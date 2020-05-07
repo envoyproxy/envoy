@@ -66,6 +66,18 @@ public:
   static std::string getCheckedEnvVar(const std::string& var);
 
   /**
+   * Obtain an appropriate base-id (for use as the base id option for an Envoy
+   * server). Each test that needs a base id should invoke this method with
+   * a different value for baseTestId. The base test id is mutated using the
+   * following environment variables:
+   * - TEST_RANDOM_SEED to handle concurrent runs via the Bazel --runs_per_test flag
+   * - TEST_SHARD_INDEX to handle concurrent runs in coverage tests
+   *
+   * @param baseTestId a uint32_t, larger than 1000000, to uniquely identify a test
+   */
+  static std::string chooseBaseId(uint32_t baseTestId);
+
+  /**
    * Obtain a private writable temporary directory.
    * @return const std::string& with the path to the temporary directory.
    */

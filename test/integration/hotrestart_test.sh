@@ -65,8 +65,8 @@ cat "${TEST_SRCDIR}/envoy"/test/config/integration/server.yaml |
 JSON_TEST_ARRAY+=("${HOT_RESTART_JSON_REUSE_PORT}")
 
 # When runs-per-test is set, use TEST_RANDOM_SEED.
-# In coverage, use TEST_SHARD_INDEX. Default to 2.
-BASE_ID="${TEST_RANDOM_SEED:-${TEST_SHARD_INDEX:-2}}"
+# or TEST_SHARD_INEX to mutate the base id.
+let BASE_ID=1000000+${TEST_RANDOM_SEED:-${TEST_SHARD_INDEX:-0}}
 
 echo "Hot restart test using --base-id ${BASE_ID}"
 

@@ -10,6 +10,14 @@ using HotRestartMessage = envoy::HotRestartMessage;
 
 static constexpr uint64_t MaxSendmsgSize = 4096;
 
+HotRestartingBase::~HotRestartingBase() {
+  if (my_domain_socket_ != -1) {
+    Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
+    Api::SysCallIntResult result = os_sys_calls.close(my_domain_socket_);
+    ASSERT(result.rc_ == 0);
+  }
+}
+
 void HotRestartingBase::initDomainSocketAddress(sockaddr_un* address) {
   memset(address, 0, sizeof(*address));
   address->sun_family = AF_UNIX;

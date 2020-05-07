@@ -23,6 +23,7 @@
 #include "test/test_common/network_utility.h"
 
 #include "absl/strings/match.h"
+#include "absl/strings/str_format.h"
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
@@ -186,6 +187,27 @@ std::string TestEnvironment::getCheckedEnvVar(const std::string& var) {
   auto optional = getOptionalEnvVar(var);
   RELEASE_ASSERT(optional.has_value(), var);
   return optional.value();
+}
+
+std::string TestEnvironment::chooseBaseId(uint32_t baseTestId) {
+  ASSERT(baseTestId >= 1000000);
+
+  auto test_random_seed = TestEnvironment::getOptionalEnvVar("TEST_RANDOM_SEED");
+  auto test_shard_index = TestEnvironment::getOptionalEnvVar("TEST_SHARD_INDEX");
+
+  if (test_random_seed) {
+    int mutator = 0;
+    if (absl::SimpleAtoi(test_random_seed.value(), &mutator)) {
+      baseTestId += mutator;
+    }
+  } else if (test_shard_index) {
+    int mutator = 0;
+    if (absl::SimpleAtoi(test_shard_index.value(), &mutator)) {
+      baseTestId += mutator;
+    }
+  }
+
+  return absl::StrFormat("%d", baseTestId);
 }
 
 void TestEnvironment::initializeOptions(int argc, char** argv) {

@@ -3,8 +3,8 @@
 source "${TEST_SRCDIR}/envoy/test/integration/test_utility.sh"
 
 # When runs-per-test is set, use TEST_RANDOM_SEED.
-# In coverage, use TEST_SHARD_INDEX. Default to 1.
-BASE_ID="${TEST_RANDOM_SEED:-${TEST_SHARD_INDEX:-1}}"
+# or TEST_SHARD_INEX to mutate the base id.
+let BASE_ID=2000000+${TEST_RANDOM_SEED:-${TEST_SHARD_INDEX:-0}}
 
 function expect_fail_with_error() {
   log="${TEST_TMPDIR}/envoy.log"
