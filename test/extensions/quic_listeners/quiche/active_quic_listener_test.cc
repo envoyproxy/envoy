@@ -103,9 +103,9 @@ protected:
         .WillRepeatedly(Return(listen_socket_));
 
     listener_factory_ = createQuicListenerFactory(yamlForQuicConfig());
-    quic_listener_ = static_unique_pointer_cast<ActiveQuicListener>(
-        std::move(listener_factory_->createActiveUdpListener(connection_handler_, *dispatcher_,
-                                                             listener_config_)));
+    quic_listener_ =
+        static_unique_pointer_cast<ActiveQuicListener>(listener_factory_->createActiveUdpListener(
+            connection_handler_, *dispatcher_, listener_config_));
     quic_dispatcher_ = ActiveQuicListenerPeer::quic_dispatcher(*quic_listener_);
 
     simulated_time_system_.advanceTimeWait(std::chrono::milliseconds(100));
