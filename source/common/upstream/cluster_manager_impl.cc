@@ -123,15 +123,23 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
   // Do not do anything if we are still doing the initial static load or if we are waiting for
   // CDS initialize.
   ENVOY_LOG(debug, "maybe finish initialize state: {}", enumToInt(state_));
-  if (state_ == State::Loading || state_ == State::WaitingForCdsInitialize) {
+  if (state_ == State::Loading || state_ == State::WaitingToStartCdsInitialization) {
     return;
   }
 
-  // If we are still waiting for primary clusters to initialize, do nothing.
-  ASSERT(state_ == State::WaitingForStaticInitialize || state_ == State::CdsInitialized);
+  ASSERT(state_ == State::WaitingToStartSecondaryInitialization ||
+         state_ == State::CdsInitialized ||
+         state_ == State::WaitingForPrimaryInitializationToComplete);
   ENVOY_LOG(debug, "maybe finish initialize primary init clusters empty: {}",
             primary_init_clusters_.empty());
+  // If we are still waiting for primary clusters to initialize, do nothing.
   if (!primary_init_clusters_.empty()) {
+    return;
+  } else if (state_ == State::WaitingForPrimaryInitializationToComplete) {
+    state_ = State::WaitingToStartSecondaryInitialization;
+    if (primary_clusters_initialized_callback_) {
+      primary_clusters_initialized_callback_();
+    }
     return;
   }
 
@@ -162,9 +170,9 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
   // directly to initialized.
   started_secondary_initialize_ = false;
   ENVOY_LOG(debug, "maybe finish initialize cds api ready: {}", cds_ != nullptr);
-  if (state_ == State::WaitingForStaticInitialize && cds_) {
+  if (state_ == State::WaitingToStartSecondaryInitialization && cds_) {
     ENVOY_LOG(info, "cm init: initializing cds");
-    state_ = State::WaitingForCdsInitialize;
+    state_ = State::WaitingToStartCdsInitialization;
     cds_->initialize();
   } else {
     ENVOY_LOG(info, "cm init: all clusters initialized");
@@ -177,7 +185,15 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
 
 void ClusterManagerInitHelper::onStaticLoadComplete() {
   ASSERT(state_ == State::Loading);
-  state_ = State::WaitingForStaticInitialize;
+  // After initialization of primary clusters has completed, transition to
+  // waiting for signal to initialize secondary clusters and then CDS.
+  state_ = State::WaitingForPrimaryInitializationToComplete;
+  maybeFinishInitialize();
+}
+
+void ClusterManagerInitHelper::startInitializingSecondaryClusters() {
+  ASSERT(state_ == State::WaitingToStartSecondaryInitialization);
+  ENVOY_LOG(debug, "continue initializing secondary clusters");
   maybeFinishInitialize();
 }
 
@@ -186,18 +202,32 @@ void ClusterManagerInitHelper::setCds(CdsApi* cds) {
   cds_ = cds;
   if (cds_) {
     cds_->setInitializedCb([this]() -> void {
-      ASSERT(state_ == State::WaitingForCdsInitialize);
+      ASSERT(state_ == State::WaitingToStartCdsInitialization);
       state_ = State::CdsInitialized;
       maybeFinishInitialize();
     });
   }
 }
 
-void ClusterManagerInitHelper::setInitializedCb(std::function<void()> callback) {
+void ClusterManagerInitHelper::setInitializedCb(
+    ClusterManager::InitializationCompleteCallback callback) {
   if (state_ == State::AllClustersInitialized) {
     callback();
   } else {
     initialized_callback_ = callback;
+  }
+}
+
+void ClusterManagerInitHelper::setPrimaryClustersInitializedCb(
+    ClusterManager::PrimaryClustersReadyCallback callback) {
+  // The callback must be set before or at the `WaitingToStartSecondaryInitialization` state.
+  ASSERT(state_ == State::WaitingToStartSecondaryInitialization ||
+         state_ == State::WaitingForPrimaryInitializationToComplete || state_ == State::Loading);
+  if (state_ == State::WaitingToStartSecondaryInitialization) {
+    // This is the case where all clusters are STATIC and without health checking.
+    callback();
+  } else {
+    primary_clusters_initialized_callback_ = callback;
   }
 }
 
@@ -346,15 +376,22 @@ ClusterManagerImpl::ClusterManagerImpl(
   init_helper_.onStaticLoadComplete();
 
   ads_mux_->start();
+}
 
+void ClusterManagerImpl::initializeSecondaryClusters(
+    const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+  init_helper_.startInitializingSecondaryClusters();
+
+  const auto& cm_config = bootstrap.cluster_manager();
   if (cm_config.has_load_stats_config()) {
     const auto& load_stats_config = cm_config.load_stats_config();
+
     load_stats_reporter_ = std::make_unique<LoadStatsReporter>(
-        local_info, *this, stats,
+        local_info_, *this, stats_,
         Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, load_stats_config,
-                                                       stats, false)
+                                                       stats_, false)
             ->create(),
-        load_stats_config.transport_api_version(), main_thread_dispatcher);
+        load_stats_config.transport_api_version(), dispatcher_);
   }
 }
 
