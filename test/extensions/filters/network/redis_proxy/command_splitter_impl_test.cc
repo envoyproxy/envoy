@@ -174,6 +174,7 @@ public:
   void makeRequest(const std::string& hash_key, Common::Redis::RespValuePtr&& request,
                    bool mirrored = false) {
     EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+    EXPECT_CALL(*fault_manager_, getFaultForCommand(_)).WillOnce(Return(absl::nullopt));
     EXPECT_CALL(*conn_pool_, makeRequest_(hash_key, RespVariantEq(*request), _))
         .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&pool_callbacks_)), Return(&pool_request_)));
     if (mirrored) {
