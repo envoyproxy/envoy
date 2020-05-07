@@ -465,7 +465,7 @@ void DnsMessageParser::buildDnsAnswerRecord(DnsQueryContextPtr& context,
     }
     break;
 
-  // TODO(abbaptis): Support additional records (eg SRV)
+  // TODO(abbaptis): Support additional records (e.g. SRV)
   default:
     ENVOY_LOG(debug, "record type [{}] is not supported", query_rec.type_);
     return;
