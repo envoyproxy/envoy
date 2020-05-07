@@ -58,13 +58,6 @@ struct GoogleAsyncTag {
 
   GoogleAsyncStreamImpl& stream_;
   const Operation op_;
-
-  // Generate a void* tag for a given Operation.
-  static void* tag(Operation op) { return reinterpret_cast<void*>(op); }
-  // Extract Operation from void* tag.
-  static Operation operation(void* tag) {
-    return static_cast<Operation>(reinterpret_cast<intptr_t>(tag));
-  }
 };
 
 class GoogleAsyncClientThreadLocal : public ThreadLocal::ThreadLocalObject,

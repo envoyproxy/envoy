@@ -32,8 +32,6 @@ public:
     return stat_name_set_->getBuiltin(str, fallback);
   }
 
-  Stats::SymbolTable& symbolTable() { return scope_.symbolTable(); }
-
 private:
   Stats::ElementVec addPrefix(const Stats::ElementVec& names);
 

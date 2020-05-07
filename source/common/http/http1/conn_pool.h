@@ -79,8 +79,6 @@ protected:
 
   void onDownstreamReset(ActiveClient& client);
   void onResponseComplete(ActiveClient& client);
-  ActiveClient& firstReady() const { return static_cast<ActiveClient&>(*ready_clients_.front()); }
-  ActiveClient& firstBusy() const { return static_cast<ActiveClient&>(*busy_clients_.front()); }
 
   Event::TimerPtr upstream_ready_timer_;
   bool upstream_ready_enabled_{false};

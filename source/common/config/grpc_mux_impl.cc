@@ -229,11 +229,6 @@ void GrpcMuxImpl::queueDiscoveryRequest(const std::string& queue_item) {
   drainRequests();
 }
 
-void GrpcMuxImpl::clearRequestQueue() {
-  grpc_stream_.maybeUpdateQueueSizeStat(0);
-  request_queue_ = {};
-}
-
 void GrpcMuxImpl::drainRequests() {
   while (!request_queue_.empty() && grpc_stream_.checkRateLimitAllowsDrain()) {
     // Process the request, if rate limiting is not enabled at all or if it is under rate limit.

@@ -118,7 +118,6 @@ private:
 
   // Request queue management logic.
   void queueDiscoveryRequest(const std::string& queue_item);
-  void clearRequestQueue();
 
   GrpcStream<envoy::service::discovery::v3::DiscoveryRequest,
              envoy::service::discovery::v3::DiscoveryResponse>

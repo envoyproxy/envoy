@@ -150,11 +150,6 @@ public:
   DnsQueryRecordPtr parseDnsQueryRecord(const Buffer::InstancePtr& buffer, uint64_t* offset);
 
   /**
-   * @return uint16_t the response code flag value from a parsed dns object
-   */
-  uint16_t getQueryResponseCode() { return static_cast<uint16_t>(header_.flags.rcode); }
-
-  /**
    * @brief Create a context object for handling a DNS Query
    *
    * @param client_request the context containing the client addressing and the buffer with the DNS

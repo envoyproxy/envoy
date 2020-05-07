@@ -48,16 +48,6 @@ public:
       Server::Configuration::ListenerFactoryContext& context,
       const envoy::extensions::filters::udp::dns_filter::v3alpha::DnsFilterConfig& config);
 
-  DnsFilterStats& stats() const { return stats_; }
-  const DnsVirtualDomainConfig& domains() const { return virtual_domains_; }
-  const std::vector<Matchers::StringMatcherPtr>& knownSuffixes() const { return known_suffixes_; }
-  const absl::flat_hash_map<std::string, std::chrono::seconds>& domainTtl() const {
-    return domain_ttl_;
-  }
-  const AddressConstPtrVec& resolvers() const { return resolvers_; }
-  bool forwardQueries() const { return forward_queries_; }
-  const std::chrono::milliseconds resolverTimeout() const { return resolver_timeout_; }
-
 private:
   static DnsFilterStats generateStats(const std::string& stat_prefix, Stats::Scope& scope) {
     const auto final_prefix = absl::StrCat("dns_filter.", stat_prefix);

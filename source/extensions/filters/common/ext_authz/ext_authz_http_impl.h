@@ -99,11 +99,6 @@ public:
   const MatcherSharedPtr& upstreamHeaderMatchers() const { return upstream_header_matchers_; }
 
   /**
-   * Returns a list of headers that will be add to the authorization request.
-   */
-  const Http::LowerCaseStrPairVector& headersToAdd() const { return authorization_headers_to_add_; }
-
-  /**
    * Returns the name used for tracing.
    */
   const std::string& tracingName() { return tracing_name_; }

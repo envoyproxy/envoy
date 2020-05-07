@@ -74,22 +74,8 @@ private:
     return result;
   }
 
-  static inline uint64_t shift_mix(uint64_t v) { return v ^ (v >> 47); }
+  static inline uint64_t shiftMix(uint64_t v) { return v ^ (v >> 47); }
 };
-
-struct ConstCharStarHash {
-  size_t operator()(const char* a) const { return HashUtil::xxHash64(a); }
-};
-
-struct ConstCharStarEqual {
-  size_t operator()(const char* a, const char* b) const { return strcmp(a, b) == 0; }
-};
-
-template <class Value>
-using ConstCharStarHashMap =
-    absl::flat_hash_map<const char*, Value, ConstCharStarHash, ConstCharStarEqual>;
-using ConstCharStarHashSet =
-    absl::flat_hash_set<const char*, ConstCharStarHash, ConstCharStarEqual>;
 
 using SharedString = std::shared_ptr<std::string>;
 

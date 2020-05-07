@@ -63,9 +63,6 @@ private:
     LocalityWeightsConstSharedPtr
     determineLocalityWeights(const HostsPerLocality& hosts_per_locality) const;
 
-    void triggerCallbacks() { HostSetImpl::runUpdateCallbacks({}, {}); }
-    bool empty() { return hosts().empty(); }
-
   private:
     const HostSet& original_host_set_;
     const bool locality_weight_aware_;
@@ -81,10 +78,6 @@ private:
     void update(uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed);
 
     bool empty() { return empty_; }
-
-    const HostSubsetImpl* getOrCreateHostSubset(uint32_t priority) {
-      return reinterpret_cast<const HostSubsetImpl*>(&getOrCreateHostSet(priority));
-    }
 
     void triggerCallbacks() {
       for (size_t i = 0; i < hostSetsPerPriority().size(); ++i) {

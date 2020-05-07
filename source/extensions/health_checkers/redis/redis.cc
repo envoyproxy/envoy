@@ -19,7 +19,7 @@ RedisHealthChecker::RedisHealthChecker(
     Extensions::NetworkFilters::Common::Redis::Client::ClientFactory& client_factory)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger)),
       client_factory_(client_factory), key_(redis_config.key()),
-      auth_password_(NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl::auth_password(
+      auth_password_(NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl::authPassword(
           cluster.info(), api)) {
   if (!key_.empty()) {
     type_ = Type::Exists;

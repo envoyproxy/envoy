@@ -46,7 +46,7 @@ RedisCluster::RedisCluster(
       local_info_(factory_context.localInfo()), random_(factory_context.random()),
       redis_discovery_session_(*this, redis_client_factory), lb_factory_(std::move(lb_factory)),
       auth_password_(
-          NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl::auth_password(info(), api)),
+          NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl::authPassword(info(), api)),
       cluster_name_(cluster.name()),
       refresh_manager_(Common::Redis::getClusterRefreshManager(
           factory_context.singletonManager(), factory_context.dispatcher(),

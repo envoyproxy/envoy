@@ -83,7 +83,6 @@ public:
       : arn_(arn), invocation_mode_(mode), payload_passthrough_(payload_passthrough) {}
 
   const Arn& arn() const& { return arn_; }
-  Arn&& arn() && { return std::move(arn_); }
   bool payloadPassthrough() const { return payload_passthrough_; }
   InvocationMode invocationMode() const { return invocation_mode_; }
 
