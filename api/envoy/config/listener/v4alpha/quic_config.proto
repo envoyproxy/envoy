@@ -37,5 +37,5 @@ message QuicProtocolOptions {
 
   // Runtime flag that controls whether the listener is enabled or not. If not specified, defaults
   // to enabled.
-  core.v3.RuntimeFeatureFlag enabled = 4;  
+  core.v3.RuntimeFeatureFlag enabled = 4;
 }
