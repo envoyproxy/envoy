@@ -30,5 +30,5 @@ message TypedExtensionConfig {
   // the inner type URL of *TypedStruct* will be utilized. See the
   // :ref:`extension configuration overview
   // <config_overview_extension_configuration>` for further details.
-  google.protobuf.Any typed_config = 2 [(validate.rules).message = {required: true}];
+  google.protobuf.Any typed_config = 2 [(validate.rules).any = {required: true}];
 }
