@@ -98,19 +98,16 @@ void HazelcastBodyEntry::readUnifiedData(ObjectDataInput& reader) {
 
 HazelcastBodyEntry::HazelcastBodyEntry() = default;
 
-HazelcastBodyEntry::HazelcastBodyEntry(int64_t header_key, std::vector<hazelcast::byte>&& buffer,
-                                       int32_t version)
-    : header_key_(header_key), version_(version), body_buffer_(std::move(buffer)) {}
+HazelcastBodyEntry::HazelcastBodyEntry(std::vector<hazelcast::byte>&& buffer, int32_t version)
+    : version_(version), body_buffer_(std::move(buffer)) {}
 
 HazelcastBodyEntry::HazelcastBodyEntry(const HazelcastBodyEntry& other) {
   body_buffer_ = other.body_buffer_;
-  header_key_ = other.header_key_;
   version_ = other.version_;
 }
 
 HazelcastBodyEntry::HazelcastBodyEntry(HazelcastBodyEntry&& other) noexcept
-    : header_key_(other.header_key_), version_(other.version_),
-      body_buffer_(std::move(other.body_buffer_)) {}
+    : version_(other.version_), body_buffer_(std::move(other.body_buffer_)) {}
 
 void HazelcastResponseEntry::writeData(ObjectDataOutput& writer) const {
   response_header_.writeUnifiedData(writer);

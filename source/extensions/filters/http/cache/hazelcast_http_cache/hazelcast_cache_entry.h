@@ -5,7 +5,6 @@
 #include "source/extensions/filters/http/cache/key.pb.h"
 
 #include "hazelcast/client/EntryView.h"
-#include "hazelcast/client/PartitionAware.h"
 #include "hazelcast/client/serialization/ObjectDataOutput.h"
 
 namespace Envoy {
@@ -14,7 +13,6 @@ namespace HttpFilters {
 namespace Cache {
 namespace HazelcastHttpCache {
 
-using hazelcast::client::PartitionAware;
 using hazelcast::client::serialization::DataSerializableFactory;
 using hazelcast::client::serialization::IdentifiedDataSerializable;
 using hazelcast::client::serialization::ObjectDataInput;
@@ -88,10 +86,10 @@ private:
  * necessary partitions according to the request will be fetched from distributed map,
  * not the whole response.
  */
-class HazelcastBodyEntry : public IdentifiedDataSerializable, public PartitionAware<int64_t> {
+class HazelcastBodyEntry : public IdentifiedDataSerializable {
 public:
   HazelcastBodyEntry();
-  HazelcastBodyEntry(int64_t header_key, std::vector<hazelcast::byte>&& buffer, int32_t version);
+  HazelcastBodyEntry(std::vector<hazelcast::byte>&& buffer, int32_t version);
   HazelcastBodyEntry(const HazelcastBodyEntry& other);
   HazelcastBodyEntry(HazelcastBodyEntry&& other) noexcept;
 
@@ -109,21 +107,12 @@ public:
   int32_t version() const { return version_; }
 
   void bodyBuffer(std::vector<hazelcast::byte>&& buffer) { body_buffer_ = std::move(buffer); }
-  void headerKey(int64_t key) { header_key_ = key; }
   void version(int32_t version) { version_ = version; }
 
 private:
   // hazelcast::client::serialization::IdentifiedDataSerializable
   int getClassId() const override { return HAZELCAST_BODY_TYPE_ID; }
   int getFactoryId() const override { return HAZELCAST_ENTRY_SERIALIZER_FACTORY_ID; }
-
-  // hazelcast::client::PartitionAware
-  const int64_t* getPartitionKey() const override { return &header_key_; }
-
-  /** The same hash key with the corresponding header. */
-  // Not stored in distributed map but used to store related bodies in the same
-  // partition in Hazelcast cluster.
-  int64_t header_key_;
 
   /** Derived from header. */
   int32_t version_;

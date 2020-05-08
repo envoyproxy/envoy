@@ -202,7 +202,7 @@ void UnifiedInsertContext::insertResponse() {
   // Versions are not necessary for unified entries. Hence passing arbitrary 0 here.
   HazelcastHeaderEntry header(std::move(header_map_), std::move(variant_key_),
                               buffer_vector_.size(), 0);
-  HazelcastBodyEntry body(variant_hash_key_, std::move(buffer_vector_), 0);
+  HazelcastBodyEntry body(std::move(buffer_vector_), 0);
 
   HazelcastResponseEntry entry(std::move(header), std::move(body));
   try {
@@ -444,8 +444,7 @@ bool DividedInsertContext::flushBuffer() {
     return true;
   }
   total_body_size_ += buffer_vector_.size();
-  HazelcastBodyEntry bodyEntry(hz_cache_.mapKey(variant_hash_key_), std::move(buffer_vector_),
-                               version_);
+  HazelcastBodyEntry bodyEntry(std::move(buffer_vector_), version_);
   buffer_vector_.clear();
   try {
     hz_cache_.putBody(variant_hash_key_, body_order_++, bodyEntry);
