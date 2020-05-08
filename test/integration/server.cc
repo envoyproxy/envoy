@@ -218,18 +218,25 @@ void IntegrationTestServerImpl::createAndRunEnvoyServer(
 IntegrationTestServerImpl::~IntegrationTestServerImpl() {
   ENVOY_LOG(info, "stopping integration test server");
 
-  Network::Address::InstanceConstSharedPtr admin_address(admin_address_);
-  admin_address_ = nullptr;
-  server_ = nullptr;
-  stat_store_ = nullptr;
-
-  if (admin_address != nullptr) {
-    BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-        admin_address, "POST", "/quitquitquit", "", Http::CodecClient::Type::HTTP1);
-    EXPECT_TRUE(response->complete());
-    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
-    server_gone_.WaitForNotification();
+  if (useAdminInterfaceToQuit()) {
+    Network::Address::InstanceConstSharedPtr admin_address(admin_address_);
+    if (admin_address != nullptr) {
+      BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+          admin_address, "POST", "/quitquitquit", "", Http::CodecClient::Type::HTTP1);
+      EXPECT_TRUE(response->complete());
+      EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+      server_gone_.WaitForNotification();
+    }
+  } else {
+    if (server_) {
+      server_->dispatcher().post([this]() { server_->shutdown(); });
+      server_gone_.WaitForNotification();
+    }
   }
+
+  server_ = nullptr;
+  admin_address_ = nullptr;
+  stat_store_ = nullptr;
 }
 
 } // namespace Envoy
