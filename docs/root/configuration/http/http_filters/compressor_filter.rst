@@ -40,13 +40,13 @@ An example configuration of the filter may look like the following:
           - text/html
           - application/json
         compressor_library:
-          name: gzip
+          name: text_optimized
           typed_config:
             "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.gzip.v3.Gzip
             memory_level: 3
             window_bits: 10
             compression_level: best
-            compression_strategy: rle
+            compression_strategy: default_strategy
 
 By *default* compression will be *skipped* when:
 
@@ -86,7 +86,9 @@ When compression is *applied*:
 Statistics
 ----------
 
-Every configured Compressor filter has statistics rooted at <stat_prefix>.<compression_library_stat_prefix>.* with the following:
+Every configured Compressor filter has statistics rooted at
+<stat_prefix>.compressor.<compressor_library.name>.<compressor_library_stat_prefix>.*
+with the following:
 
 .. csv-table::
   :header: Name, Type, Description
