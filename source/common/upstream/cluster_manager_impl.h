@@ -229,6 +229,9 @@ public:
   Tcp::ConnectionPool::Instance* tcpConnPoolForCluster(const std::string& cluster,
                                                        ResourcePriority priority,
                                                        LoadBalancerContext* context) override;
+  absl::variant<Http::ConnectionPool::Instance*, Tcp::ConnectionPool::Instance*>
+  genericConnPoolForCluster(const std::string& cluster, ResourcePriority priority,
+                            LoadBalancerContext* context) override;
   Host::CreateConnectionData tcpConnForCluster(const std::string& cluster,
                                                LoadBalancerContext* context) override;
   Http::AsyncClient& httpAsyncClientForCluster(const std::string& cluster) override;
@@ -331,6 +334,16 @@ private:
 
       Tcp::ConnectionPool::Instance* tcpConnPool(ResourcePriority priority,
                                                  LoadBalancerContext* context);
+
+      Http::ConnectionPool::Instance* getHttpPool(HostConstSharedPtr host,
+                                                  ResourcePriority priority,
+                                                  Http::Protocol protocol,
+                                                  LoadBalancerContext* context);
+      Tcp::ConnectionPool::Instance* getTcpPool(HostConstSharedPtr host, ResourcePriority priority,
+                                                LoadBalancerContext* context);
+
+      absl::variant<Http::ConnectionPool::Instance*, Tcp::ConnectionPool::Instance*>
+      genericConnPool(ResourcePriority priority, LoadBalancerContext* context);
 
       // Upstream::ThreadLocalCluster
       const PrioritySet& prioritySet() override { return priority_set_; }

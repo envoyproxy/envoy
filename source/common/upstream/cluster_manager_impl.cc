@@ -840,6 +840,18 @@ ClusterManagerImpl::tcpConnPoolForCluster(const std::string& cluster, ResourcePr
   return entry->second->tcpConnPool(priority, context);
 }
 
+absl::variant<Http::ConnectionPool::Instance*, Tcp::ConnectionPool::Instance*>
+ClusterManagerImpl::genericConnPoolForCluster(const std::string& cluster, ResourcePriority priority,
+                                              LoadBalancerContext* context) {
+  ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
+
+  auto entry = cluster_manager.thread_local_clusters_.find(cluster);
+  if (entry == cluster_manager.thread_local_clusters_.end()) {
+    return absl::variant<Http::ConnectionPool::Instance*, Tcp::ConnectionPool::Instance*>();
+  }
+  return entry->second->genericConnPool(priority, context);
+}
+
 void ClusterManagerImpl::postThreadLocalDrainConnections(const Cluster& cluster,
                                                          const HostVector& hosts_removed) {
   tls_->runOnAllThreads([this, name = cluster.info()->name(), hosts_removed]() {
@@ -1266,6 +1278,53 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::~ClusterEntry()
 }
 
 Http::ConnectionPool::Instance*
+ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::getHttpPool(
+    HostConstSharedPtr host, ResourcePriority priority, Http::Protocol protocol,
+    LoadBalancerContext* context) {
+
+  std::vector<uint8_t> hash_key = {uint8_t(protocol)};
+
+  Network::Socket::OptionsSharedPtr upstream_options(std::make_shared<Network::Socket::Options>());
+  if (context) {
+    // Inherit socket options from downstream connection, if set.
+    if (context->downstreamConnection()) {
+      addOptionsIfNotNull(upstream_options, context->downstreamConnection()->socketOptions());
+    }
+    addOptionsIfNotNull(upstream_options, context->upstreamSocketOptions());
+  }
+
+  // Use the socket options for computing connection pool hash key, if any.
+  // This allows socket options to control connection pooling so that connections with
+  // different options are not pooled together.
+  for (const auto& option : *upstream_options) {
+    option->hashKey(hash_key);
+  }
+
+  bool have_transport_socket_options = false;
+  if (context && context->upstreamTransportSocketOptions()) {
+    context->upstreamTransportSocketOptions()->hashKey(hash_key);
+    have_transport_socket_options = true;
+  }
+
+  auto& container = *parent_.getHttpConnPoolsContainer(host, true);
+
+  // Note: to simplify this, we assume that the factory is only called in the scope of this
+  // function. Otherwise, we'd need to capture a few of these variables by value.
+  auto pool = container.pools_->getPool(priority, hash_key, [&]() {
+    return parent_.parent_.factory_.allocateConnPool(
+        parent_.thread_local_dispatcher_, host, priority, protocol,
+        !upstream_options->empty() ? upstream_options : nullptr,
+        have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr);
+  });
+
+  if (pool.has_value()) {
+    return &(pool.value().get());
+  } else {
+    return nullptr;
+  }
+}
+
+Http::ConnectionPool::Instance*
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
     ResourcePriority priority, Http::Protocol protocol, LoadBalancerContext* context) {
   HostConstSharedPtr host = lb_->chooseHost(context);
@@ -1319,15 +1378,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
 }
 
 Tcp::ConnectionPool::Instance*
-ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
-    ResourcePriority priority, LoadBalancerContext* context) {
-  HostConstSharedPtr host = lb_->chooseHost(context);
-  if (!host) {
-    ENVOY_LOG(debug, "no healthy host for TCP connection pool");
-    cluster_info_->stats().upstream_cx_none_healthy_.inc();
-    return nullptr;
-  }
-
+ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::getTcpPool(
+    HostConstSharedPtr host, ResourcePriority priority, LoadBalancerContext* context) {
   // Inherit socket options from downstream connection, if set.
   std::vector<uint8_t> hash_key = {uint8_t(priority)};
 
@@ -1352,7 +1404,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
     context->upstreamTransportSocketOptions()->hashKey(hash_key);
   }
 
-  TcpConnPoolsContainer& container = parent_.host_tcp_conn_pool_map_[host];
+  auto& container = parent_.host_tcp_conn_pool_map_[host];
   if (!container.pools_[hash_key]) {
     container.pools_[hash_key] = parent_.parent_.factory_.allocateTcpConnPool(
         parent_.thread_local_dispatcher_, host, priority,
@@ -1361,6 +1413,37 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
   }
 
   return container.pools_[hash_key].get();
+}
+
+Tcp::ConnectionPool::Instance*
+ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
+    ResourcePriority priority, LoadBalancerContext* context) {
+  HostConstSharedPtr host = lb_->chooseHost(context);
+  if (!host) {
+    ENVOY_LOG(debug, "no healthy host for TCP connection pool");
+    cluster_info_->stats().upstream_cx_none_healthy_.inc();
+    return nullptr;
+  }
+  return getTcpPool(host, priority, context);
+}
+
+absl::variant<Http::ConnectionPool::Instance*, Tcp::ConnectionPool::Instance*>
+ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::genericConnPool(
+    ResourcePriority priority, LoadBalancerContext* context) {
+  HostConstSharedPtr host = lb_->chooseHost(context);
+  if (!host) {
+    ENVOY_LOG(debug, "no healthy host for TCP connection pool");
+    cluster_info_->stats().upstream_cx_none_healthy_.inc();
+    return absl::variant<Http::ConnectionPool::Instance*, Tcp::ConnectionPool::Instance*>();
+  }
+  if (host->metadata()->filter_metadata().find("envoy.plaintcponly") !=
+      host->metadata()->filter_metadata().end()) {
+    ENVOY_LOG_MISC(warn, "lambdai: has plain tcp only, use tcp conn pool");
+    return getTcpPool(std::move(host), priority, context);
+  } else {
+    ENVOY_LOG_MISC(warn, "lambdai: allow http tunnel for host");
+    return getHttpPool(std::move(host), priority, Http::Protocol::Http2, context);
+  }
 }
 
 ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
