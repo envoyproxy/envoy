@@ -193,6 +193,8 @@ DEPENDENCY_REPOSITORIES = dict(
         # Using non official tarball due to missing submodule files in the official release.
         # TODO(enozcan): Use official release with init & updating submodules
         urls = ["https://github.com/enozcan/envoy-hazelcast-cpp-client/raw/master/hazelcast-cpp-client-3.12.1.zip"],
+        use_category = ["dataplane"],
+        cpe = "N/A",
     ),
     com_github_luajit_luajit = dict(
         sha256 = "409f7fe570d3c16558e594421c47bdd130238323c9d6fd6c83dedd2aaeb082a8",

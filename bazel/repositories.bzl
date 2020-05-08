@@ -325,7 +325,7 @@ def _com_github_google_libprotobuf_mutator():
     )
 
 def _com_github_hazelcast_cpp_client():
-    location = REPOSITORY_LOCATIONS["com_github_hazelcast_cpp_client"]
+    location = _get_location("com_github_hazelcast_cpp_client")
     http_archive(
         name = "com_github_hazelcast_cpp_client",
         build_file_content = BUILD_ALL_CONTENT,
