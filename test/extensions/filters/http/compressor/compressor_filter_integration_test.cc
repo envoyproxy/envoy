@@ -81,7 +81,6 @@ public:
             window_bits: 10
             compression_level: best_compression
             compression_strategy: rle
-        stats_prefix: testprefix.
     )EOF"};
 
   const std::string default_config{R"EOF(
