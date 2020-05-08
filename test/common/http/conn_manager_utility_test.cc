@@ -139,7 +139,6 @@ public:
   MOCK_METHOD(bool, shouldStripMatchingPort, (), (const));
   MOCK_METHOD(envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction,
               headersWithUnderscoresAction, (), (const));
-  MOCK_METHOD(bool, shouldPreserveUpstreamDate, (), (const));
 
   std::unique_ptr<Http::InternalAddressConfig> internal_address_config_ =
       std::make_unique<DefaultInternalAddressConfig>();
