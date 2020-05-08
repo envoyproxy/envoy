@@ -63,7 +63,7 @@ diff --git a/test/fuzzing/README.md b/test/fuzzing/README.md
 index 0499d00cf..8f7a4536e 100644
 --- a/test/fuzzing/README.md
 +++ b/test/fuzzing/README.md
-@@ -7,14 +7,19 @@ in fmt. It is a part of the continous fuzzing at
+@@ -7,14 +7,19 @@ in fmt. It is a part of the continuous fuzzing at
  The source code is modified to make the fuzzing possible without locking up on
  resource exhaustion:
  ```cpp
