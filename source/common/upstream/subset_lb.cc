@@ -585,17 +585,14 @@ void SubsetLoadBalancer::forEachSubset(LbSubsetMap& subsets,
 }
 
 void SubsetLoadBalancer::purgeEmptySubsets(LbSubsetMap& subsets) {
-  std::vector<std::string> purge_subsets;
-
-  for (auto& value_subset_map : subsets) {
-    std::vector<HashedValue> purge_vsm;
-
-    for (auto& value_entry : value_subset_map.second) {
-      LbSubsetEntryPtr entry = value_entry.second;
+  for (auto subset_it = subsets.begin(); subset_it != subsets.end();) {
+    for (auto it = subset_it->second.begin(); it != subset_it->second.end();) {
+      LbSubsetEntryPtr entry = it->second;
 
       purgeEmptySubsets(entry->children_);
 
       if (entry->active() || entry->hasChildren()) {
+        it++;
         continue;
       }
 
@@ -605,20 +602,14 @@ void SubsetLoadBalancer::purgeEmptySubsets(LbSubsetMap& subsets) {
         stats_.lb_subsets_removed_.inc();
       }
 
-      purge_vsm.emplace_back(value_entry.first);
+      it = subset_it->second.erase(it);
     }
 
-    for (auto&& key : purge_vsm) {
-      value_subset_map.second.erase(key);
+    if (subset_it->second.empty()) {
+      subset_it = subsets.erase(subset_it);
+    } else {
+      subset_it++;
     }
-
-    if (value_subset_map.second.empty()) {
-      purge_subsets.emplace_back(value_subset_map.first);
-    }
-  }
-
-  for (auto&& key : purge_subsets) {
-    subsets.erase(key);
   }
 }
 
