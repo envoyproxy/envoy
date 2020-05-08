@@ -2745,13 +2745,15 @@ TEST_F(HttpConnectionManagerImplTest, ConnectLegacy) {
   EXPECT_CALL(filter_factory_, createUpgradeFilterChain("CONNECT", _, _))
       .WillRepeatedly(Return(false));
 
-  EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
-    decoder = &conn_manager_->newStream(encoder);
-    RequestHeaderMapPtr headers{
-        new TestRequestHeaderMapImpl{{":authority", "host"}, {":method", "CONNECT"}}};
-    decoder->decodeHeaders(std::move(headers), false);
-    data.drain(4);
-  }));
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
+        decoder = &conn_manager_->newStream(encoder);
+        RequestHeaderMapPtr headers{
+            new TestRequestHeaderMapImpl{{":authority", "host"}, {":method", "CONNECT"}}};
+        decoder->decodeHeaders(std::move(headers), false);
+        data.drain(4);
+        return Http::okStatus();
+      }));
 
   EXPECT_CALL(encoder, encodeHeaders(_, _))
       .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
