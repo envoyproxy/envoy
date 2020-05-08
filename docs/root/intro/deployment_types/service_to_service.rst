@@ -31,7 +31,7 @@ Service to service ingress listener
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 This is the port used by remote Envoys when they want to talk to the local Envoy. For example,
-*http://localhost:9211*. Incoming requests are routed to the local service on the configured
+*http://servicename:9211*. Envoy routes incoming requests to the local service on the configured
 port(s). Multiple application ports may be involved depending on application or load balancing
 needs (for example if the service needs both an HTTP port and a gRPC port). The local Envoy
 performs buffering, circuit breaking, etc. as needed.
