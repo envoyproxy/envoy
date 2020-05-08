@@ -956,9 +956,9 @@ TEST_P(SubsetLoadBalancerTest, OnlyMetadataChanged) {
   EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_13));
 }
 
-TEST_P(SubsetLoadBalancerTest, EmptySubsetsGetPurged) {
+TEST_P(SubsetLoadBalancerTest, EmptySubsetsPurged) {
   std::vector<SubsetSelectorPtr> subset_selectors = {makeSelector({"version"}),
-                                                     makeSelector({"stage"})};
+                                                     makeSelector({"version", "stage"})};
   EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
 
   // Simple add and remove.
@@ -1001,6 +1001,68 @@ TEST_P(SubsetLoadBalancerTest, EmptySubsetsGetPurged) {
   EXPECT_EQ(2U, stats_.lb_subsets_active_.value());
   EXPECT_EQ(10U, stats_.lb_subsets_created_.value());
   EXPECT_EQ(8U, stats_.lb_subsets_removed_.value());
+}
+
+TEST_P(SubsetLoadBalancerTest, EmptySubsetsPurgedCollapsed) {
+  std::vector<SubsetSelectorPtr> subset_selectors = {makeSelector({"version"}),
+                                                     makeSelector({"version", "stage"})};
+  EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
+
+  // Init subsets.
+  init({{"tcp://127.0.0.1:8000", {{"version", "1.2"}}},
+        {"tcp://127.0.0.1:8001", {{"version", "1.0"}, {"stage", "prod"}}}});
+  EXPECT_EQ(3U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(3U, stats_.lb_subsets_created_.value());
+  EXPECT_EQ(0U, stats_.lb_subsets_removed_.value());
+
+  // Get rid of 1.0.
+  host_set_.hosts_[1]->metadata(buildMetadataWithStage("1.2", "prod"));
+  host_set_.runCallbacks({}, {});
+  EXPECT_EQ(2U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(4U, stats_.lb_subsets_created_.value());
+  EXPECT_EQ(2U, stats_.lb_subsets_removed_.value());
+
+  // Get rid of stage prod.
+  host_set_.hosts_[1]->metadata(buildMetadataWithStage("1.2"));
+  host_set_.runCallbacks({}, {});
+  EXPECT_EQ(1U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(4U, stats_.lb_subsets_created_.value());
+  EXPECT_EQ(3U, stats_.lb_subsets_removed_.value());
+
+  // Add stage prod back.
+  host_set_.hosts_[1]->metadata(buildMetadataWithStage("1.2", "prod"));
+  host_set_.runCallbacks({}, {});
+  EXPECT_EQ(2U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(5U, stats_.lb_subsets_created_.value());
+  EXPECT_EQ(3U, stats_.lb_subsets_removed_.value());
+}
+
+TEST_P(SubsetLoadBalancerTest, EmptySubsetsPurgedVersionChanged) {
+  std::vector<SubsetSelectorPtr> subset_selectors = {makeSelector({"version"}),
+                                                     makeSelector({"version", "stage"})};
+  EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
+
+  // Init subsets.
+  init({{"tcp://127.0.0.1:8000", {{"version", "1.2"}}},
+        {"tcp://127.0.0.1:8001", {{"version", "1.0"}, {"stage", "prod"}}}});
+  EXPECT_EQ(3U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(3U, stats_.lb_subsets_created_.value());
+  EXPECT_EQ(0U, stats_.lb_subsets_removed_.value());
+
+  // Get rid of 1.0.
+  host_set_.hosts_[1]->metadata(buildMetadataWithStage("1.2", "prod"));
+  host_set_.runCallbacks({}, {});
+  EXPECT_EQ(2U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(4U, stats_.lb_subsets_created_.value());
+  EXPECT_EQ(2U, stats_.lb_subsets_removed_.value());
+
+  // Change versions.
+  host_set_.hosts_[0]->metadata(buildMetadataWithStage("1.3"));
+  host_set_.hosts_[1]->metadata(buildMetadataWithStage("1.4", "prod"));
+  host_set_.runCallbacks({}, {});
+  EXPECT_EQ(3U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(7U, stats_.lb_subsets_created_.value());
+  EXPECT_EQ(4U, stats_.lb_subsets_removed_.value());
 }
 
 TEST_P(SubsetLoadBalancerTest, MetadataChangedHostsAddedRemoved) {
