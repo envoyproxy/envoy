@@ -3,9 +3,10 @@
 #include "envoy/extensions/filters/http/gzip/v3/gzip.pb.h"
 
 #include "common/common/hex.h"
-#include "extensions/compression/gzip/decompressor/zlib_decompressor_impl.h"
 #include "common/protobuf/utility.h"
+
 #include "extensions/compression/gzip/compressor/zlib_compressor_impl.h"
+#include "extensions/compression/gzip/decompressor/zlib_decompressor_impl.h"
 #include "extensions/filters/http/gzip/config.h"
 #include "extensions/filters/http/gzip/gzip_filter.h"
 

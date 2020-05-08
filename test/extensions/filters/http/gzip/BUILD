@@ -17,8 +17,8 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.http.gzip",
     deps = [
         "//source/common/protobuf:utility_lib",
-        "//source/extensions/compression/gzip/decompressor:zlib_decompressor_impl_lib",
         "//source/extensions/compression/gzip/compressor:compressor_lib",
+        "//source/extensions/compression/gzip/decompressor:zlib_decompressor_impl_lib",
         "//source/extensions/filters/http/gzip:config",
         "//source/extensions/filters/http/gzip:gzip_filter_lib",
         "//test/mocks/http:http_mocks",
