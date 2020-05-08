@@ -21,8 +21,6 @@ option (udpa.annotations.file_status).work_in_progress = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Admission Control]
-// Admission Control :ref:`configuration overview
-// <config_http_filters_admission_control>`.
 // [#extension: envoy.filters.http.admission_control]
 
 message AdmissionControl {
