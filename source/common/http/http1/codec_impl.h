@@ -35,15 +35,18 @@ namespace Http1 {
   COUNTER(requests_rejected_with_underscores_in_headers)                                           \
   COUNTER(response_flood)
 
-// The following define special return values for http_parser callbacks. http_parser callbacks
-// should return non-zero to indicate an error and halt execution. The one exception is
-// on_headers_complete, where returning '1' will tell http_parser that it should not expect a body,
-// and returning '2' from on_headers_complete will tell http_parser that it should not expect a body
-// nor any further data on the connection.
-constexpr int HTTP_PARSER_SUCCESS = 0;
-constexpr int HTTP_PARSER_ERROR = -1;
-constexpr int HTTP_PARSER_NO_BODY = 1;
-constexpr int HTTP_PARSER_NO_BODY_DATA = 2;
+// The following define special return values for http_parser callbacks.
+enum class HttpParserCode {
+  // Callbacks other than on_headers_complete should return a non-zero int to indicate an error and
+  // halt execution.
+  Error = -1,
+  Success = 0,
+  // Returning '1' from on_headers_complete will tell http_parser that it should not expect a body.
+  NoBody = 1,
+  // Returning '2' from on_headers_complete will tell http_parser that it should not expect a body
+  // nor any further data on the connection.
+  NoBodyData = 2,
+};
 
 /**
  * Wrapper struct for the HTTP/1 codec stats. @see stats_macros.h
@@ -268,7 +271,7 @@ private:
    * Called in order to complete an in progress header decode.
    * @return An integer representing http_parser exit codes.
    */
-  int completeLastHeader();
+  HttpParserCode completeLastHeader();
 
   /**
    * Check if header name contains underscore character.
@@ -315,8 +318,8 @@ private:
    * dispatch is invoked.
    * @return An http_parser exit code.
    */
-  int onMessageBeginBase();
-  virtual int onMessageBegin() PURE;
+  HttpParserCode onMessageBeginBase();
+  virtual HttpParserCode onMessageBegin() PURE;
 
   /**
    * Called when URL data is received.
@@ -331,7 +334,7 @@ private:
    * @param length supplies the length.
    * @return integer representing http_parser exit code.
    */
-  int onHeaderField(const char* data, size_t length);
+  HttpParserCode onHeaderField(const char* data, size_t length);
 
   /**
    * Called when header value data is received.
@@ -339,7 +342,7 @@ private:
    * @param length supplies the length.
    * @return integer representing http_parser exit code.
    */
-  int onHeaderValue(const char* data, size_t length);
+  HttpParserCode onHeaderValue(const char* data, size_t length);
 
   /**
    * Called when headers are complete. A base routine happens first then a virtual dispatch is
@@ -347,8 +350,8 @@ private:
    * trailers are signaled via onMessageCompleteBase().
    * @return 0 if no error, 1 if there should be no body.
    */
-  int onHeadersCompleteBase();
-  virtual int onHeadersComplete() PURE;
+  HttpParserCode onHeadersCompleteBase();
+  virtual HttpParserCode onHeadersComplete() PURE;
 
   /**
    * Called to see if upgrade transition is allowed.
@@ -371,7 +374,7 @@ private:
    * Called when the request/response is complete.
    * @return An integer representing an http_parser exit code.
    */
-  int onMessageCompleteBase();
+  HttpParserCode onMessageCompleteBase();
   virtual void onMessageComplete() PURE;
 
   /**
@@ -461,9 +464,9 @@ private:
 
   // ConnectionImpl
   void onEncodeComplete() override;
-  int onMessageBegin() override;
+  HttpParserCode onMessageBegin() override;
   void onUrl(const char* data, size_t length) override;
-  int onHeadersComplete() override;
+  HttpParserCode onHeadersComplete() override;
   // If upgrade behavior is not allowed, the HCM will have sanitized the headers out.
   bool upgradeAllowed() const override { return true; }
   void onBody(Buffer::Instance& data) override;
@@ -495,7 +498,7 @@ private:
 
   void releaseOutboundResponse(const Buffer::OwnedBufferFragmentImpl* fragment);
   void maybeAddSentinelBufferFragment(Buffer::WatermarkBuffer& output_buffer) override;
-  int doFloodProtectionChecks();
+  HttpParserCode doFloodProtectionChecks();
   bool checkHeaderNameForUnderscores() override;
 
   ServerConnectionCallbacks& callbacks_;
@@ -545,9 +548,9 @@ private:
 
   // ConnectionImpl
   void onEncodeComplete() override {}
-  int onMessageBegin() override { return HTTP_PARSER_SUCCESS; }
+  HttpParserCode onMessageBegin() override { return HttpParserCode::Success; }
   void onUrl(const char*, size_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  int onHeadersComplete() override;
+  HttpParserCode onHeadersComplete() override;
   bool upgradeAllowed() const override;
   void onBody(Buffer::Instance& data) override;
   void onMessageComplete() override;
