@@ -110,7 +110,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, GzipIntegrationTest,
 /**
  * Exercises gzip compression with default configuration.
  */
-TEST_P(GzipIntegrationTest, AcceptanceDefaultConfigTest) {
+TEST_P(GzipIntegrationTest, DEPRECATED_FEATURE_TEST(AcceptanceDefaultConfigTest)) {
   initializeFilter(default_config);
   doRequestAndCompression(Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                                          {":path", "/test/long/url"},
@@ -140,7 +140,7 @@ TEST_P(GzipIntegrationTest, DEPRECATED_FEATURE_TEST(AcceptanceDeprecatedFullConf
 /**
  * Exercises gzip compression with full configuration.
  */
-TEST_P(GzipIntegrationTest, AcceptanceFullConfigTest) {
+TEST_P(GzipIntegrationTest, DEPRECATED_FEATURE_TEST(AcceptanceFullConfigTest)) {
   initializeFilter(full_config);
   doRequestAndCompression(Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                                          {":path", "/test/long/url"},
@@ -155,7 +155,7 @@ TEST_P(GzipIntegrationTest, AcceptanceFullConfigTest) {
 /**
  * Exercises filter when client request contains 'identity' type.
  */
-TEST_P(GzipIntegrationTest, IdentityAcceptEncoding) {
+TEST_P(GzipIntegrationTest, DEPRECATED_FEATURE_TEST(IdentityAcceptEncoding)) {
   initializeFilter(default_config);
   doRequestAndNoCompression(Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                                            {":path", "/test/long/url"},
@@ -170,7 +170,7 @@ TEST_P(GzipIntegrationTest, IdentityAcceptEncoding) {
 /**
  * Exercises filter when client request contains unsupported 'accept-encoding' type.
  */
-TEST_P(GzipIntegrationTest, NotSupportedAcceptEncoding) {
+TEST_P(GzipIntegrationTest, DEPRECATED_FEATURE_TEST(NotSupportedAcceptEncoding)) {
   initializeFilter(default_config);
   doRequestAndNoCompression(Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                                            {":path", "/test/long/url"},
@@ -185,7 +185,7 @@ TEST_P(GzipIntegrationTest, NotSupportedAcceptEncoding) {
 /**
  * Exercises filter when upstream response is already encoded.
  */
-TEST_P(GzipIntegrationTest, UpstreamResponseAlreadyEncoded) {
+TEST_P(GzipIntegrationTest, DEPRECATED_FEATURE_TEST(UpstreamResponseAlreadyEncoded)) {
   initializeFilter(default_config);
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
                                                  {":path", "/test/long/url"},
@@ -211,7 +211,7 @@ TEST_P(GzipIntegrationTest, UpstreamResponseAlreadyEncoded) {
 /**
  * Exercises filter when upstream responds with content length below the default threshold.
  */
-TEST_P(GzipIntegrationTest, NotEnoughContentLength) {
+TEST_P(GzipIntegrationTest, DEPRECATED_FEATURE_TEST(NotEnoughContentLength)) {
   initializeFilter(default_config);
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
                                                  {":path", "/test/long/url"},
@@ -235,7 +235,7 @@ TEST_P(GzipIntegrationTest, NotEnoughContentLength) {
 /**
  * Exercises filter when response from upstream service is empty.
  */
-TEST_P(GzipIntegrationTest, EmptyResponse) {
+TEST_P(GzipIntegrationTest, DEPRECATED_FEATURE_TEST(EmptyResponse)) {
   initializeFilter(default_config);
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
                                                  {":path", "/test/long/url"},
@@ -258,7 +258,7 @@ TEST_P(GzipIntegrationTest, EmptyResponse) {
 /**
  * Exercises filter when upstream responds with restricted content-type value.
  */
-TEST_P(GzipIntegrationTest, SkipOnContentType) {
+TEST_P(GzipIntegrationTest, DEPRECATED_FEATURE_TEST(SkipOnContentType)) {
   initializeFilter(full_config);
   doRequestAndNoCompression(Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                                            {":path", "/test/long/url"},
@@ -273,7 +273,7 @@ TEST_P(GzipIntegrationTest, SkipOnContentType) {
 /**
  * Exercises filter when upstream responds with restricted cache-control value.
  */
-TEST_P(GzipIntegrationTest, SkipOnCacheControl) {
+TEST_P(GzipIntegrationTest, DEPRECATED_FEATURE_TEST(SkipOnCacheControl)) {
   initializeFilter(full_config);
   doRequestAndNoCompression(Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                                            {":path", "/test/long/url"},
@@ -289,7 +289,7 @@ TEST_P(GzipIntegrationTest, SkipOnCacheControl) {
 /**
  * Exercises gzip compression when upstream returns a chunked response.
  */
-TEST_P(GzipIntegrationTest, AcceptanceFullConfigChunkedResponse) {
+TEST_P(GzipIntegrationTest, DEPRECATED_FEATURE_TEST(AcceptanceFullConfigChunkedResponse)) {
   initializeFilter(full_config);
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
                                                  {":path", "/test/long/url"},
@@ -313,7 +313,7 @@ TEST_P(GzipIntegrationTest, AcceptanceFullConfigChunkedResponse) {
 /**
  * Verify Vary header values are preserved.
  */
-TEST_P(GzipIntegrationTest, AcceptanceFullConfigVeryHeader) {
+TEST_P(GzipIntegrationTest, DEPRECATED_FEATURE_TEST(AcceptanceFullConfigVeryHeader)) {
   initializeFilter(default_config);
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
                                                  {":path", "/test/long/url"},

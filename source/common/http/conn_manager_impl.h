@@ -667,11 +667,14 @@ private:
     void onIdleTimeout();
     // Reset per-stream idle timer.
     void resetIdleTimer();
-    // Per-stream request timeout callback
+    // Per-stream request timeout callback.
     void onRequestTimeout();
     // Per-stream alive duration reached.
     void onStreamMaxDurationReached();
     bool hasCachedRoute() { return cached_route_.has_value() && cached_route_.value(); }
+
+    // Return local port of the connection.
+    uint32_t localPort();
 
     friend std::ostream& operator<<(std::ostream& os, const ActiveStream& s) {
       s.dumpState(os);
@@ -758,7 +761,7 @@ private:
   void onDrainTimeout();
   void startDrainSequence();
   Tracing::HttpTracer& tracer() { return *config_.tracer(); }
-  void handleCodecException(const char* error);
+  void handleCodecError(absl::string_view error);
   void doConnectionClose(absl::optional<Network::ConnectionCloseType> close_type,
                          absl::optional<StreamInfo::ResponseFlag> response_flag);
 

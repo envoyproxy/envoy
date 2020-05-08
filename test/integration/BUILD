@@ -783,25 +783,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "ratelimit_integration_test",
-    srcs = ["ratelimit_integration_test.cc"],
-    tags = ["fails_on_windows"],
-    deps = [
-        ":http_integration_lib",
-        "//source/common/buffer:zero_copy_input_stream_lib",
-        "//source/common/grpc:codec_lib",
-        "//source/common/grpc:common_lib",
-        "//source/extensions/filters/http/ratelimit:config",
-        "//test/common/grpc:grpc_client_integration_lib",
-        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/http/ratelimit/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
-        "@envoy_api//envoy/service/ratelimit/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_test(
     name = "rtds_integration_test",
     srcs = ["rtds_integration_test.cc"],
     tags = ["fails_on_windows"],
@@ -1015,11 +996,20 @@ envoy_cc_test(
 envoy_cc_test(
     name = "xds_integration_test",
     srcs = ["xds_integration_test.cc"],
-    data = ["//test/config/integration:server_xds_files"],
+    data = [
+        "//test/config/integration:server_xds_files",
+        "//test/config/integration/certs",
+    ],
     tags = ["fails_on_windows"],
     deps = [
         ":http_integration_lib",
         ":http_protocol_integration_lib",
+        "//source/extensions/filters/listener/tls_inspector:config",
+        "//source/extensions/filters/listener/tls_inspector:tls_inspector_lib",
+        "//source/extensions/filters/network/tcp_proxy:config",
+        "//source/extensions/transport_sockets/tls:config",
+        "//source/extensions/transport_sockets/tls:context_config_lib",
+        "//source/extensions/transport_sockets/tls:context_lib",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",

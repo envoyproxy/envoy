@@ -34,6 +34,7 @@
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
 #include "common/http/path_utility.h"
+#include "common/http/status.h"
 #include "common/http/utility.h"
 #include "common/network/utility.h"
 #include "common/router/config_impl.h"
@@ -218,15 +219,6 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
   }
 
   checkForDeferredClose();
-
-  // Reading may have been disabled for the non-multiplexing case, so enable it again.
-  // Also be sure to unwind any read-disable done by the prior downstream
-  // connection.
-  if (drain_state_ != DrainState::Closing && codec_->protocol() < Protocol::Http2) {
-    while (!read_callbacks_->connection().readEnabled()) {
-      read_callbacks_->connection().readDisable(false);
-    }
-  }
 }
 
 void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
@@ -279,7 +271,7 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
   return **streams_.begin();
 }
 
-void ConnectionManagerImpl::handleCodecException(const char* error) {
+void ConnectionManagerImpl::handleCodecError(absl::string_view error) {
   ENVOY_CONN_LOG(debug, "dispatch error: {}", read_callbacks_->connection(), error);
   read_callbacks_->connection().streamInfo().setResponseCodeDetails(
       absl::StrCat("codec error: ", error));
@@ -323,14 +315,15 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
   do {
     redispatch = false;
 
-    try {
-      codec_->dispatch(data);
-    } catch (const FrameFloodException& e) {
-      handleCodecException(e.what());
+    const Status status = codec_->dispatch(data);
+
+    ASSERT(!isPrematureResponseError(status));
+    if (isBufferFloodError(status)) {
+      handleCodecError(status.message());
       return Network::FilterStatus::StopIteration;
-    } catch (const CodecProtocolException& e) {
+    } else if (isCodecProtocolError(status)) {
       stats_.named_.downstream_cx_protocol_error_.inc();
-      handleCodecException(e.what());
+      handleCodecError(status.message());
       return Network::FilterStatus::StopIteration;
     }
 
@@ -345,10 +338,6 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
       if (read_callbacks_->connection().state() == Network::Connection::State::Open &&
           data.length() > 0 && streams_.empty()) {
         redispatch = true;
-      }
-
-      if (!streams_.empty() && streams_.front()->state_.remote_complete_) {
-        read_callbacks_->connection().readDisable(true);
       }
     }
   } while (redispatch);
@@ -695,6 +684,14 @@ void ConnectionManagerImpl::ActiveStream::addStreamDecoderFilterWorker(
     StreamDecoderFilterSharedPtr filter, bool dual_filter) {
   ActiveStreamDecoderFilterPtr wrapper(new ActiveStreamDecoderFilter(*this, filter, dual_filter));
   filter->setDecoderFilterCallbacks(*wrapper);
+  // Note: configured decoder filters are appended to decoder_filters_.
+  // This means that if filters are configured in the following order (assume all three filters are
+  // both decoder/encoder filters):
+  //   http_filters:
+  //     - A
+  //     - B
+  //     - C
+  // The decoder filter chain will iterate through filters A, B, C.
   wrapper->moveIntoListBack(std::move(wrapper), decoder_filters_);
 }
 
@@ -702,6 +699,14 @@ void ConnectionManagerImpl::ActiveStream::addStreamEncoderFilterWorker(
     StreamEncoderFilterSharedPtr filter, bool dual_filter) {
   ActiveStreamEncoderFilterPtr wrapper(new ActiveStreamEncoderFilter(*this, filter, dual_filter));
   filter->setEncoderFilterCallbacks(*wrapper);
+  // Note: configured encoder filters are prepended to encoder_filters_.
+  // This means that if filters are configured in the following order (assume all three filters are
+  // both decoder/encoder filters):
+  //   http_filters:
+  //     - A
+  //     - B
+  //     - C
+  // The encoder filter chain will iterate through filters C, B, A.
   wrapper->moveIntoList(std::move(wrapper), encoder_filters_);
 }
 
@@ -740,6 +745,14 @@ void ConnectionManagerImpl::ActiveStream::chargeStats(const ResponseHeaderMap& h
 
 const Network::Connection* ConnectionManagerImpl::ActiveStream::connection() {
   return &connection_manager_.read_callbacks_->connection();
+}
+
+uint32_t ConnectionManagerImpl::ActiveStream::localPort() {
+  auto ip = connection()->localAddress()->ip();
+  if (ip == nullptr) {
+    return 0;
+  }
+  return ip->port();
 }
 
 // Ordering in this function is complicated, but important.
@@ -890,6 +903,9 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
                    StreamInfo::ResponseCodeDetails::get().PathNormalizationFailed);
     return;
   }
+
+  ConnectionManagerUtility::maybeNormalizeHost(*request_headers_, connection_manager_.config_,
+                                               localPort());
 
   if (protocol == Protocol::Http11 && request_headers_->Connection() &&
       absl::EqualsIgnoreCase(request_headers_->Connection()->value().getStringView(),
@@ -1488,10 +1504,10 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
   ENVOY_STREAM_LOG(debug, "Sending local reply with details {}", *this, details);
   ASSERT(response_headers_ == nullptr);
   // For early error handling, do a best-effort attempt to create a filter chain
-  // to ensure access logging.
-  if (!state_.created_filter_chain_) {
-    createFilterChain();
-  }
+  // to ensure access logging. If the filter chain already exists this will be
+  // a no-op.
+  createFilterChain();
+
   stream_info_.setResponseCodeDetails(details);
   Utility::sendLocalReply(
       is_grpc_request,
@@ -1615,7 +1631,9 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
 void ConnectionManagerImpl::ActiveStream::encodeHeadersInternal(ResponseHeaderMap& headers,
                                                                 bool end_stream) {
   // Base headers.
-  connection_manager_.config_.dateProvider().setDateHeader(headers);
+  if (!connection_manager_.config_.shouldPreserveUpstreamDate() || !headers.Date()) {
+    connection_manager_.config_.dateProvider().setDateHeader(headers);
+  }
   // Following setReference() is safe because serverName() is constant for the life of the listener.
   const auto transformation = connection_manager_.config_.serverHeaderTransformation();
   if (transformation == ConnectionManagerConfig::HttpConnectionManagerProto::OVERWRITE ||

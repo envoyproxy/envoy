@@ -6,6 +6,9 @@
 /api/ @envoyproxy/api-shepherds
 # access loggers
 /*/extensions/access_loggers/common @auni53 @zuercher
+# compression extensions
+/*/extensions/compression/common/compressor @rojkov @junr03
+/*/extensions/compression/gzip/compressor @rojkov @junr03
 # csrf extension
 /*/extensions/filters/http/csrf @dschaller @mattklein123
 # original_src http filter extension
@@ -22,6 +25,7 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/network/thrift_proxy @zuercher @brian-pane
 # compressor used by http compression filters
 /*/extensions/filters/http/common/compressor @gsagula @rojkov @dio
+/*/extensions/filters/http/compressor @rojkov @dio
 # jwt_authn http filter extension
 /*/extensions/filters/http/jwt_authn @qiwzhang @lizan
 # grpc_http1_reverse_bridge http filter extension

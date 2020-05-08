@@ -228,6 +228,7 @@ PROT
 Postgre
 Postgres
 Prereq
+QDCOUNT
 QUIC
 QoS
 RAII
@@ -476,6 +477,7 @@ coroutines
 cors
 cout
 coverity
+cplusplus
 cpuset
 creds
 crypto
