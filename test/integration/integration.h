@@ -152,15 +152,15 @@ public:
   // Creates a test fixture with an upstream bound to INADDR_ANY on an unspecified port using the
   // provided IP |version|.
   BaseIntegrationTest(Network::Address::IpVersion version,
-                      const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
+                      const std::string& config = ConfigHelper::httpProxyConfig());
   BaseIntegrationTest(Network::Address::IpVersion version, TestTimeSystemPtr,
-                      const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG)
+                      const std::string& config = ConfigHelper::httpProxyConfig())
       : BaseIntegrationTest(version, config) {}
   // Creates a test fixture with a specified |upstream_address| function that provides the IP and
   // port to use.
   BaseIntegrationTest(const InstanceConstSharedPtrFn& upstream_address_fn,
                       Network::Address::IpVersion version,
-                      const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
+                      const std::string& config = ConfigHelper::httpProxyConfig());
 
   virtual ~BaseIntegrationTest() = default;
 
@@ -197,7 +197,10 @@ public:
   void setUpstreamAddress(uint32_t upstream_index,
                           envoy::config::endpoint::v3::LbEndpoint& endpoint) const;
 
-  virtual Network::ClientConnectionPtr makeClientConnection(uint32_t port);
+  Network::ClientConnectionPtr makeClientConnection(uint32_t port);
+  virtual Network::ClientConnectionPtr
+  makeClientConnectionWithOptions(uint32_t port,
+                                  const Network::ConnectionSocket::OptionsSharedPtr& options);
 
   void registerTestServerPorts(const std::vector<std::string>& port_names);
   void createTestServer(const std::string& json_path, const std::vector<std::string>& port_names);
@@ -325,7 +328,7 @@ public:
       resource->set_name(TestUtility::xdsResourceName(temp_any));
       resource->set_version(version);
       resource->mutable_resource()->PackFrom(API_DOWNGRADE(message));
-      for (const auto alias : aliases) {
+      for (const auto& alias : aliases) {
         resource->add_aliases(alias);
       }
     }
@@ -354,6 +357,21 @@ public:
    **/
   void sendRawHttpAndWaitForResponse(int port, const char* raw_http, std::string* response,
                                      bool disconnect_after_headers_complete = false);
+
+  /**
+   * Helper to create ConnectionDriver.
+   *
+   * @param port the port to connect to.
+   * @param initial_data the data to send.
+   * @param data_callback the callback on the received data.
+   **/
+  std::unique_ptr<RawConnectionDriver> createConnectionDriver(
+      uint32_t port, const std::string& initial_data,
+      std::function<void(Network::ClientConnection&, const Buffer::Instance&)>&& data_callback) {
+    Buffer::OwnedImpl buffer(initial_data);
+    return std::make_unique<RawConnectionDriver>(port, buffer, data_callback, version_,
+                                                 *dispatcher_);
+  }
 
 protected:
   // Create the envoy server in another thread and start it.

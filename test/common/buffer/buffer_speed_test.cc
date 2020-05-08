@@ -10,10 +10,10 @@ static constexpr uint64_t MaxBufferLength = 1024 * 1024;
 
 // The fragment needs to be heap allocated in order to survive past the processing done in the inner
 // loop in the benchmarks below. Do not attempt to release the actual contents of the buffer.
-void DeleteFragment(const void*, size_t, const Buffer::BufferFragmentImpl* self) { delete self; }
+void deleteFragment(const void*, size_t, const Buffer::BufferFragmentImpl* self) { delete self; }
 
 // Test the creation of an empty OwnedImpl.
-static void BufferCreateEmpty(benchmark::State& state) {
+static void bufferCreateEmpty(benchmark::State& state) {
   uint64_t length = 0;
   for (auto _ : state) {
     Buffer::OwnedImpl buffer;
@@ -21,10 +21,10 @@ static void BufferCreateEmpty(benchmark::State& state) {
   }
   benchmark::DoNotOptimize(length);
 }
-BENCHMARK(BufferCreateEmpty);
+BENCHMARK(bufferCreateEmpty);
 
 // Test the creation of an OwnedImpl with varying amounts of content.
-static void BufferCreate(benchmark::State& state) {
+static void bufferCreate(benchmark::State& state) {
   const std::string data(state.range(0), 'a');
   const absl::string_view input(data);
   uint64_t length = 0;
@@ -34,10 +34,10 @@ static void BufferCreate(benchmark::State& state) {
   }
   benchmark::DoNotOptimize(length);
 }
-BENCHMARK(BufferCreate)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
+BENCHMARK(bufferCreate)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
 
 // Grow an OwnedImpl in very small amounts.
-static void BufferAddSmallIncrement(benchmark::State& state) {
+static void bufferAddSmallIncrement(benchmark::State& state) {
   const std::string data("a");
   const absl::string_view input(data);
   Buffer::OwnedImpl buffer;
@@ -54,10 +54,10 @@ static void BufferAddSmallIncrement(benchmark::State& state) {
   }
   benchmark::DoNotOptimize(buffer.length());
 }
-BENCHMARK(BufferAddSmallIncrement)->Arg(1)->Arg(2)->Arg(3)->Arg(4)->Arg(5);
+BENCHMARK(bufferAddSmallIncrement)->Arg(1)->Arg(2)->Arg(3)->Arg(4)->Arg(5);
 
 // Test the appending of varying amounts of content from a string to an OwnedImpl.
-static void BufferAddString(benchmark::State& state) {
+static void bufferAddString(benchmark::State& state) {
   const std::string data(state.range(0), 'a');
   const absl::string_view input(data);
   Buffer::OwnedImpl buffer(input);
@@ -69,11 +69,11 @@ static void BufferAddString(benchmark::State& state) {
   }
   benchmark::DoNotOptimize(buffer.length());
 }
-BENCHMARK(BufferAddString)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
+BENCHMARK(bufferAddString)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
 
-// Variant of BufferAddString that appends from another Buffer::Instance
+// Variant of bufferAddString that appends from another Buffer::Instance
 // rather than from a string.
-static void BufferAddBuffer(benchmark::State& state) {
+static void bufferAddBuffer(benchmark::State& state) {
   const std::string data(state.range(0), 'a');
   const absl::string_view input(data);
   const Buffer::OwnedImpl to_add(data);
@@ -86,10 +86,10 @@ static void BufferAddBuffer(benchmark::State& state) {
   }
   benchmark::DoNotOptimize(buffer.length());
 }
-BENCHMARK(BufferAddBuffer)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
+BENCHMARK(bufferAddBuffer)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
 
 // Test the prepending of varying amounts of content from a string to an OwnedImpl.
-static void BufferPrependString(benchmark::State& state) {
+static void bufferPrependString(benchmark::State& state) {
   const std::string data(state.range(0), 'a');
   const absl::string_view input(data);
   Buffer::OwnedImpl buffer(input);
@@ -101,10 +101,10 @@ static void BufferPrependString(benchmark::State& state) {
   }
   benchmark::DoNotOptimize(buffer.length());
 }
-BENCHMARK(BufferPrependString)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
+BENCHMARK(bufferPrependString)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
 
 // Test the prepending of one OwnedImpl to another.
-static void BufferPrependBuffer(benchmark::State& state) {
+static void bufferPrependBuffer(benchmark::State& state) {
   const std::string data(state.range(0), 'a');
   const absl::string_view input(data);
   Buffer::OwnedImpl buffer(input);
@@ -114,7 +114,7 @@ static void BufferPrependBuffer(benchmark::State& state) {
     // (and never deletes) an external string.
     Buffer::OwnedImpl to_add;
     auto fragment =
-        std::make_unique<Buffer::BufferFragmentImpl>(input.data(), input.size(), DeleteFragment);
+        std::make_unique<Buffer::BufferFragmentImpl>(input.data(), input.size(), deleteFragment);
     to_add.addBufferFragment(*fragment.release());
 
     buffer.prepend(to_add);
@@ -124,9 +124,9 @@ static void BufferPrependBuffer(benchmark::State& state) {
   }
   benchmark::DoNotOptimize(buffer.length());
 }
-BENCHMARK(BufferPrependBuffer)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
+BENCHMARK(bufferPrependBuffer)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
 
-static void BufferDrain(benchmark::State& state) {
+static void bufferDrain(benchmark::State& state) {
   const std::string data(state.range(0), 'a');
   const absl::string_view input(data);
   const Buffer::OwnedImpl to_add(data);
@@ -151,10 +151,10 @@ static void BufferDrain(benchmark::State& state) {
   }
   benchmark::DoNotOptimize(buffer.length());
 }
-BENCHMARK(BufferDrain)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
+BENCHMARK(bufferDrain)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
 
 // Drain an OwnedImpl in very small amounts.
-static void BufferDrainSmallIncrement(benchmark::State& state) {
+static void bufferDrainSmallIncrement(benchmark::State& state) {
   const std::string data(1024 * 1024, 'a');
   const absl::string_view input(data);
   Buffer::OwnedImpl buffer(input);
@@ -166,10 +166,10 @@ static void BufferDrainSmallIncrement(benchmark::State& state) {
   }
   benchmark::DoNotOptimize(buffer.length());
 }
-BENCHMARK(BufferDrainSmallIncrement)->Arg(1)->Arg(2)->Arg(3)->Arg(4)->Arg(5);
+BENCHMARK(bufferDrainSmallIncrement)->Arg(1)->Arg(2)->Arg(3)->Arg(4)->Arg(5);
 
 // Test the moving of content from one OwnedImpl to another.
-static void BufferMove(benchmark::State& state) {
+static void bufferMove(benchmark::State& state) {
   const std::string data(state.range(0), 'a');
   const absl::string_view input(data);
   Buffer::OwnedImpl buffer1(input);
@@ -181,12 +181,12 @@ static void BufferMove(benchmark::State& state) {
   uint64_t length = buffer1.length();
   benchmark::DoNotOptimize(length);
 }
-BENCHMARK(BufferMove)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
+BENCHMARK(bufferMove)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
 
 // Test the moving of content from one OwnedImpl to another, one byte at a time, to
 // exercise the (likely inefficient) code path in the implementation that handles
 // partial moves.
-static void BufferMovePartial(benchmark::State& state) {
+static void bufferMovePartial(benchmark::State& state) {
   const std::string data(state.range(0), 'a');
   const absl::string_view input(data);
   Buffer::OwnedImpl buffer1(input);
@@ -200,11 +200,11 @@ static void BufferMovePartial(benchmark::State& state) {
   uint64_t length = buffer1.length();
   benchmark::DoNotOptimize(length);
 }
-BENCHMARK(BufferMovePartial)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
+BENCHMARK(bufferMovePartial)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
 
 // Test the reserve+commit cycle, for the special case where the reserved space is
 // fully used (and therefore the commit size equals the reservation size).
-static void BufferReserveCommit(benchmark::State& state) {
+static void bufferReserveCommit(benchmark::State& state) {
   Buffer::OwnedImpl buffer;
   for (auto _ : state) {
     constexpr uint64_t NumSlices = 2;
@@ -221,11 +221,11 @@ static void BufferReserveCommit(benchmark::State& state) {
   }
   benchmark::DoNotOptimize(buffer.length());
 }
-BENCHMARK(BufferReserveCommit)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
+BENCHMARK(bufferReserveCommit)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
 
 // Test the reserve+commit cycle, for the common case where the reserved space is
 // only partially used (and therefore the commit size is smaller than the reservation size).
-static void BufferReserveCommitPartial(benchmark::State& state) {
+static void bufferReserveCommitPartial(benchmark::State& state) {
   Buffer::OwnedImpl buffer;
   for (auto _ : state) {
     constexpr uint64_t NumSlices = 2;
@@ -242,26 +242,26 @@ static void BufferReserveCommitPartial(benchmark::State& state) {
   }
   benchmark::DoNotOptimize(buffer.length());
 }
-BENCHMARK(BufferReserveCommitPartial)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
+BENCHMARK(bufferReserveCommitPartial)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
 
 // Test the linearization of a buffer in the best case where the data is in one slice.
-static void BufferLinearizeSimple(benchmark::State& state) {
+static void bufferLinearizeSimple(benchmark::State& state) {
   const std::string data(state.range(0), 'a');
   const absl::string_view input(data);
   Buffer::OwnedImpl buffer;
   for (auto _ : state) {
     buffer.drain(buffer.length());
     auto fragment =
-        std::make_unique<Buffer::BufferFragmentImpl>(input.data(), input.size(), DeleteFragment);
+        std::make_unique<Buffer::BufferFragmentImpl>(input.data(), input.size(), deleteFragment);
     buffer.addBufferFragment(*fragment.release());
     benchmark::DoNotOptimize(buffer.linearize(state.range(0)));
   }
 }
-BENCHMARK(BufferLinearizeSimple)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
+BENCHMARK(bufferLinearizeSimple)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
 
 // Test the linearization of a buffer in the general case where the data is spread among
 // many slices.
-static void BufferLinearizeGeneral(benchmark::State& state) {
+static void bufferLinearizeGeneral(benchmark::State& state) {
   static constexpr uint64_t SliceSize = 1024;
   const std::string data(SliceSize, 'a');
   const absl::string_view input(data);
@@ -270,17 +270,17 @@ static void BufferLinearizeGeneral(benchmark::State& state) {
     buffer.drain(buffer.length());
     do {
       auto fragment =
-          std::make_unique<Buffer::BufferFragmentImpl>(input.data(), input.size(), DeleteFragment);
+          std::make_unique<Buffer::BufferFragmentImpl>(input.data(), input.size(), deleteFragment);
       buffer.addBufferFragment(*fragment.release());
     } while (buffer.length() < static_cast<uint64_t>(state.range(0)));
     benchmark::DoNotOptimize(buffer.linearize(state.range(0)));
   }
 }
-BENCHMARK(BufferLinearizeGeneral)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
+BENCHMARK(bufferLinearizeGeneral)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
 
 // Test buffer search, for the simple case where there are no partial matches for
 // the pattern in the buffer.
-static void BufferSearch(benchmark::State& state) {
+static void bufferSearch(benchmark::State& state) {
   const std::string Pattern(16, 'b');
   std::string data;
   data.reserve(state.range(0) + Pattern.length());
@@ -295,11 +295,11 @@ static void BufferSearch(benchmark::State& state) {
   }
   benchmark::DoNotOptimize(result);
 }
-BENCHMARK(BufferSearch)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
+BENCHMARK(bufferSearch)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
 
 // Test buffer search, for the more challenging case where there are many partial matches
 // for the pattern in the buffer.
-static void BufferSearchPartialMatch(benchmark::State& state) {
+static void bufferSearchPartialMatch(benchmark::State& state) {
   const std::string Pattern(16, 'b');
   const std::string PartialMatch("babbabbbabbbbabbbbbabbbbbbabbbbbbbabbbbbbbba");
   std::string data;
@@ -318,11 +318,11 @@ static void BufferSearchPartialMatch(benchmark::State& state) {
   }
   benchmark::DoNotOptimize(result);
 }
-BENCHMARK(BufferSearchPartialMatch)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
+BENCHMARK(bufferSearchPartialMatch)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
 
 // Test buffer startsWith, for the simple case where there is no match for the pattern at the start
 // of the buffer.
-static void BufferStartsWith(benchmark::State& state) {
+static void bufferStartsWith(benchmark::State& state) {
   const std::string Pattern(16, 'b');
   std::string data;
   data.reserve(state.range(0) + Pattern.length());
@@ -339,10 +339,10 @@ static void BufferStartsWith(benchmark::State& state) {
   }
   benchmark::DoNotOptimize(result);
 }
-BENCHMARK(BufferStartsWith)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
+BENCHMARK(bufferStartsWith)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
 
 // Test buffer startsWith, when there is a match at the start of the buffer.
-static void BufferStartsWithMatch(benchmark::State& state) {
+static void bufferStartsWithMatch(benchmark::State& state) {
   const std::string Prefix(state.range(1), 'b');
   const std::string Suffix("babbabbbabbbbabbbbbabbbbbbabbbbbbbabbbbbbbba");
   std::string data = Prefix;
@@ -362,7 +362,7 @@ static void BufferStartsWithMatch(benchmark::State& state) {
   }
   benchmark::DoNotOptimize(result);
 }
-BENCHMARK(BufferStartsWithMatch)
+BENCHMARK(bufferStartsWithMatch)
     ->Args({1, 1})
     ->Args({4096, 16})
     ->Args({16384, 256})

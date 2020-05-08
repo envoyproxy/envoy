@@ -57,7 +57,8 @@ public:
 
   virtual testing::AssertionResult statsAre(uint32_t attempt, uint32_t success, uint32_t rejected,
                                             uint32_t failure, uint32_t init_fetch_timeout,
-                                            uint64_t update_time, uint64_t version) {
+                                            uint64_t update_time, uint64_t version,
+                                            absl::string_view version_text) {
     // TODO(fredlas) rework update_success_ to make sense across all xDS carriers. Its value in
     // statsAre() calls in many tests will probably have to be changed.
     UNREFERENCED_PARAMETER(attempt);
@@ -85,6 +86,10 @@ public:
       return testing::AssertionFailure()
              << "version: expected " << version << ", got " << stats_.version_.value();
     }
+    if (version_text != stats_.version_text_.value()) {
+      return testing::AssertionFailure()
+             << "version_text: expected " << version << ", got " << stats_.version_text_.value();
+    }
     return testing::AssertionSuccess();
   }
 
@@ -105,7 +110,7 @@ public:
 
   virtual void doSubscriptionTearDown() {}
 
-  Stats::IsolatedStoreImpl stats_store_;
+  Stats::TestUtil::TestStore stats_store_;
   SubscriptionStats stats_;
 };
 

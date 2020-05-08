@@ -4,13 +4,12 @@
 #include <string>
 #include <unordered_map>
 
-#include "envoy/config/trace/v3/trace.pb.h"
+#include "envoy/config/trace/v3/zipkin.pb.h"
 
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/runtime/runtime_impl.h"
-#include "common/runtime/uuid_util.h"
 #include "common/tracing/http_tracer_impl.h"
 
 #include "extensions/tracers/zipkin/zipkin_core_constants.h"
@@ -49,6 +48,7 @@ public:
   ZipkinDriverTest() : time_source_(test_time_.timeSystem()) {}
 
   void setup(envoy::config::trace::v3::ZipkinConfig& zipkin_config, bool init_timer) {
+    cm_.thread_local_cluster_.cluster_.info_->name_ = "fake_cluster";
     ON_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))
         .WillByDefault(ReturnRef(cm_.async_client_));
 
@@ -117,6 +117,7 @@ public:
     callback->onSuccess(request, std::move(msg));
 
     EXPECT_EQ(2U, stats_.counter("tracing.zipkin.spans_sent").value());
+    EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_skipped_no_cluster").value());
     EXPECT_EQ(1U, stats_.counter("tracing.zipkin.reports_sent").value());
     EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_dropped").value());
     EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_failed").value());
@@ -161,7 +162,7 @@ TEST_F(ZipkinDriverTest, InitializeDriver) {
   }
 
   {
-    // Valid config but not valid cluster.
+    // Valid config but collector cluster doesn't exists.
     EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillOnce(Return(nullptr));
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
@@ -187,6 +188,21 @@ TEST_F(ZipkinDriverTest, InitializeDriver) {
 
     setup(zipkin_config, true);
   }
+}
+
+TEST_F(ZipkinDriverTest, AllowCollectorClusterToBeAddedViaApi) {
+  EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
+  ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features()).WillByDefault(Return(0));
+  ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, addedViaApi()).WillByDefault(Return(true));
+
+  const std::string yaml_string = R"EOF(
+  collector_cluster: fake_cluster
+  collector_endpoint: /api/v1/spans
+  )EOF";
+  envoy::config::trace::v3::ZipkinConfig zipkin_config;
+  TestUtility::loadFromYaml(yaml_string, zipkin_config);
+
+  setup(zipkin_config, true);
 }
 
 TEST_F(ZipkinDriverTest, FlushSeveralSpans) {
@@ -242,9 +258,132 @@ TEST_F(ZipkinDriverTest, FlushOneSpanReportFailure) {
   callback->onSuccess(request, std::move(msg));
 
   EXPECT_EQ(1U, stats_.counter("tracing.zipkin.spans_sent").value());
+  EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_skipped_no_cluster").value());
   EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_sent").value());
   EXPECT_EQ(1U, stats_.counter("tracing.zipkin.reports_dropped").value());
   EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_failed").value());
+}
+
+TEST_F(ZipkinDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
+  Upstream::ClusterUpdateCallbacks* cluster_update_callbacks;
+  EXPECT_CALL(cm_, addThreadLocalClusterUpdateCallbacks_(_))
+      .WillOnce(DoAll(SaveArgAddress(&cluster_update_callbacks), Return(nullptr)));
+
+  setupValidDriver("HTTP_JSON_V1");
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.min_flush_spans", 5))
+      .WillRepeatedly(Return(1));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.request_timeout", 5000U))
+      .WillRepeatedly(Return(5000U));
+
+  // Verify the effect of onClusterAddOrUpdate()/onClusterRemoval() on reporting logic,
+  // keeping in mind that they will be called both for relevant and irrelevant clusters.
+
+  {
+    // Simulate removal of the relevant cluster.
+    cluster_update_callbacks->onClusterRemoval("fake_cluster");
+
+    // Verify that no report will be sent.
+    EXPECT_CALL(cm_, httpAsyncClientForCluster(_)).Times(0);
+    EXPECT_CALL(cm_.async_client_, send_(_, _, _)).Times(0);
+
+    // Trigger flush of a span.
+    driver_
+        ->startSpan(config_, request_headers_, operation_name_, start_time_,
+                    {Tracing::Reason::Sampling, true})
+        ->finishSpan();
+
+    // Verify observability.
+    EXPECT_EQ(1U, stats_.counter("tracing.zipkin.spans_sent").value());
+    EXPECT_EQ(1U, stats_.counter("tracing.zipkin.reports_skipped_no_cluster").value());
+    EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_sent").value());
+    EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_dropped").value());
+    EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_failed").value());
+  }
+
+  {
+    // Simulate addition of an irrelevant cluster.
+    NiceMock<Upstream::MockThreadLocalCluster> unrelated_cluster;
+    unrelated_cluster.cluster_.info_->name_ = "unrelated_cluster";
+    cluster_update_callbacks->onClusterAddOrUpdate(unrelated_cluster);
+
+    // Verify that no report will be sent.
+    EXPECT_CALL(cm_, httpAsyncClientForCluster(_)).Times(0);
+    EXPECT_CALL(cm_.async_client_, send_(_, _, _)).Times(0);
+
+    // Trigger flush of a span.
+    driver_
+        ->startSpan(config_, request_headers_, operation_name_, start_time_,
+                    {Tracing::Reason::Sampling, true})
+        ->finishSpan();
+
+    // Verify observability.
+    EXPECT_EQ(2U, stats_.counter("tracing.zipkin.spans_sent").value());
+    EXPECT_EQ(2U, stats_.counter("tracing.zipkin.reports_skipped_no_cluster").value());
+    EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_sent").value());
+    EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_dropped").value());
+    EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_failed").value());
+  }
+
+  {
+    // Simulate addition of the relevant cluster.
+    cluster_update_callbacks->onClusterAddOrUpdate(cm_.thread_local_cluster_);
+
+    // Verify that report will be sent.
+    EXPECT_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))
+        .WillOnce(ReturnRef(cm_.async_client_));
+    Http::MockAsyncClientRequest request(&cm_.async_client_);
+    Http::AsyncClient::Callbacks* callback{};
+    EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+        .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&callback)), Return(&request)));
+
+    // Trigger flush of a span.
+    driver_
+        ->startSpan(config_, request_headers_, operation_name_, start_time_,
+                    {Tracing::Reason::Sampling, true})
+        ->finishSpan();
+
+    // Complete in-flight request.
+    callback->onFailure(request, Http::AsyncClient::FailureReason::Reset);
+
+    // Verify observability.
+    EXPECT_EQ(3U, stats_.counter("tracing.zipkin.spans_sent").value());
+    EXPECT_EQ(2U, stats_.counter("tracing.zipkin.reports_skipped_no_cluster").value());
+    EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_sent").value());
+    EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_dropped").value());
+    EXPECT_EQ(1U, stats_.counter("tracing.zipkin.reports_failed").value());
+  }
+
+  {
+    // Simulate removal of an irrelevant cluster.
+    cluster_update_callbacks->onClusterRemoval("unrelated_cluster");
+
+    // Verify that report will be sent.
+    EXPECT_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))
+        .WillOnce(ReturnRef(cm_.async_client_));
+    Http::MockAsyncClientRequest request(&cm_.async_client_);
+    Http::AsyncClient::Callbacks* callback{};
+    EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+        .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&callback)), Return(&request)));
+
+    // Trigger flush of a span.
+    driver_
+        ->startSpan(config_, request_headers_, operation_name_, start_time_,
+                    {Tracing::Reason::Sampling, true})
+        ->finishSpan();
+
+    // Complete in-flight request.
+    Http::ResponseMessagePtr msg(new Http::ResponseMessageImpl(
+        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "202"}}}));
+    callback->onSuccess(request, std::move(msg));
+
+    // Verify observability.
+    EXPECT_EQ(4U, stats_.counter("tracing.zipkin.spans_sent").value());
+    EXPECT_EQ(2U, stats_.counter("tracing.zipkin.reports_skipped_no_cluster").value());
+    EXPECT_EQ(1U, stats_.counter("tracing.zipkin.reports_sent").value());
+    EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_dropped").value());
+    EXPECT_EQ(1U, stats_.counter("tracing.zipkin.reports_failed").value());
+  }
 }
 
 TEST_F(ZipkinDriverTest, CancelInflightRequestsOnDestruction) {

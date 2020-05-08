@@ -91,6 +91,7 @@ public:
   MOCK_METHOD(const ClusterInfo&, cluster, (), (const));
   MOCK_METHOD(Outlier::DetectorHostMonitor&, outlierDetector, (), (const));
   MOCK_METHOD(HealthCheckHostMonitor&, healthChecker, (), (const));
+  MOCK_METHOD(const std::string&, hostnameForHealthChecks, (), (const));
   MOCK_METHOD(const std::string&, hostname, (), (const));
   MOCK_METHOD(Network::TransportSocketFactory&, transportSocketFactory, (), (const));
   MOCK_METHOD(HostStats&, stats, (), (const));
@@ -134,7 +135,8 @@ public:
 
   CreateConnectionData
   createHealthCheckConnection(Event::Dispatcher& dispatcher,
-                              Network::TransportSocketOptionsSharedPtr) const override {
+                              Network::TransportSocketOptionsSharedPtr,
+                              const envoy::config::core::v3::Metadata*) const override {
     MockCreateConnectionData data = createConnection_(dispatcher, nullptr);
     return {Network::ClientConnectionPtr{data.connection_}, data.host_description_};
   }
@@ -175,6 +177,7 @@ public:
   MOCK_METHOD(void, healthFlagSet, (HealthFlag flag));
   MOCK_METHOD(void, setActiveHealthFailureType, (ActiveHealthFailureType type));
   MOCK_METHOD(Host::Health, health, (), (const));
+  MOCK_METHOD(const std::string&, hostnameForHealthChecks, (), (const));
   MOCK_METHOD(const std::string&, hostname, (), (const));
   MOCK_METHOD(Network::TransportSocketFactory&, transportSocketFactory, (), (const));
   MOCK_METHOD(Outlier::DetectorHostMonitor&, outlierDetector, (), (const));

@@ -1,5 +1,6 @@
-#include "envoy/config/trace/v3/trace.pb.h"
-#include "envoy/config/trace/v3/trace.pb.validate.h"
+#include "envoy/config/trace/v3/http_tracer.pb.h"
+#include "envoy/config/trace/v3/opencensus.pb.h"
+#include "envoy/config/trace/v3/opencensus.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "extensions/tracers/opencensus/config.h"
@@ -15,6 +16,52 @@ namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace OpenCensus {
+
+TEST(OpenCensusTracerConfigTest, InvalidStackdriverConfiguration) {
+  NiceMock<Server::Configuration::MockTracerFactoryContext> context;
+  OpenCensusTracerFactory factory;
+
+  const std::string yaml_string = R"EOF(
+  http:
+    name: envoy.tracers.opencensus
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.trace.v2.OpenCensusConfig
+      stackdriver_exporter_enabled: true
+      stackdriver_grpc_service:
+        envoy_grpc:
+          cluster_name: stackdriver
+  )EOF";
+  envoy::config::trace::v3::Tracing configuration;
+  TestUtility::loadFromYaml(yaml_string, configuration);
+
+  auto message = Config::Utility::translateToFactoryConfig(
+      configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
+  EXPECT_THROW_WITH_MESSAGE((factory.createHttpTracer(*message, context)), EnvoyException,
+                            "Opencensus stackdriver tracer only support GoogleGrpc.");
+}
+
+TEST(OpenCensusTracerConfigTest, InvalidOcagentConfiguration) {
+  NiceMock<Server::Configuration::MockTracerFactoryContext> context;
+  OpenCensusTracerFactory factory;
+
+  const std::string yaml_string = R"EOF(
+  http:
+    name: envoy.tracers.opencensus
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.trace.v2.OpenCensusConfig
+      ocagent_exporter_enabled: true
+      ocagent_grpc_service:
+        envoy_grpc:
+          cluster_name: opencensus
+  )EOF";
+  envoy::config::trace::v3::Tracing configuration;
+  TestUtility::loadFromYaml(yaml_string, configuration);
+
+  auto message = Config::Utility::translateToFactoryConfig(
+      configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
+  EXPECT_THROW_WITH_MESSAGE((factory.createHttpTracer(*message, context)), EnvoyException,
+                            "Opencensus ocagent tracer only supports GoogleGrpc.");
+}
 
 TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracer) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
@@ -249,12 +296,6 @@ TEST(OpenCensusTracerConfigTest, ShouldRejectSubsequentCreateAttemptsWithDiffere
   // Verify that OpenCensus is only configured once in a lifetime.
   EXPECT_THROW_WITH_MESSAGE((factory.createHttpTracer(*message_two, context)), EnvoyException,
                             "Opencensus has already been configured with a different config.");
-}
-
-TEST(OpenCensusTracerConfigTest, DoubleRegistrationTest) {
-  EXPECT_THROW_WITH_MESSAGE(
-      (Registry::RegisterFactory<OpenCensusTracerFactory, Server::Configuration::TracerFactory>()),
-      EnvoyException, "Double registration for name: 'envoy.tracers.opencensus'");
 }
 
 } // namespace OpenCensus

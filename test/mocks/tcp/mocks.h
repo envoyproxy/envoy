@@ -63,6 +63,7 @@ public:
   MOCK_METHOD(void, addDrainedCallback, (DrainedCb cb));
   MOCK_METHOD(void, drainConnections, ());
   MOCK_METHOD(Cancellable*, newConnection, (Tcp::ConnectionPool::Callbacks & callbacks));
+  MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, host, (), (const));
 
   MockCancellable* newConnectionImpl(Callbacks& cb);
   void poolFailure(PoolFailureReason reason);

@@ -16,7 +16,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.metrics.v3";
 option java_outer_classname = "StatsProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Stats]
 // Statistics :ref:`architecture overview <arch_overview_statistics>`.
@@ -39,9 +39,9 @@ message StatsSink {
   // Stats sink specific configuration which depends on the sink being instantiated. See
   // :ref:`StatsdSink <envoy_api_msg_config.metrics.v3.StatsdSink>` for an example.
   oneof config_type {
-    google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
-
     google.protobuf.Any typed_config = 3;
+
+    google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
   }
 }
 

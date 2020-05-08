@@ -17,6 +17,7 @@ envoy_extension_cc_test(
     srcs = ["matchers_test.cc"],
     extension_name = "envoy.filters.http.rbac",
     deps = [
+        "//source/extensions/filters/common/expr:evaluator_lib",
         "//source/extensions/filters/common/rbac:matchers_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/ssl:ssl_mocks",

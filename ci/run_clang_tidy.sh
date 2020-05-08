@@ -51,10 +51,18 @@ function exclude_chromium_url() {
   grep -v source/common/chromium_url/
 }
 
-function filter_excludes() {
-  exclude_testdata | exclude_chromium_url | exclude_win32_impl
+# Exclude files in third_party which are temporary forks from other OSS projects.
+function exclude_third_party() {
+  grep -v third_party/
 }
 
+function filter_excludes() {
+  exclude_testdata | exclude_chromium_url | exclude_win32_impl | exclude_third_party
+}
+
+if [[ -z "${DIFF_REF}" && "${BUILD_REASON}" != "PullRequest" ]]; then
+  DIFF_REF=HEAD^
+fi
 
 if [[ "${RUN_FULL_CLANG_TIDY}" == 1 ]]; then
   echo "Running full clang-tidy..."
@@ -64,9 +72,9 @@ if [[ "${RUN_FULL_CLANG_TIDY}" == 1 ]]; then
     -export-fixes=${FIX_YAML} \
     -j ${NUM_CPUS:-0} -p 1 -quiet \
     ${APPLY_CLANG_TIDY_FIXES:+-fix}
-elif [[ "${BUILD_REASON}" != "PullRequest" ]]; then
-  echo "Running clang-tidy-diff against previous commit..."
-  git diff HEAD^ | filter_excludes | \
+elif [[ -n "${DIFF_REF}" ]]; then
+  echo "Running clang-tidy-diff against ref ${DIFF_REF}"
+  git diff ${DIFF_REF} | filter_excludes | \
     python3 "${LLVM_PREFIX}/share/clang/clang-tidy-diff.py" \
       -clang-tidy-binary=${CLANG_TIDY} \
       -export-fixes=${FIX_YAML} \

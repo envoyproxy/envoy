@@ -4,7 +4,7 @@
 #include "envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.pb.validate.h"
 
 #include "extensions/filters/http/adaptive_concurrency/adaptive_concurrency_filter.h"
-#include "extensions/filters/http/adaptive_concurrency/concurrency_controller/concurrency_controller.h"
+#include "extensions/filters/http/adaptive_concurrency/controller/controller.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
@@ -23,9 +23,9 @@ namespace HttpFilters {
 namespace AdaptiveConcurrency {
 namespace {
 
-using ConcurrencyController::RequestForwardingAction;
+using Controller::RequestForwardingAction;
 
-class MockConcurrencyController : public ConcurrencyController::ConcurrencyController {
+class MockConcurrencyController : public Controller::ConcurrencyController {
 public:
   MOCK_METHOD(RequestForwardingAction, forwardingDecision, ());
   MOCK_METHOD(void, cancelLatencySample, ());
@@ -224,7 +224,7 @@ TEST_F(AdaptiveConcurrencyFilterTest, OnDestroyCleanupTest) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
   const auto advance_time = std::chrono::nanoseconds(42);
-  time_system_.sleep(advance_time);
+  time_system_.advanceTimeWait(advance_time);
 
   Http::TestResponseHeaderMapImpl response_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));

@@ -128,7 +128,7 @@ public:
   const std::string v2_empty_fault_config_yaml = "{}";
 
   void SetUpTest(const envoy::extensions::filters::http::fault::v3::HTTPFault fault) {
-    config_.reset(new FaultFilterConfig(fault, runtime_, "prefix.", stats_, time_system_));
+    config_ = std::make_shared<FaultFilterConfig>(fault, runtime_, "prefix.", stats_, time_system_);
     filter_ = std::make_unique<FaultFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_filter_callbacks_);
@@ -301,6 +301,159 @@ TEST_F(FaultFilterTest, HeaderAbortWithHttpStatus) {
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", 429))
       .WillOnce(Return(429));
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "429"}, {"content-length", "18"}, {"content-type", "text/plain"}};
+  EXPECT_CALL(decoder_filter_callbacks_,
+              encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
+  EXPECT_CALL(decoder_filter_callbacks_, encodeData(_, true));
+
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::FaultInjected));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
+  EXPECT_EQ(1UL, config_->stats().active_faults_.value());
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  filter_->onDestroy();
+
+  EXPECT_EQ(0UL, config_->stats().delays_injected_.value());
+  EXPECT_EQ(1UL, config_->stats().aborts_injected_.value());
+  EXPECT_EQ(0UL, config_->stats().active_faults_.value());
+  EXPECT_EQ("fault_filter_abort", decoder_filter_callbacks_.details_);
+}
+
+TEST_F(FaultFilterTest, AbortWithGrpcStatus) {
+  decoder_filter_callbacks_.is_grpc_request_ = true;
+
+  envoy::extensions::filters::http::fault::v3::HTTPFault fault;
+  fault.mutable_abort()->mutable_percentage()->set_numerator(100);
+  fault.mutable_abort()->mutable_percentage()->set_denominator(
+      envoy::type::v3::FractionalPercent::HUNDRED);
+  fault.mutable_abort()->set_grpc_status(5);
+  SetUpTest(fault);
+
+  EXPECT_CALL(runtime_.snapshot_,
+              getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
+      .WillOnce(Return(std::numeric_limits<uint64_t>::max()));
+
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::DelayInjected))
+      .Times(0);
+
+  // Abort related calls
+  EXPECT_CALL(runtime_.snapshot_,
+              featureEnabled("fault.http.abort.abort_percent",
+                             Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
+      .WillOnce(Return(true));
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.grpc_status", 5))
+      .WillOnce(Return(5));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
+                                                   {"content-type", "application/grpc"},
+                                                   {"grpc-status", "5"},
+                                                   {"grpc-message", "fault filter abort"}};
+  EXPECT_CALL(decoder_filter_callbacks_,
+              encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::FaultInjected));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
+  EXPECT_EQ(1UL, config_->stats().active_faults_.value());
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  filter_->onDestroy();
+
+  EXPECT_EQ(0UL, config_->stats().delays_injected_.value());
+  EXPECT_EQ(1UL, config_->stats().aborts_injected_.value());
+  EXPECT_EQ(0UL, config_->stats().active_faults_.value());
+  EXPECT_EQ("fault_filter_abort", decoder_filter_callbacks_.details_);
+}
+
+TEST_F(FaultFilterTest, HeaderAbortWithGrpcStatus) {
+  decoder_filter_callbacks_.is_grpc_request_ = true;
+  SetUpTest(header_abort_only_yaml);
+
+  request_headers_.addCopy("x-envoy-fault-abort-grpc-request", "5");
+
+  EXPECT_CALL(runtime_.snapshot_,
+              getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
+      .WillOnce(Return(std::numeric_limits<uint64_t>::max()));
+
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::DelayInjected))
+      .Times(0);
+
+  // Abort related calls
+  EXPECT_CALL(runtime_.snapshot_,
+              featureEnabled("fault.http.abort.abort_percent",
+                             Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
+      .WillOnce(Return(true));
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.grpc_status", 5))
+      .WillOnce(Return(5));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
+                                                   {"content-type", "application/grpc"},
+                                                   {"grpc-status", "5"},
+                                                   {"grpc-message", "fault filter abort"}};
+
+  EXPECT_CALL(decoder_filter_callbacks_,
+              encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::FaultInjected));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
+  EXPECT_EQ(1UL, config_->stats().active_faults_.value());
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  filter_->onDestroy();
+
+  EXPECT_EQ(0UL, config_->stats().delays_injected_.value());
+  EXPECT_EQ(1UL, config_->stats().aborts_injected_.value());
+  EXPECT_EQ(0UL, config_->stats().active_faults_.value());
+  EXPECT_EQ("fault_filter_abort", decoder_filter_callbacks_.details_);
+}
+
+TEST_F(FaultFilterTest, HeaderAbortWithHttpAndGrpcStatus) {
+  SetUpTest(header_abort_only_yaml);
+
+  request_headers_.addCopy("x-envoy-fault-abort-request", "429");
+  request_headers_.addCopy("x-envoy-fault-abort-grpc-request", "5");
+
+  EXPECT_CALL(runtime_.snapshot_,
+              getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
+      .WillOnce(Return(std::numeric_limits<uint64_t>::max()));
+
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::DelayInjected))
+      .Times(0);
+
+  // Abort related calls
+  EXPECT_CALL(runtime_.snapshot_,
+              featureEnabled("fault.http.abort.abort_percent",
+                             Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
+      .WillOnce(Return(true));
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", 429))
+      .WillOnce(Return(429));
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.grpc_status", 5)).Times(0);
 
   Http::TestResponseHeaderMapImpl response_headers{
       {":status", "429"}, {"content-length", "18"}, {"content-type", "text/plain"}};
@@ -1032,7 +1185,7 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
   token_timer->invokeCallback();
 
   // Advance time by 1s which should refill all tokens.
-  time_system_.sleep(std::chrono::seconds(1));
+  time_system_.advanceTimeWait(std::chrono::seconds(1));
 
   // Send 1152 bytes of data which is 1s + 2 refill cycles of data.
   EXPECT_CALL(encoder_filter_callbacks_, onEncoderFilterAboveWriteBufferHighWatermark());
@@ -1047,7 +1200,7 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
   token_timer->invokeCallback();
 
   // Fire timer, also advance time.
-  time_system_.sleep(std::chrono::milliseconds(63));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(63));
   EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(63), _));
   EXPECT_CALL(encoder_filter_callbacks_,
               injectEncodedDataToFilterChain(BufferStringEqual(std::string(64, 'a')), false));
@@ -1058,20 +1211,20 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(data3, false));
 
   // Fire timer, also advance time.
-  time_system_.sleep(std::chrono::milliseconds(63));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(63));
   EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(63), _));
   EXPECT_CALL(encoder_filter_callbacks_,
               injectEncodedDataToFilterChain(BufferStringEqual(std::string(64, 'a')), false));
   token_timer->invokeCallback();
 
   // Fire timer, also advance time. No time enable because there is nothing buffered.
-  time_system_.sleep(std::chrono::milliseconds(63));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(63));
   EXPECT_CALL(encoder_filter_callbacks_,
               injectEncodedDataToFilterChain(BufferStringEqual(std::string(64, 'b')), false));
   token_timer->invokeCallback();
 
   // Advance time by 1s for a full refill.
-  time_system_.sleep(std::chrono::seconds(1));
+  time_system_.advanceTimeWait(std::chrono::seconds(1));
 
   // Now send 1024 in one shot with end_stream true which should go through and end the stream.
   EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(0), _));
@@ -1096,6 +1249,7 @@ TEST_F(FaultFilterSettingsTest, CheckDefaultRuntimeKeys) {
   EXPECT_EQ("fault.http.abort.abort_percent", settings.abortPercentRuntime());
   EXPECT_EQ("fault.http.delay.fixed_duration_ms", settings.delayDurationRuntime());
   EXPECT_EQ("fault.http.abort.http_status", settings.abortHttpStatusRuntime());
+  EXPECT_EQ("fault.http.abort.grpc_status", settings.abortGrpcStatusRuntime());
   EXPECT_EQ("fault.http.max_active_faults", settings.maxActiveFaultsRuntime());
   EXPECT_EQ("fault.http.rate_limit.response_percent", settings.responseRateLimitPercentRuntime());
 }
@@ -1105,6 +1259,7 @@ TEST_F(FaultFilterSettingsTest, CheckOverrideRuntimeKeys) {
   fault.set_abort_percent_runtime(std::string("fault.abort_percent_runtime"));
   fault.set_delay_percent_runtime(std::string("fault.delay_percent_runtime"));
   fault.set_abort_http_status_runtime(std::string("fault.abort_http_status_runtime"));
+  fault.set_abort_grpc_status_runtime(std::string("fault.abort_grpc_status_runtime"));
   fault.set_delay_duration_runtime(std::string("fault.delay_duration_runtime"));
   fault.set_max_active_faults_runtime(std::string("fault.max_active_faults_runtime"));
   fault.set_response_rate_limit_percent_runtime(
@@ -1116,6 +1271,7 @@ TEST_F(FaultFilterSettingsTest, CheckOverrideRuntimeKeys) {
   EXPECT_EQ("fault.abort_percent_runtime", settings.abortPercentRuntime());
   EXPECT_EQ("fault.delay_duration_runtime", settings.delayDurationRuntime());
   EXPECT_EQ("fault.abort_http_status_runtime", settings.abortHttpStatusRuntime());
+  EXPECT_EQ("fault.abort_grpc_status_runtime", settings.abortGrpcStatusRuntime());
   EXPECT_EQ("fault.max_active_faults_runtime", settings.maxActiveFaultsRuntime());
   EXPECT_EQ("fault.response_rate_limit_percent_runtime",
             settings.responseRateLimitPercentRuntime());

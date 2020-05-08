@@ -52,12 +52,8 @@ Driver::Driver(const XRayConfiguration& config,
 
   tls_slot_ptr_->set([this, daemon_endpoint,
                       &context](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    std::string span_name = xray_config_.segment_name_.empty()
-                                ? context.serverFactoryContext().localInfo().clusterName()
-                                : xray_config_.segment_name_;
-
     DaemonBrokerPtr broker = std::make_unique<DaemonBrokerImpl>(daemon_endpoint);
-    TracerPtr tracer = std::make_unique<Tracer>(span_name, std::move(broker),
+    TracerPtr tracer = std::make_unique<Tracer>(xray_config_.segment_name_, std::move(broker),
                                                 context.serverFactoryContext().timeSource());
     return std::make_shared<XRay::Driver::TlsTracer>(std::move(tracer), *this);
   });
@@ -99,9 +95,11 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
   }
 
   if (!should_trace.has_value()) {
+    const absl::string_view path =
+        request_headers.Path() ? request_headers.Path()->value().getStringView() : "";
     const SamplingRequest request{std::string{request_headers.Host()->value().getStringView()},
                                   std::string{request_headers.Method()->value().getStringView()},
-                                  std::string{request_headers.Path()->value().getStringView()}};
+                                  std::string{path}};
 
     should_trace = sampling_strategy_->shouldTrace(request);
   }

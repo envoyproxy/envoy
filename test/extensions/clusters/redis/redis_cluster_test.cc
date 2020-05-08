@@ -101,12 +101,12 @@ protected:
                                            ProtobufWkt::Struct::default_instance(),
                                            ProtobufMessage::getStrictValidationVisitor(), config);
     cluster_callback_ = std::make_shared<NiceMock<MockClusterSlotUpdateCallBack>>();
-    cluster_.reset(new RedisCluster(
+    cluster_ = std::make_shared<RedisCluster>(
         cluster_config,
         TestUtility::downcastAndValidate<const envoy::config::cluster::redis::RedisClusterConfig&>(
             config),
         *this, cm, runtime_, *api_, dns_resolver_, factory_context, std::move(scope), false,
-        cluster_callback_));
+        cluster_callback_);
     // This allows us to create expectation on cluster slot response without waiting for
     // makeRequest.
     pool_callbacks_ = &cluster_->redis_discovery_session_;
@@ -150,7 +150,8 @@ protected:
                               Network::DnsResolver::ResolutionStatus status =
                                   Network::DnsResolver::ResolutionStatus::Success) {
     EXPECT_CALL(*dns_resolver_, resolve(expected_address, dns_lookup_family, _))
-        .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
+        .WillOnce(Invoke([status, resolved_addresses](
+                             const std::string&, Network::DnsLookupFamily,
                              Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
           cb(status, TestUtility::makeDnsResponse(resolved_addresses));
           return nullptr;
@@ -685,7 +686,7 @@ TEST_F(RedisClusterTest, FailedDnsResponse) {
 
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(1U, cluster_->info()->stats().update_empty_.value());
+  EXPECT_EQ(0U, cluster_->info()->stats().update_empty_.value());
 
   // Does not recreate the timer on subsequent DNS resolve calls.
   EXPECT_CALL(*dns_timer, enableTimer(_, _));
@@ -694,7 +695,7 @@ TEST_F(RedisClusterTest, FailedDnsResponse) {
 
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(2U, cluster_->info()->stats().update_empty_.value());
+  EXPECT_EQ(1U, cluster_->info()->stats().update_empty_.value());
 }
 
 TEST_F(RedisClusterTest, Basic) {

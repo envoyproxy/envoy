@@ -3,6 +3,7 @@
 #include "envoy/config/config_provider.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/http/filter.h"
+#include "envoy/http/request_id_extension.h"
 #include "envoy/router/rds.h"
 #include "envoy/stats/scope.h"
 #include "envoy/tracing/http_tracer.h"
@@ -194,6 +195,11 @@ public:
   virtual ~ConnectionManagerConfig() = default;
 
   /**
+   * @return RequestIDExtensionSharedPtr The request id utilities instance to use
+   */
+  virtual RequestIDExtensionSharedPtr requestIDExtension() PURE;
+
+  /**
    *  @return const std::list<AccessLog::InstanceSharedPtr>& the access logs to write to.
    */
   virtual const std::list<AccessLog::InstanceSharedPtr>& accessLogs() PURE;
@@ -238,6 +244,11 @@ public:
    * @return whether the x-request-id should not be reset on edge entry inside mesh
    */
   virtual bool preserveExternalRequestId() const PURE;
+
+  /**
+   * @return whether the x-request-id should always be set in the response.
+   */
+  virtual bool alwaysSetRequestIdInResponse() const PURE;
 
   /**
    * @return optional idle timeout for incoming connection manager connections.
@@ -412,6 +423,24 @@ public:
    * one.
    */
   virtual bool shouldMergeSlashes() const PURE;
+
+  /**
+   * @return if the HttpConnectionManager should remove the port from host/authority header
+   */
+  virtual bool shouldStripMatchingPort() const PURE;
+
+  /**
+   * @return the action HttpConnectionManager should take when receiving client request
+   * headers containing underscore characters.
+   */
+  virtual envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+  headersWithUnderscoresAction() const PURE;
+
+  /**
+   * @return if the HttpConnectionManager should preserve the `date` response header sent by the
+   * upstream host.
+   */
+  virtual bool shouldPreserveUpstreamDate() const PURE;
 };
 } // namespace Http
 } // namespace Envoy

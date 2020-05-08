@@ -2,7 +2,7 @@
 
 #include <datadog/opentracing.h>
 
-#include "envoy/config/trace/v3/trace.pb.h"
+#include "envoy/config/trace/v3/datadog.pb.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/thread_local/thread_local.h"
@@ -12,6 +12,7 @@
 #include "common/http/async_client_utility.h"
 #include "common/http/header_map_impl.h"
 #include "common/json/json_loader.h"
+#include "common/upstream/cluster_update_tracker.h"
 
 #include "extensions/tracers/common/ot/opentracing_driver_impl.h"
 
@@ -23,6 +24,7 @@ namespace Datadog {
 #define DATADOG_TRACER_STATS(COUNTER)                                                              \
   COUNTER(traces_sent)                                                                             \
   COUNTER(timer_flushed)                                                                           \
+  COUNTER(reports_skipped_no_cluster)                                                              \
   COUNTER(reports_sent)                                                                            \
   COUNTER(reports_dropped)                                                                         \
   COUNTER(reports_failed)
@@ -49,10 +51,8 @@ public:
 
   // Getters to return the DatadogDriver's key members.
   Upstream::ClusterManager& clusterManager() { return cm_; }
-  Upstream::ClusterInfoConstSharedPtr cluster() { return cluster_; }
-  Runtime::Loader& runtime() { return runtime_; }
+  const std::string& cluster() { return cluster_; }
   DatadogTracerStats& tracerStats() { return tracer_stats_; }
-  const datadog::opentracing::TracerOptions& tracerOptions() { return tracer_options_; }
 
   // Tracer::OpenTracingDriver
   opentracing::Tracer& tracer() override;
@@ -74,11 +74,10 @@ private:
   };
 
   Upstream::ClusterManager& cm_;
-  Upstream::ClusterInfoConstSharedPtr cluster_;
+  std::string cluster_;
   DatadogTracerStats tracer_stats_;
   datadog::opentracing::TracerOptions tracer_options_;
   ThreadLocal::SlotPtr tls_;
-  Runtime::Loader& runtime_;
 };
 
 /**
@@ -129,6 +128,7 @@ private:
 
   std::map<std::string, Http::LowerCaseString> lower_case_headers_;
 
+  Upstream::ClusterUpdateTracker collector_cluster_;
   // Track active HTTP requests to be able to cancel them on destruction.
   Http::AsyncClientRequestTracker active_requests_;
 };

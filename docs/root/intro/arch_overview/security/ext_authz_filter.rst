@@ -21,8 +21,8 @@ The external authorization service cluster may be either statically configured o
 the :ref:`Cluster Discovery Service <config_cluster_manager_cds>`. If the external service is not
 available when a request comes in then whether the request is authorized or not is defined by the
 configuration setting of *failure_mode_allow* configuration in the applicable
-:ref:`network filter <envoy_api_msg_config.filter.network.ext_authz.v2.ExtAuthz>` or
-:ref:`HTTP filter <envoy_api_msg_config.filter.http.ext_authz.v2.ExtAuthz>`. If it is set to
+:ref:`network filter <envoy_v3_api_msg_extensions.filters.network.ext_authz.v3.ExtAuthz>` or
+:ref:`HTTP filter <envoy_v3_api_msg_extensions.filters.http.ext_authz.v3.ExtAuthz>`. If it is set to
 true then the request will be permitted (fail open) otherwise it will be denied.
 The default setting is *false*.
 
@@ -32,7 +32,7 @@ Service Definition
 The context of the traffic is passed on to an external authorization service using the service
 definition listed here.
 The content of the request that are passed to an authorization service is specified by
-:ref:`CheckRequest <envoy_api_msg_service.auth.v2.CheckRequest>`.
+:ref:`CheckRequest <envoy_v3_api_msg_service.auth.v3.CheckRequest>`.
 
 .. toctree::
   :glob:

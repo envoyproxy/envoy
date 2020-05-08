@@ -357,16 +357,24 @@ HttpIntegrationTest::waitForNextUpstreamRequest(const std::vector<uint64_t>& ups
   absl::optional<uint64_t> upstream_with_request;
   // If there is no upstream connection, wait for it to be established.
   if (!fake_upstream_connection_) {
-
     AssertionResult result = AssertionFailure();
-    for (auto upstream_index : upstream_indices) {
-      result = fake_upstreams_[upstream_index]->waitForHttpConnection(
-          *dispatcher_, fake_upstream_connection_, connection_wait_timeout, max_request_headers_kb_,
-          max_request_headers_count_);
+    int upstream_index = 0;
+    Event::TestTimeSystem& time_system = timeSystem();
+    auto end_time = time_system.monotonicTime() + connection_wait_timeout;
+    // Loop over the upstreams until the call times out or an upstream request is received.
+    while (!result) {
+      upstream_index = upstream_index % upstream_indices.size();
+      result = fake_upstreams_[upstream_indices[upstream_index]]->waitForHttpConnection(
+          *dispatcher_, fake_upstream_connection_, std::chrono::milliseconds(5),
+          max_request_headers_kb_, max_request_headers_count_);
       if (result) {
         upstream_with_request = upstream_index;
         break;
+      } else if (time_system.monotonicTime() >= end_time) {
+        result = (AssertionFailure() << "Timed out waiting for new connection.");
+        break;
       }
+      ++upstream_index;
     }
     RELEASE_ASSERT(result, result.message());
   }
@@ -398,7 +406,7 @@ void HttpIntegrationTest::checkSimpleRequestSuccess(uint64_t expected_request_si
 }
 
 void HttpIntegrationTest::testRouterRequestAndResponseWithBody(
-    uint64_t request_size, uint64_t response_size, bool big_header,
+    uint64_t request_size, uint64_t response_size, bool big_header, bool set_content_length_header,
     ConnectionCreationFunction* create_connection) {
   initialize();
   codec_client_ = makeHttpConnection(
@@ -406,11 +414,16 @@ void HttpIntegrationTest::testRouterRequestAndResponseWithBody(
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},    {":path", "/test/long/url"}, {":scheme", "http"},
       {":authority", "host"}, {"x-lyft-user-id", "123"},   {"x-forwarded-for", "10.0.0.1"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  if (set_content_length_header) {
+    request_headers.setContentLength(request_size);
+    response_headers.setContentLength(response_size);
+  }
   if (big_header) {
     request_headers.addCopy("big", std::string(4096, 'a'));
   }
-  auto response = sendRequestAndWaitForResponse(request_headers, request_size,
-                                                default_response_headers_, response_size);
+  auto response =
+      sendRequestAndWaitForResponse(request_headers, request_size, response_headers, response_size);
   checkSimpleRequestSuccess(request_size, response_size, response.get());
 }
 
@@ -1198,10 +1211,101 @@ void HttpIntegrationTest::testAdminDrain(Http::CodecClient::Type admin_request_t
   test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
 
   // Validate that port is closed and can be bound by other sockets.
-  EXPECT_NO_THROW(Network::TcpListenSocket(
-      Network::Utility::getAddressWithPort(*Network::Test::getCanonicalLoopbackAddress(version_),
-                                           http_port),
-      nullptr, true));
+  // This does not work for HTTP/3 because the port is not closed until the listener is completely
+  // destroyed. TODO(danzh) Match TCP behavior as much as possible.
+  if (downstreamProtocol() != Http::CodecClient::Type::HTTP3) {
+    EXPECT_NO_THROW(Network::TcpListenSocket(
+        Network::Utility::getAddressWithPort(*Network::Test::getCanonicalLoopbackAddress(version_),
+                                             http_port),
+        nullptr, true));
+  }
+}
+
+void HttpIntegrationTest::testMaxStreamDuration() {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* static_resources = bootstrap.mutable_static_resources();
+    auto* cluster = static_resources->mutable_clusters(0);
+    auto* http_protocol_options = cluster->mutable_common_http_protocol_options();
+    http_protocol_options->mutable_max_stream_duration()->MergeFrom(
+        ProtobufUtil::TimeUtil::MillisecondsToDuration(200));
+  });
+
+  initialize();
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_max_duration_reached", 1);
+
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+    codec_client_->waitForDisconnect();
+  } else {
+    response->waitForReset();
+    codec_client_->close();
+  }
+}
+
+void HttpIntegrationTest::testMaxStreamDurationWithRetry(bool invoke_retry_upstream_disconnect) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* static_resources = bootstrap.mutable_static_resources();
+    auto* cluster = static_resources->mutable_clusters(0);
+    auto* http_protocol_options = cluster->mutable_common_http_protocol_options();
+    http_protocol_options->mutable_max_stream_duration()->MergeFrom(
+        ProtobufUtil::TimeUtil::MillisecondsToDuration(1000));
+  });
+
+  Http::TestRequestHeaderMapImpl retriable_header = Http::TestRequestHeaderMapImpl{
+      {":method", "POST"},    {":path", "/test/long/url"},     {":scheme", "http"},
+      {":authority", "host"}, {"x-forwarded-for", "10.0.0.1"}, {"x-envoy-retry-on", "5xx"}};
+  initialize();
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto encoder_decoder = codec_client_->startRequest(retriable_header);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  } else {
+    ASSERT_TRUE(upstream_request_->waitForReset());
+  }
+
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_max_duration_reached", 1);
+
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+  if (invoke_retry_upstream_disconnect) {
+    test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_max_duration_reached", 2);
+    if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+      codec_client_->waitForDisconnect();
+    } else {
+      response->waitForReset();
+      codec_client_->close();
+    }
+
+    EXPECT_EQ("408", response->headers().Status()->value().getStringView());
+  } else {
+    Http::TestHeaderMapImpl response_headers{{":status", "200"}};
+    upstream_request_->encodeHeaders(response_headers, true);
+
+    response->waitForHeaders();
+    codec_client_->close();
+
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  }
 }
 
 std::string HttpIntegrationTest::listenerStatPrefix(const std::string& stat_name) {

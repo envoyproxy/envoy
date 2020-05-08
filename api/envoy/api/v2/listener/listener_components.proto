@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.api.v2.listener;
 
-import "envoy/api/v2/auth/cert.proto";
+import "envoy/api/v2/auth/tls.proto";
 import "envoy/api/v2/core/address.proto";
 import "envoy/api/v2/core/base.proto";
 import "envoy/type/range.proto";
@@ -21,7 +21,7 @@ option java_multiple_files = true;
 option csharp_namespace = "Envoy.Api.V2.ListenerNS";
 option ruby_package = "Envoy.Api.V2.ListenerNS";
 option (udpa.annotations.file_migrate).move_to_package = "envoy.config.listener.v3";
-option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (udpa.annotations.file_status).package_version_status = FROZEN;
 
 // [#protodoc-title: Listener components]
 // Listener :ref:`configuration overview <config_listeners>`
@@ -209,9 +209,32 @@ message FilterChain {
   string name = 7;
 }
 
-// [#not-implemented-hide:]
 // Listener filter chain match configuration. This is a recursive structure which allows complex
 // nested match configurations to be built using various logical operators.
+//
+// Examples:
+//
+// * Matches if the destination port is 3306.
+//
+// .. code-block:: yaml
+//
+//  destination_port_range:
+//   start: 3306
+//   end: 3307
+//
+// * Matches if the destination port is 3306 or 15000.
+//
+// .. code-block:: yaml
+//
+//  or_match:
+//    rules:
+//      - destination_port_range:
+//          start: 3306
+//          end: 3306
+//      - destination_port_range:
+//          start: 15000
+//          end: 15001
+//
 // [#next-free-field: 6]
 message ListenerFilterChainMatchPredicate {
   // A set of match configurations used for logical operations.
@@ -257,17 +280,8 @@ message ListenerFilter {
     google.protobuf.Any typed_config = 3;
   }
 
-  // [#not-implemented-hide:]
-  // Decide when to disable this listener filter on incoming traffic.
-  // Example:
-  // 0. always enable filter
-  //    don't set `filter_disabled`
-  // 1. disable when the destination port is 3306
-  //    rule.destination_port_range = Int32Range {start = 3306, end = 3307}
-  // 2. disable when the destination port is 3306 or 15000
-  //    rule.or_match = MatchSet.rules [
-  //       rule.destination_port_range = Int32Range {start = 3306, end = 3307},
-  //       rule.destination_port_range = Int32Range {start = 15000, end = 15001},
-  //    ]
+  // Optional match predicate used to disable the filter. The filter is enabled when this field is empty.
+  // See :ref:`ListenerFilterChainMatchPredicate <envoy_api_msg_listener.ListenerFilterChainMatchPredicate>`
+  // for further examples.
   ListenerFilterChainMatchPredicate filter_disabled = 4;
 }

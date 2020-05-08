@@ -71,7 +71,7 @@ protected:
   }
 
   std::unique_ptr<Event::TestTimeSystem> time_system_;
-  Stats::IsolatedStoreImpl stats_store_;
+  Stats::TestUtil::TestStore stats_store_;
   Api::ApiPtr api_;
   std::unique_ptr<GuardDogImpl> guard_dog_;
 };
@@ -100,7 +100,7 @@ protected:
     initGuardDog(fakestats_, config_kill_);
     unpet_dog_ = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
     guard_dog_->forceCheckForTest();
-    time_system_->sleep(std::chrono::milliseconds(99)); // 1 ms shy of death.
+    time_system_->advanceTimeWait(std::chrono::milliseconds(99)); // 1 ms shy of death.
   }
 
   /**
@@ -116,7 +116,7 @@ protected:
     auto second_dog_ =
         guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
     guard_dog_->forceCheckForTest();
-    time_system_->sleep(std::chrono::milliseconds(499)); // 1 ms shy of multi-death.
+    time_system_->advanceTimeWait(std::chrono::milliseconds(499)); // 1 ms shy of multi-death.
   }
 
   NiceMock<Configuration::MockMain> config_kill_;
@@ -142,7 +142,7 @@ TEST_P(GuardDogDeathTest, KillDeathTest) {
   // Is it German for "The Function"? Almost...
   auto die_function = [&]() -> void {
     SetupForDeath();
-    time_system_->sleep(std::chrono::milliseconds(401)); // 400 ms past death.
+    time_system_->advanceTimeWait(std::chrono::milliseconds(401)); // 400 ms past death.
     guard_dog_->forceCheckForTest();
   };
 
@@ -161,7 +161,7 @@ TEST_P(GuardDogAlmostDeadTest, KillNoFinalCheckTest) {
 TEST_P(GuardDogDeathTest, MultiKillDeathTest) {
   auto die_function = [&]() -> void {
     SetupForMultiDeath();
-    time_system_->sleep(std::chrono::milliseconds(2)); // 1 ms past multi-death.
+    time_system_->advanceTimeWait(std::chrono::milliseconds(2)); // 1 ms past multi-death.
     guard_dog_->forceCheckForTest();
   };
   EXPECT_DEATH(die_function(), "");
@@ -187,7 +187,7 @@ TEST_P(GuardDogAlmostDeadTest, NearDeathTest) {
   // only one is nonresponsive, so there should be no kill (single kill
   // threshold of 1s is not reached).
   for (int i = 0; i < 6; i++) {
-    time_system_->sleep(std::chrono::milliseconds(100));
+    time_system_->advanceTimeWait(std::chrono::milliseconds(100));
     pet_dog->touch();
     guard_dog_->forceCheckForTest();
   }
@@ -230,11 +230,11 @@ TEST_P(GuardDogMissTest, MissTest) {
   // We'd better start at 0:
   checkMiss(0, "MissTest check 1");
   // At 300ms we shouldn't have hit the timeout yet:
-  time_system_->sleep(std::chrono::milliseconds(300));
+  time_system_->advanceTimeWait(std::chrono::milliseconds(300));
   guard_dog_->forceCheckForTest();
   checkMiss(0, "MissTest check 2");
   // This should push it past the 500ms limit:
-  time_system_->sleep(std::chrono::milliseconds(250));
+  time_system_->advanceTimeWait(std::chrono::milliseconds(250));
   guard_dog_->forceCheckForTest();
   checkMiss(1, "MissTest check 3");
   guard_dog_->stopWatching(unpet_dog);
@@ -255,11 +255,11 @@ TEST_P(GuardDogMissTest, MegaMissTest) {
   // We'd better start at 0:
   checkMegaMiss(0, "MegaMissTest check 1");
   // This shouldn't be enough to increment the stat:
-  time_system_->sleep(std::chrono::milliseconds(499));
+  time_system_->advanceTimeWait(std::chrono::milliseconds(499));
   guard_dog_->forceCheckForTest();
   checkMegaMiss(0, "MegaMissTest check 2");
   // Just 2ms more will make it greater than 500ms timeout:
-  time_system_->sleep(std::chrono::milliseconds(2));
+  time_system_->advanceTimeWait(std::chrono::milliseconds(2));
   guard_dog_->forceCheckForTest();
   checkMegaMiss(1, "MegaMissTest check 3");
   guard_dog_->stopWatching(unpet_dog);
@@ -284,14 +284,14 @@ TEST_P(GuardDogMissTest, MissCountTest) {
   for (unsigned long i = 0; i < 2; i++) {
     EXPECT_EQ(i, stats_store_.counter("server.watchdog_miss").value());
     // This shouldn't be enough to increment the stat:
-    time_system_->sleep(std::chrono::milliseconds(499));
+    time_system_->advanceTimeWait(std::chrono::milliseconds(499));
     guard_dog_->forceCheckForTest();
     checkMiss(i, "MissCountTest check 1");
     // And if we force re-execution of the loop it still shouldn't be:
     guard_dog_->forceCheckForTest();
     checkMiss(i, "MissCountTest check 2");
     // Just 2ms more will make it greater than 500ms timeout:
-    time_system_->sleep(std::chrono::milliseconds(2));
+    time_system_->advanceTimeWait(std::chrono::milliseconds(2));
     guard_dog_->forceCheckForTest();
     checkMiss(i + 1, "MissCountTest check 3");
     // Spurious wakeup, we should still only have one miss counted.
@@ -301,11 +301,11 @@ TEST_P(GuardDogMissTest, MissCountTest) {
     // timeout value expires:
     sometimes_pet_dog->touch();
   }
-  time_system_->sleep(std::chrono::milliseconds(1000));
+  time_system_->advanceTimeWait(std::chrono::milliseconds(1000));
   sometimes_pet_dog->touch();
   // Make sure megamiss still works:
   checkMegaMiss(0UL, "MissCountTest check 5");
-  time_system_->sleep(std::chrono::milliseconds(1500));
+  time_system_->advanceTimeWait(std::chrono::milliseconds(1500));
   guard_dog_->forceCheckForTest();
   checkMegaMiss(1UL, "MissCountTest check 6");
 

@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.api.v2.core;
 
 import "envoy/api/v2/core/base.proto";
+import "envoy/api/v2/core/event_service_config.proto";
 import "envoy/type/http.proto";
 import "envoy/type/matcher/string.proto";
 import "envoy/type/range.proto";
@@ -21,7 +22,7 @@ option java_package = "io.envoyproxy.envoy.api.v2.core";
 option java_outer_classname = "HealthCheckProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package = "envoy.config.core.v3";
-option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (udpa.annotations.file_status).package_version_status = FROZEN;
 
 // [#protodoc-title: Health check]
 // * Health checking :ref:`architecture overview <arch_overview_health_checking>`.
@@ -54,7 +55,7 @@ enum HealthStatus {
   DEGRADED = 5;
 }
 
-// [#next-free-field: 22]
+// [#next-free-field: 23]
 message HealthCheck {
   // Describes the encoding of the payload bytes in the payload.
   message Payload {
@@ -73,7 +74,8 @@ message HealthCheck {
   message HttpHealthCheck {
     // The value of the host header in the HTTP health check request. If
     // left empty (default value), the name of the cluster this health check is associated
-    // with will be used.
+    // with will be used. The host header can be customized for a specific endpoint by setting the
+    // :ref:`hostname <envoy_api_field_endpoint.Endpoint.HealthCheckConfig.hostname>` field.
     string host = 1;
 
     // Specifies the HTTP path that will be requested during health checking. For example
@@ -160,7 +162,8 @@ message HealthCheck {
 
     // The value of the :authority header in the gRPC health check request. If
     // left empty (default value), the name of the cluster this health check is associated
-    // with will be used.
+    // with will be used. The authority header can be customized for a specific endpoint by setting
+    // the :ref:`hostname <envoy_api_field_endpoint.Endpoint.HealthCheckConfig.hostname>` field.
     string authority = 2;
   }
 
@@ -289,6 +292,11 @@ message HealthCheck {
   // Specifies the path to the :ref:`health check event log <arch_overview_health_check_logging>`.
   // If empty, no event log will be written.
   string event_log_path = 17;
+
+  // [#not-implemented-hide:]
+  // The gRPC service for the health check event service.
+  // If empty, health check events won't be sent to a remote endpoint.
+  EventServiceConfig event_service = 22;
 
   // If set to true, health check failure events will always be logged. If set to false, only the
   // initial health check failure event will be logged.

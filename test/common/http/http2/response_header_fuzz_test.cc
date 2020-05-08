@@ -8,8 +8,6 @@
 #include "test/common/http/http2/frame_replay.h"
 #include "test/fuzz/fuzz_runner.h"
 
-using testing::AnyNumber;
-
 namespace Envoy {
 namespace Http {
 namespace Http2 {
@@ -19,8 +17,10 @@ void Replay(const Frame& frame, ClientCodecFrameInjector& codec) {
   // Create the client connection containing the nghttp2 session.
   TestClientConnectionImpl connection(
       codec.client_connection_, codec.client_callbacks_, codec.stats_store_, codec.options_,
-      Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT);
+      Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
+      ProdNghttp2SessionFactory::get());
   // Create a new stream.
+  Http::Status status = Http::okStatus();
   codec.request_encoder_ = &connection.newStream(codec.response_decoder_);
   codec.request_encoder_->getStream().addCallbacks(codec.client_stream_callbacks_);
   // Setup a single stream to inject frames as a reply to.
@@ -29,12 +29,9 @@ void Replay(const Frame& frame, ClientCodecFrameInjector& codec) {
   codec.request_encoder_->encodeHeaders(request_headers, true);
 
   // Send frames.
-  codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
-  codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection);
-  try {
-    codec.write(frame, connection);
-  } catch (const CodecProtocolException& e) {
-  }
+  status = codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
+  status = codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection);
+  status = codec.write(frame, connection);
 }
 
 DEFINE_FUZZER(const uint8_t* buf, size_t len) {

@@ -5,6 +5,7 @@ package envoy.config.trace.v3;
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
 
+import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -12,7 +13,8 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.trace.v3";
 option java_outer_classname = "XrayProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+option (udpa.annotations.file_migrate).move_to_package = "envoy.extensions.tracers.xray.v4alpha";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: AWS X-Ray Tracer Configuration]
 // Configuration for AWS X-Ray tracer
@@ -25,8 +27,8 @@ message XRayConfig {
   // If this value is not set, the default value of 127.0.0.1:2000 will be used.
   core.v3.SocketAddress daemon_endpoint = 1;
 
-  // The name of the X-Ray segment. By default this will be set to the cluster name.
-  string segment_name = 2;
+  // The name of the X-Ray segment.
+  string segment_name = 2 [(validate.rules).string = {min_len: 1}];
 
   // The location of a local custom sampling rules JSON file.
   // For an example of the sampling rules see:

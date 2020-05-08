@@ -36,6 +36,7 @@ public:
   MOCK_METHOD(void, sendMessageRaw_, (Buffer::InstancePtr & request, bool end_stream));
   MOCK_METHOD(void, closeStream, ());
   MOCK_METHOD(void, resetStream, ());
+  MOCK_METHOD(bool, isAboveWriteBufferHighWatermark, (), (const));
 };
 
 template <class ResponseType>
@@ -74,7 +75,7 @@ public:
 class MockAsyncClient : public RawAsyncClient {
 public:
   MockAsyncClient();
-  ~MockAsyncClient();
+  ~MockAsyncClient() override;
 
   MOCK_METHOD(AsyncRequest*, sendRaw,
               (absl::string_view service_full_name, absl::string_view method_name,

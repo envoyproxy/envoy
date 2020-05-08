@@ -2,6 +2,10 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.grpc_stats.v3;
 
+import "envoy/config/core/v3/grpc_method_list.proto";
+
+import "google/protobuf/wrappers.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -9,7 +13,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.grpc_stats.v3";
 option java_outer_classname = "ConfigProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: gRPC statistics] gRPC statistics filter
 // :ref:`configuration overview <config_http_filters_grpc_stats>`.
@@ -23,6 +27,41 @@ message FilterConfig {
   // If true, the filter maintains a filter state object with the request and response message
   // counts.
   bool emit_filter_state = 1;
+
+  oneof per_method_stat_specifier {
+    // If set, specifies an allowlist of service/methods that will have individual stats
+    // emitted for them. Any call that does not match the allowlist will be counted
+    // in a stat with no method specifier: `cluster.<name>.grpc.*`.
+    config.core.v3.GrpcMethodList individual_method_stats_allowlist = 2;
+
+    // If set to true, emit stats for all service/method names.
+    //
+    // If set to false, emit stats for all service/message types to the same stats without including
+    // the service/method in the name, with prefix `cluster.<name>.grpc`. This can be useful if
+    // service/method granularity is not needed, or if each cluster only receives a single method.
+    //
+    // .. attention::
+    //   This option is only safe if all clients are trusted. If this option is enabled
+    //   with untrusted clients, the clients could cause unbounded growth in the number of stats in
+    //   Envoy, using unbounded memory and potentially slowing down stats pipelines.
+    //
+    // .. attention::
+    //   If neither `individual_method_stats_allowlist` nor `stats_for_all_methods` is set, the
+    //   behavior will default to `stats_for_all_methods=true`. This default value is deprecated,
+    //   and in a future release, if neither field is set, it will default to
+    //   `stats_for_all_methods=false` in order to be safe by default. This behavior can be
+    //   controlled with runtime override
+    //   `envoy.deprecated_features.grpc_stats_filter_enable_stats_for_all_methods_by_default`.
+    google.protobuf.BoolValue stats_for_all_methods = 3;
+  }
+
+  // If true, the filter will gather a histogram for the request time of the upstream.
+  // It works with :ref:`stats_for_all_methods
+  // <envoy_api_field_extensions.filters.http.grpc_stats.v3.FilterConfig.stats_for_all_methods>`
+  // and :ref:`individual_method_stats_allowlist
+  // <envoy_api_field_extensions.filters.http.grpc_stats.v3.FilterConfig.individual_method_stats_allowlist>` the same way
+  // request_message_count and response_message_count works.
+  bool enable_upstream_stats = 4;
 }
 
 // gRPC statistics filter state object in protobuf form.

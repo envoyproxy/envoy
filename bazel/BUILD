@@ -43,12 +43,6 @@ genrule(
     stamp = 1,
 )
 
-sh_binary(
-    name = "fuzzit_wrapper",
-    srcs = ["fuzzit_wrapper.sh"],
-    data = ["@fuzzit_linux//:fuzzit"],
-)
-
 # A target to optionally link C++ standard library dynamically in sanitizer runs.
 # TSAN doesn't support libc/libstdc++ static linking per doc:
 #   http://releases.llvm.org/8.0.1/tools/clang/docs/ThreadSanitizer.html
@@ -108,6 +102,11 @@ config_setting(
 )
 
 config_setting(
+    name = "no_debug_info",
+    values = {"define": "no_debug_info=1"},
+)
+
+config_setting(
     name = "asan_build",
     values = {"define": "ENVOY_CONFIG_ASAN=1"},
 )
@@ -125,6 +124,11 @@ config_setting(
 config_setting(
     name = "coverage_build",
     values = {"define": "ENVOY_CONFIG_COVERAGE=1"},
+)
+
+config_setting(
+    name = "compdb_build",
+    values = {"define": "ENVOY_CONFIG_COMPILATION_DATABASE=1"},
 )
 
 config_setting(

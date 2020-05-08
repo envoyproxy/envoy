@@ -13,7 +13,6 @@
 #include "common/common/cleanup.h"
 #include "common/common/utility.h"
 #include "common/config/api_version.h"
-#include "common/config/resources.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 
@@ -30,9 +29,11 @@ CdsApiPtr CdsApiImpl::create(const envoy::config::core::v3::ConfigSource& cds_co
 
 CdsApiImpl::CdsApiImpl(const envoy::config::core::v3::ConfigSource& cds_config, ClusterManager& cm,
                        Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor)
-    : cm_(cm), scope_(scope.createScope("cluster_manager.cds.")),
+    : Envoy::Config::SubscriptionBase<envoy::config::cluster::v3::Cluster>(
+          cds_config.resource_api_version()),
+      cm_(cm), scope_(scope.createScope("cluster_manager.cds.")),
       validation_visitor_(validation_visitor) {
-  const auto resource_name = getResourceName(cds_config.resource_api_version());
+  const auto resource_name = getResourceName();
   subscription_ = cm_.subscriptionFactory().subscriptionFromConfigSource(
       cds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this);
 }
@@ -66,9 +67,11 @@ void CdsApiImpl::onConfigUpdate(
     const std::string& system_version_info) {
   std::unique_ptr<Cleanup> maybe_eds_resume;
   if (cm_.adsMux()) {
-    cm_.adsMux()->pause(Config::TypeUrl::get().ClusterLoadAssignment);
-    maybe_eds_resume = std::make_unique<Cleanup>(
-        [this] { cm_.adsMux()->resume(Config::TypeUrl::get().ClusterLoadAssignment); });
+    const auto type_url = Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+        envoy::config::core::v3::ApiVersion::V2);
+    cm_.adsMux()->pause(type_url);
+    maybe_eds_resume =
+        std::make_unique<Cleanup>([this, type_url] { cm_.adsMux()->resume(type_url); });
   }
 
   ENVOY_LOG(info, "cds: add {} cluster(s), remove {} cluster(s)", added_resources.size(),

@@ -6,10 +6,12 @@
 #include "envoy/common/time.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/http/header_map.h"
+#include "envoy/http/request_id_extension.h"
 #include "envoy/stream_info/stream_info.h"
 
 #include "common/common/assert.h"
 #include "common/common/dump_state_utils.h"
+#include "common/http/request_id_extension_impl.h"
 #include "common/stream_info/filter_state_impl.h"
 
 namespace Envoy {
@@ -17,23 +19,20 @@ namespace StreamInfo {
 
 struct StreamInfoImpl : public StreamInfo {
   StreamInfoImpl(TimeSource& time_source)
-      : time_source_(time_source), start_time_(time_source.systemTime()),
-        start_time_monotonic_(time_source.monotonicTime()),
-        filter_state_(std::make_shared<FilterStateImpl>(FilterState::LifeSpan::FilterChain)) {}
+      : StreamInfoImpl(absl::nullopt, time_source,
+                       std::make_shared<FilterStateImpl>(FilterState::LifeSpan::FilterChain)) {}
 
   StreamInfoImpl(Http::Protocol protocol, TimeSource& time_source)
-      : time_source_(time_source), start_time_(time_source.systemTime()),
-        start_time_monotonic_(time_source.monotonicTime()), protocol_(protocol),
-        filter_state_(std::make_shared<FilterStateImpl>(FilterState::LifeSpan::FilterChain)) {}
+      : StreamInfoImpl(protocol, time_source,
+                       std::make_shared<FilterStateImpl>(FilterState::LifeSpan::FilterChain)) {}
 
   StreamInfoImpl(Http::Protocol protocol, TimeSource& time_source,
                  std::shared_ptr<FilterState>& parent_filter_state)
-      : time_source_(time_source), start_time_(time_source.systemTime()),
-        start_time_monotonic_(time_source.monotonicTime()), protocol_(protocol),
-        filter_state_(std::make_shared<FilterStateImpl>(
-            FilterStateImpl::LazyCreateAncestor(parent_filter_state,
-                                                FilterState::LifeSpan::DownstreamConnection),
-            FilterState::LifeSpan::FilterChain)) {}
+      : StreamInfoImpl(protocol, time_source,
+                       std::make_shared<FilterStateImpl>(
+                           FilterStateImpl::LazyCreateAncestor(parent_filter_state,
+                                                               FilterState::LifeSpan::Connection),
+                           FilterState::LifeSpan::FilterChain)) {}
 
   SystemTime startTime() const override { return start_time_; }
 
@@ -246,6 +245,13 @@ struct StreamInfoImpl : public StreamInfo {
 
   const Http::RequestHeaderMap* getRequestHeaders() const override { return request_headers_; }
 
+  void setRequestIDExtension(Http::RequestIDExtensionSharedPtr utils) override {
+    request_id_extension_ = utils;
+  }
+  Http::RequestIDExtensionSharedPtr getRequestIDExtension() const override {
+    return request_id_extension_;
+  }
+
   void dumpState(std::ostream& os, int indent_level = 0) const {
     const char* spaces = spacesForLevel(indent_level);
     os << spaces << "StreamInfoImpl " << this << DUMP_OPTIONAL_MEMBER(protocol_)
@@ -284,6 +290,13 @@ struct StreamInfoImpl : public StreamInfo {
   std::string route_name_;
 
 private:
+  StreamInfoImpl(absl::optional<Http::Protocol> protocol, TimeSource& time_source,
+                 FilterStateSharedPtr filter_state)
+      : time_source_(time_source), start_time_(time_source.systemTime()),
+        start_time_monotonic_(time_source.monotonicTime()), protocol_(protocol),
+        filter_state_(std::move(filter_state)),
+        request_id_extension_(Http::RequestIDExtensionFactory::noopInstance()) {}
+
   uint64_t bytes_received_{};
   uint64_t bytes_sent_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
@@ -294,6 +307,7 @@ private:
   Ssl::ConnectionInfoConstSharedPtr upstream_ssl_info_;
   std::string requested_server_name_;
   const Http::RequestHeaderMap* request_headers_{};
+  Http::RequestIDExtensionSharedPtr request_id_extension_;
   UpstreamTiming upstream_timing_;
   std::string upstream_transport_failure_reason_;
   absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_;

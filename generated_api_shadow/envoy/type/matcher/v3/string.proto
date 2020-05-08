@@ -12,7 +12,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.type.matcher.v3";
 option java_outer_classname = "StringProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: String matcher]
 
@@ -48,26 +48,13 @@ message StringMatcher {
     string suffix = 3 [(validate.rules).string = {min_bytes: 1}];
 
     // The input string must match the regular expression specified here.
-    // The regex grammar is defined `here
-    // <https://en.cppreference.com/w/cpp/regex/ecmascript>`_.
-    //
-    // Examples:
-    //
-    // * The regex ``\d{3}`` matches the value *123*
-    // * The regex ``\d{3}`` does not match the value *1234*
-    // * The regex ``\d{3}`` does not match the value *123.456*
-    //
-    // .. attention::
-    //   This field has been deprecated in favor of `safe_regex` as it is not safe for use with
-    //   untrusted input in all cases.
+    RegexMatcher safe_regex = 5 [(validate.rules).message = {required: true}];
+
     string hidden_envoy_deprecated_regex = 4 [
       deprecated = true,
       (validate.rules).string = {max_bytes: 1024},
       (envoy.annotations.disallowed_by_default) = true
     ];
-
-    // The input string must match the regular expression specified here.
-    RegexMatcher safe_regex = 5 [(validate.rules).message = {required: true}];
   }
 
   // If true, indicates the exact/prefix/suffix matching should be case insensitive. This has no

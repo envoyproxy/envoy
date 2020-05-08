@@ -209,6 +209,23 @@ public:
 };
 
 /**
+ * FormatterProvider for grpc-status
+ */
+class GrpcStatusFormatter : public FormatterProvider, HeaderFormatter {
+public:
+  GrpcStatusFormatter(const std::string& main_header, const std::string& alternative_header,
+                      absl::optional<size_t> max_length);
+
+  // FormatterProvider
+  std::string format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap& response_headers,
+                     const Http::ResponseTrailerMap& response_trailers,
+                     const StreamInfo::StreamInfo&) const override;
+  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                 const Http::ResponseTrailerMap&,
+                                 const StreamInfo::StreamInfo&) const override;
+};
+
+/**
  * FormatterProvider based on StreamInfo fields.
  */
 class StreamInfoFormatter : public FormatterProvider {
@@ -276,7 +293,8 @@ public:
  */
 class FilterStateFormatter : public FormatterProvider {
 public:
-  FilterStateFormatter(const std::string& key, absl::optional<size_t> max_length);
+  FilterStateFormatter(const std::string& key, absl::optional<size_t> max_length,
+                       bool serialize_as_string);
 
   // FormatterProvider
   std::string format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
@@ -286,10 +304,13 @@ public:
                                  const StreamInfo::StreamInfo&) const override;
 
 private:
-  ProtobufTypes::MessagePtr filterState(const StreamInfo::StreamInfo& stream_info) const;
+  const Envoy::StreamInfo::FilterState::Object*
+  filterState(const StreamInfo::StreamInfo& stream_info) const;
 
   std::string key_;
   absl::optional<size_t> max_length_;
+
+  bool serialize_as_string_;
 };
 
 /**
