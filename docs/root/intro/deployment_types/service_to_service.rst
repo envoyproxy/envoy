@@ -22,6 +22,9 @@ themselves with network topology, whether they are running in development or pro
 
 This listener supports both HTTP/1.1 or HTTP/2 depending on the capabilities of the application.
 
+.. image:: /_static/service_to_service_egress_listener.svg
+  :width: 40%
+
 .. _deployment_type_service_to_service_ingress:
 
 Service to service ingress listener
@@ -36,6 +39,10 @@ performs buffering, circuit breaking, etc. as needed.
 Our default configurations use HTTP/2 for all Envoy to Envoy communication, regardless of whether
 the application uses HTTP/1.1 or HTTP/2 when egressing out of a local Envoy. HTTP/2 provides
 better performance via long lived connections and explicit reset notifications.
+
+.. image:: /_static/service_to_service_ingress_listener.svg
+  :width: 55%
+
 
 Optional external service egress listeners
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
