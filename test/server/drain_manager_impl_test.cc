@@ -71,6 +71,29 @@ TEST_F(DrainManagerImplTest, DrainDeadline) {
   EXPECT_TRUE(drain_manager.drainClose());
 }
 
+TEST_F(DrainManagerImplTest, ProbabilisticDrainClose) {
+  DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::DEFAULT);
+
+  Event::MockTimer* drain_timer = new Event::MockTimer(&server_.dispatcher_);
+  EXPECT_CALL(*drain_timer, enableTimer(_, _)).Times(2);
+
+  // Ensure drainClose() behaviour is determined by the deadline.
+  drain_manager.startDrainSequence(nullptr);
+  EXPECT_CALL(server_, healthCheckFailed()).WillRepeatedly(Return(false));
+
+  // drainClose() will return true when ticks > (5 % 3 == 2).
+  ON_CALL(server_.random_, random())
+      .WillByDefault(Return(5));
+  ON_CALL(server_.options_, drainTime())
+      .WillByDefault(Return(std::chrono::seconds(3)));
+
+  EXPECT_FALSE(drain_manager.drainClose());
+  drain_timer->invokeCallback();
+  EXPECT_FALSE(drain_manager.drainClose());
+  drain_timer->invokeCallback();
+  EXPECT_TRUE(drain_manager.drainClose());
+}
+
 TEST_F(DrainManagerImplTest, ModifyOnly) {
   InSequence s;
   DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::MODIFY_ONLY);
