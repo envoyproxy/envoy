@@ -41,9 +41,9 @@ class ThreadLocalControllerImpl : public ThreadLocalController,
                                   public ThreadLocal::ThreadLocalObject {
 public:
   ThreadLocalControllerImpl(TimeSource& time_source, std::chrono::seconds sampling_window);
-  virtual ~ThreadLocalControllerImpl() = default;
-  virtual void recordSuccess() override { recordRequest(true); }
-  virtual void recordFailure() override { recordRequest(false); }
+  ~ThreadLocalControllerImpl() = default;
+  void recordSuccess() override { recordRequest(true); }
+  void recordFailure() override { recordRequest(false); }
 
   virtual uint32_t requestTotalCount() override {
     maybeUpdateHistoricalData();
@@ -56,9 +56,8 @@ public:
 
 private:
   struct RequestData {
-    RequestData() : requests(0), successes(0) {}
-    uint32_t requests;
-    uint32_t successes;
+    uint32_t requests{0};
+    uint32_t successes{0};
   };
 
   void recordRequest(const bool success);

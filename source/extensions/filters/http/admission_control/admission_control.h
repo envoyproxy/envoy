@@ -64,7 +64,7 @@ public:
   TimeSource& timeSource() const { return time_source_; }
   Stats::Scope& scope() const { return scope_; }
   double aggression() const;
-  ResponseEvaluator& response_evaluator() const { return *response_evaluator_; }
+  ResponseEvaluator& responseEvalutor() const { return *response_evaluator_; }
 
 private:
   Runtime::Loader& runtime_;

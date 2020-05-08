@@ -31,7 +31,7 @@ namespace {
 class MockThreadLocalController : public ThreadLocal::ThreadLocalObject,
                                   public ThreadLocalController {
 public:
-  MockThreadLocalController() {}
+  MockThreadLocalController() = default;
   MOCK_METHOD(uint32_t, requestTotalCount, (), (override));
   MOCK_METHOD(uint32_t, requestSuccessCount, (), (override));
   MOCK_METHOD(void, recordSuccess, (), (override));
@@ -47,7 +47,7 @@ public:
       : AdmissionControlFilterConfig(proto_config, runtime, time_source, random, scope,
                                      std::move(tls), std::move(evaluator)),
         controller_(controller) {}
-  virtual ThreadLocalController& getController() const override { return controller_; }
+  ThreadLocalController& getController() const override { return controller_; }
 
 private:
   MockThreadLocalController& controller_;

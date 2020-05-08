@@ -87,11 +87,11 @@ Http::FilterHeadersStatus AdmissionControlFilter::encodeHeaders(Http::ResponseHe
     }
 
     const uint32_t status = enumToInt(grpc_status.value());
-    successful_response = config_->response_evaluator().isGrpcSuccess(status);
+    successful_response = config_->responseEvalutor().isGrpcSuccess(status);
   } else {
     // HTTP response.
     const uint64_t http_status = Http::Utility::getResponseStatus(headers);
-    successful_response = config_->response_evaluator().isHttpSuccess(http_status);
+    successful_response = config_->responseEvalutor().isHttpSuccess(http_status);
   }
 
   if (successful_response) {
@@ -111,7 +111,7 @@ AdmissionControlFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
     // Status code must be sent in trailers.
     ASSERT(grpc_status.has_value());
 
-    if (config_->response_evaluator().isGrpcSuccess(grpc_status.value())) {
+    if (config_->responseEvalutor().isGrpcSuccess(grpc_status.value())) {
       recordSuccess();
     } else {
       recordFailure();

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #include "envoy/common/pure.h"
 
 namespace Envoy {

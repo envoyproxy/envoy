@@ -17,9 +17,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::AllOf;
-using testing::Ge;
-using testing::Le;
 using testing::NiceMock;
 using testing::Return;
 
@@ -31,7 +28,7 @@ namespace {
 
 class AdmissionControlConfigTest : public testing::Test {
 public:
-  AdmissionControlConfigTest() {}
+  AdmissionControlConfigTest() = default;
 
   std::shared_ptr<AdmissionControlFilterConfig> makeConfig(const std::string& yaml) {
     AdmissionControlProto proto;

@@ -14,8 +14,9 @@ class DefaultResponseEvaluator : public ResponseEvaluator {
 public:
   DefaultResponseEvaluator(envoy::extensions::filters::http::admission_control::v3alpha::
                                AdmissionControl::DefaultEvaluationCriteria evaluation_criteria);
-  virtual bool isHttpSuccess(uint64_t code) const override;
-  virtual bool isGrpcSuccess(uint32_t status) const override;
+  // ResponseEvaluator
+  bool isHttpSuccess(uint64_t code) const override;
+  bool isGrpcSuccess(uint32_t status) const override;
 
 private:
   std::vector<std::function<bool(uint64_t)>> http_success_fns_;
