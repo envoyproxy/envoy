@@ -438,6 +438,14 @@ public:
 
     // If this field is deprecated, warn or throw an error.
     if (field.options().deprecated()) {
+      if (absl::StartsWith(field.name(), Config::VersionUtil::DeprecatedFieldShadowPrefix)) {
+        // The field was marked as hidden_envoy_deprecated and an error must be thrown
+        const std::string fatal_error = absl::StrCat(
+            "Illegal use of deprecated option '", field.full_name(), "' from file ", filename,
+            ". This configuration has been removed from the current Envoy API. "
+            "Please see " ENVOY_DOC_URL_VERSION_HISTORY " for details.");
+        throw ProtoValidationException(fatal_error, message);
+      }
       const std::string warning =
           absl::StrCat("Using {}deprecated option '", field.full_name(), "' from file ", filename,
                        ". This configuration will be removed from "

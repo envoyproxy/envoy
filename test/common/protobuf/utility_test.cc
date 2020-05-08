@@ -1644,6 +1644,49 @@ TEST_P(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(FatalEnum)) {
       checkForDeprecation(base));
 }
 
+TEST_P(DeprecatedFieldsTest, ManualDeprecatdFieldAddition) {
+  // Create a base message and insert a deprecated field. When upgrading the
+  // deprecated field should be set as deprecated, and a warning should be logged
+  envoy::test::deprecation_test::Base baseShouldWarn =
+      TestUtility::parseYaml<envoy::test::deprecation_test::Base>(R"EOF(
+      not_deprecated: field1
+      is_deprecated: hidden_field1
+      not_deprecated_message:
+        inner_not_deprecated: subfield1
+      repeated_message:
+        - inner_not_deprecated: subfield2
+    )EOF");
+
+  // Non-fatal checks for a deprecated field should log rather than throw an exception.
+  EXPECT_LOG_CONTAINS("warning",
+                      "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'",
+                      checkForDeprecation(baseShouldWarn));
+  EXPECT_EQ(1, runtime_deprecated_feature_use_.value());
+  EXPECT_EQ(1, deprecated_feature_seen_since_process_start_.value());
+
+  // Create an upgraded message and insert a deprecated field. This is a bypass
+  // of the upgrading procedure validation, and should fail
+  envoy::test::deprecation_test::UpgradedBase baseShouldFail =
+      TestUtility::parseYaml<envoy::test::deprecation_test::UpgradedBase>(R"EOF(
+      not_deprecated: field1
+      hidden_envoy_deprecated_is_deprecated: hidden_field1
+      not_deprecated_message:
+        inner_not_deprecated: subfield1
+      repeated_message:
+        - inner_not_deprecated: subfield2
+    )EOF");
+
+  EXPECT_THROW_WITH_REGEX(
+      MessageUtil::checkForUnexpectedFields(baseShouldFail,
+                                            ProtobufMessage::getStrictValidationVisitor()),
+      ProtoValidationException,
+      "Illegal use of deprecated option "
+      "'envoy.test.deprecation_test.UpgradedBase.hidden_envoy_deprecated_is_deprecated'");
+  // The config will be rejected, so the feature will not be used.
+  EXPECT_EQ(1, runtime_deprecated_feature_use_.value());
+  EXPECT_EQ(1, deprecated_feature_seen_since_process_start_.value());
+}
+
 class TimestampUtilTest : public testing::Test, public ::testing::WithParamInterface<int64_t> {};
 
 TEST_P(TimestampUtilTest, SystemClockToTimestampTest) {
