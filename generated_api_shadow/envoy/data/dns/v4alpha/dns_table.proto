@@ -39,8 +39,8 @@ message DnsTable {
     }];
   }
 
-  // This message type is extensible and can contain a list of addresses or dictate a different
-  // method for resolving the addresses for an endpoint
+  // This message type is extensible and can contain a list of addresses, clusters or
+  // dictate a different method for resolving the addresses for an endpoint
   message DnsEndpoint {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.data.dns.v3.DnsTable.DnsEndpoint";
@@ -49,6 +49,8 @@ message DnsTable {
       option (validate.required) = true;
 
       AddressList address_list = 1;
+
+      string cluster_name = 2;
     }
   }
 

@@ -34,6 +34,7 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
   virtual_domains_.reserve(entries);
   for (const auto& virtual_domain : dns_table.virtual_domains()) {
     AddressConstPtrVec addrs{};
+    absl::string_view cluster_name;
     if (virtual_domain.endpoint().has_address_list()) {
       const auto& address_list = virtual_domain.endpoint().address_list().address();
       addrs.reserve(address_list.size());
@@ -42,8 +43,14 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
         auto ipaddr = Network::Utility::parseInternetAddress(address, 0 /* port */);
         addrs.push_back(std::move(ipaddr));
       }
+    } else {
+      cluster_name = virtual_domain.endpoint().cluster_name();
     }
-    virtual_domains_.emplace(virtual_domain.name(), std::move(addrs));
+
+    DnsEndpointConfig endpoint_config{
+        .address_list = absl::make_optional<AddressConstPtrVec>(std::move(addrs)),
+        .cluster_name = absl::make_optional<std::string>(cluster_name)};
+    virtual_domains_.emplace(virtual_domain.name(), endpoint_config);
 
     std::chrono::seconds ttl = virtual_domain.has_answer_ttl()
                                    ? std::chrono::seconds(virtual_domain.answer_ttl().seconds())
@@ -201,10 +208,48 @@ bool DnsFilter::isKnownDomain(const absl::string_view domain_name) {
   return false;
 }
 
+const DnsEndpointConfig* DnsFilter::getEndpointConfigForDomain(const absl::string_view domain) {
+  const auto& domains = config_->domains();
+
+  // TODO: If we have a large ( > 100) domain list, use a binary search.
+  const auto iter = domains.find(domain);
+  if (iter == domains.end()) {
+    ENVOY_LOG(debug, "No endpoint configuration exists for [{}]", domain);
+    return nullptr;
+  }
+
+  return &(iter->second);
+}
+
+const AddressConstPtrVec* DnsFilter::getAddressListForDomain(const absl::string_view domain) {
+  const DnsEndpointConfig* endpoint_config = getEndpointConfigForDomain(domain);
+  if (endpoint_config != nullptr && endpoint_config->address_list.has_value()) {
+    return &(endpoint_config->address_list.value());
+  }
+  return nullptr;
+}
+
+const absl::string_view DnsFilter::getClusterNameForDomain(const absl::string_view domain) {
+  const DnsEndpointConfig* endpoint_config = getEndpointConfigForDomain(domain);
+  if (endpoint_config != nullptr && endpoint_config->cluster_name.has_value()) {
+    return endpoint_config->cluster_name.value();
+  }
+  return {};
+}
+
 bool DnsFilter::resolveViaClusters(DnsQueryContextPtr& context, const DnsQueryRecord& query) {
-  Upstream::ThreadLocalCluster* cluster = cluster_manager_.get(query.name_);
+  // Determine if the domain name is being redirected to a cluster
+  const auto cluster_name = getClusterNameForDomain(query.name_);
+  absl::string_view lookup_name;
+  if (!cluster_name.empty()) {
+    lookup_name = cluster_name;
+  } else {
+    lookup_name = query.name_;
+  }
+
+  Upstream::ThreadLocalCluster* cluster = cluster_manager_.get(lookup_name);
   if (cluster == nullptr) {
-    ENVOY_LOG(debug, "Did not find a cluster for name [{}]", query.name_);
+    ENVOY_LOG(debug, "Did not find a cluster for name [{}]", lookup_name);
     return false;
   }
 
@@ -215,7 +260,7 @@ bool DnsFilter::resolveViaClusters(DnsQueryContextPtr& context, const DnsQueryRe
     for (const auto& host : hostsets->hosts()) {
       ++discovered_endpoints;
       ENVOY_LOG(debug, "using cluster host address {} for domain [{}]",
-                host->address()->ip()->addressAsString(), query.name_);
+                host->address()->ip()->addressAsString(), lookup_name);
       message_parser_.buildDnsAnswerRecord(context, query, ttl, host->address());
     }
   }
@@ -224,24 +269,20 @@ bool DnsFilter::resolveViaClusters(DnsQueryContextPtr& context, const DnsQueryRe
 
 bool DnsFilter::resolveViaConfiguredHosts(DnsQueryContextPtr& context,
                                           const DnsQueryRecord& query) {
-  const auto& domains = config_->domains();
-
-  // TODO: If we have a large ( > 100) domain list, use a binary search.
-  const auto iter = domains.find(query.name_);
-  if (iter == domains.end()) {
-    ENVOY_LOG(debug, "Domain [{}] is not a configured entry", query.name_);
+  const auto* configured_address_list = getAddressListForDomain(query.name_);
+  if (configured_address_list == nullptr) {
+    ENVOY_LOG(debug, "Domain [{}] address list was not found", query.name_);
     return false;
   }
 
-  const auto& configured_address_list = iter->second;
-  if (configured_address_list.empty()) {
+  if (configured_address_list->empty()) {
     ENVOY_LOG(debug, "Domain [{}] address list is empty", query.name_);
     return false;
   }
 
   // Build an answer record from each configured IP address
   uint64_t hosts_found = 0;
-  for (const auto& configured_address : configured_address_list) {
+  for (const auto& configured_address : *configured_address_list) {
     ASSERT(configured_address != nullptr);
     ENVOY_LOG(debug, "using local address {} for domain [{}]",
               configured_address->ip()->addressAsString(), query.name_);

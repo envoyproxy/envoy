@@ -37,7 +37,12 @@ struct DnsFilterStats {
   ALL_DNS_FILTER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-using DnsVirtualDomainConfig = absl::flat_hash_map<std::string, AddressConstPtrVec>;
+struct DnsEndpointConfig {
+  absl::optional<AddressConstPtrVec> address_list;
+  absl::optional<std::string> cluster_name;
+};
+
+using DnsVirtualDomainConfig = absl::flat_hash_map<std::string, DnsEndpointConfig>;
 
 /**
  * DnsFilter configuration class abstracting access to data necessary for the filter's operation
@@ -148,6 +153,21 @@ private:
    * constructed
    */
   bool resolveViaConfiguredHosts(DnsQueryContextPtr& context, const DnsQueryRecord& query);
+
+  /**
+   * @brief Helper function to retrieve the Endpoint configuration for a requested domain
+   */
+  const DnsEndpointConfig* getEndpointConfigForDomain(const absl::string_view domain);
+
+  /**
+   * @brief Helper function to retrieve the Address List for a requested domain
+   */
+  const AddressConstPtrVec* getAddressListForDomain(const absl::string_view domain);
+
+  /**
+   * @brief Helper function to retrieve a cluster name that a domain may be redirected towards
+   */
+  const absl::string_view getClusterNameForDomain(const absl::string_view domain);
 
   const DnsFilterEnvoyConfigSharedPtr config_;
   Network::UdpListener& listener_;

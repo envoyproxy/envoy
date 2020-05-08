@@ -47,6 +47,9 @@ public:
                   - 10.0.0.2
                   - 10.0.0.3
                   - 10.0.0.4
+            - name: "cluster.foo1.com"
+              endpoint:
+                cluster_name: "cluster_0"
     )EOF");
   }
 
@@ -126,6 +129,31 @@ TEST_P(DnsFilterIntegrationTest, ClusterLookupTest) {
 
   Network::UdpRecvData response;
   std::string query = Utils::buildQueryForDomain("cluster_0", record_type, DNS_RECORD_CLASS_IN);
+  requestResponseWithListenerAddress(*listener_address, query, response);
+
+  query_ctx_ = response_parser_->createQueryContext(response);
+  ASSERT_TRUE(query_ctx_->parse_status_);
+
+  ASSERT_EQ(2, query_ctx_->answers_.size());
+  ASSERT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_parser_->getQueryResponseCode());
+}
+
+TEST_P(DnsFilterIntegrationTest, ClusterEndpointLookupTest) {
+  setup(2);
+  const uint32_t port = lookupPort("listener_0");
+  const auto listener_address = Network::Utility::resolveUrl(
+      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
+
+  uint16_t record_type;
+  if (listener_address->ip()->ipv6()) {
+    record_type = DNS_RECORD_TYPE_AAAA;
+  } else {
+    record_type = DNS_RECORD_TYPE_A;
+  }
+
+  Network::UdpRecvData response;
+  std::string query =
+      Utils::buildQueryForDomain("cluster.foo1.com", record_type, DNS_RECORD_CLASS_IN);
   requestResponseWithListenerAddress(*listener_address, query, response);
 
   query_ctx_ = response_parser_->createQueryContext(response);
