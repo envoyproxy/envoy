@@ -355,7 +355,6 @@ public:
   headersWithUnderscoresAction() const override {
     return headers_with_underscores_action_;
   }
-  bool shouldPreserveUpstreamDate() const override { return preserve_upstream_date_; }
 
   Envoy::Event::SimulatedTimeSystem test_time_;
   NiceMock<Router::MockRouteConfigProvider> route_config_provider_;
@@ -418,7 +417,6 @@ public:
   NiceMock<Network::MockClientConnection> upstream_conn_; // for websocket tests
   NiceMock<Tcp::ConnectionPool::MockInstance> conn_pool_; // for websocket tests
   RequestIDExtensionSharedPtr request_id_extension_;
-  bool preserve_upstream_date_ = false;
 
   // TODO(mattklein123): Not all tests have been converted over to better setup. Convert the rest.
   MockResponseEncoder response_encoder_;
@@ -974,56 +972,6 @@ TEST_F(HttpConnectionManagerImplTest, RouteShouldUseNormalizedHost) {
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
-}
-
-TEST_F(HttpConnectionManagerImplTest, PreserveUpstreamDateDisabledDateNotSet) {
-  setup(false, "");
-  setUpEncoderAndDecoder(false, false);
-  sendRequestHeadersAndData();
-  preserve_upstream_date_ = false;
-  const auto* modified_headers = sendResponseHeaders(
-      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}, {"server", "foo"}}});
-  ASSERT_TRUE(modified_headers);
-  EXPECT_TRUE(modified_headers->Date());
-}
-
-TEST_F(HttpConnectionManagerImplTest, PreserveUpstreamDateDisabledDateSet) {
-  setup(false, "");
-  setUpEncoderAndDecoder(false, false);
-  sendRequestHeadersAndData();
-  preserve_upstream_date_ = false;
-  const std::string expected_date{"Tue, 15 Nov 1994 08:12:31 GMT"};
-  const auto* modified_headers =
-      sendResponseHeaders(ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{
-          {":status", "200"}, {"server", "foo"}, {"date", expected_date.c_str()}}});
-  ASSERT_TRUE(modified_headers);
-  ASSERT_TRUE(modified_headers->Date());
-  EXPECT_NE(expected_date, modified_headers->Date()->value().getStringView());
-}
-
-TEST_F(HttpConnectionManagerImplTest, PreserveUpstreamDateEnabledDateNotSet) {
-  setup(false, "");
-  setUpEncoderAndDecoder(false, false);
-  sendRequestHeadersAndData();
-  preserve_upstream_date_ = true;
-  const auto* modified_headers = sendResponseHeaders(
-      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}, {"server", "foo"}}});
-  ASSERT_TRUE(modified_headers);
-  EXPECT_TRUE(modified_headers->Date());
-}
-
-TEST_F(HttpConnectionManagerImplTest, PreserveUpstreamDateEnabledDateSet) {
-  setup(false, "");
-  setUpEncoderAndDecoder(false, false);
-  sendRequestHeadersAndData();
-  preserve_upstream_date_ = true;
-  const std::string expected_date{"Tue, 15 Nov 1994 08:12:31 GMT"};
-  const auto* modified_headers =
-      sendResponseHeaders(ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{
-          {":status", "200"}, {"server", "foo"}, {"date", expected_date.c_str()}}});
-  ASSERT_TRUE(modified_headers);
-  ASSERT_TRUE(modified_headers->Date());
-  EXPECT_EQ(expected_date, modified_headers->Date()->value().getStringView());
 }
 
 TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
