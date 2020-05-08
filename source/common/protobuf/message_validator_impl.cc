@@ -52,8 +52,7 @@ void WarningValidationVisitorImpl::onUnexpectedField(absl::string_view descripti
     case UnknownFields:
       ++prestats_unknown_count_;
       break;
-    case DeprecatedFields:
-      ++prestats_deprecated_count_;
+    default:
       break;
     }
   }
