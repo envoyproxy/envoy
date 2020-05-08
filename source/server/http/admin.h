@@ -168,6 +168,7 @@ public:
   headersWithUnderscoresAction() const override {
     return envoy::config::core::v3::HttpProtocolOptions::ALLOW;
   }
+  bool shouldPreserveUpstreamDate() const override { return false; }
   Http::Code request(absl::string_view path_and_query, absl::string_view method,
                      Http::ResponseHeaderMap& response_headers, std::string& body) override;
   void closeSocket();

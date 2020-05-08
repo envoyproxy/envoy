@@ -217,7 +217,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 #endif
       merge_slashes_(config.merge_slashes()),
       headers_with_underscores_action_(
-          config.common_http_protocol_options().headers_with_underscores_action()) {
+          config.common_http_protocol_options().headers_with_underscores_action()),
+      preserve_upstream_date_(config.preserve_upstream_date()) {
   // If idle_timeout_ was not configured in common_http_protocol_options, use value in deprecated
   // idle_timeout field.
   // TODO(asraa): Remove when idle_timeout is removed.

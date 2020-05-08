@@ -1080,6 +1080,39 @@ TEST_F(HttpConnectionManagerConfigTest, UnconfiguredRequestTimeout) {
   EXPECT_EQ(0, config.requestTimeout().count());
 }
 
+TEST_F(HttpConnectionManagerConfigTest, DisabledPreserveResponseDate) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  request_timeout: 0s
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_);
+  EXPECT_FALSE(config.shouldPreserveUpstreamDate());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, EnabledPreserveResponseDate) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  request_timeout: 0s
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  preserve_upstream_date: true
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_);
+  EXPECT_TRUE(config.shouldPreserveUpstreamDate());
+}
+
 TEST_F(HttpConnectionManagerConfigTest, SingleDateProvider) {
   const std::string yaml_string = R"EOF(
 codec_type: http1
