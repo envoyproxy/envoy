@@ -5,12 +5,16 @@ use("github.com/repokitteh/modules/review.star")
 use("github.com/repokitteh/modules/wait.star")
 use("github.com/repokitteh/modules/circleci.star", secret_token=get_secret('circle_token'))
 use(
-  "github.com/repokitteh/modules/ownerscheck.star",
+  "github.com/envoyproxy/envoy/ci/repokitteh/modules/ownerscheck.star",
   paths=[
     {
       "owner": "envoyproxy/api-shepherds!",
       "path": "api/",
       "label": "api",
+    },
+    {
+      "owner": "envoyproxy/api-watchers",
+      "path": "api/",
     },
   ],
 )

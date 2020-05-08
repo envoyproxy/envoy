@@ -2,7 +2,7 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load(":dev_binding.bzl", "envoy_dev_binding")
 load(":genrule_repository.bzl", "genrule_repository")
 load("@envoy_api//bazel:envoy_http_archive.bzl", "envoy_http_archive")
-load(":repository_locations.bzl", "DEPENDENCY_REPOSITORIES", "USE_CATEGORIES")
+load(":repository_locations.bzl", "DEPENDENCY_ANNOTATIONS", "DEPENDENCY_REPOSITORIES", "USE_CATEGORIES", "USE_CATEGORIES_WITH_CPE_OPTIONAL")
 load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_language")
 
 PPC_SKIP_TARGETS = ["envoy.filters.http.lua"]
@@ -27,6 +27,9 @@ def _repository_locations():
         if "use_category" not in location:
             fail("The 'use_category' attribute must be defined for external dependecy " + str(location["urls"]))
 
+        if "cpe" not in location and not [category for category in USE_CATEGORIES_WITH_CPE_OPTIONAL if category in location["use_category"]]:
+            fail("The 'cpe' attribute must be defined for external dependecy " + str(location["urls"]))
+
         for category in location["use_category"]:
             if category not in USE_CATEGORIES:
                 fail("Unknown use_category value '" + category + "' for dependecy " + str(location["urls"]))
@@ -39,7 +42,8 @@ REPOSITORY_LOCATIONS = _repository_locations()
 # See repository_locations.bzl for the list of annotation attributes.
 def _get_location(dependency):
     stripped = dict(REPOSITORY_LOCATIONS[dependency])
-    stripped.pop("use_category", None)
+    for attribute in DEPENDENCY_ANNOTATIONS:
+        stripped.pop(attribute, None)
     return stripped
 
 def _repository_impl(name, **kwargs):
@@ -186,7 +190,6 @@ def envoy_dependencies(skip_targets = []):
 
     # Unconditional, since we use this only for compiler-agnostic fuzzing utils.
     _org_llvm_releases_compiler_rt()
-    _fuzzit_linux()
 
     _python_deps()
     _cc_deps()
@@ -699,12 +702,6 @@ def _org_llvm_releases_compiler_rt():
     _repository_impl(
         name = "org_llvm_releases_compiler_rt",
         build_file = "@envoy//bazel/external:compiler_rt.BUILD",
-    )
-
-def _fuzzit_linux():
-    _repository_impl(
-        name = "fuzzit_linux",
-        build_file_content = "exports_files([\"fuzzit\"])",
     )
 
 def _com_github_grpc_grpc():

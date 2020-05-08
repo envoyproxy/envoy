@@ -38,7 +38,9 @@ using ExtAuthzAsyncCallbacks = Grpc::AsyncRequestCallbacks<envoy::service::auth:
  * The gRPC client does not rewrite path. NOTE: We create gRPC client for each filter stack instead
  * of a client per thread. That is ok since this is unary RPC and the cost of doing this is minimal.
  */
-class GrpcClientImpl : public Client, public ExtAuthzAsyncCallbacks {
+class GrpcClientImpl : public Client,
+                       public ExtAuthzAsyncCallbacks,
+                       public Logger::Loggable<Logger::Id::ext_authz> {
 public:
   // TODO(gsagula): remove `use_alpha` param when V2Alpha gets deprecated.
   GrpcClientImpl(Grpc::RawAsyncClientPtr&& async_client,
