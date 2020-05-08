@@ -1,4 +1,4 @@
-#include "common/compressor/zlib_compressor_impl.h"
+#include "extensions/compression/gzip/compressor/zlib_compressor_impl.h"
 
 #include <memory>
 
@@ -9,6 +9,9 @@
 #include "absl/container/fixed_array.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace Compression {
+namespace Gzip {
 namespace Compressor {
 
 ZlibCompressorImpl::ZlibCompressorImpl() : ZlibCompressorImpl(4096) {}
@@ -34,7 +37,8 @@ void ZlibCompressorImpl::init(CompressionLevel comp_level, CompressionStrategy c
   initialized_ = true;
 }
 
-void ZlibCompressorImpl::compress(Buffer::Instance& buffer, State state) {
+void ZlibCompressorImpl::compress(Buffer::Instance& buffer,
+                                  Envoy::Compression::Compressor::State state) {
   for (const Buffer::RawSlice& input_slice : buffer.getRawSlices()) {
     zstream_ptr_->avail_in = input_slice.len_;
     zstream_ptr_->next_in = static_cast<Bytef*>(input_slice.mem_);
@@ -46,7 +50,7 @@ void ZlibCompressorImpl::compress(Buffer::Instance& buffer, State state) {
     buffer.drain(input_slice.len_);
   }
 
-  process(buffer, state == State::Finish ? Z_FINISH : Z_SYNC_FLUSH);
+  process(buffer, state == Envoy::Compression::Compressor::State::Finish ? Z_FINISH : Z_SYNC_FLUSH);
 }
 
 bool ZlibCompressorImpl::deflateNext(int64_t flush_state) {
@@ -81,4 +85,7 @@ void ZlibCompressorImpl::process(Buffer::Instance& output_buffer, int64_t flush_
 }
 
 } // namespace Compressor
+} // namespace Gzip
+} // namespace Compression
+} // namespace Extensions
 } // namespace Envoy

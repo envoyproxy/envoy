@@ -1,6 +1,9 @@
 #include "extensions/filters/http/gzip/gzip_filter.h"
 
+#include "envoy/config/core/v3/base.pb.h"
+
 #include "common/http/headers.h"
+#include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/protobuf.h"
 
 namespace Envoy {
@@ -31,35 +34,38 @@ GzipFilterConfig::GzipFilterConfig(const envoy::extensions::filters::http::gzip:
       window_bits_(windowBitsUint(gzip.window_bits().value())),
       chunk_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(gzip, chunk_size, 4096)) {}
 
-std::unique_ptr<Compressor::Compressor> GzipFilterConfig::makeCompressor() {
-  auto compressor = std::make_unique<Compressor::ZlibCompressorImpl>(chunk_size_);
+Envoy::Compression::Compressor::CompressorPtr GzipFilterConfig::makeCompressor() {
+  auto compressor =
+      std::make_unique<Compression::Gzip::Compressor::ZlibCompressorImpl>(chunk_size_);
   compressor->init(compressionLevel(), compressionStrategy(), windowBits(), memoryLevel());
   return compressor;
 }
 
-Compressor::ZlibCompressorImpl::CompressionLevel GzipFilterConfig::compressionLevelEnum(
+Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel
+GzipFilterConfig::compressionLevelEnum(
     envoy::extensions::filters::http::gzip::v3::Gzip::CompressionLevel::Enum compression_level) {
   switch (compression_level) {
   case envoy::extensions::filters::http::gzip::v3::Gzip::CompressionLevel::BEST:
-    return Compressor::ZlibCompressorImpl::CompressionLevel::Best;
+    return Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel::Best;
   case envoy::extensions::filters::http::gzip::v3::Gzip::CompressionLevel::SPEED:
-    return Compressor::ZlibCompressorImpl::CompressionLevel::Speed;
+    return Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel::Speed;
   default:
-    return Compressor::ZlibCompressorImpl::CompressionLevel::Standard;
+    return Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel::Standard;
   }
 }
 
-Compressor::ZlibCompressorImpl::CompressionStrategy GzipFilterConfig::compressionStrategyEnum(
+Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy
+GzipFilterConfig::compressionStrategyEnum(
     envoy::extensions::filters::http::gzip::v3::Gzip::CompressionStrategy compression_strategy) {
   switch (compression_strategy) {
   case envoy::extensions::filters::http::gzip::v3::Gzip::RLE:
-    return Compressor::ZlibCompressorImpl::CompressionStrategy::Rle;
+    return Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy::Rle;
   case envoy::extensions::filters::http::gzip::v3::Gzip::FILTERED:
-    return Compressor::ZlibCompressorImpl::CompressionStrategy::Filtered;
+    return Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy::Filtered;
   case envoy::extensions::filters::http::gzip::v3::Gzip::HUFFMAN:
-    return Compressor::ZlibCompressorImpl::CompressionStrategy::Huffman;
+    return Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy::Huffman;
   default:
-    return Compressor::ZlibCompressorImpl::CompressionStrategy::Standard;
+    return Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard;
   }
 }
 
@@ -79,8 +85,12 @@ GzipFilterConfig::compressorConfig(const envoy::extensions::filters::http::gzip:
   envoy::extensions::filters::http::compressor::v3::Compressor compressor = {};
   if (gzip.has_hidden_envoy_deprecated_content_length()) {
     compressor.set_allocated_content_length(
+        // According to
+        // https://developers.google.com/protocol-buffers/docs/reference/cpp-generated#embeddedmessage
+        // the message Compressor takes ownership of the allocated Protobuf::Uint32Value object.
         new Protobuf::UInt32Value(gzip.hidden_envoy_deprecated_content_length()));
   }
+  // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
   for (const std::string& ctype : gzip.hidden_envoy_deprecated_content_type()) {
     compressor.add_content_type(ctype);
   }

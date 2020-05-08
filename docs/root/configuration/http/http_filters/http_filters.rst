@@ -10,6 +10,7 @@ HTTP filters
   aws_lambda_filter
   aws_request_signing_filter
   buffer_filter
+  compressor_filter
   cors_filter
   csrf_filter
   dynamic_forward_proxy_filter

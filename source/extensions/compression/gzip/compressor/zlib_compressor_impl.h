@@ -1,18 +1,21 @@
 #pragma once
 
-#include "envoy/compressor/compressor.h"
+#include "envoy/compression/compressor/compressor.h"
 
 #include "common/common/zlib/base.h"
 
 #include "zlib.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace Compression {
+namespace Gzip {
 namespace Compressor {
 
 /**
  * Implementation of compressor's interface.
  */
-class ZlibCompressorImpl : public Zlib::Base, public Compressor {
+class ZlibCompressorImpl : public Zlib::Base, public Envoy::Compression::Compressor::Compressor {
 public:
   ZlibCompressorImpl();
 
@@ -30,11 +33,22 @@ public:
    * Enum values used to set compression level during initialization.
    * best: gives best compression.
    * speed: gives best performance.
+   * levelX: allows to adjust trad-offs more precisely - from level1 (best speed, but very
+   * low compression ratio) to level9 (best compression, but low speed).
    * standard: requests a default compromise between speed and compression. (default) @see zlib
    * manual.
    */
   enum class CompressionLevel : int64_t {
     Best = Z_BEST_COMPRESSION,
+    Level1 = 1,
+    Level2 = 2,
+    Level3 = 3,
+    Level4 = 4,
+    Level5 = 5,
+    Level6 = 6,
+    Level7 = 7,
+    Level8 = 8,
+    Level9 = 9,
     Speed = Z_BEST_SPEED,
     Standard = Z_DEFAULT_COMPRESSION,
   };
@@ -42,12 +56,14 @@ public:
   /**
    * Enum values are used for setting the compression algorithm strategy.
    * filtered: used for data produced by a filter. (or predictor) @see Z_FILTERED (zlib manual)
+   * fixed: disable dynamic Huffman codes. @see Z_FIXED (zlib manual)
    * huffman: used to enforce Huffman encoding. @see RFC 1951
    * rle: used to limit match distances to one. (Run-length encoding)
    * standard: used for normal data. (default) @see Z_DEFAULT_STRATEGY in zlib manual.
    */
   enum class CompressionStrategy : uint64_t {
     Filtered = Z_FILTERED,
+    Fixed = Z_FIXED,
     Huffman = Z_HUFFMAN_ONLY,
     Rle = Z_RLE,
     Standard = Z_DEFAULT_STRATEGY,
@@ -66,8 +82,8 @@ public:
   void init(CompressionLevel level, CompressionStrategy strategy, int64_t window_bits,
             uint64_t memory_level);
 
-  // Compressor
-  void compress(Buffer::Instance& buffer, State state) override;
+  // Compression::Compressor::Compressor
+  void compress(Buffer::Instance& buffer, Envoy::Compression::Compressor::State state) override;
 
 private:
   bool deflateNext(int64_t flush_state);
@@ -75,4 +91,7 @@ private:
 };
 
 } // namespace Compressor
+} // namespace Gzip
+} // namespace Compression
+} // namespace Extensions
 } // namespace Envoy

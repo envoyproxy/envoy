@@ -7,6 +7,7 @@ Changes
 * access loggers: added GRPC_STATUS operator on logging format.
 * access loggers: applied existing buffer limits to the non-google gRPC access logs, as well as :ref:`stats <config_access_log_stats>` for logged / dropped logs.
 * access loggers: extened specifier for FilterStateFormatter to output :ref:`unstructured log string <config_access_log_format_filter_state>`.
+* compressor: generic :ref:`compressor <config_http_filters_compressor>` filter exposed to users.
 * config: added :ref:`version_text <config_cluster_manager_cds>` stat that reflects xDS version.
 * dynamic forward proxy: added :ref:`SNI based dynamic forward proxy <config_network_filters_sni_dynamic_forward_proxy>` support.
 * fault: added support for controlling the percentage of requests that abort, delay and response rate limits faults
@@ -53,6 +54,8 @@ Deprecated
 * Tracing provider configuration as part of :ref:`bootstrap config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.tracing>`
   has been deprecated in favor of configuration as part of :ref:`HTTP connection manager
   <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.provider>`.
+* The :ref:`HTTP Gzip filter <config_http_filters_gzip>` has been deprecated in favor of
+  :ref:`Compressor <config_http_filters_compressor>`.
 * The * :ref:`GoogleRE2.max_program_size<envoy_v3_api_field_type.matcher.v3.RegexMatcher.GoogleRE2.max_program_size>`
   field is now deprecated. Management servers are expected to validate regexp program sizes
   instead of expecting the client to do it.

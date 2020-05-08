@@ -3,6 +3,7 @@
 #include "envoy/buffer/buffer.h"
 
 namespace Envoy {
+namespace Compression {
 namespace Compressor {
 
 /**
@@ -26,5 +27,8 @@ public:
   virtual void compress(Buffer::Instance& buffer, State state) PURE;
 };
 
+using CompressorPtr = std::unique_ptr<Compressor>;
+
 } // namespace Compressor
+} // namespace Compression
 } // namespace Envoy

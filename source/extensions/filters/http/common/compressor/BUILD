@@ -8,12 +8,13 @@ load(
 
 envoy_package()
 
+# TODO(rojkov): move this library to source/extensions/filters/http/compressor/.
 envoy_cc_library(
     name = "compressor_lib",
     srcs = ["compressor.cc"],
     hdrs = ["compressor.h"],
     deps = [
-        "//include/envoy/compressor:compressor_interface",
+        "//include/envoy/compression/compressor:compressor_interface",
         "//include/envoy/stats:stats_macros",
         "//include/envoy/stream_info:filter_state_interface",
         "//source/common/buffer:buffer_lib",
