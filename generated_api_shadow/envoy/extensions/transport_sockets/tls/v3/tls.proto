@@ -145,16 +145,23 @@ message CommonTlsContext {
   repeated TlsCertificate tls_certificates = 2;
 
   // Configs for fetching TLS certificates via SDS API.
-  repeated SdsSecretConfig tls_certificate_sds_secret_configs = 6
-      [(validate.rules).repeated = {max_items: 1}];
+  repeated SdsSecretConfig tls_certificate_sds_secret_configs = 6 [
+    (validate.rules).repeated = {max_items: 1},
+    (udpa.annotations.field_migrate).oneof_promotion = "dynamic_tls_certificate"
+  ];
+
+  // Config for fetching TLS certificates via CA client plugin.
+  // [#not-implemented-hide:]
+  CAClientPluginConfig tls_certificate_ca_client_plugin = 9
+      [(udpa.annotations.field_migrate).oneof_promotion = "dynamic_tls_certificate"];
 
   // How to validate peer certificates.
   repeated string alpn_protocols = 4;
 
-  // Config for fetching validation context via SDS API.
-  CAClientPluginConfig tls_certificate_ca_client_plugin = 9;
-
   oneof validation_context_type {
+    // Config for fetching validation context via SDS API.
+    CertificateValidationContext validation_context = 3;
+
     // Combined certificate validation context holds a default CertificateValidationContext
     // and SDS config. When SDS server returns dynamic CertificateValidationContext, both dynamic
     // and default CertificateValidationContext are merged into a new CertificateValidationContext
@@ -162,11 +169,11 @@ message CommonTlsContext {
     // CertificateValidationContext overwrites singular fields in default
     // CertificateValidationContext, and concatenates repeated fields to default
     // CertificateValidationContext, and logical OR is applied to boolean fields.
-    CertificateValidationContext validation_context = 3;
+    SdsSecretConfig validation_context_sds_secret_config = 7;
 
     // Config for fetching validation context via CA client plugin.
     // [#not-implemented-hide:]
-    SdsSecretConfig validation_context_sds_secret_config = 7;
+    CombinedCertificateValidationContext combined_validation_context = 8;
 
     // Supplies the list of ALPN protocols that the listener should expose. In
     // practice this is likely to be set to one of two values (see the
@@ -178,10 +185,6 @@ message CommonTlsContext {
     // * "http/1.1" If the listener is only going to support HTTP/1.1.
     //
     // There is no default for this parameter. If empty, Envoy will not expose ALPN.
-    CombinedCertificateValidationContext combined_validation_context = 8;
-
-    // Config for fetching TLS certificates via CA client plugin.
-    // [#not-implemented-hide:]
     CAClientPluginConfig validation_context_ca_client_plugin = 10;
   }
 }

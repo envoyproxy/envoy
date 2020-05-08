@@ -147,9 +147,15 @@ message CommonTlsContext {
   // used for clients that support ECDSA.
   repeated TlsCertificate tls_certificates = 2;
 
-  // Configs for fetching TLS certificates via SDS API.
-  repeated SdsSecretConfig tls_certificate_sds_secret_configs = 6
-      [(validate.rules).repeated = {max_items: 1}];
+  oneof dynamic_tls_certificate {
+    // Configs for fetching TLS certificates via SDS API.
+    repeated SdsSecretConfig tls_certificate_sds_secret_configs = 6
+        [(validate.rules).repeated = {max_items: 1}];
+
+    // Config for fetching TLS certificates via CA client plugin.
+    // [#not-implemented-hide:]
+    CAClientPluginConfig tls_certificate_ca_client_plugin = 9;
+  }
 
   oneof validation_context_type {
     // How to validate peer certificates.
@@ -183,8 +189,4 @@ message CommonTlsContext {
   //
   // There is no default for this parameter. If empty, Envoy will not expose ALPN.
   repeated string alpn_protocols = 4;
-
-  // Config for fetching TLS certificates via CA client plugin.
-  // [#not-implemented-hide:]
-  CAClientPluginConfig tls_certificate_ca_client_plugin = 9;
 }
