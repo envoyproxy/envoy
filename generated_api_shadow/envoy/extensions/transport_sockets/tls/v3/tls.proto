@@ -67,15 +67,12 @@ message DownstreamTlsContext {
   // [#not-implemented-hide:]
   google.protobuf.BoolValue require_sni = 3;
 
-  // TLS session ticket key settings.
-  google.protobuf.Duration session_timeout = 6 [(validate.rules).duration = {
-    lt {seconds: 4294967296}
-    gte {}
-  }];
-
   oneof session_ticket_keys_type {
-    // Config for fetching TLS session ticket keys via SDS API.
+    // TLS session ticket key settings.
     TlsSessionTicketKeys session_ticket_keys = 4;
+
+    // Config for fetching TLS session ticket keys via SDS API.
+    SdsSecretConfig session_ticket_keys_sds_secret_config = 5;
 
     // Config for controlling stateless TLS session resumption: setting this to true will cause the TLS
     // server to not issue TLS session tickets for the purposes of stateless TLS session resumption.
@@ -85,14 +82,17 @@ message DownstreamTlsContext {
     // If this config is set to false and no keys are explicitly configured, the TLS server will issue
     // TLS session tickets and encrypt/decrypt them using an internally-generated and managed key, with the
     // implication that sessions cannot be resumed across hot restarts or on different hosts.
-    SdsSecretConfig session_ticket_keys_sds_secret_config = 5;
-
-    // If specified, session_timeout will change maximum lifetime (in seconds) of TLS session
-    // Currently this value is used as a hint to `TLS session ticket lifetime (for TLSv1.2)
-    // <https://tools.ietf.org/html/rfc5077#section-5.6>`
-    // only seconds could be specified (fractional seconds are going to be ignored).
     bool disable_stateless_session_resumption = 7;
   }
+
+  // If specified, session_timeout will change maximum lifetime (in seconds) of TLS session
+  // Currently this value is used as a hint to `TLS session ticket lifetime (for TLSv1.2)
+  // <https://tools.ietf.org/html/rfc5077#section-5.6>`
+  // only seconds could be specified (fractional seconds are going to be ignored).
+  google.protobuf.Duration session_timeout = 6 [(validate.rules).duration = {
+    lt {seconds: 4294967296}
+    gte {}
+  }];
 }
 
 // TLS context shared by both client and server TLS contexts.
@@ -130,12 +130,12 @@ message CommonTlsContext {
   repeated SdsSecretConfig tls_certificate_sds_secret_configs = 6
       [(validate.rules).repeated = {max_items: 1}];
 
-  // How to validate peer certificates.
-  repeated string alpn_protocols = 4;
-
   oneof validation_context_type {
-    // Config for fetching validation context via SDS API.
+    // How to validate peer certificates.
     CertificateValidationContext validation_context = 3;
+
+    // Config for fetching validation context via SDS API.
+    SdsSecretConfig validation_context_sds_secret_config = 7;
 
     // Combined certificate validation context holds a default CertificateValidationContext
     // and SDS config. When SDS server returns dynamic CertificateValidationContext, both dynamic
@@ -144,18 +144,18 @@ message CommonTlsContext {
     // CertificateValidationContext overwrites singular fields in default
     // CertificateValidationContext, and concatenates repeated fields to default
     // CertificateValidationContext, and logical OR is applied to boolean fields.
-    SdsSecretConfig validation_context_sds_secret_config = 7;
-
-    // Supplies the list of ALPN protocols that the listener should expose. In
-    // practice this is likely to be set to one of two values (see the
-    // :ref:`codec_type
-    // <envoy_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.codec_type>`
-    // parameter in the HTTP connection manager for more information):
-    //
-    // * "h2,http/1.1" If the listener is going to support both HTTP/2 and HTTP/1.1.
-    // * "http/1.1" If the listener is only going to support HTTP/1.1.
-    //
-    // There is no default for this parameter. If empty, Envoy will not expose ALPN.
     CombinedCertificateValidationContext combined_validation_context = 8;
   }
+
+  // Supplies the list of ALPN protocols that the listener should expose. In
+  // practice this is likely to be set to one of two values (see the
+  // :ref:`codec_type
+  // <envoy_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.codec_type>`
+  // parameter in the HTTP connection manager for more information):
+  //
+  // * "h2,http/1.1" If the listener is going to support both HTTP/2 and HTTP/1.1.
+  // * "http/1.1" If the listener is only going to support HTTP/1.1.
+  //
+  // There is no default for this parameter. If empty, Envoy will not expose ALPN.
+  repeated string alpn_protocols = 4;
 }
