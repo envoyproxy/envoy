@@ -84,7 +84,6 @@ SubsetLoadBalancer::SubsetLoadBalancer(
           update(priority, hosts_added, hosts_removed);
         }
 
-        // Drop subsets that became empty.
         purgeEmptySubsets(subsets_);
       });
 }
@@ -585,7 +584,6 @@ void SubsetLoadBalancer::forEachSubset(LbSubsetMap& subsets,
   }
 }
 
-// Purge empty subsets.
 void SubsetLoadBalancer::purgeEmptySubsets(LbSubsetMap& subsets) {
   std::vector<std::string> purge_subsets;
 
