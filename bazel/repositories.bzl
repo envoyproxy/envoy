@@ -290,6 +290,8 @@ def _com_github_fmtlib_fmt():
     _repository_impl(
         name = "com_github_fmtlib_fmt",
         build_file = "@envoy//bazel/external:fmtlib.BUILD",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:fmt.patch"],
     )
     native.bind(
         name = "fmtlib",
