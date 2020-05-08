@@ -507,11 +507,6 @@ message HttpConnectionManager {
   // 3. Tracing decision (sampled, forced, etc) is set in 14th byte of the UUID.
   RequestIDExtension request_id_extension = 36;
 
-  // If `preserve_upstream_date` is true, the value of the `date` header sent by the upstream
-  // host will not be overwritten by the HTTP Connection Manager. The default behaviour is
-  // to overwrite the `date` header unconditionally.
-  bool preserve_upstream_date = 38;
-
   // Determines if the port part should be removed from host/authority header before any processing
   // of request by HTTP filters or routing. The port would be removed only if it is equal to the :ref:`listener's<envoy_api_field_config.listener.v4alpha.Listener.address>`
   // local port and request method is not CONNECT. This affects the upstream host header as well.

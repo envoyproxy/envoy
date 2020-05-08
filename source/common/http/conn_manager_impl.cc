@@ -1631,9 +1631,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
 void ConnectionManagerImpl::ActiveStream::encodeHeadersInternal(ResponseHeaderMap& headers,
                                                                 bool end_stream) {
   // Base headers.
-  if (!connection_manager_.config_.shouldPreserveUpstreamDate() || !headers.Date()) {
-    connection_manager_.config_.dateProvider().setDateHeader(headers);
-  }
+  connection_manager_.config_.dateProvider().setDateHeader(headers);
   // Following setReference() is safe because serverName() is constant for the life of the listener.
   const auto transformation = connection_manager_.config_.serverHeaderTransformation();
   if (transformation == ConnectionManagerConfig::HttpConnectionManagerProto::OVERWRITE ||
