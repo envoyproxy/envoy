@@ -747,6 +747,14 @@ const Network::Connection* ConnectionManagerImpl::ActiveStream::connection() {
   return &connection_manager_.read_callbacks_->connection();
 }
 
+uint32_t ConnectionManagerImpl::ActiveStream::localPort() {
+  auto ip = connection()->localAddress()->ip();
+  if (ip == nullptr) {
+    return 0;
+  }
+  return ip->port();
+}
+
 // Ordering in this function is complicated, but important.
 //
 // We want to do minimal work before selecting route and creating a filter
@@ -895,6 +903,9 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
                    StreamInfo::ResponseCodeDetails::get().PathNormalizationFailed);
     return;
   }
+
+  ConnectionManagerUtility::maybeNormalizeHost(*request_headers_, connection_manager_.config_,
+                                               localPort());
 
   if (protocol == Protocol::Http11 && request_headers_->Connection() &&
       absl::EqualsIgnoreCase(request_headers_->Connection()->value().getStringView(),

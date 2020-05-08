@@ -18,6 +18,10 @@ public:
     headers_.setPath(path_value);
     return *headers_.Path();
   }
+  const HeaderEntry& hostHeaderEntry(const std::string& host_value) {
+    headers_.setHost(host_value);
+    return *headers_.Host();
+  }
   RequestHeaderMapImpl headers_;
 };
 
