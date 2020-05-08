@@ -3,7 +3,7 @@ syntax = "proto3";
 package envoy.extensions.filters.http.compressor.v3;
 
 import "envoy/config/core/v3/base.proto";
-import "envoy/extensions/compression/common/compressor/v3/compressor.proto";
+import "envoy/config/core/v3/extension.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/wrappers.proto";
@@ -56,5 +56,5 @@ message Compressor {
   // :ref:`envoy.filters.http.compressor.gzip<envoy_api_msg_extensions.compression.gzip.compressor.v3.Gzip>`
   // is included in Envoy.
   // This field is ignored if used in the context of the gzip http-filter, but is mandatory otherwise.
-  compression.common.compressor.v3.CompressorLibrary compressor_library = 6;
+  config.core.v3.TypedExtensionConfig compressor_library = 6;
 }
