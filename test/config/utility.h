@@ -27,6 +27,8 @@ namespace Envoy {
 
 class ConfigHelper {
 public:
+  using HttpConnectionManager =
+      envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager;
   struct ServerSslOptions {
     ServerSslOptions& setRsaCert(bool rsa_cert) {
       rsa_cert_ = rsa_cert;
@@ -67,8 +69,7 @@ public:
                 envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_context);
 
   using ConfigModifierFunction = std::function<void(envoy::config::bootstrap::v3::Bootstrap&)>;
-  using HttpModifierFunction = std::function<void(
-      envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&)>;
+  using HttpModifierFunction = std::function<void(HttpConnectionManager&)>;
 
   // A basic configuration (admin port, cluster_0, one listener) with no network filters.
   static std::string baseConfig();
@@ -196,15 +197,16 @@ public:
   void addClusterFilterMetadata(absl::string_view metadata_yaml,
                                 absl::string_view cluster_name = "cluster_0");
 
+  // Given an HCM with the default config, set the matcher to be a connect matcher and enable
+  // CONNECT requests.
+  static void setConnectConfig(HttpConnectionManager& hcm, bool terminate_connect);
+
 private:
   // Load the first HCM struct from the first listener into a parsed proto.
-  bool loadHttpConnectionManager(
-      envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager& hcm);
+  bool loadHttpConnectionManager(HttpConnectionManager& hcm);
   // Take the contents of the provided HCM proto and stuff them into the first HCM
   // struct of the first listener.
-  void storeHttpConnectionManager(
-      const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-          hcm);
+  void storeHttpConnectionManager(const HttpConnectionManager& hcm);
 
   // Finds the filter named 'name' from the first filter chain from the first listener.
   envoy::config::listener::v3::Filter* getFilterFromListener(const std::string& name);
