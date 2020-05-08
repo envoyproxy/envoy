@@ -310,6 +310,7 @@ private:
   HEADER_FUNC(OtSpanContext)                                                                       \
   HEADER_FUNC(Origin)                                                                              \
   HEADER_FUNC(Path)                                                                                \
+  HEADER_FUNC(OriginalPathForUpstream)                                                             \
   HEADER_FUNC(Protocol)                                                                            \
   HEADER_FUNC(Referer)                                                                             \
   HEADER_FUNC(Scheme)                                                                              \

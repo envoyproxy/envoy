@@ -136,6 +136,7 @@ public:
   const LowerCaseString Origin{"origin"};
   const LowerCaseString OtSpanContext{"x-ot-span-context"};
   const LowerCaseString Path{":path"};
+  const LowerCaseString OriginalPathForUpstream{absl::StrCat(prefix(), "-original_path_for_upstream")};
   const LowerCaseString Protocol{":protocol"};
   const LowerCaseString ProxyConnection{"proxy-connection"};
   const LowerCaseString Referer{"referer"};

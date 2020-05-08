@@ -8,8 +8,38 @@ The HTTP connection manager supports the following runtime settings:
 .. _config_http_conn_man_runtime_normalize_path:
 
 http_connection_manager.normalize_path
-  % of requests that will have path normalization applied if not already configured in
+  Requests will have normalization applied if not already configured in
   :ref:`normalize_path <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.normalize_path>`.
+
+  This setting can have the following values:
+
+  +--------------+---------------------------+
+  | Value        | Expectation               |
+  +==============+===========================+
+  | 0, false     | normalization not enabled |
+  +--------------+---------------------------+
+  | 100, true    | normalization enabled     |
+  +--------------+---------------------------+
+
+  This is evaluated at configuration load time and will apply to all requests for a given
+  configuration.
+
+.. _config_http_conn_man_runtime_normalize_path_for_upstream:
+
+http_connection_manager.normalize_path_for_upstream
+  Requests to upstream will have normalization applied if not already configured in
+  :ref:`normalize_path <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.normalize_path_for_upstream>`.
+
+  This setting can have the following values:
+
+  +--------------+------------------------------------+
+  | Value        | Expectation                        |
+  +==============+====================================+
+  | 0, false     | upstream normalization not enabled |
+  +--------------+------------------------------------+
+  | 100, true    | upstream normalization enabled     |
+  +--------------+------------------------------------+
+
   This is evaluated at configuration load time and will apply to all requests for a given
   configuration.
 
