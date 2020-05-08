@@ -17,7 +17,7 @@ load("@envoy//bazel:repositories.bzl", "envoy_dependencies")
 
 envoy_dependencies()
 
-load("//bazel:repositories_extra.bzl", "envoy_dependencies_extra")
+load("@envoy//bazel:repositories_extra.bzl", "envoy_dependencies_extra")
 
 envoy_dependencies_extra()
 
