@@ -64,6 +64,5 @@ load balancing, statistics gathering, etc.
 Configuration template
 ^^^^^^^^^^^^^^^^^^^^^^
 
-The source distribution includes an example service-to-service configuration that is very similar to
-the version that Lyft runs in production. See :ref:`here <install_ref_configs>` for more
-information.
+The source distribution includes :ref:`an example service-to-service configuration<install_ref_configs>`
+that is very similar to the version that Lyft runs in production.
