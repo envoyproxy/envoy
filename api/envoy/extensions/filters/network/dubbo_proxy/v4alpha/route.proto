@@ -18,7 +18,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // [#protodoc-title: Dubbo Proxy Route Configuration]
 // Dubbo Proxy :ref:`configuration overview <config_network_filters_dubbo_proxy>`.
 
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message RouteConfiguration {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.network.dubbo_proxy.v3.RouteConfiguration";
@@ -38,6 +38,9 @@ message RouteConfiguration {
   // The list of routes that will be matched, in order, against incoming requests. The first route
   // that matches will be used.
   repeated Route routes = 5;
+
+  // The matcher of interface. The StringMatcher type for interface.
+  type.matcher.v4alpha.StringMatcher interface_match = 6;
 }
 
 message Route {

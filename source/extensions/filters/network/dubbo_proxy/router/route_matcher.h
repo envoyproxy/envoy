@@ -139,6 +139,8 @@ private:
   const std::string service_name_;
   const absl::optional<std::string> group_;
   const absl::optional<std::string> version_;
+  const Matchers::StringMatcherImpl interface_match_;
+  const bool valid_interface_;
 };
 
 class MultiRouteMatcher : public RouteMatcher, public Logger::Loggable<Logger::Id::dubbo> {
