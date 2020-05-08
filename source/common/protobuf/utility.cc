@@ -149,11 +149,13 @@ void tryWithApiBoosting(MessageXformFn f, Protobuf::Message& message) {
   auto earlier_message = ProtobufTypes::MessagePtr(dmf.GetPrototype(earlier_version_desc)->New());
   ASSERT(earlier_message != nullptr);
   try {
+    std::cerr << "THIS WILL PRINT TRY\n";
     // Try apply f with an earlier version of the message, then upgrade the
     // result.
     f(*earlier_message, MessageVersion::EARLIER_VERSION);
     Config::VersionConverter::upgrade(*earlier_message, message);
   } catch (ApiBoostRetryException&) {
+    std::cerr << "DID NOT CATCH EXCEPTION\n";
     // If we fail at the earlier version, try f at the current version of the
     // message.
     f(message, MessageVersion::LATEST_VERSION);
