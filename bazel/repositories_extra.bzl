@@ -8,7 +8,7 @@ def _python_deps():
 
     pip3_import(
         name = "config_validation",
-        requirements = "//tools/config_validation:requirements.txt",
+        requirements = "@envoy//tools/config_validation:requirements.txt",
     )
 
 # Envoy deps that rely on a first stage of dependency loading in envoy_dependencies().
