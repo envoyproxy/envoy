@@ -62,7 +62,7 @@ do
     else
       OBJECTS="$OBJECTS -object=bazel-bin/${TARGET_BINARY:2}_with_libfuzzer"
     fi
-    TARGET="${t}_with_libfuzzer"
+    TARGET="${t}"
   else
     TEST_ARGS=(--test_arg="--log-path /dev/null" --test_arg="-l trace")
     OBJECTS="bazel-bin/test/coverage/coverage_tests"
