@@ -569,8 +569,8 @@ Envoy::StatusOr<size_t> ConnectionImpl::dispatchSlice(const char* slice, size_t 
     sendProtocolError(Http1ResponseCodeDetails::get().HttpCodecError);
     // Avoid overwriting the codec_status_ set in the callbacks.
     ASSERT(codec_status_.ok());
-    codec_status_ = codecProtocolError("http/1.1 protocol error: " +
-                                       std::string(http_errno_name(HTTP_PARSER_ERRNO(&parser_))));
+    codec_status_ = codecProtocolError(
+        absl::StrCat("http/1.1 protocol error: ", http_errno_name(HTTP_PARSER_ERRNO(&parser_))));
     return codec_status_;
   }
 
@@ -849,7 +849,6 @@ bool ServerConnectionImpl::handlePath(RequestHeaderMap& headers, unsigned int me
   if (!absolute_url.initialize(active_request.request_url_.getStringView(), is_connect)) {
     sendProtocolError(Http1ResponseCodeDetails::get().InvalidUrl);
     ASSERT(codec_status_.ok());
-    ENVOY_LOG_MISC(info, "SETTING PROTOCOL ERROR");
     codec_status_ = codecProtocolError("http/1.1 protocol error: invalid url in request line");
     return false;
   }
