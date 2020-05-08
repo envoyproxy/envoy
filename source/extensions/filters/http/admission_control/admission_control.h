@@ -52,7 +52,7 @@ public:
                                TimeSource& time_source, Runtime::RandomGenerator& random,
                                Stats::Scope& scope, ThreadLocal::SlotPtr&& tls,
                                std::unique_ptr<ResponseEvaluator> response_evaluator);
-  virtual ~AdmissionControlFilterConfig() {}
+  virtual ~AdmissionControlFilterConfig() = default;
 
   virtual ThreadLocalController& getController() const {
     return tls_->getTyped<ThreadLocalControllerImpl>();

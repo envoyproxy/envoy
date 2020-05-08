@@ -59,7 +59,7 @@ private:
  */
 class AdmissionControlTest : public testing::Test {
 public:
-  AdmissionControlTest() {}
+  AdmissionControlTest() = default;
 
   std::shared_ptr<AdmissionControlFilterConfig> makeConfig(const std::string& yaml) {
     AdmissionControlProto proto;
