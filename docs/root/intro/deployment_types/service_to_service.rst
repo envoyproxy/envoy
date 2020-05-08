@@ -8,7 +8,7 @@ Service to service only
 
 The above diagram shows the simplest Envoy deployment which uses Envoy as a communication bus for
 all traffic internal to a service oriented architecture (SOA). In this scenario, Envoy exposes
-several listeners that are used for local origin traffic as well as service to service traffic.
+several listeners that are used for local origin traffic as well as service-to-service traffic.
 
 Service to service egress listener
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -57,13 +57,13 @@ being consistent and using local port routing for all external services.
 Discovery service integration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The recommended service to service configuration uses an external discovery service for all cluster
+The recommended service-to-service configuration uses an external discovery service for all cluster
 lookups. This provides Envoy with the most detailed information possible for use when performing
 load balancing, statistics gathering, etc.
 
 Configuration template
 ^^^^^^^^^^^^^^^^^^^^^^
 
-The source distribution includes an example service to service configuration that is very similar to
+The source distribution includes an example service-to-service configuration that is very similar to
 the version that Lyft runs in production. See :ref:`here <install_ref_configs>` for more
 information.
