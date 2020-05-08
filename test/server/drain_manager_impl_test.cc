@@ -17,10 +17,12 @@ namespace Envoy {
 namespace Server {
 namespace {
 
-class DrainManagerImplTest : public testing::Test {
+const int kDrainTimeSeconds(600);
+
+class DrainManagerImplTest : public testing::Test, public Event::TestUsingSimulatedTime {
 public:
   DrainManagerImplTest() {
-    ON_CALL(server_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(600)));
+    ON_CALL(server_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(kDrainTimeSeconds)));
     ON_CALL(server_.options_, parentShutdownTime())
         .WillByDefault(Return(std::chrono::seconds(900)));
   }
@@ -48,23 +50,24 @@ TEST_F(DrainManagerImplTest, Default) {
 
   // Test drain sequence.
   Event::MockTimer* drain_timer = new Event::MockTimer(&server_.dispatcher_);
-  EXPECT_CALL(*drain_timer, enableTimer(_, _));
+  EXPECT_CALL(*drain_timer, enableTimer(_, _));  // TODO(auni) add arg
   ReadyWatcher drain_complete;
   drain_manager.startDrainSequence([&drain_complete]() -> void { drain_complete.ready(); });
-  EXPECT_CALL(*drain_timer, enableTimer(_, _));  // TODO(auni) add arg
+  EXPECT_CALL(drain_complete, ready());
   drain_timer->invokeCallback();
+}
 
-  // 600s which is the default drain time.
-  // for (size_t i = 0; i < 599; i++) {
-  //   if (i < 598) {
-  //     EXPECT_CALL(*drain_timer, enableTimer(_, _));
-  //   } else {
-  //     EXPECT_CALL(drain_complete, ready());
-  //   }
-  //   drain_timer->invokeCallback();
-  // }
+TEST_F(DrainManagerImplTest, DrainDeadline) {
+  DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::DEFAULT);
 
-  EXPECT_CALL(server_, healthCheckFailed()).WillOnce(Return(false));
+  // Ensure drainClose() behaviour is determined by the deadline.
+  drain_manager.startDrainSequence(nullptr);
+  EXPECT_CALL(server_, healthCheckFailed()).WillRepeatedly(Return(false));
+
+  EXPECT_FALSE(drain_manager.drainClose());
+  simTime().advanceTimeWait(std::chrono::seconds(kDrainTimeSeconds - 1));
+  EXPECT_FALSE(drain_manager.drainClose());
+  simTime().advanceTimeWait(std::chrono::seconds(1));
   EXPECT_TRUE(drain_manager.drainClose());
 }
 
@@ -72,7 +75,7 @@ TEST_F(DrainManagerImplTest, ModifyOnly) {
   InSequence s;
   DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::MODIFY_ONLY);
 
-  EXPECT_CALL(server_, healthCheckFailed()).Times(0);
+  EXPECT_CALL(server_, healthCheckFailed()).Times(0);  // Listener check wil short-circuit
   EXPECT_FALSE(drain_manager.drainClose());
 }
 
