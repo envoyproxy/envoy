@@ -75,7 +75,10 @@ class ClusterManagerFactory;
  * persistent and shared among multiple ongoing requests/connections.
  * Cluster manager is initialized in two phases. In the first phase which begins at the construction
  * all primary clusters (i.e. with endpoint assignments provisioned statically in bootstrap,
- * discovered through DNS or file based CDS) are initialized.
+ * discovered through DNS or file based CDS) are initialized. This phase may complete synchronously
+ * with cluster manager construction iff all clusters are STATIC and without health checks
+ * configured. At the completion of the first phase cluster manager invokes callback set through the
+ * `setPrimaryClustersInitializedCb` method.
  * After the first phase has completed the server instance initializes services (i.e. RTDS) needed
  * to successfully deploy the rest of dynamic configuration.
  * In the second phase all secondary clusters (with endpoint assignments provisioned by xDS servers)
@@ -83,6 +86,9 @@ class ClusterManagerFactory;
  */
 class ClusterManager {
 public:
+  using PrimaryClustersReadyCallback = std::function<void()>;
+  using InitializationCompleteCallback = std::function<void()>;
+
   virtual ~ClusterManager() = default;
 
   /**
@@ -99,9 +105,14 @@ public:
                                   const std::string& version_info) PURE;
 
   /**
+   * Set a callback that will be invoked when all primary clusters have been initialized.
+   */
+  virtual void setPrimaryClustersInitializedCb(PrimaryClustersReadyCallback callback) PURE;
+
+  /**
    * Set a callback that will be invoked when all owned clusters have been initialized.
    */
-  virtual void setInitializedCb(std::function<void()> callback) PURE;
+  virtual void setInitializedCb(InitializationCompleteCallback callback) PURE;
 
   /**
    * Start initialization of secondary clusters and then dynamically configured clusters.

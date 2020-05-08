@@ -103,7 +103,7 @@ ProtobufWkt::Value parseYamlNode(const YAML::Node& node) {
 
 void jsonConvertInternal(const Protobuf::Message& source,
                          ProtobufMessage::ValidationVisitor& validation_visitor,
-                         Protobuf::Message& dest) {
+                         Protobuf::Message& dest, bool do_boosting = true) {
   Protobuf::util::JsonPrintOptions json_options;
   json_options.preserve_proto_field_names = true;
   std::string json;
@@ -112,7 +112,7 @@ void jsonConvertInternal(const Protobuf::Message& source,
     throw EnvoyException(fmt::format("Unable to convert protobuf message to JSON string: {} {}",
                                      status.ToString(), source.DebugString()));
   }
-  MessageUtil::loadFromJson(json, dest, validation_visitor);
+  MessageUtil::loadFromJson(json, dest, validation_visitor, do_boosting);
 }
 
 enum class MessageVersion {
@@ -144,6 +144,7 @@ void tryWithApiBoosting(MessageXformFn f, Protobuf::Message& message) {
     f(message, MessageVersion::LATEST_VERSION);
     return;
   }
+
   Protobuf::DynamicMessageFactory dmf;
   auto earlier_message = ProtobufTypes::MessagePtr(dmf.GetPrototype(earlier_version_desc)->New());
   ASSERT(earlier_message != nullptr);
@@ -270,43 +271,49 @@ size_t MessageUtil::hash(const Protobuf::Message& message) {
 }
 
 void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& message,
-                               ProtobufMessage::ValidationVisitor& validation_visitor) {
-  tryWithApiBoosting(
-      [&json, &validation_visitor](Protobuf::Message& message, MessageVersion message_version) {
-        Protobuf::util::JsonParseOptions options;
-        options.case_insensitive_enum_parsing = true;
-        // Let's first try and get a clean parse when checking for unknown fields;
-        // this should be the common case.
-        options.ignore_unknown_fields = false;
-        const auto strict_status = Protobuf::util::JsonStringToMessage(json, &message, options);
-        if (strict_status.ok()) {
-          // Success, no need to do any extra work.
-          return;
-        }
-        // If we fail, we see if we get a clean parse when allowing unknown fields.
-        // This is essentially a workaround
-        // for https://github.com/protocolbuffers/protobuf/issues/5967.
-        // TODO(htuch): clean this up when protobuf supports JSON/YAML unknown field
-        // detection directly.
-        options.ignore_unknown_fields = true;
-        const auto relaxed_status = Protobuf::util::JsonStringToMessage(json, &message, options);
-        // If we still fail with relaxed unknown field checking, the error has nothing
-        // to do with unknown fields.
-        if (!relaxed_status.ok()) {
-          throw EnvoyException("Unable to parse JSON as proto (" + relaxed_status.ToString() +
-                               "): " + json);
-        }
-        // We know it's an unknown field at this point. If we're at the latest
-        // version, then it's definitely an unknown field, otherwise we try to
-        // load again at a later version.
-        if (message_version == MessageVersion::LATEST_VERSION) {
-          validation_visitor.onUnknownField("type " + message.GetTypeName() + " reason " +
-                                            strict_status.ToString());
-        } else {
-          throw ApiBoostRetryException("Unknown field, possibly a rename, try again.");
-        }
-      },
-      message);
+                               ProtobufMessage::ValidationVisitor& validation_visitor,
+                               bool do_boosting) {
+  auto load_json = [&json, &validation_visitor](Protobuf::Message& message,
+                                                MessageVersion message_version) {
+    Protobuf::util::JsonParseOptions options;
+    options.case_insensitive_enum_parsing = true;
+    // Let's first try and get a clean parse when checking for unknown fields;
+    // this should be the common case.
+    options.ignore_unknown_fields = false;
+    const auto strict_status = Protobuf::util::JsonStringToMessage(json, &message, options);
+    if (strict_status.ok()) {
+      // Success, no need to do any extra work.
+      return;
+    }
+    // If we fail, we see if we get a clean parse when allowing unknown fields.
+    // This is essentially a workaround
+    // for https://github.com/protocolbuffers/protobuf/issues/5967.
+    // TODO(htuch): clean this up when protobuf supports JSON/YAML unknown field
+    // detection directly.
+    options.ignore_unknown_fields = true;
+    const auto relaxed_status = Protobuf::util::JsonStringToMessage(json, &message, options);
+    // If we still fail with relaxed unknown field checking, the error has nothing
+    // to do with unknown fields.
+    if (!relaxed_status.ok()) {
+      throw EnvoyException("Unable to parse JSON as proto (" + relaxed_status.ToString() +
+                           "): " + json);
+    }
+    // We know it's an unknown field at this point. If we're at the latest
+    // version, then it's definitely an unknown field, otherwise we try to
+    // load again at a later version.
+    if (message_version == MessageVersion::LATEST_VERSION) {
+      validation_visitor.onUnknownField("type " + message.GetTypeName() + " reason " +
+                                        strict_status.ToString());
+    } else {
+      throw ApiBoostRetryException("Unknown field, possibly a rename, try again.");
+    }
+  };
+
+  if (do_boosting) {
+    tryWithApiBoosting(load_json, message);
+  } else {
+    load_json(message, MessageVersion::LATEST_VERSION);
+  }
 }
 
 void MessageUtil::loadFromJson(const std::string& json, ProtobufWkt::Struct& message) {
@@ -316,11 +323,12 @@ void MessageUtil::loadFromJson(const std::string& json, ProtobufWkt::Struct& mes
 }
 
 void MessageUtil::loadFromYaml(const std::string& yaml, Protobuf::Message& message,
-                               ProtobufMessage::ValidationVisitor& validation_visitor) {
+                               ProtobufMessage::ValidationVisitor& validation_visitor,
+                               bool do_boosting) {
   ProtobufWkt::Value value = ValueUtil::loadFromYaml(yaml);
   if (value.kind_case() == ProtobufWkt::Value::kStructValue ||
       value.kind_case() == ProtobufWkt::Value::kListValue) {
-    jsonConvertInternal(value, validation_visitor, message);
+    jsonConvertInternal(value, validation_visitor, message, do_boosting);
     return;
   }
   throw EnvoyException("Unable to convert YAML as JSON: " + yaml);
@@ -334,7 +342,7 @@ void MessageUtil::loadFromYaml(const std::string& yaml, ProtobufWkt::Struct& mes
 
 void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& message,
                                ProtobufMessage::ValidationVisitor& validation_visitor,
-                               Api::Api& api) {
+                               Api::Api& api, bool do_boosting) {
   const std::string contents = api.fileSystem().fileReadToEnd(path);
   // If the filename ends with .pb, attempt to parse it as a binary proto.
   if (absl::EndsWith(path, FileExtensions::get().ProtoBinary)) {
@@ -348,26 +356,31 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
   }
   // If the filename ends with .pb_text, attempt to parse it as a text proto.
   if (absl::EndsWith(path, FileExtensions::get().ProtoText)) {
-    tryWithApiBoosting(
-        [&contents, &path](Protobuf::Message& message, MessageVersion message_version) {
-          if (Protobuf::TextFormat::ParseFromString(contents, &message)) {
-            return;
-          }
-          if (message_version == MessageVersion::LATEST_VERSION) {
-            throw EnvoyException("Unable to parse file \"" + path + "\" as a text protobuf (type " +
-                                 message.GetTypeName() + ")");
-          } else {
-            throw ApiBoostRetryException(
-                "Failed to parse at earlier version, trying again at later version.");
-          }
-        },
-        message);
+    auto read_proto_text = [&contents, &path](Protobuf::Message& message,
+                                              MessageVersion message_version) {
+      if (Protobuf::TextFormat::ParseFromString(contents, &message)) {
+        return;
+      }
+      if (message_version == MessageVersion::LATEST_VERSION) {
+        throw EnvoyException("Unable to parse file \"" + path + "\" as a text protobuf (type " +
+                             message.GetTypeName() + ")");
+      } else {
+        throw ApiBoostRetryException(
+            "Failed to parse at earlier version, trying again at later version.");
+      }
+    };
+
+    if (do_boosting) {
+      tryWithApiBoosting(read_proto_text, message);
+    } else {
+      read_proto_text(message, MessageVersion::LATEST_VERSION);
+    }
     return;
   }
   if (absl::EndsWith(path, FileExtensions::get().Yaml)) {
-    loadFromYaml(contents, message, validation_visitor);
+    loadFromYaml(contents, message, validation_visitor, do_boosting);
   } else {
-    loadFromJson(contents, message, validation_visitor);
+    loadFromJson(contents, message, validation_visitor, do_boosting);
   }
 }
 

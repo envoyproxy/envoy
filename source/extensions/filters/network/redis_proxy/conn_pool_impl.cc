@@ -74,7 +74,7 @@ InstanceImpl::ThreadLocalPool::ThreadLocalPool(InstanceImpl& parent, Event::Disp
   cluster_update_handle_ = parent_.cm_.addThreadLocalClusterUpdateCallbacks(*this);
   Upstream::ThreadLocalCluster* cluster = parent_.cm_.get(cluster_name_);
   if (cluster != nullptr) {
-    auth_password_ = ProtocolOptionsConfigImpl::auth_password(cluster->info(), parent_.api_);
+    auth_password_ = ProtocolOptionsConfigImpl::authPassword(cluster->info(), parent_.api_);
     onClusterAddOrUpdateNonVirtual(*cluster);
   }
 }
@@ -102,7 +102,7 @@ void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
 
   if (cluster_ != nullptr) {
     // Treat an update as a removal followed by an add.
-    onClusterRemoval(cluster_name_);
+    ThreadLocalPool::onClusterRemoval(cluster_name_);
   }
 
   ASSERT(cluster_ == nullptr);

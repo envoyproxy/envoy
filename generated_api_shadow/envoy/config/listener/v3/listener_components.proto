@@ -4,7 +4,7 @@ package envoy.config.listener.v3;
 
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
-import "envoy/extensions/transport_sockets/tls/v3/cert.proto";
+import "envoy/extensions/transport_sockets/tls/v3/tls.proto";
 import "envoy/type/v3/range.proto";
 
 import "google/protobuf/any.proto";
@@ -280,16 +280,16 @@ message ListenerFilter {
   // :ref:`supported filter <config_listener_filters>`.
   string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
-  ListenerFilterChainMatchPredicate filter_disabled = 4;
-
   // Filter specific configuration which depends on the filter being instantiated.
   // See the supported filters for further documentation.
   oneof config_type {
-    // Optional match predicate used to disable the filter. The filter is enabled when this field is empty.
-    // See :ref:`ListenerFilterChainMatchPredicate <envoy_api_msg_config.listener.v3.ListenerFilterChainMatchPredicate>`
-    // for further examples.
     google.protobuf.Any typed_config = 3;
 
     google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
   }
+
+  // Optional match predicate used to disable the filter. The filter is enabled when this field is empty.
+  // See :ref:`ListenerFilterChainMatchPredicate <envoy_api_msg_config.listener.v3.ListenerFilterChainMatchPredicate>`
+  // for further examples.
+  ListenerFilterChainMatchPredicate filter_disabled = 4;
 }

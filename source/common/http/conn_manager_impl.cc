@@ -34,6 +34,7 @@
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
 #include "common/http/path_utility.h"
+#include "common/http/status.h"
 #include "common/http/utility.h"
 #include "common/network/utility.h"
 #include "common/router/config_impl.h"
@@ -218,15 +219,6 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
   }
 
   checkForDeferredClose();
-
-  // Reading may have been disabled for the non-multiplexing case, so enable it again.
-  // Also be sure to unwind any read-disable done by the prior downstream
-  // connection.
-  if (drain_state_ != DrainState::Closing && codec_->protocol() < Protocol::Http2) {
-    while (!read_callbacks_->connection().readEnabled()) {
-      read_callbacks_->connection().readDisable(false);
-    }
-  }
 }
 
 void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
@@ -272,14 +264,14 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
   new_stream->response_encoder_->getStream().addCallbacks(*new_stream);
   new_stream->buffer_limit_ = new_stream->response_encoder_->getStream().bufferLimit();
   // If the network connection is backed up, the stream should be made aware of it on creation.
-  // Both HTTP/1.x and HTTP/2 codecs handle this in StreamCallbackHelper::addCallbacks_.
+  // Both HTTP/1.x and HTTP/2 codecs handle this in StreamCallbackHelper::addCallbacksHelper.
   ASSERT(read_callbacks_->connection().aboveHighWatermark() == false ||
          new_stream->high_watermark_count_ > 0);
   new_stream->moveIntoList(std::move(new_stream), streams_);
   return **streams_.begin();
 }
 
-void ConnectionManagerImpl::handleCodecException(const char* error) {
+void ConnectionManagerImpl::handleCodecError(absl::string_view error) {
   ENVOY_CONN_LOG(debug, "dispatch error: {}", read_callbacks_->connection(), error);
   read_callbacks_->connection().streamInfo().setResponseCodeDetails(
       absl::StrCat("codec error: ", error));
@@ -323,14 +315,15 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
   do {
     redispatch = false;
 
-    try {
-      codec_->dispatch(data);
-    } catch (const FrameFloodException& e) {
-      handleCodecException(e.what());
+    const Status status = codec_->dispatch(data);
+
+    ASSERT(!isPrematureResponseError(status));
+    if (isBufferFloodError(status)) {
+      handleCodecError(status.message());
       return Network::FilterStatus::StopIteration;
-    } catch (const CodecProtocolException& e) {
+    } else if (isCodecProtocolError(status)) {
       stats_.named_.downstream_cx_protocol_error_.inc();
-      handleCodecException(e.what());
+      handleCodecError(status.message());
       return Network::FilterStatus::StopIteration;
     }
 
@@ -345,10 +338,6 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
       if (read_callbacks_->connection().state() == Network::Connection::State::Open &&
           data.length() > 0 && streams_.empty()) {
         redispatch = true;
-      }
-
-      if (!streams_.empty() && streams_.front()->state_.remote_complete_) {
-        read_callbacks_->connection().readDisable(true);
       }
     }
   } while (redispatch);
@@ -695,6 +684,14 @@ void ConnectionManagerImpl::ActiveStream::addStreamDecoderFilterWorker(
     StreamDecoderFilterSharedPtr filter, bool dual_filter) {
   ActiveStreamDecoderFilterPtr wrapper(new ActiveStreamDecoderFilter(*this, filter, dual_filter));
   filter->setDecoderFilterCallbacks(*wrapper);
+  // Note: configured decoder filters are appended to decoder_filters_.
+  // This means that if filters are configured in the following order (assume all three filters are
+  // both decoder/encoder filters):
+  //   http_filters:
+  //     - A
+  //     - B
+  //     - C
+  // The decoder filter chain will iterate through filters A, B, C.
   wrapper->moveIntoListBack(std::move(wrapper), decoder_filters_);
 }
 
@@ -702,6 +699,14 @@ void ConnectionManagerImpl::ActiveStream::addStreamEncoderFilterWorker(
     StreamEncoderFilterSharedPtr filter, bool dual_filter) {
   ActiveStreamEncoderFilterPtr wrapper(new ActiveStreamEncoderFilter(*this, filter, dual_filter));
   filter->setEncoderFilterCallbacks(*wrapper);
+  // Note: configured encoder filters are prepended to encoder_filters_.
+  // This means that if filters are configured in the following order (assume all three filters are
+  // both decoder/encoder filters):
+  //   http_filters:
+  //     - A
+  //     - B
+  //     - C
+  // The encoder filter chain will iterate through filters C, B, A.
   wrapper->moveIntoList(std::move(wrapper), encoder_filters_);
 }
 
@@ -1488,10 +1493,10 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
   ENVOY_STREAM_LOG(debug, "Sending local reply with details {}", *this, details);
   ASSERT(response_headers_ == nullptr);
   // For early error handling, do a best-effort attempt to create a filter chain
-  // to ensure access logging.
-  if (!state_.created_filter_chain_) {
-    createFilterChain();
-  }
+  // to ensure access logging. If the filter chain already exists this will be
+  // a no-op.
+  createFilterChain();
+
   stream_info_.setResponseCodeDetails(details);
   Utility::sendLocalReply(
       is_grpc_request,
@@ -2067,7 +2072,7 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {
   allowIteration();
 
   // Only resume with do100ContinueHeaders() if we've actually seen a 100-Continue.
-  if (parent_.state_.has_continue_headers_ && !continue_headers_continued_) {
+  if (has100Continueheaders()) {
     continue_headers_continued_ = true;
     do100ContinueHeaders();
     // If the response headers have not yet come in, don't continue on with

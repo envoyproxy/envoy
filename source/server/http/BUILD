@@ -15,6 +15,8 @@ envoy_cc_library(
     deps = [
         ":admin_filter_lib",
         ":config_tracker_lib",
+        ":listeners_handler_lib",
+        ":runtime_handler_lib",
         ":stats_handler_lib",
         ":utils_lib",
         "//include/envoy/filesystem:filesystem_interface",
@@ -22,7 +24,6 @@ envoy_cc_library(
         "//include/envoy/http:request_id_extension_interface",
         "//include/envoy/network:filter_interface",
         "//include/envoy/network:listen_socket_interface",
-        "//include/envoy/runtime:runtime_interface",
         "//include/envoy/server:admin_interface",
         "//include/envoy/server:hot_restart_interface",
         "//include/envoy/server:instance_interface",
@@ -86,10 +87,20 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "handler_ctx_lib",
+    hdrs = ["handler_ctx.h"],
+    deps = [
+        "//include/envoy/server:instance_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "stats_handler_lib",
     srcs = ["stats_handler.cc"],
     hdrs = ["stats_handler.h"],
     deps = [
+        ":handler_ctx_lib",
+        ":prometheus_stats_lib",
         ":utils_lib",
         "//include/envoy/http:codes_interface",
         "//include/envoy/server:admin_interface",
@@ -99,6 +110,50 @@ envoy_cc_library(
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
         "//source/common/stats:histogram_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "prometheus_stats_lib",
+    srcs = ["prometheus_stats.cc"],
+    hdrs = ["prometheus_stats.h"],
+    deps = [
+        ":utils_lib",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/stats:histogram_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "listeners_handler_lib",
+    srcs = ["listeners_handler.cc"],
+    hdrs = ["listeners_handler.h"],
+    deps = [
+        ":handler_ctx_lib",
+        ":utils_lib",
+        "//include/envoy/http:codes_interface",
+        "//include/envoy/server:admin_interface",
+        "//include/envoy/server:instance_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/http:codes_lib",
+        "//source/common/http:header_map_lib",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "runtime_handler_lib",
+    srcs = ["runtime_handler.cc"],
+    hdrs = ["runtime_handler.h"],
+    deps = [
+        ":handler_ctx_lib",
+        ":utils_lib",
+        "//include/envoy/http:codes_interface",
+        "//include/envoy/server:admin_interface",
+        "//include/envoy/server:instance_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/http:codes_lib",
+        "//source/common/http:header_map_lib",
     ],
 )
 
