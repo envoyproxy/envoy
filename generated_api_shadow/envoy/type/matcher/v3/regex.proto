@@ -36,15 +36,15 @@ message RegexMatcher {
     google.protobuf.UInt32Value max_program_size = 1 [deprecated = true];
   }
 
-  // Google's RE2 regex engine.
-  string regex = 2 [(validate.rules).string = {min_bytes: 1}];
-
   oneof engine_type {
     option (validate.required) = true;
 
-    // The regex match string. The string must be supported by the configured engine.
+    // Google's RE2 regex engine.
     GoogleRE2 google_re2 = 1 [(validate.rules).message = {required: true}];
   }
+
+  // The regex match string. The string must be supported by the configured engine.
+  string regex = 2 [(validate.rules).string = {min_bytes: 1}];
 }
 
 // Describes how to match a string and then produce a new string using a regular
