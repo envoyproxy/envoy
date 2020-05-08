@@ -119,7 +119,7 @@ TEST_P(AdmissionControlIntegrationTest, HttpTest) {
   EXPECT_NEAR(throttle_count / request_count, 0.98, 0.03);
 
   // We now wait for the history to become stale.
-  timeSystem().sleep(std::chrono::seconds(120));
+  timeSystem().advanceTimeWait(std::chrono::seconds(120));
 
   // We expect a 100% success rate after waiting. No throttling should occur.
   for (int i = 0; i < 100; ++i) {
@@ -159,7 +159,7 @@ TEST_P(AdmissionControlIntegrationTest, GrpcTest) {
   EXPECT_NEAR(throttle_count / request_count, 0.98, 0.03);
 
   // We now wait for the history to become stale.
-  timeSystem().sleep(std::chrono::seconds(120));
+  timeSystem().advanceTimeWait(std::chrono::seconds(120));
 
   // We expect a 100% success rate after waiting. No throttling should occur.
   for (int i = 0; i < 100; ++i) {

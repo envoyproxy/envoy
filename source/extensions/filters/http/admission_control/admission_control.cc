@@ -77,7 +77,7 @@ Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::RequestHea
 Http::FilterHeadersStatus AdmissionControlFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                                 bool end_stream) {
   bool successful_response = false;
-  if (Grpc::Common::isGrpcResponseHeader(headers, end_stream)) {
+  if (Grpc::Common::isGrpcResponseHeaders(headers, end_stream)) {
     absl::optional<GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(headers);
 
     // If the GRPC status isn't found in the headers, it must be found in the trailers.

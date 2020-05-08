@@ -33,7 +33,7 @@ protected:
     }
     for (int tick = 0; tick < window_.count(); ++tick) {
       record();
-      time_system_.sleep(std::chrono::seconds(1));
+      time_system_.advanceTimeWait(std::chrono::seconds(1));
     }
     // Don't sleep after the final sample to allow for measurements.
     record();
@@ -66,7 +66,7 @@ TEST_F(ThreadLocalControllerTest, RemoveStaleSamples) {
   EXPECT_EQ(window_.count(), tlc_.requestTotalCount());
   EXPECT_EQ(window_.count(), tlc_.requestSuccessCount());
 
-  time_system_.sleep(std::chrono::seconds(1));
+  time_system_.advanceTimeWait(std::chrono::seconds(1));
 
   // Continuing to sample requests at 1 per second should maintain the same request counts. We'll
   // record failures here.
@@ -75,7 +75,7 @@ TEST_F(ThreadLocalControllerTest, RemoveStaleSamples) {
   EXPECT_EQ(0, tlc_.requestSuccessCount());
 
   // Expect the oldest entry to go stale.
-  time_system_.sleep(std::chrono::seconds(1));
+  time_system_.advanceTimeWait(std::chrono::seconds(1));
   EXPECT_EQ(window_.count() - 1, tlc_.requestTotalCount());
   EXPECT_EQ(0, tlc_.requestSuccessCount());
 }
@@ -89,7 +89,7 @@ TEST_F(ThreadLocalControllerTest, RemoveStaleSamples2) {
   EXPECT_EQ(window_.count(), tlc_.requestSuccessCount());
 
   // Let's just sit here for a full day. We expect all samples to become stale.
-  time_system_.sleep(std::chrono::hours(24));
+  time_system_.advanceTimeWait(std::chrono::hours(24));
 
   EXPECT_EQ(0, tlc_.requestTotalCount());
   EXPECT_EQ(0, tlc_.requestSuccessCount());
@@ -99,9 +99,9 @@ TEST_F(ThreadLocalControllerTest, RemoveStaleSamples2) {
 TEST_F(ThreadLocalControllerTest, VerifyMemoryUsage) {
   // Make sure we don't add any null data to the history if there are sparse requests.
   tlc_.recordSuccess();
-  time_system_.sleep(std::chrono::seconds(1));
+  time_system_.advanceTimeWait(std::chrono::seconds(1));
   tlc_.recordSuccess();
-  time_system_.sleep(std::chrono::seconds(3));
+  time_system_.advanceTimeWait(std::chrono::seconds(3));
   tlc_.recordSuccess();
   EXPECT_EQ(3, tlc_.requestTotalCount());
   EXPECT_EQ(3, tlc_.requestSuccessCount());
