@@ -1,11 +1,15 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
-#include "common/compressor/zlib_compressor_impl.h"
 #include "common/decompressor/zlib_decompressor_impl.h"
+
+#include "extensions/compression/gzip/compressor/zlib_compressor_impl.h"
 
 #include "test/fuzz/fuzz_runner.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace Compression {
+namespace Gzip {
 namespace Compressor {
 namespace Fuzz {
 
@@ -61,7 +65,8 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
     full_input.add(next_data);
     Buffer::OwnedImpl buffer{next_data.data(), next_data.size()};
     provider_empty = provider.remaining_bytes() == 0;
-    compressor.compress(buffer, provider_empty ? State::Finish : State::Flush);
+    compressor.compress(buffer, provider_empty ? Envoy::Compression::Compressor::State::Finish
+                                               : Envoy::Compression::Compressor::State::Flush);
     decompressor.decompress(buffer, full_output);
   }
   RELEASE_ASSERT(full_input.toString() == full_output.toString(), "");
@@ -70,4 +75,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
 
 } // namespace Fuzz
 } // namespace Compressor
+} // namespace Gzip
+} // namespace Compression
+} // namespace Extensions
 } // namespace Envoy
