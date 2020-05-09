@@ -73,6 +73,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "documentation_url_lib",
+    hdrs = ["documentation_url.h"],
+)
+
+envoy_cc_library(
     name = "empty_string",
     hdrs = ["empty_string.h"],
 )

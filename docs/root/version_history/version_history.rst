@@ -1,3 +1,5 @@
+.. _version_history:
+
 Version history
 ---------------
 

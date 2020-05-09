@@ -64,6 +64,7 @@ envoy_cc_library(
         "//include/envoy/protobuf:message_validator_interface",
         "//include/envoy/runtime:runtime_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:documentation_url_lib",
         "//source/common/common:hash_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:api_type_oracle_lib",

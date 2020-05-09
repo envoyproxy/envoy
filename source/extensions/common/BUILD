@@ -13,6 +13,7 @@ envoy_cc_library(
     hdrs = ["utility.h"],
     deps = [
         "//include/envoy/runtime:runtime_interface",
+        "//source/common/common:documentation_url_lib",
         "//source/common/common:minimal_logger_lib",
     ],
 )
