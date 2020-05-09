@@ -2,8 +2,8 @@
 
 #include <functional>
 
-#include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/common/time.h"
+#include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/instance.h"
@@ -31,19 +31,16 @@ public:
   void startParentShutdownSequence() override;
 
 private:
-  void drainSequenceTick();
-
   Instance& server_;
   const envoy::config::listener::v3::Listener::DrainType drain_type_;
 
-  Event::TimerPtr drain_tick_timer_;
   std::atomic<bool> draining_{false};
+  Event::TimerPtr drain_tick_timer_;
+  std::function<void()> drain_complete_cb_;
   MonotonicTime drain_deadline_;
 
   Event::TimerPtr parent_shutdown_timer_;
 
-  std::atomic<uint32_t> drain_time_completed_{};
-  std::function<void()> drain_complete_cb_;
 };
 
 } // namespace Server

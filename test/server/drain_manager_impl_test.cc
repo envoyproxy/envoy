@@ -22,7 +22,8 @@ const int kDrainTimeSeconds(600);
 class DrainManagerImplTest : public testing::Test, public Event::TestUsingSimulatedTime {
 public:
   DrainManagerImplTest() {
-    ON_CALL(server_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(kDrainTimeSeconds)));
+    ON_CALL(server_.options_, drainTime())
+        .WillByDefault(Return(std::chrono::seconds(kDrainTimeSeconds)));
     ON_CALL(server_.options_, parentShutdownTime())
         .WillByDefault(Return(std::chrono::seconds(900)));
   }
@@ -50,7 +51,7 @@ TEST_F(DrainManagerImplTest, Default) {
 
   // Test drain sequence.
   Event::MockTimer* drain_timer = new Event::MockTimer(&server_.dispatcher_);
-  EXPECT_CALL(*drain_timer, enableTimer(_, _));  // TODO(auni) add arg
+  EXPECT_CALL(*drain_timer, enableTimer(_, _)); // TODO(auni) add arg
   ReadyWatcher drain_complete;
   drain_manager.startDrainSequence([&drain_complete]() -> void { drain_complete.ready(); });
   EXPECT_CALL(drain_complete, ready());
@@ -63,6 +64,8 @@ TEST_F(DrainManagerImplTest, DrainDeadline) {
   // Ensure drainClose() behaviour is determined by the deadline.
   drain_manager.startDrainSequence(nullptr);
   EXPECT_CALL(server_, healthCheckFailed()).WillRepeatedly(Return(false));
+  ON_CALL(server_.random_, random()).WillByDefault(Return(kDrainTimeSeconds * 2 - 1));
+  ON_CALL(server_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(kDrainTimeSeconds)));
 
   EXPECT_FALSE(drain_manager.drainClose());
   simTime().advanceTimeWait(std::chrono::seconds(kDrainTimeSeconds - 1));
@@ -71,26 +74,23 @@ TEST_F(DrainManagerImplTest, DrainDeadline) {
   EXPECT_TRUE(drain_manager.drainClose());
 }
 
-TEST_F(DrainManagerImplTest, ProbabilisticDrainClose) {
+TEST_F(DrainManagerImplTest, DrainDeadlineProbability) {
+  ON_CALL(server_.random_, random()).WillByDefault(Return(5));
+  ON_CALL(server_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(3)));
+
   DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::DEFAULT);
 
-  Event::MockTimer* drain_timer = new Event::MockTimer(&server_.dispatcher_);
-  EXPECT_CALL(*drain_timer, enableTimer(_, _)).Times(2);
-
-  // Ensure drainClose() behaviour is determined by the deadline.
-  drain_manager.startDrainSequence(nullptr);
+  EXPECT_CALL(server_, healthCheckFailed()).WillOnce(Return(true));
+  EXPECT_TRUE(drain_manager.drainClose());
   EXPECT_CALL(server_, healthCheckFailed()).WillRepeatedly(Return(false));
-
-  // drainClose() will return true when ticks > (5 % 3 == 2).
-  ON_CALL(server_.random_, random())
-      .WillByDefault(Return(5));
-  ON_CALL(server_.options_, drainTime())
-      .WillByDefault(Return(std::chrono::seconds(3)));
-
   EXPECT_FALSE(drain_manager.drainClose());
-  drain_timer->invokeCallback();
+  drain_manager.startDrainSequence(nullptr);
+
+  // drainClose() will return true when elapsed time > (5 % 3 == 2).
   EXPECT_FALSE(drain_manager.drainClose());
-  drain_timer->invokeCallback();
+  simTime().advanceTimeWait(std::chrono::seconds(2));
+  EXPECT_FALSE(drain_manager.drainClose());
+  simTime().advanceTimeWait(std::chrono::seconds(1));
   EXPECT_TRUE(drain_manager.drainClose());
 }
 
@@ -98,7 +98,7 @@ TEST_F(DrainManagerImplTest, ModifyOnly) {
   InSequence s;
   DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::MODIFY_ONLY);
 
-  EXPECT_CALL(server_, healthCheckFailed()).Times(0);  // Listener check wil short-circuit
+  EXPECT_CALL(server_, healthCheckFailed()).Times(0); // Listener check wil short-circuit
   EXPECT_FALSE(drain_manager.drainClose());
 }
 

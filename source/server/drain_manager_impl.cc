@@ -32,23 +32,13 @@ bool DrainManagerImpl::drainClose() const {
     return false;
   }
 
-  return server_.dispatcher().timeSource().monotonicTime() >= drain_deadline_;
+  const auto remaining_time = std::chrono::duration_cast<std::chrono::seconds>(
+      drain_deadline_ - server_.dispatcher().timeSource().monotonicTime());
+  const auto elapsed_time = server_.options().drainTime() - remaining_time;
 
-  // We use the tick time as in increasing chance that we shutdown connections.
-  // return static_cast<uint64_t>(drain_time_completed_.load()) >
-  //        (server_.random().random() % server_.options().drainTime().count());
-}
-
-void DrainManagerImpl::drainSequenceTick() {
-  ENVOY_LOG(trace, "drain tick #{}", drain_time_completed_.load());
-  ASSERT(drain_time_completed_.load() < server_.options().drainTime().count());
-  ++drain_time_completed_;
-
-  if (drain_time_completed_.load() < server_.options().drainTime().count()) {
-    drain_tick_timer_->enableTimer(std::chrono::milliseconds(1000));
-  } else if (drain_complete_cb_) {
-    drain_complete_cb_();
-  }
+  // P(shut down connections) = elapsed_drain_time / overall_drain_timeout
+  return static_cast<uint64_t>(elapsed_time.count()) >
+         (server_.random().random() % server_.options().drainTime().count());
 }
 
 void DrainManagerImpl::startDrainSequence(std::function<void()> drain_complete_cb) {
