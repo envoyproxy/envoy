@@ -161,3 +161,15 @@ message GrpcJsonTranscoder {
   //  :ref:`proto descriptor set <config_grpc_json_generate_proto_descriptor_set>`.
   bool convert_grpc_status = 9;
 }
+
+message GrpcJsonTranscoderPerRoute {
+  oneof override {
+    option (validate.required) = true;
+
+    // Disable the grpc json trasncoder filter for this particular vhost or route.
+    bool disabled = 1 [(validate.rules).bool = {const: true}];
+
+    // Override the global configuration of the filter with this new config.
+    GrpcJsonTranscoder transcoder = 2 [(validate.rules).message = {required: true}];
+  }
+}

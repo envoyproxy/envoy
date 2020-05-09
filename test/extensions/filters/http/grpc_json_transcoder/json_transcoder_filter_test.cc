@@ -10,6 +10,7 @@
 #include "common/protobuf/protobuf.h"
 
 #include "extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.h"
+#include "extensions/filters/http/well_known_names.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -24,6 +25,7 @@
 using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
+using testing::Return;
 
 using Envoy::Protobuf::FileDescriptorProto;
 using Envoy::Protobuf::FileDescriptorSet;
@@ -330,12 +332,41 @@ protected:
     return TestEnvironment::runfilesPath("test/proto/bookstore.descriptor");
   }
 
+  void routeLocalConfig(const Router::RouteSpecificFilterConfig* route_settings,
+                        const Router::RouteSpecificFilterConfig* vhost_settings) {
+    ON_CALL(decoder_callbacks_.route_->route_entry_, perFilterConfig(HttpFilterNames::get().GrpcJsonTranscoder))
+        .WillByDefault(Return(route_settings));
+    ON_CALL(decoder_callbacks_.route_->route_entry_.virtual_host_,
+            perFilterConfig(HttpFilterNames::get().GrpcJsonTranscoder))
+        .WillByDefault(Return(vhost_settings));
+  }
+
   // TODO(lizan): Add a mock of JsonTranscoderConfig and test more error cases.
   JsonTranscoderConfig config_;
   JsonTranscoderFilter filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
 };
+
+TEST_F(GrpcJsonTranscoderFilterTest, PerRouteDisabledConfigOverride) {
+  envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoderPerRoute route_cfg;
+  route_cfg.set_disabled(true);
+  JsonTranscoderConfig route_config(route_cfg, *api_);
+  routeLocalConfig(&route_config, nullptr);
+
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers, false));
+}
+
+TEST_F(GrpcJsonTranscoderFilterTest, PerVHostDisabledConfigOverride) {
+  envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoderPerRoute vhost_cfg;
+  vhost_cfg.set_disabled(true);
+  JsonTranscoderConfig vhost_config(vhost_cfg, *api_);
+  routeLocalConfig(nullptr, &vhost_config);
+
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers, false));
+}
 
 TEST_F(GrpcJsonTranscoderFilterTest, NoTranscoding) {
   Http::TestRequestHeaderMapImpl request_headers{{"content-type", "application/grpc"},
