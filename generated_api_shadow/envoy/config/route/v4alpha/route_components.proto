@@ -4,8 +4,8 @@ package envoy.config.route.v4alpha;
 
 import "envoy/config/core/v4alpha/base.proto";
 import "envoy/config/core/v4alpha/proxy_protocol.proto";
-import "envoy/type/matcher/v3/regex.proto";
-import "envoy/type/matcher/v3/string.proto";
+import "envoy/type/matcher/v4alpha/regex.proto";
+import "envoy/type/matcher/v4alpha/string.proto";
 import "envoy/type/tracing/v3/custom_tag.proto";
 import "envoy/type/v3/percent.proto";
 import "envoy/type/v3/range.proto";
@@ -143,7 +143,7 @@ message VirtualHost {
   // will see the attempt count as perceived by the second Envoy. Defaults to false.
   // This header is unaffected by the
   // :ref:`suppress_envoy_headers
-  // <envoy_api_field_extensions.filters.http.router.v3.Router.suppress_envoy_headers>` flag.
+  // <envoy_api_field_extensions.filters.http.router.v4alpha.Router.suppress_envoy_headers>` flag.
   //
   // [#next-major-version: rename to include_attempt_count_in_request.]
   bool include_request_attempt_count = 14;
@@ -155,7 +155,7 @@ message VirtualHost {
   // will see the attempt count as perceived by the Envoy closest upstream from itself. Defaults to false.
   // This header is unaffected by the
   // :ref:`suppress_envoy_headers
-  // <envoy_api_field_extensions.filters.http.router.v3.Router.suppress_envoy_headers>` flag.
+  // <envoy_api_field_extensions.filters.http.router.v4alpha.Router.suppress_envoy_headers>` flag.
   bool include_attempt_count_in_response = 19;
 
   // Indicates the retry policy for all routes in this virtual host. Note that setting a
@@ -428,7 +428,7 @@ message RouteMatch {
     // path_specifier entirely and just rely on a set of header matchers which can already match
     // on :path, etc. The issue with that is it is unclear how to generically deal with query string
     // stripping. This needs more thought.]
-    type.matcher.v3.RegexMatcher safe_regex = 10 [(validate.rules).message = {required: true}];
+    type.matcher.v4alpha.RegexMatcher safe_regex = 10 [(validate.rules).message = {required: true}];
 
     // [#not-implemented-hide:]
     // If this is used as the matcher, the matcher will only match CONNECT requests.
@@ -499,7 +499,7 @@ message CorsPolicy {
 
   // Specifies string patterns that match allowed origins. An origin is allowed if any of the
   // string matchers match.
-  repeated type.matcher.v3.StringMatcher allow_origin_string_match = 11;
+  repeated type.matcher.v4alpha.StringMatcher allow_origin_string_match = 11;
 
   // Specifies the content for the *access-control-allow-methods* header.
   string allow_methods = 2;
@@ -855,7 +855,7 @@ message RouteAction {
   // * The pattern ``(?i)/xxx/`` paired with a substitution string of ``/yyy/``
   //   would do a case-insensitive match and transform path ``/aaa/XxX/bbb`` to
   //   ``/aaa/yyy/bbb``.
-  type.matcher.v3.RegexMatchAndSubstitute regex_rewrite = 32;
+  type.matcher.v4alpha.RegexMatchAndSubstitute regex_rewrite = 32;
 
   oneof host_rewrite_specifier {
     // Indicates that during forwarding, the host header will be swapped with
@@ -1534,7 +1534,7 @@ message HeaderMatcher {
     // If specified, this regex string is a regular expression rule which implies the entire request
     // header value must match the regex. The rule will not match if only a subsequence of the
     // request header value matches the regex.
-    type.matcher.v3.RegexMatcher safe_regex_match = 11;
+    type.matcher.v4alpha.RegexMatcher safe_regex_match = 11;
 
     // If specified, header match will be performed based on range.
     // The rule will match if the request header value is within this range.
@@ -1596,7 +1596,8 @@ message QueryParameterMatcher {
 
   oneof query_parameter_match_specifier {
     // Specifies whether a query parameter value should match against a string.
-    type.matcher.v3.StringMatcher string_match = 5 [(validate.rules).message = {required: true}];
+    type.matcher.v4alpha.StringMatcher string_match = 5
+        [(validate.rules).message = {required: true}];
 
     // Specifies whether a query parameter should be present.
     bool present_match = 6;

@@ -17,7 +17,7 @@ Metadata
 --------
 
 Several parts of Envoy configuration (e.g. listeners, routes, clusters)
-contain a :ref:`metadata <envoy_api_msg_core.Metadata>` where arbitrary
+contain a :ref:`metadata <envoy_v3_api_msg_config.core.v3.Metadata>` where arbitrary
 key-value pairs can be encoded. The typical pattern is to use the filter
 names in reverse DNS format as the key and encode filter specific
 configuration metadata in the value. This metadata is immutable and shared
@@ -31,7 +31,7 @@ weighted cluster to select appropriate endpoints in a cluster
 Typed Metadata
 --------------
 
-:ref:`Metadata <envoy_api_msg_core.Metadata>` as such is untyped. Before
+:ref:`Metadata <envoy_v3_api_msg_config.core.v3.Metadata>` as such is untyped. Before
 acting on the metadata, callers typically convert it to a typed class
 object. The cost of conversion becomes non-negligible when performed
 repeatedly (e.g., for each request stream or connection). Typed Metadata
@@ -57,8 +57,8 @@ is specified as part of the configuration. A `FilterState::Object` implements
 HTTP Per-Route Filter Configuration
 -----------------------------------
 
-In HTTP routes, :ref:`per_filter_config
-<envoy_api_field_route.VirtualHost.per_filter_config>` allows HTTP filters
+In HTTP routes, :ref:`typed_per_filter_config
+<envoy_v3_api_field_config.route.v3.VirtualHost.typed_per_filter_config>` allows HTTP filters
 to have virtualhost/route-specific configuration in addition to a global
 filter config common to all virtual hosts. This configuration is converted
 and embedded into the route table. It is up to the HTTP filter
@@ -66,9 +66,9 @@ implementation to treat the route-specific filter config as a replacement
 to global config or an enhancement. For example, the HTTP fault filter uses
 this technique to provide per-route fault configuration.
 
-`per_filter_config` is a `map<string, ProtobufWkt::Struct>`. The Connection
+`typed_per_filter_config` is a `map<string, google.protobuf.Any>`. The Connection
 manager iterates over this map and invokes the filter factory interface
-`createRouteSpecificFilterConfig` to parse/validate the struct value and
+`createRouteSpecificFilterConfigTyped` to parse/validate the struct value and
 convert it into a typed class object that’s stored with the route
 itself. HTTP filters can then query the route-specific filter config during
 request processing.
