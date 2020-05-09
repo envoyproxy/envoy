@@ -33,7 +33,10 @@ namespace CommandSplitter {
 class RedisCommandSplitterImplTest : public testing::Test {
 public:
   RedisCommandSplitterImplTest() : RedisCommandSplitterImplTest(false) {}
-  RedisCommandSplitterImplTest(bool latency_in_macro) : latency_in_micros_(latency_in_macro) {}
+  RedisCommandSplitterImplTest(bool latency_in_macro) : latency_in_micros_(latency_in_macro) {
+    // EXPECT_CALL(*fault_manager_, getFaultForCommand(_)).WillOnce(Return(absl::nullopt));
+    ON_CALL(*fault_manager_, getFaultForCommand(_)).WillByDefault(Return(absl::nullopt));
+  }
   void makeBulkStringArray(Common::Redis::RespValue& value,
                            const std::vector<std::string>& strings) {
     std::vector<Common::Redis::RespValue> values(strings.size());
@@ -174,7 +177,6 @@ public:
   void makeRequest(const std::string& hash_key, Common::Redis::RespValuePtr&& request,
                    bool mirrored = false) {
     EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
-    EXPECT_CALL(*fault_manager_, getFaultForCommand(_)).WillOnce(Return(absl::nullopt));
     EXPECT_CALL(*conn_pool_, makeRequest_(hash_key, RespVariantEq(*request), _))
         .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&pool_callbacks_)), Return(&pool_request_)));
     if (mirrored) {
