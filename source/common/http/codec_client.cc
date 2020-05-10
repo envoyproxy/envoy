@@ -147,9 +147,6 @@ CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& conne
                                  Upstream::HostDescriptionConstSharedPtr host,
                                  Event::Dispatcher& dispatcher)
     : CodecClient(type, std::move(connection), host, dispatcher) {
-
-  // instantiate codec stats in ClusterInfo so they can be pulled here.
-
   switch (type) {
   case Type::HTTP1: {
     codec_ = std::make_unique<Http1::ClientConnectionImpl>(
