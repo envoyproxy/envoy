@@ -60,6 +60,7 @@ def _get_relevant_specs(specs, changed_files):
     status_label = spec.get("github_status_label", "")
     if files:
       relevant.append(struct(files=files,
+                             owner=spec.owner,
                              path_match=path_match,
                              allow_global_approval=allow_global_approval,
                              status_label=status_label))
