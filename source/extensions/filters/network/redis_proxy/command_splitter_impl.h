@@ -65,13 +65,6 @@ public:
                                        TimeSource& time_source) PURE;
 };
 
-struct HandlerData {
-  CommandStats command_stats_;
-  std::reference_wrapper<CommandHandler> handler_;
-};
-
-using HandlerDataPtr = std::shared_ptr<HandlerData>;
-
 class CommandHandlerBase {
 protected:
   CommandHandlerBase(Router& router) : router_(router) {}
@@ -123,57 +116,6 @@ protected:
   ConnPool::InstanceSharedPtr conn_pool_;
   Common::Redis::Client::PoolRequest* handle_{};
   Common::Redis::RespValuePtr incoming_request_;
-};
-
-/**
- * ErrorFaultRequest returns an error.
- */
-class ErrorFaultRequest : public SingleServerRequest {
-public:
-  static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
-                                SplitCallbacks& callbacks, CommandStats& command_stats,
-                                TimeSource& time_source);
-
-private:
-  ErrorFaultRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source)
-      : SingleServerRequest(callbacks, command_stats, time_source) {}
-
-public:
-  const static std::string FAULT_INJECTED_ERROR;
-};
-
-/**
- * DelayFaultRequest wraps a request- either a normal request or a fault- and delays it.
- */
-class DelayFaultRequest : public SplitRequestBase, public SplitCallbacks {
-public:
-  static std::unique_ptr<DelayFaultRequest>
-  create(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
-         Event::Dispatcher& dispatcher, std::chrono::milliseconds delay);
-
-  DelayFaultRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
-                    Event::Dispatcher& dispatcher, std::chrono::milliseconds delay)
-      : SplitRequestBase(command_stats, time_source), callbacks_(callbacks),
-        dispatcher_(dispatcher), delay_(delay) {}
-
-  // SplitCallbacks
-  bool connectionAllowed() override { return callbacks_.connectionAllowed(); }
-  void onAuth(const std::string& password) override { callbacks_.onAuth(password); }
-  void onResponse(Common::Redis::RespValuePtr&& response) override;
-
-  // RedisProxy::CommandSplitter::SplitRequest
-  void cancel() override;
-
-  SplitRequestPtr wrapped_request_ptr_;
-
-private:
-  void onDelayResponse();
-
-  SplitCallbacks& callbacks_;
-  Event::Dispatcher& dispatcher_;
-  std::chrono::milliseconds delay_;
-  Event::TimerPtr delay_timer_;
-  Common::Redis::RespValuePtr response_;
 };
 
 /**
@@ -344,6 +286,13 @@ public:
                               SplitCallbacks& callbacks) override;
 
 private:
+  struct HandlerData {
+    CommandStats command_stats_;
+    std::reference_wrapper<CommandHandler> handler_;
+  };
+
+  using HandlerDataPtr = std::shared_ptr<HandlerData>;
+
   void addHandler(Stats::Scope& scope, const std::string& stat_prefix, const std::string& name,
                   bool latency_in_micros, CommandHandler& handler);
   void onInvalidRequest(SplitCallbacks& callbacks);

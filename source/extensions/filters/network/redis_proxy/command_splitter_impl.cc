@@ -126,50 +126,6 @@ SplitRequestPtr SimpleRequest::create(Router& router,
   return request_ptr;
 }
 
-const std::string ErrorFaultRequest::FAULT_INJECTED_ERROR = "Fault Injected: Error";
-
-SplitRequestPtr ErrorFaultRequest::create(Router&, Common::Redis::RespValuePtr&&,
-                                          SplitCallbacks& callbacks, CommandStats& command_stats,
-                                          TimeSource& time_source) {
-  std::unique_ptr<ErrorFaultRequest> request_ptr{
-      new ErrorFaultRequest(callbacks, command_stats, time_source)};
-
-  request_ptr->onResponse(Common::Redis::Utility::makeError(FAULT_INJECTED_ERROR));
-  command_stats.error_.inc();
-  command_stats.error_fault_.inc();
-  return request_ptr;
-}
-
-std::unique_ptr<DelayFaultRequest> DelayFaultRequest::create(SplitCallbacks& callbacks,
-                                                             CommandStats& command_stats,
-                                                             TimeSource& time_source,
-                                                             Event::Dispatcher& dispatcher,
-                                                             std::chrono::milliseconds delay) {
-  std::unique_ptr<DelayFaultRequest> delay_fault_ptr{
-      new DelayFaultRequest(callbacks, command_stats, time_source, dispatcher, delay)};
-  return delay_fault_ptr;
-}
-
-void DelayFaultRequest::onResponse(Common::Redis::RespValuePtr&& response) {
-  response_ = std::move(response);
-  dispatcher_.post([this]() {
-    delay_timer_ = dispatcher_.createTimer([this]() -> void { onDelayResponse(); });
-    delay_timer_->enableTimer(delay_);
-  });
-}
-
-void DelayFaultRequest::onDelayResponse() {
-  command_stats_.delay_fault_.inc();
-  wrapped_request_ptr_->completeLatency();
-  callbacks_.onResponse(std::move(response_));
-  delay_timer_ = nullptr;
-}
-
-void DelayFaultRequest::cancel() {
-  delay_timer_->disableTimer();
-  delay_timer_ = nullptr;
-}
-
 SplitRequestPtr EvalRequest::create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                     SplitCallbacks& callbacks, CommandStats& command_stats,
                                     TimeSource& time_source) {
