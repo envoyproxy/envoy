@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <functional>
 #include <memory>
 
@@ -73,6 +74,66 @@ private:
   // https://gist.github.com/jmarantz/d22b836cee3ca203cc368553eda81ce5
   // does not currently work well with thread-annotation.
   absl::CondVar condvar_;
+};
+
+// Manages an array of atomic pointers to T, providing a relatively
+// contention-free mechanism to lazily get a T* at an index, where the caller
+// provides a mechanism to instantiate a T* under lock, if one is not already
+// been stored at that index.
+template <class T, uint32_t size> class AtomicArray {
+public:
+  AtomicArray() {
+    for (auto& ptr : data_) {
+      ptr = nullptr;
+    }
+  }
+
+  using MakeObject = std::function<T*()>;
+
+  /*
+   * Returns an already existing T* at index, or calls make_object to
+   * instantiate and save the T* uner lock.
+   *
+   * @param index the Index to look up.
+   * @param make_object function to call under lock to make a T*.
+   * @return The new or already-existing T*.
+   */
+  T* get(uint32_t index, const MakeObject& make_object) {
+    std::atomic<T*>& atomic_ref = data_[index];
+
+    // First, use an atomic load to see if the object has already been allocated.
+    if (atomic_ref.load() == nullptr) {
+      absl::MutexLock lock(&mutex_);
+
+      // If that fails, check again under lock as two threads might have raced
+      // to create the object.
+      if (atomic_ref.load() == nullptr) {
+        atomic_ref = make_object();
+      }
+    }
+    return atomic_ref.load();
+  }
+
+private:
+  std::atomic<T*> data_[size];
+  absl::Mutex mutex_;
+};
+
+// Manages a pointers to T, providing a relatively contention-free mechanism to
+// lazily create a T*, where the caller provides a mechanism to instantiate a
+// T* under lock, if one is not already been stored.
+template <class T> class AtomicObject : private AtomicArray<T, 1> {
+public:
+  using typename AtomicArray<T, 1>::MakeObject;
+
+  /*
+   * Returns an already existing T*, or calls make_object to instantiate and
+   * save the T* uner lock.
+   *
+   * @param make_object function to call under lock to make a T*.
+   * @return The new or already-existing T*.
+   */
+  T* get(const MakeObject& make_object) { return AtomicArray<T, 1>::get(0, make_object); }
 };
 
 } // namespace Thread
