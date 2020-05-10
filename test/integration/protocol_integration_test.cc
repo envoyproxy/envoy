@@ -782,6 +782,16 @@ TEST_P(ProtocolIntegrationTest, TwoRequests) { testTwoRequests(); }
 
 TEST_P(ProtocolIntegrationTest, TwoRequestsWithForcedBackup) { testTwoRequests(true); }
 
+TEST_P(ProtocolIntegrationTest, BasicMaxStreamDuration) { testMaxStreamDuration(); }
+
+TEST_P(ProtocolIntegrationTest, MaxStreamDurationWithRetryPolicy) {
+  testMaxStreamDurationWithRetry(false);
+}
+
+TEST_P(ProtocolIntegrationTest, MaxStreamDurationWithRetryPolicyWhenRetryUpstreamDisconnection) {
+  testMaxStreamDurationWithRetry(true);
+}
+
 // Verify that headers with underscores in their names are dropped from client requests
 // but remain in upstream responses.
 TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresDropped) {
@@ -1779,8 +1789,12 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectIsBlocked) {
       Http::TestRequestHeaderMapImpl{{":method", "CONNECT"}, {":authority", "host.com:80"}});
 
   if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
+    // TODO(alyssawilk) either reinstate prior behavior, or include a release
+    // note with this PR.
+    // Because CONNECT requests for HTTP/1 do not include a path, they will fail
+    // to find a route match and return a 404.
     response->waitForEndStream();
-    EXPECT_EQ("403", response->headers().Status()->value().getStringView());
+    EXPECT_EQ("404", response->headers().Status()->value().getStringView());
     EXPECT_TRUE(response->complete());
   } else {
     response->waitForReset();
