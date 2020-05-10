@@ -426,6 +426,8 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
   ClientConnectionPtr client;
   ServerConnectionPtr server;
   const bool http2 = http_version == HttpVersion::Http2;
+  Http1::CodecStats http1_codec_stats{
+    ALL_HTTP1_CODEC_STATS(POOL_COUNTER_PREFIX(stats_store, "http1"))};
 
   if (http2) {
     client = std::make_unique<Http2::TestClientConnectionImpl>(
@@ -433,7 +435,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
         max_request_headers_kb, max_response_headers_count,
         Http2::ProdNghttp2SessionFactory::get());
   } else {
-    client = std::make_unique<Http1::ClientConnectionImpl>(client_connection, stats_store,
+    client = std::make_unique<Http1::ClientConnectionImpl>(client_connection, http1_codec_stats,
                                                            client_callbacks, client_http1settings,
                                                            max_response_headers_count);
   }
@@ -449,7 +451,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
   } else {
     const Http1Settings server_http1settings{fromHttp1Settings(input.h1_settings().server())};
     server = std::make_unique<Http1::ServerConnectionImpl>(
-        server_connection, stats_store, server_callbacks, server_http1settings,
+        server_connection, http1_codec_stats, server_callbacks, server_http1settings,
         max_request_headers_kb, max_request_headers_count, headers_with_underscores_action);
   }
 

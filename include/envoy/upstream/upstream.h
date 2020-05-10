@@ -911,6 +911,9 @@ public:
   virtual const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>&
   upstreamHttpProtocolOptions() const PURE;
 
+  virtual Http::Http1::CodecStats& http1CodecStats() const PURE;
+  virtual Http::Http2::CodecStats& http2CodecStats() const PURE;
+
 protected:
   /**
    * Invoked by extensionProtocolOptionsTyped.

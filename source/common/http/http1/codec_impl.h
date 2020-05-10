@@ -229,7 +229,7 @@ public:
   void onUnderlyingConnectionBelowWriteBufferLowWatermark() override { onBelowLowWatermark(); }
 
 protected:
-  ConnectionImpl(Network::Connection& connection, Stats::Scope& stats, http_parser_type type,
+  ConnectionImpl(Network::Connection& connection, CodecStats& stats, http_parser_type type,
                  uint32_t max_headers_kb, const uint32_t max_headers_count,
                  HeaderKeyFormatterPtr&& header_key_formatter, bool enable_trailers);
 
@@ -418,7 +418,7 @@ private:
  */
 class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
 public:
-  ServerConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
+  ServerConnectionImpl(Network::Connection& connection, CodecStats& stats,
                        ServerConnectionCallbacks& callbacks, const Http1Settings& settings,
                        uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
                        envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
@@ -517,7 +517,7 @@ private:
  */
 class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
-  ClientConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
+  ClientConnectionImpl(Network::Connection& connection, CodecStats& stats,
                        ConnectionCallbacks& callbacks, const Http1Settings& settings,
                        const uint32_t max_response_headers_count);
 

@@ -101,5 +101,19 @@ MockClusterInfo::MockClusterInfo()
 
 MockClusterInfo::~MockClusterInfo() = default;
 
+Http::Http1::CodecStats& MockClusterInfo::http1CodecStats() const {
+  return *http1_codec_stats_.get([this]() -> Http::Http1::CodecStats* {
+    return new Http::Http1::CodecStats{
+      ALL_HTTP1_CODEC_STATS(POOL_COUNTER_PREFIX(statsScope(), "http1."))};
+  });
+}
+
+Http::Http2::CodecStats& MockClusterInfo::http2CodecStats() const {
+  return *http2_codec_stats_.get([this]() -> Http::Http2::CodecStats* {
+    return new Http::Http2::CodecStats{
+      ALL_HTTP2_CODEC_STATS(POOL_COUNTER_PREFIX(statsScope(), "http2."))};
+  });
+}
+
 } // namespace Upstream
 } // namespace Envoy

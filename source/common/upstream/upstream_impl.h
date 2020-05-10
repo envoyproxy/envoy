@@ -38,8 +38,11 @@
 #include "common/common/callback_impl.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/logger.h"
+#include "common/common/thread.h"
 #include "common/config/metadata.h"
 #include "common/config/well_known_names.h"
+#include "common/http/http1/codec_impl.h"
+#include "common/http/http2/codec_impl.h"
 #include "common/init/manager_impl.h"
 #include "common/network/utility.h"
 #include "common/shared_pool/shared_pool.h"
@@ -598,6 +601,9 @@ public:
   Http::Protocol
   upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const override;
 
+  Http::Http1::CodecStats& http1CodecStats() const override;
+  Http::Http2::CodecStats& http2CodecStats() const override;
+
 private:
   struct ResourceManagers {
     ResourceManagers(const envoy::config::cluster::v3::Cluster& config, Runtime::Loader& runtime,
@@ -653,6 +659,10 @@ private:
   const absl::optional<envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type_;
   const std::unique_ptr<Server::Configuration::CommonFactoryContext> factory_context_;
   std::vector<Network::FilterFactoryCb> filter_factories_;
+  mutable Thread::AtomicPtr<Http::Http1::CodecStats, Thread::AtomicPtrAllocMode::DeleteOnDestruct>
+      http1_codec_stats_;
+  mutable Thread::AtomicPtr<Http::Http2::CodecStats, Thread::AtomicPtrAllocMode::DeleteOnDestruct>
+      http2_codec_stats_;
 };
 
 /**

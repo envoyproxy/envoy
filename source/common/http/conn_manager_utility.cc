@@ -52,8 +52,9 @@ ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(
         connection, callbacks, scope, http2_options, max_request_headers_kb,
         max_request_headers_count, headers_with_underscores_action);
   } else {
+    Http1::CodecStats stats{ALL_HTTP1_CODEC_STATS(POOL_COUNTER_PREFIX(scope, "http1."))};
     return std::make_unique<Http1::ServerConnectionImpl>(
-        connection, scope, callbacks, http1_settings, max_request_headers_kb,
+        connection, stats, callbacks, http1_settings, max_request_headers_kb,
         max_request_headers_count, headers_with_underscores_action);
   }
 }
