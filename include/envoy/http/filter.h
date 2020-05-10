@@ -147,7 +147,8 @@ public:
    * caching where applicable to avoid multiple lookups. If a filter has modified the headers in
    * a way that affects routing, clearRouteCache() must be called to clear the cache.
    *
-   * NOTE: In the future we may want to allow the filter to override the route entry.
+   * NOTE: In the future we want to split rotue into 2 method, one will be a const that just return
+   * current route and another one that actully resolve the route.
    */
   virtual Router::RouteConstSharedPtr route() PURE;
 
@@ -161,6 +162,11 @@ public:
    *
    * NOTE: clearRouteCache() must be called before invoking this method otherwise cached route will
    * be returned directly to the caller and the callback will not be invoked.
+   *
+   * Currently the route callback decision can be overriden by clearroute/route call in the
+   * subsequent filter this may not be optimal in some usecases we may want to persist the callbacks
+   * so they always participate in later routing decision or make it an independent entity that like
+   * filters that gets invoked on route resolution.
    */
   virtual Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) PURE;
 
