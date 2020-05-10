@@ -426,16 +426,16 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
   ClientConnectionPtr client;
   ServerConnectionPtr server;
   const bool http2 = http_version == HttpVersion::Http2;
-  Http1::CodecStats http1_codec_stats{
-    ALL_HTTP1_CODEC_STATS(POOL_COUNTER_PREFIX(stats_store, "http1"))};
 
   if (http2) {
+    Http2::CodecStats stats{ALL_HTTP2_CODEC_STATS(POOL_COUNTER_PREFIX(stats_store, "http2."))};
     client = std::make_unique<Http2::TestClientConnectionImpl>(
-        client_connection, client_callbacks, stats_store, client_http2_options,
+        client_connection, client_callbacks, stats, client_http2_options,
         max_request_headers_kb, max_response_headers_count,
         Http2::ProdNghttp2SessionFactory::get());
   } else {
-    client = std::make_unique<Http1::ClientConnectionImpl>(client_connection, http1_codec_stats,
+    Http1::CodecStats stats{ALL_HTTP1_CODEC_STATS(POOL_COUNTER_PREFIX(stats_store, "http1."))};
+    client = std::make_unique<Http1::ClientConnectionImpl>(client_connection, stats,
                                                            client_callbacks, client_http1settings,
                                                            max_response_headers_count);
   }
@@ -445,13 +445,15 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
   if (http2) {
     const envoy::config::core::v3::Http2ProtocolOptions server_http2_options{
         fromHttp2Settings(input.h2_settings().server())};
+    Http2::CodecStats stats{ALL_HTTP2_CODEC_STATS(POOL_COUNTER_PREFIX(stats_store, "http2."))};
     server = std::make_unique<Http2::TestServerConnectionImpl>(
-        server_connection, server_callbacks, stats_store, server_http2_options,
+        server_connection, server_callbacks, stats, server_http2_options,
         max_request_headers_kb, max_request_headers_count, headers_with_underscores_action);
   } else {
     const Http1Settings server_http1settings{fromHttp1Settings(input.h1_settings().server())};
+    Http1::CodecStats stats{ALL_HTTP1_CODEC_STATS(POOL_COUNTER_PREFIX(stats_store, "http1."))};
     server = std::make_unique<Http1::ServerConnectionImpl>(
-        server_connection, http1_codec_stats, server_callbacks, server_http1settings,
+        server_connection, stats, server_callbacks, server_http1settings,
         max_request_headers_kb, max_request_headers_count, headers_with_underscores_action);
   }
 

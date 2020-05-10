@@ -48,8 +48,9 @@ ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
         headers_with_underscores_action) {
   if (determineNextProtocol(connection, data) == Http2::ALPN_STRING) {
+    Http2::CodecStats stats{ALL_HTTP2_CODEC_STATS(POOL_COUNTER_PREFIX(scope, "http2."))};
     return std::make_unique<Http2::ServerConnectionImpl>(
-        connection, callbacks, scope, http2_options, max_request_headers_kb,
+        connection, callbacks, stats, http2_options, max_request_headers_kb,
         max_request_headers_count, headers_with_underscores_action);
   } else {
     Http1::CodecStats stats{ALL_HTTP1_CODEC_STATS(POOL_COUNTER_PREFIX(scope, "http1."))};

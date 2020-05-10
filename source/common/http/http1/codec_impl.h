@@ -11,7 +11,6 @@
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
-#include "envoy/stats/scope.h"
 
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/assert.h"

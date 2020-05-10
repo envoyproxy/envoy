@@ -11,7 +11,6 @@
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
-#include "envoy/stats/scope.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/watermark_buffer.h"
@@ -114,7 +113,7 @@ public:
  */
 class ConnectionImpl : public virtual Connection, protected Logger::Loggable<Logger::Id::http2> {
 public:
-  ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
+  ConnectionImpl(Network::Connection& connection, CodecStats& stats,
                  const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                  const uint32_t max_headers_kb, const uint32_t max_headers_count);
 
@@ -517,7 +516,7 @@ private:
 class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
   ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks& callbacks,
-                       Stats::Scope& stats,
+                       CodecStats& stats,
                        const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                        const uint32_t max_response_headers_kb,
                        const uint32_t max_response_headers_count,
@@ -552,7 +551,7 @@ private:
 class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
 public:
   ServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks,
-                       Stats::Scope& scope,
+                       CodecStats& stats,
                        const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                        const uint32_t max_request_headers_kb,
                        const uint32_t max_request_headers_count,
