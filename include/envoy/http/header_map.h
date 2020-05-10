@@ -293,6 +293,7 @@ private:
   HEADER_FUNC(EnvoyRetryGrpcOn)                                                                    \
   HEADER_FUNC(EnvoyRetriableStatusCodes)                                                           \
   HEADER_FUNC(EnvoyRetriableHeaderNames)                                                           \
+  HEADER_FUNC(EnvoyOriginalMethod)                                                                 \
   HEADER_FUNC(EnvoyOriginalPath)                                                                   \
   HEADER_FUNC(EnvoyOriginalUrl)                                                                    \
   HEADER_FUNC(EnvoyUpstreamAltStatName)                                                            \
