@@ -76,18 +76,36 @@ private:
   absl::CondVar condvar_;
 };
 
+enum class AtomicPtrAllocMode { DoNotDelete, DeleteOnDestruct };
+
 // Manages an array of atomic pointers to T, providing a relatively
 // contention-free mechanism to lazily get a T* at an index, where the caller
 // provides a mechanism to instantiate a T* under lock, if one is not already
 // been stored at that index.
-template <class T, uint32_t size> class AtomicArray {
+//
+// alloc_mode controls whether allocated T* entries should be deleted on
+// destruction of the array. This should be set to AtomicPtrAllocMode::DoNotDelete
+// if the T* returned from MakeObject are managed by the caller.
+template <class T, uint32_t size, AtomicPtrAllocMode alloc_mode> class AtomicPtrArray {
 public:
-  AtomicArray() {
+  AtomicPtrArray() {
     for (auto& ptr : data_) {
       ptr = nullptr;
     }
   }
 
+  ~AtomicPtrArray() {
+    if (alloc_mode == AtomicPtrAllocMode::DeleteOnDestruct) {
+      for (auto& ptr : data_) {
+        delete ptr;
+      }
+    }
+  }
+
+  // User-defined function for allocating an object. This will be called
+  // under a lock controlled by this class, so MakeObject will not race
+  // against itself. MakeObject is allowed to return nullptr, in which
+  // case the next call to get() will call MakeObject again.
   using MakeObject = std::function<T*()>;
 
   /*
@@ -122,9 +140,16 @@ private:
 // Manages a pointers to T, providing a relatively contention-free mechanism to
 // lazily create a T*, where the caller provides a mechanism to instantiate a
 // T* under lock, if one is not already been stored.
-template <class T> class AtomicObject : private AtomicArray<T, 1> {
+//
+// alloc_mode controls whether allocated T* objects should be deleted on
+// destruction of the AtomicObject. This should be set to
+// AtomicPtrAllocMode::DoNotDelete if the T* returned from MakeObject are managed
+// by the caller.
+template <class T, AtomicPtrAllocMode alloc_mode>
+class AtomicPtr : private AtomicPtrArray<T, 1, alloc_mode> {
 public:
-  using typename AtomicArray<T, 1>::MakeObject;
+  using BaseClass = AtomicPtrArray<T, 1, alloc_mode>;
+  using typename BaseClass::MakeObject;
 
   /*
    * Returns an already existing T*, or calls make_object to instantiate and
@@ -133,7 +158,7 @@ public:
    * @param make_object function to call under lock to make a T*.
    * @return The new or already-existing T*.
    */
-  T* get(const MakeObject& make_object) { return AtomicArray<T, 1>::get(0, make_object); }
+  T* get(const MakeObject& make_object) { return BaseClass::get(0, make_object); }
 };
 
 } // namespace Thread

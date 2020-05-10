@@ -472,6 +472,17 @@ Http::ServerConnectionPtr
 HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
                                          const Buffer::Instance& data,
                                          Http::ServerConnectionCallbacks& callbacks) {
+  // instantiate codec stats in HttpConnectionManagerConfig so they can be pulled here.
+  /*
+    Yeah something like that. But take a look at
+    Http::ConnectionManagerStats stats_;
+    Http::ConnectionManagerTracingStats tracing_stats_;
+    in the hcm config
+    it would basically be just adding more like that
+    for the codec stats
+    and then just passing them
+    I think pretty simple
+  */
   switch (codec_type_) {
   case CodecType::HTTP1:
     return std::make_unique<Http::Http1::ServerConnectionImpl>(

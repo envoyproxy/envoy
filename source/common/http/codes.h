@@ -108,7 +108,9 @@ private:
 
   static constexpr uint32_t NumHttpCodes = 500;
   static constexpr uint32_t HttpCodeOffset = 100; // code 100 is at index 0.
-  mutable Thread::AtomicArray<const uint8_t, NumHttpCodes> rc_stat_names_;
+  mutable Thread::AtomicPtrArray<const uint8_t, NumHttpCodes,
+                                 Thread::AtomicPtrAllocMode::DoNotDelete>
+      rc_stat_names_;
 };
 
 /**
