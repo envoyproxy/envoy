@@ -485,16 +485,17 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
   */
   switch (codec_type_) {
   case CodecType::HTTP1: {
-    Http::Http1::CodecStats stats{ALL_HTTP1_CODEC_STATS(POOL_COUNTER_PREFIX(
-        context_.scope(), "http1"))};
+    Http::Http1::CodecStats stats{HTTP1_CODEC_STATS(context_.scope())};
     return std::make_unique<Http::Http1::ServerConnectionImpl>(
         connection, stats, callbacks, http1_settings_, maxRequestHeadersKb(),
         maxRequestHeadersCount(), headersWithUnderscoresAction());
   }
-  case CodecType::HTTP2:
+  case CodecType::HTTP2: {
+    Http::Http2::CodecStats stats{HTTP2_CODEC_STATS(context_.scope())};
     return std::make_unique<Http::Http2::ServerConnectionImpl>(
-        connection, callbacks, context_.scope(), http2_options_, maxRequestHeadersKb(),
+        connection, callbacks, stats, http2_options_, maxRequestHeadersKb(),
         maxRequestHeadersCount(), headersWithUnderscoresAction());
+  }
   case CodecType::HTTP3:
     // Hard code Quiche factory name here to instantiate a QUIC codec implemented.
     // TODO(danzh) Add support to get the factory name from config, possibly

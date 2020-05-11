@@ -62,6 +62,8 @@ struct CodecStats {
   ALL_HTTP2_CODEC_STATS(GENERATE_COUNTER_STRUCT)
 };
 
+#define HTTP2_CODEC_STATS(scope) ALL_HTTP2_CODEC_STATS(POOL_COUNTER_PREFIX(scope, "http2."))
+
 class Utility {
 public:
   /**

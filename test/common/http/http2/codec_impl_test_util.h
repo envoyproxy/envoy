@@ -12,7 +12,7 @@ namespace Http2 {
 class TestCodecStatsProvider {
  public:
   TestCodecStatsProvider(Stats::Scope& scope)
-      : http2_codec_stats_{ALL_HTTP2_CODEC_STATS(POOL_COUNTER_PREFIX(scope, "http2."))} {}
+      : http2_codec_stats_{HTTP2_CODEC_STATS(scope)} {}
 
   Http::Http2::CodecStats http2_codec_stats_;
 };
@@ -83,8 +83,9 @@ public:
                            uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
                            Nghttp2SessionFactory& http2_session_factory)
       : TestCodecStatsProvider(scope),
-        ClientConnectionImpl(connection, callbacks, stats_, http2_options, max_request_headers_kb,
-                             max_request_headers_count, http2_session_factory) {}
+        ClientConnectionImpl(connection, callbacks, http2_codec_stats_, http2_options,
+                             max_request_headers_kb, max_request_headers_count,
+                             http2_session_factory) {}
 
   nghttp2_session* session() { return session_; }
 

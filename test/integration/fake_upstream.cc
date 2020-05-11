@@ -256,7 +256,7 @@ FakeHttpConnection::FakeHttpConnection(
     Http::Http1Settings http1_settings;
     // For the purpose of testing, we always have the upstream encode the trailers if any
     http1_settings.enable_trailers_ = true;
-    Http::Http1::CodecStats stats{ALL_HTTP1_CODEC_STATS(POOL_COUNTER_PREFIX(store, "http1"))};
+    Http::Http1::CodecStats stats{HTTP1_CODEC_STATS(store)};
     codec_ = std::make_unique<TestHttp1ServerConnectionImpl>(
         shared_connection_.connection(), stats, *this, http1_settings, max_request_headers_kb,
         max_request_headers_count, headers_with_underscores_action);
@@ -266,8 +266,9 @@ FakeHttpConnection::FakeHttpConnection(
             envoy::config::core::v3::Http2ProtocolOptions());
     http2_options.set_allow_connect(true);
     http2_options.set_allow_metadata(true);
+    Http::Http2::CodecStats stats{HTTP2_CODEC_STATS(store)};
     codec_ = std::make_unique<Http::Http2::ServerConnectionImpl>(
-        shared_connection_.connection(), *this, store, http2_options, max_request_headers_kb,
+        shared_connection_.connection(), *this, stats, http2_options, max_request_headers_kb,
         max_request_headers_count, headers_with_underscores_action);
     ASSERT(type == Type::HTTP2);
   }

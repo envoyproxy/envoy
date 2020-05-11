@@ -1107,15 +1107,13 @@ ClusterInfoImpl::generateCircuitBreakersStats(Stats::Scope& scope, const std::st
 
 Http::Http1::CodecStats& ClusterInfoImpl::http1CodecStats() const {
   return *http1_codec_stats_.get([this]() -> Http::Http1::CodecStats* {
-    return new Http::Http1::CodecStats{
-      ALL_HTTP1_CODEC_STATS(POOL_COUNTER_PREFIX(*stats_scope_, "http1."))};
+    return new Http::Http1::CodecStats{HTTP1_CODEC_STATS(*stats_scope_)};
   });
 }
 
 Http::Http2::CodecStats& ClusterInfoImpl::http2CodecStats() const {
   return *http2_codec_stats_.get([this]() -> Http::Http2::CodecStats* {
-    return new Http::Http2::CodecStats{
-      ALL_HTTP2_CODEC_STATS(POOL_COUNTER_PREFIX(*stats_scope_, "http2."))};
+    return new Http::Http2::CodecStats{HTTP2_CODEC_STATS(*stats_scope_)};
   });
 }
 
