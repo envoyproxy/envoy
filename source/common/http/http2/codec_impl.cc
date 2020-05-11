@@ -318,7 +318,7 @@ void ConnectionImpl::StreamImpl::submitTrailers(const HeaderMap& trailers) {
   std::vector<nghttp2_nv> final_headers;
   buildHeaders(final_headers, trailers);
   int rc =
-      nghttp2_submit_trailer(parent_.session_, stream_id_, &final_headers[0], final_headers.size());
+      nghttp2_submit_trailer(parent_.session_, stream_id_, final_headers.data(), final_headers.size());
   ASSERT(rc == 0);
 }
 
