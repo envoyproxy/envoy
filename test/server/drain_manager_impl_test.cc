@@ -101,7 +101,7 @@ TEST_F(DrainManagerImplTest, ModifyOnly) {
   InSequence s;
   DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::MODIFY_ONLY);
 
-  EXPECT_CALL(server_, healthCheckFailed()).Times(0); // Listener check wil short-circuit
+  EXPECT_CALL(server_, healthCheckFailed()).Times(0); // Listener check will short-circuit
   EXPECT_FALSE(drain_manager.drainClose());
 }
 
