@@ -47,9 +47,10 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
       cluster_name = virtual_domain.endpoint().cluster_name();
     }
 
-    DnsEndpointConfig endpoint_config{
-        .address_list = absl::make_optional<AddressConstPtrVec>(std::move(addrs)),
-        .cluster_name = absl::make_optional<std::string>(cluster_name)};
+    DnsEndpointConfig endpoint_config;
+    endpoint_config.address_list = absl::make_optional<AddressConstPtrVec>(std::move(addrs));
+    endpoint_config.cluster_name = absl::make_optional<std::string>(cluster_name);
+
     virtual_domains_.emplace(virtual_domain.name(), endpoint_config);
 
     std::chrono::seconds ttl = virtual_domain.has_answer_ttl()
