@@ -1128,7 +1128,8 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
   }
 }
 
-RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const Http::RequestHeaderMap& headers,
+RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb,
+                                                         const Http::RequestHeaderMap& headers,
                                                          const StreamInfo::StreamInfo& stream_info,
                                                          uint64_t random_value) const {
   // No x-forwarded-proto header. This normally only happens when ActiveStream::decodeHeaders
@@ -1148,14 +1149,32 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const Http::RequestHead
   }
 
   // Check for a route that matches the request.
-  for (const RouteEntryImplBaseConstSharedPtr& route : routes_) {
-    if (!headers.Path() && !route->supportsPathlessHeaders()) {
+  for (auto route = routes_.begin(); route != routes_.end(); ++route) {
+    if (!headers.Path() && !(*route)->supportsPathlessHeaders()) {
       continue;
     }
-    RouteConstSharedPtr route_entry = route->matches(headers, stream_info, random_value);
-    if (nullptr != route_entry) {
-      return route_entry;
+
+    RouteConstSharedPtr route_entry = (*route)->matches(headers, stream_info, random_value);
+    if (nullptr == route_entry) {
+      continue;
     }
+
+    if (cb) {
+      RouteEvalStatus eval_status = (std::next(route) == routes_.end())
+                                        ? RouteEvalStatus::NoMoreRoutes
+                                        : RouteEvalStatus::HasMoreRoutes;
+      RouteMatchStatus match_status = cb(route_entry, eval_status);
+      if (match_status == RouteMatchStatus::Accept) {
+        return route_entry;
+      }
+      if (match_status == RouteMatchStatus::Continue &&
+          eval_status == RouteEvalStatus::NoMoreRoutes) {
+        return nullptr;
+      }
+      continue;
+    }
+
+    return route_entry;
   }
 
   return nullptr;
@@ -1200,12 +1219,14 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMa
   return default_virtual_host_.get();
 }
 
-RouteConstSharedPtr RouteMatcher::route(const Http::RequestHeaderMap& headers,
+RouteConstSharedPtr RouteMatcher::route(const RouteCallback& cb,
+                                        const Http::RequestHeaderMap& headers,
                                         const StreamInfo::StreamInfo& stream_info,
                                         uint64_t random_value) const {
+
   const VirtualHostImpl* virtual_host = findVirtualHost(headers);
   if (virtual_host) {
-    return virtual_host->getRouteFromEntries(headers, stream_info, random_value);
+    return virtual_host->getRouteFromEntries(cb, headers, stream_info, random_value);
   } else {
     return nullptr;
   }
@@ -1249,6 +1270,13 @@ ConfigImpl::ConfigImpl(const envoy::config::route::v3::RouteConfiguration& confi
       HeaderParser::configure(config.request_headers_to_add(), config.request_headers_to_remove());
   response_headers_parser_ = HeaderParser::configure(config.response_headers_to_add(),
                                                      config.response_headers_to_remove());
+}
+
+RouteConstSharedPtr ConfigImpl::route(const RouteCallback& cb,
+                                      const Http::RequestHeaderMap& headers,
+                                      const StreamInfo::StreamInfo& stream_info,
+                                      uint64_t random_value) const {
+  return route_matcher_->route(cb, headers, stream_info, random_value);
 }
 
 namespace {
