@@ -393,7 +393,6 @@ message RouteMatch {
     google.protobuf.BoolValue validated = 2;
   }
 
-  // [#not-implemented-hide:]
   // An extensible message for matching CONNECT requests.
   message ConnectMatcher {
   }

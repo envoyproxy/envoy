@@ -394,7 +394,6 @@ message RouteMatch {
     google.protobuf.BoolValue validated = 2;
   }
 
-  // [#not-implemented-hide:]
   // An extensible message for matching CONNECT requests.
   message ConnectMatcher {
     option (udpa.annotations.versioning).previous_message_type =
