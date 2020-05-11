@@ -2,7 +2,7 @@ import Foundation
 
 /// Represents an HTTP request method.
 @objc
-public enum RequestMethod: Int {
+public enum RequestMethod: Int, CaseIterable {
   case delete
   case get
   case head
@@ -31,6 +31,32 @@ public enum RequestMethod: Int {
       return "PUT"
     case .trace:
       return "TRACE"
+    }
+  }
+
+  /// Initialize the method using a string value.
+  ///
+  /// - parameter stringValue: Case-insensitive string value to use for initialization.
+  init?(stringValue: String) {
+    switch stringValue.uppercased() {
+    case "DELETE":
+      self = .delete
+    case "GET":
+      self = .get
+    case "HEAD":
+      self = .head
+    case "OPTIONS":
+      self = .options
+    case "PATCH":
+      self = .patch
+    case "POST":
+      self = .post
+    case "PUT":
+      self = .put
+    case "TRACE":
+      self = .trace
+    default:
+      return nil
     }
   }
 }
