@@ -14,6 +14,7 @@ envoy_cc_test(
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",
+        "//test/mocks/network:connection_mocks",
         "//test/test_common:utility_lib",
     ],
 )

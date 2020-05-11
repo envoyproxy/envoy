@@ -34,9 +34,11 @@
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
 #include "common/http/path_utility.h"
+#include "common/http/status.h"
 #include "common/http/utility.h"
 #include "common/network/utility.h"
 #include "common/router/config_impl.h"
+#include "common/runtime/runtime_features.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/stats/timespan_impl.h"
 
@@ -218,15 +220,6 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
   }
 
   checkForDeferredClose();
-
-  // Reading may have been disabled for the non-multiplexing case, so enable it again.
-  // Also be sure to unwind any read-disable done by the prior downstream
-  // connection.
-  if (drain_state_ != DrainState::Closing && codec_->protocol() < Protocol::Http2) {
-    while (!read_callbacks_->connection().readEnabled()) {
-      read_callbacks_->connection().readDisable(false);
-    }
-  }
 }
 
 void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
@@ -279,7 +272,7 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
   return **streams_.begin();
 }
 
-void ConnectionManagerImpl::handleCodecException(const char* error) {
+void ConnectionManagerImpl::handleCodecError(absl::string_view error) {
   ENVOY_CONN_LOG(debug, "dispatch error: {}", read_callbacks_->connection(), error);
   read_callbacks_->connection().streamInfo().setResponseCodeDetails(
       absl::StrCat("codec error: ", error));
@@ -323,14 +316,15 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
   do {
     redispatch = false;
 
-    try {
-      codec_->dispatch(data);
-    } catch (const FrameFloodException& e) {
-      handleCodecException(e.what());
+    const Status status = codec_->dispatch(data);
+
+    ASSERT(!isPrematureResponseError(status));
+    if (isBufferFloodError(status)) {
+      handleCodecError(status.message());
       return Network::FilterStatus::StopIteration;
-    } catch (const CodecProtocolException& e) {
+    } else if (isCodecProtocolError(status)) {
       stats_.named_.downstream_cx_protocol_error_.inc();
-      handleCodecException(e.what());
+      handleCodecError(status.message());
       return Network::FilterStatus::StopIteration;
     }
 
@@ -345,10 +339,6 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
       if (read_callbacks_->connection().state() == Network::Connection::State::Open &&
           data.length() > 0 && streams_.empty()) {
         redispatch = true;
-      }
-
-      if (!streams_.empty() && streams_.front()->state_.remote_complete_) {
-        read_callbacks_->connection().readDisable(true);
       }
     }
   } while (redispatch);
@@ -695,6 +685,14 @@ void ConnectionManagerImpl::ActiveStream::addStreamDecoderFilterWorker(
     StreamDecoderFilterSharedPtr filter, bool dual_filter) {
   ActiveStreamDecoderFilterPtr wrapper(new ActiveStreamDecoderFilter(*this, filter, dual_filter));
   filter->setDecoderFilterCallbacks(*wrapper);
+  // Note: configured decoder filters are appended to decoder_filters_.
+  // This means that if filters are configured in the following order (assume all three filters are
+  // both decoder/encoder filters):
+  //   http_filters:
+  //     - A
+  //     - B
+  //     - C
+  // The decoder filter chain will iterate through filters A, B, C.
   wrapper->moveIntoListBack(std::move(wrapper), decoder_filters_);
 }
 
@@ -702,6 +700,14 @@ void ConnectionManagerImpl::ActiveStream::addStreamEncoderFilterWorker(
     StreamEncoderFilterSharedPtr filter, bool dual_filter) {
   ActiveStreamEncoderFilterPtr wrapper(new ActiveStreamEncoderFilter(*this, filter, dual_filter));
   filter->setEncoderFilterCallbacks(*wrapper);
+  // Note: configured encoder filters are prepended to encoder_filters_.
+  // This means that if filters are configured in the following order (assume all three filters are
+  // both decoder/encoder filters):
+  //   http_filters:
+  //     - A
+  //     - B
+  //     - C
+  // The encoder filter chain will iterate through filters C, B, A.
   wrapper->moveIntoList(std::move(wrapper), encoder_filters_);
 }
 
@@ -742,6 +748,14 @@ const Network::Connection* ConnectionManagerImpl::ActiveStream::connection() {
   return &connection_manager_.read_callbacks_->connection();
 }
 
+uint32_t ConnectionManagerImpl::ActiveStream::localPort() {
+  auto ip = connection()->localAddress()->ip();
+  if (ip == nullptr) {
+    return 0;
+  }
+  return ip->port();
+}
+
 // Ordering in this function is complicated, but important.
 //
 // We want to do minimal work before selecting route and creating a filter
@@ -761,10 +775,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
                                connection_manager_.read_callbacks_->connection().dispatcher());
   request_headers_ = std::move(headers);
 
-  // TODO(alyssawilk) remove this synthetic path in a follow-up PR, including
-  // auditing of empty path headers. We check for path because HTTP/2 connect requests may have a
-  // path.
-  if (HeaderUtility::isConnect(*request_headers_) && !request_headers_->Path()) {
+  if (HeaderUtility::isConnect(*request_headers_) && !request_headers_->Path() &&
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.stop_faking_paths")) {
     request_headers_->setPath("/");
   }
 
@@ -865,20 +877,23 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   // Verify header sanity checks which should have been performed by the codec.
   ASSERT(HeaderUtility::requestHeadersValid(*request_headers_).has_value() == false);
 
-  // Currently we only support relative paths at the application layer. We expect the codec to have
-  // broken the path into pieces if applicable. NOTE: Currently the HTTP/1.1 codec only does this
-  // when the allow_absolute_url flag is enabled on the HCM.
-  // https://tools.ietf.org/html/rfc7230#section-5.3 We also need to check for the existence of
-  // :path because CONNECT does not have a path, and we don't support that currently.
-  if (!request_headers_->Path() || request_headers_->Path()->value().getStringView().empty() ||
-      request_headers_->Path()->value().getStringView()[0] != '/') {
-    const bool has_path =
-        request_headers_->Path() && !request_headers_->Path()->value().getStringView().empty();
+  // Check for the existence of the :path header for non-CONNECT requests. We expect the codec to
+  // have broken the path into pieces if applicable. NOTE: Currently the HTTP/1.1 codec only does
+  // this when the allow_absolute_url flag is enabled on the HCM.
+  if ((!HeaderUtility::isConnect(*request_headers_) && !request_headers_->Path()) ||
+      (request_headers_->Path() && request_headers_->Path()->value().getStringView().empty())) {
+    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::NotFound, "", nullptr,
+                   state_.is_head_request_, absl::nullopt,
+                   StreamInfo::ResponseCodeDetails::get().MissingPath);
+    return;
+  }
+
+  // Currently we only support relative paths at the application layer.
+  if (request_headers_->Path() && request_headers_->Path()->value().getStringView()[0] != '/') {
     connection_manager_.stats_.named_.downstream_rq_non_relative_path_.inc();
     sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::NotFound, "", nullptr,
                    state_.is_head_request_, absl::nullopt,
-                   has_path ? StreamInfo::ResponseCodeDetails::get().AbsolutePath
-                            : StreamInfo::ResponseCodeDetails::get().MissingPath);
+                   StreamInfo::ResponseCodeDetails::get().AbsolutePath);
     return;
   }
 
@@ -890,6 +905,9 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
                    StreamInfo::ResponseCodeDetails::get().PathNormalizationFailed);
     return;
   }
+
+  ConnectionManagerUtility::maybeNormalizeHost(*request_headers_, connection_manager_.config_,
+                                               localPort());
 
   if (protocol == Protocol::Http11 && request_headers_->Connection() &&
       absl::EqualsIgnoreCase(request_headers_->Connection()->value().getStringView(),
@@ -1413,7 +1431,9 @@ void ConnectionManagerImpl::ActiveStream::snapScopedRouteConfig() {
   }
 }
 
-void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
+void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() { refreshCachedRoute(nullptr); }
+
+void ConnectionManagerImpl::ActiveStream::refreshCachedRoute(const Router::RouteCallback& cb) {
   Router::RouteConstSharedPtr route;
   if (request_headers_ != nullptr) {
     if (connection_manager_.config_.isRoutable() &&
@@ -1422,7 +1442,7 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
       snapScopedRouteConfig();
     }
     if (snapped_route_config_ != nullptr) {
-      route = snapped_route_config_->route(*request_headers_, stream_info_, stream_id_);
+      route = snapped_route_config_->route(cb, *request_headers_, stream_info_, stream_id_);
     }
   }
   stream_info_.route_entry_ = route ? route->routeEntry() : nullptr;
@@ -1488,10 +1508,10 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
   ENVOY_STREAM_LOG(debug, "Sending local reply with details {}", *this, details);
   ASSERT(response_headers_ == nullptr);
   // For early error handling, do a best-effort attempt to create a filter chain
-  // to ensure access logging.
-  if (!state_.created_filter_chain_) {
-    createFilterChain();
-  }
+  // to ensure access logging. If the filter chain already exists this will be
+  // a no-op.
+  createFilterChain();
+
   stream_info_.setResponseCodeDetails(details);
   Utility::sendLocalReply(
       is_grpc_request,
@@ -2241,10 +2261,15 @@ Upstream::ClusterInfoConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBas
 }
 
 Router::RouteConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::route() {
-  if (!parent_.cached_route_.has_value()) {
-    parent_.refreshCachedRoute();
-  }
+  return route(nullptr);
+}
 
+Router::RouteConstSharedPtr
+ConnectionManagerImpl::ActiveStreamFilterBase::route(const Router::RouteCallback& cb) {
+  if (parent_.cached_route_.has_value()) {
+    return parent_.cached_route_.value();
+  }
+  parent_.refreshCachedRoute(cb);
   return parent_.cached_route_.value();
 }
 

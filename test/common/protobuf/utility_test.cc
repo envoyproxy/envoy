@@ -1396,12 +1396,15 @@ class DeprecatedFieldsTest : public testing::TestWithParam<bool> {
 protected:
   DeprecatedFieldsTest()
       : with_upgrade_(GetParam()), api_(Api::createApiForTest(store_)),
-        runtime_deprecated_feature_use_(store_.counter("runtime.deprecated_feature_use")) {
+        runtime_deprecated_feature_use_(store_.counter("runtime.deprecated_feature_use")),
+        deprecated_feature_seen_since_process_start_(
+            store_.gauge("runtime.deprecated_feature_seen_since_process_start",
+                         Stats::Gauge::ImportMode::NeverImport)) {
     envoy::config::bootstrap::v3::LayeredRuntime config;
     config.add_layers()->mutable_admin_layer();
-    loader_ = std::make_unique<Runtime::ScopedLoaderSingleton>(Runtime::LoaderPtr{
-        new Runtime::LoaderImpl(dispatcher_, tls_, config, local_info_, init_manager_, store_,
-                                generator_, validation_visitor_, *api_)});
+    loader_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
+        Runtime::LoaderPtr{new Runtime::LoaderImpl(dispatcher_, tls_, config, local_info_, store_,
+                                                   generator_, validation_visitor_, *api_)});
   }
 
   void checkForDeprecation(const Protobuf::Message& message) {
@@ -1424,8 +1427,8 @@ protected:
   Runtime::MockRandomGenerator rand_;
   std::unique_ptr<Runtime::ScopedLoaderSingleton> loader_;
   Stats::Counter& runtime_deprecated_feature_use_;
+  Stats::Gauge& deprecated_feature_seen_since_process_start_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  Init::MockManager init_manager_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
 };
 
@@ -1446,6 +1449,7 @@ TEST_P(DeprecatedFieldsTest, NoErrorWhenDeprecatedFieldsUnused) {
   // Fatal checks for a non-deprecated field should cause no problem.
   checkForDeprecation(base);
   EXPECT_EQ(0, runtime_deprecated_feature_use_.value());
+  EXPECT_EQ(0, deprecated_feature_seen_since_process_start_.value());
 }
 
 TEST_P(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(IndividualFieldDeprecated)) {
@@ -1456,6 +1460,7 @@ TEST_P(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(IndividualFieldDeprecated))
                       "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'",
                       checkForDeprecation(base));
   EXPECT_EQ(1, runtime_deprecated_feature_use_.value());
+  EXPECT_EQ(1, deprecated_feature_seen_since_process_start_.value());
 }
 
 // Use of a deprecated and disallowed field should result in an exception.

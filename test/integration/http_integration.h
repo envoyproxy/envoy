@@ -40,7 +40,7 @@ public:
   startRequest(const Http::RequestHeaderMap& headers);
   bool waitForDisconnect(std::chrono::milliseconds time_to_wait = std::chrono::milliseconds(0));
   Network::ClientConnection* connection() const { return connection_.get(); }
-  Network::ConnectionEvent last_connection_event() const { return last_connection_event_; }
+  Network::ConnectionEvent lastConnectionEvent() const { return last_connection_event_; }
   Network::Connection& rawConnection() { return *connection_; }
   bool disconnected() { return disconnected_; }
 
@@ -220,7 +220,9 @@ protected:
                     bool response_trailers_present);
   // Test /drain_listener from admin portal.
   void testAdminDrain(Http::CodecClient::Type admin_request_type);
-
+  // Test max stream duration.
+  void testMaxStreamDuration();
+  void testMaxStreamDurationWithRetry(bool invoke_retry_upstream_disconnect);
   Http::CodecClient::Type downstreamProtocol() const { return downstream_protocol_; }
   // Prefix listener stat with IP:port, including IP version dependent loopback address.
   std::string listenerStatPrefix(const std::string& stat_name);

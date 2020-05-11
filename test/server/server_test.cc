@@ -47,6 +47,7 @@ TEST(ServerInstanceUtil, flushHelper) {
   c.inc();
   store.gauge("world", Stats::Gauge::ImportMode::Accumulate).set(5);
   store.histogram("histogram", Stats::Histogram::Unit::Unspecified);
+  store.textReadout("text").set("is important");
 
   std::list<Stats::SinkPtr> sinks;
   InstanceUtil::flushMetricsToSinks(sinks, store);
@@ -64,6 +65,10 @@ TEST(ServerInstanceUtil, flushHelper) {
     ASSERT_EQ(snapshot.gauges().size(), 1);
     EXPECT_EQ(snapshot.gauges()[0].get().name(), "world");
     EXPECT_EQ(snapshot.gauges()[0].get().value(), 5);
+
+    ASSERT_EQ(snapshot.textReadouts().size(), 1);
+    EXPECT_EQ(snapshot.textReadouts()[0].get().name(), "text");
+    EXPECT_EQ(snapshot.textReadouts()[0].get().value(), "is important");
   }));
   c.inc();
   InstanceUtil::flushMetricsToSinks(sinks, store);
@@ -77,6 +82,7 @@ TEST(ServerInstanceUtil, flushHelper) {
     EXPECT_TRUE(snapshot.counters().empty());
     EXPECT_TRUE(snapshot.gauges().empty());
     EXPECT_EQ(snapshot.histograms().size(), 1);
+    EXPECT_TRUE(snapshot.textReadouts().empty());
   }));
   InstanceUtil::flushMetricsToSinks(sinks, mock_store);
 }
@@ -723,7 +729,6 @@ TEST_P(ServerInstanceImplTest, BootstrapRuntime) {
   EXPECT_EQ("bar", server_->runtime().snapshot().get("foo").value().get());
   // This should access via the override/some_service overlay.
   EXPECT_EQ("fozz", server_->runtime().snapshot().get("fizz").value().get());
-  EXPECT_EQ("foobar", server_->runtime().snapshot().getLayers()[3]->name());
 }
 
 // Validate that a runtime absent an admin layer will fail mutating operations
@@ -740,6 +745,22 @@ TEST_P(ServerInstanceImplTest, RuntimeNoAdminLayer) {
       Http::Code::ServiceUnavailable,
       server_->admin().request("/runtime_modify?foo=bar", "POST", response_headers, response_body));
   EXPECT_EQ("No admin layer specified", response_body);
+}
+
+// Verify that bootstrap fails if RTDS is configured through an EDS cluster
+TEST_P(ServerInstanceImplTest, BootstrapRtdsThroughEdsFails) {
+  options_.service_cluster_name_ = "some_service";
+  options_.service_node_name_ = "some_node_name";
+  EXPECT_THROW_WITH_REGEX(initialize("test/server/test_data/server/runtime_bootstrap_eds.yaml"),
+                          EnvoyException, "must have a statically defined non-EDS cluster");
+}
+
+// Verify that bootstrap fails if RTDS is configured through an ADS using EDS cluster
+TEST_P(ServerInstanceImplTest, BootstrapRtdsThroughAdsViaEdsFails) {
+  options_.service_cluster_name_ = "some_service";
+  options_.service_node_name_ = "some_node_name";
+  EXPECT_THROW_WITH_REGEX(initialize("test/server/test_data/server/runtime_bootstrap_ads_eds.yaml"),
+                          EnvoyException, "Unknown gRPC client cluster");
 }
 
 TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(InvalidLegacyBootstrapRuntime)) {
