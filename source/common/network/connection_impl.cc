@@ -48,6 +48,8 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
     : ConnectionImplBase(dispatcher, next_global_id_++),
       transport_socket_(std::move(transport_socket)), socket_(std::move(socket)),
       stream_info_(stream_info), filter_manager_(*this),
+      read_buffer_([this]() -> void { this->onReadBufferLowWatermark(); },
+                   [this]() -> void { this->onReadBufferHighWatermark(); }),
       write_buffer_(dispatcher.getWatermarkFactory().create(
           [this]() -> void { this->onWriteBufferLowWatermark(); },
           [this]() -> void { this->onWriteBufferHighWatermark(); })),
@@ -186,6 +188,11 @@ Connection::State ConnectionImpl::state() const {
 
 void ConnectionImpl::closeConnectionImmediately() { closeSocket(ConnectionEvent::LocalClose); }
 
+bool ConnectionImpl::consumerWantsToRead() {
+  return read_disable_count_ == 0 ||
+         (read_disable_count_ == 1 && read_buffer_.aboveHighWatermark());
+}
+
 void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
   if (!ioHandle().isOpen()) {
     return;
@@ -268,7 +275,7 @@ void ConnectionImpl::noDelay(bool enable) {
 }
 
 void ConnectionImpl::onRead(uint64_t read_buffer_size) {
-  if (read_disable_count_ != 0 || inDelayedClose()) {
+  if (inDelayedClose() || !consumerWantsToRead()) {
     return;
   }
   ASSERT(ioHandle().isOpen());
@@ -342,24 +349,25 @@ void ConnectionImpl::readDisable(bool disable) {
     }
   } else {
     --read_disable_count_;
-    if (read_disable_count_ != 0) {
-      // The socket should stay disabled.
-      return;
-    }
     if (state() != State::Open || file_event_ == nullptr) {
       // If readDisable is called on a closed connection, do not crash.
       return;
     }
 
-    // We never ask for both early close and read at the same time. If we are reading, we want to
-    // consume all available data.
-    file_event_->setEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write);
-    // If the connection has data buffered there's no guarantee there's also data in the kernel
-    // which will kick off the filter chain. Instead fake an event to make sure the buffered data
-    // gets processed regardless and ensure that we dispatch it via onRead.
-    if (read_buffer_.length() > 0) {
-      dispatch_buffered_data_ = true;
-      file_event_->activate(Event::FileReadyType::Read);
+    if (read_disable_count_ == 0) {
+      // We never ask for both early close and read at the same time. If we are reading, we want to
+      // consume all available data.
+      file_event_->setEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write);
+    }
+
+    if (consumerWantsToRead()) {
+      // If the connection has data buffered there's no guarantee there's also data in the kernel
+      // which will kick off the filter chain. Instead fake an event to make sure the buffered data
+      // gets processed regardless and ensure that we dispatch it via onRead.
+      if (read_buffer_.length() > 0) {
+        dispatch_buffered_data_ = true;
+        file_event_->activate(Event::FileReadyType::Read);
+      }
     }
   }
 }
@@ -465,7 +473,18 @@ void ConnectionImpl::setBufferLimits(uint32_t limit) {
   // would result in respecting the exact buffer limit.
   if (limit > 0) {
     static_cast<Buffer::WatermarkBuffer*>(write_buffer_.get())->setWatermarks(limit + 1);
+    read_buffer_.setWatermarks(limit + 1);
   }
+}
+
+void ConnectionImpl::onReadBufferLowWatermark() {
+  ENVOY_CONN_LOG(debug, "onBelowReadBufferLowWatermark", *this);
+  readDisable(false);
+}
+
+void ConnectionImpl::onReadBufferHighWatermark() {
+  ENVOY_CONN_LOG(debug, "onAboveReadBufferHighWatermark", *this);
+  readDisable(true);
 }
 
 void ConnectionImpl::onWriteBufferLowWatermark() {
@@ -528,6 +547,17 @@ void ConnectionImpl::onReadReady() {
   ENVOY_CONN_LOG(trace, "read ready", *this);
 
   ASSERT(!connecting_);
+
+  // We get here while read disabled iff the consumer of connection data kicked off a read, and
+  // instead of reading from the socket we simply need to dispatch already read data.
+  if (read_disable_count_ != 0) {
+    ASSERT(dispatch_buffered_data_);
+    ASSERT(consumerWantsToRead());
+    dispatch_buffered_data_ = false;
+    onRead(read_buffer_.length());
+    dispatch_buffered_data_ = false;
+    return;
+  }
 
   IoResult result = transport_socket_->doRead(read_buffer_);
   uint64_t new_buffer_size = read_buffer_.length();

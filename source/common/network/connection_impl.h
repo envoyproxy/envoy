@@ -122,11 +122,19 @@ public:
   static uint64_t nextGlobalIdForTest() { return next_global_id_; }
 
 protected:
+  // A convenience function which returns true if
+  // 1) The read disable count is zero or
+  // 2) The read disable count is one, due to the read buffer being overrun.
+  // In either case the consumer of the data would like to read from the buffer.
+  bool consumerWantsToRead();
+
   // Network::ConnectionImplBase
   void closeConnectionImmediately() override;
 
   void closeSocket(ConnectionEvent close_type);
 
+  void onReadBufferLowWatermark();
+  void onReadBufferHighWatermark();
   void onWriteBufferLowWatermark();
   void onWriteBufferHighWatermark();
 
@@ -135,7 +143,9 @@ protected:
   StreamInfo::StreamInfo& stream_info_;
   FilterManagerImpl filter_manager_;
 
-  Buffer::OwnedImpl read_buffer_;
+  // Ensure that if the consumer of the data from this connection isn't
+  // consuming, that the connection eventually stops reading from the wire.
+  Buffer::WatermarkBuffer read_buffer_;
   // This must be a WatermarkBuffer, but as it is created by a factory the ConnectionImpl only has
   // a generic pointer.
   // It MUST be defined after the filter_manager_ as some filters may have callbacks that
