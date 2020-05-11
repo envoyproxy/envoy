@@ -1096,6 +1096,7 @@ bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
     if (upstream_request.upstreamHost()) {
       upstream_request.upstreamHost()->stats().rq_error_.inc();
     }
+
     upstream_request.removeFromList(upstream_requests_);
     return true;
   } else if (retry_status == RetryStatus::NoOverflow) {
@@ -1287,7 +1288,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
         code_stats.chargeBasicResponseStat(cluster_->statsScope(), config_.retry_,
                                            static_cast<Http::Code>(response_code));
 
-        if (!end_stream) {
+        if (!end_stream || !upstream_request.encodeComplete()) {
           upstream_request.resetStream();
         }
         upstream_request.removeFromList(upstream_requests_);
