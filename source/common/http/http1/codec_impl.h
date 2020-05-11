@@ -35,19 +35,6 @@ namespace Http1 {
   COUNTER(requests_rejected_with_underscores_in_headers)                                           \
   COUNTER(response_flood)
 
-// The following define special return values for http_parser callbacks.
-enum class HttpParserCode {
-  // Callbacks other than on_headers_complete should return a non-zero int to indicate an error and
-  // halt execution.
-  Error = -1,
-  Success = 0,
-  // Returning '1' from on_headers_complete will tell http_parser that it should not expect a body.
-  NoBody = 1,
-  // Returning '2' from on_headers_complete will tell http_parser that it should not expect a body
-  // nor any further data on the connection.
-  NoBodyData = 2,
-};
-
 /**
  * Wrapper struct for the HTTP/1 codec stats. @see stats_macros.h
  */
@@ -238,6 +225,21 @@ protected:
                  HeaderKeyFormatterPtr&& header_key_formatter, bool enable_trailers);
 
   bool resetStreamCalled() { return reset_stream_called_; }
+
+  // The following define special return values for http_parser callbacks.
+  enum class HttpParserCode {
+    // Callbacks other than on_headers_complete should return a non-zero int to indicate an error
+    // and
+    // halt execution.
+    Error = -1,
+    Success = 0,
+    // Returning '1' from on_headers_complete will tell http_parser that it should not expect a
+    // body.
+    NoBody = 1,
+    // Returning '2' from on_headers_complete will tell http_parser that it should not expect a body
+    // nor any further data on the connection.
+    NoBodyData = 2,
+  };
 
   Network::Connection& connection_;
   CodecStats stats_;

@@ -267,7 +267,7 @@ void ServerConnectionImpl::maybeAddSentinelBufferFragment(Buffer::WatermarkBuffe
   outbound_responses_++;
 }
 
-HttpParserCode ServerConnectionImpl::doFloodProtectionChecks() {
+ConnectionImpl::HttpParserCode ServerConnectionImpl::doFloodProtectionChecks() {
   ASSERT(dispatching_);
   if (!flood_protection_) {
     return HttpParserCode::Success;
@@ -453,7 +453,7 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& st
   parser_.data = this;
 }
 
-HttpParserCode ConnectionImpl::completeLastHeader() {
+ConnectionImpl::HttpParserCode ConnectionImpl::completeLastHeader() {
   ASSERT(dispatching_);
   ENVOY_CONN_LOG(trace, "completed header: key={} value={}", connection_,
                  current_header_field_.getStringView(), current_header_value_.getStringView());
@@ -577,7 +577,7 @@ Envoy::StatusOr<size_t> ConnectionImpl::dispatchSlice(const char* slice, size_t 
   return rc;
 }
 
-HttpParserCode ConnectionImpl::onHeaderField(const char* data, size_t length) {
+ConnectionImpl::HttpParserCode ConnectionImpl::onHeaderField(const char* data, size_t length) {
   ASSERT(dispatching_);
   // We previously already finished up the headers, these headers are
   // now trailers.
@@ -602,7 +602,7 @@ HttpParserCode ConnectionImpl::onHeaderField(const char* data, size_t length) {
   return HttpParserCode::Success;
 }
 
-HttpParserCode ConnectionImpl::onHeaderValue(const char* data, size_t length) {
+ConnectionImpl::HttpParserCode ConnectionImpl::onHeaderValue(const char* data, size_t length) {
   ASSERT(dispatching_);
   if (header_parsing_state_ == HeaderParsingState::Done && !enable_trailers_) {
     // Ignore trailers.
@@ -651,7 +651,7 @@ HttpParserCode ConnectionImpl::onHeaderValue(const char* data, size_t length) {
   return HttpParserCode::Success;
 }
 
-HttpParserCode ConnectionImpl::onHeadersCompleteBase() {
+ConnectionImpl::HttpParserCode ConnectionImpl::onHeadersCompleteBase() {
   ASSERT(!processing_trailers_);
   ASSERT(dispatching_);
   ENVOY_CONN_LOG(trace, "onHeadersCompleteBase", connection_);
@@ -744,7 +744,7 @@ void ConnectionImpl::onChunkHeader(bool is_final_chunk) {
   }
 }
 
-HttpParserCode ConnectionImpl::onMessageCompleteBase() {
+ConnectionImpl::HttpParserCode ConnectionImpl::onMessageCompleteBase() {
   ENVOY_CONN_LOG(trace, "message complete", connection_);
 
   dispatchBufferedBody();
@@ -773,7 +773,7 @@ HttpParserCode ConnectionImpl::onMessageCompleteBase() {
   return HttpParserCode::Success;
 }
 
-HttpParserCode ConnectionImpl::onMessageBeginBase() {
+ConnectionImpl::HttpParserCode ConnectionImpl::onMessageBeginBase() {
   ENVOY_CONN_LOG(trace, "message begin", connection_);
   // Make sure that if HTTP/1.0 and HTTP/1.1 requests share a connection Envoy correctly sets
   // protocol for each request. Envoy defaults to 1.1 but sets the protocol to 1.0 where applicable
@@ -868,7 +868,7 @@ bool ServerConnectionImpl::handlePath(RequestHeaderMap& headers, unsigned int me
   return true;
 }
 
-HttpParserCode ServerConnectionImpl::onHeadersComplete() {
+ConnectionImpl::HttpParserCode ServerConnectionImpl::onHeadersComplete() {
   // Handle the case where response happens prior to request complete. It's up to upper layer code
   // to disconnect the connection but we shouldn't fire any more events since it doesn't make
   // sense.
@@ -939,7 +939,7 @@ HttpParserCode ServerConnectionImpl::onHeadersComplete() {
   return HttpParserCode::Success;
 }
 
-HttpParserCode ServerConnectionImpl::onMessageBegin() {
+ConnectionImpl::HttpParserCode ServerConnectionImpl::onMessageBegin() {
   if (!resetStreamCalled()) {
     ASSERT(!active_request_.has_value());
     active_request_.emplace(*this, header_key_formatter_.get());
@@ -1097,7 +1097,7 @@ RequestEncoder& ClientConnectionImpl::newStream(ResponseDecoder& response_decode
   return pending_response_.value().encoder_;
 }
 
-HttpParserCode ClientConnectionImpl::onHeadersComplete() {
+ConnectionImpl::HttpParserCode ClientConnectionImpl::onHeadersComplete() {
   // Handle the case where the client is closing a kept alive connection (by sending a 408
   // with a 'Connection: close' header). In this case we just let response flush out followed
   // by the remote close.
