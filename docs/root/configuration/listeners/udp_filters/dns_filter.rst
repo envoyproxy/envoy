@@ -65,15 +65,21 @@ Example Configuration
                 address_list:
                   address:
                   - 10.0.3.1
+            - name: "www.domain4.com"
+              endpoint:
+                cluster_name: cluster_0
 
 
-In this example, Envoy is configured to respond to client queries for three domains. For any
+In this example, Envoy is configured to respond to client queries for four domains. For any
 other query, it will forward upstream to external resolvers. The filter will return an address
 matching the input query type. If the query is for type A records and no A records are configured,
 Envoy will return no addresses and set the response code appropriately. Conversely, if there are
 matching records for the query type, each configured address is returned. This is also true for
 AAAA records. Only A and AAAA records are supported. If the filter parses other queries for other
-record types, the filter immediately responds indicating that the query is not supported.
+record types, the filter immediately responds indicating that the query is not supported.  The
+filter can also redirect a query for a DNS name to the enpoints of a cluster.  The last domain
+in the configuration demonstrates this.  Along with an address list, a cluster name is a valid
+endpoint for a DNS name.
 
 The filter can also consume its domain configuration from an external DNS table. The same entities
 appearing in the static configuration can be stored as JSON or YAML in a separate file and referenced
