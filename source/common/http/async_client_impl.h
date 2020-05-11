@@ -163,6 +163,11 @@ private:
       return nullptr;
     }
 
+    Router::RouteConstSharedPtr route(const Router::RouteCallback&, const Http::RequestHeaderMap&,
+                                      const StreamInfo::StreamInfo&, uint64_t) const override {
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    }
+
     const std::list<LowerCaseString>& internalOnlyHeaders() const override {
       return internal_only_headers_;
     }
@@ -326,6 +331,9 @@ private:
   Event::Dispatcher& dispatcher() override { return parent_.dispatcher_; }
   void resetStream() override;
   Router::RouteConstSharedPtr route() override { return route_; }
+  Router::RouteConstSharedPtr route(const Router::RouteCallback&) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
   Upstream::ClusterInfoConstSharedPtr clusterInfo() override { return parent_.cluster_; }
   void clearRouteCache() override {}
   uint64_t streamId() const override { return stream_id_; }

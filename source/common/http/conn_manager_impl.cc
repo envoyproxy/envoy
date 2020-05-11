@@ -1431,7 +1431,9 @@ void ConnectionManagerImpl::ActiveStream::snapScopedRouteConfig() {
   }
 }
 
-void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
+void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() { refreshCachedRoute(nullptr); }
+
+void ConnectionManagerImpl::ActiveStream::refreshCachedRoute(const Router::RouteCallback& cb) {
   Router::RouteConstSharedPtr route;
   if (request_headers_ != nullptr) {
     if (connection_manager_.config_.isRoutable() &&
@@ -1440,7 +1442,7 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
       snapScopedRouteConfig();
     }
     if (snapped_route_config_ != nullptr) {
-      route = snapped_route_config_->route(*request_headers_, stream_info_, stream_id_);
+      route = snapped_route_config_->route(cb, *request_headers_, stream_info_, stream_id_);
     }
   }
   stream_info_.route_entry_ = route ? route->routeEntry() : nullptr;
@@ -2259,10 +2261,15 @@ Upstream::ClusterInfoConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBas
 }
 
 Router::RouteConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::route() {
-  if (!parent_.cached_route_.has_value()) {
-    parent_.refreshCachedRoute();
-  }
+  return route(nullptr);
+}
 
+Router::RouteConstSharedPtr
+ConnectionManagerImpl::ActiveStreamFilterBase::route(const Router::RouteCallback& cb) {
+  if (parent_.cached_route_.has_value()) {
+    return parent_.cached_route_.value();
+  }
+  parent_.refreshCachedRoute(cb);
   return parent_.cached_route_.value();
 }
 
