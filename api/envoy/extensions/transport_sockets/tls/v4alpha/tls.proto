@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.transport_sockets.tls.v4alpha;
 
+import "envoy/config/core/v4alpha/extension.proto";
 import "envoy/extensions/transport_sockets/tls/v4alpha/common.proto";
 import "envoy/extensions/transport_sockets/tls/v4alpha/secret.proto";
 
@@ -110,8 +111,8 @@ message CommonTlsContext {
     // plugin name
     string name = 1;
 
-    // plugin specific config based on the plugin name
-    google.protobuf.Any typed_config = 2;
+    // plugin specific config
+    config.core.v4alpha.TypedExtensionConfig typed_config = 2;
   }
 
   message CombinedCertificateValidationContext {
