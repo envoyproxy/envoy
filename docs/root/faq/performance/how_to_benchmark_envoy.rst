@@ -41,4 +41,7 @@ the following guidance:
 * Be critical of your bootstrap or xDS configuration. Ideally every line has a motivation and is
   necessary for the benchmark under consideration.
 
+* Familiarize yourself with `latency measurement best practices
+  <https://www.youtube.com/watch?v=lJ8ydIuPFeU>`_.
+
 * Avoid `benchmarking crimes <https://www.cse.unsw.edu.au/~gernot/benchmarking-crimes.html>`_.
