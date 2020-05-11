@@ -31,6 +31,7 @@ Changes
   Can be disabled by setting runtime feature `envoy.reloadable_features.listener_in_place_filterchain_update` to false.
   Also added additional draining filter chain stat for :ref:`listener manager <config_listener_manager_stats>` to track the number of draining filter chains and the number of in place update attempts.
 * logger: added :ref:`--log-format-prefix-with-location <operations_cli>` command line option to prefix '%v' with file path and line number.
+* logger: changing debug logs to log config as YAML rather than JSON.
 * lrs: added new *envoy_api_field_service.load_stats.v2.LoadStatsResponse.send_all_clusters* field
   in LRS response, which allows management servers to avoid explicitly listing all clusters it is
   interested in; behavior is allowed based on new "envoy.lrs.supports_send_all_clusters" capability

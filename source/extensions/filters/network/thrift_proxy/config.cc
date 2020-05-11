@@ -157,7 +157,7 @@ void ConfigImpl::processFilter(
   ENVOY_LOG(debug, "    thrift filter #{}", filter_factories_.size());
   ENVOY_LOG(debug, "      name: {}", string_name);
   ENVOY_LOG(debug, "    config: {}",
-            MessageUtil::getJsonStringFromMessage(
+            MessageUtil::getYamlStringFromMessage(
                 proto_config.has_typed_config()
                     ? static_cast<const Protobuf::Message&>(proto_config.typed_config())
                     : static_cast<const Protobuf::Message&>(

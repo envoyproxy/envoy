@@ -1686,10 +1686,10 @@ TEST_F(SubsetLoadBalancerTest, DescribeMetadata) {
   num_value.set_number_value(100);
 
   auto tester = SubsetLoadBalancerDescribeMetadataTester(lb_);
-  tester.test("version=\"abc\"", {{"version", str_value}});
+  tester.test("version=abc", {{"version", str_value}});
   tester.test("number=100", {{"number", num_value}});
-  tester.test("x=\"abc\", y=100", {{"x", str_value}, {"y", num_value}});
-  tester.test("y=100, x=\"abc\"", {{"y", num_value}, {"x", str_value}});
+  tester.test("x=abc, y=100", {{"x", str_value}, {"y", num_value}});
+  tester.test("y=100, x=abc", {{"y", num_value}, {"x", str_value}});
   tester.test("<no metadata>", {});
 }
 

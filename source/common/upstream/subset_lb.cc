@@ -531,7 +531,7 @@ std::string SubsetLoadBalancer::describeMetadata(const SubsetLoadBalancer::Subse
       first = false;
     }
 
-    buf << it.first << "=" << MessageUtil::getJsonStringFromMessage(it.second);
+    buf << it.first << "=" << MessageUtil::getYamlStringFromMessage(it.second);
   }
 
   return buf.str();
