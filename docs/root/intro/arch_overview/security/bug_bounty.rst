@@ -53,12 +53,12 @@ attack surface for the initial stages of this program. We exclude any threat fro
 * Any filters apart from the HTTP connection manager network filter and HTTP router filter.
 * Admin console; this is disabled in the execution environment.
 
-In the future we will relax these restrictions as we increase the sophistication of the
-program's execution environment.
-
 We also explicitly exclude any local attacks (e.g. via local processes, shells, etc.) against
 the Envoy process. All attacks must occur via the network data plane on port 10000. Similarly,
 kernel and Docker vulnerabilities are outside the threat model.
+
+In the future we may relax some of these restrictions as we increase the sophistication of the
+program's execution environment.
 
 .. _arch_overview_bug_bounty_ee:
 
@@ -125,6 +125,9 @@ that falls into one of these categories:
 * TLS certificate exfiltration: requests that are able to obtain the edge Envoy's
   `serverkey.pem`.
 * Remote code exploits: any root shell obtained via the network data plane.
+* At the discretion of the OSS Envoy security team, sufficiently interesting vulnerabilities that
+  don't fit the above categories but are likely to fall into the category of high or critical
+  vulnerabilities.
 
 Working with the Docker images
 ------------------------------
