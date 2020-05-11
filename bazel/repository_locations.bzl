@@ -53,11 +53,11 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["build"],
     ),
     bazel_toolchains = dict(
-        sha256 = "239a1a673861eabf988e9804f45da3b94da28d1aff05c373b013193c315d9d9e",
-        strip_prefix = "bazel-toolchains-3.0.1",
+        sha256 = "144290c4166bd67e76a54f96cd504ed86416ca3ca82030282760f0823c10be48",
+        strip_prefix = "bazel-toolchains-3.1.1",
         urls = [
-            "https://github.com/bazelbuild/bazel-toolchains/releases/download/3.0.1/bazel-toolchains-3.0.1.tar.gz",
-            "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/3.0.1.tar.gz",
+            "https://github.com/bazelbuild/bazel-toolchains/releases/download/3.1.1/bazel-toolchains-3.1.1.tar.gz",
+            "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/3.1.1.tar.gz",
         ],
         use_category = ["build"],
     ),
@@ -67,10 +67,10 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["build"],
     ),
     envoy_build_tools = dict(
-        sha256 = "9d348f92ae8fb2495393109aac28aea314ad1fb013cdec1ab7b1224f804be1b7",
-        strip_prefix = "envoy-build-tools-823c2e9386eee5117f7ef9e3d7c90e784cd0d047",
-        # 2020-04-07
-        urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/823c2e9386eee5117f7ef9e3d7c90e784cd0d047.tar.gz"],
+        sha256 = "",
+        strip_prefix = "envoy-build-tools-8d7a0cb9be7a34c726575d79688ae3dea565a424",
+        # 2020-05-08
+        urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/8d7a0cb9be7a34c726575d79688ae3dea565a424.tar.gz"],
         use_category = ["build"],
     ),
     boringssl = dict(
