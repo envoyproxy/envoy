@@ -5,6 +5,7 @@
 
 #include "test/test_common/thread_factory_for_test.h"
 
+#include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -45,10 +46,43 @@ TEST_F(ThreadTest, AtomicPtr) {
   thread1->join();
   thread2->join();
 
-  // NOow enuure the "thread1" value sticks past the thread lifetimes.
+  // Now ensure the "thread1" value sticks past the thread lifetimes.
   bool called = false;
-  EXPECT_EQ("thread1", *str.get([&called]() -> std::string* { called = true; return nullptr; }));
+  EXPECT_EQ("thread1", *str.get([&called]() -> std::string* {
+    called = true;
+    return nullptr;
+  }));
   EXPECT_FALSE(called);
+}
+
+TEST_F(ThreadTest, AtomicPtrThreadSpammer) {
+  AtomicPtr<std::string, AtomicPtrAllocMode::DeleteOnDestruct> str;
+  absl::Notification go;
+  constexpr uint32_t num_threads = 100;
+  AtomicPtr<uint32_t, AtomicPtrAllocMode::DeleteOnDestruct> answer;
+  uint32_t calls = 0;
+  auto thread_fn = [&go, &answer, &calls]() {
+    go.WaitForNotification();
+    answer.get([&calls]() {
+      ++calls;
+      return new uint32_t(42);
+    });
+  };
+  std::vector<ThreadPtr> threads;
+  for (uint32_t i = 0; i < num_threads; ++i) {
+    threads.emplace_back(thread_factory_.createThread(thread_fn));
+  }
+  EXPECT_EQ(0, calls);
+  go.Notify();
+  for (auto& thread : threads) {
+    thread->join();
+  }
+  EXPECT_EQ(1, calls);
+  EXPECT_EQ(42, *answer.get([&calls]() {
+    ++calls;
+    return nullptr;
+  }));
+  EXPECT_EQ(1, calls);
 }
 
 // Tests that null can be allocated, but the allocator will be re-called each

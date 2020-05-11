@@ -6,6 +6,8 @@
 
 #include "envoy/thread/thread.h"
 
+#include "common/common/non_copyable.h"
+
 #include "absl/synchronization/mutex.h"
 
 namespace Envoy {
@@ -86,7 +88,8 @@ enum class AtomicPtrAllocMode { DoNotDelete, DeleteOnDestruct };
 // alloc_mode controls whether allocated T* entries should be deleted on
 // destruction of the array. This should be set to AtomicPtrAllocMode::DoNotDelete
 // if the T* returned from MakeObject are managed by the caller.
-template <class T, uint32_t size, AtomicPtrAllocMode alloc_mode> class AtomicPtrArray {
+template <class T, uint32_t size, AtomicPtrAllocMode alloc_mode>
+class AtomicPtrArray : NonCopyable {
 public:
   AtomicPtrArray() {
     for (auto& ptr : data_) {
