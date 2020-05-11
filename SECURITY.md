@@ -74,10 +74,10 @@ If a vulnerability does not affect any point release but only master, additional
 
 * If the issue is detected and a fix is available within 5 days of the introduction of the
   vulnerability, or the issue is deemed a low severity vulnerability, the fix will be publicly
-  reviewed and landed on master. A courtesy e-mail will be sent to envoy-users@googlegroups.com,
+  reviewed and landed on master. If the severity is at least medium or at maintainer discretion
+  a courtesy e-mail will be sent to envoy-users@googlegroups.com,
   envoy-dev@googlegroups.com, envoy-security-announce@googlegroups.com and
-  cncf-envoy-distributors-announce@lists.cncf.io if the severity is medium or
-  greater or at maintainer discretion.
+  cncf-envoy-distributors-announce@lists.cncf.io.
 * If the vulnerability has been in existence for more than 5 days and is medium or higher, we will
   activate the security release process.
 
