@@ -141,12 +141,12 @@ def _reconcile(config, specs=None):
     if spec.owner[-1] == '!':
       _update_status(spec.owner[:-1], spec.status_label, spec.path_match, approved)
 
-      if spec.label is not None:
+      if spec.label:
         if approved:
           github.issue_unlabel(spec.label)
         else:
           github.issue_label(spec.label)
-    elif spec.label is not None: # fyis
+    elif spec.label: # fyis
       github.issue_label(spec.label)
 
   return results
@@ -219,7 +219,7 @@ def _lgtm_by_comment(config, comment_id, command, sender, sha):
 
   label = labels[0]
 
-  specs = [s for s in _get_specs(config) if s.label is not None and s.label == label]
+  specs = [s for s in _get_specs(config) if s.label and s.label == label]
 
   if len(specs) == 0:
     react(comment_id, 'no relevant owners for "%s"' % label)
