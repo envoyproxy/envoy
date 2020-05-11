@@ -25,19 +25,7 @@ public:
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) {
-          auto* route_config = hcm.mutable_route_config();
-          ASSERT_EQ(1, route_config->virtual_hosts_size());
-          auto* route = route_config->mutable_virtual_hosts(0)->mutable_routes(0);
-          auto* match = route->mutable_match();
-          match->Clear();
-          match->mutable_connect_matcher();
-
-          auto* upgrade = route->mutable_route()->add_upgrade_configs();
-          upgrade->set_upgrade_type("CONNECT");
-          upgrade->mutable_connect_config();
-
-          hcm.add_upgrade_configs()->set_upgrade_type("CONNECT");
-          hcm.mutable_http2_protocol_options()->set_allow_connect(true);
+          ConfigHelper::setConnectConfig(hcm, true);
 
           if (enable_timeout_) {
             hcm.mutable_stream_idle_timeout()->set_seconds(0);
@@ -201,10 +189,7 @@ public:
   void initialize() override {
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-                hcm) -> void {
-          hcm.add_upgrade_configs()->set_upgrade_type("CONNECT");
-          hcm.mutable_http2_protocol_options()->set_allow_connect(true);
-        });
+                hcm) -> void { ConfigHelper::setConnectConfig(hcm, false); });
     HttpProtocolIntegrationTest::initialize();
   }
 
