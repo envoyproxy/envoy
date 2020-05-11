@@ -300,36 +300,36 @@ public:
              uint32_t concurrency);
 
   void waitForCounterEq(const std::string& name, uint64_t value) override {
-    TestUtility::waitForCounterEq(stat_store(), name, value, time_system_);
+    TestUtility::waitForCounterEq(statStore(), name, value, time_system_);
   }
 
   void waitForCounterGe(const std::string& name, uint64_t value) override {
-    TestUtility::waitForCounterGe(stat_store(), name, value, time_system_);
+    TestUtility::waitForCounterGe(statStore(), name, value, time_system_);
   }
 
   void waitForGaugeGe(const std::string& name, uint64_t value) override {
-    TestUtility::waitForGaugeGe(stat_store(), name, value, time_system_);
+    TestUtility::waitForGaugeGe(statStore(), name, value, time_system_);
   }
 
   void waitForGaugeEq(const std::string& name, uint64_t value) override {
-    TestUtility::waitForGaugeEq(stat_store(), name, value, time_system_);
+    TestUtility::waitForGaugeEq(statStore(), name, value, time_system_);
   }
 
   Stats::CounterSharedPtr counter(const std::string& name) override {
     // When using the thread local store, only counters() is thread safe. This also allows us
     // to test if a counter exists at all versus just defaulting to zero.
-    return TestUtility::findCounter(stat_store(), name);
+    return TestUtility::findCounter(statStore(), name);
   }
 
   Stats::GaugeSharedPtr gauge(const std::string& name) override {
     // When using the thread local store, only gauges() is thread safe. This also allows us
     // to test if a counter exists at all versus just defaulting to zero.
-    return TestUtility::findGauge(stat_store(), name);
+    return TestUtility::findGauge(statStore(), name);
   }
 
-  std::vector<Stats::CounterSharedPtr> counters() override { return stat_store().counters(); }
+  std::vector<Stats::CounterSharedPtr> counters() override { return statStore().counters(); }
 
-  std::vector<Stats::GaugeSharedPtr> gauges() override { return stat_store().gauges(); }
+  std::vector<Stats::GaugeSharedPtr> gauges() override { return statStore().gauges(); }
 
   // ListenerHooks
   void onWorkerListenerAdded() override;
@@ -347,8 +347,10 @@ public:
 
   // Should not be called until createAndRunEnvoyServer() is called.
   virtual Server::Instance& server() PURE;
-  virtual Stats::Store& stat_store() PURE;
-  virtual Network::Address::InstanceConstSharedPtr admin_address() PURE;
+  virtual Stats::Store& statStore() PURE;
+  virtual Network::Address::InstanceConstSharedPtr adminAddress() PURE;
+  void useAdminInterfaceToQuit(bool use) { use_admin_interface_to_quit_ = use; }
+  bool useAdminInterfaceToQuit() { return use_admin_interface_to_quit_; }
 
 protected:
   IntegrationTestServer(Event::TestTimeSystem& time_system, Api::Api& api,
@@ -356,7 +358,7 @@ protected:
       : time_system_(time_system), api_(api), config_path_(config_path) {}
 
   // Create the running envoy server. This function will call serverReady() when the virtual
-  // functions server(), stat_store(), and admin_address() may be called, but before the server
+  // functions server(), statStore(), and adminAddress() may be called, but before the server
   // has been started.
   // The subclass is also responsible for tearing down this server in its destructor.
   virtual void createAndRunEnvoyServer(OptionsImpl& options, Event::TimeSystem& time_system,
@@ -367,7 +369,7 @@ protected:
                                        ProcessObjectOptRef process_object) PURE;
 
   // Will be called by subclass on server thread when the server is ready to be accessed. The
-  // server may not have been run yet, but all server access methods (server(), stat_store(),
+  // server may not have been run yet, but all server access methods (server(), statStore(),
   // adminAddress()) will be available.
   void serverReady();
 
@@ -392,6 +394,7 @@ private:
   std::function<void()> on_worker_listener_removed_cb_;
   TcpDumpPtr tcp_dump_;
   std::function<void(IntegrationTestServer&)> on_server_ready_cb_;
+  bool use_admin_interface_to_quit_{};
 };
 
 // Default implementation of IntegrationTestServer
@@ -407,11 +410,11 @@ public:
     RELEASE_ASSERT(server_ != nullptr, "");
     return *server_;
   }
-  Stats::Store& stat_store() override {
+  Stats::Store& statStore() override {
     RELEASE_ASSERT(stat_store_ != nullptr, "");
     return *stat_store_;
   }
-  Network::Address::InstanceConstSharedPtr admin_address() override { return admin_address_; }
+  Network::Address::InstanceConstSharedPtr adminAddress() override { return admin_address_; }
 
 private:
   void createAndRunEnvoyServer(OptionsImpl& options, Event::TimeSystem& time_system,
