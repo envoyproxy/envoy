@@ -41,7 +41,15 @@ the following guidance:
 * Be critical of your bootstrap or xDS configuration. Ideally every line has a motivation and is
   necessary for the benchmark under consideration.
 
+* Examine `perf` profiles of Envoy during the benchmark run, e.g. with `flame graphs
+  <http://www.brendangregg.com/flamegraphs.html>`_. Verify that Envoy is spending its time
+  doing the expected essential work under test, rather than some unrelated or tangential
+  work.
+
 * Familiarize yourself with `latency measurement best practices
-  <https://www.youtube.com/watch?v=lJ8ydIuPFeU>`_.
+  <https://www.youtube.com/watch?v=lJ8ydIuPFeU>`_. In particular, never measure latency at
+  max load, this is not generally meaningful or reflecting of real system performance; aim
+  to measure below the knee of the QPS-latency curve. Prefer open vs. closed loop load
+  generators.
 
 * Avoid `benchmarking crimes <https://www.cse.unsw.edu.au/~gernot/benchmarking-crimes.html>`_.
