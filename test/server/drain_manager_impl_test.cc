@@ -67,7 +67,8 @@ TEST_F(DrainManagerImplTest, DrainDeadline) {
   drain_manager.startDrainSequence(nullptr);
   EXPECT_CALL(server_, healthCheckFailed()).WillRepeatedly(Return(false));
   ON_CALL(server_.random_, random()).WillByDefault(Return(kDrainTimeSeconds * 2 - 1));
-  ON_CALL(server_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(kDrainTimeSeconds)));
+  ON_CALL(server_.options_, drainTime())
+      .WillByDefault(Return(std::chrono::seconds(kDrainTimeSeconds)));
 
   EXPECT_FALSE(drain_manager.drainClose());
   simTime().advanceTimeWait(std::chrono::seconds(kDrainTimeSeconds - 1));

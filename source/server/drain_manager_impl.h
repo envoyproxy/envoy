@@ -40,7 +40,6 @@ private:
   MonotonicTime drain_deadline_;
 
   Event::TimerPtr parent_shutdown_timer_;
-
 };
 
 } // namespace Server
