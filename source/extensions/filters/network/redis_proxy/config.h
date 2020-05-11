@@ -26,20 +26,16 @@ public:
           proto_config)
       : auth_password_(proto_config.auth_password()) {}
 
-  std::string auth_password(Api::Api& api) const {
+  std::string authPassword(Api::Api& api) const {
     return Config::DataSource::read(auth_password_, true, api);
   }
 
-  const envoy::config::core::v3::DataSource& auth_password_datasource() const {
-    return auth_password_;
-  }
-
-  static const std::string auth_password(const Upstream::ClusterInfoConstSharedPtr info,
-                                         Api::Api& api) {
+  static const std::string authPassword(const Upstream::ClusterInfoConstSharedPtr info,
+                                        Api::Api& api) {
     auto options = info->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
         NetworkFilterNames::get().RedisProxy);
     if (options) {
-      return options->auth_password(api);
+      return options->authPassword(api);
     }
     return EMPTY_STRING;
   }
