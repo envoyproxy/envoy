@@ -75,7 +75,7 @@ function llvm_coverage() {
 
 
   local object_files="$(find -L "${RUNFILES_DIR}" -type f -exec file -L {} \; \
-       | grep ELF | sed 's,:.*,,')"
+       | grep ELF | grep -v "LSB core" | sed 's,:.*,,')"
   
   local object_param=""
   for object_file in ${object_files}; do
