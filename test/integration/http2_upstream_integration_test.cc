@@ -55,66 +55,6 @@ TEST_P(Http2UpstreamIntegrationTest, Retry) { testRetry(); }
 
 TEST_P(Http2UpstreamIntegrationTest, GrpcRetry) { testGrpcRetry(); }
 
-// Regression test https://github.com/envoyproxy/envoy/issues/11131
-// Send complete response headers directing a retry and reset the stream to make
-// sure that Envoy cleans up stream state correctly when doing a retry with
-// complete response but incomplete request.
-TEST_P(Http2UpstreamIntegrationTest, RetryStreamingReset) {
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto encoder_decoder =
-      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
-                                                                 {":path", "/test/long/url"},
-                                                                 {":scheme", "http"},
-                                                                 {":authority", "host"},
-                                                                 {"x-forwarded-for", "10.0.0.1"},
-                                                                 {"x-envoy-retry-on", "5xx"}});
-  auto& encoder = encoder_decoder.first;
-  auto& response = encoder_decoder.second;
-
-  // Send some data, but not the entire body.
-  std::string data(1024, 'a');
-  Buffer::OwnedImpl send1(data);
-  encoder.encodeData(send1, false);
-
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-
-  // Send back an upstream failure and end stream. Make sure an immediate reset
-  // doesn't cause problems.
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
-  upstream_request_->encodeResetStream();
-
-  // Make sure the fake stream is reset.
-  if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
-    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  } else {
-    ASSERT_TRUE(upstream_request_->waitForReset());
-  }
-
-  // Wait for a retry. Ensure all data, both before and after the retry, is received.
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-
-  // Finish the request.
-  std::string data2(512, 'b');
-  Buffer::OwnedImpl send2(data2);
-  encoder.encodeData(send2, true);
-  std::string combined_request_data = data + data2;
-  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, combined_request_data));
-
-  upstream_request_->encodeHeaders(default_response_headers_, false);
-  upstream_request_->encodeData(512, true);
-
-  response->waitForEndStream();
-  EXPECT_TRUE(upstream_request_->complete());
-  EXPECT_EQ(combined_request_data.size(), upstream_request_->bodyLength());
-
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
-  EXPECT_EQ(512U, response->body().size());
-}
-
 TEST_P(Http2UpstreamIntegrationTest, Trailers) { testTrailers(1024, 2048, true, true); }
 
 // Ensure Envoy handles streaming requests and responses simultaneously.
