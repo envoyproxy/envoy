@@ -15,7 +15,6 @@
 #include "common/stats/timespan_impl.h"
 
 #include "extensions/filters/network/common/redis/client_impl.h"
-#include "extensions/filters/network/common/redis/fault.h"
 #include "extensions/filters/network/common/redis/utility.h"
 #include "extensions/filters/network/redis_proxy/command_splitter.h"
 #include "extensions/filters/network/redis_proxy/conn_pool_impl.h"
@@ -44,9 +43,7 @@ using Response = ConstSingleton<ResponseValues>;
 #define ALL_COMMAND_STATS(COUNTER)                                                                 \
   COUNTER(total)                                                                                   \
   COUNTER(success)                                                                                 \
-  COUNTER(error)                                                                                   \
-  COUNTER(error_fault)                                                                             \
-  COUNTER(delay_fault)
+  COUNTER(error)
 
 /**
  * Struct definition for all command stats. @see stats_macros.h
@@ -78,11 +75,6 @@ protected:
                                        const Common::Redis::RespValue& request);
   void updateStats(const bool success);
 
-  // To support delay faults, we allow faults to override the regular command latency
-  // recording behavior.
-  void delayLatencyMetric() { delay_command_latency_ = true; }
-  void completeLatency() { command_latency_->complete(); }
-
   SplitRequestBase(CommandStats& command_stats, TimeSource& time_source)
       : command_stats_(command_stats) {
     command_latency_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
@@ -90,7 +82,6 @@ protected:
   }
   CommandStats& command_stats_;
   Stats::TimespanPtr command_latency_;
-  bool delay_command_latency_;
 };
 
 /**
@@ -278,8 +269,7 @@ struct InstanceStats {
 class InstanceImpl : public Instance, Logger::Loggable<Logger::Id::redis> {
 public:
   InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::string& stat_prefix,
-               TimeSource& time_source, bool latency_in_micros, Event::Dispatcher& dispatcher,
-               Common::Redis::FaultManagerPtr&& fault_manager);
+               TimeSource& time_source, bool latency_in_micros);
 
   // RedisProxy::CommandSplitter::Instance
   SplitRequestPtr makeRequest(Common::Redis::RespValuePtr&& request,
@@ -306,11 +296,6 @@ private:
   TrieLookupTable<HandlerDataPtr> handler_lookup_table_;
   InstanceStats stats_;
   TimeSource& time_source_;
-  Event::Dispatcher& dispatcher_;
-
-  Common::Redis::FaultManagerPtr fault_manager_;
-
-  const std::string ERROR_FAULT = "error_fault";
 };
 
 } // namespace CommandSplitter
