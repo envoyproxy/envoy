@@ -38,8 +38,12 @@ bool RequestHeadersAction::populateDescriptor(const Router::RouteEntry&,
                                               const Http::HeaderMap& headers,
                                               const Network::Address::Instance&) const {
   const Http::HeaderEntry* header_value = headers.get(header_name_);
-  if (!header_value) {
+  if (!header_value && !skip_if_absent_) {
     return false;
+  }
+  
+  if(!header_value && skip_if_absent_) {
+    return true;
   }
 
   descriptor.entries_.push_back(
