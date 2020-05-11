@@ -38,6 +38,7 @@
 #include "common/http/utility.h"
 #include "common/network/utility.h"
 #include "common/router/config_impl.h"
+#include "common/runtime/runtime_features.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/stats/timespan_impl.h"
 
@@ -765,19 +766,28 @@ uint32_t ConnectionManagerImpl::ActiveStream::localPort() {
 // can't route select properly without full headers), checking state required to
 // serve error responses (connection close, head requests, etc), and
 // modifications which may themselves affect route selection.
-//
-// TODO(alyssawilk) all the calls here should be audited for order priority,
-// e.g. many early returns do not currently handle connection: close properly.
 void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& headers,
                                                         bool end_stream) {
   ScopeTrackerScopeState scope(this,
                                connection_manager_.read_callbacks_->connection().dispatcher());
   request_headers_ = std::move(headers);
 
-  // TODO(alyssawilk) remove this synthetic path in a follow-up PR, including
-  // auditing of empty path headers. We check for path because HTTP/2 connect requests may have a
-  // path.
-  if (HeaderUtility::isConnect(*request_headers_) && !request_headers_->Path()) {
+  // Both saw_connection_close_ and is_head_request_ affect local replies: set
+  // them as early as possible.
+  const Protocol protocol = connection_manager_.codec_->protocol();
+  const bool fixed_connection_close =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.fixed_connection_close");
+  if (fixed_connection_close) {
+    state_.saw_connection_close_ =
+        HeaderUtility::shouldCloseConnection(protocol, *request_headers_);
+  }
+  if (request_headers_->Method() && Http::Headers::get().MethodValues.Head ==
+                                        request_headers_->Method()->value().getStringView()) {
+    state_.is_head_request_ = true;
+  }
+
+  if (HeaderUtility::isConnect(*request_headers_) && !request_headers_->Path() &&
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.stop_faking_paths")) {
     request_headers_->setPath("/");
   }
 
@@ -794,10 +804,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
     snapped_route_config_ = connection_manager_.config_.routeConfigProvider()->config();
   }
 
-  if (Http::Headers::get().MethodValues.Head ==
-      request_headers_->Method()->value().getStringView()) {
-    state_.is_head_request_ = true;
-  }
   ENVOY_STREAM_LOG(debug, "request headers complete (end_stream={}):\n{}", *this, end_stream,
                    *request_headers_);
 
@@ -835,7 +841,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
                                                         connection_manager_.stats_.scope_);
 
   // Make sure we are getting a codec version we support.
-  Protocol protocol = connection_manager_.codec_->protocol();
   if (protocol == Protocol::Http10) {
     // Assume this is HTTP/1.0. This is fine for HTTP/0.9 but this code will also affect any
     // requests with non-standard version numbers (0.9, 1.3), basically anything which is not
@@ -848,7 +853,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
       sendLocalReply(false, Code::UpgradeRequired, "", nullptr, state_.is_head_request_,
                      absl::nullopt, StreamInfo::ResponseCodeDetails::get().LowVersion);
       return;
-    } else {
+    } else if (!fixed_connection_close) {
       // HTTP/1.0 defaults to single-use connections. Make sure the connection
       // will be closed unless Keep-Alive is present.
       state_.saw_connection_close_ = true;
@@ -858,40 +863,42 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
         state_.saw_connection_close_ = false;
       }
     }
-  }
-
-  if (!request_headers_->Host()) {
-    if ((protocol == Protocol::Http10) &&
+    if (!request_headers_->Host() &&
         !connection_manager_.config_.http1Settings().default_host_for_http_10_.empty()) {
       // Add a default host if configured to do so.
       request_headers_->setHost(
           connection_manager_.config_.http1Settings().default_host_for_http_10_);
-    } else {
-      // Require host header. For HTTP/1.1 Host has already been translated to :authority.
-      sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::BadRequest, "",
-                     nullptr, state_.is_head_request_, absl::nullopt,
-                     StreamInfo::ResponseCodeDetails::get().MissingHost);
-      return;
     }
+  }
+
+  if (!request_headers_->Host()) {
+    // Require host header. For HTTP/1.1 Host has already been translated to :authority.
+    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::BadRequest, "",
+                   nullptr, state_.is_head_request_, absl::nullopt,
+                   StreamInfo::ResponseCodeDetails::get().MissingHost);
+    return;
   }
 
   // Verify header sanity checks which should have been performed by the codec.
   ASSERT(HeaderUtility::requestHeadersValid(*request_headers_).has_value() == false);
 
-  // Currently we only support relative paths at the application layer. We expect the codec to have
-  // broken the path into pieces if applicable. NOTE: Currently the HTTP/1.1 codec only does this
-  // when the allow_absolute_url flag is enabled on the HCM.
-  // https://tools.ietf.org/html/rfc7230#section-5.3 We also need to check for the existence of
-  // :path because CONNECT does not have a path, and we don't support that currently.
-  if (!request_headers_->Path() || request_headers_->Path()->value().getStringView().empty() ||
-      request_headers_->Path()->value().getStringView()[0] != '/') {
-    const bool has_path =
-        request_headers_->Path() && !request_headers_->Path()->value().getStringView().empty();
+  // Check for the existence of the :path header for non-CONNECT requests. We expect the codec to
+  // have broken the path into pieces if applicable. NOTE: Currently the HTTP/1.1 codec only does
+  // this when the allow_absolute_url flag is enabled on the HCM.
+  if ((!HeaderUtility::isConnect(*request_headers_) && !request_headers_->Path()) ||
+      (request_headers_->Path() && request_headers_->Path()->value().getStringView().empty())) {
+    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::NotFound, "", nullptr,
+                   state_.is_head_request_, absl::nullopt,
+                   StreamInfo::ResponseCodeDetails::get().MissingPath);
+    return;
+  }
+
+  // Currently we only support relative paths at the application layer.
+  if (request_headers_->Path() && request_headers_->Path()->value().getStringView()[0] != '/') {
     connection_manager_.stats_.named_.downstream_rq_non_relative_path_.inc();
     sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::NotFound, "", nullptr,
                    state_.is_head_request_, absl::nullopt,
-                   has_path ? StreamInfo::ResponseCodeDetails::get().AbsolutePath
-                            : StreamInfo::ResponseCodeDetails::get().MissingPath);
+                   StreamInfo::ResponseCodeDetails::get().AbsolutePath);
     return;
   }
 
@@ -907,7 +914,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   ConnectionManagerUtility::maybeNormalizeHost(*request_headers_, connection_manager_.config_,
                                                localPort());
 
-  if (protocol == Protocol::Http11 && request_headers_->Connection() &&
+  if (!fixed_connection_close && protocol == Protocol::Http11 && request_headers_->Connection() &&
       absl::EqualsIgnoreCase(request_headers_->Connection()->value().getStringView(),
                              Http::Headers::get().ConnectionValues.Close)) {
     state_.saw_connection_close_ = true;
@@ -915,7 +922,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   // Note: Proxy-Connection is not a standard header, but is supported here
   // since it is supported by http-parser the underlying parser for http
   // requests.
-  if (protocol < Protocol::Http2 && !state_.saw_connection_close_ &&
+  if (!fixed_connection_close && protocol < Protocol::Http2 && !state_.saw_connection_close_ &&
       request_headers_->ProxyConnection() &&
       absl::EqualsIgnoreCase(request_headers_->ProxyConnection()->value().getStringView(),
                              Http::Headers::get().ConnectionValues.Close)) {
@@ -1429,7 +1436,9 @@ void ConnectionManagerImpl::ActiveStream::snapScopedRouteConfig() {
   }
 }
 
-void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
+void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() { refreshCachedRoute(nullptr); }
+
+void ConnectionManagerImpl::ActiveStream::refreshCachedRoute(const Router::RouteCallback& cb) {
   Router::RouteConstSharedPtr route;
   if (request_headers_ != nullptr) {
     if (connection_manager_.config_.isRoutable() &&
@@ -1438,7 +1447,7 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
       snapScopedRouteConfig();
     }
     if (snapped_route_config_ != nullptr) {
-      route = snapped_route_config_->route(*request_headers_, stream_info_, stream_id_);
+      route = snapped_route_config_->route(cb, *request_headers_, stream_info_, stream_id_);
     }
   }
   stream_info_.route_entry_ = route ? route->routeEntry() : nullptr;
@@ -1631,9 +1640,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
 void ConnectionManagerImpl::ActiveStream::encodeHeadersInternal(ResponseHeaderMap& headers,
                                                                 bool end_stream) {
   // Base headers.
-  if (!connection_manager_.config_.shouldPreserveUpstreamDate() || !headers.Date()) {
-    connection_manager_.config_.dateProvider().setDateHeader(headers);
-  }
+  connection_manager_.config_.dateProvider().setDateHeader(headers);
   // Following setReference() is safe because serverName() is constant for the life of the listener.
   const auto transformation = connection_manager_.config_.serverHeaderTransformation();
   if (transformation == ConnectionManagerConfig::HttpConnectionManagerProto::OVERWRITE ||
@@ -2259,10 +2266,15 @@ Upstream::ClusterInfoConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBas
 }
 
 Router::RouteConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::route() {
-  if (!parent_.cached_route_.has_value()) {
-    parent_.refreshCachedRoute();
-  }
+  return route(nullptr);
+}
 
+Router::RouteConstSharedPtr
+ConnectionManagerImpl::ActiveStreamFilterBase::route(const Router::RouteCallback& cb) {
+  if (parent_.cached_route_.has_value()) {
+    return parent_.cached_route_.value();
+  }
+  parent_.refreshCachedRoute(cb);
   return parent_.cached_route_.value();
 }
 
