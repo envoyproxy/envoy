@@ -261,6 +261,13 @@ Status JsonTranscoderConfig::createMethodInfo(const Protobuf::MethodDescriptor* 
     return status;
   }
 
+  if (!method_info->response_body_field_path.empty() && !method_info->response_type_is_http_body_) {
+    // TODO(euroelessar): Implement https://github.com/envoyproxy/envoy/issues/11136.
+    return Status(Code::UNIMPLEMENTED,
+                  "Setting \"response_body\" is not supported yet for non-HttpBody fields: " +
+                      descriptor->full_name());
+  }
+
   return Status::OK;
 }
 
@@ -700,9 +707,9 @@ bool JsonTranscoderFilter::buildResponseFromHttpBodyOutput(
       Buffer::ZeroCopyInputStreamImpl stream(std::move(frame.data_));
       if (!HttpBodyUtils::parseMessageByFieldPath(&stream, method_->response_body_field_path,
                                                   &http_body)) {
-        // TODO(elessar): Return error to client.
+        // TODO(euroelessar): Return error to client.
         encoder_callbacks_->resetStream();
-        return;
+        return true;
       }
       const auto& body = http_body.data();
 

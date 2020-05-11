@@ -122,6 +122,15 @@ service Bookstore {
   }
 }
 
+service ServiceWithResponseBody {
+  rpc EchoStruct(EchoStructReqResp) returns (EchoStructReqResp) {
+    option (google.api.http) = {
+      get: "/echoStruct"
+      response_body: "content"
+    };
+  }
+}
+
 // A shelf resource.
 message Shelf {
   // A unique shelf id.

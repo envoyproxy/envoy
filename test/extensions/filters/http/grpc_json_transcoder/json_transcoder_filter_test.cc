@@ -165,6 +165,15 @@ TEST_F(GrpcJsonTranscoderConfigTest, NonProto) {
       EnvoyException, "transcoding_filter: Unable to parse proto descriptor");
 }
 
+TEST_F(GrpcJsonTranscoderConfigTest, JsonResponseBody) {
+  EXPECT_THROW_WITH_REGEX(
+      JsonTranscoderConfig config(
+          getProtoConfig(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"),
+                         "bookstore.ServiceWithResponseBody"),
+          *api_),
+      EnvoyException, "Setting \"response_body\" is not supported yet for non-HttpBody fields");
+}
+
 TEST_F(GrpcJsonTranscoderConfigTest, NonBinaryProto) {
   envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder proto_config;
   proto_config.set_proto_descriptor_bin("This is invalid proto");
