@@ -92,15 +92,15 @@ template <class T, uint32_t size, AtomicPtrAllocMode alloc_mode>
 class AtomicPtrArray : NonCopyable {
 public:
   AtomicPtrArray() {
-    for (auto& ptr : data_) {
-      ptr = nullptr;
+    for (uint32_t i = 0; i < size; ++i) {
+      data_[i] = nullptr;
     }
   }
 
   ~AtomicPtrArray() {
     if (alloc_mode == AtomicPtrAllocMode::DeleteOnDestruct) {
-      for (auto& ptr : data_) {
-        delete ptr;
+      for (uint32_t i = 0; i < size; ++i) {
+        delete data_[i];
       }
     }
   }

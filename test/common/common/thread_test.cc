@@ -16,7 +16,6 @@ protected:
   ThreadFactory& thread_factory_{threadFactoryForTest()};
 };
 
-#if 0
 // Tests that two threads racing to create an object have well-defined
 // behavior.
 TEST_F(ThreadTest, AtomicPtrDeleteOnDestruct) {
@@ -55,7 +54,6 @@ TEST_F(ThreadTest, AtomicPtrDeleteOnDestruct) {
   }));
   EXPECT_FALSE(called);
 }
-#endif
 
 // Same test as AtomicPtrDeleteOnDestruct, except the allocator callbacks return
 // pointers to locals, rather than allocating the strings on the heap.
@@ -99,7 +97,6 @@ TEST_F(ThreadTest, AtomicPtrDoNotDelete) {
   EXPECT_FALSE(called);
 }
 
-#if 0
 TEST_F(ThreadTest, AtomicPtrThreadSpammer) {
   AtomicPtr<std::string, AtomicPtrAllocMode::DeleteOnDestruct> str;
   absl::Notification go;
@@ -129,7 +126,6 @@ TEST_F(ThreadTest, AtomicPtrThreadSpammer) {
   }));
   EXPECT_EQ(1, calls);
 }
-#endif
 
 // Tests that null can be allocated, but the allocator will be re-called each
 // time until a non-null result is returned.
