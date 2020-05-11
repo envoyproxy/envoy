@@ -151,8 +151,7 @@ CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& conne
   switch (type) {
   case Type::HTTP1: {
     codec_ = std::make_unique<Http1::ClientConnectionImpl>(
-        *connection_, host->cluster().http1CodecStats(), *this,
-        host->cluster().http1Settings(),
+        *connection_, host->cluster().http1CodecStats(), *this, host->cluster().http1Settings(),
         host->cluster().maxResponseHeadersCount());
     break;
   }

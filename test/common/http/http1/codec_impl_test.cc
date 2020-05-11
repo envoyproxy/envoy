@@ -56,9 +56,8 @@ Buffer::OwnedImpl createBufferWithNByteSlices(absl::string_view input, size_t ma
 } // namespace
 
 class Http1CodecTestBase : public testing::Test {
- protected:
-  Http1CodecTestBase() : http1_codec_stats_{
-    HTTP1_CODEC_STATS(store_)} {}
+protected:
+  Http1CodecTestBase() : http1_codec_stats_{HTTP1_CODEC_STATS(store_)} {}
 
   Stats::TestUtil::TestStore store_;
   Http::Http1::CodecStats http1_codec_stats_;
@@ -116,7 +115,7 @@ protected:
   uint32_t max_request_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_{envoy::config::core::v3::HttpProtocolOptions::ALLOW};
-  //MOCK_METHOD(Http::Http2::CodecStats&, http2CodecStats, (), (const));
+  // MOCK_METHOD(Http::Http2::CodecStats&, http2CodecStats, (), (const));
 };
 
 void Http1ServerConnectionImplTest::expect400(Protocol p, bool allow_absolute_url,

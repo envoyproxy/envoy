@@ -10,9 +10,8 @@ namespace Http {
 namespace Http2 {
 
 class TestCodecStatsProvider {
- public:
-  TestCodecStatsProvider(Stats::Scope& scope)
-      : http2_codec_stats_{HTTP2_CODEC_STATS(scope)} {}
+public:
+  TestCodecStatsProvider(Stats::Scope& scope) : http2_codec_stats_{HTTP2_CODEC_STATS(scope)} {}
 
   Http::Http2::CodecStats http2_codec_stats_;
 };
@@ -53,7 +52,8 @@ private:
   std::unordered_map<int32_t, uint32_t> settings_;
 };
 
-class TestServerConnectionImpl : public TestCodecStatsProvider, public ServerConnectionImpl,
+class TestServerConnectionImpl : public TestCodecStatsProvider,
+                                 public ServerConnectionImpl,
                                  public TestCodecSettingsProvider {
 public:
   TestServerConnectionImpl(
@@ -64,8 +64,8 @@ public:
           headers_with_underscores_action)
       : TestCodecStatsProvider(scope),
         ServerConnectionImpl(connection, callbacks, http2_codec_stats_, http2_options,
-                             max_request_headers_kb,
-                             max_request_headers_count, headers_with_underscores_action) {}
+                             max_request_headers_kb, max_request_headers_count,
+                             headers_with_underscores_action) {}
   nghttp2_session* session() { return session_; }
   using ServerConnectionImpl::getStream;
 
@@ -74,7 +74,8 @@ protected:
   void onSettingsForTest(const nghttp2_settings& settings) override { onSettingsFrame(settings); }
 };
 
-class TestClientConnectionImpl : public TestCodecStatsProvider, public ClientConnectionImpl,
+class TestClientConnectionImpl : public TestCodecStatsProvider,
+                                 public ClientConnectionImpl,
                                  public TestCodecSettingsProvider {
 public:
   TestClientConnectionImpl(Network::Connection& connection, Http::ConnectionCallbacks& callbacks,

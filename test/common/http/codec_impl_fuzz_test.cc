@@ -451,8 +451,8 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
     const Http1Settings server_http1settings{fromHttp1Settings(input.h1_settings().server())};
     Http1::CodecStats stats{HTTP1_CODEC_STATS(stats_store)};
     server = std::make_unique<Http1::ServerConnectionImpl>(
-        server_connection, stats, server_callbacks, server_http1settings,
-        max_request_headers_kb, max_request_headers_count, headers_with_underscores_action);
+        server_connection, stats, server_callbacks, server_http1settings, max_request_headers_kb,
+        max_request_headers_count, headers_with_underscores_action);
   }
 
   ReorderBuffer client_write_buf{*server};

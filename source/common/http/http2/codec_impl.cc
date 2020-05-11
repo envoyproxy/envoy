@@ -443,8 +443,8 @@ void ConnectionImpl::StreamImpl::onMetadataDecoded(MetadataMapPtr&& metadata_map
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stats,
                                const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                                const uint32_t max_headers_kb, const uint32_t max_headers_count)
-    : stats_(stats), connection_(connection),
-      max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count),
+    : stats_(stats), connection_(connection), max_headers_kb_(max_headers_kb),
+      max_headers_count_(max_headers_count),
       per_stream_buffer_limit_(http2_options.initial_stream_window_size().value()),
       stream_error_on_invalid_http_messaging_(
           http2_options.stream_error_on_invalid_http_messaging()),
@@ -1211,8 +1211,8 @@ int ClientConnectionImpl::onHeader(const nghttp2_frame* frame, HeaderString&& na
 }
 
 ServerConnectionImpl::ServerConnectionImpl(
-    Network::Connection& connection, Http::ServerConnectionCallbacks& callbacks,
-    CodecStats& stats, const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
+    Network::Connection& connection, Http::ServerConnectionCallbacks& callbacks, CodecStats& stats,
+    const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
     const uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
         headers_with_underscores_action)
