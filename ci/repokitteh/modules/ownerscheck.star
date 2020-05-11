@@ -7,11 +7,13 @@
 #       "owner": "envoyproxy/api-shepherds!",
 #       "path": "api/",
 #       "label": "api",
+#       "allow_global_approval": True,
+#       "github_status_label" = "any API change",
 #     },
 #   ],
 # )
 #
-# This module will maintain a commit status per specified path (also aka as spec).
+# This module will maintain a commit status per specified path regex (also aka as spec).
 #
 # Two types of approvals:
 # 1. Global approvals, done by approving the PR using Github's review approval feature.
@@ -19,7 +21,14 @@
 #    associated with the path. This does not affect GitHub's PR approve status, only
 #    this module's maintained commit status. This approval is automatically revoked
 #    if any further changes are done to the relevant files in this spec.
+#
+# By default, 'allow_global_approval' is true and either (1) or (2) above can unblock
+# merges. If 'allow_global_approval' is set false, then only (2) will unblock a merge.
+#
+# 'label' refers to a GitHub label applied to any matching PR. The GitHub check status
+# can be customized with `github_status_label`.
 
+load("text", "match")
 load("github.com/repokitteh/modules/lib/utils.star", "react")
 
 def _store_partial_approval(who, files):
@@ -44,11 +53,17 @@ def _get_relevant_specs(specs, changed_files):
   relevant = []
 
   for spec in specs:
-    prefix = spec["path"]
+    path_match = spec["path"]
 
-    files = [f for f in changed_files if f['filename'].startswith(prefix)]
+    files = [f for f in changed_files if match(path_match, f['filename'])]
+    allow_global_approval = spec.get("allow_global_approval", True)
+    status_label = spec.get("github_status_label", "")
     if files:
-      relevant.append(struct(files=files, prefix=prefix, **spec))
+      relevant.append(struct(files=files,
+                             owner=spec.owner,
+                             path_match=path_match,
+                             allow_global_approval=allow_global_approval,
+                             status_label=status_label))
 
   print("specs: %s" % relevant)
 
@@ -81,7 +96,7 @@ def _is_approved(spec, approvers):
     print("team %s(%d) = %s" % (team_name, team_id, required))
 
   for r in required:
-    if any([a for a in approvers if a == r]):
+    if spec.allow_global_approval and any([a for a in approvers if a == r]):
       print("global approver: %s" % r)
       return True
 
@@ -92,11 +107,12 @@ def _is_approved(spec, approvers):
   return False
 
 
-def _update_status(owner, prefix, approved):
+def _update_status(owner, status_label, path_match, approved):
+  changes_to = path_match or '/'
   github.create_status(
     state=approved and 'success' or 'pending',
-    context='%s must approve' % owner,
-    description='changes to %s' % (prefix or '/'),
+    context='%s must approve for %s' % (owner, status_label),
+    description='changes to %s' % changes_to,
   )
 
 def _get_specs(config):
@@ -122,7 +138,7 @@ def _reconcile(config, specs=None):
     results.append((spec, approved))
 
     if spec.owner[-1] == '!':
-      _update_status(spec.owner[:-1], spec.prefix, approved)
+      _update_status(spec.owner[:-1], spec.status_label, spec.path_match, approved)
 
       if hasattr(spec, 'label'):
         if approved:
@@ -150,13 +166,13 @@ def _comment(config, results, force=False):
     if mention[-1] == '!':
       mention = mention[:-1]
 
-    prefix = spec.prefix
-    if prefix:
-      prefix = ' for changes made to `' + prefix + '`'
+    match_description = spec.path_match
+    if match_description:
+      match_description = ' for changes made to `' + match_description + '`'
 
     mode = spec.owner[-1] == '!' and 'approval' or 'fyi'
 
-    key = "ownerscheck/%s/%s" % (spec.owner, spec.prefix)
+    key = "ownerscheck/%s/%s" % (spec.owner, spec.path_match)
 
     if (not force) and (store_get(key) == mode):
       mode = 'skip'
@@ -164,9 +180,9 @@ def _comment(config, results, force=False):
       store_put(key, mode)
 
     if mode == 'approval':
-      lines.append('CC %s: Your approval is needed%s.' % (mention, prefix))
+      lines.append('CC %s: Your approval is needed%s.' % (mention, match_description))
     elif mode == 'fyi':
-      lines.append('CC %s: FYI only%s.' % (mention, prefix))
+      lines.append('CC %s: FYI only%s.' % (mention, match_description))
 
   if lines:
     github.issue_create_comment('\n'.join(lines))
