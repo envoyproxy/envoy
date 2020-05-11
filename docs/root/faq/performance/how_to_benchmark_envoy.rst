@@ -23,23 +23,45 @@ the following guidance:
   <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.generate_request_id>`.
 
 * Disable :ref:`dynamic_stats
-  <envoy_v3_api_field_extensions.filters.http.router.v3.Router.dynamic_stats>`.
+  <envoy_v3_api_field_extensions.filters.http.router.v3.Router.dynamic_stats>`. If you are measuring
+  the overhead vs. a direct connection, you might want to consider disabling all stats via
+  :ref:`reject_all <envoy_v3_api_field_config.metrics.v3.StatsMatcher.reject_all>`.
 
 * Ensure that the networking and HTTP filter chains are reflective of comparable features
   in the systems that Envoy is being compared with.
 
 * Ensure that TLS settings (if any) are realistic and that consistent cyphers are used in
-  any comparison.
+  any comparison. Session reuse may have a significant impact on results and should be tracked via
+  :ref:`listener SSL stats <config_listener_stats>`.
 
 * Ensure that :ref:`HTTP/2 settings <envoy_v3_api_msg_config.core.v3.Http2ProtocolOptions>`, in
   particular those that affect flow control and stream concurrency, are consistent in any
-  comparison.
+  comparison. Ideally taking into account BDP and network link latencies when optimizing any
+  HTTP/2 settings.
 
 * Verify in the listener and cluster stats that the number of streams, connections and errors
   matches what is expected in any given experiment.
 
+* Make sure you are aware of how connections created by your load generator are
+  distributed across Envoy worker threads. This is especially important for
+  benchmarks that use low connection counts and perfect keep-alive.
+
+* Make sure request-release timing expectations line up with what is intended.
+  Some load generators produce naturally jittery and/or batchy timings. This
+  might end up being an unintended dominant factor in certain tests.
+
+* The specifics of how your load generator reuses connections is an important factor (e.g. MRU,
+  random, LRU, etc.) as this impacts work distribution.
+
+* If you're trying to measure small (say < 1ms) latencies, make sure the measurement tool and
+  environment have the required sensitivity and the noise floor is sufficiently low.
+
 * Be critical of your bootstrap or xDS configuration. Ideally every line has a motivation and is
   necessary for the benchmark under consideration.
+
+* Consider using `Nighthawk <https://github.com/envoyproxy/nighthawk>`_ as your
+  load generator and measurement tool. We are committed to building out
+  benchmarking and latency measurement best practices in this tool.
 
 * Examine `perf` profiles of Envoy during the benchmark run, e.g. with `flame graphs
   <http://www.brendangregg.com/flamegraphs.html>`_. Verify that Envoy is spending its time
