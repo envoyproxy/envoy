@@ -181,6 +181,7 @@ private:
 
     bool initialized() const { return priority_subset_ != nullptr; }
     bool active() const { return initialized() && !priority_subset_->empty(); }
+    bool hasChildren() const { return !children_.empty(); }
 
     LbSubsetMap children_;
 
@@ -197,10 +198,10 @@ private:
 
   void updateFallbackSubset(uint32_t priority, const HostVector& hosts_added,
                             const HostVector& hosts_removed);
-  void processSubsets(
-      const HostVector& hosts_added, const HostVector& hosts_removed,
-      std::function<void(LbSubsetEntryPtr)> update_cb,
-      std::function<void(LbSubsetEntryPtr, HostPredicate, const SubsetMetadata&, bool)> cb);
+  void
+  processSubsets(const HostVector& hosts_added, const HostVector& hosts_removed,
+                 std::function<void(LbSubsetEntryPtr)> update_cb,
+                 std::function<void(LbSubsetEntryPtr, HostPredicate, const SubsetMetadata&)> cb);
 
   HostConstSharedPtr tryChooseHostFromContext(LoadBalancerContext* context, bool& host_chosen);
 
@@ -215,6 +216,7 @@ private:
   LbSubsetEntryPtr findOrCreateSubset(LbSubsetMap& subsets, const SubsetMetadata& kvs,
                                       uint32_t idx);
   void forEachSubset(LbSubsetMap& subsets, std::function<void(LbSubsetEntryPtr)> cb);
+  void purgeEmptySubsets(LbSubsetMap& subsets);
 
   std::vector<SubsetMetadata> extractSubsetMetadata(const std::set<std::string>& subset_keys,
                                                     const Host& host);
