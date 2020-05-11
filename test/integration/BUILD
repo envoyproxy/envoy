@@ -1,6 +1,5 @@
 licenses(["notice"])  # Apache 2
 
-load("@rules_python//python:defs.bzl", "py_binary")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_fuzz_test",
