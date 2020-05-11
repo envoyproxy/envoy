@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <cstring>
 #include <functional>
 #include <memory>
 
@@ -91,16 +92,12 @@ enum class AtomicPtrAllocMode { DoNotDelete, DeleteOnDestruct };
 template <class T, uint32_t size, AtomicPtrAllocMode alloc_mode>
 class AtomicPtrArray : NonCopyable {
 public:
-  AtomicPtrArray() {
-    for (uint32_t i = 0; i < size; ++i) {
-      data_[i] = nullptr;
-    }
-  }
+  AtomicPtrArray() { memset(data_, 0, sizeof(data_)); }
 
   ~AtomicPtrArray() {
     if (alloc_mode == AtomicPtrAllocMode::DeleteOnDestruct) {
-      for (uint32_t i = 0; i < size; ++i) {
-        delete data_[i];
+      for (T* ptr : data_) {
+        delete ptr;
       }
     }
   }
