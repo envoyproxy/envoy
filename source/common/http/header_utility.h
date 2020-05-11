@@ -146,6 +146,11 @@ public:
    */
   static bool shouldCloseConnection(Http::Protocol protocol,
                                     const RequestOrResponseHeaderMap& headers);
+
+  /**
+   * @brief Remove the port part from host/authority header if it is equal to provided port
+   */
+  static void stripPortFromHost(RequestHeaderMap& headers, uint32_t listener_port);
 };
 } // namespace Http
 } // namespace Envoy

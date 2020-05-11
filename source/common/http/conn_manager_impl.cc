@@ -748,6 +748,14 @@ const Network::Connection* ConnectionManagerImpl::ActiveStream::connection() {
   return &connection_manager_.read_callbacks_->connection();
 }
 
+uint32_t ConnectionManagerImpl::ActiveStream::localPort() {
+  auto ip = connection()->localAddress()->ip();
+  if (ip == nullptr) {
+    return 0;
+  }
+  return ip->port();
+}
+
 // Ordering in this function is complicated, but important.
 //
 // We want to do minimal work before selecting route and creating a filter
@@ -778,10 +786,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
     state_.is_head_request_ = true;
   }
 
-  // TODO(alyssawilk) remove this synthetic path in a follow-up PR, including
-  // auditing of empty path headers. We check for path because HTTP/2 connect requests may have a
-  // path.
-  if (HeaderUtility::isConnect(*request_headers_) && !request_headers_->Path()) {
+  if (HeaderUtility::isConnect(*request_headers_) && !request_headers_->Path() &&
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.stop_faking_paths")) {
     request_headers_->setPath("/");
   }
 
@@ -876,20 +882,23 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   // Verify header sanity checks which should have been performed by the codec.
   ASSERT(HeaderUtility::requestHeadersValid(*request_headers_).has_value() == false);
 
-  // Currently we only support relative paths at the application layer. We expect the codec to have
-  // broken the path into pieces if applicable. NOTE: Currently the HTTP/1.1 codec only does this
-  // when the allow_absolute_url flag is enabled on the HCM.
-  // https://tools.ietf.org/html/rfc7230#section-5.3 We also need to check for the existence of
-  // :path because CONNECT does not have a path, and we don't support that currently.
-  if (!request_headers_->Path() || request_headers_->Path()->value().getStringView().empty() ||
-      request_headers_->Path()->value().getStringView()[0] != '/') {
-    const bool has_path =
-        request_headers_->Path() && !request_headers_->Path()->value().getStringView().empty();
+  // Check for the existence of the :path header for non-CONNECT requests. We expect the codec to
+  // have broken the path into pieces if applicable. NOTE: Currently the HTTP/1.1 codec only does
+  // this when the allow_absolute_url flag is enabled on the HCM.
+  if ((!HeaderUtility::isConnect(*request_headers_) && !request_headers_->Path()) ||
+      (request_headers_->Path() && request_headers_->Path()->value().getStringView().empty())) {
+    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::NotFound, "", nullptr,
+                   state_.is_head_request_, absl::nullopt,
+                   StreamInfo::ResponseCodeDetails::get().MissingPath);
+    return;
+  }
+
+  // Currently we only support relative paths at the application layer.
+  if (request_headers_->Path() && request_headers_->Path()->value().getStringView()[0] != '/') {
     connection_manager_.stats_.named_.downstream_rq_non_relative_path_.inc();
     sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::NotFound, "", nullptr,
                    state_.is_head_request_, absl::nullopt,
-                   has_path ? StreamInfo::ResponseCodeDetails::get().AbsolutePath
-                            : StreamInfo::ResponseCodeDetails::get().MissingPath);
+                   StreamInfo::ResponseCodeDetails::get().AbsolutePath);
     return;
   }
 
@@ -901,6 +910,9 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
                    StreamInfo::ResponseCodeDetails::get().PathNormalizationFailed);
     return;
   }
+
+  ConnectionManagerUtility::maybeNormalizeHost(*request_headers_, connection_manager_.config_,
+                                               localPort());
 
   if (!fixed_connection_close && protocol == Protocol::Http11 && request_headers_->Connection() &&
       absl::EqualsIgnoreCase(request_headers_->Connection()->value().getStringView(),
@@ -1424,7 +1436,9 @@ void ConnectionManagerImpl::ActiveStream::snapScopedRouteConfig() {
   }
 }
 
-void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
+void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() { refreshCachedRoute(nullptr); }
+
+void ConnectionManagerImpl::ActiveStream::refreshCachedRoute(const Router::RouteCallback& cb) {
   Router::RouteConstSharedPtr route;
   if (request_headers_ != nullptr) {
     if (connection_manager_.config_.isRoutable() &&
@@ -1433,7 +1447,7 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
       snapScopedRouteConfig();
     }
     if (snapped_route_config_ != nullptr) {
-      route = snapped_route_config_->route(*request_headers_, stream_info_, stream_id_);
+      route = snapped_route_config_->route(cb, *request_headers_, stream_info_, stream_id_);
     }
   }
   stream_info_.route_entry_ = route ? route->routeEntry() : nullptr;
@@ -1626,9 +1640,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
 void ConnectionManagerImpl::ActiveStream::encodeHeadersInternal(ResponseHeaderMap& headers,
                                                                 bool end_stream) {
   // Base headers.
-  if (!connection_manager_.config_.shouldPreserveUpstreamDate() || !headers.Date()) {
-    connection_manager_.config_.dateProvider().setDateHeader(headers);
-  }
+  connection_manager_.config_.dateProvider().setDateHeader(headers);
   // Following setReference() is safe because serverName() is constant for the life of the listener.
   const auto transformation = connection_manager_.config_.serverHeaderTransformation();
   if (transformation == ConnectionManagerConfig::HttpConnectionManagerProto::OVERWRITE ||
@@ -2254,10 +2266,15 @@ Upstream::ClusterInfoConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBas
 }
 
 Router::RouteConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::route() {
-  if (!parent_.cached_route_.has_value()) {
-    parent_.refreshCachedRoute();
-  }
+  return route(nullptr);
+}
 
+Router::RouteConstSharedPtr
+ConnectionManagerImpl::ActiveStreamFilterBase::route(const Router::RouteCallback& cb) {
+  if (parent_.cached_route_.has_value()) {
+    return parent_.cached_route_.value();
+  }
+  parent_.refreshCachedRoute(cb);
   return parent_.cached_route_.value();
 }
 

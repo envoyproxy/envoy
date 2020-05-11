@@ -771,7 +771,7 @@ TEST_P(IntegrationTest, AbsolutePathWithoutPort) {
 
 // Ensure that connect behaves the same with allow_absolute_url enabled and without
 TEST_P(IntegrationTest, Connect) {
-  const std::string& request = "CONNECT www.somewhere.com:80 HTTP/1.1\r\nHost: host\r\n\r\n";
+  const std::string& request = "CONNECT www.somewhere.com:80 HTTP/1.1\r\n\r\n";
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     // Clone the whole listener.
     auto static_resources = bootstrap.mutable_static_resources();
@@ -1301,14 +1301,11 @@ TEST_P(IntegrationTest, TestUpgradeHeaderInResponse) {
 TEST_P(IntegrationTest, ConnectWithNoBody) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-              hcm) -> void {
-        hcm.add_upgrade_configs()->set_upgrade_type("CONNECT");
-        hcm.mutable_http2_protocol_options()->set_allow_connect(true);
-      });
+              hcm) -> void { ConfigHelper::setConnectConfig(hcm, false); });
   initialize();
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("http"));
-  tcp_client->write("CONNECT host.com:80 HTTP/1.1\r\nHost: host\r\n\r\n", false);
+  tcp_client->write("CONNECT host.com:80 HTTP/1.1\r\n\r\n", false);
 
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
@@ -1338,16 +1335,13 @@ TEST_P(IntegrationTest, ConnectWithNoBody) {
 TEST_P(IntegrationTest, ConnectWithChunkedBody) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-              hcm) -> void {
-        hcm.add_upgrade_configs()->set_upgrade_type("CONNECT");
-        hcm.mutable_http2_protocol_options()->set_allow_connect(true);
-      });
+              hcm) -> void { ConfigHelper::setConnectConfig(hcm, false); });
   initialize();
 
   // Send the payload early so we can regression test that body data does not
   // get proxied until after the response headers are sent.
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("http"));
-  tcp_client->write("CONNECT host.com:80 HTTP/1.1\r\nHost: host\r\n\r\npayload", false);
+  tcp_client->write("CONNECT host.com:80 HTTP/1.1\r\n\r\npayload", false);
 
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
@@ -1377,6 +1371,11 @@ TEST_P(IntegrationTest, ConnectWithChunkedBody) {
 
   tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+}
+
+TEST_P(IntegrationTest, QuitQuitQuit) {
+  initialize();
+  test_server_->useAdminInterfaceToQuit(true);
 }
 
 } // namespace Envoy
