@@ -44,7 +44,11 @@ TEST_F(ThreadTest, AtomicPtr) {
   sync.signal("creator");
   thread1->join();
   thread2->join();
-  EXPECT_EQ("thread1", *str.get([]() -> std::string* { return new std::string("mainline"); }));
+
+  // NOow enuure the "thread1" value sticks past the thread lifetimes.
+  bool called = false;
+  EXPECT_EQ("thread1", *str.get([&called]() -> std::string* { called = true; return nullptr; }));
+  EXPECT_FALSE(called);
 }
 
 // Tests that null can be allocated, but the allocator will be re-called each
