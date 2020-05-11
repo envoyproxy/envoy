@@ -14,7 +14,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.filters.common.fault.v3";
 option java_outer_classname = "FaultProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Common fault injection types]
 
@@ -40,10 +40,6 @@ message FaultDelay {
 
   reserved 2;
 
-  // Unused and deprecated. Will be removed in the next release.
-  FaultDelayType hidden_envoy_deprecated_type = 1
-      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
-
   oneof fault_delay_secifier {
     option (validate.required) = true;
 
@@ -61,6 +57,9 @@ message FaultDelay {
 
   // The percentage of operations/connections/requests on which the delay will be injected.
   type.v3.FractionalPercent percentage = 4;
+
+  FaultDelayType hidden_envoy_deprecated_type = 1
+      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 }
 
 // Describes a rate limit to be applied.

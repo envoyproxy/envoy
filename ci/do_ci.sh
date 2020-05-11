@@ -58,6 +58,11 @@ function cp_binary_for_image_build() {
 
   # Copy for azp which doesn't preserve permissions, creating a tar archive
   tar czf "${ENVOY_BUILD_DIR}"/envoy_binary.tar.gz -C "${ENVOY_SRCDIR}" build_"$1" build_"$1"_stripped
+
+  # Remove binaries to save space, only if BUILD_REASON exists (running in AZP)
+  [[ -z "${BUILD_REASON}" ]] || \
+    rm -rf "${ENVOY_SRCDIR}"/build_"$1" "${ENVOY_SRCDIR}"/build_"$1"_stripped "${ENVOY_DELIVERY_DIR}"/envoy \
+      bazel-bin/"${ENVOY_BIN}"
 }
 
 function bazel_binary_build() {
@@ -90,9 +95,12 @@ CI_TARGET=$1
 
 if [[ $# -gt 1 ]]; then
   shift
-  TEST_TARGETS=$*
+  COVERAGE_TEST_TARGETS=$*
+  TEST_TARGETS="$COVERAGE_TEST_TARGETS"
 else
-  TEST_TARGETS=//test/...
+  # Coverage test will add QUICHE tests by itself.
+  COVERAGE_TEST_TARGETS=//test/...
+  TEST_TARGETS="${COVERAGE_TEST_TARGETS} @com_googlesource_quiche//:ci_tests"
 fi
 
 if [[ "$CI_TARGET" == "bazel.release" ]]; then
@@ -254,14 +262,14 @@ elif [[ "$CI_TARGET" == "bazel.api" ]]; then
   exit 0
 elif [[ "$CI_TARGET" == "bazel.coverage" ]]; then
   setup_clang_toolchain
-  echo "bazel coverage build with tests ${TEST_TARGETS}"
+  echo "bazel coverage build with tests ${COVERAGE_TEST_TARGETS}"
 
   # Reduce the amount of memory Bazel tries to use to prevent it from launching too many subprocesses.
   # This should prevent the system from running out of memory and killing tasks. See discussion on
   # https://github.com/envoyproxy/envoy/pull/5611.
   [ -z "$CIRCLECI" ] || export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --local_ram_resources=12288"
 
-  test/run_envoy_bazel_coverage.sh ${TEST_TARGETS}
+  test/run_envoy_bazel_coverage.sh ${COVERAGE_TEST_TARGETS}
   collect_build_profile coverage
   exit 0
 elif [[ "$CI_TARGET" == "bazel.clang_tidy" ]]; then
@@ -291,14 +299,6 @@ elif [[ "$CI_TARGET" == "bazel.fuzz" ]]; then
   echo "bazel ASAN libFuzzer build with fuzz tests ${FUZZ_TEST_TARGETS}"
   echo "Building envoy fuzzers and executing 100 fuzz iterations..."
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} --config=asan-fuzzer ${FUZZ_TEST_TARGETS} --test_arg="-runs=10"
-  exit 0
-elif [[ "$CI_TARGET" == "bazel.fuzzit" ]]; then
-  setup_clang_toolchain
-  FUZZ_TEST_TARGETS="$(bazel query "attr('tags','fuzzer',${TEST_TARGETS})")"
-  echo "bazel ASAN libFuzzer build with fuzz tests ${FUZZ_TEST_TARGETS}"
-  echo "Building fuzzers and run under Fuzzit"
-  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} --config=asan-fuzzer ${FUZZ_TEST_TARGETS} \
-    --test_env=FUZZIT_API_KEY --test_env=ENVOY_BUILD_IMAGE --test_timeout=1200 --run_under=//bazel:fuzzit_wrapper
   exit 0
 elif [[ "$CI_TARGET" == "fix_format" ]]; then
   # proto_format.sh needs to build protobuf.

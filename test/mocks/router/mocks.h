@@ -353,6 +353,7 @@ public:
   MOCK_METHOD(const RouteSpecificFilterConfig*, perFilterConfig, (const std::string&), (const));
   MOCK_METHOD(bool, includeAttemptCountInRequest, (), (const));
   MOCK_METHOD(bool, includeAttemptCountInResponse, (), (const));
+  MOCK_METHOD(const absl::optional<ConnectConfig>&, connectConfig, (), (const));
   MOCK_METHOD(const UpgradeMap&, upgradeMap, (), (const));
   MOCK_METHOD(InternalRedirectAction, internalRedirectAction, (), (const));
   MOCK_METHOD(uint32_t, maxInternalRedirects, (), (const));
@@ -374,6 +375,7 @@ public:
   testing::NiceMock<MockPathMatchCriterion> path_match_criterion_;
   envoy::config::core::v3::Metadata metadata_;
   UpgradeMap upgrade_map_;
+  absl::optional<ConnectConfig> connect_config_;
 };
 
 class MockDecorator : public Decorator {
@@ -428,6 +430,11 @@ public:
               (const Http::RequestHeaderMap&, const Envoy::StreamInfo::StreamInfo&,
                uint64_t random_value),
               (const));
+  MOCK_METHOD(RouteConstSharedPtr, route,
+              (const RouteCallback& cb, const Http::RequestHeaderMap&,
+               const Envoy::StreamInfo::StreamInfo&, uint64_t random_value),
+              (const));
+
   MOCK_METHOD(const std::list<Http::LowerCaseString>&, internalOnlyHeaders, (), (const));
   MOCK_METHOD(const std::string&, name, (), (const));
   MOCK_METHOD(bool, usesVhds, (), (const));

@@ -54,9 +54,7 @@ public:
   // Http::AsyncClient
   Request* send(RequestMessagePtr&& request, Callbacks& callbacks,
                 const AsyncClient::RequestOptions& options) override;
-
   Stream* start(StreamCallbacks& callbacks, const AsyncClient::StreamOptions& options) override;
-
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
 
 private:
@@ -94,6 +92,7 @@ public:
   void sendData(Buffer::Instance& data, bool end_stream) override;
   void sendTrailers(RequestTrailerMap& trailers) override;
   void reset() override;
+  bool isAboveWriteBufferHighWatermark() const override { return high_watermark_calls_ > 0; }
 
 protected:
   bool remoteClosed() { return remote_closed_; }
@@ -162,6 +161,11 @@ private:
     Router::RouteConstSharedPtr route(const Http::RequestHeaderMap&, const StreamInfo::StreamInfo&,
                                       uint64_t) const override {
       return nullptr;
+    }
+
+    Router::RouteConstSharedPtr route(const Router::RouteCallback&, const Http::RequestHeaderMap&,
+                                      const StreamInfo::StreamInfo&, uint64_t) const override {
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     }
 
     const std::list<LowerCaseString>& internalOnlyHeaders() const override {
@@ -268,6 +272,9 @@ private:
     const Router::RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override {
       return nullptr;
     }
+    const absl::optional<ConnectConfig>& connectConfig() const override {
+      return connect_config_nullopt_;
+    }
 
     bool includeAttemptCountInRequest() const override { return false; }
     bool includeAttemptCountInResponse() const override { return false; }
@@ -292,6 +299,7 @@ private:
     Router::RouteEntry::UpgradeMap upgrade_map_;
     const std::string& cluster_name_;
     absl::optional<std::chrono::milliseconds> timeout_;
+    static const absl::optional<ConnectConfig> connect_config_nullopt_;
     const std::string route_name_;
   };
 
@@ -323,6 +331,9 @@ private:
   Event::Dispatcher& dispatcher() override { return parent_.dispatcher_; }
   void resetStream() override;
   Router::RouteConstSharedPtr route() override { return route_; }
+  Router::RouteConstSharedPtr route(const Router::RouteCallback&) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
   Upstream::ClusterInfoConstSharedPtr clusterInfo() override { return parent_.cluster_; }
   void clearRouteCache() override {}
   uint64_t streamId() const override { return stream_id_; }
@@ -367,8 +378,11 @@ private:
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeTrailers(ResponseTrailerMapPtr&& trailers) override;
   void encodeMetadata(MetadataMapPtr&&) override {}
-  void onDecoderFilterAboveWriteBufferHighWatermark() override {}
-  void onDecoderFilterBelowWriteBufferLowWatermark() override {}
+  void onDecoderFilterAboveWriteBufferHighWatermark() override { ++high_watermark_calls_; }
+  void onDecoderFilterBelowWriteBufferLowWatermark() override {
+    ASSERT(high_watermark_calls_ != 0);
+    --high_watermark_calls_;
+  }
   void addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
   void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
   void setDecoderBufferLimit(uint32_t) override {}
@@ -392,6 +406,7 @@ private:
   Tracing::NullSpan active_span_;
   const Tracing::Config& tracing_config_;
   std::shared_ptr<RouteImpl> route_;
+  uint32_t high_watermark_calls_{};
   bool local_closed_{};
   bool remote_closed_{};
   Buffer::InstancePtr buffered_body_;

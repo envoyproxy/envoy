@@ -158,12 +158,39 @@ TEST_P(IntegrationTest, ConnectionClose) {
 }
 
 TEST_P(IntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
-  testRouterRequestAndResponseWithBody(1024, 512, false);
+  testRouterRequestAndResponseWithBody(1024, 512, false, false);
+}
+
+TEST_P(IntegrationTest, RouterRequestAndResponseWithGiantBodyNoBuffer) {
+  testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, false);
 }
 
 TEST_P(IntegrationTest, FlowControlOnAndGiantBody) {
   config_helper_.setBufferLimits(1024, 1024);
-  testRouterRequestAndResponseWithBody(1024 * 1024, 1024 * 1024, false);
+  testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, false);
+}
+
+TEST_P(IntegrationTest, LargeFlowControlOnAndGiantBody) {
+  config_helper_.setBufferLimits(128 * 1024, 128 * 1024);
+  testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, false);
+}
+
+TEST_P(IntegrationTest, RouterRequestAndResponseWithBodyAndContentLengthNoBuffer) {
+  testRouterRequestAndResponseWithBody(1024, 512, false, true);
+}
+
+TEST_P(IntegrationTest, RouterRequestAndResponseWithGiantBodyAndContentLengthNoBuffer) {
+  testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, true);
+}
+
+TEST_P(IntegrationTest, FlowControlOnAndGiantBodyWithContentLength) {
+  config_helper_.setBufferLimits(1024, 1024);
+  testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, true);
+}
+
+TEST_P(IntegrationTest, LargeFlowControlOnAndGiantBodyWithContentLength) {
+  config_helper_.setBufferLimits(128 * 1024, 128 * 1024);
+  testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, true);
 }
 
 TEST_P(IntegrationTest, RouterRequestAndResponseLargeHeaderNoBuffer) {
@@ -227,6 +254,16 @@ TEST_P(IntegrationTest, EnvoyProxyingEarly100ContinueWithEncoderFilter) {
 
 TEST_P(IntegrationTest, EnvoyProxyingLate100ContinueWithEncoderFilter) {
   testEnvoyProxying100Continue(false, true);
+}
+
+// Regression test for https://github.com/envoyproxy/envoy/issues/10923.
+TEST_P(IntegrationTest, EnvoyProxying100ContinueWithDecodeDataPause) {
+  config_helper_.addFilter(R"EOF(
+  name: stop-iteration-and-continue-filter
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Empty
+  )EOF");
+  testEnvoyProxying100Continue(true);
 }
 
 // This is a regression for https://github.com/envoyproxy/envoy/issues/2715 and validates that a
@@ -456,6 +493,21 @@ TEST_P(IntegrationTest, Http09Enabled) {
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("HTTP/1.0"));
 }
 
+TEST_P(IntegrationTest, Http09WithKeepalive) {
+  useAccessLog();
+  autonomous_upstream_ = true;
+  config_helper_.addConfigModifier(&setAllowHttp10WithDefaultHost);
+  initialize();
+  reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())
+      ->setResponseHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(
+          Http::TestHeaderMapImpl({{":status", "200"}, {"content-length", "0"}})));
+  std::string response;
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET /\r\nConnection: keep-alive\r\n\r\n",
+                                &response, true);
+  EXPECT_THAT(response, HasSubstr("HTTP/1.0 200 OK\r\n"));
+  EXPECT_THAT(response, HasSubstr("connection: keep-alive\r\n"));
+}
+
 // Turn HTTP/1.0 support on and verify the request is proxied and the default host is sent upstream.
 TEST_P(IntegrationTest, Http10Enabled) {
   autonomous_upstream_ = true;
@@ -553,25 +605,23 @@ TEST_P(IntegrationTest, Pipeline) {
   initialize();
   std::string response;
 
-  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nHost: host\r\n\r\nGET / HTTP/1.1\r\n\r\n");
-  RawConnectionDriver connection(
-      lookupPort("http"), buffer,
+  auto connection = createConnectionDriver(
+      lookupPort("http"), "GET / HTTP/1.1\r\nHost: host\r\n\r\nGET / HTTP/1.1\r\n\r\n",
       [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
         response.append(data.toString());
-      },
-      version_);
+      });
   // First response should be success.
   while (response.find("200") == std::string::npos) {
-    connection.run(Event::Dispatcher::RunType::NonBlock);
+    connection->run(Event::Dispatcher::RunType::NonBlock);
   }
   EXPECT_THAT(response, HasSubstr("HTTP/1.1 200 OK\r\n"));
 
   // Second response should be 400 (no host)
   while (response.find("400") == std::string::npos) {
-    connection.run(Event::Dispatcher::RunType::NonBlock);
+    connection->run(Event::Dispatcher::RunType::NonBlock);
   }
   EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
-  connection.close();
+  connection->close();
 }
 
 // Checks to ensure that we reject the third request that is pipelined in the
@@ -602,30 +652,27 @@ TEST_P(IntegrationTest, PipelineWithTrailers) {
                           "trailer2:t3\r\n"
                           "\r\n");
 
-  Buffer::OwnedImpl buffer(absl::StrCat(good_request, good_request, bad_request));
-
-  RawConnectionDriver connection(
-      lookupPort("http"), buffer,
-      [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
+  auto connection = createConnectionDriver(
+      lookupPort("http"), absl::StrCat(good_request, good_request, bad_request),
+      [&response](Network::ClientConnection&, const Buffer::Instance& data) -> void {
         response.append(data.toString());
-      },
-      version_);
+      });
 
   // First response should be success.
   size_t pos;
   while ((pos = response.find("200")) == std::string::npos) {
-    connection.run(Event::Dispatcher::RunType::NonBlock);
+    connection->run(Event::Dispatcher::RunType::NonBlock);
   }
   EXPECT_THAT(response, HasSubstr("HTTP/1.1 200 OK\r\n"));
   while (response.find("200", pos + 1) == std::string::npos) {
-    connection.run(Event::Dispatcher::RunType::NonBlock);
+    connection->run(Event::Dispatcher::RunType::NonBlock);
   }
   while (response.find("400") == std::string::npos) {
-    connection.run(Event::Dispatcher::RunType::NonBlock);
+    connection->run(Event::Dispatcher::RunType::NonBlock);
   }
 
   EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
-  connection.close();
+  connection->close();
 }
 
 // Add a pipeline test where complete request headers in the first request merit
@@ -636,24 +683,22 @@ TEST_P(IntegrationTest, PipelineInline) {
   initialize();
   std::string response;
 
-  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\nGET / HTTP/1.0\r\n\r\n");
-  RawConnectionDriver connection(
-      lookupPort("http"), buffer,
-      [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
+  auto connection = createConnectionDriver(
+      lookupPort("http"), "GET / HTTP/1.1\r\n\r\nGET / HTTP/1.0\r\n\r\n",
+      [&response](Network::ClientConnection&, const Buffer::Instance& data) -> void {
         response.append(data.toString());
-      },
-      version_);
+      });
 
   while (response.find("400") == std::string::npos) {
-    connection.run(Event::Dispatcher::RunType::NonBlock);
+    connection->run(Event::Dispatcher::RunType::NonBlock);
   }
   EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
 
   while (response.find("426") == std::string::npos) {
-    connection.run(Event::Dispatcher::RunType::NonBlock);
+    connection->run(Event::Dispatcher::RunType::NonBlock);
   }
   EXPECT_THAT(response, HasSubstr("HTTP/1.1 426 Upgrade Required\r\n"));
-  connection.close();
+  connection->close();
 }
 
 TEST_P(IntegrationTest, NoHost) {
@@ -726,7 +771,7 @@ TEST_P(IntegrationTest, AbsolutePathWithoutPort) {
 
 // Ensure that connect behaves the same with allow_absolute_url enabled and without
 TEST_P(IntegrationTest, Connect) {
-  const std::string& request = "CONNECT www.somewhere.com:80 HTTP/1.1\r\nHost: host\r\n\r\n";
+  const std::string& request = "CONNECT www.somewhere.com:80 HTTP/1.1\r\n\r\n";
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     // Clone the whole listener.
     auto static_resources = bootstrap.mutable_static_resources();
@@ -927,8 +972,8 @@ TEST_P(IntegrationTest, ViaAppendWith100Continue) {
 TEST_P(IntegrationTest, TestDelayedConnectionTeardownOnGracefulClose) {
   // This test will trigger an early 413 Payload Too Large response due to buffer limits being
   // exceeded. The following filter is needed since the router filter will never trigger a 413.
-  config_helper_.addFilter("{ name: http_dynamo_filter, typed_config: { \"@type\": "
-                           "type.googleapis.com/envoy.config.filter.http.dynamo.v2.Dynamo } }");
+  config_helper_.addFilter("{ name: encoder-decoder-buffer-filter, typed_config: { \"@type\": "
+                           "type.googleapis.com/google.protobuf.Empty } }");
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
 
@@ -956,14 +1001,14 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownOnGracefulClose) {
   // Issue a local close and check that the client did not pick up a remote close which can happen
   // when delayed close semantics are disabled.
   codec_client_->connection()->close(Network::ConnectionCloseType::NoFlush);
-  EXPECT_EQ(codec_client_->last_connection_event(), Network::ConnectionEvent::LocalClose);
+  EXPECT_EQ(codec_client_->lastConnectionEvent(), Network::ConnectionEvent::LocalClose);
 }
 
 // Test configuration of the delayed close timeout on downstream HTTP/1.1 connections. A value of 0
 // disables delayed close processing.
 TEST_P(IntegrationTest, TestDelayedConnectionTeardownConfig) {
-  config_helper_.addFilter("{ name: http_dynamo_filter, typed_config: { \"@type\": "
-                           "type.googleapis.com/envoy.config.filter.http.dynamo.v2.Dynamo } }");
+  config_helper_.addFilter("{ name: encoder-decoder-buffer-filter, typed_config: { \"@type\": "
+                           "type.googleapis.com/google.protobuf.Empty } }");
   config_helper_.setBufferLimits(1024, 1024);
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -993,13 +1038,13 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownConfig) {
   // Therefore, avoid checking response code/payload here and instead simply look for the remote
   // close.
   EXPECT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(500)));
-  EXPECT_EQ(codec_client_->last_connection_event(), Network::ConnectionEvent::RemoteClose);
+  EXPECT_EQ(codec_client_->lastConnectionEvent(), Network::ConnectionEvent::RemoteClose);
 }
 
 // Test that delay closed connections are eventually force closed when the timeout triggers.
 TEST_P(IntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
-  config_helper_.addFilter("{ name: http_dynamo_filter, typed_config: { \"@type\": "
-                           "type.googleapis.com/envoy.config.filter.http.dynamo.v2.Dynamo } }");
+  config_helper_.addFilter("{ name: encoder-decoder-buffer-filter, typed_config: { \"@type\": "
+                           "type.googleapis.com/google.protobuf.Empty } }");
   config_helper_.setBufferLimits(1024, 1024);
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -1027,7 +1072,7 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
   response->waitForEndStream();
   // The delayed close timeout should trigger since client is not closing the connection.
   EXPECT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(2000)));
-  EXPECT_EQ(codec_client_->last_connection_event(), Network::ConnectionEvent::RemoteClose);
+  EXPECT_EQ(codec_client_->lastConnectionEvent(), Network::ConnectionEvent::RemoteClose);
   EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value(),
             1);
 }
@@ -1225,6 +1270,112 @@ TEST_P(IntegrationTest, TestManyBadRequests) {
     EXPECT_THAT(response->headers(), HttpStatusIs("400"));
   }
   EXPECT_EQ(0, test_server_->counter("http1.response_flood")->value());
+}
+
+// Regression test for https://github.com/envoyproxy/envoy/issues/10566
+TEST_P(IntegrationTest, TestUpgradeHeaderInResponse) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT(fake_upstream_connection != nullptr);
+  ASSERT_TRUE(fake_upstream_connection->write("HTTP/1.1 200 OK\r\n"
+                                              "connection: upgrade\r\n"
+                                              "upgrade: h2\r\n"
+                                              "Transfer-encoding: chunked\r\n\r\n"
+                                              "b\r\nHello World\r\n0\r\n\r\n",
+                                              false));
+
+  response->waitForHeaders();
+  EXPECT_EQ(nullptr, response->headers().Upgrade());
+  EXPECT_EQ(nullptr, response->headers().Connection());
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("Hello World", response->body());
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_P(IntegrationTest, ConnectWithNoBody) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void { ConfigHelper::setConnectConfig(hcm, false); });
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("http"));
+  tcp_client->write("CONNECT host.com:80 HTTP/1.1\r\n\r\n", false);
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  std::string data;
+  ASSERT_TRUE(fake_upstream_connection->waitForData(
+      FakeRawConnection::waitForInexactMatch("\r\n\r\n"), &data));
+  EXPECT_TRUE(absl::StartsWith(data, "CONNECT host.com:80 HTTP/1.1"));
+  // No transfer-encoding: chunked or connection: close
+  EXPECT_FALSE(absl::StrContains(data, "hunked")) << data;
+  EXPECT_FALSE(absl::StrContains(data, "onnection")) << data;
+
+  ASSERT_TRUE(fake_upstream_connection->write("HTTP/1.1 200 OK\r\nContent-length: 0\r\n\r\n"));
+  tcp_client->waitForData("\r\n\r\n", false);
+  EXPECT_TRUE(absl::StartsWith(tcp_client->data(), "HTTP/1.1 200 OK\r\n")) << tcp_client->data();
+  // Make sure the following payload is proxied without chunks or any other modifications.
+  tcp_client->write("payload");
+  ASSERT_TRUE(fake_upstream_connection->waitForData(
+      FakeRawConnection::waitForInexactMatch("\r\n\r\npayload"), &data));
+
+  ASSERT_TRUE(fake_upstream_connection->write("return-payload"));
+  tcp_client->waitForData("\r\n\r\nreturn-payload", false);
+
+  tcp_client->close();
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+}
+
+TEST_P(IntegrationTest, ConnectWithChunkedBody) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void { ConfigHelper::setConnectConfig(hcm, false); });
+  initialize();
+
+  // Send the payload early so we can regression test that body data does not
+  // get proxied until after the response headers are sent.
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("http"));
+  tcp_client->write("CONNECT host.com:80 HTTP/1.1\r\n\r\npayload", false);
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  std::string data;
+  ASSERT_TRUE(fake_upstream_connection->waitForData(
+      FakeRawConnection::waitForInexactMatch("\r\n\r\n"), &data));
+  // No transfer-encoding: chunked or connection: close
+  EXPECT_FALSE(absl::StrContains(data, "hunked")) << data;
+  EXPECT_FALSE(absl::StrContains(data, "onnection")) << data;
+  // The payload should not be present as the response headers have not been sent.
+  EXPECT_FALSE(absl::StrContains(data, "payload")) << data;
+
+  ASSERT_TRUE(fake_upstream_connection->write(
+      "HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\n\r\nb\r\nHello World\r\n0\r\n\r\n"));
+  tcp_client->waitForData("0\r\n\r\n", false);
+  EXPECT_TRUE(absl::StartsWith(tcp_client->data(), "HTTP/1.1 200 OK\r\n"));
+  EXPECT_TRUE(absl::StrContains(tcp_client->data(), "hunked")) << tcp_client->data();
+  EXPECT_TRUE(absl::StrContains(tcp_client->data(), "\r\n\r\nb\r\nHello World\r\n0\r\n\r\n"))
+      << tcp_client->data();
+
+  // Make sure the early payload is proxied without chunks or any other modifications.
+  ASSERT_TRUE(fake_upstream_connection->waitForData(
+      FakeRawConnection::waitForInexactMatch("\r\n\r\npayload")));
+
+  ASSERT_TRUE(fake_upstream_connection->write("return-payload"));
+  tcp_client->waitForData("\r\n\r\nreturn-payload", false);
+
+  tcp_client->close();
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+}
+
+TEST_P(IntegrationTest, QuitQuitQuit) {
+  initialize();
+  test_server_->useAdminInterfaceToQuit(true);
 }
 
 } // namespace Envoy

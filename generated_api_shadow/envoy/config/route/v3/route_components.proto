@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.config.route.v3;
 
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/proxy_protocol.proto";
 import "envoy/type/matcher/v3/regex.proto";
 import "envoy/type/matcher/v3/string.proto";
 import "envoy/type/tracing/v3/custom_tag.proto";
@@ -22,7 +23,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.route.v3";
 option java_outer_classname = "RouteComponentsProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: HTTP route components]
 // * Routing :ref:`architecture overview <arch_overview_http_routing>`
@@ -106,7 +107,9 @@ message VirtualHost {
 
   // Specifies a list of HTTP headers that should be removed from each request
   // handled by this virtual host.
-  repeated string request_headers_to_remove = 13;
+  repeated string request_headers_to_remove = 13 [(validate.rules).repeated = {
+    items {string {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}}
+  }];
 
   // Specifies a list of HTTP headers that should be added to each response
   // handled by this virtual host. Headers specified at this level are applied
@@ -123,14 +126,6 @@ message VirtualHost {
 
   // Indicates that the virtual host has a CORS policy.
   CorsPolicy cors = 8;
-
-  // The per_filter_config field can be used to provide virtual host-specific
-  // configurations for filters. The key should match the filter name, such as
-  // *envoy.filters.http.buffer* for the HTTP buffer filter. Use of this field is filter
-  // specific; see the :ref:`HTTP filter documentation <config_http_filters>`
-  // for if and how it is utilized.
-  map<string, google.protobuf.Struct> hidden_envoy_deprecated_per_filter_config = 12
-      [deprecated = true];
 
   // The per_filter_config field can be used to provide virtual host-specific
   // configurations for filters. The key should match the filter name, such as
@@ -182,6 +177,9 @@ message VirtualHost {
   // If set and a route-specific limit is not set, the bytes actually buffered will be the minimum
   // value of this and the listener per_connection_buffer_limit_bytes.
   google.protobuf.UInt32Value per_request_buffer_limit_bytes = 18;
+
+  map<string, google.protobuf.Struct> hidden_envoy_deprecated_per_filter_config = 12
+      [deprecated = true];
 }
 
 // A filter-defined action type.
@@ -238,14 +236,6 @@ message Route {
   // Decorator for the matched route.
   Decorator decorator = 5;
 
-  // The per_filter_config field can be used to provide route-specific
-  // configurations for filters. The key should match the filter name, such as
-  // *envoy.filters.http.buffer* for the HTTP buffer filter. Use of this field is filter
-  // specific; see the :ref:`HTTP filter documentation <config_http_filters>` for
-  // if and how it is utilized.
-  map<string, google.protobuf.Struct> hidden_envoy_deprecated_per_filter_config = 8
-      [deprecated = true];
-
   // The typed_per_filter_config field can be used to provide route-specific
   // configurations for filters. The key should match the filter name, such as
   // *envoy.filters.http.buffer* for the HTTP buffer filter. Use of this field is filter
@@ -264,7 +254,9 @@ message Route {
 
   // Specifies a list of HTTP headers that should be removed from each request
   // matching this route.
-  repeated string request_headers_to_remove = 12;
+  repeated string request_headers_to_remove = 12 [(validate.rules).repeated = {
+    items {string {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}}
+  }];
 
   // Specifies a set of headers that will be added to responses to requests
   // matching this route. Headers specified at this level are applied before
@@ -287,6 +279,9 @@ message Route {
   // If set, the bytes actually buffered will be the minimum value of this and the
   // listener per_connection_buffer_limit_bytes.
   google.protobuf.UInt32Value per_request_buffer_limit_bytes = 16;
+
+  map<string, google.protobuf.Struct> hidden_envoy_deprecated_per_filter_config = 8
+      [deprecated = true];
 }
 
 // Compared to the :ref:`cluster <envoy_api_field_config.route.v3.RouteAction.cluster>` field that specifies a
@@ -355,15 +350,10 @@ message WeightedCluster {
     // *envoy.filters.http.buffer* for the HTTP buffer filter. Use of this field is filter
     // specific; see the :ref:`HTTP filter documentation <config_http_filters>`
     // for if and how it is utilized.
+    map<string, google.protobuf.Any> typed_per_filter_config = 10;
+
     map<string, google.protobuf.Struct> hidden_envoy_deprecated_per_filter_config = 8
         [deprecated = true];
-
-    // The per_filter_config field can be used to provide weighted cluster-specific
-    // configurations for filters. The key should match the filter name, such as
-    // *envoy.filters.http.buffer* for the HTTP buffer filter. Use of this field is filter
-    // specific; see the :ref:`HTTP filter documentation <config_http_filters>`
-    // for if and how it is utilized.
-    map<string, google.protobuf.Any> typed_per_filter_config = 10;
   }
 
   // Specifies one or more upstream clusters associated with the route.
@@ -384,7 +374,7 @@ message WeightedCluster {
   string runtime_key_prefix = 2;
 }
 
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message RouteMatch {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteMatch";
 
@@ -406,6 +396,11 @@ message RouteMatch {
     google.protobuf.BoolValue validated = 2;
   }
 
+  // [#not-implemented-hide:]
+  // An extensible message for matching CONNECT requests.
+  message ConnectMatcher {
+  }
+
   reserved 5;
 
   oneof path_specifier {
@@ -422,28 +417,6 @@ message RouteMatch {
     // If specified, the route is a regular expression rule meaning that the
     // regex must match the *:path* header once the query string is removed. The entire path
     // (without the query string) must match the regex. The rule will not match if only a
-    // subsequence of the *:path* header matches the regex. The regex grammar is defined `here
-    // <https://en.cppreference.com/w/cpp/regex/ecmascript>`_.
-    //
-    // Examples:
-    //
-    // * The regex ``/b[io]t`` matches the path */bit*
-    // * The regex ``/b[io]t`` matches the path */bot*
-    // * The regex ``/b[io]t`` does not match the path */bite*
-    // * The regex ``/b[io]t`` does not match the path */bit/bot*
-    //
-    // .. attention::
-    //   This field has been deprecated in favor of `safe_regex` as it is not safe for use with
-    //   untrusted input in all cases.
-    string hidden_envoy_deprecated_regex = 3 [
-      deprecated = true,
-      (validate.rules).string = {max_bytes: 1024},
-      (envoy.annotations.disallowed_by_default) = true
-    ];
-
-    // If specified, the route is a regular expression rule meaning that the
-    // regex must match the *:path* header once the query string is removed. The entire path
-    // (without the query string) must match the regex. The rule will not match if only a
     // subsequence of the *:path* header matches the regex.
     //
     // [#next-major-version: In the v3 API we should redo how path specification works such
@@ -454,6 +427,22 @@ message RouteMatch {
     // on :path, etc. The issue with that is it is unclear how to generically deal with query string
     // stripping. This needs more thought.]
     type.matcher.v3.RegexMatcher safe_regex = 10 [(validate.rules).message = {required: true}];
+
+    // [#not-implemented-hide:]
+    // If this is used as the matcher, the matcher will only match CONNECT requests.
+    // Note that this will not match HTTP/2 upgrade-style CONNECT requests
+    // (WebSocket and the like) as they are normalized in Envoy as HTTP/1.1 style
+    // upgrades.
+    // This is the only way to match CONNECT requests for HTTP/1.1. For HTTP/2,
+    // where CONNECT requests may have a path, the path matchers will work if
+    // there is a path present.
+    ConnectMatcher connect_matcher = 12;
+
+    string hidden_envoy_deprecated_regex = 3 [
+      deprecated = true,
+      (validate.rules).string = {max_bytes: 1024},
+      (envoy.annotations.disallowed_by_default) = true
+    ];
   }
 
   // Indicates that prefix/path matching should be case insensitive. The default
@@ -508,25 +497,6 @@ message RouteMatch {
 message CorsPolicy {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.CorsPolicy";
 
-  // Specifies the origins that will be allowed to do CORS requests.
-  //
-  // An origin is allowed if either allow_origin or allow_origin_regex match.
-  //
-  // .. attention::
-  //  This field has been deprecated in favor of `allow_origin_string_match`.
-  repeated string hidden_envoy_deprecated_allow_origin = 1
-      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
-
-  // Specifies regex patterns that match allowed origins.
-  //
-  // An origin is allowed if either allow_origin or allow_origin_regex match.
-  //
-  // .. attention::
-  //   This field has been deprecated in favor of `allow_origin_string_match` as it is not safe for
-  //   use with untrusted input in all cases.
-  repeated string hidden_envoy_deprecated_allow_origin_regex = 8
-      [deprecated = true, (validate.rules).repeated = {items {string {max_bytes: 1024}}}];
-
   // Specifies string patterns that match allowed origins. An origin is allowed if any of the
   // string matchers match.
   repeated type.matcher.v3.StringMatcher allow_origin_string_match = 11;
@@ -547,15 +517,6 @@ message CorsPolicy {
   google.protobuf.BoolValue allow_credentials = 6;
 
   oneof enabled_specifier {
-    // Specifies if the CORS filter is enabled. Defaults to true. Only effective on route.
-    //
-    // .. attention::
-    //
-    //   **This field is deprecated**. Set the
-    //   :ref:`filter_enabled<envoy_api_field_config.route.v3.CorsPolicy.filter_enabled>` field instead.
-    google.protobuf.BoolValue hidden_envoy_deprecated_enabled = 7
-        [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
-
     // Specifies the % of requests for which the CORS filter is enabled.
     //
     // If neither ``enabled``, ``filter_enabled``, nor ``shadow_enabled`` are specified, the CORS
@@ -564,6 +525,9 @@ message CorsPolicy {
     // If :ref:`runtime_key <envoy_api_field_config.core.v3.RuntimeFractionalPercent.runtime_key>` is
     // specified, Envoy will lookup the runtime key to get the percentage of requests to filter.
     core.v3.RuntimeFractionalPercent filter_enabled = 9;
+
+    google.protobuf.BoolValue hidden_envoy_deprecated_enabled = 7
+        [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
   }
 
   // Specifies the % of requests for which the CORS policies will be evaluated and tracked, but not
@@ -576,6 +540,12 @@ message CorsPolicy {
   // Envoy will lookup the runtime key to get the percentage of requests for which it will evaluate
   // and track the request's *Origin* to determine if it's valid but will not enforce any policies.
   core.v3.RuntimeFractionalPercent shadow_enabled = 10;
+
+  repeated string hidden_envoy_deprecated_allow_origin = 1
+      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
+
+  repeated string hidden_envoy_deprecated_allow_origin_regex = 8
+      [deprecated = true, (validate.rules).repeated = {items {string {max_bytes: 1024}}}];
 }
 
 // [#next-free-field: 34]
@@ -615,24 +585,6 @@ message RouteAction {
     // exist in the cluster manager configuration.
     string cluster = 1 [(validate.rules).string = {min_bytes: 1}];
 
-    // If not specified, all requests to the target cluster will be mirrored. If
-    // specified, Envoy will lookup the runtime key to get the % of requests to
-    // mirror. Valid values are from 0 to 10000, allowing for increments of
-    // 0.01% of requests to be mirrored. If the runtime key is specified in the
-    // configuration but not present in runtime, 0 is the default and thus 0% of
-    // requests will be mirrored.
-    //
-    // .. attention::
-    //
-    //   **This field is deprecated**. Set the
-    //   :ref:`runtime_fraction
-    //   <envoy_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.runtime_fraction>`
-    //   field instead. Mirroring occurs if both this and
-    //   <envoy_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.runtime_fraction>`
-    //   are not set.
-    string hidden_envoy_deprecated_runtime_key = 2
-        [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
-
     // If not specified, all requests to the target cluster will be mirrored.
     //
     // If specified, this field takes precedence over the `runtime_key` field and requests must also
@@ -645,6 +597,9 @@ message RouteAction {
 
     // Determines if the trace span should be sampled. Defaults to true.
     google.protobuf.BoolValue trace_sampled = 4;
+
+    string hidden_envoy_deprecated_runtime_key = 2
+        [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
   }
 
   // Specifies the route's hashing policy if the upstream cluster uses a hashing :ref:`load balancer
@@ -777,6 +732,14 @@ message RouteAction {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RouteAction.UpgradeConfig";
 
+    // [#not-implemented-hide:]
+    // Configuration for sending data upstream as a raw data payload. This is used for
+    // CONNECT requests, when forwarding CONNECT payload as raw TCP.
+    message ConnectConfig {
+      // If present, the proxy protocol header will be prepended to the CONNECT payload sent upstream.
+      core.v3.ProxyProtocolConfig proxy_protocol_config = 1;
+    }
+
     // The case-insensitive name of this upgrade, e.g. "websocket".
     // For each upgrade type present in upgrade_configs, requests with
     // Upgrade: [upgrade_type] will be proxied upstream.
@@ -785,6 +748,11 @@ message RouteAction {
 
     // Determines if upgrades are available on this route. Defaults to true.
     google.protobuf.BoolValue enabled = 2;
+
+    // [#not-implemented-hide:]
+    // Configuration for sending data upstream as a raw data payload. This is used for
+    // CONNECT requests, when forwarding CONNECT payload as raw TCP.
+    ConnectConfig connect_config = 3;
   }
 
   reserved 12, 18, 19, 16, 22, 21;
@@ -962,13 +930,6 @@ message RouteAction {
   // should not be set if this field is used.
   google.protobuf.Any retry_policy_typed_config = 33;
 
-  // Indicates that the route has a request mirroring policy.
-  //
-  // .. attention::
-  //   This field has been deprecated in favor of `request_mirror_policies` which supports one or
-  //   more mirroring policies.
-  RequestMirrorPolicy hidden_envoy_deprecated_request_mirror_policy = 10 [deprecated = true];
-
   // Indicates that the route has request mirroring policies.
   repeated RequestMirrorPolicy request_mirror_policies = 30;
 
@@ -1056,6 +1017,8 @@ message RouteAction {
   // it'll take precedence over the virtual host level hedge policy entirely
   // (e.g.: policies are not merged, most internal one becomes the enforced policy).
   HedgePolicy hedge_policy = 27;
+
+  RequestMirrorPolicy hidden_envoy_deprecated_request_mirror_policy = 10 [deprecated = true];
 }
 
 // HTTP retry :ref:`architecture overview <arch_overview_http_routing_retry>`.
@@ -1070,9 +1033,9 @@ message RetryPolicy {
     string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
     oneof config_type {
-      google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
-
       google.protobuf.Any typed_config = 3;
+
+      google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
     }
   }
 
@@ -1083,9 +1046,9 @@ message RetryPolicy {
     string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
     oneof config_type {
-      google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
-
       google.protobuf.Any typed_config = 3;
+
+      google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
     }
   }
 
@@ -1353,25 +1316,6 @@ message Tracing {
 message VirtualCluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.VirtualCluster";
 
-  // Specifies a regex pattern to use for matching requests. The entire path of the request
-  // must match the regex. The regex grammar used is defined `here
-  // <https://en.cppreference.com/w/cpp/regex/ecmascript>`_.
-  //
-  // Examples:
-  //
-  // * The regex ``/rides/\d+`` matches the path */rides/0*
-  // * The regex ``/rides/\d+`` matches the path */rides/123*
-  // * The regex ``/rides/\d+`` does not match the path */rides/123/456*
-  //
-  // .. attention::
-  //   This field has been deprecated in favor of `headers` as it is not safe for use with
-  //   untrusted input in all cases.
-  string hidden_envoy_deprecated_pattern = 1 [
-    deprecated = true,
-    (validate.rules).string = {max_bytes: 1024},
-    (envoy.annotations.disallowed_by_default) = true
-  ];
-
   // Specifies a list of header matchers to use for matching requests. Each specified header must
   // match. The pseudo-headers `:path` and `:method` can be used to match the request path and
   // method, respectively.
@@ -1382,11 +1326,12 @@ message VirtualCluster {
   // router filter and are documented :ref:`here <config_http_filters_router_stats>`.
   string name = 2 [(validate.rules).string = {min_bytes: 1}];
 
-  // Optionally specifies the HTTP method to match on. For example GET, PUT,
-  // etc.
-  //
-  // .. attention::
-  //   This field has been deprecated in favor of `headers`.
+  string hidden_envoy_deprecated_pattern = 1 [
+    deprecated = true,
+    (validate.rules).string = {max_bytes: 1024},
+    (envoy.annotations.disallowed_by_default) = true
+  ];
+
   core.v3.RequestMethod hidden_envoy_deprecated_method = 3
       [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 }
@@ -1589,26 +1534,6 @@ message HeaderMatcher {
 
     // If specified, this regex string is a regular expression rule which implies the entire request
     // header value must match the regex. The rule will not match if only a subsequence of the
-    // request header value matches the regex. The regex grammar used in the value field is defined
-    // `here <https://en.cppreference.com/w/cpp/regex/ecmascript>`_.
-    //
-    // Examples:
-    //
-    // * The regex ``\d{3}`` matches the value *123*
-    // * The regex ``\d{3}`` does not match the value *1234*
-    // * The regex ``\d{3}`` does not match the value *123.456*
-    //
-    // .. attention::
-    //   This field has been deprecated in favor of `safe_regex_match` as it is not safe for use
-    //   with untrusted input in all cases.
-    string hidden_envoy_deprecated_regex_match = 5 [
-      deprecated = true,
-      (validate.rules).string = {max_bytes: 1024},
-      (envoy.annotations.disallowed_by_default) = true
-    ];
-
-    // If specified, this regex string is a regular expression rule which implies the entire request
-    // header value must match the regex. The rule will not match if only a subsequence of the
     // request header value matches the regex.
     type.matcher.v3.RegexMatcher safe_regex_match = 11;
 
@@ -1644,6 +1569,12 @@ message HeaderMatcher {
     //
     // * The suffix *abcd* matches the value *xyzabcd*, but not for *xyzbcd*.
     string suffix_match = 10 [(validate.rules).string = {min_bytes: 1}];
+
+    string hidden_envoy_deprecated_regex_match = 5 [
+      deprecated = true,
+      (validate.rules).string = {max_bytes: 1024},
+      (envoy.annotations.disallowed_by_default) = true
+    ];
   }
 
   // If specified, the match result will be inverted before checking. Defaults to false.
@@ -1666,25 +1597,6 @@ message QueryParameterMatcher {
   // *path*'s query string.
   string name = 1 [(validate.rules).string = {min_bytes: 1 max_bytes: 1024}];
 
-  // Specifies the value of the key. If the value is absent, a request
-  // that contains the key in its query string will match, whether the
-  // key appears with a value (e.g., "?debug=true") or not (e.g., "?debug")
-  //
-  // ..attention::
-  //   This field is deprecated. Use an `exact` match inside the `string_match` field.
-  string hidden_envoy_deprecated_value = 3
-      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
-
-  // Specifies whether the query parameter value is a regular expression.
-  // Defaults to false. The entire query parameter value (i.e., the part to
-  // the right of the equals sign in "key=value") must match the regex.
-  // E.g., the regex ``\d+$`` will match *123* but not *a123* or *123a*.
-  //
-  // ..attention::
-  //   This field is deprecated. Use a `safe_regex` match inside the `string_match` field.
-  google.protobuf.BoolValue hidden_envoy_deprecated_regex = 4
-      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
-
   oneof query_parameter_match_specifier {
     // Specifies whether a query parameter value should match against a string.
     type.matcher.v3.StringMatcher string_match = 5 [(validate.rules).message = {required: true}];
@@ -1692,4 +1604,10 @@ message QueryParameterMatcher {
     // Specifies whether a query parameter should be present.
     bool present_match = 6;
   }
+
+  string hidden_envoy_deprecated_value = 3
+      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
+
+  google.protobuf.BoolValue hidden_envoy_deprecated_regex = 4
+      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 }

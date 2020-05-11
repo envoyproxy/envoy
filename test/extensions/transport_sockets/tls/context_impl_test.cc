@@ -3,7 +3,7 @@
 
 #include "envoy/admin/v3/certs.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
-#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.validate.h"
+#include "envoy/extensions/transport_sockets/tls/v3/tls.pb.validate.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 
 #include "common/json/json_loader.h"
@@ -703,6 +703,75 @@ TEST_F(SslServerContextImplTicketTest, VerifySanWithNoCA) {
   EXPECT_THROW_WITH_MESSAGE(loadConfigYaml(yaml), EnvoyException,
                             "SAN-based verification of peer certificates without trusted CA "
                             "is insecure and not allowed");
+}
+
+TEST_F(SslServerContextImplTicketTest, StatelessSessionResumptionEnabledByDefault) {
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  const std::string tls_context_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+  )EOF";
+  TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
+
+  ServerContextConfigImpl server_context_config(tls_context, factory_context_);
+  EXPECT_FALSE(server_context_config.disableStatelessSessionResumption());
+}
+
+TEST_F(SslServerContextImplTicketTest, StatelessSessionResumptionExplicitlyEnabled) {
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  const std::string tls_context_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+  disable_stateless_session_resumption: false
+  )EOF";
+  TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
+
+  ServerContextConfigImpl server_context_config(tls_context, factory_context_);
+  EXPECT_FALSE(server_context_config.disableStatelessSessionResumption());
+}
+
+TEST_F(SslServerContextImplTicketTest, StatelessSessionResumptionDisabled) {
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  const std::string tls_context_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+  disable_stateless_session_resumption: true
+  )EOF";
+  TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
+
+  ServerContextConfigImpl server_context_config(tls_context, factory_context_);
+  EXPECT_TRUE(server_context_config.disableStatelessSessionResumption());
+}
+
+TEST_F(SslServerContextImplTicketTest, StatelessSessionResumptionEnabledWhenKeyIsConfigured) {
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  const std::string tls_context_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+  session_ticket_keys:
+    keys:
+      filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
+)EOF";
+  TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
+
+  ServerContextConfigImpl server_context_config(tls_context, factory_context_);
+  EXPECT_FALSE(server_context_config.disableStatelessSessionResumption());
 }
 
 class ClientContextConfigImplTest : public SslCertsTest {};

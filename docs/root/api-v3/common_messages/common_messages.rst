@@ -6,9 +6,11 @@ Common messages
   :maxdepth: 2
 
   ../config/core/v3/base.proto
+  ../config/core/v3/extension.proto
   ../config/core/v3/address.proto
   ../config/core/v3/backoff.proto
   ../config/core/v3/protocol.proto
+  ../config/core/v3/proxy_protocol.proto
   ../service/discovery/v3/discovery.proto
   ../config/core/v3/config_source.proto
   ../config/core/v3/grpc_service.proto

@@ -159,6 +159,18 @@ bool supportsIpVersion(const Address::IpVersion version) {
   return true;
 }
 
+std::string ipVersionToDnsFamily(Network::Address::IpVersion version) {
+  switch (version) {
+  case Network::Address::IpVersion::v4:
+    return "V4_ONLY";
+  case Network::Address::IpVersion::v6:
+    return "V6_ONLY";
+  }
+
+  // This seems to be needed on the coverage build for some reason.
+  NOT_REACHED_GCOVR_EXCL_LINE;
+}
+
 std::pair<Address::InstanceConstSharedPtr, Network::IoHandlePtr>
 bindFreeLoopbackPort(Address::IpVersion version, Address::SocketType type) {
   Address::InstanceConstSharedPtr addr = getCanonicalLoopbackAddress(version);

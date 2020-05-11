@@ -97,12 +97,14 @@ MockRouteEntry::MockRouteEntry() {
   ON_CALL(*this, upgradeMap()).WillByDefault(ReturnRef(upgrade_map_));
   ON_CALL(*this, hedgePolicy()).WillByDefault(ReturnRef(hedge_policy_));
   ON_CALL(*this, routeName()).WillByDefault(ReturnRef(route_name_));
+  ON_CALL(*this, connectConfig()).WillByDefault(ReturnRef(connect_config_));
 }
 
 MockRouteEntry::~MockRouteEntry() = default;
 
 MockConfig::MockConfig() : route_(new NiceMock<MockRoute>()) {
   ON_CALL(*this, route(_, _, _)).WillByDefault(Return(route_));
+  ON_CALL(*this, route(_, _, _, _)).WillByDefault(Return(route_));
   ON_CALL(*this, internalOnlyHeaders()).WillByDefault(ReturnRef(internal_only_headers_));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
   ON_CALL(*this, usesVhds()).WillByDefault(Return(false));

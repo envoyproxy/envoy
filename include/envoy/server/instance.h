@@ -7,7 +7,7 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/api.h"
 #include "envoy/common/mutex_tracer.h"
-#include "envoy/config/trace/v3/trace.pb.h"
+#include "envoy/config/trace/v3/http_tracer.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/grpc/context.h"
 #include "envoy/http/context.h"
@@ -75,9 +75,9 @@ public:
   virtual void drainListeners() PURE;
 
   /**
-   * @return const DrainManager& singleton for use by the entire server.
+   * @return DrainManager& singleton for use by the entire server.
    */
-  virtual const DrainManager& drainManager() PURE;
+  virtual DrainManager& drainManager() PURE;
 
   /**
    * @return AccessLogManager for use by the entire server.

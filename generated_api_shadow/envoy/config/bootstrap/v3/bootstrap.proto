@@ -11,8 +11,8 @@ import "envoy/config/core/v3/socket_option.proto";
 import "envoy/config/listener/v3/listener.proto";
 import "envoy/config/metrics/v3/stats.proto";
 import "envoy/config/overload/v3/overload.proto";
-import "envoy/config/trace/v3/trace.proto";
-import "envoy/extensions/transport_sockets/tls/v3/cert.proto";
+import "envoy/config/trace/v3/http_tracer.proto";
+import "envoy/extensions/transport_sockets/tls/v3/secret.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
@@ -26,7 +26,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.bootstrap.v3";
 option java_outer_classname = "BootstrapProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Bootstrap]
 // This proto is supplied via the :option:`-c` CLI flag and acts as the root
@@ -127,15 +127,12 @@ message Bootstrap {
   // Optional watchdog configuration.
   Watchdog watchdog = 8;
 
-  // Configuration for an external tracing provider. If not specified, no
-  // tracing will be performed.
-  trace.v3.Tracing tracing = 9;
-
-  // Configuration for the runtime configuration provider (deprecated). If not
-  // specified, a “null” provider will be used which will result in all defaults
-  // being used.
-  Runtime hidden_envoy_deprecated_runtime = 11
-      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
+  // Configuration for an external tracing provider.
+  //
+  // .. attention::
+  //  This field has been deprecated in favor of :ref:`HttpConnectionManager.Tracing.provider
+  //  <envoy_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.provider>`.
+  trace.v3.Tracing tracing = 9 [deprecated = true];
 
   // Configuration for the runtime configuration provider. If not
   // specified, a “null” provider will be used which will result in all defaults
@@ -178,6 +175,9 @@ message Bootstrap {
   // :ref:`use_tcp_for_dns_lookups <envoy_api_field_config.cluster.v3.Cluster.use_tcp_for_dns_lookups>` are
   // specified.
   bool use_tcp_for_dns_lookups = 20;
+
+  Runtime hidden_envoy_deprecated_runtime = 11
+      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 }
 
 // Administration interface :ref:`operations documentation

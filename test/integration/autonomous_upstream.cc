@@ -66,7 +66,8 @@ AutonomousHttpConnection::AutonomousHttpConnection(SharedConnectionWrapper& shar
                                                    Stats::Store& store, Type type,
                                                    AutonomousUpstream& upstream)
     : FakeHttpConnection(shared_connection, store, type, upstream.timeSystem(),
-                         Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT),
+                         Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
+                         envoy::config::core::v3::HttpProtocolOptions::ALLOW),
       upstream_(upstream) {}
 
 Http::RequestDecoder& AutonomousHttpConnection::newStream(Http::ResponseEncoder& response_encoder,

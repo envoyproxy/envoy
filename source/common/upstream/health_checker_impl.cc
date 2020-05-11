@@ -1,5 +1,7 @@
 #include "common/upstream/health_checker_impl.h"
 
+#include <memory>
+
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/data/core/v3/health_check_event.pb.h"
 #include "envoy/server/health_checker_config.h"
@@ -248,7 +250,8 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onEvent(Network::Conne
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
   if (!client_) {
     Upstream::Host::CreateConnectionData conn =
-        host_->createHealthCheckConnection(parent_.dispatcher_, parent_.transportSocketOptions());
+        host_->createHealthCheckConnection(parent_.dispatcher_, parent_.transportSocketOptions(),
+                                           parent_.transportSocketMatchMetadata().get());
     client_.reset(parent_.createCodecClient(conn));
     client_->addConnectionCallbacks(connection_callback_impl_);
     expect_reset_ = false;
@@ -503,9 +506,11 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onEvent(Network::Connect
 void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onInterval() {
   if (!client_) {
     client_ =
-        host_->createHealthCheckConnection(parent_.dispatcher_, parent_.transportSocketOptions())
+        host_
+            ->createHealthCheckConnection(parent_.dispatcher_, parent_.transportSocketOptions(),
+                                          parent_.transportSocketMatchMetadata().get())
             .connection_;
-    session_callbacks_.reset(new TcpSessionCallbacks(*this));
+    session_callbacks_ = std::make_shared<TcpSessionCallbacks>(*this);
     client_->addConnectionCallbacks(*session_callbacks_);
     client_->addReadFilter(session_callbacks_);
 
@@ -581,8 +586,8 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::decodeHeaders(
                   end_stream);
     return;
   }
-  if (!Grpc::Common::hasGrpcContentType(*headers)) {
-    onRpcComplete(Grpc::Status::WellKnownGrpcStatus::Internal, "invalid gRPC content-type", false);
+  if (!Grpc::Common::isGrpcResponseHeaders(*headers, end_stream)) {
+    onRpcComplete(Grpc::Status::WellKnownGrpcStatus::Internal, "not a gRPC request", false);
     return;
   }
   if (end_stream) {
@@ -657,7 +662,8 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onEvent(Network::Conne
 void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
   if (!client_) {
     Upstream::Host::CreateConnectionData conn =
-        host_->createHealthCheckConnection(parent_.dispatcher_, parent_.transportSocketOptions());
+        host_->createHealthCheckConnection(parent_.dispatcher_, parent_.transportSocketOptions(),
+                                           parent_.transportSocketMatchMetadata().get());
     client_ = parent_.createCodecClient(conn);
     client_->addConnectionCallbacks(connection_callback_impl_);
     client_->setCodecConnectionCallbacks(http_connection_callback_impl_);
@@ -791,9 +797,11 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::logHealthCheckStatus(
     case grpc::health::v1::HealthCheckResponse::UNKNOWN:
       service_status = "unknown";
       break;
+    case grpc::health::v1::HealthCheckResponse::SERVICE_UNKNOWN:
+      service_status = "service_unknown";
+      break;
     default:
-      // Should not happen really, Protobuf should not parse undefined enums values.
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      service_status = "unknown_healthcheck_response";
       break;
     }
   }

@@ -165,18 +165,6 @@ public:
   // Caches may modify the key according to local needs, though care must be
   // taken to ensure that meaningfully distinct responses have distinct keys.
   const Key& key() const { return key_; }
-  Key& key() { return key_; }
-
-  // Returns the subset of this request's headers that are listed in
-  // envoy::extensions::filters::http::cache::v3alpha::CacheConfig::allowed_vary_headers. If a cache
-  // storage implementation forwards lookup requests to a remote cache server that supports *vary*
-  // headers, that server may need to see these headers. For local implementations, it may be
-  // simpler to instead call makeLookupResult with each potential response.
-  HeaderVector& vary_headers() { return vary_headers_; }
-  const HeaderVector& vary_headers() const { return vary_headers_; }
-
-  // Time when this LookupRequest was created (in response to an HTTP request).
-  SystemTime timestamp() const { return timestamp_; }
 
   // WARNING: Incomplete--do not use in production (yet).
   // Returns a LookupResult suitable for sending to the cache filter's
@@ -195,7 +183,13 @@ private:
 
   Key key_;
   std::vector<RawByteRange> request_range_spec_;
+  // Time when this LookupRequest was created (in response to an HTTP request).
   SystemTime timestamp_;
+  // The subset of this request's headers that are listed in
+  // envoy::extensions::filters::http::cache::v3alpha::CacheConfig::allowed_vary_headers. If a cache
+  // storage implementation forwards lookup requests to a remote cache server that supports *vary*
+  // headers, that server may need to see these headers. For local implementations, it may be
+  // simpler to instead call makeLookupResult with each potential response.
   HeaderVector vary_headers_;
   const std::string request_cache_control_;
 };
@@ -311,7 +305,7 @@ public:
   // as the calling CacheFilter).
   virtual HttpCache&
   getCache(const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& config) PURE;
-  virtual ~HttpCacheFactory() = default;
+  ~HttpCacheFactory() override = default;
 
 private:
   const std::string name_;

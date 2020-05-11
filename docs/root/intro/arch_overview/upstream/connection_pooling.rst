@@ -21,8 +21,8 @@ HTTP/2
 ------
 
 The HTTP/2 connection pool multiplexes multiple requests over a single connection, up to the limits
-imposed by :ref:`max concurrent streams <envoy_api_field_core.Http2ProtocolOptions.max_concurrent_streams>`
-and :ref:`max requests per connection <envoy_api_field_Cluster.max_requests_per_connection>`.
+imposed by :ref:`max concurrent streams <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.max_concurrent_streams>`
+and :ref:`max requests per connection <envoy_v3_api_field_config.cluster.v3.Cluster.max_requests_per_connection>`.
 The HTTP/2 connection pool establishes only as many connections as are needed to serve the current
 requests. With no limits, this will be only a single connection. If a GOAWAY frame is received or
 if the connection reaches the maximum stream limit, the connection pool will drain the existing one.

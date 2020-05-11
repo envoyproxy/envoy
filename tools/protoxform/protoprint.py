@@ -8,6 +8,7 @@
 # Usage: protoprint.py <source file path> <type database path>
 
 from collections import deque
+import copy
 import functools
 import io
 import os
@@ -41,8 +42,8 @@ from udpa.annotations import status_pb2
 NEXT_FREE_FIELD_MIN = 5
 
 
-class ProtoXformError(Exception):
-  """Base error class for the protoxform module."""
+class ProtoPrintError(Exception):
+  """Base error class for the protoprint module."""
 
 
 def ExtractClangProtoStyle(clang_format_text):
@@ -169,12 +170,13 @@ def FormatTypeContextComments(type_context, annotation_xforms=None):
   return leading, trailing
 
 
-def FormatHeaderFromFile(source_code_info, file_proto):
+def FormatHeaderFromFile(source_code_info, file_proto, empty_file):
   """Format proto header.
 
   Args:
     source_code_info: SourceCodeInfo object.
     file_proto: FileDescriptorProto for file.
+    empty_file: are there no message/enum/service defs in file?
 
   Returns:
     Formatted proto header as a string.
@@ -226,8 +228,10 @@ def FormatHeaderFromFile(source_code_info, file_proto):
     options.Extensions[status_pb2.file_status].CopyFrom(
         file_proto.options.Extensions[status_pb2.file_status])
 
-  options.Extensions[status_pb2.file_status].package_version_status = file_proto.options.Extensions[
-      status_pb2.file_status].package_version_status
+  if not empty_file:
+    options.Extensions[
+        status_pb2.file_status].package_version_status = file_proto.options.Extensions[
+            status_pb2.file_status].package_version_status
 
   options_block = FormatOptions(options)
 
@@ -311,6 +315,33 @@ def NormalizeFieldTypeName(type_context, field_fqn):
     remaining_field_fqn_splits = deque(field_fqn_splits[:-1])
     normalized_splits = deque([field_fqn_splits[-1]])
 
+    if list(remaining_field_fqn_splits)[:1] != type_context_splits[:1] and (
+        len(remaining_field_fqn_splits) == 0 or
+        remaining_field_fqn_splits[0] in type_context_splits[1:]):
+      # Notice that in some cases it is error-prone to normalize a type name.
+      # E.g., it would be an error to replace ".external.Type" with "external.Type"
+      # in the context of "envoy.extensions.type.external.vX.Config".
+      # In such a context protoc resolves "external.Type" into
+      # "envoy.extensions.type.external.Type", which is exactly what the use of a
+      # fully-qualified name ".external.Type" was meant to prevent.
+      #
+      # A type SHOULD remain fully-qualified under the following conditions:
+      # 1. its root package is different from the root package of the context type
+      # 2. EITHER the type doesn't belong to any package at all
+      #    OR     its root package has a name that collides with one of the packages
+      #           of the context type
+      #
+      # E.g.,
+      # a) although ".some.Type" has a different root package than the context type
+      #    "TopLevelType", it is still safe to normalize it into "some.Type"
+      # b) although ".google.protobuf.Any" has a different root package than the context type
+      #    "envoy.api.v2.Cluster", it still safe to normalize it into "google.protobuf.Any"
+      # c) it is error-prone to normalize ".TopLevelType" in the context of "some.Type"
+      #    into "TopLevelType"
+      # d) it is error-prone to normalize ".external.Type" in the context of
+      #    "envoy.extensions.type.external.vX.Config" into "external.Type"
+      return field_fqn
+
     def EquivalentInTypeContext(splits):
       type_context_splits_tmp = deque(type_context_splits)
       while type_context_splits_tmp:
@@ -385,7 +416,7 @@ def FormatFieldType(type_context, field):
   }
   if field.type in pretty_type_names:
     return label + pretty_type_names[field.type]
-  raise ProtoXformError('Unknown field type ' + str(field.type))
+  raise ProtoPrintError('Unknown field type ' + str(field.type))
 
 
 def FormatServiceMethod(type_context, method):
@@ -504,9 +535,15 @@ def FormatReserved(enum_or_msg_proto):
   Returns:
     Formatted enum_or_msg_proto as a string.
   """
-  reserved_fields = FormatBlock('reserved %s;\n' % ','.join(
-      map(str, sum([list(range(rr.start, rr.end)) for rr in enum_or_msg_proto.reserved_range],
-                   [])))) if enum_or_msg_proto.reserved_range else ''
+  rrs = copy.deepcopy(enum_or_msg_proto.reserved_range)
+  # Fixups for singletons that don't seem to always have [inclusive, exclusive)
+  # format when parsed by protoc.
+  for rr in rrs:
+    if rr.start == rr.end:
+      rr.end += 1
+  reserved_fields = FormatBlock(
+      'reserved %s;\n' %
+      ','.join(map(str, sum([list(range(rr.start, rr.end)) for rr in rrs], [])))) if rrs else ''
   if enum_or_msg_proto.reserved_name:
     reserved_fields += FormatBlock('reserved %s;\n' %
                                    ', '.join('"%s"' % n for n in enum_or_msg_proto.reserved_name))
@@ -566,6 +603,7 @@ class ProtoFormatVisitor(visitor.Visitor):
           oneof_index = None
       if oneof_index is None and field.HasField('oneof_index'):
         oneof_index = field.oneof_index
+        assert (oneof_index < len(msg_proto.oneof_decl))
         oneof_proto = msg_proto.oneof_decl[oneof_index]
         oneof_leading_comment, oneof_trailing_comment = FormatTypeContextComments(
             type_context.ExtendOneof(oneof_index, field.name))
@@ -580,7 +618,8 @@ class ProtoFormatVisitor(visitor.Visitor):
                                                   formatted_msgs, reserved_fields, fields)
 
   def VisitFile(self, file_proto, type_context, services, msgs, enums):
-    header = FormatHeaderFromFile(type_context.source_code_info, file_proto)
+    empty_file = len(services) == 0 and len(enums) == 0 and len(msgs) == 0
+    header = FormatHeaderFromFile(type_context.source_code_info, file_proto, empty_file)
     formatted_services = FormatBlock('\n'.join(services))
     formatted_enums = FormatBlock('\n'.join(enums))
     formatted_msgs = FormatBlock('\n'.join(msgs))
@@ -590,7 +629,10 @@ class ProtoFormatVisitor(visitor.Visitor):
 if __name__ == '__main__':
   proto_desc_path = sys.argv[1]
   file_proto = descriptor_pb2.FileDescriptorProto()
-  text_format.Merge(pathlib.Path(proto_desc_path).read_text(), file_proto)
+  input_text = pathlib.Path(proto_desc_path).read_text()
+  if not input_text:
+    sys.exit(0)
+  text_format.Merge(input_text, file_proto)
   dst_path = pathlib.Path(sys.argv[2])
   utils.LoadTypeDb(sys.argv[3])
   dst_path.write_bytes(traverse.TraverseFile(file_proto, ProtoFormatVisitor()))

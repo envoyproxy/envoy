@@ -2,8 +2,9 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_benchmark_test",
+    "envoy_cc_benchmark_binary",
     "envoy_cc_test",
-    "envoy_cc_test_binary",
     "envoy_cc_test_library",
     "envoy_package",
 )
@@ -98,6 +99,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "health_checker_impl_test",
     srcs = ["health_checker_impl_test.cc"],
+    tags = ["fails_on_windows"],
     deps = [
         ":utility_lib",
         "//source/common/buffer:buffer_lib",
@@ -180,6 +182,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "load_stats_reporter_test",
     srcs = ["load_stats_reporter_test.cc"],
+    tags = ["fails_on_windows"],
     deps = [
         "//source/common/stats:stats_lib",
         "//source/common/upstream:load_stats_reporter_lib",
@@ -339,7 +342,7 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test_binary(
+envoy_cc_benchmark_binary(
     name = "load_balancer_benchmark",
     srcs = ["load_balancer_benchmark.cc"],
     external_deps = [
@@ -355,6 +358,13 @@ envoy_cc_test_binary(
         "//test/test_common:printers_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
+)
+
+envoy_benchmark_test(
+    name = "load_balancer_benchmark_test",
+    timeout = "long",
+    benchmark_binary = "load_balancer_benchmark",
+    tags = ["fails_on_windows"],
 )
 
 envoy_cc_test(

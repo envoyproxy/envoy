@@ -16,7 +16,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.ext_authz.v3";
 option java_outer_classname = "ExtAuthzProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: External Authorization]
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
@@ -49,13 +49,6 @@ message ExtAuthz {
   // Note that errors can be *always* tracked in the :ref:`stats
   // <config_http_filters_ext_authz_stats>`.
   bool failure_mode_allow = 2;
-
-  // Sets the package version the gRPC service should use. This is particularly
-  // useful when transitioning from alpha to release versions assuming that both definitions are
-  // semantically compatible. Deprecation note: This field is deprecated and should only be used for
-  // version upgrade. See release notes for more details.
-  bool hidden_envoy_deprecated_use_alpha = 4
-      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 
   // Enables filter to buffer the client request body and send it within the authorization request.
   // A ``x-envoy-auth-partial-body: false|true`` metadata header will be added to the authorization
@@ -105,6 +98,9 @@ message ExtAuthz {
   // When this field is true, Envoy will include the peer X.509 certificate, if available, in the
   // :ref:`certificate<envoy_api_field_service.auth.v3.AttributeContext.Peer.certificate>`.
   bool include_peer_certificate = 10;
+
+  bool hidden_envoy_deprecated_use_alpha = 4
+      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 }
 
 // Configuration for buffering the request data.

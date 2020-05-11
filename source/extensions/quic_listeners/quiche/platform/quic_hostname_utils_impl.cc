@@ -23,7 +23,7 @@ bool QuicHostnameUtilsImpl::IsValidSNI(quiche::QuicheStringPiece sni) {
   // TODO(wub): Implement it on top of GoogleUrl, once it is available.
 
   return sni.find_last_of('.') != std::string::npos &&
-         Envoy::Http::Utility::Url().initialize(absl::StrCat("http://", sni));
+         Envoy::Http::Utility::Url().initialize(absl::StrCat("http://", sni), false);
 }
 
 // static

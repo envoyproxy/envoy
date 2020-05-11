@@ -174,14 +174,15 @@ public:
               (const Network::ListenerFilterMatcherSharedPtr&, Network::ListenerFilterPtr&));
 };
 
-class MockFilterChain : public FilterChain {
+class MockFilterChain : public DrainableFilterChain {
 public:
   MockFilterChain();
   ~MockFilterChain() override;
 
-  // Network::FilterChain
+  // Network::DrainableFilterChain
   MOCK_METHOD(const TransportSocketFactory&, transportSocketFactory, (), (const));
   MOCK_METHOD(const std::vector<FilterFactoryCb>&, networkFilterFactories, (), (const));
+  MOCK_METHOD(void, startDraining, ());
 };
 
 class MockFilterChainManager : public FilterChainManager {
@@ -354,8 +355,12 @@ public:
   MOCK_METHOD(uint64_t, numConnections, (), (const));
   MOCK_METHOD(void, incNumConnections, ());
   MOCK_METHOD(void, decNumConnections, ());
-  MOCK_METHOD(void, addListener, (ListenerConfig & config));
+  MOCK_METHOD(void, addListener,
+              (absl::optional<uint64_t> overridden_listener, ListenerConfig& config));
   MOCK_METHOD(void, removeListeners, (uint64_t listener_tag));
+  MOCK_METHOD(void, removeFilterChains,
+              (uint64_t listener_tag, const std::list<const Network::FilterChain*>& filter_chains,
+               std::function<void()> completion));
   MOCK_METHOD(void, stopListeners, (uint64_t listener_tag));
   MOCK_METHOD(void, stopListeners, ());
   MOCK_METHOD(void, disableListeners, ());

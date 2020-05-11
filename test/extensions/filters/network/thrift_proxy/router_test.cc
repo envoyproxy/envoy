@@ -95,7 +95,7 @@ public:
   void initializeMetadata(MessageType msg_type, std::string method = "method") {
     msg_type_ = msg_type;
 
-    metadata_.reset(new MessageMetadata());
+    metadata_ = std::make_shared<MessageMetadata>();
     metadata_->setMethodName(method);
     metadata_->setMessageType(msg_type_);
     metadata_->setSequenceId(1);
@@ -368,7 +368,7 @@ TEST_F(ThriftRouterTest, PoolRemoteConnectionFailure) {
         EXPECT_TRUE(end_stream);
       }));
   context_.cluster_manager_.tcp_conn_pool_.poolFailure(
-      Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+      ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
 }
 
 TEST_F(ThriftRouterTest, PoolLocalConnectionFailure) {
@@ -377,7 +377,7 @@ TEST_F(ThriftRouterTest, PoolLocalConnectionFailure) {
   startRequest(MessageType::Call);
 
   context_.cluster_manager_.tcp_conn_pool_.poolFailure(
-      Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure);
+      ConnectionPool::PoolFailureReason::LocalConnectionFailure);
 }
 
 TEST_F(ThriftRouterTest, PoolTimeout) {
@@ -392,8 +392,7 @@ TEST_F(ThriftRouterTest, PoolTimeout) {
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
         EXPECT_TRUE(end_stream);
       }));
-  context_.cluster_manager_.tcp_conn_pool_.poolFailure(
-      Tcp::ConnectionPool::PoolFailureReason::Timeout);
+  context_.cluster_manager_.tcp_conn_pool_.poolFailure(ConnectionPool::PoolFailureReason::Timeout);
 }
 
 TEST_F(ThriftRouterTest, PoolOverflowFailure) {
@@ -408,8 +407,7 @@ TEST_F(ThriftRouterTest, PoolOverflowFailure) {
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*too many connections.*"));
         EXPECT_TRUE(end_stream);
       }));
-  context_.cluster_manager_.tcp_conn_pool_.poolFailure(
-      Tcp::ConnectionPool::PoolFailureReason::Overflow);
+  context_.cluster_manager_.tcp_conn_pool_.poolFailure(ConnectionPool::PoolFailureReason::Overflow);
 }
 
 TEST_F(ThriftRouterTest, PoolConnectionFailureWithOnewayMessage) {
@@ -419,7 +417,7 @@ TEST_F(ThriftRouterTest, PoolConnectionFailureWithOnewayMessage) {
   EXPECT_CALL(callbacks_, sendLocalReply(_, _)).Times(0);
   EXPECT_CALL(callbacks_, resetDownstreamConnection());
   context_.cluster_manager_.tcp_conn_pool_.poolFailure(
-      Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+      ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
 
   destroyRouter();
 }
