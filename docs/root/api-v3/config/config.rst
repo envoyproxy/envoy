@@ -17,4 +17,3 @@ Extensions
   grpc_credential/grpc_credential
   retry/retry
   trace/trace
-  compression/decompressor
