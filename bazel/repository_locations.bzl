@@ -67,7 +67,7 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["build"],
     ),
     envoy_build_tools = dict(
-        sha256 = "",
+        sha256 = "e2cb99cf66e36412a9f570fe0391ff0c457ff17c2524ccdf73853c2752e8d372",
         strip_prefix = "envoy-build-tools-8d7a0cb9be7a34c726575d79688ae3dea565a424",
         # 2020-05-08
         urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/8d7a0cb9be7a34c726575d79688ae3dea565a424.tar.gz"],
