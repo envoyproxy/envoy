@@ -69,7 +69,8 @@ following are the command line options that Envoy supports.
 .. option:: --concurrency <integer>
 
   *(optional)* The number of :ref:`worker threads <arch_overview_threading>` to run. If not
-  specified defaults to the number of hardware threads on the machine.
+  specified defaults to the number of hardware threads on the machine. If set to zero, Envoy will 
+  still run one worker thread.
 
 .. option:: -l <string>, --log-level <string>
 
@@ -183,15 +184,15 @@ following are the command line options that Envoy supports.
 
   *(optional)* Defines the local service cluster name where Envoy is running. The
   local service cluster name is first sourced from the :ref:`Bootstrap node
-  <envoy_api_field_config.bootstrap.v2.Bootstrap.node>` message's :ref:`cluster
-  <envoy_api_field_core.Node.cluster>` field. This CLI option provides an alternative
+  <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.node>` message's :ref:`cluster
+  <envoy_v3_api_field_config.core.v3.Node.cluster>` field. This CLI option provides an alternative
   method for specifying this value and will override any value set in bootstrap
   configuration. It should be set if any of the following features are used:
   :ref:`statsd <arch_overview_statistics>`, :ref:`health check cluster
-  verification <envoy_api_field_core.HealthCheck.HttpHealthCheck.service_name>`,
-  :ref:`runtime override directory <envoy_api_msg_config.bootstrap.v2.Runtime>`,
+  verification <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.service_name_matcher>`,
+  :ref:`runtime override directory <envoy_v3_api_msg_config.bootstrap.v3.Runtime>`,
   :ref:`user agent addition
-  <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.add_user_agent>`,
+  <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.add_user_agent>`,
   :ref:`HTTP global rate limiting <config_http_filters_rate_limit>`,
   :ref:`CDS <config_cluster_manager_cds>`, and :ref:`HTTP tracing
   <arch_overview_tracing>`, either via this CLI option or in the bootstrap
@@ -201,8 +202,8 @@ following are the command line options that Envoy supports.
 
   *(optional)* Defines the local service node name where Envoy is running. The
   local service node name is first sourced from the :ref:`Bootstrap node
-  <envoy_api_field_config.bootstrap.v2.Bootstrap.node>` message's :ref:`id
-  <envoy_api_field_core.Node.id>` field. This CLI option provides an alternative
+  <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.node>` message's :ref:`id
+  <envoy_v3_api_field_config.core.v3.Node.id>` field. This CLI option provides an alternative
   method for specifying this value and will override any value set in bootstrap
   configuration. It should be set if any of the following features are used:
   :ref:`statsd <arch_overview_statistics>`, :ref:`CDS
@@ -214,12 +215,12 @@ following are the command line options that Envoy supports.
 
   *(optional)* Defines the local service zone where Envoy is running. The local
   service zone is first sourced from the :ref:`Bootstrap node
-  <envoy_api_field_config.bootstrap.v2.Bootstrap.node>` message's :ref:`locality.zone
-  <envoy_api_field_core.Locality.zone>` field. This CLI option provides an
+  <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.node>` message's :ref:`locality.zone
+  <envoy_v3_api_field_config.core.v3.Locality.zone>` field. This CLI option provides an
   alternative method for specifying this value and will override any value set
   in bootstrap configuration. It should be set if discovery service routing is
   used and the discovery service exposes :ref:`zone data
-  <envoy_api_msg_endpoint.LocalityLbEndpoints>`, either via this CLI option or in
+  <envoy_v3_api_msg_config.endpoint.v3.LocalityLbEndpoints>`, either via this CLI option or in
   the bootstrap configuration. The meaning of zone is context dependent, e.g.
   `Availability Zone (AZ)
   <https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html>`_
@@ -261,7 +262,7 @@ following are the command line options that Envoy supports.
 .. option:: --enable-mutex-tracing
 
   *(optional)* This flag enables the collection of mutex contention statistics
-  (:ref:`MutexStats <envoy_api_msg_admin.v2alpha.MutexStats>`) as well as a contention endpoint
+  (:ref:`MutexStats <envoy_v3_api_msg_admin.v3.MutexStats>`) as well as a contention endpoint
   (:http:get:`/contention`). Mutex tracing is not enabled by default, since it incurs a slight performance
   penalty for those Envoys which already experience mutex contention.
 

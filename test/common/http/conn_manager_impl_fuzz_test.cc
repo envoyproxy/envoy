@@ -160,6 +160,7 @@ public:
   headersWithUnderscoresAction() const override {
     return envoy::config::core::v3::HttpProtocolOptions::ALLOW;
   }
+  bool shouldPreserveUpstreamDate() const override { return false; }
 
   const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
       config_;
@@ -246,6 +247,7 @@ public:
                     end_stream ? StreamState::Closed : StreamState::PendingDataOrTrailers;
               }));
           decoder_->decodeHeaders(std::move(headers), end_stream);
+          return Http::okStatus();
         }));
     ON_CALL(*decoder_filter_, decodeHeaders(_, _))
         .WillByDefault(
@@ -339,6 +341,7 @@ public:
         EXPECT_CALL(*config_.codec_, dispatch(_)).WillOnce(InvokeWithoutArgs([this, &data_action] {
           Buffer::OwnedImpl buf(std::string(data_action.size() % (1024 * 1024), 'a'));
           decoder_->decodeData(buf, data_action.end_stream());
+          return Http::okStatus();
         }));
         fakeOnData();
         FUZZ_ASSERT(testing::Mock::VerifyAndClearExpectations(config_.codec_));
@@ -361,6 +364,7 @@ public:
             .WillOnce(InvokeWithoutArgs([this, &trailers_action] {
               decoder_->decodeTrailers(std::make_unique<TestRequestTrailerMapImpl>(
                   Fuzz::fromHeaders<TestRequestTrailerMapImpl>(trailers_action.headers())));
+              return Http::okStatus();
             }));
         fakeOnData();
         FUZZ_ASSERT(testing::Mock::VerifyAndClearExpectations(config_.codec_));
@@ -381,9 +385,8 @@ public:
     }
     case test::common::http::RequestAction::kThrowDecoderException: {
       if (state == StreamState::PendingDataOrTrailers) {
-        EXPECT_CALL(*config_.codec_, dispatch(_)).WillOnce(InvokeWithoutArgs([] {
-          throw CodecProtocolException("blah");
-        }));
+        EXPECT_CALL(*config_.codec_, dispatch(_))
+            .WillOnce(testing::Throw(CodecProtocolException("blah")));
         fakeOnData();
         FUZZ_ASSERT(testing::Mock::VerifyAndClearExpectations(config_.codec_));
         state = StreamState::Closed;
@@ -523,7 +526,8 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
     case test::common::http::Action::kNewStream: {
       streams.emplace_back(new FuzzStream(
           conn_manager, config,
-          Fuzz::fromHeaders<TestRequestHeaderMapImpl>(action.new_stream().request_headers()),
+          Fuzz::fromHeaders<TestRequestHeaderMapImpl>(action.new_stream().request_headers(),
+                                                      /* ignore_headers =*/{}, {":authority"}),
           action.new_stream().status(), action.new_stream().end_stream()));
       break;
     }

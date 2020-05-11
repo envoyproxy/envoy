@@ -15,10 +15,12 @@
 
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/assert.h"
+#include "common/common/statusor.h"
 #include "common/http/codec_helper.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/http1/header_formatter.h"
+#include "common/http/status.h"
 
 namespace Envoy {
 namespace Http {
@@ -51,6 +53,12 @@ class StreamEncoderImpl : public virtual StreamEncoder,
                           public StreamCallbackHelper,
                           public Http1StreamEncoderOptions {
 public:
+  ~StreamEncoderImpl() override {
+    // When the stream goes away, undo any read blocks to resume reading.
+    while (read_disable_calls_ != 0) {
+      StreamEncoderImpl::readDisable(false);
+    }
+  }
   // Http::StreamEncoder
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeMetadata(const MetadataMapVector&) override;
@@ -75,6 +83,8 @@ public:
   void setIsResponseToConnectRequest(bool value) { is_response_to_connect_request_ = value; }
   void setDetails(absl::string_view details) { details_ = details; }
 
+  void clearReadDisableCallsForTests() { read_disable_calls_ = 0; }
+
 protected:
   StreamEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter);
   void setIsContentLengthAllowed(bool value) { is_content_length_allowed_ = value; }
@@ -85,6 +95,7 @@ protected:
   static const std::string LAST_CHUNK;
 
   ConnectionImpl& connection_;
+  uint32_t read_disable_calls_{};
   bool disable_chunk_encoding_ : 1;
   bool chunk_encoding_ : 1;
   bool processing_100_continue_ : 1;
@@ -196,16 +207,20 @@ public:
   uint64_t bufferRemainingSize();
   void copyToBuffer(const char* data, uint64_t length);
   void reserveBuffer(uint64_t size);
-  void readDisable(bool disable) { connection_.readDisable(disable); }
+  void readDisable(bool disable) {
+    if (connection_.state() == Network::Connection::State::Open) {
+      connection_.readDisable(disable);
+    }
+  }
   uint32_t bufferLimit() { return connection_.bufferLimit(); }
-  virtual bool supports_http_10() { return false; }
+  virtual bool supportsHttp10() { return false; }
   bool maybeDirectDispatch(Buffer::Instance& data);
   virtual void maybeAddSentinelBufferFragment(Buffer::WatermarkBuffer&) {}
   CodecStats& stats() { return stats_; }
   bool enableTrailers() const { return enable_trailers_; }
 
   // Http::Connection
-  void dispatch(Buffer::Instance& data) override;
+  Http::Status dispatch(Buffer::Instance& data) override;
   void goAway() override {} // Called during connection manager drain flow
   Protocol protocol() override { return protocol_; }
   void shutdownNotice() override {} // Called during connection manager drain flow
@@ -263,6 +278,15 @@ private:
   virtual bool shouldDropHeaderWithUnderscoresInNames(absl::string_view /* header_name */) const {
     return false;
   }
+
+  /**
+   * An inner dispatch call that executes the dispatching logic. While exception removal is in
+   * migration (#10878), this function may either throw an exception or return an error status.
+   * Exceptions are caught and translated to their corresponding statuses in the outer level
+   * dispatch.
+   * TODO(#10878): Remove this when exception removal is complete.
+   */
+  Http::Status innerDispatch(Buffer::Instance& data);
 
   /**
    * Dispatch a memory span.
@@ -399,10 +423,9 @@ public:
                        uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
                        envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
                            headers_with_underscores_action);
+  bool supportsHttp10() override { return codec_settings_.accept_http_10_; }
 
-  bool supports_http_10() override { return codec_settings_.accept_http_10_; }
-
-private:
+protected:
   /**
    * An active HTTP/1.1 request.
    */
@@ -415,7 +438,11 @@ private:
     ResponseEncoderImpl response_encoder_;
     bool remote_complete_{};
   };
+  absl::optional<ActiveRequest>& activeRequest() { return active_request_; }
+  // ConnectionImpl
+  void onMessageComplete() override;
 
+private:
   /**
    * Manipulate the request's first line, parsing the url and converting to a relative path if
    * necessary. Compute Host / :authority headers based on 7230#5.7 and 7230#6
@@ -434,7 +461,6 @@ private:
   // If upgrade behavior is not allowed, the HCM will have sanitized the headers out.
   bool upgradeAllowed() const override { return true; }
   void onBody(Buffer::Instance& data) override;
-  void onMessageComplete() override;
   void onResetStream(StreamResetReason reason) override;
   void sendProtocolError(absl::string_view details) override;
   void onAboveHighWatermark() override;
