@@ -1387,7 +1387,7 @@ message RateLimit {
       string descriptor_key = 2 [(validate.rules).string = {min_bytes: 1}];
 
       // Optional parameter which determines if the RLS is called if a request header 
-      // is not present. Defaults to false to ensure no breaking behaviour
+      // is not present. Defaults to false to ensure no breaking behaviour.
       bool skip_if_absent = 3;
     }
 
