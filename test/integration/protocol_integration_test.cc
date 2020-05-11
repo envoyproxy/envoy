@@ -448,7 +448,6 @@ TEST_P(ProtocolIntegrationTest, RetryStreamingReset) {
   EXPECT_EQ(512U, response->body().size());
 }
 
-
 TEST_P(ProtocolIntegrationTest, RetryStreamingCancelDueToBufferOverflow) {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
