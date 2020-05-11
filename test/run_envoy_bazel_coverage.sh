@@ -21,7 +21,7 @@ else
   COVERAGE_TARGETS=//test/...
 fi
 
-bazel coverage ${BAZEL_BUILD_OPTIONS} --test_output=errors \
+bazel coverage ${BAZEL_BUILD_OPTIONS} --test_output=all \
     --test_tag_filters=-nocoverage,-fuzz_target --build_tests_only \
     --combined_report=lcov "${COVERAGE_TARGETS}"
 
