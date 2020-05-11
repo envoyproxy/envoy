@@ -199,7 +199,7 @@ public:
   /**
    * @return uint16_t the response code flag value from a generated dns object
    */
-  uint16_t getAnswerResponseCode() { return static_cast<uint16_t>(generated_.flags.rcode); }
+  uint16_t getAnswerResponseCode() { return static_cast<uint16_t>(response_header_.flags.rcode); }
 
   /**
    * @brief Parse the incoming query and create a context object for the filter
@@ -249,7 +249,7 @@ private:
   bool recursion_available_;
   uint64_t retry_count_;
   DnsHeader header_;
-  DnsHeader generated_;
+  DnsHeader response_header_;
 };
 
 } // namespace DnsFilter

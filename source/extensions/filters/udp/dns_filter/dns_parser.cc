@@ -413,37 +413,37 @@ DnsQueryRecordPtr DnsMessageParser::parseDnsQueryRecord(const Buffer::InstancePt
 void DnsMessageParser::setDnsResponseFlags(DnsQueryContextPtr& query_context,
                                            const uint16_t questions, const uint16_t answers) {
   // Copy the transaction ID
-  generated_.id = header_.id;
+  response_header_.id = header_.id;
 
   // Signify that this is a response to a query
-  generated_.flags.qr = 1;
+  response_header_.flags.qr = 1;
 
-  generated_.flags.opcode = header_.flags.opcode;
-  generated_.flags.aa = 0;
-  generated_.flags.tc = 0;
+  response_header_.flags.opcode = header_.flags.opcode;
+  response_header_.flags.aa = 0;
+  response_header_.flags.tc = 0;
 
   // Copy Recursion flags
-  generated_.flags.rd = header_.flags.rd;
+  response_header_.flags.rd = header_.flags.rd;
 
   // Set the recursion flag based on whether Envoy is configured to forward queries
-  generated_.flags.ra = recursion_available_;
+  response_header_.flags.ra = recursion_available_;
 
   // reserved flag is not set
-  generated_.flags.z = 0;
+  response_header_.flags.z = 0;
 
   // Set the authenticated flags to zero
-  generated_.flags.ad = 0;
+  response_header_.flags.ad = 0;
 
-  generated_.flags.cd = 0;
-  generated_.answers = answers;
-  generated_.flags.rcode = query_context->response_code_;
+  response_header_.flags.cd = 0;
+  response_header_.answers = answers;
+  response_header_.flags.rcode = query_context->response_code_;
 
   // Set the number of questions from the incoming query
-  generated_.questions = questions;
+  response_header_.questions = questions;
 
   // We will not include any additional records
-  generated_.authority_rrs = 0;
-  generated_.additional_rrs = 0;
+  response_header_.authority_rrs = 0;
+  response_header_.additional_rrs = 0;
 }
 
 void DnsMessageParser::buildDnsAnswerRecord(DnsQueryContextPtr& context,
@@ -570,16 +570,16 @@ void DnsMessageParser::buildResponseBuffer(DnsQueryContextPtr& query_context,
   setDnsResponseFlags(query_context, serialized_queries, serialized_answers);
 
   // Build the response buffer for transmission to the client
-  buffer.writeBEInt<uint16_t>(generated_.id);
+  buffer.writeBEInt<uint16_t>(response_header_.id);
 
   uint16_t flags;
-  ::memcpy(&flags, static_cast<void*>(&generated_.flags), sizeof(uint16_t));
+  ::memcpy(&flags, static_cast<void*>(&response_header_.flags), sizeof(uint16_t));
   buffer.writeBEInt<uint16_t>(flags);
 
-  buffer.writeBEInt<uint16_t>(generated_.questions);
-  buffer.writeBEInt<uint16_t>(generated_.answers);
-  buffer.writeBEInt<uint16_t>(generated_.authority_rrs);
-  buffer.writeBEInt<uint16_t>(generated_.additional_rrs);
+  buffer.writeBEInt<uint16_t>(response_header_.questions);
+  buffer.writeBEInt<uint16_t>(response_header_.answers);
+  buffer.writeBEInt<uint16_t>(response_header_.authority_rrs);
+  buffer.writeBEInt<uint16_t>(response_header_.additional_rrs);
 
   // write the queries and answers
   buffer.move(query_buffer);

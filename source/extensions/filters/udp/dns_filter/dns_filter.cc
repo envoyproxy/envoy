@@ -253,6 +253,8 @@ bool DnsFilter::resolveViaClusters(DnsQueryContextPtr& context, const DnsQueryRe
     return false;
   }
 
+  // TODO(abaptiste): consider using host weights when returning answer addresses
+
   // Return the address for all discovered endpoints
   size_t discovered_endpoints = 0;
   const uint32_t ttl = getDomainTTL(query.name_);

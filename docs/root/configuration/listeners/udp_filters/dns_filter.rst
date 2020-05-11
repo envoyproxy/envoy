@@ -76,9 +76,9 @@ matching the input query type. If the query is for type A records and no A recor
 Envoy will return no addresses and set the response code appropriately. Conversely, if there are
 matching records for the query type, each configured address is returned. This is also true for
 AAAA records. Only A and AAAA records are supported. If the filter parses other queries for other
-record types, the filter immediately responds indicating that the query is not supported.  The
-filter can also redirect a query for a DNS name to the enpoints of a cluster.  The last domain
-in the configuration demonstrates this.  Along with an address list, a cluster name is a valid
+record types, the filter immediately responds indicating that the query is not supported. The
+filter can also redirect a query for a DNS name to the enpoints of a cluster. The last domain
+in the configuration demonstrates this. Along with an address list, a cluster name is a valid
 endpoint for a DNS name.
 
 The filter can also consume its domain configuration from an external DNS table. The same entities
