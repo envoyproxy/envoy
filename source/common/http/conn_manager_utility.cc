@@ -9,12 +9,14 @@
 #include "common/access_log/access_log_formatter.h"
 #include "common/common/empty_string.h"
 #include "common/common/utility.h"
+#include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
 #include "common/http/path_utility.h"
 #include "common/http/utility.h"
 #include "common/network/utility.h"
+#include "common/runtime/runtime_features.h"
 #include "common/tracing/http_tracer_impl.h"
 
 #include "absl/strings/str_cat.h"
@@ -362,9 +364,10 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(RequestHeaderMap& request
   }
 }
 
-void ConnectionManagerUtility::mutateResponseHeaders(
-    ResponseHeaderMap& response_headers, const RequestHeaderMap* request_headers,
-    const RequestIDExtensionSharedPtr& rid_extension, const std::string& via) {
+void ConnectionManagerUtility::mutateResponseHeaders(ResponseHeaderMap& response_headers,
+                                                     const RequestHeaderMap* request_headers,
+                                                     ConnectionManagerConfig& config,
+                                                     const std::string& via) {
   if (request_headers != nullptr && Utility::isUpgrade(*request_headers) &&
       Utility::isUpgrade(response_headers)) {
     // As in mutateRequestHeaders, Upgrade responses have special handling.
@@ -373,16 +376,26 @@ void ConnectionManagerUtility::mutateResponseHeaders(
     // upgrade response it has already passed the protocol checks.
     const bool no_body =
         (!response_headers.TransferEncoding() && !response_headers.ContentLength());
-    if (no_body) {
+
+    const bool is_1xx = CodeUtility::is1xx(Utility::getResponseStatus(response_headers));
+
+    // We are explicitly forbidden from setting content-length for 1xx responses
+    // (RFC7230, Section 3.3.2). We ignore 204 because this is an upgrade.
+    if (no_body && !is_1xx) {
       response_headers.setContentLength(uint64_t(0));
     }
   } else {
     response_headers.removeConnection();
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.fix_upgrade_response")) {
+      response_headers.removeUpgrade();
+    }
   }
+
   response_headers.removeTransferEncoding();
 
-  if (request_headers != nullptr && request_headers->EnvoyForceTrace()) {
-    rid_extension->setInResponse(response_headers, *request_headers);
+  if (request_headers != nullptr &&
+      (config.alwaysSetRequestIdInResponse() || request_headers->EnvoyForceTrace())) {
+    config.requestIDExtension()->setInResponse(response_headers, *request_headers);
   }
   response_headers.removeKeepAlive();
   response_headers.removeProxyConnection();
@@ -394,7 +407,9 @@ void ConnectionManagerUtility::mutateResponseHeaders(
 
 bool ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_headers,
                                                   const ConnectionManagerConfig& config) {
-  ASSERT(request_headers.Path());
+  if (!request_headers.Path()) {
+    return true; // It's as valid as it is going to get.
+  }
   bool is_valid_path = true;
   if (config.shouldNormalizePath()) {
     is_valid_path = PathUtil::canonicalPath(request_headers);
@@ -404,6 +419,14 @@ bool ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_head
     PathUtil::mergeSlashes(request_headers);
   }
   return is_valid_path;
+}
+
+void ConnectionManagerUtility::maybeNormalizeHost(RequestHeaderMap& request_headers,
+                                                  const ConnectionManagerConfig& config,
+                                                  uint32_t port) {
+  if (config.shouldStripMatchingPort()) {
+    HeaderUtility::stripPortFromHost(request_headers, port);
+  }
 }
 
 } // namespace Http

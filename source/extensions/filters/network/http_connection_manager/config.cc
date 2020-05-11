@@ -196,6 +196,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       drain_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, drain_timeout, 5000)),
       generate_request_id_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, generate_request_id, true)),
       preserve_external_request_id_(config.preserve_external_request_id()),
+      always_set_request_id_in_response_(config.always_set_request_id_in_response()),
       date_provider_(date_provider),
       listener_stats_(Http::ConnectionManagerImpl::generateListenerStats(stats_prefix_,
                                                                          context_.listenerScope())),
@@ -215,8 +216,10 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
                                                       0))),
 #endif
       merge_slashes_(config.merge_slashes()),
+      strip_matching_port_(config.strip_matching_host_port()),
       headers_with_underscores_action_(
-          config.common_http_protocol_options().headers_with_underscores_action()) {
+          config.common_http_protocol_options().headers_with_underscores_action()),
+      preserve_upstream_date_(config.preserve_upstream_date()) {
   // If idle_timeout_ was not configured in common_http_protocol_options, use value in deprecated
   // idle_timeout field.
   // TODO(asraa): Remove when idle_timeout is removed.
@@ -547,11 +550,15 @@ const Network::Address::Instance& HttpConnectionManagerConfig::localAddress() {
  * "envoy.filters.network.http_connection_manager" filter instance.
  */
 const envoy::config::trace::v3::Tracing_Http* HttpConnectionManagerConfig::getPerFilterTracerConfig(
-    const envoy::extensions::filters::network::http_connection_manager::v3::
-        HttpConnectionManager&) {
-  // At the moment, it is not yet possible to define tracing provider as part of
-  // "envoy.filters.network.http_connection_manager" config.
-  // Therefore, we always fallback to using the default server-wide tracing provider.
+    const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+        config) {
+  // Give precedence to tracing provider configuration defined as part of
+  // "envoy.filters.network.http_connection_manager" filter config.
+  if (config.tracing().has_provider()) {
+    return &config.tracing().provider();
+  }
+  // Otherwise, for the sake of backwards compatibility, fallback to using tracing provider
+  // configuration defined in the bootstrap config.
   if (context_.httpContext().defaultTracingConfig().has_http()) {
     return &context_.httpContext().defaultTracingConfig().http();
   }

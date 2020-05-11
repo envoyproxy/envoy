@@ -31,7 +31,7 @@ envoy_cc_extension(
     deps = [
         ":zlib_decompressor_impl_lib",
         "//source/common/http:headers_lib",
-        "//source/extensions/compression/common/decompressor:factory_base_lib",
+        "//source/extensions/compression/common/decompressor:decompressor_factory_base_lib",
         "@envoy_api//envoy/extensions/compression/gzip/decompressor/v3:pkg_cc_proto",
     ],
 )

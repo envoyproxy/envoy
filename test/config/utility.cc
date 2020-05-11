@@ -15,7 +15,6 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/assert.h"
-#include "common/config/resources.h"
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
 
@@ -23,6 +22,7 @@
 #include "test/config/integration/certs/clientcert_hash.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/resources.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_replace.h"

@@ -36,11 +36,12 @@ public:
                         Runtime::Loader& runtime);
 
   Runtime::Loader& runtime() { return runtime_; }
-  Stats::Scope& scope() { return scope_; }
   FilterRequestType requestType() const { return request_type_; }
   const Network::LcTrie::LcTrie<std::string>& trie() const { return *trie_; }
 
-  void incHit(absl::string_view tag) { incCounter(hit_, tag); }
+  void incHit(absl::string_view tag) {
+    incCounter(stat_name_set_->getBuiltin(absl::StrCat(tag, ".hit"), unknown_tag_));
+  }
   void incNoHit() { incCounter(no_hit_); }
   void incTotal() { incCounter(total_); }
 
@@ -59,16 +60,16 @@ private:
     }
   }
 
-  void incCounter(Stats::StatName name1, absl::string_view tag = "");
+  void incCounter(Stats::StatName name);
 
   const FilterRequestType request_type_;
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
   Stats::StatNameSetPtr stat_name_set_;
   const Stats::StatName stats_prefix_;
-  const Stats::StatName hit_;
   const Stats::StatName no_hit_;
   const Stats::StatName total_;
+  const Stats::StatName unknown_tag_;
   std::unique_ptr<Network::LcTrie::LcTrie<std::string>> trie_;
 };
 

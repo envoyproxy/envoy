@@ -35,6 +35,11 @@ public:
    * @return a snapshot of all histograms.
    */
   virtual const std::vector<std::reference_wrapper<const ParentHistogram>>& histograms() PURE;
+
+  /**
+   * @return a snapshot of all text readouts.
+   */
+  virtual const std::vector<std::reference_wrapper<const TextReadout>>& textReadouts() PURE;
 };
 
 /**

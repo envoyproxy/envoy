@@ -23,7 +23,7 @@ Envoy::Compression::Decompressor::DecompressorPtr GzipDecompressorFactory::creat
 }
 
 Envoy::Compression::Decompressor::DecompressorFactoryPtr
-GzipDecompressorLibraryFactory::createDecompressorLibraryFromProtoTyped(
+GzipDecompressorLibraryFactory::createDecompressorFactoryFromProtoTyped(
     const envoy::extensions::compression::gzip::decompressor::v3::Gzip& proto_config) {
   return std::make_unique<GzipDecompressorFactory>(proto_config);
 }

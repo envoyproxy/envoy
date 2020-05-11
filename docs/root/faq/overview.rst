@@ -12,6 +12,21 @@ Build
   build/binaries
   build/boringssl
 
+API
+---
+.. toctree::
+  :maxdepth: 2
+
+  api/envoy_v2_support
+  api/envoy_v3
+  api/envoy_upgrade_v3
+  api/extensions
+  api/control_plane_version_support
+  api/control_plane
+  api/package_naming
+  api/why_versioning
+  api/incremental
+
 Performance
 -----------
 
