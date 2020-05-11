@@ -159,7 +159,7 @@ build:remote-msan --config=rbe-toolchain-msan
 
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/master/toolchains/rbe_toolchains_config.bzl#L8
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:09a5a914c904faa39dbc641181cb43b68cabf626
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:4a5cbb97e1a068661cab495bf40cccc96bb37ca1
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker

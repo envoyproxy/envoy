@@ -42,6 +42,17 @@ template <class T> T fromSanitizedHeaders(const test::fuzz::Headers& headers) {
   return Fuzz::fromHeaders<T>(headers, {"transfer-encoding"});
 }
 
+// Template specialization for TestRequestHeaderMapImpl to include a Host header. This guards
+// against missing host headers in CONNECT requests that would have failed parsing on ingress.
+// TODO(#10878): When proper error handling is introduced for non-dispatching codec calls, remove
+// this and fail gracefully.
+template <>
+TestRequestHeaderMapImpl
+fromSanitizedHeaders<TestRequestHeaderMapImpl>(const test::fuzz::Headers& headers) {
+  return Fuzz::fromHeaders<TestRequestHeaderMapImpl>(headers, {"transfer-encoding"},
+                                                     {":authority"});
+}
+
 // Convert from test proto Http1ServerSettings to Http1Settings.
 Http1Settings fromHttp1Settings(const test::common::http::Http1ServerSettings& settings) {
   Http1Settings h1_settings;
@@ -345,14 +356,20 @@ public:
     bufs_.back().move(data);
   }
 
-  void drain() {
+  Http::Status drain() {
+    Status status = Http::okStatus();
     while (!bufs_.empty()) {
       Buffer::OwnedImpl& buf = bufs_.front();
       while (buf.length() > 0) {
-        connection_.dispatch(buf);
+        status = connection_.dispatch(buf);
+        if (!status.ok()) {
+          ENVOY_LOG_MISC(trace, "Error status: {}", status.message());
+          return status;
+        }
       }
       bufs_.pop_front();
     }
+    return status;
   }
 
   void mutate(uint32_t buffer, uint32_t offset, uint8_t value) {
@@ -472,11 +489,19 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
         return stream->request_.request_decoder_;
       }));
 
-  const auto client_server_buf_drain = [&client_write_buf, &server_write_buf] {
+  auto client_server_buf_drain = [&client_write_buf, &server_write_buf] {
+    Http::Status status = Http::okStatus();
     while (!client_write_buf.empty() || !server_write_buf.empty()) {
-      client_write_buf.drain();
-      server_write_buf.drain();
+      status = client_write_buf.drain();
+      if (!status.ok()) {
+        return status;
+      }
+      status = server_write_buf.drain();
+      if (!status.ok()) {
+        return status;
+      }
     }
+    return status;
   };
 
   // We track whether the connection should be closed for HTTP/1, since stream resets imply
@@ -484,92 +509,103 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
   bool should_close_connection = false;
 
   constexpr auto max_actions = 1024;
-  try {
-    for (int i = 0; i < std::min(max_actions, input.actions().size()) && !should_close_connection;
-         ++i) {
-      const auto& action = input.actions(i);
-      ENVOY_LOG_MISC(trace, "action {} with {} streams", action.DebugString(), streams.size());
-      switch (action.action_selector_case()) {
-      case test::common::http::Action::kNewStream: {
-        if (!http2) {
-          // HTTP/1 codec needs to have existing streams complete, so make it
-          // easier to achieve a successful multi-stream example by flushing.
-          client_server_buf_drain();
-          // HTTP/1 client codec can only have a single active stream.
-          if (!pending_streams.empty() || (!streams.empty() && streams.back()->active())) {
-            ENVOY_LOG_MISC(trace, "Skipping new stream as HTTP/1 and already have existing stream");
-            continue;
-          }
-        }
-        HttpStreamPtr stream = std::make_unique<HttpStream>(
-            *client,
-            fromSanitizedHeaders<TestRequestHeaderMapImpl>(action.new_stream().request_headers()),
-            action.new_stream().end_stream(), [&should_close_connection, http2]() {
-              // HTTP/1 codec has stream reset implying connection close.
-              if (!http2) {
-                should_close_connection = true;
-              }
-            });
-        stream->moveIntoListBack(std::move(stream), pending_streams);
-        break;
-      }
-      case test::common::http::Action::kStreamAction: {
-        const auto& stream_action = action.stream_action();
-        if (streams.empty()) {
+  bool codec_error = false;
+  for (int i = 0; i < std::min(max_actions, input.actions().size()) && !should_close_connection &&
+                  !codec_error;
+       ++i) {
+    const auto& action = input.actions(i);
+    ENVOY_LOG_MISC(trace, "action {} with {} streams", action.DebugString(), streams.size());
+    switch (action.action_selector_case()) {
+    case test::common::http::Action::kNewStream: {
+      if (!http2) {
+        // HTTP/1 codec needs to have existing streams complete, so make it
+        // easier to achieve a successful multi-stream example by flushing.
+        if (!client_server_buf_drain().ok()) {
+          codec_error = true;
           break;
         }
-        // Index into list of created streams (not HTTP/2 level stream ID).
-        const uint32_t stream_id = stream_action.stream_id() % streams.size();
-        ENVOY_LOG_MISC(trace, "action for stream index {}", stream_id);
-        (*std::next(streams.begin(), stream_id))->streamAction(stream_action);
+        // HTTP/1 client codec can only have a single active stream.
+        if (!pending_streams.empty() || (!streams.empty() && streams.back()->active())) {
+          ENVOY_LOG_MISC(trace, "Skipping new stream as HTTP/1 and already have existing stream");
+          continue;
+        }
+      }
+      HttpStreamPtr stream = std::make_unique<HttpStream>(
+          *client,
+          fromSanitizedHeaders<TestRequestHeaderMapImpl>(action.new_stream().request_headers()),
+          action.new_stream().end_stream(), [&should_close_connection, http2]() {
+            // HTTP/1 codec has stream reset implying connection close.
+            if (!http2) {
+              should_close_connection = true;
+            }
+          });
+      stream->moveIntoListBack(std::move(stream), pending_streams);
+      break;
+    }
+    case test::common::http::Action::kStreamAction: {
+      const auto& stream_action = action.stream_action();
+      if (streams.empty()) {
         break;
       }
-      case test::common::http::Action::kMutate: {
-        const auto& mutate = action.mutate();
-        ReorderBuffer& write_buf = mutate.server() ? server_write_buf : client_write_buf;
-        write_buf.mutate(mutate.buffer(), mutate.offset(), mutate.value());
+      // Index into list of created streams (not HTTP/2 level stream ID).
+      const uint32_t stream_id = stream_action.stream_id() % streams.size();
+      ENVOY_LOG_MISC(trace, "action for stream index {}", stream_id);
+      (*std::next(streams.begin(), stream_id))->streamAction(stream_action);
+      break;
+    }
+    case test::common::http::Action::kMutate: {
+      const auto& mutate = action.mutate();
+      ReorderBuffer& write_buf = mutate.server() ? server_write_buf : client_write_buf;
+      write_buf.mutate(mutate.buffer(), mutate.offset(), mutate.value());
+      break;
+    }
+    case test::common::http::Action::kSwapBuffer: {
+      const auto& swap_buffer = action.swap_buffer();
+      ReorderBuffer& write_buf = swap_buffer.server() ? server_write_buf : client_write_buf;
+      write_buf.swap(swap_buffer.buffer());
+      break;
+    }
+    case test::common::http::Action::kClientDrain: {
+      if (!client_write_buf.drain().ok()) {
+        codec_error = true;
         break;
       }
-      case test::common::http::Action::kSwapBuffer: {
-        const auto& swap_buffer = action.swap_buffer();
-        ReorderBuffer& write_buf = swap_buffer.server() ? server_write_buf : client_write_buf;
-        write_buf.swap(swap_buffer.buffer());
+      break;
+    }
+    case test::common::http::Action::kServerDrain: {
+      if (!server_write_buf.drain().ok()) {
+        codec_error = true;
         break;
       }
-      case test::common::http::Action::kClientDrain: {
-        client_write_buf.drain();
+      break;
+    }
+    case test::common::http::Action::kQuiesceDrain: {
+      if (!client_server_buf_drain().ok()) {
+        codec_error = true;
         break;
       }
-      case test::common::http::Action::kServerDrain: {
-        server_write_buf.drain();
+      break;
+    }
+    default:
+      // Maybe nothing is set?
+      break;
+    }
+    if (DebugMode && !should_close_connection && !codec_error) {
+      if (!client_server_buf_drain().ok()) {
+        codec_error = true;
         break;
-      }
-      case test::common::http::Action::kQuiesceDrain: {
-        client_server_buf_drain();
-        break;
-      }
-      default:
-        // Maybe nothing is set?
-        break;
-      }
-      if (DebugMode && !should_close_connection) {
-        client_server_buf_drain();
       }
     }
-    // Drain all remaining buffers, unless the connection is effectively closed.
-    if (!should_close_connection) {
-      client_server_buf_drain();
+  }
+  // Drain all remaining buffers, unless the connection is effectively closed.
+  if (!should_close_connection && !codec_error) {
+    if (!client_server_buf_drain().ok()) {
+      codec_error = true;
     }
-    if (http2) {
-      dynamic_cast<Http2::TestClientConnectionImpl&>(*client).goAway();
-      dynamic_cast<Http2::TestServerConnectionImpl&>(*server).goAway();
-    }
-  } catch (CodecProtocolException& e) {
-    ENVOY_LOG_MISC(debug, "CodecProtocolException {}", e.what());
-  } catch (CodecClientException& e) {
-    ENVOY_LOG_MISC(debug, "CodecClientException {}", e.what());
-  } catch (PrematureResponseException& e) {
-    ENVOY_LOG_MISC(debug, "PrematureResponseException {}", e.what());
+  }
+  if (!codec_error && http2) {
+    dynamic_cast<Http2::TestClientConnectionImpl&>(*client).goAway();
+    dynamic_cast<Http2::TestServerConnectionImpl&>(*server).goAway();
   }
 }
 

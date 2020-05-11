@@ -186,7 +186,7 @@ message AccessLogCommon {
 }
 
 // Flags indicating occurrences during request/response processing.
-// [#next-free-field: 20]
+// [#next-free-field: 21]
 message ResponseFlags {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.data.accesslog.v2.ResponseFlags";
@@ -263,6 +263,9 @@ message ResponseFlags {
 
   // Indicates there was an HTTP protocol error on the downstream request.
   bool downstream_protocol_error = 19;
+
+  // Indicates there was a max stream duration reached on the upstream request.
+  bool upstream_max_stream_duration_reached = 20;
 }
 
 // Properties of a negotiated TLS connection.

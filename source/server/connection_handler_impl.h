@@ -199,7 +199,6 @@ private:
                                public Network::ConnectionCallbacks {
     ActiveTcpConnection(ActiveConnections& active_connections,
                         Network::ConnectionPtr&& new_connection, TimeSource& time_system,
-                        Network::ListenerConfig& config,
                         std::unique_ptr<StreamInfo::StreamInfo>&& stream_info);
     ~ActiveTcpConnection() override;
 
@@ -218,7 +217,6 @@ private:
     ActiveConnections& active_connections_;
     Network::ConnectionPtr connection_;
     Stats::TimespanPtr conn_length_;
-    Network::ListenerConfig& config_;
   };
 
   /**

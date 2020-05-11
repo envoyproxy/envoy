@@ -6,17 +6,17 @@ HTTP upgrades
 Envoy Upgrade support is intended mainly for WebSocket and CONNECT support, but may be used for
 arbitrary upgrades as well. Upgrades pass both the HTTP headers and the upgrade payload
 through an HTTP filter chain. One may configure the
-:ref:`upgrade_configs <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.upgrade_configs>`
+:ref:`upgrade_configs <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.upgrade_configs>`
 with or without custom filter chains. If only the
-:ref:`upgrade_type <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.UpgradeConfig.upgrade_type>`
+:ref:`upgrade_type <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.UpgradeConfig.upgrade_type>`
 is specified, both the upgrade headers, any request and response body, and HTTP data payload will
 pass through the default HTTP filter chain. To avoid the use of HTTP-only filters for upgrade payload,
 one can set up custom
-:ref:`filters <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.UpgradeConfig.filters>`
+:ref:`filters <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.UpgradeConfig.filters>`
 for the given upgrade type, up to and including only using the router filter to send the HTTP
 data upstream.
 
-Upgrades can be enabled or disabled on a :ref:`per-route <envoy_api_field_route.RouteAction.upgrade_configs>` basis.
+Upgrades can be enabled or disabled on a :ref:`per-route <envoy_v3_api_field_config.route.v3.RouteAction.upgrade_configs>` basis.
 Any per-route enabling/disabling automatically overrides HttpConnectionManager configuration as
 laid out below, but custom filter chains can only be configured on a per-HttpConnectionManager basis.
 
@@ -49,7 +49,7 @@ In this case, if a client is for example using WebSocket, we want the Websocket 
 upstream server functionally intact, which means it needs to traverse the HTTP/2 hop.
 
 This is accomplished via `extended CONNECT <https://tools.ietf.org/html/rfc8441>`_ support,
-turned on by setting :ref:`allow_connect <envoy_api_field_core.Http2ProtocolOptions.allow_connect>`
+turned on by setting :ref:`allow_connect <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.allow_connect>`
 true at the second layer Envoy. The
 WebSocket request will be transformed into an HTTP/2 CONNECT stream, with :protocol header
 indicating the original upgrade, traverse the HTTP/2 hop, and be downgraded back into an HTTP/1
@@ -89,3 +89,17 @@ upgrade requests or responses with bodies.
 .. This mode of CONNECT support can create major security holes if configured correctly, as the upstream
 .. will be forwarded *unsanitized* headers if they are in the body payload. Please use with caution
 
+.. Tunneling TCP over HTTP/2
+.. ^^^^^^^^^^^^^^^^^^^^^^^^^
+.. Envoy also has support for transforming raw TCP into HTTP/2 CONNECT requests. This can be used to
+.. proxy multiplexed TCP over pre-warmed secure connections and amortize the cost of any TLS handshake.
+.. An example set up proxying SMTP would look something like this
+..
+.. [SMTP Upstream] --- raw SMTP --- [L2 Envoy]  --- SMTP tunneled over HTTP/2  --- [L1 Envoy]  --- raw SMTP  --- [Client]
+..
+.. Examples of such a set up can be found in the Envoy example config `directory <https://github.com/envoyproxy/envoy/tree/master/configs/>`
+.. If you run `bazel-bin/source/exe/envoy-static --config-path configs/encapsulate_in_connect.yaml --base-id 1`
+.. and `bazel-bin/source/exe/envoy-static --config-path  configs/terminate_connect.yaml`
+.. you will be running two Envoys, the first listening for TCP traffic on port 10000 and encapsulating it in an HTTP/2
+.. CONNECT request, and the second listening for HTTP/2 on 10001, stripping the CONNECT headers, and forwarding the
+.. original TCP upstream, in this case to google.com.
