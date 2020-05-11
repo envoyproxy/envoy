@@ -82,7 +82,7 @@ enum class AtomicPtrAllocMode { DoNotDelete, DeleteOnDestruct };
 
 // Manages an array of atomic pointers to T, providing a relatively
 // contention-free mechanism to lazily get a T* at an index, where the caller
-// provides a mechanism to instantiate a T* under lock, if one is not already
+// provides a mechanism to instantiate a T* under lock, if one has not already
 // been stored at that index.
 //
 // alloc_mode controls whether allocated T* entries should be deleted on
@@ -140,9 +140,9 @@ private:
   absl::Mutex mutex_;
 };
 
-// Manages a pointers to T, providing a relatively contention-free mechanism to
+// Manages a pointer to T, providing a relatively contention-free mechanism to
 // lazily create a T*, where the caller provides a mechanism to instantiate a
-// T* under lock, if one is not already been stored.
+// T* under lock, if one has not already been stored.
 //
 // alloc_mode controls whether allocated T* objects should be deleted on
 // destruction of the AtomicObject. This should be set to
