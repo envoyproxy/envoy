@@ -178,7 +178,7 @@ public:
     return std::to_string(key).append("#").append(std::to_string(order));
   }
 
-  virtual ~HazelcastCache() = default;
+  ~HazelcastCache() override = default;
 
 protected:
   /** Cache mode */

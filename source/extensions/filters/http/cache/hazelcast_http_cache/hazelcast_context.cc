@@ -39,12 +39,12 @@ void HazelcastLookupContextBase::handleLookupFailure(absl::string_view message,
 void HazelcastLookupContextBase::createVariantKey(Key& raw_key) {
   ASSERT(raw_key.custom_fields_size() == 0);
   ASSERT(raw_key.custom_ints_size() == 0); // Key must be pure.
-  if (lookup_request_.vary_headers().empty()) {
+  if (lookup_request_.varyHeaders().empty()) {
     return;
   }
   std::vector<std::pair<std::string, std::string>> header_strings;
 
-  for (const Http::HeaderEntry& header : lookup_request_.vary_headers()) {
+  for (const Http::HeaderEntry& header : lookup_request_.varyHeaders()) {
     header_strings.push_back(std::make_pair(std::string(header.key().getStringView()),
                                             std::string(header.value().getStringView())));
   }
@@ -101,12 +101,12 @@ void UnifiedLookupContext::getHeaders(LookupHeadersCallback&& cb) {
   ENVOY_LOG(debug, "Looking up unified response with key: {}u", variant_hash_key_);
   try {
     response_ = hz_cache_.getResponse(variant_hash_key_);
-  } catch (HazelcastClientOfflineException e) {
+  } catch (HazelcastClientOfflineException& e) {
     handleLookupFailure("Hazelcast cluster connection is lost! Aborting lookups and "
                         "insertions until the connection is restored...",
                         cb);
     return;
-  } catch (OperationTimeoutException e) {
+  } catch (OperationTimeoutException& e) {
     handleLookupFailure("Operation timed out during cache lookup.", cb);
     return;
   } catch (std::exception& e) {
@@ -207,9 +207,9 @@ void UnifiedInsertContext::insertResponse() {
   HazelcastResponseEntry entry(std::move(header), std::move(body));
   try {
     hz_cache_.putResponseIfAbsent(variant_hash_key_, entry);
-  } catch (HazelcastClientOfflineException e) {
+  } catch (HazelcastClientOfflineException& e) {
     ENVOY_LOG(warn, "Hazelcast cluster connection is lost! Failed to insert response.");
-  } catch (OperationTimeoutException e) {
+  } catch (OperationTimeoutException& e) {
     ENVOY_LOG(warn, "Operation timed out during cache insertion.");
   } catch (std::exception& e) {
     ENVOY_LOG(warn, "Response insertion to cache has failed: {}", e.what());
@@ -225,12 +225,12 @@ void DividedLookupContext::getHeaders(LookupHeadersCallback&& cb) {
   HazelcastHeaderPtr header_entry;
   try {
     header_entry = hz_cache_.getHeader(variant_hash_key_);
-  } catch (HazelcastClientOfflineException e) {
+  } catch (HazelcastClientOfflineException& e) {
     handleLookupFailure("Hazelcast cluster connection is lost! Aborting lookups and "
                         "insertions until the connection is restored.",
                         cb);
     return;
-  } catch (OperationTimeoutException e) {
+  } catch (OperationTimeoutException& e) {
     handleLookupFailure("Operation timed out during cache lookup.", cb);
     return;
   } catch (std::exception& e) {
@@ -263,7 +263,7 @@ void DividedLookupContext::getHeaders(LookupHeadersCallback&& cb) {
     // Hazelcast cluster.
     try {
       abort_insertion_ = !hz_cache_.tryLock(variant_hash_key_);
-    } catch (HazelcastClientOfflineException e) {
+    } catch (HazelcastClientOfflineException& e) {
       handleLookupFailure("Hazelcast cluster connection is lost! Aborting lookups and insertions"
                           " until the connection is restored...",
                           cb);
@@ -300,12 +300,12 @@ void DividedLookupContext::getBody(const AdjustedByteRange& range, LookupBodyCal
             body_index);
   try {
     body = hz_cache_.getBody(variant_hash_key_, body_index);
-  } catch (HazelcastClientOfflineException e) {
+  } catch (HazelcastClientOfflineException& e) {
     handleBodyLookupFailure("Hazelcast cluster connection is lost! Aborting lookups and "
                             "insertions until the connection is restored...",
                             cb);
     return;
-  } catch (OperationTimeoutException e) {
+  } catch (OperationTimeoutException& e) {
     handleBodyLookupFailure("Operation timed out during cache lookup.", cb);
     return;
   } catch (std::exception& e) {
@@ -448,10 +448,10 @@ bool DividedInsertContext::flushBuffer() {
   buffer_vector_.clear();
   try {
     hz_cache_.putBody(variant_hash_key_, body_order_++, bodyEntry);
-  } catch (HazelcastClientOfflineException e) {
+  } catch (HazelcastClientOfflineException& e) {
     ENVOY_LOG(warn, "Hazelcast cluster connection is lost!");
     return false;
-  } catch (OperationTimeoutException e) {
+  } catch (OperationTimeoutException& e) {
     ENVOY_LOG(warn, "Operation timed out during body insertion.");
     return false;
   } catch (std::exception& e) {
@@ -478,7 +478,7 @@ void DividedInsertContext::insertHeader() {
     hz_cache_.putHeader(variant_hash_key_, header);
     hz_cache_.unlock(variant_hash_key_);
     ENVOY_LOG(debug, "Inserted header entry with key {}u", variant_hash_key_);
-  } catch (HazelcastClientOfflineException e) {
+  } catch (HazelcastClientOfflineException& e) {
     ENVOY_LOG(warn, "Hazelcast Connection is offline!");
     // To handle leftover locks, hazelcast.lock.max.lease.time.seconds property must
     // be set to a reasonable value on the server side. It is Long.MAX by default.

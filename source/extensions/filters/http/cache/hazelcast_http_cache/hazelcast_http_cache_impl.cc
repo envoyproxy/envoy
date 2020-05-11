@@ -42,9 +42,9 @@ void HazelcastHttpCache::updateHeaders(LookupContextPtr&& lookup_context,
     } else {
       updateDividedHeaders(std::move(lookup_context), std::move(response_headers));
     }
-  } catch (HazelcastClientOfflineException e) {
+  } catch (HazelcastClientOfflineException& e) {
     ENVOY_LOG(warn, "Hazelcast Connection is offline!");
-  } catch (OperationTimeoutException e) {
+  } catch (OperationTimeoutException& e) {
     ENVOY_LOG(warn, "Updating headers has timed out.");
   } catch (std::exception& e) {
     ENVOY_LOG(warn, "Updating headers has failed: {}", e.what());
@@ -100,10 +100,10 @@ void HazelcastHttpCache::onMissingBody(uint64_t key, int32_t version, uint64_t b
     }
     getHeaderMap().remove(mapKey(key));
     unlock(key);
-  } catch (HazelcastClientOfflineException e) {
+  } catch (HazelcastClientOfflineException& e) {
     // see DividedInsertContext#insertHeader() for left over locks on a connection failure.
     ENVOY_LOG(warn, "Hazelcast Connection is offline!");
-  } catch (OperationTimeoutException e) {
+  } catch (OperationTimeoutException& e) {
     ENVOY_LOG(warn, "Clean up for missing body has timed out.");
   } catch (std::exception& e) {
     ENVOY_LOG(warn, "Clean up for missing body has failed: {}", e.what());

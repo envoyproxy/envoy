@@ -1,5 +1,7 @@
 #include "extensions/filters/http/cache/hazelcast_http_cache/hazelcast_cache_entry.h"
 
+#include "common/protobuf/utility.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -78,6 +80,12 @@ HazelcastHeaderEntry::HazelcastHeaderEntry(HazelcastHeaderEntry&& other) noexcep
     : header_map_(std::move(other.header_map_)), variant_key_(std::move(other.variant_key_)),
       body_size_(other.body_size_), version_(other.version_) {}
 
+bool HazelcastHeaderEntry::operator==(const HazelcastHeaderEntry& other) const {
+  return body_size_ == other.body_size_ && version_ == other.version_ &&
+         Envoy::Protobuf::util::MessageDifferencer::Equals(variant_key_, other.variant_key_) &&
+         *header_map_ == *other.header_map_;
+}
+
 void HazelcastBodyEntry::writeData(ObjectDataOutput& writer) const {
   writeUnifiedData(writer);
   writer.writeInt(version_);
@@ -109,6 +117,10 @@ HazelcastBodyEntry::HazelcastBodyEntry(const HazelcastBodyEntry& other) {
 HazelcastBodyEntry::HazelcastBodyEntry(HazelcastBodyEntry&& other) noexcept
     : version_(other.version_), body_buffer_(std::move(other.body_buffer_)) {}
 
+bool HazelcastBodyEntry::operator==(const HazelcastBodyEntry& other) const {
+  return version_ == other.version_ && body_buffer_ == other.body_buffer_;
+}
+
 void HazelcastResponseEntry::writeData(ObjectDataOutput& writer) const {
   response_header_.writeUnifiedData(writer);
   response_body_.writeUnifiedData(writer);
@@ -124,6 +136,14 @@ HazelcastResponseEntry::HazelcastResponseEntry() = default;
 HazelcastResponseEntry::HazelcastResponseEntry(HazelcastHeaderEntry&& header,
                                                HazelcastBodyEntry&& body)
     : response_header_(std::move(header)), response_body_(std::move(body)){};
+
+bool HazelcastResponseEntry::operator==(const HazelcastResponseEntry& other) const {
+  // Ignore the fields not written to distributed map.
+  return response_body_.buffer() == other.body().buffer() &&
+         Envoy::Protobuf::util::MessageDifferencer::Equals(response_header_.variantKey(),
+                                                           other.header().variantKey()) &&
+         *response_header_.headerMap() == *other.header().headerMap();
+}
 
 } // namespace HazelcastHttpCache
 } // namespace Cache

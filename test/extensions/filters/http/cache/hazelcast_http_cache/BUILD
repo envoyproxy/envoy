@@ -45,6 +45,15 @@ envoy_extension_cc_test(
     ],
 )
 
+envoy_extension_cc_test(
+    name = "hazelcast_serialization_test",
+    srcs = ["serialization_test.cc"],
+    extension_name = "envoy.filters.http.cache.hazelcast_http_cache",
+    deps = [
+        ":hazelcast_test_lib",
+    ],
+)
+
 envoy_extension_cc_test_library(
     name = "hazelcast_test_lib",
     srcs = ["hazelcast_test_cache.cc"],
