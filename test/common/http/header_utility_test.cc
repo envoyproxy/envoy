@@ -2,6 +2,7 @@
 #include <vector>
 
 #include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/http/protocol.h"
 #include "envoy/json/json_object.h"
 
 #include "common/http/header_utility.h"
@@ -547,6 +548,26 @@ TEST(HeaderIsValidTest, HeaderNameContainsUnderscore) {
   EXPECT_TRUE(HeaderUtility::headerNameContainsUnderscore("_cookie"));
   EXPECT_TRUE(HeaderUtility::headerNameContainsUnderscore("cookie_"));
   EXPECT_TRUE(HeaderUtility::headerNameContainsUnderscore("x_something"));
+}
+
+TEST(PercentEncoding, ShouldCloseConnection) {
+  EXPECT_TRUE(HeaderUtility::shouldCloseConnection(Protocol::Http10,
+                                                   TestRequestHeaderMapImpl{{"foo", "bar"}}));
+  EXPECT_FALSE(HeaderUtility::shouldCloseConnection(
+      Protocol::Http10, TestRequestHeaderMapImpl{{"connection", "keep-alive"}}));
+  EXPECT_FALSE(HeaderUtility::shouldCloseConnection(
+      Protocol::Http10, TestRequestHeaderMapImpl{{"connection", "foo, keep-alive"}}));
+
+  EXPECT_FALSE(HeaderUtility::shouldCloseConnection(Protocol::Http11,
+                                                    TestRequestHeaderMapImpl{{"foo", "bar"}}));
+  EXPECT_TRUE(HeaderUtility::shouldCloseConnection(
+      Protocol::Http11, TestRequestHeaderMapImpl{{"connection", "close"}}));
+  EXPECT_TRUE(HeaderUtility::shouldCloseConnection(
+      Protocol::Http11, TestRequestHeaderMapImpl{{"connection", "te,close"}}));
+  EXPECT_TRUE(HeaderUtility::shouldCloseConnection(
+      Protocol::Http11, TestRequestHeaderMapImpl{{"proxy-connection", "close"}}));
+  EXPECT_TRUE(HeaderUtility::shouldCloseConnection(
+      Protocol::Http11, TestRequestHeaderMapImpl{{"proxy-connection", "foo,close"}}));
 }
 
 } // namespace Http

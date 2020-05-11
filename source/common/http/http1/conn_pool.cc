@@ -12,6 +12,7 @@
 
 #include "common/http/codec_client.h"
 #include "common/http/codes.h"
+#include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/runtime/runtime_features.h"
 
@@ -81,23 +82,30 @@ ConnPoolImpl::StreamWrapper::~StreamWrapper() {
 void ConnPoolImpl::StreamWrapper::onEncodeComplete() { encode_complete_ = true; }
 
 void ConnPoolImpl::StreamWrapper::decodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) {
-  // If Connection: close OR
-  //    Http/1.0 and not Connection: keep-alive OR
-  //    Proxy-Connection: close
-  if ((headers->Connection() &&
-       (absl::EqualsIgnoreCase(headers->Connection()->value().getStringView(),
-                               Headers::get().ConnectionValues.Close))) ||
-      (parent_.codec_client_->protocol() == Protocol::Http10 &&
-       (!headers->Connection() ||
-        !absl::EqualsIgnoreCase(headers->Connection()->value().getStringView(),
-                                Headers::get().ConnectionValues.KeepAlive))) ||
-      (headers->ProxyConnection() &&
-       (absl::EqualsIgnoreCase(headers->ProxyConnection()->value().getStringView(),
-                               Headers::get().ConnectionValues.Close)))) {
-    parent_.parent_.host_->cluster().stats().upstream_cx_close_notify_.inc();
-    close_connection_ = true;
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.fixed_connection_close")) {
+    close_connection_ =
+        HeaderUtility::shouldCloseConnection(parent_.codec_client_->protocol(), *headers);
+    if (close_connection_) {
+      parent_.parent_.host_->cluster().stats().upstream_cx_close_notify_.inc();
+    }
+  } else {
+    // If Connection: close OR
+    //    Http/1.0 and not Connection: keep-alive OR
+    //    Proxy-Connection: close
+    if ((headers->Connection() &&
+         (absl::EqualsIgnoreCase(headers->Connection()->value().getStringView(),
+                                 Headers::get().ConnectionValues.Close))) ||
+        (parent_.codec_client_->protocol() == Protocol::Http10 &&
+         (!headers->Connection() ||
+          !absl::EqualsIgnoreCase(headers->Connection()->value().getStringView(),
+                                  Headers::get().ConnectionValues.KeepAlive))) ||
+        (headers->ProxyConnection() &&
+         (absl::EqualsIgnoreCase(headers->ProxyConnection()->value().getStringView(),
+                                 Headers::get().ConnectionValues.Close)))) {
+      parent_.parent_.host_->cluster().stats().upstream_cx_close_notify_.inc();
+      close_connection_ = true;
+    }
   }
-
   ResponseDecoderWrapper::decodeHeaders(std::move(headers), end_stream);
 }
 
