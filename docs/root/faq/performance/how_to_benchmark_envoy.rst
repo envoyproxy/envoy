@@ -44,7 +44,10 @@ the following guidance:
 
 * Make sure you are aware of how connections created by your load generator are
   distributed across Envoy worker threads. This is especially important for
-  benchmarks that use low connection counts and perfect keep-alive.
+  benchmarks that use low connection counts and perfect keep-alive. You should be aware that
+  Envoy will allocate all streams for a given connection to a single worker thread. This means,
+  for example, that if you have 72 logical cores and worker threads, but only a single HTTP/2
+  connection from your load generator, then only 1 worker thread will be active.
 
 * Make sure request-release timing expectations line up with what is intended.
   Some load generators produce naturally jittery and/or batchy timings. This
