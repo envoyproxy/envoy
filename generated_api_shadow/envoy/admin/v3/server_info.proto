@@ -95,7 +95,7 @@ message CommandLineOptions {
   // See :option:`--reject-unknown-dynamic-fields` for details.
   bool reject_unknown_dynamic_fields = 26;
 
-  // See :option:`--ignore_unknown_dynamic_fields` for details.
+  // See :option:`--ignore-unknown-dynamic-fields` for details.
   bool ignore_unknown_dynamic_fields = 30;
 
   // See :option:`--admin-address-path` for details.
