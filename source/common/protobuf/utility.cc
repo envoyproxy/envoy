@@ -8,6 +8,7 @@
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/common/assert.h"
+#include "common/common/documentation_url.h"
 #include "common/common/fmt.h"
 #include "common/config/api_type_oracle.h"
 #include "common/config/version_converter.h"
@@ -198,11 +199,9 @@ void deprecatedFieldHelper(Runtime::Loader* runtime, bool proto_annotated_as_dep
   if (warn_only) {
     ENVOY_LOG_MISC(warn, "{}", with_overridden);
   } else {
-    const char fatal_error[] =
-        " If continued use of this field is absolutely necessary, see "
-        "https://www.envoyproxy.io/docs/envoy/latest/configuration/operations/runtime"
-        "#using-runtime-overrides-for-deprecated-features for how to apply a temporary and "
-        "highly discouraged override.";
+    const char fatal_error[] = " If continued use of this field is absolutely necessary, "
+                               "see " ENVOY_DOC_URL_RUNTIME_OVERRIDE_DEPRECATED " for how "
+                               "to apply a temporary and highly discouraged override.";
     throw ProtoValidationException(with_overridden + fatal_error, message);
   }
 }
@@ -408,8 +407,7 @@ void checkForDeprecatedNonRepeatedEnumValue(const Protobuf::Message& message,
                    enum_value_descriptor->name(), " for enum '", field->full_name(), "' from file ",
                    filename, ". This enum value will be removed from Envoy soon",
                    (default_value ? " so a non-default value must now be explicitly set" : ""),
-                   ". Please see https://www.envoyproxy.io/docs/envoy/latest/intro/deprecated "
-                   "for details.");
+                   ". Please see " ENVOY_DOC_URL_VERSION_HISTORY " for details.");
   deprecatedFieldHelper(
       runtime, true /*deprecated*/,
       enum_value_descriptor->options().GetExtension(envoy::annotations::disallowed_by_default_enum),
@@ -440,11 +438,10 @@ public:
 
     // If this field is deprecated, warn or throw an error.
     if (field.options().deprecated()) {
-      const std::string warning = absl::StrCat(
-          "Using {}deprecated option '", field.full_name(), "' from file ", filename,
-          ". This configuration will be removed from "
-          "Envoy soon. Please see https://www.envoyproxy.io/docs/envoy/latest/intro/deprecated "
-          "for details.");
+      const std::string warning =
+          absl::StrCat("Using {}deprecated option '", field.full_name(), "' from file ", filename,
+                       ". This configuration will be removed from "
+                       "Envoy soon. Please see " ENVOY_DOC_URL_VERSION_HISTORY " for details.");
 
       deprecatedFieldHelper(runtime_, true /*deprecated*/,
                             field.options().GetExtension(envoy::annotations::disallowed_by_default),

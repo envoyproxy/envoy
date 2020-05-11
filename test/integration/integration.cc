@@ -518,18 +518,17 @@ void BaseIntegrationTest::createTestServer(const std::string& json_path,
 void BaseIntegrationTest::sendRawHttpAndWaitForResponse(int port, const char* raw_http,
                                                         std::string* response,
                                                         bool disconnect_after_headers_complete) {
-  Buffer::OwnedImpl buffer(raw_http);
-  RawConnectionDriver connection(
-      port, buffer,
-      [&](Network::ClientConnection& client, const Buffer::Instance& data) -> void {
+  auto connection = createConnectionDriver(
+      port, raw_http,
+      [response, disconnect_after_headers_complete](Network::ClientConnection& client,
+                                                    const Buffer::Instance& data) -> void {
         response->append(data.toString());
         if (disconnect_after_headers_complete && response->find("\r\n\r\n") != std::string::npos) {
           client.close(Network::ConnectionCloseType::NoFlush);
         }
-      },
-      version_);
+      });
 
-  connection.run();
+  connection->run();
 }
 
 IntegrationTestServerPtr BaseIntegrationTest::createIntegrationTestServer(

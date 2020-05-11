@@ -179,6 +179,7 @@ MSET
 MSVC
 MTLS
 MTU
+MULTIFRAME
 NACK
 NACKed
 NACKs
@@ -227,6 +228,7 @@ PROT
 Postgre
 Postgres
 Prereq
+QDCOUNT
 QUIC
 QoS
 RAII
@@ -421,6 +423,7 @@ builtins
 bulkstrings
 bursty
 bytecode
+bytestream
 cacheability
 callee
 callsite
@@ -475,6 +478,7 @@ coroutines
 cors
 cout
 coverity
+cplusplus
 cpuset
 creds
 crypto

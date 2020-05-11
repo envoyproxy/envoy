@@ -4,14 +4,14 @@ DynamoDB
 ========
 
 * DynamoDB :ref:`architecture overview <arch_overview_dynamo>`
-* :ref:`v2 API reference <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpFilter.name>`
+* :ref:`v3 API reference <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.name>`
 * This filter should be configured with the name *envoy.filters.http.dynamo*.
 
 Statistics
 ----------
 
 The DynamoDB filter outputs statistics in the *http.<stat_prefix>.dynamodb.* namespace. The :ref:`stat prefix
-<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.stat_prefix>` comes from the
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stat_prefix>` comes from the
 owning HTTP connection manager.
 
 Per operation stats can be found in the *http.<stat_prefix>.dynamodb.operation.<operation_name>.*

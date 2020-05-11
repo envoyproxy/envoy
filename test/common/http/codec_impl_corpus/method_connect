@@ -1,0 +1,10 @@
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "CONNECT"
+      }
+    }
+  }
+}

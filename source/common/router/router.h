@@ -265,6 +265,7 @@ public:
                                UpstreamRequest& upstream_request) PURE;
   virtual void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) PURE;
   virtual void onPerTryTimeout(UpstreamRequest& upstream_request) PURE;
+  virtual void onStreamMaxDurationReached(UpstreamRequest& upstream_request) PURE;
 
   virtual Http::StreamDecoderFilterCallbacks* callbacks() PURE;
   virtual Upstream::ClusterInfoConstSharedPtr cluster() PURE;
@@ -432,6 +433,7 @@ public:
                        UpstreamRequest& upstream_request) override;
   void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) override;
   void onPerTryTimeout(UpstreamRequest& upstream_request) override;
+  void onStreamMaxDurationReached(UpstreamRequest& upstream_request) override;
   Http::StreamDecoderFilterCallbacks* callbacks() override { return callbacks_; }
   Upstream::ClusterInfoConstSharedPtr cluster() override { return cluster_; }
   FilterConfig& config() override { return config_; }
@@ -467,6 +469,12 @@ private:
                    const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
                    Runtime::Loader& runtime, Runtime::RandomGenerator& random,
                    Event::Dispatcher& dispatcher, Upstream::ResourcePriority priority) PURE;
+
+  using HttpOrTcpPool =
+      absl::variant<Http::ConnectionPool::Instance*, Tcp::ConnectionPool::Instance*>;
+  HttpOrTcpPool createConnPool(Upstream::HostDescriptionConstSharedPtr& host);
+  UpstreamRequestPtr createUpstreamRequest(Filter::HttpOrTcpPool conn_pool);
+
   Http::ConnectionPool::Instance* getHttpConnPool();
   void maybeDoShadowing();
   bool maybeRetryReset(Http::StreamResetReason reset_reason, UpstreamRequest& upstream_request);

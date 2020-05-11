@@ -127,11 +127,19 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
     return;
   }
 
-  // If we are still waiting for primary clusters to initialize, do nothing.
-  ASSERT(state_ == State::WaitingToStartSecondaryInitialization || state_ == State::CdsInitialized);
+  ASSERT(state_ == State::WaitingToStartSecondaryInitialization ||
+         state_ == State::CdsInitialized ||
+         state_ == State::WaitingForPrimaryInitializationToComplete);
   ENVOY_LOG(debug, "maybe finish initialize primary init clusters empty: {}",
             primary_init_clusters_.empty());
+  // If we are still waiting for primary clusters to initialize, do nothing.
   if (!primary_init_clusters_.empty()) {
+    return;
+  } else if (state_ == State::WaitingForPrimaryInitializationToComplete) {
+    state_ = State::WaitingToStartSecondaryInitialization;
+    if (primary_clusters_initialized_callback_) {
+      primary_clusters_initialized_callback_();
+    }
     return;
   }
 
@@ -179,7 +187,8 @@ void ClusterManagerInitHelper::onStaticLoadComplete() {
   ASSERT(state_ == State::Loading);
   // After initialization of primary clusters has completed, transition to
   // waiting for signal to initialize secondary clusters and then CDS.
-  state_ = State::WaitingToStartSecondaryInitialization;
+  state_ = State::WaitingForPrimaryInitializationToComplete;
+  maybeFinishInitialize();
 }
 
 void ClusterManagerInitHelper::startInitializingSecondaryClusters() {
@@ -200,11 +209,25 @@ void ClusterManagerInitHelper::setCds(CdsApi* cds) {
   }
 }
 
-void ClusterManagerInitHelper::setInitializedCb(std::function<void()> callback) {
+void ClusterManagerInitHelper::setInitializedCb(
+    ClusterManager::InitializationCompleteCallback callback) {
   if (state_ == State::AllClustersInitialized) {
     callback();
   } else {
     initialized_callback_ = callback;
+  }
+}
+
+void ClusterManagerInitHelper::setPrimaryClustersInitializedCb(
+    ClusterManager::PrimaryClustersReadyCallback callback) {
+  // The callback must be set before or at the `WaitingToStartSecondaryInitialization` state.
+  ASSERT(state_ == State::WaitingToStartSecondaryInitialization ||
+         state_ == State::WaitingForPrimaryInitializationToComplete || state_ == State::Loading);
+  if (state_ == State::WaitingToStartSecondaryInitialization) {
+    // This is the case where all clusters are STATIC and without health checking.
+    callback();
+  } else {
+    primary_clusters_initialized_callback_ = callback;
   }
 }
 
