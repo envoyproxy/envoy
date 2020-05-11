@@ -26,7 +26,7 @@ MockMirrorPolicy::MockMirrorPolicy(ConnPool::InstanceSharedPtr conn_pool)
   ON_CALL(*this, shouldMirror(_)).WillByDefault(Return(true));
 }
 
-MockFaultManager::MockFaultManager() {}
+MockFaultManager::MockFaultManager() = default;
 MockFaultManager::MockFaultManager(const MockFaultManager&) {}
 MockFaultManager::~MockFaultManager() = default;
 

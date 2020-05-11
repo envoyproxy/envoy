@@ -2,8 +2,6 @@
 
 #include <string>
 
-#include "envoy/api/api.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {

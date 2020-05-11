@@ -43,7 +43,7 @@ Fault::Fault(envoy::extensions::filters::network::redis_proxy::v3::RedisProxy_Re
 std::vector<std::string> Fault::buildCommands(
     envoy::extensions::filters::network::redis_proxy::v3::RedisProxy_RedisFault base_fault) {
   std::vector<std::string> commands;
-  for (auto command : base_fault.commands()) {
+  for (const std::string& command : base_fault.commands()) {
     commands.emplace_back(absl::AsciiStrToLower(command));
   }
   return commands;
@@ -67,8 +67,8 @@ FaultMap FaultManagerImpl::buildFaultMap(
   FaultMap fault_map;
   for (auto base_fault : faults) {
     auto fault_ptr = std::make_shared<Fault>(base_fault);
-    if (fault_ptr->commands().size() > 0) {
-      for (std::string command : fault_ptr->commands()) {
+    if (!fault_ptr->commands().empty()) {
+      for (const std::string& command : fault_ptr->commands()) {
         fault_map[command].emplace_back(fault_ptr);
       }
     } else {
@@ -82,7 +82,7 @@ FaultMap FaultManagerImpl::buildFaultMap(
   FaultMap::iterator it_outer = fault_map.find(FaultManagerImpl::ALL_KEY);
   if (it_outer != fault_map.end()) {
     // For each ALL_KEY fault...
-    for (auto fault_ptr : it_outer->second) {
+    for (const FaultPtr& fault_ptr : it_outer->second) {
       // Loop through all unique commands other than ALL_KEY and add the fault.
       FaultMap::iterator it_inner;
       for (it_inner = fault_map.begin(); it_inner != fault_map.end(); it_inner++) {
@@ -114,7 +114,7 @@ FaultManagerImpl::getFaultForCommandInternal(std::string command) const {
     auto random_number = random_.random() % 100;
     int amortized_fault = 0;
 
-    for (auto fault_ptr : it_outer->second) {
+    for (const FaultPtr& fault_ptr : it_outer->second) {
       uint64_t fault_injection_percentage;
       if (fault_ptr->runtimeKey().has_value()) {
         fault_injection_percentage = runtime_.snapshot().getInteger(fault_ptr->runtimeKey().value(),

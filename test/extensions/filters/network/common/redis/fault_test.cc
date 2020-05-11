@@ -10,7 +10,6 @@
 
 #include "gtest/gtest.h"
 
-using testing::InSequence;
 using testing::Return;
 
 namespace Envoy {
