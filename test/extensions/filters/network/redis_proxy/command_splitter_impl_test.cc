@@ -12,6 +12,7 @@
 #include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/extensions/filters/network/redis_proxy/mocks.h"
 #include "test/mocks/common.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 
@@ -32,7 +33,10 @@ namespace CommandSplitter {
 class RedisCommandSplitterImplTest : public testing::Test {
 public:
   RedisCommandSplitterImplTest() : RedisCommandSplitterImplTest(false) {}
-  RedisCommandSplitterImplTest(bool latency_in_macro) : latency_in_micros_(latency_in_macro) {}
+  RedisCommandSplitterImplTest(bool latency_in_macro) : latency_in_micros_(latency_in_macro) {
+    // EXPECT_CALL(*fault_manager_, getFaultForCommand(_)).WillOnce(Return(absl::nullopt));
+    ON_CALL(*fault_manager_, getFaultForCommand(_)).WillByDefault(Return(absl::nullopt));
+  }
   void makeBulkStringArray(Common::Redis::RespValue& value,
                            const std::vector<std::string>& strings) {
     std::vector<Common::Redis::RespValue> values(strings.size());
@@ -57,9 +61,17 @@ public:
   std::shared_ptr<NiceMock<MockRoute>> route_{
       new NiceMock<MockRoute>(ConnPool::InstanceSharedPtr{conn_pool_})};
   NiceMock<Stats::MockIsolatedStatsStore> store_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
+  std::shared_ptr<NiceMock<MockFaultManager>> fault_manager_{new NiceMock<MockFaultManager>()};
+
   Event::SimulatedTimeSystem time_system_;
-  InstanceImpl splitter_{std::make_unique<NiceMock<MockRouter>>(route_), store_, "redis.foo.",
-                         time_system_, latency_in_micros_};
+  InstanceImpl splitter_{std::make_unique<NiceMock<MockRouter>>(route_),
+                         store_,
+                         "redis.foo.",
+                         time_system_,
+                         latency_in_micros_,
+                         dispatcher_,
+                         fault_manager_};
   MockSplitCallbacks callbacks_;
   SplitRequestPtr handle_;
 };
@@ -372,8 +384,6 @@ TEST_F(RedisSingleServerRequestTest, PingSuccess) {
 TEST_F(RedisSingleServerRequestTest, EvalSuccess) {
   InSequence s;
 
-  std::cout << "-----"
-            << "EvalSuccess!" << std::endl;
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
   makeBulkStringArray(*request, {"eval", "return {ARGV[1]}", "1", "key", "arg"});
   makeRequest("key", std::move(request));

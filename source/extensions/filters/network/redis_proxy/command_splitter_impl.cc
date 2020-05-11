@@ -79,7 +79,9 @@ void SplitRequestBase::updateStats(const bool success) {
   } else {
     command_stats_.error_.inc();
   }
-  command_latency_->complete();
+  if (!delay_command_latency_) {
+    command_latency_->complete();
+  }
 }
 
 SingleServerRequest::~SingleServerRequest() { ASSERT(!handle_); }
@@ -392,12 +394,14 @@ void SplitKeysSumResultRequest::onChildResponse(Common::Redis::RespValuePtr&& va
 }
 
 InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::string& stat_prefix,
-                           TimeSource& time_source, bool latency_in_micros)
+                           TimeSource& time_source, bool latency_in_micros,
+                           Event::Dispatcher& dispatcher,
+                           Common::Redis::FaultManagerPtr&& fault_manager)
     : router_(std::move(router)), simple_command_handler_(*router_),
       eval_command_handler_(*router_), mget_handler_(*router_), mset_handler_(*router_),
       split_keys_sum_result_handler_(*router_),
       stats_{ALL_COMMAND_SPLITTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix + "splitter."))},
-      time_source_(time_source) {
+      time_source_(time_source), dispatcher_(dispatcher), fault_manager_(fault_manager) {
   for (const std::string& command : Common::Redis::SupportedCommands::simpleCommands()) {
     addHandler(scope, stat_prefix, command, latency_in_micros, simple_command_handler_);
   }
@@ -463,6 +467,7 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
     return nullptr;
   }
 
+  // Get the handler for the downstream request
   auto handler = handler_lookup_table_.find(to_lower_string.c_str());
   if (handler == nullptr) {
     stats_.unsupported_command_.inc();
@@ -470,8 +475,10 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
         fmt::format("unsupported command '{}'", request->asArray()[0].asString())));
     return nullptr;
   }
+
   ENVOY_LOG(debug, "redis: splitting '{}'", request->toString());
   handler->command_stats_.total_.inc();
+  dispatcher_.name(); // TODO: Make this compile
   SplitRequestPtr request_ptr = handler->handler_.get().startRequest(
       std::move(request), callbacks, handler->command_stats_, time_source_);
   return request_ptr;
