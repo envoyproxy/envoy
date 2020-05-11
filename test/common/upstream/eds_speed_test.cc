@@ -41,8 +41,8 @@ public:
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_,
         singleton_manager_, tls_, validation_visitor_, *api_);
-    cluster_.reset(
-        new EdsClusterImpl(eds_cluster_, runtime_, factory_context, std::move(scope), false));
+    cluster_ = std::make_shared<EdsClusterImpl>(eds_cluster_, runtime_, factory_context,
+                                                std::move(scope), false);
     EXPECT_EQ(initialize_phase, cluster_->initializePhase());
     eds_callbacks_ = cm_.subscription_factory_.callbacks_;
   }
@@ -121,7 +121,7 @@ public:
 } // namespace Upstream
 } // namespace Envoy
 
-static void BM_PriorityAndLocalityWeighted(benchmark::State& state) {
+static void priorityAndLocalityWeighted(benchmark::State& state) {
   Envoy::Thread::MutexBasicLockable lock;
   Envoy::Logger::Context logging_state(spdlog::level::warn,
                                        Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
@@ -131,4 +131,4 @@ static void BM_PriorityAndLocalityWeighted(benchmark::State& state) {
   }
 }
 
-BENCHMARK(BM_PriorityAndLocalityWeighted)->Ranges({{false, true}, {2000, 100000}});
+BENCHMARK(priorityAndLocalityWeighted)->Ranges({{false, true}, {2000, 100000}});
