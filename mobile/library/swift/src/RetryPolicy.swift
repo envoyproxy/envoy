@@ -31,6 +31,30 @@ public enum RetryRule: Int, CaseIterable {
       return "reset"
     }
   }
+
+  /// Initialize the rule using a string value.
+  ///
+  /// - parameter stringValue: Case-insensitive rule value to use for initialization.
+  init?(stringValue: String) {
+    switch stringValue.lowercased() {
+    case "5xx":
+      self = .status5xx
+    case "gateway-error":
+      self = .gatewayError
+    case "connect-failure":
+      self = .connectFailure
+    case "refused-stream":
+      self = .refusedStream
+    case "retriable-4xx":
+      self = .retriable4xx
+    case "retriable-headers":
+      self = .retriableHeaders
+    case "reset":
+      self = .reset
+    default:
+      return nil
+    }
+  }
 }
 
 /// Specifies how a request may be retried, containing one or more rules.

@@ -117,4 +117,23 @@ final class RequestMapperTests: XCTestCase {
 
     XCTAssertEqual(["123"], requestHeaders["x-envoy-max-retries"])
   }
+
+  func testConvertingRetryPolicyToHeadersAndBackCreatesTheSameRetryPolicy() {
+    let retryPolicy = RetryPolicy(maxRetryCount: 123, retryOn: RetryRule.allCases,
+                                  retryStatusCodes: [400, 410], perRetryTimeoutMS: 9001)
+    let headers = Headers(headers: retryPolicy.outboundHeaders())
+    XCTAssertEqual(RetryPolicy(headers: headers), retryPolicy)
+  }
+
+  func testConvertingRequestMethodToStringAndBackCreatesTheSameRequestMethod() {
+    for method in RequestMethod.allCases {
+      XCTAssertEqual(RequestMethod(stringValue: method.stringValue), method)
+    }
+  }
+
+  func testConvertingHttpProtocolToStringAndBackCreatesTheSameHttpProtocol() {
+    for httpProtocol in UpstreamHttpProtocol.allCases {
+      XCTAssertEqual(UpstreamHttpProtocol(stringValue: httpProtocol.stringValue), httpProtocol)
+    }
+  }
 }

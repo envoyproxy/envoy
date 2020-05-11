@@ -1,6 +1,6 @@
-licenses(["notice"])  # Apache 2
-
 load("//bazel:swift_static_framework.bzl", "swift_static_framework")
+
+licenses(["notice"])  # Apache 2
 
 swift_static_framework(
     name = "ios_framework",
@@ -10,17 +10,34 @@ swift_static_framework(
         "EnvoyClientBuilder.swift",
         "EnvoyError.swift",
         "EnvoyStreamEmitter.swift",
+        "Filter.swift",
+        "FilterDataStatus.swift",
+        "FilterHeaderStatus.swift",
+        "FilterRegistry.swift",
+        "FilterTrailerStatus.swift",
         "GRPCClient.swift",
         "GRPCRequestBuilder.swift",
         "GRPCResponseHandler.swift",
         "GRPCStreamEmitter.swift",
         "HTTPClient.swift",
+        "Headers.swift",
+        "HeadersBuilder.swift",
         "LogLevel.swift",
         "Request.swift",
         "RequestBuilder.swift",
+        "RequestFilter.swift",
+        "RequestFilterCallbacks.swift",
+        "RequestHeaders.swift",
+        "RequestHeadersBuilder.swift",
         "RequestMapper.swift",
         "RequestMethod.swift",
+        "RequestTrailers.swift",
+        "RequestTrailersBuilder.swift",
+        "ResponseFilter.swift",
+        "ResponseFilterCallbacks.swift",
         "ResponseHandler.swift",
+        "ResponseHeaders.swift",
+        "ResponseTrailers.swift",
         "RetryPolicy.swift",
         "RetryPolicyMapper.swift",
         "StreamEmitter.swift",
