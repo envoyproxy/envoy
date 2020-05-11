@@ -38,4 +38,7 @@ the following guidance:
 * Verify in the listener and cluster stats that the number of streams, connections and errors
   matches what is expected in any given experiment.
 
+* Be critical of your bootstrap or xDS configuration. Ideally every line has a motivation and is
+  necessary for the benchmark under consideration.
+
 * Avoid `benchmarking crimes <https://www.cse.unsw.edu.au/~gernot/benchmarking-crimes.html>`_.
