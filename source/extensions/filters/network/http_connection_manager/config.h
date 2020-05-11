@@ -163,6 +163,7 @@ public:
     return headers_with_underscores_action_;
   }
   std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
+  bool shouldPreserveUpstreamDate() const override { return preserve_upstream_date_; }
 
 private:
   enum class CodecType { HTTP1, HTTP2, HTTP3, AUTO };
@@ -228,6 +229,7 @@ private:
   const bool strip_matching_port_;
   const envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
+  const bool preserve_upstream_date_;
 
   // Default idle timeout is 5 minutes if nothing is specified in the HCM config.
   static const uint64_t StreamIdleTimeoutMs = 5 * 60 * 1000;

@@ -795,9 +795,6 @@ TEST_F(HttpConnectionManagerConfigTest, ServerOverwrite) {
   - name: envoy.filters.http.router
   )EOF";
 
-  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
-      .WillOnce(Invoke(&context_.runtime_loader_.snapshot_,
-                       &Runtime::MockSnapshot::featureEnabledDefault));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_);
@@ -815,9 +812,6 @@ TEST_F(HttpConnectionManagerConfigTest, ServerAppendIfAbsent) {
   - name: envoy.filters.http.router
   )EOF";
 
-  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
-      .WillOnce(Invoke(&context_.runtime_loader_.snapshot_,
-                       &Runtime::MockSnapshot::featureEnabledDefault));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_);
@@ -835,9 +829,6 @@ TEST_F(HttpConnectionManagerConfigTest, ServerPassThrough) {
   - name: envoy.filters.http.router
   )EOF";
 
-  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
-      .WillOnce(Invoke(&context_.runtime_loader_.snapshot_,
-                       &Runtime::MockSnapshot::featureEnabledDefault));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_);
@@ -857,8 +848,9 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathDefault) {
   )EOF";
 
   EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
-      .WillOnce(Invoke(&context_.runtime_loader_.snapshot_,
-                       &Runtime::MockSnapshot::featureEnabledDefault));
+      .Times(2)
+      .WillRepeatedly(Invoke(&context_.runtime_loader_.snapshot_,
+                             &Runtime::MockSnapshot::featureEnabledDefault));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_);
@@ -879,6 +871,9 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathRuntime) {
   - name: envoy.filters.http.router
   )EOF";
 
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
+      .WillOnce(Invoke(&context_.runtime_loader_.snapshot_,
+                       &Runtime::MockSnapshot::featureEnabledDefault));
   EXPECT_CALL(context_.runtime_loader_.snapshot_,
               featureEnabled("http_connection_manager.normalize_path", An<uint64_t>()))
       .WillOnce(Return(true));
@@ -899,6 +894,9 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathTrue) {
   - name: envoy.filters.http.router
   )EOF";
 
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
+      .WillOnce(Invoke(&context_.runtime_loader_.snapshot_,
+                       &Runtime::MockSnapshot::featureEnabledDefault));
   EXPECT_CALL(context_.runtime_loader_.snapshot_,
               featureEnabled("http_connection_manager.normalize_path", An<uint64_t>()))
       .Times(0);
@@ -919,6 +917,9 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathFalse) {
   - name: envoy.filters.http.router
   )EOF";
 
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
+      .WillOnce(Invoke(&context_.runtime_loader_.snapshot_,
+                       &Runtime::MockSnapshot::featureEnabledDefault));
   EXPECT_CALL(context_.runtime_loader_.snapshot_,
               featureEnabled("http_connection_manager.normalize_path", An<uint64_t>()))
       .Times(0);
@@ -1128,6 +1129,124 @@ TEST_F(HttpConnectionManagerConfigTest, UnconfiguredRequestTimeout) {
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_);
   EXPECT_EQ(0, config.requestTimeout().count());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, DefaultPreserveResponseDate) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  request_timeout: 0s
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
+      .Times(2)
+      .WillRepeatedly(Invoke(&context_.runtime_loader_.snapshot_,
+                             &Runtime::MockSnapshot::featureEnabledDefault));
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_);
+  EXPECT_TRUE(config.shouldPreserveUpstreamDate());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, RuntimeEnabledPreserveResponseDate) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  request_timeout: 0s
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
+      .WillOnce(Invoke(&context_.runtime_loader_.snapshot_,
+                       &Runtime::MockSnapshot::featureEnabledDefault));
+
+  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+              featureEnabled("http_connection_manager.preserve_upstream_date", An<uint64_t>()))
+      .WillOnce(Return(true));
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_);
+  EXPECT_TRUE(config.shouldPreserveUpstreamDate());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, RuntimeDisabledPreserveResponseDate) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  request_timeout: 0s
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
+      .WillOnce(Invoke(&context_.runtime_loader_.snapshot_,
+                       &Runtime::MockSnapshot::featureEnabledDefault));
+
+  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+              featureEnabled("http_connection_manager.preserve_upstream_date", An<uint64_t>()))
+      .WillOnce(Return(false));
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_);
+  EXPECT_FALSE(config.shouldPreserveUpstreamDate());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, DisabledPreserveResponseDate) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  request_timeout: 0s
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  preserve_upstream_date: false
+  )EOF";
+
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
+      .WillOnce(Invoke(&context_.runtime_loader_.snapshot_,
+                       &Runtime::MockSnapshot::featureEnabledDefault));
+
+  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+              featureEnabled("http_connection_manager.preserve_upstream_date", An<uint64_t>()))
+      .Times(0);
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_);
+  EXPECT_FALSE(config.shouldPreserveUpstreamDate());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, EnabledPreserveResponseDate) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  request_timeout: 0s
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  preserve_upstream_date: true
+  )EOF";
+
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
+      .WillOnce(Invoke(&context_.runtime_loader_.snapshot_,
+                       &Runtime::MockSnapshot::featureEnabledDefault));
+
+  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+              featureEnabled("http_connection_manager.preserve_upstream_date", An<uint64_t>()))
+      .Times(0);
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_);
+  EXPECT_TRUE(config.shouldPreserveUpstreamDate());
 }
 
 TEST_F(HttpConnectionManagerConfigTest, SingleDateProvider) {
