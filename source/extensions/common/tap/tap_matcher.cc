@@ -51,9 +51,13 @@ void buildMatcher(const envoy::config::tap::v3::MatchPredicate& match_config,
     new_matcher = std::make_unique<HttpResponseTrailersMatcher>(
         match_config.http_response_trailers_match(), matchers);
     break;
-  case envoy::config::tap::v3::MatchPredicate::RuleCase::kHttpGenericBodyMatch:
-    new_matcher =
-        std::make_unique<HttpGenericBodyMatcher>(match_config.http_generic_body_match(), matchers);
+  case envoy::config::tap::v3::MatchPredicate::RuleCase::kHttpRequestGenericBodyMatch:
+    new_matcher = std::make_unique<HttpRequestGenericBodyMatcher>(
+        match_config.http_request_generic_body_match(), matchers);
+    break;
+  case envoy::config::tap::v3::MatchPredicate::RuleCase::kHttpResponseGenericBodyMatch:
+    new_matcher = std::make_unique<HttpResponseGenericBodyMatcher>(
+        match_config.http_response_generic_body_match(), matchers);
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -159,7 +163,7 @@ void HttpGenericBodyMatcher::onBody(const Buffer::Instance& data,
     return (-1 != data.search(static_cast<const void*>(pattern.c_str()), pattern.length(), 0));
   });
 
-  statuses[my_index_].matches_ |= found;
+  statuses[my_index_].matches_ = found;
   statuses[my_index_].might_change_status_ = false;
 }
 

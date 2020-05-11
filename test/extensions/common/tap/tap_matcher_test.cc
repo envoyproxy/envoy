@@ -19,6 +19,8 @@ public:
   std::vector<MatcherPtr> matchers_;
   Matcher::MatchStatusVector statuses_;
   envoy::config::tap::v3::MatchPredicate config_;
+
+  enum class Direction { Request, Response };
 };
 
 class TapMatcherTest : public TapMatcherTestBase, public testing::Test {
@@ -31,7 +33,9 @@ public:
 
 class TapMatcherBodyTest
     : public TapMatcherTestBase,
-      public ::testing::TestWithParam<std::tuple<std::vector<std::string>, std::pair<bool, bool>>> {
+      public ::testing::TestWithParam<
+          std::tuple<TapMatcherTestBase::Direction,
+                     std::tuple<std::vector<std::string>, std::pair<bool, bool>>>> {
 public:
   void createTestBody();
 
@@ -132,13 +136,21 @@ void TapMatcherBodyTest::createTestBody() {
 // Parameterized test passes various configurations
 // which are appended to the yaml string.
 TEST_P(TapMatcherBodyTest, GenericBodyTest) {
-  std::string matcher_yaml =
-      R"EOF(
-http_generic_body_match:
+  Direction dir = std::get<0>(GetParam());
+  std::string matcher_yaml;
+  if (Direction::Request == dir) {
+    matcher_yaml =
+        R"EOF(http_request_generic_body_match:
   patterns:)EOF";
+  } else {
+    matcher_yaml =
+        R"EOF(http_response_generic_body_match:
+  patterns:)EOF";
+  }
 
+  auto text_and_result = std::get<1>(GetParam());
   // Append vector of matchers
-  for (auto i : std::get<0>(GetParam())) {
+  for (auto i : std::get<0>(text_and_result)) {
     matcher_yaml += '\n';
     matcher_yaml += i;
     matcher_yaml += '\n';
@@ -152,51 +164,58 @@ http_generic_body_match:
 
   createTestBody();
 
-  matchers_[0]->onBody(data_, statuses_);
-  const std::pair<bool, bool>& expected = std::get<1>(GetParam());
+  if (Direction::Request == dir) {
+    matchers_[0]->onRequestBody(data_, statuses_);
+  } else {
+    matchers_[0]->onResponseBody(data_, statuses_);
+  }
+  const std::pair<bool, bool>& expected = std::get<1>(text_and_result);
   EXPECT_EQ((Matcher::MatchStatus{expected.first, expected.second}),
             matchers_[0]->matchStatus(statuses_));
 }
 
 INSTANTIATE_TEST_SUITE_P(
     TapMatcherBodyTestSuite, TapMatcherBodyTest,
-    ::testing::Values(
-        // Should match - envoy is in the body
-        std::make_tuple(std::vector<std::string>{"    - contains_text: \"envoy\""},
-                        std::make_pair(true, false)),
-        // Should not  match - envoy123 is not in the body
-        std::make_tuple(std::vector<std::string>{"    - contains_text: \"envoy123\""},
-                        std::make_pair(false, false)),
-        // Should match - both envoy and proxy are in the body
-        std::make_tuple(std::vector<std::string>{"    - contains_text: \"envoy\"",
-                                                 "    - contains_text: \"proxy\""},
-                        std::make_pair(true, false)),
-        // Should not match - envoy is in the body but balancer is not
-        std::make_tuple(std::vector<std::string>{"    - contains_text: \"envoy\"",
-                                                 "    - contains_text: \"balancer\""},
-                        std::make_pair(false, false)),
-        // Should match - hex "beef" is in the body
-        std::make_tuple(std::vector<std::string>{"    - contains_hex: \"beef\""},
-                        std::make_pair(true, false)),
-        // Should not match - hex "beefab" is not in the body
-        std::make_tuple(std::vector<std::string>{"    - contains_hex: \"beefab\""},
-                        std::make_pair(false, false)),
-        // Should match - string envoy and hex "beef" are in the body
-        std::make_tuple(std::vector<std::string>{"    - contains_hex: \"beef\"",
-                                                 "    - contains_text: \"envoy\""},
-                        std::make_pair(true, false)),
-        // Should not match - string envoy is in the body but and hex "beefab" is not
-        std::make_tuple(std::vector<std::string>{"    - contains_hex: \"beefab\"",
-                                                 "    - contains_text: \"envoy\""},
-                        std::make_pair(false, false)),
-        // Should not match - string envoy123 is not in the body and hex "beef" is in the body
-        std::make_tuple(std::vector<std::string>{"    - contains_hex: \"beef\"",
-                                                 "    - contains_text: \"envoy123\""},
-                        std::make_pair(false, false)),
-        // Should not match - string and hex are not in the body
-        std::make_tuple(std::vector<std::string>{"    - contains_hex: \"beefab\"",
-                                                 "    - contains_text: \"envoy123\""},
-                        std::make_pair(false, false))));
+    ::testing::Combine(
+        ::testing::Values(TapMatcherBodyTest::Direction::Request,
+                          TapMatcherBodyTest::Direction::Response),
+        ::testing::Values(
+            // Should match - envoy is in the body
+            std::make_tuple(std::vector<std::string>{"    - contains_text: \"envoy\""},
+                            std::make_pair(true, false)),
+            // Should not  match - envoy123 is not in the body
+            std::make_tuple(std::vector<std::string>{"    - contains_text: \"envoy123\""},
+                            std::make_pair(false, false)),
+            // Should match - both envoy and proxy are in the body
+            std::make_tuple(std::vector<std::string>{"    - contains_text: \"envoy\"",
+                                                     "    - contains_text: \"proxy\""},
+                            std::make_pair(true, false)),
+            // Should not match - envoy is in the body but balancer is not
+            std::make_tuple(std::vector<std::string>{"    - contains_text: \"envoy\"",
+                                                     "    - contains_text: \"balancer\""},
+                            std::make_pair(false, false)),
+            // Should match - hex "beef" is in the body
+            std::make_tuple(std::vector<std::string>{"    - contains_hex: \"beef\""},
+                            std::make_pair(true, false)),
+            // Should not match - hex "beefab" is not in the body
+            std::make_tuple(std::vector<std::string>{"    - contains_hex: \"beefab\""},
+                            std::make_pair(false, false)),
+            // Should match - string envoy and hex "beef" are in the body
+            std::make_tuple(std::vector<std::string>{"    - contains_hex: \"beef\"",
+                                                     "    - contains_text: \"envoy\""},
+                            std::make_pair(true, false)),
+            // Should not match - string envoy is in the body but and hex "beefab" is not
+            std::make_tuple(std::vector<std::string>{"    - contains_hex: \"beefab\"",
+                                                     "    - contains_text: \"envoy\""},
+                            std::make_pair(false, false)),
+            // Should not match - string envoy123 is not in the body and hex "beef" is in the body
+            std::make_tuple(std::vector<std::string>{"    - contains_hex: \"beef\"",
+                                                     "    - contains_text: \"envoy123\""},
+                            std::make_pair(false, false)),
+            // Should not match - string and hex are not in the body
+            std::make_tuple(std::vector<std::string>{"    - contains_hex: \"beefab\"",
+                                                     "    - contains_text: \"envoy123\""},
+                            std::make_pair(false, false)))));
 
 } // namespace
 } // namespace Tap

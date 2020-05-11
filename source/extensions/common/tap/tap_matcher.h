@@ -105,7 +105,8 @@ public:
   virtual void onHttpResponseTrailers(const Http::ResponseTrailerMap& response_trailers,
                                       MatchStatusVector& statuses) const PURE;
 
-  virtual void onBody(const Buffer::Instance& data, MatchStatusVector& statuses) const PURE;
+  virtual void onRequestBody(const Buffer::Instance& data, MatchStatusVector& statuses) const PURE;
+  virtual void onResponseBody(const Buffer::Instance& data, MatchStatusVector& statuses) const PURE;
 
   /**
    * @return whether given currently available information, the matcher matches.
@@ -162,9 +163,15 @@ public:
       m.onHttpResponseTrailers(response_trailers, statuses);
     });
   }
-  void onBody(const Buffer::Instance& data, MatchStatusVector& statuses) const override {
-    updateLocalStatus(
-        statuses, [&data](Matcher& m, MatchStatusVector& statuses) { m.onBody(data, statuses); });
+  void onRequestBody(const Buffer::Instance& data, MatchStatusVector& statuses) const override {
+    updateLocalStatus(statuses, [&data](Matcher& m, MatchStatusVector& statuses) {
+      m.onRequestBody(data, statuses);
+    });
+  }
+  void onResponseBody(const Buffer::Instance& data, MatchStatusVector& statuses) const override {
+    updateLocalStatus(statuses, [&data](Matcher& m, MatchStatusVector& statuses) {
+      m.onResponseBody(data, statuses);
+    });
   }
 
 protected:
@@ -220,7 +227,8 @@ public:
   void onHttpRequestTrailers(const Http::RequestTrailerMap&, MatchStatusVector&) const override {}
   void onHttpResponseHeaders(const Http::ResponseHeaderMap&, MatchStatusVector&) const override {}
   void onHttpResponseTrailers(const Http::ResponseTrailerMap&, MatchStatusVector&) const override {}
-  void onBody(const Buffer::Instance&, MatchStatusVector&) const override {}
+  void onRequestBody(const Buffer::Instance&, MatchStatusVector&) const override {}
+  void onResponseBody(const Buffer::Instance&, MatchStatusVector&) const override {}
 };
 
 /**
@@ -320,11 +328,30 @@ public:
   HttpGenericBodyMatcher(const envoy::config::tap::v3::HttpGenericBodyMatch& config,
                          const std::vector<MatcherPtr>& matchers);
 
-  void onBody(const Buffer::Instance&, MatchStatusVector&) const override;
+protected:
+  void onBody(const Buffer::Instance&, MatchStatusVector&) const;
 
 private:
   // Vector of strings which body must contain to get match.
   std::vector<std::string> patterns_;
+};
+
+class HttpRequestGenericBodyMatcher : public HttpGenericBodyMatcher {
+public:
+  using HttpGenericBodyMatcher::HttpGenericBodyMatcher;
+
+  void onRequestBody(const Buffer::Instance& data, MatchStatusVector& statuses) const override {
+    onBody(data, statuses);
+  }
+};
+
+class HttpResponseGenericBodyMatcher : public HttpGenericBodyMatcher {
+public:
+  using HttpGenericBodyMatcher::HttpGenericBodyMatcher;
+
+  void onResponseBody(const Buffer::Instance& data, MatchStatusVector& statuses) const override {
+    onBody(data, statuses);
+  }
 };
 
 } // namespace Tap
