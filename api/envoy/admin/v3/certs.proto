@@ -1,4 +1,3 @@
-test
 syntax = "proto3";
 
 package envoy.admin.v3;

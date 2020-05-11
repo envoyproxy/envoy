@@ -1,4 +1,3 @@
-test
 # Contributing guide
 
 ## API changes
