@@ -1,0 +1,123 @@
+trigger:
+  branches:
+    include:
+      - "master"
+      - "release/v*"
+  tags:
+    include:
+      - "v*"
+
+# PR build config is manually overridden in Azure pipelines UI with different secrets
+pr: none
+
+jobs:
+  - job: format
+    dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
+    pool:
+      vmImage: "ubuntu-16.04"
+    steps:
+      - task: CacheBeta@1
+        inputs:
+          key: "format | ./WORKSPACE | **/*.bzl"
+          path: $(Build.StagingDirectory)/repository_cache
+
+      - script: ci/run_envoy_docker.sh 'ci/check_and_fix_format.sh'
+        workingDirectory: $(Build.SourcesDirectory)
+        env:
+          ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+          BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+          BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+          GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+        displayName: "Run check format scripts"
+
+      - task: PublishBuildArtifacts@1
+        inputs:
+          pathtoPublish: "$(Build.StagingDirectory)/fix_format.diff"
+          artifactName: format
+        condition: failed()
+
+  - job: release
+    displayName: "Linux-x64 release"
+    dependsOn: ["format"]
+    # For master builds, continue even if format fails
+    condition: and(not(canceled()), or(succeeded(), ne(variables['Build.Reason'], 'PullRequest')))
+    pool:
+      vmImage: "ubuntu-16.04"
+    steps:
+      - template: bazel.yml
+        parameters:
+          ciTarget: bazel.release
+
+  - job: bazel
+    displayName: "Linux-x64"
+    dependsOn: ["release"]
+    # For master builds, continue even if format fails
+    condition: and(not(canceled()), or(succeeded(), ne(variables['Build.Reason'], 'PullRequest')))
+    strategy:
+      maxParallel: 3
+      matrix:
+        gcc:
+          CI_TARGET: "bazel.gcc"
+        clang_tidy:
+          CI_TARGET: "bazel.clang_tidy"
+        asan:
+          CI_TARGET: "bazel.asan"
+        tsan:
+          CI_TARGET: "bazel.tsan"
+        compile_time_options:
+          CI_TARGET: "bazel.compile_time_options"
+    timeoutInMinutes: 360
+    pool:
+      vmImage: "Ubuntu 16.04"
+    steps:
+      - template: bazel.yml
+        parameters:
+          ciTarget: $(CI_TARGET)
+
+  - job: docker
+    displayName: "Linux-x64 docker"
+    dependsOn: ["release"]
+    condition: and(succeeded(), eq(variables['PostSubmit'], 'true'), ne(variables['Build.Reason'], 'PullRequest'))
+    pool:
+      vmImage: "ubuntu-16.04"
+    steps:
+      - task: DownloadBuildArtifacts@0
+        inputs:
+          buildType: current
+          artifactName: "bazel.release"
+          itemPattern: "bazel.release/envoy_binary.tar.gz"
+          downloadType: single
+          targetPath: $(Build.StagingDirectory)
+
+      - bash: |
+          set -e
+          tar zxf $(Build.StagingDirectory)/bazel.release/envoy_binary.tar.gz
+          ci/docker_ci.sh
+        workingDirectory: $(Build.SourcesDirectory)
+        env:
+          AZP_BRANCH: $(Build.SourceBranch)
+          AZP_SHA1: $(Build.SourceVersion)
+          DOCKERHUB_USERNAME: $(DockerUsername)
+          DOCKERHUB_PASSWORD: $(DockerPassword)
+
+  - job: macOS
+    dependsOn: ["format"]
+    timeoutInMinutes: 360
+    pool:
+      vmImage: "macos-latest"
+    steps:
+      - script: ./ci/mac_ci_setup.sh
+        displayName: "Install dependencies"
+
+      - script: ./ci/mac_ci_steps.sh
+        displayName: "Run Mac CI"
+        env:
+          BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+          BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+          GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+
+      - task: PublishTestResults@2
+        inputs:
+          testResultsFiles: "**/bazel-testlogs/**/test.xml"
+          testRunTitle: "macOS"
+        condition: always()
