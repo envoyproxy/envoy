@@ -176,7 +176,6 @@ message TcpProxy {
   // limited to 1.
   repeated type.HashPolicy hash_policy = 11 [(validate.rules).repeated = {max_items: 1}];
 
-  // [#not-implemented-hide:] feature in progress
   // If set, this configures tunneling, e.g. configuration options to tunnel multiple TCP
   // payloads over a shared HTTP/2 tunnel. If this message is absent, the payload
   // will be proxied upstream as per usual.

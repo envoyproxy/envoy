@@ -430,7 +430,6 @@ message RouteMatch {
     // stripping. This needs more thought.]
     type.matcher.v4alpha.RegexMatcher safe_regex = 10 [(validate.rules).message = {required: true}];
 
-    // [#not-implemented-hide:]
     // If this is used as the matcher, the matcher will only match CONNECT requests.
     // Note that this will not match HTTP/2 upgrade-style CONNECT requests
     // (WebSocket and the like) as they are normalized in Envoy as HTTP/1.1 style
@@ -724,7 +723,6 @@ message RouteAction {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.route.v3.RouteAction.UpgradeConfig";
 
-    // [#not-implemented-hide:]
     // Configuration for sending data upstream as a raw data payload. This is used for
     // CONNECT requests, when forwarding CONNECT payload as raw TCP.
     message ConnectConfig {
@@ -744,7 +742,6 @@ message RouteAction {
     // Determines if upgrades are available on this route. Defaults to true.
     google.protobuf.BoolValue enabled = 2;
 
-    // [#not-implemented-hide:]
     // Configuration for sending data upstream as a raw data payload. This is used for
     // CONNECT requests, when forwarding CONNECT payload as raw TCP.
     ConnectConfig connect_config = 3;
