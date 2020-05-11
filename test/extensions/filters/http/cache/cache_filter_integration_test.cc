@@ -73,7 +73,7 @@ TEST_P(CacheIntegrationTest, MissInsertHit) {
   }
 
   // Advance time, to verify the original date header is preserved.
-  simTime().advanceTimeAsync(std::chrono::seconds(10));
+  simTime().advanceTimeWait(std::chrono::seconds(10));
 
   // Send second request, and get response from cache.
   IntegrationStreamDecoderPtr request = codec_client_->makeHeaderOnlyRequest(request_headers);
