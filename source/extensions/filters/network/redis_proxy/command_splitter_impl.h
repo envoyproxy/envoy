@@ -85,6 +85,7 @@ protected:
 
   SplitRequestBase(CommandStats& command_stats, TimeSource& time_source)
       : command_stats_(command_stats) {
+    delay_command_latency_ = false;
     command_latency_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
         command_stats_.latency_, time_source);
   }
