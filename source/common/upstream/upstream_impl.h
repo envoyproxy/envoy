@@ -707,7 +707,6 @@ public:
   static std::tuple<HostsPerLocalityConstSharedPtr, HostsPerLocalityConstSharedPtr,
                     HostsPerLocalityConstSharedPtr>
   partitionHostsPerLocality(const HostsPerLocality& hosts);
-  Stats::SymbolTable& symbolTable() { return symbol_table_; }
   Config::ConstMetadataSharedPoolSharedPtr constMetadataSharedPool() {
     return const_metadata_shared_pool_;
   }
@@ -815,9 +814,6 @@ public:
                            const absl::optional<HostVector>& hosts_removed,
                            const absl::optional<Upstream::Host::HealthFlag> health_checker_flag,
                            absl::optional<uint32_t> overprovisioning_factor = absl::nullopt);
-
-  // Returns the size of the current cluster priority state.
-  size_t size() const { return priority_state_.size(); }
 
   // Returns the saved priority state.
   PriorityState& priorityState() { return priority_state_; }
