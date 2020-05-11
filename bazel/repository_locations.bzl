@@ -288,7 +288,7 @@ DEPENDENCY_REPOSITORIES = dict(
         strip_prefix = "http-parser-2.9.3",
         urls = ["https://github.com/nodejs/http-parser/archive/v2.9.3.tar.gz"],
         use_category = ["dataplane"],
-        cpe = "N/A",
+        cpe = "cpe:2.3:a:nodejs:node.js:*",
     ),
     com_github_pallets_jinja = dict(
         sha256 = "db49236731373e4f3118af880eb91bb0aa6978bc0cf8b35760f6a026f1a9ffc4",
