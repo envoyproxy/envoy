@@ -59,6 +59,8 @@ TEST_F(DrainManagerImplTest, Default) {
 }
 
 TEST_F(DrainManagerImplTest, DrainDeadline) {
+  // TODO(auni53): Add integration tests for this once TestDrainManager is
+  // removed.
   DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::DEFAULT);
 
   // Ensure drainClose() behaviour is determined by the deadline.
