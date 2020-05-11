@@ -22,6 +22,9 @@ public:
    * Function that maps a HostDescription to it's effective priority level in a cluster.
    * For most cluster types, the mapping is simply `return host.priority()`, but some
    * cluster types require more complex mapping.
+   * @return either the effective priority, or absl::nullopt if the mapping cannot be determined,
+   *         which can happen if the host has been removed from the configurations since it was
+   *         used.
    */
   using PriorityMappingFunc =
       std::function<absl::optional<uint32_t>(const Upstream::HostDescription&)>;
