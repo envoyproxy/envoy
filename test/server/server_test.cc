@@ -582,6 +582,7 @@ TEST_P(ServerInstanceImplTest, ValidationRejectDynamic) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
   options_.reject_unknown_dynamic_fields_ = true;
+  options_.ignore_unknown_dynamic_fields_ = true; // reject takes precedence over ignore
   EXPECT_NO_THROW(initialize("test/server/test_data/server/empty_bootstrap.yaml"));
   EXPECT_THAT_THROWS_MESSAGE(
       server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo"),

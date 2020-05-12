@@ -81,6 +81,9 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   TCLAP::SwitchArg reject_unknown_dynamic_fields("", "reject-unknown-dynamic-fields",
                                                  "reject unknown fields in dynamic configuration",
                                                  cmd, false);
+  TCLAP::SwitchArg ignore_unknown_dynamic_fields("", "ignore-unknown-dynamic-fields",
+                                                 "ignore unknown fields in dynamic configuration",
+                                                 cmd, false);
 
   TCLAP::ValueArg<std::string> admin_address_path("", "admin-address-path", "Admin address path",
                                                   false, "", "string", cmd);
@@ -235,6 +238,7 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   allow_unknown_static_fields_ =
       allow_unknown_static_fields.getValue() || allow_unknown_fields.getValue();
   reject_unknown_dynamic_fields_ = reject_unknown_dynamic_fields.getValue();
+  ignore_unknown_dynamic_fields_ = ignore_unknown_dynamic_fields.getValue();
   admin_address_path_ = admin_address_path.getValue();
   log_path_ = log_path.getValue();
   restart_epoch_ = restart_epoch.getValue();
@@ -321,6 +325,7 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
   command_line_options->set_config_yaml(configYaml());
   command_line_options->set_allow_unknown_static_fields(allow_unknown_static_fields_);
   command_line_options->set_reject_unknown_dynamic_fields(reject_unknown_dynamic_fields_);
+  command_line_options->set_ignore_unknown_dynamic_fields(ignore_unknown_dynamic_fields_);
   command_line_options->set_admin_address_path(adminAddressPath());
   command_line_options->set_component_log_level(component_log_level_str_);
   command_line_options->set_log_level(spdlog::level::to_string_view(logLevel()).data(),

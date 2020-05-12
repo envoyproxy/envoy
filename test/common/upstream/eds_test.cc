@@ -228,6 +228,24 @@ TEST_F(EdsTest, ValidateFail) {
   EXPECT_FALSE(initialized_);
 }
 
+// Validate that onConfigUpdate() can ignore unknown fields.
+// this doesn't test the actual functionality, as the ValidationVisitor is mocked out,
+// however it is functionally tested in dynamic_validation_integration_test.
+TEST_F(EdsTest, ValidateIgnored) {
+  validation_visitor_.setSkipValidation(true);
+  initialize();
+  envoy::config::endpoint::v3::ClusterLoadAssignment resource;
+  resource.set_cluster_name("fare");
+  auto* unknown = resource.GetReflection()->MutableUnknownFields(&resource);
+  // add a field that doesn't exist in the proto definition:
+  unknown->AddFixed32(1000, 1);
+
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
+  resources.Add()->PackFrom(resource);
+  doOnConfigUpdateVerifyNoThrow(resource);
+  EXPECT_TRUE(initialized_);
+}
+
 // Validate that onConfigUpdate() with unexpected cluster names rejects config.
 TEST_F(EdsTest, OnConfigUpdateWrongName) {
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;

@@ -30,11 +30,16 @@
 namespace Envoy {
 namespace Server {
 
+struct FieldValidationConfig {
+  bool allow_unknown_static_fields = false;
+  bool reject_unknown_dynamic_fields = false;
+  bool ignore_unknown_dynamic_fields = false;
+};
+
 // Create OptionsImpl structures suitable for tests.
 OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::string& config_yaml,
                                   Network::Address::IpVersion ip_version,
-                                  bool allow_unknown_static_fields = false,
-                                  bool reject_unknown_dynamic_fields = false,
+                                  FieldValidationConfig validation_config = FieldValidationConfig(),
                                   uint32_t concurrency = 1);
 
 class TestDrainManager : public DrainManager {
@@ -268,13 +273,15 @@ class IntegrationTestServer : public Logger::Loggable<Logger::Id::testing>,
                               public IntegrationTestServerStats,
                               public Server::ComponentFactory {
 public:
-  static IntegrationTestServerPtr create(
-      const std::string& config_path, const Network::Address::IpVersion version,
-      std::function<void(IntegrationTestServer&)> on_server_ready_function,
-      std::function<void()> on_server_init_function, bool deterministic,
-      Event::TestTimeSystem& time_system, Api::Api& api, bool defer_listener_finalization = false,
-      ProcessObjectOptRef process_object = absl::nullopt, bool allow_unknown_static_fields = false,
-      bool reject_unknown_dynamic_fields = false, uint32_t concurrency = 1);
+  static IntegrationTestServerPtr
+  create(const std::string& config_path, const Network::Address::IpVersion version,
+         std::function<void(IntegrationTestServer&)> on_server_ready_function,
+         std::function<void()> on_server_init_function, bool deterministic,
+         Event::TestTimeSystem& time_system, Api::Api& api,
+         bool defer_listener_finalization = false,
+         ProcessObjectOptRef process_object = absl::nullopt,
+         Server::FieldValidationConfig validation_config = Server::FieldValidationConfig(),
+         uint32_t concurrency = 1);
   // Note that the derived class is responsible for tearing down the server in its
   // destructor.
   ~IntegrationTestServer() override;
@@ -296,8 +303,7 @@ public:
   void start(const Network::Address::IpVersion version,
              std::function<void()> on_server_init_function, bool deterministic,
              bool defer_listener_finalization, ProcessObjectOptRef process_object,
-             bool allow_unknown_static_fields, bool reject_unknown_dynamic_fields,
-             uint32_t concurrency);
+             Server::FieldValidationConfig validation_config, uint32_t concurrency);
 
   void waitForCounterEq(const std::string& name, uint64_t value) override {
     TestUtility::waitForCounterEq(statStore(), name, value, time_system_);
@@ -378,8 +384,8 @@ private:
    * Runs the real server on a thread.
    */
   void threadRoutine(const Network::Address::IpVersion version, bool deterministic,
-                     ProcessObjectOptRef process_object, bool allow_unknown_static_fields,
-                     bool reject_unknown_dynamic_fields, uint32_t concurrency);
+                     ProcessObjectOptRef process_object,
+                     Server::FieldValidationConfig validation_config, uint32_t concurrency);
 
   Event::TestTimeSystem& time_system_;
   Api::Api& api_;

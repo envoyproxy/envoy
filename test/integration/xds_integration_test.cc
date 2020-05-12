@@ -37,7 +37,7 @@ public:
 
   void createEnvoyServer(const ApiFilesystemConfig& api_filesystem_config) {
     registerPort("upstream_0", fake_upstreams_.back()->localAddress()->ip()->port());
-    createApiTestServer(api_filesystem_config, {"http"}, false, false, false);
+    createApiTestServer(api_filesystem_config, {"http"}, {false, false, false}, false);
     EXPECT_EQ(1, test_server_->counter("listener_manager.lds.update_success")->value());
     EXPECT_EQ(1, test_server_->counter("http.router.rds.route_config_0.update_success")->value());
     EXPECT_EQ(1, test_server_->counter("cluster_manager.cds.update_success")->value());

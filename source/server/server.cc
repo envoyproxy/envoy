@@ -60,7 +60,8 @@ InstanceImpl::InstanceImpl(
     Filesystem::Instance& file_system, std::unique_ptr<ProcessContext> process_context)
     : init_manager_(init_manager), workers_started_(false), live_(false), shutdown_(false),
       options_(options), validation_context_(options_.allowUnknownStaticFields(),
-                                             !options.rejectUnknownDynamicFields()),
+                                             !options.rejectUnknownDynamicFields(),
+                                             options.ignoreUnknownDynamicFields()),
       time_source_(time_system), restarter_(restarter), start_time_(time(nullptr)),
       original_start_time_(start_time_), stats_store_(store), thread_local_(tls),
       api_(new Api::Impl(thread_factory, store, time_system, file_system,

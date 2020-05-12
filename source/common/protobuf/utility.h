@@ -250,7 +250,9 @@ public:
   static void validate(const MessageType& message,
                        ProtobufMessage::ValidationVisitor& validation_visitor) {
     // Log warnings or throw errors if deprecated fields or unknown fields are in use.
-    checkForUnexpectedFields(message, validation_visitor);
+    if (!validation_visitor.skipValidation()) {
+      checkForUnexpectedFields(message, validation_visitor);
+    }
 
     std::string err;
     if (!Validate(message, &err)) {
