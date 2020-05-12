@@ -19,7 +19,7 @@
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
 
-#include "extensions/filters/http/admission_control/response_evaluators/default_evaluator.h"
+#include "extensions/filters/http/admission_control/evaluators/default_evaluator.h"
 #include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {

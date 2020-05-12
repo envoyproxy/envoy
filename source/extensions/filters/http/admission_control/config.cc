@@ -7,8 +7,8 @@
 #include "common/common/enum_to_int.h"
 
 #include "extensions/filters/http/admission_control/admission_control.h"
-#include "extensions/filters/http/admission_control/response_evaluators/default_evaluator.h"
-#include "extensions/filters/http/admission_control/response_evaluators/response_evaluator.h"
+#include "extensions/filters/http/admission_control/evaluators/default_evaluator.h"
+#include "extensions/filters/http/admission_control/evaluators/response_evaluator.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -19,7 +19,7 @@
 #include "common/http/codes.h"
 #include "common/runtime/runtime_protos.h"
 
-#include "extensions/filters/http/admission_control/response_evaluators/response_evaluator.h"
+#include "extensions/filters/http/admission_control/evaluators/response_evaluator.h"
 #include "extensions/filters/http/admission_control/thread_local_controller.h"
 #include "extensions/filters/http/common/pass_through_filter.h"
 

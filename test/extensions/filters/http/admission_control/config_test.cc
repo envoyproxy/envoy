@@ -6,7 +6,7 @@
 #include "common/stats/isolated_store_impl.h"
 
 #include "extensions/filters/http/admission_control/admission_control.h"
-#include "extensions/filters/http/admission_control/response_evaluators/default_evaluator.h"
+#include "extensions/filters/http/admission_control/evaluators/default_evaluator.h"
 
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/mocks.h"

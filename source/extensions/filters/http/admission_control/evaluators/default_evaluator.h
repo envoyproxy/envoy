@@ -3,7 +3,7 @@
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.h"
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.validate.h"
 
-#include "extensions/filters/http/admission_control/response_evaluators/response_evaluator.h"
+#include "extensions/filters/http/admission_control/evaluators/response_evaluator.h"
 
 namespace Envoy {
 namespace Extensions {
