@@ -20,6 +20,7 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -719,7 +720,46 @@ TEST_F(Http1ConnPoolImplTest, ProxyConnectionCloseHeader) {
   callbacks.outer_encoder_->encodeHeaders(
       TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true);
 
-  // Response with 'proxy-connection: close' which should cause the connection to go away.
+  // Response with 'proxy-connection: close' which should cause the connection to go away, even if
+  // there are other tokens in that header.
+  EXPECT_CALL(conn_pool_, onClientDestroy());
+  ResponseHeaderMapPtr response_headers(
+      new TestResponseHeaderMapImpl{{":status", "200"}, {"Proxy-Connection", "Close, foo"}});
+  inner_decoder->decodeHeaders(std::move(response_headers), true);
+  dispatcher_.clearDeferredDeleteList();
+
+  EXPECT_EQ(0U, cluster_->stats_.upstream_cx_destroy_with_active_rq_.value());
+}
+
+/**
+ * Test legacy behavior when upstream sends us 'proxy-connection: close'
+ */
+TEST_F(Http1ConnPoolImplTest, ProxyConnectionCloseHeaderLegacy) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.fixed_connection_close", "false"}});
+  InSequence s;
+
+  // Request 1 should kick off a new connection.
+  NiceMock<MockResponseDecoder> outer_decoder;
+  ConnPoolCallbacks callbacks;
+  conn_pool_.expectClientCreate();
+  Http::ConnectionPool::Cancellable* handle = conn_pool_.newStream(outer_decoder, callbacks);
+
+  EXPECT_NE(nullptr, handle);
+
+  NiceMock<MockRequestEncoder> request_encoder;
+  ResponseDecoder* inner_decoder;
+  EXPECT_CALL(*conn_pool_.test_clients_[0].codec_, newStream(_))
+      .WillOnce(DoAll(SaveArgAddress(&inner_decoder), ReturnRef(request_encoder)));
+  EXPECT_CALL(callbacks.pool_ready_, ready());
+
+  conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
+  callbacks.outer_encoder_->encodeHeaders(
+      TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true);
+
+  // Response with 'proxy-connection: close' which should cause the connection to go away, even if
+  // there are other tokens in that header.
   EXPECT_CALL(conn_pool_, onClientDestroy());
   ResponseHeaderMapPtr response_headers(
       new TestResponseHeaderMapImpl{{":status", "200"}, {"Proxy-Connection", "Close"}});
@@ -733,6 +773,43 @@ TEST_F(Http1ConnPoolImplTest, ProxyConnectionCloseHeader) {
  * Test when upstream is HTTP/1.0 and does not send 'connection: keep-alive'
  */
 TEST_F(Http1ConnPoolImplTest, Http10NoConnectionKeepAlive) {
+  InSequence s;
+
+  // Request 1 should kick off a new connection.
+  NiceMock<MockResponseDecoder> outer_decoder;
+  ConnPoolCallbacks callbacks;
+  conn_pool_.expectClientCreate(Protocol::Http10);
+  Http::ConnectionPool::Cancellable* handle = conn_pool_.newStream(outer_decoder, callbacks);
+
+  EXPECT_NE(nullptr, handle);
+
+  NiceMock<MockRequestEncoder> request_encoder;
+  ResponseDecoder* inner_decoder;
+  EXPECT_CALL(*conn_pool_.test_clients_[0].codec_, newStream(_))
+      .WillOnce(DoAll(SaveArgAddress(&inner_decoder), ReturnRef(request_encoder)));
+  EXPECT_CALL(callbacks.pool_ready_, ready());
+
+  conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
+  callbacks.outer_encoder_->encodeHeaders(
+      TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true);
+
+  // Response without 'connection: keep-alive' which should cause the connection to go away.
+  EXPECT_CALL(conn_pool_, onClientDestroy());
+  ResponseHeaderMapPtr response_headers(
+      new TestResponseHeaderMapImpl{{":protocol", "HTTP/1.0"}, {":status", "200"}});
+  inner_decoder->decodeHeaders(std::move(response_headers), true);
+  dispatcher_.clearDeferredDeleteList();
+
+  EXPECT_EQ(0U, cluster_->stats_.upstream_cx_destroy_with_active_rq_.value());
+}
+
+/**
+ * Test legacy behavior when upstream is HTTP/1.0 and does not send 'connection: keep-alive'
+ */
+TEST_F(Http1ConnPoolImplTest, Http10NoConnectionKeepAliveLegacy) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.fixed_connection_close", "false"}});
   InSequence s;
 
   // Request 1 should kick off a new connection.
