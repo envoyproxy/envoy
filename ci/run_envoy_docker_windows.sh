@@ -4,7 +4,7 @@ set -e
 
 # TODO(sunjayBhatia, wrowe): update this note once we have an RBE toolchain generated for Windows
 # NOTE: Update this from the latest pushed image here: https://hub.docker.com/r/envoyproxy/envoy-build-windows2019/tags
-ENVOY_BUILD_SHA="596a50d2aa5bd62d233273b4abce967d9dda4bab"
+ENVOY_BUILD_SHA="9b7dc527351b9888805377a05e5975d6ef8d6ae1"
 
 [[ -z "${IMAGE_NAME}" ]] && IMAGE_NAME="envoyproxy/envoy-build-windows2019"
 # The IMAGE_ID defaults to the CI hash but can be set to an arbitrary image ID (found with 'docker
