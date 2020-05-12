@@ -3,6 +3,7 @@
 #include "envoy/buffer/buffer.h"
 
 namespace Envoy {
+namespace Compression {
 namespace Decompressor {
 
 /**
@@ -21,5 +22,8 @@ public:
                           Buffer::Instance& output_buffer) PURE;
 };
 
+using DecompressorPtr = std::unique_ptr<Decompressor>;
+
 } // namespace Decompressor
+} // namespace Compression
 } // namespace Envoy

@@ -32,8 +32,8 @@ envoy_extension_cc_test(
     ],
     extension_name = "envoy.filters.http.compressor",
     deps = [
-        "//source/common/decompressor:decompressor_lib",
         "//source/extensions/compression/gzip/compressor:config",
+        "//source/extensions/compression/gzip/decompressor:config",
         "//source/extensions/filters/http/compressor:config",
         "//test/integration:http_integration_lib",
         "//test/test_common:simulated_time_system_lib",
