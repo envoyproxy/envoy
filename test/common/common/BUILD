@@ -38,6 +38,17 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "substitution_format_string_test",
+    srcs = ["substitution_format_string_test.cc"],
+    deps = [
+        "//source/common/common:substitution_format_string_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
 envoy_cc_fuzz_test(
     name = "base64_fuzz_test",
     srcs = ["base64_fuzz_test.cc"],

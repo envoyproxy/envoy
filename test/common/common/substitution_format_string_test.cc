@@ -1,0 +1,103 @@
+#include "common/common/substitution_format_string.h"
+
+#include "test/mocks/http/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/utility.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+
+using testing::Return;
+
+namespace Envoy {
+
+class SubstitutionFormatStringUtilsTest : public ::testing::Test {
+public:
+  Http::TestRequestHeaderMapImpl request_headers_{{":method", "GET"}, {":path", "/bar/foo"}};
+  Http::TestResponseHeaderMapImpl response_headers_;
+  Http::TestResponseTrailerMapImpl response_trailers_;
+  StreamInfo::MockStreamInfo stream_info_;
+
+  envoy::config::core::v3::SubstitutionFormatString config_;
+};
+
+TEST_F(SubstitutionFormatStringUtilsTest, TestFomProtoConfigEmpty) {
+  EXPECT_EQ(nullptr, SubstitutionFormatStringUtils::fromProtoConfig(config_));
+}
+
+TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigText) {
+  const std::string yaml = R"EOF(
+  text_format: "text_string"
+)EOF";
+  TestUtility::loadFromYaml(yaml, config_);
+
+  auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_);
+  EXPECT_EQ("text_string", formatter->format(request_headers_, response_headers_,
+                                             response_trailers_, stream_info_));
+}
+
+TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigTypedJson) {
+  const std::string yaml = R"EOF(
+  json_format:
+    text: "plain_text"
+    path: "%REQ(:path)%"
+    code: "%RESPONSE_CODE%"
+)EOF";
+  TestUtility::loadFromYaml(yaml, config_);
+
+  absl::optional<uint32_t> response_code{200};
+  EXPECT_CALL(stream_info_, responseCode()).WillRepeatedly(Return(response_code));
+
+  auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_);
+  const auto out_json =
+      formatter->format(request_headers_, response_headers_, response_trailers_, stream_info_);
+
+  const std::string expected = R"EOF({
+    "text": "plain_text",
+    "path": "/bar/foo",
+    "code": 200
+})EOF";
+  EXPECT_TRUE(TestUtility::jsonStringEqual(out_json, expected));
+}
+
+TEST_F(SubstitutionFormatStringUtilsTest, TestInvalidConfigWithBool) {
+  const std::string yaml = R"EOF(
+  json_format:
+    field: true
+)EOF";
+  {
+    TestUtility::loadFromYaml(yaml, config_);
+    EXPECT_THROW_WITH_MESSAGE(SubstitutionFormatStringUtils::fromProtoConfig(config_),
+                              EnvoyException,
+                              "Only string values are supported in the JSON access log format.");
+  }
+}
+
+TEST_F(SubstitutionFormatStringUtilsTest, TestInvalidConfigWithInt) {
+  const std::string yaml = R"EOF(
+  json_format:
+    field: 200
+)EOF";
+  {
+    TestUtility::loadFromYaml(yaml, config_);
+    EXPECT_THROW_WITH_MESSAGE(SubstitutionFormatStringUtils::fromProtoConfig(config_),
+                              EnvoyException,
+                              "Only string values are supported in the JSON access log format.");
+  }
+}
+
+TEST_F(SubstitutionFormatStringUtilsTest, TestInvalidConfigWithNested) {
+  const std::string yaml = R"EOF(
+  json_format:
+    field:
+      nest_field: "value"
+)EOF";
+  {
+    TestUtility::loadFromYaml(yaml, config_);
+    EXPECT_THROW_WITH_MESSAGE(SubstitutionFormatStringUtils::fromProtoConfig(config_),
+                              EnvoyException,
+                              "Only string values are supported in the JSON access log format.");
+  }
+}
+
+} // namespace Envoy
