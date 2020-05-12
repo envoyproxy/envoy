@@ -283,12 +283,8 @@ void InstanceImpl::initialize(const Options& options,
                                    POOL_HISTOGRAM_PREFIX(stats_store_, server_stats_prefix))});
   validation_context_.static_warning_validation_visitor().setUnknownCounter(
       server_stats_->static_unknown_fields_);
-  validation_context_.static_warning_validation_visitor().setDeprecatedCounter(
-      server_stats_->static_deprecated_fields_);
   validation_context_.dynamic_warning_validation_visitor().setUnknownCounter(
       server_stats_->dynamic_unknown_fields_);
-  validation_context_.dynamic_warning_validation_visitor().setDeprecatedCounter(
-      server_stats_->dynamic_deprecated_fields_);
 
   initialization_timer_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       server_stats_->initialization_time_ms_, timeSource());

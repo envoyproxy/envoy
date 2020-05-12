@@ -17,12 +17,6 @@ void WarningValidationVisitorImpl::setUnknownCounter(Stats::Counter& counter) {
   counter.add(prestats_unknown_count_);
 }
 
-void WarningValidationVisitorImpl::setDeprecatedCounter(Stats::Counter& counter) {
-  ASSERT(deprecated_counter_ == nullptr);
-  deprecated_counter_ = &counter;
-  counter.add(prestats_deprecated_count_);
-}
-
 void WarningValidationVisitorImpl::onUnknownField(absl::string_view description) {
   onUnexpectedField(description, unknown_counter_, ValidationType::UnknownFields);
 }

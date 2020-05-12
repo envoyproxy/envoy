@@ -23,7 +23,6 @@ class WarningValidationVisitorImpl : public ValidationVisitor,
                                      public Logger::Loggable<Logger::Id::config> {
 public:
   void setUnknownCounter(Stats::Counter& counter);
-  void setDeprecatedCounter(Stats::Counter& counter);
 
   // Envoy::ProtobufMessage::ValidationVisitor
   void onUnknownField(absl::string_view description) override;
@@ -38,11 +37,7 @@ private:
   // This can be late initialized via setUnknownCounter(), enabling the server bootstrap loading
   // which occurs prior to the initialization of the stats subsystem.
   Stats::Counter* unknown_counter_{};
-  // This can be late initialized via setDeprecatedCounter(), enabling the server bootstrap loading
-  // which occurs prior to the initialization of the stats subsystem.
-  Stats::Counter* deprecated_counter_{};
   uint64_t prestats_unknown_count_{};
-  uint64_t prestats_deprecated_count_{};
 };
 
 class StrictValidationVisitorImpl : public ValidationVisitor {
