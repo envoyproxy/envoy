@@ -526,21 +526,56 @@ TEST_F(OwnedImplTest, Search) {
   }
   EXPECT_STREQ("abaaaabaaaaaba", buffer.toString().c_str());
 
-  EXPECT_EQ(-1, buffer.search("c", 1, 0));
-  EXPECT_EQ(0, buffer.search("", 0, 0));
-  EXPECT_EQ(buffer.length(), buffer.search("", 0, buffer.length()));
-  EXPECT_EQ(-1, buffer.search("", 0, buffer.length() + 1));
-  EXPECT_EQ(0, buffer.search("a", 1, 0));
-  EXPECT_EQ(1, buffer.search("b", 1, 1));
-  EXPECT_EQ(2, buffer.search("a", 1, 1));
-  EXPECT_EQ(0, buffer.search("abaa", 4, 0));
-  EXPECT_EQ(2, buffer.search("aaaa", 4, 0));
-  EXPECT_EQ(2, buffer.search("aaaa", 4, 1));
-  EXPECT_EQ(2, buffer.search("aaaa", 4, 2));
-  EXPECT_EQ(7, buffer.search("aaaaab", 6, 0));
-  EXPECT_EQ(0, buffer.search("abaaaabaaaaaba", 14, 0));
-  EXPECT_EQ(12, buffer.search("ba", 2, 10));
-  EXPECT_EQ(-1, buffer.search("abaaaabaaaaabaa", 15, 0));
+  EXPECT_EQ(-1, buffer.search("c", 1, 0, 0));
+  EXPECT_EQ(0, buffer.search("", 0, 0, 0));
+  EXPECT_EQ(buffer.length(), buffer.search("", 0, buffer.length(), 0));
+  EXPECT_EQ(-1, buffer.search("", 0, buffer.length() + 1, 0));
+  EXPECT_EQ(0, buffer.search("a", 1, 0, 0));
+  EXPECT_EQ(1, buffer.search("b", 1, 1, 0));
+  EXPECT_EQ(2, buffer.search("a", 1, 1, 0));
+  EXPECT_EQ(0, buffer.search("abaa", 4, 0, 0));
+  EXPECT_EQ(2, buffer.search("aaaa", 4, 0, 0));
+  EXPECT_EQ(2, buffer.search("aaaa", 4, 1, 0));
+  EXPECT_EQ(2, buffer.search("aaaa", 4, 2, 0));
+  EXPECT_EQ(7, buffer.search("aaaaab", 6, 0, 0));
+  EXPECT_EQ(0, buffer.search("abaaaabaaaaaba", 14, 0, 0));
+  EXPECT_EQ(12, buffer.search("ba", 2, 10, 0));
+  EXPECT_EQ(-1, buffer.search("abaaaabaaaaabaa", 15, 0, 0));
+}
+
+TEST_F(OwnedImplTest, SearchWithLengthLimit) {
+  // Populate a buffer with a string split across many small slices, to
+  // exercise edge cases in the search implementation.
+  static const char* Inputs[] = {"ab", "a", "", "aaa", "b", "a", "aaa", "ab", "a"};
+  Buffer::OwnedImpl buffer;
+  for (const auto& input : Inputs) {
+    buffer.appendSliceForTest(input);
+  }
+  EXPECT_STREQ("abaaaabaaaaaba", buffer.toString().c_str());
+
+  // The string is there, but the search is limited to 1 byte.
+  EXPECT_EQ(-1, buffer.search("b", 1, 0, 1));
+  // The string is there, but the search is limited to 1 byte.
+  EXPECT_EQ(-1, buffer.search("ab", 2, 0, 1));
+  // The string is there, but spans over 2 slices. The search length is enough
+  // to find it.
+  EXPECT_EQ(1, buffer.search("ba", 2, 0, 3));
+  EXPECT_EQ(1, buffer.search("ba", 2, 0, 5));
+  EXPECT_EQ(1, buffer.search("ba", 2, 1, 2));
+  EXPECT_EQ(1, buffer.search("ba", 2, 1, 5));
+  // The string spans over 3 slices. test different variations of search length
+  // and starting position.
+  EXPECT_EQ(2, buffer.search("aaaab", 5, 2, 5));
+  EXPECT_EQ(-1, buffer.search("aaaab", 5, 2, 3));
+  EXPECT_EQ(2, buffer.search("aaaab", 5, 2, 6));
+  EXPECT_EQ(2, buffer.search("aaaab", 5, 0, 8));
+  EXPECT_EQ(-1, buffer.search("aaaab", 5, 0, 6));
+  // Test searching for the string which in in the last slice.
+  EXPECT_EQ(12, buffer.search("ba", 2, 12, 2));
+  EXPECT_EQ(12, buffer.search("ba", 2, 11, 3));
+  EXPECT_EQ(-1, buffer.search("ba", 2, 11, 2));
+  // Test cases when length to search is larger than buffer
+  EXPECT_EQ(12, buffer.search("ba", 2, 11, 10e6));
 }
 
 TEST_F(OwnedImplTest, StartsWith) {
@@ -662,7 +697,7 @@ TEST_F(OwnedImplTest, ReserveZeroCommit) {
   Api::IoCallUint64Result result = buf.read(io_handle, max_length);
   ASSERT_EQ(result.rc_, static_cast<uint64_t>(rc));
   ASSERT_EQ(::close(pipe_fds[1]), 0);
-  ASSERT_EQ(previous_length, buf.search(data.data(), rc, previous_length));
+  ASSERT_EQ(previous_length, buf.search(data.data(), rc, previous_length, 0));
   EXPECT_EQ("bbbbb", buf.toString().substr(0, 5));
   expectSlices({{5, 0, 4056}, {1953, 2103, 4056}}, buf);
 }

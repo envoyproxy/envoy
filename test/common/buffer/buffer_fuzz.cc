@@ -153,7 +153,8 @@ public:
     return 1;
   }
 
-  ssize_t search(const void* data, uint64_t size, size_t start) const override {
+  ssize_t search(const void* data, uint64_t size, size_t start, size_t length) const override {
+    UNREFERENCED_PARAMETER(length);
     return asStringView().find({static_cast<const char*>(data), size}, start);
   }
 
@@ -400,7 +401,7 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
     const std::string& content = action.search().content();
     const uint32_t offset = action.search().offset();
     const std::string data = target_buffer.toString();
-    FUZZ_ASSERT(target_buffer.search(content.data(), content.size(), offset) ==
+    FUZZ_ASSERT(target_buffer.search(content.data(), content.size(), offset, 0) ==
                 static_cast<ssize_t>(target_buffer.toString().find(content, offset)));
     break;
   }
