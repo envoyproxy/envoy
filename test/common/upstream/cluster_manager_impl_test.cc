@@ -52,7 +52,6 @@ public:
       type: STATIC
       lb_policy: ROUND_ROBIN
       load_assignment:
-        cluster_name: cluster_1
         endpoints:
         - lb_endpoints:
           - endpoint:
@@ -104,7 +103,7 @@ public:
     auto message_ptr = admin_.config_tracker_.config_tracker_callbacks_["clusters"]();
     const auto& clusters_config_dump =
         dynamic_cast<const envoy::admin::v3::ClustersConfigDump&>(*message_ptr);
-   
+
     envoy::admin::v3::ClustersConfigDump expected_clusters_config_dump;
     TestUtility::loadFromYaml(expected_dump_yaml, expected_clusters_config_dump);
     EXPECT_EQ(expected_clusters_config_dump.DebugString(), clusters_config_dump.DebugString());

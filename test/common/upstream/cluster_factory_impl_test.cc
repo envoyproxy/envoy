@@ -80,7 +80,6 @@ TEST_F(TestStaticClusterImplTest, CreateWithoutConfig) {
       connect_timeout: 0.25s
       lb_policy: ROUND_ROBIN
       load_assignment:
-        cluster_name: staticcluster
         endpoints:
           - lb_endpoints:
             - endpoint:
@@ -123,7 +122,6 @@ TEST_F(TestStaticClusterImplTest, CreateWithStructConfig) {
       connect_timeout: 0.25s
       lb_policy: ROUND_ROBIN
       load_assignment:
-        cluster_name: staticcluster
         endpoints:
           - lb_endpoints:
             - endpoint:
@@ -168,7 +166,6 @@ TEST_F(TestStaticClusterImplTest, CreateWithTypedConfig) {
       connect_timeout: 0.25s
       lb_policy: ROUND_ROBIN
       load_assignment:
-        cluster_name: staticcluster
         endpoints:
           - lb_endpoints:
             - endpoint:

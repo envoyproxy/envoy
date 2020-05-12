@@ -48,7 +48,6 @@ constexpr static const char* kDefaultStaticClusterTmpl = R"EOF(
   }
   )EOF";
 
-
 inline std::string defaultStaticClusterJson(const std::string& name) {
   return fmt::sprintf(kDefaultStaticClusterTmpl, name, R"EOF(
 "socket_address": {
