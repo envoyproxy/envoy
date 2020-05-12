@@ -14,7 +14,7 @@ parameters:
     default: "--config=remote-ci --jobs=$(RbeJobs) --curses=no --experimental_repository_cache_hardlinks"
   - name: managedAgent
     type: boolean
-    default: false
+    default: true
 
 steps:
   - task: Cache@2
