@@ -38,7 +38,7 @@ TEST_F(PreviousRoutesTest, TargetIsOnlyTakenOnce) {
     auto predicate = factory_->createInternalRedirectPredicate(*config_, current_route_name);
     ASSERT(predicate);
 
-    EXPECT_TRUE(predicate->acceptTargetRoute(filter_state_, "route_1"));
+    EXPECT_TRUE(predicate->acceptTargetRoute(filter_state_, "route_1", false, false));
     // New filter state data is created with route name.
     EXPECT_TRUE(filter_state_.hasDataWithName(
         "envoy.internal_redirect.previous_routes_predicate_state.fake_current_route"));
@@ -49,7 +49,7 @@ TEST_F(PreviousRoutesTest, TargetIsOnlyTakenOnce) {
     auto predicate = factory_->createInternalRedirectPredicate(*config_, current_route_name);
     ASSERT(predicate);
 
-    EXPECT_FALSE(predicate->acceptTargetRoute(filter_state_, "route_1"));
+    EXPECT_FALSE(predicate->acceptTargetRoute(filter_state_, "route_1", false, false));
   }
 }
 
@@ -59,7 +59,7 @@ TEST_F(PreviousRoutesTest, RoutesAreIndependent) {
     auto predicate = factory_->createInternalRedirectPredicate(*config_, "route_0");
     ASSERT(predicate);
 
-    EXPECT_TRUE(predicate->acceptTargetRoute(filter_state_, "route_2"));
+    EXPECT_TRUE(predicate->acceptTargetRoute(filter_state_, "route_2", false, false));
     // New filter state data is created with route name.
     EXPECT_TRUE(filter_state_.hasDataWithName(
         "envoy.internal_redirect.previous_routes_predicate_state.route_0"));
@@ -70,7 +70,7 @@ TEST_F(PreviousRoutesTest, RoutesAreIndependent) {
     auto predicate = factory_->createInternalRedirectPredicate(*config_, "route_1");
     ASSERT(predicate);
 
-    EXPECT_TRUE(predicate->acceptTargetRoute(filter_state_, "route_2"));
+    EXPECT_TRUE(predicate->acceptTargetRoute(filter_state_, "route_2", false, false));
     // New filter state data is created with route name.
     EXPECT_TRUE(filter_state_.hasDataWithName(
         "envoy.internal_redirect.previous_routes_predicate_state.route_1"));
