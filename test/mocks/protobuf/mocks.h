@@ -13,6 +13,13 @@ public:
   ~MockValidationVisitor() override;
 
   MOCK_METHOD(void, onUnknownField, (absl::string_view));
+
+  bool skipValidation() override { return skip_validation_; }
+
+  void setSkipValidation(bool s) { skip_validation_ = s; }
+
+private:
+  bool skip_validation_ = false;
 };
 
 class MockValidationContext : public ValidationContext {
