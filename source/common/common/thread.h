@@ -1,10 +1,13 @@
 #pragma once
 
 #include <atomic>
+#include <cstring>
 #include <functional>
 #include <memory>
 
 #include "envoy/thread/thread.h"
+
+#include "common/common/non_copyable.h"
 
 #include "absl/synchronization/mutex.h"
 
@@ -80,24 +83,28 @@ enum class AtomicPtrAllocMode { DoNotDelete, DeleteOnDestruct };
 
 // Manages an array of atomic pointers to T, providing a relatively
 // contention-free mechanism to lazily get a T* at an index, where the caller
-// provides a mechanism to instantiate a T* under lock, if one is not already
+// provides a mechanism to instantiate a T* under lock, if one has not already
 // been stored at that index.
 //
 // alloc_mode controls whether allocated T* entries should be deleted on
 // destruction of the array. This should be set to AtomicPtrAllocMode::DoNotDelete
 // if the T* returned from MakeObject are managed by the caller.
-template <class T, uint32_t size, AtomicPtrAllocMode alloc_mode> class AtomicPtrArray {
+template <class T, uint32_t size, AtomicPtrAllocMode alloc_mode>
+class AtomicPtrArray : NonCopyable {
 public:
   AtomicPtrArray() {
-    for (auto& ptr : data_) {
-      ptr = nullptr;
+    for (std::atomic<T*>& atomic_ref : data_) {
+      atomic_ref = nullptr;
     }
   }
 
   ~AtomicPtrArray() {
     if (alloc_mode == AtomicPtrAllocMode::DeleteOnDestruct) {
-      for (auto& ptr : data_) {
-        delete ptr;
+      for (std::atomic<T*>& atomic_ref : data_) {
+        T* ptr = atomic_ref.load();
+        if (ptr != nullptr) {
+          delete ptr;
+        }
       }
     }
   }
@@ -110,11 +117,11 @@ public:
 
   /*
    * Returns an already existing T* at index, or calls make_object to
-   * instantiate and save the T* uner lock.
+   * instantiate and save the T* under lock.
    *
    * @param index the Index to look up.
    * @param make_object function to call under lock to make a T*.
-   * @return The new or already-existing T*.
+   * @return The new or already-existing T*, possibly nullptr if make_object returns nullptr.
    */
   T* get(uint32_t index, const MakeObject& make_object) {
     std::atomic<T*>& atomic_ref = data_[index];
@@ -137,9 +144,9 @@ private:
   absl::Mutex mutex_;
 };
 
-// Manages a pointers to T, providing a relatively contention-free mechanism to
+// Manages a pointer to T, providing a relatively contention-free mechanism to
 // lazily create a T*, where the caller provides a mechanism to instantiate a
-// T* under lock, if one is not already been stored.
+// T* under lock, if one has not already been stored.
 //
 // alloc_mode controls whether allocated T* objects should be deleted on
 // destruction of the AtomicObject. This should be set to
@@ -153,10 +160,10 @@ public:
 
   /*
    * Returns an already existing T*, or calls make_object to instantiate and
-   * save the T* uner lock.
+   * save the T* under lock.
    *
    * @param make_object function to call under lock to make a T*.
-   * @return The new or already-existing T*.
+   * @return The new or already-existing T*, possibly nullptr if make_object returns nullptr.
    */
   T* get(const MakeObject& make_object) { return BaseClass::get(0, make_object); }
 };
