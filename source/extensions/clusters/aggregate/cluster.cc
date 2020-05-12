@@ -4,6 +4,8 @@
 #include "envoy/extensions/clusters/aggregate/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/aggregate/v3/cluster.pb.validate.h"
 
+#include "common/common/assert.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Clusters {
@@ -20,10 +22,9 @@ Cluster::Cluster(const envoy::config::cluster::v3::Cluster& cluster,
       cluster_manager_(cluster_manager), runtime_(runtime), random_(random),
       tls_(tls.allocateSlot()), clusters_(config.clusters().begin(), config.clusters().end()) {}
 
-PriorityContext
+PriorityContextPtr
 Cluster::linearizePrioritySet(const std::function<bool(const std::string&)>& skip_predicate) {
-  Upstream::PrioritySetImpl priority_set;
-  std::vector<std::pair<uint32_t, Upstream::ThreadLocalCluster*>> priority_to_cluster;
+  PriorityContextPtr priority_context = std::make_unique<PriorityContext>();
   uint32_t next_priority_after_linearizing = 0;
 
   // Linearize the priority set. e.g. for clusters [C_0, C_1, C_2] referred in aggregate cluster
@@ -47,16 +48,21 @@ Cluster::linearizePrioritySet(const std::function<bool(const std::string&)>& ski
     uint32_t priority_in_current_cluster = 0;
     for (const auto& host_set : tlc->prioritySet().hostSetsPerPriority()) {
       if (!host_set->hosts().empty()) {
-        priority_set.updateHosts(
-            next_priority_after_linearizing++, Upstream::HostSetImpl::updateHostsParams(*host_set),
+        priority_context->priority_set_.updateHosts(
+            next_priority_after_linearizing, Upstream::HostSetImpl::updateHostsParams(*host_set),
             host_set->localityWeights(), host_set->hosts(), {}, host_set->overprovisioningFactor());
-        priority_to_cluster.emplace_back(std::make_pair(priority_in_current_cluster, tlc));
+        priority_context->priority_to_cluster_.emplace_back(
+            std::make_pair(priority_in_current_cluster, tlc));
+
+        priority_context->cluster_and_priority_to_linearized_priority_[std::make_pair(
+            cluster, priority_in_current_cluster)] = next_priority_after_linearizing;
+        next_priority_after_linearizing++;
       }
       priority_in_current_cluster++;
     }
   }
 
-  return std::make_pair(std::move(priority_set), std::move(priority_to_cluster));
+  return priority_context;
 }
 
 void Cluster::startPreInit() {
@@ -85,10 +91,11 @@ void Cluster::startPreInit() {
 void Cluster::refresh(const std::function<bool(const std::string&)>& skip_predicate) {
   // Post the priority set to worker threads.
   tls_->runOnAllThreads([this, skip_predicate, cluster_name = this->info()->name()]() {
-    PriorityContext priority_set = linearizePrioritySet(skip_predicate);
+    PriorityContextPtr priority_context = linearizePrioritySet(skip_predicate);
     Upstream::ThreadLocalCluster* cluster = cluster_manager_.get(cluster_name);
     ASSERT(cluster != nullptr);
-    dynamic_cast<AggregateClusterLoadBalancer&>(cluster->loadBalancer()).refresh(priority_set);
+    dynamic_cast<AggregateClusterLoadBalancer&>(cluster->loadBalancer())
+        .refresh(std::move(priority_context));
   });
 }
 
@@ -113,15 +120,41 @@ void Cluster::onClusterRemoval(const std::string& cluster_name) {
   }
 }
 
+absl::optional<uint32_t> AggregateClusterLoadBalancer::LoadBalancerImpl::hostToLinearizedPriority(
+    const Upstream::HostDescription& host) const {
+  auto it = priority_context_.cluster_and_priority_to_linearized_priority_.find(
+      std::make_pair(host.cluster().name(), host.priority()));
+
+  if (it != priority_context_.cluster_and_priority_to_linearized_priority_.end()) {
+    return it->second;
+  } else {
+    // The HostSet can change due to CDS/EDS updates between retries.
+    return absl::nullopt;
+  }
+}
+
 Upstream::HostConstSharedPtr
 AggregateClusterLoadBalancer::LoadBalancerImpl::chooseHost(Upstream::LoadBalancerContext* context) {
+  const Upstream::HealthyAndDegradedLoad* priority_loads = nullptr;
+  if (context != nullptr) {
+    priority_loads = &context->determinePriorityLoad(
+        priority_set_, per_priority_load_,
+        [this](const auto& host) { return hostToLinearizedPriority(host); });
+  } else {
+    priority_loads = &per_priority_load_;
+  }
+
   const auto priority_pair =
-      choosePriority(random_.random(), per_priority_load_.healthy_priority_load_,
-                     per_priority_load_.degraded_priority_load_);
-  AggregateLoadBalancerContext aggregate_context(context, priority_pair.second,
-                                                 priority_to_cluster_[priority_pair.first].first);
-  return priority_to_cluster_[priority_pair.first].second->loadBalancer().chooseHost(
-      &aggregate_context);
+      choosePriority(random_.random(), priority_loads->healthy_priority_load_,
+                     priority_loads->degraded_priority_load_);
+
+  AggregateLoadBalancerContext aggregate_context(
+      context, priority_pair.second,
+      priority_context_.priority_to_cluster_[priority_pair.first].first);
+
+  Upstream::ThreadLocalCluster* cluster =
+      priority_context_.priority_to_cluster_[priority_pair.first].second;
+  return cluster->loadBalancer().chooseHost(&aggregate_context);
 }
 
 Upstream::HostConstSharedPtr

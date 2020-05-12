@@ -170,7 +170,7 @@ public:
                             priority),
         used_(true) {
     setEdsHealthFlag(health_status);
-    weight(initial_weight);
+    HostImpl::weight(initial_weight);
   }
 
   // Upstream::Host

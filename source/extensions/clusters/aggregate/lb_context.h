@@ -37,11 +37,13 @@ public:
   }
   const Upstream::HealthyAndDegradedLoad&
   determinePriorityLoad(const Upstream::PrioritySet&,
-                        const Upstream::HealthyAndDegradedLoad& original_priority_load) override {
+                        const Upstream::HealthyAndDegradedLoad& original_priority_load,
+                        const Upstream::RetryPriority::PriorityMappingFunc&) override {
     // Re-assign load. Set all traffic to the priority and availability selected in aggregate
     // cluster.
-    // TODO(yxue): allow determinePriorityLoad to affect the load of top level cluster and verify it
-    // works with current retry plugin
+    //
+    // Note: context_->determinePriorityLoad() was already called and its result handled in
+    // AggregateClusterLoadBalancer::LoadBalancerImpl::chooseHost().
     const size_t priorities = original_priority_load.healthy_priority_load_.get().size();
     priority_load_.healthy_priority_load_.get().assign(priorities, 0);
     priority_load_.degraded_priority_load_.get().assign(priorities, 0);

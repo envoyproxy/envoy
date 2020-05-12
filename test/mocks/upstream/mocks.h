@@ -133,7 +133,8 @@ public:
   ~MockRetryPriority() override;
 
   const HealthyAndDegradedLoad& determinePriorityLoad(const PrioritySet&,
-                                                      const HealthyAndDegradedLoad&) override {
+                                                      const HealthyAndDegradedLoad&,
+                                                      const PriorityMappingFunc&) override {
     return priority_load_;
   }
 
