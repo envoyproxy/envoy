@@ -53,6 +53,8 @@ struct Response {
   Http::HeaderVector headers_to_append;
   // Optional http headers used on either denied or ok responses.
   Http::HeaderVector headers_to_add;
+  // Optional http headers used on either denied or ok responses.
+  Http::HeaderVector headers_to_add_and_append;
   // Optional http body used only on denied response.
   std::string body;
   // Optional http status used only on denied response.

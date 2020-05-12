@@ -213,6 +213,11 @@ message AuthorizationResponse {
   // Note that coexistent headers will be overridden.
   type.matcher.v3.ListStringMatcher allowed_upstream_headers = 1;
 
+  // When this :ref:`list <envoy_api_msg_type.matcher.v3.ListStringMatcher>` is set, authorization
+  // response headers that have a correspondent match will be added to the client's response. Note
+  // that coexistent headers will be appended.
+  type.matcher.v3.ListStringMatcher allowed_upstream_headers_to_append = 3;
+
   // When this :ref:`list <envoy_api_msg_type.matcher.v3.ListStringMatcher>`. is set, authorization
   // response headers that have a correspondent match will be added to the client's response. Note
   // that when this list is *not* set, all the authorization response headers, except *Authority

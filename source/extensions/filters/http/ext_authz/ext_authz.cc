@@ -174,6 +174,10 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       ENVOY_STREAM_LOG(trace, "'{}':'{}'", *callbacks_, header.first.get(), header.second);
       request_headers_->setCopy(header.first, header.second);
     }
+    for (const auto& header : response->headers_to_add_and_append) {
+      ENVOY_STREAM_LOG(trace, "'{}':'{}'", *callbacks_, header.first.get(), header.second);
+      request_headers_->addCopy(header.first, header.second);
+    }
     for (const auto& header : response->headers_to_append) {
       const Http::HeaderEntry* header_to_modify = request_headers_->get(header.first);
       if (header_to_modify) {
