@@ -103,11 +103,29 @@ Network::TransportSocketFactoryPtr createTransportSocketFactoryHelper(
     ASSERT(local_address != nullptr);
 
     GrpcAltsCredentialsOptionsPtr options;
+    // if (is_upstream) {
+    //   options = GrpcAltsCredentialsOptionsPtr(grpc_alts_credentials_client_options_create());
+    // } else {
+    //   options = GrpcAltsCredentialsOptionsPtr(grpc_alts_credentials_server_options_create());
+    // }
     if (is_upstream) {
+      LOG(INFO) << "Creating options for upstream";
       options = GrpcAltsCredentialsOptionsPtr(grpc_alts_credentials_client_options_create());
+      std::unique_ptr<grpc_channel_credentials> credentials = make_unique<grpc_channel_credentials>(grpc_alts_credentials_create(options.get()));
+      if (grpc_alts_credentials* creds = dynamic_cast<grpc_alts_credentials*>(credentials.get())) {
+        LOG(INFO) << "casting success!";
+        options = GrpcAltsCredentialsOptionsPtr(grpc_alts_credentials_options_copy(creds->options()));
+      }
     } else {
+      LOG(INFO) << "Creating options for downstream";
       options = GrpcAltsCredentialsOptionsPtr(grpc_alts_credentials_server_options_create());
+      std::unique_ptr<grpc_server_credentials> credentials = make_unique<grpc_channel_credentials>(grpc_alts_server_credentials_create(options.get()));
+      if (grpc_alts_server_credentials* creds = dynamic_cast<grpc_alts_server_credentials*>(credentials.get())) {
+        LOG(INFO) << "casting success!";
+        options = GrpcAltsCredentialsOptionsPtr(grpc_alts_credentials_options_copy(creds->options()));
+      }
     }
+
     const char* target_name = is_upstream ? "" : nullptr;
     tsi_handshaker* handshaker = nullptr;
     // Specifying target name as empty since TSI won't take care of validating peer identity
