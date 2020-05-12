@@ -92,11 +92,16 @@ enum class AtomicPtrAllocMode { DoNotDelete, DeleteOnDestruct };
 template <class T, uint32_t size, AtomicPtrAllocMode alloc_mode>
 class AtomicPtrArray : NonCopyable {
 public:
-  AtomicPtrArray() { memset(data_, 0, sizeof(data_)); }
+  AtomicPtrArray() {
+    for (std::atomic<T*>& atomic_ref : data_) {
+      atomic_ref = nullptr;
+    }
+  }
 
   ~AtomicPtrArray() {
     if (alloc_mode == AtomicPtrAllocMode::DeleteOnDestruct) {
-      for (T* ptr : data_) {
+      for (std::atomic<T*>& atomic_ref : data_) {
+        T* ptr = atomic_ref.load();
         if (ptr != nullptr) {
           delete ptr;
         }
