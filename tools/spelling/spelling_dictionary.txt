@@ -504,6 +504,7 @@ dechunked
 decl
 decls
 decompressor
+decompressors
 decrement
 decrypt
 dedup
