@@ -56,6 +56,12 @@ public:
   NiceMock<Tracing::MockHttpTracerManager> http_tracer_manager_;
   std::shared_ptr<NiceMock<Tracing::MockHttpTracer>> http_tracer_{
       std::make_shared<NiceMock<Tracing::MockHttpTracer>>()};
+  void httpConnectionManagerConfigHelper(
+      const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+          config) {
+    HttpConnectionManagerConfig(config, context_, date_provider_, route_config_provider_manager_,
+                                scoped_routes_config_provider_manager_, http_tracer_manager_);
+  }
 };
 
 TEST_F(HttpConnectionManagerConfigTest, ValidateFail) {
@@ -85,9 +91,7 @@ http_filters:
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
-      HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
-                                  date_provider_, route_config_provider_manager_,
-                                  scoped_routes_config_provider_manager_, http_tracer_manager_),
+      httpConnectionManagerConfigHelper(parseHttpConnectionManagerFromV2Yaml(yaml_string)),
       EnvoyException, "Didn't find a registered implementation for name: 'foo'");
 }
 
@@ -115,9 +119,7 @@ http_filters:
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
-      HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
-                                  date_provider_, route_config_provider_manager_,
-                                  scoped_routes_config_provider_manager_, http_tracer_manager_),
+      httpConnectionManagerConfigHelper(parseHttpConnectionManagerFromV2Yaml(yaml_string)),
       EnvoyException,
       "Error: terminal filter named envoy.filters.http.router of type envoy.filters.http.router "
       "must be the last filter in a http filter chain.");
@@ -146,9 +148,7 @@ http_filters:
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
-      HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
-                                  date_provider_, route_config_provider_manager_,
-                                  scoped_routes_config_provider_manager_, http_tracer_manager_),
+      httpConnectionManagerConfigHelper(parseHttpConnectionManagerFromV2Yaml(yaml_string)),
       EnvoyException,
       "Error: non-terminal filter named health_check of type "
       "envoy.filters.http.health_check is the last filter in a http filter "
@@ -1302,9 +1302,7 @@ http2_protocol_options:
   custom_settings_parameters: { identifier: 3, value: 2048 }
   )EOF";
   // This will throw when Http2ProtocolOptions validation fails.
-  HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
-                              date_provider_, route_config_provider_manager_,
-                              scoped_routes_config_provider_manager_, http_tracer_manager_);
+  httpConnectionManagerConfigHelper(parseHttpConnectionManagerFromV2Yaml(yaml_string));
 }
 
 // Validates that named and user defined parameter collisions will trigger a config validation
@@ -1336,9 +1334,7 @@ http2_protocol_options:
     - { identifier: 3, value: 1024 }
   )EOF";
   EXPECT_THROW_WITH_REGEX(
-      HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
-                                  date_provider_, route_config_provider_manager_,
-                                  scoped_routes_config_provider_manager_, http_tracer_manager_),
+      httpConnectionManagerConfigHelper(parseHttpConnectionManagerFromV2Yaml(yaml_string)),
       EnvoyException,
       R"(the \{hpack_table_size,max_concurrent_streams\} HTTP/2 SETTINGS parameter\(s\) can not be)"
       " configured");
@@ -1370,9 +1366,7 @@ http2_protocol_options:
     - { identifier: 8, value: 0 }
   )EOF";
   EXPECT_THROW_WITH_REGEX(
-      HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
-                                  date_provider_, route_config_provider_manager_,
-                                  scoped_routes_config_provider_manager_, http_tracer_manager_),
+      httpConnectionManagerConfigHelper(parseHttpConnectionManagerFromV2Yaml(yaml_string)),
       EnvoyException,
       "the \"allow_connect\" SETTINGS parameter must only be configured through the named field");
 
@@ -1395,9 +1389,7 @@ http_filters:
 http2_protocol_options:
   allow_connect: true
   )EOF";
-  HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string2), context_,
-                              date_provider_, route_config_provider_manager_,
-                              scoped_routes_config_provider_manager_, http_tracer_manager_);
+  httpConnectionManagerConfigHelper(parseHttpConnectionManagerFromV2Yaml(yaml_string2));
 }
 
 // Validates that setting the server push parameter via user defined parameters is disallowed.
@@ -1423,9 +1415,7 @@ http2_protocol_options:
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(
-      HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
-                                  date_provider_, route_config_provider_manager_,
-                                  scoped_routes_config_provider_manager_, http_tracer_manager_),
+      httpConnectionManagerConfigHelper(parseHttpConnectionManagerFromV2Yaml(yaml_string)),
       EnvoyException,
       "server push is not supported by Envoy and can not be enabled via a SETTINGS parameter.");
 
@@ -1457,9 +1447,7 @@ http2_protocol_options:
 
   // The server push exception is thrown first.
   EXPECT_THROW_WITH_REGEX(
-      HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
-                                  date_provider_, route_config_provider_manager_,
-                                  scoped_routes_config_provider_manager_, http_tracer_manager_),
+      httpConnectionManagerConfigHelper(parseHttpConnectionManagerFromV2Yaml(yaml_string)),
       EnvoyException,
       "server push is not supported by Envoy and can not be enabled via a SETTINGS parameter.");
 }
@@ -1491,9 +1479,7 @@ http2_protocol_options:
     - { identifier: 12, value: 10 }
   )EOF";
   EXPECT_THROW_WITH_REGEX(
-      HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
-                                  date_provider_, route_config_provider_manager_,
-                                  scoped_routes_config_provider_manager_, http_tracer_manager_),
+      httpConnectionManagerConfigHelper(parseHttpConnectionManagerFromV2Yaml(yaml_string)),
       EnvoyException,
       R"(inconsistent HTTP/2 custom SETTINGS parameter\(s\) detected; identifiers = \{0x0a\})");
 }
@@ -1620,9 +1606,7 @@ TEST_F(HttpConnectionManagerConfigTest, UnknownRequestIDExtension) {
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(
-      HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
-                                  date_provider_, route_config_provider_manager_,
-                                  scoped_routes_config_provider_manager_, http_tracer_manager_),
+      httpConnectionManagerConfigHelper(parseHttpConnectionManagerFromV2Yaml(yaml_string)),
       EnvoyException, "Didn't find a registered implementation for type");
 }
 
