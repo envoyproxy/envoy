@@ -115,7 +115,6 @@ protected:
   uint32_t max_request_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_{envoy::config::core::v3::HttpProtocolOptions::ALLOW};
-  // MOCK_METHOD(Http::Http2::CodecStats&, http2CodecStats, (), (const));
 };
 
 void Http1ServerConnectionImplTest::expect400(Protocol p, bool allow_absolute_url,

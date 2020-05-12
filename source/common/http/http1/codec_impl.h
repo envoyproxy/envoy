@@ -41,6 +41,7 @@ struct CodecStats {
   ALL_HTTP1_CODEC_STATS(GENERATE_COUNTER_STRUCT)
 };
 
+// Constructor-args for CodecStats.
 #define HTTP1_CODEC_STATS(scope) ALL_HTTP1_CODEC_STATS(POOL_COUNTER_PREFIX(scope, "http1."))
 
 class ConnectionImpl;
