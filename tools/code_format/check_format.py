@@ -1032,7 +1032,7 @@ if __name__ == "__main__":
     results = []
 
     def PooledCheckFormat(path_predicate):
-      pool = multiprocessing.get_context("fork").Pool(processes=args.num_workers)
+      pool = multiprocessing.Pool(processes=args.num_workers)
       # For each file in target_path, start a new task in the pool and collect the
       # results (results is passed by reference, and is used as an output).
       for root, _, files in os.walk(target_path):

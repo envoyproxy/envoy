@@ -21,24 +21,35 @@ DecompressorFilterConfig::DecompressorFilterConfig(
                                     : ".",
                                 decompressor_factory->statsPrefix() + ".")),
       decompressor_factory_(std::move(decompressor_factory)),
-      request_direction_config_(proto_config, stats_prefix_, scope, runtime),
-      response_direction_config_(proto_config, stats_prefix_, scope, runtime) {}
+      request_direction_config_(proto_config.request_direction_config(), stats_prefix_, scope,
+                                runtime),
+      response_direction_config_(proto_config.response_direction_config(), stats_prefix_, scope,
+                                 runtime) {}
 
 DecompressorFilterConfig::DirectionConfig::DirectionConfig(
     const bool is_request_direction,
-    const envoy::extensions::filters::http::decompressor::v3::Decompressor& proto_config,
+    const envoy::extensions::filters::http::decompressor::v3::Decompressor::CommonDirectionConfig&
+        proto_config,
     const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
     : request_or_response_(is_request_direction ? "request" : "response"),
-      stats_(generateStats(stats_prefix + request_or_response_, scope)),
-      decompression_enabled_(is_request_direction ? proto_config.request_decompression_enabled()
-                                                  : proto_config.response_decompression_enabled(),
-                             runtime) {}
+      stats_(generateStats(stats_prefix, scope)),
+      decompression_enabled_(proto_config.enabled(), runtime) {}
 
-DecompressorFilterConfig::RequestDirectionConfig::RequestDirectionConfig(const envoy::extensions::filters::http::decompressor::v3::Decompressor& proto_config,
-        const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime) : DirectionConfig(true, proto_config, stats_prefix, scope, runtime), advertise_accept_encoding_(proto_config.request_direction_config().advertise_accept_encoding()) {}
+DecompressorFilterConfig::RequestDirectionConfig::RequestDirectionConfig(
+    const envoy::extensions::filters::http::decompressor::v3::Decompressor::RequestDirectionConfig&
+        proto_config,
+    const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
+    : DirectionConfig(true, proto_config.common_config(), stats_prefix + "request.", scope,
+                      runtime),
+      advertise_accept_encoding_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, advertise_accept_encoding, true)) {}
 
-DecompressorFilterConfig::ResponseDirectionConfig::ResponseDirectionConfig(const envoy::extensions::filters::http::decompressor::v3::Decompressor& proto_config,
-        const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime) : DirectionConfig(false, proto_config, stats_prefix, scope, runtime) {}
+DecompressorFilterConfig::ResponseDirectionConfig::ResponseDirectionConfig(
+    const envoy::extensions::filters::http::decompressor::v3::Decompressor::ResponseDirectionConfig&
+        proto_config,
+    const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
+    : DirectionConfig(false, proto_config.common_config(), stats_prefix + "response.", scope,
+                      runtime) {}
 
 DecompressorFilter::DecompressorFilter(DecompressorFilterConfigSharedPtr config)
     : config_(std::move(config)) {}
@@ -115,11 +126,11 @@ void DecompressorFilter::maybeInitDecompress(
     removeContentEncoding(headers);
     // Note that the log will print the updated headers. The incoming headers can be seen from the
     // log above.
-    ENVOY_STREAM_LOG(debug, "do decompress {}: {}", callbacks, direction_config.requestOrResponse(),
+    ENVOY_STREAM_LOG(debug, "do decompress {}: {}", callbacks, direction_config.logString(),
                      headers);
   } else {
-    ENVOY_STREAM_LOG(debug, "do not decompress {}: {}", callbacks,
-                     direction_config.requestOrResponse(), headers);
+    ENVOY_STREAM_LOG(debug, "do not decompress {}: {}", callbacks, direction_config.logString(),
+                     headers);
     direction_config.stats().not_decompressed_.inc();
   }
 }
@@ -133,8 +144,7 @@ Http::FilterDataStatus DecompressorFilter::maybeDecompress(
     Buffer::OwnedImpl output_buffer;
     decompressor->decompress(input_buffer, output_buffer);
     ENVOY_STREAM_LOG(debug, "{} data decompressed from {} bytes to {} bytes", callbacks,
-                     direction_config.requestOrResponse(), input_buffer.length(),
-                     output_buffer.length());
+                     direction_config.logString(), input_buffer.length(), output_buffer.length());
     input_buffer.drain(input_buffer.length());
     input_buffer.add(output_buffer);
   }

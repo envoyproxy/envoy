@@ -172,15 +172,19 @@ TEST_P(DecompressorFilterTest, DecompressionActiveTransferEncodingPresentAlready
 
 TEST_P(DecompressorFilterTest, DecompressionDisabled) {
   setUpFilter(R"EOF(
-response_decompression_enabled:
-  default_value: false
-  runtime_key: does_not_exist
-request_decompression_enabled:
-  default_value: false
-  runtime_key: does_not_exist
 decompressor_library:
   typed_config:
     "@type": "type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip"
+request_direction_config:
+  common_config:
+    enabled:
+      default_value: false
+      runtime_key: does_not_exist
+response_direction_config:
+  common_config:
+    enabled:
+      default_value: false
+      runtime_key: does_not_exist
 )EOF");
 
   EXPECT_CALL(*decompressor_factory_, createDecompressor()).Times(0);

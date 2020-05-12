@@ -21,6 +21,7 @@ envoy_cc_library(
         "//include/envoy/compression/decompressor:decompressor_interface",
         "//include/envoy/http:filter_interface",
         "//source/common/buffer:buffer_lib",
+        "//source/common/common:macros",
         "//source/common/http:headers_lib",
         "//source/common/runtime:runtime_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",

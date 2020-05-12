@@ -18,6 +18,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/http:headers_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/extensions/compression/gzip/decompressor:config",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/decompressor:config",
         "//test/mocks/compression/decompressor:decompressor_mocks",

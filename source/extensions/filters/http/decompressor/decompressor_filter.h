@@ -5,6 +5,7 @@
 #include "envoy/extensions/filters/http/decompressor/v3/decompressor.pb.h"
 #include "envoy/http/filter.h"
 
+#include "common/common/macros.h"
 #include "common/runtime/runtime_protos.h"
 
 #include "extensions/filters/http/common/pass_through_filter.h"
@@ -35,12 +36,14 @@ class DecompressorFilterConfig {
 public:
   class DirectionConfig {
   public:
-    DirectionConfig(
-        const bool is_request_direction,
-        const envoy::extensions::filters::http::decompressor::v3::Decompressor& proto_config,
-        const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime);
+    DirectionConfig(const bool is_request_direction,
+                    const envoy::extensions::filters::http::decompressor::v3::Decompressor::
+                        CommonDirectionConfig& proto_config,
+                    const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime);
 
-    const std::string& requestOrResponse() const { return request_or_response_; }
+    virtual ~DirectionConfig() = default;
+
+    virtual const std::string& logString() const PURE;
     const DecompressorStats& stats() const { return stats_; }
     bool decompressionEnabled() const { return decompression_enabled_.enabled(); }
 
@@ -56,18 +59,33 @@ public:
 
   class RequestDirectionConfig : public DirectionConfig {
   public:
-    RequestDirectionConfig(const envoy::extensions::filters::http::decompressor::v3::Decompressor& proto_config,
-        const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime);
+    RequestDirectionConfig(const envoy::extensions::filters::http::decompressor::v3::Decompressor::
+                               RequestDirectionConfig& proto_config,
+                           const std::string& stats_prefix, Stats::Scope& scope,
+                           Runtime::Loader& runtime);
 
-    const bool advertiseAcceptEncoding() const { return advertise_accept_encoding_; }
+    // DirectionConfig
+    const std::string& logString() const override {
+      CONSTRUCT_ON_FIRST_USE(std::string, "request");
+    }
+
+    bool advertiseAcceptEncoding() const { return advertise_accept_encoding_; }
 
   private:
     const bool advertise_accept_encoding_;
   };
 
   class ResponseDirectionConfig : public DirectionConfig {
-    ResponseDirectionConfig(const envoy::extensions::filters::http::decompressor::v3::Decompressor& proto_config,
-        const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime);
+  public:
+    ResponseDirectionConfig(const envoy::extensions::filters::http::decompressor::v3::Decompressor::
+                                ResponseDirectionConfig& proto_config,
+                            const std::string& stats_prefix, Stats::Scope& scope,
+                            Runtime::Loader& runtime);
+
+    // DirectionConfig
+    const std::string& logString() const override {
+      CONSTRUCT_ON_FIRST_USE(std::string, "response");
+    }
   };
 
   DecompressorFilterConfig(
