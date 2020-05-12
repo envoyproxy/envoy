@@ -59,6 +59,7 @@ envoy_extension_cc_test(
     ],
     data = [
         "//test/proto:bookstore_proto_descriptor",
+        "//test/proto:helloworld_proto_descriptor",
     ],
     extension_name = "envoy.filters.http.grpc_json_transcoder",
     tags = ["fails_on_windows"],
@@ -69,6 +70,7 @@ envoy_extension_cc_test(
         "//test/integration:http_integration_lib",
         "//test/proto:bookstore_proto_cc_proto",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/filters/http/grpc_json_transcoder/v3:pkg_cc_proto",
     ],
 )
 

@@ -44,6 +44,12 @@ envoy_proto_descriptor(
     ],
 )
 
+envoy_proto_descriptor(
+    name = "helloworld_proto_descriptor",
+    srcs = ["helloworld.proto"],
+    out = "helloworld.descriptor",
+)
+
 envoy_proto_library(
     name = "sensitive_proto",
     srcs = [":sensitive.proto"],
