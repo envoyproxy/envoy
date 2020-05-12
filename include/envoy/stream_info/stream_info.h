@@ -74,8 +74,10 @@ enum ResponseFlag {
   DownstreamProtocolError = 0x40000,
   // Upstream request reached to user defined max stream duration.
   UpstreamMaxStreamDurationReached = 0x80000,
+  // True if the response was served from an Envoy cache filter.
+  ResponseFromCacheFilter = 0x100000,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = UpstreamMaxStreamDurationReached
+  LastFlag = ResponseFromCacheFilter
 };
 
 /**
