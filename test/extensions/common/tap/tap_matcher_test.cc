@@ -31,7 +31,7 @@ public:
   Http::TestResponseTrailerMapImpl response_trailers_;
 };
 
-class TapMatcherBodyTest
+class TapMatcherGenericBodyTest
     : public TapMatcherTestBase,
       public ::testing::TestWithParam<
           std::tuple<TapMatcherTestBase::Direction,
@@ -118,7 +118,7 @@ and_match:
 // - string "envoy"
 // - string "proxy"
 // - hex string "BEEFA"
-void TapMatcherBodyTest::createTestBody() {
+void TapMatcherGenericBodyTest::createTestBody() {
   data_.drain(data_.length());
   std::string body = " This is test body which contains string ";
   body += "envoy";
@@ -132,10 +132,21 @@ void TapMatcherBodyTest::createTestBody() {
   data_.add(body_end.data(), body_end.length());
 }
 
+// Test the case when hex string is not even number of characters
+TEST_F(TapMatcherGenericBodyTest, WrongConfigTest) {
+  std::string matcher_yaml = R"EOF(
+http_request_generic_body_match:
+  patterns:
+    - contains_hex: beefa
+)EOF";
+  TestUtility::loadFromYaml(matcher_yaml, config_);
+  ASSERT_ANY_THROW(buildMatcher(config_, matchers_));
+}
+
 // Test different configurations against the body.
 // Parameterized test passes various configurations
 // which are appended to the yaml string.
-TEST_P(TapMatcherBodyTest, GenericBodyTest) {
+TEST_P(TapMatcherGenericBodyTest, GenericBodyTest) {
   Direction dir = std::get<0>(GetParam());
   std::string matcher_yaml;
   if (Direction::Request == dir) {
@@ -175,10 +186,10 @@ TEST_P(TapMatcherBodyTest, GenericBodyTest) {
 }
 
 INSTANTIATE_TEST_SUITE_P(
-    TapMatcherBodyTestSuite, TapMatcherBodyTest,
+    TapMatcherGenericBodyTestSuite, TapMatcherGenericBodyTest,
     ::testing::Combine(
-        ::testing::Values(TapMatcherBodyTest::Direction::Request,
-                          TapMatcherBodyTest::Direction::Response),
+        ::testing::Values(TapMatcherTestBase::Direction::Request,
+                          TapMatcherTestBase::Direction::Response),
         ::testing::Values(
             // Should match - envoy is in the body
             std::make_tuple(std::vector<std::string>{"    - contains_text: \"envoy\""},
@@ -215,7 +226,26 @@ INSTANTIATE_TEST_SUITE_P(
             // Should not match - string and hex are not in the body
             std::make_tuple(std::vector<std::string>{"    - contains_hex: \"beefab\"",
                                                      "    - contains_text: \"envoy123\""},
-                            std::make_pair(false, false)))));
+                            std::make_pair(false, false)),
+            // Limit search to first 10 bytes. "envoy" string is in the body
+            // but should not be found.
+            std::make_tuple(std::vector<std::string>{"    - contains_text: \"envoy\"",
+                                                     "  bytes_limit: 10"},
+                            std::make_pair(false, false)),
+            // Limit search to include the string.
+            std::make_tuple(std::vector<std::string>{"    - contains_text: \"envoy\"",
+                                                     "  bytes_limit: 50"},
+                            std::make_pair(true, false)),
+            // Both patterns are in the body, but search limit includes only "envoy"
+            std::make_tuple(std::vector<std::string>{"    - contains_hex: \"beef\"",
+                                                     "    - contains_text: \"envoy\"",
+                                                     "  bytes_limit: 50"},
+                            std::make_pair(false, false)),
+            // Now pass enormously large value. It should work just fine
+            std::make_tuple(std::vector<std::string>{"    - contains_hex: \"beef\"",
+                                                     "    - contains_text: \"envoy\"",
+                                                     "  bytes_limit: 50000000"},
+                            std::make_pair(true, false)))));
 
 } // namespace
 } // namespace Tap

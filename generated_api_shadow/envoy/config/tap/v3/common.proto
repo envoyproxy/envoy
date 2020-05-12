@@ -120,7 +120,11 @@ message HttpGenericBodyMatch {
     }
   }
 
-  repeated GenericTextMatch patterns = 1 [(validate.rules).repeated = {min_items: 1}];
+  // Limit search to specified number of bytes - default zero (not limit - match entire captured buffer).
+  uint32 bytes_limit = 1;
+
+  // List of patterns to match.
+  repeated GenericTextMatch patterns = 2 [(validate.rules).repeated = {min_items: 1}];
 }
 
 // Tap output configuration.

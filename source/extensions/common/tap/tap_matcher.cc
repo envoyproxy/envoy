@@ -155,12 +155,14 @@ HttpGenericBodyMatcher::HttpGenericBodyMatcher(
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }
+  limit_ = config.bytes_limit();
 }
 
 void HttpGenericBodyMatcher::onBody(const Buffer::Instance& data,
                                     MatchStatusVector& statuses) const {
-  bool found = std::all_of(patterns_.begin(), patterns_.end(), [&data](std::string pattern) {
-    return (-1 != data.search(static_cast<const void*>(pattern.c_str()), pattern.length(), 0));
+  bool found = std::all_of(patterns_.begin(), patterns_.end(), [&data, this](std::string pattern) {
+    return (-1 !=
+            data.search(static_cast<const void*>(pattern.c_str()), pattern.length(), 0, limit_));
   });
 
   statuses[my_index_].matches_ = found;

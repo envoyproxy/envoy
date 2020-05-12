@@ -321,6 +321,10 @@ public:
 class HttpBodyMatcherBase : public SimpleMatcher {
 public:
   HttpBodyMatcherBase(const std::vector<MatcherPtr>& matchers) : SimpleMatcher(matchers) {}
+
+protected:
+  // Limit search to specified number of bytes;
+  uint32_t limit_{};
 };
 
 class HttpGenericBodyMatcher : public HttpBodyMatcherBase {
