@@ -10,15 +10,16 @@
 
 namespace Envoy {
 namespace Thread {
+namespace {
 
-class ThreadTest : public testing::Test {
+class ThreadAsyncPtrTest : public testing::Test {
 protected:
   ThreadFactory& thread_factory_{threadFactoryForTest()};
 };
 
 // Tests that two threads racing to create an object have well-defined
 // behavior.
-TEST_F(ThreadTest, AtomicPtrDeleteOnDestruct) {
+TEST_F(ThreadAsyncPtrTest, DeleteOnDestruct) {
   AtomicPtr<std::string, AtomicPtrAllocMode::DeleteOnDestruct> str;
   ThreadSynchronizer sync;
   sync.enable();
@@ -57,7 +58,7 @@ TEST_F(ThreadTest, AtomicPtrDeleteOnDestruct) {
 
 // Same test as AtomicPtrDeleteOnDestruct, except the allocator callbacks return
 // pointers to locals, rather than allocating the strings on the heap.
-TEST_F(ThreadTest, AtomicPtrDoNotDelete) {
+TEST_F(ThreadAsyncPtrTest, DoNotDelete) {
   const std::string thread1_str("thread1");
   const std::string thread2_str("thread2");
   AtomicPtr<const std::string, AtomicPtrAllocMode::DoNotDelete> str;
@@ -97,7 +98,7 @@ TEST_F(ThreadTest, AtomicPtrDoNotDelete) {
   EXPECT_FALSE(called);
 }
 
-TEST_F(ThreadTest, AtomicPtrThreadSpammer) {
+TEST_F(ThreadAsyncPtrTest, ThreadSpammer) {
   AtomicPtr<std::string, AtomicPtrAllocMode::DeleteOnDestruct> str;
   absl::Notification go;
   constexpr uint32_t num_threads = 100;
@@ -129,7 +130,7 @@ TEST_F(ThreadTest, AtomicPtrThreadSpammer) {
 
 // Tests that null can be allocated, but the allocator will be re-called each
 // time until a non-null result is returned.
-TEST_F(ThreadTest, Null) {
+TEST_F(ThreadAsyncPtrTest, Null) {
   AtomicPtr<std::string, AtomicPtrAllocMode::DeleteOnDestruct> str;
   uint32_t calls = 0;
   EXPECT_EQ(nullptr, str.get([&calls]() -> std::string* {
@@ -156,7 +157,7 @@ TEST_F(ThreadTest, Null) {
 // Tests array semantics. Note that AtomicPtr is implemented a 1-element
 // AtomicPtrArray, so there's no need to repeat the complex thread-race test
 // from AtomicPtr.
-TEST_F(ThreadTest, Array) {
+TEST_F(ThreadAsyncPtrTest, Array) {
   const uint32_t size = 5;
   AtomicPtrArray<std::string, size, AtomicPtrAllocMode::DeleteOnDestruct> strs;
   for (uint32_t i = 0; i < size; ++i) {
@@ -176,7 +177,7 @@ TEST_F(ThreadTest, Array) {
   }
 }
 
-TEST_F(ThreadTest, ManagedAlloc) {
+TEST_F(ThreadAsyncPtrTest, ManagedAlloc) {
   const uint32_t size = 5;
   std::vector<std::unique_ptr<std::string>> pool;
   AtomicPtrArray<std::string, size, AtomicPtrAllocMode::DoNotDelete> strs;
@@ -189,5 +190,6 @@ TEST_F(ThreadTest, ManagedAlloc) {
   }
 }
 
+} // namespace
 } // namespace Thread
 } // namespace Envoy
