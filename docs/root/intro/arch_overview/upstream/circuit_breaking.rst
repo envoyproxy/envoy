@@ -17,8 +17,8 @@ configure and code each application independently. Envoy supports various types 
 * **Cluster maximum pending requests**: The maximum number of requests that will be queued while
   waiting for a ready connection pool connection. Requests are added to the list
   of pending requests whenever there aren't enough upstream connections available to immediately dispatch
-  the request. For HTTP/2 connections, if :ref:`max concurrent streams <envoy_api_field_core.Http2ProtocolOptions.max_concurrent_streams>`
-  and :ref:`max requests per connection <envoy_api_field_Cluster.max_requests_per_connection>` are not
+  the request. For HTTP/2 connections, if :ref:`max concurrent streams <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.max_concurrent_streams>`
+  and :ref:`max requests per connection <envoy_v3_api_field_config.cluster.v3.Cluster.max_requests_per_connection>` are not
   configured, all requests will be multiplexed over the same connection so this circuit breaker
   will only be hit when no connection is already established. If this circuit breaker overflows the
   :ref:`upstream_rq_pending_overflow <config_cluster_manager_cluster_stats>` counter for the cluster will
@@ -27,7 +27,7 @@ configure and code each application independently. Envoy supports various types 
   in a cluster at any given time. If this circuit breaker overflows the :ref:`upstream_rq_pending_overflow <config_cluster_manager_cluster_stats>`
   counter for the cluster will increment.
 * **Cluster maximum active retries**: The maximum number of retries that can be outstanding to all
-  hosts in a cluster at any given time. In general we recommend using :ref:`retry budgets <envoy_api_field_cluster.CircuitBreakers.Thresholds.retry_budget>`; however, if static circuit breaking is preferred it should aggressively circuit break
+  hosts in a cluster at any given time. In general we recommend using :ref:`retry budgets <envoy_v3_api_field_config.cluster.v3.CircuitBreakers.Thresholds.retry_budget>`; however, if static circuit breaking is preferred it should aggressively circuit break
   retries. This is so that retries for sporadic failures are allowed, but the overall retry volume cannot
   explode and cause large scale cascading failure. If this circuit breaker overflows the
   :ref:`upstream_rq_retry_overflow <config_cluster_manager_cluster_stats>` counter for the cluster

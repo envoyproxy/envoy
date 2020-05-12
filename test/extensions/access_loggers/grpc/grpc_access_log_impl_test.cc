@@ -16,8 +16,10 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
+#include "test/test_common/test_runtime.h"
 
 using testing::_;
+using testing::AnyNumber;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
@@ -198,6 +200,47 @@ TEST_F(GrpcAccessLoggerImplTest, WatermarksOverrun) {
       TestUtility::findCounter(stats_store_, "access_logs.grpc_access_log.logs_dropped")->value());
 }
 
+// Test legacy behavior of unbounded access logs.
+TEST_F(GrpcAccessLoggerImplTest, WatermarksLegacy) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.disallow_unbounded_access_logs", "false"}});
+
+  InSequence s;
+  initLogger(FlushInterval, 1);
+
+  // Start a stream for the first log.
+  MockAccessLogStream stream;
+  AccessLogCallbacks* callbacks;
+  expectStreamStart(stream, &callbacks);
+  EXPECT_CALL(local_info_, node());
+
+  EXPECT_CALL(stream, isAboveWriteBufferHighWatermark())
+      .Times(AnyNumber())
+      .WillRepeatedly(Return(true));
+
+  // Fail to flush, so the log stays buffered up.
+  envoy::data::accesslog::v3::HTTPAccessLogEntry entry;
+  entry.mutable_request()->set_path("/test/path1");
+  EXPECT_CALL(stream, sendMessageRaw_(_, false)).Times(0);
+  logger_->log(envoy::data::accesslog::v3::HTTPAccessLogEntry(entry));
+  EXPECT_EQ(
+      1,
+      TestUtility::findCounter(stats_store_, "access_logs.grpc_access_log.logs_written")->value());
+  EXPECT_EQ(
+      0,
+      TestUtility::findCounter(stats_store_, "access_logs.grpc_access_log.logs_dropped")->value());
+
+  // As with the above test, try to log more. The log will not be dropped.
+  EXPECT_CALL(stream, sendMessageRaw_(_, _)).Times(0);
+  logger_->log(envoy::data::accesslog::v3::HTTPAccessLogEntry(entry));
+  EXPECT_EQ(
+      2,
+      TestUtility::findCounter(stats_store_, "access_logs.grpc_access_log.logs_written")->value());
+  EXPECT_EQ(
+      0,
+      TestUtility::findCounter(stats_store_, "access_logs.grpc_access_log.logs_dropped")->value());
+}
 // Test that stream failure is handled correctly.
 TEST_F(GrpcAccessLoggerImplTest, StreamFailure) {
   InSequence s;

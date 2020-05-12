@@ -4,7 +4,7 @@ gRPC HTTP/1.1 bridge
 ====================
 
 * gRPC :ref:`architecture overview <arch_overview_grpc>`
-* :ref:`v2 API reference <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpFilter.name>`
+* :ref:`v3 API reference <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.name>`
 * This filter should be configured with the name *envoy.filters.http.grpc_http1_bridge*.
 
 This is a simple filter which enables the bridging of an HTTP/1.1 client which does not support
