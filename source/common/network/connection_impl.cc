@@ -360,14 +360,12 @@ void ConnectionImpl::readDisable(bool disable) {
       file_event_->setEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write);
     }
 
-    if (consumerWantsToRead()) {
+    if (consumerWantsToRead() && read_buffer_.length() > 0) {
       // If the connection has data buffered there's no guarantee there's also data in the kernel
       // which will kick off the filter chain. Instead fake an event to make sure the buffered data
       // gets processed regardless and ensure that we dispatch it via onRead.
-      if (read_buffer_.length() > 0) {
-        dispatch_buffered_data_ = true;
-        file_event_->activate(Event::FileReadyType::Read);
-      }
+      dispatch_buffered_data_ = true;
+      setReadBufferReady();
     }
   }
 }
@@ -479,7 +477,9 @@ void ConnectionImpl::setBufferLimits(uint32_t limit) {
 
 void ConnectionImpl::onReadBufferLowWatermark() {
   ENVOY_CONN_LOG(debug, "onBelowReadBufferLowWatermark", *this);
-  readDisable(false);
+  if (state() == State::Open) {
+    readDisable(false);
+  }
 }
 
 void ConnectionImpl::onReadBufferHighWatermark() {
@@ -548,14 +548,16 @@ void ConnectionImpl::onReadReady() {
 
   ASSERT(!connecting_);
 
-  // We get here while read disabled iff the consumer of connection data kicked off a read, and
-  // instead of reading from the socket we simply need to dispatch already read data.
+  // We get here while read disabled in two ways.
+  // 1) There was a call to setReadBufferReady(), for example if a raw buffer socket ceded due to
+  //    shouldDrainReadBuffer(). In this case we defer the event until the socket is read enabled.
+  // 2) The consumer of connection data called readDisable(true), and instead of reading from the
+  //    socket we simply need to dispatch already read data.
   if (read_disable_count_ != 0) {
-    ASSERT(dispatch_buffered_data_);
-    ASSERT(consumerWantsToRead());
-    dispatch_buffered_data_ = false;
-    onRead(read_buffer_.length());
-    dispatch_buffered_data_ = false;
+    if (dispatch_buffered_data_ && consumerWantsToRead()) {
+      onRead(read_buffer_.length());
+      dispatch_buffered_data_ = false;
+    }
     return;
   }
 
