@@ -1,6 +1,7 @@
 #include "extensions/filters/http/decompressor/decompressor_filter.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/common/macros.h"
 #include "common/http/headers.h"
 
 namespace Envoy {
@@ -12,9 +13,16 @@ DecompressorFilterConfig::DecompressorFilterConfig(
     const envoy::extensions::filters::http::decompressor::v3::Decompressor& proto_config,
     const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
     Compression::Decompressor::DecompressorFactoryPtr decompressor_factory)
-    : decompressor_factory_(std::move(decompressor_factory)),
-      request_direction_config_(true, proto_config, stats_prefix, scope, runtime),
-      response_direction_config_(false, proto_config, stats_prefix, scope, runtime) {}
+    : stats_prefix_(fmt::format("{}decompressor.{}{}", stats_prefix,
+                                proto_config.decompressor_library().name() +
+                                            proto_config.decompressor_library().name() ==
+                                        ""
+                                    ? ""
+                                    : ".",
+                                decompressor_factory->statsPrefix() + ".")),
+      decompressor_factory_(std::move(decompressor_factory)),
+      request_direction_config_(true, proto_config, stats_prefix_, scope, runtime),
+      response_direction_config_(false, proto_config, stats_prefix_, scope, runtime) {}
 
 DecompressorFilterConfig::DirectionConfig::DirectionConfig(
     const bool is_request_direction,

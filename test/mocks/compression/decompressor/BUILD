@@ -13,7 +13,7 @@ envoy_cc_mock(
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
-        "//include/envoy/compression/decompressor:config_interface",
+        "//include/envoy/compression/decompressor:decompressor_config_interface",
         "//include/envoy/compression/decompressor:decompressor_interface",
     ],
 )

@@ -28,7 +28,7 @@ Http::FilterFactoryCb DecompressorFilterFactory::createFilterFactoryFromProtoTyp
       proto_config.decompressor_library().typed_config(), context.messageValidationVisitor(),
       *decompressor_library_factory);
   Compression::Decompressor::DecompressorFactoryPtr decompressor_factory =
-      decompressor_library_factory->createDecompressorLibraryFromProto(*message, context);
+      decompressor_library_factory->createDecompressorFactoryFromProto(*message, context);
   DecompressorFilterConfigSharedPtr filter_config = std::make_shared<DecompressorFilterConfig>(
       proto_config, stats_prefix, context.scope(), context.runtime(),
       std::move(decompressor_factory));

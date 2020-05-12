@@ -67,6 +67,7 @@ public:
   const DirectionConfig& responseDirectionConfig() { return response_direction_config_; }
 
 private:
+  const std::string stats_prefix_;
   Compression::Decompressor::DecompressorFactoryPtr decompressor_factory_;
   const DirectionConfig request_direction_config_;
   const DirectionConfig response_direction_config_;
