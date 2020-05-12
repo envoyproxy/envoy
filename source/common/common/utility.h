@@ -700,16 +700,6 @@ public:
    */
   absl::string_view toStringView() const { return {data_, size_}; }
 
-  /**
-   * @return the number of bytes in the string
-   */
-  size_t size() const { return size_; }
-
-  /**
-   * @return a pointer to the first byte of the string.
-   */
-  const char* data() const { return data_; }
-
 private:
   // Constructor is declared private so that no one constructs one without the
   // proper size allocation. to accommodate the variable-size buffer.

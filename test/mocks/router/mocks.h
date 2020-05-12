@@ -166,7 +166,8 @@ public:
   MOCK_METHOD(void, onHostAttempted, (Upstream::HostDescriptionConstSharedPtr));
   MOCK_METHOD(bool, shouldSelectAnotherHost, (const Upstream::Host& host));
   MOCK_METHOD(const Upstream::HealthyAndDegradedLoad&, priorityLoadForRetry,
-              (const Upstream::PrioritySet&, const Upstream::HealthyAndDegradedLoad&));
+              (const Upstream::PrioritySet&, const Upstream::HealthyAndDegradedLoad&,
+               const Upstream::RetryPriority::PriorityMappingFunc&));
   MOCK_METHOD(uint32_t, hostSelectionMaxAttempts, (), (const));
 
   DoRetryCallback callback_;
@@ -446,6 +447,11 @@ public:
               (const Http::RequestHeaderMap&, const Envoy::StreamInfo::StreamInfo&,
                uint64_t random_value),
               (const));
+  MOCK_METHOD(RouteConstSharedPtr, route,
+              (const RouteCallback& cb, const Http::RequestHeaderMap&,
+               const Envoy::StreamInfo::StreamInfo&, uint64_t random_value),
+              (const));
+
   MOCK_METHOD(const std::list<Http::LowerCaseString>&, internalOnlyHeaders, (), (const));
   MOCK_METHOD(const std::string&, name, (), (const));
   MOCK_METHOD(bool, usesVhds, (), (const));

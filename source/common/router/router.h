@@ -373,15 +373,17 @@ public:
     return retry_state_->shouldSelectAnotherHost(host);
   }
 
-  const Upstream::HealthyAndDegradedLoad&
-  determinePriorityLoad(const Upstream::PrioritySet& priority_set,
-                        const Upstream::HealthyAndDegradedLoad& original_priority_load) override {
+  const Upstream::HealthyAndDegradedLoad& determinePriorityLoad(
+      const Upstream::PrioritySet& priority_set,
+      const Upstream::HealthyAndDegradedLoad& original_priority_load,
+      const Upstream::RetryPriority::PriorityMappingFunc& priority_mapping_func) override {
     // We only modify the priority load on retries.
     if (!is_retry_) {
       return original_priority_load;
     }
 
-    return retry_state_->priorityLoadForRetry(priority_set, original_priority_load);
+    return retry_state_->priorityLoadForRetry(priority_set, original_priority_load,
+                                              priority_mapping_func);
   }
 
   uint32_t hostSelectionRetryCount() const override {

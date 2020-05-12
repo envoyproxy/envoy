@@ -69,7 +69,8 @@ following are the command line options that Envoy supports.
 .. option:: --concurrency <integer>
 
   *(optional)* The number of :ref:`worker threads <arch_overview_threading>` to run. If not
-  specified defaults to the number of hardware threads on the machine.
+  specified defaults to the number of hardware threads on the machine. If set to zero, Envoy will 
+  still run one worker thread.
 
 .. option:: -l <string>, --log-level <string>
 
@@ -286,6 +287,13 @@ following are the command line options that Envoy supports.
   desirable for most Envoy deployments. Warnings are logged for the first use of any unknown field
   and these occurrences are counted in the :ref:`server.dynamic_unknown_fields <server_statistics>`
   statistic.
+
+.. option:: --ignore-unknown-dynamic-fields
+
+  *(optional)* This flag disables validation of protobuf configuration for unknown fields in dynamic
+   configuration. Unlike setting --reject-unknown-dynamic-fields to false, it does not log warnings or
+   count occurrences of unknown fields, in the interest of configuration processing speed. If
+   --reject-unknown-dynamic-fields is set to true, this flag has no effect.
 
 .. option:: --disable-extensions <extension list>
 
