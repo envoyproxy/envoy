@@ -9,9 +9,9 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "decompressor_interface",
-    hdrs = ["decompressor.h"],
+    name = "decompressor_factory_base_lib",
+    hdrs = ["factory_base.h"],
     deps = [
-        "//include/envoy/buffer:buffer_interface",
+        "//include/envoy/compression/decompressor:decompressor_config_interface",
     ],
 )
