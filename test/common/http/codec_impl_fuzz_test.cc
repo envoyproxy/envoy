@@ -10,7 +10,6 @@
 #include <functional>
 
 #include "common/common/assert.h"
-#include "common/common/hex.h"
 #include "common/common/logger.h"
 #include "common/http/exception.h"
 #include "common/http/header_map_impl.h"
