@@ -25,8 +25,6 @@ else
     COVERAGE_TARGETS="$(bazel query 'attr("tags", "fuzz_target", //test/...)')"
 fi
 
-echo "    COVERAGE_TARGETS=${COVERAGE_TARGETS}"
-
 SCRIPT_DIR="$(realpath "$(dirname "$0")")"
 TEMP_CORPORA=""
 if [ "$FUZZ_COVERAGE" == "true" ]
@@ -36,7 +34,6 @@ then
   FUZZ_TEMPDIR=${FUZZ_TEMPDIR} "${SCRIPT_DIR}"/build_and_run_fuzz_targets.sh ${COVERAGE_TARGETS}
 else
   # Make sure //test/coverage:coverage_tests is up-to-date.
-  echo "${SCRIPT_DIR}"/coverage/gen_build.sh ${COVERAGE_TARGETS}
   "${SCRIPT_DIR}"/coverage/gen_build.sh ${COVERAGE_TARGETS}
 fi
 
