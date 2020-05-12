@@ -14,27 +14,12 @@ wrapTransportSocketOptions(Network::TransportSocketOptionsSharedPtr transport_so
     return transport_socket_options;
   }
 
-  // TODO(reviewers): Given that we pass along the ALPN fallback over the same public interface that
-  // is provided as part of the LBContext, its possible that the ALPN fallback has already been set
-  // on the object. Right now we just stomp on it, which isn't great.
-  //
-  // This is further complicated by the fact that the TransportSocketOptions object is hashed to
-  // determine which conn pool to use: this is fine right now since we already include the protocol
-  // in the hash, but might set us up poorly for other changes that might want to follow the same
-  // pattern.
-  //
-  // One option would be to introduce a new parameter to createConnection so that the ALPN fallback
-  // can't be set on something that is exposed by the LB interface. It feels a bit odd to have two
-  // different parameters that both control the transport socket, but it would reduce the ambiguity
-  // of how this all works.
-
   // If configured to do so, we override the ALPN to use for the upstream connection to match the
   // selected protocol.
   std::vector<std::string> alpn;
   switch (protocol) {
   case Http::Protocol::Http10:
-    alpn.push_back("http/1.0");
-    break;
+    NOT_REACHED_GCOVR_EXCL_LINE
   case Http::Protocol::Http11:
     alpn.push_back("http/1.1");
     break;
@@ -42,7 +27,7 @@ wrapTransportSocketOptions(Network::TransportSocketOptionsSharedPtr transport_so
     alpn.push_back("h2");
     break;
   case Http::Protocol::Http3:
-    alpn.push_back("h3");
+    NOT_REACHED_GCOVR_EXCL_LINE
     break;
   }
 

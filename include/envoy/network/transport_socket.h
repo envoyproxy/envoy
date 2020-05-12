@@ -180,11 +180,19 @@ public:
   virtual const std::vector<std::string>& verifySubjectAltNameListOverride() const PURE;
 
   /**
+   * The application protocols to use when negotiating an upstream connection. When an application
+   * protocol override is provided, it will *always* be used.
    * @return the optional overridden application protocols.
    */
   virtual const std::vector<std::string>& applicationProtocolListOverride() const PURE;
 
   /**
+   * The application protocol to use when negotatiing an upstream connection and no other application
+   * protocol has been configureed. Both TransportSocketOptions::applicationProtocolListOverrride and
+   * application protocols configured in the CommonTlsContext on the Cluster will take precedence.
+   *
+   * Note that this might be overriden by intermediate code (e.g. set by the HTTP connection pool),
+   * so providing a value here might not always take effect if set by out of tree code.
    * @return the optional fallback for application protocols, for when they are not specified in the
    *         TLS configuration.
    */
