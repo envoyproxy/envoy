@@ -5,8 +5,9 @@ Changes
 -------
 
 * access loggers: added GRPC_STATUS operator on logging format.
-* access loggers: applied existing buffer limits to the non-google gRPC access logs, as well as :ref:`stats <config_access_log_stats>` for logged / dropped logs.
+* access loggers: applied existing buffer limits to access logs, as well as :ref:`stats <config_access_log_stats>` for logged / dropped logs. This can be reverted temporarily by setting runtime feature `envoy.reloadable_features.disallow_unbounded_access_logs` to false.
 * access loggers: extened specifier for FilterStateFormatter to output :ref:`unstructured log string <config_access_log_format_filter_state>`.
+* build: official released binary is now built on Ubuntu 18.04, requires glibc >= 2.27.
 * compressor: generic :ref:`compressor <config_http_filters_compressor>` filter exposed to users.
 * config: added :ref:`version_text <config_cluster_manager_cds>` stat that reflects xDS version.
 * dynamic forward proxy: added :ref:`SNI based dynamic forward proxy <config_network_filters_sni_dynamic_forward_proxy>` support.
@@ -22,6 +23,7 @@ Changes
 * health checks: allow configuring health check transport sockets by specifying :ref:`transport socket match criteria <envoy_v3_api_field_config.core.v3.HealthCheck.transport_socket_match_criteria>`.
 * http: added :ref:`stripping port from host header <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.strip_matching_host_port>` support.
 * http: fixed a bug where in some cases slash was moved from path to query string when :ref:`merging of adjacent slashes<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.merge_slashes>` is enabled.
+* http: fixed several bugs with applying correct connection close behavior across the http connection manager, health checker, and connection pool. This behavior may be temporarily reverted by setting runtime feature `envoy.reloadable_features.fix_connection_close` to false.
 * http: fixed a bug where the upgrade header was not cleared on responses to non-upgrade requests.
   Can be reverted temporarily by setting runtime feature `envoy.reloadable_features.fix_upgrade_response` to false.
 * http: remove legacy connection pool code and their runtime features: `envoy.reloadable_features.new_http1_connection_pool_behavior` and

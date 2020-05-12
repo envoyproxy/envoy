@@ -53,11 +53,11 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["build"],
     ),
     bazel_toolchains = dict(
-        sha256 = "239a1a673861eabf988e9804f45da3b94da28d1aff05c373b013193c315d9d9e",
-        strip_prefix = "bazel-toolchains-3.0.1",
+        sha256 = "144290c4166bd67e76a54f96cd504ed86416ca3ca82030282760f0823c10be48",
+        strip_prefix = "bazel-toolchains-3.1.1",
         urls = [
-            "https://github.com/bazelbuild/bazel-toolchains/releases/download/3.0.1/bazel-toolchains-3.0.1.tar.gz",
-            "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/3.0.1.tar.gz",
+            "https://github.com/bazelbuild/bazel-toolchains/releases/download/3.1.1/bazel-toolchains-3.1.1.tar.gz",
+            "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/3.1.1.tar.gz",
         ],
         use_category = ["build"],
     ),
@@ -67,10 +67,10 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["build"],
     ),
     envoy_build_tools = dict(
-        sha256 = "9d348f92ae8fb2495393109aac28aea314ad1fb013cdec1ab7b1224f804be1b7",
-        strip_prefix = "envoy-build-tools-823c2e9386eee5117f7ef9e3d7c90e784cd0d047",
-        # 2020-04-07
-        urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/823c2e9386eee5117f7ef9e3d7c90e784cd0d047.tar.gz"],
+        sha256 = "e2cb99cf66e36412a9f570fe0391ff0c457ff17c2524ccdf73853c2752e8d372",
+        strip_prefix = "envoy-build-tools-8d7a0cb9be7a34c726575d79688ae3dea565a424",
+        # 2020-05-08
+        urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/8d7a0cb9be7a34c726575d79688ae3dea565a424.tar.gz"],
         use_category = ["build"],
     ),
     boringssl = dict(
@@ -163,7 +163,7 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "N/A",
     ),
     com_github_google_libprotobuf_mutator = dict(
-        sha256 = "",
+        sha256 = "f6def6cdf63e29a367d46c0ad9e3e31eed89d031e22e0caac126f1e62d8b3fd0",
         strip_prefix = "libprotobuf-mutator-3521f47a2828da9ace403e4ecc4aece1a84feb36",
         # 2020-02-04
         urls = ["https://github.com/google/libprotobuf-mutator/archive/3521f47a2828da9ace403e4ecc4aece1a84feb36.tar.gz"],
@@ -288,7 +288,7 @@ DEPENDENCY_REPOSITORIES = dict(
         strip_prefix = "http-parser-2.9.3",
         urls = ["https://github.com/nodejs/http-parser/archive/v2.9.3.tar.gz"],
         use_category = ["dataplane"],
-        cpe = "N/A",
+        cpe = "cpe:2.3:a:nodejs:node.js:*",
     ),
     com_github_pallets_jinja = dict(
         sha256 = "db49236731373e4f3118af880eb91bb0aa6978bc0cf8b35760f6a026f1a9ffc4",

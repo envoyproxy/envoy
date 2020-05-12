@@ -26,8 +26,6 @@ public:
     return std::make_unique<ConfigProto>();
   }
 
-  std::string category() const override { return "envoy.compression.compressor"; }
-
   std::string name() const override { return name_; }
 
 protected:
@@ -36,6 +34,7 @@ protected:
 private:
   virtual Envoy::Compression::Compressor::CompressorFactoryPtr
   createCompressorFactoryFromProtoTyped(const ConfigProto&) PURE;
+
   const std::string name_;
 };
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/decompressor/decompressor.h"
+#include "envoy/compression/decompressor/decompressor.h"
 
 #include "common/common/logger.h"
 #include "common/common/zlib/base.h"
@@ -8,13 +8,16 @@
 #include "zlib.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace Compression {
+namespace Gzip {
 namespace Decompressor {
 
 /**
  * Implementation of decompressor's interface.
  */
 class ZlibDecompressorImpl : public Zlib::Base,
-                             public Decompressor,
+                             public Envoy::Compression::Decompressor::Decompressor,
                              public Logger::Loggable<Logger::Id::decompression> {
 public:
   ZlibDecompressorImpl();
@@ -37,7 +40,7 @@ public:
    */
   void init(int64_t window_bits);
 
-  // Decompressor
+  // Compression::Decompressor::Decompressor
   void decompress(const Buffer::Instance& input_buffer, Buffer::Instance& output_buffer) override;
 
   // Flag to track whether error occurred during decompression.
@@ -49,4 +52,7 @@ private:
 };
 
 } // namespace Decompressor
+} // namespace Gzip
+} // namespace Compression
+} // namespace Extensions
 } // namespace Envoy

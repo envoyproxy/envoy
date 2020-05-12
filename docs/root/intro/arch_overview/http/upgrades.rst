@@ -89,3 +89,17 @@ upgrade requests or responses with bodies.
 .. This mode of CONNECT support can create major security holes if configured correctly, as the upstream
 .. will be forwarded *unsanitized* headers if they are in the body payload. Please use with caution
 
+.. Tunneling TCP over HTTP/2
+.. ^^^^^^^^^^^^^^^^^^^^^^^^^
+.. Envoy also has support for transforming raw TCP into HTTP/2 CONNECT requests. This can be used to
+.. proxy multiplexed TCP over pre-warmed secure connections and amortize the cost of any TLS handshake.
+.. An example set up proxying SMTP would look something like this
+..
+.. [SMTP Upstream] --- raw SMTP --- [L2 Envoy]  --- SMTP tunneled over HTTP/2  --- [L1 Envoy]  --- raw SMTP  --- [Client]
+..
+.. Examples of such a set up can be found in the Envoy example config `directory <https://github.com/envoyproxy/envoy/tree/master/configs/>`
+.. If you run `bazel-bin/source/exe/envoy-static --config-path configs/encapsulate_in_connect.yaml --base-id 1`
+.. and `bazel-bin/source/exe/envoy-static --config-path  configs/terminate_connect.yaml`
+.. you will be running two Envoys, the first listening for TCP traffic on port 10000 and encapsulating it in an HTTP/2
+.. CONNECT request, and the second listening for HTTP/2 on 10001, stripping the CONNECT headers, and forwarding the
+.. original TCP upstream, in this case to google.com.
