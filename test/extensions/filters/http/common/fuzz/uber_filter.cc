@@ -28,6 +28,21 @@ UberFilterFuzzer::UberFilterFuzzer() {
   perFilterSetup();
 }
 
+std::vector<std::string> UberFilterFuzzer::parseHttpData(const test::fuzz::HttpData& data) {
+  std::vector<std::string> data_chunks;
+
+  if (data.has_http_body()) {
+    for (const auto& http_data : data.http_body().data()) {
+      data_chunks.push_back(http_data.data());
+    }
+  } else if (data.has_proto_body()) {
+    const std::string serialized = data.proto_body().message().value();
+    data_chunks = absl::StrSplit(serialized, absl::ByLength(data.proto_body().chunk_size()));
+  }
+
+  return data_chunks;
+}
+
 void UberFilterFuzzer::decode(Http::StreamDecoderFilter* filter, const test::fuzz::HttpData& data) {
   bool end_stream = false;
 
@@ -53,33 +68,15 @@ void UberFilterFuzzer::decode(Http::StreamDecoderFilter* filter, const test::fuz
     return;
   }
 
-  if (data.has_http_body()) {
-    for (int i = 0; i < data.http_body().data_size(); i++) {
-      if (i == data.http_body().data_size() - 1 && !data.has_trailers()) {
-        end_stream = true;
-      }
-      Buffer::OwnedImpl buffer(data.http_body().data(i));
-      ENVOY_LOG_MISC(debug, "Decoding http data (end_stream={}): {} ", end_stream,
-                     buffer.toString());
-      if (filter->decodeData(buffer, end_stream) != Http::FilterDataStatus::Continue) {
-        return;
-      }
+  const std::vector<std::string> data_chunks = parseHttpData(data);
+  for (size_t i = 0; i < data_chunks.size(); i++) {
+    if (!data.has_trailers() && i == data_chunks.size() - 1) {
+      end_stream = true;
     }
-  } else if (data.has_proto_body()) {
-    const std::string serialized = data.proto_body().message().value();
-    const std::vector<std::string> serialized_chunks =
-        absl::StrSplit(serialized, absl::ByLength(data.proto_body().chunk_size()));
-
-    for (size_t i = 0; i < serialized_chunks.size(); i++) {
-      if (!data.has_trailers() && i == serialized_chunks.size() - 1) {
-        end_stream = true;
-      }
-      Buffer::OwnedImpl buffer(serialized_chunks[i]);
-      ENVOY_LOG_MISC(debug, "Decoding serialized proto data (end_stream={}): {} ", end_stream,
-                     buffer.toString());
-      if (filter->decodeData(buffer, end_stream) != Http::FilterDataStatus::Continue) {
-        return;
-      }
+    Buffer::OwnedImpl buffer(data_chunks[i]);
+    ENVOY_LOG_MISC(debug, "Decoding data (end_stream={}): {} ", end_stream, buffer.toString());
+    if (filter->decodeData(buffer, end_stream) != Http::FilterDataStatus::Continue) {
+      return;
     }
   }
 
@@ -112,6 +109,32 @@ void UberFilterFuzzer::fuzz(
 
   decode(filter_.get(), data);
   reset();
+}
+
+void UberFilterFuzzer::guideAnyProtoType(test::fuzz::HttpData* mutable_data, int seed) {
+  // These types are request/response from the test Bookstore service
+  // for the gRPC Transcoding filter.
+  static const std::vector<std::string> expected_types = {
+      "type.googleapis.com/bookstore.ListShelvesResponse",
+      "type.googleapis.com/bookstore.CreateShelfRequest",
+      "type.googleapis.com/bookstore.GetShelfRequest",
+      "type.googleapis.com/bookstore.DeleteShelfRequest",
+      "type.googleapis.com/bookstore.ListBooksRequest",
+      "type.googleapis.com/bookstore.CreateBookRequest",
+      "type.googleapis.com/bookstore.GetBookRequest",
+      "type.googleapis.com/bookstore.UpdateBookRequest",
+      "type.googleapis.com/bookstore.DeleteBookRequest",
+      "type.googleapis.com/bookstore.GetAuthorRequest",
+      "type.googleapis.com/bookstore.EchoBodyRequest",
+      "type.googleapis.com/bookstore.EchoStructReqResp",
+      "type.googleapis.com/bookstore.Shelf",
+      "type.googleapis.com/bookstore.Book",
+      "type.googleapis.com/google.protobuf.Empty",
+      "type.googleapis.com/google.api.HttpBody",
+  };
+  ProtobufWkt::Any* mutable_any = mutable_data->mutable_proto_body()->mutable_message();
+  const std::string& type_url = expected_types[(seed / 2) % expected_types.size()];
+  mutable_any->set_type_url(type_url);
 }
 
 void UberFilterFuzzer::reset() {

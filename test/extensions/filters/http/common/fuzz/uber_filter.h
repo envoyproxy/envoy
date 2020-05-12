@@ -16,6 +16,9 @@ public:
                 proto_config,
             const test::fuzz::HttpData& data);
 
+  // For fuzzing proto data, guide the mutator to useful 'Any' types.
+  static void guideAnyProtoType(test::fuzz::HttpData* mutable_data, int seed);
+
 protected:
   // Set-up filter specific mock expectations in constructor.
   void perFilterSetup();
@@ -23,7 +26,9 @@ protected:
   void cleanFuzzedConfig(absl::string_view filter_name, Protobuf::Message* message);
 
   // This executes the decode methods to be fuzzed.
+  std::vector<std::string> parseHttpData(const test::fuzz::HttpData& data);
   void decode(Http::StreamDecoderFilter* filter, const test::fuzz::HttpData& data);
+
   void reset();
 
 private:
