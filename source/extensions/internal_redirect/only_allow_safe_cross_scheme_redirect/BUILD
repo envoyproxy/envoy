@@ -16,6 +16,7 @@ envoy_cc_library(
         "//include/envoy/router:internal_redirect_interface",
         "//include/envoy/stream_info:filter_state_interface",
         "//source/extensions/internal_redirect:well_known_names",
+        "@envoy_api//envoy/extensions/internal_redirect/only_allow_safe_cross_scheme_redirect/v3:pkg_cc_proto",
     ],
 )
 

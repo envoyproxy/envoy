@@ -368,7 +368,8 @@ TEST_P(RedirectIntegrationTest,
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  default_request_headers_.setHost("handle.internal.redirect.only.allow.safe.cross.scheme.redirect");
+  default_request_headers_.setHost(
+      "handle.internal.redirect.only.allow.safe.cross.scheme.redirect");
   IntegrationStreamDecoderPtr response =
       codec_client_->makeHeaderOnlyRequest(default_request_headers_);
 

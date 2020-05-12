@@ -15,8 +15,7 @@ class OnlyAllowSafeCrossSchemeRedirectPredicateFactory
     : public Router::InternalRedirectPredicateFactory {
 public:
   Router::InternalRedirectPredicateSharedPtr
-  createInternalRedirectPredicate(const Protobuf::Message&,
-                                  absl::string_view) override {
+  createInternalRedirectPredicate(const Protobuf::Message&, absl::string_view) override {
     return std::make_shared<OnlyAllowSafeCrossSchemeRedirectPredicate>();
   }
 

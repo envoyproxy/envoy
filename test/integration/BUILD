@@ -639,6 +639,7 @@ envoy_cc_test(
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/internal_redirect/allow_listed_routes/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/internal_redirect/only_allow_safe_cross_scheme_redirect/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/internal_redirect/previous_routes/v3:pkg_cc_proto",
     ],
 )
