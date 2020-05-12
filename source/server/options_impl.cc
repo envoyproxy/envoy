@@ -15,6 +15,7 @@
 
 #include "server/options_impl_platform.h"
 
+#include "absl/strings/str_replace.h"
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 #include "spdlog/spdlog.h"
@@ -24,6 +25,8 @@ namespace Envoy {
 namespace {
 std::vector<std::string> toArgsVector(int argc, const char* const* argv) {
   std::vector<std::string> args;
+  args.reserve(argc);
+
   for (int i = 0; i < argc; ++i) {
     args.emplace_back(argv[i]);
   }
@@ -63,6 +66,11 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   TCLAP::ValueArg<std::string> config_yaml(
       "", "config-yaml", "Inline YAML configuration, merges with the contents of --config-path",
       false, "", "string", cmd);
+  TCLAP::ValueArg<uint32_t> bootstrap_version(
+      "", "bootstrap-version",
+      "API version to parse the bootstrap config as (e.g. 3). If "
+      "unset, all known versions will be attempted",
+      false, 0, "string", cmd);
 
   TCLAP::SwitchArg allow_unknown_fields("", "allow-unknown-fields",
                                         "allow unknown fields in static configuration (DEPRECATED)",
@@ -72,6 +80,9 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
                                                false);
   TCLAP::SwitchArg reject_unknown_dynamic_fields("", "reject-unknown-dynamic-fields",
                                                  "reject unknown fields in dynamic configuration",
+                                                 cmd, false);
+  TCLAP::SwitchArg ignore_unknown_dynamic_fields("", "ignore-unknown-dynamic-fields",
+                                                 "ignore unknown fields in dynamic configuration",
                                                  cmd, false);
 
   TCLAP::ValueArg<std::string> admin_address_path("", "admin-address-path", "Admin address path",
@@ -90,6 +101,11 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   TCLAP::SwitchArg log_format_escaped("", "log-format-escaped",
                                       "Escape c-style escape sequences in the application logs",
                                       cmd, false);
+  TCLAP::ValueArg<bool> log_format_prefix_with_location(
+      "", "log-format-prefix-with-location",
+      "Prefix all occurrences of '%v' in log format with with '[%g:%#] ' ('[path/to/file.cc:99] "
+      "').",
+      false, true, "bool", cmd);
   TCLAP::ValueArg<std::string> log_path("", "log-path", "Path to logfile", false, "", "string",
                                         cmd);
   TCLAP::ValueArg<uint32_t> restart_epoch("", "restart-epoch", "hot restart epoch #", false, 0,
@@ -166,6 +182,9 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   }
 
   log_format_ = log_format.getValue();
+  if (log_format_prefix_with_location.getValue()) {
+    log_format_ = absl::StrReplaceAll(log_format_, {{"%%", "%%"}, {"%v", "[%g:%#] %v"}});
+  }
   log_format_escaped_ = log_format_escaped.getValue();
 
   parseComponentLogLevels(component_log_level.getValue());
@@ -209,6 +228,9 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
 
   config_path_ = config_path.getValue();
   config_yaml_ = config_yaml.getValue();
+  if (bootstrap_version.getValue() != 0) {
+    bootstrap_version_ = bootstrap_version.getValue();
+  }
   if (allow_unknown_fields.getValue()) {
     ENVOY_LOG(warn,
               "--allow-unknown-fields is deprecated, use --allow-unknown-static-fields instead.");
@@ -216,6 +238,7 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   allow_unknown_static_fields_ =
       allow_unknown_static_fields.getValue() || allow_unknown_fields.getValue();
   reject_unknown_dynamic_fields_ = reject_unknown_dynamic_fields.getValue();
+  ignore_unknown_dynamic_fields_ = ignore_unknown_dynamic_fields.getValue();
   admin_address_path_ = admin_address_path.getValue();
   log_path_ = log_path.getValue();
   restart_epoch_ = restart_epoch.getValue();
@@ -232,7 +255,7 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   }
 
   if (!disable_extensions.getValue().empty()) {
-    disabled_extensions_ = absl::StrSplit(disable_extensions.getValue(), ",");
+    disabled_extensions_ = absl::StrSplit(disable_extensions.getValue(), ',');
   }
 }
 
@@ -302,6 +325,7 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
   command_line_options->set_config_yaml(configYaml());
   command_line_options->set_allow_unknown_static_fields(allow_unknown_static_fields_);
   command_line_options->set_reject_unknown_dynamic_fields(reject_unknown_dynamic_fields_);
+  command_line_options->set_ignore_unknown_dynamic_fields(ignore_unknown_dynamic_fields_);
   command_line_options->set_admin_address_path(adminAddressPath());
   command_line_options->set_component_log_level(component_log_level_str_);
   command_line_options->set_log_level(spdlog::level::to_string_view(logLevel()).data(),
@@ -353,7 +377,7 @@ OptionsImpl::OptionsImpl(const std::string& service_cluster, const std::string& 
 
 void OptionsImpl::disableExtensions(const std::vector<std::string>& names) {
   for (const auto& name : names) {
-    const std::vector<absl::string_view> parts = absl::StrSplit(name, absl::MaxSplits("/", 1));
+    const std::vector<absl::string_view> parts = absl::StrSplit(name, absl::MaxSplits('/', 1));
 
     if (parts.size() != 2) {
       ENVOY_LOG_MISC(warn, "failed to disable invalid extension name '{}'", name);

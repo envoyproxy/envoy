@@ -252,7 +252,8 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
                                          const std::string& config)
     : api_(Api::createApiForTest(stats_store_)),
       mock_buffer_factory_(new NiceMock<MockBufferFactory>),
-      dispatcher_(api_->allocateDispatcher(Buffer::WatermarkFactoryPtr{mock_buffer_factory_})),
+      dispatcher_(api_->allocateDispatcher("test_thread",
+                                           Buffer::WatermarkFactoryPtr{mock_buffer_factory_})),
       version_(version), upstream_address_fn_(upstream_address_fn),
       config_helper_(version, *api_, config),
       default_log_level_(TestEnvironment::getOptions().logLevel()) {
@@ -262,7 +263,7 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
   // notification and clear the pool connection if necessary. A real fix would require adding fairly
   // complex test hooks to the server and/or spin waiting on stats, neither of which I think are
   // necessary right now.
-  timeSystem().sleep(std::chrono::milliseconds(10));
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(10));
   ON_CALL(*mock_buffer_factory_, create_(_, _))
       .WillByDefault(Invoke([](std::function<void()> below_low,
                                std::function<void()> above_high) -> Buffer::Instance* {
@@ -370,7 +371,7 @@ void BaseIntegrationTest::createEnvoy() {
   for (int i = 0; i < static_resources.listeners_size(); ++i) {
     named_ports.push_back(static_resources.listeners(i).name());
   }
-  createGeneratedApiTestServer(bootstrap_path, named_ports, false, true, false);
+  createGeneratedApiTestServer(bootstrap_path, named_ports, {false, true, false}, false);
 }
 
 void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol) {
@@ -415,9 +416,20 @@ void BaseIntegrationTest::setUpstreamAddress(
 }
 
 void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>& port_names) {
-  auto port_it = port_names.cbegin();
-  auto listeners = test_server_->server().listenerManager().listeners();
+  bool listeners_ready = false;
+  absl::Mutex l;
+  std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners;
+  test_server_->server().dispatcher().post([this, &listeners, &listeners_ready, &l]() {
+    listeners = test_server_->server().listenerManager().listeners();
+    l.Lock();
+    listeners_ready = true;
+    l.Unlock();
+  });
+  l.LockWhen(absl::Condition(&listeners_ready));
+  l.Unlock();
+
   auto listener_it = listeners.cbegin();
+  auto port_it = port_names.cbegin();
   for (; port_it != port_names.end() && listener_it != listeners.end(); ++port_it, ++listener_it) {
     const auto listen_addr = listener_it->get().listenSocketFactory().localAddress();
     if (listen_addr->type() == Network::Address::Type::Ip) {
@@ -438,15 +450,13 @@ std::string getListenerDetails(Envoy::Server::Instance& server) {
   return MessageUtil::getYamlStringFromMessage(listener_info.dynamic_listeners(0).error_state());
 }
 
-void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootstrap_path,
-                                                       const std::vector<std::string>& port_names,
-                                                       bool allow_unknown_static_fields,
-                                                       bool reject_unknown_dynamic_fields,
-                                                       bool allow_lds_rejection) {
-  test_server_ = IntegrationTestServer::create(
-      bootstrap_path, version_, on_server_ready_function_, on_server_init_function_, deterministic_,
-      timeSystem(), *api_, defer_listener_finalization_, process_object_,
-      allow_unknown_static_fields, reject_unknown_dynamic_fields, concurrency_);
+void BaseIntegrationTest::createGeneratedApiTestServer(
+    const std::string& bootstrap_path, const std::vector<std::string>& port_names,
+    Server::FieldValidationConfig validator_config, bool allow_lds_rejection) {
+  test_server_ = IntegrationTestServer::create(bootstrap_path, version_, on_server_ready_function_,
+                                               on_server_init_function_, deterministic_,
+                                               timeSystem(), *api_, defer_listener_finalization_,
+                                               process_object_, validator_config, concurrency_);
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0 &&
       !defer_listener_finalization_) {
 
@@ -468,7 +478,7 @@ void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootst
                        absl::StrCat("Lds update failed. Details\n",
                                     getListenerDetails(test_server_->server())));
       }
-      time_system_.sleep(std::chrono::milliseconds(10));
+      time_system_.advanceTimeWait(std::chrono::milliseconds(10));
     }
 
     registerTestServerPorts(port_names);
@@ -477,8 +487,7 @@ void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootst
 
 void BaseIntegrationTest::createApiTestServer(const ApiFilesystemConfig& api_filesystem_config,
                                               const std::vector<std::string>& port_names,
-                                              bool allow_unknown_static_fields,
-                                              bool reject_unknown_dynamic_fields,
+                                              Server::FieldValidationConfig validator_config,
                                               bool allow_lds_rejection) {
   const std::string eds_path = TestEnvironment::temporaryFileSubstitute(
       api_filesystem_config.eds_path_, port_map_, version_);
@@ -488,11 +497,11 @@ void BaseIntegrationTest::createApiTestServer(const ApiFilesystemConfig& api_fil
       api_filesystem_config.rds_path_, port_map_, version_);
   const std::string lds_path = TestEnvironment::temporaryFileSubstitute(
       api_filesystem_config.lds_path_, {{"rds_json_path", rds_path}}, port_map_, version_);
-  createGeneratedApiTestServer(
-      TestEnvironment::temporaryFileSubstitute(
-          api_filesystem_config.bootstrap_path_,
-          {{"cds_json_path", cds_path}, {"lds_json_path", lds_path}}, port_map_, version_),
-      port_names, allow_unknown_static_fields, reject_unknown_dynamic_fields, allow_lds_rejection);
+  createGeneratedApiTestServer(TestEnvironment::temporaryFileSubstitute(
+                                   api_filesystem_config.bootstrap_path_,
+                                   {{"cds_json_path", cds_path}, {"lds_json_path", lds_path}},
+                                   port_map_, version_),
+                               port_names, validator_config, allow_lds_rejection);
 }
 
 void BaseIntegrationTest::createTestServer(const std::string& json_path,
@@ -506,18 +515,17 @@ void BaseIntegrationTest::createTestServer(const std::string& json_path,
 void BaseIntegrationTest::sendRawHttpAndWaitForResponse(int port, const char* raw_http,
                                                         std::string* response,
                                                         bool disconnect_after_headers_complete) {
-  Buffer::OwnedImpl buffer(raw_http);
-  RawConnectionDriver connection(
-      port, buffer,
-      [&](Network::ClientConnection& client, const Buffer::Instance& data) -> void {
+  auto connection = createConnectionDriver(
+      port, raw_http,
+      [response, disconnect_after_headers_complete](Network::ClientConnection& client,
+                                                    const Buffer::Instance& data) -> void {
         response->append(data.toString());
         if (disconnect_after_headers_complete && response->find("\r\n\r\n") != std::string::npos) {
           client.close(Network::ConnectionCloseType::NoFlush);
         }
-      },
-      version_);
+      });
 
-  connection.run();
+  connection->run();
 }
 
 IntegrationTestServerPtr BaseIntegrationTest::createIntegrationTestServer(
@@ -534,12 +542,28 @@ void BaseIntegrationTest::useListenerAccessLog(absl::string_view format) {
   ASSERT_TRUE(config_helper_.setListenerAccessLog(listener_access_log_name_, format));
 }
 
-std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename) {
+// Assuming logs are newline delineated, return the start index of the nth entry.
+// If there are not n entries, it will return file.length() (end of the string
+// index)
+size_t entryIndex(const std::string& file, uint32_t entry) {
+  size_t index = 0;
+  for (uint32_t i = 0; i < entry; ++i) {
+    index = file.find('\n', index);
+    if (index == std::string::npos || index == file.length()) {
+      return file.length();
+    }
+    ++index;
+  }
+  return index;
+}
+
+std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename, uint32_t entry) {
   // Wait a max of 1s for logs to flush to disk.
   for (int i = 0; i < 1000; ++i) {
     std::string contents = TestEnvironment::readFileToStringForTest(filename, false);
-    if (contents.length() > 0) {
-      return contents;
+    size_t index = entryIndex(contents, entry);
+    if (contents.length() > index) {
+      return contents.substr(index);
     }
     absl::SleepFor(absl::Milliseconds(1));
   }

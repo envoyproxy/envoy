@@ -40,7 +40,7 @@ public:
   startRequest(const Http::RequestHeaderMap& headers);
   bool waitForDisconnect(std::chrono::milliseconds time_to_wait = std::chrono::milliseconds(0));
   Network::ClientConnection* connection() const { return connection_.get(); }
-  Network::ConnectionEvent last_connection_event() const { return last_connection_event_; }
+  Network::ConnectionEvent lastConnectionEvent() const { return last_connection_event_; }
   Network::Connection& rawConnection() { return *connection_; }
   bool disconnected() { return disconnected_; }
 
@@ -87,17 +87,17 @@ public:
   // https://github.com/envoyproxy/envoy-filter-example/pull/69 is reverted.
   HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
                       Network::Address::IpVersion version, TestTimeSystemPtr,
-                      const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG)
+                      const std::string& config = ConfigHelper::httpProxyConfig())
       : HttpIntegrationTest(downstream_protocol, version, config) {}
 
   HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
                       Network::Address::IpVersion version,
-                      const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
+                      const std::string& config = ConfigHelper::httpProxyConfig());
 
   HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
                       const InstanceConstSharedPtrFn& upstream_address_fn,
                       Network::Address::IpVersion version,
-                      const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
+                      const std::string& config = ConfigHelper::httpProxyConfig());
   ~HttpIntegrationTest() override;
 
 protected:
@@ -173,7 +173,7 @@ protected:
   void testRouterVirtualClusters();
 
   void testRouterRequestAndResponseWithBody(uint64_t request_size, uint64_t response_size,
-                                            bool big_header,
+                                            bool big_header, bool set_content_length_header = false,
                                             ConnectionCreationFunction* creator = nullptr);
   void testRouterHeaderOnlyRequestAndResponse(ConnectionCreationFunction* creator = nullptr,
                                               int upstream_index = 0,
@@ -220,7 +220,9 @@ protected:
                     bool response_trailers_present);
   // Test /drain_listener from admin portal.
   void testAdminDrain(Http::CodecClient::Type admin_request_type);
-
+  // Test max stream duration.
+  void testMaxStreamDuration();
+  void testMaxStreamDurationWithRetry(bool invoke_retry_upstream_disconnect);
   Http::CodecClient::Type downstreamProtocol() const { return downstream_protocol_; }
   // Prefix listener stat with IP:port, including IP version dependent loopback address.
   std::string listenerStatPrefix(const std::string& stat_name);

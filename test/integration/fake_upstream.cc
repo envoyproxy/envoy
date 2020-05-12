@@ -221,19 +221,44 @@ void FakeStream::finishGrpcStream(Grpc::Status::GrpcStatus status) {
       Http::TestHeaderMapImpl{{"grpc-status", std::to_string(static_cast<uint32_t>(status))}});
 }
 
-FakeHttpConnection::FakeHttpConnection(SharedConnectionWrapper& shared_connection,
-                                       Stats::Store& store, Type type,
-                                       Event::TestTimeSystem& time_system,
-                                       uint32_t max_request_headers_kb,
-                                       uint32_t max_request_headers_count)
+// The TestHttp1ServerConnectionImpl outlives its underlying Network::Connection
+// so must not access the Connection on teardown. To achieve this, clear the
+// read disable calls to avoid checking / editing the Connection blocked state.
+class TestHttp1ServerConnectionImpl : public Http::Http1::ServerConnectionImpl {
+public:
+  using Http::Http1::ServerConnectionImpl::ServerConnectionImpl;
+
+  void onMessageComplete() override {
+    ServerConnectionImpl::onMessageComplete();
+
+    if (activeRequest().has_value() && activeRequest().value().request_decoder_) {
+      // Undo the read disable from the base class - we have many tests which
+      // waitForDisconnect after a full request has been read which will not
+      // receive the disconnect if reading is disabled.
+      activeRequest().value().response_encoder_.readDisable(false);
+    }
+  }
+  ~TestHttp1ServerConnectionImpl() override {
+    if (activeRequest().has_value()) {
+      activeRequest().value().response_encoder_.clearReadDisableCallsForTests();
+    }
+  }
+};
+
+FakeHttpConnection::FakeHttpConnection(
+    SharedConnectionWrapper& shared_connection, Stats::Store& store, Type type,
+    Event::TestTimeSystem& time_system, uint32_t max_request_headers_kb,
+    uint32_t max_request_headers_count,
+    envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+        headers_with_underscores_action)
     : FakeConnectionBase(shared_connection, time_system) {
   if (type == Type::HTTP1) {
     Http::Http1Settings http1_settings;
     // For the purpose of testing, we always have the upstream encode the trailers if any
     http1_settings.enable_trailers_ = true;
-    codec_ = std::make_unique<Http::Http1::ServerConnectionImpl>(
+    codec_ = std::make_unique<TestHttp1ServerConnectionImpl>(
         shared_connection_.connection(), store, *this, http1_settings, max_request_headers_kb,
-        max_request_headers_count);
+        max_request_headers_count, headers_with_underscores_action);
   } else {
     envoy::config::core::v3::Http2ProtocolOptions http2_options =
         ::Envoy::Http2::Utility::initializeAndValidateOptions(
@@ -242,7 +267,7 @@ FakeHttpConnection::FakeHttpConnection(SharedConnectionWrapper& shared_connectio
     http2_options.set_allow_metadata(true);
     codec_ = std::make_unique<Http::Http2::ServerConnectionImpl>(
         shared_connection_.connection(), *this, store, http2_options, max_request_headers_kb,
-        max_request_headers_count);
+        max_request_headers_count, headers_with_underscores_action);
     ASSERT(type == Type::HTTP2);
   }
 
@@ -422,8 +447,8 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
     : http_type_(type), socket_(Network::SocketSharedPtr(listen_socket.release())),
       socket_factory_(std::make_shared<FakeListenSocketFactory>(socket_)),
       api_(Api::createApiForTest(stats_store_)), time_system_(time_system),
-      dispatcher_(api_->allocateDispatcher()),
-      handler_(new Server::ConnectionHandlerImpl(*dispatcher_, "fake_upstream")),
+      dispatcher_(api_->allocateDispatcher("fake_upstream")),
+      handler_(new Server::ConnectionHandlerImpl(*dispatcher_)),
       allow_unexpected_disconnects_(false), read_disable_on_new_connection_(true),
       enable_half_close_(enable_half_close), listener_(*this),
       filter_chain_(Network::Test::createEmptyFilterChain(std::move(transport_socket_factory))) {
@@ -462,7 +487,7 @@ void FakeUpstream::createUdpListenerFilterChain(Network::UdpListenerFilterManage
 }
 
 void FakeUpstream::threadRoutine() {
-  handler_->addListener(listener_);
+  handler_->addListener(absl::nullopt, listener_);
   server_initialized_.setReady();
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   handler_.reset();
@@ -473,11 +498,11 @@ void FakeUpstream::threadRoutine() {
   }
 }
 
-AssertionResult FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
-                                                    FakeHttpConnectionPtr& connection,
-                                                    milliseconds timeout,
-                                                    uint32_t max_request_headers_kb,
-                                                    uint32_t max_request_headers_count) {
+AssertionResult FakeUpstream::waitForHttpConnection(
+    Event::Dispatcher& client_dispatcher, FakeHttpConnectionPtr& connection, milliseconds timeout,
+    uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
+    envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+        headers_with_underscores_action) {
   Event::TestTimeSystem& time_system = timeSystem();
   auto end_time = time_system.monotonicTime() + timeout;
   {
@@ -496,12 +521,14 @@ AssertionResult FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_di
     if (new_connections_.empty()) {
       return AssertionFailure() << "Got a new connection event, but didn't create a connection.";
     }
-    connection = std::make_unique<FakeHttpConnection>(consumeConnection(), stats_store_, http_type_,
-                                                      time_system, max_request_headers_kb,
-                                                      max_request_headers_count);
+    connection = std::make_unique<FakeHttpConnection>(
+        consumeConnection(), stats_store_, http_type_, time_system, max_request_headers_kb,
+        max_request_headers_count, headers_with_underscores_action);
   }
   VERIFY_ASSERTION(connection->initialize());
-  VERIFY_ASSERTION(connection->readDisable(false));
+  if (read_disable_on_new_connection_) {
+    VERIFY_ASSERTION(connection->readDisable(false));
+  }
   return AssertionSuccess();
 }
 
@@ -529,7 +556,7 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
         connection = std::make_unique<FakeHttpConnection>(
             upstream.consumeConnection(), upstream.stats_store_, upstream.http_type_,
             upstream.timeSystem(), Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
-            Http::DEFAULT_MAX_HEADERS_COUNT);
+            Http::DEFAULT_MAX_HEADERS_COUNT, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
         lock.release();
         VERIFY_ASSERTION(connection->initialize());
         VERIFY_ASSERTION(connection->readDisable(false));

@@ -28,12 +28,41 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, Http2IntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(Http2IntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
-  testRouterRequestAndResponseWithBody(1024, 512, false);
+  testRouterRequestAndResponseWithBody(1024, 512, false, false);
+}
+
+TEST_P(Http2IntegrationTest, RouterRequestAndResponseWithGiantBodyNoBuffer) {
+  testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, false);
 }
 
 TEST_P(Http2IntegrationTest, FlowControlOnAndGiantBody) {
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
-  testRouterRequestAndResponseWithBody(1024 * 1024, 1024 * 1024, false);
+  testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, false);
+}
+
+TEST_P(Http2IntegrationTest, LargeFlowControlOnAndGiantBody) {
+  config_helper_.setBufferLimits(128 * 1024,
+                                 128 * 1024); // Set buffer limits upstream and downstream.
+  testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, false);
+}
+
+TEST_P(Http2IntegrationTest, RouterRequestAndResponseWithBodyAndContentLengthNoBuffer) {
+  testRouterRequestAndResponseWithBody(1024, 512, false, true);
+}
+
+TEST_P(Http2IntegrationTest, RouterRequestAndResponseWithGiantBodyAndContentLengthNoBuffer) {
+  testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, true);
+}
+
+TEST_P(Http2IntegrationTest, FlowControlOnAndGiantBodyWithContentLength) {
+  config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
+  testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, true);
+}
+
+TEST_P(Http2IntegrationTest, LargeFlowControlOnAndGiantBodyWithContentLength) {
+  config_helper_.setBufferLimits(128 * 1024,
+                                 128 * 1024); // Set buffer limits upstream and downstream.
+  testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, true);
 }
 
 TEST_P(Http2IntegrationTest, RouterHeaderOnlyRequestAndResponseNoBuffer) {
@@ -794,38 +823,32 @@ TEST_P(Http2IntegrationTest, CodecErrorAfterStreamStart) {
 
 TEST_P(Http2IntegrationTest, BadMagic) {
   initialize();
-  Buffer::OwnedImpl buffer("hello");
   std::string response;
-  RawConnectionDriver connection(
-      lookupPort("http"), buffer,
-      [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
+  auto connection = createConnectionDriver(
+      lookupPort("http"), "hello",
+      [&response](Network::ClientConnection&, const Buffer::Instance& data) -> void {
         response.append(data.toString());
-      },
-      version_);
-
-  connection.run();
+      });
+  connection->run();
   EXPECT_EQ("", response);
 }
 
 TEST_P(Http2IntegrationTest, BadFrame) {
   initialize();
-  Buffer::OwnedImpl buffer("PRI * HTTP/2.0\r\n\r\nSM\r\n\r\nhelloworldcauseanerror");
   std::string response;
-  RawConnectionDriver connection(
-      lookupPort("http"), buffer,
-      [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
+  auto connection = createConnectionDriver(
+      lookupPort("http"), "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\nhelloworldcauseanerror",
+      [&response](Network::ClientConnection&, const Buffer::Instance& data) -> void {
         response.append(data.toString());
-      },
-      version_);
-
-  connection.run();
+      });
+  connection->run();
   EXPECT_TRUE(response.find("SETTINGS expected") != std::string::npos);
 }
 
 // Send client headers, a GoAway and then a body and ensure the full request and
 // response are received.
 TEST_P(Http2IntegrationTest, GoAway) {
-  config_helper_.addFilter(ConfigHelper::DEFAULT_HEALTH_CHECK_FILTER);
+  config_helper_.addFilter(ConfigHelper::defaultHealthCheckFilter());
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1095,26 +1118,25 @@ TEST_P(Http2IntegrationTest, SimultaneousRequestWithBufferLimits) {
 // Test downstream connection delayed close processing.
 TEST_P(Http2IntegrationTest, DelayedCloseAfterBadFrame) {
   initialize();
-  Buffer::OwnedImpl buffer("PRI * HTTP/2.0\r\n\r\nSM\r\n\r\nhelloworldcauseanerror");
   std::string response;
-  RawConnectionDriver connection(
-      lookupPort("http"), buffer,
+
+  auto connection = createConnectionDriver(
+      lookupPort("http"), "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\nhelloworldcauseanerror",
       [&](Network::ClientConnection& connection, const Buffer::Instance& data) -> void {
         response.append(data.toString());
         connection.dispatcher().exit();
-      },
-      version_);
+      });
 
-  connection.run();
+  connection->run();
   EXPECT_THAT(response, HasSubstr("SETTINGS expected"));
   // Due to the multiple dispatchers involved (one for the RawConnectionDriver and another for the
   // Envoy server), it's possible the delayed close timer could fire and close the server socket
   // prior to the data callback above firing. Therefore, we may either still be connected, or have
   // received a remote close.
-  if (connection.last_connection_event() == Network::ConnectionEvent::Connected) {
-    connection.run();
+  if (connection->lastConnectionEvent() == Network::ConnectionEvent::Connected) {
+    connection->run();
   }
-  EXPECT_EQ(connection.last_connection_event(), Network::ConnectionEvent::RemoteClose);
+  EXPECT_EQ(connection->lastConnectionEvent(), Network::ConnectionEvent::RemoteClose);
   EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value(),
             1);
 }
@@ -1125,25 +1147,23 @@ TEST_P(Http2IntegrationTest, DelayedCloseDisabled) {
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(0); });
   initialize();
-  Buffer::OwnedImpl buffer("PRI * HTTP/2.0\r\n\r\nSM\r\n\r\nhelloworldcauseanerror");
   std::string response;
-  RawConnectionDriver connection(
-      lookupPort("http"), buffer,
+  auto connection = createConnectionDriver(
+      lookupPort("http"), "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\nhelloworldcauseanerror",
       [&](Network::ClientConnection& connection, const Buffer::Instance& data) -> void {
         response.append(data.toString());
         connection.dispatcher().exit();
-      },
-      version_);
+      });
 
-  connection.run();
+  connection->run();
   EXPECT_THAT(response, HasSubstr("SETTINGS expected"));
   // Due to the multiple dispatchers involved (one for the RawConnectionDriver and another for the
   // Envoy server), it's possible for the 'connection' to receive the data and exit the dispatcher
   // prior to the FIN being received from the server.
-  if (connection.last_connection_event() == Network::ConnectionEvent::Connected) {
-    connection.run();
+  if (connection->lastConnectionEvent() == Network::ConnectionEvent::Connected) {
+    connection->run();
   }
-  EXPECT_EQ(connection.last_connection_event(), Network::ConnectionEvent::RemoteClose);
+  EXPECT_EQ(connection->lastConnectionEvent(), Network::ConnectionEvent::RemoteClose);
   EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value(),
             0);
 }

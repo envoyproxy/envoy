@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <iterator>
 #include <list>
 #include <map>
 #include <memory>
@@ -53,6 +54,9 @@ public:
   virtual RouteConstSharedPtr matches(const Http::RequestHeaderMap& headers,
                                       const StreamInfo::StreamInfo& stream_info,
                                       uint64_t random_value) const PURE;
+
+  // By default, matchers do not support null Path headers.
+  virtual bool supportsPathlessHeaders() const { return false; }
 };
 
 class PerFilterConfigs {
@@ -160,7 +164,8 @@ public:
                   Server::Configuration::ServerFactoryContext& factory_context, Stats::Scope& scope,
                   ProtobufMessage::ValidationVisitor& validator, bool validate_clusters);
 
-  RouteConstSharedPtr getRouteFromEntries(const Http::RequestHeaderMap& headers,
+  RouteConstSharedPtr getRouteFromEntries(const RouteCallback& cb,
+                                          const Http::RequestHeaderMap& headers,
                                           const StreamInfo::StreamInfo& stream_info,
                                           uint64_t random_value) const;
   const VirtualCluster* virtualClusterFromEntries(const Http::HeaderMap& headers) const;
@@ -465,6 +470,7 @@ public:
   bool includeAttemptCountInResponse() const override {
     return vhost_.includeAttemptCountInResponse();
   }
+  const absl::optional<ConnectConfig>& connectConfig() const override { return connect_config_; }
   const UpgradeMap& upgradeMap() const override { return upgrade_map_; }
   InternalRedirectAction internalRedirectAction() const override {
     return internal_redirect_action_;
@@ -494,6 +500,7 @@ protected:
   std::string regex_rewrite_substitution_;
   const std::string host_rewrite_;
   bool include_vh_rate_limits_;
+  absl::optional<ConnectConfig> connect_config_;
 
   RouteConstSharedPtr clusterEntry(const Http::HeaderMap& headers, uint64_t random_value) const;
 
@@ -590,6 +597,9 @@ private:
     }
     bool includeAttemptCountInResponse() const override {
       return parent_->includeAttemptCountInResponse();
+    }
+    const absl::optional<ConnectConfig>& connectConfig() const override {
+      return parent_->connectConfig();
     }
     const UpgradeMap& upgradeMap() const override { return parent_->upgradeMap(); }
     InternalRedirectAction internalRedirectAction() const override {
@@ -825,6 +835,29 @@ private:
 };
 
 /**
+ * Route entry implementation for CONNECT requests.
+ */
+class ConnectRouteEntryImpl : public RouteEntryImplBase {
+public:
+  ConnectRouteEntryImpl(const VirtualHostImpl& vhost, const envoy::config::route::v3::Route& route,
+                        Server::Configuration::ServerFactoryContext& factory_context,
+                        ProtobufMessage::ValidationVisitor& validator);
+
+  // Router::PathMatchCriterion
+  const std::string& matcher() const override { return EMPTY_STRING; }
+  PathMatchType matchType() const override { return PathMatchType::None; }
+
+  // Router::Matchable
+  RouteConstSharedPtr matches(const Http::RequestHeaderMap& headers,
+                              const StreamInfo::StreamInfo& stream_info,
+                              uint64_t random_value) const override;
+
+  // Router::DirectResponseEntry
+  void rewritePathHeader(Http::RequestHeaderMap&, bool) const override;
+
+  bool supportsPathlessHeaders() const override { return true; }
+};
+/**
  * Wraps the route configuration which matches an incoming request headers to a backend cluster.
  * This is split out mainly to help with unit testing.
  */
@@ -835,7 +868,7 @@ public:
                Server::Configuration::ServerFactoryContext& factory_context,
                ProtobufMessage::ValidationVisitor& validator, bool validate_clusters);
 
-  RouteConstSharedPtr route(const Http::RequestHeaderMap& headers,
+  RouteConstSharedPtr route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
                             const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const;
 
   const VirtualHostImpl* findVirtualHost(const Http::RequestHeaderMap& headers) const;
@@ -885,8 +918,12 @@ public:
   RouteConstSharedPtr route(const Http::RequestHeaderMap& headers,
                             const StreamInfo::StreamInfo& stream_info,
                             uint64_t random_value) const override {
-    return route_matcher_->route(headers, stream_info, random_value);
+    return route(nullptr, headers, stream_info, random_value);
   }
+
+  RouteConstSharedPtr route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
+                            const StreamInfo::StreamInfo& stream_info,
+                            uint64_t random_value) const override;
 
   const std::list<Http::LowerCaseString>& internalOnlyHeaders() const override {
     return internal_only_headers_;
@@ -919,6 +956,11 @@ public:
   // Router::Config
   RouteConstSharedPtr route(const Http::RequestHeaderMap&, const StreamInfo::StreamInfo&,
                             uint64_t) const override {
+    return nullptr;
+  }
+
+  RouteConstSharedPtr route(const RouteCallback&, const Http::RequestHeaderMap&,
+                            const StreamInfo::StreamInfo&, uint64_t) const override {
     return nullptr;
   }
 

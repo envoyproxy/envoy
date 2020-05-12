@@ -4,7 +4,7 @@
 AWS Lambda
 ==========
 
-* :ref:`v2 API reference <envoy_api_msg_config.filter.http.aws_lambda.v2alpha.config>`
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.aws_lambda.v3.Config>`
 * This filter should be configured with the name *envoy.filters.http.aws_lambda*.
 
 .. attention::
@@ -15,11 +15,11 @@ The HTTP AWS Lambda filter is used to trigger an AWS Lambda function from a stan
 It supports a few options to control whether to pass through the HTTP request payload as is or to wrap it in a JSON
 schema.
 
-If :ref:`payload_passthrough <envoy_api_msg_config.filter.http.aws_lambda.v2alpha.config>` is set to
+If :ref:`payload_passthrough <envoy_v3_api_field_extensions.filters.http.aws_lambda.v3.Config.payload_passthrough>` is set to
 ``true``, then the payload is sent to Lambda without any transformations.
 *Note*: This means you lose access to all the HTTP headers in the Lambda function.
 
-However, if :ref:`payload_passthrough <envoy_api_msg_config.filter.http.aws_lambda.v2alpha.config>`
+However, if :ref:`payload_passthrough <envoy_v3_api_field_extensions.filters.http.aws_lambda.v3.Config.payload_passthrough>`
 is set to ``false``, then the HTTP request is transformed to a JSON payload with the following schema:
 
 .. code-block::
@@ -81,7 +81,7 @@ On the other end, the response of the Lambda function must conform to the follow
 .. _regional Lambda endpoint: https://docs.aws.amazon.com/general/latest/gr/lambda-service.html
 
 The filter supports :ref:`per-filter configuration
-<envoy_api_msg_config.filter.http.aws_lambda.v2alpha.PerRouteConfig>`.
+<envoy_v3_api_msg_extensions.filters.http.aws_lambda.v3.PerRouteConfig>`.
 
 If you use the per-filter configuration, the target cluster _must_ have the following metadata:
 
@@ -132,7 +132,7 @@ in us-west-2:
     transport_socket:
       name: envoy.transport_sockets.tls
       typed_config:
-        "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
         sni: "*.amazonaws.com"
 
 
@@ -179,6 +179,21 @@ An example with the Lambda metadata applied to a weighted-cluster:
     transport_socket:
       name: envoy.transport_sockets.tls
       typed_config:
-        "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
         sni: "*.amazonaws.com"
+
+
+Statistics
+----------
+
+The AWS Lambda filter outputs statistics in the *http.<stat_prefix>.aws_lambda.* namespace. The
+:ref:`stat prefix <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.stat_prefix>`
+comes from the owning HTTP connection manager.
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  server_error, Counter, Total requests that returned invalid JSON response (see :ref:`payload_passthrough <envoy_api_msg_config.filter.http.aws_lambda.v2alpha.config>`)
+  upstream_rq_payload_size, Histogram, Size in bytes of the request after JSON-tranformation (if any).
 

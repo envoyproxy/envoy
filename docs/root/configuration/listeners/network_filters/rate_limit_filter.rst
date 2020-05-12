@@ -4,7 +4,7 @@ Rate limit
 ==========
 
 * Global rate limiting :ref:`architecture overview <arch_overview_global_rate_limit>`
-* :ref:`v2 API reference <envoy_api_msg_config.filter.network.rate_limit.v2.RateLimit>`
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.network.ratelimit.v3.RateLimit>`
 * This filter should be configured with the name *envoy.filters.network.ratelimit*.
 
 .. note::
@@ -30,7 +30,7 @@ following statistics:
   cx_closed, Counter, Total connections closed due to an over limit response from the rate limit service
   active, Gauge, Total active requests to the rate limit service
   failure_mode_allowed, Counter, "Total requests that were error(s) but were allowed through because
-  of :ref:`failure_mode_deny <envoy_api_msg_config.filter.http.rate_limit.v2.RateLimit>` set to false."
+  of :ref:`failure_mode_deny <envoy_v3_api_field_extensions.filters.network.ratelimit.v3.RateLimit.failure_mode_deny>` set to false."
 
 Runtime
 -------

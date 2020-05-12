@@ -22,6 +22,7 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -944,12 +945,14 @@ filter:
       - SI
       - IH
       - DPE
+      - UMSDR
+      - RFCF
 typed_config:
   "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
   path: /dev/null
   )EOF";
 
-  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x40000,
+  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x100000,
                 "A flag has been added. Fix this code.");
 
   const std::vector<StreamInfo::ResponseFlag> all_response_flags = {
@@ -972,7 +975,8 @@ typed_config:
       StreamInfo::ResponseFlag::StreamIdleTimeout,
       StreamInfo::ResponseFlag::InvalidEnvoyRequestHeaders,
       StreamInfo::ResponseFlag::DownstreamProtocolError,
-  };
+      StreamInfo::ResponseFlag::UpstreamMaxStreamDurationReached,
+      StreamInfo::ResponseFlag::ResponseFromCacheFilter};
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
 
@@ -1004,7 +1008,8 @@ typed_config:
       "[\"embedded message failed validation\"] | caused by "
       "ResponseFlagFilterValidationError.Flags[i]: [\"value must be in list \" [\"LH\" \"UH\" "
       "\"UT\" \"LR\" \"UR\" \"UF\" \"UC\" \"UO\" \"NR\" \"DI\" \"FI\" \"RL\" \"UAEX\" \"RLSE\" "
-      "\"DC\" \"URX\" \"SI\" \"IH\" \"DPE\"]]): name: \"accesslog\"\nfilter {\n  "
+      "\"DC\" \"URX\" \"SI\" \"IH\" \"DPE\" \"UMSDR\" \"RFCF\"]]): name: \"accesslog\"\nfilter {\n "
+      " "
       "response_flag_filter {\n    flags: \"UnsupportedFlag\"\n  }\n}\ntyped_config {\n  "
       "[type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog] {\n    path: \"/dev/null\"\n  "
       "}\n}\n");
@@ -1030,10 +1035,46 @@ typed_config:
       "[\"embedded message failed validation\"] | caused by "
       "ResponseFlagFilterValidationError.Flags[i]: [\"value must be in list \" [\"LH\" \"UH\" "
       "\"UT\" \"LR\" \"UR\" \"UF\" \"UC\" \"UO\" \"NR\" \"DI\" \"FI\" \"RL\" \"UAEX\" \"RLSE\" "
-      "\"DC\" \"URX\" \"SI\" \"IH\" \"DPE\"]]): name: \"accesslog\"\nfilter {\n  "
+      "\"DC\" \"URX\" \"SI\" \"IH\" \"DPE\" \"UMSDR\" \"RFCF\"]]): name: \"accesslog\"\nfilter {\n "
+      " "
       "response_flag_filter {\n    flags: \"UnsupportedFlag\"\n  }\n}\ntyped_config {\n  "
       "[type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog] {\n    path: \"/dev/null\"\n  "
       "}\n}\n");
+}
+
+TEST_F(AccessLogImplTest, ValidGrpcStatusMessage) {
+  const std::string yaml = R"EOF(
+name: accesslog
+typed_config:
+  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  path: /dev/null
+  format: "%GRPC_STATUS%\n"
+  )EOF";
+
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+  {
+    EXPECT_CALL(*file_, write(_));
+    response_trailers_.addCopy(Http::Headers::get().GrpcStatus, "0");
+    log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+    EXPECT_EQ("OK\n", output_);
+    response_trailers_.remove(Http::Headers::get().GrpcStatus);
+  }
+  {
+    InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+    EXPECT_CALL(*file_, write(_));
+    response_headers_.addCopy(Http::Headers::get().GrpcStatus, "1");
+    log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+    EXPECT_EQ("Canceled\n", output_);
+    response_headers_.remove(Http::Headers::get().GrpcStatus);
+  }
+  {
+    InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+    EXPECT_CALL(*file_, write(_));
+    response_headers_.addCopy(Http::Headers::get().GrpcStatus, "-1");
+    log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+    EXPECT_EQ("-1\n", output_);
+    response_headers_.remove(Http::Headers::get().GrpcStatus);
+  }
 }
 
 TEST_F(AccessLogImplTest, GrpcStatusFilterValues) {
@@ -1245,7 +1286,8 @@ public:
 };
 
 TEST_F(AccessLogImplTest, TestHeaderFilterPresence) {
-  Registry::RegisterFactory<TestHeaderFilterFactory, ExtensionFilterFactory> registered;
+  TestHeaderFilterFactory factory;
+  Registry::InjectFactory<ExtensionFilterFactory> registration(factory);
 
   const std::string yaml = R"EOF(
 name: accesslog
@@ -1280,7 +1322,7 @@ public:
 
   // AccessLog::Filter
   bool evaluate(const StreamInfo::StreamInfo&, const Http::RequestHeaderMap&,
-                const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&) override {
+                const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&) const override {
     if (current_++ == 0) {
       return true;
     }
@@ -1291,7 +1333,7 @@ public:
   }
 
 private:
-  uint32_t current_ = 0;
+  mutable uint32_t current_ = 0;
   uint32_t sample_rate_;
 };
 
@@ -1321,7 +1363,8 @@ public:
 };
 
 TEST_F(AccessLogImplTest, SampleExtensionFilter) {
-  Registry::RegisterFactory<SampleExtensionFilterFactory, ExtensionFilterFactory> registered;
+  SampleExtensionFilterFactory factory;
+  Registry::InjectFactory<ExtensionFilterFactory> registration(factory);
 
   const std::string yaml = R"EOF(
 name: accesslog

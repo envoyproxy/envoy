@@ -11,6 +11,7 @@
 #include "common/common/fmt.h"
 #include "common/common/hex.h"
 #include "common/protobuf/message_validator_impl.h"
+#include "common/protobuf/utility.h"
 #include "common/runtime/runtime_impl.h"
 
 #include "source/extensions/tracers/xray/daemon.pb.validate.h"
@@ -70,42 +71,37 @@ void Span::finishSpan() {
 
   daemon::Segment s;
   s.set_name(name());
-  s.set_id(Id());
+  s.set_id(id());
   s.set_trace_id(traceId());
   s.set_start_time(time_point_cast<SecondsWithFraction>(startTime()).time_since_epoch().count());
   s.set_end_time(
       time_point_cast<SecondsWithFraction>(time_source_.systemTime()).time_since_epoch().count());
   s.set_parent_id(parentId());
-  using KeyValue = Protobuf::Map<std::string, std::string>::value_type;
+
+  auto* request_fields = s.mutable_http()->mutable_request()->mutable_fields();
+  for (const auto& field : http_request_annotations_) {
+    request_fields->insert({field.first, field.second});
+  }
+
+  auto* response_fields = s.mutable_http()->mutable_response()->mutable_fields();
+  for (const auto& field : http_response_annotations_) {
+    response_fields->insert({field.first, field.second});
+  }
+
   for (const auto& item : custom_annotations_) {
-    s.mutable_annotations()->insert(KeyValue{item.first, item.second});
+    s.mutable_annotations()->insert({item.first, item.second});
   }
 
-  for (const auto& item : http_request_annotations_) {
-    s.mutable_http()->mutable_request()->insert(KeyValue{item.first, item.second});
-  }
+  const std::string json = MessageUtil::getJsonStringFromMessage(
+      s, false /* pretty_print  */, false /* always_print_primitive_fields */);
 
-  for (const auto& item : http_response_annotations_) {
-    s.mutable_http()->mutable_response()->insert(KeyValue{item.first, item.second});
-  }
-
-  // TODO(marcomagdy): test how expensive this validation is. Might be worth turning off in
-  // optimized builds..
-  MessageUtil::validate(s, ProtobufMessage::getStrictValidationVisitor());
-  Protobuf::util::JsonPrintOptions json_options;
-  json_options.preserve_proto_field_names = true;
-  std::string json;
-  const auto status = Protobuf::util::MessageToJsonString(s, &json, json_options);
-  ASSERT(status.ok());
   broker_.send(json);
 } // namespace XRay
 
 void Span::injectContext(Http::RequestHeaderMap& request_headers) {
   const std::string xray_header_value =
-      fmt::format("root={};parent={};sampled={}", traceId(), Id(), sampled() ? "1" : "0");
-
-  // Set the XRay header into envoy header map for visibility to upstream
-  request_headers.addCopy(Http::LowerCaseString(XRayTraceHeader), xray_header_value);
+      fmt::format("Root={};Parent={};Sampled={}", traceId(), id(), sampled() ? "1" : "0");
+  request_headers.setCopy(Http::LowerCaseString(XRayTraceHeader), xray_header_value);
 }
 
 Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& operation_name,
@@ -113,10 +109,10 @@ Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& ope
   auto child_span = std::make_unique<XRay::Span>(time_source_, broker_);
   const auto ticks = time_source_.monotonicTime().time_since_epoch().count();
   child_span->setId(ticks);
-  child_span->setName(operation_name);
+  child_span->setName(name());
   child_span->setOperation(operation_name);
   child_span->setStartTime(start_time);
-  child_span->setParentId(Id());
+  child_span->setParentId(id());
   child_span->setTraceId(traceId());
   child_span->setSampled(sampled());
   return child_span;
@@ -186,20 +182,30 @@ void Span::setTag(absl::string_view name, absl::string_view value) {
   }
 
   if (name == HttpUrl) {
-    http_request_annotations_.emplace(SpanUrl, value);
+    http_request_annotations_.emplace(SpanUrl, ValueUtil::stringValue(std::string(value)));
   } else if (name == HttpMethod) {
-    http_request_annotations_.emplace(SpanMethod, value);
+    http_request_annotations_.emplace(SpanMethod, ValueUtil::stringValue(std::string(value)));
   } else if (name == HttpUserAgent) {
-    http_request_annotations_.emplace(SpanUserAgent, value);
+    http_request_annotations_.emplace(SpanUserAgent, ValueUtil::stringValue(std::string(value)));
   } else if (name == HttpStatusCode) {
-    http_response_annotations_.emplace(SpanStatus, value);
+    uint64_t status_code;
+    if (!absl::SimpleAtoi(value, &status_code)) {
+      ENVOY_LOG(debug, "{} must be a number, given: {}", HttpStatusCode, value);
+      return;
+    }
+    http_response_annotations_.emplace(SpanStatus, ValueUtil::numberValue(status_code));
   } else if (name == HttpResponseSize) {
-    http_response_annotations_.emplace(SpanContentLength, value);
+    uint64_t response_size;
+    if (!absl::SimpleAtoi(value, &response_size)) {
+      ENVOY_LOG(debug, "{} must be a number, given: {}", HttpResponseSize, value);
+      return;
+    }
+    http_response_annotations_.emplace(SpanContentLength, ValueUtil::numberValue(response_size));
   } else if (name == PeerAddress) {
-    http_request_annotations_.emplace(SpanClientIp, value);
+    http_request_annotations_.emplace(SpanClientIp, ValueUtil::stringValue(std::string(value)));
     // In this case, PeerAddress refers to the client's actual IP address, not
     // the address specified in the the HTTP X-Forwarded-For header.
-    http_request_annotations_.emplace(SpanXForwardedFor, "false");
+    http_request_annotations_.emplace(SpanXForwardedFor, ValueUtil::boolValue(false));
   } else {
     custom_annotations_.emplace(name, value);
   }

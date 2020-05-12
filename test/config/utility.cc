@@ -15,7 +15,6 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/assert.h"
-#include "common/config/resources.h"
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
 
@@ -23,6 +22,7 @@
 #include "test/config/integration/certs/clientcert_hash.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/resources.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_replace.h"
@@ -30,7 +30,8 @@
 
 namespace Envoy {
 
-const std::string ConfigHelper::BASE_CONFIG = R"EOF(
+std::string ConfigHelper::baseConfig() {
+  return R"EOF(
 admin:
   access_log_path: /dev/null
   address:
@@ -68,8 +69,10 @@ static_resources:
         address: 127.0.0.1
         port_value: 0
 )EOF";
+}
 
-const std::string ConfigHelper::BASE_UDP_LISTENER_CONFIG = R"EOF(
+std::string ConfigHelper::baseUdpListenerConfig() {
+  return R"EOF(
 admin:
   access_log_path: /dev/null
   address:
@@ -96,8 +99,10 @@ static_resources:
         port_value: 0
         protocol: udp
 )EOF";
+}
 
-const std::string ConfigHelper::TCP_PROXY_CONFIG = BASE_CONFIG + R"EOF(
+std::string ConfigHelper::tcpProxyConfig() {
+  return absl::StrCat(baseConfig(), R"EOF(
     filter_chains:
       filters:
         name: tcp
@@ -105,9 +110,18 @@ const std::string ConfigHelper::TCP_PROXY_CONFIG = BASE_CONFIG + R"EOF(
           "@type": type.googleapis.com/envoy.config.filter.network.tcp_proxy.v2.TcpProxy
           stat_prefix: tcp_stats
           cluster: cluster_0
-)EOF";
+)EOF");
+}
 
-const std::string ConfigHelper::HTTP_PROXY_CONFIG = BASE_CONFIG + R"EOF(
+std::string ConfigHelper::tlsInspectorFilter() {
+  return R"EOF(
+name: "envoy.filters.listener.tls_inspector"
+typed_config:
+)EOF";
+}
+
+std::string ConfigHelper::httpProxyConfig() {
+  return absl::StrCat(baseConfig(), R"EOF(
     filter_chains:
       filters:
         name: http
@@ -134,12 +148,14 @@ const std::string ConfigHelper::HTTP_PROXY_CONFIG = BASE_CONFIG + R"EOF(
                   prefix: "/"
               domains: "*"
             name: route_config_0
-)EOF";
+)EOF");
+}
 
 // TODO(danzh): For better compatibility with HTTP integration test framework,
 // it's better to combine with HTTP_PROXY_CONFIG, and use config modifiers to
 // specify quic specific things.
-const std::string ConfigHelper::QUIC_HTTP_PROXY_CONFIG = BASE_UDP_LISTENER_CONFIG + R"EOF(
+std::string ConfigHelper::quicHttpProxyConfig() {
+  return absl::StrCat(baseUdpListenerConfig(), R"EOF(
     filter_chains:
       transport_socket:
         name: envoy.transport_sockets.quic
@@ -170,34 +186,38 @@ const std::string ConfigHelper::QUIC_HTTP_PROXY_CONFIG = BASE_UDP_LISTENER_CONFI
             name: route_config_0
     udp_listener_config:
       udp_listener_name: "quiche_quic_listener"
-)EOF";
+)EOF");
+}
 
-const std::string ConfigHelper::DEFAULT_BUFFER_FILTER =
-    R"EOF(
+std::string ConfigHelper::defaultBufferFilter() {
+  return R"EOF(
 name: buffer
 typed_config:
     "@type": type.googleapis.com/envoy.config.filter.http.buffer.v2.Buffer
     max_request_bytes : 5242880
 )EOF";
+}
 
-const std::string ConfigHelper::SMALL_BUFFER_FILTER =
-    R"EOF(
+std::string ConfigHelper::smallBufferFilter() {
+  return R"EOF(
 name: buffer
 typed_config:
     "@type": type.googleapis.com/envoy.config.filter.http.buffer.v2.Buffer
     max_request_bytes : 1024
 )EOF";
+}
 
-const std::string ConfigHelper::DEFAULT_HEALTH_CHECK_FILTER =
-    R"EOF(
+std::string ConfigHelper::defaultHealthCheckFilter() {
+  return R"EOF(
 name: health_check
 typed_config:
     "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
     pass_through_mode: false
 )EOF";
+}
 
-const std::string ConfigHelper::DEFAULT_SQUASH_FILTER =
-    R"EOF(
+std::string ConfigHelper::defaultSquashFilter() {
+  return R"EOF(
 name: squash
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.squash.v2.Squash
@@ -217,6 +237,7 @@ typed_config:
     seconds: 1
     nanos: 0
 )EOF";
+}
 
 // TODO(fredlas) set_node_on_first_message_only was true; the delta+SotW unification
 //               work restores it here.
@@ -410,6 +431,26 @@ void ConfigHelper::addClusterFilterMetadata(absl::string_view metadata_yaml,
     }
     break;
   }
+}
+
+void ConfigHelper::setConnectConfig(
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager& hcm,
+    bool terminate_connect) {
+  auto* route_config = hcm.mutable_route_config();
+  ASSERT_EQ(1, route_config->virtual_hosts_size());
+  auto* route = route_config->mutable_virtual_hosts(0)->mutable_routes(0);
+  auto* match = route->mutable_match();
+  match->Clear();
+  match->mutable_connect_matcher();
+
+  if (terminate_connect) {
+    auto* upgrade = route->mutable_route()->add_upgrade_configs();
+    upgrade->set_upgrade_type("CONNECT");
+    upgrade->mutable_connect_config();
+  }
+
+  hcm.add_upgrade_configs()->set_upgrade_type("CONNECT");
+  hcm.mutable_http2_protocol_options()->set_allow_connect(true);
 }
 
 void ConfigHelper::applyConfigModifiers() {
@@ -725,7 +766,7 @@ bool ConfigHelper::setAccessLog(const std::string& filename, absl::string_view f
   loadHttpConnectionManager(hcm_config);
   envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
   if (!format.empty()) {
-    access_log_config.set_format(std::string(format));
+    access_log_config.set_format(absl::StrCat(format, "\n"));
   }
   access_log_config.set_path(filename);
   hcm_config.mutable_access_log(0)->mutable_typed_config()->PackFrom(access_log_config);
@@ -819,6 +860,18 @@ void ConfigHelper::addNetworkFilter(const std::string& filter_yaml) {
   // Now move it to the front.
   for (int i = filter_chain->filters_size() - 1; i > 0; --i) {
     filter_chain->mutable_filters()->SwapElements(i, i - 1);
+  }
+}
+
+void ConfigHelper::addListenerFilter(const std::string& filter_yaml) {
+  RELEASE_ASSERT(!finalized_, "");
+  auto* listener = bootstrap_.mutable_static_resources()->mutable_listeners(0);
+  auto* filter_list_back = listener->add_listener_filters();
+  TestUtility::loadFromYaml(filter_yaml, *filter_list_back);
+
+  // Now move it to the front.
+  for (int i = listener->listener_filters_size() - 1; i > 0; --i) {
+    listener->mutable_listener_filters()->SwapElements(i, i - 1);
   }
 }
 

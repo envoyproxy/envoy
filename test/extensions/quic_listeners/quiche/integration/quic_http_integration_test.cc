@@ -48,7 +48,7 @@ class QuicHttpIntegrationTest : public HttpIntegrationTest,
 public:
   QuicHttpIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP3, GetParam(),
-                            ConfigHelper::QUIC_HTTP_PROXY_CONFIG),
+                            ConfigHelper::quicHttpProxyConfig()),
         supported_versions_(quic::CurrentSupportedVersions()),
         crypto_config_(std::make_unique<EnvoyQuicFakeProofVerifier>()), conn_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *conn_helper_.GetClock()),
@@ -265,7 +265,7 @@ TEST_P(QuicHttpIntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
   response->waitForEndStream();
   // The delayed close timeout should trigger since client is not closing the connection.
   EXPECT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(5000)));
-  EXPECT_EQ(codec_client_->last_connection_event(), Network::ConnectionEvent::RemoteClose);
+  EXPECT_EQ(codec_client_->lastConnectionEvent(), Network::ConnectionEvent::RemoteClose);
   EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value(),
             1);
 }

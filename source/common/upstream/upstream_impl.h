@@ -120,6 +120,7 @@ public:
     }
   }
   HostStats& stats() const override { return stats_; }
+  const std::string& hostnameForHealthChecks() const override { return health_checks_hostname_; }
   const std::string& hostname() const override { return hostname_; }
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
   Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
@@ -131,15 +132,14 @@ public:
   }
   uint32_t priority() const override { return priority_; }
   void priority(uint32_t priority) override { priority_ = priority; }
-
-private:
   Network::TransportSocketFactory&
   resolveTransportSocketFactory(const Network::Address::InstanceConstSharedPtr& dest_address,
-                                const envoy::config::core::v3::Metadata* metadata);
+                                const envoy::config::core::v3::Metadata* metadata) const;
 
 protected:
   ClusterInfoConstSharedPtr cluster_;
   const std::string hostname_;
+  const std::string health_checks_hostname_;
   Network::Address::InstanceConstSharedPtr address_;
   Network::Address::InstanceConstSharedPtr health_check_address_;
   std::atomic<bool> canary_;
@@ -170,7 +170,7 @@ public:
                             priority),
         used_(true) {
     setEdsHealthFlag(health_status);
-    weight(initial_weight);
+    HostImpl::weight(initial_weight);
   }
 
   // Upstream::Host
@@ -181,9 +181,10 @@ public:
   CreateConnectionData createConnection(
       Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
       Network::TransportSocketOptionsSharedPtr transport_socket_options) const override;
-  CreateConnectionData createHealthCheckConnection(
-      Event::Dispatcher& dispatcher,
-      Network::TransportSocketOptionsSharedPtr transport_socket_options) const override;
+  CreateConnectionData
+  createHealthCheckConnection(Event::Dispatcher& dispatcher,
+                              Network::TransportSocketOptionsSharedPtr transport_socket_options,
+                              const envoy::config::core::v3::Metadata* metadata) const override;
 
   std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>>
   gauges() const override {
@@ -538,6 +539,9 @@ public:
   const envoy::config::core::v3::Http2ProtocolOptions& http2Options() const override {
     return http2_options_;
   }
+  const envoy::config::core::v3::HttpProtocolOptions& commonHttpProtocolOptions() const override {
+    return common_http_protocol_options_;
+  }
   ProtocolOptionsConfigConstSharedPtr
   extensionProtocolOptions(const std::string& name) const override;
   LoadBalancerType lbType() const override { return lb_type_; }
@@ -625,6 +629,7 @@ private:
   const uint64_t features_;
   const Http::Http1Settings http1_settings_;
   const envoy::config::core::v3::Http2ProtocolOptions http2_options_;
+  const envoy::config::core::v3::HttpProtocolOptions common_http_protocol_options_;
   const std::map<std::string, ProtocolOptionsConfigConstSharedPtr> extension_protocol_options_;
   mutable ResourceManagers resource_managers_;
   const std::string maintenance_mode_runtime_key_;
@@ -702,7 +707,6 @@ public:
   static std::tuple<HostsPerLocalityConstSharedPtr, HostsPerLocalityConstSharedPtr,
                     HostsPerLocalityConstSharedPtr>
   partitionHostsPerLocality(const HostsPerLocality& hosts);
-  Stats::SymbolTable& symbolTable() { return symbol_table_; }
   Config::ConstMetadataSharedPoolSharedPtr constMetadataSharedPool() {
     return const_metadata_shared_pool_;
   }
@@ -810,9 +814,6 @@ public:
                            const absl::optional<HostVector>& hosts_removed,
                            const absl::optional<Upstream::Host::HealthFlag> health_checker_flag,
                            absl::optional<uint32_t> overprovisioning_factor = absl::nullopt);
-
-  // Returns the size of the current cluster priority state.
-  size_t size() const { return priority_state_.size(); }
 
   // Returns the saved priority state.
   PriorityState& priorityState() { return priority_state_; }

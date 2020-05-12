@@ -139,6 +139,7 @@ private:
     virtual Buffer::WatermarkBufferPtr createBuffer() PURE;
     virtual Buffer::WatermarkBufferPtr& bufferedData() PURE;
     virtual bool complete() PURE;
+    virtual bool has100Continueheaders() PURE;
     virtual void do100ContinueHeaders() PURE;
     virtual void doHeaders(bool end_stream) PURE;
     virtual void doData(bool end_stream) PURE;
@@ -153,6 +154,7 @@ private:
     Event::Dispatcher& dispatcher() override;
     void resetStream() override;
     Router::RouteConstSharedPtr route() override;
+    Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) override;
     Upstream::ClusterInfoConstSharedPtr clusterInfo() override;
     void clearRouteCache() override;
     uint64_t streamId() const override;
@@ -237,6 +239,7 @@ private:
     Buffer::WatermarkBufferPtr createBuffer() override;
     Buffer::WatermarkBufferPtr& bufferedData() override { return parent_.buffered_request_data_; }
     bool complete() override { return parent_.state_.remote_complete_; }
+    bool has100Continueheaders() override { return false; }
     void do100ContinueHeaders() override { NOT_REACHED_GCOVR_EXCL_LINE; }
     void doHeaders(bool end_stream) override {
       parent_.decodeHeaders(this, *parent_.request_headers_, end_stream);
@@ -313,7 +316,7 @@ private:
     // so that we can issue gRPC local responses to gRPC requests. Filter's decodeHeaders()
     // called here may change the content type, so we must check it before the call.
     FilterHeadersStatus decodeHeaders(RequestHeaderMap& headers, bool end_stream) {
-      is_grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
+      is_grpc_request_ = Grpc::Common::isGrpcRequestHeaders(headers);
       FilterHeadersStatus status = handle_->decodeHeaders(headers, end_stream);
       if (end_stream) {
         handle_->decodeComplete();
@@ -349,6 +352,9 @@ private:
     Buffer::WatermarkBufferPtr createBuffer() override;
     Buffer::WatermarkBufferPtr& bufferedData() override { return parent_.buffered_response_data_; }
     bool complete() override { return parent_.state_.local_complete_; }
+    bool has100Continueheaders() override {
+      return parent_.state_.has_continue_headers_ && !continue_headers_continued_;
+    }
     void do100ContinueHeaders() override {
       parent_.encode100ContinueHeaders(this, *parent_.continue_headers_);
     }
@@ -574,6 +580,7 @@ private:
     void snapScopedRouteConfig();
 
     void refreshCachedRoute();
+    void refreshCachedRoute(const Router::RouteCallback& cb);
     void
     requestRouteConfigUpdate(Event::Dispatcher& thread_local_dispatcher,
                              Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb);
@@ -614,7 +621,7 @@ private:
           : remote_complete_(false), local_complete_(false), codec_saw_local_complete_(false),
             saw_connection_close_(false), successful_upgrade_(false), created_filter_chain_(false),
             is_internally_created_(false), decorated_propagate_(true), has_continue_headers_(false),
-            is_head_request_(false), decoding_headers_only_(false), encoding_headers_only_(false) {}
+            is_head_request_(false) {}
 
       uint32_t filter_call_state_{0};
       // The following 3 members are booleans rather than part of the space-saving bitfield as they
@@ -644,10 +651,10 @@ private:
       bool is_head_request_ : 1;
       // Whether a filter has indicated that the request should be treated as a headers only
       // request.
-      bool decoding_headers_only_;
+      bool decoding_headers_only_{false};
       // Whether a filter has indicated that the response should be treated as a headers only
       // response.
-      bool encoding_headers_only_;
+      bool encoding_headers_only_{false};
 
       // Used to track which filter is the latest filter that has received data.
       ActiveStreamEncoderFilter* latest_data_encoding_filter_{};
@@ -662,11 +669,14 @@ private:
     void onIdleTimeout();
     // Reset per-stream idle timer.
     void resetIdleTimer();
-    // Per-stream request timeout callback
+    // Per-stream request timeout callback.
     void onRequestTimeout();
     // Per-stream alive duration reached.
     void onStreamMaxDurationReached();
     bool hasCachedRoute() { return cached_route_.has_value() && cached_route_.value(); }
+
+    // Return local port of the connection.
+    uint32_t localPort();
 
     friend std::ostream& operator<<(std::ostream& os, const ActiveStream& s) {
       s.dumpState(os);
@@ -753,7 +763,7 @@ private:
   void onDrainTimeout();
   void startDrainSequence();
   Tracing::HttpTracer& tracer() { return *config_.tracer(); }
-  void handleCodecException(const char* error);
+  void handleCodecError(absl::string_view error);
   void doConnectionClose(absl::optional<Network::ConnectionCloseType> close_type,
                          absl::optional<StreamInfo::ResponseFlag> response_flag);
 

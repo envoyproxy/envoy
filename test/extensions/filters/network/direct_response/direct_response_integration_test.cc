@@ -10,7 +10,7 @@ public:
   DirectResponseIntegrationTest() : BaseIntegrationTest(GetParam(), directResponseConfig()) {}
 
   static std::string directResponseConfig() {
-    return ConfigHelper::BASE_CONFIG + R"EOF(
+    return absl::StrCat(ConfigHelper::baseConfig(), R"EOF(
     filter_chains:
       filters:
       - name: direct_response
@@ -18,7 +18,7 @@ public:
           "@type": type.googleapis.com/envoy.extensions.filters.network.direct_response.v3.Config
           response:
             inline_string: "hello, world!\n"
-      )EOF";
+      )EOF");
   }
 
   /**
@@ -43,17 +43,14 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, DirectResponseIntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(DirectResponseIntegrationTest, Hello) {
-  Buffer::OwnedImpl buffer("hello");
   std::string response;
-  RawConnectionDriver connection(
-      lookupPort("listener_0"), buffer,
-      [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
+  auto connection = createConnectionDriver(
+      lookupPort("listener_0"), "hello",
+      [&response](Network::ClientConnection& conn, const Buffer::Instance& data) -> void {
         response.append(data.toString());
-        connection.close();
-      },
-      version_);
-
-  connection.run();
+        conn.close(Network::ConnectionCloseType::FlushWrite);
+      });
+  connection->run();
   EXPECT_EQ("hello, world!\n", response);
   EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
               testing::HasSubstr(StreamInfo::ResponseCodeDetails::get().DirectResponse));

@@ -47,6 +47,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:metadata_lib",
+        "//source/common/grpc:common_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf:message_validator_lib",
         "//source/common/stream_info:utility_lib",
@@ -62,6 +63,7 @@ envoy_cc_library(
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/api:api_interface",
         "//source/common/buffer:buffer_lib",
+        "//source/common/common:logger_lib",
         "//source/common/common:thread_lib",
     ],
 )

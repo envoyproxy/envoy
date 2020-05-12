@@ -4,7 +4,7 @@ package envoy.config.listener.v3;
 
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
-import "envoy/extensions/transport_sockets/tls/v3/cert.proto";
+import "envoy/extensions/transport_sockets/tls/v3/tls.proto";
 import "envoy/type/v3/range.proto";
 
 import "google/protobuf/any.proto";
@@ -18,7 +18,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.listener.v3";
 option java_outer_classname = "ListenerComponentsProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Listener components]
 // Listener :ref:`configuration overview <config_listeners>`
@@ -35,9 +35,9 @@ message Filter {
   // Filter specific configuration which depends on the filter being
   // instantiated. See the supported filters for further documentation.
   oneof config_type {
-    google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
-
     google.protobuf.Any typed_config = 4;
+
+    google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
   }
 }
 
@@ -175,15 +175,6 @@ message FilterChain {
   // The criteria to use when matching a connection to this filter chain.
   FilterChainMatch filter_chain_match = 1;
 
-  // The TLS context for this filter chain.
-  //
-  // .. attention::
-  //
-  //   **This field is deprecated**. Use `transport_socket` with name `tls` instead. If both are
-  //   set, `transport_socket` takes priority.
-  envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
-      hidden_envoy_deprecated_tls_context = 2 [deprecated = true];
-
   // A list of individual network filters that make up the filter chain for
   // connections established with the listener. Order matters as the filters are
   // processed sequentially as connection events happen. Note: If the filter
@@ -212,11 +203,37 @@ message FilterChain {
   // name is provided, Envoy will allocate an internal UUID for the filter chain. If the filter
   // chain is to be dynamically updated or removed via FCDS a unique name must be provided.
   string name = 7;
+
+  envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
+      hidden_envoy_deprecated_tls_context = 2 [deprecated = true];
 }
 
-// [#not-implemented-hide:]
 // Listener filter chain match configuration. This is a recursive structure which allows complex
 // nested match configurations to be built using various logical operators.
+//
+// Examples:
+//
+// * Matches if the destination port is 3306.
+//
+// .. code-block:: yaml
+//
+//  destination_port_range:
+//   start: 3306
+//   end: 3307
+//
+// * Matches if the destination port is 3306 or 15000.
+//
+// .. code-block:: yaml
+//
+//  or_match:
+//    rules:
+//      - destination_port_range:
+//          start: 3306
+//          end: 3306
+//      - destination_port_range:
+//          start: 15000
+//          end: 15001
+//
 // [#next-free-field: 6]
 message ListenerFilterChainMatchPredicate {
   option (udpa.annotations.versioning).previous_message_type =
@@ -266,22 +283,13 @@ message ListenerFilter {
   // Filter specific configuration which depends on the filter being instantiated.
   // See the supported filters for further documentation.
   oneof config_type {
-    google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
-
     google.protobuf.Any typed_config = 3;
+
+    google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
   }
 
-  // [#not-implemented-hide:]
-  // Decide when to disable this listener filter on incoming traffic.
-  // Example:
-  // 0. always enable filter
-  //    don't set `filter_disabled`
-  // 1. disable when the destination port is 3306
-  //    rule.destination_port_range = Int32Range {start = 3306, end = 3307}
-  // 2. disable when the destination port is 3306 or 15000
-  //    rule.or_match = MatchSet.rules [
-  //       rule.destination_port_range = Int32Range {start = 3306, end = 3307},
-  //       rule.destination_port_range = Int32Range {start = 15000, end = 15001},
-  //    ]
+  // Optional match predicate used to disable the filter. The filter is enabled when this field is empty.
+  // See :ref:`ListenerFilterChainMatchPredicate <envoy_api_msg_config.listener.v3.ListenerFilterChainMatchPredicate>`
+  // for further examples.
   ListenerFilterChainMatchPredicate filter_disabled = 4;
 }

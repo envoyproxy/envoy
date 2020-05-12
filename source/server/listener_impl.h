@@ -5,9 +5,11 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/filter_config.h"
+#include "envoy/server/instance.h"
 #include "envoy/server/listener_manager.h"
 #include "envoy/stats/scope.h"
 
@@ -21,6 +23,15 @@
 
 namespace Envoy {
 namespace Server {
+
+class ListenerMessageUtil {
+public:
+  /**
+   * @return true if listener message lhs and rhs are the same if ignoring filter_chains field.
+   */
+  static bool filterChainOnlyChange(const envoy::config::listener::v3::Listener& lhs,
+                                    const envoy::config::listener::v3::Listener& rhs);
+};
 
 class ListenerManagerImpl;
 
@@ -75,13 +86,129 @@ private:
 //                     initializing all listeners after workers are started.
 
 /**
+ * The common functionality shared by PerListenerFilterFactoryContexts and
+ * PerFilterChainFactoryFactoryContexts.
+ */
+class ListenerFactoryContextBaseImpl final : public Configuration::FactoryContext,
+                                             public Network::DrainDecision {
+public:
+  ListenerFactoryContextBaseImpl(Envoy::Server::Instance& server,
+                                 ProtobufMessage::ValidationVisitor& validation_visitor,
+                                 const envoy::config::listener::v3::Listener& config,
+                                 Server::DrainManagerPtr drain_manager);
+  AccessLog::AccessLogManager& accessLogManager() override;
+  Upstream::ClusterManager& clusterManager() override;
+  Event::Dispatcher& dispatcher() override;
+  Network::DrainDecision& drainDecision() override;
+  Grpc::Context& grpcContext() override;
+  bool healthCheckFailed() override;
+  Http::Context& httpContext() override;
+  Init::Manager& initManager() override;
+  const LocalInfo::LocalInfo& localInfo() const override;
+  Envoy::Runtime::RandomGenerator& random() override;
+  Envoy::Runtime::Loader& runtime() override;
+  Stats::Scope& scope() override;
+  Singleton::Manager& singletonManager() override;
+  OverloadManager& overloadManager() override;
+  ThreadLocal::Instance& threadLocal() override;
+  Admin& admin() override;
+  const envoy::config::core::v3::Metadata& listenerMetadata() const override;
+  envoy::config::core::v3::TrafficDirection direction() const override;
+  TimeSource& timeSource() override;
+  ProtobufMessage::ValidationContext& messageValidationContext() override;
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
+  Api::Api& api() override;
+  ServerLifecycleNotifier& lifecycleNotifier() override;
+  ProcessContextOptRef processContext() override;
+  Configuration::ServerFactoryContext& getServerFactoryContext() const override;
+  Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
+  Stats::Scope& listenerScope() override;
+
+  // DrainDecision
+  bool drainClose() const override {
+    return drain_manager_->drainClose() || server_.drainManager().drainClose();
+  }
+  Server::DrainManager& drainManager();
+
+private:
+  Envoy::Server::Instance& server_;
+  const envoy::config::core::v3::Metadata metadata_;
+  envoy::config::core::v3::TrafficDirection direction_;
+  Stats::ScopePtr global_scope_;
+  Stats::ScopePtr listener_scope_; // Stats with listener named scope.
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
+  const Server::DrainManagerPtr drain_manager_;
+};
+
+class ListenerImpl;
+
+// TODO(lambdai): Strip the interface since ListenerFactoryContext only need to support
+// ListenerFilterChain creation. e.g, Is listenerMetaData() required? Is it required only at
+// listener update or during the lifetime of listener?
+class PerListenerFactoryContextImpl : public Configuration::ListenerFactoryContext {
+public:
+  PerListenerFactoryContextImpl(Envoy::Server::Instance& server,
+                                ProtobufMessage::ValidationVisitor& validation_visitor,
+                                const envoy::config::listener::v3::Listener& config_message,
+                                const Network::ListenerConfig* listener_config,
+                                ListenerImpl& listener_impl, DrainManagerPtr drain_manager)
+      : listener_factory_context_base_(std::make_shared<ListenerFactoryContextBaseImpl>(
+            server, validation_visitor, config_message, std::move(drain_manager))),
+        listener_config_(listener_config), listener_impl_(listener_impl) {}
+  PerListenerFactoryContextImpl(
+      std::shared_ptr<ListenerFactoryContextBaseImpl> listener_factory_context_base,
+      const Network::ListenerConfig* listener_config, ListenerImpl& listener_impl)
+      : listener_factory_context_base_(listener_factory_context_base),
+        listener_config_(listener_config), listener_impl_(listener_impl) {}
+
+  // FactoryContext
+  AccessLog::AccessLogManager& accessLogManager() override;
+  Upstream::ClusterManager& clusterManager() override;
+  Event::Dispatcher& dispatcher() override;
+  Network::DrainDecision& drainDecision() override;
+  Grpc::Context& grpcContext() override;
+  bool healthCheckFailed() override;
+  Http::Context& httpContext() override;
+  Init::Manager& initManager() override;
+  const LocalInfo::LocalInfo& localInfo() const override;
+  Envoy::Runtime::RandomGenerator& random() override;
+  Envoy::Runtime::Loader& runtime() override;
+  Stats::Scope& scope() override;
+  Singleton::Manager& singletonManager() override;
+  OverloadManager& overloadManager() override;
+  ThreadLocal::Instance& threadLocal() override;
+  Admin& admin() override;
+  const envoy::config::core::v3::Metadata& listenerMetadata() const override;
+  envoy::config::core::v3::TrafficDirection direction() const override;
+  TimeSource& timeSource() override;
+  ProtobufMessage::ValidationContext& messageValidationContext() override;
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
+  Api::Api& api() override;
+  ServerLifecycleNotifier& lifecycleNotifier() override;
+  ProcessContextOptRef processContext() override;
+  Configuration::ServerFactoryContext& getServerFactoryContext() const override;
+  Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
+
+  Stats::Scope& listenerScope() override;
+
+  // ListenerFactoryContext
+  const Network::ListenerConfig& listenerConfig() const override;
+
+  ListenerFactoryContextBaseImpl& parentFactoryContext() { return *listener_factory_context_base_; }
+  friend class ListenerImpl;
+
+private:
+  std::shared_ptr<ListenerFactoryContextBaseImpl> listener_factory_context_base_;
+  const Network::ListenerConfig* listener_config_;
+  ListenerImpl& listener_impl_;
+};
+
+/**
  * Maps proto config to runtime config for a listener with a network filter chain.
  */
-class ListenerImpl : public Network::ListenerConfig,
-                     public Configuration::ListenerFactoryContext,
-                     public Network::DrainDecision,
-                     public Network::FilterChainFactory,
-                     Logger::Loggable<Logger::Id::config> {
+class ListenerImpl final : public Network::ListenerConfig,
+                           public Network::FilterChainFactory,
+                           Logger::Loggable<Logger::Id::config> {
 public:
   /**
    * Create a new listener.
@@ -99,6 +226,28 @@ public:
                ListenerManagerImpl& parent, const std::string& name, bool added_via_api,
                bool workers_started, uint64_t hash, uint32_t concurrency);
   ~ListenerImpl() override;
+
+  // TODO(lambdai): Explore using the same ListenerImpl object to execute in place filter chain
+  // update.
+  /**
+   * Execute in place filter chain update. The filter chain update is less expensive than full
+   * listener update because connections may not need to be drained.
+   */
+  std::unique_ptr<ListenerImpl>
+  newListenerWithFilterChain(const envoy::config::listener::v3::Listener& config,
+                             bool workers_started, uint64_t hash);
+  /**
+   * Determine if in place filter chain update could be executed at this moment.
+   */
+  bool supportUpdateFilterChain(const envoy::config::listener::v3::Listener& config,
+                                bool worker_started);
+
+  /**
+   * Run the callback on each filter chain that exists in this listener but not in the passed
+   * listener config.
+   */
+  void diffFilterChain(const ListenerImpl& another_listener,
+                       std::function<void(Network::DrainableFilterChain&)> callback);
 
   /**
    * Helper functions to determine whether a listener is blocked for update or remove.
@@ -121,7 +270,9 @@ public:
   const Network::ListenSocketFactorySharedPtr& getSocketFactory() const { return socket_factory_; }
   void debugLog(const std::string& message);
   void initialize();
-  DrainManager& localDrainManager() const { return *local_drain_manager_; }
+  DrainManager& localDrainManager() const {
+    return listener_factory_context_->listener_factory_context_base_->drainManager();
+  }
   void setSocketFactory(const Network::ListenSocketFactorySharedPtr& socket_factory);
   void setSocketAndOptions(const Network::SocketSharedPtr& socket);
   const Network::Socket::OptionsSharedPtr& listenSocketOptions() { return listen_socket_options_; }
@@ -144,7 +295,7 @@ public:
   bool continueOnListenerFiltersTimeout() const override {
     return continue_on_listener_filters_timeout_;
   }
-  Stats::Scope& listenerScope() override { return *listener_scope_; }
+  Stats::Scope& listenerScope() override { return listener_factory_context_->listenerScope(); }
   uint64_t listenerTag() const override { return listener_tag_; }
   const std::string& name() const override { return name_; }
   Network::ActiveUdpListenerFactory* udpListenerFactory() override {
@@ -154,35 +305,10 @@ public:
   const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
     return access_logs_;
   }
-
-  // Server::Configuration::ListenerFactoryContext
-  AccessLog::AccessLogManager& accessLogManager() override;
-  Upstream::ClusterManager& clusterManager() override;
-  Event::Dispatcher& dispatcher() override;
-  Network::DrainDecision& drainDecision() override;
-  Grpc::Context& grpcContext() override;
-  bool healthCheckFailed() override;
-  Http::Context& httpContext() override;
-  Init::Manager& initManager() override;
-  const LocalInfo::LocalInfo& localInfo() const override;
-  Envoy::Runtime::RandomGenerator& random() override;
-  Envoy::Runtime::Loader& runtime() override;
-  Stats::Scope& scope() override;
-  Singleton::Manager& singletonManager() override;
-  OverloadManager& overloadManager() override;
-  ThreadLocal::Instance& threadLocal() override;
-  Admin& admin() override;
-  const envoy::config::core::v3::Metadata& listenerMetadata() const override;
-  envoy::config::core::v3::TrafficDirection direction() const override;
-  TimeSource& timeSource() override;
-  const Network::ListenerConfig& listenerConfig() const override;
-  ProtobufMessage::ValidationContext& messageValidationContext() override;
-  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
-  Api::Api& api() override;
-  ServerLifecycleNotifier& lifecycleNotifier() override;
-  ProcessContextOptRef processContext() override;
-  Configuration::ServerFactoryContext& getServerFactoryContext() const override;
-  Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
+  Init::Manager& initManager();
+  envoy::config::core::v3::TrafficDirection direction() const override {
+    return config().traffic_direction();
+  }
 
   void ensureSocketOptions() {
     if (!listen_socket_options_) {
@@ -190,8 +316,6 @@ public:
           std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
     }
   }
-  // Network::DrainDecision
-  bool drainClose() const override;
 
   // Network::FilterChainFactory
   bool createNetworkFilterChain(Network::Connection& connection,
@@ -203,10 +327,26 @@ public:
   SystemTime last_updated_;
 
 private:
-  void addListenSocketOption(const Network::Socket::OptionConstSharedPtr& option) {
-    ensureSocketOptions();
-    listen_socket_options_->emplace_back(std::move(option));
-  }
+  /**
+   * Create a new listener from an existing listener and the new config message if the in place
+   * filter chain update is decided. Should be called only by newListenerWithFilterChain().
+   */
+  ListenerImpl(const ListenerImpl& origin, const envoy::config::listener::v3::Listener& config,
+               const std::string& version_info, ListenerManagerImpl& parent,
+               const std::string& name, bool added_via_api, bool workers_started, uint64_t hash,
+               uint32_t concurrency);
+  // Helpers for constructor.
+  void buildAccessLog();
+  void buildUdpListenerFactory(Network::Address::SocketType socket_type, uint32_t concurrency);
+  void buildListenSocketOptions(Network::Address::SocketType socket_type);
+  void createListenerFilterFactories(Network::Address::SocketType socket_type);
+  void validateFilterChains(Network::Address::SocketType socket_type);
+  void buildFilterChains();
+  void buildSocketOptions();
+  void buildOriginalDstListenerFilter();
+  void buildProxyProtocolListenerFilter();
+  void buildTlsInspectorListenerFilter();
+
   void addListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) {
     ensureSocketOptions();
     Network::Socket::appendOptions(listen_socket_options_, options);
@@ -214,11 +354,8 @@ private:
 
   ListenerManagerImpl& parent_;
   Network::Address::InstanceConstSharedPtr address_;
-  FilterChainManagerImpl filter_chain_manager_;
 
   Network::ListenSocketFactorySharedPtr socket_factory_;
-  Stats::ScopePtr global_scope_;   // Stats with global named scope, but needed for LDS cleanup.
-  Stats::ScopePtr listener_scope_; // Stats with listener named scope.
   const bool bind_to_port_;
   const bool hand_off_restored_destination_connections_;
   const uint32_t per_connection_buffer_limit_bytes_;
@@ -229,14 +366,11 @@ private:
   const uint64_t hash_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
 
-  // This init watcher, if workers_started_ is false, notifies the "parent" listener manager when
-  // listener initialization is complete.
-  Init::WatcherImpl local_init_watcher_;
   // A target is added to Server's InitManager if workers_started_ is false.
   Init::TargetImpl listener_init_target_;
   // This init manager is populated with targets from the filter chain factories, namely
   // RdsRouteConfigSubscription::init_target_, so the listener can wait for route configs.
-  Init::ManagerImpl dynamic_init_manager_;
+  std::unique_ptr<Init::Manager> dynamic_init_manager_;
 
   std::vector<Network::ListenerFilterFactoryCb> listener_filter_factories_;
   std::vector<Network::UdpListenerFilterFactoryCb> udp_listener_filter_factories_;
@@ -250,6 +384,14 @@ private:
   const bool continue_on_listener_filters_timeout_;
   Network::ActiveUdpListenerFactoryPtr udp_listener_factory_;
   Network::ConnectionBalancerPtr connection_balancer_;
+  std::shared_ptr<PerListenerFactoryContextImpl> listener_factory_context_;
+  FilterChainManagerImpl filter_chain_manager_;
+
+  // This init watcher, if workers_started_ is false, notifies the "parent" listener manager when
+  // listener initialization is complete.
+  // Important: local_init_watcher_ must be the last field in the class to avoid unexpected watcher
+  // callback during the destroy of ListenerImpl.
+  Init::WatcherImpl local_init_watcher_;
 
   // to access ListenerManagerImpl::factory_.
   friend class ListenerFilterChainFactoryBuilder;

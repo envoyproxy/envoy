@@ -26,16 +26,14 @@ HistogramStatisticsImpl::HistogramStatisticsImpl(const histogram_t* histogram_pt
 }
 
 const std::vector<double>& HistogramStatisticsImpl::supportedQuantiles() const {
-  static const std::vector<double> supported_quantiles = {0,    0.25, 0.5,   0.75,  0.90,
-                                                          0.95, 0.99, 0.995, 0.999, 1};
-  return supported_quantiles;
+  CONSTRUCT_ON_FIRST_USE(std::vector<double>,
+                         {0, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 0.995, 0.999, 1});
 }
 
 const std::vector<double>& HistogramStatisticsImpl::supportedBuckets() const {
-  static const std::vector<double> supported_buckets = {
-      0.5,  1,    5,     10,    25,    50,     100,    250,     500,    1000,
-      2500, 5000, 10000, 30000, 60000, 300000, 600000, 1800000, 3600000};
-  return supported_buckets;
+  CONSTRUCT_ON_FIRST_USE(std::vector<double>,
+                         {0.5, 1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000,
+                          60000, 300000, 600000, 1800000, 3600000});
 }
 
 std::string HistogramStatisticsImpl::quantileSummary() const {
@@ -43,7 +41,8 @@ std::string HistogramStatisticsImpl::quantileSummary() const {
   const std::vector<double>& supported_quantiles = supportedQuantiles();
   summary.reserve(supported_quantiles.size());
   for (size_t i = 0; i < supported_quantiles.size(); ++i) {
-    summary.push_back(fmt::format("P{}: {}", 100 * supported_quantiles[i], computed_quantiles_[i]));
+    summary.push_back(
+        fmt::format("P{:g}: {:g}", 100 * supported_quantiles[i], computed_quantiles_[i]));
   }
   return absl::StrJoin(summary, ", ");
 }
@@ -53,7 +52,7 @@ std::string HistogramStatisticsImpl::bucketSummary() const {
   const std::vector<double>& supported_buckets = supportedBuckets();
   bucket_summary.reserve(supported_buckets.size());
   for (size_t i = 0; i < supported_buckets.size(); ++i) {
-    bucket_summary.push_back(fmt::format("B{}: {}", supported_buckets[i], computed_buckets_[i]));
+    bucket_summary.push_back(fmt::format("B{:g}: {}", supported_buckets[i], computed_buckets_[i]));
   }
   return absl::StrJoin(bucket_summary, ", ");
 }

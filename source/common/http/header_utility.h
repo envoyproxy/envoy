@@ -5,6 +5,7 @@
 #include "envoy/common/regex.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/http/header_map.h"
+#include "envoy/http/protocol.h"
 #include "envoy/json/json_object.h"
 #include "envoy/type/v3/range.pb.h"
 
@@ -94,13 +95,27 @@ public:
    * http://tools.ietf.org/html/rfc7230#section-3.2
    * @return bool true if the header values are valid, according to the aforementioned RFC.
    */
-  static bool headerIsValid(const absl::string_view header_value);
+  static bool headerValueIsValid(const absl::string_view header_value);
+
+  /**
+   * Checks if header name contains underscore characters.
+   * Underscore character is allowed in header names by the RFC-7230 and this check is implemented
+   * as a security measure due to systems that treat '_' and '-' as interchangeable. Envoy by
+   * default allows headers with underscore characters.
+   * @return bool true if header name contains underscore characters.
+   */
+  static bool headerNameContainsUnderscore(const absl::string_view header_name);
 
   /**
    * Validates that the characters in the authority are valid.
    * @return bool true if the header values are valid, false otherwise.
    */
   static bool authorityIsValid(const absl::string_view authority_value);
+
+  /**
+   * @brief a helper function to determine if the headers represent a CONNECT request.
+   */
+  static bool isConnect(const RequestHeaderMap& headers);
 
   /**
    * Add headers from one HeaderMap to another
@@ -121,6 +136,21 @@ public:
    */
   static absl::optional<std::reference_wrapper<const absl::string_view>>
   requestHeadersValid(const RequestHeaderMap& headers);
+
+  /**
+   * Determines if the response should be framed by Connection: Close based on protocol
+   * and headers.
+   * @param protocol the protocol of the request
+   * @param headers the request or response headers
+   * @return if the response should be framed by Connection: Close
+   */
+  static bool shouldCloseConnection(Http::Protocol protocol,
+                                    const RequestOrResponseHeaderMap& headers);
+
+  /**
+   * @brief Remove the port part from host/authority header if it is equal to provided port
+   */
+  static void stripPortFromHost(RequestHeaderMap& headers, uint32_t listener_port);
 };
 } // namespace Http
 } // namespace Envoy

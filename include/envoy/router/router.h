@@ -11,6 +11,7 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/common/matchers.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
@@ -322,11 +323,13 @@ public:
    * Returns a reference to the PriorityLoad that should be used for the next retry.
    * @param priority_set current priority set.
    * @param original_priority_load original priority load.
+   * @param priority_mapping_func see @Upstream::RetryPriority::PriorityMappingFunc.
    * @return HealthyAndDegradedLoad that should be used to select a priority for the next retry.
    */
-  virtual const Upstream::HealthyAndDegradedLoad&
-  priorityLoadForRetry(const Upstream::PrioritySet& priority_set,
-                       const Upstream::HealthyAndDegradedLoad& original_priority_load) PURE;
+  virtual const Upstream::HealthyAndDegradedLoad& priorityLoadForRetry(
+      const Upstream::PrioritySet& priority_set,
+      const Upstream::HealthyAndDegradedLoad& original_priority_load,
+      const Upstream::RetryPriority::PriorityMappingFunc& priority_mapping_func) PURE;
   /**
    * return how many times host selection should be reattempted during host selection.
    */
@@ -825,6 +828,12 @@ public:
    */
   virtual const UpgradeMap& upgradeMap() const PURE;
 
+  using ConnectConfig = envoy::config::route::v3::RouteAction::UpgradeConfig::ConnectConfig;
+  /**
+   * If present, informs how to handle proxying CONNECT requests on this route.
+   */
+  virtual const absl::optional<ConnectConfig>& connectConfig() const PURE;
+
   /**
    * @returns the internal redirect action which should be taken on this route.
    */
@@ -951,6 +960,44 @@ public:
 using RouteConstSharedPtr = std::shared_ptr<const Route>;
 
 /**
+ * RouteCallback, returns one of these enums to the route matcher to indicate
+ * if the matched route has been accepted or it wants the route matching to
+ * continue.
+ */
+enum class RouteMatchStatus {
+  // Continue matching route
+  Continue,
+  // Accept matched route
+  Accept
+};
+
+/**
+ * RouteCallback is passed this enum to indicate if more routes are available for evaluation.
+ */
+enum class RouteEvalStatus {
+  // Has more routes that can be evaluated for match.
+  HasMoreRoutes,
+  // All routes have been evaluated for match.
+  NoMoreRoutes
+};
+
+/**
+ * RouteCallback can be used to override routing decision made by the Route::Config::route,
+ * this callback is passed the RouteConstSharedPtr, when a matching route is found, and
+ * RouteEvalStatus indicating whether there are more routes available for evaluation.
+ *
+ * RouteCallback will be called back only when at least one matching route is found, if no matching
+ * routes are found RouteCallback will not be invoked. RouteCallback can return one of the
+ * RouteMatchStatus enum to indicate if the match has been accepted or should the route match
+ * evaluation continue.
+ *
+ * Returning RouteMatchStatus::Continue, when no more routes available for evaluation will result in
+ * no further callbacks and no route is deemed to be accepted and nullptr is returned to the caller
+ * of Route::Config::route.
+ */
+using RouteCallback = std::function<RouteMatchStatus(RouteConstSharedPtr, RouteEvalStatus)>;
+
+/**
  * The router configuration.
  */
 class Config {
@@ -966,6 +1013,25 @@ public:
    * @return the route or nullptr if there is no matching route for the request.
    */
   virtual RouteConstSharedPtr route(const Http::RequestHeaderMap& headers,
+                                    const StreamInfo::StreamInfo& stream_info,
+                                    uint64_t random_value) const PURE;
+
+  /**
+   * Based on the incoming HTTP request headers, determine the target route (containing either a
+   * route entry or a direct response entry) for the request.
+   *
+   * Invokes callback with matched route, callback can choose to accept the route by returning
+   * RouteStatus::Stop or continue route match from last matched route by returning
+   * RouteMatchStatus::Continue, when more routes are available.
+   *
+   * @param cb supplies callback to be invoked upon route match.
+   * @param headers supplies the request headers.
+   * @param random_value supplies the random seed to use if a runtime choice is required. This
+   *        allows stable choices between calls if desired.
+   * @return the route accepted by the callback or nullptr if no match found or none of route is
+   * accepted by the callback.
+   */
+  virtual RouteConstSharedPtr route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
                                     const StreamInfo::StreamInfo& stream_info,
                                     uint64_t random_value) const PURE;
 

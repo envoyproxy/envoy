@@ -29,11 +29,12 @@ TEST(OriginalSrcConfigFactoryTest, TestCreateFactory) {
   NiceMock<Server::Configuration::MockListenerFactoryContext> context;
 
   Network::ListenerFilterFactoryCb cb =
-      factory.createFilterFactoryFromProto(*proto_config, context);
+      factory.createListenerFilterFactoryFromProto(*proto_config, nullptr, context);
   Network::MockListenerFilterManager manager;
   Network::ListenerFilterPtr added_filter;
-  EXPECT_CALL(manager, addAcceptFilter_(_))
-      .WillOnce(Invoke([&added_filter](Network::ListenerFilterPtr& filter) {
+  EXPECT_CALL(manager, addAcceptFilter_(_, _))
+      .WillOnce(Invoke([&added_filter](const Network::ListenerFilterMatcherSharedPtr&,
+                                       Network::ListenerFilterPtr& filter) {
         added_filter = std::move(filter);
       }));
   cb(manager);

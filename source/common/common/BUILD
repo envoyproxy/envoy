@@ -73,6 +73,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "documentation_url_lib",
+    hdrs = ["documentation_url.h"],
+)
+
+envoy_cc_library(
     name = "empty_string",
     hdrs = ["empty_string.h"],
 )
@@ -417,5 +422,23 @@ envoy_cc_library(
         "//include/envoy/common:time_interface",
         "//include/envoy/common:token_bucket_interface",
         "//source/common/common:utility_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "zlib_base_lib",
+    srcs = ["zlib/base.cc"],
+    hdrs = ["zlib/base.h"],
+    external_deps = ["zlib"],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "statusor_lib",
+    hdrs = ["statusor.h"],
+    deps = [
+        "//third_party/statusor:statusor_lib",
     ],
 )

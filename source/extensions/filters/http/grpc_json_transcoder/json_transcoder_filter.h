@@ -47,7 +47,7 @@ struct MethodInfo {
   bool request_type_is_http_body_ = false;
   bool response_type_is_http_body_ = false;
 };
-typedef std::shared_ptr<MethodInfo> MethodInfoSharedPtr;
+using MethodInfoSharedPtr = std::shared_ptr<MethodInfo>;
 
 void createHttpBodyEnvelope(Buffer::Instance& output,
                             const std::vector<const Protobuf::Field*>& request_body_field_path,
@@ -149,10 +149,7 @@ public:
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override;
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
-  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override {
-    doTrailers(trailers);
-    return Http::FilterTrailersStatus::Continue;
-  }
+  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
   Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override {
     return Http::FilterMetadataStatus::Continue;
   }
@@ -165,7 +162,11 @@ private:
   bool checkIfTranscoderFailed(const std::string& details);
   bool readToBuffer(Protobuf::io::ZeroCopyInputStream& stream, Buffer::Instance& data);
   void maybeSendHttpBodyRequestMessage();
-  void buildResponseFromHttpBodyOutput(Http::ResponseHeaderMap& response_headers,
+  /**
+   * Builds response from HttpBody protobuf.
+   * Returns true if at least one gRPC frame has processed.
+   */
+  bool buildResponseFromHttpBodyOutput(Http::ResponseHeaderMap& response_headers,
                                        Buffer::Instance& data);
   bool maybeConvertGrpcStatus(Grpc::Status::GrpcStatus grpc_status,
                               Http::ResponseHeaderOrTrailerMap& trailers);
@@ -189,8 +190,8 @@ private:
   std::string content_type_;
 
   bool error_{false};
-  bool has_http_body_response_{false};
   bool has_body_{false};
+  bool http_body_response_headers_set_{false};
 };
 
 } // namespace GrpcJsonTranscoder

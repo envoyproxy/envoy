@@ -8,6 +8,9 @@
 #include <unordered_set>
 
 #include "envoy/admin/v3/config_dump.pb.h"
+#include "envoy/common/exception.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.validate.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.validate.h"
 #include "envoy/event/dispatcher.h"
@@ -24,8 +27,8 @@
 #include "common/common/mutex_tracer_impl.h"
 #include "common/common/utility.h"
 #include "common/common/version.h"
-#include "common/config/resources.h"
 #include "common/config/utility.h"
+#include "common/config/version_converter.h"
 #include "common/http/codes.h"
 #include "common/local_info/local_info_impl.h"
 #include "common/memory/stats.h"
@@ -57,15 +60,16 @@ InstanceImpl::InstanceImpl(
     Filesystem::Instance& file_system, std::unique_ptr<ProcessContext> process_context)
     : init_manager_(init_manager), workers_started_(false), live_(false), shutdown_(false),
       options_(options), validation_context_(options_.allowUnknownStaticFields(),
-                                             !options.rejectUnknownDynamicFields()),
+                                             !options.rejectUnknownDynamicFields(),
+                                             options.ignoreUnknownDynamicFields()),
       time_source_(time_system), restarter_(restarter), start_time_(time(nullptr)),
       original_start_time_(start_time_), stats_store_(store), thread_local_(tls),
       api_(new Api::Impl(thread_factory, store, time_system, file_system,
                          process_context ? ProcessContextOptRef(std::ref(*process_context))
                                          : absl::nullopt)),
-      dispatcher_(api_->allocateDispatcher()),
+      dispatcher_(api_->allocateDispatcher("main_thread")),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
-      handler_(new ConnectionHandlerImpl(*dispatcher_, "main_thread")),
+      handler_(new ConnectionHandlerImpl(*dispatcher_)),
       random_generator_(std::move(random_generator)), listener_component_factory_(*this),
       worker_factory_(thread_local_, *api_, hooks),
       access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
@@ -122,7 +126,9 @@ InstanceImpl::~InstanceImpl() {
   // RdsRouteConfigSubscription is an Init::Target, ~RdsRouteConfigSubscription triggers a callback
   // set at initialization, which goes to unregister it from the top-level InitManager, which has
   // already been destructed (use-after-free) causing a segfault.
+  ENVOY_LOG(debug, "destroying listener manager");
   listener_manager_.reset();
+  ENVOY_LOG(debug, "destroyed listener manager");
 }
 
 Upstream::ClusterManager& InstanceImpl::clusterManager() { return *config_.clusterManager(); }
@@ -156,6 +162,12 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store) {
   histograms_.reserve(snapped_histograms_.size());
   for (const auto& histogram : snapped_histograms_) {
     histograms_.push_back(*histogram);
+  }
+
+  snapped_text_readouts_ = store.textReadouts();
+  text_readouts_.reserve(snapped_text_readouts_.size());
+  for (const auto& text_readout : snapped_text_readouts_) {
+    text_readouts_.push_back(*text_readout);
   }
 }
 
@@ -218,6 +230,26 @@ void InstanceImpl::flushStatsInternal() {
 
 bool InstanceImpl::healthCheckFailed() { return !live_.load(); }
 
+namespace {
+// Loads a bootstrap object, potentially at a specific version (upgrading if necessary).
+void loadBootsrap(absl::optional<uint32_t> bootstrap_version,
+                  envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                  std::function<void(Protobuf::Message&, bool)> load_function) {
+
+  if (!bootstrap_version.has_value()) {
+    load_function(bootstrap, true);
+  } else if (*bootstrap_version == 3) {
+    load_function(bootstrap, false);
+  } else if (*bootstrap_version == 2) {
+    envoy::config::bootstrap::v2::Bootstrap bootstrap_v2;
+    load_function(bootstrap_v2, false);
+    Config::VersionConverter::upgrade(bootstrap_v2, bootstrap);
+  } else {
+    throw EnvoyException(fmt::format("Unknown bootstrap version {}.", *bootstrap_version));
+  }
+}
+} // namespace
+
 void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                                        const Options& options,
                                        ProtobufMessage::ValidationVisitor& validation_visitor,
@@ -233,11 +265,19 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
   }
 
   if (!config_path.empty()) {
-    MessageUtil::loadFromFile(config_path, bootstrap, validation_visitor, api);
+    loadBootsrap(
+        options.bootstrapVersion(), bootstrap,
+        [&config_path, &validation_visitor, &api](Protobuf::Message& message, bool do_boosting) {
+          MessageUtil::loadFromFile(config_path, message, validation_visitor, api, do_boosting);
+        });
   }
   if (!config_yaml.empty()) {
     envoy::config::bootstrap::v3::Bootstrap bootstrap_override;
-    MessageUtil::loadFromYaml(config_yaml, bootstrap_override, validation_visitor);
+    loadBootsrap(options.bootstrapVersion(), bootstrap_override,
+                 [&config_yaml, &validation_visitor](Protobuf::Message& message, bool do_boosting) {
+                   MessageUtil::loadFromYaml(config_yaml, message, validation_visitor, do_boosting);
+                 });
+    // TODO(snowp): The fact that we do a merge here doesn't seem to be covered under test.
     bootstrap.MergeFrom(bootstrap_override);
   }
   if (config_proto.ByteSize() != 0) {
@@ -377,6 +417,21 @@ void InstanceImpl::initialize(const Options& options,
     dispatcher_->initializeStats(stats_store_, "server.");
   }
 
+  // The broad order of initialization from this point on is the following:
+  // 1. Statically provisioned configuration (bootstrap) are loaded.
+  // 2. Cluster manager is created and all primary clusters (i.e. with endpoint assignments
+  //    provisioned statically in bootstrap, discovered through DNS or file based CDS) are
+  //    initialized.
+  // 3. Various services are initialized and configured using the bootstrap config.
+  // 4. RTDS is initialized using primary clusters. This  allows runtime overrides to be fully
+  //    configured before the rest of xDS configuration is provisioned.
+  // 5. Secondary clusters (with endpoint assignments provisioned by xDS servers) are initialized.
+  // 6. The rest of the dynamic configuration is provisioned.
+  //
+  // Please note: this order requires that RTDS is provisioned using a primary cluster. If RTDS is
+  // provisioned through ADS then ADS must use primary cluster as well. This invariant is enforced
+  // during RTDS initialization and invalid configuration will be rejected.
+
   // Runtime gets initialized before the main configuration since during main configuration
   // load things may grab a reference to the loader for later use.
   runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
@@ -411,20 +466,8 @@ void InstanceImpl::initialize(const Options& options,
   // instantiated (which in turn relies on runtime...).
   Runtime::LoaderSingleton::get().initialize(clusterManager());
 
-  if (bootstrap_.has_hds_config()) {
-    const auto& hds_config = bootstrap_.hds_config();
-    async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
-        *config_.clusterManager(), thread_local_, time_source_, *api_, grpc_context_.statNames());
-    hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
-        stats_store_,
-        Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config,
-                                                       stats_store_)
-            ->create(),
-        hds_config.transport_api_version(), *dispatcher_, Runtime::LoaderSingleton::get(),
-        stats_store_, *ssl_context_manager_, *random_generator_, info_factory_, access_log_manager_,
-        *config_.clusterManager(), *local_info_, *admin_, *singleton_manager_, thread_local_,
-        messageValidationContext().dynamicValidationVisitor(), *api_);
-  }
+  clusterManager().setPrimaryClustersInitializedCb(
+      [this]() { onClusterManagerPrimaryInitializationComplete(); });
 
   for (Stats::SinkPtr& sink : config_.statsSinks()) {
     stats_store_.addSink(*sink);
@@ -438,6 +481,31 @@ void InstanceImpl::initialize(const Options& options,
   // GuardDog (deadlock detection) object and thread setup before workers are
   // started and before our own run() loop runs.
   guard_dog_ = std::make_unique<Server::GuardDogImpl>(stats_store_, config_, *api_);
+}
+
+void InstanceImpl::onClusterManagerPrimaryInitializationComplete() {
+  // If RTDS was not configured the `onRuntimeReady` callback is immediately invoked.
+  Runtime::LoaderSingleton::get().startRtdsSubscriptions([this]() { onRuntimeReady(); });
+}
+
+void InstanceImpl::onRuntimeReady() {
+  // Begin initializing secondary clusters after RTDS configuration has been applied.
+  clusterManager().initializeSecondaryClusters(bootstrap_);
+
+  if (bootstrap_.has_hds_config()) {
+    const auto& hds_config = bootstrap_.hds_config();
+    async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
+        *config_.clusterManager(), thread_local_, time_source_, *api_, grpc_context_.statNames());
+    hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
+        stats_store_,
+        Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config,
+                                                       stats_store_, false)
+            ->create(),
+        hds_config.transport_api_version(), *dispatcher_, Runtime::LoaderSingleton::get(),
+        stats_store_, *ssl_context_manager_, *random_generator_, info_factory_, access_log_manager_,
+        *config_.clusterManager(), *local_info_, *admin_, *singleton_manager_, thread_local_,
+        messageValidationContext().dynamicValidationVisitor(), *api_);
+  }
 }
 
 void InstanceImpl::startWorkers() {
@@ -457,8 +525,8 @@ Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
   ENVOY_LOG(info, "runtime: {}", MessageUtil::getYamlStringFromMessage(config.runtime()));
   return std::make_unique<Runtime::LoaderImpl>(
       server.dispatcher(), server.threadLocal(), config.runtime(), server.localInfo(),
-      server.initManager(), server.stats(), server.random(),
-      server.messageValidationContext().dynamicValidationVisitor(), server.api());
+      server.stats(), server.random(), server.messageValidationContext().dynamicValidationVisitor(),
+      server.api());
 }
 
 void InstanceImpl::loadServerFlags(const absl::optional<std::string>& flags_path) {
@@ -498,7 +566,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
     });
 
     sig_usr_1_ = dispatcher.listenForSignal(SIGUSR1, [&access_log_manager]() {
-      ENVOY_LOG(warn, "caught SIGUSR1");
+      ENVOY_LOG(info, "caught SIGUSR1. Reopening access logs.");
       access_log_manager.reopen();
     });
 
@@ -521,11 +589,13 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
       return;
     }
 
+    const auto type_url = Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>(
+        envoy::config::core::v3::ApiVersion::V2);
     // Pause RDS to ensure that we don't send any requests until we've
     // subscribed to all the RDS resources. The subscriptions happen in the init callbacks,
     // so we pause RDS until we've completed all the callbacks.
     if (cm.adsMux()) {
-      cm.adsMux()->pause(Config::TypeUrl::get().RouteConfiguration);
+      cm.adsMux()->pause(type_url);
     }
 
     ENVOY_LOG(info, "all clusters initialized. initializing init manager");
@@ -534,7 +604,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
     // Now that we're execute all the init callbacks we can resume RDS
     // as we've subscribed to all the statically defined RDS resources.
     if (cm.adsMux()) {
-      cm.adsMux()->resume(Config::TypeUrl::get().RouteConfiguration);
+      cm.adsMux()->resume(type_url);
     }
   });
 }

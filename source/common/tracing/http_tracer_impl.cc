@@ -36,6 +36,9 @@ static std::string valueOrDefault(const Http::HeaderEntry* header, const char* d
 
 static std::string buildUrl(const Http::RequestHeaderMap& request_headers,
                             const uint32_t max_path_length) {
+  if (!request_headers.Path()) {
+    return "";
+  }
   std::string path(request_headers.EnvoyOriginalPath()
                        ? request_headers.EnvoyOriginalPath()->value().getStringView()
                        : request_headers.Path()->value().getStringView());
@@ -184,7 +187,7 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
                   std::string(request_headers->ClientTraceId()->value().getStringView()));
     }
 
-    if (Grpc::Common::hasGrpcContentType(*request_headers)) {
+    if (Grpc::Common::isGrpcRequestHeaders(*request_headers)) {
       addGrpcRequestTags(span, *request_headers);
     }
   }

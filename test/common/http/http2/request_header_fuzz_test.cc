@@ -7,8 +7,6 @@
 #include "test/common/http/http2/frame_replay.h"
 #include "test/fuzz/fuzz_runner.h"
 
-using testing::AnyNumber;
-
 namespace Envoy {
 namespace Http {
 namespace Http2 {
@@ -18,14 +16,13 @@ void Replay(const Frame& frame, ServerCodecFrameInjector& codec) {
   // Create the server connection containing the nghttp2 session.
   TestServerConnectionImpl connection(
       codec.server_connection_, codec.server_callbacks_, codec.stats_store_, codec.options_,
-      Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT);
-  codec.write(WellKnownFrames::clientConnectionPrefaceFrame(), connection);
-  codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
-  codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection);
-  try {
-    codec.write(frame, connection);
-  } catch (const CodecProtocolException& e) {
-  }
+      Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
+      envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+  Http::Status status = Http::okStatus();
+  status = codec.write(WellKnownFrames::clientConnectionPrefaceFrame(), connection);
+  status = codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
+  status = codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection);
+  status = codec.write(frame, connection);
 }
 
 DEFINE_FUZZER(const uint8_t* buf, size_t len) {

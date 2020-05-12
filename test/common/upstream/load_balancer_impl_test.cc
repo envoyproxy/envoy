@@ -128,7 +128,7 @@ TEST_P(LoadBalancerBaseTest, PrioritySelection) {
 
   HealthyAndDegradedLoad priority_load{Upstream::HealthyLoad({100, 0, 0}),
                                        Upstream::DegradedLoad({0, 0, 0})};
-  EXPECT_CALL(context, determinePriorityLoad(_, _)).WillRepeatedly(ReturnRef(priority_load));
+  EXPECT_CALL(context, determinePriorityLoad(_, _, _)).WillRepeatedly(ReturnRef(priority_load));
   // Primary and failover are in panic mode. Load distribution is based
   // on the number of hosts regardless of their health.
   EXPECT_EQ(50, lb_.percentageLoad(0));
@@ -205,11 +205,10 @@ TEST_P(LoadBalancerBaseTest, PrioritySelectionFuzz) {
     updateHostSet(failover_host_set_, failover_set_hosts, unhealthy_hosts, degraded_hosts);
   }
 
-  EXPECT_CALL(context, determinePriorityLoad(_, _))
+  EXPECT_CALL(context, determinePriorityLoad(_, _, _))
       .WillRepeatedly(
-          Invoke([](const auto&, const auto& original_load) -> const HealthyAndDegradedLoad& {
-            return original_load;
-          }));
+          Invoke([](const auto&, const auto& original_load,
+                    const auto&) -> const HealthyAndDegradedLoad& { return original_load; }));
 
   for (uint64_t i = 0; i < total_hosts; ++i) {
     const auto hs = lb_.chooseHostSet(&context);
@@ -234,7 +233,7 @@ TEST_P(LoadBalancerBaseTest, PrioritySelectionWithFilter) {
   HealthyAndDegradedLoad priority_load{Upstream::HealthyLoad({0u, 100u}),
                                        Upstream::DegradedLoad({0, 0})};
   // return a filter that excludes priority 0
-  EXPECT_CALL(context, determinePriorityLoad(_, _)).WillRepeatedly(ReturnRef(priority_load));
+  EXPECT_CALL(context, determinePriorityLoad(_, _, _)).WillRepeatedly(ReturnRef(priority_load));
 
   updateHostSet(host_set_, 1 /* num_hosts */, 1 /* num_healthy_hosts */);
   updateHostSet(failover_host_set_, 1, 1);
@@ -531,11 +530,11 @@ class RoundRobinLoadBalancerTest : public LoadBalancerTestBase {
 public:
   void init(bool need_local_cluster) {
     if (need_local_cluster) {
-      local_priority_set_.reset(new PrioritySetImpl());
+      local_priority_set_ = std::make_shared<PrioritySetImpl>();
       local_priority_set_->getOrCreateHostSet(0);
     }
-    lb_.reset(new RoundRobinLoadBalancer(priority_set_, local_priority_set_.get(), stats_, runtime_,
-                                         random_, common_config_));
+    lb_ = std::make_shared<RoundRobinLoadBalancer>(priority_set_, local_priority_set_.get(), stats_,
+                                                   runtime_, random_, common_config_);
   }
 
   // Updates priority 0 with the given hosts and hosts_per_locality.
@@ -1009,7 +1008,7 @@ TEST_P(RoundRobinLoadBalancerTest, HostSelectionWithFilter) {
   } else {
     priority_load.healthy_priority_load_ = HealthyLoad({0u, 100u});
   }
-  EXPECT_CALL(context, determinePriorityLoad(_, _)).WillRepeatedly(ReturnRef(priority_load));
+  EXPECT_CALL(context, determinePriorityLoad(_, _, _)).WillRepeatedly(ReturnRef(priority_load));
   EXPECT_CALL(context, hostSelectionRetryCount()).WillRepeatedly(Return(2));
 
   // Calling chooseHost multiple times always returns host one, since the filter will reject
@@ -1562,8 +1561,8 @@ INSTANTIATE_TEST_SUITE_P(PrimaryOrFailover, LeastRequestLoadBalancerTest,
 class RandomLoadBalancerTest : public LoadBalancerTestBase {
 public:
   void init() {
-    lb_.reset(
-        new RandomLoadBalancer(priority_set_, nullptr, stats_, runtime_, random_, common_config_));
+    lb_ = std::make_shared<RandomLoadBalancer>(priority_set_, nullptr, stats_, runtime_, random_,
+                                               common_config_);
   }
   std::shared_ptr<LoadBalancer> lb_;
 };

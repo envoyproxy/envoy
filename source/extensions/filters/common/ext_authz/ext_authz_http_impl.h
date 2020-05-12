@@ -10,7 +10,6 @@
 #include "common/common/logger.h"
 #include "common/common/matchers.h"
 #include "common/router/header_parser.h"
-#include "common/runtime/runtime_protos.h"
 
 #include "extensions/filters/common/ext_authz/ext_authz.h"
 
@@ -98,11 +97,6 @@ public:
    * should be send to an the upstream server.
    */
   const MatcherSharedPtr& upstreamHeaderMatchers() const { return upstream_header_matchers_; }
-
-  /**
-   * Returns a list of headers that will be add to the authorization request.
-   */
-  const Http::LowerCaseStrPairVector& headersToAdd() const { return authorization_headers_to_add_; }
 
   /**
    * Returns the name used for tracing.

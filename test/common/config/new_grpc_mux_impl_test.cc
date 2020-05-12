@@ -6,12 +6,11 @@
 #include "common/common/empty_string.h"
 #include "common/config/new_grpc_mux_impl.h"
 #include "common/config/protobuf_link_hacks.h"
-#include "common/config/resources.h"
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
 #include "common/protobuf/protobuf.h"
-#include "common/stats/isolated_store_impl.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/common.h"
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
@@ -19,6 +18,7 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/resources.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
@@ -60,7 +60,7 @@ public:
   std::unique_ptr<NewGrpcMuxImpl> grpc_mux_;
   NiceMock<Config::MockSubscriptionCallbacks> callbacks_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  Stats::IsolatedStoreImpl stats_;
+  Stats::TestUtil::TestStore stats_;
   Envoy::Config::RateLimitSettings rate_limit_settings_;
   Stats::Gauge& control_plane_connected_state_;
 };
