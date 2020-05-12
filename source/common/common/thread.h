@@ -117,11 +117,11 @@ public:
 
   /*
    * Returns an already existing T* at index, or calls make_object to
-   * instantiate and save the T* uner lock.
+   * instantiate and save the T* under lock.
    *
    * @param index the Index to look up.
    * @param make_object function to call under lock to make a T*.
-   * @return The new or already-existing T*.
+   * @return The new or already-existing T*, possibly nullptr if make_object returns nullptr.
    */
   T* get(uint32_t index, const MakeObject& make_object) {
     std::atomic<T*>& atomic_ref = data_[index];
@@ -160,10 +160,10 @@ public:
 
   /*
    * Returns an already existing T*, or calls make_object to instantiate and
-   * save the T* uner lock.
+   * save the T* under lock.
    *
    * @param make_object function to call under lock to make a T*.
-   * @return The new or already-existing T*.
+   * @return The new or already-existing T*, possibly nullptr if make_object returns nullptr.
    */
   T* get(const MakeObject& make_object) { return BaseClass::get(0, make_object); }
 };
