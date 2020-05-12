@@ -19,6 +19,9 @@ the following guidance:
   logical core on your machine) or set to match the number of cores/threads made available to other
   network proxies in your comparison.
 
+* Disable :ref:`circuit breaking <faq_disable_circuit_breaking>`. A common issue during benchmarking
+  is that Envoy's default circuit breaker limits are low, leading to connection and request queuing.
+
 * Disable :ref:`generate_request_id
   <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.generate_request_id>`.
 
