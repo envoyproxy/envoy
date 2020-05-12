@@ -53,11 +53,11 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["build"],
     ),
     bazel_toolchains = dict(
-        sha256 = "239a1a673861eabf988e9804f45da3b94da28d1aff05c373b013193c315d9d9e",
-        strip_prefix = "bazel-toolchains-3.0.1",
+        sha256 = "144290c4166bd67e76a54f96cd504ed86416ca3ca82030282760f0823c10be48",
+        strip_prefix = "bazel-toolchains-3.1.1",
         urls = [
-            "https://github.com/bazelbuild/bazel-toolchains/releases/download/3.0.1/bazel-toolchains-3.0.1.tar.gz",
-            "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/3.0.1.tar.gz",
+            "https://github.com/bazelbuild/bazel-toolchains/releases/download/3.1.1/bazel-toolchains-3.1.1.tar.gz",
+            "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/3.1.1.tar.gz",
         ],
         use_category = ["build"],
     ),
@@ -67,10 +67,10 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["build"],
     ),
     envoy_build_tools = dict(
-        sha256 = "9d348f92ae8fb2495393109aac28aea314ad1fb013cdec1ab7b1224f804be1b7",
-        strip_prefix = "envoy-build-tools-823c2e9386eee5117f7ef9e3d7c90e784cd0d047",
-        # 2020-04-07
-        urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/823c2e9386eee5117f7ef9e3d7c90e784cd0d047.tar.gz"],
+        sha256 = "328648f158e7167f881d984433ff6bfe203bf0b815a99d98d22fb01a0fc95f70",
+        strip_prefix = "envoy-build-tools-f41e5ef5a023e50da088035449c6cdee0ae30d71",
+        # 2020-05-11
+        urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/f41e5ef5a023e50da088035449c6cdee0ae30d71.tar.gz"],
         use_category = ["build"],
     ),
     boringssl = dict(
@@ -288,7 +288,7 @@ DEPENDENCY_REPOSITORIES = dict(
         strip_prefix = "http-parser-2.9.3",
         urls = ["https://github.com/nodejs/http-parser/archive/v2.9.3.tar.gz"],
         use_category = ["dataplane"],
-        cpe = "N/A",
+        cpe = "cpe:2.3:a:nodejs:node.js:*",
     ),
     com_github_pallets_jinja = dict(
         sha256 = "db49236731373e4f3118af880eb91bb0aa6978bc0cf8b35760f6a026f1a9ffc4",
