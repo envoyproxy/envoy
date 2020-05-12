@@ -113,8 +113,6 @@ message TcpProxy {
   // Configuration for tunneling TCP over other transports or application layers.
   // Currently, only HTTP/2 is supported. When other options exist, HTTP/2 will
   // remain the default.
-  // Note that CONNECT support is currently considered alpha in Envoy.
-  // [#comment:TODO(htuch): Replace the above comment with an alpha tag.
   message TunnelingConfig {
     // The hostname to send in the synthesized CONNECT headers to the upstream proxy.
     string hostname = 1 [(validate.rules).string = {min_bytes: 1}];
@@ -178,6 +176,7 @@ message TcpProxy {
   // limited to 1.
   repeated type.HashPolicy hash_policy = 11 [(validate.rules).repeated = {max_items: 1}];
 
+  // [#not-implemented-hide:] feature in progress
   // If set, this configures tunneling, e.g. configuration options to tunnel multiple TCP
   // payloads over a shared HTTP/2 tunnel. If this message is absent, the payload
   // will be proxied upstream as per usual.
