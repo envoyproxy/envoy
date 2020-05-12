@@ -200,6 +200,7 @@ TEST_F(GrpcAccessLoggerImplTest, WatermarksOverrun) {
       TestUtility::findCounter(stats_store_, "access_logs.grpc_access_log.logs_dropped")->value());
 }
 
+// Test legacy behavior of unbounded access logs.
 TEST_F(GrpcAccessLoggerImplTest, WatermarksLegacy) {
   TestScopedRuntime scoped_runtime;
   Runtime::LoaderSingleton::getExisting()->mergeValues(

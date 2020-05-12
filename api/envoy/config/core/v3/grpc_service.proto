@@ -234,7 +234,7 @@ message GrpcService {
     // gRPC library.
     google.protobuf.Struct config = 6;
 
-    // How many bytes each steam can buffer internally.
+    // How many bytes each stream can buffer internally.
     // If not set an implementation defined default is applied (1MiB).
     google.protobuf.UInt32Value per_stream_buffer_limit_bytes = 7;
   }
