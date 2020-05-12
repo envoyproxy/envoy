@@ -177,6 +177,7 @@ public:
                            const Http::AsyncClient::StreamOptions& options) override;
 
   TimeSource& timeSource() { return dispatcher_.timeSource(); }
+  uint64_t perStreamBufferLimitBytes() const { return per_stream_buffer_limit_bytes_; }
 
 private:
   Event::Dispatcher& dispatcher_;
@@ -190,6 +191,7 @@ private:
   const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue> initial_metadata_;
   Stats::ScopeSharedPtr scope_;
   GoogleAsyncClientStats stats_;
+  uint64_t per_stream_buffer_limit_bytes_;
 
   friend class GoogleAsyncClientThreadLocal;
   friend class GoogleAsyncRequestImpl;
@@ -212,8 +214,12 @@ public:
   void sendMessageRaw(Buffer::InstancePtr&& request, bool end_stream) override;
   void closeStream() override;
   void resetStream() override;
-  // The GoogleAsyncClientImpl doesn't do Envoy watermark based flow control.
-  bool isAboveWriteBufferHighWatermark() const override { return false; }
+  // While the Google-gRPC code doesn't use Envoy watermark buffers, the logical
+  // analog is to make sure that the aren't too many bytes in the pending write
+  // queue.
+  bool isAboveWriteBufferHighWatermark() const override {
+    return bytes_in_write_pending_queue_ > parent_.perStreamBufferLimitBytes();
+  }
 
 protected:
   bool callFailed() const { return call_failed_; }
@@ -274,6 +280,7 @@ private:
   grpc::ClientContext ctxt_;
   std::unique_ptr<grpc::GenericClientAsyncReaderWriter> rw_;
   std::queue<PendingMessage> write_pending_queue_;
+  uint64_t bytes_in_write_pending_queue_{};
   grpc::ByteBuffer read_buf_;
   grpc::Status status_;
   // Has Operation::Init completed?

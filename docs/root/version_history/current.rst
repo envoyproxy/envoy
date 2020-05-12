@@ -5,7 +5,7 @@ Changes
 -------
 
 * access loggers: added GRPC_STATUS operator on logging format.
-* access loggers: applied existing buffer limits to the non-google gRPC access logs, as well as :ref:`stats <config_access_log_stats>` for logged / dropped logs.
+* access loggers: applied existing buffer limits to access logs, as well as :ref:`stats <config_access_log_stats>` for logged / dropped logs. This can be reverted temporarily by setting runtime feature `envoy.reloadable_features.disallow_unbounded_access_logs` to false.
 * access loggers: extened specifier for FilterStateFormatter to output :ref:`unstructured log string <config_access_log_format_filter_state>`.
 * build: official released binary is now built on Ubuntu 18.04, requires glibc >= 2.27.
 * compressor: generic :ref:`compressor <config_http_filters_compressor>` filter exposed to users.
