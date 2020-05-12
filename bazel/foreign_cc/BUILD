@@ -83,6 +83,10 @@ envoy_cmake_external(
     },
     defines = ["CARES_STATICLIB"],
     lib_source = "@com_github_c_ares_c_ares//:all",
+    linkopts = select({
+        "@envoy//bazel:apple": ["-lresolv"],
+        "//conditions:default": [],
+    }),
     static_libraries = select({
         "//bazel:windows_x86_64": ["cares.lib"],
         "//conditions:default": ["libcares.a"],

@@ -57,7 +57,6 @@ def _envoy_linkopts():
             # See note here: https://luajit.org/install.html
             "-pagezero_size 10000",
             "-image_base 100000000",
-            "-lresolv",
         ],
         "@envoy//bazel:windows_x86_64": [
             "-DEFAULTLIB:advapi32.lib",
