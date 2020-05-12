@@ -97,7 +97,9 @@ public:
   ~AtomicPtrArray() {
     if (alloc_mode == AtomicPtrAllocMode::DeleteOnDestruct) {
       for (T* ptr : data_) {
-        delete ptr;
+        if (ptr != nullptr) {
+          delete ptr;
+        }
       }
     }
   }
