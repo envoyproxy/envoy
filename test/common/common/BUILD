@@ -248,6 +248,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "thread_test",
+    srcs = ["thread_test.cc"],
+    deps = [
+        "//source/common/common:thread_lib",
+        "//source/common/common:thread_synchronizer_lib",
+        "//test/test_common:thread_factory_for_test_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "stl_helpers_test",
     srcs = ["stl_helpers_test.cc"],
     deps = [
