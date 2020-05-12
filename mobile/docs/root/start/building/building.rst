@@ -31,7 +31,7 @@ Follow the Envoy instructions `here <https://github.com/envoyproxy/envoy/blob/ma
 Android requirements
 --------------------
 
-- Android SDK Platform 28
+- Android SDK Platform 29
 - Android NDK 19.2.5345600
 
 ----------------
