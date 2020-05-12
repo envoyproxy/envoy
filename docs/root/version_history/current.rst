@@ -7,6 +7,7 @@ Changes
 * access loggers: added GRPC_STATUS operator on logging format.
 * access loggers: applied existing buffer limits to the non-google gRPC access logs, as well as :ref:`stats <config_access_log_stats>` for logged / dropped logs.
 * access loggers: extened specifier for FilterStateFormatter to output :ref:`unstructured log string <config_access_log_format_filter_state>`.
+* build: official released binary is now built on Ubuntu 18.04, requires glibc >= 2.27.
 * compressor: generic :ref:`compressor <config_http_filters_compressor>` filter exposed to users.
 * config: added :ref:`version_text <config_cluster_manager_cds>` stat that reflects xDS version.
 * dynamic forward proxy: added :ref:`SNI based dynamic forward proxy <config_network_filters_sni_dynamic_forward_proxy>` support.

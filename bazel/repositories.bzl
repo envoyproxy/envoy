@@ -24,6 +24,9 @@ BUILD_ALL_CONTENT = """filegroup(name = "all", srcs = glob(["**"]), visibility =
 def _repository_locations():
     locations = dict(DEPENDENCY_REPOSITORIES)
     for key, location in locations.items():
+        if "sha256" not in location or len(location["sha256"]) == 0:
+            fail("SHA256 missing for external dependency " + str(location["urls"]))
+
         if "use_category" not in location:
             fail("The 'use_category' attribute must be defined for external dependecy " + str(location["urls"]))
 
