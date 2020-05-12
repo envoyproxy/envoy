@@ -163,7 +163,7 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "N/A",
     ),
     com_github_google_libprotobuf_mutator = dict(
-        sha256 = "",
+        sha256 = "f6def6cdf63e29a367d46c0ad9e3e31eed89d031e22e0caac126f1e62d8b3fd0",
         strip_prefix = "libprotobuf-mutator-3521f47a2828da9ace403e4ecc4aece1a84feb36",
         # 2020-02-04
         urls = ["https://github.com/google/libprotobuf-mutator/archive/3521f47a2828da9ace403e4ecc4aece1a84feb36.tar.gz"],
