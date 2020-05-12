@@ -2289,9 +2289,10 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::clearRouteCache() {
 }
 
 Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamDecoderFilter::createBuffer() {
-  auto buffer =
-      std::make_unique<Buffer::WatermarkBuffer>([this]() -> void { this->requestDataDrained(); },
-                                                [this]() -> void { this->requestDataTooLarge(); });
+  auto buffer = std::make_unique<Buffer::WatermarkBuffer>(
+      [this]() -> void { this->requestDataDrained(); },
+      [this]() -> void { this->requestDataTooLarge(); },
+      []() -> void { /* TODO(adip): Handle overflow watermark */ });
   buffer->setWatermarks(parent_.buffer_limit_);
   return buffer;
 }
@@ -2458,8 +2459,10 @@ ConnectionManagerImpl::ActiveStreamDecoderFilter::routeConfig() {
 }
 
 Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamEncoderFilter::createBuffer() {
-  auto buffer = new Buffer::WatermarkBuffer([this]() -> void { this->responseDataDrained(); },
-                                            [this]() -> void { this->responseDataTooLarge(); });
+  auto buffer =
+      new Buffer::WatermarkBuffer([this]() -> void { this->responseDataDrained(); },
+                                  [this]() -> void { this->responseDataTooLarge(); },
+                                  []() -> void { /* TODO(adip): Handle overflow watermark */ });
   buffer->setWatermarks(parent_.buffer_limit_);
   return Buffer::WatermarkBufferPtr{buffer};
 }

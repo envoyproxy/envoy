@@ -502,7 +502,8 @@ StreamRateLimiter::StreamRateLimiter(uint64_t max_kbps, uint64_t max_buffered_da
       // ~63ms intervals.
       token_bucket_(SecondDivisor, time_source, SecondDivisor),
       token_timer_(dispatcher.createTimer([this] { onTokenTimer(); })),
-      buffer_(resume_data_cb, pause_data_cb) {
+      buffer_(resume_data_cb, pause_data_cb,
+              []() -> void { /* TODO(adip): Handle overflow watermark */ }) {
   ASSERT(bytes_per_time_slice_ > 0);
   ASSERT(max_buffered_data > 0);
   buffer_.setWatermarks(max_buffered_data);
