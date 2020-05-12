@@ -168,10 +168,8 @@ public:
   envoy::config::core::v3::Metadata metadata_;
   std::unique_ptr<Envoy::Config::TypedMetadata> typed_metadata_;
   absl::optional<std::chrono::milliseconds> max_stream_duration_;
-  mutable Thread::AtomicPtr<Http::Http1::CodecStats, Thread::AtomicPtrAllocMode::DeleteOnDestruct>
-      http1_codec_stats_;
-  mutable Thread::AtomicPtr<Http::Http2::CodecStats, Thread::AtomicPtrAllocMode::DeleteOnDestruct>
-      http2_codec_stats_;
+  mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
+  mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
 };
 
 class MockIdleTimeEnabledClusterInfo : public MockClusterInfo {

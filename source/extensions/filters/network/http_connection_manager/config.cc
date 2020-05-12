@@ -486,13 +486,15 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
   */
   switch (codec_type_) {
   case CodecType::HTTP1: {
-    Http::Http1::CodecStats stats{HTTP1_CODEC_STATS(context_.scope())};
+    Http::Http1::CodecStats& stats =
+        Http::Http1::CodecStats::atomicGet(http1_codec_stats_, context_.scope());
     return std::make_unique<Http::Http1::ServerConnectionImpl>(
         connection, stats, callbacks, http1_settings_, maxRequestHeadersKb(),
         maxRequestHeadersCount(), headersWithUnderscoresAction());
   }
   case CodecType::HTTP2: {
-    Http::Http2::CodecStats stats{HTTP2_CODEC_STATS(context_.scope())};
+    Http::Http2::CodecStats& stats =
+        Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.scope());
     return std::make_unique<Http::Http2::ServerConnectionImpl>(
         connection, callbacks, stats, http2_options_, maxRequestHeadersKb(),
         maxRequestHeadersCount(), headersWithUnderscoresAction());
@@ -508,10 +510,10 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
             .createQuicServerConnection(connection, callbacks));
   case CodecType::AUTO:
     return Http::ConnectionManagerUtility::autoCreateCodec(
-        connection, data, callbacks, context_.scope(), http1_settings_, http2_options_,
-        maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
+        connection, data, callbacks, context_.scope(), http1_codec_stats_, http2_codec_stats_,
+        http1_settings_, http2_options_, maxRequestHeadersKb(), maxRequestHeadersCount(),
+        headersWithUnderscoresAction());
   }
-
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 

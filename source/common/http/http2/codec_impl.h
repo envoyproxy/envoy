@@ -16,6 +16,7 @@
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"
+#include "common/common/thread.h"
 #include "common/http/codec_helper.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/http2/metadata_decoder.h"
@@ -55,15 +56,21 @@ const std::string CLIENT_MAGIC_PREFIX = "PRI * HTTP/2";
   COUNTER(trailers)                                                                                \
   COUNTER(tx_reset)
 
+// Constructor-args for CodecStats.
+#define HTTP2_CODEC_STATS(scope) ALL_HTTP2_CODEC_STATS(POOL_COUNTER_PREFIX(scope, "http2."))
+
 /**
  * Wrapper struct for the HTTP/2 codec stats. @see stats_macros.h
  */
 struct CodecStats {
+  using AtomicPtr = Thread::AtomicPtr<CodecStats, Thread::AtomicPtrAllocMode::DeleteOnDestruct>;
+
+  static CodecStats& atomicGet(AtomicPtr& ptr, Stats::Scope& scope) {
+    return *ptr.get([&scope]() -> CodecStats* { return new CodecStats{HTTP2_CODEC_STATS(scope)}; });
+  }
+
   ALL_HTTP2_CODEC_STATS(GENERATE_COUNTER_STRUCT)
 };
-
-// Constructor-args for CodecStats.
-#define HTTP2_CODEC_STATS(scope) ALL_HTTP2_CODEC_STATS(POOL_COUNTER_PREFIX(scope, "http2."))
 
 class Utility {
 public:

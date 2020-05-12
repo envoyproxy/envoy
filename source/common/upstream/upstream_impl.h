@@ -659,10 +659,8 @@ private:
   const absl::optional<envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type_;
   const std::unique_ptr<Server::Configuration::CommonFactoryContext> factory_context_;
   std::vector<Network::FilterFactoryCb> filter_factories_;
-  mutable Thread::AtomicPtr<Http::Http1::CodecStats, Thread::AtomicPtrAllocMode::DeleteOnDestruct>
-      http1_codec_stats_;
-  mutable Thread::AtomicPtr<Http::Http2::CodecStats, Thread::AtomicPtrAllocMode::DeleteOnDestruct>
-      http2_codec_stats_;
+  mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
+  mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
 };
 
 /**

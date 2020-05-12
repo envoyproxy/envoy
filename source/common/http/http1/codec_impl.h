@@ -15,6 +15,7 @@
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/assert.h"
 #include "common/common/statusor.h"
+#include "common/common/thread.h"
 #include "common/http/codec_helper.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
@@ -34,15 +35,21 @@ namespace Http1 {
   COUNTER(requests_rejected_with_underscores_in_headers)                                           \
   COUNTER(response_flood)
 
+// Constructor-args for CodecStats.
+#define HTTP1_CODEC_STATS(scope) ALL_HTTP1_CODEC_STATS(POOL_COUNTER_PREFIX(scope, "http1."))
+
 /**
  * Wrapper struct for the HTTP/1 codec stats. @see stats_macros.h
  */
 struct CodecStats {
+  using AtomicPtr = Thread::AtomicPtr<CodecStats, Thread::AtomicPtrAllocMode::DeleteOnDestruct>;
+
+  static CodecStats& atomicGet(AtomicPtr& ptr, Stats::Scope& scope) {
+    return *ptr.get([&scope]() -> CodecStats* { return new CodecStats{HTTP1_CODEC_STATS(scope)}; });
+  }
+
   ALL_HTTP1_CODEC_STATS(GENERATE_COUNTER_STRUCT)
 };
-
-// Constructor-args for CodecStats.
-#define HTTP1_CODEC_STATS(scope) ALL_HTTP1_CODEC_STATS(POOL_COUNTER_PREFIX(scope, "http1."))
 
 class ConnectionImpl;
 

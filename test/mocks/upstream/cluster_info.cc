@@ -102,15 +102,11 @@ MockClusterInfo::MockClusterInfo()
 MockClusterInfo::~MockClusterInfo() = default;
 
 Http::Http1::CodecStats& MockClusterInfo::http1CodecStats() const {
-  return *http1_codec_stats_.get([this]() -> Http::Http1::CodecStats* {
-    return new Http::Http1::CodecStats{HTTP1_CODEC_STATS(statsScope())};
-  });
+  return Http::Http1::CodecStats::atomicGet(http1_codec_stats_, statsScope());
 }
 
 Http::Http2::CodecStats& MockClusterInfo::http2CodecStats() const {
-  return *http2_codec_stats_.get([this]() -> Http::Http2::CodecStats* {
-    return new Http::Http2::CodecStats{HTTP2_CODEC_STATS(statsScope())};
-  });
+  return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, statsScope());
 }
 
 } // namespace Upstream
