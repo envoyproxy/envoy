@@ -156,9 +156,9 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "N/A",
     ),
     com_github_gabime_spdlog = dict(
-        sha256 = "b38e0bbef7faac2b82fed550a0c19b0d4e7f6737d5321d4fd8f216b80f8aee8a",
-        strip_prefix = "spdlog-1.5.0",
-        urls = ["https://github.com/gabime/spdlog/archive/v1.5.0.tar.gz"],
+        sha256 = "afd18f62d1bc466c60bef088e6b637b0284be88c515cedc59ad4554150af6043",
+        strip_prefix = "spdlog-1.4.0",
+        urls = ["https://github.com/gabime/spdlog/archive/v1.4.0.tar.gz"],
         use_category = ["observability"],
         cpe = "N/A",
     ),
