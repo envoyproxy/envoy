@@ -32,7 +32,8 @@ std::vector<std::string> UberFilterFuzzer::parseHttpData(const test::fuzz::HttpD
   std::vector<std::string> data_chunks;
 
   if (data.has_http_body()) {
-    for (const auto& http_data : data.http_body().data()) {
+    data_chunks.reserve(data.http_body().data_size());
+    for (const std::string& http_data : data.http_body().data()) {
       data_chunks.push_back(http_data);
     }
   } else if (data.has_proto_body()) {
