@@ -19,7 +19,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Load Report]
 
-// These are stats Envoy reports to GLB at a frequency defined by
+// These are stats Envoy reports to the management server at a frequency defined by
 // :ref:`LoadStatsResponse.load_reporting_interval<envoy_api_field_service.load_stats.v3.LoadStatsResponse.load_reporting_interval>`.
 // Stats per upstream region/zone and optionally per subzone.
 // [#next-free-field: 9]
