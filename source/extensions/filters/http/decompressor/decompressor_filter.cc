@@ -70,7 +70,7 @@ Http::FilterHeadersStatus DecompressorFilter::decodeHeaders(Http::RequestHeaderM
                       headers);
 
   if (config_->responseDirectionConfig().decompressionEnabled()) {
-    // FIX ME(junr03): discuss this unconditional addition. Should this be optional and
+    // FIX ME: discuss this unconditional addition. Should this be optional and
     // configurable? i.e even if response decompression is enabled the filter could chose to
     // advertise or not.
     injectAcceptEncoding(headers);
@@ -115,8 +115,8 @@ void DecompressorFilter::maybeInitDecompress(
     direction_config.stats().decompressed_.inc();
     decompressor = config_->makeDecompressor();
 
-    // FIX ME(junr03): if there is length present the filter will need to buffer, and decompress
-    // only once all the data has been received. The alternative that was implemented in @rojkov's
+    // FIX ME: if there is length present the filter will need to buffer, and decompress
+    // only once all the data has been received. The alternative that was implemented in the
     // original branch was to delete Content Length and add Transfer Encoding chunked. This will
     // most likely not work at Lyft. Moreover, is that acceptable for all decompression schemes?
     // Lastly, the code was different in the request (absent) and response path, why?
@@ -140,7 +140,7 @@ Http::FilterDataStatus DecompressorFilter::maybeDecompress(
     Compression::Decompressor::Decompressor* decompressor, Http::StreamFilterCallbacks& callbacks,
     Buffer::Instance& input_buffer) const {
   if (decompressor) {
-    // FIX ME(junr03): do we want stats on total bytes like the compressor?
+    // FIX ME: do we want stats on total bytes like the compressor?
     Buffer::OwnedImpl output_buffer;
     decompressor->decompress(input_buffer, output_buffer);
     ENVOY_STREAM_LOG(debug, "{} data decompressed from {} bytes to {} bytes", callbacks,
@@ -161,7 +161,7 @@ bool DecompressorFilter::hasCacheControlNoTransform(
 
 bool DecompressorFilter::contentEncodingMatches(Http::RequestOrResponseHeaderMap& headers) const {
   if (headers.ContentEncoding()) {
-    // FIX ME(junr03): is there no way to get the first value in the HeaderString?
+    // FIX ME: is there no way to get the first value in the HeaderString?
     absl::string_view coding = StringUtil::trim(
         StringUtil::cropRight(headers.ContentEncoding()->value().getStringView(), ","));
     if (StringUtil::CaseInsensitiveCompare()(config_->contentEncoding(), coding)) {
@@ -172,7 +172,7 @@ bool DecompressorFilter::contentEncodingMatches(Http::RequestOrResponseHeaderMap
 }
 
 void DecompressorFilter::removeContentEncoding(Http::RequestOrResponseHeaderMap& headers) const {
-  // FIX ME(junr03): there should be a general HeaderString method to remove a value from the comma
+  // FIX ME: there should be a general HeaderString method to remove a value from the comma
   // delimited list.
   const auto all_codings = headers.ContentEncoding()->value().getStringView();
   const auto remaining_codings = StringUtil::trim(StringUtil::cropLeft(all_codings, ","));
@@ -186,8 +186,8 @@ void DecompressorFilter::removeContentEncoding(Http::RequestOrResponseHeaderMap&
 
 // TODO(junr03): inject encoding with configurable qvalue with q=1 by default.
 void DecompressorFilter::injectAcceptEncoding(Http::RequestHeaderMap& headers) const {
-  // FIX ME(junr03): the code here in rojkov's original branch prepended the current filter's
-  // content enconding. However, my read of the content encoding spec leads me to think that we
+  // FIX ME: the code here in rojkov's original branch prepended the current filter's
+  // content encoding. However, my read of the content encoding spec leads me to think that we
   // should append. Discuss in code review.
   // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Encoding
   headers.appendAcceptEncoding(config_->contentEncoding(), ",");
@@ -198,7 +198,7 @@ void DecompressorFilter::injectAcceptEncoding(Http::RequestHeaderMap& headers) c
  */
 void DecompressorFilter::sanitizeTransferEncoding(Http::RequestOrResponseHeaderMap& headers) const {
   const Http::HeaderEntry* transfer_encoding = headers.TransferEncoding();
-  // FIX ME(junr03): should there be a utility for finding if a specific value is present in the
+  // FIX ME: should there be a utility for finding if a specific value is present in the
   // header value string? Is the issue that not all headers are delimited the same way?
   if (!(transfer_encoding &&
         StringUtil::caseFindToken(transfer_encoding->value().getStringView(), ",",

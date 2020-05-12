@@ -122,7 +122,7 @@ TEST_P(DecompressorFilterTest, DecompressionActive) {
 
   EXPECT_EQ(nullptr, headers_after_filter->ContentEncoding());
 
-  // FIX ME(junr03): pending decision on this.
+  // FIX ME: pending decision on this.
   EXPECT_EQ(nullptr, headers_after_filter->ContentLength());
   EXPECT_EQ("chunked", headers_after_filter->TransferEncoding()->value().getStringView());
 
@@ -142,7 +142,7 @@ TEST_P(DecompressorFilterTest, DecompressionActiveMultipleEncodings) {
 
   EXPECT_EQ("br", headers_after_filter->ContentEncoding()->value().getStringView());
 
-  // FIX ME(junr03): pending decision on this.
+  // FIX ME: pending decision on this.
   EXPECT_EQ(nullptr, headers_after_filter->ContentLength());
   EXPECT_EQ("chunked", headers_after_filter->TransferEncoding()->value().getStringView());
 
@@ -163,7 +163,7 @@ TEST_P(DecompressorFilterTest, DecompressionActiveTransferEncodingPresentAlready
 
   EXPECT_EQ("br", headers_after_filter->ContentEncoding()->value().getStringView());
 
-  // FIX ME(junr03): pending decision on this.
+  // FIX ME: pending decision on this.
   EXPECT_EQ(nullptr, headers_after_filter->ContentLength());
   EXPECT_EQ("chunked", headers_after_filter->TransferEncoding()->value().getStringView());
 
