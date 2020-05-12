@@ -33,7 +33,7 @@ std::vector<std::string> UberFilterFuzzer::parseHttpData(const test::fuzz::HttpD
 
   if (data.has_http_body()) {
     for (const auto& http_data : data.http_body().data()) {
-      data_chunks.push_back(http_data.data());
+      data_chunks.push_back(http_data);
     }
   } else if (data.has_proto_body()) {
     const std::string serialized = data.proto_body().message().value();
