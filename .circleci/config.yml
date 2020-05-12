@@ -56,6 +56,7 @@ jobs:
        - checkout
        - run:
            command:
+             sudo mkdir -p -m 0777 /build
              ci/run_envoy_docker.sh 'BAZEL_EXTRA_TEST_OPTIONS=--test_env=ENVOY_IP_TEST_VERSIONS=v4only ci/do_ci.sh bazel.coverage'
            no_output_timeout: 60m
        - persist_to_workspace:
