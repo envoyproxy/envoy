@@ -84,7 +84,7 @@ envoy_cmake_external(
     defines = ["CARES_STATICLIB"],
     lib_source = "@com_github_c_ares_c_ares//:all",
     linkopts = select({
-        "@envoy//bazel:apple": ["-lresolv"],
+        "//bazel:apple": ["-lresolv"],
         "//conditions:default": [],
     }),
     static_libraries = select({
