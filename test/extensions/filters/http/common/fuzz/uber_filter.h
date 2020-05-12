@@ -25,8 +25,10 @@ protected:
   // Filter specific input cleanup.
   void cleanFuzzedConfig(absl::string_view filter_name, Protobuf::Message* message);
 
-  // This executes the decode methods to be fuzzed.
+  // Parses http or proto body into chunks.
   std::vector<std::string> parseHttpData(const test::fuzz::HttpData& data);
+
+  // This executes the decode methods to be fuzzed.
   void decode(Http::StreamDecoderFilter* filter, const test::fuzz::HttpData& data);
 
   void reset();
