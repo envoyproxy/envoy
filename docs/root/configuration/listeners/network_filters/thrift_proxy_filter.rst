@@ -3,23 +3,23 @@
 Thrift proxy
 ============
 
-* :ref:`v2 API reference <envoy_api_msg_config.filter.network.thrift_proxy.v2alpha1.ThriftProxy>`
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.ThriftProxy>`
 * This filter should be configured with the name *envoy.filters.network.thrift_proxy*.
 
 Cluster Protocol Options
 ------------------------
 
 Thrift connections to upstream hosts can be configured by adding an entry to the appropriate
-Cluster's :ref:`extension_protocol_options<envoy_api_field_Cluster.extension_protocol_options>`
+Cluster's :ref:`extension_protocol_options<envoy_v3_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`
 keyed by `envoy.filters.network.thrift_proxy`. The
-:ref:`ThriftProtocolOptions<envoy_api_msg_config.filter.network.thrift_proxy.v2alpha1.ThriftProtocolOptions>`
+:ref:`ThriftProtocolOptions<envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.ThriftProtocolOptions>`
 message describes the available options.
 
 Thrift Request Metadata
 -----------------------
 
-The :ref:`HEADER transport<envoy_api_enum_value_config.filter.network.thrift_proxy.v2alpha1.TransportType.HEADER>`
-and :ref:`TWITTER protocol<envoy_api_enum_value_config.filter.network.thrift_proxy.v2alpha1.ProtocolType.TWITTER>`
+The :ref:`HEADER transport<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.TransportType.HEADER>`
+and :ref:`TWITTER protocol<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.ProtocolType.TWITTER>`
 support metadata. In particular, the
 `Header transport <https://github.com/apache/thrift/blob/master/doc/specs/HeaderFormat.md>`_
 supports informational key/value pairs and the Twitter protocol transmits
@@ -29,13 +29,13 @@ Header Transport Metadata
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Header transport key/value pairs are available for routing as
-:ref:`headers <envoy_api_field_config.filter.network.thrift_proxy.v2alpha1.RouteMatch.headers>`.
+:ref:`headers <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteMatch.headers>`.
 
 Twitter Protocol Metadata
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Twitter protocol request contexts are converted into headers which are available for routing as
-:ref:`headers <envoy_api_field_config.filter.network.thrift_proxy.v2alpha1.RouteMatch.headers>`.
+:ref:`headers <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteMatch.headers>`.
 In addition, the following fields are presented as headers:
 
 Client Identifier

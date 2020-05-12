@@ -97,20 +97,22 @@ using SubscriptionPtr = std::unique_ptr<Subscription>;
 /**
  * Per subscription stats. @see stats_macros.h
  */
-#define ALL_SUBSCRIPTION_STATS(COUNTER, GAUGE)                                                     \
+#define ALL_SUBSCRIPTION_STATS(COUNTER, GAUGE, TEXT_READOUT)                                       \
   COUNTER(init_fetch_timeout)                                                                      \
   COUNTER(update_attempt)                                                                          \
   COUNTER(update_failure)                                                                          \
   COUNTER(update_rejected)                                                                         \
   COUNTER(update_success)                                                                          \
   GAUGE(update_time, NeverImport)                                                                  \
-  GAUGE(version, NeverImport)
+  GAUGE(version, NeverImport)                                                                      \
+  TEXT_READOUT(version_text)
 
 /**
  * Struct definition for per subscription stats. @see stats_macros.h
  */
 struct SubscriptionStats {
-  ALL_SUBSCRIPTION_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
+  ALL_SUBSCRIPTION_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT,
+                         GENERATE_TEXT_READOUT_STRUCT)
 };
 
 } // namespace Config

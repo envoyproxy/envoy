@@ -2,6 +2,7 @@
 #include <vector>
 
 #include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/http/protocol.h"
 #include "envoy/json/json_object.h"
 
 #include "common/http/header_utility.h"
@@ -18,6 +19,56 @@ envoy::config::route::v3::HeaderMatcher parseHeaderMatcherFromYaml(const std::st
   envoy::config::route::v3::HeaderMatcher header_matcher;
   TestUtility::loadFromYaml(yaml, header_matcher);
   return header_matcher;
+}
+
+class HeaderUtilityTest : public testing::Test {
+public:
+  const HeaderEntry& hostHeaderEntry(const std::string& host_value, bool set_connect = false) {
+    headers_.setHost(host_value);
+    if (set_connect) {
+      headers_.setMethod(Http::Headers::get().MethodValues.Connect);
+    }
+    return *headers_.Host();
+  }
+  RequestHeaderMapImpl headers_;
+};
+
+// Port's part from host header get removed
+TEST_F(HeaderUtilityTest, RemovePortsFromHost) {
+  const std::vector<std::pair<std::string, std::string>> host_headers{
+      {"localhost", "localhost"},           // w/o port part
+      {"localhost:443", "localhost"},       // name w/ port
+      {"", ""},                             // empty
+      {":443", ""},                         // just port
+      {"192.168.1.1", "192.168.1.1"},       // ipv4
+      {"192.168.1.1:443", "192.168.1.1"},   // ipv4 w/ port
+      {"[fc00::1]:443", "[fc00::1]"},       // ipv6 w/ port
+      {"[fc00::1]", "[fc00::1]"},           // ipv6
+      {":", ":"},                           // malformed string #1
+      {"]:", "]:"},                         // malformed string #2
+      {":abc", ":abc"},                     // malformed string #3
+      {"localhost:80", "localhost:80"},     // port not matching w/ hostname
+      {"192.168.1.1:80", "192.168.1.1:80"}, // port not matching w/ ipv4
+      {"[fc00::1]:80", "[fc00::1]:80"}      // port not matching w/ ipv6
+  };
+
+  for (const auto& host_pair : host_headers) {
+    auto& host_header = hostHeaderEntry(host_pair.first);
+    HeaderUtility::stripPortFromHost(headers_, 443);
+    EXPECT_EQ(host_header.value().getStringView(), host_pair.second);
+  }
+}
+
+// Port's part from host header won't be removed if method is "connect"
+TEST_F(HeaderUtilityTest, RemovePortsFromHostConnect) {
+  const std::vector<std::pair<std::string, std::string>> host_headers{
+      {"localhost:443", "localhost:443"},
+  };
+  for (const auto& host_pair : host_headers) {
+    auto& host_header = hostHeaderEntry(host_pair.first, true);
+    HeaderUtility::stripPortFromHost(headers_, 443);
+    EXPECT_EQ(host_header.value().getStringView(), host_pair.second);
+  }
 }
 
 TEST(HeaderDataConstructorTest, NoSpecifierSet) {
@@ -497,6 +548,26 @@ TEST(HeaderIsValidTest, HeaderNameContainsUnderscore) {
   EXPECT_TRUE(HeaderUtility::headerNameContainsUnderscore("_cookie"));
   EXPECT_TRUE(HeaderUtility::headerNameContainsUnderscore("cookie_"));
   EXPECT_TRUE(HeaderUtility::headerNameContainsUnderscore("x_something"));
+}
+
+TEST(PercentEncoding, ShouldCloseConnection) {
+  EXPECT_TRUE(HeaderUtility::shouldCloseConnection(Protocol::Http10,
+                                                   TestRequestHeaderMapImpl{{"foo", "bar"}}));
+  EXPECT_FALSE(HeaderUtility::shouldCloseConnection(
+      Protocol::Http10, TestRequestHeaderMapImpl{{"connection", "keep-alive"}}));
+  EXPECT_FALSE(HeaderUtility::shouldCloseConnection(
+      Protocol::Http10, TestRequestHeaderMapImpl{{"connection", "foo, keep-alive"}}));
+
+  EXPECT_FALSE(HeaderUtility::shouldCloseConnection(Protocol::Http11,
+                                                    TestRequestHeaderMapImpl{{"foo", "bar"}}));
+  EXPECT_TRUE(HeaderUtility::shouldCloseConnection(
+      Protocol::Http11, TestRequestHeaderMapImpl{{"connection", "close"}}));
+  EXPECT_TRUE(HeaderUtility::shouldCloseConnection(
+      Protocol::Http11, TestRequestHeaderMapImpl{{"connection", "te,close"}}));
+  EXPECT_TRUE(HeaderUtility::shouldCloseConnection(
+      Protocol::Http11, TestRequestHeaderMapImpl{{"proxy-connection", "close"}}));
+  EXPECT_TRUE(HeaderUtility::shouldCloseConnection(
+      Protocol::Http11, TestRequestHeaderMapImpl{{"proxy-connection", "foo,close"}}));
 }
 
 } // namespace Http

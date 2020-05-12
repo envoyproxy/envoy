@@ -19,7 +19,7 @@ wrapTransportSocketOptions(Network::TransportSocketOptionsSharedPtr transport_so
   std::vector<std::string> alpn;
   switch (protocol) {
   case Http::Protocol::Http10:
-    NOT_REACHED_GCOVR_EXCL_LINE
+    NOT_REACHED_GCOVR_EXCL_LINE;
   case Http::Protocol::Http11:
     alpn.push_back("http/1.1");
     break;
@@ -27,7 +27,7 @@ wrapTransportSocketOptions(Network::TransportSocketOptionsSharedPtr transport_so
     alpn.push_back("h2");
     break;
   case Http::Protocol::Http3:
-    NOT_REACHED_GCOVR_EXCL_LINE
+    NOT_REACHED_GCOVR_EXCL_LINE;
     break;
   }
 

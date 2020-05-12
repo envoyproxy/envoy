@@ -234,26 +234,26 @@ message GrpcService {
 
   reserved 4;
 
-  // Envoy's in-built gRPC client.
-  // See the :ref:`gRPC services overview <arch_overview_grpc_services>`
-  // documentation for discussion on gRPC client selection.
-  google.protobuf.Duration timeout = 3;
-
-  // `Google C++ gRPC client <https://github.com/grpc/grpc>`_
-  // See the :ref:`gRPC services overview <arch_overview_grpc_services>`
-  // documentation for discussion on gRPC client selection.
-  repeated HeaderValue initial_metadata = 5;
-
   oneof target_specifier {
     option (validate.required) = true;
 
-    // The timeout for the gRPC request. This is the timeout for a specific
-    // request.
+    // Envoy's in-built gRPC client.
+    // See the :ref:`gRPC services overview <arch_overview_grpc_services>`
+    // documentation for discussion on gRPC client selection.
     EnvoyGrpc envoy_grpc = 1;
 
-    // Additional metadata to include in streams initiated to the GrpcService.
-    // This can be used for scenarios in which additional ad hoc authorization
-    // headers (e.g. ``x-foo-bar: baz-key``) are to be injected.
+    // `Google C++ gRPC client <https://github.com/grpc/grpc>`_
+    // See the :ref:`gRPC services overview <arch_overview_grpc_services>`
+    // documentation for discussion on gRPC client selection.
     GoogleGrpc google_grpc = 2;
   }
+
+  // The timeout for the gRPC request. This is the timeout for a specific
+  // request.
+  google.protobuf.Duration timeout = 3;
+
+  // Additional metadata to include in streams initiated to the GrpcService.
+  // This can be used for scenarios in which additional ad hoc authorization
+  // headers (e.g. ``x-foo-bar: baz-key``) are to be injected.
+  repeated HeaderValue initial_metadata = 5;
 }

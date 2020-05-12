@@ -425,6 +425,11 @@ public:
   virtual bool shouldMergeSlashes() const PURE;
 
   /**
+   * @return if the HttpConnectionManager should remove the port from host/authority header
+   */
+  virtual bool shouldStripMatchingPort() const PURE;
+
+  /**
    * @return the action HttpConnectionManager should take when receiving client request
    * headers containing underscore characters.
    */
