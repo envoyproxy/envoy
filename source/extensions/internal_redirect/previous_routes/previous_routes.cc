@@ -34,7 +34,7 @@ private:
 } // namespace
 
 bool PreviousRoutesPredicate::acceptTargetRoute(StreamInfo::FilterState& filter_state,
-                                                absl::string_view route_name) {
+                                                absl::string_view route_name, bool, bool) {
   auto filter_state_name =
       absl::StrCat(PreviousRoutesPredicateStateNamePrefix, ".", current_route_name_);
   if (!filter_state.hasData<PreviousRoutesPredicateState>(filter_state_name)) {

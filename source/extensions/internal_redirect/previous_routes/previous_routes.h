@@ -16,8 +16,8 @@ public:
   explicit PreviousRoutesPredicate(absl::string_view current_route_name)
       : current_route_name_(current_route_name) {}
 
-  bool acceptTargetRoute(StreamInfo::FilterState& filter_state,
-                         absl::string_view route_name) override;
+  bool acceptTargetRoute(StreamInfo::FilterState& filter_state, absl::string_view route_name, bool,
+                         bool) override;
 
   absl::string_view name() const override {
     return InternalRedirectPredicateValues::get().PreviousRoutesPredicate;

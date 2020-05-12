@@ -16,12 +16,12 @@ namespace InternalRedirect {
 class AllowListedRoutesPredicate : public Router::InternalRedirectPredicate {
 public:
   AllowListedRoutesPredicate(
-      absl::string_view,
       const envoy::extensions::internal_redirect::allow_listed_routes::v3::AllowListedRoutesConfig&
           config)
       : allowed_routes_(config.allowed_route_names().begin(), config.allowed_route_names().end()) {}
 
-  bool acceptTargetRoute(StreamInfo::FilterState&, absl::string_view route_name) override {
+  bool acceptTargetRoute(StreamInfo::FilterState&, absl::string_view route_name, bool,
+                         bool) override {
     return allowed_routes_.contains(route_name);
   }
 

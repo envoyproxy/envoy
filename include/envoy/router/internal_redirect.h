@@ -27,7 +27,8 @@ public:
    *         response to be proxied downstream.
    */
   virtual bool acceptTargetRoute(StreamInfo::FilterState& filter_state,
-                                 absl::string_view target_route_name) PURE;
+                                 absl::string_view target_route_name, bool downstream_is_https,
+                                 bool target_is_https) PURE;
 
   /**
    * @return the name of the current predicate.

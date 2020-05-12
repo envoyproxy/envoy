@@ -4571,7 +4571,7 @@ TEST_F(RouterTest, InternalRedirectRejectedByPredicate) {
   EXPECT_CALL(callbacks_, clearRouteCache()).Times(1);
   EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, predicates())
       .WillOnce(Return(std::vector<InternalRedirectPredicateSharedPtr>({mock_predicate})));
-  EXPECT_CALL(*mock_predicate, acceptTargetRoute(_, _)).WillOnce(Return(false));
+  EXPECT_CALL(*mock_predicate, acceptTargetRoute(_, _, _, _)).WillOnce(Return(false));
   ON_CALL(*mock_predicate, name()).WillByDefault(Return("mock_predicate"));
   EXPECT_CALL(callbacks_, recreateStream()).Times(0);
 

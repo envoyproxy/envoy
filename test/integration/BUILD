@@ -633,6 +633,7 @@ envoy_cc_test(
         ":http_protocol_integration_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/internal_redirect/allow_listed_routes:config",
+        "//source/extensions/internal_redirect/only_allow_safe_cross_scheme_redirect:config",
         "//source/extensions/internal_redirect/previous_routes:config",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",

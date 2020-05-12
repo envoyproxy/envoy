@@ -1524,7 +1524,8 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
 
   auto& route_name = route->routeEntry()->routeName();
   for (auto& predicate : policy.predicates()) {
-    if (!predicate->acceptTargetRoute(*filter_state, route_name)) {
+    if (!predicate->acceptTargetRoute(*filter_state, route_name, !scheme_is_http,
+                                      !target_is_http)) {
       config_.stats_.passthrough_internal_redirect_predicate_.inc();
       ENVOY_STREAM_LOG(trace, "rejecting redirect targeting {}, by {} predicate", *callbacks_,
                        route_name, predicate->name());

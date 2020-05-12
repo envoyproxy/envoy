@@ -17,14 +17,12 @@ namespace InternalRedirect {
 class AllowListedRoutesPredicateFactory : public Router::InternalRedirectPredicateFactory {
 public:
   Router::InternalRedirectPredicateSharedPtr
-  createInternalRedirectPredicate(const Protobuf::Message& config,
-                                  absl::string_view current_route_name) override {
+  createInternalRedirectPredicate(const Protobuf::Message& config, absl::string_view) override {
     auto allow_listed_routes_config =
         MessageUtil::downcastAndValidate<const envoy::extensions::internal_redirect::
                                              allow_listed_routes::v3::AllowListedRoutesConfig&>(
             config, ProtobufMessage::getStrictValidationVisitor());
-    return std::make_shared<AllowListedRoutesPredicate>(current_route_name,
-                                                        allow_listed_routes_config);
+    return std::make_shared<AllowListedRoutesPredicate>(allow_listed_routes_config);
   }
 
   std::string name() const override {
