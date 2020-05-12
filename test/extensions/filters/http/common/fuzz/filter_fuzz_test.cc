@@ -41,7 +41,7 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::http::FilterFuzzTestCase& i
         // the time. The other half the time, let the fuzzing engine choose
         // any message to serialize.
         if (seed % 2 == 0 && input->data().has_proto_body()) {
-          UberFilterFuzzer::guideAnyProtoType(input->mutable_data(), seed);
+          UberFilterFuzzer::guideAnyProtoType(input->mutable_data(), seed / 2);
         }
       }};
 

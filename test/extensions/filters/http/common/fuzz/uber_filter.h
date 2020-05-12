@@ -17,7 +17,7 @@ public:
             const test::fuzz::HttpData& data);
 
   // For fuzzing proto data, guide the mutator to useful 'Any' types.
-  static void guideAnyProtoType(test::fuzz::HttpData* mutable_data, int seed);
+  static void guideAnyProtoType(test::fuzz::HttpData* mutable_data, uint choice);
 
 protected:
   // Set-up filter specific mock expectations in constructor.
