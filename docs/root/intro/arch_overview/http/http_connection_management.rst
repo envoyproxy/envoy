@@ -201,6 +201,10 @@ Specifically, the *allow listed routes* predicate defines edges of individual no
 and the *previous routes* predicate defines "visited" state of the edges, so that loop can be avoided
 if so desired.
 
+A third predicate :ref:`only_allow_safe_cross_scheme_redirect                                      
+<envoy_v3_api_msg_extensions.internal_redirect.only_allow_safe_cross_scheme_redirect.v3.OnlyAllowSafeCrossSchemeRedirectConfig>`
+can be used to prevent HTTP -> HTTPS redirect.
+
 Once the redirect has passed these checks, the request headers which were shipped to the original
 upstream will be modified by:
 
