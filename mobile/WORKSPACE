@@ -25,10 +25,10 @@ http_archive(
 http_archive(
     name = "com_google_absl",
     patches = ["//bazel:abseil.patch"],
-    sha256 = "190b0c9e65ef0866b44c54b517b5a3e15b67a1001b34547f03f8f4d8553c2851",
-    strip_prefix = "abseil-cpp-63ee2f8877915a3565c29707dba8fe4d7822596a",
-    # 2020-01-08
-    urls = ["https://github.com/abseil/abseil-cpp/archive/63ee2f8877915a3565c29707dba8fe4d7822596a.tar.gz"],
+    sha256 = "14ee08e2089c2a9b6bf27e1d10abc5629c69c4d0bab4b78ec5b65a29ea1c2af7",
+    strip_prefix = "abseil-cpp-cf3a1998e9d41709d4141e2f13375993cba1130e",
+    # 2020-03-05
+    urls = ["https://github.com/abseil/abseil-cpp/archive/cf3a1998e9d41709d4141e2f13375993cba1130e.tar.gz"],
 )
 
 # This should be kept in sync with Envoy itself, we just need to apply this patch
