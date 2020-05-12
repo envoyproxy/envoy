@@ -6,7 +6,9 @@ values can change when Github change their tar/gzip libraries breaking
 builds. Maintainer provided tarballs are more stable and the maintainer
 can provide the SHA256.
 
-# Adding external dependencies to Envoy (native Bazel)
+# Adding external dependencies to Envoy (C++)
+
+## Native Bazel
 
 This is the preferred style of adding dependencies that use Bazel for their
 build process.
@@ -17,7 +19,7 @@ build process.
    `external_deps` attribute.
 3. `bazel test //test/...`
 
-# Adding external dependencies to Envoy (external CMake)
+## External CMake (preferred)
 
 This is the preferred style of adding dependencies that use CMake for their build system.
 
@@ -29,7 +31,8 @@ This is the preferred style of adding dependencies that use CMake for their buil
    `external_deps` attribute.
 4. `bazel test //test/...`
 
-# Adding external dependencies to Envoy (genrule repository)
+
+## genrule repository
 
 This is the newer style of adding dependencies with no upstream Bazel configs.
 It wraps the dependency's native build tooling in a Bazel-aware shell script,
@@ -53,6 +56,24 @@ for details on Bazel's shell extensions.
 Dependencies between external libraries can use the standard Bazel dependency
 resolution logic, using the `$(location)` shell extension to resolve paths
 to binaries, libraries, headers, etc.
+
+# Adding external dependencies to Envoy (Python)
+
+Python dependencies should be added via `pip3` and `rules_python`. The process
+is:
+
+1. Define a `pip3_import()` pointing at your target `requirements.txt` in
+   [`bazel/repositories_extra.bzl`](repositories_extra.bzl)
+
+2. Add a `pip_install()` invocation in
+   [`bazel/dependency_imports.bzl`](dependency_imports.bzl).
+
+3. Add a `requirements("<package name")` in the `BUILD` file that depends on
+   this package.
+
+You can use [`tools/config_validation/BUILD`](../tools/config_validation/BUILD) as an example
+for this flow. See also the [`rules_python`](https://github.com/bazelbuild/rules_python)
+documentation for further references.
 
 # Updating an external dependency version
 

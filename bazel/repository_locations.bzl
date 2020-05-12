@@ -365,8 +365,11 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["build"],
     ),
     rules_python = dict(
-        sha256 = "aa96a691d3a8177f3215b14b0edc9641787abaaa30363a080165d06ab65e1161",
-        urls = ["https://github.com/bazelbuild/rules_python/releases/download/0.0.1/rules_python-0.0.1.tar.gz"],
+        sha256 = "76a8fd4e7eca2a3590f816958faa0d83c9b2ce9c32634c5c375bcccf161d3bb5",
+        strip_prefix = "rules_python-a0fbf98d4e3a232144df4d0d80b577c7a693b570",
+        # 2020-04-09
+        # TODO(htuch): revert back to a point releases when pip3_import appears.
+        urls = ["https://github.com/bazelbuild/rules_python/archive/a0fbf98d4e3a232144df4d0d80b577c7a693b570.tar.gz"],
         use_category = ["build"],
     ),
     six = dict(
