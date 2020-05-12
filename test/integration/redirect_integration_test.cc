@@ -235,7 +235,9 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPreventedByPreviousRoutesPredica
   internal_redirect_policy->mutable_max_internal_redirects()->set_value(10);
   envoy::extensions::internal_redirect::previous_routes::v3::PreviousRoutesConfig
       previous_routes_config;
-  internal_redirect_policy->add_predicates()->PackFrom(previous_routes_config);
+  auto* predicate = internal_redirect_policy->add_predicates();
+  predicate->set_name("previous_routes");
+  predicate->mutable_typed_config()->PackFrom(previous_routes_config);
   config_helper_.addVirtualHost(handle_prevent_repeated_target);
 
   // Validate that header sanitization is only called once.
@@ -286,10 +288,11 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPreventedByAllowListedRoutesPred
                                        ->mutable_internal_redirect_policy();
 
   auto* allow_listed_routes_predicate = internal_redirect_policy->add_predicates();
+  allow_listed_routes_predicate->set_name("allow_listed_routes");
   envoy::extensions::internal_redirect::allow_listed_routes::v3::AllowListedRoutesConfig
       allow_listed_routes_config;
   *allow_listed_routes_config.add_allowed_route_names() = "max_three_hop";
-  allow_listed_routes_predicate->PackFrom(allow_listed_routes_config);
+  allow_listed_routes_predicate->mutable_typed_config()->PackFrom(allow_listed_routes_config);
 
   internal_redirect_policy->mutable_max_internal_redirects()->set_value(10);
 

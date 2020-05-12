@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.config.route.v3;
 
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/proxy_protocol.proto";
 import "envoy/type/matcher/v3/regex.proto";
 import "envoy/type/matcher/v3/string.proto";
@@ -1621,7 +1622,7 @@ message InternalRedirectPolicy {
   // Specifies a list of predicates that are queried when an upstream response is deemed
   // to trigger an internal redirect by all other criteria. Any predicate in the list can reject
   // the redirect, causing the response to be proxied to downstream.
-  repeated google.protobuf.Any predicates = 3;
+  repeated core.v3.TypedExtensionConfig predicates = 3;
 
   // Disallow internal redirect to follow a target URI with a different scheme than the value of
   // x-forwarded-proto. Default behavior is to follow such redirects.
