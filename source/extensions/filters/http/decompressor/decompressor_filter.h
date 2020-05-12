@@ -54,6 +54,22 @@ public:
     const Runtime::FeatureFlag decompression_enabled_;
   };
 
+  class RequestDirectionConfig : public DirectionConfig {
+  public:
+    RequestDirectionConfig(const envoy::extensions::filters::http::decompressor::v3::Decompressor& proto_config,
+        const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime);
+
+    const bool advertiseAcceptEncoding() const { return advertise_accept_encoding_; }
+
+  private:
+    const bool advertise_accept_encoding_;
+  };
+
+  class ResponseDirectionConfig : public DirectionConfig {
+    ResponseDirectionConfig(const envoy::extensions::filters::http::decompressor::v3::Decompressor& proto_config,
+        const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime);
+  };
+
   DecompressorFilterConfig(
       const envoy::extensions::filters::http::decompressor::v3::Decompressor& proto_config,
       const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
@@ -63,14 +79,14 @@ public:
     return decompressor_factory_->createDecompressor();
   }
   const std::string& contentEncoding() { return decompressor_factory_->contentEncoding(); }
-  const DirectionConfig& requestDirectionConfig() { return request_direction_config_; }
-  const DirectionConfig& responseDirectionConfig() { return response_direction_config_; }
+  const RequestDirectionConfig& requestDirectionConfig() { return request_direction_config_; }
+  const ResponseDirectionConfig& responseDirectionConfig() { return response_direction_config_; }
 
 private:
   const std::string stats_prefix_;
   Compression::Decompressor::DecompressorFactoryPtr decompressor_factory_;
-  const DirectionConfig request_direction_config_;
-  const DirectionConfig response_direction_config_;
+  const RequestDirectionConfig request_direction_config_;
+  const ResponseDirectionConfig response_direction_config_;
 };
 
 using DecompressorFilterConfigSharedPtr = std::shared_ptr<DecompressorFilterConfig>;

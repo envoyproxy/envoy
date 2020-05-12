@@ -21,8 +21,8 @@ DecompressorFilterConfig::DecompressorFilterConfig(
                                     : ".",
                                 decompressor_factory->statsPrefix() + ".")),
       decompressor_factory_(std::move(decompressor_factory)),
-      request_direction_config_(true, proto_config, stats_prefix_, scope, runtime),
-      response_direction_config_(false, proto_config, stats_prefix_, scope, runtime) {}
+      request_direction_config_(proto_config, stats_prefix_, scope, runtime),
+      response_direction_config_(proto_config, stats_prefix_, scope, runtime) {}
 
 DecompressorFilterConfig::DirectionConfig::DirectionConfig(
     const bool is_request_direction,
@@ -33,6 +33,12 @@ DecompressorFilterConfig::DirectionConfig::DirectionConfig(
       decompression_enabled_(is_request_direction ? proto_config.request_decompression_enabled()
                                                   : proto_config.response_decompression_enabled(),
                              runtime) {}
+
+DecompressorFilterConfig::RequestDirectionConfig::RequestDirectionConfig(const envoy::extensions::filters::http::decompressor::v3::Decompressor& proto_config,
+        const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime) : DirectionConfig(true, proto_config, stats_prefix, scope, runtime), advertise_accept_encoding_(proto_config.request_direction_config().advertise_accept_encoding()) {}
+
+DecompressorFilterConfig::ResponseDirectionConfig::ResponseDirectionConfig(const envoy::extensions::filters::http::decompressor::v3::Decompressor& proto_config,
+        const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime) : DirectionConfig(false, proto_config, stats_prefix, scope, runtime) {}
 
 DecompressorFilter::DecompressorFilter(DecompressorFilterConfigSharedPtr config)
     : config_(std::move(config)) {}
