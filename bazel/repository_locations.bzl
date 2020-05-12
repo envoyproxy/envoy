@@ -149,21 +149,21 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["other"],
     ),
     com_github_fmtlib_fmt = dict(
-        sha256 = "fe6e4ff397e01c379fc4532519339c93da47404b9f6674184a458a9967a76575",
-        strip_prefix = "fmt-6.2.0",
-        urls = ["https://github.com/fmtlib/fmt/archive/6.2.0.tar.gz"],
+        sha256 = "5014aacf55285bf79654539791de0d6925063fddf4dfdd597ef76b53eb994f86",
+        strip_prefix = "fmt-e2ff910675c7800e5c4e28e1509ca6a50bdceafa",
+        urls = ["https://github.com/fmtlib/fmt/archive/e2ff910675c7800e5c4e28e1509ca6a50bdceafa.tar.gz"],
         use_category = ["observability"],
         cpe = "N/A",
     ),
     com_github_gabime_spdlog = dict(
-        sha256 = "afd18f62d1bc466c60bef088e6b637b0284be88c515cedc59ad4554150af6043",
-        strip_prefix = "spdlog-1.4.0",
-        urls = ["https://github.com/gabime/spdlog/archive/v1.4.0.tar.gz"],
+        sha256 = "b38e0bbef7faac2b82fed550a0c19b0d4e7f6737d5321d4fd8f216b80f8aee8a",
+        strip_prefix = "spdlog-1.5.0",
+        urls = ["https://github.com/gabime/spdlog/archive/v1.5.0.tar.gz"],
         use_category = ["observability"],
         cpe = "N/A",
     ),
     com_github_google_libprotobuf_mutator = dict(
-        sha256 = "",
+        sha256 = "f6def6cdf63e29a367d46c0ad9e3e31eed89d031e22e0caac126f1e62d8b3fd0",
         strip_prefix = "libprotobuf-mutator-3521f47a2828da9ace403e4ecc4aece1a84feb36",
         # 2020-02-04
         urls = ["https://github.com/google/libprotobuf-mutator/archive/3521f47a2828da9ace403e4ecc4aece1a84feb36.tar.gz"],

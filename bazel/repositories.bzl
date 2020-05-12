@@ -290,10 +290,6 @@ def _com_github_fmtlib_fmt():
     _repository_impl(
         name = "com_github_fmtlib_fmt",
         build_file = "@envoy//bazel/external:fmtlib.BUILD",
-        patch_args = ["-p1"],
-        # This patch fixes throws that prevented over-exhausting fuzzing resourced in the
-        # fmt library code during fuzzing mode.
-        patches = ["@envoy//bazel:fmt.patch"],
     )
     native.bind(
         name = "fmtlib",
