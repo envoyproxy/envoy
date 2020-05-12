@@ -423,6 +423,7 @@ builtins
 bulkstrings
 bursty
 bytecode
+bytestream
 cacheability
 callee
 callsite
@@ -477,6 +478,7 @@ coroutines
 cors
 cout
 coverity
+cplusplus
 cpuset
 creds
 crypto
