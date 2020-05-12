@@ -34,6 +34,7 @@ Performance
   :maxdepth: 2
 
   performance/how_fast_is_envoy
+  performance/how_to_benchmark_envoy
 
 Configuration
 -------------
