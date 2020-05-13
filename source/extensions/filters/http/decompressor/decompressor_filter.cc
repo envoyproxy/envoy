@@ -71,7 +71,7 @@ Http::FilterHeadersStatus DecompressorFilter::decodeHeaders(Http::RequestHeaderM
 
   //   2. If request decompression is enabled, then decompress the request.
   return maybeInitDecompress(config_->requestDirectionConfig(), request_decompressor_,
-                             *decoder_callbacks_, headers);
+                             decoder_callbacks_, *decoder_callbacks_, headers);
 };
 
 Http::FilterDataStatus DecompressorFilter::decodeData(Buffer::Instance& data, bool end_stream) {
@@ -88,7 +88,7 @@ Http::FilterHeadersStatus DecompressorFilter::encodeHeaders(Http::ResponseHeader
   ENVOY_STREAM_LOG(debug, "DecompressorFilter::encodeHeaders: {}", *encoder_callbacks_, headers);
 
   return maybeInitDecompress(config_->responseDirectionConfig(), response_decompressor_,
-                             *encoder_callbacks_, headers);
+                             encoder_callbacks_, *encoder_callbacks_, headers);
 }
 
 Http::FilterDataStatus DecompressorFilter::encodeData(Buffer::Instance& data, bool end_stream) {
@@ -96,11 +96,12 @@ Http::FilterDataStatus DecompressorFilter::encodeData(Buffer::Instance& data, bo
                          *decoder_callbacks_, data, end_stream);
 }
 
-Http::FilterHeadersStatus
-DecompressorFilter::maybeInitDecompress(DecompressorFilterConfig::DirectionConfig& direction_config,
-                                        Compression::Decompressor::DecompressorPtr& decompressor,
-                                        Http::StreamFilterCallbacks& callbacks,
-                                        Http::RequestOrResponseHeaderMap& headers) {
+Http::FilterHeadersStatus DecompressorFilter::maybeInitDecompress(
+    DecompressorFilterConfig::DirectionConfig& direction_config,
+    Compression::Decompressor::DecompressorPtr& decompressor,
+    absl::variant<Http::StreamDecoderFilterCallbacks*, Http::StreamEncoderFilterCallbacks*>
+        decoder_or_encoder_callbacks,
+    Http::StreamFilterCallbacks& callbacks, Http::RequestOrResponseHeaderMap& headers) {
   if (direction_config.decompressionEnabled() && !hasCacheControlNoTransform(headers) &&
       contentEncodingMatches(headers)) {
     direction_config.stats().decompressed_.inc();
@@ -112,7 +113,14 @@ DecompressorFilter::maybeInitDecompress(DecompressorFilterConfig::DirectionConfi
     // the filter is configured to buffer.
     if (headers.removeContentLength() > 0 && direction_config.maxBufferedBytes()) {
       direction_config.setBuffering(true);
-      callbacks.setBufferLimit(direction_config.maxBufferedBytes().value());
+      if (absl::holds_alternative<Http::StreamDecoderFilterCallbacks*>(
+              decoder_or_encoder_callbacks)) {
+        absl::get<Http::StreamDecoderFilterCallbacks*>(decoder_or_encoder_callbacks)
+            ->setDecoderBufferLimit(direction_config.maxBufferedBytes().value());
+      } else {
+        absl::get<Http::StreamEncoderFilterCallbacks*>(decoder_or_encoder_callbacks)
+            ->setEncoderBufferLimit(direction_config.maxBufferedBytes().value());
+      }
       direction_config.setHeaders(&headers);
       // Note that the log will print the updated headers. The incoming headers can be seen from the
       // log in decode/encodeHeaders.

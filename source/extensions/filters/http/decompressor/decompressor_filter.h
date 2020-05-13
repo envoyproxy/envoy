@@ -137,11 +137,12 @@ public:
   Http::FilterDataStatus encodeData(Buffer::Instance&, bool) override;
 
 private:
-  Http::FilterHeadersStatus
-  maybeInitDecompress(DecompressorFilterConfig::DirectionConfig& direction_config,
-                      Compression::Decompressor::DecompressorPtr& decompressor,
-                      Http::StreamFilterCallbacks& callbacks,
-                      Http::RequestOrResponseHeaderMap& headers);
+  Http::FilterHeadersStatus maybeInitDecompress(
+      DecompressorFilterConfig::DirectionConfig& direction_config,
+      Compression::Decompressor::DecompressorPtr& decompressor,
+      absl::variant<Http::StreamDecoderFilterCallbacks*, Http::StreamEncoderFilterCallbacks*>
+          decoder_or_encoder_callbacks,
+      Http::StreamFilterCallbacks& callbacks, Http::RequestOrResponseHeaderMap& headers);
   Http::FilterDataStatus
   maybeDecompress(DecompressorFilterConfig::DirectionConfig& direction_config,
                   Compression::Decompressor::Decompressor* decompressor,
