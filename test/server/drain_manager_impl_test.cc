@@ -75,6 +75,12 @@ TEST_F(DrainManagerImplTest, DrainDeadline) {
   EXPECT_FALSE(drain_manager.drainClose());
   simTime().advanceTimeWait(std::chrono::seconds(1));
   EXPECT_TRUE(drain_manager.drainClose());
+
+  // Test that this still works if remaining time is negative
+  simTime().advanceTimeWait(std::chrono::seconds(1));
+  EXPECT_TRUE(drain_manager.drainClose());
+  simTime().advanceTimeWait(std::chrono::seconds(500));
+  EXPECT_TRUE(drain_manager.drainClose());
 }
 
 TEST_F(DrainManagerImplTest, DrainDeadlineProbability) {

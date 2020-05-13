@@ -36,7 +36,6 @@ private:
 
   std::atomic<bool> draining_{false};
   Event::TimerPtr drain_tick_timer_;
-  std::function<void()> drain_complete_cb_;
   MonotonicTime drain_deadline_;
 
   Event::TimerPtr parent_shutdown_timer_;
