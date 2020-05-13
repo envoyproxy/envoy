@@ -63,14 +63,14 @@ typed_config:
 
     const std::string cluster_type_config =
         fmt::format(R"EOF(
-  name: envoy.clusters.dynamic_forward_proxy
-  typed_config:
-    "@type": type.googleapis.com/envoy.config.cluster.dynamic_forward_proxy.v2alpha.ClusterConfig
-    dns_cache_config:
-      name: foo
-      dns_lookup_family: {}
-      max_hosts: {}
-  )EOF",
+name: envoy.clusters.dynamic_forward_proxy
+typed_config:
+  "@type": type.googleapis.com/envoy.config.cluster.dynamic_forward_proxy.v2alpha.ClusterConfig
+  dns_cache_config:
+    name: foo
+    dns_lookup_family: {}
+    max_hosts: {}
+)EOF",
                     Network::Test::ipVersionToDnsFamily(GetParam()), max_hosts);
 
     TestUtility::loadFromYaml(cluster_type_config, *cluster_.mutable_cluster_type());
@@ -106,7 +106,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyFilterIntegrationTest,
 
 class ProxyFilterCircuitBreakerIntegrationTest : public ProxyFilterIntegrationTest {
 public:
-  ProxyFilterCircuitBreakerIntegrationTest() {}
+  ProxyFilterCircuitBreakerIntegrationTest() = default;
 
   void setup(uint64_t max_hosts = 1024, uint32_t max_pending_requests = 0) {
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
@@ -114,7 +114,7 @@ public:
     const std::string filter = fmt::format(R"EOF(
 name: dynamic_forward_proxy
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.dynamic_forward_proxy.v2alpha.FilterConfig
+  "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig
   dns_cache_config:
     name: foo
     dns_lookup_family: {}
@@ -157,7 +157,7 @@ typed_config:
         R"EOF(
   name: envoy.clusters.dynamic_forward_proxy
   typed_config:
-    "@type": type.googleapis.com/envoy.config.cluster.dynamic_forward_proxy.v2alpha.ClusterConfig
+    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
     dns_cache_config:
       name: foo
       dns_lookup_family: {}

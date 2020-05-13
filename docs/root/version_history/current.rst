@@ -8,6 +8,7 @@ Changes
 * access loggers: applied existing buffer limits to the non-google gRPC access logs, as well as :ref:`stats <config_access_log_stats>` for logged / dropped logs.
 * access loggers: extened specifier for FilterStateFormatter to output :ref:`unstructured log string <config_access_log_format_filter_state>`.
 * dynamic forward proxy: added :ref:`SNI based dynamic forward proxy <config_network_filters_sni_dynamic_forward_proxy>` support.
+* dynamic forward proxy: added configurable circuit breakers for resolver on DNS cache.
 * fault: added support for controlling the percentage of requests that abort, delay and response rate limits faults
   are applied to using :ref:`HTTP headers <config_http_filters_fault_injection_http_header>` to the HTTP fault filter.
 * fault: added support for specifying grpc_status code in abort faults using

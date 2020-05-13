@@ -8,6 +8,8 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/mocks/upstream/transport_socket_match.h"
 
+#include "absl/memory/memory.h"
+
 using testing::AtLeast;
 using testing::Eq;
 using testing::InSequence;
@@ -46,12 +48,15 @@ public:
     // Configure max pending to 1 so we can test circuit breaking.
     cm_.thread_local_cluster_.cluster_.info_->resetResourceManager(0, 1, 0, 0, 0);
 
-    cb_stats =
-        std::unique_ptr<Extensions::Common::DynamicForwardProxy::DnsCacheCircuitBreakersStats>(
-            new Extensions::Common::DynamicForwardProxy::DnsCacheCircuitBreakersStats{
-                ALL_DNS_CACHE_CIRCUIT_BREAKERS_STATS(
-                    POOL_GAUGE_PREFIX(store_, "circuit_breakers"),
-                    POOL_GAUGE_PREFIX(store_, "circuit_breakers"))});
+    // This temporal pointer variable is used for aggregate initialization since we can't apply
+    // aggregated initializer to std::make_unique directly.
+    auto* cb_stats__ptr = new Extensions::Common::DynamicForwardProxy::DnsCacheCircuitBreakersStats{
+        ALL_DNS_CACHE_CIRCUIT_BREAKERS_STATS(POOL_GAUGE_PREFIX(store_, "circuit_breakers"),
+                                             POOL_GAUGE_PREFIX(store_, "circuit_breakers"))};
+    cb_stats_ =
+        absl::WrapUnique<Extensions::Common::DynamicForwardProxy::DnsCacheCircuitBreakersStats>(
+            cb_stats__ptr);
+
     envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheCircuitBreakers cb_config;
     std::string config_yaml = R"EOF(
       max_pending_requests: 1
@@ -60,7 +65,7 @@ public:
 
     dns_cache_resource_manager_ =
         std::make_unique<Extensions::Common::DynamicForwardProxy::DnsCacheResourceManager>(
-            *cb_stats, loader_, "default", cb_config);
+            *cb_stats_, loader_, "default", cb_config);
   }
 
   ~ProxyFilterTest() override {
@@ -84,7 +89,7 @@ public:
   NiceMock<Stats::MockIsolatedStatsStore> store_;
   NiceMock<Runtime::MockLoader> loader_;
   Http::TestRequestHeaderMapImpl request_headers_{{":authority", "foo"}};
-  std::unique_ptr<Extensions::Common::DynamicForwardProxy::DnsCacheCircuitBreakersStats> cb_stats;
+  std::unique_ptr<Extensions::Common::DynamicForwardProxy::DnsCacheCircuitBreakersStats> cb_stats_;
   std::unique_ptr<Extensions::Common::DynamicForwardProxy::DnsCacheResourceManager>
       dns_cache_resource_manager_;
 };
@@ -201,8 +206,8 @@ TEST_F(ProxyFilterTest, CircuitBreakerOverflowWithDnsCacheResourceManager) {
             filter_->decodeHeaders(request_headers_, false));
 
   // Check if the Circuit Breaking is activated.
-  EXPECT_EQ(0U, cb_stats->rq_pending_remaining_.value());
-  EXPECT_EQ(1U, cb_stats->rq_pending_opening_.value());
+  EXPECT_EQ(0U, cb_stats_->rq_pending_remaining_.value());
+  EXPECT_EQ(1U, cb_stats_->rq_pending_opening_.value());
 
   // Create a second filter for a 2nd request.
   auto filter2 = std::make_unique<ProxyFilter>(filter_config_);
