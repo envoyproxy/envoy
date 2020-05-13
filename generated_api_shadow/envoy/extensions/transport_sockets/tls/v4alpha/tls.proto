@@ -103,15 +103,20 @@ message CommonTlsContext {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.transport_sockets.tls.v3.CommonTlsContext";
 
-  // Config for CA client plugin to get secrets
-  message CAClientPluginConfig {
+  // Config for Certificate provider to get certificates. This provider should allow certificates to be
+  // fetched/refreshed over the network "asynchronously" with respect to the TLS handshake.
+  message CertificateProvider {
     option (udpa.annotations.versioning).previous_message_type =
-        "envoy.extensions.transport_sockets.tls.v3.CommonTlsContext.CAClientPluginConfig";
+        "envoy.extensions.transport_sockets.tls.v3.CommonTlsContext.CertificateProvider";
 
-    // plugin name
+    // certificate name: can be used to request a local cert vs a root cert
     string name = 1;
 
-    // plugin specific config
+    // Provider specific config: contains a name and an Any struct to pass a typed config.
+    // Note: an implementation is expected to dedup multiple instances of the same config
+    // to maintain a single certificate-provider instance. The sharing can happen, for
+    // examplem, among multiple clusters or between the tls_certificate and validation_context
+    // certificate providers of a cluster.
     config.core.v4alpha.TypedExtensionConfig typed_config = 2;
   }
 
@@ -125,13 +130,14 @@ message CommonTlsContext {
         [(validate.rules).message = {required: true}];
 
     oneof dynamic_validation_context {
-      // Config for fetching validation context via SDS API.
+      // Config for fetching validation context via SDS API. Note SDS API allows certificates to be
+      // fetched/refreshed over the network "asynchronously" with respect to the TLS handshake.
       SdsSecretConfig validation_context_sds_secret_config = 2
           [(validate.rules).message = {required: true}];
 
-      // Config for fetching validation context via CA client plugin
+      // Certificate provider for fetching validation context
       // [#not-implemented-hide:]
-      CAClientPluginConfig validation_context_ca_client_plugin = 3;
+      CertificateProvider validation_context_certificate_provider = 3;
     }
   }
 
@@ -148,21 +154,21 @@ message CommonTlsContext {
   // used for clients that support ECDSA.
   repeated TlsCertificate tls_certificates = 2;
 
-  oneof dynamic_tls_certificate {
-    // Configs for fetching TLS certificates via SDS API.
-    repeated SdsSecretConfig tls_certificate_sds_secret_configs = 6
-        [(validate.rules).repeated = {max_items: 1}];
+  // Configs for fetching TLS certificates via SDS API. Note SDS API allows certificates to be
+  // fetched/refreshed over the network "asynchronously" with respect to the TLS handshake.
+  repeated SdsSecretConfig tls_certificate_sds_secret_configs = 6
+      [(validate.rules).repeated = {max_items: 1}];
 
-    // Config for fetching TLS certificates via CA client plugin.
-    // [#not-implemented-hide:]
-    CAClientPluginConfig tls_certificate_ca_client_plugin = 9;
-  }
+  // Certificate provider for fetching TLS certificates.
+  // [#not-implemented-hide:]
+  CertificateProvider tls_certificate_certificate_provider = 9;
 
   oneof validation_context_type {
     // How to validate peer certificates.
     CertificateValidationContext validation_context = 3;
 
-    // Config for fetching validation context via SDS API.
+    // Config for fetching validation context via SDS API. Note SDS API allows certificates to be
+    // fetched/refreshed over the network "asynchronously" with respect to the TLS handshake.
     SdsSecretConfig validation_context_sds_secret_config = 7;
 
     // Combined certificate validation context holds a default CertificateValidationContext
@@ -174,9 +180,9 @@ message CommonTlsContext {
     // CertificateValidationContext, and logical OR is applied to boolean fields.
     CombinedCertificateValidationContext combined_validation_context = 8;
 
-    // Config for fetching validation context via CA client plugin.
+    // Certificate provider for fetching validation context.
     // [#not-implemented-hide:]
-    CAClientPluginConfig validation_context_ca_client_plugin = 10;
+    CertificateProvider validation_context_certificate_provider = 10;
   }
 
   // Supplies the list of ALPN protocols that the listener should expose. In
