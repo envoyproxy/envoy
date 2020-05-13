@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/internal_redirect/only_allow_safe_cross_scheme_redirect/v3/only_allow_safe_cross_scheme_redirect_config.pb.h"
-#include "envoy/extensions/internal_redirect/only_allow_safe_cross_scheme_redirect/v3/only_allow_safe_cross_scheme_redirect_config.pb.validate.h"
 #include "envoy/router/internal_redirect.h"
 
 #include "extensions/internal_redirect/only_allow_safe_cross_scheme_redirect/only_allow_safe_cross_scheme_redirect.h"

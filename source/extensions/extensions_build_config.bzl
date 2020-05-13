@@ -185,6 +185,6 @@ EXTENSIONS = {
     # Internal redirect predicates
     #
     "envoy.internal_redirect_predicates.allow_listed_routes": "//source/extensions/internal_redirect/allow_listed_routes:config",
-    "envoy.internal_redirect_predicates.only_allow_safe_cross_scheme_redirect": "//source/extensions/internal_redirect/only_allow_safe_cross_scheme_redirect:config",
     "envoy.internal_redirect_predicates.previous_routes":     "//source/extensions/internal_redirect/previous_routes:config",
+    "envoy.internal_redirect_predicates.only_allow_safe_cross_scheme_redirect": "//source/extensions/internal_redirect/only_allow_safe_cross_scheme_redirect:config",
 }

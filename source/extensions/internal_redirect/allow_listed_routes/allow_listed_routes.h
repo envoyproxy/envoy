@@ -15,7 +15,7 @@ namespace InternalRedirect {
 
 class AllowListedRoutesPredicate : public Router::InternalRedirectPredicate {
 public:
-  AllowListedRoutesPredicate(
+  explicit AllowListedRoutesPredicate(
       const envoy::extensions::internal_redirect::allow_listed_routes::v3::AllowListedRoutesConfig&
           config)
       : allowed_routes_(config.allowed_route_names().begin(), config.allowed_route_names().end()) {}
