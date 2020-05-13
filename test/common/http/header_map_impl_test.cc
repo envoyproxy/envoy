@@ -1,6 +1,8 @@
+#include <algorithm>
 #include <memory>
 #include <string>
 
+#include "common/http/header_list_view.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/header_utility.h"
 
@@ -9,6 +11,7 @@
 
 #include "gtest/gtest.h"
 
+using ::testing::ElementsAre;
 using ::testing::InSequence;
 
 namespace Envoy {
@@ -912,13 +915,17 @@ TEST(HeaderMapImplTest, TestHeaderList) {
   std::array<std::string, 2> values{"/", "world"};
 
   auto headers = createHeaderMap<TestHeaderMapImpl>({{keys[0], values[0]}, {keys[1], values[1]}});
-  const auto header_list = headers->createHeaderListView();
-  const auto header_keys = header_list.keys();
-  const auto header_values = header_list.values();
-  for (size_t i = 0; i < keys.size(); ++i) {
-    EXPECT_EQ(keys[i].get(), header_keys[i].get().getStringView());
-    EXPECT_EQ(values[i], header_values[i].get().getStringView());
-  }
+  const auto header_list = HeaderListView(headers->header_map_);
+  std::vector<absl::string_view> str_header_keys(2);
+  std::transform(header_list.keys().begin(), header_list.keys().end(), str_header_keys.begin(),
+                 [](auto key) -> absl::string_view { return key.get().getStringView(); });
+  std::vector<absl::string_view> str_header_values(2);
+  std::transform(header_list.values().begin(), header_list.values().end(),
+                 str_header_values.begin(),
+                 [](auto value) -> absl::string_view { return value.get().getStringView(); });
+
+  EXPECT_THAT(str_header_keys, ElementsAre(":path", "hello"));
+  EXPECT_THAT(str_header_values, ElementsAre("/", "world"));
 }
 
 TEST(HeaderMapImplTest, TestAppendHeader) {

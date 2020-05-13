@@ -115,7 +115,6 @@ envoy_cc_test_library(
         "//source/common/config:version_converter_lib",
         "//source/common/filesystem:directory_lib",
         "//source/common/filesystem:filesystem_lib",
-        "//source/common/http:header_list_view_lib",
         "//source/common/http:header_map_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/network:address_lib",

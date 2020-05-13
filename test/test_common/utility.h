@@ -20,7 +20,6 @@
 #include "common/common/empty_string.h"
 #include "common/common/thread.h"
 #include "common/config/version_converter.h"
-#include "common/http/header_list_view.h"
 #include "common/http/header_map_impl.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
@@ -778,7 +777,6 @@ public:
   void dumpState(std::ostream& os, int indent_level = 0) const override {
     header_map_.dumpState(os, indent_level);
   }
-  HeaderListView createHeaderListView() const { return HeaderListView(header_map_); }
 
   Impl header_map_;
 };
