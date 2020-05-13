@@ -31,7 +31,6 @@ envoy_cc_test(
         "//include/envoy/runtime:runtime_interface",
         "//source/common/http:message_lib",
         "//source/common/json:json_loader_lib",
-        "//source/common/profiler:profiler_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:symbol_table_creator_lib",
@@ -85,6 +84,23 @@ envoy_cc_test(
     deps = [
         "//source/server/http:prometheus_stats_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "logs_handler_test",
+    srcs = ["logs_handler_test.cc"],
+    deps = [
+        ":admin_instance_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "profiling_handler_test",
+    srcs = ["profiling_handler_test.cc"],
+    deps = [
+        ":admin_instance_lib",
+        "//test/test_common:logging_lib",
     ],
 )
 

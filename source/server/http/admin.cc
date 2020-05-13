@@ -41,7 +41,6 @@
 #include "common/memory/utils.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/utility.h"
-#include "common/profiler/profiler.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 #include "common/router/config_impl.h"
@@ -258,53 +257,6 @@ void trimResourceMessage(const Protobuf::FieldMask& field_mask, Protobuf::Messag
 }
 
 } // namespace
-
-bool AdminImpl::changeLogLevel(const Http::Utility::QueryParams& params) {
-  if (params.size() != 1) {
-    return false;
-  }
-
-  std::string name = params.begin()->first;
-  std::string level = params.begin()->second;
-
-  // First see if the level is valid.
-  size_t level_to_use = std::numeric_limits<size_t>::max();
-  for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_string_views); i++) {
-    if (level == spdlog::level::level_string_views[i]) {
-      level_to_use = i;
-      break;
-    }
-  }
-
-  if (level_to_use == std::numeric_limits<size_t>::max()) {
-    return false;
-  }
-
-  // Now either change all levels or a single level.
-  if (name == "level") {
-    ENVOY_LOG(debug, "change all log levels: level='{}'", level);
-    for (Logger::Logger& logger : Logger::Registry::loggers()) {
-      logger.setLevel(static_cast<spdlog::level::level_enum>(level_to_use));
-    }
-  } else {
-    ENVOY_LOG(debug, "change log level: name='{}' level='{}'", name, level);
-    Logger::Logger* logger_to_change = nullptr;
-    for (Logger::Logger& logger : Logger::Registry::loggers()) {
-      if (logger.name() == name) {
-        logger_to_change = &logger;
-        break;
-      }
-    }
-
-    if (!logger_to_change) {
-      return false;
-    }
-
-    logger_to_change->setLevel(static_cast<spdlog::level::level_enum>(level_to_use));
-  }
-
-  return true;
-}
 
 void AdminImpl::addOutlierInfo(const std::string& cluster_name,
                                const Upstream::Outlier::Detector* outlier_detector,
@@ -603,77 +555,6 @@ Http::Code AdminImpl::handlerContention(absl::string_view,
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerCpuProfiler(absl::string_view url, Http::ResponseHeaderMap&,
-                                         Buffer::Instance& response, AdminStream&) {
-  Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
-  if (query_params.size() != 1 || query_params.begin()->first != "enable" ||
-      (query_params.begin()->second != "y" && query_params.begin()->second != "n")) {
-    response.add("?enable=<y|n>\n");
-    return Http::Code::BadRequest;
-  }
-
-  bool enable = query_params.begin()->second == "y";
-  if (enable && !Profiler::Cpu::profilerEnabled()) {
-    if (!Profiler::Cpu::startProfiler(profile_path_)) {
-      response.add("failure to start the profiler");
-      return Http::Code::InternalServerError;
-    }
-
-  } else if (!enable && Profiler::Cpu::profilerEnabled()) {
-    Profiler::Cpu::stopProfiler();
-  }
-
-  response.add("OK\n");
-  return Http::Code::OK;
-}
-
-Http::Code AdminImpl::handlerHeapProfiler(absl::string_view url, Http::ResponseHeaderMap&,
-                                          Buffer::Instance& response, AdminStream&) {
-  if (!Profiler::Heap::profilerEnabled()) {
-    response.add("The current build does not support heap profiler");
-    return Http::Code::NotImplemented;
-  }
-
-  Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
-  if (query_params.size() != 1 || query_params.begin()->first != "enable" ||
-      (query_params.begin()->second != "y" && query_params.begin()->second != "n")) {
-    response.add("?enable=<y|n>\n");
-    return Http::Code::BadRequest;
-  }
-
-  Http::Code res = Http::Code::OK;
-  bool enable = query_params.begin()->second == "y";
-  if (enable) {
-    if (Profiler::Heap::isProfilerStarted()) {
-      response.add("Fail to start heap profiler: already started");
-      res = Http::Code::BadRequest;
-    } else if (!Profiler::Heap::startProfiler(profile_path_)) {
-      // GCOVR_EXCL_START
-      // TODO(silentdai) remove the GCOVR when startProfiler is better implemented
-      response.add("Fail to start the heap profiler");
-      res = Http::Code::InternalServerError;
-      // GCOVR_EXCL_STOP
-    } else {
-      response.add("Starting heap profiler");
-      res = Http::Code::OK;
-    }
-  } else {
-    // !enable
-    if (!Profiler::Heap::isProfilerStarted()) {
-      response.add("Fail to stop heap profiler: not started");
-      res = Http::Code::BadRequest;
-    } else {
-      Profiler::Heap::stopProfiler();
-      response.add(
-          fmt::format("Heap profiler stopped and data written to {}. See "
-                      "http://goog-perftools.sourceforge.net/doc/heap_profiler.html for details.",
-                      profile_path_));
-      res = Http::Code::OK;
-    }
-  }
-  return res;
-}
-
 Http::Code AdminImpl::handlerHealthcheckFail(absl::string_view, Http::ResponseHeaderMap&,
                                              Buffer::Instance& response, AdminStream&) {
   server_.failHealthcheck(true);
@@ -692,32 +573,6 @@ Http::Code AdminImpl::handlerHotRestartVersion(absl::string_view, Http::Response
                                                Buffer::Instance& response, AdminStream&) {
   response.add(server_.hotRestart().version());
   return Http::Code::OK;
-}
-
-Http::Code AdminImpl::handlerLogging(absl::string_view url, Http::ResponseHeaderMap&,
-                                     Buffer::Instance& response, AdminStream&) {
-  Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
-
-  Http::Code rc = Http::Code::OK;
-  if (!query_params.empty() && !changeLogLevel(query_params)) {
-    response.add("usage: /logging?<name>=<level> (change single level)\n");
-    response.add("usage: /logging?level=<level> (change all levels)\n");
-    response.add("levels: ");
-    for (auto level_string_view : spdlog::level::level_string_views) {
-      response.add(fmt::format("{} ", level_string_view));
-    }
-
-    response.add("\n");
-    rc = Http::Code::NotFound;
-  }
-
-  response.add("active loggers:\n");
-  for (const Logger::Logger& logger : Logger::Registry::loggers()) {
-    response.add(fmt::format("  {}: {}\n", logger.name(), logger.levelString()));
-  }
-
-  response.add("\n");
-  return rc;
 }
 
 // TODO(ambuc): Add more tcmalloc stats, export proto details based on allocator.
@@ -800,13 +655,6 @@ Http::Code AdminImpl::handlerCerts(absl::string_view, Http::ResponseHeaderMap& r
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerReopenLogs(absl::string_view, Http::ResponseHeaderMap&,
-                                        Buffer::Instance& response, AdminStream&) {
-  server_.accessLogManager().reopen();
-  response.add("OK\n");
-  return Http::Code::OK;
-}
-
 ConfigTracker& AdminImpl::getConfigTracker() { return config_tracker_; }
 
 AdminImpl::NullRouteConfigProvider::NullRouteConfigProvider(TimeSource& time_source)
@@ -845,7 +693,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
           Http::ConnectionManagerImpl::generateTracingStats("http.admin.", no_op_store_)),
       route_config_provider_(server.timeSource()),
       scoped_route_config_provider_(server.timeSource()), stats_handler_(server),
-      runtime_handler_(server), listeners_handler_(server),
+      logs_handler_(server), profiling_handler_(profile_path), runtime_handler_(server),
+      listeners_handler_(server),
       // TODO(jsedgwick) add /runtime_reset endpoint that removes all admin-set values
       handlers_{
           {"/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false, false},
@@ -857,9 +706,9 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
           {"/contention", "dump current Envoy mutex contention stats (if enabled)",
            MAKE_ADMIN_HANDLER(handlerContention), false, false},
           {"/cpuprofiler", "enable/disable the CPU profiler",
-           MAKE_ADMIN_HANDLER(handlerCpuProfiler), false, true},
+           MAKE_ADMIN_HANDLER(profiling_handler_.handlerCpuProfiler), false, true},
           {"/heapprofiler", "enable/disable the heap profiler",
-           MAKE_ADMIN_HANDLER(handlerHeapProfiler), false, true},
+           MAKE_ADMIN_HANDLER(profiling_handler_.handlerHeapProfiler), false, true},
           {"/healthcheck/fail", "cause the server to fail health checks",
            MAKE_ADMIN_HANDLER(handlerHealthcheckFail), false, true},
           {"/healthcheck/ok", "cause the server to pass health checks",
@@ -868,8 +717,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
            false},
           {"/hot_restart_version", "print the hot restart compatibility version",
            MAKE_ADMIN_HANDLER(handlerHotRestartVersion), false, false},
-          {"/logging", "query/change logging levels", MAKE_ADMIN_HANDLER(handlerLogging), false,
-           true},
+          {"/logging", "query/change logging levels",
+           MAKE_ADMIN_HANDLER(logs_handler_.handlerLogging), false, true},
           {"/memory", "print current allocation/heap usage", MAKE_ADMIN_HANDLER(handlerMemory),
            false, false},
           {"/quitquitquit", "exit the server", MAKE_ADMIN_HANDLER(handlerQuitQuitQuit), false,
@@ -900,8 +749,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
            false, false},
           {"/runtime_modify", "modify runtime values",
            MAKE_ADMIN_HANDLER(runtime_handler_.handlerRuntimeModify), false, true},
-          {"/reopen_logs", "reopen access logs", MAKE_ADMIN_HANDLER(handlerReopenLogs), false,
-           true},
+          {"/reopen_logs", "reopen access logs",
+           MAKE_ADMIN_HANDLER(logs_handler_.handlerReopenLogs), false, true},
       },
       date_provider_(server.dispatcher().timeSource()),
       admin_filter_chain_(std::make_shared<AdminFilterChain>()) {}
