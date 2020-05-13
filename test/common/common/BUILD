@@ -195,6 +195,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "basic_resource_impl_test",
+    srcs = ["basic_resource_impl_test.cc"],
+    deps = [
+        "//source/common/common:basic_resource_lib",
+        "//test/mocks/runtime:runtime_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "token_bucket_impl_test",
     srcs = ["token_bucket_impl_test.cc"],
     deps = [
