@@ -51,7 +51,7 @@ jobs:
           ciTarget: bazel.release
 
   - job: release_arm64
-    displayName: "Linux-aarch64 release.server_only"
+    displayName: "Linux-arm64 release.server_only"
     dependsOn: ["format"]
     condition: ne(variables['Build.Reason'], 'PullRequest')
     pool: "arm-large"
