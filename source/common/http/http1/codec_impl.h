@@ -226,7 +226,10 @@ protected:
 
   bool resetStreamCalled() { return reset_stream_called_; }
 
-  // The following define special return values for http_parser callbacks.
+  // The following define special return values for http_parser callbacks. See:
+  // https://github.com/nodejs/http-parser/blob/5c5b3ac62662736de9e71640a8dc16da45b32503/http_parser.h#L72
+  // These codes do not overlap with standard HTTP Status codes. They are only used for user
+  // callbacks.
   enum class HttpParserCode {
     // Callbacks other than on_headers_complete should return a non-zero int to indicate an error
     // and
