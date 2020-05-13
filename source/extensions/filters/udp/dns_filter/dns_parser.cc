@@ -506,10 +506,11 @@ void DnsMessageParser::setResponseCode(DnsQueryContextPtr& context,
 void DnsMessageParser::generateRandomIndices(const size_t count,
                                              absl::flat_hash_set<size_t>& elements) {
   elements.clear();
+  elements.reserve(count);
   while (elements.size() < count) {
     size_t element = rng_.random() % count;
     if (!elements.contains(element)) {
-      elements.insert(element);
+      elements.emplace(element);
     }
   }
 }
