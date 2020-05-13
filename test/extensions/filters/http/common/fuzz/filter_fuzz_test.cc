@@ -36,6 +36,13 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::http::FilterFuzzTestCase& i
         input->mutable_config()->mutable_typed_config()->set_type_url(
             absl::StrCat("type.googleapis.com/",
                          factory->createEmptyConfigProto()->GetDescriptor()->full_name()));
+
+        // For fuzzing proto data, guide the mutator to useful 'Any' types half
+        // the time. The other half the time, let the fuzzing engine choose
+        // any message to serialize.
+        if (seed % 2 == 0 && input->data().has_proto_body()) {
+          UberFilterFuzzer::guideAnyProtoType(input->mutable_data(), seed / 2);
+        }
       }};
 
   try {
