@@ -70,6 +70,8 @@ TEST_F(DrainManagerImplTest, DrainDeadline) {
   ON_CALL(server_.options_, drainTime())
       .WillByDefault(Return(std::chrono::seconds(kDrainTimeSeconds)));
 
+  // random() should be called when elapsed time < drain timeout
+  EXPECT_CALL(server_.random_, random()).Times(2);
   EXPECT_FALSE(drain_manager.drainClose());
   simTime().advanceTimeWait(std::chrono::seconds(kDrainTimeSeconds - 1));
   EXPECT_FALSE(drain_manager.drainClose());
@@ -84,7 +86,7 @@ TEST_F(DrainManagerImplTest, DrainDeadline) {
 }
 
 TEST_F(DrainManagerImplTest, DrainDeadlineProbability) {
-  ON_CALL(server_.random_, random()).WillByDefault(Return(5));
+  ON_CALL(server_.random_, random()).WillByDefault(Return(4));
   ON_CALL(server_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(3)));
 
   DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::DEFAULT);
@@ -95,10 +97,13 @@ TEST_F(DrainManagerImplTest, DrainDeadlineProbability) {
   EXPECT_FALSE(drain_manager.drainClose());
   drain_manager.startDrainSequence(nullptr);
 
-  // drainClose() will return true when elapsed time > (5 % 3 == 2).
+  // random() should be called when elapsed time < drain timeout
+  EXPECT_CALL(server_.random_, random()).Times(2);
+  // Current elapsed time is 0
+  // drainClose() will return true when elapsed time > (4 % 3 == 1).
   EXPECT_FALSE(drain_manager.drainClose());
   simTime().advanceTimeWait(std::chrono::seconds(2));
-  EXPECT_FALSE(drain_manager.drainClose());
+  EXPECT_TRUE(drain_manager.drainClose());
   simTime().advanceTimeWait(std::chrono::seconds(1));
   EXPECT_TRUE(drain_manager.drainClose());
 }

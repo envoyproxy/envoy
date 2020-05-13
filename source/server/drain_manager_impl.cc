@@ -32,11 +32,15 @@ bool DrainManagerImpl::drainClose() const {
     return false;
   }
 
-  const auto remaining_time = std::chrono::duration_cast<std::chrono::seconds>(
-      drain_deadline_ - server_.dispatcher().timeSource().monotonicTime());
-  const auto elapsed_time = server_.options().drainTime() - remaining_time;
+  const MonotonicTime current_time  = server_.dispatcher().timeSource().monotonicTime();
+  if (current_time >= drain_deadline_) {
+    return true;
+  }
 
-  // P(shut down connections) = elapsed_drain_time / overall_drain_timeout
+  // P(return true) = elapsed time / drain timeout
+  const auto remaining_time = std::chrono::duration_cast<std::chrono::seconds>(
+      drain_deadline_ - current_time);
+  const auto elapsed_time = server_.options().drainTime() - remaining_time;
   return static_cast<uint64_t>(elapsed_time.count()) >
          (server_.random().random() % server_.options().drainTime().count());
 }
