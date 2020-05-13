@@ -75,6 +75,6 @@ steps:
   # TODO(lizan): This is aw workaround for self hosted azure agent can't clean up bazel local cache due to 
   # permission. Remove this once it is resolved.
   - bash: |
-      rm -rf ${Build.StagingDirectory}/tmp
+      rm -rf $(Build.StagingDirectory)/tmp
     displayName: "Self hosted agent clean up"
     condition: eq(false, ${{ parameters.managedAgent }})
