@@ -58,6 +58,7 @@ SERIALIZE_AS_STRING_WHITELIST = (
     "./test/common/config/version_converter_test.cc",
     "./test/common/grpc/codec_test.cc",
     "./test/common/grpc/codec_fuzz_test.cc",
+    "./test/extensions/filters/http/common/fuzz/uber_filter.h",
 )
 
 # Files in these paths can use Protobuf::util::JsonStringToMessage

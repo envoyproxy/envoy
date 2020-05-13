@@ -6,7 +6,9 @@ config {
   }
 }
 data {
-  data: "\001\000\000\t"
+  http_body {
+    data: "\001\000\000\t"
+  }
   trailers {
     headers {
       key: "0"
