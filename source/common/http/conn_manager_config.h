@@ -425,17 +425,16 @@ public:
   virtual bool shouldMergeSlashes() const PURE;
 
   /**
+   * @return if the HttpConnectionManager should remove the port from host/authority header
+   */
+  virtual bool shouldStripMatchingPort() const PURE;
+
+  /**
    * @return the action HttpConnectionManager should take when receiving client request
    * headers containing underscore characters.
    */
   virtual envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
   headersWithUnderscoresAction() const PURE;
-
-  /**
-   * @return if the HttpConnectionManager should preserve the `date` response header sent by the
-   * upstream host.
-   */
-  virtual bool shouldPreserveUpstreamDate() const PURE;
 };
 } // namespace Http
 } // namespace Envoy

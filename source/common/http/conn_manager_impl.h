@@ -154,6 +154,7 @@ private:
     Event::Dispatcher& dispatcher() override;
     void resetStream() override;
     Router::RouteConstSharedPtr route() override;
+    Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) override;
     Upstream::ClusterInfoConstSharedPtr clusterInfo() override;
     void clearRouteCache() override;
     uint64_t streamId() const override;
@@ -579,6 +580,7 @@ private:
     void snapScopedRouteConfig();
 
     void refreshCachedRoute();
+    void refreshCachedRoute(const Router::RouteCallback& cb);
     void
     requestRouteConfigUpdate(Event::Dispatcher& thread_local_dispatcher,
                              Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb);
@@ -667,11 +669,14 @@ private:
     void onIdleTimeout();
     // Reset per-stream idle timer.
     void resetIdleTimer();
-    // Per-stream request timeout callback
+    // Per-stream request timeout callback.
     void onRequestTimeout();
     // Per-stream alive duration reached.
     void onStreamMaxDurationReached();
     bool hasCachedRoute() { return cached_route_.has_value() && cached_route_.value(); }
+
+    // Return local port of the connection.
+    uint32_t localPort();
 
     friend std::ostream& operator<<(std::ostream& os, const ActiveStream& s) {
       s.dumpState(os);
