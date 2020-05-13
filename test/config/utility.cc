@@ -15,7 +15,6 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/assert.h"
-#include "common/config/resources.h"
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
 
@@ -23,6 +22,7 @@
 #include "test/config/integration/certs/clientcert_hash.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/resources.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_replace.h"
@@ -431,6 +431,26 @@ void ConfigHelper::addClusterFilterMetadata(absl::string_view metadata_yaml,
     }
     break;
   }
+}
+
+void ConfigHelper::setConnectConfig(
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager& hcm,
+    bool terminate_connect) {
+  auto* route_config = hcm.mutable_route_config();
+  ASSERT_EQ(1, route_config->virtual_hosts_size());
+  auto* route = route_config->mutable_virtual_hosts(0)->mutable_routes(0);
+  auto* match = route->mutable_match();
+  match->Clear();
+  match->mutable_connect_matcher();
+
+  if (terminate_connect) {
+    auto* upgrade = route->mutable_route()->add_upgrade_configs();
+    upgrade->set_upgrade_type("CONNECT");
+    upgrade->mutable_connect_config();
+  }
+
+  hcm.add_upgrade_configs()->set_upgrade_type("CONNECT");
+  hcm.mutable_http2_protocol_options()->set_allow_connect(true);
 }
 
 void ConfigHelper::applyConfigModifiers() {

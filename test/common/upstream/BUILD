@@ -99,6 +99,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "health_checker_impl_test",
     srcs = ["health_checker_impl_test.cc"],
+    tags = ["fails_on_windows"],
     deps = [
         ":utility_lib",
         "//source/common/buffer:buffer_lib",
@@ -117,6 +118,7 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
@@ -181,6 +183,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "load_stats_reporter_test",
     srcs = ["load_stats_reporter_test.cc"],
+    tags = ["fails_on_windows"],
     deps = [
         "//source/common/stats:stats_lib",
         "//source/common/upstream:load_stats_reporter_lib",
@@ -362,6 +365,7 @@ envoy_benchmark_test(
     name = "load_balancer_benchmark_test",
     timeout = "long",
     benchmark_binary = "load_balancer_benchmark",
+    tags = ["fails_on_windows"],
 )
 
 envoy_cc_test(

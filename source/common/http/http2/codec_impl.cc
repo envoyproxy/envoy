@@ -161,6 +161,19 @@ void ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& hea
     upgrade_type_ = std::string(headers.Upgrade()->value().getStringView());
     Http::Utility::transformUpgradeRequestFromH1toH2(*modified_headers);
     buildHeaders(final_headers, *modified_headers);
+  } else if (headers.Method() && headers.Method()->value() == "CONNECT") {
+    // If this is not an upgrade style connect (above branch) it is a bytestream
+    // connect and should have :path and :protocol set accordingly
+    // As HTTP/1.1 does not require a path for CONNECT, we may have to add one
+    // if shifting codecs. For now, default to "/" - this can be made
+    // configurable if necessary.
+    // https://tools.ietf.org/html/draft-kinnear-httpbis-http2-transport-02
+    modified_headers = createHeaderMap<RequestHeaderMapImpl>(headers);
+    modified_headers->setProtocol(Headers::get().ProtocolValues.Bytestream);
+    if (!headers.Path()) {
+      modified_headers->setPath("/");
+    }
+    buildHeaders(final_headers, *modified_headers);
   } else {
     buildHeaders(final_headers, headers);
   }
@@ -463,8 +476,20 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& st
 
 ConnectionImpl::~ConnectionImpl() { nghttp2_session_del(session_); }
 
-void ConnectionImpl::dispatch(Buffer::Instance& data) {
+Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
+  // TODO(#10878): Remove this wrapper when exception removal is complete. innerDispatch may either
+  // throw an exception or return an error status. The utility wrapper catches exceptions and
+  // converts them to error statuses.
+  return Http::Utility::exceptionToStatus(
+      [&](Buffer::Instance& data) -> Http::Status { return innerDispatch(data); }, data);
+}
+
+Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
   ENVOY_CONN_LOG(trace, "dispatching {} bytes", connection_, data.length());
+  // Make sure that dispatching_ is set to false after dispatching, even when
+  // ConnectionImpl::dispatch returns early or throws an exception (consider removing if there is a
+  // single return after exception removal (#10878)).
+  Cleanup cleanup([this]() { dispatching_ = false; });
   for (const Buffer::RawSlice& slice : data.getRawSlices()) {
     dispatching_ = true;
     ssize_t rc =
@@ -485,6 +510,7 @@ void ConnectionImpl::dispatch(Buffer::Instance& data) {
 
   // Decoding incoming frames can generate outbound frames so flush pending.
   sendPendingFrames();
+  return Http::okStatus();
 }
 
 ConnectionImpl::StreamImpl* ConnectionImpl::getStream(int32_t stream_id) {
@@ -1335,7 +1361,15 @@ void ServerConnectionImpl::checkOutboundQueueLimits() {
   }
 }
 
-void ServerConnectionImpl::dispatch(Buffer::Instance& data) {
+Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
+  // TODO(#10878): Remove this wrapper when exception removal is complete. innerDispatch may either
+  // throw an exception or return an error status. The utility wrapper catches exceptions and
+  // converts them to error statuses.
+  return Http::Utility::exceptionToStatus(
+      [&](Buffer::Instance& data) -> Http::Status { return innerDispatch(data); }, data);
+}
+
+Http::Status ServerConnectionImpl::innerDispatch(Buffer::Instance& data) {
   ASSERT(!dispatching_downstream_data_);
   dispatching_downstream_data_ = true;
 
@@ -1346,7 +1380,7 @@ void ServerConnectionImpl::dispatch(Buffer::Instance& data) {
   // Make sure downstream outbound queue was not flooded by the upstream frames.
   checkOutboundQueueLimits();
 
-  ConnectionImpl::dispatch(data);
+  return ConnectionImpl::innerDispatch(data);
 }
 
 absl::optional<int>

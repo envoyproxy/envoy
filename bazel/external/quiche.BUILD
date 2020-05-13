@@ -59,14 +59,20 @@ quiche_copts = select({
         # Remove these after upstream fix.
         "-Wno-unused-parameter",
         "-Wno-unused-function",
-        "-Wno-unused-const-variable",
-        "-Wno-type-limits",
         # quic_inlined_frame.h uses offsetof() to optimize memory usage in frames.
         "-Wno-invalid-offsetof",
-        "-Wno-type-limits",
-        "-Wno-return-type",
     ],
 })
+
+test_suite(
+    name = "ci_tests",
+    tests = [
+        "http2_platform_api_test",
+        "quic_platform_api_test",
+        "quiche_common_test",
+        "spdy_platform_api_test",
+    ],
+)
 
 envoy_cc_test_library(
     name = "http2_test_tools_random",
@@ -3553,6 +3559,7 @@ envoy_cc_test(
     name = "spdy_core_header_block_test",
     srcs = ["quiche/spdy/core/spdy_header_block_test.cc"],
     copts = quiche_copts,
+    coverage = False,
     repository = "@envoy",
     tags = ["nofips"],
     deps = [

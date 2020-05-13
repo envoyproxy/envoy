@@ -20,6 +20,11 @@ envoy_basic_cc_library(
 )
 
 envoy_cc_library(
+    name = "conn_pool_interface",
+    hdrs = ["conn_pool.h"],
+)
+
+envoy_cc_library(
     name = "mutex_tracer",
     hdrs = ["mutex_tracer.h"],
 )

@@ -17,11 +17,9 @@
 #include "envoy/http/request_id_extension.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
-#include "envoy/runtime/runtime.h"
 #include "envoy/server/admin.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/listener_manager.h"
-#include "envoy/stats/scope.h"
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/resource_manager.h"
 
@@ -40,6 +38,9 @@
 
 #include "server/http/admin_filter.h"
 #include "server/http/config_tracker_impl.h"
+#include "server/http/listeners_handler.h"
+#include "server/http/runtime_handler.h"
+#include "server/http/stats_handler.h"
 
 #include "extensions/filters/http/common/pass_through_filter.h"
 
@@ -116,6 +117,7 @@ public:
   Http::FilterChainFactory& filterFactory() override { return *this; }
   bool generateRequestId() const override { return false; }
   bool preserveExternalRequestId() const override { return false; }
+  bool alwaysSetRequestIdInResponse() const override { return false; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   bool isRoutable() const override { return false; }
   absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
@@ -162,6 +164,7 @@ public:
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   bool shouldNormalizePath() const override { return true; }
   bool shouldMergeSlashes() const override { return true; }
+  bool shouldStripMatchingPort() const override { return false; }
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
   headersWithUnderscoresAction() const override {
     return envoy::config::core::v3::HttpProtocolOptions::ALLOW;
@@ -234,8 +237,6 @@ private:
     TimeSource& time_source_;
   };
 
-  friend class AdminStatsTest;
-
   /**
    * Attempt to change the log level of a logger or all loggers
    * @param params supplies the incoming endpoint query params.
@@ -255,12 +256,6 @@ private:
   void writeClustersAsText(Buffer::Instance& response);
 
   /**
-   * Helper methods for the /listeners url handler.
-   */
-  void writeListenersAsJson(Buffer::Instance& response);
-  void writeListenersAsText(Buffer::Instance& response);
-
-  /**
    * Helper methods for the /config_dump url handler.
    */
   void addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
@@ -273,19 +268,6 @@ private:
   absl::optional<std::pair<Http::Code, std::string>>
   addResourceToDump(envoy::admin::v3::ConfigDump& dump, const absl::optional<std::string>& mask,
                     const std::string& resource) const;
-
-  template <class StatType>
-  static bool shouldShowMetric(const StatType& metric, const bool used_only,
-                               const absl::optional<std::regex>& regex) {
-    return ((!used_only || metric.used()) &&
-            (!regex.has_value() || std::regex_search(metric.name(), regex.value())));
-  }
-  static std::string statsAsJson(const std::map<std::string, uint64_t>& all_stats,
-                                 const std::map<std::string, std::string>& text_readouts,
-                                 const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
-                                 bool used_only,
-                                 const absl::optional<std::regex> regex = absl::nullopt,
-                                 bool pretty_print = false);
 
   std::vector<const UrlHandler*> sortedHandlers() const;
   envoy::admin::v3::ServerInfo::State serverState();
@@ -325,9 +307,6 @@ private:
   Http::Code handlerHotRestartVersion(absl::string_view path_and_query,
                                       Http::ResponseHeaderMap& response_headers,
                                       Buffer::Instance& response, AdminStream&);
-  Http::Code handlerListenerInfo(absl::string_view path_and_query,
-                                 Http::ResponseHeaderMap& response_headers,
-                                 Buffer::Instance& response, AdminStream&);
   Http::Code handlerLogging(absl::string_view path_and_query,
                             Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                             AdminStream&);
@@ -338,46 +317,15 @@ private:
   Http::Code handlerQuitQuitQuit(absl::string_view path_and_query,
                                  Http::ResponseHeaderMap& response_headers,
                                  Buffer::Instance& response, AdminStream&);
-  Http::Code handlerDrainListeners(absl::string_view path_and_query,
-                                   Http::ResponseHeaderMap& response_headers,
-                                   Buffer::Instance& response, AdminStream&);
-  Http::Code handlerResetCounters(absl::string_view path_and_query,
-                                  Http::ResponseHeaderMap& response_headers,
-                                  Buffer::Instance& response, AdminStream&);
-  Http::Code handlerStatsRecentLookups(absl::string_view path_and_query,
-                                       Http::ResponseHeaderMap& response_headers,
-                                       Buffer::Instance& response, AdminStream&);
-  Http::Code handlerStatsRecentLookupsClear(absl::string_view path_and_query,
-                                            Http::ResponseHeaderMap& response_headers,
-                                            Buffer::Instance& response, AdminStream&);
-  Http::Code handlerStatsRecentLookupsDisable(absl::string_view path_and_query,
-                                              Http::ResponseHeaderMap& response_headers,
-                                              Buffer::Instance& response, AdminStream&);
-  Http::Code handlerStatsRecentLookupsEnable(absl::string_view path_and_query,
-                                             Http::ResponseHeaderMap& response_headers,
-                                             Buffer::Instance& response, AdminStream&);
   Http::Code handlerServerInfo(absl::string_view path_and_query,
                                Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream&);
   Http::Code handlerReady(absl::string_view path_and_query,
                           Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                           AdminStream&);
-  Http::Code handlerStats(absl::string_view path_and_query,
-                          Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
-                          AdminStream&);
-  Http::Code handlerPrometheusStats(absl::string_view path_and_query,
-                                    Http::ResponseHeaderMap& response_headers,
-                                    Buffer::Instance& response, AdminStream&);
-  Http::Code handlerRuntime(absl::string_view path_and_query,
-                            Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
-                            AdminStream&);
-  Http::Code handlerRuntimeModify(absl::string_view path_and_query,
-                                  Http::ResponseHeaderMap& response_headers,
-                                  Buffer::Instance& response, AdminStream&);
   Http::Code handlerReopenLogs(absl::string_view path_and_query,
                                Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream&);
-  bool isFormUrlEncoded(const Http::HeaderEntry* content_type) const;
 
   class AdminListenSocketFactory : public Network::ListenSocketFactory {
   public:
@@ -477,6 +425,9 @@ private:
   Http::ConnectionManagerTracingStats tracing_stats_;
   NullRouteConfigProvider route_config_provider_;
   NullScopedRouteConfigProvider scoped_route_config_provider_;
+  Server::StatsHandler stats_handler_;
+  Server::RuntimeHandler runtime_handler_;
+  Server::ListenersHandler listeners_handler_;
   std::list<UrlHandler> handlers_;
   const uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
   const uint32_t max_request_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
@@ -493,51 +444,6 @@ private:
   Network::ListenSocketFactorySharedPtr socket_factory_;
   AdminListenerPtr listener_;
   const AdminInternalAddressConfig internal_address_config_;
-};
-
-/**
- * Formatter for metric/labels exported to Prometheus.
- *
- * See: https://prometheus.io/docs/concepts/data_model
- */
-class PrometheusStatsFormatter {
-public:
-  /**
-   * Extracts counters and gauges and relevant tags, appending them to
-   * the response buffer after sanitizing the metric / label names.
-   * @return uint64_t total number of metric types inserted in response.
-   */
-  static uint64_t statsAsPrometheus(const std::vector<Stats::CounterSharedPtr>& counters,
-                                    const std::vector<Stats::GaugeSharedPtr>& gauges,
-                                    const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
-                                    Buffer::Instance& response, const bool used_only,
-                                    const absl::optional<std::regex>& regex);
-  /**
-   * Format the given tags, returning a string as a comma-separated list
-   * of <tag_name>="<tag_value>" pairs.
-   */
-  static std::string formattedTags(const std::vector<Stats::Tag>& tags);
-  /**
-   * Format the given metric name, prefixed with "envoy_".
-   */
-  static std::string metricName(const std::string& extracted_name);
-
-private:
-  /**
-   * Take a string and sanitize it according to Prometheus conventions.
-   */
-  static std::string sanitizeName(const std::string& name);
-
-  /*
-   * Determine whether a metric has never been emitted and choose to
-   * not show it if we only wanted used metrics.
-   */
-  template <class StatType>
-  static bool shouldShowMetric(const StatType& metric, const bool used_only,
-                               const absl::optional<std::regex>& regex) {
-    return ((!used_only || metric.used()) &&
-            (!regex.has_value() || std::regex_search(metric.name(), regex.value())));
-  }
 };
 
 } // namespace Server

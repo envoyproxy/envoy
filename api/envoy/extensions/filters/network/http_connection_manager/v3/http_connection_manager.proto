@@ -30,7 +30,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 37]
+// [#next-free-field: 40]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager";
@@ -263,8 +263,8 @@ message HttpConnectionManager {
   }
 
   // A list of individual HTTP filters that make up the filter chain for
-  // requests made to the connection manager. Order matters as the filters are
-  // processed sequentially as request events happen.
+  // requests made to the connection manager. :ref:`Order matters <arch_overview_http_filters_ordering>`
+  // as the filters are processed sequentially as request events happen.
   repeated HttpFilter http_filters = 5;
 
   // Whether the connection manager manipulates the :ref:`config_http_conn_man_headers_user-agent`
@@ -433,6 +433,11 @@ message HttpConnectionManager {
   // is the current Envoy behaviour. This defaults to false.
   bool preserve_external_request_id = 32;
 
+  // If set, Envoy will always set :ref:`x-request-id <config_http_conn_man_headers_x-request-id>` header in response.
+  // If this is false or not set, the request ID is returned in responses only if tracing is forced using
+  // :ref:`x-envoy-force-trace <config_http_conn_man_headers_x-envoy-force-trace>` header.
+  bool always_set_request_id_in_response = 37;
+
   // How to handle the :ref:`config_http_conn_man_headers_x-forwarded-client-cert` (XFCC) HTTP
   // header.
   ForwardClientCertDetails forward_client_cert_details = 16
@@ -501,6 +506,14 @@ message HttpConnectionManager {
   //
   // 3. Tracing decision (sampled, forced, etc) is set in 14th byte of the UUID.
   RequestIDExtension request_id_extension = 36;
+
+  // Determines if the port part should be removed from host/authority header before any processing
+  // of request by HTTP filters or routing. The port would be removed only if it is equal to the :ref:`listener's<envoy_api_field_config.listener.v3.Listener.address>`
+  // local port and request method is not CONNECT. This affects the upstream host header as well.
+  // Without setting this option, incoming requests with host `example:443` will not match against
+  // route with :ref:`domains<envoy_api_field_config.route.v3.VirtualHost.domains>` match set to `example`. Defaults to `false`. Note that port removal is not part
+  // of `HTTP spec <https://tools.ietf.org/html/rfc3986>` and is provided for convenience.
+  bool strip_matching_host_port = 39;
 }
 
 message Rds {
