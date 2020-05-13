@@ -16,7 +16,7 @@ public:
    * @return the hex encoded string representing data
    */
   static std::string encode(const std::vector<uint8_t>& data) {
-    return encode(&data[0], data.size());
+    return encode(data.data(), data.size());
   }
 
   /**
