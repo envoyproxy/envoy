@@ -143,7 +143,10 @@ def envoy_cc_fuzz_test(
         copts = fuzz_copts + envoy_copts("@envoy", test = True),
         linkopts = ["-fsanitize=fuzzer"] + _envoy_test_linkopts(),
         linkstatic = 1,
-        testonly = 1,
+        args = select({
+            "@envoy//bazel:coverage_build": ["$(locations %s)" % corpus_name],
+            "//conditions:default": [],
+        }),
         data = [corpus_name],
         deps = [":" + test_lib_name],
         tags = ["manual", "fuzzer"] + tags,
