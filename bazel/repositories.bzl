@@ -834,6 +834,8 @@ filegroup(
     location = _get_location("edenhill_librdkafka")
     http_archive(
         name = "edenhill_librdkafka",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel/foreign_cc:librdkafka.patch"],
         build_file_content = BUILD_ALL_CONTENT,
         **location
     )
