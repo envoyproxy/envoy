@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.h"
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.validate.h"
 
