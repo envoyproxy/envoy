@@ -61,8 +61,10 @@ TEST(Utility, ParseRegex) {
   // Verify max program size.
   {
     envoy::type::matcher::v3::RegexMatcher matcher;
-    matcher.mutable_google_re2()->mutable_max_program_size()->set_value(1);
     matcher.set_regex("/asdf/.*");
+    matcher.mutable_google_re2();
+    EXPECT_NO_THROW(Utility::parseRegex(matcher));
+    matcher.mutable_google_re2()->mutable_max_program_size()->set_value(1);
 #ifndef GTEST_USES_SIMPLE_RE
     EXPECT_THROW_WITH_REGEX(Utility::parseRegex(matcher), EnvoyException,
                             "RE2 program size of [0-9]+ > max program size of 1\\.");

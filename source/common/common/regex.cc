@@ -47,12 +47,14 @@ public:
       throw EnvoyException(regex_.error());
     }
 
-    const uint32_t max_program_size =
-        PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.google_re2(), max_program_size, 100);
-    if (static_cast<uint32_t>(regex_.ProgramSize()) > max_program_size) {
-      throw EnvoyException(fmt::format("regex '{}' RE2 program size of {} > max program size of "
-                                       "{}. Increase configured max program size if necessary.",
-                                       config.regex(), regex_.ProgramSize(), max_program_size));
+    if (config.google_re2().has_max_program_size()) {
+      const uint32_t max_program_size =
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.google_re2(), max_program_size, 100);
+      if (static_cast<uint32_t>(regex_.ProgramSize()) > max_program_size) {
+        throw EnvoyException(fmt::format("regex '{}' RE2 program size of {} > max program size of "
+                                        "{}. Increase configured max program size if necessary.",
+                                        config.regex(), regex_.ProgramSize(), max_program_size));
+      }
     }
   }
 
