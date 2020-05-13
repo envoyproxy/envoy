@@ -48,7 +48,7 @@ FileAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
       break;
     case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::
         kTypedJsonFormat:
-      *sff_config.mutable_json_format() = fal_config.typed_json_format();
+      *sff_config.mutable_typed_json_format() = fal_config.typed_json_format();
       break;
     default:
       break;

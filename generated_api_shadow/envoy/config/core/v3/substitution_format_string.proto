@@ -17,25 +17,31 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // to generate a new string in either plain text or JSON format.
 message SubstitutionFormatString {
   oneof format {
-    // Text access log  :ref:`format string<config_access_log_format_strings>`.
-    // This field specifies :ref:`custom access log formats <config_access_log_format>`.
+    // Specify a format with command operators to form a text string.
+    // Its details is described in :ref:`format string<config_access_log_format_strings>`.
     //
     // .. code-block::
     //
-    //   text_format: %RESP_BODY%:%RESPONSE_CODE%
+    //   text_format: %RESP_BODY%:%RESPONSE_CODE%:path=$REQ(:path)%
     //
     // The following plain text will be created:
     //
     // .. code-block::
     //
-    //   upstream connect error:204
+    //   upstream connect error:204:path=/foo
     //
     string text_format = 1;
 
-    // JSON access log :ref:`format dictionary<config_access_log_format_dictionaries>`. Values are
-    // rendered as strings, numbers, or boolean values as appropriate. Nested JSON objects may
-    // be produced by some command operators (e.g. FILTER_STATE or DYNAMIC_METADATA). See the
-    // documentation for a specific command operator for details.
+    // Specify a format with command operators to form a JSON string.
+    // Its details is described in :ref:`format dictionary<config_access_log_format_dictionaries>`.
+    // All values are rendered as strings.
+    google.protobuf.Struct json_format = 2;
+
+    // Specify a format with command operators to form a JSON string.
+    // Its details is described in :ref:`format dictionary<config_access_log_format_dictionaries>`.
+    // Values are rendered as strings, numbers, or boolean values as appropriate.
+    // Nested JSON objects may be produced by some command operators (e.g. FILTER_STATE or DYNAMIC_METADATA).
+    // See the documentation for a specific command operator for details.
     //
     // .. code-block::
     //
@@ -52,6 +58,6 @@ message SubstitutionFormatString {
     //    "message": "My error message"
     //  }
     //
-    google.protobuf.Struct json_format = 2;
+    google.protobuf.Struct typed_json_format = 3;
   }
 }

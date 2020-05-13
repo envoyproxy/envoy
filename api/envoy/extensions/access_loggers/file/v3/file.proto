@@ -33,13 +33,13 @@ message FileAccessLog {
     // Access log :ref:`format string<config_access_log_format_strings>`.
     // Envoy supports :ref:`custom access log formats <config_access_log_format>` as well as a
     // :ref:`default format <config_access_log_default_format>`.
-    // It is deprecated.
+    // This field is deprecated.
     // Please use :ref:`log_format <envoy_v3_api_field_extensions.access_loggers.file.v3.FileAccessLog.log_format>`.
     string format = 2 [deprecated = true];
 
     // Access log :ref:`format dictionary<config_access_log_format_dictionaries>`. All values
     // are rendered as strings.
-    // It is deprecated.
+    // This field is deprecated.
     // Please use :ref:`log_format <envoy_v3_api_field_extensions.access_loggers.file.v3.FileAccessLog.log_format>`.
     google.protobuf.Struct json_format = 3 [deprecated = true];
 
@@ -47,7 +47,7 @@ message FileAccessLog {
     // rendered as strings, numbers, or boolean values as appropriate. Nested JSON objects may
     // be produced by some command operators (e.g.FILTER_STATE or DYNAMIC_METADATA). See the
     // documentation for a specific command operator for details.
-    // It is deprecated.
+    // This field is deprecated.
     // Please use :ref:`log_format <envoy_v3_api_field_extensions.access_loggers.file.v3.FileAccessLog.log_format>`.
     google.protobuf.Struct typed_json_format = 4 [deprecated = true];
 

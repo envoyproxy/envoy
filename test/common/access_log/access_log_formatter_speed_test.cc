@@ -9,7 +9,7 @@
 namespace {
 
 std::unique_ptr<Envoy::AccessLog::JsonFormatterImpl> MakeJsonFormatter(bool typed) {
-  std::unordered_map<std::string, std::string> JsonLogFormat = {
+  absl::flat_hash_map<std::string, std::string> JsonLogFormat = {
       {"remote_address", "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"},
       {"start_time", "%START_TIME(%Y/%m/%dT%H:%M:%S%z %s)%"},
       {"method", "%REQ(:METHOD)%"},

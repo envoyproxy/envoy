@@ -5,9 +5,9 @@
 namespace Envoy {
 namespace {
 
-std::unordered_map<std::string, std::string>
+absl::flat_hash_map<std::string, std::string>
 convertJsonFormatToMap(ProtobufWkt::Struct json_format) {
-  std::unordered_map<std::string, std::string> output;
+  absl::flat_hash_map<std::string, std::string> output;
   for (const auto& pair : json_format.fields()) {
     if (pair.second.kind_case() != ProtobufWkt::Value::kStringValue) {
       throw EnvoyException("Only string values are supported in the JSON access log format.");
@@ -26,6 +26,10 @@ AccessLog::FormatterPtr SubstitutionFormatStringUtils::fromProtoConfig(
     return std::make_unique<AccessLog::FormatterImpl>(config.text_format());
   case envoy::config::core::v3::SubstitutionFormatString::FormatCase::kJsonFormat: {
     auto json_format_map = convertJsonFormatToMap(config.json_format());
+    return std::make_unique<AccessLog::JsonFormatterImpl>(json_format_map, false);
+  }
+  case envoy::config::core::v3::SubstitutionFormatString::FormatCase::kTypedJsonFormat: {
+    auto json_format_map = convertJsonFormatToMap(config.typed_json_format());
     return std::make_unique<AccessLog::JsonFormatterImpl>(json_format_map, true);
   }
   default:
