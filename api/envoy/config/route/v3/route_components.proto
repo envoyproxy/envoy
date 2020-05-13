@@ -393,7 +393,6 @@ message RouteMatch {
     google.protobuf.BoolValue validated = 2;
   }
 
-  // [#not-implemented-hide:]
   // An extensible message for matching CONNECT requests.
   message ConnectMatcher {
   }
@@ -427,7 +426,6 @@ message RouteMatch {
     // stripping. This needs more thought.]
     type.matcher.v3.RegexMatcher safe_regex = 10 [(validate.rules).message = {required: true}];
 
-    // [#not-implemented-hide:]
     // If this is used as the matcher, the matcher will only match CONNECT requests.
     // Note that this will not match HTTP/2 upgrade-style CONNECT requests
     // (WebSocket and the like) as they are normalized in Envoy as HTTP/1.1 style
@@ -435,6 +433,8 @@ message RouteMatch {
     // This is the only way to match CONNECT requests for HTTP/1.1. For HTTP/2,
     // where CONNECT requests may have a path, the path matchers will work if
     // there is a path present.
+    // Note that CONNECT support is currently considered alpha in Envoy.
+    // [#comment:TODO(htuch): Replace the above comment with an alpha tag.
     ConnectMatcher connect_matcher = 12;
   }
 
@@ -721,7 +721,6 @@ message RouteAction {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RouteAction.UpgradeConfig";
 
-    // [#not-implemented-hide:]
     // Configuration for sending data upstream as a raw data payload. This is used for
     // CONNECT requests, when forwarding CONNECT payload as raw TCP.
     message ConnectConfig {
@@ -738,9 +737,10 @@ message RouteAction {
     // Determines if upgrades are available on this route. Defaults to true.
     google.protobuf.BoolValue enabled = 2;
 
-    // [#not-implemented-hide:]
     // Configuration for sending data upstream as a raw data payload. This is used for
     // CONNECT requests, when forwarding CONNECT payload as raw TCP.
+    // Note that CONNECT support is currently considered alpha in Envoy.
+    // [#comment:TODO(htuch): Replace the above comment with an alpha tag.
     ConnectConfig connect_config = 3;
   }
 

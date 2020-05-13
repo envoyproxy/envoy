@@ -14,7 +14,7 @@ Changes
 * Hot restart :repo:`compile time flag </bazel#hot-restart>` added.
 * Original destination :ref:`cluster <arch_overview_service_discovery_types_original_destination>`
   and :ref:`load balancer <arch_overview_load_balancing_types_original_destination>` added.
-* :ref:`WebSocket <arch_overview_websocket>` is now supported.
+* :ref:`WebSocket <arch_overview_upgrades>` is now supported.
 * Virtual cluster priorities have been hard removed without deprecation as we are reasonably sure
   no one is using this feature.
 * Route `validate_clusters` option added.
