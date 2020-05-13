@@ -48,9 +48,12 @@ public:
     const DecompressorStats& stats() const { return stats_; }
     bool decompressionEnabled() const { return decompression_enabled_.enabled(); }
     const absl::optional<uint32_t>& maxBufferedBytes() const { return max_buffered_bytes_; }
-    void setHeaders(Http::RequestHeaderMap* headers) { headers_ = headers; }
+    void setBuffering(const bool buffering) { buffering_ = buffering; }
+    bool buffering() const { return buffering_; }
     void addToUncompressedLength(uint64_t bytes) { uncompressed_length_ += bytes; }
     uint64_t uncompressedLength() const { return uncompressed_length_; }
+    void setHeaders(Http::RequestOrResponseHeaderMap* headers) { headers_ = headers; }
+    Http::RequestOrResponseHeaderMap* headers() const { return headers_; }
 
   private:
     static DecompressorStats generateStats(const std::string& prefix, Stats::Scope& scope) {
@@ -60,8 +63,9 @@ public:
     const DecompressorStats stats_;
     const Runtime::FeatureFlag decompression_enabled_;
     const absl::optional<uint32_t> max_buffered_bytes_;
+    bool buffering_{};
     uint64_t uncompressed_length_{};
-    Http::RequestHeaderMap* headers_{};
+    Http::RequestOrResponseHeaderMap* headers_{};
   };
 
   class RequestDirectionConfig : public DirectionConfig {
@@ -104,14 +108,14 @@ public:
     return decompressor_factory_->createDecompressor();
   }
   const std::string& contentEncoding() { return decompressor_factory_->contentEncoding(); }
-  const RequestDirectionConfig& requestDirectionConfig() { return request_direction_config_; }
-  const ResponseDirectionConfig& responseDirectionConfig() { return response_direction_config_; }
+  RequestDirectionConfig& requestDirectionConfig() { return request_direction_config_; }
+  ResponseDirectionConfig& responseDirectionConfig() { return response_direction_config_; }
 
 private:
   const std::string stats_prefix_;
   Compression::Decompressor::DecompressorFactoryPtr decompressor_factory_;
-  const RequestDirectionConfig request_direction_config_;
-  const ResponseDirectionConfig response_direction_config_;
+  RequestDirectionConfig request_direction_config_;
+  ResponseDirectionConfig response_direction_config_;
 };
 
 using DecompressorFilterConfigSharedPtr = std::shared_ptr<DecompressorFilterConfig>;
@@ -134,14 +138,15 @@ public:
 
 private:
   Http::FilterHeadersStatus
-  maybeInitDecompress(const DecompressorFilterConfig::DirectionConfig& direction_config,
+  maybeInitDecompress(DecompressorFilterConfig::DirectionConfig& direction_config,
                       Compression::Decompressor::DecompressorPtr& decompressor,
                       Http::StreamFilterCallbacks& callbacks,
                       Http::RequestOrResponseHeaderMap& headers);
   Http::FilterDataStatus
-  maybeDecompress(const DecompressorFilterConfig::DirectionConfig& direction_config,
+  maybeDecompress(DecompressorFilterConfig::DirectionConfig& direction_config,
                   Compression::Decompressor::Decompressor* decompressor,
-                  Http::StreamFilterCallbacks& callbacks, Buffer::Instance& input_buffer) const;
+                  Http::StreamFilterCallbacks& callbacks, Buffer::Instance& input_buffer,
+                  const bool end_stream) const;
 
   // TODO(junr03): these do not need to be member functions. They can all be part of a static
   // utility class. Moreover, they can be shared between compressor and decompressor.

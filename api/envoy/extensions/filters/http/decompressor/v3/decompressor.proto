@@ -34,7 +34,7 @@ message Decompressor {
     // The setting configures the maximum uncompressed size the filter will buffer before the connection
     // manager will stop buffering and return a 413 response.
     // If the setting is absent, the filter will stream inflated data frames as they are received.
-    google.protobuf.UInt32Value max_buffered_bytes = 1 [(validate.rules).uint32 = {gt: 0}];
+    google.protobuf.UInt32Value max_buffered_bytes = 2 [(validate.rules).uint32 = {gt: 0}];
   }
 
   // Configuration for filter behavior on the request direction.

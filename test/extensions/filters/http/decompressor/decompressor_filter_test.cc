@@ -274,6 +274,11 @@ request_direction_config:
   expectDecompression(decompressor_ptr);
 }
 
+TEST_P(DecompressorFilterTest, Buffering) {
+  // FIX ME: add tests.
+  ASSERT_TRUE(false);
+}
+
 } // namespace
 } // namespace Decompressor
 } // namespace HttpFilters

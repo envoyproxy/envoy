@@ -209,6 +209,13 @@ public:
    * @return the ScopeTrackedObject for this stream.
    */
   virtual const ScopeTrackedObject& scope() PURE;
+
+  /**
+   * This routine may be called to change the buffer limit for filters.
+   *
+   * @param limit supplies the desired buffer limit.
+   */
+  virtual void setBufferLimit(uint32_t limit) PURE;
 };
 
 /**

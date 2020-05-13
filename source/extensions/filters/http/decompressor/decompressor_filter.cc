@@ -28,7 +28,9 @@ DecompressorFilterConfig::DirectionConfig::DirectionConfig(
     const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
     : stats_(generateStats(stats_prefix, scope)),
       decompression_enabled_(proto_config.enabled(), runtime),
-      max_buffered_bytes_(proto_config.has_max_buffered_bytes() ? absl::optional<uint32_t>(proto_config.max_buffered_bytes()) : absl::nullopt) {}
+      max_buffered_bytes_(proto_config.has_max_buffered_bytes()
+                              ? absl::optional<uint32_t>(proto_config.max_buffered_bytes().value())
+                              : absl::nullopt) {}
 
 DecompressorFilterConfig::RequestDirectionConfig::RequestDirectionConfig(
     const envoy::extensions::filters::http::decompressor::v3::Decompressor::RequestDirectionConfig&
@@ -72,9 +74,9 @@ Http::FilterHeadersStatus DecompressorFilter::decodeHeaders(Http::RequestHeaderM
                              *decoder_callbacks_, headers);
 };
 
-Http::FilterDataStatus DecompressorFilter::decodeData(Buffer::Instance& data, bool) {
+Http::FilterDataStatus DecompressorFilter::decodeData(Buffer::Instance& data, bool end_stream) {
   return maybeDecompress(config_->requestDirectionConfig(), request_decompressor_.get(),
-                         *decoder_callbacks_, data);
+                         *decoder_callbacks_, data, end_stream);
 }
 
 Http::FilterHeadersStatus DecompressorFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
@@ -89,15 +91,16 @@ Http::FilterHeadersStatus DecompressorFilter::encodeHeaders(Http::ResponseHeader
                              *encoder_callbacks_, headers);
 }
 
-Http::FilterDataStatus DecompressorFilter::encodeData(Buffer::Instance& data, bool) {
+Http::FilterDataStatus DecompressorFilter::encodeData(Buffer::Instance& data, bool end_stream) {
   return maybeDecompress(config_->requestDirectionConfig(), response_decompressor_.get(),
-                         *decoder_callbacks_, data);
+                         *decoder_callbacks_, data, end_stream);
 }
 
-Http::FilterHeadersStatus DecompressorFilter::maybeInitDecompress(
-    const DecompressorFilterConfig::DirectionConfig& direction_config,
-    Compression::Decompressor::DecompressorPtr& decompressor,
-    Http::StreamFilterCallbacks& callbacks, Http::RequestOrResponseHeaderMap& headers) {
+Http::FilterHeadersStatus
+DecompressorFilter::maybeInitDecompress(DecompressorFilterConfig::DirectionConfig& direction_config,
+                                        Compression::Decompressor::DecompressorPtr& decompressor,
+                                        Http::StreamFilterCallbacks& callbacks,
+                                        Http::RequestOrResponseHeaderMap& headers) {
   if (direction_config.decompressionEnabled() && !hasCacheControlNoTransform(headers) &&
       contentEncodingMatches(headers)) {
     direction_config.stats().decompressed_.inc();
@@ -105,22 +108,23 @@ Http::FilterHeadersStatus DecompressorFilter::maybeInitDecompress(
     // remove the compression scheme's content encoding because the filter is going to decompress.
     removeContentEncoding(headers);
 
-    // Per the filter documentation, only buffer if there was a Content-Length header present, and
-    // the filter is configured to preserve the header.
-    if (headers.removeContentLength() > 0 && direction_config.preserveContentLength()) {
-
-      callbacks
+    // Per the filter documentation, only buffer if there is a Content-Length header present, and
+    // the filter is configured to buffer.
+    if (headers.removeContentLength() > 0 && direction_config.maxBufferedBytes()) {
+      direction_config.setBuffering(true);
+      callbacks.setBufferLimit(direction_config.maxBufferedBytes().value());
+      direction_config.setHeaders(&headers);
       // Note that the log will print the updated headers. The incoming headers can be seen from the
       // log in decode/encodeHeaders.
-      ENVOY_STREAM_LOG(debug, "do decompress (without buffering) {}: {}", callbacks, direction_config.logString(),
-                     headers);
+      ENVOY_STREAM_LOG(debug, "do decompress (without buffering) {}: {}", callbacks,
+                       direction_config.logString(), headers);
       return Http::FilterHeadersStatus::StopIteration;
     }
     // FIX ME: chunked should not be added if we buffer, right?
     sanitizeTransferEncoding(headers);
 
-    ENVOY_STREAM_LOG(debug, "do decompress (without buffering) {}: {}", callbacks, direction_config.logString(),
-                     headers);
+    ENVOY_STREAM_LOG(debug, "do decompress (without buffering) {}: {}", callbacks,
+                     direction_config.logString(), headers);
   } else {
     ENVOY_STREAM_LOG(debug, "do not decompress {}: {}", callbacks, direction_config.logString(),
                      headers);
@@ -130,19 +134,32 @@ Http::FilterHeadersStatus DecompressorFilter::maybeInitDecompress(
   return Http::FilterHeadersStatus::Continue;
 }
 
-Http::FilterDataStatus DecompressorFilter::maybeDecompress(
-    const DecompressorFilterConfig::DirectionConfig& direction_config,
-    Compression::Decompressor::Decompressor* decompressor, Http::StreamFilterCallbacks& callbacks,
-    Buffer::Instance& input_buffer) const {
+Http::FilterDataStatus
+DecompressorFilter::maybeDecompress(DecompressorFilterConfig::DirectionConfig& direction_config,
+                                    Compression::Decompressor::Decompressor* decompressor,
+                                    Http::StreamFilterCallbacks& callbacks,
+                                    Buffer::Instance& input_buffer, const bool end_stream) const {
   if (decompressor) {
     Buffer::OwnedImpl output_buffer;
     decompressor->decompress(input_buffer, output_buffer);
     direction_config.stats().total_compressed_bytes_.add(input_buffer.length());
     direction_config.stats().total_uncompressed_bytes_.add(output_buffer.length());
+    direction_config.addToUncompressedLength(output_buffer.length());
     ENVOY_STREAM_LOG(debug, "{} data decompressed from {} bytes to {} bytes", callbacks,
                      direction_config.logString(), input_buffer.length(), output_buffer.length());
     input_buffer.drain(input_buffer.length());
     input_buffer.add(output_buffer);
+
+    if (direction_config.buffering()) {
+      if (!end_stream) {
+        // The connection manager can deal with buffering. The input_buffer now contains the
+        // uncompressed bytes;
+        return Http::FilterDataStatus::StopIterationAndBuffer;
+      }
+      // In the last frame reset the Content-Length header with the uncompressed size.
+      ASSERT(direction_config.headers() != nullptr);
+      direction_config.headers()->setContentLength(direction_config.uncompressedLength());
+    }
   }
   return Http::FilterDataStatus::Continue;
 }

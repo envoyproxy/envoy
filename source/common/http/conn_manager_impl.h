@@ -300,6 +300,7 @@ private:
     addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& watermark_callbacks) override;
     void
     removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& watermark_callbacks) override;
+    void setBufferLimit(uint32_t limit) override { setDecoderBufferLimit(limit); }
     void setDecoderBufferLimit(uint32_t limit) override { parent_.setBufferLimit(limit); }
     uint32_t decoderBufferLimit() override { return parent_.buffer_limit_; }
     bool recreateStream() override;
@@ -389,6 +390,7 @@ private:
     void addEncodedMetadata(MetadataMapPtr&& metadata_map) override;
     void onEncoderFilterAboveWriteBufferHighWatermark() override;
     void onEncoderFilterBelowWriteBufferLowWatermark() override;
+    void setBufferLimit(uint32_t limit) override { setEncoderBufferLimit(limit); }
     void setEncoderBufferLimit(uint32_t limit) override { parent_.setBufferLimit(limit); }
     uint32_t encoderBufferLimit() override { return parent_.buffer_limit_; }
     void continueEncoding() override;

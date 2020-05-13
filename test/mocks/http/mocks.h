@@ -149,6 +149,7 @@ public:
   MOCK_METHOD(void, onDecoderFilterBelowWriteBufferLowWatermark, ());
   MOCK_METHOD(void, addDownstreamWatermarkCallbacks, (DownstreamWatermarkCallbacks&));
   MOCK_METHOD(void, removeDownstreamWatermarkCallbacks, (DownstreamWatermarkCallbacks&));
+  MOCK_METHOD(void, setBufferLimit, (uint32_t));
   MOCK_METHOD(void, setDecoderBufferLimit, (uint32_t));
   MOCK_METHOD(uint32_t, decoderBufferLimit, ());
   MOCK_METHOD(bool, recreateStream, ());
@@ -224,6 +225,7 @@ public:
   MOCK_METHOD(const ScopeTrackedObject&, scope, ());
   MOCK_METHOD(void, onEncoderFilterAboveWriteBufferHighWatermark, ());
   MOCK_METHOD(void, onEncoderFilterBelowWriteBufferLowWatermark, ());
+  MOCK_METHOD(void, setBufferLimit, (uint32_t));
   MOCK_METHOD(void, setEncoderBufferLimit, (uint32_t));
   MOCK_METHOD(uint32_t, encoderBufferLimit, ());
 
