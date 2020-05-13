@@ -366,7 +366,6 @@ actions:
               testing::ContainerEq(descriptors_));
 }
 
-
 // Validate that a descriptor is added if at least one request header has value.
 TEST_F(RateLimitPolicyEntryTest, RequestHeadersPartialMatchWithSkipIfAbsent) {
   const std::string yaml = R"EOF(
@@ -390,7 +389,6 @@ actions:
               testing::ContainerEq(descriptors_));
 }
 
-
 TEST_F(RateLimitPolicyEntryTest, RequestHeadersPartialMatchWithoutSkipIfAbsent) {
   const std::string yaml = R"EOF(
 actions:
@@ -412,7 +410,6 @@ actions:
   EXPECT_TRUE(descriptors_.empty());
 }
 
-
 TEST_F(RateLimitPolicyEntryTest, RequestHeadersCompleteMatch) {
   const std::string yaml = R"EOF(
 actions:
@@ -431,12 +428,10 @@ actions:
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header,
                                          default_remote_address_);
-  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"my_header_name", "test_value"},  {"my_header", "test_value"}}}}),
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>(
+                  {{{{"my_header_name", "test_value"}, {"my_header", "test_value"}}}}),
               testing::ContainerEq(descriptors_));
 }
-
-
-
 
 TEST_F(RateLimitPolicyEntryTest, RequestHeadersMatchDefaultSkipIfAbsent) {
   const std::string yaml = R"EOF(
@@ -454,11 +449,10 @@ actions:
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header,
                                          default_remote_address_);
-  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"my_header_name", "test_value"},  {"my_header", "test_value"}}}}),
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>(
+                  {{{{"my_header_name", "test_value"}, {"my_header", "test_value"}}}}),
               testing::ContainerEq(descriptors_));
 }
-
-
 
 TEST_F(RateLimitPolicyEntryTest, RequestHeadersNoMatch) {
   const std::string yaml = R"EOF(

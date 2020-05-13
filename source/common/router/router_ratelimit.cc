@@ -41,8 +41,8 @@ bool RequestHeadersAction::populateDescriptor(const Router::RouteEntry&,
   if (!header_value && !skip_if_absent_) {
     return false;
   }
-  
-  if(!header_value && skip_if_absent_) {
+
+  if (!header_value && skip_if_absent_) {
     return true;
   }
 
