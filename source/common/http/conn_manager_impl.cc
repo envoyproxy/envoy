@@ -1645,8 +1645,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeadersInternal(ResponseHeaderMa
   // overwrite the upstream date unconditionally (a previous behavior), only do so if the response
   // is not from cache
   const bool should_preserve_upstream_date =
-      connection_manager_.runtime_.snapshot().featureEnabled(
-          "http_connection_manager.preserve_upstream_date", 100) ||
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.preserve_upstream_date") ||
       stream_info_.hasResponseFlag(StreamInfo::ResponseFlag::ResponseFromCacheFilter);
   if (!should_preserve_upstream_date || !headers.Date()) {
     connection_manager_.config_.dateProvider().setDateHeader(headers);

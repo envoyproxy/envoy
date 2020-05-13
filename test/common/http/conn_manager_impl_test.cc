@@ -1168,9 +1168,9 @@ TEST_F(HttpConnectionManagerImplTest, RouteShouldUseNormalizedHost) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, PreserveUpstreamDateDisabledDateNotSet) {
-  EXPECT_CALL(runtime_.snapshot_,
-              featureEnabled("http_connection_manager.preserve_upstream_date", 100))
-      .WillOnce(Return(false));
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.preserve_upstream_date", "false"}});
   setup(false, "");
   setUpEncoderAndDecoder(false, false);
   sendRequestHeadersAndData();
@@ -1181,9 +1181,9 @@ TEST_F(HttpConnectionManagerImplTest, PreserveUpstreamDateDisabledDateNotSet) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, PreserveUpstreamDateEnabledDateNotSet) {
-  EXPECT_CALL(runtime_.snapshot_,
-              featureEnabled("http_connection_manager.preserve_upstream_date", 100))
-      .WillOnce(Return(true));
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.preserve_upstream_date", "true"}});
   setup(false, "");
   setUpEncoderAndDecoder(false, false);
   sendRequestHeadersAndData();
@@ -1194,9 +1194,9 @@ TEST_F(HttpConnectionManagerImplTest, PreserveUpstreamDateEnabledDateNotSet) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, PreserveUpstreamDateDisabledDateSet) {
-  EXPECT_CALL(runtime_.snapshot_,
-              featureEnabled("http_connection_manager.preserve_upstream_date", 100))
-      .WillOnce(Return(false));
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.preserve_upstream_date", "false"}});
   setup(false, "");
   setUpEncoderAndDecoder(false, false);
   sendRequestHeadersAndData();
@@ -1210,9 +1210,9 @@ TEST_F(HttpConnectionManagerImplTest, PreserveUpstreamDateDisabledDateSet) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, PreserveUpstreamDateEnabledDateSet) {
-  EXPECT_CALL(runtime_.snapshot_,
-              featureEnabled("http_connection_manager.preserve_upstream_date", 100))
-      .WillOnce(Return(true));
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.preserve_upstream_date", "true"}});
   setup(false, "");
   setUpEncoderAndDecoder(false, false);
   sendRequestHeadersAndData();
@@ -1226,9 +1226,9 @@ TEST_F(HttpConnectionManagerImplTest, PreserveUpstreamDateEnabledDateSet) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, PreserveUpstreamDateDisabledDateFromCache) {
-  EXPECT_CALL(runtime_.snapshot_,
-              featureEnabled("http_connection_manager.preserve_upstream_date", 100))
-      .WillOnce(Return(false));
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.preserve_upstream_date", "false"}});
   setup(false, "");
   setUpEncoderAndDecoder(false, false);
   sendRequestHeadersAndData();
