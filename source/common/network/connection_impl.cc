@@ -223,7 +223,8 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
 
   socket_->close();
 
-  raiseEvent(close_type);
+  // Call the base class directly as close() is called in the destructor.
+  ConnectionImpl::raiseEvent(close_type);
 }
 
 void ConnectionImpl::noDelay(bool enable) {
