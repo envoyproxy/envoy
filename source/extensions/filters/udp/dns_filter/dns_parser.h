@@ -6,6 +6,7 @@
 #include "envoy/network/listener.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/runtime/runtime_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -62,11 +63,11 @@ using AnswerCallback = std::function<void(DnsQueryRecordPtr& query, AddressConst
 class DnsAnswerRecord : public BaseDnsRecord {
 public:
   DnsAnswerRecord(const std::string& query_name, const uint16_t rec_type, const uint16_t rec_class,
-                  const uint32_t ttl, Network::Address::InstanceConstSharedPtr ipaddr)
+                  const std::chrono::seconds ttl, Network::Address::InstanceConstSharedPtr ipaddr)
       : BaseDnsRecord(query_name, rec_type, rec_class), ttl_(ttl), ip_addr_(ipaddr) {}
   bool serialize(Buffer::OwnedImpl& output) override;
 
-  const uint32_t ttl_;
+  const std::chrono::seconds ttl_;
   const Network::Address::InstanceConstSharedPtr ip_addr_;
 };
 
@@ -184,7 +185,8 @@ public:
    * @param ipaddr the address that is returned in the answer record
    */
   void buildDnsAnswerRecord(DnsQueryContextPtr& context, const DnsQueryRecord& query_rec,
-                            const uint32_t ttl, Network::Address::InstanceConstSharedPtr ipaddr);
+                            const std::chrono::seconds ttl,
+                            Network::Address::InstanceConstSharedPtr ipaddr);
 
   /**
    * @return uint16_t the response code flag value from a parsed dns object
@@ -246,10 +248,18 @@ private:
   const std::string parseDnsNameRecord(const Buffer::InstancePtr& buffer, uint64_t* available_bytes,
                                        uint64_t* name_offset);
 
+  /**
+   * @brief Helper function to generate a random set of indices which are used to determine the
+   * order of serialized answer records. This ensures the server does not return a fixed list
+   * of answers when more than one address is configured for a record
+   */
+  void generateRandomIndices(const size_t count, absl::flat_hash_set<size_t>& elements);
+
   bool recursion_available_;
   uint64_t retry_count_;
   DnsHeader header_;
   DnsHeader response_header_;
+  Runtime::RandomGeneratorImpl rng_;
 };
 
 } // namespace DnsFilter

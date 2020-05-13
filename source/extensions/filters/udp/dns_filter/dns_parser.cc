@@ -81,7 +81,7 @@ bool DnsAnswerRecord::serialize(Buffer::OwnedImpl& output) {
   if (serializeName(output)) {
     output.writeBEInt<uint16_t>(type_);
     output.writeBEInt<uint16_t>(class_);
-    output.writeBEInt<uint32_t>(ttl_);
+    output.writeBEInt<uint32_t>(static_cast<uint32_t>(ttl_.count()));
 
     ASSERT(ip_addr_ != nullptr);
     const auto ip_address = ip_addr_->ip();
@@ -359,8 +359,8 @@ DnsAnswerRecordPtr DnsMessageParser::parseDnsAnswerRecord(const Buffer::Instance
 
   *offset = data_offset;
 
-  return std::make_unique<DnsAnswerRecord>(record_name, record_type, record_class, ttl,
-                                           std::move(ip_addr));
+  return std::make_unique<DnsAnswerRecord>(record_name, record_type, record_class,
+                                           std::chrono::seconds{ttl}, std::move(ip_addr));
 }
 
 DnsQueryRecordPtr DnsMessageParser::parseDnsQueryRecord(const Buffer::InstancePtr& buffer,
@@ -447,7 +447,8 @@ void DnsMessageParser::setDnsResponseFlags(DnsQueryContextPtr& query_context,
 }
 
 void DnsMessageParser::buildDnsAnswerRecord(DnsQueryContextPtr& context,
-                                            const DnsQueryRecord& query_rec, const uint32_t ttl,
+                                            const DnsQueryRecord& query_rec,
+                                            const std::chrono::seconds ttl,
                                             Network::Address::InstanceConstSharedPtr ipaddr) {
   // Verify that we have an address matching the query record type
   switch (query_rec.type_) {
@@ -502,6 +503,17 @@ void DnsMessageParser::setResponseCode(DnsQueryContextPtr& context,
   context->response_code_ = DNS_RESPONSE_CODE_NO_ERROR;
 }
 
+void DnsMessageParser::generateRandomIndices(const size_t count,
+                                             absl::flat_hash_set<size_t>& elements) {
+  elements.clear();
+  while (elements.size() < count) {
+    size_t element = rng_.random() % count;
+    if (!elements.contains(element)) {
+      elements.insert(element);
+    }
+  }
+}
+
 void DnsMessageParser::buildResponseBuffer(DnsQueryContextPtr& query_context,
                                            Buffer::OwnedImpl& buffer) {
   // Ensure that responses stay below the 512 byte byte limit. If we are to exceed this we must add
@@ -534,11 +546,20 @@ void DnsMessageParser::buildResponseBuffer(DnsQueryContextPtr& query_context,
     ++serialized_queries;
     total_buffer_size += query_buffer.length();
 
-    for (const auto& answer : query_context->answers_) {
+    // Generate a set of random indices of the answer records that we serialize. We do this
+    // so that we don't always return the same records in the same order for every query
+    absl::flat_hash_set<size_t> indices{};
+    generateRandomIndices(query_context->answers_.size(), indices);
+
+    const auto& answers = query_context->answers_;
+    for (const size_t index : indices) {
+      const auto answer = std::next(answers.begin(), index);
       // Query names are limited to 255 characters. Since we are using ares to decode the encoded
       // names, we should not end up with a non-conforming name here.
       //
       // See Section 2.3.4 of https://tools.ietf.org/html/rfc1035
+
+      // TODO(abaptiste): add stats for record overflow
       if (query->name_.size() > MAX_DNS_NAME_SIZE) {
         ENVOY_LOG(
             debug,
@@ -546,12 +567,12 @@ void DnsMessageParser::buildResponseBuffer(DnsQueryContextPtr& query_context,
             query->name_);
         continue;
       }
-      if (answer.first != query->name_) {
+      if (answer->first != query->name_) {
         continue;
       }
 
       Buffer::OwnedImpl serialized_answer;
-      if (!answer.second->serialize(serialized_answer)) {
+      if (!answer->second->serialize(serialized_answer)) {
         ENVOY_LOG(debug, "Unable to serialize answer record for {}", query->name_);
         continue;
       }

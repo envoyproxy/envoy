@@ -133,7 +133,7 @@ private:
   /**
    * @return uint32_t retrieves the configured per domain TTL to be inserted into answer records
    */
-  uint32_t getDomainTTL(const absl::string_view domain);
+  std::chrono::seconds getDomainTTL(const absl::string_view domain);
 
   /**
    * @brief Resolves the supplied query from configured clusters

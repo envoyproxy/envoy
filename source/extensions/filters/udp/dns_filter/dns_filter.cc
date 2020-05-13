@@ -176,18 +176,14 @@ DnsLookupResponseCode DnsFilter::getResponseForQuery(DnsQueryContextPtr& context
   return DnsLookupResponseCode::Success;
 }
 
-uint32_t DnsFilter::getDomainTTL(const absl::string_view domain) {
+std::chrono::seconds DnsFilter::getDomainTTL(const absl::string_view domain) {
   const auto& domain_ttl_config = config_->domainTtl();
   const auto& iter = domain_ttl_config.find(domain);
 
-  uint32_t ttl;
   if (iter == domain_ttl_config.end()) {
-    ttl = static_cast<uint32_t>(DEFAULT_RESOLVER_TTL.count());
-  } else {
-    ttl = static_cast<uint32_t>(iter->second.count());
+    return DEFAULT_RESOLVER_TTL;
   }
-
-  return ttl;
+  return iter->second;
 }
 
 bool DnsFilter::isKnownDomain(const absl::string_view domain_name) {
@@ -211,14 +207,11 @@ bool DnsFilter::isKnownDomain(const absl::string_view domain_name) {
 
 const DnsEndpointConfig* DnsFilter::getEndpointConfigForDomain(const absl::string_view domain) {
   const auto& domains = config_->domains();
-
-  // TODO: If we have a large ( > 100) domain list, use a binary search.
   const auto iter = domains.find(domain);
   if (iter == domains.end()) {
     ENVOY_LOG(debug, "No endpoint configuration exists for [{}]", domain);
     return nullptr;
   }
-
   return &(iter->second);
 }
 
@@ -258,7 +251,7 @@ bool DnsFilter::resolveViaClusters(DnsQueryContextPtr& context, const DnsQueryRe
 
   // Return the address for all discovered endpoints
   size_t discovered_endpoints = 0;
-  const uint32_t ttl = getDomainTTL(query.name_);
+  const std::chrono::seconds ttl = getDomainTTL(query.name_);
   for (const auto& hostsets : cluster->prioritySet().hostSetsPerPriority()) {
     for (const auto& host : hostsets->hosts()) {
       ++discovered_endpoints;
@@ -290,7 +283,7 @@ bool DnsFilter::resolveViaConfiguredHosts(DnsQueryContextPtr& context,
     ENVOY_LOG(debug, "using local address {} for domain [{}]",
               configured_address->ip()->addressAsString(), query.name_);
     ++hosts_found;
-    const uint32_t ttl = getDomainTTL(query.name_);
+    const std::chrono::seconds ttl = getDomainTTL(query.name_);
     message_parser_.buildDnsAnswerRecord(context, query, ttl, configured_address);
   }
   return (hosts_found != 0);
