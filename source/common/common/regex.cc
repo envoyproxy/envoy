@@ -52,8 +52,8 @@ public:
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.google_re2(), max_program_size, 100);
       if (static_cast<uint32_t>(regex_.ProgramSize()) > max_program_size) {
         throw EnvoyException(fmt::format("regex '{}' RE2 program size of {} > max program size of "
-                                        "{}. Increase configured max program size if necessary.",
-                                        config.regex(), regex_.ProgramSize(), max_program_size));
+                                         "{}. Increase configured max program size if necessary.",
+                                         config.regex(), regex_.ProgramSize(), max_program_size));
       }
     }
   }
