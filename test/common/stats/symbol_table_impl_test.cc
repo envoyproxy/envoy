@@ -142,21 +142,35 @@ TEST_P(StatNameTest, TestEmpty) {
 }
 
 TEST_P(StatNameTest, TestDynamic100k) {
-  // Tests 100k different sizes of dynamic stat, covering all kinds of
-  // corner cases of spilling over into multi-byte lengths.
-
-  std::string stat_str("dynamic_stat.x");
-  for (int i = 0; i < 100 * 1000; ++i) {
-    char ch = i % 256;
-    if (ch == '.') {
-      ch = 'x';
+  // Tests a variety different sizes of dynamic stat ranging to 500k, covering
+  // potential corner cases of spilling over into multi-byte lengths.
+  std::string stat_str("dyn.x");
+  char ch = '\001';
+  StatName ab = makeStat("a.b");
+  StatName cd = makeStat("c.d");
+  auto test_at_size = [this, &stat_str, &ch, ab, cd](uint32_t size) {
+    if (size > stat_str.size()) {
+      // Add rotating characters to stat_str until we hit size.
+      for (uint32_t i = stat_str.size(); i < size; ++i, ++ch) {
+        stat_str += (ch == '.') ? 'x' : ch;
+      }
+      StatNameDynamicStorage storage(stat_str, *table_);
+      StatName dynamic = storage.statName();
+      EXPECT_EQ(stat_str, table_->toString(dynamic));
+      SymbolTable::StoragePtr joined = table_->join({ab, dynamic, cd});
+      EXPECT_EQ(absl::StrCat("a.b.", stat_str, ".c.d"), table_->toString(StatName(joined.get())));
     }
-    stat_str += ch;
-    StatNameDynamicStorage storage(stat_str, *table_);
-    StatName dynamic = storage.statName();
-    EXPECT_EQ(stat_str, table_->toString(dynamic));
-    SymbolTable::StoragePtr joined = table_->join({makeStat("a.b"), dynamic, makeStat("c.d")});
-    EXPECT_EQ(absl::StrCat("a.b.", stat_str, ".c.d"), table_->toString(StatName(joined.get())));
+  };
+
+  // The outer-loop hits powers of 2 from 8 to 512k.
+  for (uint32_t i = 3; i < 20; ++i) {
+    int32_t pow_2 = 1 << i;
+
+    // The inner-loop covers every offset from the power of 2, between offsets of
+    // -10 and +10.
+    for (int32_t j = std::max(0, pow_2 - 10); j < pow_2 + 10; ++j) {
+      test_at_size(j);
+    }
   }
 }
 
