@@ -20,10 +20,12 @@ namespace Decompressor {
  */
 #define ALL_DECOMPRESSOR_STATS(COUNTER)                                                            \
   COUNTER(decompressed)                                                                            \
-  COUNTER(not_decompressed)
+  COUNTER(not_decompressed)                                                                        \
+  COUNTER(total_uncompressed_bytes)                                                                \
+  COUNTER(total_compressed_bytes)
 
 /**
- * Struct definition for compressor stats. @see stats_macros.h
+ * Struct definition for decompressor stats. @see stats_macros.h
  */
 struct DecompressorStats {
   ALL_DECOMPRESSOR_STATS(GENERATE_COUNTER_STRUCT)
@@ -36,8 +38,7 @@ class DecompressorFilterConfig {
 public:
   class DirectionConfig {
   public:
-    DirectionConfig(const bool is_request_direction,
-                    const envoy::extensions::filters::http::decompressor::v3::Decompressor::
+    DirectionConfig(const envoy::extensions::filters::http::decompressor::v3::Decompressor::
                         CommonDirectionConfig& proto_config,
                     const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime);
 
@@ -46,15 +47,21 @@ public:
     virtual const std::string& logString() const PURE;
     const DecompressorStats& stats() const { return stats_; }
     bool decompressionEnabled() const { return decompression_enabled_.enabled(); }
+    const absl::optional<uint32_t>& maxBufferedBytes() const { return max_buffered_bytes_; }
+    void setHeaders(Http::RequestHeaderMap* headers) { headers_ = headers; }
+    void addToUncompressedLength(uint64_t bytes) { uncompressed_length_ += bytes; }
+    uint64_t uncompressedLength() const { return uncompressed_length_; }
 
   private:
     static DecompressorStats generateStats(const std::string& prefix, Stats::Scope& scope) {
       return DecompressorStats{ALL_DECOMPRESSOR_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
     }
 
-    const std::string request_or_response_;
     const DecompressorStats stats_;
     const Runtime::FeatureFlag decompression_enabled_;
+    const absl::optional<uint32_t> max_buffered_bytes_;
+    uint64_t uncompressed_length_{};
+    Http::RequestHeaderMap* headers_{};
   };
 
   class RequestDirectionConfig : public DirectionConfig {
@@ -126,10 +133,11 @@ public:
   Http::FilterDataStatus encodeData(Buffer::Instance&, bool) override;
 
 private:
-  void maybeInitDecompress(const DecompressorFilterConfig::DirectionConfig& direction_config,
-                           Compression::Decompressor::DecompressorPtr& decompressor,
-                           Http::StreamFilterCallbacks& callbacks,
-                           Http::RequestOrResponseHeaderMap& headers);
+  Http::FilterHeadersStatus
+  maybeInitDecompress(const DecompressorFilterConfig::DirectionConfig& direction_config,
+                      Compression::Decompressor::DecompressorPtr& decompressor,
+                      Http::StreamFilterCallbacks& callbacks,
+                      Http::RequestOrResponseHeaderMap& headers);
   Http::FilterDataStatus
   maybeDecompress(const DecompressorFilterConfig::DirectionConfig& direction_config,
                   Compression::Decompressor::Decompressor* decompressor,
@@ -140,7 +148,6 @@ private:
   bool hasCacheControlNoTransform(Http::RequestOrResponseHeaderMap& headers) const;
   bool contentEncodingMatches(Http::RequestOrResponseHeaderMap& headers) const;
   void removeContentEncoding(Http::RequestOrResponseHeaderMap& headers) const;
-  void injectAcceptEncoding(Http::RequestHeaderMap& headers) const;
   void sanitizeTransferEncoding(Http::RequestOrResponseHeaderMap& headers) const;
 
   DecompressorFilterConfigSharedPtr config_;

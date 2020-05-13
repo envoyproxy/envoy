@@ -19,9 +19,8 @@ option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Decompressor]
-// Decompressor :ref:`configuration overview <config_http_filters_decompressor>`.
+// [#extension: envoy.filters.http.decompressor]
 
-// [#not-implemented-hide:]
 message Decompressor {
   // Common configuration for filter behavior on both the request and response direction.
   message CommonDirectionConfig {
@@ -29,19 +28,21 @@ message Decompressor {
     // filter will operate as a pass-through filter. If the message is unspecified, the filter will be enabled.
     config.core.v3.RuntimeFeatureFlag enabled = 1;
 
-    // If set to true, and the Content-Length header is present, the Decompressor filter will buffer
-    // data frames until complete and will update the Content Length header with the inflated size.
-    // Otherwise, the filter will remove the Content-Length header (if present) and stream inflated
-    // data frames as they are received.
-    bool preserve_content_length = 2;
+    // If set, and the Content-Length header is present, the Decompressor filter will buffer
+    // data frames until the final data frame and will update the Content Length header with
+    // the inflated size.
+    // The setting configures the maximum uncompressed size the filter will buffer before the connection
+    // manager will stop buffering and return a 413 response.
+    // If the setting is absent, the filter will stream inflated data frames as they are received.
+    google.protobuf.UInt32Value max_buffered_bytes = 1 [(validate.rules).uint32 = {gt: 0}];
   }
 
   // Configuration for filter behavior on the request direction.
   message RequestDirectionConfig {
     CommonDirectionConfig common_config = 1;
 
-    // If set to true, modifies the Accept-Encoding request header by appending the
-    // decompressor_library's encoding. Defaults to true.
+    // If set to true, and response decompression is enabled, the filter modifies the Accept-Encoding
+    // request header by appending the decompressor_library's encoding. Defaults to true.
     google.protobuf.BoolValue advertise_accept_encoding = 2;
   }
 
@@ -51,7 +52,7 @@ message Decompressor {
   }
 
   // A decompressor library to use for decompression. Currently only
-  // :ref:`envoy.decompressors.gzip<envoy_api_msg_extensions.decompressors.gzip.v3.Gzip>`
+  // :ref:`envoy.compression.gzip.compressor<envoy_api_msg_extensions.compression.gzip.decompressor.v3.Gzip>`
   // is included in Envoy.
   config.core.v3.TypedExtensionConfig decompressor_library = 1
       [(validate.rules).message = {required: true}];

@@ -49,11 +49,11 @@ decompressor_library:
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
-  bool requestDirection() { return GetParam(); }
+  bool isRequestDirection() { return GetParam(); }
 
   std::unique_ptr<Http::RequestOrResponseHeaderMap> doHeaders(const Http::HeaderMap& rhs,
                                                               const bool end_stream = false) {
-    if (requestDirection()) {
+    if (isRequestDirection()) {
       auto request_headers = Http::createHeaderMap<Http::TestRequestHeaderMapImpl>(rhs);
       EXPECT_EQ(Http::FilterHeadersStatus::Continue,
                 filter_->decodeHeaders(*request_headers, end_stream));
@@ -67,7 +67,7 @@ decompressor_library:
   }
 
   void doData(Buffer::Instance& buffer, const bool end_stream = false) {
-    if (requestDirection()) {
+    if (isRequestDirection()) {
       EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, end_stream));
     } else {
       EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(buffer, end_stream));
@@ -107,7 +107,8 @@ decompressor_library:
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
 };
 
-INSTANTIATE_TEST_SUITE_P(RequestOrResponse, DecompressorFilterTest, ::testing::Values(true, false));
+INSTANTIATE_TEST_SUITE_P(IsRequestDirection, DecompressorFilterTest,
+                         ::testing::Values(true, false));
 
 TEST_P(DecompressorFilterTest, DecompressionActive) {
   // Keep the decompressor to set expectations about it
@@ -125,6 +126,12 @@ TEST_P(DecompressorFilterTest, DecompressionActive) {
   // FIX ME: pending decision on this.
   EXPECT_EQ(nullptr, headers_after_filter->ContentLength());
   EXPECT_EQ("chunked", headers_after_filter->TransferEncoding()->value().getStringView());
+  const auto* accept_encoding = headers_after_filter->get(Http::LowerCaseString{"accept-encoding"});
+  if (isRequestDirection()) {
+    EXPECT_EQ("mock", accept_encoding->value().getStringView());
+  } else {
+    EXPECT_EQ(nullptr, accept_encoding);
+  }
 
   expectDecompression(decompressor_ptr);
 }
@@ -238,6 +245,33 @@ TEST_P(DecompressorFilterTest, NoResponseDecompressionNoTransformPresent) {
   TestUtility::headerMapEqualIgnoreOrder(headers_before_filter, *headers_after_filter);
 
   expectNoDecompression();
+}
+
+TEST_P(DecompressorFilterTest, DisableAdvertiseAcceptEncoding) {
+  setUpFilter(R"EOF(
+decompressor_library:
+  typed_config:
+    "@type": "type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip"
+request_direction_config:
+  advertise_accept_encoding: false
+)EOF");
+
+  // Keep the decompressor to set expectations about it
+  auto decompressor = std::make_unique<Compression::Decompressor::MockDecompressor>();
+  auto* decompressor_ptr = decompressor.get();
+  EXPECT_CALL(*decompressor_factory_, createDecompressor())
+      .WillOnce(Return(ByMove(std::move(decompressor))));
+  Http::TestHeaderMapImpl headers_before_filter{{"content-encoding", "mock"},
+                                                {"content-length", "256"}};
+  std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
+      doHeaders(headers_before_filter);
+
+  EXPECT_EQ(nullptr, headers_after_filter->ContentEncoding());
+  EXPECT_EQ(nullptr, headers_after_filter->ContentLength());
+  EXPECT_EQ("chunked", headers_after_filter->TransferEncoding()->value().getStringView());
+  EXPECT_EQ(nullptr, headers_after_filter->get(Http::LowerCaseString{"accept-encoding"}));
+
+  expectDecompression(decompressor_ptr);
 }
 
 } // namespace
