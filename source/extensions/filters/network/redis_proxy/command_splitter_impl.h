@@ -85,7 +85,7 @@ protected:
 
   SplitRequestBase(CommandStats& command_stats, TimeSource& time_source)
       : command_stats_(command_stats) {
-    delay_command_latency_ = false;
+    delay_command_latency_ = false; // TODO: Fix this part
     command_latency_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
         command_stats_.latency_, time_source);
   }
@@ -117,6 +117,57 @@ protected:
   ConnPool::InstanceSharedPtr conn_pool_;
   Common::Redis::Client::PoolRequest* handle_{};
   Common::Redis::RespValuePtr incoming_request_;
+};
+
+/**
+ * ErrorFaultRequest returns an error.
+ */
+class ErrorFaultRequest : public SingleServerRequest {
+public:
+  static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
+                                SplitCallbacks& callbacks, CommandStats& command_stats,
+                                TimeSource& time_source);
+
+private:
+  ErrorFaultRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source)
+      : SingleServerRequest(callbacks, command_stats, time_source) {}
+
+public:
+  const static std::string FAULT_INJECTED_ERROR;
+};
+
+/**
+ * DelayFaultRequest wraps a request- either a normal request or a fault- and delays it.
+ */
+class DelayFaultRequest : public SplitRequestBase, public SplitCallbacks {
+public:
+  static std::unique_ptr<DelayFaultRequest>
+  create(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
+         Event::Dispatcher& dispatcher, std::chrono::milliseconds delay);
+
+  DelayFaultRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
+                    Event::Dispatcher& dispatcher, std::chrono::milliseconds delay)
+      : SplitRequestBase(command_stats, time_source), callbacks_(callbacks),
+        dispatcher_(dispatcher), delay_(delay) {}
+
+  // SplitCallbacks
+  bool connectionAllowed() override { return callbacks_.connectionAllowed(); }
+  void onAuth(const std::string& password) override { callbacks_.onAuth(password); }
+  void onResponse(Common::Redis::RespValuePtr&& response) override;
+
+  // RedisProxy::CommandSplitter::SplitRequest
+  void cancel() override;
+
+  SplitRequestPtr wrapped_request_ptr_;
+
+private:
+  void onDelayResponse();
+
+  SplitCallbacks& callbacks_;
+  Event::Dispatcher& dispatcher_;
+  std::chrono::milliseconds delay_;
+  Event::TimerPtr delay_timer_;
+  Common::Redis::RespValuePtr response_;
 };
 
 /**
