@@ -840,18 +840,6 @@ ClusterManagerImpl::tcpConnPoolForCluster(const std::string& cluster, ResourcePr
   return entry->second->tcpConnPool(priority, context);
 }
 
-absl::variant<Http::ConnectionPool::Instance*, Tcp::ConnectionPool::Instance*>
-ClusterManagerImpl::genericConnPoolForCluster(const std::string& cluster, ResourcePriority priority,
-                                              LoadBalancerContext* context) {
-  ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
-
-  auto entry = cluster_manager.thread_local_clusters_.find(cluster);
-  if (entry == cluster_manager.thread_local_clusters_.end()) {
-    return absl::variant<Http::ConnectionPool::Instance*, Tcp::ConnectionPool::Instance*>();
-  }
-  return entry->second->genericConnPool(priority, context);
-}
-
 void ClusterManagerImpl::postThreadLocalDrainConnections(const Cluster& cluster,
                                                          const HostVector& hosts_removed) {
   tls_->runOnAllThreads([this, name = cluster.info()->name(), hosts_removed]() {
@@ -1425,25 +1413,6 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
     return nullptr;
   }
   return getTcpPool(host, priority, context);
-}
-
-absl::variant<Http::ConnectionPool::Instance*, Tcp::ConnectionPool::Instance*>
-ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::genericConnPool(
-    ResourcePriority priority, LoadBalancerContext* context) {
-  HostConstSharedPtr host = lb_->chooseHost(context);
-  if (!host) {
-    ENVOY_LOG(debug, "no healthy host for TCP connection pool");
-    cluster_info_->stats().upstream_cx_none_healthy_.inc();
-    return absl::variant<Http::ConnectionPool::Instance*, Tcp::ConnectionPool::Instance*>();
-  }
-  if (host->metadata()->filter_metadata().find("envoy.plaintcponly") !=
-      host->metadata()->filter_metadata().end()) {
-    ENVOY_LOG_MISC(warn, "lambdai: has plain tcp only, use tcp conn pool");
-    return getTcpPool(std::move(host), priority, context);
-  } else {
-    ENVOY_LOG_MISC(warn, "lambdai: allow http tunnel for host");
-    return getHttpPool(std::move(host), priority, Http::Protocol::Http2, context);
-  }
 }
 
 ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(

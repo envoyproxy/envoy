@@ -171,14 +171,6 @@ public:
                                                                ResourcePriority priority,
                                                                LoadBalancerContext* context) PURE;
 
-  virtual absl::variant<Http::ConnectionPool::Instance*, Tcp::ConnectionPool::Instance*>
-  genericConnPoolForCluster(const std::string& cluster, ResourcePriority priority,
-                            LoadBalancerContext* context) {
-    UNREFERENCED_PARAMETER(cluster);
-    UNREFERENCED_PARAMETER(priority);
-    UNREFERENCED_PARAMETER(context);
-    return absl::variant<Http::ConnectionPool::Instance*, Tcp::ConnectionPool::Instance*>();
-  }
   /**
    * Allocate a load balanced TCP connection for a cluster. The created connection is already
    * bound to the correct *per-thread* dispatcher, so no further synchronization is needed. The

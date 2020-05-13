@@ -1,6 +1,8 @@
 #pragma once
 
 #include "envoy/common/pure.h"
+#include "envoy/http/conn_pool.h"
+#include "envoy/tcp/conn_pool.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
@@ -32,6 +34,13 @@ public:
    * @return LoadBalancer& the backing load balancer.
    */
   virtual LoadBalancer& loadBalancer() PURE;
+
+  virtual Http::ConnectionPool::Instance* getHttpPool(HostConstSharedPtr host,
+                                                      ResourcePriority priority,
+                                                      Http::Protocol protocol,
+                                                      LoadBalancerContext* context) PURE;
+  virtual Tcp::ConnectionPool::Instance*
+  getTcpPool(HostConstSharedPtr host, ResourcePriority priority, LoadBalancerContext* context) PURE;
 };
 
 } // namespace Upstream
