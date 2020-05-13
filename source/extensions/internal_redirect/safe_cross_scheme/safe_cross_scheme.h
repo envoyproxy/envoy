@@ -11,7 +11,7 @@ namespace Envoy {
 namespace Extensions {
 namespace InternalRedirect {
 
-class OnlyAllowSafeCrossSchemeRedirectPredicate : public Router::InternalRedirectPredicate {
+class SafeCrossSchemePredicate : public Router::InternalRedirectPredicate {
 public:
   bool acceptTargetRoute(StreamInfo::FilterState&, absl::string_view, bool downstream_is_https,
                          bool target_is_https) override {
@@ -19,7 +19,7 @@ public:
   }
 
   absl::string_view name() const override {
-    return InternalRedirectPredicateValues::get().OnlyAllowSafeCrossSchemeRedirectPredicate;
+    return InternalRedirectPredicateValues::get().SafeCrossSchemePredicate;
   }
 };
 

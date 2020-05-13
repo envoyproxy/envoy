@@ -170,8 +170,8 @@ For a redirect to be handled successfully it must pass the following checks:
 2. Have a *location* header with a valid, fully qualified URL.
 3. The request must have been fully processed by Envoy.
 4. The request must not have a body.
-5. :ref:`disallow_cross_scheme_redirect
-   <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.disallow_cross_scheme_redirect>` is false (default),
+5. :ref:`allow_cross_scheme_redirect
+   <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.allow_cross_scheme_redirect>` is true (default to false),
    or the scheme of the downstream request and the *location* header are the same.
 6. The number of previously handled internal redirect within a given downstream request does not
    exceed :ref:`max internal redirects
@@ -201,8 +201,8 @@ Specifically, the *allow listed routes* predicate defines edges of individual no
 and the *previous routes* predicate defines "visited" state of the edges, so that loop can be avoided
 if so desired.
 
-A third predicate :ref:`only_allow_safe_cross_scheme_redirect                                      
-<envoy_v3_api_msg_extensions.internal_redirect.only_allow_safe_cross_scheme_redirect.v3.OnlyAllowSafeCrossSchemeRedirectConfig>`
+A third predicate :ref:`safe_cross_scheme                                      
+<envoy_v3_api_msg_extensions.internal_redirect.safe_cross_scheme.v3.SafeCrossSchemeConfig>`
 can be used to prevent HTTP -> HTTPS redirect.
 
 Once the redirect has passed these checks, the request headers which were shipped to the original

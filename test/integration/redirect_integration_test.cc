@@ -1,8 +1,8 @@
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/internal_redirect/allow_listed_routes/v3/allow_listed_routes_config.pb.h"
-#include "envoy/extensions/internal_redirect/only_allow_safe_cross_scheme_redirect/v3/only_allow_safe_cross_scheme_redirect_config.pb.h"
 #include "envoy/extensions/internal_redirect/previous_routes/v3/previous_routes_config.pb.h"
+#include "envoy/extensions/internal_redirect/safe_cross_scheme/v3/safe_cross_scheme_config.pb.h"
 
 #include "test/integration/http_protocol_integration.h"
 
@@ -340,24 +340,24 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPreventedByAllowListedRoutesPred
       test_server_->counter("http.config_test.passthrough_internal_redirect_predicate")->value());
 }
 
-TEST_P(RedirectIntegrationTest,
-       InternalRedirectPreventedByOnlyAllowSafeCrossSchemeRedirectPredicate) {
-  auto handle_only_allow_safe_cross_scheme_redirect_route = config_helper_.createVirtualHost(
+TEST_P(RedirectIntegrationTest, InternalRedirectPreventedBySafeCrossSchemePredicate) {
+  auto handle_safe_cross_scheme_route = config_helper_.createVirtualHost(
       "handle.internal.redirect.only.allow.safe.cross.scheme.redirect");
-  auto* internal_redirect_policy =
-      handle_only_allow_safe_cross_scheme_redirect_route.mutable_routes(0)
-          ->mutable_route()
-          ->mutable_internal_redirect_policy();
+  auto* internal_redirect_policy = handle_safe_cross_scheme_route.mutable_routes(0)
+                                       ->mutable_route()
+                                       ->mutable_internal_redirect_policy();
+
+  internal_redirect_policy->set_allow_cross_scheme_redirect(true);
 
   auto* predicate = internal_redirect_policy->add_predicates();
-  predicate->set_name("only_allow_safe_cross_scheme_redirect_predicate");
-  envoy::extensions::internal_redirect::only_allow_safe_cross_scheme_redirect::v3::
-      OnlyAllowSafeCrossSchemeRedirectConfig predicate_config;
+  predicate->set_name("safe_cross_scheme_predicate");
+  envoy::extensions::internal_redirect::safe_cross_scheme::v3::SafeCrossSchemeConfig
+      predicate_config;
   predicate->mutable_typed_config()->PackFrom(predicate_config);
 
   internal_redirect_policy->mutable_max_internal_redirects()->set_value(10);
 
-  config_helper_.addVirtualHost(handle_only_allow_safe_cross_scheme_redirect_route);
+  config_helper_.addVirtualHost(handle_safe_cross_scheme_route);
 
   // Validate that header sanitization is only called once.
   config_helper_.addConfigModifier(

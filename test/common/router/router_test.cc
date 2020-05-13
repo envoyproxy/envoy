@@ -304,7 +304,7 @@ public:
         .WillByDefault(Return(max_internal_redirects));
     ON_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_,
             isCrossSchemeRedirectAllowed())
-        .WillByDefault(Return(true));
+        .WillByDefault(Return(false));
     ON_CALL(callbacks_, connection()).WillByDefault(Return(&connection_));
   }
 
@@ -4546,9 +4546,6 @@ TEST_F(RouterTest, CrossSchemeRedirectRejectedByPolicy) {
   redirect_headers_->setLocation("https://www.foo.com");
 
   EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
-  EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_,
-              isCrossSchemeRedirectAllowed())
-      .WillOnce(Return(false));
   EXPECT_CALL(callbacks_, recreateStream()).Times(0);
 
   response_decoder_->decodeHeaders(std::move(redirect_headers_), true);
@@ -4595,9 +4592,6 @@ TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
   sendRequest();
 
   EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
-  EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_,
-              isCrossSchemeRedirectAllowed())
-      .WillOnce(Return(false));
   EXPECT_CALL(callbacks_, clearRouteCache()).Times(1);
   EXPECT_CALL(callbacks_, recreateStream()).Times(1).WillOnce(Return(true));
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
@@ -4643,6 +4637,9 @@ TEST_F(RouterTest, CrossSchemeRedirectAllowedByPolicy) {
   redirect_headers_->setLocation("http://www.foo.com");
   EXPECT_CALL(connection_, ssl()).Times(1).WillOnce(Return(ssl_connection));
   EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
+  EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_,
+              isCrossSchemeRedirectAllowed())
+      .WillOnce(Return(true));
   EXPECT_CALL(callbacks_, clearRouteCache()).Times(1);
   EXPECT_CALL(callbacks_, recreateStream()).Times(1).WillOnce(Return(true));
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);

@@ -46,14 +46,8 @@ Changes
   tracing is not forced.
 * router: allow retries of streaming or incomplete requests. This removes stat `rq_retry_skipped_request_not_complete`.
 * router: allow retries by default when upstream responds with :ref:`x-envoy-overloaded <config_http_filters_router_x-envoy-overloaded_set>`.
-* router: internal redirect configs are moved to the :ref`internal_redirect_policy
-  <envoy_api_field_router.RouterAction.internal_redirect_policy>` field, which defines more fine
-  grained control of the internal redirect behavior. This changes the default cross scheme redirect behavior.
-  All cross scheme redirect is allowed by default, but http downstream to https target is disallowed. To restore
-  the previous behavior, set disallow_cross_scheme_redirect=true and use
-  :ref:`only_allow_safe_cross_scheme_redirect
-  <envoy_v3_api_msg_extensions.internal_redirect.only_allow_safe_cross_scheme_redirect.v3.OnlyAllowSafeCrossSchemeRedirectConfig>`,
-  in :ref:`predicates <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.predicates>`.
+* router: more fine grained internal redirect configs are added to the :ref`internal_redirect_policy
+  <envoy_api_field_router.RouterAction.internal_redirect_policy>` field.
 * runtime: add new gauge :ref:`deprecated_feature_seen_since_process_start <runtime_stats>` that gets reset across hot restarts.
 * stats: added the option to :ref:`report counters as deltas <envoy_v3_api_field_config.metrics.v3.MetricsServiceConfig.report_counters_as_deltas>` to the metrics service stats sink.
 * tracing: tracing configuration has been made fully dynamic and every HTTP connection manager
@@ -71,3 +65,10 @@ Deprecated
 * The * :ref:`GoogleRE2.max_program_size<envoy_v3_api_field_type.matcher.v3.RegexMatcher.GoogleRE2.max_program_size>`
   field is now deprecated. Management servers are expected to validate regexp program sizes
   instead of expecting the client to do it.
+* The :ref:`internal_redirect_action <envoy_v3_api_field_config.route.v3.RouteAction.internal_redirect_action>`
+  field and :ref:`max_internal_redirects <envoy_v3_api_field_config.route.v3.RouteAction.max_internal_redirects>` field
+  are now deprecated. This changes the implemented default cross scheme redirect behavior.
+  All cross scheme redirect are disallowed by default. To restore
+  the previous behavior, set allow_cross_scheme_redirect=true and use
+  :ref:`safe_cross_scheme<envoy_v3_api_msg_extensions.internal_redirect.safe_cross_scheme.v3.SafeCrossSchemeConfig>`,
+  in :ref:`predicates <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.predicates>`.

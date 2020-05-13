@@ -13,11 +13,11 @@ namespace InternalRedirect {
  */
 class InternalRedirectPredicatesNameValues {
 public:
-  const std::string PreviousRoutesPredicate = "envoy.internal_redirect_predicates.previous_routes";
   const std::string AllowListedRoutesPredicate =
       "envoy.internal_redirect_predicates.allow_listed_routes";
-  const std::string OnlyAllowSafeCrossSchemeRedirectPredicate =
-      "envoy.internal_redirect_predicates.only_allow_safe_cross_scheme_redirect";
+  const std::string PreviousRoutesPredicate = "envoy.internal_redirect_predicates.previous_routes";
+  const std::string SafeCrossSchemePredicate =
+      "envoy.internal_redirect_predicates.safe_cross_scheme";
 };
 
 using InternalRedirectPredicateValues = ConstSingleton<InternalRedirectPredicatesNameValues>;
