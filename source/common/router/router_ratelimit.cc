@@ -38,14 +38,11 @@ bool RequestHeadersAction::populateDescriptor(const Router::RouteEntry&,
                                               const Http::HeaderMap& headers,
                                               const Network::Address::Instance&) const {
   const Http::HeaderEntry* header_value = headers.get(header_name_);
-  if (!header_value && !skip_if_absent_) {
-    return false;
-  }
 
-  if (!header_value && skip_if_absent_) {
-    return true;
+  // If header is not present and skip_if_absent_ is not set to true, short circuit here and return.
+  if (!header_value) {
+    return skip_if_absent_;
   }
-
   descriptor.entries_.push_back(
       {descriptor_key_, std::string(header_value->value().getStringView())});
   return true;

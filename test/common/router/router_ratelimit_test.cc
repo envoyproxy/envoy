@@ -366,8 +366,9 @@ actions:
               testing::ContainerEq(descriptors_));
 }
 
-// Validate that a descriptor is added if at least one request header has value.
-TEST_F(RateLimitPolicyEntryTest, RequestHeadersPartialMatchWithSkipIfAbsent) {
+// Validate that a descriptor is added if the missing request header
+// has skip_if_absent set to true
+TEST_F(RateLimitPolicyEntryTest, RequestHeadersWithSkipIfAbsent) {
   const std::string yaml = R"EOF(
 actions:
 - request_headers:
@@ -389,7 +390,9 @@ actions:
               testing::ContainerEq(descriptors_));
 }
 
-TEST_F(RateLimitPolicyEntryTest, RequestHeadersPartialMatchWithoutSkipIfAbsent) {
+// Tests if the descriptors are added if one of the headers is missing
+// and skip_if_absent is set to default value which is false
+TEST_F(RateLimitPolicyEntryTest, RequestHeadersWithDefaultSkipIfAbsent) {
   const std::string yaml = R"EOF(
 actions:
 - request_headers:
@@ -408,50 +411,6 @@ actions:
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header,
                                          default_remote_address_);
   EXPECT_TRUE(descriptors_.empty());
-}
-
-TEST_F(RateLimitPolicyEntryTest, RequestHeadersCompleteMatch) {
-  const std::string yaml = R"EOF(
-actions:
-- request_headers:
-    header_name: x-header-name
-    descriptor_key: my_header_name
-    skip_if_absent: false
-- request_headers:
-    header_name: x-header
-    descriptor_key: my_header
-    skip_if_absent: false
-  )EOF";
-
-  setupTest(yaml);
-  Http::TestHeaderMapImpl header{{"x-header-name", "test_value"}, {"x-header", "test_value"}};
-
-  rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header,
-                                         default_remote_address_);
-  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>(
-                  {{{{"my_header_name", "test_value"}, {"my_header", "test_value"}}}}),
-              testing::ContainerEq(descriptors_));
-}
-
-TEST_F(RateLimitPolicyEntryTest, RequestHeadersMatchDefaultSkipIfAbsent) {
-  const std::string yaml = R"EOF(
-actions:
-- request_headers:
-    header_name: x-header-name
-    descriptor_key: my_header_name
-- request_headers:
-    header_name: x-header
-    descriptor_key: my_header
-  )EOF";
-
-  setupTest(yaml);
-  Http::TestHeaderMapImpl header{{"x-header-name", "test_value"}, {"x-header", "test_value"}};
-
-  rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header,
-                                         default_remote_address_);
-  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>(
-                  {{{{"my_header_name", "test_value"}, {"my_header", "test_value"}}}}),
-              testing::ContainerEq(descriptors_));
 }
 
 TEST_F(RateLimitPolicyEntryTest, RequestHeadersNoMatch) {
