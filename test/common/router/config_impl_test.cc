@@ -6937,7 +6937,7 @@ virtual_hosts:
       internal_redirect_policy.shouldRedirectForResponseCode(static_cast<Http::Code>(200)));
   EXPECT_EQ(1, internal_redirect_policy.maxInternalRedirects());
   EXPECT_TRUE(internal_redirect_policy.predicates().empty());
-  EXPECT_TRUE(internal_redirect_policy.isCrossSchemeRedirectAllowed());
+  EXPECT_FALSE(internal_redirect_policy.isCrossSchemeRedirectAllowed());
 }
 
 TEST_F(RouteConfigurationV2, InternalRedirctPolicyDropsInvalidRedirectCode) {

@@ -250,6 +250,7 @@ public:
   virtual bool enabled() const PURE;
 
   /**
+   * @param response_code the response code from the upstream.
    * @return whether the given response_code should trigger an internal redirect on this route.
    */
   virtual bool shouldRedirectForResponseCode(const Http::Code& response_code) const PURE;

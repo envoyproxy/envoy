@@ -11,7 +11,7 @@ option java_outer_classname = "AllowListedRoutesConfigProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: AllowListed routes internal redirect predicate]
+// [#protodoc-title: Allow listed routes internal redirect predicate]
 
 // An internal redirect predicate that accepts only explicitly allowed target routes.
 // [#extension: envoy.internal_redirect_predicates.allow_listed_routes]

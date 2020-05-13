@@ -21,7 +21,11 @@ public:
   /**
    * A FilterState is provided so that predicate implementation can use it to preserve state across
    * internal redirects.
-   *
+   * @param filter_state supplies the filter state associated with the current request so that the
+   *        predicates can use it to persist states across filter chains.
+   * @param target_route_name indicates the route that an internal redirect is targeting.
+   * @param downstream_is_https indicates the downstream request is using https.
+   * @param target_is_https indicates the internal redirect target url has https in the url.
    * @return whether the route specified by target_route_name is allowed to be followed. Any
    *         predicate returning false will prevent the redirect from being followed, causing the
    *         response to be proxied downstream.
@@ -46,6 +50,8 @@ public:
   ~InternalRedirectPredicateFactory() override = default;
 
   /**
+   * @param config contains the proto stored in TypedExtensionConfig.typed_config for the predicate.
+   * @param current_route_name stores the route name of the route where the predicate is installed.
    * @return an InternalRedirectPredicate. The given current_route_name is useful for predicates
    *         that need to create per-route FilterState.
    */

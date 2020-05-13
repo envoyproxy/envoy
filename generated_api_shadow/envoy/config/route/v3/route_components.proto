@@ -1643,6 +1643,6 @@ message InternalRedirectPolicy {
   repeated core.v3.TypedExtensionConfig predicates = 3;
 
   // Allow internal redirect to follow a target URI with a different scheme than the value of
-  // x-forwarded-proto. Default behavior is to proxy such redirects downstream.
+  // x-forwarded-proto. The default is false.
   bool allow_cross_scheme_redirect = 4;
 }

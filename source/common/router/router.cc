@@ -1472,10 +1472,10 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
     return false;
   }
 
-  auto& policy = route_entry_->internalRedirectPolicy();
+  const auto& policy = route_entry_->internalRedirectPolicy();
   // Don't allow serving TLS responses over plaintext unless allowed by policy.
-  bool scheme_is_http = schemeIsHttp(downstream_headers, *callbacks_->connection());
-  bool target_is_http = absolute_url.scheme() == Http::Headers::get().SchemeValues.Http;
+  const bool scheme_is_http = schemeIsHttp(downstream_headers, *callbacks_->connection());
+  const bool target_is_http = absolute_url.scheme() == Http::Headers::get().SchemeValues.Http;
   if (!policy.isCrossSchemeRedirectAllowed() && scheme_is_http != target_is_http) {
     config_.stats_.passthrough_internal_redirect_unsafe_scheme_.inc();
     return false;
@@ -1498,7 +1498,7 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
   }
   std::string original_host(downstream_headers.Host()->value().getStringView());
   std::string original_path(downstream_headers.Path()->value().getStringView());
-  bool scheme_is_set = (downstream_headers.Scheme() != nullptr);
+  const bool scheme_is_set = (downstream_headers.Scheme() != nullptr);
   Cleanup restore_original_headers(
       [&downstream_headers, original_host, original_path, scheme_is_set, scheme_is_http]() {
         downstream_headers.setHost(original_host);
@@ -1515,15 +1515,15 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
   downstream_headers.setPath(absolute_url.pathAndQueryParams());
 
   callbacks_->clearRouteCache();
-  auto route = callbacks_->route();
+  const auto route = callbacks_->route();
   // Don't allow a redirect to a non existing route.
   if (!route) {
     config_.stats_.passthrough_internal_redirect_no_route_.inc();
     return false;
   }
 
-  auto& route_name = route->routeEntry()->routeName();
-  for (auto& predicate : policy.predicates()) {
+  const auto& route_name = route->routeEntry()->routeName();
+  for (const auto& predicate : policy.predicates()) {
     if (!predicate->acceptTargetRoute(*filter_state, route_name, !scheme_is_http,
                                       !target_is_http)) {
       config_.stats_.passthrough_internal_redirect_predicate_.inc();
