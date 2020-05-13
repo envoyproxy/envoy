@@ -115,7 +115,7 @@ message CommonTlsContext {
     // Provider specific config: contains a name and an Any struct to pass a typed config.
     // Note: an implementation is expected to dedup multiple instances of the same config
     // to maintain a single certificate-provider instance. The sharing can happen, for
-    // examplem, among multiple clusters or between the tls_certificate and validation_context
+    // example, among multiple clusters or between the tls_certificate and validation_context
     // certificate providers of a cluster.
     config.core.v4alpha.TypedExtensionConfig typed_config = 2;
   }
