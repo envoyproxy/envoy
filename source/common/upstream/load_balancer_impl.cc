@@ -323,7 +323,8 @@ void LoadBalancerBase::recalculateLoadInTotalPanic() {
 std::pair<HostSet&, LoadBalancerBase::HostAvailability>
 LoadBalancerBase::chooseHostSet(LoadBalancerContext* context) {
   if (context) {
-    const auto priority_loads = context->determinePriorityLoad(priority_set_, per_priority_load_);
+    const auto priority_loads = context->determinePriorityLoad(
+        priority_set_, per_priority_load_, Upstream::RetryPriority::defaultPriorityMapping);
 
     const auto priority_and_source =
         choosePriority(random_.random(), priority_loads.healthy_priority_load_,
