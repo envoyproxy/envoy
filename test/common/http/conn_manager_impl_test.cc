@@ -1232,7 +1232,6 @@ TEST_F(HttpConnectionManagerImplTest, PreserveUpstreamDateDisabledDateFromCache)
   setup(false, "");
   setUpEncoderAndDecoder(false, false);
   sendRequestHeadersAndData();
-  ASSERT(stream_callbacks_ != nullptr);
   encoder_filters_[0]->callbacks_->streamInfo().setResponseFlag(
       StreamInfo::ResponseFlag::ResponseFromCacheFilter);
   const std::string expected_date{"Tue, 15 Nov 1994 08:12:31 GMT"};
