@@ -53,9 +53,7 @@ namespace Server {
  */
 #define ALL_SERVER_STATS(COUNTER, GAUGE, HISTOGRAM)                                                \
   COUNTER(debug_assertion_failures)                                                                \
-  COUNTER(dynamic_deprecated_fields)                                                               \
   COUNTER(dynamic_unknown_fields)                                                                  \
-  COUNTER(static_deprecated_fields)                                                                \
   COUNTER(static_unknown_fields)                                                                   \
   GAUGE(concurrency, NeverImport)                                                                  \
   GAUGE(days_until_first_cert_expiring, Accumulate)                                                \

@@ -3,6 +3,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
 
+#include "common/common/documentation_url.h"
 #include "common/protobuf/protobuf.h"
 
 #include "absl/strings/string_view.h"
@@ -12,10 +13,9 @@ namespace ProtobufMessage {
 
 namespace ValidationError {
 const char deprecation_error[] =
-    " If continued use of this field is absolutely necessary, see "
-    "https://www.envoyproxy.io/docs/envoy/latest/configuration/operations/runtime"
-    "#using-runtime-overrides-for-deprecated-features for how to apply a temporary and "
-    "highly discouraged override.";
+    " If continued use of this field is absolutely necessary, " 
+    "see " ENVOY_DOC_URL_RUNTIME_OVERRIDE_DEPRECATED " for "
+    "how to apply a temporary and highly discouraged override.";
 
 /**
  * Exception class for reporting validation errors due to the presence of unknown
