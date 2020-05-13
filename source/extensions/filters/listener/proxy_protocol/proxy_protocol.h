@@ -44,7 +44,7 @@ using ConfigSharedPtr = std::shared_ptr<Config>;
 enum ProxyProtocolVersion { Unknown = -1, InProgress = -2, V1 = 1, V2 = 2 };
 
 enum class ProxyState{
-    // failed to read proxy protocol.
+    // Failed to read proxy protocol.
     ProtocolFail,
 
     // Unsupported command or address family or transport.

@@ -317,7 +317,7 @@ bool Filter::readProxyHeader(os_fd_t fd) {
         buf_off_ += read_result.rc_;
         nread -= read_result.rc_;
       }
-      // if a nullopt is returned, false is returned and break out of the method.
+      // If a nullopt is returned, false is returned and break out of the method.
       if(!lenV2Address(buf_).has_value()){
         return false;
       }
