@@ -1,14 +1,17 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/hex.h"
-#include "common/decompressor/zlib_decompressor_impl.h"
 
 #include "extensions/compression/gzip/compressor/zlib_compressor_impl.h"
+#include "extensions/compression/gzip/decompressor/zlib_decompressor_impl.h"
 
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace Compression {
+namespace Gzip {
 namespace Decompressor {
 namespace {
 
@@ -31,13 +34,13 @@ protected:
     for (uint64_t i = 0; i < 30; ++i) {
       TestUtility::feedBufferWithRandomCharacters(buffer, default_input_size * i, i);
       original_text.append(buffer.toString());
-      compressor.compress(buffer, Compression::Compressor::State::Flush);
+      compressor.compress(buffer, Envoy::Compression::Compressor::State::Flush);
       accumulation_buffer.add(buffer);
       drainBuffer(buffer);
     }
     ASSERT_EQ(0, buffer.length());
 
-    compressor.compress(buffer, Compression::Compressor::State::Finish);
+    compressor.compress(buffer, Envoy::Compression::Compressor::State::Finish);
     accumulation_buffer.add(buffer);
 
     drainBuffer(buffer);
@@ -99,7 +102,7 @@ TEST_F(ZlibDecompressorImplTest, CallingChecksum) {
   ASSERT_EQ(0, compressor.checksum());
 
   TestUtility::feedBufferWithRandomCharacters(compressor_buffer, 4096);
-  compressor.compress(compressor_buffer, Compression::Compressor::State::Flush);
+  compressor.compress(compressor_buffer, Envoy::Compression::Compressor::State::Flush);
   ASSERT_TRUE(compressor.checksum() > 0);
 
   ZlibDecompressorImpl decompressor;
@@ -132,14 +135,14 @@ TEST_F(ZlibDecompressorImplTest, CompressAndDecompress) {
   for (uint64_t i = 0; i < 20; ++i) {
     TestUtility::feedBufferWithRandomCharacters(buffer, default_input_size * i, i);
     original_text.append(buffer.toString());
-    compressor.compress(buffer, Compression::Compressor::State::Flush);
+    compressor.compress(buffer, Envoy::Compression::Compressor::State::Flush);
     accumulation_buffer.add(buffer);
     drainBuffer(buffer);
   }
 
   ASSERT_EQ(0, buffer.length());
 
-  compressor.compress(buffer, Compression::Compressor::State::Finish);
+  compressor.compress(buffer, Envoy::Compression::Compressor::State::Finish);
   ASSERT_GE(10, buffer.length());
 
   accumulation_buffer.add(buffer);
@@ -200,14 +203,14 @@ TEST_F(ZlibDecompressorImplTest, DecompressWithSmallOutputBuffer) {
   for (uint64_t i = 0; i < 20; ++i) {
     TestUtility::feedBufferWithRandomCharacters(buffer, default_input_size * i, i);
     original_text.append(buffer.toString());
-    compressor.compress(buffer, Compression::Compressor::State::Flush);
+    compressor.compress(buffer, Envoy::Compression::Compressor::State::Flush);
     accumulation_buffer.add(buffer);
     drainBuffer(buffer);
   }
 
   ASSERT_EQ(0, buffer.length());
 
-  compressor.compress(buffer, Compression::Compressor::State::Finish);
+  compressor.compress(buffer, Envoy::Compression::Compressor::State::Finish);
   ASSERT_GE(10, buffer.length());
 
   accumulation_buffer.add(buffer);
@@ -278,7 +281,7 @@ TEST_F(ZlibDecompressorImplTest, CompressDecompressOfMultipleSlices) {
       Extensions::Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard,
       gzip_window_bits, memory_level);
 
-  compressor.compress(buffer, Compression::Compressor::State::Flush);
+  compressor.compress(buffer, Envoy::Compression::Compressor::State::Flush);
   accumulation_buffer.add(buffer);
 
   ZlibDecompressorImpl decompressor;
@@ -297,4 +300,7 @@ TEST_F(ZlibDecompressorImplTest, CompressDecompressOfMultipleSlices) {
 
 } // namespace
 } // namespace Decompressor
+} // namespace Gzip
+} // namespace Compression
+} // namespace Extensions
 } // namespace Envoy

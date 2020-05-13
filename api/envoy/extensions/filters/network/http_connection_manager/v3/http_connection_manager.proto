@@ -231,7 +231,7 @@ message HttpConnectionManager {
     // Determines if upgrades are enabled or disabled by default. Defaults to true.
     // This can be overridden on a per-route basis with :ref:`cluster
     // <envoy_api_field_config.route.v3.RouteAction.upgrade_configs>` as documented in the
-    // :ref:`upgrade documentation <arch_overview_websocket>`.
+    // :ref:`upgrade documentation <arch_overview_upgrades>`.
     google.protobuf.BoolValue enabled = 3;
   }
 
