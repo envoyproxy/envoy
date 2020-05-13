@@ -51,30 +51,32 @@ decompressor_library:
 
   bool isRequestDirection() { return GetParam(); }
 
-  std::unique_ptr<Http::RequestOrResponseHeaderMap> doHeaders(const Http::HeaderMap& rhs,
-                                                              const bool end_stream, const absl::optional<uint32_t> max_buffer_bytes) {
-    auto expected_status = max_buffer_bytes.has_value() ? Http::FilterHeadersStatus::StopIteration : Http::FilterHeadersStatus::Continue;
+  std::unique_ptr<Http::RequestOrResponseHeaderMap>
+  doHeaders(const Http::HeaderMap& rhs, const bool end_stream,
+            const absl::optional<uint32_t> max_buffer_bytes) {
+    auto expected_status = max_buffer_bytes.has_value() ? Http::FilterHeadersStatus::StopIteration
+                                                        : Http::FilterHeadersStatus::Continue;
     if (isRequestDirection()) {
       if (max_buffer_bytes.has_value()) {
         EXPECT_CALL(decoder_callbacks_, setDecoderBufferLimit(max_buffer_bytes.value())).Times(1);
       }
       auto request_headers = Http::createHeaderMap<Http::TestRequestHeaderMapImpl>(rhs);
-      EXPECT_EQ(expected_status,
-                filter_->decodeHeaders(*request_headers, end_stream));
+      EXPECT_EQ(expected_status, filter_->decodeHeaders(*request_headers, end_stream));
       return std::move(request_headers);
     } else {
-            if (max_buffer_bytes.has_value()) {
+      if (max_buffer_bytes.has_value()) {
         EXPECT_CALL(encoder_callbacks_, setEncoderBufferLimit(max_buffer_bytes.value())).Times(1);
       }
       auto response_headers = Http::createHeaderMap<Http::TestResponseHeaderMapImpl>(rhs);
-      EXPECT_EQ(expected_status,
-                filter_->encodeHeaders(*response_headers, end_stream));
+      EXPECT_EQ(expected_status, filter_->encodeHeaders(*response_headers, end_stream));
       return std::move(response_headers);
     }
   }
 
   void doData(Buffer::Instance& buffer, const bool end_stream, const bool expect_buffering) {
-    auto expected_status = expect_buffering ? Http::FilterDataStatus::StopIterationAndBuffer : Http::FilterDataStatus::Continue;
+    auto expected_status = expect_buffering && !end_stream
+                               ? Http::FilterDataStatus::StopIterationAndBuffer
+                               : Http::FilterDataStatus::Continue;
     if (isRequestDirection()) {
       EXPECT_EQ(expected_status, filter_->decodeData(buffer, end_stream));
     } else {
@@ -82,7 +84,8 @@ decompressor_library:
     }
   }
 
-  void expectDecompression(Compression::Decompressor::MockDecompressor* decompressor_ptr, const bool expect_buffering) {
+  void expectDecompression(Compression::Decompressor::MockDecompressor* decompressor_ptr,
+                           const bool expect_buffering) {
     EXPECT_CALL(*decompressor_ptr, decompress(_, _))
         .Times(2)
         .WillRepeatedly(
@@ -126,16 +129,15 @@ TEST_P(DecompressorFilterTest, DecompressionActive) {
       .WillOnce(Return(ByMove(std::move(decompressor))));
   Http::TestHeaderMapImpl headers_before_filter{{"content-encoding", "mock"},
                                                 {"content-length", "256"}};
-  std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
-      doHeaders(headers_before_filter, false /* end_stream */, absl::nullopt /* max_buffer_bytes */);
+  std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter = doHeaders(
+      headers_before_filter, false /* end_stream */, absl::nullopt /* max_buffer_bytes */);
 
   EXPECT_EQ(nullptr, headers_after_filter->ContentEncoding());
-
-  // FIX ME: pending decision on this.
   EXPECT_EQ(nullptr, headers_after_filter->ContentLength());
   EXPECT_EQ("chunked", headers_after_filter->TransferEncoding()->value().getStringView());
   const auto* accept_encoding = headers_after_filter->get(Http::LowerCaseString{"accept-encoding"});
   if (isRequestDirection()) {
+    // Advertised by default.
     EXPECT_EQ("mock", accept_encoding->value().getStringView());
   } else {
     EXPECT_EQ(nullptr, accept_encoding);
@@ -152,12 +154,11 @@ TEST_P(DecompressorFilterTest, DecompressionActiveMultipleEncodings) {
       .WillOnce(Return(ByMove(std::move(decompressor))));
   Http::TestHeaderMapImpl headers_before_filter{{"content-encoding", "mock, br"},
                                                 {"content-length", "256"}};
-  std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
-      doHeaders(headers_before_filter, false /* end_stream */, absl::nullopt /* max_buffer_bytes */);
+  std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter = doHeaders(
+      headers_before_filter, false /* end_stream */, absl::nullopt /* max_buffer_bytes */);
 
   EXPECT_EQ("br", headers_after_filter->ContentEncoding()->value().getStringView());
 
-  // FIX ME: pending decision on this.
   EXPECT_EQ(nullptr, headers_after_filter->ContentLength());
   EXPECT_EQ("chunked", headers_after_filter->TransferEncoding()->value().getStringView());
 
@@ -173,8 +174,8 @@ TEST_P(DecompressorFilterTest, DecompressionActiveTransferEncodingPresentAlready
   Http::TestHeaderMapImpl headers_before_filter{{"content-encoding", "mock, br"},
                                                 {"content-length", "256"},
                                                 {"transfer-encoding", "chunked"}};
-  std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
-      doHeaders(headers_before_filter, false /* end_stream */, absl::nullopt /* max_buffer_bytes */);
+  std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter = doHeaders(
+      headers_before_filter, false /* end_stream */, absl::nullopt /* max_buffer_bytes */);
 
   EXPECT_EQ("br", headers_after_filter->ContentEncoding()->value().getStringView());
 
@@ -205,8 +206,8 @@ response_direction_config:
   EXPECT_CALL(*decompressor_factory_, createDecompressor()).Times(0);
   Http::TestHeaderMapImpl headers_before_filter{{"content-encoding", "mock"},
                                                 {"content-length", "256"}};
-  std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
-      doHeaders(headers_before_filter, false /* end_stream */, absl::nullopt /* max_buffer_bytes */);
+  std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter = doHeaders(
+      headers_before_filter, false /* end_stream */, absl::nullopt /* max_buffer_bytes */);
   TestUtility::headerMapEqualIgnoreOrder(headers_before_filter, *headers_after_filter);
 
   expectNoDecompression();
@@ -216,7 +217,7 @@ TEST_P(DecompressorFilterTest, NoDecompressionHeadersOnly) {
   EXPECT_CALL(*decompressor_factory_, createDecompressor()).Times(0);
   Http::TestHeaderMapImpl headers_before_filter;
   std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
-      doHeaders(headers_before_filter, true /* end_stream */, false /* expect_buffering */);
+      doHeaders(headers_before_filter, true /* end_stream */, absl::nullopt /* max_buffer_bytes */);
   TestUtility::headerMapEqualIgnoreOrder(headers_before_filter, *headers_after_filter);
 }
 
@@ -224,8 +225,8 @@ TEST_P(DecompressorFilterTest, NoDecompressionContentEncodingDoesNotMatch) {
   EXPECT_CALL(*decompressor_factory_, createDecompressor()).Times(0);
   Http::TestHeaderMapImpl headers_before_filter{{"content-encoding", "not-matching"},
                                                 {"content-length", "256"}};
-  std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
-      doHeaders(headers_before_filter, false /* end_stream */, absl::nullopt /* max_buffer_bytes */);
+  std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter = doHeaders(
+      headers_before_filter, false /* end_stream */, absl::nullopt /* max_buffer_bytes */);
   TestUtility::headerMapEqualIgnoreOrder(headers_before_filter, *headers_after_filter);
 
   expectNoDecompression();
@@ -235,8 +236,8 @@ TEST_P(DecompressorFilterTest, NoDecompressionContentEncodingNotCurrent) {
   EXPECT_CALL(*decompressor_factory_, createDecompressor()).Times(0);
   Http::TestHeaderMapImpl headers_before_filter{{"content-encoding", "gzip,mock"},
                                                 {"content-length", "256"}};
-  std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
-      doHeaders(headers_before_filter, false /* end_stream */, absl::nullopt /* max_buffer_bytes */);
+  std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter = doHeaders(
+      headers_before_filter, false /* end_stream */, absl::nullopt /* max_buffer_bytes */);
   TestUtility::headerMapEqualIgnoreOrder(headers_before_filter, *headers_after_filter);
 
   expectNoDecompression();
@@ -248,8 +249,8 @@ TEST_P(DecompressorFilterTest, NoResponseDecompressionNoTransformPresent) {
       {"cache-control", Http::Headers::get().CacheControlValues.NoTransform},
       {"content-encoding", "mock"},
       {"content-length", "256"}};
-  std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
-      doHeaders(headers_before_filter, false /* end_stream */, absl::nullopt /* max_buffer_bytes */);
+  std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter = doHeaders(
+      headers_before_filter, false /* end_stream */, absl::nullopt /* max_buffer_bytes */);
   TestUtility::headerMapEqualIgnoreOrder(headers_before_filter, *headers_after_filter);
 
   expectNoDecompression();
@@ -271,8 +272,8 @@ request_direction_config:
       .WillOnce(Return(ByMove(std::move(decompressor))));
   Http::TestHeaderMapImpl headers_before_filter{{"content-encoding", "mock"},
                                                 {"content-length", "256"}};
-  std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
-      doHeaders(headers_before_filter, false /* end_stream */, absl::nullopt /* max_buffer_bytes */);
+  std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter = doHeaders(
+      headers_before_filter, false /* end_stream */, absl::nullopt /* max_buffer_bytes */);
 
   EXPECT_EQ(nullptr, headers_after_filter->ContentEncoding());
   EXPECT_EQ(nullptr, headers_after_filter->ContentLength());
@@ -282,7 +283,7 @@ request_direction_config:
   expectDecompression(decompressor_ptr, false /* expect_buffering */);
 }
 
-TEST_P(DecompressorFilterTest, Buffering) {
+TEST_P(DecompressorFilterTest, BufferingWithConfig) {
   setUpFilter(R"EOF(
 decompressor_library:
   typed_config:
@@ -303,14 +304,43 @@ response_direction_config:
   Http::TestHeaderMapImpl headers_before_filter{{"content-encoding", "mock"},
                                                 {"content-length", "256"}};
   std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
-      doHeaders(headers_before_filter, false /* end_stream */, 65000 /* expect_buffering */);
+      doHeaders(headers_before_filter, false /* end_stream */, 65000 /* max_buffer_bytes */);
+
+  EXPECT_EQ(nullptr, headers_after_filter->ContentEncoding());
+  EXPECT_EQ(nullptr, headers_after_filter->ContentLength());
+  // Chunked is not added when buffering.
+  EXPECT_EQ(nullptr, headers_after_filter->TransferEncoding());
+
+  expectDecompression(decompressor_ptr, true /* expect_buffering */);
+}
+
+TEST_P(DecompressorFilterTest, NoBufferingWhenContentLengthAbsent) {
+  setUpFilter(R"EOF(
+decompressor_library:
+  typed_config:
+    "@type": "type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip"
+request_direction_config:
+  common_config:
+    max_buffered_bytes: 65000
+response_direction_config:
+  common_config:
+    max_buffered_bytes: 65000
+)EOF");
+
+  // Keep the decompressor to set expectations about it
+  auto decompressor = std::make_unique<Compression::Decompressor::MockDecompressor>();
+  auto* decompressor_ptr = decompressor.get();
+  EXPECT_CALL(*decompressor_factory_, createDecompressor())
+      .WillOnce(Return(ByMove(std::move(decompressor))));
+  Http::TestHeaderMapImpl headers_before_filter{{"content-encoding", "mock"}};
+  std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter = doHeaders(
+      headers_before_filter, false /* end_stream */, absl::nullopt /* max_buffer_bytes */);
 
   EXPECT_EQ(nullptr, headers_after_filter->ContentEncoding());
   EXPECT_EQ(nullptr, headers_after_filter->ContentLength());
   EXPECT_EQ("chunked", headers_after_filter->TransferEncoding()->value().getStringView());
-  EXPECT_EQ(nullptr, headers_after_filter->get(Http::LowerCaseString{"accept-encoding"}));
 
-  expectDecompression(decompressor_ptr, true /* expect_buffering */);
+  expectDecompression(decompressor_ptr, false /* expect_buffering */);
 }
 
 } // namespace

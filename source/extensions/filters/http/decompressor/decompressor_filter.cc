@@ -92,8 +92,8 @@ Http::FilterHeadersStatus DecompressorFilter::encodeHeaders(Http::ResponseHeader
 }
 
 Http::FilterDataStatus DecompressorFilter::encodeData(Buffer::Instance& data, bool end_stream) {
-  return maybeDecompress(config_->requestDirectionConfig(), response_decompressor_.get(),
-                         *decoder_callbacks_, data, end_stream);
+  return maybeDecompress(config_->responseDirectionConfig(), response_decompressor_.get(),
+                         *encoder_callbacks_, data, end_stream);
 }
 
 Http::FilterHeadersStatus DecompressorFilter::maybeInitDecompress(
