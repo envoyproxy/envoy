@@ -41,6 +41,8 @@
 #include "server/http/admin_filter.h"
 #include "server/http/config_tracker_impl.h"
 #include "server/http/listeners_handler.h"
+#include "server/http/logs_handler.h"
+#include "server/http/profiling_handler.h"
 #include "server/http/runtime_handler.h"
 #include "server/http/stats_handler.h"
 
@@ -240,13 +242,6 @@ private:
   };
 
   /**
-   * Attempt to change the log level of a logger or all loggers
-   * @param params supplies the incoming endpoint query params.
-   * @return TRUE if level change succeeded, FALSE otherwise.
-   */
-  bool changeLogLevel(const Http::Utility::QueryParams& params);
-
-  /**
    * Helper methods for the /clusters url handler.
    */
   void addCircuitSettings(const std::string& cluster_name, const std::string& priority_str,
@@ -309,9 +304,6 @@ private:
   Http::Code handlerHotRestartVersion(absl::string_view path_and_query,
                                       Http::ResponseHeaderMap& response_headers,
                                       Buffer::Instance& response, AdminStream&);
-  Http::Code handlerLogging(absl::string_view path_and_query,
-                            Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
-                            AdminStream&);
   Http::Code handlerMemory(absl::string_view path_and_query,
                            Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                            AdminStream&);
@@ -325,9 +317,6 @@ private:
   Http::Code handlerReady(absl::string_view path_and_query,
                           Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                           AdminStream&);
-  Http::Code handlerReopenLogs(absl::string_view path_and_query,
-                               Http::ResponseHeaderMap& response_headers,
-                               Buffer::Instance& response, AdminStream&);
 
   class AdminListenSocketFactory : public Network::ListenSocketFactory {
   public:
@@ -428,6 +417,8 @@ private:
   NullRouteConfigProvider route_config_provider_;
   NullScopedRouteConfigProvider scoped_route_config_provider_;
   Server::StatsHandler stats_handler_;
+  Server::LogsHandler logs_handler_;
+  Server::ProfilingHandler profiling_handler_;
   Server::RuntimeHandler runtime_handler_;
   Server::ListenersHandler listeners_handler_;
   std::list<UrlHandler> handlers_;
