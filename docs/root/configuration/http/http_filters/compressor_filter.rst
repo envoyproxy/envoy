@@ -42,10 +42,10 @@ An example configuration of the filter may look like the following:
         compressor_library:
           name: text_optimized
           typed_config:
-            "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.gzip.v3.Gzip
+            "@type": type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip
             memory_level: 3
             window_bits: 10
-            compression_level: best
+            compression_level: best_compression
             compression_strategy: default_strategy
 
 By *default* compression will be *skipped* when:
