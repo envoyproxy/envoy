@@ -8,6 +8,7 @@ shift
 mkdir -p fuzz_corpus/seed_corpus
 cp -r $@ fuzz_corpus/seed_corpus
 
-LLVM_PROFILE_FILE= ${TEST_BINARY} fuzz_corpus -max_total_time=60
+# Don't collect coverage when generating corpus
+LLVM_PROFILE_FILE= ${TEST_BINARY} fuzz_corpus -seed=${FUZZ_CORPUS_SEED:-1} -max_total_time=${FUZZ_CORPUS_TIME:-60}
 
 ${TEST_BINARY} fuzz_corpus -runs=0
