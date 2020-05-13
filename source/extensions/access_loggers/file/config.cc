@@ -32,11 +32,10 @@ FileAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
 
   if (fal_config.has_log_format()) {
     formatter = SubstitutionFormatStringUtils::fromProtoConfig(fal_config.log_format());
-  }
-  // backward compatible code for deprecated access_log_format, to be removed.
-  if (fal_config.access_log_format_case() !=
-      envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::
-          ACCESS_LOG_FORMAT_NOT_SET) {
+  } else if (fal_config.access_log_format_case() !=
+             envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::
+                 ACCESS_LOG_FORMAT_NOT_SET) {
+    // Backward compatible code for deprecated access_log_format, to be removed.
     envoy::config::core::v3::SubstitutionFormatString sff_config;
     switch (fal_config.access_log_format_case()) {
     case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::kFormat:
