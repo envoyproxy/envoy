@@ -567,6 +567,7 @@ envoy_cc_test_library(
         "//source/extensions/transport_sockets/tap:config",
         "//source/extensions/transport_sockets/tls:config",
         "//source/server:connection_handler_lib",
+        "//source/server:drain_manager_lib",
         "//source/server:hot_restart_nop_lib",
         "//source/server:listener_hooks_lib",
         "//source/server:process_context_lib",
@@ -591,6 +592,7 @@ envoy_cc_test_library(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
