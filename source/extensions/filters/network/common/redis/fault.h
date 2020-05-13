@@ -1,6 +1,11 @@
 #pragma once
 
+#include <chrono>
 #include <string>
+
+#include "envoy/common/pure.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
