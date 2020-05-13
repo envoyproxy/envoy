@@ -145,17 +145,18 @@ TEST_P(StatNameTest, TestDynamic100k) {
   // Tests a variety different sizes of dynamic stat ranging from 3 to 256k=1,
   // covering potential corner cases of spilling over into multi-byte lengths.
   std::string stat_str("dyn.x");
-  auto test_at_size = [this, &stat_str](uint32_t size) {
+  char ch = '\001';
+  StatName ab = makeStat("a.b");
+  StatName cd = makeStat("c.d");
+  auto test_at_size = [this, &stat_str, &ch, ab, cd](uint32_t size) {
     if (size > stat_str.size()) {
-      char ch = size % 251;
-      if (ch == '.') {
-        ch = 'x';
+      for (uint32_t i = stat_str.size(); i < size; ++i, ++ch) {
+        stat_str += (ch == '.') ? 'x' : ch;
       }
-      stat_str.append(size - stat_str.size(), ch);
       StatNameDynamicStorage storage(stat_str, *table_);
       StatName dynamic = storage.statName();
       EXPECT_EQ(stat_str, table_->toString(dynamic));
-      SymbolTable::StoragePtr joined = table_->join({makeStat("a.b"), dynamic, makeStat("c.d")});
+      SymbolTable::StoragePtr joined = table_->join({ab, dynamic, cd});
       EXPECT_EQ(absl::StrCat("a.b.", stat_str, ".c.d"), table_->toString(StatName(joined.get())));
     }
   };
