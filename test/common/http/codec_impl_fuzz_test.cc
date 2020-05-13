@@ -418,11 +418,14 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
       fromHttp2Settings(input.h2_settings().client())};
   const Http1Settings client_http1settings;
   NiceMock<MockConnectionCallbacks> client_callbacks;
+  NiceMock<Network::MockConnection> server_connection;
+  NiceMock<MockServerConnectionCallbacks> server_callbacks;
   uint32_t max_request_headers_kb = Http::DEFAULT_MAX_REQUEST_HEADERS_KB;
   uint32_t max_request_headers_count = Http::DEFAULT_MAX_HEADERS_COUNT;
   uint32_t max_response_headers_count = Http::DEFAULT_MAX_HEADERS_COUNT;
   const envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action = envoy::config::core::v3::HttpProtocolOptions::ALLOW;
+
   ClientConnectionPtr client;
   ServerConnectionPtr server;
   const bool http2 = http_version == HttpVersion::Http2;
@@ -438,8 +441,6 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
                                                            max_response_headers_count);
   }
 
-  NiceMock<Network::MockConnection> server_connection;
-  NiceMock<MockServerConnectionCallbacks> server_callbacks;
   if (http2) {
     const envoy::config::core::v3::Http2ProtocolOptions server_http2_options{
         fromHttp2Settings(input.h2_settings().server())};
