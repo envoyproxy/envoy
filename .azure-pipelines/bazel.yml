@@ -72,9 +72,9 @@ steps:
       artifactName: ${{ parameters.ciTarget }}
     condition: always()
 
-  # TODO(lizan): This is aw workaround for self hosted azure agent can't clean up bazel local cache due to 
+  # TODO(lizan): This is a workaround for self hosted azure agent can't clean up bazel local cache due to
   # permission. Remove this once it is resolved.
   - bash: |
-      rm -rf $(Build.StagingDirectory)/tmp
+      chmod -R u+w $(Build.StagingDirectory)
     displayName: "Self hosted agent clean up"
     condition: eq(false, ${{ parameters.managedAgent }})
