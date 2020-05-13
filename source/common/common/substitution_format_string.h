@@ -19,7 +19,7 @@ public:
    * Generate a formatter object from config SubstitutionFormatString.
    */
   static AccessLog::FormatterPtr
-  fromProtoConfig(const envoy::config::core::v3::SubstitutionFormatString& foramt);
+  fromProtoConfig(const envoy::config::core::v3::SubstitutionFormatString& config);
 };
 
 } // namespace Envoy

@@ -51,7 +51,7 @@ FileAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
       *sff_config.mutable_typed_json_format() = fal_config.typed_json_format();
       break;
     default:
-      break;
+      NOT_REACHED_GCOVR_EXCL_LINE;
     }
     formatter = SubstitutionFormatStringUtils::fromProtoConfig(sff_config);
   }

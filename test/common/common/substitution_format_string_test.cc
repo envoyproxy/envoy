@@ -1,3 +1,5 @@
+#include "envoy/config/core/v3/substitution_format_string.pb.validate.h"
+
 #include "common/common/substitution_format_string.h"
 
 #include "test/mocks/http/mocks.h"
@@ -26,8 +28,10 @@ public:
   envoy::config::core::v3::SubstitutionFormatString config_;
 };
 
-TEST_F(SubstitutionFormatStringUtilsTest, TestFomProtoConfigEmpty) {
-  EXPECT_EQ(nullptr, SubstitutionFormatStringUtils::fromProtoConfig(config_));
+TEST_F(SubstitutionFormatStringUtilsTest, TestEmptyIsInvalid) {
+  envoy::config::core::v3::SubstitutionFormatString empty_config;
+  std::string err;
+  EXPECT_FALSE(Validate(empty_config, &err));
 }
 
 TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigText) {

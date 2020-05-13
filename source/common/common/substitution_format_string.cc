@@ -33,7 +33,7 @@ AccessLog::FormatterPtr SubstitutionFormatStringUtils::fromProtoConfig(
     return std::make_unique<AccessLog::JsonFormatterImpl>(json_format_map, true);
   }
   default:
-    return nullptr;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
   return nullptr;
 }

@@ -53,6 +53,7 @@ message FileAccessLog {
 
     // Configuration to form access log data and format.
     // If not specified, use :ref:`default format <config_access_log_default_format>`.
-    config.core.v3.SubstitutionFormatString log_format = 5;
+    config.core.v3.SubstitutionFormatString log_format = 5
+        [(validate.rules).message = {required: true}];
   }
 }
