@@ -20,6 +20,8 @@
       "**/bazel-*/**": true
     }
   },
+  "remoteUser": "vscode",
+  "containerUser": "vscode",
   "postCreateCommand": ".devcontainer/setup.sh",
   "extensions": [
     "github.vscode-pull-request-github",
