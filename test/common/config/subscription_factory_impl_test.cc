@@ -325,8 +325,9 @@ TEST_F(SubscriptionFactoryTest, LogWarningOnDeprecatedApi) {
   config.mutable_api_config_source()->set_transport_api_version(
       envoy::config::core::v3::ApiVersion::V2);
   NiceMock<Runtime::MockSnapshot> snapshot;
-  EXPECT_CALL(runtime_, snapshot()).WillOnce(ReturnRef(snapshot));
+  EXPECT_CALL(runtime_, snapshot()).WillRepeatedly(ReturnRef(snapshot));
   EXPECT_CALL(snapshot, runtimeFeatureEnabled(_)).WillOnce(Return(true));
+  EXPECT_CALL(snapshot, countDeprecatedFeatureUse());
 
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   NiceMock<Upstream::MockClusterMockPrioritySet> cluster;
