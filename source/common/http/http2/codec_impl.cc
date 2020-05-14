@@ -162,8 +162,17 @@ void ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& hea
     Http::Utility::transformUpgradeRequestFromH1toH2(*modified_headers);
     buildHeaders(final_headers, *modified_headers);
   } else if (headers.Method() && headers.Method()->value() == "CONNECT") {
+    // If this is not an upgrade style connect (above branch) it is a bytestream
+    // connect and should have :path and :protocol set accordingly
+    // As HTTP/1.1 does not require a path for CONNECT, we may have to add one
+    // if shifting codecs. For now, default to "/" - this can be made
+    // configurable if necessary.
+    // https://tools.ietf.org/html/draft-kinnear-httpbis-http2-transport-02
     modified_headers = createHeaderMap<RequestHeaderMapImpl>(headers);
     modified_headers->setProtocol(Headers::get().ProtocolValues.Bytestream);
+    if (!headers.Path()) {
+      modified_headers->setPath("/");
+    }
     buildHeaders(final_headers, *modified_headers);
   } else {
     buildHeaders(final_headers, headers);
@@ -308,8 +317,8 @@ void ConnectionImpl::StreamImpl::saveHeader(HeaderString&& name, HeaderString&& 
 void ConnectionImpl::StreamImpl::submitTrailers(const HeaderMap& trailers) {
   std::vector<nghttp2_nv> final_headers;
   buildHeaders(final_headers, trailers);
-  int rc =
-      nghttp2_submit_trailer(parent_.session_, stream_id_, &final_headers[0], final_headers.size());
+  int rc = nghttp2_submit_trailer(parent_.session_, stream_id_, final_headers.data(),
+                                  final_headers.size());
   ASSERT(rc == 0);
 }
 
@@ -364,7 +373,7 @@ int ConnectionImpl::StreamImpl::onDataSourceSend(const uint8_t* framehd, size_t 
 void ConnectionImpl::ClientStreamImpl::submitHeaders(const std::vector<nghttp2_nv>& final_headers,
                                                      nghttp2_data_provider* provider) {
   ASSERT(stream_id_ == -1);
-  stream_id_ = nghttp2_submit_request(parent_.session_, nullptr, &final_headers.data()[0],
+  stream_id_ = nghttp2_submit_request(parent_.session_, nullptr, final_headers.data(),
                                       final_headers.size(), provider, base());
   ASSERT(stream_id_ > 0);
 }
@@ -372,7 +381,7 @@ void ConnectionImpl::ClientStreamImpl::submitHeaders(const std::vector<nghttp2_n
 void ConnectionImpl::ServerStreamImpl::submitHeaders(const std::vector<nghttp2_nv>& final_headers,
                                                      nghttp2_data_provider* provider) {
   ASSERT(stream_id_ != -1);
-  int rc = nghttp2_submit_response(parent_.session_, stream_id_, &final_headers.data()[0],
+  int rc = nghttp2_submit_response(parent_.session_, stream_id_, final_headers.data(),
                                    final_headers.size(), provider);
   ASSERT(rc == 0);
 }
@@ -987,7 +996,7 @@ void ConnectionImpl::sendSettings(
        {NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, http2_options.max_concurrent_streams().value()},
        {NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE, http2_options.initial_stream_window_size().value()}});
   if (!settings.empty()) {
-    int rc = nghttp2_submit_settings(session_, NGHTTP2_FLAG_NONE, &settings[0], settings.size());
+    int rc = nghttp2_submit_settings(session_, NGHTTP2_FLAG_NONE, settings.data(), settings.size());
     ASSERT(rc == 0);
   } else {
     // nghttp2_submit_settings need to be called at least once

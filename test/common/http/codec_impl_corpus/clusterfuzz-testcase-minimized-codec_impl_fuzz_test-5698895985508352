@@ -1,0 +1,49 @@
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "5"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "r"
+      }
+      headers {
+        key: ":authority"
+        value: "5"
+      }
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    response {
+      headers {
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 1
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      trailers {
+      }
+    }
+  }
+}
