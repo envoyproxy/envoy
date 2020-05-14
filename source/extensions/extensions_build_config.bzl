@@ -180,4 +180,11 @@ EXTENSIONS = {
     #
 
     "envoy.filters.http.cache.simple_http_cache":       "//source/extensions/filters/http/cache/simple_http_cache:simple_http_cache_lib",
+
+    #
+    # Internal redirect predicates
+    #
+    "envoy.internal_redirect_predicates.allow_listed_routes": "//source/extensions/internal_redirect/allow_listed_routes:config",
+    "envoy.internal_redirect_predicates.previous_routes":     "//source/extensions/internal_redirect/previous_routes:config",
+    "envoy.internal_redirect_predicates.safe_cross_scheme":   "//source/extensions/internal_redirect/safe_cross_scheme:config",
 }
