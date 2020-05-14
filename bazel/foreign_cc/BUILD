@@ -89,6 +89,10 @@ envoy_cmake_external(
         "//bazel:apple": ["-lresolv"],
         "//conditions:default": [],
     }),
+    postfix_script = select({
+        "//bazel:windows_x86_64": "cp -L $EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/nameser.h $INSTALLDIR/include/nameser.h",
+        "//conditions:default": "",
+    }),
     static_libraries = select({
         "//bazel:windows_x86_64": ["cares.lib"],
         "//conditions:default": ["libcares.a"],

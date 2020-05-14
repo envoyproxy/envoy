@@ -241,15 +241,11 @@ def _com_github_circonus_labs_libcircllhist():
         actual = "@com_github_circonus_labs_libcircllhist//:libcircllhist",
     )
 
-BUILD_C_ARES_CONTENT = BUILD_ALL_CONTENT + """
-exports_files(["nameser.h"])
-"""
-
 def _com_github_c_ares_c_ares():
     location = _get_location("com_github_c_ares_c_ares")
     http_archive(
         name = "com_github_c_ares_c_ares",
-        build_file_content = BUILD_C_ARES_CONTENT,
+        build_file_content = BUILD_ALL_CONTENT,
         **location
     )
     native.bind(
