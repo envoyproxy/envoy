@@ -18,7 +18,7 @@ message Headers {
 
 message HttpBody {
   // The bytes that will be used as the request body.
-  repeated string data = 1 [(validate.rules).repeated .min_items = 1];
+  repeated string data = 1 [(validate.rules).repeated.min_items = 1];
 }
 
 // HttpBody cannot efficiently create serialized protos.
@@ -28,7 +28,10 @@ message ProtoBody {
   google.protobuf.Any message = 1 [(validate.rules).any.required = true];
 
   // The size (in bytes) of each buffer when forming the requests.
-  uint64 chunk_size = 2 [(validate.rules).uint64.gt = 0];
+  uint64 chunk_size = 2 [(validate.rules).uint64 = {
+    gt : 0,
+    lt: 20
+  }];
 }
 
 message HttpData {
