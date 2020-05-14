@@ -109,7 +109,7 @@ void WatermarkBuffer::checkHighAndOverflowWatermarks() {
 
   // Check if overflow watermark is enabled, wasn't previously triggered,
   // and the buffer size is above the threshold
-  if (above_overflow_watermark_ && overflow_watermark_ != 0 && !above_overflow_watermark_called_ &&
+  if (overflow_watermark_ != 0 && !above_overflow_watermark_called_ &&
       OwnedImpl::length() > overflow_watermark_) {
     above_overflow_watermark_called_ = true;
     above_overflow_watermark_();
