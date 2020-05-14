@@ -420,8 +420,7 @@ TEST_F(WatermarkBufferTest, OverflowWatermarkDisabledOnVeryHighValue) {
 
   int high_watermark_buffer1 = 0;
   int overflow_watermark_buffer1 = 0;
-  Buffer::WatermarkBuffer buffer1{[&]() -> void { },
-                                  [&]() -> void { ++high_watermark_buffer1; },
+  Buffer::WatermarkBuffer buffer1{[&]() -> void {}, [&]() -> void { ++high_watermark_buffer1; },
                                   [&]() -> void { ++overflow_watermark_buffer1; }};
 
   // Make sure the overflow threshold will be above std::numeric_limits<uint32_t>::max()

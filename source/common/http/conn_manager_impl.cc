@@ -2467,10 +2467,10 @@ ConnectionManagerImpl::ActiveStreamDecoderFilter::routeConfig() {
 }
 
 Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamEncoderFilter::createBuffer() {
-  auto buffer =
-      new Buffer::WatermarkBuffer([this]() -> void { this->responseDataDrained(); },
-                                  [this]() -> void { this->responseDataTooLarge(); },
-                                  []() -> void { /* TODO(adisuissa): Handle overflow watermark */ });
+  auto buffer = new Buffer::WatermarkBuffer(
+      [this]() -> void { this->responseDataDrained(); },
+      [this]() -> void { this->responseDataTooLarge(); },
+      []() -> void { /* TODO(adisuissa): Handle overflow watermark */ });
   buffer->setWatermarks(parent_.buffer_limit_);
   return Buffer::WatermarkBufferPtr{buffer};
 }
