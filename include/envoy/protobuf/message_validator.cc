@@ -13,7 +13,7 @@ void ValidationVisitor::onDeprecatedFieldDefault(absl::string_view description,
                                                  bool soft_deprecation) {
   if (soft_deprecation) {
     ENVOY_LOG_MISC(warn, "Unexpected field: {}",
-              absl::StrCat(description, ValidationError::deprecation_error));
+                   absl::StrCat(description, ValidationError::deprecation_error));
   } else {
     throw ValidationError::DeprecatedProtoFieldException(
         absl::StrCat(description, ValidationError::deprecation_error));
