@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.config.route.v3;
 
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/proxy_protocol.proto";
 import "envoy/type/matcher/v3/regex.proto";
 import "envoy/type/matcher/v3/string.proto";
@@ -536,7 +537,7 @@ message CorsPolicy {
   core.v3.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
-// [#next-free-field: 34]
+// [#next-free-field: 35]
 message RouteAction {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteAction";
 
@@ -549,6 +550,7 @@ message RouteAction {
   }
 
   // Configures :ref:`internal redirect <arch_overview_internal_redirects>` behavior.
+  // [#next-major-version: remove this definition - it's defined in the InternalRedirectPolicy message.]
   enum InternalRedirectAction {
     PASS_THROUGH_INTERNAL_REDIRECT = 0;
     HANDLE_INTERNAL_REDIRECT = 1;
@@ -986,7 +988,13 @@ message RouteAction {
 
   repeated UpgradeConfig upgrade_configs = 25;
 
-  InternalRedirectAction internal_redirect_action = 26;
+  // If present, Envoy will try to follow an upstream redirect response instead of proxying the
+  // response back to the downstream. An upstream redirect response is defined
+  // by :ref:`redirect_response_codes
+  // <envoy_api_field_config.route.v3.InternalRedirectPolicy.redirect_response_codes>`.
+  InternalRedirectPolicy internal_redirect_policy = 34;
+
+  InternalRedirectAction internal_redirect_action = 26 [deprecated = true];
 
   // An internal redirect is handled, iff the number of previous internal redirects that a
   // downstream request has encountered is lower than this value, and
@@ -1002,7 +1010,7 @@ message RouteAction {
   // will pass the redirect back to downstream.
   //
   // If not specified, at most one redirect will be followed.
-  google.protobuf.UInt32Value max_internal_redirects = 31;
+  google.protobuf.UInt32Value max_internal_redirects = 31 [deprecated = true];
 
   // Indicates that the route has a hedge policy. Note that if this is set,
   // it'll take precedence over the virtual host level hedge policy entirely
@@ -1592,4 +1600,31 @@ message QueryParameterMatcher {
     // Specifies whether a query parameter should be present.
     bool present_match = 6;
   }
+}
+
+// HTTP Internal Redirect :ref:`architecture overview <arch_overview_internal_redirects>`.
+message InternalRedirectPolicy {
+  // An internal redirect is not handled, unless the number of previous internal redirects that a
+  // downstream request has encountered is lower than this value.
+  // In the case where a downstream request is bounced among multiple routes by internal redirect,
+  // the first route that hits this threshold, or does not set :ref:`internal_redirect_policy
+  // <envoy_api_field_config.route.v3.RouteAction.internal_redirect_policy>`
+  // will pass the redirect back to downstream.
+  //
+  // If not specified, at most one redirect will be followed.
+  google.protobuf.UInt32Value max_internal_redirects = 1;
+
+  // Defines what upstream response codes are allowed to trigger internal redirect. If unspecified,
+  // only 302 will be treated as internal redirect.
+  // Only 301, 302, 303, 307 and 308 are valid values. Any other codes will be ignored.
+  repeated uint32 redirect_response_codes = 2 [(validate.rules).repeated = {max_items: 5}];
+
+  // Specifies a list of predicates that are queried when an upstream response is deemed
+  // to trigger an internal redirect by all other criteria. Any predicate in the list can reject
+  // the redirect, causing the response to be proxied to downstream.
+  repeated core.v3.TypedExtensionConfig predicates = 3;
+
+  // Allow internal redirect to follow a target URI with a different scheme than the value of
+  // x-forwarded-proto. The default is false.
+  bool allow_cross_scheme_redirect = 4;
 }
