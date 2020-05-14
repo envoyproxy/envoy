@@ -35,7 +35,7 @@ std::unique_ptr<Envoy::TestStreamInfo> makeStreamInfo() {
 
 namespace Envoy {
 
-static void BM_AccessLogFormatter(benchmark::State& state) {
+static void bM_AccessLogFormatter(benchmark::State& state) {
   std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo();
   static const char* LogFormat =
       "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT% %START_TIME(%Y/%m/%dT%H:%M:%S%z %s)% "
@@ -57,9 +57,9 @@ static void BM_AccessLogFormatter(benchmark::State& state) {
   }
   benchmark::DoNotOptimize(output_bytes);
 }
-BENCHMARK(BM_AccessLogFormatter);
+BENCHMARK(bM_AccessLogFormatter);
 
-static void BM_JsonAccessLogFormatter(benchmark::State& state) {
+static void bM_JsonAccessLogFormatter(benchmark::State& state) {
   std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo();
   std::unique_ptr<Envoy::AccessLog::JsonFormatterImpl> json_formatter = makeJsonFormatter(false);
 
@@ -74,9 +74,9 @@ static void BM_JsonAccessLogFormatter(benchmark::State& state) {
   }
   benchmark::DoNotOptimize(output_bytes);
 }
-BENCHMARK(BM_JsonAccessLogFormatter);
+BENCHMARK(bM_JsonAccessLogFormatter);
 
-static void BM_TypedJsonAccessLogFormatter(benchmark::State& state) {
+static void bM_TypedJsonAccessLogFormatter(benchmark::State& state) {
   std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo();
   std::unique_ptr<Envoy::AccessLog::JsonFormatterImpl> typed_json_formatter =
       makeJsonFormatter(true);
@@ -92,6 +92,6 @@ static void BM_TypedJsonAccessLogFormatter(benchmark::State& state) {
   }
   benchmark::DoNotOptimize(output_bytes);
 }
-BENCHMARK(BM_TypedJsonAccessLogFormatter);
+BENCHMARK(bM_TypedJsonAccessLogFormatter);
 
 } // namespace Envoy
