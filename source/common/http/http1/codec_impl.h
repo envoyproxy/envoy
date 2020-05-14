@@ -35,9 +35,6 @@ namespace Http1 {
   COUNTER(requests_rejected_with_underscores_in_headers)                                           \
   COUNTER(response_flood)
 
-// Constructor-args for CodecStats.
-#define HTTP1_CODEC_STATS(scope) ALL_HTTP1_CODEC_STATS(POOL_COUNTER_PREFIX(scope, "http1."))
-
 /**
  * Wrapper struct for the HTTP/1 codec stats. @see stats_macros.h
  */
@@ -45,7 +42,9 @@ struct CodecStats {
   using AtomicPtr = Thread::AtomicPtr<CodecStats, Thread::AtomicPtrAllocMode::DeleteOnDestruct>;
 
   static CodecStats& atomicGet(AtomicPtr& ptr, Stats::Scope& scope) {
-    return *ptr.get([&scope]() -> CodecStats* { return new CodecStats{HTTP1_CODEC_STATS(scope)}; });
+    return *ptr.get([&scope]() -> CodecStats* {
+      return new CodecStats{ALL_HTTP1_CODEC_STATS(POOL_COUNTER_PREFIX(scope, "http1."))};
+    });
   }
 
   ALL_HTTP1_CODEC_STATS(GENERATE_COUNTER_STRUCT)
@@ -245,7 +244,7 @@ protected:
   bool resetStreamCalled() { return reset_stream_called_; }
 
   Network::Connection& connection_;
-  CodecStats stats_;
+  CodecStats& stats_;
   http_parser parser_;
   Http::Code error_code_{Http::Code::BadRequest};
   const HeaderKeyFormatterPtr header_key_formatter_;

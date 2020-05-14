@@ -11,9 +11,14 @@ namespace Http2 {
 
 class TestCodecStatsProvider {
 public:
-  TestCodecStatsProvider(Stats::Scope& scope) : http2_codec_stats_{HTTP2_CODEC_STATS(scope)} {}
+  TestCodecStatsProvider(Stats::Scope& scope) : scope_(scope) {}
 
-  Http::Http2::CodecStats http2_codec_stats_;
+  Http::Http2::CodecStats& http2CodecStats() {
+    return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, scope_);
+  }
+
+  Stats::Scope& scope_;
+  Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
 };
 
 class TestCodecSettingsProvider {
@@ -63,7 +68,7 @@ public:
       envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
           headers_with_underscores_action)
       : TestCodecStatsProvider(scope),
-        ServerConnectionImpl(connection, callbacks, http2_codec_stats_, http2_options,
+        ServerConnectionImpl(connection, callbacks, http2CodecStats(), http2_options,
                              max_request_headers_kb, max_request_headers_count,
                              headers_with_underscores_action) {}
   nghttp2_session* session() { return session_; }
@@ -84,7 +89,7 @@ public:
                            uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
                            Nghttp2SessionFactory& http2_session_factory)
       : TestCodecStatsProvider(scope),
-        ClientConnectionImpl(connection, callbacks, http2_codec_stats_, http2_options,
+        ClientConnectionImpl(connection, callbacks, http2CodecStats(), http2_options,
                              max_request_headers_kb, max_request_headers_count,
                              http2_session_factory) {}
 

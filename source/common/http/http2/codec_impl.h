@@ -56,9 +56,6 @@ const std::string CLIENT_MAGIC_PREFIX = "PRI * HTTP/2";
   COUNTER(trailers)                                                                                \
   COUNTER(tx_reset)
 
-// Constructor-args for CodecStats.
-#define HTTP2_CODEC_STATS(scope) ALL_HTTP2_CODEC_STATS(POOL_COUNTER_PREFIX(scope, "http2."))
-
 /**
  * Wrapper struct for the HTTP/2 codec stats. @see stats_macros.h
  */
@@ -66,7 +63,9 @@ struct CodecStats {
   using AtomicPtr = Thread::AtomicPtr<CodecStats, Thread::AtomicPtrAllocMode::DeleteOnDestruct>;
 
   static CodecStats& atomicGet(AtomicPtr& ptr, Stats::Scope& scope) {
-    return *ptr.get([&scope]() -> CodecStats* { return new CodecStats{HTTP2_CODEC_STATS(scope)}; });
+    return *ptr.get([&scope]() -> CodecStats* {
+      return new CodecStats{ALL_HTTP2_CODEC_STATS(POOL_COUNTER_PREFIX(scope, "http2."))};
+    });
   }
 
   ALL_HTTP2_CODEC_STATS(GENERATE_COUNTER_STRUCT)
@@ -417,7 +416,7 @@ protected:
 
   std::list<StreamImplPtr> active_streams_;
   nghttp2_session* session_{};
-  CodecStats stats_;
+  CodecStats& stats_;
   Network::Connection& connection_;
   const uint32_t max_headers_kb_;
   const uint32_t max_headers_count_;
