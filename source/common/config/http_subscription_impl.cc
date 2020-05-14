@@ -85,11 +85,14 @@ void HttpSubscriptionImpl::parseResponse(const Http::ResponseMessage& response) 
     return;
   }
   try {
-    callbacks_.onConfigUpdate(message.resources(), message.version_info());
+    const std::string control_plane = (message.has_control_plane()) ? message.control_plane().identifier() : std::string();
+    callbacks_.onConfigUpdate(message.resources(), message.version_info(), control_plane);
     request_.set_version_info(message.version_info());
     stats_.update_time_.set(DateUtil::nowToMilliseconds(dispatcher_.timeSource()));
     stats_.version_.set(HashUtil::xxHash64(request_.version_info()));
     stats_.version_text_.set(request_.version_info());
+    if (!control_plane.empty())
+      stats_.control_plane_.set(message.control_plane().identifier());
     stats_.update_success_.inc();
   } catch (const EnvoyException& e) {
     handleFailure(Config::ConfigUpdateFailureReason::UpdateRejected, &e);

@@ -27,12 +27,14 @@ public:
 
   // Config::SubscriptionCallbacks (all pass through to callbacks_!)
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
-                      const std::string& version_info) override;
+                      const std::string& version_info,
+                      const std::string& control_plane = std::string()) override;
 
   void onConfigUpdate(
       const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-      const std::string& system_version_info) override;
+      const std::string& system_version_info,
+      const std::string& control_plane = std::string()) override;
 
   void onConfigUpdateFailed(ConfigUpdateFailureReason reason, const EnvoyException* e) override;
 

@@ -53,18 +53,21 @@ void GrpcSubscriptionImpl::updateResourceInterest(
 // Config::SubscriptionCallbacks
 void GrpcSubscriptionImpl::onConfigUpdate(
     const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
-    const std::string& version_info) {
+    const std::string& version_info,
+    const std::string& control_plane) {
   disableInitFetchTimeoutTimer();
   // TODO(mattklein123): In the future if we start tracking per-resource versions, we need to
   // supply those versions to onConfigUpdate() along with the xDS response ("system")
   // version_info. This way, both types of versions can be tracked and exposed for debugging by
   // the configuration update targets.
-  callbacks_.onConfigUpdate(resources, version_info);
+  callbacks_.onConfigUpdate(resources, version_info, control_plane);
   stats_.update_success_.inc();
   stats_.update_attempt_.inc();
   stats_.update_time_.set(DateUtil::nowToMilliseconds(dispatcher_.timeSource()));
   stats_.version_.set(HashUtil::xxHash64(version_info));
   stats_.version_text_.set(version_info);
+  if (!control_plane.empty())
+    stats_.control_plane_.set(control_plane);
   ENVOY_LOG(debug, "gRPC config for {} accepted with {} resources with version {}", type_url_,
             resources.size(), version_info);
 }
@@ -72,14 +75,17 @@ void GrpcSubscriptionImpl::onConfigUpdate(
 void GrpcSubscriptionImpl::onConfigUpdate(
     const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-    const std::string& system_version_info) {
+    const std::string& system_version_info,
+    const std::string& control_plane) {
   disableInitFetchTimeoutTimer();
   stats_.update_attempt_.inc();
-  callbacks_.onConfigUpdate(added_resources, removed_resources, system_version_info);
+  callbacks_.onConfigUpdate(added_resources, removed_resources, system_version_info, control_plane);
   stats_.update_success_.inc();
   stats_.update_time_.set(DateUtil::nowToMilliseconds(dispatcher_.timeSource()));
   stats_.version_.set(HashUtil::xxHash64(system_version_info));
   stats_.version_text_.set(system_version_info);
+  if (!control_plane.empty())
+    stats_.control_plane_.set(control_plane);
 }
 
 void GrpcSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason reason,

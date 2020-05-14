@@ -55,6 +55,8 @@ void FilesystemSubscriptionImpl::refresh() {
     stats_.update_time_.set(DateUtil::nowToMilliseconds(api_.timeSource()));
     stats_.version_.set(HashUtil::xxHash64(message.version_info()));
     stats_.version_text_.set(message.version_info());
+    if (message.has_control_plane())
+        stats_.control_plane_.set(message.control_plane().identifier());
     stats_.update_success_.inc();
     ENVOY_LOG(debug, "Filesystem config update accepted for {}: {}", path_, message.DebugString());
   } catch (const ProtobufMessage::UnknownProtoFieldException& e) {

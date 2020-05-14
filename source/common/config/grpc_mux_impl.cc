@@ -126,6 +126,7 @@ bool GrpcMuxImpl::paused(const std::string& type_url) const {
 void GrpcMuxImpl::onDiscoveryResponse(
     std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message) {
   const std::string& type_url = message->type_url();
+  const std::string control_plane = (message->has_control_plane()) ? message->control_plane().identifier() : std::string();
   ENVOY_LOG(debug, "Received gRPC message for {} at version {}", type_url, message->version_info());
   if (api_state_.count(type_url) == 0) {
     ENVOY_LOG(warn, "Ignoring the message for type URL {} as it has no current subscribers.",
@@ -173,7 +174,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
       // Listener) even if the message does not have resources so that update_empty stat
       // is properly incremented and state-of-the-world semantics are maintained.
       if (watch->resources_.empty()) {
-        watch->callbacks_.onConfigUpdate(message->resources(), message->version_info());
+        watch->callbacks_.onConfigUpdate(message->resources(), message->version_info(), control_plane);
         continue;
       }
       Protobuf::RepeatedPtrField<ProtobufWkt::Any> found_resources;
@@ -186,7 +187,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
       // onConfigUpdate should be called only on watches(clusters/routes) that have
       // updates in the message for EDS/RDS.
       if (!found_resources.empty()) {
-        watch->callbacks_.onConfigUpdate(found_resources, message->version_info());
+        watch->callbacks_.onConfigUpdate(found_resources, message->version_info(), control_plane);
       }
     }
     // TODO(mattklein123): In the future if we start tracking per-resource versions, we

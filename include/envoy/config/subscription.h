@@ -39,7 +39,8 @@ public:
    *        requests.
    */
   virtual void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
-                              const std::string& version_info) PURE;
+                              const std::string& version_info,
+                              const std::string& control_plane = std::string()) PURE;
 
   /**
    * Called when a delta configuration update is received.
@@ -52,7 +53,8 @@ public:
   virtual void onConfigUpdate(
       const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-      const std::string& system_version_info) PURE;
+      const std::string& system_version_info,
+      const std::string& control_plane = std::string()) PURE;
 
   /**
    * Called when either the Subscription is unable to fetch a config update or when onConfigUpdate
@@ -105,7 +107,8 @@ using SubscriptionPtr = std::unique_ptr<Subscription>;
   COUNTER(update_success)                                                                          \
   GAUGE(update_time, NeverImport)                                                                  \
   GAUGE(version, NeverImport)                                                                      \
-  TEXT_READOUT(version_text)
+  TEXT_READOUT(version_text)                                                                       \
+  TEXT_READOUT(control_plane)
 
 /**
  * Struct definition for per subscription stats. @see stats_macros.h
