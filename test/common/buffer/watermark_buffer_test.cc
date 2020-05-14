@@ -375,15 +375,18 @@ TEST_F(WatermarkBufferTest, OverflowWatermark) {
 
   // Overflow is only triggered once
   buffer1.drain(18);
+  EXPECT_EQ(4, buffer1.length());
   EXPECT_EQ(1, high_watermark_buffer1);
   EXPECT_EQ(1, low_watermark_buffer1);
   EXPECT_EQ(1, overflow_watermark_buffer1);
   buffer1.add(TEN_BYTES, 10);
   EXPECT_EQ(2, high_watermark_buffer1);
   EXPECT_EQ(1, overflow_watermark_buffer1);
+  EXPECT_EQ(14, buffer1.length());
   buffer1.add(TEN_BYTES, 6);
   EXPECT_EQ(2, high_watermark_buffer1);
   EXPECT_EQ(1, overflow_watermark_buffer1);
+  EXPECT_EQ(20, buffer1.length());
 }
 
 TEST_F(WatermarkBufferTest, OverflowWatermarkDisabled) {
@@ -408,6 +411,33 @@ TEST_F(WatermarkBufferTest, OverflowWatermarkDisabled) {
   EXPECT_EQ(1, high_watermark_buffer1);
   EXPECT_EQ(0, overflow_watermark_buffer1);
   EXPECT_EQ(21, buffer1.length());
+}
+
+TEST_F(WatermarkBufferTest, OverflowWatermarkDisabledOnVeryHighValue) {
+  // Verifies that the overflow watermark is disabled when its value is higher
+  // than uint32_t max value
+  TestScopedRuntime scoped_runtime;
+
+  int high_watermark_buffer1 = 0;
+  int overflow_watermark_buffer1 = 0;
+  Buffer::WatermarkBuffer buffer1{[&]() -> void { },
+                                  [&]() -> void { ++high_watermark_buffer1; },
+                                  [&]() -> void { ++overflow_watermark_buffer1; }};
+
+  // Make sure the overflow threshold will be above std::numeric_limits<uint32_t>::max()
+  Runtime::LoaderSingleton::getExisting()->mergeValues({{"envoy.buffer.overflow_multiplier", "3"}});
+  buffer1.setWatermarks((std::numeric_limits<uint32_t>::max() / 3) + 4);
+
+  // Add 2 halves instead of full uint32_t::max to get around std::bad_alloc exception
+  uint32_t half_max = std::numeric_limits<uint32_t>::max() / 2;
+  buffer1.add(std::string(half_max, 'a').data(), half_max);
+  buffer1.add(std::string(half_max, 'a').data(), half_max);
+  EXPECT_EQ(1, high_watermark_buffer1);
+  EXPECT_EQ(0, overflow_watermark_buffer1);
+  buffer1.add(TEN_BYTES, 10);
+  EXPECT_EQ(1, high_watermark_buffer1);
+  EXPECT_EQ(0, overflow_watermark_buffer1);
+  EXPECT_EQ(2 * half_max + static_cast<uint64_t>(10), buffer1.length());
 }
 
 TEST_F(WatermarkBufferTest, OverflowWatermarkEqualHighWatermark) {
