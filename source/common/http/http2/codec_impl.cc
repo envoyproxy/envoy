@@ -317,8 +317,8 @@ void ConnectionImpl::StreamImpl::saveHeader(HeaderString&& name, HeaderString&& 
 void ConnectionImpl::StreamImpl::submitTrailers(const HeaderMap& trailers) {
   std::vector<nghttp2_nv> final_headers;
   buildHeaders(final_headers, trailers);
-  int rc =
-      nghttp2_submit_trailer(parent_.session_, stream_id_, &final_headers[0], final_headers.size());
+  int rc = nghttp2_submit_trailer(parent_.session_, stream_id_, final_headers.data(),
+                                  final_headers.size());
   ASSERT(rc == 0);
 }
 
@@ -373,7 +373,7 @@ int ConnectionImpl::StreamImpl::onDataSourceSend(const uint8_t* framehd, size_t 
 void ConnectionImpl::ClientStreamImpl::submitHeaders(const std::vector<nghttp2_nv>& final_headers,
                                                      nghttp2_data_provider* provider) {
   ASSERT(stream_id_ == -1);
-  stream_id_ = nghttp2_submit_request(parent_.session_, nullptr, &final_headers.data()[0],
+  stream_id_ = nghttp2_submit_request(parent_.session_, nullptr, final_headers.data(),
                                       final_headers.size(), provider, base());
   ASSERT(stream_id_ > 0);
 }
@@ -381,7 +381,7 @@ void ConnectionImpl::ClientStreamImpl::submitHeaders(const std::vector<nghttp2_n
 void ConnectionImpl::ServerStreamImpl::submitHeaders(const std::vector<nghttp2_nv>& final_headers,
                                                      nghttp2_data_provider* provider) {
   ASSERT(stream_id_ != -1);
-  int rc = nghttp2_submit_response(parent_.session_, stream_id_, &final_headers.data()[0],
+  int rc = nghttp2_submit_response(parent_.session_, stream_id_, final_headers.data(),
                                    final_headers.size(), provider);
   ASSERT(rc == 0);
 }
@@ -996,7 +996,7 @@ void ConnectionImpl::sendSettings(
        {NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, http2_options.max_concurrent_streams().value()},
        {NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE, http2_options.initial_stream_window_size().value()}});
   if (!settings.empty()) {
-    int rc = nghttp2_submit_settings(session_, NGHTTP2_FLAG_NONE, &settings[0], settings.size());
+    int rc = nghttp2_submit_settings(session_, NGHTTP2_FLAG_NONE, settings.data(), settings.size());
     ASSERT(rc == 0);
   } else {
     // nghttp2_submit_settings need to be called at least once
