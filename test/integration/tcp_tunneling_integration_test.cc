@@ -41,6 +41,7 @@ public:
     request_encoder_ = &encoder_decoder.first;
     response_ = std::move(encoder_decoder.second);
     ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_raw_upstream_connection_));
+    response_->waitForHeaders();
   }
 
   void sendBidirectionalData(const char* downstream_send_data = "hello",
@@ -126,7 +127,7 @@ TEST_P(ConnectTerminationIntegrationTest, TestTimeout) {
   setUpConnection();
 
   // Wait for the timeout to close the connection.
-  response_->waitForEndStream();
+  response_->waitForReset();
   ASSERT_TRUE(fake_raw_upstream_connection_->waitForHalfClose());
 }
 
