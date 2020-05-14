@@ -206,11 +206,11 @@ public:
   void createTestServer(const std::string& json_path, const std::vector<std::string>& port_names);
   void createGeneratedApiTestServer(const std::string& bootstrap_path,
                                     const std::vector<std::string>& port_names,
-                                    bool allow_unknown_static_fields,
-                                    bool reject_unknown_dynamic_fields, bool allow_lds_rejection);
+                                    Server::FieldValidationConfig validator_config,
+                                    bool allow_lds_rejection);
   void createApiTestServer(const ApiFilesystemConfig& api_filesystem_config,
                            const std::vector<std::string>& port_names,
-                           bool allow_unknown_static_fields, bool reject_unknown_dynamic_fields,
+                           Server::FieldValidationConfig validator_config,
                            bool allow_lds_rejection);
 
   Event::TestTimeSystem& timeSystem() { return time_system_; }
@@ -222,8 +222,8 @@ public:
 
   // Enable the listener access log
   void useListenerAccessLog(absl::string_view format = "");
-  // Waits for the first access log entry.
-  std::string waitForAccessLog(const std::string& filename);
+  // Waits for the nth access log entry, defaulting to log entry 0.
+  std::string waitForAccessLog(const std::string& filename, uint32_t entry = 0);
 
   std::string listener_access_log_name_;
 

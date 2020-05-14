@@ -17,6 +17,7 @@ ASCII
 ASSERTs
 AST
 AWS
+Allowlisted
 BACKTRACE
 BSON
 BPF
@@ -170,6 +171,7 @@ LHS
 LLVM
 LPT
 LRS
+Loggable
 MB
 MD
 MERCHANTABILITY
@@ -362,6 +364,7 @@ alloc
 alloca
 allocator
 allowlist
+allowlisted
 alls
 alphanumerics
 amongst
@@ -504,6 +507,7 @@ dechunked
 decl
 decls
 decompressor
+decompressors
 decrement
 decrypt
 dedup

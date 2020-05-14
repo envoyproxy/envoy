@@ -53,6 +53,7 @@ configure_make(
         "//bazel:windows_x86_64": ["lua51.lib"],
         "//conditions:default": ["libluajit-5.1.a"],
     }),
+    tags = ["skip_on_windows"],
 )
 
 configure_make(
@@ -72,6 +73,7 @@ configure_make(
         "//bazel:windows_x86_64": ["lua51.lib"],
         "//conditions:default": ["libluajit-5.1.a"],
     }),
+    tags = ["skip_on_windows"],
 )
 
 envoy_cmake_external(

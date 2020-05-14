@@ -5,10 +5,10 @@ Two flavors of Envoy Docker images, based on Ubuntu and Alpine Linux, are built.
 ## Ubuntu Envoy image
 The Ubuntu based Envoy Docker image at [`envoyproxy/envoy-build:<hash>`](https://hub.docker.com/r/envoyproxy/envoy-build/) is used for CircleCI checks,
 where `<hash>` is specified in [`envoy_build_sha.sh`](https://github.com/envoyproxy/envoy/blob/master/ci/envoy_build_sha.sh). Developers
-may work with `envoyproxy/envoy-build:latest` to provide a self-contained environment for building Envoy binaries and
-running tests that reflects the latest built Ubuntu Envoy image. Moreover, the Docker image
-at [`envoyproxy/envoy:<hash>`](https://hub.docker.com/r/envoyproxy/envoy/) is an image that has an Envoy binary at `/usr/local/bin/envoy`. The `<hash>`
-corresponds to the master commit at which the binary was compiled. Lastly, `envoyproxy/envoy-dev:latest` contains an Envoy
+may work with the latest build image SHA in [envoy-build-tools](https://github.com/envoyproxy/envoy-build-tools/blob/master/toolchains/rbe_toolchains_config.bzl#L8)
+repo to provide a self-contained environment for building Envoy binaries and running tests that reflects the latest built Ubuntu Envoy image.
+Moreover, the Docker image at [`envoyproxy/envoy-dev:<hash>`](https://hub.docker.com/r/envoyproxy/envoy-dev/) is an image that has an Envoy binary at `/usr/local/bin/envoy`.
+The `<hash>` corresponds to the master commit at which the binary was compiled. Lastly, `envoyproxy/envoy-dev:latest` contains an Envoy
 binary built from the latest tip of master that passed tests.
 
 ## Alpine Envoy image
@@ -23,8 +23,8 @@ master commit at which the binary was compiled, and `latest` corresponds to a bi
 Currently there are three build images:
 
 * `envoyproxy/envoy-build` &mdash; alias to `envoyproxy/envoy-build-ubuntu`.
-* `envoyproxy/envoy-build-ubuntu` &mdash; based on Ubuntu 16.04 (Xenial) with GCC 7 and Clang 9 compiler.
-* `envoyproxy/envoy-build-centos` &mdash; based on CentOS 7 with GCC 7 and Clang 9 compiler, this image is experimental and not well tested.
+* `envoyproxy/envoy-build-ubuntu` &mdash; based on Ubuntu 18.04 (Bionic) with GCC 9 and Clang 9 compiler.
+* `envoyproxy/envoy-build-centos` &mdash; based on CentOS 7 with GCC 9 and Clang 9 compiler, this image is experimental and not well tested.
 
 The source for these images is located in the [envoyproxy/envoy-build-tools](https://github.com/envoyproxy/envoy-build-tools)
 repository.
