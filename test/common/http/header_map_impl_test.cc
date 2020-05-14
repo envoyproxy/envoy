@@ -915,17 +915,17 @@ TEST(HeaderMapImplTest, TestHeaderList) {
   std::array<std::string, 2> values{"/", "world"};
 
   auto headers = createHeaderMap<TestHeaderMapImpl>({{keys[0], values[0]}, {keys[1], values[1]}});
-  const auto header_list = HeaderListView(headers->header_map_);
-  std::vector<absl::string_view> str_header_keys(2);
-  std::transform(header_list.keys().begin(), header_list.keys().end(), str_header_keys.begin(),
-                 [](auto key) -> absl::string_view { return key.get().getStringView(); });
-  std::vector<absl::string_view> str_header_values(2);
-  std::transform(header_list.values().begin(), header_list.values().end(),
-                 str_header_values.begin(),
-                 [](auto value) -> absl::string_view { return value.get().getStringView(); });
+  HeaderListView header_list(headers->header_map_);
+  auto to_string_views =
+      [](const HeaderListView::HeaderStringRefs& strs) -> std::vector<absl::string_view> {
+    std::vector<absl::string_view> str_views(strs.size());
+    std::transform(strs.begin(), strs.end(), str_views.begin(),
+                   [](auto value) -> absl::string_view { return value.get().getStringView(); });
+    return str_views;
+  };
 
-  EXPECT_THAT(str_header_keys, ElementsAre(":path", "hello"));
-  EXPECT_THAT(str_header_values, ElementsAre("/", "world"));
+  EXPECT_THAT(to_string_views(header_list.keys()), ElementsAre(":path", "hello"));
+  EXPECT_THAT(to_string_views(header_list.values()), ElementsAre("/", "world"));
 }
 
 TEST(HeaderMapImplTest, TestAppendHeader) {
