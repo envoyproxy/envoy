@@ -333,7 +333,6 @@ public:
 private:
   UpstreamRequest* upstream_request_;
   Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
-  bool sent_headers_{};
 };
 
 } // namespace Router
