@@ -38,7 +38,9 @@ public:
   void setWatermarks(uint32_t watermark) { setWatermarks(watermark / 2, watermark); }
   void setWatermarks(uint32_t low_watermark, uint32_t high_watermark);
   uint32_t highWatermark() const { return high_watermark_; }
-  bool aboveHighWatermark() const { return above_high_watermark_called_; }
+  // Returns true if the high watermark callbacks have been called more recently
+  // than the low watermark callbacks.
+  bool highWatermarkTriggered() const { return above_high_watermark_called_; }
 
 private:
   void checkHighWatermark();

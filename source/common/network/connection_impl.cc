@@ -190,7 +190,7 @@ void ConnectionImpl::closeConnectionImmediately() { closeSocket(ConnectionEvent:
 
 bool ConnectionImpl::consumerWantsToRead() {
   return read_disable_count_ == 0 ||
-         (read_disable_count_ == 1 && read_buffer_.aboveHighWatermark());
+         (read_disable_count_ == 1 && read_buffer_.highWatermarkTriggered());
 }
 
 void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
@@ -319,8 +319,8 @@ void ConnectionImpl::readDisable(bool disable) {
   ASSERT(state() == State::Open);
   ASSERT(file_event_ != nullptr);
 
-  ENVOY_CONN_LOG(trace, "readDisable: enabled={} disable_count={} state={}", *this,
-                 read_disable_count_, disable, static_cast<int>(state()));
+  ENVOY_CONN_LOG(trace, "readDisable: disable={} disable_count={} state={} buffer_length={}", *this,
+                 disable, read_disable_count_, static_cast<int>(state()), read_buffer_.length());
 
   // When we disable reads, we still allow for early close notifications (the equivalent of
   // EPOLLRDHUP for an epoll backend). For backends that support it, this allows us to apply
@@ -363,8 +363,9 @@ void ConnectionImpl::readDisable(bool disable) {
 
     if (consumerWantsToRead() && read_buffer_.length() > 0) {
       // If the connection has data buffered there's no guarantee there's also data in the kernel
-      // which will kick off the filter chain. Instead fake an event to make sure the buffered data
-      // gets processed regardless and ensure that we dispatch it via onRead.
+      // which will kick off the filter chain. Alternately if the read buffer has data the fd could
+      // be read disabled. To handle these cases, fake an event to make sure the buffered data gets
+      // processed regardless and ensure that we dispatch it via onRead.
       dispatch_buffered_data_ = true;
       setReadBufferReady();
     }
@@ -485,7 +486,9 @@ void ConnectionImpl::onReadBufferLowWatermark() {
 
 void ConnectionImpl::onReadBufferHighWatermark() {
   ENVOY_CONN_LOG(debug, "onAboveReadBufferHighWatermark", *this);
-  readDisable(true);
+  if (state() == State::Open) {
+    readDisable(true);
+  }
 }
 
 void ConnectionImpl::onWriteBufferLowWatermark() {
@@ -545,7 +548,9 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
 }
 
 void ConnectionImpl::onReadReady() {
-  ENVOY_CONN_LOG(trace, "read ready", *this);
+  ENVOY_CONN_LOG(trace, "read ready. dispatch_buffered_data={}", *this, dispatch_buffered_data_);
+  const bool latched_dispatch_buffered_data = dispatch_buffered_data_;
+  dispatch_buffered_data_ = false;
 
   ASSERT(!connecting_);
 
@@ -555,9 +560,8 @@ void ConnectionImpl::onReadReady() {
   // 2) The consumer of connection data called readDisable(true), and instead of reading from the
   //    socket we simply need to dispatch already read data.
   if (read_disable_count_ != 0) {
-    if (dispatch_buffered_data_ && consumerWantsToRead()) {
+    if (latched_dispatch_buffered_data && consumerWantsToRead()) {
       onRead(read_buffer_.length());
-      dispatch_buffered_data_ = false;
     }
     return;
   }
@@ -575,13 +579,12 @@ void ConnectionImpl::onReadReady() {
 
   read_end_stream_ |= result.end_stream_read_;
   if (result.bytes_processed_ != 0 || result.end_stream_read_ ||
-      (dispatch_buffered_data_ && read_buffer_.length() > 0)) {
+      (latched_dispatch_buffered_data && read_buffer_.length() > 0)) {
     // Skip onRead if no bytes were processed unless we explicitly want to force onRead for
     // buffered data. For instance, skip onRead if the connection was closed without producing
     // more data.
     onRead(new_buffer_size);
   }
-  dispatch_buffered_data_ = false;
 
   // The read callback may have already closed the connection.
   if (result.action_ == PostIoAction::Close || bothSidesHalfClosed()) {
