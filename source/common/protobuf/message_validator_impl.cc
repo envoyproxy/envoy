@@ -18,38 +18,24 @@ void WarningValidationVisitorImpl::setUnknownCounter(Stats::Counter& counter) {
 }
 
 void WarningValidationVisitorImpl::onUnknownField(absl::string_view description) {
-  onUnexpectedField(description, unknown_counter_, ValidationType::UnknownFields);
-}
-
-void WarningValidationVisitorImpl::onDeprecatedField(absl::string_view description) {
-  std::string message = absl::StrCat(description, ValidationError::deprecation_error);
-  onUnexpectedField(description, nullptr, ValidationType::DeprecatedFields);
-  throw ValidationError::DeprecatedProtoFieldException(
-      absl::StrCat(description, ValidationError::deprecation_error));
-}
-
-void WarningValidationVisitorImpl::onUnexpectedField(absl::string_view description,
-                                                     Stats::Counter* counter,
-                                                     const ValidationType& validation_type) {
   const uint64_t hash = HashUtil::xxHash64(description);
   auto it = descriptions_.insert(hash);
   // If we've seen this before, skip.
   if (!it.second) {
     return;
   }
-  // It's a new/deprecated field, log and bump stat.
+  // It's a new field, log and bump stat.
   ENVOY_LOG(warn, "Unexpected field: {}", description);
-  if (counter != nullptr) {
-    counter->inc();
+  if (unknown_counter_ == nullptr) {
+    ++prestats_unknown_count_;
   } else {
-    switch (validation_type) {
-    case UnknownFields:
-      ++prestats_unknown_count_;
-      break;
-    default:
-      break;
-    }
+    unknown_counter_->inc();
   }
+}
+
+void WarningValidationVisitorImpl::onDeprecatedField(absl::string_view description,
+                                                     bool soft_deprecation) {
+  onDeprecatedFieldDefault(description, soft_deprecation);
 }
 
 void StrictValidationVisitorImpl::onUnknownField(absl::string_view description) {
@@ -57,9 +43,9 @@ void StrictValidationVisitorImpl::onUnknownField(absl::string_view description) 
       absl::StrCat("Protobuf message (", description, ") has unknown fields"));
 }
 
-void StrictValidationVisitorImpl::onDeprecatedField(absl::string_view description) {
-  throw ValidationError::DeprecatedProtoFieldException(
-      absl::StrCat(description, ValidationError::deprecation_error));
+void StrictValidationVisitorImpl::onDeprecatedField(absl::string_view description,
+                                                    bool soft_deprecation) {
+  onDeprecatedFieldDefault(description, soft_deprecation);
 }
 
 ValidationVisitor& getNullValidationVisitor() {

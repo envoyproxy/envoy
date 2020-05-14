@@ -14,7 +14,7 @@ class NullValidationVisitorImpl : public ValidationVisitor {
 public:
   // Envoy::ProtobufMessage::ValidationVisitor
   void onUnknownField(absl::string_view) override {}
-  void onDeprecatedField(absl::string_view) override {}
+  void onDeprecatedField(absl::string_view, bool) override {}
 
   // Envoy::ProtobufMessage::ValidationVisitor
   bool skipValidation() override { return true; }
@@ -29,14 +29,12 @@ public:
 
   // Envoy::ProtobufMessage::ValidationVisitor
   void onUnknownField(absl::string_view description) override;
-  void onDeprecatedField(absl::string_view description) override;
+  void onDeprecatedField(absl::string_view description, bool soft_deprecation) override;
 
   // Envoy::ProtobufMessage::ValidationVisitor
   bool skipValidation() override { return false; }
 
 private:
-  void onUnexpectedField(absl::string_view description, Stats::Counter* counter,
-                         const ValidationType& validation_type);
   // Track hashes of descriptions we've seen, to avoid log spam. A hash is used here to avoid
   // wasting memory with unused strings.
   absl::flat_hash_set<uint64_t> descriptions_;
@@ -53,7 +51,7 @@ public:
 
   // Envoy::ProtobufMessage::ValidationVisitor
   bool skipValidation() override { return false; }
-  void onDeprecatedField(absl::string_view description) override;
+  void onDeprecatedField(absl::string_view description, bool soft_deprecation) override;
 };
 
 ValidationVisitor& getStrictValidationVisitor();

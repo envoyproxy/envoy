@@ -12,10 +12,9 @@ namespace Envoy {
 namespace ProtobufMessage {
 
 namespace ValidationError {
-const char deprecation_error[] =
-    " If continued use of this field is absolutely necessary, "
-    "see " ENVOY_DOC_URL_RUNTIME_OVERRIDE_DEPRECATED " for "
-    "how to apply a temporary and highly discouraged override.";
+const char deprecation_error[] = " If continued use of this field is absolutely necessary, "
+                                 "see " ENVOY_DOC_URL_RUNTIME_OVERRIDE_DEPRECATED " for "
+                                 "how to apply a temporary and highly discouraged override.";
 
 /**
  * Exception class for reporting validation errors due to the presence of unknown
@@ -37,11 +36,6 @@ public:
 
 } // namespace ValidationError
 
-enum ValidationType {
-  UnknownFields,
-  DeprecatedFields,
-};
-
 /**
  * Visitor interface for a Protobuf::Message. The methods of ValidationVisitor are invoked to
  * perform validation based on events encountered during or after the parsing of proto binary
@@ -53,7 +47,7 @@ public:
 
   /**
    * Invoked when an unknown field is encountered.
-   * @param description human readable description of the field
+   * @param description human readable description of the field.
    */
   virtual void onUnknownField(absl::string_view description) PURE;
 
@@ -65,9 +59,12 @@ public:
 
   /**
    * Invoked when deprecated field is encountered.
-   * @param description human readable description of the field
+   * @param description human readable description of the field.
    */
-  virtual void onDeprecatedField(absl::string_view description) PURE;
+  virtual void onDeprecatedField(absl::string_view description, bool soft_deprecation) PURE;
+
+protected:
+  void onDeprecatedFieldDefault(absl::string_view description, bool soft_deprecation);
 };
 
 class ValidationContext {
