@@ -535,6 +535,7 @@ RtdsSubscription::RtdsSubscription(
       validation_visitor_(validation_visitor) {}
 
 void RtdsSubscription::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                                      const std::string&,
                                       const std::string&) {
   validateUpdateSize(resources.size());
   auto runtime = MessageUtil::anyConvertAndValidate<envoy::service::runtime::v3::Runtime>(
@@ -551,11 +552,12 @@ void RtdsSubscription::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufW
 
 void RtdsSubscription::onConfigUpdate(
     const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& resources,
-    const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
+    const Protobuf::RepeatedPtrField<std::string>&, const std::string&, 
+    const std::string& control_plane) {
   validateUpdateSize(resources.size());
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> unwrapped_resource;
   *unwrapped_resource.Add() = resources[0].resource();
-  onConfigUpdate(unwrapped_resource, resources[0].version());
+  onConfigUpdate(unwrapped_resource, resources[0].version(), control_plane);
 }
 
 void RtdsSubscription::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,

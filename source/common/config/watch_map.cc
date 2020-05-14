@@ -54,7 +54,8 @@ absl::flat_hash_set<Watch*> WatchMap::watchesInterestedIn(const std::string& res
 }
 
 void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
-                              const std::string& version_info) {
+                              const std::string& version_info,
+                              const std::string& control_plane) {
   if (watches_.empty()) {
     return;
   }
@@ -85,11 +86,11 @@ void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>
       //    of this watch's resources, so the watch must be informed with an onConfigUpdate.
       // 3) Otherwise, we can skip onConfigUpdate for this watch.
       if (map_is_single_wildcard || !watch->state_of_the_world_empty_) {
-        watch->callbacks_.onConfigUpdate({}, version_info);
+        watch->callbacks_.onConfigUpdate({}, version_info, control_plane);
         watch->state_of_the_world_empty_ = true;
       }
     } else {
-      watch->callbacks_.onConfigUpdate(this_watch_updates->second, version_info);
+      watch->callbacks_.onConfigUpdate(this_watch_updates->second, version_info, control_plane);
       watch->state_of_the_world_empty_ = false;
     }
   }
@@ -124,7 +125,8 @@ AddedRemoved WatchMap::convertAliasWatchesToNameWatches(
 void WatchMap::onConfigUpdate(
     const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-    const std::string& system_version_info) {
+    const std::string& system_version_info,
+    const std::string& control_plane) {
   // Build a pair of maps: from watches, to the set of resources {added,removed} that each watch
   // cares about. Each entry in the map-pair is then a nice little bundle that can be fed directly
   // into the individual onConfigUpdate()s.
@@ -150,17 +152,17 @@ void WatchMap::onConfigUpdate(
     const auto removed = per_watch_removed.find(cur_watch);
     if (removed == per_watch_removed.end()) {
       // additions only, no removals
-      cur_watch->callbacks_.onConfigUpdate(added.second, {}, system_version_info);
+      cur_watch->callbacks_.onConfigUpdate(added.second, {}, system_version_info, control_plane);
     } else {
       // both additions and removals
-      cur_watch->callbacks_.onConfigUpdate(added.second, removed->second, system_version_info);
+      cur_watch->callbacks_.onConfigUpdate(added.second, removed->second, system_version_info, control_plane);
       // Drop the removals now, so the final removals-only pass won't use them.
       per_watch_removed.erase(removed);
     }
   }
   // Any removals-only updates will not have been picked up in the per_watch_added loop.
   for (auto& removed : per_watch_removed) {
-    removed.first->callbacks_.onConfigUpdate({}, removed.second, system_version_info);
+    removed.first->callbacks_.onConfigUpdate({}, removed.second, system_version_info, control_plane);
   }
 }
 
