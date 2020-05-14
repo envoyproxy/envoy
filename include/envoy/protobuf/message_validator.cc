@@ -2,7 +2,7 @@
 
 #include "envoy/common/exception.h"
 
-#include "common/common/macros.h"
+#include "common/common/logger.h"
 
 #include "absl/strings/str_cat.h"
 
@@ -12,7 +12,7 @@ namespace ProtobufMessage {
 void ValidationVisitor::onDeprecatedFieldDefault(absl::string_view description,
                                                  bool soft_deprecation) {
   if (soft_deprecation) {
-    ENVOY_LOG(warn, "Unexpected field: {}",
+    ENVOY_LOG_MISC(warn, "Unexpected field: {}",
               absl::StrCat(description, ValidationError::deprecation_error));
   } else {
     throw ValidationError::DeprecatedProtoFieldException(
