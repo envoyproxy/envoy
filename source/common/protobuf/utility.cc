@@ -200,13 +200,6 @@ void deprecatedFieldHelper(Runtime::Loader* runtime, bool proto_annotated_as_dep
 
   validation_visitor.onDeprecatedField("type " + message.GetTypeName() + " " + with_overridden,
                                        warn_only);
-
-  // if (warn_only) {
-  //   ENVOY_LOG_MISC(warn, "{}", with_overridden);
-  // } else {
-  //   validation_visitor.onDeprecatedField("type " + message.GetTypeName() + " " +
-  //   with_overridden);
-  // }
 }
 
 } // namespace
