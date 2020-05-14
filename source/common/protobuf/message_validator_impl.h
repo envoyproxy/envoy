@@ -15,6 +15,9 @@ public:
   // Envoy::ProtobufMessage::ValidationVisitor
   void onUnknownField(absl::string_view) override {}
   void onDeprecatedField(absl::string_view) override {}
+
+  // Envoy::ProtobufMessage::ValidationVisitor
+  bool skipValidation() override { return true; }
 };
 
 ValidationVisitor& getNullValidationVisitor();
@@ -27,6 +30,9 @@ public:
   // Envoy::ProtobufMessage::ValidationVisitor
   void onUnknownField(absl::string_view description) override;
   void onDeprecatedField(absl::string_view description) override;
+
+  // Envoy::ProtobufMessage::ValidationVisitor
+  bool skipValidation() override { return false; }
 
 private:
   void onUnexpectedField(absl::string_view description, Stats::Counter* counter,
@@ -44,6 +50,9 @@ class StrictValidationVisitorImpl : public ValidationVisitor {
 public:
   // Envoy::ProtobufMessage::ValidationVisitor
   void onUnknownField(absl::string_view description) override;
+
+  // Envoy::ProtobufMessage::ValidationVisitor
+  bool skipValidation() override { return false; }
   void onDeprecatedField(absl::string_view description) override;
 };
 
@@ -67,11 +76,14 @@ private:
 
 class ProdValidationContextImpl : public ValidationContextImpl {
 public:
-  ProdValidationContextImpl(bool allow_unknown_static_fields, bool allow_unknown_dynamic_fields)
+  ProdValidationContextImpl(bool allow_unknown_static_fields, bool allow_unknown_dynamic_fields,
+                            bool ignore_unknown_dynamic_fields)
       : ValidationContextImpl(allow_unknown_static_fields ? static_warning_validation_visitor_
                                                           : getStrictValidationVisitor(),
                               allow_unknown_dynamic_fields
-                                  ? dynamic_warning_validation_visitor_
+                                  ? (ignore_unknown_dynamic_fields
+                                         ? ProtobufMessage::getNullValidationVisitor()
+                                         : dynamic_warning_validation_visitor_)
                                   : ProtobufMessage::getStrictValidationVisitor()) {}
 
   ProtobufMessage::WarningValidationVisitorImpl& static_warning_validation_visitor() {

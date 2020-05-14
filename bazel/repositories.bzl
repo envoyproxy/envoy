@@ -8,6 +8,7 @@ load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_languag
 PPC_SKIP_TARGETS = ["envoy.filters.http.lua"]
 
 WINDOWS_SKIP_TARGETS = [
+    "envoy.filters.http.lua",
     "envoy.tracers.dynamic_ot",
     "envoy.tracers.lightstep",
     "envoy.tracers.datadog",
@@ -68,9 +69,9 @@ _default_envoy_build_config = repository_rule(
     },
 )
 
-# Python dependencies. If these become non-trivial, we might be better off using a virtualenv to
-# wrap them, but for now we can treat them as first-class Bazel.
+# Python dependencies.
 def _python_deps():
+    # TODO(htuch): convert these to pip3_import.
     _repository_impl(
         name = "com_github_pallets_markupsafe",
         build_file = "@envoy//bazel/external:markupsafe.BUILD",
@@ -343,8 +344,6 @@ def _com_github_libevent_libevent():
     http_archive(
         name = "com_github_libevent_libevent",
         build_file_content = BUILD_ALL_CONTENT,
-        patch_args = ["-p0"],
-        patches = ["@envoy//bazel/foreign_cc:libevent_msvc.patch"],
         **location
     )
     native.bind(

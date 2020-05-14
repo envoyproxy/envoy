@@ -13,7 +13,7 @@ namespace ProtobufMessage {
 
 namespace ValidationError {
 const char deprecation_error[] =
-    " If continued use of this field is absolutely necessary, " 
+    " If continued use of this field is absolutely necessary, "
     "see " ENVOY_DOC_URL_RUNTIME_OVERRIDE_DEPRECATED " for "
     "how to apply a temporary and highly discouraged override.";
 
@@ -56,6 +56,12 @@ public:
    * @param description human readable description of the field
    */
   virtual void onUnknownField(absl::string_view description) PURE;
+
+  /**
+   * If true, skip this validation visitor in the interest of speed when
+   * possible.
+   **/
+  virtual bool skipValidation() PURE;
 
   /**
    * Invoked when deprecated field is encountered.
