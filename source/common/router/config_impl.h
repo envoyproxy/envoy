@@ -387,6 +387,46 @@ private:
 };
 
 /**
+ * Implementation of InternalRedirectPolicy that reads from the proto
+ * InternalRedirectPolicy of the RouteAction.
+ */
+class InternalRedirectPolicyImpl : public InternalRedirectPolicy {
+public:
+  // Constructor that enables internal redirect with policy_config controlling the configurable
+  // behaviors.
+  explicit InternalRedirectPolicyImpl(
+      const envoy::config::route::v3::InternalRedirectPolicy& policy_config,
+      ProtobufMessage::ValidationVisitor& validator, absl::string_view current_route_name);
+  // Default constructor that disables internal redirect.
+  InternalRedirectPolicyImpl() = default;
+
+  bool enabled() const override { return enabled_; }
+
+  bool shouldRedirectForResponseCode(const Http::Code& response_code) const override {
+    return redirect_response_codes_.contains(response_code);
+  }
+
+  std::vector<InternalRedirectPredicateSharedPtr> predicates() const override;
+
+  uint32_t maxInternalRedirects() const override { return max_internal_redirects_; }
+
+  bool isCrossSchemeRedirectAllowed() const override { return allow_cross_scheme_redirect_; }
+
+private:
+  absl::flat_hash_set<Http::Code> buildRedirectResponseCodes(
+      const envoy::config::route::v3::InternalRedirectPolicy& policy_config) const;
+
+  const std::string current_route_name_;
+  const absl::flat_hash_set<Http::Code> redirect_response_codes_;
+  const uint32_t max_internal_redirects_{1};
+  const bool enabled_{false};
+  const bool allow_cross_scheme_redirect_{false};
+
+  std::vector<std::pair<InternalRedirectPredicateFactory*, ProtobufTypes::MessagePtr>>
+      predicate_factories_;
+};
+
+/**
  * Base implementation for all route entries.
  */
 class RouteEntryImplBase : public RouteEntry,
@@ -442,6 +482,9 @@ public:
   Upstream::ResourcePriority priority() const override { return priority_; }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
   const RetryPolicy& retryPolicy() const override { return retry_policy_; }
+  const InternalRedirectPolicy& internalRedirectPolicy() const override {
+    return internal_redirect_policy_;
+  }
   uint32_t retryShadowBufferLimit() const override { return retry_shadow_buffer_limit_; }
   const std::vector<ShadowPolicyPtr>& shadowPolicies() const override { return shadow_policies_; }
   const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const override {
@@ -472,10 +515,6 @@ public:
   }
   const absl::optional<ConnectConfig>& connectConfig() const override { return connect_config_; }
   const UpgradeMap& upgradeMap() const override { return upgrade_map_; }
-  InternalRedirectAction internalRedirectAction() const override {
-    return internal_redirect_action_;
-  }
-  uint32_t maxInternalRedirects() const override { return max_internal_redirects_; }
 
   // Router::DirectResponseEntry
   std::string newPath(const Http::RequestHeaderMap& headers) const override;
@@ -548,6 +587,9 @@ private:
     Upstream::ResourcePriority priority() const override { return parent_->priority(); }
     const RateLimitPolicy& rateLimitPolicy() const override { return parent_->rateLimitPolicy(); }
     const RetryPolicy& retryPolicy() const override { return parent_->retryPolicy(); }
+    const InternalRedirectPolicy& internalRedirectPolicy() const override {
+      return parent_->internalRedirectPolicy();
+    }
     uint32_t retryShadowBufferLimit() const override { return parent_->retryShadowBufferLimit(); }
     const std::vector<ShadowPolicyPtr>& shadowPolicies() const override {
       return parent_->shadowPolicies();
@@ -602,10 +644,6 @@ private:
       return parent_->connectConfig();
     }
     const UpgradeMap& upgradeMap() const override { return parent_->upgradeMap(); }
-    InternalRedirectAction internalRedirectAction() const override {
-      return parent_->internalRedirectAction();
-    }
-    uint32_t maxInternalRedirects() const override { return parent_->maxInternalRedirects(); }
 
     // Router::Route
     const DirectResponseEntry* directResponseEntry() const override { return nullptr; }
@@ -694,6 +732,11 @@ private:
                    const envoy::config::route::v3::RouteAction& route_config,
                    ProtobufMessage::ValidationVisitor& validation_visitor) const;
 
+  InternalRedirectPolicyImpl
+  buildInternalRedirectPolicy(const envoy::config::route::v3::RouteAction& route_config,
+                              ProtobufMessage::ValidationVisitor& validator,
+                              absl::string_view current_route_name) const;
+
   // Default timeout is 15s if nothing is specified in the route config.
   static const uint64_t DEFAULT_ROUTE_TIMEOUT_MS = 15000;
 
@@ -720,6 +763,7 @@ private:
   const bool strip_query_;
   const HedgePolicyImpl hedge_policy_;
   const RetryPolicyImpl retry_policy_;
+  const InternalRedirectPolicyImpl internal_redirect_policy_;
   const RateLimitPolicyImpl rate_limit_policy_;
   std::vector<ShadowPolicyPtr> shadow_policies_;
   const Upstream::ResourcePriority priority_;
@@ -749,8 +793,6 @@ private:
   PerFilterConfigs per_filter_configs_;
   const std::string route_name_;
   TimeSource& time_source_;
-  InternalRedirectAction internal_redirect_action_;
-  uint32_t max_internal_redirects_{1};
 };
 
 /**
