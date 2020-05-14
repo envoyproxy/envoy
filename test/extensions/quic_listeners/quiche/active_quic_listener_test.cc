@@ -95,12 +95,8 @@ protected:
     listen_socket_->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
     listen_socket_->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
 
-    EXPECT_CALL(listener_config_, listenSocketFactory())
-        .Times(AnyNumber())
-        .WillRepeatedly(ReturnRef(socket_factory_));
-    EXPECT_CALL(socket_factory_, getListenSocket())
-        .Times(AnyNumber())
-        .WillRepeatedly(Return(listen_socket_));
+    ON_CALL(listener_config_, listenSocketFactory()).WillByDefault(ReturnRef(socket_factory_));
+    ON_CALL(socket_factory_, getListenSocket()).WillByDefault(Return(listen_socket_));
 
     listener_factory_ = createQuicListenerFactory(yamlForQuicConfig());
     quic_listener_ =
@@ -263,7 +259,7 @@ protected:
   Server::ConnectionHandlerImpl connection_handler_;
   std::unique_ptr<ActiveQuicListener> quic_listener_;
   Network::ActiveUdpListenerFactoryPtr listener_factory_;
-  Network::MockListenSocketFactory socket_factory_;
+  NiceMock<Network::MockListenSocketFactory> socket_factory_;
   EnvoyQuicDispatcher* quic_dispatcher_;
   std::unique_ptr<Runtime::ScopedLoaderSingleton> loader_;
 
