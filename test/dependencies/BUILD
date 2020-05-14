@@ -14,5 +14,4 @@ envoy_cc_test(
     external_deps = [
         "curl",
     ],
-    tags = ["fails_on_windows"],
 )

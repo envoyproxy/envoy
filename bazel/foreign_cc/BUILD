@@ -53,6 +53,7 @@ configure_make(
         "//bazel:windows_x86_64": ["lua51.lib"],
         "//conditions:default": ["libluajit-5.1.a"],
     }),
+    tags = ["skip_on_windows"],
 )
 
 configure_make(
@@ -72,6 +73,7 @@ configure_make(
         "//bazel:windows_x86_64": ["lua51.lib"],
         "//conditions:default": ["libluajit-5.1.a"],
     }),
+    tags = ["skip_on_windows"],
 )
 
 envoy_cmake_external(
@@ -101,6 +103,9 @@ envoy_cmake_external(
         "CMAKE_USE_GSSAPI": "off",
         "HTTP_ONLY": "on",
         "CMAKE_INSTALL_LIBDIR": "lib",
+        # Explicitly enable Unix sockets and disable crypto for Windows
+        "USE_UNIX_SOCKETS": "on",
+        "CURL_DISABLE_CRYPTO_AUTH": "on",
         # C-Ares.
         "ENABLE_ARES": "on",
         "CARES_LIBRARY": "$EXT_BUILD_DEPS/ares",
@@ -212,6 +217,8 @@ envoy_cmake_external(
     cache_entries = {
         "BUILD_SHARED_LIBS": "off",
         "CMAKE_CXX_COMPILER_FORCED": "on",
+        "CMAKE_C_COMPILER_FORCED": "on",
+        "SKIP_BUILD_EXAMPLES": "on",
     },
     lib_source = "@net_zlib//:all",
     static_libraries = select({

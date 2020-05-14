@@ -17,12 +17,6 @@ V2_ONLY_PATHS = [
     'config/common/tap',
 ]
 
-# These are trees that allow v3+ protos, but only a strict whitelist.
-V3_RESTRICTED_PATHS = {
-    'config/accesslog/v3': ['accesslog.proto'],
-    'service/discovery/v3': ['ads.proto', 'discovery.proto'],
-}
-
 # These are the only legacy trees that we permit not to terminate with a versioned suffix.
 VERSIONLESS_PATHS = [
     'annotations',
@@ -70,13 +64,6 @@ def ValidateProtoPath(proto_path):
     for p in V2_ONLY_PATHS:
       if str(proto_path).startswith(p):
         raise ValidationError('v3+ protos are not allowed in %s' % p)
-
-    # Validate v3 restricted paths.
-    for p in V3_RESTRICTED_PATHS:
-      if str(proto_path).startswith(p):
-        allowed_files = V3_RESTRICTED_PATHS[p]
-        if proto_path.name not in allowed_files:
-          raise ValidationError('Only %s allowed in %s' % (allowed_files, p))
 
 
 # Validate a list of proto paths.

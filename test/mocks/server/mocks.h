@@ -77,6 +77,7 @@ public:
   MOCK_METHOD(const absl::optional<uint32_t>&, bootstrapVersion, (), (const));
   MOCK_METHOD(bool, allowUnknownStaticFields, (), (const));
   MOCK_METHOD(bool, rejectUnknownDynamicFields, (), (const));
+  MOCK_METHOD(bool, ignoreUnknownDynamicFields, (), (const));
   MOCK_METHOD(const std::string&, adminAddressPath, (), (const));
   MOCK_METHOD(Network::Address::IpVersion, localAddressIpVersion, (), (const));
   MOCK_METHOD(std::chrono::seconds, drainTime, (), (const));
@@ -107,6 +108,7 @@ public:
   absl::optional<uint32_t> bootstrap_version_;
   bool allow_unknown_static_fields_{};
   bool reject_unknown_dynamic_fields_{};
+  bool ignore_unknown_dynamic_fields_{};
   std::string admin_address_path_;
   std::string service_cluster_name_;
   std::string service_node_name_;
@@ -432,8 +434,8 @@ public:
 
   TimeSource& timeSource() override { return time_system_; }
 
-  testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
+  testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   std::shared_ptr<testing::NiceMock<Network::MockDnsResolver>> dns_resolver_{
       new testing::NiceMock<Network::MockDnsResolver>()};
   testing::NiceMock<Api::MockApi> api_;

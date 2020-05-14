@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <fstream>
 #include <string>
-#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -12,14 +11,12 @@
 #include "envoy/admin/v3/certs.pb.h"
 #include "envoy/admin/v3/clusters.pb.h"
 #include "envoy/admin/v3/config_dump.pb.h"
-#include "envoy/admin/v3/listeners.pb.h"
 #include "envoy/admin/v3/memory.pb.h"
 #include "envoy/admin/v3/metrics.pb.h"
 #include "envoy/admin/v3/mutex_stats.pb.h"
 #include "envoy/admin/v3/server_info.pb.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/filesystem/filesystem.h"
-#include "envoy/runtime/runtime.h"
 #include "envoy/server/hot_restart.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/options.h"
@@ -44,13 +41,11 @@
 #include "common/memory/utils.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/utility.h"
-#include "common/profiler/profiler.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 #include "common/router/config_impl.h"
 #include "common/upstream/host_utility.h"
 
-#include "server/http/stats_handler.h"
 #include "server/http/utils.h"
 
 #include "extensions/access_loggers/file/file_access_log_impl.h"
@@ -263,53 +258,6 @@ void trimResourceMessage(const Protobuf::FieldMask& field_mask, Protobuf::Messag
 
 } // namespace
 
-bool AdminImpl::changeLogLevel(const Http::Utility::QueryParams& params) {
-  if (params.size() != 1) {
-    return false;
-  }
-
-  std::string name = params.begin()->first;
-  std::string level = params.begin()->second;
-
-  // First see if the level is valid.
-  size_t level_to_use = std::numeric_limits<size_t>::max();
-  for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_string_views); i++) {
-    if (level == spdlog::level::level_string_views[i]) {
-      level_to_use = i;
-      break;
-    }
-  }
-
-  if (level_to_use == std::numeric_limits<size_t>::max()) {
-    return false;
-  }
-
-  // Now either change all levels or a single level.
-  if (name == "level") {
-    ENVOY_LOG(debug, "change all log levels: level='{}'", level);
-    for (Logger::Logger& logger : Logger::Registry::loggers()) {
-      logger.setLevel(static_cast<spdlog::level::level_enum>(level_to_use));
-    }
-  } else {
-    ENVOY_LOG(debug, "change log level: name='{}' level='{}'", name, level);
-    Logger::Logger* logger_to_change = nullptr;
-    for (Logger::Logger& logger : Logger::Registry::loggers()) {
-      if (logger.name() == name) {
-        logger_to_change = &logger;
-        break;
-      }
-    }
-
-    if (!logger_to_change) {
-      return false;
-    }
-
-    logger_to_change->setLevel(static_cast<spdlog::level::level_enum>(level_to_use));
-  }
-
-  return true;
-}
-
 void AdminImpl::addOutlierInfo(const std::string& cluster_name,
                                const Upstream::Outlier::Detector* outlier_detector,
                                Buffer::Instance& response) {
@@ -488,24 +436,6 @@ void AdminImpl::writeClustersAsText(Buffer::Instance& response) {
   }
 }
 
-void AdminImpl::writeListenersAsJson(Buffer::Instance& response) {
-  envoy::admin::v3::Listeners listeners;
-  for (const auto& listener : server_.listenerManager().listeners()) {
-    envoy::admin::v3::ListenerStatus& listener_status = *listeners.add_listener_statuses();
-    listener_status.set_name(listener.get().name());
-    Network::Utility::addressToProtobufAddress(*listener.get().listenSocketFactory().localAddress(),
-                                               *listener_status.mutable_local_address());
-  }
-  response.add(MessageUtil::getJsonStringFromMessage(listeners, true)); // pretty-print
-}
-
-void AdminImpl::writeListenersAsText(Buffer::Instance& response) {
-  for (const auto& listener : server_.listenerManager().listeners()) {
-    response.add(fmt::format("{}::{}\n", listener.get().name(),
-                             listener.get().listenSocketFactory().localAddress()->asString()));
-  }
-}
-
 Http::Code AdminImpl::handlerClusters(absl::string_view url,
                                       Http::ResponseHeaderMap& response_headers,
                                       Buffer::Instance& response, AdminStream&) {
@@ -625,77 +555,6 @@ Http::Code AdminImpl::handlerContention(absl::string_view,
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerCpuProfiler(absl::string_view url, Http::ResponseHeaderMap&,
-                                         Buffer::Instance& response, AdminStream&) {
-  Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
-  if (query_params.size() != 1 || query_params.begin()->first != "enable" ||
-      (query_params.begin()->second != "y" && query_params.begin()->second != "n")) {
-    response.add("?enable=<y|n>\n");
-    return Http::Code::BadRequest;
-  }
-
-  bool enable = query_params.begin()->second == "y";
-  if (enable && !Profiler::Cpu::profilerEnabled()) {
-    if (!Profiler::Cpu::startProfiler(profile_path_)) {
-      response.add("failure to start the profiler");
-      return Http::Code::InternalServerError;
-    }
-
-  } else if (!enable && Profiler::Cpu::profilerEnabled()) {
-    Profiler::Cpu::stopProfiler();
-  }
-
-  response.add("OK\n");
-  return Http::Code::OK;
-}
-
-Http::Code AdminImpl::handlerHeapProfiler(absl::string_view url, Http::ResponseHeaderMap&,
-                                          Buffer::Instance& response, AdminStream&) {
-  if (!Profiler::Heap::profilerEnabled()) {
-    response.add("The current build does not support heap profiler");
-    return Http::Code::NotImplemented;
-  }
-
-  Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
-  if (query_params.size() != 1 || query_params.begin()->first != "enable" ||
-      (query_params.begin()->second != "y" && query_params.begin()->second != "n")) {
-    response.add("?enable=<y|n>\n");
-    return Http::Code::BadRequest;
-  }
-
-  Http::Code res = Http::Code::OK;
-  bool enable = query_params.begin()->second == "y";
-  if (enable) {
-    if (Profiler::Heap::isProfilerStarted()) {
-      response.add("Fail to start heap profiler: already started");
-      res = Http::Code::BadRequest;
-    } else if (!Profiler::Heap::startProfiler(profile_path_)) {
-      // GCOVR_EXCL_START
-      // TODO(silentdai) remove the GCOVR when startProfiler is better implemented
-      response.add("Fail to start the heap profiler");
-      res = Http::Code::InternalServerError;
-      // GCOVR_EXCL_STOP
-    } else {
-      response.add("Starting heap profiler");
-      res = Http::Code::OK;
-    }
-  } else {
-    // !enable
-    if (!Profiler::Heap::isProfilerStarted()) {
-      response.add("Fail to stop heap profiler: not started");
-      res = Http::Code::BadRequest;
-    } else {
-      Profiler::Heap::stopProfiler();
-      response.add(
-          fmt::format("Heap profiler stopped and data written to {}. See "
-                      "http://goog-perftools.sourceforge.net/doc/heap_profiler.html for details.",
-                      profile_path_));
-      res = Http::Code::OK;
-    }
-  }
-  return res;
-}
-
 Http::Code AdminImpl::handlerHealthcheckFail(absl::string_view, Http::ResponseHeaderMap&,
                                              Buffer::Instance& response, AdminStream&) {
   server_.failHealthcheck(true);
@@ -716,32 +575,6 @@ Http::Code AdminImpl::handlerHotRestartVersion(absl::string_view, Http::Response
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerLogging(absl::string_view url, Http::ResponseHeaderMap&,
-                                     Buffer::Instance& response, AdminStream&) {
-  Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
-
-  Http::Code rc = Http::Code::OK;
-  if (!query_params.empty() && !changeLogLevel(query_params)) {
-    response.add("usage: /logging?<name>=<level> (change single level)\n");
-    response.add("usage: /logging?level=<level> (change all levels)\n");
-    response.add("levels: ");
-    for (auto level_string_view : spdlog::level::level_string_views) {
-      response.add(fmt::format("{} ", level_string_view));
-    }
-
-    response.add("\n");
-    rc = Http::Code::NotFound;
-  }
-
-  response.add("active loggers:\n");
-  for (const Logger::Logger& logger : Logger::Registry::loggers()) {
-    response.add(fmt::format("  {}: {}\n", logger.name(), logger.levelString()));
-  }
-
-  response.add("\n");
-  return rc;
-}
-
 // TODO(ambuc): Add more tcmalloc stats, export proto details based on allocator.
 Http::Code AdminImpl::handlerMemory(absl::string_view, Http::ResponseHeaderMap& response_headers,
                                     Buffer::Instance& response, AdminStream&) {
@@ -754,17 +587,6 @@ Http::Code AdminImpl::handlerMemory(absl::string_view, Http::ResponseHeaderMap& 
   memory.set_pageheap_free(Memory::Stats::totalPageHeapFree());
   memory.set_total_physical_bytes(Memory::Stats::totalPhysicalBytes());
   response.add(MessageUtil::getJsonStringFromMessage(memory, true, true)); // pretty-print
-  return Http::Code::OK;
-}
-
-Http::Code AdminImpl::handlerDrainListeners(absl::string_view url, Http::ResponseHeaderMap&,
-                                            Buffer::Instance& response, AdminStream&) {
-  const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
-  ListenerManager::StopListenersType stop_listeners_type =
-      params.find("inboundonly") != params.end() ? ListenerManager::StopListenersType::InboundOnly
-                                                 : ListenerManager::StopListenersType::All;
-  server_.listenerManager().stopListeners(stop_listeners_type);
-  response.add("OK\n");
   return Http::Code::OK;
 }
 
@@ -812,21 +634,6 @@ Http::Code AdminImpl::handlerQuitQuitQuit(absl::string_view, Http::ResponseHeade
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerListenerInfo(absl::string_view url,
-                                          Http::ResponseHeaderMap& response_headers,
-                                          Buffer::Instance& response, AdminStream&) {
-  const Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
-  const auto format_value = Utility::formatParam(query_params);
-
-  if (format_value.has_value() && format_value.value() == "json") {
-    writeListenersAsJson(response);
-    response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-  } else {
-    writeListenersAsText(response);
-  }
-  return Http::Code::OK;
-}
-
 Http::Code AdminImpl::handlerCerts(absl::string_view, Http::ResponseHeaderMap& response_headers,
                                    Buffer::Instance& response, AdminStream&) {
   // This set is used to track distinct certificates. We may have multiple listeners, upstreams, etc
@@ -845,113 +652,6 @@ Http::Code AdminImpl::handlerCerts(absl::string_view, Http::ResponseHeaderMap& r
     }
   });
   response.add(MessageUtil::getJsonStringFromMessage(certificates, true, true));
-  return Http::Code::OK;
-}
-
-Http::Code AdminImpl::handlerRuntime(absl::string_view url,
-                                     Http::ResponseHeaderMap& response_headers,
-                                     Buffer::Instance& response, AdminStream&) {
-  const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
-  response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-
-  // TODO(jsedgwick): Use proto to structure this output instead of arbitrary JSON.
-  const auto& layers = server_.runtime().snapshot().getLayers();
-
-  std::vector<ProtobufWkt::Value> layer_names;
-  layer_names.reserve(layers.size());
-  std::map<std::string, std::vector<std::string>> entries;
-  for (const auto& layer : layers) {
-    layer_names.push_back(ValueUtil::stringValue(layer->name()));
-    for (const auto& value : layer->values()) {
-      const auto found = entries.find(value.first);
-      if (found == entries.end()) {
-        entries.emplace(value.first, std::vector<std::string>{});
-      }
-    }
-  }
-
-  for (const auto& layer : layers) {
-    for (auto& entry : entries) {
-      const auto found = layer->values().find(entry.first);
-      const auto& entry_value =
-          found == layer->values().end() ? EMPTY_STRING : found->second.raw_string_value_;
-      entry.second.push_back(entry_value);
-    }
-  }
-
-  ProtobufWkt::Struct layer_entries;
-  auto* layer_entry_fields = layer_entries.mutable_fields();
-  for (const auto& entry : entries) {
-    std::vector<ProtobufWkt::Value> layer_entry_values;
-    layer_entry_values.reserve(entry.second.size());
-    std::string final_value;
-    for (const auto& value : entry.second) {
-      if (!value.empty()) {
-        final_value = value;
-      }
-      layer_entry_values.push_back(ValueUtil::stringValue(value));
-    }
-
-    ProtobufWkt::Struct layer_entry_value;
-    auto* layer_entry_value_fields = layer_entry_value.mutable_fields();
-
-    (*layer_entry_value_fields)["final_value"] = ValueUtil::stringValue(final_value);
-    (*layer_entry_value_fields)["layer_values"] = ValueUtil::listValue(layer_entry_values);
-    (*layer_entry_fields)[entry.first] = ValueUtil::structValue(layer_entry_value);
-  }
-
-  ProtobufWkt::Struct runtime;
-  auto* fields = runtime.mutable_fields();
-
-  (*fields)["layers"] = ValueUtil::listValue(layer_names);
-  (*fields)["entries"] = ValueUtil::structValue(layer_entries);
-
-  response.add(MessageUtil::getJsonStringFromMessage(runtime, true, true));
-  return Http::Code::OK;
-}
-
-bool AdminImpl::isFormUrlEncoded(const Http::HeaderEntry* content_type) const {
-  if (content_type == nullptr) {
-    return false;
-  }
-
-  return content_type->value().getStringView() ==
-         Http::Headers::get().ContentTypeValues.FormUrlEncoded;
-}
-
-Http::Code AdminImpl::handlerRuntimeModify(absl::string_view url, Http::ResponseHeaderMap&,
-                                           Buffer::Instance& response, AdminStream& admin_stream) {
-  Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
-  if (params.empty()) {
-    // Check if the params are in the request's body.
-    if (admin_stream.getRequestBody() != nullptr &&
-        isFormUrlEncoded(admin_stream.getRequestHeaders().ContentType())) {
-      params = Http::Utility::parseFromBody(admin_stream.getRequestBody()->toString());
-    }
-
-    if (params.empty()) {
-      response.add("usage: /runtime_modify?key1=value1&key2=value2&keyN=valueN\n");
-      response.add("       or send the parameters as form values\n");
-      response.add("use an empty value to remove a previously added override");
-      return Http::Code::BadRequest;
-    }
-  }
-  std::unordered_map<std::string, std::string> overrides;
-  overrides.insert(params.begin(), params.end());
-  try {
-    server_.runtime().mergeValues(overrides);
-  } catch (const EnvoyException& e) {
-    response.add(e.what());
-    return Http::Code::ServiceUnavailable;
-  }
-  response.add("OK\n");
-  return Http::Code::OK;
-}
-
-Http::Code AdminImpl::handlerReopenLogs(absl::string_view, Http::ResponseHeaderMap&,
-                                        Buffer::Instance& response, AdminStream&) {
-  server_.accessLogManager().reopen();
-  response.add("OK\n");
   return Http::Code::OK;
 }
 
@@ -992,7 +692,9 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
       tracing_stats_(
           Http::ConnectionManagerImpl::generateTracingStats("http.admin.", no_op_store_)),
       route_config_provider_(server.timeSource()),
-      scoped_route_config_provider_(server.timeSource()),
+      scoped_route_config_provider_(server.timeSource()), stats_handler_(server),
+      logs_handler_(server), profiling_handler_(profile_path), runtime_handler_(server),
+      listeners_handler_(server),
       // TODO(jsedgwick) add /runtime_reset endpoint that removes all admin-set values
       handlers_{
           {"/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false, false},
@@ -1004,9 +706,9 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
           {"/contention", "dump current Envoy mutex contention stats (if enabled)",
            MAKE_ADMIN_HANDLER(handlerContention), false, false},
           {"/cpuprofiler", "enable/disable the CPU profiler",
-           MAKE_ADMIN_HANDLER(handlerCpuProfiler), false, true},
+           MAKE_ADMIN_HANDLER(profiling_handler_.handlerCpuProfiler), false, true},
           {"/heapprofiler", "enable/disable the heap profiler",
-           MAKE_ADMIN_HANDLER(handlerHeapProfiler), false, true},
+           MAKE_ADMIN_HANDLER(profiling_handler_.handlerHeapProfiler), false, true},
           {"/healthcheck/fail", "cause the server to fail health checks",
            MAKE_ADMIN_HANDLER(handlerHealthcheckFail), false, true},
           {"/healthcheck/ok", "cause the server to pass health checks",
@@ -1015,38 +717,40 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
            false},
           {"/hot_restart_version", "print the hot restart compatibility version",
            MAKE_ADMIN_HANDLER(handlerHotRestartVersion), false, false},
-          {"/logging", "query/change logging levels", MAKE_ADMIN_HANDLER(handlerLogging), false,
-           true},
+          {"/logging", "query/change logging levels",
+           MAKE_ADMIN_HANDLER(logs_handler_.handlerLogging), false, true},
           {"/memory", "print current allocation/heap usage", MAKE_ADMIN_HANDLER(handlerMemory),
            false, false},
           {"/quitquitquit", "exit the server", MAKE_ADMIN_HANDLER(handlerQuitQuitQuit), false,
            true},
-          {"/reset_counters", "reset all counters to zero", StatsHandler::handlerResetCounters,
-           false, true},
-          {"/drain_listeners", "drain listeners", MAKE_ADMIN_HANDLER(handlerDrainListeners), false,
-           true},
+          {"/reset_counters", "reset all counters to zero",
+           MAKE_ADMIN_HANDLER(stats_handler_.handlerResetCounters), false, true},
+          {"/drain_listeners", "drain listeners",
+           MAKE_ADMIN_HANDLER(listeners_handler_.handlerDrainListeners), false, true},
           {"/server_info", "print server version/status information",
            MAKE_ADMIN_HANDLER(handlerServerInfo), false, false},
           {"/ready", "print server state, return 200 if LIVE, otherwise return 503",
            MAKE_ADMIN_HANDLER(handlerReady), false, false},
-          {"/stats", "print server stats", StatsHandler::handlerStats, false, false},
-          {"/stats/prometheus", "print server stats in prometheus format",
-           StatsHandler::handlerPrometheusStats, false, false},
-          {"/stats/recentlookups", "Show recent stat-name lookups",
-           StatsHandler::handlerStatsRecentLookups, false, false},
-          {"/stats/recentlookups/clear", "clear list of stat-name lookups and counter",
-           StatsHandler::handlerStatsRecentLookupsClear, false, true},
-          {"/stats/recentlookups/disable", "disable recording of reset stat-name lookup names",
-           StatsHandler::handlerStatsRecentLookupsDisable, false, true},
-          {"/stats/recentlookups/enable", "enable recording of reset stat-name lookup names",
-           StatsHandler::handlerStatsRecentLookupsEnable, false, true},
-          {"/listeners", "print listener info", MAKE_ADMIN_HANDLER(handlerListenerInfo), false,
+          {"/stats", "print server stats", MAKE_ADMIN_HANDLER(stats_handler_.handlerStats), false,
            false},
-          {"/runtime", "print runtime values", MAKE_ADMIN_HANDLER(handlerRuntime), false, false},
-          {"/runtime_modify", "modify runtime values", MAKE_ADMIN_HANDLER(handlerRuntimeModify),
-           false, true},
-          {"/reopen_logs", "reopen access logs", MAKE_ADMIN_HANDLER(handlerReopenLogs), false,
-           true},
+          {"/stats/prometheus", "print server stats in prometheus format",
+           MAKE_ADMIN_HANDLER(stats_handler_.handlerPrometheusStats), false, false},
+          {"/stats/recentlookups", "Show recent stat-name lookups",
+           MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookups), false, false},
+          {"/stats/recentlookups/clear", "clear list of stat-name lookups and counter",
+           MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookupsClear), false, true},
+          {"/stats/recentlookups/disable", "disable recording of reset stat-name lookup names",
+           MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookupsDisable), false, true},
+          {"/stats/recentlookups/enable", "enable recording of reset stat-name lookup names",
+           MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookupsEnable), false, true},
+          {"/listeners", "print listener info",
+           MAKE_ADMIN_HANDLER(listeners_handler_.handlerListenerInfo), false, false},
+          {"/runtime", "print runtime values", MAKE_ADMIN_HANDLER(runtime_handler_.handlerRuntime),
+           false, false},
+          {"/runtime_modify", "modify runtime values",
+           MAKE_ADMIN_HANDLER(runtime_handler_.handlerRuntimeModify), false, true},
+          {"/reopen_logs", "reopen access logs",
+           MAKE_ADMIN_HANDLER(logs_handler_.handlerReopenLogs), false, true},
       },
       date_provider_(server.dispatcher().timeSource()),
       admin_filter_chain_(std::make_shared<AdminFilterChain>()) {}
@@ -1101,12 +805,7 @@ Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
           break;
         }
       }
-      if (handler.requires_server_) {
-        code = handler.handler_with_server_(path_and_query, response_headers, response,
-                                            admin_stream, server_);
-      } else {
-        code = handler.handler_(path_and_query, response_headers, response, admin_stream);
-      }
+      code = handler.handler_(path_and_query, response_headers, response, admin_stream);
       Memory::Utils::tryShrinkHeap();
       break;
     }

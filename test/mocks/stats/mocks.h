@@ -263,7 +263,7 @@ public:
   MockTextReadout();
   ~MockTextReadout() override;
 
-  MOCK_METHOD1(set, void(std::string&& value));
+  MOCK_METHOD1(set, void(absl::string_view value));
   MOCK_CONST_METHOD0(used, bool());
   MOCK_CONST_METHOD0(value, std::string());
 
@@ -279,11 +279,12 @@ public:
   MOCK_METHOD(const std::vector<CounterSnapshot>&, counters, ());
   MOCK_METHOD(const std::vector<std::reference_wrapper<const Gauge>>&, gauges, ());
   MOCK_METHOD(const std::vector<std::reference_wrapper<const ParentHistogram>>&, histograms, ());
-  MOCK_METHOD(const std::vector<TextReadout>&, textReadouts, ());
+  MOCK_METHOD(const std::vector<std::reference_wrapper<const TextReadout>>&, textReadouts, ());
 
   std::vector<CounterSnapshot> counters_;
   std::vector<std::reference_wrapper<const Gauge>> gauges_;
   std::vector<std::reference_wrapper<const ParentHistogram>> histograms_;
+  std::vector<std::reference_wrapper<const TextReadout>> text_readouts_;
 };
 
 class MockSink : public Sink {

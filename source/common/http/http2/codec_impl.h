@@ -21,6 +21,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/http2/metadata_decoder.h"
 #include "common/http/http2/metadata_encoder.h"
+#include "common/http/status.h"
 #include "common/http/utility.h"
 
 #include "absl/types/optional.h"
@@ -121,7 +122,7 @@ public:
 
   // Http::Connection
   // NOTE: the `dispatch` method is also overridden in the ServerConnectionImpl class
-  void dispatch(Buffer::Instance& data) override;
+  Http::Status dispatch(Buffer::Instance& data) override;
   void goAway() override;
   Protocol protocol() override { return Protocol::Http2; }
   void shutdownNotice() override;
@@ -137,6 +138,16 @@ public:
       stream->runLowWatermarkCallbacks();
     }
   }
+
+  /**
+   * An inner dispatch call that executes the dispatching logic. While exception removal is in
+   * migration (#10878), this function may either throw an exception or return an error status.
+   * Exceptions are caught and translated to their corresponding statuses in the outer level
+   * dispatch.
+   * This needs to be virtual so that ServerConnectionImpl can override.
+   * TODO(#10878): Remove this when exception removal is complete.
+   */
+  virtual Http::Status innerDispatch(Buffer::Instance& data);
 
 protected:
   friend class ProdNghttp2SessionFactory;
@@ -565,7 +576,8 @@ private:
   // ClientConnectionImpl::checkOutboundQueueLimits method). The dispatch method on the
   // ServerConnectionImpl objects is called only when processing data from the downstream client in
   // the ConnectionManagerImpl::onData method.
-  void dispatch(Buffer::Instance& data) override;
+  Http::Status dispatch(Buffer::Instance& data) override;
+  Http::Status innerDispatch(Buffer::Instance& data) override;
 
   ServerConnectionCallbacks& callbacks_;
 

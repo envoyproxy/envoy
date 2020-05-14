@@ -73,6 +73,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "documentation_url_lib",
+    hdrs = ["documentation_url.h"],
+)
+
+envoy_cc_library(
     name = "empty_string",
     hdrs = ["empty_string.h"],
 )
@@ -274,7 +279,9 @@ envoy_cc_library(
     name = "thread_lib",
     hdrs = ["thread.h"],
     external_deps = ["abseil_synchronization"],
-    deps = envoy_cc_platform_dep("thread_impl_lib"),
+    deps = envoy_cc_platform_dep("thread_impl_lib") + [
+        ":non_copyable",
+    ],
 )
 
 envoy_cc_posix_library(
