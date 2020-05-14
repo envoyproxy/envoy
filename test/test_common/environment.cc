@@ -193,7 +193,7 @@ std::string TestEnvironment::getCheckedEnvVar(const std::string& var) {
   return optional.value();
 }
 
-void TestEnvironment::initializeTestMain(char* programName) {
+void TestEnvironment::initializeTestMain(char* program_name) {
 #ifdef WIN32
   _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
 
@@ -207,9 +207,9 @@ void TestEnvironment::initializeTestMain(char* programName) {
 #endif
 
 #ifdef __APPLE__
-  UNREFERENCED_PARAMETER(programName);
+  UNREFERENCED_PARAMETER(program_name);
 #else
-  absl::InitializeSymbolizer(programName);
+  absl::InitializeSymbolizer(program_name);
 #endif
 
 #ifdef ENVOY_HANDLE_SIGNALS

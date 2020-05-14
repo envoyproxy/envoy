@@ -25,9 +25,9 @@ public:
   /**
    * Perform common initialization steps needed to run a test binary. This
    * method should be called first in all test main functions.
-   * @param programName argv[0] test program is invoked with
+   * @param program_name argv[0] test program is invoked with
    */
-  static void initializeTestMain(char* programName);
+  static void initializeTestMain(char* program_name);
 
   /**
    * Initialize command-line options for later access by tests in getOptions().
