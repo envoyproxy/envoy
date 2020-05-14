@@ -28,13 +28,13 @@ public:
   ActiveQuicListener(Event::Dispatcher& dispatcher, Network::ConnectionHandler& parent,
                      Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
                      Network::Socket::OptionsSharedPtr options,
-                     const envoy::config::core::v3::RuntimeFeatureFlag enabled);
+                     const envoy::config::core::v3::RuntimeFeatureFlag& enabled);
 
   ActiveQuicListener(Event::Dispatcher& dispatcher, Network::ConnectionHandler& parent,
                      Network::SocketSharedPtr listen_socket,
                      Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
                      Network::Socket::OptionsSharedPtr options,
-                     const envoy::config::core::v3::RuntimeFeatureFlag enabled);
+                     const envoy::config::core::v3::RuntimeFeatureFlag& enabled);
 
   ~ActiveQuicListener() override;
 

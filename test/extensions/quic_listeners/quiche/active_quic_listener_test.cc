@@ -348,16 +348,8 @@ TEST_P(ActiveQuicListenerTest, ProcessBufferedChlos) {
   ReadFromClientSockets();
 }
 
-TEST_P(ActiveQuicListenerTest, QuicProcessingDisabled) {
-  Runtime::LoaderSingleton::getExisting()->mergeValues({{"quic.enabled", " false"}});
-  sendFullCHLO(quic::test::TestConnectionId(1));
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  // If listener was enabled, there should have been session created for active connection.
-  EXPECT_TRUE(quic_dispatcher_->session_map().empty());
-  EXPECT_FALSE(ActiveQuicListenerPeer::enabled(*quic_listener_));
-}
-
 TEST_P(ActiveQuicListenerTest, QuicProcessingDisabledAndEnabled) {
+  EXPECT_TRUE(ActiveQuicListenerPeer::enabled(*quic_listener_));
   Runtime::LoaderSingleton::getExisting()->mergeValues({{"quic.enabled", " false"}});
   sendFullCHLO(quic::test::TestConnectionId(1));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
