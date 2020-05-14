@@ -27,14 +27,6 @@ message Decompressor {
     // Runtime flag that controls whether the filter is enabled for decompression or not. If set to false, the
     // filter will operate as a pass-through filter. If the message is unspecified, the filter will be enabled.
     config.core.v3.RuntimeFeatureFlag enabled = 1;
-
-    // If set, and the Content-Length header is present, the Decompressor filter will buffer
-    // data frames until the final data frame and will update the Content Length header with
-    // the inflated size.
-    // The setting configures the maximum uncompressed size the filter will buffer before the connection
-    // manager will stop buffering and return a 413 response.
-    // If the setting is absent, the filter will stream inflated data frames as they are received.
-    google.protobuf.UInt32Value max_buffered_bytes = 2 [(validate.rules).uint32 = {gt: 0}];
   }
 
   // Configuration for filter behavior on the request direction.
