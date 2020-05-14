@@ -79,7 +79,7 @@ void SplitRequestBase::updateStats(const bool success) {
   } else {
     command_stats_.error_.inc();
   }
-  if (!delay_command_latency_) {
+  if (command_latency_ != nullptr) {
     command_latency_->complete();
   }
 }
@@ -107,9 +107,9 @@ const std::string ErrorFaultRequest::FAULT_INJECTED_ERROR = "Fault Injected: Err
 
 SplitRequestPtr ErrorFaultRequest::create(Router&, Common::Redis::RespValuePtr&&,
                                           SplitCallbacks& callbacks, CommandStats& command_stats,
-                                          TimeSource& time_source) {
+                                          TimeSource& time_source, bool delay_command_latency) {
   std::unique_ptr<ErrorFaultRequest> request_ptr{
-      new ErrorFaultRequest(callbacks, command_stats, time_source)};
+      new ErrorFaultRequest(callbacks, command_stats, time_source, delay_command_latency)};
 
   request_ptr->onResponse(Common::Redis::Utility::makeError(FAULT_INJECTED_ERROR));
   command_stats.error_.inc();
@@ -137,7 +137,7 @@ void DelayFaultRequest::onResponse(Common::Redis::RespValuePtr&& response) {
 
 void DelayFaultRequest::onDelayResponse() {
   command_stats_.delay_fault_.inc();
-  wrapped_request_ptr_->completeLatency();
+  command_latency_->complete(); // Complete latency of the command stats of the wrapped request
   callbacks_.onResponse(std::move(response_));
   delay_timer_ = nullptr;
 }
@@ -150,9 +150,9 @@ void DelayFaultRequest::cancel() {
 SplitRequestPtr SimpleRequest::create(Router& router,
                                       Common::Redis::RespValuePtr&& incoming_request,
                                       SplitCallbacks& callbacks, CommandStats& command_stats,
-                                      TimeSource& time_source) {
+                                      TimeSource& time_source, bool delay_command_latency) {
   std::unique_ptr<SimpleRequest> request_ptr{
-      new SimpleRequest(callbacks, command_stats, time_source)};
+      new SimpleRequest(callbacks, command_stats, time_source, delay_command_latency)};
 
   const auto route = router.upstreamPool(incoming_request->asArray()[1].asString());
   if (route) {
@@ -172,7 +172,7 @@ SplitRequestPtr SimpleRequest::create(Router& router,
 
 SplitRequestPtr EvalRequest::create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                     SplitCallbacks& callbacks, CommandStats& command_stats,
-                                    TimeSource& time_source) {
+                                    TimeSource& time_source, bool delay_command_latency) {
   // EVAL looks like: EVAL script numkeys key [key ...] arg [arg ...]
   // Ensure there are at least three args to the command or it cannot be hashed.
   if (incoming_request->asArray().size() < 4) {
@@ -181,7 +181,7 @@ SplitRequestPtr EvalRequest::create(Router& router, Common::Redis::RespValuePtr&
     return nullptr;
   }
 
-  std::unique_ptr<EvalRequest> request_ptr{new EvalRequest(callbacks, command_stats, time_source)};
+  std::unique_ptr<EvalRequest> request_ptr{new EvalRequest(callbacks, command_stats, time_source, delay_command_latency)};
 
   const auto route = router.upstreamPool(incoming_request->asArray()[3].asString());
   if (route) {
@@ -223,8 +223,8 @@ void FragmentedRequest::onChildFailure(uint32_t index) {
 
 SplitRequestPtr MGETRequest::create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                     SplitCallbacks& callbacks, CommandStats& command_stats,
-                                    TimeSource& time_source) {
-  std::unique_ptr<MGETRequest> request_ptr{new MGETRequest(callbacks, command_stats, time_source)};
+                                    TimeSource& time_source, bool delay_command_latency) {
+  std::unique_ptr<MGETRequest> request_ptr{new MGETRequest(callbacks, command_stats, time_source, delay_command_latency)};
 
   request_ptr->num_pending_responses_ = incoming_request->asArray().size() - 1;
   request_ptr->pending_requests_.reserve(request_ptr->num_pending_responses_);
@@ -296,13 +296,13 @@ void MGETRequest::onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t 
 
 SplitRequestPtr MSETRequest::create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                     SplitCallbacks& callbacks, CommandStats& command_stats,
-                                    TimeSource& time_source) {
+                                    TimeSource& time_source, bool delay_command_latency) {
   if ((incoming_request->asArray().size() - 1) % 2 != 0) {
     onWrongNumberOfArguments(callbacks, *incoming_request);
     command_stats.error_.inc();
     return nullptr;
   }
-  std::unique_ptr<MSETRequest> request_ptr{new MSETRequest(callbacks, command_stats, time_source)};
+  std::unique_ptr<MSETRequest> request_ptr{new MSETRequest(callbacks, command_stats, time_source, delay_command_latency)};
 
   request_ptr->num_pending_responses_ = (incoming_request->asArray().size() - 1) / 2;
   request_ptr->pending_requests_.reserve(request_ptr->num_pending_responses_);
@@ -371,9 +371,10 @@ SplitRequestPtr SplitKeysSumResultRequest::create(Router& router,
                                                   Common::Redis::RespValuePtr&& incoming_request,
                                                   SplitCallbacks& callbacks,
                                                   CommandStats& command_stats,
-                                                  TimeSource& time_source) {
+                                                  TimeSource& time_source,
+                                                  bool delay_command_latency) {
   std::unique_ptr<SplitKeysSumResultRequest> request_ptr{
-      new SplitKeysSumResultRequest(callbacks, command_stats, time_source)};
+      new SplitKeysSumResultRequest(callbacks, command_stats, time_source, delay_command_latency)};
 
   request_ptr->num_pending_responses_ = incoming_request->asArray().size() - 1;
   request_ptr->pending_requests_.reserve(request_ptr->num_pending_responses_);
@@ -546,20 +547,15 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
   if (fault.has_value() && fault.value().first == Common::Redis::FaultType::Error) {
     request_ptr = ErrorFaultRequest::create(*router_, std::move(request),
                                             has_delay_fault ? *delay_fault_ptr : callbacks,
-                                            handler->command_stats_, time_source_);
-    // request_ptr = error_fault.startRequest(std::move(request),
-    //                                                 has_delay_fault ? *delay_fault_ptr :
-    //                                                 callbacks, handler->command_stats_,
-    //                                                 time_source_);
+                                            handler->command_stats_, time_source_, has_delay_fault);
   } else {
     request_ptr = handler->handler_.get().startRequest(
         std::move(request), has_delay_fault ? *delay_fault_ptr : callbacks, handler->command_stats_,
-        time_source_);
+        time_source_, has_delay_fault);
   }
 
   // Complete delay, if any. The delay fault takes ownership of the wrapped request.
   if (has_delay_fault) {
-    request_ptr->delayLatencyMetric();
     delay_fault_ptr->wrapped_request_ptr_ = std::move(request_ptr);
     return delay_fault_ptr;
   } else {
