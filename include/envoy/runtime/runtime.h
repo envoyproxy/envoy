@@ -105,7 +105,7 @@ public:
   using OverrideLayerConstPtr = std::unique_ptr<const OverrideLayer>;
 
   /**
-   * Updates deprecated feature use stats
+   * Updates deprecated feature use stats.
    */
   virtual void countDeprecatedFeatureUse() const PURE;
 

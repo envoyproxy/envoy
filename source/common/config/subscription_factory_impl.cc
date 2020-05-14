@@ -29,12 +29,11 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
   SubscriptionStats stats = Utility::generateStats(scope);
 
   const auto transport_api_version = config.api_config_source().transport_api_version();
-  if (transport_api_version == envoy::config::core::v3::ApiVersion::V2) {
+  if (transport_api_version == envoy::config::core::v3::ApiVersion::V2 &&
+      runtime_.snapshot().runtimeFeatureEnabled("api.enable_deprecated_warning")) {
     runtime_.snapshot().countDeprecatedFeatureUse();
-    if (runtime_.snapshot().runtimeFeatureEnabled("api.enable_deprecated_warning")) {
-      ENVOY_LOG(warn,
-                "xDS of version v2 has been deprecated and will be removed in subsequent versions");
-    }
+    ENVOY_LOG(warn,
+              "xDS of version v2 has been deprecated and will be removed in subsequent versions");
   }
 
   switch (config.config_source_specifier_case()) {
