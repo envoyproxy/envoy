@@ -231,6 +231,21 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "drain_close_integration_test",
+    srcs = [
+        "drain_close_integration_test.cc",
+    ],
+    # tags = ["fails_on_windows"],
+    deps = [
+        ":http_protocol_integration_lib",
+        # "//source/common/http:header_map_lib",
+        "//source/extensions/filters/http/health_check:config",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
 exports_files(["test_utility.sh"])
 
 envoy_sh_test(
