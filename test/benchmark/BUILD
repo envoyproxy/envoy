@@ -16,8 +16,5 @@ envoy_cc_test_library(
     ],
     deps = [
         "//test/test_common:environment_lib",
-    ] + select({
-        "//bazel:disable_signal_trace": [],
-        "//conditions:default": ["//source/common/signal:sigaction_lib"],
-    }),
+    ],
 )
