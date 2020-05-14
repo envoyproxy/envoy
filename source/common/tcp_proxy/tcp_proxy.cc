@@ -436,13 +436,11 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
     if (host) {
       if (host->metadata()->filter_metadata().find("envoy.plaintcponly") !=
           host->metadata()->filter_metadata().end()) {
-        ENVOY_LOG_MISC(warn, "lambdai: has plain tcp only, use tcp conn pool");
         auto* conn_pool = thread_local_cluster->getTcpPool(
             std::move(host), Upstream::ResourcePriority::Default, this);
         if (conn_pool) {
           connecting_ = true;
           connect_attempts_++;
-
           // Given this function is reentrant, make sure we only reset the upstream_handle_ if given
           // a valid connection handle. If newConnection fails inline it may result in attempting to
           // select a new host, and a recursive call to initializeUpstreamConnection. In this case
@@ -458,7 +456,6 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
           return Network::FilterStatus::StopIteration;
         }
       } else {
-        ENVOY_LOG_MISC(warn, "lambdai: allow http tunnel for host");
         auto* conn_pool = thread_local_cluster->getHttpPool(
             std::move(host), Upstream::ResourcePriority::Default, Http::Protocol::Http2, this);
         if (conn_pool) {

@@ -35,10 +35,24 @@ public:
    */
   virtual LoadBalancer& loadBalancer() PURE;
 
+  /**
+   * Allocate or get the http connection pool which is owned by the host.
+   * @param host the host owned by this cluster.
+   * @param priority the priority of the connection pool.
+   * @param protocol http protocol.
+   * @return Http::ConnectionPool::Instance* a tcp connection pool or nullptr if there is no such pool and fail to allocate new pool.
+   */
   virtual Http::ConnectionPool::Instance* getHttpPool(HostConstSharedPtr host,
                                                       ResourcePriority priority,
                                                       Http::Protocol protocol,
                                                       LoadBalancerContext* context) PURE;
+  
+  /**
+   * Allocate or get the tcp connection pool which is owned by the host.
+   * @param host the host owned by this cluster.
+   * @param priority the priority of the connection pool.
+   * @return Tcp::ConnectionPool::Instance* a tcp connection pool or nullptr if there is no such pool and fail to allocate new pool.
+   */                                                      
   virtual Tcp::ConnectionPool::Instance*
   getTcpPool(HostConstSharedPtr host, ResourcePriority priority, LoadBalancerContext* context) PURE;
 };
