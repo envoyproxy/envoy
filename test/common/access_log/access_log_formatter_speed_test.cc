@@ -6,6 +6,8 @@
 
 #include "benchmark/benchmark.h"
 
+namespace Envoy {
+
 namespace {
 
 std::unique_ptr<Envoy::AccessLog::JsonFormatterImpl> makeJsonFormatter(bool typed) {
@@ -33,9 +35,8 @@ std::unique_ptr<Envoy::TestStreamInfo> makeStreamInfo() {
 
 } // namespace
 
-namespace Envoy {
-
-static void bM_AccessLogFormatter(benchmark::State& state) {
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_AccessLogFormatter(benchmark::State& state) {
   std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo();
   static const char* LogFormat =
       "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT% %START_TIME(%Y/%m/%dT%H:%M:%S%z %s)% "
@@ -57,9 +58,10 @@ static void bM_AccessLogFormatter(benchmark::State& state) {
   }
   benchmark::DoNotOptimize(output_bytes);
 }
-BENCHMARK(bM_AccessLogFormatter);
+BENCHMARK(BM_AccessLogFormatter);
 
-static void bM_JsonAccessLogFormatter(benchmark::State& state) {
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_JsonAccessLogFormatter(benchmark::State& state) {
   std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo();
   std::unique_ptr<Envoy::AccessLog::JsonFormatterImpl> json_formatter = makeJsonFormatter(false);
 
@@ -74,9 +76,10 @@ static void bM_JsonAccessLogFormatter(benchmark::State& state) {
   }
   benchmark::DoNotOptimize(output_bytes);
 }
-BENCHMARK(bM_JsonAccessLogFormatter);
+BENCHMARK(BM_JsonAccessLogFormatter);
 
-static void bM_TypedJsonAccessLogFormatter(benchmark::State& state) {
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_TypedJsonAccessLogFormatter(benchmark::State& state) {
   std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo();
   std::unique_ptr<Envoy::AccessLog::JsonFormatterImpl> typed_json_formatter =
       makeJsonFormatter(true);
@@ -92,6 +95,6 @@ static void bM_TypedJsonAccessLogFormatter(benchmark::State& state) {
   }
   benchmark::DoNotOptimize(output_bytes);
 }
-BENCHMARK(bM_TypedJsonAccessLogFormatter);
+BENCHMARK(BM_TypedJsonAccessLogFormatter);
 
 } // namespace Envoy
