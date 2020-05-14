@@ -8,7 +8,7 @@
 
 namespace {
 
-std::unique_ptr<Envoy::AccessLog::JsonFormatterImpl> MakeJsonFormatter(bool typed) {
+std::unique_ptr<Envoy::AccessLog::JsonFormatterImpl> makeJsonFormatter(bool typed) {
   absl::flat_hash_map<std::string, std::string> JsonLogFormat = {
       {"remote_address", "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"},
       {"start_time", "%START_TIME(%Y/%m/%dT%H:%M:%S%z %s)%"},
@@ -61,7 +61,7 @@ BENCHMARK(BM_AccessLogFormatter);
 
 static void BM_JsonAccessLogFormatter(benchmark::State& state) {
   std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo();
-  std::unique_ptr<Envoy::AccessLog::JsonFormatterImpl> json_formatter = MakeJsonFormatter(false);
+  std::unique_ptr<Envoy::AccessLog::JsonFormatterImpl> json_formatter = makeJsonFormatter(false);
 
   size_t output_bytes = 0;
   Http::TestRequestHeaderMapImpl request_headers;
@@ -79,7 +79,7 @@ BENCHMARK(BM_JsonAccessLogFormatter);
 static void BM_TypedJsonAccessLogFormatter(benchmark::State& state) {
   std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo();
   std::unique_ptr<Envoy::AccessLog::JsonFormatterImpl> typed_json_formatter =
-      MakeJsonFormatter(true);
+      makeJsonFormatter(true);
 
   size_t output_bytes = 0;
   Http::TestRequestHeaderMapImpl request_headers;
