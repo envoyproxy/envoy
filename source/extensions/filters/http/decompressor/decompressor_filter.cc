@@ -72,8 +72,12 @@ Http::FilterHeadersStatus DecompressorFilter::decodeHeaders(Http::RequestHeaderM
 };
 
 Http::FilterDataStatus DecompressorFilter::decodeData(Buffer::Instance& data, bool) {
-  return maybeDecompress(config_->requestDirectionConfig(), request_decompressor_.get(),
-                         *decoder_callbacks_, data);
+  return maybeDecompress(
+      config_->requestDirectionConfig(),
+      request_decompressor_
+          ? Envoy::Compression::Decompressor::DecompressorOptRef(std::ref(*request_decompressor_))
+          : absl::nullopt,
+      *decoder_callbacks_, data);
 }
 
 Http::FilterHeadersStatus DecompressorFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
@@ -89,8 +93,12 @@ Http::FilterHeadersStatus DecompressorFilter::encodeHeaders(Http::ResponseHeader
 }
 
 Http::FilterDataStatus DecompressorFilter::encodeData(Buffer::Instance& data, bool) {
-  return maybeDecompress(config_->requestDirectionConfig(), response_decompressor_.get(),
-                         *decoder_callbacks_, data);
+  return maybeDecompress(
+      config_->requestDirectionConfig(),
+      response_decompressor_
+          ? Envoy::Compression::Decompressor::DecompressorOptRef(std::ref(*response_decompressor_))
+          : absl::nullopt,
+      *decoder_callbacks_, data);
 }
 
 Http::FilterHeadersStatus DecompressorFilter::maybeInitDecompress(
@@ -120,11 +128,11 @@ Http::FilterHeadersStatus DecompressorFilter::maybeInitDecompress(
 
 Http::FilterDataStatus DecompressorFilter::maybeDecompress(
     const DecompressorFilterConfig::DirectionConfig& direction_config,
-    Compression::Decompressor::Decompressor* decompressor, Http::StreamFilterCallbacks& callbacks,
-    Buffer::Instance& input_buffer) const {
-  if (decompressor) {
+    Compression::Decompressor::DecompressorOptRef decompressor,
+    Http::StreamFilterCallbacks& callbacks, Buffer::Instance& input_buffer) const {
+  if (decompressor.has_value()) {
     Buffer::OwnedImpl output_buffer;
-    decompressor->decompress(input_buffer, output_buffer);
+    decompressor->get().decompress(input_buffer, output_buffer);
 
     // Report decompression via stats and logging before modifying the input buffer.
     direction_config.stats().total_compressed_bytes_.add(input_buffer.length());
