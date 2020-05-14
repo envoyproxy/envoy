@@ -109,10 +109,11 @@ message CommonTlsContext {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.extensions.transport_sockets.tls.v3.CommonTlsContext.CertificateProvider";
 
-    // certificate name: can be used to request a local cert vs a root cert
+    // opaque name used to specify certificate instances or types. For example, "ROOTCA" to specify
+    // a root-certficate (validation context) or "TLS" to specify a new tls-certificate.
     string name = 1;
 
-    // Provider specific config: contains a name and an Any struct to pass a typed config.
+    // Provider specific config.
     // Note: an implementation is expected to dedup multiple instances of the same config
     // to maintain a single certificate-provider instance. The sharing can happen, for
     // example, among multiple clusters or between the tls_certificate and validation_context
