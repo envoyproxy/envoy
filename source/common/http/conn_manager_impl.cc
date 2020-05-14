@@ -1640,9 +1640,17 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
 void ConnectionManagerImpl::ActiveStream::encodeHeadersInternal(ResponseHeaderMap& headers,
                                                                 bool end_stream) {
   // Base headers.
-  if (!stream_info_.hasResponseFlag(StreamInfo::ResponseFlag::ResponseFromCacheFilter)) {
+
+  // By default, always preserve the upstream date response header if present. If we choose to
+  // overwrite the upstream date unconditionally (a previous behavior), only do so if the response
+  // is not from cache
+  const bool should_preserve_upstream_date =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.preserve_upstream_date") ||
+      stream_info_.hasResponseFlag(StreamInfo::ResponseFlag::ResponseFromCacheFilter);
+  if (!should_preserve_upstream_date || !headers.Date()) {
     connection_manager_.config_.dateProvider().setDateHeader(headers);
   }
+
   // Following setReference() is safe because serverName() is constant for the life of the listener.
   const auto transformation = connection_manager_.config_.serverHeaderTransformation();
   if (transformation == ConnectionManagerConfig::HttpConnectionManagerProto::OVERWRITE ||
