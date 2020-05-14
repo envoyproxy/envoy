@@ -254,6 +254,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "header_list_view_lib",
+    srcs = ["header_list_view.cc"],
+    hdrs = ["header_list_view.h"],
+    deps = [
+        "//include/envoy/http:header_map_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "header_map_lib",
     srcs = ["header_map_impl.cc"],
     hdrs = ["header_map_impl.h"],

@@ -1,6 +1,8 @@
+#include <algorithm>
 #include <memory>
 #include <string>
 
+#include "common/http/header_list_view.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/header_utility.h"
 
@@ -9,6 +11,7 @@
 
 #include "gtest/gtest.h"
 
+using ::testing::ElementsAre;
 using ::testing::InSequence;
 
 namespace Envoy {
@@ -918,6 +921,24 @@ TEST(HeaderMapImplTest, Get) {
     EXPECT_EQ("world2", headers->get(foo)->value().getStringView());
     EXPECT_EQ(nullptr, headers->get(LowerCaseString("foo")));
   }
+}
+
+TEST(HeaderMapImplTest, TestHeaderList) {
+  std::array<Http::LowerCaseString, 2> keys{Headers::get().Path, LowerCaseString("hello")};
+  std::array<std::string, 2> values{"/", "world"};
+
+  auto headers = createHeaderMap<TestHeaderMapImpl>({{keys[0], values[0]}, {keys[1], values[1]}});
+  HeaderListView header_list(headers->header_map_);
+  auto to_string_views =
+      [](const HeaderListView::HeaderStringRefs& strs) -> std::vector<absl::string_view> {
+    std::vector<absl::string_view> str_views(strs.size());
+    std::transform(strs.begin(), strs.end(), str_views.begin(),
+                   [](auto value) -> absl::string_view { return value.get().getStringView(); });
+    return str_views;
+  };
+
+  EXPECT_THAT(to_string_views(header_list.keys()), ElementsAre(":path", "hello"));
+  EXPECT_THAT(to_string_views(header_list.values()), ElementsAre("/", "world"));
 }
 
 TEST(HeaderMapImplTest, TestAppendHeader) {
