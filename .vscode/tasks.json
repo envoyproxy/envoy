@@ -24,7 +24,7 @@
     {
       "label": "Refresh Compilation Database",
       "type": "shell",
-      "command": ".vscode/refresh_compdb.sh",
+      "command": "tools/vscode/refresh_compdb.sh",
       "problemMatcher": []
     }
   ]
