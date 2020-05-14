@@ -94,10 +94,10 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "N/A",
     ),
     com_google_absl = dict(
-        sha256 = "14ee08e2089c2a9b6bf27e1d10abc5629c69c4d0bab4b78ec5b65a29ea1c2af7",
-        strip_prefix = "abseil-cpp-cf3a1998e9d41709d4141e2f13375993cba1130e",
-        # 2020-03-05
-        urls = ["https://github.com/abseil/abseil-cpp/archive/cf3a1998e9d41709d4141e2f13375993cba1130e.tar.gz"],
+        sha256 = "cd477bfd0d19f803f85d118c7943b7908930310d261752730afa981118fee230",
+        strip_prefix = "abseil-cpp-ca9856cabc23d771bcce634677650eb6fc4363ae",
+        # 2020-04-30
+        urls = ["https://github.com/abseil/abseil-cpp/archive/ca9856cabc23d771bcce634677650eb6fc4363ae.tar.gz"],
         use_category = ["dataplane", "controlplane"],
         cpe = "N/A",
     ),
@@ -237,16 +237,18 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["test"],
     ),
     com_github_libevent_libevent = dict(
-        sha256 = "549d34065eb2485dfad6c8de638caaa6616ed130eec36dd978f73b6bdd5af113",
+        sha256 = "c64156c24602ab7a5c66937d774cc55868911d5bbbf1650792f5877744b1c2d9",
         # This SHA includes the new "prepare" and "check" watchers, used for event loop performance
         # stats (see https://github.com/libevent/libevent/pull/793) and the fix for a race condition
         # in the watchers (see https://github.com/libevent/libevent/pull/802).
         # This also includes the fixes for https://github.com/libevent/libevent/issues/806
         # and https://github.com/lyft/envoy-mobile/issues/215.
-        # TODO(mergeconflict): Update to v2.2 when it is released.
-        strip_prefix = "libevent-0d7d85c2083f7a4c9efe01c061486f332b576d28",
-        # 2019-07-02
-        urls = ["https://github.com/libevent/libevent/archive/0d7d85c2083f7a4c9efe01c061486f332b576d28.tar.gz"],
+        # This also include the fixes for Phantom events with EV_ET (see
+        # https://github.com/libevent/libevent/issues/984).
+        # TODO(adip): Update to v2.2 when it is released.
+        strip_prefix = "libevent-06a11929511bebaaf40c52aaf91de397b1782ba2",
+        # 2020-05-08
+        urls = ["https://github.com/libevent/libevent/archive/06a11929511bebaaf40c52aaf91de397b1782ba2.tar.gz"],
         use_category = ["dataplane"],
         cpe = "cpe:2.3:a:libevent_project:libevent:*",
     ),
