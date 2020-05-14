@@ -129,13 +129,13 @@ public:
   HttpHealthCheckerImplTest()
       : cluster_(new NiceMock<MockClusterMockPrioritySet>()),
         event_logger_(new MockHealthCheckEventLogger()) {}
-  void allocHealthChecker(const std::string& yaml) {
+
+  virtual void allocHealthChecker(const std::string& yaml) {
     health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
         *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
         HealthCheckEventLoggerPtr(event_logger_));
   }
-
-  void addCompletionCallback() {
+  virtual void addCompletionCallback() {
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
           onHostStatus(host, changed_state);
