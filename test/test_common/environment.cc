@@ -206,7 +206,9 @@ void TestEnvironment::initializeTestMain(char* programName) {
   RELEASE_ASSERT(WSAStartup(version_requested, &wsa_data) == 0, "");
 #endif
 
-#ifndef __APPLE__
+#ifdef __APPLE__
+  UNREFERENCED_PARAMETER(programName);
+#else
   absl::InitializeSymbolizer(programName);
 #endif
 
