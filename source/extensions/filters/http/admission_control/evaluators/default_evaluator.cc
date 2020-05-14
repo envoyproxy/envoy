@@ -18,7 +18,7 @@ DefaultResponseEvaluator::DefaultResponseEvaluator(
   if (evaluation_criteria.http_status_size() > 0) {
     for (const auto& range : evaluation_criteria.http_status()) {
       http_success_fns_.emplace_back(
-          [range](int status) { return (range.start() <= status) && (status < range.end()); });
+          [range](uint64_t status) { return (range.start() <= status) && (status < range.end()); });
     }
   } else {
     // We default to all 5xx codes as request failures.
