@@ -64,7 +64,7 @@ TEST_F(DrainManagerImplTest, DrainDeadline) {
   DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::DEFAULT);
 
   // Ensure drainClose() behaviour is determined by the deadline.
-  drain_manager.startDrainSequence(nullptr);
+  drain_manager.startDrainSequence([] {});
   EXPECT_CALL(server_, healthCheckFailed()).WillRepeatedly(Return(false));
   ON_CALL(server_.random_, random()).WillByDefault(Return(kDrainTimeSeconds * 2 - 1));
   ON_CALL(server_.options_, drainTime())
@@ -95,7 +95,7 @@ TEST_F(DrainManagerImplTest, DrainDeadlineProbability) {
   EXPECT_TRUE(drain_manager.drainClose());
   EXPECT_CALL(server_, healthCheckFailed()).WillRepeatedly(Return(false));
   EXPECT_FALSE(drain_manager.drainClose());
-  drain_manager.startDrainSequence(nullptr);
+  drain_manager.startDrainSequence([] {});
 
   // random() should be called when elapsed time < drain timeout
   EXPECT_CALL(server_.random_, random()).Times(2);

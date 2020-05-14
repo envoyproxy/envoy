@@ -46,6 +46,7 @@ bool DrainManagerImpl::drainClose() const {
 }
 
 void DrainManagerImpl::startDrainSequence(std::function<void()> drain_complete_cb) {
+  ASSERT(drain_complete_cb);
   ASSERT(!draining_);
   ASSERT(!drain_tick_timer_);
   draining_ = true;
