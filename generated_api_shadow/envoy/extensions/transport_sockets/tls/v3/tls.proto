@@ -107,7 +107,7 @@ message CommonTlsContext {
   // fetched/refreshed over the network "asynchronously" with respect to the TLS handshake.
   message CertificateProvider {
     // opaque name used to specify certificate instances or types. For example, "ROOTCA" to specify
-    // a root-certficate (validation context) or "TLS" to specify a new tls-certificate.
+    // a root-certificate (validation context) or "TLS" to specify a new tls-certificate.
     string name = 1;
 
     // Provider specific config.

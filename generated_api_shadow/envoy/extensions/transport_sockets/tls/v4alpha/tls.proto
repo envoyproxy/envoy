@@ -110,7 +110,7 @@ message CommonTlsContext {
         "envoy.extensions.transport_sockets.tls.v3.CommonTlsContext.CertificateProvider";
 
     // opaque name used to specify certificate instances or types. For example, "ROOTCA" to specify
-    // a root-certficate (validation context) or "TLS" to specify a new tls-certificate.
+    // a root-certificate (validation context) or "TLS" to specify a new tls-certificate.
     string name = 1;
 
     // Provider specific config.
