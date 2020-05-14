@@ -181,7 +181,8 @@ SplitRequestPtr EvalRequest::create(Router& router, Common::Redis::RespValuePtr&
     return nullptr;
   }
 
-  std::unique_ptr<EvalRequest> request_ptr{new EvalRequest(callbacks, command_stats, time_source, delay_command_latency)};
+  std::unique_ptr<EvalRequest> request_ptr{
+      new EvalRequest(callbacks, command_stats, time_source, delay_command_latency)};
 
   const auto route = router.upstreamPool(incoming_request->asArray()[3].asString());
   if (route) {
@@ -224,7 +225,8 @@ void FragmentedRequest::onChildFailure(uint32_t index) {
 SplitRequestPtr MGETRequest::create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                     SplitCallbacks& callbacks, CommandStats& command_stats,
                                     TimeSource& time_source, bool delay_command_latency) {
-  std::unique_ptr<MGETRequest> request_ptr{new MGETRequest(callbacks, command_stats, time_source, delay_command_latency)};
+  std::unique_ptr<MGETRequest> request_ptr{
+      new MGETRequest(callbacks, command_stats, time_source, delay_command_latency)};
 
   request_ptr->num_pending_responses_ = incoming_request->asArray().size() - 1;
   request_ptr->pending_requests_.reserve(request_ptr->num_pending_responses_);
@@ -302,7 +304,8 @@ SplitRequestPtr MSETRequest::create(Router& router, Common::Redis::RespValuePtr&
     command_stats.error_.inc();
     return nullptr;
   }
-  std::unique_ptr<MSETRequest> request_ptr{new MSETRequest(callbacks, command_stats, time_source, delay_command_latency)};
+  std::unique_ptr<MSETRequest> request_ptr{
+      new MSETRequest(callbacks, command_stats, time_source, delay_command_latency)};
 
   request_ptr->num_pending_responses_ = (incoming_request->asArray().size() - 1) / 2;
   request_ptr->pending_requests_.reserve(request_ptr->num_pending_responses_);
@@ -367,12 +370,10 @@ void MSETRequest::onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t 
   }
 }
 
-SplitRequestPtr SplitKeysSumResultRequest::create(Router& router,
-                                                  Common::Redis::RespValuePtr&& incoming_request,
-                                                  SplitCallbacks& callbacks,
-                                                  CommandStats& command_stats,
-                                                  TimeSource& time_source,
-                                                  bool delay_command_latency) {
+SplitRequestPtr
+SplitKeysSumResultRequest::create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
+                                  SplitCallbacks& callbacks, CommandStats& command_stats,
+                                  TimeSource& time_source, bool delay_command_latency) {
   std::unique_ptr<SplitKeysSumResultRequest> request_ptr{
       new SplitKeysSumResultRequest(callbacks, command_stats, time_source, delay_command_latency)};
 

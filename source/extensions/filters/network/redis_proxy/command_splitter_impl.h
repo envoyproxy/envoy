@@ -80,7 +80,7 @@ protected:
 
   // To support delay faults, we allow faults to override the regular command latency
   // recording behavior.
-  void completeLatency() { 
+  void completeLatency() {
     if (command_latency_ != nullptr) {
       command_latency_->complete();
     }
@@ -88,8 +88,8 @@ protected:
   SplitRequestBase(CommandStats& command_stats, TimeSource& time_source, bool delay_command_latency)
       : command_stats_(command_stats) {
     if (!delay_command_latency) {
-        command_latency_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
-        command_stats_.latency_, time_source);
+      command_latency_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
+          command_stats_.latency_, time_source);
     } else {
       command_latency_ = nullptr;
     }
@@ -115,7 +115,8 @@ public:
 protected:
   SingleServerRequest(SplitCallbacks& callbacks, CommandStats& command_stats,
                       TimeSource& time_source, bool delay_command_latency)
-      : SplitRequestBase(command_stats, time_source, delay_command_latency), callbacks_(callbacks) {}
+      : SplitRequestBase(command_stats, time_source, delay_command_latency), callbacks_(callbacks) {
+  }
 
   SplitCallbacks& callbacks_;
   ConnPool::InstanceSharedPtr conn_pool_;
@@ -133,7 +134,8 @@ public:
                                 TimeSource& time_source, bool has_delaydelay_command_latency_fault);
 
 private:
-  ErrorFaultRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source, bool delay_command_latency)
+  ErrorFaultRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
+                    bool delay_command_latency)
       : SingleServerRequest(callbacks, command_stats, time_source, delay_command_latency) {}
 
 public:
@@ -184,7 +186,8 @@ public:
                                 TimeSource& time_source, bool delay_command_latency);
 
 private:
-  SimpleRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source, bool delay_command_latency)
+  SimpleRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
+                bool delay_command_latency)
       : SingleServerRequest(callbacks, command_stats, time_source, delay_command_latency) {}
 };
 
@@ -198,7 +201,8 @@ public:
                                 TimeSource& time_source, bool delay_command_latency);
 
 private:
-  EvalRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source, bool delay_command_latency)
+  EvalRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
+              bool delay_command_latency)
       : SingleServerRequest(callbacks, command_stats, time_source, delay_command_latency) {}
 };
 
@@ -215,8 +219,10 @@ public:
   void cancel() override;
 
 protected:
-  FragmentedRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source, bool delay_command_latency)
-      : SplitRequestBase(command_stats, time_source, delay_command_latency), callbacks_(callbacks) {}
+  FragmentedRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
+                    bool delay_command_latency)
+      : SplitRequestBase(command_stats, time_source, delay_command_latency), callbacks_(callbacks) {
+  }
 
   struct PendingRequest : public ConnPool::PoolCallbacks {
     PendingRequest(FragmentedRequest& parent, uint32_t index) : parent_(parent), index_(index) {}
@@ -254,7 +260,8 @@ public:
                                 TimeSource& time_source, bool delay_command_latency);
 
 private:
-  MGETRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source, bool delay_command_latency)
+  MGETRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
+              bool delay_command_latency)
       : FragmentedRequest(callbacks, command_stats, time_source, delay_command_latency) {}
 
   // RedisProxy::CommandSplitter::FragmentedRequest
@@ -296,7 +303,8 @@ public:
                                 TimeSource& time_source, bool delay_command_latency);
 
 private:
-  MSETRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source, bool delay_command_latency)
+  MSETRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
+              bool delay_command_latency)
       : FragmentedRequest(callbacks, command_stats, time_source, delay_command_latency) {}
 
   // RedisProxy::CommandSplitter::FragmentedRequest
@@ -312,8 +320,10 @@ class CommandHandlerFactory : public CommandHandler, CommandHandlerBase {
 public:
   CommandHandlerFactory(Router& router) : CommandHandlerBase(router) {}
   SplitRequestPtr startRequest(Common::Redis::RespValuePtr&& request, SplitCallbacks& callbacks,
-                               CommandStats& command_stats, TimeSource& time_source, bool delay_command_latency) override {
-    return RequestClass::create(router_, std::move(request), callbacks, command_stats, time_source, delay_command_latency);
+                               CommandStats& command_stats, TimeSource& time_source,
+                               bool delay_command_latency) override {
+    return RequestClass::create(router_, std::move(request), callbacks, command_stats, time_source,
+                                delay_command_latency);
   }
 };
 
