@@ -328,6 +328,7 @@ TEST_F(StatMergerDynamicTest, DynamicsWithFakeSymbolTable) {
   EXPECT_EQ(0, dynamicEncodeDecodeTest("hello..D:world"));
   EXPECT_EQ(0, dynamicEncodeDecodeTest("D:hello..D:world"));
   EXPECT_EQ(0, dynamicEncodeDecodeTest("D:hello.D:.D:world"));
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("aV.D:,b"));
 
   // TODO(#10008): these tests fail because fake/real symbol tables
   // deal with empty components differently.

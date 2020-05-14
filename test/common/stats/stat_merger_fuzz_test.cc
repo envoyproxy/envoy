@@ -58,8 +58,10 @@ void testDynamicEncoding(absl::string_view data, SymbolTable& symbol_table) {
   StatMerger::DynamicContext dynamic_context(symbol_table);
   std::string name = symbol_table.toString(stat_name);
   StatMerger::DynamicsMap dynamic_map;
-  dynamic_map[name] = symbol_table.getDynamicSpans(stat_name);
-
+  DynamicSpans spans = symbol_table.getDynamicSpans(stat_name);
+  if (!spans.empty()) {
+    dynamic_map[name] = spans;
+  }
   StatName decoded = dynamic_context.makeDynamicStatName(name, dynamic_map);
   FUZZ_ASSERT(name == symbol_table.toString(decoded));
   FUZZ_ASSERT(stat_name == decoded);
