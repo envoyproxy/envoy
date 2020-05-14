@@ -193,7 +193,7 @@ void UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream) {
       buffered_request_body_ = std::make_unique<Buffer::WatermarkBuffer>(
           [this]() -> void { this->enableDataFromDownstreamForFlowControl(); },
           [this]() -> void { this->disableDataFromDownstreamForFlowControl(); },
-          []() -> void { /* TODO(adip): Handle overflow watermark */ });
+          []() -> void { /* TODO(adisuissa): Handle overflow watermark */ });
       buffered_request_body_->setWatermarks(parent_.callbacks()->decoderBufferLimit());
     }
 

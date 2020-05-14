@@ -274,11 +274,11 @@ protected:
     Buffer::WatermarkBuffer pending_recv_data_{
         [this]() -> void { this->pendingRecvBufferLowWatermark(); },
         [this]() -> void { this->pendingRecvBufferHighWatermark(); },
-        []() -> void { /* TODO(adip): Handle overflow watermark */ }};
+        []() -> void { /* TODO(adisuissa): Handle overflow watermark */ }};
     Buffer::WatermarkBuffer pending_send_data_{
         [this]() -> void { this->pendingSendBufferLowWatermark(); },
         [this]() -> void { this->pendingSendBufferHighWatermark(); },
-        []() -> void { /* TODO(adip): Handle overflow watermark */ }};
+        []() -> void { /* TODO(adisuissa): Handle overflow watermark */ }};
     HeaderMapPtr pending_trailers_to_encode_;
     std::unique_ptr<MetadataDecoder> metadata_decoder_;
     std::unique_ptr<MetadataEncoder> metadata_encoder_;
