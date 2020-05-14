@@ -332,7 +332,8 @@ public:
                      static_cast<int>(request_.stream_state_),
                      static_cast<int>(response_.stream_state_));
       if (stream_action.has_dispatching_action()) {
-        // Simulate some response action while dispatching request headers, data, or trailers.
+        // Simulate some response action while dispatching request headers, data, or trailers. This
+        // may happen as a result of a filter sending a direct response.
         ENVOY_LOG_MISC(debug, "Setting dispatching action  on {} in state {} {}", stream_index_,
                        static_cast<int>(request_.stream_state_),
                        static_cast<int>(response_.stream_state_));

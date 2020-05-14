@@ -104,10 +104,10 @@ inline Http::MetadataMapVector fromMetadata(const test::fuzz::Metadata& metadata
   Http::MetadataMapVector metadata_map_vector;
   if (!metadata.metadata().empty()) {
     Http::MetadataMap metadata_map;
-    for (const auto& pair : metadata.metadata()) {
-      metadata_map.insert(pair);
-    }
     Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
+    for (const auto& pair : metadata.metadata()) {
+      metadata_map_ptr->insert(pair);
+    }
     metadata_map_vector.push_back(std::move(metadata_map_ptr));
   }
   return metadata_map_vector;

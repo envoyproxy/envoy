@@ -43,7 +43,8 @@ message StreamAction {
   // Optionally set a dispatching action. This is a directional action that will
   // be called while the stream action is sending headers, data, or trailers.
   // This will only apply to request stream actions (so that the dispatching
-  // action occurs in the response direction).
+  // action occurs in the response direction). This may happen as a result of a
+  // filter sending a direct response.
   DirectionalAction dispatching_action = 4;
 }
 
