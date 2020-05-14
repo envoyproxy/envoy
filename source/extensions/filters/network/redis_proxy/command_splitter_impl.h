@@ -78,13 +78,6 @@ protected:
                                        const Common::Redis::RespValue& request);
   void updateStats(const bool success);
 
-  // To support delay faults, we allow faults to override the regular command latency
-  // recording behavior.
-  void completeLatency() {
-    if (command_latency_ != nullptr) {
-      command_latency_->complete();
-    }
-  }
   SplitRequestBase(CommandStats& command_stats, TimeSource& time_source, bool delay_command_latency)
       : command_stats_(command_stats) {
     if (!delay_command_latency) {
@@ -376,7 +369,7 @@ private:
 
   Common::Redis::FaultManagerPtr fault_manager_;
 
-  const std::string ERROR_FAULT = "error_fault";
+  const std::string error_fault_ = "error_fault";
 };
 
 } // namespace CommandSplitter
