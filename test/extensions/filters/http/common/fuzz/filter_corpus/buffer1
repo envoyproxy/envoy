@@ -15,5 +15,7 @@ data {
       "a" value : "b"
     }
   }
-  data: "hello"
+  http_body {
+    data: "hello"
+  }
 }
