@@ -42,7 +42,6 @@ def generateCompilationDatabase(args):
       else:
         logging.warning("bazel build failed {}: {}".format(e.returncode, e.cmd))
 
-
   subprocess.check_call(["bazel", "build"] + bazel_options + [
       "--aspects=@bazel_compdb//:aspects.bzl%compilation_database_aspect",
       "--output_groups=compdb_files"
