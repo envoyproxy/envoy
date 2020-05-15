@@ -129,6 +129,10 @@ InstanceImpl::~InstanceImpl() {
   ENVOY_LOG(debug, "destroying listener manager");
   listener_manager_.reset();
   ENVOY_LOG(debug, "destroyed listener manager");
+
+  // This ensures that we don't have any pending deletions that extend the lifetime of objects beyond the
+  // lifetime of the other fields.
+  dispatcher_->clearDeferredDeleteList();
 }
 
 Upstream::ClusterManager& InstanceImpl::clusterManager() { return *config_.clusterManager(); }

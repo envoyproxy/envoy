@@ -66,6 +66,12 @@ public:
                      ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory,
                      Filesystem::Instance& file_system);
 
+  ~ValidationInstance() {
+    // This ensures that we don't have any pending deletions that extend the lifetime of objects beyond the
+    // lifetime of the other fields.
+    dispatcher_->clearDeferredDeleteList();
+  }
+
   // Server::Instance
   Admin& admin() override { return admin_; }
   Api::Api& api() override { return *api_; }
