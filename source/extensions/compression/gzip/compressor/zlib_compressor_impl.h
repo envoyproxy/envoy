@@ -2,7 +2,7 @@
 
 #include "envoy/compression/compressor/compressor.h"
 
-#include "common/common/zlib/base.h"
+#include "extensions/compression/gzip/common/base.h"
 
 #include "zlib.h"
 
