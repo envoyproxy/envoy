@@ -2,9 +2,9 @@
 
 #include "common/stats/thread_local_store.h"
 
-#include "server/http/stats_handler.h"
+#include "server/admin/stats_handler.h"
 
-#include "test/server/http/admin_instance.h"
+#include "test/server/admin/admin_instance.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
