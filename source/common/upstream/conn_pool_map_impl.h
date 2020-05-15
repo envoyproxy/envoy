@@ -30,7 +30,7 @@ ConnPoolMap<KEY_TYPE, POOL_TYPE>::getPool(KEY_TYPE key, const PoolFactory& facto
   if (pool_iter != active_pools_.end()) {
     return std::ref(*(pool_iter->second));
   }
-  Resource& connPoolResource = host_->cluster().resourceManager(priority_).connectionPools();
+  ResourceLimit& connPoolResource = host_->cluster().resourceManager(priority_).connectionPools();
   // We need a new pool. Check if we have room.
   if (!connPoolResource.canCreate()) {
     // We're full. Try to free up a pool. If we can't, bail out.

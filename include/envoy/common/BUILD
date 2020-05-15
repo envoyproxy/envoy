@@ -30,6 +30,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "resource_interface",
+    hdrs = ["resource.h"],
+)
+
+envoy_cc_library(
     name = "time_interface",
     hdrs = ["time.h"],
 )
