@@ -24,6 +24,7 @@ void WarningValidationVisitorImpl::onUnknownField(absl::string_view description)
   if (!it.second) {
     return;
   }
+  
   // It's a new field, log and bump stat.
   ENVOY_LOG(warn, "Unexpected field: {}", description);
   if (unknown_counter_ == nullptr) {
