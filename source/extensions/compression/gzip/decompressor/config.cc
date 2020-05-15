@@ -16,7 +16,8 @@ const uint32_t GzipHeaderValue = 16;
 
 GzipDecompressorFactory::GzipDecompressorFactory(
     const envoy::extensions::compression::gzip::decompressor::v3::Gzip& gzip)
-    : window_bits_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(gzip, window_bits, DefaultWindowBits) | GzipHeaderValue ),
+    : window_bits_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(gzip, window_bits, DefaultWindowBits) |
+                   GzipHeaderValue),
       chunk_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(gzip, chunk_size, DefaultChunkSize)) {}
 
 Envoy::Compression::Decompressor::DecompressorPtr GzipDecompressorFactory::createDecompressor() {
