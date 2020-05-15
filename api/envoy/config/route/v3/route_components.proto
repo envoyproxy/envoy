@@ -552,6 +552,8 @@ message RouteAction {
   // Configures :ref:`internal redirect <arch_overview_internal_redirects>` behavior.
   // [#next-major-version: remove this definition - it's defined in the InternalRedirectPolicy message.]
   enum InternalRedirectAction {
+    option deprecated = true;
+
     PASS_THROUGH_INTERNAL_REDIRECT = 0;
     HANDLE_INTERNAL_REDIRECT = 1;
   }
