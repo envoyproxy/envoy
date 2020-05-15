@@ -8,8 +8,10 @@ Open with VSCode with the Container extension installed. Follow the [official gu
 repository directly from GitHub or from checked-out source tree.
 
 After opening, run the `Refresh Compilation Database` task to generate compilation database to navigate in source code. 
-This will run partial build of Envoy and may take a while depends on the machine performance. This task is needed to run everytime after
-changing BUILD files to get the changes reflected.
+This will run partial build of Envoy and may take a while depends on the machine performance.
+This task is needed to run everytime after:
+- Changing a BUILD file that add/remove files from a target, changes dependencies
+- Changing API proto files
 
 ## Advanced Usages
 
