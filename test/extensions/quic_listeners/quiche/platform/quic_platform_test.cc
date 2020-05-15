@@ -239,7 +239,11 @@ TEST_F(QuicPlatformTest, QuicServerStats) {
 }
 
 TEST_F(QuicPlatformTest, QuicStackTraceTest) {
+#ifndef ENVOY_CONFIG_COVERAGE
+  // This doesn't work in coverage build because part of the stacktrace will be overwritten by
+  // __llvm_coverage_mapping
   EXPECT_THAT(QuicStackTrace(), HasSubstr("QuicStackTraceTest"));
+#endif
 }
 
 TEST_F(QuicPlatformTest, QuicSleep) { QuicSleep(QuicTime::Delta::FromMilliseconds(20)); }
