@@ -4,7 +4,7 @@
 
 #include "common/common/assert.h"
 
-#include "server/http/config_tracker_impl.h"
+#include "server/admin/config_tracker_impl.h"
 
 namespace Envoy {
 namespace Server {

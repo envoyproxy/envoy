@@ -1,4 +1,4 @@
-#include "server/http/listeners_handler.h"
+#include "server/admin/listeners_handler.h"
 
 #include "envoy/admin/v3/listeners.pb.h"
 
@@ -6,7 +6,7 @@
 #include "common/http/utility.h"
 #include "common/network/utility.h"
 
-#include "server/http/utils.h"
+#include "server/admin/utils.h"
 
 namespace Envoy {
 namespace Server {

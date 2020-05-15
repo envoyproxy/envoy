@@ -35,8 +35,8 @@
 #include "common/secret/secret_manager_impl.h"
 #include "common/upstream/health_discovery_service.h"
 
+#include "server/admin/admin.h"
 #include "server/configuration_impl.h"
-#include "server/http/admin.h"
 #include "server/listener_hooks.h"
 #include "server/listener_manager_impl.h"
 #include "server/overload_manager_impl.h"

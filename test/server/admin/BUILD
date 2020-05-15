@@ -14,7 +14,7 @@ envoy_cc_test_library(
     srcs = ["admin_instance.cc"],
     hdrs = ["admin_instance.h"],
     deps = [
-        "//source/server/http:admin_lib",
+        "//source/server/admin:admin_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
@@ -36,7 +36,7 @@ envoy_cc_test(
         "//source/common/stats:symbol_table_creator_lib",
         "//source/common/stats:thread_local_store_lib",
         "//source/extensions/transport_sockets/tls:context_config_lib",
-        "//source/server/http:admin_lib",
+        "//source/server/admin:admin_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
@@ -54,7 +54,7 @@ envoy_cc_test(
     name = "admin_filter_test",
     srcs = ["admin_filter_test.cc"],
     deps = [
-        "//source/server/http:admin_filter_lib",
+        "//source/server/admin:admin_filter_lib",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
     ],
@@ -66,7 +66,7 @@ envoy_cc_test(
     deps = [
         ":admin_instance_lib",
         "//source/common/stats:thread_local_store_lib",
-        "//source/server/http:stats_handler_lib",
+        "//source/server/admin:stats_handler_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
     ],
@@ -82,7 +82,7 @@ envoy_cc_test(
     name = "prometheus_stats_test",
     srcs = ["prometheus_stats_test.cc"],
     deps = [
-        "//source/server/http:prometheus_stats_lib",
+        "//source/server/admin:prometheus_stats_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -108,7 +108,7 @@ envoy_cc_test(
     name = "config_tracker_impl_test",
     srcs = ["config_tracker_impl_test.cc"],
     deps = [
-        "//source/server/http:config_tracker_lib",
+        "//source/server/admin:config_tracker_lib",
         "//test/mocks:common_lib",
     ],
 )

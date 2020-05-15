@@ -1,4 +1,4 @@
-#include "server/http/prometheus_stats.h"
+#include "server/admin/prometheus_stats.h"
 
 #include "common/common/empty_string.h"
 #include "common/stats/histogram_impl.h"

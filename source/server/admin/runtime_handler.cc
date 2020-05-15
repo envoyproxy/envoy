@@ -1,4 +1,4 @@
-#include "server/http/runtime_handler.h"
+#include "server/admin/runtime_handler.h"
 
 #include <string>
 #include <unordered_map>
@@ -8,7 +8,7 @@
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 
-#include "server/http/utils.h"
+#include "server/admin/utils.h"
 
 namespace Envoy {
 namespace Server {

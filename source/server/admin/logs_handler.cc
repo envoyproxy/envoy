@@ -1,10 +1,10 @@
-#include "server/http/logs_handler.h"
+#include "server/admin/logs_handler.h"
 
 #include <string>
 
 #include "common/common/logger.h"
 
-#include "server/http/utils.h"
+#include "server/admin/utils.h"
 
 namespace Envoy {
 namespace Server {

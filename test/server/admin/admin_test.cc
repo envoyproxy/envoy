@@ -19,7 +19,7 @@
 
 #include "extensions/transport_sockets/tls/context_config_impl.h"
 
-#include "test/server/http/admin_instance.h"
+#include "test/server/admin/admin_instance.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"

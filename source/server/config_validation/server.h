@@ -20,11 +20,11 @@
 #include "common/secret/secret_manager_impl.h"
 #include "common/thread_local/thread_local_impl.h"
 
+#include "server/admin/admin.h"
 #include "server/config_validation/admin.h"
 #include "server/config_validation/api.h"
 #include "server/config_validation/cluster_manager.h"
 #include "server/config_validation/dns.h"
-#include "server/http/admin.h"
 #include "server/listener_manager_impl.h"
 #include "server/server.h"
 

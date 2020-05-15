@@ -1,8 +1,8 @@
-#include "server/http/profiling_handler.h"
+#include "server/admin/profiling_handler.h"
 
 #include "common/profiler/profiler.h"
 
-#include "server/http/utils.h"
+#include "server/admin/utils.h"
 
 namespace Envoy {
 namespace Server {
