@@ -82,6 +82,7 @@ DEPENDENCY_REPOSITORIES = dict(
         # 3. Find a commit in BoringSSL's "master-with-bazel" branch that merges <boringssl_revision>.
         #
         # chromium-81.0.4044.69
+        # 2020-01-22
         urls = ["https://github.com/google/boringssl/archive/1c2769383f027befac5b75b6cedd25daf3bf4dcf.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
@@ -145,9 +146,10 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["other"],
     ),
     com_github_fmtlib_fmt = dict(
-        sha256 = "f1907a58d5e86e6c382e51441d92ad9e23aea63827ba47fd647eacc0d3a16c78",
-        strip_prefix = "fmt-6.0.0",
-        urls = ["https://github.com/fmtlib/fmt/archive/6.0.0.tar.gz"],
+        sha256 = "5014aacf55285bf79654539791de0d6925063fddf4dfdd597ef76b53eb994f86",
+        strip_prefix = "fmt-e2ff910675c7800e5c4e28e1509ca6a50bdceafa",
+        # 2020-04-29
+        urls = ["https://github.com/fmtlib/fmt/archive/e2ff910675c7800e5c4e28e1509ca6a50bdceafa.tar.gz"],
         use_category = ["observability"],
         cpe = "N/A",
     ),
@@ -179,6 +181,7 @@ DEPENDENCY_REPOSITORIES = dict(
         # This sha on grpc:v1.25.x branch is specifically chosen to fix gRPC STS call credential options.
         sha256 = "bbc8f020f4e85ec029b047fab939b8c81f3d67254b5c724e1003a2bc49ddd123",
         strip_prefix = "grpc-d8f4928fa779f6005a7fe55a176bdb373b0f910f",
+        # 2020-02-11
         urls = ["https://github.com/grpc/grpc/archive/d8f4928fa779f6005a7fe55a176bdb373b0f910f.tar.gz"],
         use_category = ["dataplane", "controlplane"],
         cpe = "cpe:2.3:a:grpc:grpc:*",
