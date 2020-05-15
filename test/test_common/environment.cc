@@ -17,11 +17,16 @@
 #include "common/common/utility.h"
 #include "common/filesystem/directory.h"
 
+#ifdef ENVOY_HANDLE_SIGNALS
+#include "common/signal/signal_action.h"
+#endif
+
 #include "server/options_impl.h"
 
 #include "test/test_common/file_system_for_test.h"
 #include "test/test_common/network_utility.h"
 
+#include "absl/debugging/symbolize.h"
 #include "absl/strings/match.h"
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
@@ -186,6 +191,31 @@ std::string TestEnvironment::getCheckedEnvVar(const std::string& var) {
   auto optional = getOptionalEnvVar(var);
   RELEASE_ASSERT(optional.has_value(), var);
   return optional.value();
+}
+
+void TestEnvironment::initializeTestMain(char* program_name) {
+#ifdef WIN32
+  _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
+
+  _set_invalid_parameter_handler([](const wchar_t* expression, const wchar_t* function,
+                                    const wchar_t* file, unsigned int line,
+                                    uintptr_t pReserved) {});
+
+  WSADATA wsa_data;
+  const WORD version_requested = MAKEWORD(2, 2);
+  RELEASE_ASSERT(WSAStartup(version_requested, &wsa_data) == 0, "");
+#endif
+
+#ifdef __APPLE__
+  UNREFERENCED_PARAMETER(program_name);
+#else
+  absl::InitializeSymbolizer(program_name);
+#endif
+
+#ifdef ENVOY_HANDLE_SIGNALS
+  // Enabled by default. Control with "bazel --define=signal_trace=disabled"
+  static Envoy::SignalAction handle_sigs;
+#endif
 }
 
 void TestEnvironment::initializeOptions(int argc, char** argv) {

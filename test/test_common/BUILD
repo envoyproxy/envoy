@@ -25,6 +25,7 @@ envoy_cc_test_library(
     hdrs = ["environment.h"],
     external_deps = [
         "abseil_optional",
+        "abseil_symbolize",
         "bazel_runfiles",
     ],
     deps = [
@@ -39,7 +40,10 @@ envoy_cc_test_library(
         "//source/common/network:utility_lib",
         "//source/server:options_lib",
         "//test/common/runtime:utility_lib",
-    ],
+    ] + select({
+        "//bazel:disable_signal_trace": [],
+        "//conditions:default": ["//source/common/signal:sigaction_lib"],
+    }),
 )
 
 envoy_cc_test_library(

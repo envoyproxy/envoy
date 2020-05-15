@@ -1988,6 +1988,7 @@ TEST(AccessLogFormatterTest, ParserFailures) {
       "%REQ(valid)% %NOT_VALID%",
       "%REQ(FIRST?SECOND%",
       "%%",
+      "%%HOSTNAME%PROTOCOL%",
       "%protocol%",
       "%REQ(TEST):%",
       "%REQ(TEST):3q4%",
