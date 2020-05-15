@@ -1,14 +1,27 @@
 ---
 tasks:
   gcc:
+    name: "GCC"
     platform: ubuntu1804
     build_targets:
       - "//source/exe:envoy-static"
   rbe:
+    name: "RBE"
     platform: ubuntu1804
     test_targets:
       - "//test/..."
     test_flags:
       - "--config=remote-clang"
       - "--config=remote-ci"
+      - "--jobs=75"
+  coverage:
+    name: "Coverage"
+    platform: ubuntu1804
+    test_targets:
+      - "//test/integration/..."
+      - "//test/exe/..."
+    test_flags:
+      - "--config=remote-clang"
+      - "--config=remote-ci"
+      - "--config=coverage"
       - "--jobs=75"
