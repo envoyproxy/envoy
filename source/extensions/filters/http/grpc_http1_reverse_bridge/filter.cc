@@ -57,7 +57,9 @@ void adjustContentLength(Http::RequestOrResponseHeaderMap& headers,
   if (length_header != nullptr) {
     uint64_t length;
     if (absl::SimpleAtoi(length_header->value().getStringView(), &length)) {
-      headers.setContentLength(adjustment(length));
+      if (length != 0) {
+        headers.setContentLength(adjustment(length));
+      }
     }
   }
 }
