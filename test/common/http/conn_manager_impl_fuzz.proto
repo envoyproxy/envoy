@@ -61,7 +61,9 @@ message RequestAction {
     DataAction data = 1;
     TrailerAction trailers = 2;
     google.protobuf.Empty continue_decoding = 3;
-    google.protobuf.Empty throw_decoder_exception = 4;
+    // Dispatch no longer throws, but rather returns an error status.
+    google.protobuf.Empty throw_decoder_exception = 4 [deprecated = true];
+    google.protobuf.Empty return_decoder_error = 5;
     // TODO(htuch): Model and fuzz watermark events.
   }
 }

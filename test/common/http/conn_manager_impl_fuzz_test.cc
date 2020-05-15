@@ -383,10 +383,12 @@ public:
       }
       break;
     }
-    case test::common::http::RequestAction::kThrowDecoderException: {
+    case test::common::http::RequestAction::kThrowDecoderException:
+    // Dispatch no longer throws, execute subsequent kReturnDecoderError case.
+    case test::common::http::RequestAction::kReturnDecoderError: {
       if (state == StreamState::PendingDataOrTrailers) {
         EXPECT_CALL(*config_.codec_, dispatch(_))
-            .WillOnce(testing::Throw(CodecProtocolException("blah")));
+            .WillOnce(testing::Return(codecProtocolError("blah")));
         fakeOnData();
         FUZZ_ASSERT(testing::Mock::VerifyAndClearExpectations(config_.codec_));
         state = StreamState::Closed;
