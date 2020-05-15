@@ -25,6 +25,10 @@ public:
     return absl::StartsWith(data, prefix);
   }
 
+static bool EndsWith(QuicheStringPiece data, QuicheStringPiece suffix) {
+    return absl::EndsWith(data, suffix);
+  }
+
   static bool EndsWithIgnoreCase(QuicheStringPieceImpl data, QuicheStringPieceImpl suffix) {
     return absl::EndsWithIgnoreCase(data, suffix);
   }
@@ -59,6 +63,14 @@ public:
 
   static void Base64Encode(const uint8_t* data, size_t data_len, std::string* output) {
     return quiche::Base64Encode(data, data_len, output);
+  }
+
+static QuicheOptional<std::string> Base64Decode(QuicheStringPiece input) {
+    std::string output;
+    if (!absl::Base64Unescape(input, &output)) {
+      return QuicheOptional<std::string>();
+    }
+    return output;
   }
 
   static std::string HexDump(QuicheStringPieceImpl binary_data) {

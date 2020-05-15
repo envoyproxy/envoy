@@ -20,6 +20,8 @@
 #include "common/network/listen_socket_impl.h"
 #include "common/network/socket_option_factory.h"
 #include "extensions/quic_listeners/quiche/active_quic_listener.h"
+#include "test/extensions/quic_listeners/quiche/test_utils.h"
+#include "test/extensions/quic_listeners/quiche/test_proof_source.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/environment.h"
 #include "test/mocks/network/mocks.h"
@@ -37,6 +39,23 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Quic {
 
+std::vector<std::pair<Network::Address::IpVersion, bool>> generateTestParam() {
+  std::vector<std::pair<Network::Address::IpVersion, bool>> param;
+for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
+  for (bool use_http3 : {true, false}) {
+  param.emplace_back(ip_version, use_http3);
+  }
+}
+
+  return param;
+}
+
+static std::string
+  testParamsToString(const ::testing::TestParamInfo<std::pair<Network::Address::IpVersion, bool> >& params) {
+    std::string ip_version = params.param.first == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6";
+      return absl::StrCat(ip_version, params.param.second ? "_UseHttp3" : "_UseGQuic");
+  }
+
 class ActiveQuicListenerPeer {
 public:
   static EnvoyQuicDispatcher* quic_dispatcher(ActiveQuicListener& listener) {
@@ -48,16 +67,18 @@ public:
   }
 };
 
-class ActiveQuicListenerTest : public testing::TestWithParam<Network::Address::IpVersion> {
+class ActiveQuicListenerTest : public  testing::TestWithParam<std::pair<Network::Address::IpVersion, bool>> {
 protected:
   using Socket = Network::NetworkListenSocket<
       Network::NetworkSocketTrait<Network::Address::SocketType::Datagram>>;
 
   ActiveQuicListenerTest()
-      : version_(GetParam()), api_(Api::createApiForTest(simulated_time_system_)),
+      : version_(GetParam().first), api_(Api::createApiForTest(simulated_time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")), clock_(*dispatcher_),
         local_address_(Network::Test::getCanonicalLoopbackAddress(version_)),
-        connection_handler_(*dispatcher_) {}
+        connection_handler_(*dispatcher_) {
+SetQuicReloadableFlag(quic_enable_version_draft_27, GetParam().second);
+        }
 
   void SetUp() override {
     listen_socket_ =
@@ -66,7 +87,7 @@ protected:
     listen_socket_->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
 
     quic_listener_ = std::make_unique<ActiveQuicListener>(
-        *dispatcher_, connection_handler_, listen_socket_, listener_config_, quic_config_, nullptr);
+        *dispatcher_, connection_handler_, listen_socket_, listener_config_, quic_config_, nullptr, std::make_unique<TestProofSource>());
     simulated_time_system_.advanceTimeWait(std::chrono::milliseconds(100));
   }
 
@@ -83,8 +104,10 @@ protected:
           Server::Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories);
           return true;
         }));
+    if (!quic::VersionUsesHttp3(quic::CurrentSupportedVersions()[0].transport_version)) {
     EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::Connected))
         .Times(connection_count);
+    }
     EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose))
         .Times(connection_count);
 
@@ -114,44 +137,18 @@ protected:
     }
   }
 
-  // TODO(bencebeky): Factor out parts common with
-  // EnvoyQuicDispatcherTest::createFullChloPacket() to test_utils.
-  void SendFullCHLO(quic::QuicConnectionId connection_id) {
+  void SendCHLO(quic::QuicConnectionId connection_id) {
     client_sockets_.push_back(std::make_unique<Socket>(local_address_, nullptr, /*bind*/ false));
-    quic::CryptoHandshakeMessage chlo = quic::test::crypto_test_utils::GenerateDefaultInchoateCHLO(
-        &clock_, quic::AllSupportedVersions()[0].transport_version,
-        &ActiveQuicListenerPeer::crypto_config(*quic_listener_));
-    chlo.SetVector(quic::kCOPT, quic::QuicTagVector{quic::kREJ});
-    quic::CryptoHandshakeMessage full_chlo;
-    quic::QuicReferenceCountedPointer<quic::QuicSignedServerConfig> signed_config(
-        new quic::QuicSignedServerConfig);
-    quic::QuicCompressedCertsCache cache(
-        quic::QuicCompressedCertsCache::kQuicCompressedCertsCacheSize);
-    quic::test::crypto_test_utils::GenerateFullCHLO(
-        chlo, &ActiveQuicListenerPeer::crypto_config(*quic_listener_),
+    Buffer::OwnedImpl payload = generateChloPacketToSend(
+        quic::CurrentSupportedVersions()[0], quic_config_,
+        ActiveQuicListenerPeer::crypto_config(*quic_listener_), connection_id, clock_,
         envoyAddressInstanceToQuicSocketAddress(local_address_),
-        envoyAddressInstanceToQuicSocketAddress(local_address_),
-        quic::AllSupportedVersions()[0].transport_version, &clock_, signed_config, &cache,
-        &full_chlo);
-    // Overwrite version label to highest current supported version.
-    full_chlo.SetVersion(quic::kVER, quic::CurrentSupportedVersions()[0]);
-    quic::QuicConfig quic_config;
-    quic_config.ToHandshakeMessage(&full_chlo,
-                                   quic::CurrentSupportedVersions()[0].transport_version);
-
-    std::string packet_content(full_chlo.GetSerialized().AsStringPiece());
-    auto encrypted_packet = std::unique_ptr<quic::QuicEncryptedPacket>(
-        quic::test::ConstructEncryptedPacket(connection_id, quic::EmptyQuicConnectionId(),
-                                             /*version_flag=*/true, /*reset_flag*/ false,
-                                             /*packet_number=*/1, packet_content));
-
-    Buffer::RawSlice first_slice{
-        reinterpret_cast<void*>(const_cast<char*>(encrypted_packet->data())),
-        encrypted_packet->length()};
+        envoyAddressInstanceToQuicSocketAddress(local_address_), "test.example.org");
+    Buffer::RawSliceVector slice = payload.getRawSlices();
+    ASSERT(slice.size() == 1);
     // Send a full CHLO to finish 0-RTT handshake.
-    auto send_rc = Network::Utility::writeToSocket(client_sockets_.back()->ioHandle(), &first_slice,
-                                                   1, nullptr, *listen_socket_->localAddress());
-    ASSERT_EQ(encrypted_packet->length(), send_rc.rc_);
+    auto send_rc = Network::Utility::writeToSocket(client_sockets_.back()->ioHandle(), slice.data(), 1, nullptr, *listen_socket_->localAddress());
+    ASSERT_EQ(slice[0].len_, send_rc.rc_);
   }
 
   void ReadFromClientSockets() {
@@ -211,9 +208,9 @@ protected:
   std::list<Network::MockFilterChain> filter_chains_;
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, ActiveQuicListenerTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(ActiveQuicListenerTests, ActiveQuicListenerTest,
+                         testing::ValuesIn(generateTestParam()),
+                         testParamsToString);
 
 TEST_P(ActiveQuicListenerTest, FailSocketOptionUponCreation) {
   auto option = std::make_unique<Network::MockSocketOption>();
@@ -223,13 +220,15 @@ TEST_P(ActiveQuicListenerTest, FailSocketOptionUponCreation) {
   options->emplace_back(std::move(option));
   EXPECT_THROW_WITH_REGEX(std::make_unique<ActiveQuicListener>(*dispatcher_, connection_handler_,
                                                                listen_socket_, listener_config_,
-                                                               quic_config_, options),
+                                                               quic_config_, options,
+std::make_unique<TestProofSource>()
+                                                               ),
                           EnvoyException, "Failed to apply socket options.");
 }
 
-TEST_P(ActiveQuicListenerTest, ReceiveFullQuicCHLO) {
+TEST_P(ActiveQuicListenerTest, ReceiveQuicCHLO) {
   configureMocks(/* connection_count = */ 1);
-  SendFullCHLO(quic::test::TestConnectionId(1));
+  SendCHLO(quic::test::TestConnectionId(1));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   ReadFromClientSockets();
 }
@@ -244,7 +243,7 @@ TEST_P(ActiveQuicListenerTest, ProcessBufferedChlos) {
 
   // Generate one more CHLO than can be processed immediately.
   for (size_t i = 1; i <= ActiveQuicListener::kNumSessionsToCreatePerLoop + 1; ++i) {
-    SendFullCHLO(quic::test::TestConnectionId(i));
+    SendCHLO(quic::test::TestConnectionId(i));
   }
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
@@ -258,7 +257,7 @@ TEST_P(ActiveQuicListenerTest, ProcessBufferedChlos) {
   EXPECT_TRUE(buffered_packets->HasChlosBuffered());
 
   // Generate more data to trigger a socket read during the next event loop.
-  SendFullCHLO(quic::test::TestConnectionId(ActiveQuicListener::kNumSessionsToCreatePerLoop + 2));
+  SendCHLO(quic::test::TestConnectionId(ActiveQuicListener::kNumSessionsToCreatePerLoop + 2));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   // The socket read results in processing all CHLOs.

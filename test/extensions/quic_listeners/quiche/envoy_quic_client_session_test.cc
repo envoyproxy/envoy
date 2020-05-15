@@ -6,6 +6,7 @@
 
 #include "quiche/quic/core/crypto/null_encrypter.h"
 #include "quiche/quic/test_tools/crypto_test_utils.h"
+#include "quiche/quic/test_tools/quic_config_peer.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
 
 #pragma GCC diagnostic pop
@@ -62,9 +63,9 @@ public:
   TestQuicCryptoClientStream(const quic::QuicServerId& server_id, quic::QuicSession* session,
                              std::unique_ptr<quic::ProofVerifyContext> verify_context,
                              quic::QuicCryptoClientConfig* crypto_config,
-                             ProofHandler* proof_handler)
+                             ProofHandler* proof_handler, bool has_application_state)
       : quic::QuicCryptoClientStream(server_id, session, std::move(verify_context), crypto_config,
-                                     proof_handler) {}
+                                     proof_handler, has_application_state) {}
 
   bool encryption_established() const override { return true; }
 };
@@ -84,7 +85,7 @@ public:
   std::unique_ptr<quic::QuicCryptoClientStreamBase> CreateQuicCryptoStream() override {
     return std::make_unique<TestQuicCryptoClientStream>(
         server_id(), this, crypto_config()->proof_verifier()->CreateDefaultContext(),
-        crypto_config(), this);
+        crypto_config(), this, true);
   }
 };
 
@@ -111,6 +112,7 @@ public:
                             *dispatcher_,
                             /*send_buffer_limit*/ 1024 * 1024),
         http_connection_(envoy_quic_session_, http_connection_callbacks_) {
+          quic::SetVerbosityLogThreshold(1);
     EXPECT_EQ(time_system_.systemTime(), envoy_quic_session_.streamInfo().startTime());
     EXPECT_EQ(EMPTY_STRING, envoy_quic_session_.nextProtocol());
     EXPECT_EQ(Http::Protocol::Http3, http_connection_.protocol());
@@ -122,6 +124,19 @@ public:
 
   void SetUp() override {
     envoy_quic_session_.Initialize();
+     quic::test::QuicConfigPeer::SetReceivedMaxBidirectionalStreams(
+          envoy_quic_session_.config(), quic::kDefaultMaxStreamsPerConnection);
+      quic::test::QuicConfigPeer::SetReceivedMaxUnidirectionalStreams(
+          envoy_quic_session_.config(), quic::kDefaultMaxStreamsPerConnection);
+    quic::test::QuicConfigPeer::SetReceivedInitialSessionFlowControlWindow(
+        envoy_quic_session_.config(), quic::kMinimumFlowControlSendWindow);
+    quic::test::QuicConfigPeer::SetReceivedInitialMaxStreamDataBytesUnidirectional(
+        envoy_quic_session_.config(), quic::kMinimumFlowControlSendWindow);
+    quic::test::QuicConfigPeer::SetReceivedInitialMaxStreamDataBytesIncomingBidirectional(
+        envoy_quic_session_.config(), quic::kMinimumFlowControlSendWindow);
+    quic::test::QuicConfigPeer::SetReceivedInitialMaxStreamDataBytesOutgoingBidirectional(
+        envoy_quic_session_.config(), quic::kMinimumFlowControlSendWindow);
+    envoy_quic_session_.OnConfigNegotiated();
     envoy_quic_session_.addConnectionCallbacks(network_connection_callbacks_);
     envoy_quic_session_.setConnectionStats(
         {read_total_, read_current_, write_total_, write_current_, nullptr, nullptr});

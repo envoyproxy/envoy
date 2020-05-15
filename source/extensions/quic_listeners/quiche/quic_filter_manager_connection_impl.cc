@@ -130,6 +130,7 @@ void QuicFilterManagerConnectionImpl::rawWrite(Buffer::Instance& /*data*/, bool 
 }
 
 void QuicFilterManagerConnectionImpl::adjustBytesToSend(int64_t delta) {
+  std::cerr << "=============== buffer more bytes " << delta << "\n";
   bytes_to_send_ += delta;
   write_buffer_watermark_simulation_.checkHighWatermark(bytes_to_send_);
   write_buffer_watermark_simulation_.checkLowWatermark(bytes_to_send_);

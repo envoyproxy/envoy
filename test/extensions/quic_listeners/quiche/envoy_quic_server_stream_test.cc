@@ -1,5 +1,7 @@
 #include <string>
 
+#include "quiche/quic/test_tools/quic_config_peer.h"
+
 #include "common/event/libevent_scheduler.h"
 #include "common/http/headers.h"
 
@@ -49,6 +51,7 @@ public:
     quic_stream_->setRequestDecoder(stream_decoder_);
     quic_stream_->addCallbacks(stream_callbacks_);
     quic_session_.ActivateStream(std::unique_ptr<EnvoyQuicServerStream>(quic_stream_));
+    EXPECT_CALL(quic_session_, ShouldYield(_)).WillRepeatedly(testing::Return(false));
     EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _))
         .WillRepeatedly(Invoke([](quic::QuicStreamId, size_t write_length, quic::QuicStreamOffset,
                                   quic::StreamSendingState state, bool,
@@ -64,6 +67,19 @@ public:
 
   void SetUp() override {
     quic_session_.Initialize();
+    quic::test::QuicConfigPeer::SetReceivedMaxBidirectionalStreams(
+          quic_session_.config(), quic::kDefaultMaxStreamsPerConnection);
+      quic::test::QuicConfigPeer::SetReceivedMaxUnidirectionalStreams(
+          quic_session_.config(), quic::kDefaultMaxStreamsPerConnection);
+    quic::test::QuicConfigPeer::SetReceivedInitialSessionFlowControlWindow(
+        quic_session_.config(), quic::kMinimumFlowControlSendWindow);
+    quic::test::QuicConfigPeer::SetReceivedInitialMaxStreamDataBytesUnidirectional(
+        quic_session_.config(), quic::kMinimumFlowControlSendWindow);
+    quic::test::QuicConfigPeer::SetReceivedInitialMaxStreamDataBytesIncomingBidirectional(
+        quic_session_.config(), quic::kMinimumFlowControlSendWindow);
+    quic::test::QuicConfigPeer::SetReceivedInitialMaxStreamDataBytesOutgoingBidirectional(
+        quic_session_.config(), quic::kMinimumFlowControlSendWindow);
+    quic_session_.OnConfigNegotiated();
     request_headers_.OnHeaderBlockStart();
     request_headers_.OnHeader(":authority", host_);
     request_headers_.OnHeader(":method", "POST");
@@ -151,6 +167,7 @@ INSTANTIATE_TEST_SUITE_P(EnvoyQuicServerStreamTests, EnvoyQuicServerStreamTest,
                          testing::ValuesIn({true, false}));
 
 TEST_P(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
+  quic::SetVerbosityLogThreshold(1);
   quic::QuicHeaderList request_headers;
   request_headers.OnHeaderBlockStart();
   request_headers.OnHeader(":authority", host_);

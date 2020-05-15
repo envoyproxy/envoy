@@ -129,6 +129,7 @@ envoy_cc_test(
         "//test/test_common:simulated_time_system_lib",
         "@com_googlesource_quiche//:quic_test_tools_server_session_base_peer",
         "@com_googlesource_quiche//:quic_test_tools_test_utils_interface_lib",
+        "@com_googlesource_quiche//:quic_test_tools_config_peer_lib",
     ],
 )
 
@@ -166,6 +167,7 @@ envoy_cc_test(
         "skip_on_windows",
     ],
     deps = [
+        ":test_utils_lib",
         ":quic_test_utils_for_envoy_lib",
         "//source/extensions/quic_listeners/quiche:active_quic_listener_lib",
         "//source/extensions/quic_listeners/quiche:envoy_quic_utils_lib",
@@ -186,6 +188,8 @@ envoy_cc_test(
         "skip_on_windows",
     ],
     deps = [
+        ":test_proof_source_lib",
+        ":test_utils_lib",
         ":quic_test_utils_for_envoy_lib",
         "//include/envoy/stats:stats_macros",
         "//source/extensions/quic_listeners/quiche:envoy_quic_alarm_factory_lib",
@@ -205,11 +209,21 @@ envoy_cc_test(
 )
 
 envoy_cc_test_library(
+    name = "test_proof_source_lib",
+ hdrs = ["test_proof_source.h"],
+    tags = ["nofips"],
+    deps = [
+         "//source/extensions/quic_listeners/quiche:envoy_quic_fake_proof_source_lib",
+    "@com_googlesource_quiche//:quic_test_tools_test_certificates_lib",
+    ],
+    )
+
+envoy_cc_test_library(
     name = "quic_test_utils_for_envoy_lib",
     srcs = ["crypto_test_utils_for_envoy.cc"],
     tags = ["nofips"],
     deps = [
-        "//source/extensions/quic_listeners/quiche:envoy_quic_proof_source_lib",
+        ":test_proof_source_lib",
         "//source/extensions/quic_listeners/quiche:envoy_quic_proof_verifier_lib",
         "@com_googlesource_quiche//:quic_test_tools_test_utils_interface_lib",
     ],
@@ -276,5 +290,6 @@ envoy_cc_test_library(
     deps = [
         "//source/extensions/quic_listeners/quiche:quic_filter_manager_connection_lib",
         "@com_googlesource_quiche//:quic_core_http_spdy_session_lib",
+        "@com_googlesource_quiche//:quic_test_tools_first_flight_lib",
     ],
 )

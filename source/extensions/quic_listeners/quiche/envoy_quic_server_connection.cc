@@ -46,6 +46,7 @@ bool EnvoyQuicServerConnection::OnPacketHeader(const quic::QuicPacketHeader& hea
                     quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
     return false;
   }
+  std::cerr << "========== get filter chain " << filter_chain_ << "\n";
   const bool empty_filter_chain = !listener_config_.filterChainFactory().createNetworkFilterChain(
       envoyConnection(), filter_chain_->networkFilterFactories());
   if (empty_filter_chain) {

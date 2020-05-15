@@ -43,13 +43,34 @@ public:
   Http::StreamResetReason last_stream_reset_reason_{Http::StreamResetReason::LocalReset};
 };
 
+
+std::vector<std::pair<Network::Address::IpVersion, bool>> generateTestParam() {
+  std::vector<std::pair<Network::Address::IpVersion, bool>> param;
+  for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
+    for (bool use_http3 : {true, false}) {
+      param.emplace_back(ip_version, use_http3);
+    }
+  }
+
+  return param;
+}
+
+static std::string testParamsToString(
+    const ::testing::TestParamInfo<std::pair<Network::Address::IpVersion, bool>>& params) {
+  std::string ip_version = params.param.first == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6";
+  return absl::StrCat(ip_version, params.param.second ? "_UseHttp3" : "_UseGQuic");
+}
+
 class QuicHttpIntegrationTest : public HttpIntegrationTest,
-                                public testing::TestWithParam<Network::Address::IpVersion> {
+                                public testing::TestWithParam<std::pair<Network::Address::IpVersion, bool>> {
 public:
   QuicHttpIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP3, GetParam(),
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP3, GetParam().first,
                             ConfigHelper::quicHttpProxyConfig()),
-        supported_versions_(quic::CurrentSupportedVersions()),
+        supported_versions_([] () {
+          SetQuicReloadableFlag(quic_enable_version_draft_27, GetParam().second);
+          return quic::CurrentSupportedVersions();
+        }()),
         crypto_config_(std::make_unique<EnvoyQuicFakeProofVerifier>()), conn_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *conn_helper_.GetClock()),
         injected_resource_filename_(TestEnvironment::temporaryPath("injected_resource")),
@@ -108,7 +129,10 @@ public:
   void initialize() override {
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-      ConfigHelper::initializeTls({}, *tls_context.mutable_common_tls_context());
+      ConfigHelper::initializeTls(ConfigHelper::ServerSslOptions()
+                                  .setRsaCert(true)
+                                  .setTlsV13(true),
+                                  *tls_context.mutable_common_tls_context());
       auto* filter_chain =
           bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
       auto* transport_socket = filter_chain->mutable_transport_socket();
@@ -176,9 +200,9 @@ protected:
   AtomicFileUpdater file_updater_;
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, QuicHttpIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(QuicHttpIntegrationTests, QuicHttpIntegrationTest,
+                         testing::ValuesIn(generateTestParam()),
+                         testParamsToString );
 
 TEST_P(QuicHttpIntegrationTest, GetRequestAndEmptyResponse) {
   testRouterHeaderOnlyRequestAndResponse();
@@ -285,13 +309,13 @@ TEST_P(QuicHttpIntegrationTest, MultipleQuicListenersWithBPF) {
     cached->add_server_designated_connection_id(quic::test::TestConnectionId(i << 32));
     codec_clients.push_back(makeHttpConnection(lookupPort("http")));
   }
-  if (GetParam() == Network::Address::IpVersion::v4) {
+  if (GetParam().first == Network::Address::IpVersion::v4) {
     test_server_->waitForCounterEq("listener.0.0.0.0_0.downstream_cx_total", 8u);
   } else {
     test_server_->waitForCounterEq("listener.[__]_0.downstream_cx_total", 8u);
   }
   for (size_t i = 0; i < concurrency_; ++i) {
-    if (GetParam() == Network::Address::IpVersion::v4) {
+    if (GetParam().first == Network::Address::IpVersion::v4) {
       test_server_->waitForGaugeEq(
           fmt::format("listener.0.0.0.0_0.worker_{}.downstream_cx_active", i), 1u);
       test_server_->waitForCounterEq(
@@ -328,7 +352,7 @@ TEST_P(QuicHttpIntegrationTest, MultipleQuicListenersNoBPF) {
     cached->add_server_designated_connection_id(quic::test::TestConnectionId(i << 32));
     codec_clients.push_back(makeHttpConnection(lookupPort("http")));
   }
-  if (GetParam() == Network::Address::IpVersion::v4) {
+  if (GetParam().first == Network::Address::IpVersion::v4) {
     test_server_->waitForCounterEq("listener.0.0.0.0_0.downstream_cx_total", 8u);
   } else {
     test_server_->waitForCounterEq("listener.[__]_0.downstream_cx_total", 8u);
@@ -336,7 +360,7 @@ TEST_P(QuicHttpIntegrationTest, MultipleQuicListenersNoBPF) {
   // Even without BPF support, these connections should more or less distributed
   // across different workers.
   for (size_t i = 0; i < concurrency_; ++i) {
-    if (GetParam() == Network::Address::IpVersion::v4) {
+    if (GetParam().first == Network::Address::IpVersion::v4) {
       EXPECT_LT(
           test_server_->gauge(fmt::format("listener.0.0.0.0_0.worker_{}.downstream_cx_active", i))
               ->value(),

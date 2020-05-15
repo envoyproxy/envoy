@@ -27,10 +27,18 @@ public:
                      Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
                      Network::Socket::OptionsSharedPtr options);
 
+  ActiveQuicListener(Event::Dispatcher& dispatcher,
+                                       Network::ConnectionHandler& parent,
+                                       Network::SocketSharedPtr listen_socket,
+                                       Network::ListenerConfig& listener_config,
+                                       const quic::QuicConfig& quic_config,
+                                       Network::Socket::OptionsSharedPtr options);
+
   ActiveQuicListener(Event::Dispatcher& dispatcher, Network::ConnectionHandler& parent,
                      Network::SocketSharedPtr listen_socket,
                      Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
-                     Network::Socket::OptionsSharedPtr options);
+                     Network::Socket::OptionsSharedPtr options,
+                     std::unique_ptr<quic::ProofSource> proof_source);
 
   ~ActiveQuicListener() override;
 

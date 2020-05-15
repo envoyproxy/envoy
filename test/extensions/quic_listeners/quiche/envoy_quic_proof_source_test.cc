@@ -41,6 +41,7 @@ class EnvoyQuicFakeProofSourceTest : public ::testing::Test {
 protected:
   std::string hostname_{"www.fake.com"};
   quic::QuicSocketAddress server_address_;
+    quic::QuicSocketAddress client_address_;
   quic::QuicTransportVersion version_{quic::QUIC_VERSION_UNSUPPORTED};
   quiche::QuicheStringPiece chlo_hash_{""};
   std::string server_config_{"Server Config"};
@@ -54,7 +55,7 @@ TEST_F(EnvoyQuicFakeProofSourceTest, TestGetProof) {
   bool called = false;
   auto callback = std::make_unique<TestGetProofCallback>(called, expected_signature_,
                                                          "Fake timestamp", expected_certs_);
-  proof_source_.GetProof(server_address_, hostname_, server_config_, version_, chlo_hash_,
+  proof_source_.GetProof(server_address_, client_address_, hostname_, server_config_, version_, chlo_hash_,
                          std::move(callback));
   EXPECT_TRUE(called);
 }

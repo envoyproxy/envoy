@@ -19,14 +19,14 @@
 #endif
 
 #include <memory>
-#include "extensions/quic_listeners/quiche/envoy_quic_fake_proof_source.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_fake_proof_verifier.h"
+#include "test/extensions/quic_listeners/quiche/test_proof_source.h"
 
 namespace quic {
 namespace test {
 namespace crypto_test_utils {
 std::unique_ptr<ProofSource> ProofSourceForTesting() {
-  return std::make_unique<Envoy::Quic::EnvoyQuicFakeProofSource>();
+  return std::make_unique<Envoy::Quic::TestProofSource>();
 }
 
 std::unique_ptr<ProofVerifier> ProofVerifierForTesting() {

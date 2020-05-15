@@ -74,17 +74,15 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["build"],
     ),
     boringssl = dict(
-        sha256 = "a3d4de4f03cb321ef943678d72a045c9a19d26b23d6f4e313f97600c65201a27",
-        strip_prefix = "boringssl-1c2769383f027befac5b75b6cedd25daf3bf4dcf",
+        sha256 = "8ae14b52b7889cf92f3b107610b12afb5011506c77f90c7b3d4a36ed7283905a",
+        strip_prefix = "boringssl-107c03cf6d364939469194396bf7a6b2572d0f9c",
         # To update BoringSSL, which tracks Chromium releases:
         # 1. Open https://omahaproxy.appspot.com/ and note <current_version> of linux/stable release.
         # 2. Open https://chromium.googlesource.com/chromium/src/+/refs/tags/<current_version>/DEPS and note <boringssl_revision>.
         # 3. Find a commit in BoringSSL's "master-with-bazel" branch that merges <boringssl_revision>.
         #
-        # chromium-81.0.4044.69
-        urls = ["https://github.com/google/boringssl/archive/1c2769383f027befac5b75b6cedd25daf3bf4dcf.tar.gz"],
-        use_category = ["dataplane"],
-        cpe = "N/A",
+        # chromium-83.0.4103.34 (beta as of 5/4/2020)
+        urls = ["https://github.com/google/boringssl/archive/107c03cf6d364939469194396bf7a6b2572d0f9c.tar.gz"],
     ),
     boringssl_fips = dict(
         sha256 = "b12ad676ee533824f698741bd127f6fbc82c46344398a6d78d25e62c6c418c73",
@@ -403,11 +401,17 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "N/A",
     ),
     com_googlesource_quiche = dict(
+<<<<<<< Updated upstream
         # Static snapshot of https://quiche.googlesource.com/quiche/+archive/41c9fdead26b31deefae3c325a2cf1a873688ba3.tar.gz
         sha256 = "75af53154402e1654cfd32d8aaeed5fab4dbb79d3cab8c9866019d5369c1889e",
         urls = ["https://storage.googleapis.com/quiche-envoy-integration/41c9fdead26b31deefae3c325a2cf1a873688ba3.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
+=======
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/25da9198727ef05edeb99d9f4ce5b6acb3cb87b5.tar.gz
+        sha256 = "52bac2f91a0900730fe3bfb14ffb668f205fe0de48e42ecfee677e3743ec33ee",
+        urls = ["https://storage.googleapis.com/quiche-envoy-integration/25da9198727ef05edeb99d9f4ce5b6acb3cb87b5.tar.gz"],
+>>>>>>> Stashed changes
     ),
     com_googlesource_googleurl = dict(
         # Static snapshot of https://quiche.googlesource.com/quiche/+archive/googleurl_dbf5ad147f60afc125e99db7549402af49a5eae8.tar.gz
