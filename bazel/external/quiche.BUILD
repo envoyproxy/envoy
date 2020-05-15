@@ -59,6 +59,8 @@ quiche_copts = select({
         # Remove these after upstream fix.
         "-Wno-unused-parameter",
         "-Wno-unused-function",
+        "-Wno-unknown-warning-option",
+        "-Wno-deprecated-copy",
         # quic_inlined_frame.h uses offsetof() to optimize memory usage in frames.
         "-Wno-invalid-offsetof",
     ],
