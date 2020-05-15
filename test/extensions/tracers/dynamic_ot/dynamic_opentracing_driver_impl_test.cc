@@ -73,10 +73,14 @@ TEST_F(DynamicOpenTracingDriverTest, InitializeDriver) {
 TEST_F(DynamicOpenTracingDriverTest, FlushSpans) {
   setupValidDriver();
 
-  Tracing::SpanPtr first_span = driver_->startSpan(config_, request_headers_, operation_name_,
-                                                   start_time_, {Tracing::Reason::Sampling, true});
-  first_span->finishSpan();
-  driver_->tracer().Close();
+  {
+    Tracing::SpanPtr first_span = driver_->startSpan(
+        config_, request_headers_, operation_name_, start_time_, {Tracing::Reason::Sampling, true});
+    first_span->finishSpan();
+    driver_->tracer().Close();
+  }
+
+  driver_ = nullptr;
 
   const Json::ObjectSharedPtr spans_json =
       TestEnvironment::jsonLoadFromString(TestEnvironment::readFileToStringForTest(spans_file_));
