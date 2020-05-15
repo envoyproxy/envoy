@@ -1,12 +1,12 @@
-#include "server/http/stats_handler.h"
+#include "server/admin/stats_handler.h"
 
 #include "common/common/empty_string.h"
 #include "common/html/utility.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 
-#include "server/http/prometheus_stats.h"
-#include "server/http/utils.h"
+#include "server/admin/prometheus_stats.h"
+#include "server/admin/utils.h"
 
 namespace Envoy {
 namespace Server {

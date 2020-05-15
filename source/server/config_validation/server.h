@@ -24,7 +24,7 @@
 #include "server/config_validation/api.h"
 #include "server/config_validation/cluster_manager.h"
 #include "server/config_validation/dns.h"
-#include "server/http/admin.h"
+#include "server/admin/admin.h"
 #include "server/listener_manager_impl.h"
 #include "server/server.h"
 

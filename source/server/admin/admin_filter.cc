@@ -1,6 +1,6 @@
-#include "server/http/admin_filter.h"
+#include "server/admin/admin_filter.h"
 
-#include "server/http/utils.h"
+#include "server/admin/utils.h"
 
 namespace Envoy {
 namespace Server {

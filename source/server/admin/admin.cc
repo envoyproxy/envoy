@@ -1,4 +1,4 @@
-#include "server/http/admin.h"
+#include "server/admin/admin.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -46,7 +46,7 @@
 #include "common/router/config_impl.h"
 #include "common/upstream/host_utility.h"
 
-#include "server/http/utils.h"
+#include "server/admin/utils.h"
 
 #include "extensions/access_loggers/file/file_access_log_impl.h"
 

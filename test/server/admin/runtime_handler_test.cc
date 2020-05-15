@@ -1,4 +1,4 @@
-#include "test/server/http/admin_instance.h"
+#include "test/server/admin/admin_instance.h"
 
 namespace Envoy {
 namespace Server {

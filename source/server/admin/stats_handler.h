@@ -11,7 +11,7 @@
 
 #include "common/stats/histogram_impl.h"
 
-#include "server/http/handler_ctx.h"
+#include "server/admin/handler_ctx.h"
 
 #include "absl/strings/string_view.h"
 
