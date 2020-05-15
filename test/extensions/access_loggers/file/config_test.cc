@@ -53,7 +53,7 @@ TEST(FileAccessLogConfigTest, ConfigureFromProto) {
   EXPECT_NE(nullptr, dynamic_cast<FileAccessLog*>(log.get()));
 }
 
-TEST(FileAccessLogConfigTest, FileAccessLogTest) {
+TEST(FileAccessLogConfigTest, DEPRECATED_FEATURE_TEST(FileAccessLogTest)) {
   auto factory =
       Registry::FactoryRegistry<Server::Configuration::AccessLogInstanceFactory>::getFactory(
           AccessLogNames::get().File);
@@ -76,7 +76,7 @@ TEST(FileAccessLogConfigTest, FileAccessLogTest) {
   EXPECT_NE(nullptr, dynamic_cast<FileAccessLog*>(instance.get()));
 }
 
-TEST(FileAccessLogConfigTest, FileAccessLogJsonTest) {
+TEST(FileAccessLogConfigTest, DEPRECATED_FEATURE_TEST(FileAccessLogJsonTest)) {
   envoy::config::accesslog::v3::AccessLog config;
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
@@ -110,7 +110,7 @@ TEST(FileAccessLogConfigTest, FileAccessLogJsonTest) {
   EXPECT_NE(nullptr, dynamic_cast<FileAccessLog*>(log.get()));
 }
 
-TEST(FileAccessLogConfigTest, FileAccessLogTypedJsonTest) {
+TEST(FileAccessLogConfigTest, DEPRECATED_FEATURE_TEST(FileAccessLogTypedJsonTest)) {
   envoy::config::accesslog::v3::AccessLog config;
 
   envoy::extensions::access_loggers::file::v3::FileAccessLog fal_config;
@@ -136,51 +136,69 @@ TEST(FileAccessLogConfigTest, FileAccessLogTypedJsonTest) {
   EXPECT_NE(nullptr, dynamic_cast<FileAccessLog*>(log.get()));
 }
 
-TEST(FileAccessLogConfigTest, FileAccessLogJsonWithBoolValueTest) {
-  {
-    // Make sure we fail if you set a bool value in the format dictionary
-    envoy::config::accesslog::v3::AccessLog config;
-    config.set_name(AccessLogNames::get().File);
+TEST(FileAccessLogConfigTest, DEPRECATED_FEATURE_TEST(FileAccessLogDeprecatedFormat)) {
+  const std::vector<std::string> configs{
+      R"(
+  path: "/foo"
+  format: "plain_text"
+)",
+      R"(
+  path: "/foo"
+  json_format:
+    text: "plain_text"
+)",
+      R"(
+  path: "/foo"
+  typed_json_format:
+    text: "plain_text"
+)",
+  };
+
+  for (const auto& yaml : configs) {
     envoy::extensions::access_loggers::file::v3::FileAccessLog fal_config;
-    fal_config.set_path("/dev/null");
+    TestUtility::loadFromYaml(yaml, fal_config);
 
-    ProtobufWkt::Value bool_value;
-    bool_value.set_bool_value(false);
-    auto json_format = fal_config.mutable_json_format();
-    (*json_format->mutable_fields())["protocol"] = bool_value;
-
+    envoy::config::accesslog::v3::AccessLog config;
     config.mutable_typed_config()->PackFrom(fal_config);
-    NiceMock<Server::Configuration::MockFactoryContext> context;
 
-    EXPECT_THROW_WITH_MESSAGE(AccessLog::AccessLogFactory::fromProto(config, context),
-                              EnvoyException,
-                              "Only string values are supported in the JSON access log format.");
+    NiceMock<Server::Configuration::MockFactoryContext> context;
+    AccessLog::InstanceSharedPtr log = AccessLog::AccessLogFactory::fromProto(config, context);
+
+    EXPECT_NE(nullptr, log);
+    EXPECT_NE(nullptr, dynamic_cast<FileAccessLog*>(log.get()));
   }
 }
 
-TEST(FileAccessLogConfigTest, FileAccessLogJsonWithNestedKeyTest) {
-  {
-    // Make sure we fail if you set a nested Struct value in the format dictionary
-    envoy::config::accesslog::v3::AccessLog config;
-    config.set_name(AccessLogNames::get().File);
+TEST(FileAccessLogConfigTest, FileAccessLogCheckLogFormat) {
+  const std::vector<std::string> configs{
+      // log_format: text_format
+      R"(
+  path: "/foo"
+  log_format:
+    text_format: "plain_text"
+)",
+
+      // log_format: json_format
+      R"(
+  path: "/foo"
+  log_format:
+    json_format:
+      text: "plain_text"
+)",
+  };
+
+  for (const auto& yaml : configs) {
     envoy::extensions::access_loggers::file::v3::FileAccessLog fal_config;
-    fal_config.set_path("/dev/null");
+    TestUtility::loadFromYaml(yaml, fal_config);
 
-    ProtobufWkt::Value string_value;
-    string_value.set_string_value("some_nested_value");
-
-    ProtobufWkt::Value struct_value;
-    (*struct_value.mutable_struct_value()->mutable_fields())["some_nested_key"] = string_value;
-
-    auto json_format = fal_config.mutable_json_format();
-    (*json_format->mutable_fields())["top_level_key"] = struct_value;
-
+    envoy::config::accesslog::v3::AccessLog config;
     config.mutable_typed_config()->PackFrom(fal_config);
-    NiceMock<Server::Configuration::MockFactoryContext> context;
 
-    EXPECT_THROW_WITH_MESSAGE(AccessLog::AccessLogFactory::fromProto(config, context),
-                              EnvoyException,
-                              "Only string values are supported in the JSON access log format.");
+    NiceMock<Server::Configuration::MockFactoryContext> context;
+    AccessLog::InstanceSharedPtr log = AccessLog::AccessLogFactory::fromProto(config, context);
+
+    EXPECT_NE(nullptr, log);
+    EXPECT_NE(nullptr, dynamic_cast<FileAccessLog*>(log.get()));
   }
 }
 

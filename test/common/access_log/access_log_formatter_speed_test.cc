@@ -6,10 +6,12 @@
 
 #include "benchmark/benchmark.h"
 
+namespace Envoy {
+
 namespace {
 
-std::unique_ptr<Envoy::AccessLog::JsonFormatterImpl> MakeJsonFormatter(bool typed) {
-  std::unordered_map<std::string, std::string> JsonLogFormat = {
+std::unique_ptr<Envoy::AccessLog::JsonFormatterImpl> makeJsonFormatter(bool typed) {
+  absl::flat_hash_map<std::string, std::string> JsonLogFormat = {
       {"remote_address", "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"},
       {"start_time", "%START_TIME(%Y/%m/%dT%H:%M:%S%z %s)%"},
       {"method", "%REQ(:METHOD)%"},
@@ -33,8 +35,7 @@ std::unique_ptr<Envoy::TestStreamInfo> makeStreamInfo() {
 
 } // namespace
 
-namespace Envoy {
-
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_AccessLogFormatter(benchmark::State& state) {
   std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo();
   static const char* LogFormat =
@@ -59,9 +60,10 @@ static void BM_AccessLogFormatter(benchmark::State& state) {
 }
 BENCHMARK(BM_AccessLogFormatter);
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_JsonAccessLogFormatter(benchmark::State& state) {
   std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo();
-  std::unique_ptr<Envoy::AccessLog::JsonFormatterImpl> json_formatter = MakeJsonFormatter(false);
+  std::unique_ptr<Envoy::AccessLog::JsonFormatterImpl> json_formatter = makeJsonFormatter(false);
 
   size_t output_bytes = 0;
   Http::TestRequestHeaderMapImpl request_headers;
@@ -76,10 +78,11 @@ static void BM_JsonAccessLogFormatter(benchmark::State& state) {
 }
 BENCHMARK(BM_JsonAccessLogFormatter);
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_TypedJsonAccessLogFormatter(benchmark::State& state) {
   std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo();
   std::unique_ptr<Envoy::AccessLog::JsonFormatterImpl> typed_json_formatter =
-      MakeJsonFormatter(true);
+      makeJsonFormatter(true);
 
   size_t output_bytes = 0;
   Http::TestRequestHeaderMapImpl request_headers;

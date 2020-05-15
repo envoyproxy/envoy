@@ -17,5 +17,6 @@ Common messages
   ../config/core/v3/grpc_method_list.proto
   ../config/core/v3/http_uri.proto
   ../config/core/v3/socket_option.proto
+  ../config/core/v3/substitution_format_string.proto
   ../extensions/common/ratelimit/v3/ratelimit.proto
   ../extensions/filters/common/fault/v3/fault.proto

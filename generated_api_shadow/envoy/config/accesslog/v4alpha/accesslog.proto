@@ -43,7 +43,7 @@ message AccessLog {
   // configurations include:
   //
   // #. "envoy.access_loggers.file": :ref:`FileAccessLog
-  //    <envoy_api_msg_extensions.access_loggers.file.v3.FileAccessLog>`
+  //    <envoy_api_msg_extensions.access_loggers.file.v4alpha.FileAccessLog>`
   // #. "envoy.access_loggers.http_grpc": :ref:`HttpGrpcAccessLogConfig
   //    <envoy_api_msg_extensions.access_loggers.grpc.v3.HttpGrpcAccessLogConfig>`
   // #. "envoy.access_loggers.tcp_grpc": :ref:`TcpGrpcAccessLogConfig

@@ -104,6 +104,8 @@ Format dictionaries have the following restrictions:
   When using the ``typed_json_format``, integer values that exceed :math:`2^{53}` will be
   represented with reduced precision as they must be converted to floating point numbers.
 
+.. _config_access_log_command_operators:
+
 Command Operators
 -----------------
 

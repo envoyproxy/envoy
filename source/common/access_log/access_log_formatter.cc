@@ -107,8 +107,8 @@ std::string FormatterImpl::format(const Http::RequestHeaderMap& request_headers,
   return log_line;
 }
 
-JsonFormatterImpl::JsonFormatterImpl(std::unordered_map<std::string, std::string>& format_mapping,
-                                     bool preserve_types)
+JsonFormatterImpl::JsonFormatterImpl(
+    const absl::flat_hash_map<std::string, std::string>& format_mapping, bool preserve_types)
     : preserve_types_(preserve_types) {
   for (const auto& pair : format_mapping) {
     json_output_format_.emplace(pair.first, AccessLogFormatParser::parse(pair.second));
