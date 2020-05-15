@@ -28,6 +28,22 @@ UberFilterFuzzer::UberFilterFuzzer() {
   perFilterSetup();
 }
 
+std::vector<std::string> UberFilterFuzzer::parseHttpData(const test::fuzz::HttpData& data) {
+  std::vector<std::string> data_chunks;
+
+  if (data.has_http_body()) {
+    data_chunks.reserve(data.http_body().data_size());
+    for (const std::string& http_data : data.http_body().data()) {
+      data_chunks.push_back(http_data);
+    }
+  } else if (data.has_proto_body()) {
+    const std::string serialized = data.proto_body().message().value();
+    data_chunks = absl::StrSplit(serialized, absl::ByLength(data.proto_body().chunk_size()));
+  }
+
+  return data_chunks;
+}
+
 void UberFilterFuzzer::decode(Http::StreamDecoderFilter* filter, const test::fuzz::HttpData& data) {
   bool end_stream = false;
 
@@ -42,22 +58,24 @@ void UberFilterFuzzer::decode(Http::StreamDecoderFilter* filter, const test::fuz
     headers.setHost("foo.com");
   }
 
-  if (data.data().empty() && !data.has_trailers()) {
+  if (data.body_case() == test::fuzz::HttpData::BODY_NOT_SET && !data.has_trailers()) {
     end_stream = true;
   }
-  ENVOY_LOG_MISC(debug, "Decoding headers: {} ", data.headers().DebugString());
+  ENVOY_LOG_MISC(debug, "Decoding headers (end_stream={}): {} ", end_stream,
+                 data.headers().DebugString());
   const auto& headersStatus = filter->decodeHeaders(headers, end_stream);
   if (headersStatus != Http::FilterHeadersStatus::Continue &&
       headersStatus != Http::FilterHeadersStatus::StopIteration) {
     return;
   }
 
-  for (int i = 0; i < data.data().size(); i++) {
-    if (i == data.data().size() - 1 && !data.has_trailers()) {
+  const std::vector<std::string> data_chunks = parseHttpData(data);
+  for (size_t i = 0; i < data_chunks.size(); i++) {
+    if (!data.has_trailers() && i == data_chunks.size() - 1) {
       end_stream = true;
     }
-    Buffer::OwnedImpl buffer(data.data().Get(i));
-    ENVOY_LOG_MISC(debug, "Decoding data: {} ", buffer.toString());
+    Buffer::OwnedImpl buffer(data_chunks[i]);
+    ENVOY_LOG_MISC(debug, "Decoding data (end_stream={}): {} ", end_stream, buffer.toString());
     if (filter->decodeData(buffer, end_stream) != Http::FilterDataStatus::Continue) {
       return;
     }

@@ -426,7 +426,7 @@ TcpHealthCheckMatcher::MatchSegments TcpHealthCheckMatcher::loadProtoBytes(
 bool TcpHealthCheckMatcher::match(const MatchSegments& expected, const Buffer::Instance& buffer) {
   uint64_t start_index = 0;
   for (const std::vector<uint8_t>& segment : expected) {
-    ssize_t search_result = buffer.search(&segment[0], segment.size(), start_index);
+    ssize_t search_result = buffer.search(segment.data(), segment.size(), start_index);
     if (search_result == -1) {
       return false;
     }
@@ -528,7 +528,7 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onInterval() {
   if (!parent_.send_bytes_.empty()) {
     Buffer::OwnedImpl data;
     for (const std::vector<uint8_t>& segment : parent_.send_bytes_) {
-      data.add(&segment[0], segment.size());
+      data.add(segment.data(), segment.size());
     }
 
     client_->write(data, false);

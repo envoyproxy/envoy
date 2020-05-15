@@ -60,6 +60,8 @@ quiche_copts = select({
         "-Wno-unused-parameter",
         "-Wno-unused-function",
         "-Wno-return-type",
+        "-Wno-unknown-warning-option",
+        "-Wno-deprecated-copy",
         # quic_inlined_frame.h uses offsetof() to optimize memory usage in frames.
         "-Wno-invalid-offsetof",
         # to suppress errors re: size_t vs. int comparisons
