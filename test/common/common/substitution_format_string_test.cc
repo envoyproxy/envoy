@@ -62,27 +62,6 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigJson) {
   const std::string expected = R"EOF({
     "text": "plain text",
     "path": "/bar/foo",
-    "code": "200"
-})EOF";
-  EXPECT_TRUE(TestUtility::jsonStringEqual(out_json, expected));
-}
-
-TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigTypedJson) {
-  const std::string yaml = R"EOF(
-  typed_json_format:
-    text: "plain text"
-    path: "%REQ(:path)%"
-    code: "%RESPONSE_CODE%"
-)EOF";
-  TestUtility::loadFromYaml(yaml, config_);
-
-  auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_);
-  const auto out_json =
-      formatter->format(request_headers_, response_headers_, response_trailers_, stream_info_);
-
-  const std::string expected = R"EOF({
-    "text": "plain text",
-    "path": "/bar/foo",
     "code": 200
 })EOF";
   EXPECT_TRUE(TestUtility::jsonStringEqual(out_json, expected));
@@ -100,19 +79,6 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestInvalidConfigs) {
 )",
       R"(
   json_format:
-    field:
-      nest_field: "value"
-)",
-      R"(
-  typed_json_format:
-    field: true
-)",
-      R"(
-  typed_json_format:
-    field: 200
-)",
-      R"(
-  typed_json_format:
     field:
       nest_field: "value"
 )",

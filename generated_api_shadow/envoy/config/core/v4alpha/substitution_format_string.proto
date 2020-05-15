@@ -41,11 +41,6 @@ message SubstitutionFormatString {
 
     // Specify a format with command operators to form a JSON string.
     // Its details is described in :ref:`format dictionary<config_access_log_format_dictionaries>`.
-    // All values are rendered as strings.
-    google.protobuf.Struct json_format = 2 [(validate.rules).message = {required: true}];
-
-    // Specify a format with command operators to form a JSON string.
-    // Its details is described in :ref:`format dictionary<config_access_log_format_dictionaries>`.
     // Values are rendered as strings, numbers, or boolean values as appropriate.
     // Nested JSON objects may be produced by some command operators (e.g. FILTER_STATE or DYNAMIC_METADATA).
     // See the documentation for a specific command operator for details.
@@ -65,6 +60,6 @@ message SubstitutionFormatString {
     //    "message": "My error message"
     //  }
     //
-    google.protobuf.Struct typed_json_format = 3 [(validate.rules).message = {required: true}];
+    google.protobuf.Struct json_format = 2 [(validate.rules).message = {required: true}];
   }
 }

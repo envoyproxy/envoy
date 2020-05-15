@@ -32,22 +32,19 @@ FileAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
 
   if (fal_config.has_log_format()) {
     formatter = SubstitutionFormatStringUtils::fromProtoConfig(fal_config.log_format());
+  } else if (fal_config.has_json_format()) {
+    formatter = SubstitutionFormatStringUtils::createJsonFormatter(fal_config.json_format(), false);
   } else if (fal_config.access_log_format_case() !=
              envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::
                  ACCESS_LOG_FORMAT_NOT_SET) {
-    // Backward compatible code for deprecated access_log_format, to be removed.
     envoy::config::core::v3::SubstitutionFormatString sff_config;
     switch (fal_config.access_log_format_case()) {
     case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::kFormat:
       sff_config.set_text_format(fal_config.format());
       break;
     case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::
-        kJsonFormat:
-      *sff_config.mutable_json_format() = fal_config.json_format();
-      break;
-    case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::
         kTypedJsonFormat:
-      *sff_config.mutable_typed_json_format() = fal_config.typed_json_format();
+      *sff_config.mutable_json_format() = fal_config.typed_json_format();
       break;
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;

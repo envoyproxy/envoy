@@ -20,6 +20,12 @@ public:
    */
   static AccessLog::FormatterPtr
   fromProtoConfig(const envoy::config::core::v3::SubstitutionFormatString& config);
+
+  /**
+   * Generate a Json formatter object from proto::Struct config
+   */
+  static AccessLog::FormatterPtr createJsonFormatter(const ProtobufWkt::Struct& struct_format,
+                                                     bool preserve_types);
 };
 
 } // namespace Envoy
