@@ -363,6 +363,8 @@ envoy_cc_library(
         "//include/envoy/server:listener_manager_interface",
         "//include/envoy/server:transport_socket_config_interface",
         "//include/envoy/server:worker_interface",
+        "//source/common/common:basic_resource_lib",
+        "//source/common/common:empty_string",
         "//source/common/config:utility_lib",
         "//source/common/config:version_converter_lib",
         "//source/common/http:conn_manager_lib",

@@ -118,6 +118,7 @@ envoy_cc_library(
         ":connection_interface",
         ":listen_socket_interface",
         "//include/envoy/access_log:access_log_interface",
+        "//include/envoy/common:resource_interface",
         "//include/envoy/stats:stats_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],

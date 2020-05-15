@@ -35,6 +35,7 @@ envoy_cc_library(
         "//source/common/access_log:access_log_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
+        "//source/common/common:basic_resource_lib",
         "//source/common/common:empty_string",
         "//source/common/common:macros",
         "//source/common/common:minimal_logger_lib",
