@@ -17,13 +17,13 @@ namespace Envoy {
 namespace Server {
 namespace {
 
-const int kDrainTimeSeconds(600);
+const int DrainTickSeconds(600);
 
 class DrainManagerImplTest : public testing::Test, public Event::TestUsingSimulatedTime {
 public:
   DrainManagerImplTest() {
     ON_CALL(server_.options_, drainTime())
-        .WillByDefault(Return(std::chrono::seconds(kDrainTimeSeconds)));
+        .WillByDefault(Return(std::chrono::seconds(DrainTickSeconds)));
     ON_CALL(server_.options_, parentShutdownTime())
         .WillByDefault(Return(std::chrono::seconds(900)));
   }
@@ -66,14 +66,14 @@ TEST_F(DrainManagerImplTest, DrainDeadline) {
   // Ensure drainClose() behaviour is determined by the deadline.
   drain_manager.startDrainSequence([] {});
   EXPECT_CALL(server_, healthCheckFailed()).WillRepeatedly(Return(false));
-  ON_CALL(server_.random_, random()).WillByDefault(Return(kDrainTimeSeconds * 2 - 1));
+  ON_CALL(server_.random_, random()).WillByDefault(Return(DrainTickSeconds * 2 - 1));
   ON_CALL(server_.options_, drainTime())
-      .WillByDefault(Return(std::chrono::seconds(kDrainTimeSeconds)));
+      .WillByDefault(Return(std::chrono::seconds(DrainTickSeconds)));
 
   // random() should be called when elapsed time < drain timeout
   EXPECT_CALL(server_.random_, random()).Times(2);
   EXPECT_FALSE(drain_manager.drainClose());
-  simTime().advanceTimeWait(std::chrono::seconds(kDrainTimeSeconds - 1));
+  simTime().advanceTimeWait(std::chrono::seconds(DrainTickSeconds - 1));
   EXPECT_FALSE(drain_manager.drainClose());
   simTime().advanceTimeWait(std::chrono::seconds(1));
   EXPECT_TRUE(drain_manager.drainClose());
