@@ -39,7 +39,6 @@
 #include "extensions/quic_listeners/quiche/platform/envoy_quic_clock.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
 
-using testing::AnyNumber;
 using testing::Return;
 using testing::ReturnRef;
 
