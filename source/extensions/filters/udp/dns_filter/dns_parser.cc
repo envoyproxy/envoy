@@ -526,6 +526,10 @@ void DnsMessageParser::buildResponseBuffer(DnsQueryContextPtr& query_context,
   static constexpr uint64_t MAX_DNS_RESPONSE_SIZE = 512;
   static constexpr uint64_t MAX_DNS_NAME_SIZE = 255;
 
+  // Amazon Route53 will return up to 8 records in an answer
+  // https://aws.amazon.com/route53/faqs/#associate_multiple_ip_with_single_record
+  static constexpr uint64_t MAX_RETURNED_RECORDS = 8;
+
   // Each response must have DNS flags, which spans 4 bytes. Account for them immediately so that we
   // can adjust the number of returned answers to remain under the limit
   uint64_t total_buffer_size = sizeof(DnsHeaderFlags);
@@ -547,12 +551,14 @@ void DnsMessageParser::buildResponseBuffer(DnsQueryContextPtr& query_context,
     ++serialized_queries;
     total_buffer_size += query_buffer.length();
 
-    // Generate a set of random indices of the answer records that we serialize. We do this
-    // so that we don't always return the same records in the same order for every query
-    absl::flat_hash_set<size_t> indices{};
-    generateRandomIndices(query_context->answers_.size(), indices);
-
     const auto& answers = query_context->answers_;
+
+    // Generate a set of up to 8 random indices of the answer records that we serialize. We do this
+    // so that we don't always return the same records in the same order for every query.
+    absl::flat_hash_set<size_t> indices{};
+    const size_t max_indices = std::min(answers.size(), MAX_RETURNED_RECORDS);
+    generateRandomIndices(max_indices, indices);
+
     for (const size_t index : indices) {
       const auto answer = std::next(answers.begin(), index);
       // Query names are limited to 255 characters. Since we are using ares to decode the encoded
