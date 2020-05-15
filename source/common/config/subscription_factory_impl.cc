@@ -30,7 +30,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
 
   const auto transport_api_version = config.api_config_source().transport_api_version();
   if (transport_api_version == envoy::config::core::v3::ApiVersion::V2 &&
-      runtime_.snapshot().runtimeFeatureEnabled("api.enable_deprecated_warning")) {
+      runtime_.snapshot().runtimeFeatureEnabled("envoy.api.enable_deprecated_v2_api_warning")) {
     runtime_.snapshot().countDeprecatedFeatureUse();
     ENVOY_LOG(warn,
               "xDS of version v2 has been deprecated and will be removed in subsequent versions");
