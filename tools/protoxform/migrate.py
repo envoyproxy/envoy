@@ -191,6 +191,8 @@ class UpgradeVisitor(visitor.Visitor):
 
   def VisitEnum(self, enum_proto, type_context):
     upgraded_proto = copy.deepcopy(enum_proto)
+    if upgraded_proto.options.deprecated and not self._envoy_internal_shadow:
+      options.AddHideOption(upgraded_proto.options)
     for v in upgraded_proto.value:
       if v.options.deprecated:
         # We need special handling for the zero field, as proto3 needs some value
