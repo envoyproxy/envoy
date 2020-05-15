@@ -34,6 +34,10 @@ SdsApi::SdsApi(envoy::config::core::v3::ConfigSource sds_config, absl::string_vi
   // two listeners which share same SdsApi to register at separate init managers, and
   // each init manager has a chance to initialize its targets.
   init_manager.add(init_target_);
+  const auto resource_name = getResourceName();
+  // This has to happen here (rather than in initialize()) as it can throw exceptions.
+  subscription_ = subscription_factory_.subscriptionFromConfigSource(
+      sds_config_, Grpc::Common::typeUrl(resource_name), stats_, *this);
 }
 
 void SdsApi::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
@@ -111,9 +115,8 @@ void SdsApi::validateUpdateSize(int num_resources) {
 }
 
 void SdsApi::initialize() {
-  const auto resource_name = getResourceName();
-  subscription_ = subscription_factory_.subscriptionFromConfigSource(
-      sds_config_, Grpc::Common::typeUrl(resource_name), stats_, *this);
+  // Don't put any code here that can throw exceptions, this has been the cause of multiple
+  // hard-to-diagnose regressions.
   subscription_->start({sds_config_name_});
 }
 

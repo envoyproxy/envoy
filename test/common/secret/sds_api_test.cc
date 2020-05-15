@@ -24,6 +24,7 @@
 
 using ::testing::_;
 using ::testing::Invoke;
+using ::testing::InvokeWithoutArgs;
 
 namespace Envoy {
 namespace Secret {
@@ -61,6 +62,23 @@ TEST_F(SdsApiTest, BasicTest) {
       config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_,
       server.stats(), init_manager_, []() {}, *dispatcher_, *api_);
   initialize();
+}
+
+// Validate that SdsApi object is created and initialized successfully.
+TEST_F(SdsApiTest, BadConfigSource) {
+  ::testing::InSequence s;
+  NiceMock<Server::MockInstance> server;
+  envoy::config::core::v3::ConfigSource config_source;
+  EXPECT_CALL(subscription_factory_, subscriptionFromConfigSource(_, _, _, _))
+      .WillOnce(InvokeWithoutArgs([]() -> Config::SubscriptionPtr {
+        throw EnvoyException("bad config");
+        return nullptr;
+      }));
+  EXPECT_THROW_WITH_MESSAGE(TlsCertificateSdsApi(
+                                config_source, "abc.com", subscription_factory_, time_system_,
+                                validation_visitor_, server.stats(), init_manager_, []() {},
+                                *dispatcher_, *api_),
+                            EnvoyException, "bad config");
 }
 
 // Validate that TlsCertificateSdsApi updates secrets successfully if a good secret
