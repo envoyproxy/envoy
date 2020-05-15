@@ -40,6 +40,7 @@ message ClusterLoadAssignment {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.ClusterLoadAssignment.Policy";
 
+    // [#not-implemented-hide:]
     message DropOverload {
       option (udpa.annotations.versioning).previous_message_type =
           "envoy.api.v2.ClusterLoadAssignment.Policy.DropOverload";
@@ -74,6 +75,7 @@ message ClusterLoadAssignment {
     //    "throttle"_drop = 60%
     //    "lb"_drop = 20%  // 50% of the remaining 'actual' load, which is 40%.
     //    actual_outgoing_load = 20% // remaining after applying all categories.
+    // [#not-implemented-hide:]
     repeated DropOverload drop_overloads = 2;
 
     // Priority levels and localities are considered overprovisioned with this

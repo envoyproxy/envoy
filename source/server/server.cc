@@ -416,6 +416,21 @@ void InstanceImpl::initialize(const Options& options,
     dispatcher_->initializeStats(stats_store_, "server.");
   }
 
+  // The broad order of initialization from this point on is the following:
+  // 1. Statically provisioned configuration (bootstrap) are loaded.
+  // 2. Cluster manager is created and all primary clusters (i.e. with endpoint assignments
+  //    provisioned statically in bootstrap, discovered through DNS or file based CDS) are
+  //    initialized.
+  // 3. Various services are initialized and configured using the bootstrap config.
+  // 4. RTDS is initialized using primary clusters. This  allows runtime overrides to be fully
+  //    configured before the rest of xDS configuration is provisioned.
+  // 5. Secondary clusters (with endpoint assignments provisioned by xDS servers) are initialized.
+  // 6. The rest of the dynamic configuration is provisioned.
+  //
+  // Please note: this order requires that RTDS is provisioned using a primary cluster. If RTDS is
+  // provisioned through ADS then ADS must use primary cluster as well. This invariant is enforced
+  // during RTDS initialization and invalid configuration will be rejected.
+
   // Runtime gets initialized before the main configuration since during main configuration
   // load things may grab a reference to the loader for later use.
   runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
@@ -450,6 +465,32 @@ void InstanceImpl::initialize(const Options& options,
   // instantiated (which in turn relies on runtime...).
   Runtime::LoaderSingleton::get().initialize(clusterManager());
 
+  clusterManager().setPrimaryClustersInitializedCb(
+      [this]() { onClusterManagerPrimaryInitializationComplete(); });
+
+  for (Stats::SinkPtr& sink : config_.statsSinks()) {
+    stats_store_.addSink(*sink);
+  }
+
+  // Some of the stat sinks may need dispatcher support so don't flush until the main loop starts.
+  // Just setup the timer.
+  stat_flush_timer_ = dispatcher_->createTimer([this]() -> void { flushStats(); });
+  stat_flush_timer_->enableTimer(config_.statsFlushInterval());
+
+  // GuardDog (deadlock detection) object and thread setup before workers are
+  // started and before our own run() loop runs.
+  guard_dog_ = std::make_unique<Server::GuardDogImpl>(stats_store_, config_, *api_);
+}
+
+void InstanceImpl::onClusterManagerPrimaryInitializationComplete() {
+  // If RTDS was not configured the `onRuntimeReady` callback is immediately invoked.
+  Runtime::LoaderSingleton::get().startRtdsSubscriptions([this]() { onRuntimeReady(); });
+}
+
+void InstanceImpl::onRuntimeReady() {
+  // Begin initializing secondary clusters after RTDS configuration has been applied.
+  clusterManager().initializeSecondaryClusters(bootstrap_);
+
   if (bootstrap_.has_hds_config()) {
     const auto& hds_config = bootstrap_.hds_config();
     async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
@@ -464,19 +505,6 @@ void InstanceImpl::initialize(const Options& options,
         *config_.clusterManager(), *local_info_, *admin_, *singleton_manager_, thread_local_,
         messageValidationContext().dynamicValidationVisitor(), *api_);
   }
-
-  for (Stats::SinkPtr& sink : config_.statsSinks()) {
-    stats_store_.addSink(*sink);
-  }
-
-  // Some of the stat sinks may need dispatcher support so don't flush until the main loop starts.
-  // Just setup the timer.
-  stat_flush_timer_ = dispatcher_->createTimer([this]() -> void { flushStats(); });
-  stat_flush_timer_->enableTimer(config_.statsFlushInterval());
-
-  // GuardDog (deadlock detection) object and thread setup before workers are
-  // started and before our own run() loop runs.
-  guard_dog_ = std::make_unique<Server::GuardDogImpl>(stats_store_, config_, *api_);
 }
 
 void InstanceImpl::startWorkers() {
@@ -496,8 +524,8 @@ Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
   ENVOY_LOG(info, "runtime: {}", MessageUtil::getYamlStringFromMessage(config.runtime()));
   return std::make_unique<Runtime::LoaderImpl>(
       server.dispatcher(), server.threadLocal(), config.runtime(), server.localInfo(),
-      server.initManager(), server.stats(), server.random(),
-      server.messageValidationContext().dynamicValidationVisitor(), server.api());
+      server.stats(), server.random(), server.messageValidationContext().dynamicValidationVisitor(),
+      server.api());
 }
 
 void InstanceImpl::loadServerFlags(const absl::optional<std::string>& flags_path) {
