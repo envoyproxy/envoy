@@ -406,10 +406,10 @@ def FormatSecurityOptions(security_option, field, type_context, edge_default_yam
 
   if security_option.configure_for_untrusted_downstream:
     sections.append(
-        Indent(4, 'This field should be configured in the presence of untrusted *downstreams*'))
+        Indent(4, 'This field should be configured in the presence of untrusted *downstreams*.'))
   if security_option.configure_for_untrusted_upstream:
     sections.append(
-        Indent(4, 'This field should be configured in the presence of untrusted *upstreams*'))
+        Indent(4, 'This field should be configured in the presence of untrusted *upstreams*.'))
 
   validate_fragment.ValidateFragment(field.type_name[1:], edge_default_yaml)
   field_name = type_context.name.split('.')[-1]
@@ -420,7 +420,7 @@ def FormatSecurityOptions(security_option, field, type_context, edge_default_yam
       '\n'.join(IndentLines(6,
                             yaml.dump(example).split('\n'))))
 
-  return '.. note::\n' + '\n\n'.join(sections)
+  return '.. attention::\n' + '\n\n'.join(sections)
 
 
 def FormatFieldAsDefinitionListItem(outer_type_context, type_context, field,

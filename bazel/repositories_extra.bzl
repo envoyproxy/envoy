@@ -12,7 +12,7 @@ def _python_deps():
     )
     pip3_import(
         name = "protodoc_pip3",
-        requirements = "//tools/protodoc:requirements.txt",
+        requirements = "@envoy//tools/protodoc:requirements.txt",
     )
 
 # Envoy deps that rely on a first stage of dependency loading in envoy_dependencies().
