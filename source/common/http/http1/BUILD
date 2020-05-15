@@ -29,7 +29,6 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/buffer:watermark_buffer_lib",
         "//source/common/common:assert_lib",
-        "//source/common/common:cleanup_lib",
         "//source/common/common:statusor_lib",
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",

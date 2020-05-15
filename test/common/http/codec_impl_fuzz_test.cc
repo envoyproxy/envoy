@@ -88,6 +88,7 @@ fromHttp2Settings(const test::common::http::Http2Settings& settings) {
       settings.initial_connection_window_size() %
           (1 + Http2Utility::OptionsLimits::MAX_INITIAL_CONNECTION_WINDOW_SIZE -
            Http2Utility::OptionsLimits::MIN_INITIAL_CONNECTION_WINDOW_SIZE));
+  options.set_allow_metadata(true);
   return options;
 }
 
@@ -180,6 +181,7 @@ public:
     if (!end_stream) {
       request_.request_encoder_->getStream().addCallbacks(request_.stream_callbacks_);
     }
+
     request_.request_encoder_->encodeHeaders(request_headers, end_stream);
     request_.stream_state_ = end_stream ? StreamState::Closed : StreamState::PendingDataOrTrailers;
     response_.stream_state_ = StreamState::PendingHeaders;
@@ -271,6 +273,17 @@ public:
       }
       break;
     }
+    case test::common::http::DirectionalAction::kMetadata: {
+      if (state.isLocalOpen() && state.stream_state_ != StreamState::Closed) {
+        if (response) {
+          state.response_encoder_->encodeMetadata(
+              Fuzz::fromMetadata(directional_action.metadata()));
+        } else {
+          state.request_encoder_->encodeMetadata(Fuzz::fromMetadata(directional_action.metadata()));
+        }
+      }
+      break;
+    }
     case test::common::http::DirectionalAction::kResetStream: {
       if (state.stream_state_ != StreamState::Closed) {
         StreamEncoder* encoder;
@@ -318,6 +331,29 @@ public:
       ENVOY_LOG_MISC(debug, "Request stream action on {} in state {} {}", stream_index_,
                      static_cast<int>(request_.stream_state_),
                      static_cast<int>(response_.stream_state_));
+      if (stream_action.has_dispatching_action()) {
+        // Simulate some response action while dispatching request headers, data, or trailers. This
+        // may happen as a result of a filter sending a direct response.
+        ENVOY_LOG_MISC(debug, "Setting dispatching action  on {} in state {} {}", stream_index_,
+                       static_cast<int>(request_.stream_state_),
+                       static_cast<int>(response_.stream_state_));
+        auto request_action = stream_action.request().directional_action_selector_case();
+        if (request_action == test::common::http::DirectionalAction::kHeaders) {
+          EXPECT_CALL(request_.request_decoder_, decodeHeaders_(_, _))
+              .WillOnce(InvokeWithoutArgs(
+                  [&] { directionalAction(response_, stream_action.dispatching_action()); }));
+        } else if (request_action == test::common::http::DirectionalAction::kData) {
+          EXPECT_CALL(request_.request_decoder_, decodeData(_, _))
+              .Times(testing::AtLeast(1))
+              .WillRepeatedly(InvokeWithoutArgs(
+                  [&] { directionalAction(response_, stream_action.dispatching_action()); }));
+        } else if (request_action == test::common::http::DirectionalAction::kTrailers) {
+          EXPECT_CALL(request_.request_decoder_, decodeTrailers_(_))
+              .WillOnce(InvokeWithoutArgs(
+                  [&] { directionalAction(response_, stream_action.dispatching_action()); }));
+        }
+      }
+      // Perform the stream action.
       directionalAction(request_, stream_action.request());
       break;
     }
