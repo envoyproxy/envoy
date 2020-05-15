@@ -51,9 +51,9 @@ inline std::string replaceInvalidCharacters(absl::string_view string) {
 inline std::string replaceInvalidHostCharacters(absl::string_view string) {
   std::string filtered;
   filtered.reserve(string.length());
-  for (const uint8_t* c = reinterpret_cast<const uint8_t*>(string.data()); *c; ++c) {
-    if (nghttp2_check_authority(c, 1)) {
-      filtered.push_back(*c);
+  for (const char& c : string) {
+    if (nghttp2_check_authority(reinterpret_cast<const uint8_t*>(&c), 1)) {
+      filtered.push_back(c);
     } else {
       filtered.push_back('0');
     }
