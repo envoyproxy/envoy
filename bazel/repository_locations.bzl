@@ -67,10 +67,10 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["build"],
     ),
     envoy_build_tools = dict(
-        sha256 = "328648f158e7167f881d984433ff6bfe203bf0b815a99d98d22fb01a0fc95f70",
-        strip_prefix = "envoy-build-tools-f41e5ef5a023e50da088035449c6cdee0ae30d71",
-        # 2020-05-11
-        urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/f41e5ef5a023e50da088035449c6cdee0ae30d71.tar.gz"],
+        sha256 = "b0efe70a1d122fffb89570771f4ec3b912aa0a8a0ce56218223918d7737d01e2",
+        strip_prefix = "envoy-build-tools-3cbc1d66b9e9ead42daf69e01597cacf4fb52151",
+        # 2020-05-15
+        urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/3cbc1d66b9e9ead42daf69e01597cacf4fb52151.tar.gz"],
         use_category = ["build"],
     ),
     boringssl = dict(
@@ -434,10 +434,10 @@ DEPENDENCY_REPOSITORIES = dict(
     # provided as part of the compiler-rt source distribution. We can't use the
     # Clang variant as we are not a Clang-LLVM only shop today.
     org_llvm_releases_compiler_rt = dict(
-        sha256 = "56e4cd96dd1d8c346b07b4d6b255f976570c6f2389697347a6c3dcb9e820d10e",
+        sha256 = "6a7da64d3a0a7320577b68b9ca4933bdcab676e898b759850e827333c3282c75",
         # Only allow peeking at fuzzer related files for now.
-        strip_prefix = "compiler-rt-9.0.0.src/lib",
-        urls = ["http://releases.llvm.org/9.0.0/compiler-rt-9.0.0.src.tar.xz"],
+        strip_prefix = "compiler-rt-10.0.0.src/include",
+        urls = ["https://github.com/llvm/llvm-project/releases/download/llvmorg-10.0.0/compiler-rt-10.0.0.src.tar.xz"],
         use_category = ["test"],
     ),
     upb = dict(
