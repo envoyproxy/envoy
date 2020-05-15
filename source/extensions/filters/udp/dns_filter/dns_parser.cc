@@ -528,7 +528,7 @@ void DnsMessageParser::buildResponseBuffer(DnsQueryContextPtr& query_context,
 
   // Amazon Route53 will return up to 8 records in an answer
   // https://aws.amazon.com/route53/faqs/#associate_multiple_ip_with_single_record
-  static constexpr uint64_t MAX_RETURNED_RECORDS = 8;
+  static constexpr size_t MAX_RETURNED_RECORDS = 8;
 
   // Each response must have DNS flags, which spans 4 bytes. Account for them immediately so that we
   // can adjust the number of returned answers to remain under the limit
