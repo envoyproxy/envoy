@@ -137,7 +137,7 @@ makeLocalityWeights(std::initializer_list<uint32_t> locality_weights) {
 }
 
 inline envoy::config::core::v3::HealthCheck
-parseHealthCheckFromV2Yaml(const std::string& yaml_string) {
+parseHealthCheckFromV3Yaml(const std::string& yaml_string) {
   envoy::config::core::v3::HealthCheck health_check;
   TestUtility::loadFromYamlAndValidate(yaml_string, health_check);
   return health_check;

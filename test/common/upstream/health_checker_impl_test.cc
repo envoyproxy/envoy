@@ -146,7 +146,7 @@ public:
     )EOF";
 
     health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
-        *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+        *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
         HealthCheckEventLoggerPtr(event_logger_));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
@@ -170,7 +170,7 @@ public:
     )EOF";
 
     health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
-        *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+        *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
         HealthCheckEventLoggerPtr(event_logger_));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
@@ -193,7 +193,7 @@ public:
     )EOF";
 
     health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
-        *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+        *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
         HealthCheckEventLoggerPtr(event_logger_));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
@@ -216,7 +216,7 @@ public:
     )EOF";
 
     health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
-        *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+        *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
         HealthCheckEventLoggerPtr(event_logger_));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
@@ -239,7 +239,7 @@ public:
     )EOF";
 
     health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
-        *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+        *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
         HealthCheckEventLoggerPtr(event_logger_));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
@@ -263,7 +263,7 @@ public:
     )EOF";
 
     health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
-        *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+        *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
         HealthCheckEventLoggerPtr(event_logger_));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
@@ -284,7 +284,7 @@ public:
     )EOF";
 
     health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
-        *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+        *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
         HealthCheckEventLoggerPtr(event_logger_));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
@@ -310,7 +310,7 @@ public:
     )EOF";
 
     health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
-        *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+        *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
         HealthCheckEventLoggerPtr(event_logger_));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
@@ -332,7 +332,7 @@ public:
     )EOF";
 
     health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
-        *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+        *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
         HealthCheckEventLoggerPtr(event_logger_));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
@@ -355,7 +355,7 @@ public:
                                    prefix);
 
     health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
-        *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+        *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
         HealthCheckEventLoggerPtr(event_logger_));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
@@ -377,7 +377,7 @@ public:
     )EOF";
 
     health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
-        *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+        *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
         HealthCheckEventLoggerPtr(event_logger_));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
@@ -399,7 +399,7 @@ public:
     )EOF";
 
     health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
-        *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+        *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
         HealthCheckEventLoggerPtr(event_logger_));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
@@ -423,7 +423,7 @@ public:
     )EOF";
 
     health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
-        *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+        *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
         HealthCheckEventLoggerPtr(event_logger_));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
@@ -447,7 +447,7 @@ public:
                                    host);
 
     health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
-        *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+        *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
         HealthCheckEventLoggerPtr(event_logger_));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
@@ -522,7 +522,7 @@ public:
     )EOF";
 
     health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
-        *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+        *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
         HealthCheckEventLoggerPtr(event_logger_));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
@@ -547,7 +547,7 @@ public:
     )EOF";
 
     health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
-        *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+        *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
         HealthCheckEventLoggerPtr(event_logger_));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
@@ -1027,7 +1027,7 @@ TEST_F(HttpHealthCheckerImplTest, ZeroRetryInterval) {
     )EOF";
 
   health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
-      *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+      *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
       HealthCheckEventLoggerPtr(event_logger_));
   health_checker_->addHostCheckCompleteCb(
       [this](HostSharedPtr host, HealthTransition changed_state) -> void {
@@ -1097,7 +1097,7 @@ TEST_F(HttpHealthCheckerImplTest, TlsOptions) {
   EXPECT_CALL(*socket_factory, createTransportSocket(ApplicationProtocolListEq("http1")));
 
   health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
-      *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+      *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
       HealthCheckEventLoggerPtr(event_logger_));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
@@ -2528,7 +2528,7 @@ TEST_F(HttpHealthCheckerImplTest, TransportSocketMatchCriteria) {
   cluster_->info_->transport_socket_matcher_ = std::move(transport_socket_match);
 
   health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
-      *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+      *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
       HealthCheckEventLoggerPtr(event_logger_));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
@@ -2571,7 +2571,7 @@ TEST_F(HttpHealthCheckerImplTest, NoTransportSocketMatchCriteria) {
   cluster_->info_->transport_socket_matcher_ = std::move(transport_socket_match);
 
   health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
-      *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+      *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
       HealthCheckEventLoggerPtr(event_logger_));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
@@ -2614,7 +2614,7 @@ public:
     )EOF";
 
     health_checker_ = std::make_shared<TestProdHttpHealthChecker>(
-        *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+        *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
         HealthCheckEventLoggerPtr(event_logger_));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
@@ -2637,7 +2637,7 @@ public:
     )EOF";
 
     health_checker_ = std::make_shared<TestProdHttpHealthChecker>(
-        *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+        *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
         HealthCheckEventLoggerPtr(event_logger_));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
@@ -2672,7 +2672,7 @@ TEST_F(HttpHealthCheckerImplTest, DEPRECATED_FEATURE_TEST(Http1CodecClient)) {
     )EOF";
 
   health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
-      *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+      *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
       HealthCheckEventLoggerPtr(event_logger_));
   health_checker_->addHostCheckCompleteCb(
       [this](HostSharedPtr host, HealthTransition changed_state) -> void {
@@ -2697,7 +2697,7 @@ TEST_F(HttpHealthCheckerImplTest, DEPRECATED_FEATURE_TEST(Http2CodecClient)) {
     )EOF";
 
   health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
-      *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+      *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
       HealthCheckEventLoggerPtr(event_logger_));
   health_checker_->addHostCheckCompleteCb(
       [this](HostSharedPtr host, HealthTransition changed_state) -> void {
@@ -2791,7 +2791,7 @@ TEST(HttpStatusChecker, Default) {
   )EOF";
 
   HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
-      parseHealthCheckFromV2Yaml(yaml).http_health_check().expected_statuses(), 200);
+      parseHealthCheckFromV3Yaml(yaml).http_health_check().expected_statuses(), 200);
 
   EXPECT_TRUE(http_status_checker.inRange(200));
   EXPECT_FALSE(http_status_checker.inRange(204));
@@ -2813,7 +2813,7 @@ TEST(HttpStatusChecker, Single100) {
   )EOF";
 
   HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
-      parseHealthCheckFromV2Yaml(yaml).http_health_check().expected_statuses(), 200);
+      parseHealthCheckFromV3Yaml(yaml).http_health_check().expected_statuses(), 200);
 
   EXPECT_FALSE(http_status_checker.inRange(200));
 
@@ -2838,7 +2838,7 @@ TEST(HttpStatusChecker, Single599) {
   )EOF";
 
   HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
-      parseHealthCheckFromV2Yaml(yaml).http_health_check().expected_statuses(), 200);
+      parseHealthCheckFromV3Yaml(yaml).http_health_check().expected_statuses(), 200);
 
   EXPECT_FALSE(http_status_checker.inRange(200));
 
@@ -2865,7 +2865,7 @@ TEST(HttpStatusChecker, Ranges_204_304) {
   )EOF";
 
   HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
-      parseHealthCheckFromV2Yaml(yaml).http_health_check().expected_statuses(), 200);
+      parseHealthCheckFromV3Yaml(yaml).http_health_check().expected_statuses(), 200);
 
   EXPECT_FALSE(http_status_checker.inRange(200));
 
@@ -2894,7 +2894,7 @@ TEST(HttpStatusChecker, Below100) {
 
   EXPECT_THROW_WITH_MESSAGE(
       HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
-          parseHealthCheckFromV2Yaml(yaml).http_health_check().expected_statuses(), 200),
+          parseHealthCheckFromV3Yaml(yaml).http_health_check().expected_statuses(), 200),
       EnvoyException, "Invalid http status range: expecting start >= 100, but found start=99");
 }
 
@@ -2915,7 +2915,7 @@ TEST(HttpStatusChecker, Above599) {
 
   EXPECT_THROW_WITH_MESSAGE(
       HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
-          parseHealthCheckFromV2Yaml(yaml).http_health_check().expected_statuses(), 200),
+          parseHealthCheckFromV3Yaml(yaml).http_health_check().expected_statuses(), 200),
       EnvoyException, "Invalid http status range: expecting end <= 600, but found end=601");
 }
 
@@ -2936,7 +2936,7 @@ TEST(HttpStatusChecker, InvalidRange) {
 
   EXPECT_THROW_WITH_MESSAGE(
       HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
-          parseHealthCheckFromV2Yaml(yaml).http_health_check().expected_statuses(), 200),
+          parseHealthCheckFromV3Yaml(yaml).http_health_check().expected_statuses(), 200),
       EnvoyException,
       "Invalid http status range: expecting start < end, but found start=200 and end=200");
 }
@@ -2958,7 +2958,7 @@ TEST(HttpStatusChecker, InvalidRange2) {
 
   EXPECT_THROW_WITH_MESSAGE(
       HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
-          parseHealthCheckFromV2Yaml(yaml).http_health_check().expected_statuses(), 200),
+          parseHealthCheckFromV3Yaml(yaml).http_health_check().expected_statuses(), 200),
       EnvoyException,
       "Invalid http status range: expecting start < end, but found start=201 and end=200");
 }
@@ -3044,7 +3044,7 @@ public:
     )EOF";
 
     health_checker_ = std::make_shared<TcpHealthCheckerImpl>(
-        *cluster_, parseHealthCheckFromV2Yaml(yaml.str()), dispatcher_, runtime_, random_,
+        *cluster_, parseHealthCheckFromV3Yaml(yaml.str()), dispatcher_, runtime_, random_,
         HealthCheckEventLoggerPtr(event_logger_));
   }
 
@@ -3058,7 +3058,7 @@ public:
     )EOF";
 
     health_checker_ = std::make_shared<TcpHealthCheckerImpl>(
-        *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+        *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
         HealthCheckEventLoggerPtr(event_logger_));
   }
 
@@ -3077,7 +3077,7 @@ public:
     )EOF";
 
     health_checker_ = std::make_shared<TcpHealthCheckerImpl>(
-        *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+        *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
         HealthCheckEventLoggerPtr(event_logger_));
   }
 
@@ -4842,7 +4842,7 @@ TEST(HealthCheckProto, Validation) {
       path: /healthcheck
     )EOF";
     envoy::config::core::v3::HealthCheck health_check_proto;
-    EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV2Yaml(yaml)), EnvoyException,
+    EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV3Yaml(yaml)), EnvoyException,
                             "Proto constraint validation failed.*value must be greater than.*");
   }
   {
@@ -4858,7 +4858,7 @@ TEST(HealthCheckProto, Validation) {
       path: /healthcheck
     )EOF";
     envoy::config::core::v3::HealthCheck health_check_proto;
-    EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV2Yaml(yaml)), EnvoyException,
+    EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV3Yaml(yaml)), EnvoyException,
                             "Proto constraint validation failed.*value must be greater than.*");
   }
   {
@@ -4874,7 +4874,7 @@ TEST(HealthCheckProto, Validation) {
       path: /healthcheck
     )EOF";
     envoy::config::core::v3::HealthCheck health_check_proto;
-    EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV2Yaml(yaml)), EnvoyException,
+    EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV3Yaml(yaml)), EnvoyException,
                             "Proto constraint validation failed.*value must be greater than.*");
   }
   {
@@ -4890,7 +4890,7 @@ TEST(HealthCheckProto, Validation) {
       path: /healthcheck
     )EOF";
     envoy::config::core::v3::HealthCheck health_check_proto;
-    EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV2Yaml(yaml)), EnvoyException,
+    EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV3Yaml(yaml)), EnvoyException,
                             "Proto constraint validation failed.*value must be greater than.*");
   }
   {
@@ -4904,7 +4904,7 @@ TEST(HealthCheckProto, Validation) {
       path: /healthcheck
     )EOF";
     envoy::config::core::v3::HealthCheck health_check_proto;
-    EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV2Yaml(yaml)), EnvoyException,
+    EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV3Yaml(yaml)), EnvoyException,
                             "Proto constraint validation failed.*value is required.*");
   }
   {
@@ -4918,7 +4918,7 @@ TEST(HealthCheckProto, Validation) {
       path: /healthcheck
     )EOF";
     envoy::config::core::v3::HealthCheck health_check_proto;
-    EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV2Yaml(yaml)), EnvoyException,
+    EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV3Yaml(yaml)), EnvoyException,
                             "Proto constraint validation failed.*value is required.*");
   }
 }
