@@ -44,7 +44,7 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
 void Filter::onRead() {
     ProxyState status = onReadWorker();
 
-    if(state == ProxyState::ProtocolFail){
+    if(status == ProxyState::ProtocolFail){
         config_->stats_.downstream_cx_proxy_proto_error_.inc();
         cb_->continueFilterChain(false);
     }

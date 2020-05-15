@@ -77,7 +77,7 @@ private:
   static const size_t MAX_PROXY_PROTO_LEN_V1 = 108;
 
   void onRead();
-  void onReadWorker();
+  ProxyState onReadWorker();
 
   /**
    * Helper function that attempts to read the proxy header
@@ -95,9 +95,9 @@ private:
   /**
    * Given a char * & len, parse the header as per spec
    */
-  void parseV1Header(char* buf, size_t len);
-  void parseV2Header(char* buf);
-  size_t lenV2Address(char* buf);
+  ProxyState parseV1Header(char* buf, size_t len);
+  ProxyState parseV2Header(char* buf);
+  absl::optional<size_t> lenV2Address(char* buf);
 
   Network::ListenerFilterCallbacks* cb_{};
   Event::FileEventPtr file_event_;
