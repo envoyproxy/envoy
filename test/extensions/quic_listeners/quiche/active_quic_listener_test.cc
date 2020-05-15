@@ -103,7 +103,6 @@ protected:
         staticUniquePointerCast<ActiveQuicListener>(listener_factory_->createActiveUdpListener(
             connection_handler_, *dispatcher_, listener_config_));
     quic_dispatcher_ = ActiveQuicListenerPeer::quicDispatcher(*quic_listener_);
-
     simulated_time_system_.advanceTimeWait(std::chrono::milliseconds(100));
   }
 
