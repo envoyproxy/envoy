@@ -1,4 +1,4 @@
-#include "server/http/admin_filter.h"
+#include "server/admin/admin_filter.h"
 
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"

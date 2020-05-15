@@ -36,13 +36,13 @@
 #include "common/router/scoped_config_impl.h"
 #include "common/stats/isolated_store_impl.h"
 
-#include "server/http/admin_filter.h"
-#include "server/http/config_tracker_impl.h"
-#include "server/http/listeners_handler.h"
-#include "server/http/logs_handler.h"
-#include "server/http/profiling_handler.h"
-#include "server/http/runtime_handler.h"
-#include "server/http/stats_handler.h"
+#include "server/admin/admin_filter.h"
+#include "server/admin/config_tracker_impl.h"
+#include "server/admin/listeners_handler.h"
+#include "server/admin/logs_handler.h"
+#include "server/admin/profiling_handler.h"
+#include "server/admin/runtime_handler.h"
+#include "server/admin/stats_handler.h"
 
 #include "extensions/filters/http/common/pass_through_filter.h"
 
