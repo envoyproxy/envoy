@@ -16,6 +16,10 @@ message Headers {
   repeated envoy.config.core.v3.HeaderValue headers = 1;
 }
 
+message Metadata {
+  map<string, string> metadata = 1;
+}
+
 message HttpBody {
   // The bytes that will be used as the request body.
   repeated string data = 1 [(validate.rules).repeated .min_items = 1];
