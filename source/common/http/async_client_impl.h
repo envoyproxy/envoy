@@ -54,9 +54,7 @@ public:
   // Http::AsyncClient
   Request* send(RequestMessagePtr&& request, Callbacks& callbacks,
                 const AsyncClient::RequestOptions& options) override;
-
   Stream* start(StreamCallbacks& callbacks, const AsyncClient::StreamOptions& options) override;
-
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
 
 private:
@@ -94,6 +92,7 @@ public:
   void sendData(Buffer::Instance& data, bool end_stream) override;
   void sendTrailers(RequestTrailerMap& trailers) override;
   void reset() override;
+  bool isAboveWriteBufferHighWatermark() const override { return high_watermark_calls_ > 0; }
 
 protected:
   bool remoteClosed() { return remote_closed_; }
@@ -164,6 +163,11 @@ private:
       return nullptr;
     }
 
+    Router::RouteConstSharedPtr route(const Router::RouteCallback&, const Http::RequestHeaderMap&,
+                                      const StreamInfo::StreamInfo&, uint64_t) const override {
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    }
+
     const std::list<LowerCaseString>& internalOnlyHeaders() const override {
       return internal_only_headers_;
     }
@@ -227,6 +231,9 @@ private:
     }
     const Router::RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
     const Router::RetryPolicy& retryPolicy() const override { return retry_policy_; }
+    const Router::InternalRedirectPolicy& internalRedirectPolicy() const override {
+      return internal_redirect_policy_;
+    }
     uint32_t retryShadowBufferLimit() const override {
       return std::numeric_limits<uint32_t>::max();
     }
@@ -275,15 +282,12 @@ private:
     bool includeAttemptCountInRequest() const override { return false; }
     bool includeAttemptCountInResponse() const override { return false; }
     const Router::RouteEntry::UpgradeMap& upgradeMap() const override { return upgrade_map_; }
-    Router::InternalRedirectAction internalRedirectAction() const override {
-      return Router::InternalRedirectAction::PassThrough;
-    }
-    uint32_t maxInternalRedirects() const override { return 1; }
     const std::string& routeName() const override { return route_name_; }
     std::unique_ptr<const HashPolicyImpl> hash_policy_;
     static const NullHedgePolicy hedge_policy_;
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullRetryPolicy retry_policy_;
+    static const Router::InternalRedirectPolicyImpl internal_redirect_policy_;
     static const std::vector<Router::ShadowPolicyPtr> shadow_policies_;
     static const NullVirtualHost virtual_host_;
     static const std::multimap<std::string, std::string> opaque_config_;
@@ -327,6 +331,9 @@ private:
   Event::Dispatcher& dispatcher() override { return parent_.dispatcher_; }
   void resetStream() override;
   Router::RouteConstSharedPtr route() override { return route_; }
+  Router::RouteConstSharedPtr route(const Router::RouteCallback&) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
   Upstream::ClusterInfoConstSharedPtr clusterInfo() override { return parent_.cluster_; }
   void clearRouteCache() override {}
   uint64_t streamId() const override { return stream_id_; }
@@ -371,8 +378,11 @@ private:
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeTrailers(ResponseTrailerMapPtr&& trailers) override;
   void encodeMetadata(MetadataMapPtr&&) override {}
-  void onDecoderFilterAboveWriteBufferHighWatermark() override {}
-  void onDecoderFilterBelowWriteBufferLowWatermark() override {}
+  void onDecoderFilterAboveWriteBufferHighWatermark() override { ++high_watermark_calls_; }
+  void onDecoderFilterBelowWriteBufferLowWatermark() override {
+    ASSERT(high_watermark_calls_ != 0);
+    --high_watermark_calls_;
+  }
   void addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
   void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
   void setDecoderBufferLimit(uint32_t) override {}
@@ -396,6 +406,7 @@ private:
   Tracing::NullSpan active_span_;
   const Tracing::Config& tracing_config_;
   std::shared_ptr<RouteImpl> route_;
+  uint32_t high_watermark_calls_{};
   bool local_closed_{};
   bool remote_closed_{};
   Buffer::InstancePtr buffered_body_;

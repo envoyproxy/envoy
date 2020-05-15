@@ -19,6 +19,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "codec_impl_test",
     srcs = ["codec_impl_test.cc"],
+    tags = ["fails_on_windows"],
     deps = [
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/event:dispatcher_interface",
@@ -44,6 +45,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "conn_pool_test",
     srcs = ["conn_pool_test.cc"],
+    tags = ["fails_on_windows"],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_lib",
@@ -61,6 +63,7 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )

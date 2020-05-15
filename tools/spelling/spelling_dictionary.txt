@@ -17,6 +17,7 @@ ASCII
 ASSERTs
 AST
 AWS
+Allowlisted
 BACKTRACE
 BSON
 BPF
@@ -170,6 +171,7 @@ LHS
 LLVM
 LPT
 LRS
+Loggable
 MB
 MD
 MERCHANTABILITY
@@ -179,6 +181,7 @@ MSET
 MSVC
 MTLS
 MTU
+MULTIFRAME
 NACK
 NACKed
 NACKs
@@ -227,6 +230,7 @@ PROT
 Postgre
 Postgres
 Prereq
+QDCOUNT
 QUIC
 QoS
 RAII
@@ -360,6 +364,7 @@ alloc
 alloca
 allocator
 allowlist
+allowlisted
 alls
 alphanumerics
 amongst
@@ -421,6 +426,7 @@ builtins
 bulkstrings
 bursty
 bytecode
+bytestream
 cacheability
 callee
 callsite
@@ -475,6 +481,7 @@ coroutines
 cors
 cout
 coverity
+cplusplus
 cpuset
 creds
 crypto
@@ -500,6 +507,7 @@ dechunked
 decl
 decls
 decompressor
+decompressors
 decrement
 decrypt
 dedup

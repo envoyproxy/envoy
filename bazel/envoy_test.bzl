@@ -58,6 +58,7 @@ def _envoy_test_linkopts():
         "@envoy//bazel:windows_x86_64": [
             "-DEFAULTLIB:advapi32.lib",
             "-DEFAULTLIB:ws2_32.lib",
+            "-DEFAULTLIB:iphlpapi.lib",
             "-WX",
         ],
 
@@ -121,7 +122,7 @@ def envoy_cc_fuzz_test(
             ],
         }),
         size = size,
-        tags = tags,
+        tags = ["fuzz_target"] + tags,
     )
 
     # This target exists only for

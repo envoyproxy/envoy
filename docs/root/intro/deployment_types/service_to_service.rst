@@ -8,7 +8,7 @@ Service to service only
 
 The above diagram shows the simplest Envoy deployment which uses Envoy as a communication bus for
 all traffic internal to a service oriented architecture (SOA). In this scenario, Envoy exposes
-several listeners that are used for local origin traffic as well as service to service traffic.
+several listeners that are used for local origin traffic as well as service-to-service traffic.
 
 Service to service egress listener
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -22,13 +22,16 @@ themselves with network topology, whether they are running in development or pro
 
 This listener supports both HTTP/1.1 or HTTP/2 depending on the capabilities of the application.
 
+.. image:: /_static/service_to_service_egress_listener.svg
+  :width: 40%
+
 .. _deployment_type_service_to_service_ingress:
 
 Service to service ingress listener
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 This is the port used by remote Envoys when they want to talk to the local Envoy. For example,
-*http://localhost:9211*. Incoming requests are routed to the local service on the configured
+*http://servicename:9211*. Envoy routes incoming requests to the local service on the configured
 port(s). Multiple application ports may be involved depending on application or load balancing
 needs (for example if the service needs both an HTTP port and a gRPC port). The local Envoy
 performs buffering, circuit breaking, etc. as needed.
@@ -36,6 +39,10 @@ performs buffering, circuit breaking, etc. as needed.
 Our default configurations use HTTP/2 for all Envoy to Envoy communication, regardless of whether
 the application uses HTTP/1.1 or HTTP/2 when egressing out of a local Envoy. HTTP/2 provides
 better performance via long lived connections and explicit reset notifications.
+
+.. image:: /_static/service_to_service_ingress_listener.svg
+  :width: 55%
+
 
 Optional external service egress listeners
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -50,13 +57,12 @@ being consistent and using local port routing for all external services.
 Discovery service integration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The recommended service to service configuration uses an external discovery service for all cluster
+The recommended service-to-service configuration uses an external discovery service for all cluster
 lookups. This provides Envoy with the most detailed information possible for use when performing
 load balancing, statistics gathering, etc.
 
 Configuration template
 ^^^^^^^^^^^^^^^^^^^^^^
 
-The source distribution includes an example service to service configuration that is very similar to
-the version that Lyft runs in production. See :ref:`here <install_ref_configs>` for more
-information.
+The source distribution includes :ref:`an example service-to-service configuration<install_ref_configs>`
+that is very similar to the version that Lyft runs in production.

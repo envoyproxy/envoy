@@ -6,6 +6,8 @@
 # https://github.com/actions/virtual-environments/blob/master/images/macos/macos-10.15-Readme.md for
 # a list of pre-installed tools in the macOS image.
 
+export HOMEBREW_NO_AUTO_UPDATE=1
+
 function is_installed {
     brew ls --versions "$1" >/dev/null
 }
@@ -39,6 +41,7 @@ fi
 # to unlink/overwrite them to install bazelisk
 echo "Installing bazelbuild/tap/bazelisk"
 brew install --force bazelbuild/tap/bazelisk
+brew unlink bazelbuild/tap/bazelisk || true
 if ! brew link --overwrite bazelbuild/tap/bazelisk; then
     echo "Failed to install and link bazelbuild/tap/bazelisk"
     exit 1

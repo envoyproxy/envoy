@@ -28,9 +28,6 @@ public:
     return std::make_shared<Common::Redis::RedisCommandStats>(symbol_table, "upstream_commands");
   }
 
-  Stats::Counter& counter(Stats::Scope& scope, const Stats::StatNameVec& stat_names);
-  Stats::Histogram& histogram(Stats::Scope& scope, const Stats::StatNameVec& stat_names,
-                              Stats::Histogram::Unit unit);
   Stats::TimespanPtr createCommandTimer(Stats::Scope& scope, Stats::StatName command,
                                         Envoy::TimeSource& time_source);
   Stats::TimespanPtr createAggregateTimer(Stats::Scope& scope, Envoy::TimeSource& time_source);

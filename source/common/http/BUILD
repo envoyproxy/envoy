@@ -51,6 +51,7 @@ envoy_cc_library(
     deps = [
         ":codec_wrappers_lib",
         ":exception_lib",
+        ":status_lib",
         ":utility_lib",
         "//include/envoy/event:deferred_deletable",
         "//include/envoy/http:codec_interface",
@@ -167,6 +168,7 @@ envoy_cc_library(
         ":header_utility_lib",
         ":headers_lib",
         ":path_utility_lib",
+        ":status_lib",
         ":user_agent_lib",
         ":utility_lib",
         "//include/envoy/access_log:access_log_interface",
@@ -252,6 +254,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "header_list_view_lib",
+    srcs = ["header_list_view.cc"],
+    hdrs = ["header_list_view.h"],
+    deps = [
+        "//include/envoy/http:header_map_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "header_map_lib",
     srcs = ["header_map_impl.cc"],
     hdrs = ["header_map_impl.h"],
@@ -316,6 +327,7 @@ envoy_cc_library(
         "//include/envoy/stats:stats_macros",
         "//include/envoy/stats:timespan_interface",
         "//source/common/stats:symbol_table_lib",
+        "//source/common/stats:utility_lib",
     ],
 )
 

@@ -216,6 +216,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
                                                       0))),
 #endif
       merge_slashes_(config.merge_slashes()),
+      strip_matching_port_(config.strip_matching_host_port()),
       headers_with_underscores_action_(
           config.common_http_protocol_options().headers_with_underscores_action()) {
   // If idle_timeout_ was not configured in common_http_protocol_options, use value in deprecated

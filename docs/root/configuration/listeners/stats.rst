@@ -64,13 +64,15 @@ statistics. Any ``:`` character in the stats name is replaced with ``_``.
    :header: Name, Type, Description
    :widths: 1, 1, 2
 
-   listener_added, Counter, Total listeners added (either via static config or LDS)
-   listener_modified, Counter, Total listeners modified (via LDS)
-   listener_removed, Counter, Total listeners removed (via LDS)
-   listener_stopped, Counter, Total listeners stopped
-   listener_create_success, Counter, Total listener objects successfully added to workers
-   listener_create_failure, Counter, Total failed listener object additions to workers
-   total_listeners_warming, Gauge, Number of currently warming listeners
-   total_listeners_active, Gauge, Number of currently active listeners
-   total_listeners_draining, Gauge, Number of currently draining listeners
+   listener_added, Counter, Total listeners added (either via static config or LDS).
+   listener_modified, Counter, Total listeners modified (via LDS).
+   listener_removed, Counter, Total listeners removed (via LDS).
+   listener_stopped, Counter, Total listeners stopped.
+   listener_create_success, Counter, Total listener objects successfully added to workers.
+   listener_create_failure, Counter, Total failed listener object additions to workers.
+   listener_in_place_updated, Counter, Total listener objects created to execute filter chain update path.
+   total_filter_chains_draining, Gauge, Number of currently draining filter chains.
+   total_listeners_warming, Gauge, Number of currently warming listeners.
+   total_listeners_active, Gauge, Number of currently active listeners.
+   total_listeners_draining, Gauge, Number of currently draining listeners.
    workers_started, Gauge, A boolean (1 if started and 0 otherwise) that indicates whether listeners have been initialized on workers.

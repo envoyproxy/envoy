@@ -29,6 +29,7 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -568,6 +569,7 @@ public:
   void expectClientCreate(size_t index, const HostWithHealthCheckMap& health_check_map) {
     TestSession& test_session = *test_sessions_[index];
     test_session.codec_ = new NiceMock<Http::MockClientConnection>();
+    ON_CALL(*test_session.codec_, protocol()).WillByDefault(Return(Http::Protocol::Http11));
     test_session.client_connection_ = new NiceMock<Network::MockClientConnection>();
     connection_index_.push_back(index);
     codec_index_.push_back(index);
@@ -2070,6 +2072,56 @@ TEST_F(HttpHealthCheckerImplTest, ProxyConnectionClose) {
   test_sessions_[0]->interval_timer_->invokeCallback();
 }
 
+TEST_F(HttpHealthCheckerImplTest, ConnectionCloseLegacy) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.fixed_connection_close", "false"}});
+  setupNoServiceValidationHC();
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respond(0, "200", true);
+  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+
+  expectClientCreate(0);
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  test_sessions_[0]->interval_timer_->invokeCallback();
+}
+
+TEST_F(HttpHealthCheckerImplTest, ProxyConnectionCloseLegacy) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.fixed_connection_close", "false"}});
+  setupNoServiceValidationHC();
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respond(0, "200", false, true);
+  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+
+  expectClientCreate(0);
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  test_sessions_[0]->interval_timer_->invokeCallback();
+}
+
 TEST_F(HttpHealthCheckerImplTest, HealthCheckIntervals) {
   setupHealthCheckIntervalOverridesHC();
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
@@ -2465,6 +2517,122 @@ TEST_F(HttpHealthCheckerImplTest, SuccessWithMultipleHostsAndAltPort) {
 TEST_F(HttpHealthCheckerImplTest, Http2ClusterUseHttp2CodecClient) {
   setupNoServiceValidationHCWithHttp2();
   EXPECT_EQ(Http::CodecClient::Type::HTTP2, health_checker_->codecClientType());
+}
+
+MATCHER_P(MetadataEq, expected, "") {
+  const envoy::config::core::v3::Metadata* metadata = arg;
+  if (!metadata) {
+    return false;
+  }
+  EXPECT_TRUE(Envoy::Protobuf::util::MessageDifferencer::Equals(*metadata, expected));
+  return true;
+}
+
+TEST_F(HttpHealthCheckerImplTest, TransportSocketMatchCriteria) {
+  const std::string host = "fake_cluster";
+  const std::string path = "/healthcheck";
+  const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    no_traffic_interval: 1s
+    interval_jitter_percent: 40
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    http_health_check:
+      service_name_matcher:
+        prefix: locations
+      path: /healthcheck
+    transport_socket_match_criteria:
+      key: value
+    )EOF";
+
+  auto default_socket_factory = std::make_unique<Network::MockTransportSocketFactory>();
+  // We expect that this default_socket_factory will NOT be used to create a transport socket for
+  // the health check connection.
+  EXPECT_CALL(*default_socket_factory, createTransportSocket(_)).Times(0);
+  EXPECT_CALL(*default_socket_factory, implementsSecureTransport());
+  auto transport_socket_match =
+      std::make_unique<Upstream::MockTransportSocketMatcher>(std::move(default_socket_factory));
+
+  auto metadata = TestUtility::parseYaml<envoy::config::core::v3::Metadata>(
+      R"EOF(
+    filter_metadata:
+      envoy.transport_socket_match:
+        key: value
+  )EOF");
+
+  Stats::IsolatedStoreImpl stats_store;
+  auto health_transport_socket_stats = TransportSocketMatchStats{
+      ALL_TRANSPORT_SOCKET_MATCH_STATS(POOL_COUNTER_PREFIX(stats_store, "test"))};
+  auto health_check_only_socket_factory = std::make_unique<Network::MockTransportSocketFactory>();
+
+  // We expect resolve() to be called twice, once for endpoint socket matching (with no metadata in
+  // this test) and once for health check socket matching. In the latter we expect metadata that
+  // matches the above object.
+  EXPECT_CALL(*transport_socket_match, resolve(nullptr));
+  EXPECT_CALL(*transport_socket_match, resolve(MetadataEq(metadata)))
+      .WillOnce(Return(TransportSocketMatcher::MatchData(
+          *health_check_only_socket_factory, health_transport_socket_stats, "health_check_only")));
+  // The health_check_only_socket_factory should be used to create a transport socket for the health
+  // check connection.
+  EXPECT_CALL(*health_check_only_socket_factory, createTransportSocket(_));
+
+  cluster_->info_->transport_socket_matcher_ = std::move(transport_socket_match);
+
+  health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
+      *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+      HealthCheckEventLoggerPtr(event_logger_));
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  cluster_->info_->stats().upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+  EXPECT_EQ(health_transport_socket_stats.total_match_count_.value(), 1);
+}
+
+TEST_F(HttpHealthCheckerImplTest, NoTransportSocketMatchCriteria) {
+  const std::string host = "fake_cluster";
+  const std::string path = "/healthcheck";
+  const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    no_traffic_interval: 1s
+    interval_jitter_percent: 40
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    http_health_check:
+      service_name_matcher:
+        prefix: locations
+      path: /healthcheck
+    )EOF";
+
+  auto default_socket_factory = std::make_unique<Network::MockTransportSocketFactory>();
+  // The default_socket_factory should be used to create a transport socket for the health check
+  // connection.
+  EXPECT_CALL(*default_socket_factory, createTransportSocket(_));
+  EXPECT_CALL(*default_socket_factory, implementsSecureTransport());
+  auto transport_socket_match =
+      std::make_unique<Upstream::MockTransportSocketMatcher>(std::move(default_socket_factory));
+  // We expect resolve() to be called exactly once for endpoint socket matching. We should not
+  // attempt to match again for health checks since there is not match criteria in the config.
+  EXPECT_CALL(*transport_socket_match, resolve(nullptr));
+
+  cluster_->info_->transport_socket_matcher_ = std::move(transport_socket_match);
+
+  health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
+      *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
+      HealthCheckEventLoggerPtr(event_logger_));
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  cluster_->info_->stats().upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
 }
 
 class TestProdHttpHealthChecker : public ProdHttpHealthCheckerImpl {
