@@ -24,6 +24,9 @@ BAZEL_REMOTE_CACHE=grpcs://remotebuildexecution.googleapis.com
 BAZEL_BUILD_EXTRA_OPTIONS=--config=remote-ci --config=remote --jobs=<Number of jobs>
 ```
 
+By default the `--config=remote` implies [`--remote_download_toplevel`](https://docs.bazel.build/versions/master/command-line-reference.html#flag--remote_download_toplevel),
+change this to `minimal` or `all` depending on where you're running the container by adding them to `BAZEL_BUILD_EXTRA_OPTIONS`.
+
 ### Disk performance
 
 Docker for Mac/Windows is known to have disk performance issue, this makes formatting all files in the container very slow.
