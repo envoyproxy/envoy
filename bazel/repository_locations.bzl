@@ -109,13 +109,9 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "cpe:2.3:a:apache:thrift:*",
     ),
     com_github_c_ares_c_ares = dict(
-        sha256 = "bbaab13d6ad399a278d476f533e4d88a7ec7d729507348bb9c2e3b207ba4c606",
-        strip_prefix = "c-ares-d7e070e7283f822b1d2787903cce3615536c5610",
-        # 2019-06-19
-        # 27 new commits from release-1.15.0. Upgrade for commit 7d3591ee8a1a63e7748e68e6d880bd1763a32885 "getaddrinfo enhancements" and follow up fixes.
-        # Use getaddrinfo to query DNS record and TTL.
-        # TODO(crazyxy): Update to release-1.16.0 when it is released.
-        urls = ["https://github.com/c-ares/c-ares/archive/d7e070e7283f822b1d2787903cce3615536c5610.tar.gz"],
+        sha256 = "d08312d0ecc3bd48eee0a4cc0d2137c9f194e0a28de2028928c0f6cae85f86ce",
+        strip_prefix = "c-ares-1.16.1",
+        urls = ["https://github.com/c-ares/c-ares/releases/download/cares-1_16_1/c-ares-1.16.1.tar.gz"],
         use_category = ["dataplane"],
         cpe = "cpe:2.3:a:c-ares_project:c-ares:*",
     ),
