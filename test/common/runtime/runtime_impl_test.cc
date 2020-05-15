@@ -809,10 +809,11 @@ protected:
 
 TEST_F(DiskLayerTest, IllegalPath) {
 #ifdef WIN32
-  // no illegal paths on Windows at the moment
-  return;
-#endif
+  EXPECT_THROW_WITH_MESSAGE(DiskLayer("test", R"EOF(\\.\)EOF", *api_), EnvoyException,
+                            R"EOF(Invalid path: \\.\)EOF");
+#else
   EXPECT_THROW_WITH_MESSAGE(DiskLayer("test", "/dev", *api_), EnvoyException, "Invalid path: /dev");
+#endif
 }
 
 // Validate that we catch recursion that goes too deep in the runtime filesystem
