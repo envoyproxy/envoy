@@ -228,7 +228,6 @@ proto_library(
         "//envoy/config/trace/v2:pkg",
         "//envoy/config/trace/v2alpha:pkg",
         "//envoy/config/transport_socket/alts/v2alpha:pkg",
-        "//envoy/config/transport_socket/quic/v2alpha:pkg",
         "//envoy/config/transport_socket/raw_buffer/v2:pkg",
         "//envoy/config/transport_socket/tap/v2alpha:pkg",
         "//envoy/data/accesslog/v2:pkg",
