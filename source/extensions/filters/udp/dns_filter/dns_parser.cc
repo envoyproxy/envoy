@@ -503,18 +503,14 @@ void DnsMessageParser::setResponseCode(DnsQueryContextPtr& context,
   context->response_code_ = DNS_RESPONSE_CODE_NO_ERROR;
 }
 
-void DnsMessageParser::generateRandomIndices(absl::FixedArray<size_t>& index_array) {
-  const size_t indices = index_array.size();
-
-  absl::flat_hash_set<size_t> used_indices{};
-  used_indices.reserve(indices);
-
-  size_t i = 0;
-  while (i < indices) {
-    const size_t random_index = rng_.random() % indices;
-    if (!used_indices.contains(random_index)) {
-      used_indices.emplace(random_index);
-      index_array[i++] = random_index;
+void DnsMessageParser::generateRandomIndices(const size_t count,
+                                             absl::flat_hash_set<size_t>& elements) {
+  elements.clear();
+  elements.reserve(count);
+  while (elements.size() < count) {
+    size_t element = rng_.random() % count;
+    if (!elements.contains(element)) {
+      elements.emplace(element);
     }
   }
 }
@@ -551,13 +547,12 @@ void DnsMessageParser::buildResponseBuffer(DnsQueryContextPtr& query_context,
     ++serialized_queries;
     total_buffer_size += query_buffer.length();
 
-    const auto& answers = query_context->answers_;
-
     // Generate a set of random indices of the answer records that we serialize. We do this
     // so that we don't always return the same records in the same order for every query
-    absl::FixedArray<size_t> indices(answers.size());
-    generateRandomIndices(indices);
+    absl::flat_hash_set<size_t> indices{};
+    generateRandomIndices(query_context->answers_.size(), indices);
 
+    const auto& answers = query_context->answers_;
     for (const size_t index : indices) {
       const auto answer = std::next(answers.begin(), index);
       // Query names are limited to 255 characters. Since we are using ares to decode the encoded

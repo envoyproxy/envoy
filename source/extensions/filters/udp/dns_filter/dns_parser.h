@@ -253,7 +253,7 @@ private:
    * order of serialized answer records. This ensures the server does not return a fixed list
    * of answers when more than one address is configured for a record
    */
-  void generateRandomIndices(absl::FixedArray<size_t>& index_array);
+  void generateRandomIndices(const size_t count, absl::flat_hash_set<size_t>& elements);
 
   bool recursion_available_;
   uint64_t retry_count_;
