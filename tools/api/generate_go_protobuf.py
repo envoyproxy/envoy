@@ -84,7 +84,7 @@ def updatedSinceSHA(repo, last_sha):
 
 
 def writeRevisionInfo(repo, sha):
-  # Put a file 
+  # Put a file in the generated code root containing the latest mirrored SHA
   dst = os.path.join(repo, 'envoy', 'COMMIT')
   with open(dst, 'w') as fh:
     fh.write(sha)
