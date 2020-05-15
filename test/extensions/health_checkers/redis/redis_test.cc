@@ -49,7 +49,7 @@ public:
         "@type": type.googleapis.com/envoy.config.health_checker.redis.v2.Redis
     )EOF";
 
-    const auto& health_check_config = Upstream::parseHealthCheckFromV2Yaml(yaml);
+    const auto& health_check_config = Upstream::parseHealthCheckFromV3Yaml(yaml);
     const auto& redis_config = getRedisHealthCheckConfig(
         health_check_config, ProtobufMessage::getStrictValidationVisitor());
 
@@ -73,7 +73,7 @@ public:
         "@type": type.googleapis.com/envoy.config.health_checker.redis.v2.Redis
     )EOF";
 
-    const auto& health_check_config = Upstream::parseHealthCheckFromV2Yaml(yaml);
+    const auto& health_check_config = Upstream::parseHealthCheckFromV3Yaml(yaml);
     const auto& redis_config = getRedisHealthCheckConfig(
         health_check_config, ProtobufMessage::getStrictValidationVisitor());
 
@@ -97,7 +97,7 @@ public:
         key: foo
     )EOF";
 
-    const auto& health_check_config = Upstream::parseHealthCheckFromV2Yaml(yaml);
+    const auto& health_check_config = Upstream::parseHealthCheckFromV3Yaml(yaml);
     const auto& redis_config = getRedisHealthCheckConfig(
         health_check_config, ProtobufMessage::getStrictValidationVisitor());
 
@@ -120,7 +120,7 @@ public:
         key: foo
     )EOF";
 
-    const auto& health_check_config = Upstream::parseHealthCheckFromV2Yaml(yaml);
+    const auto& health_check_config = Upstream::parseHealthCheckFromV3Yaml(yaml);
     const auto& redis_config = getRedisHealthCheckConfig(
         health_check_config, ProtobufMessage::getStrictValidationVisitor());
 
@@ -144,7 +144,7 @@ public:
         "@type": type.googleapis.com/envoy.config.health_checker.redis.v2.Redis
     )EOF";
 
-    const auto& health_check_config = Upstream::parseHealthCheckFromV2Yaml(yaml);
+    const auto& health_check_config = Upstream::parseHealthCheckFromV3Yaml(yaml);
     const auto& redis_config = getRedisHealthCheckConfig(
         health_check_config, ProtobufMessage::getStrictValidationVisitor());
 
