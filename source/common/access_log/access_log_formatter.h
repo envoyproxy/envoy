@@ -12,6 +12,7 @@
 
 #include "common/common/utility.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -101,7 +102,7 @@ private:
 
 class JsonFormatterImpl : public Formatter {
 public:
-  JsonFormatterImpl(std::unordered_map<std::string, std::string>& format_mapping,
+  JsonFormatterImpl(const absl::flat_hash_map<std::string, std::string>& format_mapping,
                     bool preserve_types);
 
   // Formatter::format
