@@ -17,7 +17,7 @@ option java_multiple_files = true;
 option java_generic_services = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Load reporting service (LRS)]
+// [#protodoc-title: Load Reporting service (LRS)]
 
 // Load Reporting Service is an Envoy API to emit load reports. Envoy will initiate a bi-directional
 // stream with a management server. Upon connecting, the management server can send a
@@ -25,8 +25,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // interested in getting the load reports for. Envoy in this node will start sending
 // :ref:`LoadStatsRequest <envoy_api_msg_service.load_stats.v3.LoadStatsRequest>`. This is done periodically
 // based on the :ref:`load reporting interval <envoy_api_field_service.load_stats.v3.LoadStatsResponse.load_reporting_interval>`
-// For details, take a look at the `sandbox example
-// <https://www.envoyproxy.io/docs/envoy/latest/start/sandboxes/load_reporting_service.html>`_.
+// For details, take a look at the :ref:`Load Reporting Service sandbox example <install_sandboxes_load_reporting_service>`.
 
 service LoadReportingService {
   // Advanced API to allow for multi-dimensional load balancing by remote
