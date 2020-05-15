@@ -113,7 +113,7 @@ void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& h
 }
 
 void EdsClusterImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
-                                    const std::string&) {
+                                    const std::string&, const std::string&) {
   if (!validateUpdateSize(resources.size())) {
     return;
   }
@@ -147,7 +147,7 @@ void EdsClusterImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt
 
 void EdsClusterImpl::onConfigUpdate(
     const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& resources,
-    const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
+    const Protobuf::RepeatedPtrField<std::string>&, const std::string&, const std::string&) {
   if (!validateUpdateSize(resources.size())) {
     return;
   }
