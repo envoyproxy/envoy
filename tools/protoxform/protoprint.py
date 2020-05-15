@@ -566,6 +566,8 @@ class ProtoFormatVisitor(visitor.Visitor):
                                             trailing_comment, methods)
 
   def VisitEnum(self, enum_proto, type_context):
+    if protoxform_options.HasHideOption(enum_proto.options):
+      return ''
     leading_comment, trailing_comment = FormatTypeContextComments(type_context)
     formatted_options = FormatOptions(enum_proto.options)
     reserved_fields = FormatReserved(enum_proto)

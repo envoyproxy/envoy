@@ -19,6 +19,11 @@ message Sample {
     string key = 1;
     string value = 2;
   }
+  enum DeprecateEnum {
+    option deprecated = true;
+    FIRST = 0;
+    SECOND = 1;
+  }
   repeated Entry entries = 1;
   string will_deprecated = 2 [deprecated = true];
   string will_rename_compoent = 3 [(udpa.annotations.field_migrate).rename = "renamed_component"];
