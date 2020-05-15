@@ -1,6 +1,6 @@
 #include "common/profiler/profiler.h"
 
-#include "test/server/http/admin_instance.h"
+#include "test/server/admin/admin_instance.h"
 #include "test/test_common/logging.h"
 
 namespace Envoy {
