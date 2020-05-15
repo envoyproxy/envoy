@@ -67,8 +67,8 @@ public:
                      Filesystem::Instance& file_system);
 
   ~ValidationInstance() {
-    // This ensures that we don't have any pending deletions that extend the lifetime of objects beyond the
-    // lifetime of the other fields.
+    // This ensures that we don't have any pending deletions that extend the lifetime of objects
+    // beyond the lifetime of the other fields.
     dispatcher_->clearDeferredDeleteList();
   }
 
