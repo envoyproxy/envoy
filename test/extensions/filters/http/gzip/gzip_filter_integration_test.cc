@@ -1,6 +1,6 @@
 #include "envoy/event/timer.h"
 
-#include "common/decompressor/zlib_decompressor_impl.h"
+#include "extensions/compression/gzip/decompressor/zlib_decompressor_impl.h"
 
 #include "test/integration/http_integration.h"
 #include "test/test_common/simulated_time_system.h"
@@ -100,7 +100,7 @@ public:
 
   const uint64_t window_bits{15 | 16};
 
-  Decompressor::ZlibDecompressorImpl decompressor_{};
+  Extensions::Compression::Gzip::Decompressor::ZlibDecompressorImpl decompressor_{};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, GzipIntegrationTest,

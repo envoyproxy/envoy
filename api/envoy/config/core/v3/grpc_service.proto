@@ -8,6 +8,7 @@ import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/struct.proto";
+import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/sensitive.proto";
 import "udpa/annotations/status.proto";
@@ -37,7 +38,7 @@ message GrpcService {
     string cluster_name = 1 [(validate.rules).string = {min_bytes: 1}];
   }
 
-  // [#next-free-field: 7]
+  // [#next-free-field: 8]
   message GoogleGrpc {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.core.GrpcService.GoogleGrpc";
@@ -232,6 +233,10 @@ message GrpcService {
     // Additional configuration for site-specific customizations of the Google
     // gRPC library.
     google.protobuf.Struct config = 6;
+
+    // How many bytes each stream can buffer internally.
+    // If not set an implementation defined default is applied (1MiB).
+    google.protobuf.UInt32Value per_stream_buffer_limit_bytes = 7;
   }
 
   reserved 4;

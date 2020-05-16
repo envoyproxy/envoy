@@ -110,6 +110,28 @@ build:sizeopt -c opt --copt -Os
 # Test options
 build --test_env=HEAPCHECK=normal --test_env=PPROF_PATH
 
+# Coverage options
+coverage --config=coverage
+build:coverage --action_env=BAZEL_USE_LLVM_NATIVE_COVERAGE=1
+build:coverage --action_env=GCOV=llvm-profdata
+build:coverage --copt=-DNDEBUG
+build:coverage --test_timeout=900
+build:coverage --define=ENVOY_CONFIG_COVERAGE=1
+build:coverage --cxxopt="-DENVOY_CONFIG_COVERAGE=1"
+build:coverage --coverage_support=@envoy//bazel/coverage:coverage_support
+build:coverage --test_env=CC_CODE_COVERAGE_SCRIPT=external/envoy/bazel/coverage/collect_cc_coverage.sh
+build:coverage --test_env=HEAPCHECK=
+build:coverage --combined_report=lcov
+build:coverage --strategy=TestRunner=sandboxed,local
+build:coverage --strategy=CoverageReport=sandboxed,local
+build:coverage --experimental_use_llvm_covmap
+build:coverage --collect_code_coverage
+build:coverage --instrumentation_filter="//source(?!/common/chromium_url|/extensions/quic_listeners/quiche/platform)[/:],//include[/:]"
+coverage:test-coverage --test_arg="--log-path /dev/null"
+coverage:test-coverage --test_arg="-l trace"
+coverage:fuzz-coverage --config=asan-fuzzer
+coverage:fuzz-coverage --run_under=@envoy//bazel/coverage:fuzz_coverage_wrapper.sh
+
 # Remote execution: https://docs.bazel.build/versions/master/remote-execution.html
 build:rbe-toolchain --host_platform=@envoy_build_tools//toolchains:rbe_ubuntu_clang_platform
 build:rbe-toolchain --platforms=@envoy_build_tools//toolchains:rbe_ubuntu_clang_platform
@@ -159,7 +181,7 @@ build:remote-msan --config=rbe-toolchain-msan
 
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/master/toolchains/rbe_toolchains_config.bzl#L8
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:09a5a914c904faa39dbc641181cb43b68cabf626
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:04f06115b6ee7cfea74930353fb47a41149cbec3
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker
@@ -190,6 +212,7 @@ build:asan-fuzzer --config=clang-asan
 build:asan-fuzzer --define=FUZZING_ENGINE=libfuzzer
 build:asan-fuzzer --copt=-fsanitize=fuzzer-no-link
 build:asan-fuzzer --copt=-fno-omit-frame-pointer
+build:asan-fuzzer --copt=-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
 # Remove UBSAN halt_on_error to avoid crashing on protobuf errors.
 build:asan-fuzzer --test_env=UBSAN_OPTIONS=print_stacktrace=1
 

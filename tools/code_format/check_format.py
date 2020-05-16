@@ -58,6 +58,7 @@ SERIALIZE_AS_STRING_WHITELIST = (
     "./test/common/config/version_converter_test.cc",
     "./test/common/grpc/codec_test.cc",
     "./test/common/grpc/codec_fuzz_test.cc",
+    "./test/extensions/filters/http/common/fuzz/uber_filter.h",
 )
 
 # Files in these paths can use Protobuf::util::JsonStringToMessage
@@ -77,10 +78,10 @@ STD_REGEX_WHITELIST = (
     "./source/common/stats/tag_extractor_impl.cc",
     "./source/common/access_log/access_log_formatter.cc",
     "./source/extensions/filters/http/squash/squash_filter.h",
-    "./source/extensions/filters/http/squash/squash_filter.cc", "./source/server/http/utils.h",
-    "./source/server/http/utils.cc", "./source/server/http/stats_handler.h",
-    "./source/server/http/stats_handler.cc", "./source/server/http/prometheus_stats.h",
-    "./source/server/http/prometheus_stats.cc", "./tools/clang_tools/api_booster/main.cc",
+    "./source/extensions/filters/http/squash/squash_filter.cc", "./source/server/admin/utils.h",
+    "./source/server/admin/utils.cc", "./source/server/admin/stats_handler.h",
+    "./source/server/admin/stats_handler.cc", "./source/server/admin/prometheus_stats.h",
+    "./source/server/admin/prometheus_stats.cc", "./tools/clang_tools/api_booster/main.cc",
     "./tools/clang_tools/api_booster/proto_cxx_utils.cc", "./source/common/common/version.cc")
 
 # Only one C++ file should instantiate grpc_init

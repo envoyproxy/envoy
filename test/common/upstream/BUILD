@@ -96,6 +96,37 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_benchmark_binary(
+    name = "eds_speed_test",
+    srcs = ["eds_speed_test.cc"],
+    external_deps = [
+        "benchmark",
+    ],
+    deps = [
+        ":utility_lib",
+        "//source/common/config:utility_lib",
+        "//source/common/upstream:eds_lib",
+        "//source/extensions/transport_sockets/raw_buffer:config",
+        "//source/server:transport_socket_config_lib",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/protobuf:protobuf_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "eds_speed_test_benchmark_test",
+    benchmark_binary = "eds_speed_test",
+)
+
 envoy_cc_test(
     name = "health_checker_impl_test",
     srcs = ["health_checker_impl_test.cc"],
@@ -118,6 +149,7 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",

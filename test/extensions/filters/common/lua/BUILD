@@ -12,6 +12,7 @@ envoy_package()
 envoy_cc_test(
     name = "lua_test",
     srcs = ["lua_test.cc"],
+    tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/common/lua:lua_lib",
         "//test/mocks:common_lib",
@@ -23,7 +24,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "wrappers_test",
     srcs = ["wrappers_test.cc"],
-    tags = ["fails_on_windows"],
+    tags = ["skip_on_windows"],
     deps = [
         ":lua_wrappers_lib",
         "//source/common/buffer:buffer_lib",
@@ -38,6 +39,7 @@ envoy_cc_test(
 envoy_cc_test_library(
     name = "lua_wrappers_lib",
     hdrs = ["lua_wrappers.h"],
+    tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/common/lua:lua_lib",
         "//test/mocks/thread_local:thread_local_mocks",
