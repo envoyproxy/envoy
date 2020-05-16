@@ -23,7 +23,7 @@ public protocol ResponseFilter: Filter {
   ///
   /// Filters may mutate or buffer (defer and concatenate) the data.
   ///
-  /// - parameter body:      The outbound body data chunk.
+  /// - parameter body:      The inbound body data chunk.
   /// - parameter endStream: Whether this is the last data frame.
   ///
   /// - returns: The data status containing body with which to continue or buffer.
@@ -46,7 +46,7 @@ public protocol ResponseFilter: Filter {
   /// - error: The error that occurred within Envoy.
   func onError(_ error: EnvoyError)
 
-  /// Called at most once when the client cancels a response.
+  /// Called at most once when the client cancels the stream.
   ///
   /// This should be considered a terminal state, and invalidates any previous attempts to
   /// `stopIteration{...}`.

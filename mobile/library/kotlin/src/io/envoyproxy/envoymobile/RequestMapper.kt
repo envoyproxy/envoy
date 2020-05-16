@@ -8,7 +8,7 @@ internal fun Request.outboundHeaders(): Map<String, List<String>> {
     !entry.key.startsWith(":") && !entry.key.startsWith("x-envoy-mobile")
   })
   result.putAll(retryPolicyHeaders)
-  result[":method"] = listOf(method.stringValue())
+  result[":method"] = listOf(method.stringValue)
   result[":scheme"] = listOf(scheme)
   result[":authority"] = listOf(authority)
   result[":path"] = listOf(path)
@@ -18,17 +18,4 @@ internal fun Request.outboundHeaders(): Map<String, List<String>> {
   }
 
   return result
-}
-
-private fun RequestMethod.stringValue(): String {
-  return when (this) {
-    RequestMethod.DELETE -> "DELETE"
-    RequestMethod.GET -> "GET"
-    RequestMethod.HEAD -> "HEAD"
-    RequestMethod.OPTIONS -> "OPTIONS"
-    RequestMethod.PATCH -> "PATCH"
-    RequestMethod.POST -> "POST"
-    RequestMethod.PUT -> "PUT"
-    RequestMethod.TRACE -> "TRACE"
-  }
 }

@@ -20,7 +20,7 @@ public class HeadersBuilder: NSObject {
 
   /// Replace all values at the provided name with a new set of header values.
   ///
-  /// - parameter name:  The header name.
+  /// - parameter name: The header name.
   /// - parameter value: Value the value associated to the header name.
   ///
   /// - returns: This builder.
@@ -44,7 +44,7 @@ public class HeadersBuilder: NSObject {
   /// Instantiate a new builder.
   ///
   /// - parameter headers: The headers to start with.
-  init(headers: [String: [String]] = [:]) {
+  init(headers: [String: [String]]) {
     self.headers = headers
   }
 }

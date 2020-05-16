@@ -20,5 +20,5 @@ public protocol ResponseFilterCallbacks {
   /// `endStream = true` in order to guarantee that the client will not send its own trailers.
   ///
   /// - parameter trailers: The trailers to add and pass to subsequent filters.
-  func addResponseTrailers() -> ResponseHeaders
+  func addResponseTrailers(_ trailers: ResponseTrailers)
 }

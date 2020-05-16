@@ -36,5 +36,5 @@ public protocol RequestFilter: Filter {
   /// - parameter trailers: The outbound trailers.
   ///
   /// - returns: The trailer status containing body with which to continue or buffer.
-  func onRequestTrailers(_ trailers: RequestHeaders) -> FilterTrailerStatus<RequestHeaders>
+  func onRequestTrailers(_ trailers: RequestTrailers) -> FilterTrailerStatus<RequestTrailers>
 }
