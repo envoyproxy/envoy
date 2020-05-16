@@ -63,7 +63,8 @@ void VhdsSubscription::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureRe
 void VhdsSubscription::onConfigUpdate(
     const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-    const std::string& version_info) {
+    const std::string& version_info,
+    const std::string&) {
   if (config_update_info_->onVhdsUpdate(added_resources, removed_resources, version_info)) {
     stats_.config_reload_.inc();
     ENVOY_LOG(debug, "vhds: loading new configuration: config_name={} hash={}",

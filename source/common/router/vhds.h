@@ -60,11 +60,12 @@ public:
 private:
   // Config::SubscriptionCallbacks
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>&,
-                      const std::string&) override {
+                      const std::string&, const std::string& = std::string()) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
   void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>&,
-                      const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override;
+                      const Protobuf::RepeatedPtrField<std::string>&, const std::string&,
+                      const std::string& = std::string()) override;
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override {

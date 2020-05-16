@@ -37,7 +37,7 @@ SdsApi::SdsApi(envoy::config::core::v3::ConfigSource sds_config, absl::string_vi
 }
 
 void SdsApi::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
-                            const std::string& version_info) {
+                            const std::string& version_info, const std::string&) {
   validateUpdateSize(resources.size());
   auto secret =
       MessageUtil::anyConvertAndValidate<envoy::extensions::transport_sockets::tls::v3::Secret>(
@@ -86,7 +86,7 @@ void SdsApi::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& 
 
 void SdsApi::onConfigUpdate(
     const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& resources,
-    const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
+    const Protobuf::RepeatedPtrField<std::string>&, const std::string&, const std::string&) {
   validateUpdateSize(resources.size());
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> unwrapped_resource;
   *unwrapped_resource.Add() = resources[0].resource();

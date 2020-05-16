@@ -106,7 +106,8 @@ RdsRouteConfigSubscription::~RdsRouteConfigSubscription() {
 
 void RdsRouteConfigSubscription::onConfigUpdate(
     const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
-    const std::string& version_info) {
+    const std::string& version_info,
+    const std::string&) {
   if (!validateUpdateSize(resources.size())) {
     return;
   }
@@ -179,7 +180,8 @@ void RdsRouteConfigSubscription::maybeCreateInitManager(
 
 void RdsRouteConfigSubscription::onConfigUpdate(
     const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
-    const Protobuf::RepeatedPtrField<std::string>& removed_resources, const std::string&) {
+    const Protobuf::RepeatedPtrField<std::string>& removed_resources, const std::string&,
+    const std::string&) {
   if (!removed_resources.empty()) {
     // TODO(#2500) when on-demand resource loading is supported, an RDS removal may make sense
     // (see discussion in #6879), and so we should do something other than ignoring here.

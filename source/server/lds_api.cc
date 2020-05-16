@@ -40,7 +40,7 @@ LdsApiImpl::LdsApiImpl(const envoy::config::core::v3::ConfigSource& lds_config,
 void LdsApiImpl::onConfigUpdate(
     const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-    const std::string& system_version_info) {
+    const std::string& system_version_info, const std::string&) {
   std::unique_ptr<Cleanup> maybe_eds_resume;
   if (cm_.adsMux()) {
     const auto type_url = Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>(
@@ -100,7 +100,7 @@ void LdsApiImpl::onConfigUpdate(
 }
 
 void LdsApiImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
-                                const std::string& version_info) {
+                                const std::string& version_info, const std::string& control_plane) {
   // We need to keep track of which listeners need to remove.
   // Specifically, it's [listeners we currently have] - [listeners found in the response].
   std::unordered_set<std::string> listeners_to_remove;
@@ -127,7 +127,7 @@ void LdsApiImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::An
   for (const auto& listener : listeners_to_remove) {
     *to_remove_repeated.Add() = listener;
   }
-  onConfigUpdate(to_add_repeated, to_remove_repeated, version_info);
+  onConfigUpdate(to_add_repeated, to_remove_repeated, version_info, control_plane);
 }
 
 void LdsApiImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,

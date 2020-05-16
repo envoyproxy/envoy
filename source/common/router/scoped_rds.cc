@@ -223,7 +223,8 @@ ScopedRdsConfigSubscription::removeScopes(
 void ScopedRdsConfigSubscription::onConfigUpdate(
     const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-    const std::string& version_info) {
+    const std::string& version_info,
+    const std::string&) {
   // NOTE: deletes are done before adds/updates.
 
   absl::flat_hash_map<std::string, ScopedRouteInfoConstSharedPtr> to_be_removed_scopes;
@@ -307,7 +308,8 @@ void ScopedRdsConfigSubscription::onRdsConfigUpdate(const std::string& scope_nam
 // CdsApiImpl::onConfigUpdate.
 void ScopedRdsConfigSubscription::onConfigUpdate(
     const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
-    const std::string& version_info) {
+    const std::string& version_info,
+    const std::string& control_plane) {
   absl::flat_hash_map<std::string, envoy::config::route::v3::ScopedRouteConfiguration>
       scoped_routes;
   absl::flat_hash_map<uint64_t, std::string> scope_name_by_key_hash;
@@ -346,7 +348,7 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   for (const auto& scoped_route : scoped_routes_to_remove) {
     *to_remove_repeated.Add() = scoped_route.first;
   }
-  onConfigUpdate(to_add_repeated, to_remove_repeated, version_info);
+  onConfigUpdate(to_add_repeated, to_remove_repeated, version_info, control_plane);
 }
 
 ScopedRdsConfigProvider::ScopedRdsConfigProvider(
