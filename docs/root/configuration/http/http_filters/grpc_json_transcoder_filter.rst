@@ -87,10 +87,10 @@ can be send by the gRPC server in the server streaming case.
 In this case, HTTP response header `Content-Type` will use the `content-type` from the first
 `google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`.
 
-Metadata
+Headers
 --------
 
-gRPC-JSON forwards the following metadata to the gRPC server:
+gRPC-JSON forwards the following headers to the gRPC server:
 
 * `x-envoy-original-path`, containing the value of the original path of HTTP request
 * `x-envoy-original-method`, containing the value of the original method of HTTP request
