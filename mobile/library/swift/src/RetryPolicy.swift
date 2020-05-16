@@ -51,8 +51,12 @@ public enum RetryRule: Int, CaseIterable {
       self = .retriableHeaders
     case "reset":
       self = .reset
-    default:
+    // This is mapped to null because this string value is added to headers automatically
+    // in RetryPolicy.outboundHeaders()
+    case "retriable-status-codes":
       return nil
+    default:
+      fatalError("invalid value '\(stringValue)'")
     }
   }
 }

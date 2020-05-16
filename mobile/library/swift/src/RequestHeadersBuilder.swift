@@ -1,6 +1,6 @@
 import Foundation
 
-/// Builder used for constructing instances of `RequestHeaders` types.
+/// Builder used for constructing instances of `RequestHeaders`.
 @objcMembers
 public final class RequestHeadersBuilder: HeadersBuilder {
   /// Initialize a new instance of the builder.

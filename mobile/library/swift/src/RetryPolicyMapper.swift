@@ -26,14 +26,14 @@ extension RetryPolicy {
   /// Initialize the retry policy from a set of headers.
   ///
   /// - parameter headers: The headers with which to initialize the retry policy.
-  convenience init?(headers: Headers) {
+  static func from(headers: Headers) -> RetryPolicy? {
     guard let maxRetryCount = headers.value(forName: "x-envoy-max-retries")?
       .first.flatMap(UInt.init) else
     {
       return nil
     }
 
-    self.init(
+    return RetryPolicy(
       maxRetryCount: maxRetryCount,
       retryOn: headers.value(forName: "x-envoy-retry-on")?.compactMap(RetryRule.init) ?? [],
       retryStatusCodes: headers.value(forName: "x-envoy-retriable-status-codes")?

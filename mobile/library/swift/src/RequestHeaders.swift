@@ -25,7 +25,7 @@ public final class RequestHeaders: Headers {
 
   /// Retry policy to use for this request.
   public var retryPolicy: RetryPolicy? {
-    return RetryPolicy(headers: self)
+    return RetryPolicy.from(headers: self)
   }
 
   /// The protocol version to use for upstream requests.

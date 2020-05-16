@@ -1,6 +1,6 @@
 import Foundation
 
-/// Builder used for constructing instances of `RequestTrailers` types.
+/// Builder used for constructing instances of `RequestTrailers`.
 @objcMembers
 public final class RequestTrailersBuilder: HeadersBuilder {
   /// Build the request trailers using the current builder.

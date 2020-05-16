@@ -37,7 +37,7 @@ public enum RequestMethod: Int, CaseIterable {
   /// Initialize the method using a string value.
   ///
   /// - parameter stringValue: Case-insensitive string value to use for initialization.
-  init?(stringValue: String) {
+  init(stringValue: String) {
     switch stringValue.uppercased() {
     case "DELETE":
       self = .delete
@@ -56,7 +56,7 @@ public enum RequestMethod: Int, CaseIterable {
     case "TRACE":
       self = .trace
     default:
-      return nil
+      fatalError("invalid value '\(stringValue)'")
     }
   }
 }
