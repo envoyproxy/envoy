@@ -14,6 +14,7 @@ import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -108,7 +109,8 @@ message Listener {
 
   // Soft limit on size of the listener’s new connection read and write buffers.
   // If unspecified, an implementation defined default is applied (1MiB).
-  google.protobuf.UInt32Value per_connection_buffer_limit_bytes = 5;
+  google.protobuf.UInt32Value per_connection_buffer_limit_bytes = 5
+      [(udpa.annotations.security).configure_for_untrusted_downstream = true];
 
   // Listener metadata.
   core.v4alpha.Metadata metadata = 6;

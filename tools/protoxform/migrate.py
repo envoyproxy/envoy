@@ -8,7 +8,7 @@ from tools.api_proto_plugin import visitor
 from tools.protoxform import options
 from tools.protoxform import utils
 
-from envoy.annotations import resource_pb2
+from envoy_api_canonical.envoy.annotations import resource_pb2
 from udpa.annotations import migrate_pb2
 from udpa.annotations import status_pb2
 from google.api import annotations_pb2
@@ -251,6 +251,8 @@ def VersionUpgradeXform(n, envoy_internal_shadow, file_proto, params):
     v(N+1) FileDescriptorProto message.
   """
   # Load type database.
+  if params['type_db_path']:
+    utils.LoadTypeDb(params['type_db_path'])
   typedb = utils.GetTypeDb()
   # If this isn't a proto in an upgraded package, return None.
   if file_proto.name not in typedb.next_version_protos or not typedb.next_version_protos[
