@@ -38,7 +38,9 @@ swift_static_framework(
         "ResponseHandler.swift",
         # TODO: add builders for ResponseHeaders/Trailers.
         "ResponseHeaders.swift",
+        "ResponseHeadersBuilder.swift",
         "ResponseTrailers.swift",
+        "ResponseTrailersBuilder.swift",
         "RetryPolicy.swift",
         "RetryPolicyMapper.swift",
         "StreamEmitter.swift",

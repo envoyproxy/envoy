@@ -66,9 +66,10 @@ envoy_mobile_kt_library(
         "ResponseFilter.kt",
         "ResponseFilterCallbacks.kt",
         "ResponseHandler.kt",
-        # TODO: add builders for ResponseHeaders/Trailers.
         "ResponseHeaders.kt",
+        "ResponseHeadersBuilder.kt",
         "ResponseTrailers.kt",
+        "ResponseTrailersBuilder.kt",
         "RetryPolicy.kt",
         "RetryPolicyMapper.kt",
         "StreamEmitter.kt",
