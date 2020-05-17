@@ -31,6 +31,8 @@
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/config/utility.h"
+#include "common/http/http1/codec_impl.h"
+#include "common/http/http2/codec_impl.h"
 #include "common/http/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/resolver_impl.h"
@@ -1101,6 +1103,14 @@ ClusterInfoImpl::generateCircuitBreakersStats(Stats::Scope& scope, const std::st
     return {ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(POOL_GAUGE_PREFIX(scope, prefix),
                                                NULL_POOL_GAUGE(scope))};
   }
+}
+
+Http::Http1::CodecStats& ClusterInfoImpl::http1CodecStats() const {
+  return Http::Http1::CodecStats::atomicGet(http1_codec_stats_, *stats_scope_);
+}
+
+Http::Http2::CodecStats& ClusterInfoImpl::http2CodecStats() const {
+  return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, *stats_scope_);
 }
 
 ResourceManagerImplPtr

@@ -8,7 +8,6 @@
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
-#include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
 #include "common/common/cleanup.h"
@@ -450,11 +449,11 @@ void ConnectionImpl::StreamImpl::onMetadataDecoded(MetadataMapPtr&& metadata_map
   decoder().decodeMetadata(std::move(metadata_map_ptr));
 }
 
-ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
+ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stats,
                                const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                                const uint32_t max_headers_kb, const uint32_t max_headers_count)
-    : stats_{ALL_HTTP2_CODEC_STATS(POOL_COUNTER_PREFIX(stats, "http2."))}, connection_(connection),
-      max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count),
+    : stats_(stats), connection_(connection), max_headers_kb_(max_headers_kb),
+      max_headers_count_(max_headers_count),
       per_stream_buffer_limit_(http2_options.initial_stream_window_size().value()),
       stream_error_on_invalid_http_messaging_(
           http2_options.stream_error_on_invalid_http_messaging()),
@@ -1171,7 +1170,7 @@ ConnectionImpl::ClientHttp2Options::ClientHttp2Options(
 }
 
 ClientConnectionImpl::ClientConnectionImpl(
-    Network::Connection& connection, Http::ConnectionCallbacks& callbacks, Stats::Scope& stats,
+    Network::Connection& connection, Http::ConnectionCallbacks& callbacks, CodecStats& stats,
     const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
     const uint32_t max_response_headers_kb, const uint32_t max_response_headers_count,
     Nghttp2SessionFactory& http2_session_factory)
@@ -1221,12 +1220,12 @@ int ClientConnectionImpl::onHeader(const nghttp2_frame* frame, HeaderString&& na
 }
 
 ServerConnectionImpl::ServerConnectionImpl(
-    Network::Connection& connection, Http::ServerConnectionCallbacks& callbacks,
-    Stats::Scope& scope, const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
+    Network::Connection& connection, Http::ServerConnectionCallbacks& callbacks, CodecStats& stats,
+    const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
     const uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
         headers_with_underscores_action)
-    : ConnectionImpl(connection, scope, http2_options, max_request_headers_kb,
+    : ConnectionImpl(connection, stats, http2_options, max_request_headers_kb,
                      max_request_headers_count),
       callbacks_(callbacks), headers_with_underscores_action_(headers_with_underscores_action) {
   Http2Options h2_options(http2_options);

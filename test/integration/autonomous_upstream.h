@@ -35,8 +35,9 @@ private:
 // An upstream which creates AutonomousStreams for new incoming streams.
 class AutonomousHttpConnection : public FakeHttpConnection {
 public:
-  AutonomousHttpConnection(SharedConnectionWrapper& shared_connection, Stats::Store& store,
-                           Type type, AutonomousUpstream& upstream);
+  AutonomousHttpConnection(AutonomousUpstream& autonomous_upstream,
+                           SharedConnectionWrapper& shared_connection, Type type,
+                           AutonomousUpstream& upstream);
 
   Http::RequestDecoder& newStream(Http::ResponseEncoder& response_encoder, bool) override;
 

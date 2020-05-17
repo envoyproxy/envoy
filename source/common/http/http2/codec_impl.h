@@ -11,12 +11,12 @@
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
-#include "envoy/stats/scope.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"
+#include "common/common/thread.h"
 #include "common/http/codec_helper.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/http2/metadata_decoder.h"
@@ -60,6 +60,14 @@ const std::string CLIENT_MAGIC_PREFIX = "PRI * HTTP/2";
  * Wrapper struct for the HTTP/2 codec stats. @see stats_macros.h
  */
 struct CodecStats {
+  using AtomicPtr = Thread::AtomicPtr<CodecStats, Thread::AtomicPtrAllocMode::DeleteOnDestruct>;
+
+  static CodecStats& atomicGet(AtomicPtr& ptr, Stats::Scope& scope) {
+    return *ptr.get([&scope]() -> CodecStats* {
+      return new CodecStats{ALL_HTTP2_CODEC_STATS(POOL_COUNTER_PREFIX(scope, "http2."))};
+    });
+  }
+
   ALL_HTTP2_CODEC_STATS(GENERATE_COUNTER_STRUCT)
 };
 
@@ -114,7 +122,7 @@ public:
  */
 class ConnectionImpl : public virtual Connection, protected Logger::Loggable<Logger::Id::http2> {
 public:
-  ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
+  ConnectionImpl(Network::Connection& connection, CodecStats& stats,
                  const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                  const uint32_t max_headers_kb, const uint32_t max_headers_count);
 
@@ -408,7 +416,7 @@ protected:
 
   std::list<StreamImplPtr> active_streams_;
   nghttp2_session* session_{};
-  CodecStats stats_;
+  CodecStats& stats_;
   Network::Connection& connection_;
   const uint32_t max_headers_kb_;
   const uint32_t max_headers_count_;
@@ -517,7 +525,7 @@ private:
 class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
   ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks& callbacks,
-                       Stats::Scope& stats,
+                       CodecStats& stats,
                        const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                        const uint32_t max_response_headers_kb,
                        const uint32_t max_response_headers_count,
@@ -552,7 +560,7 @@ private:
 class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
 public:
   ServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks,
-                       Stats::Scope& scope,
+                       CodecStats& stats,
                        const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                        const uint32_t max_request_headers_kb,
                        const uint32_t max_request_headers_count,
