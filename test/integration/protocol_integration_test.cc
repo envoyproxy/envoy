@@ -337,12 +337,16 @@ TEST_P(ProtocolIntegrationTest, Retry) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(512U, response->body().size());
+  Stats::Store& stats = test_server_->server().stats();
   if (upstreamProtocol() == FakeHttpConnection::Type::HTTP2) {
-    Stats::Store& stats = test_server_->server().stats();
     Stats::CounterSharedPtr counter =
         TestUtility::findCounter(stats, "cluster.cluster_0.http2.tx_reset");
     ASSERT_NE(nullptr, counter);
     EXPECT_EQ(1L, counter->value());
+  } else {
+    Stats::CounterSharedPtr counter =
+        TestUtility::findCounter(stats, "cluster.cluster_0.http1.dropped_headers_with_underscores");
+    EXPECT_NE(nullptr, counter);
   }
 }
 
