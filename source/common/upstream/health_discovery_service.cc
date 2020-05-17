@@ -10,6 +10,7 @@
 
 #include "common/config/version_converter.h"
 #include "common/protobuf/protobuf.h"
+#include "common/upstream/upstream_impl.h"
 
 namespace Envoy {
 namespace Upstream {

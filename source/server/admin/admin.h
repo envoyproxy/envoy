@@ -29,6 +29,8 @@
 #include "common/http/conn_manager_impl.h"
 #include "common/http/date_provider_impl.h"
 #include "common/http/default_server_string.h"
+#include "common/http/http1/codec_impl.h"
+#include "common/http/http2/codec_impl.h"
 #include "common/http/request_id_extension_impl.h"
 #include "common/http/utility.h"
 #include "common/network/connection_balancer_impl.h"
@@ -429,6 +431,8 @@ private:
   Http::SlowDateProviderImpl date_provider_;
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
   Http::Http1Settings http1_settings_;
+  Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
+  Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   ConfigTrackerImpl config_tracker_;
   const Network::FilterChainSharedPtr admin_filter_chain_;
   Network::SocketSharedPtr socket_;
