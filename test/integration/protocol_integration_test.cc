@@ -337,6 +337,13 @@ TEST_P(ProtocolIntegrationTest, Retry) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(512U, response->body().size());
+  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP2) {
+    Stats::Store& stats = test_server_->server().stats();
+    Stats::CounterSharedPtr counter =
+        TestUtility::findCounter(stats, "cluster.cluster_0.http2.tx_reset");
+    ASSERT_NE(nullptr, counter);
+    EXPECT_EQ(1L, counter->value());
+  }
 }
 
 TEST_P(ProtocolIntegrationTest, RetryStreaming) {
@@ -882,6 +889,11 @@ TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresDropped) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_THAT(response->headers(), HeaderHasValueRef("bar_baz", "fooz"));
+  Stats::Store& stats = test_server_->server().stats();
+  std::string stat_name = (downstreamProtocol() == Http::CodecClient::Type::HTTP1)
+                              ? "http1.dropped_headers_with_underscores"
+                              : "http2.dropped_headers_with_underscores";
+  EXPECT_EQ(1L, TestUtility::findCounter(stats, stat_name)->value());
 }
 
 // Verify that by default headers with underscores in their names remain in both requests and
