@@ -39,7 +39,8 @@ CdsApiImpl::CdsApiImpl(const envoy::config::core::v3::ConfigSource& cds_config, 
 }
 
 void CdsApiImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
-                                const std::string& version_info) {
+                                const std::string& version_info,
+                                const std::string& control_plane) {
   ClusterManager::ClusterInfoMap clusters_to_remove = cm_.clusters();
   std::vector<envoy::config::cluster::v3::Cluster> clusters;
   for (const auto& cluster_blob : resources) {
@@ -58,13 +59,14 @@ void CdsApiImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::An
     to_add->set_version(version_info);
     to_add->mutable_resource()->PackFrom(cluster);
   }
-  onConfigUpdate(to_add_repeated, to_remove_repeated, version_info);
+  onConfigUpdate(to_add_repeated, to_remove_repeated, version_info, control_plane);
 }
 
 void CdsApiImpl::onConfigUpdate(
     const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-    const std::string& system_version_info) {
+    const std::string& system_version_info,
+    const std::string&) {
   std::unique_ptr<Cleanup> maybe_eds_resume;
   if (cm_.adsMux()) {
     const auto type_url = Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(

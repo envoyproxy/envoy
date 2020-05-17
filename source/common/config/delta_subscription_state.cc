@@ -59,6 +59,7 @@ UpdateAck DeltaSubscriptionState::handleResponse(
 void DeltaSubscriptionState::handleGoodResponse(
     const envoy::service::discovery::v3::DeltaDiscoveryResponse& message) {
   absl::flat_hash_set<std::string> names_added_removed;
+  const std::string control_plane = (message.has_control_plane()) ? message.control_plane().identifier() : std::string();
   for (const auto& resource : message.resources()) {
     if (!names_added_removed.insert(resource.name()).second) {
       throw EnvoyException(
@@ -82,7 +83,7 @@ void DeltaSubscriptionState::handleGoodResponse(
     }
   }
   callbacks_.onConfigUpdate(message.resources(), message.removed_resources(),
-                            message.system_version_info());
+                            message.system_version_info(), control_plane);
   for (const auto& resource : message.resources()) {
     setResourceVersion(resource.name(), resource.version());
   }

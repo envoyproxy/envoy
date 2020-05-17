@@ -535,8 +535,7 @@ RtdsSubscription::RtdsSubscription(
       validation_visitor_(validation_visitor) {}
 
 void RtdsSubscription::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
-                                      const std::string&,
-                                      const std::string&) {
+                                      const std::string&, const std::string&) {
   validateUpdateSize(resources.size());
   auto runtime = MessageUtil::anyConvertAndValidate<envoy::service::runtime::v3::Runtime>(
       resources[0], validation_visitor_);

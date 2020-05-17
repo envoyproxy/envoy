@@ -61,7 +61,8 @@ public:
   ~GrpcSubscriptionTestHarness() override { EXPECT_CALL(async_stream_, sendMessageRaw_(_, false)); }
 
   void expectSendMessage(const std::set<std::string>& cluster_names, const std::string& version,
-                         bool expect_node = false) override {
+                         const std::string& control_plane, bool expect_node = false) override {
+    UNREFERENCED_PARAMETER(control_plane);
     expectSendMessage(cluster_names, version, expect_node, Grpc::Status::WellKnownGrpcStatus::Ok,
                       "");
   }
@@ -98,7 +99,8 @@ public:
   }
 
   void deliverConfigUpdate(const std::vector<std::string>& cluster_names,
-                           const std::string& version, bool accept) override {
+                           const std::string& version, const std::string& control_plane,
+                           bool accept) override {
     std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse> response(
         new envoy::service::discovery::v3::DiscoveryResponse());
     response->set_version_info(version);

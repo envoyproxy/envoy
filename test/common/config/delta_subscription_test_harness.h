@@ -80,9 +80,10 @@ public:
   }
 
   void expectSendMessage(const std::set<std::string>& cluster_names, const std::string& version,
-                         bool expect_node = false) override {
+                         const std::string& control_plane, bool expect_node = false) override {
     UNREFERENCED_PARAMETER(version);
     UNREFERENCED_PARAMETER(expect_node);
+    UNREFERENCED_PARAMETER(control_plane)
     expectSendMessage(cluster_names, {}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
   }
 
@@ -127,7 +128,8 @@ public:
   }
 
   void deliverConfigUpdate(const std::vector<std::string>& cluster_names,
-                           const std::string& version, bool accept) override {
+                           const std::string& version, const std::string& control_plane,
+                           bool accept) override {
     auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
     last_response_nonce_ = std::to_string(HashUtil::xxHash64(version));
     response->set_nonce(last_response_nonce_);
@@ -147,7 +149,7 @@ public:
       }
     }
     Protobuf::RepeatedPtrField<std::string> removed_resources;
-    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, version)).WillOnce(ThrowOnRejectedConfig(accept));
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, version, control_plane)).WillOnce(ThrowOnRejectedConfig(accept));
     if (accept) {
       expectSendMessage({}, version);
     } else {
