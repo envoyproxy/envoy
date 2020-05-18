@@ -475,6 +475,10 @@ private:
     void addDecodedData(ActiveStreamDecoderFilter& filter, Buffer::Instance& data, bool streaming);
     RequestTrailerMap& addDecodedTrailers();
     MetadataMapVector& addDecodedMetadata();
+    // Helper function for the case where we have a header only request, but a filter adds a body
+    // to it.
+    void maybeContinueDecoding(
+        const std::list<ActiveStreamDecoderFilterPtr>::iterator& maybe_continue_data_entry);
     void decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHeaderMap& headers,
                        bool end_stream);
     // Sends data through decoding filter chains. filter_iteration_start_state indicates which
