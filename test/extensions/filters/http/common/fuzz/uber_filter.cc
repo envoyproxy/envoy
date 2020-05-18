@@ -3,6 +3,7 @@
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
 #include "common/http/message_impl.h"
+#include "common/http/utility.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 
@@ -62,6 +63,7 @@ void UberFilterFuzzer::runData(FilterType* filter, const test::fuzz::HttpData& d
   const auto& headersStatus = sendHeaders(filter, data, end_stream);
   if (headersStatus != Http::FilterHeadersStatus::Continue &&
       headersStatus != Http::FilterHeadersStatus::StopIteration) {
+    ENVOY_LOG_MISC(debug, "Finished with FilterHeadersStatus: {}", headersStatus);
     return;
   }
 
@@ -73,6 +75,7 @@ void UberFilterFuzzer::runData(FilterType* filter, const test::fuzz::HttpData& d
     Buffer::OwnedImpl buffer(data_chunks[i]);
     const auto& dataStatus = sendData(filter, buffer, end_stream);
     if (dataStatus != Http::FilterDataStatus::Continue) {
+      ENVOY_LOG_MISC(debug, "Finished with FilterDataStatus: {}", dataStatus);
       return;
     }
   }
@@ -106,7 +109,13 @@ Http::FilterHeadersStatus UberFilterFuzzer::sendHeaders(Http::StreamEncoderFilte
                                                         const test::fuzz::HttpData& data,
                                                         bool end_stream) {
   response_headers_ = Fuzz::fromHeaders<Http::TestResponseHeaderMapImpl>(data.headers());
-  if (response_headers_.Status() == nullptr) {
+
+  // Status must be a valid unsigned long. If not set, the utility function below will throw
+  // an exception on the data path of some filters. This should never happen in production, so catch
+  // the exception and set to a default value.
+  try {
+    (void)Http::Utility::getResponseStatus(response_headers_);
+  } catch (const Http::CodecClientException& e) {
     response_headers_.setStatus(200);
   }
 

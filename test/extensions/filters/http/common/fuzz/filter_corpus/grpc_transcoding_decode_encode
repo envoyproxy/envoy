@@ -27,6 +27,10 @@ upstream_data {
       key: ":status"
       value: "200"
     }
+    headers {
+      key: "content-type"
+      value: "application/grpc"
+    }
   }
   proto_body {
     message {
@@ -35,6 +39,12 @@ upstream_data {
         title: "Hardy Boys"
       }
     }
-    chunk_size: 3
+    chunk_size: 100
+  }
+  trailers {
+    headers {
+      key: "grpc-status"
+      value: "0"
+    }
   }
 }
