@@ -67,7 +67,13 @@ jobs:
       - run: ls -lh dist/
       - name: start simulator
         run: ./ci/mac_start_emulator.sh
-      - run: bazel mobile-install --fat_apk_cpu=x86 --start_app //examples/java/hello_world:hello_envoy
+      # Return to using:
+      #   bazel mobile-install --fat_apk_cpu=x86 --start_app //examples/java/hello_world:hello_envoy
+      # When https://github.com/lyft/envoy-mobile/issues/853 is fixed.
+      - run: |
+          bazel build --fat_apk_cpu=x86 //examples/java/hello_world:hello_envoy
+          adb install -r --no-incremental bazel-bin/examples/java/hello_world/hello_envoy.apk
+          adb shell am start -n io.envoyproxy.envoymobile.helloenvoy/.MainActivity
         name: 'Start java app'
       - run: 'adb logcat -e "successful response" -m 1'
         name: 'Check liveliness'
@@ -89,7 +95,13 @@ jobs:
       - run: ls -lh dist/
       - name: start simulator
         run: ./ci/mac_start_emulator.sh
-      - run: bazel mobile-install --fat_apk_cpu=x86 --start_app //examples/kotlin/hello_world:hello_envoy_kt
+      # Return to using:
+      #   bazel mobile-install --fat_apk_cpu=x86 --start_app //examples/kotlin/hello_world:hello_envoy_kt
+      # When https://github.com/lyft/envoy-mobile/issues/853 is fixed.
+      - run: |
+          bazel build --fat_apk_cpu=x86 //examples/kotlin/hello_world:hello_envoy_kt
+          adb install -r --no-incremental bazel-bin/examples/kotlin/hello_world/hello_envoy_kt.apk
+          adb shell am start -n io.envoyproxy.envoymobile.helloenvoykotlin/.MainActivity
         name: 'Start kotlin app'
       - run: 'adb logcat -e "successful response" -m 1'
         name: 'Check liveliness'
