@@ -503,16 +503,16 @@ void DnsMessageParser::setResponseCode(DnsQueryContextPtr& context,
   context->response_code_ = DNS_RESPONSE_CODE_NO_ERROR;
 }
 
-void DnsMessageParser::generateRandomIndices(const size_t count,
-                                             absl::flat_hash_set<size_t>& elements) {
-  elements.clear();
-  elements.reserve(count);
-  while (elements.size() < count) {
-    size_t element = rng_.random() % count;
-    if (!elements.contains(element)) {
-      elements.emplace(element);
-    }
+void DnsMessageParser::randomizeFirstAnswerIndex(std::vector<size_t>& elements) {
+  const size_t random_start_index = rng_.random() % elements.size();
+  // This iterator should never be equal to end() since the vector should contain all possible
+  // indices
+  const auto iter = std::find(elements.begin(), elements.end(), random_start_index);
+  if (iter == elements.begin()) {
+    return;
   }
+  elements.erase(iter);
+  elements[0] = random_start_index;
 }
 
 void DnsMessageParser::buildResponseBuffer(DnsQueryContextPtr& query_context,
@@ -553,11 +553,14 @@ void DnsMessageParser::buildResponseBuffer(DnsQueryContextPtr& query_context,
 
     const auto& answers = query_context->answers_;
 
-    // Generate a set of up to 8 random indices of the answer records that we serialize. We do this
-    // so that we don't always return the same records in the same order for every query.
-    absl::flat_hash_set<size_t> indices{};
-    const size_t max_indices = std::min(answers.size(), MAX_RETURNED_RECORDS);
-    generateRandomIndices(max_indices, indices);
+    // Generate a vector containing up to 8 indices of the answer records. We randomize the
+    // first entry if there are more than 8 records.
+    std::vector<size_t> indices(answers.size());
+    std::iota(indices.begin(), indices.end(), 0);
+    if (answers.size() > MAX_RETURNED_RECORDS) {
+      randomizeFirstAnswerIndex(indices);
+      indices.resize(MAX_RETURNED_RECORDS);
+    }
 
     for (const size_t index : indices) {
       const auto answer = std::next(answers.begin(), index);

@@ -249,11 +249,9 @@ private:
                                        uint64_t* name_offset);
 
   /**
-   * @brief Helper function to generate a random set of indices which are used to determine the
-   * order of serialized answer records. This ensures the server does not return a fixed list
-   * of answers when more than one address is configured for a record
+   * @brief Helper function to randomize the index of the first answer record returned to a client
    */
-  void generateRandomIndices(const size_t count, absl::flat_hash_set<size_t>& elements);
+  void randomizeFirstAnswerIndex(std::vector<size_t>& elements);
 
   bool recursion_available_;
   uint64_t retry_count_;

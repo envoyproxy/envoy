@@ -22,6 +22,7 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
       stats_(generateStats(config.stat_prefix(), root_scope_)) {
   using envoy::extensions::filters::udp::dns_filter::v3alpha::DnsFilterConfig;
 
+  Runtime::RandomGeneratorImpl random;
   const auto& server_config = config.server_config();
 
   envoy::data::dns::v3::DnsTable dns_table;
@@ -38,9 +39,16 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
     if (virtual_domain.endpoint().has_address_list()) {
       const auto& address_list = virtual_domain.endpoint().address_list().address();
       addrs.reserve(address_list.size());
+
+      // Randomize the configured addresses
+      std::vector<size_t> indices(address_list.size());
+      std::iota(indices.begin(), indices.end(), 0);
+      std::shuffle(indices.begin(), indices.end(), random);
+
       // Creating the IP address will throw an exception if the address string is malformed
-      for (const auto& address : address_list) {
-        auto ipaddr = Network::Utility::parseInternetAddress(address, 0 /* port */);
+      for (const auto index : indices) {
+        const auto address_iter = std::next(address_list.begin(), index);
+        auto ipaddr = Network::Utility::parseInternetAddress(*address_iter, 0 /* port */);
         addrs.push_back(std::move(ipaddr));
       }
     } else {
