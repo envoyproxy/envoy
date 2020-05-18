@@ -166,10 +166,10 @@ void UberFilterFuzzer::fuzz(
 
   // Data path should not throw exceptions.
   if (decoder_filter_ != nullptr) {
-    ASSERT_NO_THROW(runData(decoder_filter_.get(), downstream_data));
+    runData(decoder_filter_.get(), downstream_data);
   }
   if (encoder_filter_ != nullptr) {
-    ASSERT_NO_THROW(runData(encoder_filter_.get(), upstream_data));
+    runData(encoder_filter_.get(), upstream_data);
   }
 
   reset();
