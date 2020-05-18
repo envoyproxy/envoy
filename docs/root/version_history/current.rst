@@ -46,6 +46,8 @@ Changes
 * request_id: added to :ref:`always_set_request_id_in_response setting <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.always_set_request_id_in_response>`
   to set :ref:`x-request-id <config_http_conn_man_headers_x-request-id>` header in response even if
   tracing is not forced.
+* router: add support for RESPONSE_FLAGS and RESPONSE_CODE_DETAILS :ref:`header formatters
+  <config_http_conn_man_headers_custom_request_headers>`.
 * router: allow retries of streaming or incomplete requests. This removes stat `rq_retry_skipped_request_not_complete`.
 * router: allow retries by default when upstream responds with :ref:`x-envoy-overloaded <config_http_filters_router_x-envoy-overloaded_set>`.
 * router: more fine grained internal redirect configs are added to the :ref`internal_redirect_policy
