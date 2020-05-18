@@ -1307,7 +1307,7 @@ TEST_P(IntegrationTest, ConnectWithNoBody) {
   // Send the payload early so we can regression test that body data does not
   // get proxied until after the response headers are sent.
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("http"));
-  tcp_client->write("CONNECT host.com:80 HTTP/1.1\r\n\r\nreturn-payload", false);
+  tcp_client->write("CONNECT host.com:80 HTTP/1.1\r\n\r\npayload", false);
 
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
@@ -1325,10 +1325,10 @@ TEST_P(IntegrationTest, ConnectWithNoBody) {
   tcp_client->waitForData("\r\n\r\n", false);
   EXPECT_TRUE(absl::StartsWith(tcp_client->data(), "HTTP/1.1 200 OK\r\n")) << tcp_client->data();
   // Make sure the following payload is proxied without chunks or any other modifications.
-  tcp_client->write("payload");
   ASSERT_TRUE(fake_upstream_connection->waitForData(
       FakeRawConnection::waitForInexactMatch("\r\n\r\npayload"), &data));
 
+  ASSERT_TRUE(fake_upstream_connection->write("return-payload"));
   tcp_client->waitForData("\r\n\r\nreturn-payload", false);
   EXPECT_FALSE(absl::StrContains(tcp_client->data(), "hunked"));
 

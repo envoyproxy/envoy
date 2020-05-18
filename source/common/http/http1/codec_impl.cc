@@ -165,8 +165,8 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
     } else if (connection_.protocol() == Protocol::Http10) {
       chunk_encoding_ = false;
     } else {
-      // Specifically for responses to connct requests, do not send the chunked
-      // encoding header: https://tools.ietf.org/html/rfc7231#section-4.3.6
+      // For responses to connct requests, do not send the chunked encoding header:
+      // https://tools.ietf.org/html/rfc7231#section-4.3.6
       if (!is_response_to_connect_request_) {
         encodeFormattedHeader(Headers::get().TransferEncoding.get(),
                               Headers::get().TransferEncodingValues.Chunked);
