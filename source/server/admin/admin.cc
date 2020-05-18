@@ -555,20 +555,6 @@ Http::Code AdminImpl::handlerContention(absl::string_view,
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerHealthcheckFail(absl::string_view, Http::ResponseHeaderMap&,
-                                             Buffer::Instance& response, AdminStream&) {
-  server_.failHealthcheck(true);
-  response.add("OK\n");
-  return Http::Code::OK;
-}
-
-Http::Code AdminImpl::handlerHealthcheckOk(absl::string_view, Http::ResponseHeaderMap&,
-                                           Buffer::Instance& response, AdminStream&) {
-  server_.failHealthcheck(false);
-  response.add("OK\n");
-  return Http::Code::OK;
-}
-
 Http::Code AdminImpl::handlerHotRestartVersion(absl::string_view, Http::ResponseHeaderMap&,
                                                Buffer::Instance& response, AdminStream&) {
   response.add(server_.hotRestart().version());
@@ -625,13 +611,6 @@ Http::Code AdminImpl::handlerReady(absl::string_view, Http::ResponseHeaderMap&,
   Http::Code code =
       state == envoy::admin::v3::ServerInfo::LIVE ? Http::Code::OK : Http::Code::ServiceUnavailable;
   return code;
-}
-
-Http::Code AdminImpl::handlerQuitQuitQuit(absl::string_view, Http::ResponseHeaderMap&,
-                                          Buffer::Instance& response, AdminStream&) {
-  server_.shutdown();
-  response.add("OK\n");
-  return Http::Code::OK;
 }
 
 Http::Code AdminImpl::handlerCerts(absl::string_view, Http::ResponseHeaderMap& response_headers,
@@ -694,7 +673,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
       route_config_provider_(server.timeSource()),
       scoped_route_config_provider_(server.timeSource()), stats_handler_(server),
       logs_handler_(server), profiling_handler_(profile_path), runtime_handler_(server),
-      listeners_handler_(server),
+      listeners_handler_(server), server_cmd_handler_(server),
       // TODO(jsedgwick) add /runtime_reset endpoint that removes all admin-set values
       handlers_{
           {"/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false, false},
@@ -710,9 +689,9 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
           {"/heapprofiler", "enable/disable the heap profiler",
            MAKE_ADMIN_HANDLER(profiling_handler_.handlerHeapProfiler), false, true},
           {"/healthcheck/fail", "cause the server to fail health checks",
-           MAKE_ADMIN_HANDLER(handlerHealthcheckFail), false, true},
+           MAKE_ADMIN_HANDLER(server_cmd_handler_.handlerHealthcheckFail), false, true},
           {"/healthcheck/ok", "cause the server to pass health checks",
-           MAKE_ADMIN_HANDLER(handlerHealthcheckOk), false, true},
+           MAKE_ADMIN_HANDLER(server_cmd_handler_.handlerHealthcheckOk), false, true},
           {"/help", "print out list of admin commands", MAKE_ADMIN_HANDLER(handlerHelp), false,
            false},
           {"/hot_restart_version", "print the hot restart compatibility version",
@@ -721,8 +700,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
            MAKE_ADMIN_HANDLER(logs_handler_.handlerLogging), false, true},
           {"/memory", "print current allocation/heap usage", MAKE_ADMIN_HANDLER(handlerMemory),
            false, false},
-          {"/quitquitquit", "exit the server", MAKE_ADMIN_HANDLER(handlerQuitQuitQuit), false,
-           true},
+          {"/quitquitquit", "exit the server",
+           MAKE_ADMIN_HANDLER(server_cmd_handler_.handlerQuitQuitQuit), false, true},
           {"/reset_counters", "reset all counters to zero",
            MAKE_ADMIN_HANDLER(stats_handler_.handlerResetCounters), false, true},
           {"/drain_listeners", "drain listeners",
