@@ -116,9 +116,9 @@ if __name__ == "__main__":
   cloneGoProtobufs(repo)
   last_sha = findLastSyncSHA(repo)
   changes = updatedSinceSHA(repo, last_sha)
-  new_sha = changes[0]
   if changes:
     print('Changes detected: %s' % changes)
+    new_sha = changes[0]
     syncGoProtobufs(output, repo)
     writeRevisionInfo(repo, new_sha)
     publishGoProtobufs(repo, new_sha)
