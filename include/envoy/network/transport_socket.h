@@ -5,6 +5,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 #include "envoy/network/io_handle.h"
+#include "envoy/network/proxy_protocol.h"
 #include "envoy/ssl/connection.h"
 
 #include "absl/types/optional.h"
@@ -183,6 +184,11 @@ public:
    * @return the optional overridden application protocols.
    */
   virtual const std::vector<std::string>& applicationProtocolListOverride() const PURE;
+
+  /**
+   * @return optional proxy protocol address info.
+   */
+  virtual absl::optional<Network::ProxyProtocolHeader> proxyProtocolHeader() const PURE;
 
   /**
    * @param vector of bytes to which the option should append hash key data that will be used

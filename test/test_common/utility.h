@@ -157,6 +157,18 @@ public:
   static bool buffersEqual(const Buffer::Instance& lhs, const Buffer::Instance& rhs);
 
   /**
+   * Compare 2 RawSlice pointers.
+   * @param lhs supplies raw slice 1.
+   * @param rhs supplies raw slice 2.
+   * @param num_slices The number of slices to compare. It is assumed lhs and rhs have the same
+   * number.
+   * @return true if for num_slices, all lhs raw slices are equal to the corresponding rhs raw slice
+   *         in length and a byte by byte data comparison. false otherwise
+   */
+  static bool rawSlicesEqual(const Buffer::RawSlice* lhs, const Buffer::RawSlice* rhs,
+                             size_t num_slices);
+
+  /**
    * Feed a buffer with random characters.
    * @param buffer supplies the buffer to be fed.
    * @param n_char number of characters that should be added to the supplied buffer.

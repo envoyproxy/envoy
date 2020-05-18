@@ -339,6 +339,7 @@ envoy_cc_library(
         ":application_protocol_lib",
         ":upstream_server_name_lib",
         ":upstream_subject_alt_names_lib",
+        "//include/envoy/network:proxy_protocol_header",
         "//include/envoy/network:transport_socket_interface",
         "//include/envoy/stream_info:filter_state_interface",
         "//source/common/common:scalar_to_byte_vector_lib",

@@ -159,6 +159,7 @@ EXTENSIONS = {
     #
 
     "envoy.transport_sockets.alts":                     "//source/extensions/transport_sockets/alts:config",
+    "envoy.transport_sockets.proxy_protocol":           "//source/extensions/transport_sockets/proxy_protocol:proxy_protocol",
     "envoy.transport_sockets.raw_buffer":               "//source/extensions/transport_sockets/raw_buffer:config",
     "envoy.transport_sockets.tap":                      "//source/extensions/transport_sockets/tap:config",
     "envoy.transport_sockets.quic":                     "//source/extensions/quic_listeners/quiche:quic_transport_socket_factory_lib",
