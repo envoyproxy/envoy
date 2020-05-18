@@ -80,7 +80,7 @@ The specification of the :ref:`listeners <envoy_v3_api_file_envoy/config/listene
                   domains: ["*"]
                   routes:
                   - match: { prefix: "/" }
-                    route: { host_rewrite: www.google.com, cluster: service_google }
+                    route: { host_rewrite_literal: www.google.com, cluster: service_google }
               http_filters:
               - name: envoy.filters.http.router
 
