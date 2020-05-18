@@ -122,7 +122,7 @@ final class RequestMapperTests: XCTestCase {
     let retryPolicy = RetryPolicy(maxRetryCount: 123, retryOn: RetryRule.allCases,
                                   retryStatusCodes: [400, 410], perRetryTimeoutMS: 9001)
     let headers = Headers(headers: retryPolicy.outboundHeaders())
-    XCTAssertEqual(RetryPolicy(headers: headers), retryPolicy)
+    XCTAssertEqual(RetryPolicy.from(headers: headers), retryPolicy)
   }
 
   func testConvertingRequestMethodToStringAndBackCreatesTheSameRequestMethod() {
