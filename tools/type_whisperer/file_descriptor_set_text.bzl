@@ -9,7 +9,7 @@ def _file_descriptor_set_text(ctx):
     args = [ctx.outputs.pb_text.path]
     for dep in file_descriptor_sets.to_list():
         ws_name = dep.owner.workspace_name
-        if (not ws_name) or ws_name in ctx.attr.proto_repositories:
+        if (not ws_name) or ws_name in ctx.attr.proto_repositories or ctx.attr.with_external_deps:
             args.append(dep.path)
 
     ctx.actions.run(
@@ -29,6 +29,10 @@ file_descriptor_set_text = rule(
         "proto_repositories": attr.string_list(
             default = ["envoy_api_canonical"],
             allow_empty = False,
+        ),
+        "with_external_deps": attr.bool(
+            doc = "Include file descriptors for external dependencies.",
+            default = False,
         ),
         "_file_descriptor_set_text_gen": attr.label(
             default = Label("//tools/type_whisperer:file_descriptor_set_text_gen"),
