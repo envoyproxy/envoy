@@ -64,7 +64,8 @@ TEST_F(SdsApiTest, BasicTest) {
   initialize();
 }
 
-// Validate that SdsApi object is created and initialized successfully.
+// Validate that bad ConfigSources are caught at construction time. This is a
+// regression test for https://github.com/envoyproxy/envoy/issues/10976.
 TEST_F(SdsApiTest, BadConfigSource) {
   ::testing::InSequence s;
   NiceMock<Server::MockInstance> server;
