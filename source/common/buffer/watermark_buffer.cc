@@ -72,7 +72,7 @@ Api::IoCallUint64Result WatermarkBuffer::write(Network::IoHandle& io_handle) {
 void WatermarkBuffer::setWatermarks(uint32_t low_watermark, uint32_t high_watermark) {
   ASSERT(low_watermark < high_watermark || (high_watermark == 0 && low_watermark == 0));
   uint32_t overflow_watermark_multiplier =
-      Runtime::getInteger("envoy.buffer.overflow_multiplier", 2);
+      Runtime::getInteger("envoy.buffer.overflow_multiplier", 0);
   if (overflow_watermark_multiplier > 0 &&
       (static_cast<uint64_t>(overflow_watermark_multiplier) * high_watermark) >
           std::numeric_limits<uint32_t>::max()) {
