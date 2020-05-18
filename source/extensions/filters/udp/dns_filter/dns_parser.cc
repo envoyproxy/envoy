@@ -503,18 +503,6 @@ void DnsMessageParser::setResponseCode(DnsQueryContextPtr& context,
   context->response_code_ = DNS_RESPONSE_CODE_NO_ERROR;
 }
 
-void DnsMessageParser::randomizeFirstAnswerIndex(std::vector<size_t>& elements) {
-  const size_t random_start_index = rng_.random() % elements.size();
-  // This iterator should never be equal to end() since the vector should contain all possible
-  // indices
-  const auto iter = std::find(elements.begin(), elements.end(), random_start_index);
-  if (iter == elements.begin()) {
-    return;
-  }
-  elements.erase(iter);
-  elements[0] = random_start_index;
-}
-
 void DnsMessageParser::buildResponseBuffer(DnsQueryContextPtr& query_context,
                                            Buffer::OwnedImpl& buffer) {
   // Ensure that responses stay below the 512 byte byte limit. If we are to exceed this we must add
@@ -552,18 +540,16 @@ void DnsMessageParser::buildResponseBuffer(DnsQueryContextPtr& query_context,
     total_buffer_size += query_buffer.length();
 
     const auto& answers = query_context->answers_;
-
-    // Generate a vector containing up to 8 indices of the answer records. We randomize the
-    // first entry if there are more than 8 records.
-    std::vector<size_t> indices(answers.size());
-    std::iota(indices.begin(), indices.end(), 0);
-    if (answers.size() > MAX_RETURNED_RECORDS) {
-      randomizeFirstAnswerIndex(indices);
-      indices.resize(MAX_RETURNED_RECORDS);
+    if (answers.empty()) {
+      continue;
     }
+    const size_t num_answers = answers.size();
 
-    for (const size_t index : indices) {
-      const auto answer = std::next(answers.begin(), index);
+    // Randomize the starting index if we have more than 8 records
+    size_t index = num_answers > MAX_RETURNED_RECORDS ? rng_.random() % num_answers : 0;
+
+    while (serialized_answers < num_answers) {
+      const auto answer = std::next(answers.begin(), (index++ % num_answers));
       // Query names are limited to 255 characters. Since we are using ares to decode the encoded
       // names, we should not end up with a non-conforming name here.
       //
@@ -594,6 +580,10 @@ void DnsMessageParser::buildResponseBuffer(DnsQueryContextPtr& query_context,
       ++serialized_answers;
       total_buffer_size += serialized_answer_length;
       answer_buffer.add(serialized_answer);
+
+      if (serialized_answers == MAX_RETURNED_RECORDS) {
+        break;
+      }
     }
   }
 

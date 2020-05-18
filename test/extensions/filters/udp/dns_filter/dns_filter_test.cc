@@ -60,6 +60,7 @@ public:
     EXPECT_CALL(listener_factory_, dispatcher()).Times(AtLeast(0));
     EXPECT_CALL(listener_factory_, clusterManager()).Times(AtLeast(0));
     EXPECT_CALL(listener_factory_, api()).WillOnce(ReturnRef(*api_));
+    EXPECT_CALL(listener_factory_, random()).WillOnce(ReturnRef(random_));
 
     config_ = std::make_shared<DnsFilterEnvoyConfig>(listener_factory_, config);
     filter_ = std::make_unique<DnsFilter>(callbacks_, config_);
@@ -83,6 +84,7 @@ public:
   Network::UdpRecvData udp_response_;
   NiceMock<Filesystem::MockInstance> file_system_;
   NiceMock<Stats::MockHistogram> histogram_;
+  NiceMock<Runtime::MockRandomGenerator> random_;
   Server::Configuration::MockListenerFactoryContext listener_factory_;
   Stats::IsolatedStoreImpl stats_store_;
   std::unique_ptr<DnsFilter> filter_;

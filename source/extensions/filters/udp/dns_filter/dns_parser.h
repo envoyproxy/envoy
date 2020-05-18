@@ -248,11 +248,6 @@ private:
   const std::string parseDnsNameRecord(const Buffer::InstancePtr& buffer, uint64_t* available_bytes,
                                        uint64_t* name_offset);
 
-  /**
-   * @brief Helper function to randomize the index of the first answer record returned to a client
-   */
-  void randomizeFirstAnswerIndex(std::vector<size_t>& elements);
-
   bool recursion_available_;
   uint64_t retry_count_;
   DnsHeader header_;

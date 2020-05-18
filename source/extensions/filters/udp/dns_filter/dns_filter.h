@@ -87,6 +87,7 @@ private:
   uint64_t retry_count_;
   AddressConstPtrVec resolvers_;
   std::chrono::milliseconds resolver_timeout_;
+  Runtime::RandomGenerator& random_;
 };
 
 using DnsFilterEnvoyConfigSharedPtr = std::shared_ptr<const DnsFilterEnvoyConfig>;

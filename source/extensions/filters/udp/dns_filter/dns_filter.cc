@@ -19,10 +19,9 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
     Server::Configuration::ListenerFactoryContext& context,
     const envoy::extensions::filters::udp::dns_filter::v3alpha::DnsFilterConfig& config)
     : root_scope_(context.scope()), cluster_manager_(context.clusterManager()), api_(context.api()),
-      stats_(generateStats(config.stat_prefix(), root_scope_)) {
+      stats_(generateStats(config.stat_prefix(), root_scope_)), random_(context.random()) {
   using envoy::extensions::filters::udp::dns_filter::v3alpha::DnsFilterConfig;
 
-  Runtime::RandomGeneratorImpl random;
   const auto& server_config = config.server_config();
 
   envoy::data::dns::v3::DnsTable dns_table;
@@ -43,7 +42,7 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
       // Randomize the configured addresses
       std::vector<size_t> indices(address_list.size());
       std::iota(indices.begin(), indices.end(), 0);
-      std::shuffle(indices.begin(), indices.end(), random);
+      std::shuffle(indices.begin(), indices.end(), random_);
 
       // Creating the IP address will throw an exception if the address string is malformed
       for (const auto index : indices) {
