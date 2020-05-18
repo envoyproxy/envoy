@@ -282,9 +282,6 @@ private:
   Http::Code handlerConfigDump(absl::string_view path_and_query,
                                Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream&) const;
-  Http::Code handlerContention(absl::string_view path_and_query,
-                               Http::ResponseHeaderMap& response_headers,
-                               Buffer::Instance& response, AdminStream&);
   Http::Code handlerHelp(absl::string_view path_and_query,
                          Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                          AdminStream&);

@@ -12,7 +12,6 @@
 #include "envoy/admin/v3/clusters.pb.h"
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/admin/v3/metrics.pb.h"
-#include "envoy/admin/v3/mutex_stats.pb.h"
 #include "envoy/admin/v3/server_info.pb.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/filesystem/filesystem.h"
@@ -532,26 +531,6 @@ Http::Code AdminImpl::handlerConfigDump(absl::string_view url,
   return Http::Code::OK;
 }
 
-// TODO(ambuc) Export this as a server (?) stat for monitoring.
-Http::Code AdminImpl::handlerContention(absl::string_view,
-                                        Http::ResponseHeaderMap& response_headers,
-                                        Buffer::Instance& response, AdminStream&) {
-
-  if (server_.options().mutexTracingEnabled() && server_.mutexTracer() != nullptr) {
-    response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-
-    envoy::admin::v3::MutexStats mutex_stats;
-    mutex_stats.set_num_contentions(server_.mutexTracer()->numContentions());
-    mutex_stats.set_current_wait_cycles(server_.mutexTracer()->currentWaitCycles());
-    mutex_stats.set_lifetime_wait_cycles(server_.mutexTracer()->lifetimeWaitCycles());
-    response.add(MessageUtil::getJsonStringFromMessage(mutex_stats, true, true));
-  } else {
-    response.add("Mutex contention tracing is not enabled. To enable, run Envoy with flag "
-                 "--enable-mutex-tracing.");
-  }
-  return Http::Code::OK;
-}
-
 ConfigTracker& AdminImpl::getConfigTracker() { return config_tracker_; }
 
 AdminImpl::NullRouteConfigProvider::NullRouteConfigProvider(TimeSource& time_source)
@@ -602,7 +581,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
           {"/config_dump", "dump current Envoy configs (experimental)",
            MAKE_ADMIN_HANDLER(handlerConfigDump), false, false},
           {"/contention", "dump current Envoy mutex contention stats (if enabled)",
-           MAKE_ADMIN_HANDLER(handlerContention), false, false},
+           MAKE_ADMIN_HANDLER(stats_handler_.handlerContention), false, false},
           {"/cpuprofiler", "enable/disable the CPU profiler",
            MAKE_ADMIN_HANDLER(profiling_handler_.handlerCpuProfiler), false, true},
           {"/heapprofiler", "enable/disable the heap profiler",
