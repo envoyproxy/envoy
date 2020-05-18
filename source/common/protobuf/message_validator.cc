@@ -1,6 +1,5 @@
-#include "envoy/protobuf/message_validator.h"
-
 #include "envoy/common/exception.h"
+#include "envoy/protobuf/message_validator.h"
 
 #include "common/common/logger.h"
 

@@ -10,32 +10,6 @@
 
 namespace Envoy {
 namespace ProtobufMessage {
-
-namespace ValidationError {
-const char deprecation_error[] = " If continued use of this field is absolutely necessary, "
-                                 "see " ENVOY_DOC_URL_RUNTIME_OVERRIDE_DEPRECATED " for "
-                                 "how to apply a temporary and highly discouraged override.";
-
-/**
- * Exception class for reporting validation errors due to the presence of unknown
- * fields in a protobuf.
- */
-class UnknownProtoFieldException : public EnvoyException {
-public:
-  UnknownProtoFieldException(const std::string& message) : EnvoyException(message) {}
-};
-
-/**
- * Exception class for reporting validation errors due to the presence of deprecated
- * fields in a protobuf.
- */
-class DeprecatedProtoFieldException : public EnvoyException {
-public:
-  DeprecatedProtoFieldException(const std::string& message) : EnvoyException(message) {}
-};
-
-} // namespace ValidationError
-
 /**
  * Visitor interface for a Protobuf::Message. The methods of ValidationVisitor are invoked to
  * perform validation based on events encountered during or after the parsing of proto binary
