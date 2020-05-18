@@ -102,10 +102,10 @@ public:
   }
 
   // Network::TransportSocketCallbacks
-  IoHandle& ioHandle() override { return socket_->ioHandle(); }
+  IoHandle& ioHandle() final { return socket_->ioHandle(); }
   const IoHandle& ioHandle() const override { return socket_->ioHandle(); }
   Connection& connection() override { return *this; }
-  void raiseEvent(ConnectionEvent event) final override;
+  void raiseEvent(ConnectionEvent event) final;
   // Should the read buffer be drained?
   bool shouldDrainReadBuffer() override {
     return read_buffer_limit_ > 0 && read_buffer_.length() >= read_buffer_limit_;

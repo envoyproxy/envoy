@@ -194,7 +194,7 @@ bool ConnectionImpl::consumerWantsToRead() {
 }
 
 void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
-  if (!ioHandle().isOpen()) {
+  if (!ConnectionImpl::ioHandle().isOpen()) {
     return;
   }
 
