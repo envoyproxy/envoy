@@ -32,9 +32,9 @@ We will activate the security release process for disclosures that meet the foll
     + Memory exhaustion with amplification factor of 100 or more. I.e. 100 byte client request leading to
       10000 bytes of memory consumed by Envoy or
       
-    + CPU exhaustion where 100 or fewer connections consume an entire CPU core.
+    + CPU exhaustion where 100 or fewer HTTP/1 connections or HTTP/2 streams consume an entire CPU core.
 
-The Envoy availability stance around CPU and memory DoS, is still evolving, especially for brute force
+The Envoy availability stance around CPU and memory DoS is still evolving, especially for brute force
 attacks. We acknowledge that brute force (i.e. these with amplification factor less than 100) attacks are
 likely for Envoy deployments as part of cloud infrastructure or with the use of botnets. We will continue
 to iterate and fix well known resource issues in the open, e.g. overload manager and watermark improvements.
