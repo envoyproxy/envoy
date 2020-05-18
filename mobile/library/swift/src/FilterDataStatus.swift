@@ -1,3 +1,5 @@
+import Foundation
+
 /// Status returned by filters when transmitting or receiving data.
 public enum FilterDataStatus {
   /// Continue filter chain iteration. If headers have not yet been sent to the next filter, they
