@@ -296,8 +296,8 @@ public:
   virtual void startRtdsSubscriptions(ReadyCallback on_done) PURE;
 
   /**
-   * Stops any existing RTDS subscriptions. This should be called prior to invalidating the the streams
-   * managed by the cluster manager.
+   * Stops any existing RTDS subscriptions. This should be called prior to invalidating the the
+   * streams managed by the cluster manager.
    */
   virtual void stop() PURE;
 };
