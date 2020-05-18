@@ -75,6 +75,7 @@ public:
   MOCK_METHOD(std::shared_ptr<const Snapshot>, threadsafeSnapshot, ());
   MOCK_METHOD(void, mergeValues, ((const std::unordered_map<std::string, std::string>&)));
   MOCK_METHOD(void, startRtdsSubscriptions, (ReadyCallback));
+  MOCK_METHOD(void, stop, ());
 
   testing::NiceMock<MockSnapshot> snapshot_;
 };

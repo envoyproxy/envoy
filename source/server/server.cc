@@ -130,6 +130,10 @@ InstanceImpl::~InstanceImpl() {
   listener_manager_.reset();
   ENVOY_LOG(debug, "destroyed listener manager");
 
+  // Stop the RTDS subscriptions before we shut everything down, as clearing the deferred list will
+  // otherwise invalidate the streams used by RTDS.
+  Runtime::LoaderSingleton::get().stop();
+
   // This ensures that we don't have any pending deletions that extend the lifetime of objects
   // beyond the lifetime of the other fields.
   dispatcher_->clearDeferredDeleteList();

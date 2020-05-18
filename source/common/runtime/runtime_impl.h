@@ -254,7 +254,10 @@ public:
   std::shared_ptr<const Snapshot> threadsafeSnapshot() override;
   void mergeValues(const std::unordered_map<std::string, std::string>& values) override;
   void startRtdsSubscriptions(ReadyCallback on_done) override;
-
+  void stop() override {
+    subscriptions_.clear();
+  }
+  
 private:
   friend RtdsSubscription;
 
