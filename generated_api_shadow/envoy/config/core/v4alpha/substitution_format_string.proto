@@ -47,7 +47,7 @@ message SubstitutionFormatString {
     //
     // .. code-block::
     //
-    //  typed_json_format:
+    //  json_format:
     //    status: %RESPONSE_CODE%
     //    message: %RESP_BODY%
     //

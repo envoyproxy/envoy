@@ -25,6 +25,7 @@
 #include "common/http/http3/well_known_names.h"
 #include "common/http/request_id_extension_impl.h"
 #include "common/http/utility.h"
+#include "common/local_reply/local_reply.h"
 #include "common/protobuf/utility.h"
 #include "common/router/rds_impl.h"
 #include "common/router/scoped_rds.h"
@@ -438,6 +439,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           std::make_pair(name, FilterConfig{std::move(factories), enabled}));
     }
   }
+
+  local_reply_ = LocalReply::Factory::create(config.local_reply_config(), context);
 }
 
 void HttpConnectionManagerConfig::processFilter(

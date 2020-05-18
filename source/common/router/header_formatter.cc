@@ -328,8 +328,9 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
       static const Http::ResponseTrailerMapImpl empty_response_trailers;
       std::string formatted;
       for (const auto& formatter : formatters) {
-        absl::StrAppend(&formatted, formatter->format(empty_request_headers, empty_response_headers,
-                                                      empty_response_trailers, stream_info));
+        absl::StrAppend(&formatted,
+                        formatter->format(empty_request_headers, empty_response_headers,
+                                          empty_response_trailers, stream_info, std::string()));
       }
       return formatted;
     };

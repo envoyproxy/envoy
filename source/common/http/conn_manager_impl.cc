@@ -1519,22 +1519,29 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
 
   stream_info_.setResponseCodeDetails(details);
   Utility::sendLocalReply(
-      is_grpc_request,
-      [this, modify_headers](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
-        if (modify_headers != nullptr) {
-          modify_headers(*headers);
-        }
-        response_headers_ = std::move(headers);
-        // TODO: Start encoding from the last decoder filter that saw the
-        // request instead.
-        encodeHeaders(nullptr, *response_headers_, end_stream);
-      },
-      [this](Buffer::Instance& data, bool end_stream) -> void {
-        // TODO: Start encoding from the last decoder filter that saw the
-        // request instead.
-        encodeData(nullptr, data, end_stream, FilterIterationStartState::CanStartFromCurrent);
-      },
-      state_.destroyed_, code, body, grpc_status, is_head_request);
+      state_.destroyed_,
+      Utility::EncodeFunctions{
+          [this](Code& code, std::string& body, absl::string_view& content_type) -> void {
+            if (connection_manager_.config_.localReply()) {
+              connection_manager_.config_.localReply()->rewrite(
+                  request_headers_.get(), stream_info_, code, body, content_type);
+            }
+          },
+          [this, modify_headers](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
+            if (modify_headers != nullptr) {
+              modify_headers(*headers);
+            }
+            response_headers_ = std::move(headers);
+            // TODO: Start encoding from the last decoder filter that saw the
+            // request instead.
+            encodeHeaders(nullptr, *response_headers_, end_stream);
+          },
+          [this](Buffer::Instance& data, bool end_stream) -> void {
+            // TODO: Start encoding from the last decoder filter that saw the
+            // request instead.
+            encodeData(nullptr, data, end_stream, FilterIterationStartState::CanStartFromCurrent);
+          }},
+      Utility::LocalReplyData{is_grpc_request, code, body, grpc_status, is_head_request});
 }
 
 void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
@@ -2538,17 +2545,26 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataTooLarge() {
       // Instead, call the encodeHeadersInternal / encodeDataInternal helpers
       // directly, which maximizes shared code with the normal response path.
       Http::Utility::sendLocalReply(
-          Grpc::Common::hasGrpcContentType(*parent_.request_headers_),
-          [&](ResponseHeaderMapPtr&& response_headers, bool end_stream) -> void {
-            parent_.response_headers_ = std::move(response_headers);
-            parent_.encodeHeadersInternal(*parent_.response_headers_, end_stream);
-          },
-          [&](Buffer::Instance& data, bool end_stream) -> void {
-            parent_.encodeDataInternal(data, end_stream);
-          },
-          parent_.state_.destroyed_, Http::Code::InternalServerError,
-          CodeUtility::toString(Http::Code::InternalServerError), absl::nullopt,
-          parent_.state_.is_head_request_);
+          parent_.state_.destroyed_,
+          Utility::EncodeFunctions{
+              [&](Code& code, std::string& body, absl::string_view& content_type) -> void {
+                if (parent_.connection_manager_.config_.localReply()) {
+                  parent_.connection_manager_.config_.localReply()->rewrite(
+                      parent_.request_headers_.get(), parent_.stream_info_, code, body,
+                      content_type);
+                }
+              },
+              [&](ResponseHeaderMapPtr&& response_headers, bool end_stream) -> void {
+                parent_.response_headers_ = std::move(response_headers);
+                parent_.encodeHeadersInternal(*parent_.response_headers_, end_stream);
+              },
+              [&](Buffer::Instance& data, bool end_stream) -> void {
+                parent_.encodeDataInternal(data, end_stream);
+              }},
+          Utility::LocalReplyData{Grpc::Common::hasGrpcContentType(*parent_.request_headers_),
+                                  Http::Code::InternalServerError,
+                                  CodeUtility::toString(Http::Code::InternalServerError),
+                                  absl::nullopt, parent_.state_.is_head_request_});
       parent_.maybeEndEncode(parent_.state_.local_complete_);
     } else {
       ENVOY_STREAM_LOG(

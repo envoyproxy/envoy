@@ -21,7 +21,7 @@ DEFINE_PROTO_FUZZER(const test::common::access_log::TestCase& input) {
         Fuzz::fromHeaders<Http::TestResponseTrailerMapImpl>(input.response_trailers());
     const auto& stream_info = Fuzz::fromStreamInfo(input.stream_info());
     for (const auto& it : formatters) {
-      it->format(request_headers, response_headers, response_trailers, stream_info);
+      it->format(request_headers, response_headers, response_trailers, stream_info, std::string{});
     }
     ENVOY_LOG_MISC(trace, "Success");
   } catch (const EnvoyException& e) {

@@ -16,8 +16,8 @@ void FileAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
                             const Http::ResponseHeaderMap& response_headers,
                             const Http::ResponseTrailerMap& response_trailers,
                             const StreamInfo::StreamInfo& stream_info) {
-  log_file_->write(
-      formatter_->format(request_headers, response_headers, response_trailers, stream_info));
+  log_file_->write(formatter_->format(request_headers, response_headers, response_trailers,
+                                      stream_info, std::string()));
 }
 
 } // namespace File

@@ -355,6 +355,7 @@ public:
   headersWithUnderscoresAction() const override {
     return headers_with_underscores_action_;
   }
+  LocalReply::LocalReply* localReply() const override { return nullptr; }
 
   Envoy::Event::SimulatedTimeSystem test_time_;
   NiceMock<Router::MockRouteConfigProvider> route_config_provider_;

@@ -120,6 +120,7 @@ public:
   const Http::InternalAddressConfig& internalAddressConfig() const override {
     return *internal_address_config_;
   }
+
   MOCK_METHOD(bool, unixSocketInternal, ());
   MOCK_METHOD(uint32_t, xffNumTrustedHops, (), (const));
   MOCK_METHOD(bool, skipXffAppend, (), (const));
@@ -139,6 +140,7 @@ public:
   MOCK_METHOD(bool, shouldStripMatchingPort, (), (const));
   MOCK_METHOD(envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction,
               headersWithUnderscoresAction, (), (const));
+  MOCK_METHOD(LocalReply::LocalReply*, localReply, (), (const));
 
   std::unique_ptr<Http::InternalAddressConfig> internal_address_config_ =
       std::make_unique<DefaultInternalAddressConfig>();
@@ -163,6 +165,7 @@ public:
     tracing_config_ = {
         Tracing::OperationName::Ingress, {}, percent1, percent2, percent1, false, 256};
     ON_CALL(config_, tracingConfig()).WillByDefault(Return(&tracing_config_));
+    ON_CALL(config_, localReply()).WillByDefault(Return(nullptr));
 
     ON_CALL(config_, via()).WillByDefault(ReturnRef(via_));
     ON_CALL(config_, requestIDExtension()).WillByDefault(Return(request_id_extension_));

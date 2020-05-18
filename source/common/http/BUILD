@@ -143,6 +143,7 @@ envoy_cc_library(
         "//include/envoy/http:filter_interface",
         "//include/envoy/http:request_id_extension_interface",
         "//include/envoy/router:rds_interface",
+        "//source/common/local_reply:local_reply_lib",
         "//source/common/network:utility_lib",
         "//source/common/stats:symbol_table_lib",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
