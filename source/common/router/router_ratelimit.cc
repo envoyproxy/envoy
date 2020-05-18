@@ -39,7 +39,7 @@ bool RequestHeadersAction::populateDescriptor(const Router::RouteEntry&,
                                               const Network::Address::Instance&) const {
   const Http::HeaderEntry* header_value = headers.get(header_name_);
 
-  // If header is not present and skip_if_absent_ is not set to true, short circuit here and return.
+  // If header is not present and skip_if_absent_ is true, ignore the descriptor
   if (!header_value) {
     return skip_if_absent_;
   }
