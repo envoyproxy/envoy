@@ -304,7 +304,17 @@ void StreamEncoderImpl::resetStream(StreamResetReason reason) {
   connection_.onResetStreamBase(reason);
 }
 
-void StreamEncoderImpl::readDisable(bool disable) { connection_.readDisable(disable); }
+void StreamEncoderImpl::readDisable(bool disable) {
+  if (disable) {
+    ++read_disable_calls_;
+  } else {
+    ASSERT(read_disable_calls_ != 0);
+    if (read_disable_calls_ != 0) {
+      --read_disable_calls_;
+    }
+  }
+  connection_.readDisable(disable);
+}
 
 uint32_t StreamEncoderImpl::bufferLimit() { return connection_.bufferLimit(); }
 
@@ -322,7 +332,7 @@ void ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers, bool e
   ASSERT(headers.Status() != nullptr);
   uint64_t numeric_status = Utility::getResponseStatus(headers);
 
-  if (connection_.protocol() == Protocol::Http10 && connection_.supports_http_10()) {
+  if (connection_.protocol() == Protocol::Http10 && connection_.supportsHttp10()) {
     connection_.copyToBuffer(HTTP_10_RESPONSE_PREFIX, sizeof(HTTP_10_RESPONSE_PREFIX) - 1);
   } else {
     connection_.copyToBuffer(RESPONSE_PREFIX, sizeof(RESPONSE_PREFIX) - 1);
@@ -430,11 +440,11 @@ http_parser_settings ConnectionImpl::settings_{
     nullptr // on_chunk_complete
 };
 
-ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
+ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stats,
                                http_parser_type type, uint32_t max_headers_kb,
                                const uint32_t max_headers_count,
                                HeaderKeyFormatterPtr&& header_key_formatter, bool enable_trailers)
-    : connection_(connection), stats_{ALL_HTTP1_CODEC_STATS(POOL_COUNTER_PREFIX(stats, "http1."))},
+    : connection_(connection), stats_(stats),
       header_key_formatter_(std::move(header_key_formatter)), processing_trailers_(false),
       handling_upgrade_(false), reset_stream_called_(false), deferred_end_stream_headers_(false),
       strict_header_validation_(
@@ -494,12 +504,20 @@ bool ConnectionImpl::maybeDirectDispatch(Buffer::Instance& data) {
   return true;
 }
 
-void ConnectionImpl::dispatch(Buffer::Instance& data) {
+Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
+  // TODO(#10878): Remove this wrapper when exception removal is complete. innerDispatch may either
+  // throw an exception or return an error status. The utility wrapper catches exceptions and
+  // converts them to error statuses.
+  return Utility::exceptionToStatus(
+      [&](Buffer::Instance& data) -> Http::Status { return innerDispatch(data); }, data);
+}
+
+Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
   ENVOY_CONN_LOG(trace, "parsing {} bytes", connection_, data.length());
   ASSERT(buffered_body_.length() == 0);
 
   if (maybeDirectDispatch(data)) {
-    return;
+    return Http::okStatus();
   }
 
   // Always unpause before dispatch.
@@ -528,6 +546,7 @@ void ConnectionImpl::dispatch(Buffer::Instance& data) {
   // If an upgrade has been handled and there is body data or early upgrade
   // payload to send on, send it on.
   maybeDirectDispatch(data);
+  return Http::okStatus();
 }
 
 size_t ConnectionImpl::dispatchSlice(const char* slice, size_t len) {
@@ -724,7 +743,7 @@ void ConnectionImpl::onResetStreamBase(StreamResetReason reason) {
 }
 
 ServerConnectionImpl::ServerConnectionImpl(
-    Network::Connection& connection, Stats::Scope& stats, ServerConnectionCallbacks& callbacks,
+    Network::Connection& connection, CodecStats& stats, ServerConnectionCallbacks& callbacks,
     const Http1Settings& settings, uint32_t max_request_headers_kb,
     const uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
@@ -892,6 +911,10 @@ void ServerConnectionImpl::onMessageComplete() {
   ASSERT(!handling_upgrade_);
   if (active_request_.has_value()) {
     auto& active_request = active_request_.value();
+
+    if (active_request.request_decoder_) {
+      active_request.response_encoder_.readDisable(true);
+    }
     active_request.remote_complete_ = true;
     if (deferred_end_stream_headers_) {
       active_request.request_decoder_->decodeHeaders(
@@ -977,7 +1000,7 @@ void ServerConnectionImpl::checkHeaderNameForUnderscores() {
   }
 }
 
-ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
+ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, CodecStats& stats,
                                            ConnectionCallbacks&, const Http1Settings& settings,
                                            const uint32_t max_response_headers_count)
     : ConnectionImpl(connection, stats, HTTP_RESPONSE, MAX_RESPONSE_HEADERS_KB,
@@ -1078,17 +1101,6 @@ void ClientConnectionImpl::onMessageComplete() {
     // Encoder is used as part of decode* calls later in this function so pending_response_ can not
     // be reset just yet. Preserve the state in pending_response_done_ instead.
     pending_response_done_ = true;
-
-    // Streams are responsible for unwinding any outstanding readDisable(true)
-    // calls done on the underlying connection as they are destroyed. As this is
-    // the only place a HTTP/1 stream is destroyed where the Network::Connection is
-    // reused, unwind any outstanding readDisable() calls here. Do this before we dispatch
-    // end_stream in case the caller immediately reuses the connection.
-    if (connection_.state() == Network::Connection::State::Open) {
-      while (!connection_.readEnabled()) {
-        connection_.readDisable(false);
-      }
-    }
 
     if (deferred_end_stream_headers_) {
       response.decoder_->decodeHeaders(

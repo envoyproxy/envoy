@@ -237,9 +237,9 @@ envoy_sh_test(
     srcs = envoy_select_hot_restart([
         "hotrestart_test.sh",
     ]),
+    cc_binary = ["//source/exe:envoy-static"],
     data = [
         "test_utility.sh",
-        "//source/exe:envoy-static",
         "//test/config/integration:server_config_files",
         "//tools:socket_passing",
     ],
@@ -250,9 +250,9 @@ envoy_sh_test(
 envoy_sh_test(
     name = "run_envoy_test",
     srcs = ["run_envoy_test.sh"],
+    cc_binary = ["//source/exe:envoy-static"],
     data = [
         "test_utility.sh",
-        "//source/exe:envoy-static",
         "//test/config/integration:server_config_files",
     ],
     # TODO: This script invocation does not work on Windows, see: https://github.com/bazelbuild/bazel/issues/10959
@@ -572,6 +572,7 @@ envoy_cc_test_library(
         "//source/extensions/transport_sockets/tap:config",
         "//source/extensions/transport_sockets/tls:config",
         "//source/server:connection_handler_lib",
+        "//source/server:drain_manager_lib",
         "//source/server:hot_restart_nop_lib",
         "//source/server:listener_hooks_lib",
         "//source/server:process_context_lib",
@@ -596,6 +597,7 @@ envoy_cc_test_library(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
@@ -637,9 +639,15 @@ envoy_cc_test(
     deps = [
         ":http_protocol_integration_lib",
         "//source/common/http:header_map_lib",
+        "//source/extensions/internal_redirect/allow_listed_routes:config",
+        "//source/extensions/internal_redirect/previous_routes:config",
+        "//source/extensions/internal_redirect/safe_cross_scheme:config",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/internal_redirect/allow_listed_routes/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/internal_redirect/previous_routes/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/internal_redirect/safe_cross_scheme/v3:pkg_cc_proto",
     ],
 )
 
@@ -784,25 +792,6 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_test(
-    name = "ratelimit_integration_test",
-    srcs = ["ratelimit_integration_test.cc"],
-    tags = ["fails_on_windows"],
-    deps = [
-        ":http_integration_lib",
-        "//source/common/buffer:zero_copy_input_stream_lib",
-        "//source/common/grpc:codec_lib",
-        "//source/common/grpc:common_lib",
-        "//source/extensions/filters/http/ratelimit:config",
-        "//test/common/grpc:grpc_client_integration_lib",
-        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/http/ratelimit/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
-        "@envoy_api//envoy/service/ratelimit/v3:pkg_cc_proto",
     ],
 )
 

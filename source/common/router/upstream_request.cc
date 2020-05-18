@@ -590,6 +590,12 @@ void TcpUpstream::encodeHeaders(const Http::RequestHeaderMap&, bool end_stream) 
   if (data.length() != 0 || end_stream) {
     upstream_conn_data_->connection().write(data, end_stream);
   }
+
+  // TcpUpstream::encodeHeaders is called after the UpstreamRequest is fully initialized. Also use
+  // this time to synthesize the 200 response headers downstream to complete the CONNECT handshake.
+  Http::ResponseHeaderMapPtr headers{
+      Http::createHeaderMap<Http::ResponseHeaderMapImpl>({{Http::Headers::get().Status, "200"}})};
+  upstream_request_->decodeHeaders(std::move(headers), false);
 }
 
 void TcpUpstream::encodeTrailers(const Http::RequestTrailerMap&) {
@@ -610,12 +616,6 @@ void TcpUpstream::resetStream() {
 }
 
 void TcpUpstream::onUpstreamData(Buffer::Instance& data, bool end_stream) {
-  if (!sent_headers_) {
-    Http::ResponseHeaderMapPtr headers{
-        Http::createHeaderMap<Http::ResponseHeaderMapImpl>({{Http::Headers::get().Status, "200"}})};
-    upstream_request_->decodeHeaders(std::move(headers), false);
-    sent_headers_ = true;
-  }
   upstream_request_->decodeData(data, end_stream);
 }
 

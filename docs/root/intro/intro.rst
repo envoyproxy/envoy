@@ -10,3 +10,10 @@ Introduction
   arch_overview/arch_overview
   deployment_types/deployment_types
   getting_help
+
+.. These pages are only here for redirects from log lines from shipping versions of Envoy, so hide them.
+.. toctree::
+  :hidden:
+
+  version_history
+  deprecated

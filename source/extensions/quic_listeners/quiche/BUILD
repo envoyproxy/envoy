@@ -274,6 +274,7 @@ envoy_cc_library(
         "//include/envoy/network:listener_interface",
         "//source/common/network:listener_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/runtime:runtime_lib",
         "//source/server:connection_handler_lib",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
