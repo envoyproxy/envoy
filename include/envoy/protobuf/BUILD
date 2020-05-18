@@ -10,7 +10,6 @@ envoy_package()
 
 envoy_cc_library(
     name = "message_validator_interface",
-    srcs = ["message_validator.cc"],
     hdrs = ["message_validator.h"],
     deps = [
         "//source/common/common:documentation_url_lib",
