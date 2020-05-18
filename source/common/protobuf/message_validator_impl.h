@@ -3,6 +3,7 @@
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/stats/stats.h"
 
+#include "common/common/documentation_url.h"
 #include "common/common/logger.h"
 
 #include "absl/container/flat_hash_set.h"
@@ -10,30 +11,9 @@
 namespace Envoy {
 namespace ProtobufMessage {
 
-namespace ValidationError {
 const char deprecation_error[] = " If continued use of this field is absolutely necessary, "
                                  "see " ENVOY_DOC_URL_RUNTIME_OVERRIDE_DEPRECATED " for "
                                  "how to apply a temporary and highly discouraged override.";
-
-/**
- * Exception class for reporting validation errors due to the presence of unknown
- * fields in a protobuf.
- */
-class UnknownProtoFieldException : public EnvoyException {
-public:
-  UnknownProtoFieldException(const std::string& message) : EnvoyException(message) {}
-};
-
-/**
- * Exception class for reporting validation errors due to the presence of deprecated
- * fields in a protobuf.
- */
-class DeprecatedProtoFieldException : public EnvoyException {
-public:
-  DeprecatedProtoFieldException(const std::string& message) : EnvoyException(message) {}
-};
-
-} // namespace ValidationError
 
 class NullValidationVisitorImpl : public ValidationVisitor {
 public:

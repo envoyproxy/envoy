@@ -3,13 +3,31 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
 
-#include "common/common/documentation_url.h"
 #include "common/protobuf/protobuf.h"
 
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace ProtobufMessage {
+
+/**
+ * Exception class for reporting validation errors due to the presence of unknown
+ * fields in a protobuf.
+ */
+class UnknownProtoFieldException : public EnvoyException {
+public:
+  UnknownProtoFieldException(const std::string& message) : EnvoyException(message) {}
+};
+
+/**
+ * Exception class for reporting validation errors due to the presence of deprecated
+ * fields in a protobuf.
+ */
+class DeprecatedProtoFieldException : public EnvoyException {
+public:
+  DeprecatedProtoFieldException(const std::string& message) : EnvoyException(message) {}
+};
+
 /**
  * Visitor interface for a Protobuf::Message. The methods of ValidationVisitor are invoked to
  * perform validation based on events encountered during or after the parsing of proto binary
@@ -36,9 +54,6 @@ public:
    * @param description human readable description of the field.
    */
   virtual void onDeprecatedField(absl::string_view description, bool soft_deprecation) PURE;
-
-protected:
-  void onDeprecatedFieldDefault(absl::string_view description, bool soft_deprecation);
 };
 
 class ValidationContext {

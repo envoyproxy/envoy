@@ -57,7 +57,7 @@ void FilesystemSubscriptionImpl::refresh() {
     stats_.version_text_.set(message.version_info());
     stats_.update_success_.inc();
     ENVOY_LOG(debug, "Filesystem config update accepted for {}: {}", path_, message.DebugString());
-  } catch (const ProtobufMessage::ValidationError::UnknownProtoFieldException& e) {
+  } catch (const ProtobufMessage::UnknownProtoFieldException& e) {
     configRejected(e, message.DebugString());
   } catch (const EnvoyException& e) {
     if (config_update_available) {

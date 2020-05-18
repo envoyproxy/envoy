@@ -51,7 +51,7 @@ TEST(StrictValidationVisitorImpl, UnknownField) {
   StrictValidationVisitorImpl strict_validation_visitor;
   EXPECT_FALSE(strict_validation_visitor.skipValidation());
   EXPECT_THROW_WITH_MESSAGE(strict_validation_visitor.onUnknownField("foo"),
-                            ValidationError::UnknownProtoFieldException,
+                            UnknownProtoFieldException,
                             "Protobuf message (foo) has unknown fields");
 }
 
