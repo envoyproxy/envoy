@@ -14,7 +14,7 @@ redirection, the filter also handles retry, statistics, etc.
 .. _config_http_filters_router_headers_consumed:
 
 HTTP headers (consumed from downstreams)
------------------------
+----------------------------------------
 
 The router consumes and sets various HTTP headers both on the egress/request path as well as on the
 ingress/response path. They are documented in this section.
@@ -266,7 +266,7 @@ this header is present on an egress response, its value will override any locall
 operation (span) name on the client span.
 
 HTTP headers (consumed from upstream)
------------------------
+-------------------------------------
 
 x-envoy-upstream-canary
 ^^^^^^^^^^^^^^^^^^^^^^^
