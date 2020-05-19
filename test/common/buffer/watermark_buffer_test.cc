@@ -414,6 +414,12 @@ TEST_F(WatermarkBufferTest, OverflowWatermarkDisabled) {
 }
 
 TEST_F(WatermarkBufferTest, OverflowWatermarkDisabledOnVeryHighValue) {
+// Disabling execution with TSAN as it causes the test to use too much memory
+// and time, making the test fail in some settings (such as CI)
+#if defined(__has_feature) && __has_feature(thread_sanitizer)
+  ENVOY_LOG_MISC(critical, "WatermarkBufferTest::OverflowWatermarkDisabledOnVeryHighValue not "
+                           "supported by this compiler configuration");
+#else
   // Verifies that the overflow watermark is disabled when its value is higher
   // than uint32_t max value
   TestScopedRuntime scoped_runtime;
@@ -428,15 +434,17 @@ TEST_F(WatermarkBufferTest, OverflowWatermarkDisabledOnVeryHighValue) {
   buffer1.setWatermarks((std::numeric_limits<uint32_t>::max() / 3) + 4);
 
   // Add 2 halves instead of full uint32_t::max to get around std::bad_alloc exception
-  uint32_t half_max = std::numeric_limits<uint32_t>::max() / 2;
-  buffer1.add(std::string(half_max, 'a').data(), half_max);
-  buffer1.add(std::string(half_max, 'a').data(), half_max);
+  const uint32_t half_max = std::numeric_limits<uint32_t>::max() / 2;
+  const std::string half_max_str = std::string(half_max, 'a');
+  buffer1.add(half_max_str.data(), half_max);
+  buffer1.add(half_max_str.data(), half_max);
   EXPECT_EQ(1, high_watermark_buffer1);
   EXPECT_EQ(0, overflow_watermark_buffer1);
   buffer1.add(TEN_BYTES, 10);
   EXPECT_EQ(1, high_watermark_buffer1);
   EXPECT_EQ(0, overflow_watermark_buffer1);
   EXPECT_EQ(2 * half_max + static_cast<uint64_t>(10), buffer1.length());
+#endif
 }
 
 TEST_F(WatermarkBufferTest, OverflowWatermarkEqualHighWatermark) {
