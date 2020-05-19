@@ -399,7 +399,7 @@ public:
     std::string name = GLOBAL_SCRIPT_NAME;
     const auto config_per_route = getConfigPerRoute(decoder_callbacks_.callbacks_);
     if (config_per_route) {
-      // Filter is diabled by route config
+      // Filter is disabled by route config
       if (config_per_route->disabled()) {
         return Http::FilterHeadersStatus::Continue;
       }
@@ -432,7 +432,7 @@ public:
     std::string name = GLOBAL_SCRIPT_NAME;
     const auto config_per_route = getConfigPerRoute(decoder_callbacks_.callbacks_);
     if (config_per_route) {
-      // Filter is diabled by route config
+      // Filter is disabled by route config
       if (config_per_route->disabled()) {
         return Http::FilterHeadersStatus::Continue;
       }
