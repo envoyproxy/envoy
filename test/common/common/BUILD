@@ -7,6 +7,7 @@ load(
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
     "envoy_package",
+    "envoy_proto_library",
 )
 
 envoy_package()
@@ -303,5 +304,26 @@ envoy_cc_test(
     deps = [
         "//source/common/common:statusor_lib",
         "//source/common/http:status_lib",
+    ],
+)
+
+envoy_proto_library(
+    name = "token_bucket_fuzz_proto",
+    srcs = ["token_bucket_fuzz.proto"],
+    deps = [
+        "@envoy_api//envoy/type/v3:pkg",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "token_bucket_fuzz_test",
+    srcs = ["token_bucket_fuzz_test.cc"],
+    corpus = "token_bucket_corpus",
+    deps = [
+        ":token_bucket_fuzz_proto_cc_proto",
+        "//source/common/common:token_bucket_impl_lib",
+        "//source/common/protobuf:utility_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
     ],
 )

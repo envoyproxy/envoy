@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package test.common.common;
+
+import "envoy/type/v3/token_bucket.proto";
+
+import "google/protobuf/empty.proto";
+
+import "validate/validate.proto";
+
+message Consume {
+  uint64 tokens = 1 [(validate.rules).uint64 = {gt: 0}];
+  bool allow_partial = 2;
+}
+
+message Reset {
+  uint64 num_tokens = 1 [(validate.rules).uint64 = {gt: 0}];
+}
+
+message AdvanceTime {
+  uint32 milliseconds = 1 [(validate.rules).uint32 = {gt: 0}];
+}
+
+message Action {
+  oneof action_selector {
+    option (validate.required) = true;
+    Consume consume = 1;
+    google.protobuf.Empty next_token = 2;
+    Reset reset = 3;
+    AdvanceTime advance_time = 4;
+  }
+}
+
+message TokenBucketFuzzTestCase {
+  envoy.type.v3.TokenBucket config = 1 [(validate.rules).message = {required: true}];
+  repeated Action actions = 2;
+}

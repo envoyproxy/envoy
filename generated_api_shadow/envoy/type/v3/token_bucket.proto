@@ -33,6 +33,6 @@ message TokenBucket {
   // `max_tokens` tokens.
   google.protobuf.Duration fill_interval = 3 [(validate.rules).duration = {
     required: true
-    gt {}
+    gt {nanos: 50000000}
   }];
 }

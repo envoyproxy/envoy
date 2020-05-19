@@ -1,0 +1,48 @@
+config {
+  max_tokens: 1
+  tokens_per_fill {
+    value: 1
+  }
+  fill_interval {
+    seconds: 2
+  }
+}
+actions {
+  consume {
+    tokens: 1
+    allow_partial: false
+  }
+}
+actions {
+  advance_time {
+    milliseconds: 500
+  }
+}
+actions {
+  consume {
+    tokens: 1
+    allow_partial: false
+  }
+}
+actions {
+  advance_time {
+    milliseconds: 1000
+  }
+}
+actions {
+  consume {
+    tokens: 1
+    allow_partial: false
+  }
+}
+actions {
+  advance_time {
+    milliseconds: 500
+  }
+}
+actions {
+  consume {
+    tokens: 1
+    allow_partial: false
+  }
+}
