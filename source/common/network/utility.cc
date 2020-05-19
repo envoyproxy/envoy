@@ -506,8 +506,7 @@ Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, const Buffer::I
                                                const Address::Ip* local_ip,
                                                const Address::Instance& peer_address) {
   Buffer::RawSliceVector slices = buffer.getRawSlices();
-  return writeToSocket(handle, !slices.empty() ? &slices[0] : nullptr, slices.size(), local_ip,
-                       peer_address);
+  return writeToSocket(handle, slices.data(), slices.size(), local_ip, peer_address);
 }
 
 Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, Buffer::RawSlice* slices,

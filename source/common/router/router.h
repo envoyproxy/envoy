@@ -41,6 +41,11 @@ namespace Router {
  */
 // clang-format off
 #define ALL_ROUTER_STATS(COUNTER)                                                                  \
+  COUNTER(passthrough_internal_redirect_bad_location)                                              \
+  COUNTER(passthrough_internal_redirect_unsafe_scheme)                                             \
+  COUNTER(passthrough_internal_redirect_too_many_redirects)                                        \
+  COUNTER(passthrough_internal_redirect_no_route)                                                  \
+  COUNTER(passthrough_internal_redirect_predicate)                                                 \
   COUNTER(no_route)                                                                                \
   COUNTER(no_cluster)                                                                              \
   COUNTER(rq_redirect)                                                                             \
@@ -368,15 +373,17 @@ public:
     return retry_state_->shouldSelectAnotherHost(host);
   }
 
-  const Upstream::HealthyAndDegradedLoad&
-  determinePriorityLoad(const Upstream::PrioritySet& priority_set,
-                        const Upstream::HealthyAndDegradedLoad& original_priority_load) override {
+  const Upstream::HealthyAndDegradedLoad& determinePriorityLoad(
+      const Upstream::PrioritySet& priority_set,
+      const Upstream::HealthyAndDegradedLoad& original_priority_load,
+      const Upstream::RetryPriority::PriorityMappingFunc& priority_mapping_func) override {
     // We only modify the priority load on retries.
     if (!is_retry_) {
       return original_priority_load;
     }
 
-    return retry_state_->priorityLoadForRetry(priority_set, original_priority_load);
+    return retry_state_->priorityLoadForRetry(priority_set, original_priority_load,
+                                              priority_mapping_func);
   }
 
   uint32_t hostSelectionRetryCount() const override {
@@ -500,6 +507,8 @@ private:
   void resetOtherUpstreams(UpstreamRequest& upstream_request);
   void sendNoHealthyUpstreamResponse();
   bool setupRedirect(const Http::ResponseHeaderMap& headers, UpstreamRequest& upstream_request);
+  bool convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& downstream_headers,
+                                                const Http::HeaderEntry& internal_redirect);
   void updateOutlierDetection(Upstream::Outlier::Result result, UpstreamRequest& upstream_request,
                               absl::optional<uint64_t> code);
   void doRetry();

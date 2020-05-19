@@ -14,7 +14,7 @@ jobs:
   - job: format
     dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
     pool:
-      vmImage: "ubuntu-16.04"
+      vmImage: "ubuntu-18.04"
     steps:
       - task: Cache@2
         inputs:
@@ -44,11 +44,24 @@ jobs:
     condition: and(not(canceled()), or(succeeded(), ne(variables['Build.Reason'], 'PullRequest')))
     timeoutInMinutes: 360
     pool:
-      vmImage: "ubuntu-16.04"
+      vmImage: "ubuntu-18.04"
     steps:
       - template: bazel.yml
         parameters:
           ciTarget: bazel.release
+
+  - job: release_arm64
+    displayName: "Linux-arm64 release.server_only"
+    dependsOn: ["format"]
+    condition: ne(variables['Build.Reason'], 'PullRequest')
+    pool: "arm-large"
+    steps:
+      - template: bazel.yml
+        parameters:
+          managedAgent: false
+          ciTarget: bazel.release.server_only
+          rbe: ""
+          bazelBuildExtraOptions: "--curses=no"
 
   - job: bazel
     displayName: "Linux-x64"
@@ -70,7 +83,7 @@ jobs:
           CI_TARGET: "bazel.compile_time_options"
     timeoutInMinutes: 360
     pool:
-      vmImage: "Ubuntu 16.04"
+      vmImage: "ubuntu-18.04"
     steps:
       - template: bazel.yml
         parameters:
@@ -81,7 +94,7 @@ jobs:
     dependsOn: ["release"]
     condition: and(succeeded(), eq(variables['PostSubmit'], 'true'), ne(variables['Build.Reason'], 'PullRequest'))
     pool:
-      vmImage: "ubuntu-16.04"
+      vmImage: "ubuntu-18.04"
     steps:
       - task: DownloadBuildArtifacts@0
         inputs:

@@ -51,9 +51,9 @@ inline std::string replaceInvalidCharacters(absl::string_view string) {
 inline std::string replaceInvalidHostCharacters(absl::string_view string) {
   std::string filtered;
   filtered.reserve(string.length());
-  for (const uint8_t* c = reinterpret_cast<const uint8_t*>(string.data()); *c; ++c) {
-    if (nghttp2_check_authority(c, 1)) {
-      filtered.push_back(*c);
+  for (const char& c : string) {
+    if (nghttp2_check_authority(reinterpret_cast<const uint8_t*>(&c), 1)) {
+      filtered.push_back(c);
     } else {
       filtered.push_back('0');
     }
@@ -97,6 +97,20 @@ inline T fromHeaders(
     header_map.addCopy(header, "dummy");
   }
   return header_map;
+}
+
+// Convert from test proto Metadata to MetadataMap
+inline Http::MetadataMapVector fromMetadata(const test::fuzz::Metadata& metadata) {
+  Http::MetadataMapVector metadata_map_vector;
+  if (!metadata.metadata().empty()) {
+    Http::MetadataMap metadata_map;
+    Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
+    for (const auto& pair : metadata.metadata()) {
+      metadata_map_ptr->insert(pair);
+    }
+    metadata_map_vector.push_back(std::move(metadata_map_ptr));
+  }
+  return metadata_map_vector;
 }
 
 // Convert from HeaderMap to test proto Headers.

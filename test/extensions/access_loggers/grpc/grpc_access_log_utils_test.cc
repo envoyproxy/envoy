@@ -42,6 +42,7 @@ TEST(UtilityResponseFlagsToAccessLogResponseFlagsTest, All) {
   common_access_log_expected.mutable_response_flags()->set_downstream_protocol_error(true);
   common_access_log_expected.mutable_response_flags()->set_upstream_max_stream_duration_reached(
       true);
+  common_access_log_expected.mutable_response_flags()->set_response_from_cache_filter(true);
 
   EXPECT_EQ(common_access_log_expected.DebugString(), common_access_log.DebugString());
 }

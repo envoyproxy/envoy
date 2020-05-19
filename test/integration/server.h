@@ -6,6 +6,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/server/options.h"
 #include "envoy/server/process_context.h"
 #include "envoy/stats/stats.h"
@@ -15,6 +16,7 @@
 #include "common/common/logger.h"
 #include "common/common/thread.h"
 
+#include "server/drain_manager_impl.h"
 #include "server/listener_hooks.h"
 #include "server/options_impl.h"
 #include "server/server.h"
@@ -30,27 +32,23 @@
 namespace Envoy {
 namespace Server {
 
+struct FieldValidationConfig {
+  bool allow_unknown_static_fields = false;
+  bool reject_unknown_dynamic_fields = false;
+  bool ignore_unknown_dynamic_fields = false;
+};
+
 // Create OptionsImpl structures suitable for tests.
 OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::string& config_yaml,
                                   Network::Address::IpVersion ip_version,
-                                  bool allow_unknown_static_fields = false,
-                                  bool reject_unknown_dynamic_fields = false,
+                                  FieldValidationConfig validation_config = FieldValidationConfig(),
                                   uint32_t concurrency = 1);
-
-class TestDrainManager : public DrainManager {
-public:
-  // Server::DrainManager
-  bool drainClose() const override { return draining_; }
-  void startDrainSequence(std::function<void()>) override {}
-  void startParentShutdownSequence() override {}
-
-  bool draining_{};
-};
 
 class TestComponentFactory : public ComponentFactory {
 public:
-  Server::DrainManagerPtr createDrainManager(Server::Instance&) override {
-    return Server::DrainManagerPtr{new Server::TestDrainManager()};
+  Server::DrainManagerPtr createDrainManager(Server::Instance& server) override {
+    return Server::DrainManagerPtr{
+        new Server::DrainManagerImpl(server, envoy::config::listener::v3::Listener::MODIFY_ONLY)};
   }
   Runtime::LoaderPtr createRuntime(Server::Instance& server,
                                    Server::Configuration::Initial& config) override {
@@ -268,20 +266,22 @@ class IntegrationTestServer : public Logger::Loggable<Logger::Id::testing>,
                               public IntegrationTestServerStats,
                               public Server::ComponentFactory {
 public:
-  static IntegrationTestServerPtr create(
-      const std::string& config_path, const Network::Address::IpVersion version,
-      std::function<void(IntegrationTestServer&)> on_server_ready_function,
-      std::function<void()> on_server_init_function, bool deterministic,
-      Event::TestTimeSystem& time_system, Api::Api& api, bool defer_listener_finalization = false,
-      ProcessObjectOptRef process_object = absl::nullopt, bool allow_unknown_static_fields = false,
-      bool reject_unknown_dynamic_fields = false, uint32_t concurrency = 1);
+  static IntegrationTestServerPtr
+  create(const std::string& config_path, const Network::Address::IpVersion version,
+         std::function<void(IntegrationTestServer&)> on_server_ready_function,
+         std::function<void()> on_server_init_function, bool deterministic,
+         Event::TestTimeSystem& time_system, Api::Api& api,
+         bool defer_listener_finalization = false,
+         ProcessObjectOptRef process_object = absl::nullopt,
+         Server::FieldValidationConfig validation_config = Server::FieldValidationConfig(),
+         uint32_t concurrency = 1);
   // Note that the derived class is responsible for tearing down the server in its
   // destructor.
   ~IntegrationTestServer() override;
 
   void waitUntilListenersReady();
 
-  Server::TestDrainManager& drainManager() { return *drain_manager_; }
+  Server::DrainManagerImpl& drainManager() { return *drain_manager_; }
   void setOnWorkerListenerAddedCb(std::function<void()> on_worker_listener_added) {
     on_worker_listener_added_cb_ = std::move(on_worker_listener_added);
   }
@@ -296,8 +296,7 @@ public:
   void start(const Network::Address::IpVersion version,
              std::function<void()> on_server_init_function, bool deterministic,
              bool defer_listener_finalization, ProcessObjectOptRef process_object,
-             bool allow_unknown_static_fields, bool reject_unknown_dynamic_fields,
-             uint32_t concurrency);
+             Server::FieldValidationConfig validation_config, uint32_t concurrency);
 
   void waitForCounterEq(const std::string& name, uint64_t value) override {
     TestUtility::waitForCounterEq(statStore(), name, value, time_system_);
@@ -336,8 +335,9 @@ public:
   void onWorkerListenerRemoved() override;
 
   // Server::ComponentFactory
-  Server::DrainManagerPtr createDrainManager(Server::Instance&) override {
-    drain_manager_ = new Server::TestDrainManager();
+  Server::DrainManagerPtr createDrainManager(Server::Instance& server) override {
+    drain_manager_ =
+        new Server::DrainManagerImpl(server, envoy::config::listener::v3::Listener::MODIFY_ONLY);
     return Server::DrainManagerPtr{drain_manager_};
   }
   Runtime::LoaderPtr createRuntime(Server::Instance& server,
@@ -378,8 +378,8 @@ private:
    * Runs the real server on a thread.
    */
   void threadRoutine(const Network::Address::IpVersion version, bool deterministic,
-                     ProcessObjectOptRef process_object, bool allow_unknown_static_fields,
-                     bool reject_unknown_dynamic_fields, uint32_t concurrency);
+                     ProcessObjectOptRef process_object,
+                     Server::FieldValidationConfig validation_config, uint32_t concurrency);
 
   Event::TestTimeSystem& time_system_;
   Api::Api& api_;
@@ -389,7 +389,7 @@ private:
   Thread::MutexBasicLockable listeners_mutex_;
   uint64_t pending_listeners_;
   ConditionalInitializer server_set_;
-  Server::TestDrainManager* drain_manager_{};
+  Server::DrainManagerImpl* drain_manager_{};
   std::function<void()> on_worker_listener_added_cb_;
   std::function<void()> on_worker_listener_removed_cb_;
   TcpDumpPtr tcp_dump_;
