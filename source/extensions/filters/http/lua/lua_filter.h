@@ -1,9 +1,11 @@
 #pragma once
 
+#include "envoy/extensions/filters/http/lua/v3/lua.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/crypto/utility.h"
+#include "common/http/utility.h"
 
 #include "extensions/common/utility.h"
 #include "extensions/filters/common/lua/wrappers.h"
@@ -14,6 +16,45 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Lua {
+
+constexpr char GLOBAL_SCRIPT_NAME[] = "GLOBAL";
+
+class SingleScriptConfig : Logger::Loggable<Logger::Id::lua> {
+public:
+  SingleScriptConfig(const std::string& lua_code, ThreadLocal::SlotAllocator& tls);
+
+  Extensions::Filters::Common::Lua::CoroutinePtr createCoroutine() {
+    return lua_state_.createCoroutine();
+  }
+
+  int decodeFunctionRef() { return lua_state_.getGlobalRef(decode_function_slot_); }
+  int encodeFunctionRef() { return lua_state_.getGlobalRef(encode_function_slot_); }
+
+  uint64_t runtimeBytesUsed() { return lua_state_.runtimeBytesUsed(); }
+  void runtimeGC() { return lua_state_.runtimeGC(); }
+
+private:
+  uint64_t decode_function_slot_{};
+  uint64_t encode_function_slot_{};
+
+  Filters::Common::Lua::ThreadLocalState lua_state_;
+};
+
+using SingleScriptConfigPtr = std::unique_ptr<SingleScriptConfig>;
+
+class FilterConfigPerRoute;
+
+namespace {
+const FilterConfigPerRoute* getConfigPerRoute(Http::StreamFilterCallbacks* callbacks) {
+  if (callbacks == nullptr || callbacks->route() == nullptr ||
+      callbacks->route()->routeEntry() == nullptr) {
+    return nullptr;
+  }
+
+  return Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(
+      Extensions::HttpFilters::HttpFilterNames::get().Lua, callbacks->route());
+}
+} // namespace
 
 /**
  * Callbacks used by a stream handler to access the filter.
@@ -292,23 +333,49 @@ public:
  */
 class FilterConfig : Logger::Loggable<Logger::Id::lua> {
 public:
-  FilterConfig(const std::string& lua_code, ThreadLocal::SlotAllocator& tls,
-               Upstream::ClusterManager& cluster_manager);
-  Filters::Common::Lua::CoroutinePtr createCoroutine() { return lua_state_.createCoroutine(); }
-  int requestFunctionRef() { return lua_state_.getGlobalRef(request_function_slot_); }
-  int responseFunctionRef() { return lua_state_.getGlobalRef(response_function_slot_); }
-  uint64_t runtimeBytesUsed() { return lua_state_.runtimeBytesUsed(); }
-  void runtimeGC() { return lua_state_.runtimeGC(); }
+  FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua& proto_config,
+               ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cluster_manager,
+               Api::Api& api);
+
+  SingleScriptConfig* scriptConfig(const std::string& name) const {
+    auto iter = script_configs_map_.find(name);
+    if (iter != script_configs_map_.end()) {
+      return iter->second.get();
+    } else {
+      return nullptr;
+    }
+  }
 
   Upstream::ClusterManager& cluster_manager_;
 
 private:
-  Filters::Common::Lua::ThreadLocalState lua_state_;
-  uint64_t request_function_slot_;
-  uint64_t response_function_slot_;
+  const std::map<std::string, std::string>
+  readSourceCodes(const envoy::extensions::filters::http::lua::v3::Lua& config,
+                  Api::Api& api) const;
+
+  absl::flat_hash_map<std::string, SingleScriptConfigPtr> script_configs_map_;
 };
 
 using FilterConfigConstSharedPtr = std::shared_ptr<FilterConfig>;
+
+/**
+ * Route configuration for the filter.
+ */
+class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig {
+public:
+  FilterConfigPerRoute(const envoy::extensions::filters::http::lua::v3::LuaPerRoute& config,
+                       ThreadLocal::SlotAllocator& tls, Api::Api& api);
+
+  bool disabled() const { return disabled_; }
+  const std::string& name() const { return name_; }
+  SingleScriptConfig* scriptConfig() const { return single_script_config_ptr_.get(); }
+
+private:
+  const bool disabled_;
+  const std::string name_;
+
+  SingleScriptConfigPtr single_script_config_ptr_{};
+};
 
 // TODO(mattklein123): Filter stats.
 
@@ -329,14 +396,28 @@ public:
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override {
-    return doHeaders(request_stream_wrapper_, request_coroutine_, decoder_callbacks_,
-                     config_->requestFunctionRef(), headers, end_stream);
+    std::string name = GLOBAL_SCRIPT_NAME;
+    const auto config_per_route = getConfigPerRoute(decoder_callbacks_.callbacks_);
+    if (config_per_route) {
+      // Filter is diabled by route config
+      if (config_per_route->disabled()) {
+        return Http::FilterHeadersStatus::Continue;
+      }
+      name = config_per_route->name().empty() ? name : config_per_route->name();
+      script_config_ = config_per_route->scriptConfig();
+    }
+    script_config_ = script_config_ ? script_config_ : config_->scriptConfig(name);
+    if (!script_config_) {
+      return Http::FilterHeadersStatus::Continue;
+    }
+    return doHeaders(decoder_stream_wrapper_, decoder_coroutine_, decoder_callbacks_,
+                     script_config_->decodeFunctionRef(), headers, end_stream);
   }
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override {
-    return doData(request_stream_wrapper_, data, end_stream);
+    return doData(decoder_stream_wrapper_, data, end_stream);
   }
   Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override {
-    return doTrailers(request_stream_wrapper_, trailers);
+    return doTrailers(decoder_stream_wrapper_, trailers);
   }
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     decoder_callbacks_.callbacks_ = &callbacks;
@@ -348,14 +429,28 @@ public:
   }
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override {
-    return doHeaders(response_stream_wrapper_, response_coroutine_, encoder_callbacks_,
-                     config_->responseFunctionRef(), headers, end_stream);
+    std::string name = GLOBAL_SCRIPT_NAME;
+    const auto config_per_route = getConfigPerRoute(decoder_callbacks_.callbacks_);
+    if (config_per_route) {
+      // Filter is diabled by route config
+      if (config_per_route->disabled()) {
+        return Http::FilterHeadersStatus::Continue;
+      }
+      name = config_per_route->name().empty() ? name : config_per_route->name();
+      script_config_ = config_per_route->scriptConfig();
+    }
+    script_config_ = script_config_ ? script_config_ : config_->scriptConfig(name);
+    if (!script_config_) {
+      return Http::FilterHeadersStatus::Continue;
+    }
+    return doHeaders(encoder_stream_wrapper_, encoder_coroutine_, encoder_callbacks_,
+                     script_config_->encodeFunctionRef(), headers, end_stream);
   }
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override {
-    return doData(response_stream_wrapper_, data, end_stream);
+    return doData(encoder_stream_wrapper_, data, end_stream);
   };
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override {
-    return doTrailers(response_stream_wrapper_, trailers);
+    return doTrailers(encoder_stream_wrapper_, trailers);
   };
   Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override {
     return Http::FilterMetadataStatus::Continue;
@@ -416,11 +511,12 @@ private:
   Http::FilterDataStatus doData(StreamHandleRef& handle, Buffer::Instance& data, bool end_stream);
   Http::FilterTrailersStatus doTrailers(StreamHandleRef& handle, Http::HeaderMap& trailers);
 
-  FilterConfigConstSharedPtr config_;
+  FilterConfigConstSharedPtr config_{};
+  SingleScriptConfig* script_config_{};
   DecoderCallbacks decoder_callbacks_{*this};
   EncoderCallbacks encoder_callbacks_{*this};
-  StreamHandleRef request_stream_wrapper_;
-  StreamHandleRef response_stream_wrapper_;
+  StreamHandleRef decoder_stream_wrapper_;
+  StreamHandleRef encoder_stream_wrapper_;
   bool destroyed_{};
 
   // These coroutines used to be owned by the stream handles. After investigating #3570, it
@@ -435,8 +531,8 @@ private:
   // coroutine at all and it would be taken care of automatically via a runtime internal reference
   // when a yield happens. However, given that I don't fully understand the runtime internals, this
   // seems like a safer fix for now.
-  Filters::Common::Lua::CoroutinePtr request_coroutine_;
-  Filters::Common::Lua::CoroutinePtr response_coroutine_;
+  Filters::Common::Lua::CoroutinePtr decoder_coroutine_;
+  Filters::Common::Lua::CoroutinePtr encoder_coroutine_;
 };
 
 } // namespace Lua

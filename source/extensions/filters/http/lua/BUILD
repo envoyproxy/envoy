@@ -23,12 +23,14 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:enum_to_int",
+        "//source/common/config:datasource_lib",
         "//source/common/crypto:utility_lib",
         "//source/common/http:message_lib",
         "//source/extensions/common:utility_lib",
         "//source/extensions/filters/common/lua:lua_lib",
         "//source/extensions/filters/common/lua:wrappers_lib",
         "//source/extensions/filters/http:well_known_names",
+        "@envoy_api//envoy/extensions/filters/http/lua/v3:pkg_cc_proto",
     ],
 )
 

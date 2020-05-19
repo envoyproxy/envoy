@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.lua.v3;
 
+import "envoy/config/core/v3/base.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -24,4 +26,26 @@ message Lua {
   // be properly escaped. YAML configuration may be easier to read since YAML supports multi-line
   // strings so complex scripts can be easily expressed inline in the configuration.
   string inline_code = 1 [(validate.rules).string = {min_bytes: 1}];
+
+  // The Lua source codes that Envoy will execute based on name. Key is Lua source code name, e.g.
+  // ``foo.lua``, this name can be referenced by
+  // :ref:`LuaPerRoute.name <envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.name>`.
+  map<string, config.core.v3.DataSource> source_codes = 2;
+}
+
+message LuaPerRoute {
+  oneof override {
+    option (validate.required) = true;
+
+    // Disable the Lua filter for this particular vhost or route. If disabled is specified in
+    // multiple per-filter-configs, the most specific one will be used.
+    bool disabled = 1 [(validate.rules).bool = {const: true}];
+
+    // The name of a Lua source code defined in
+    // :ref:`Lua.source_codes <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.source_codes>`.
+    string name = 2 [(validate.rules).string = {min_bytes: 1}];
+
+    // Lua source code from RDS directly.
+    config.core.v3.DataSource code = 3;
+  }
 }
