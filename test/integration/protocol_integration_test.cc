@@ -969,9 +969,8 @@ TEST_P(DownstreamProtocolIntegrationTest, ValidZeroLengthContent) {
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
 
-// Optimal behavior for 304-with-body is not well defined, as documented on
-// https://github.com/envoyproxy/envoy/issues/9274 but this regression tests
-// and documents current behavior.
+// Test we're following https://tools.ietf.org/html/rfc7230#section-3.3.2
+// as best we can.
 TEST_P(ProtocolIntegrationTest, 304WithBody) {
   initialize();
 
@@ -1000,6 +999,9 @@ TEST_P(ProtocolIntegrationTest, 304WithBody) {
     // Any body sent after the request is considered complete will not be handled as part of the
     // active request, but will be flagged as a protocol error for the no-longer-associated
     // connection.
+    // Ideally if we got the body with the headers we would instead reset the
+    // stream, but it turns out that's complicated so instead we consistently
+    // forward the headers and error out after.
     test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_protocol_error", 1);
   }
 
