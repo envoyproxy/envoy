@@ -22,7 +22,7 @@ public:
 
   void setupResponseParser() {
     response_parser_ =
-        std::make_unique<DnsMessageParser>(true /*recursive queries */, 0 /* retry_count */);
+        std::make_unique<DnsMessageParser>(true /*recursive queries */, 0 /* retry_count */, random_);
   }
 
   static std::string configToUse() {
@@ -88,6 +88,7 @@ public:
     client.recv(response_datagram);
   }
 
+  NiceMock<Runtime::MockRandomGenerator> random_;
   std::unique_ptr<DnsMessageParser> response_parser_;
   DnsQueryContextPtr query_ctx_;
 };

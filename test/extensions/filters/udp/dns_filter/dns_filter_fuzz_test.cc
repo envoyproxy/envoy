@@ -20,8 +20,9 @@ namespace {
 DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   Buffer::InstancePtr query_buffer = std::make_unique<Buffer::OwnedImpl>();
   query_buffer->add(buf, len);
+  NiceMock<Runtime::MockRandomGenerator> random_;
 
-  DnsMessageParser message_parser(false /* recurse */, 0 /*retry_count */);
+  DnsMessageParser message_parser(false /* recurse */, 0 /*retry_count */, random_);
 
   const auto local = Network::Utility::parseInternetAddressAndPort("127.0.2.1:5353");
   const auto peer = Network::Utility::parseInternetAddressAndPort("127.0.2.1:55088");

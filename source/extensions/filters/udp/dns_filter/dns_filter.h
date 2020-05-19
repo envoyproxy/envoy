@@ -64,6 +64,7 @@ public:
   const std::chrono::milliseconds resolverTimeout() const { return resolver_timeout_; }
   Upstream::ClusterManager& clusterManager() const { return cluster_manager_; }
   uint64_t retryCount() const { return retry_count_; }
+  Runtime::RandomGenerator& random() const { return random_; }
 
 private:
   static DnsFilterStats generateStats(const std::string& stat_prefix, Stats::Scope& scope) {
@@ -104,7 +105,7 @@ public:
   DnsFilter(Network::UdpReadFilterCallbacks& callbacks, const DnsFilterEnvoyConfigSharedPtr& config)
       : UdpListenerReadFilter(callbacks), config_(config), listener_(callbacks.udpListener()),
         cluster_manager_(config_->clusterManager()),
-        message_parser_(config->forwardQueries(), config->retryCount()) {}
+        message_parser_(config->forwardQueries(), config->retryCount(), config->random()) {}
 
   // Network::UdpListenerReadFilter callbacks
   void onData(Network::UdpRecvData& client_request) override;

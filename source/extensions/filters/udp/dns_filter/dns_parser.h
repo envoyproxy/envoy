@@ -139,8 +139,8 @@ public:
     uint16_t additional_rrs;
   });
 
-  DnsMessageParser(bool recurse, uint64_t retry_count)
-      : recursion_available_(recurse), retry_count_(retry_count) {}
+  DnsMessageParser(bool recurse, uint64_t retry_count, Runtime::RandomGenerator& random)
+      : recursion_available_(recurse), retry_count_(retry_count), rng_(random) {}
 
   /**
    * @brief Builds an Answer record for the active query. The active query transaction ID is at the
@@ -252,7 +252,7 @@ private:
   uint64_t retry_count_;
   DnsHeader header_;
   DnsHeader response_header_;
-  Runtime::RandomGeneratorImpl rng_;
+  Runtime::RandomGenerator& rng_;
 };
 
 } // namespace DnsFilter

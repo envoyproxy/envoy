@@ -14,6 +14,7 @@
 
 using testing::AtLeast;
 using testing::InSequence;
+using testing::Return;
 using testing::ReturnRef;
 
 namespace Envoy {
@@ -34,8 +35,9 @@ public:
       : listener_address_(Network::Utility::parseInternetAddressAndPort("127.0.2.1:5353")),
         api_(Api::createApiForTest()) {
 
+    EXPECT_CALL(random_, random()).WillRepeatedly(Return(3));
     response_parser_ =
-        std::make_unique<DnsMessageParser>(true /* recursive queries */, 0 /* retries */);
+        std::make_unique<DnsMessageParser>(true /* recursive queries */, 0 /* retries */, random_);
     udp_response_.addresses_.local_ = listener_address_;
     udp_response_.addresses_.peer_ = listener_address_;
     udp_response_.buffer_ = std::make_unique<Buffer::OwnedImpl>();
@@ -717,18 +719,17 @@ TEST_F(DnsFilterTest, RandomizeFirstAnswerTest) {
   // We shuffle the list of addresses when we read the config, and in the case of more than
   // 8 defined addresses, we randomize the initial starting index. We should not end up with
   // the first answer being the first defined address, or the answers appearing in the same
-  // order as they are defined. There does exist a non-zero probability that both orders match.
-  size_t matched_count = 0;
-  size_t index = 0;
-  char address[32];
+  // order as they are defined.
+  std::list<std::string> resolved_order {
+    "10.0.16.5", "10.0.16.6", "10.0.16.7", "10.0.16.8", "10.0.16.9", "10.0.16.10", "10.0.16.11",
+        "10.0.16.12"
+  };
+
+  auto resolved_answer_iter = resolved_order.begin();
   for (const auto& answer : query_ctx_->answers_) {
     const auto resolved_address = answer.second->ip_addr_->ip()->addressAsString();
-    snprintf(address, sizeof(address), "10.0.16.%ld", ++index);
-    if (resolved_address.compare(address) == 0) {
-      ++matched_count;
-    }
+    EXPECT_EQ(0L, resolved_address.compare(*resolved_answer_iter++));
   }
-  EXPECT_TRUE(matched_count == 0);
 }
 } // namespace
 } // namespace DnsFilter
