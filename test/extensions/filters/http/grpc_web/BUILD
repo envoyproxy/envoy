@@ -42,6 +42,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
+        "//source/extensions/filters/http/grpc_web:config",
         "//source/extensions/filters/http/grpc_web:grpc_web_filter_lib",
         "//test/integration:http_integration_lib",
         "//test/mocks/upstream:upstream_mocks",
