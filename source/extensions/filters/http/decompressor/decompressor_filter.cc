@@ -146,7 +146,7 @@ bool DecompressorFilter::hasCacheControlNoTransform(
 }
 
 /**
- * Content-Encoding matches if the configured encoding is the first value in the comma-delimented
+ * Content-Encoding matches if the configured encoding is the first value in the comma-delimited
  * Content-Encoding header, regardless of spacing and casing.
  */
 bool DecompressorFilter::contentEncodingMatches(Http::RequestOrResponseHeaderMap& headers) const {
