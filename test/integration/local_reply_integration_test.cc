@@ -27,9 +27,8 @@ mappers:
         header:
           name: test-header
           exact_match: exact-match-value
-    rewriter:
-      status_code: 550
-format:
+    status_code: 550
+body_format:
   json_format:
     level: TRACE
     user_agent: "%REQ(USER-AGENT)%"
@@ -88,27 +87,24 @@ mappers:
         header:
           name: test-header
           exact_match: exact-match-value-1
-    rewriter:
-      status_code: 550
+    status_code: 550
   - filter:
       header_filter:
         header:
           name: test-header
           exact_match: exact-match-value
-    rewriter:
-      status_code: 551
-      body:
-        inline_string: "customized body text"
-    format:
+    status_code: 551
+    body:
+      inline_string: "customized body text"
+    body_format:
       text_format: "%RESP_BODY% %RESPONSE_CODE%"
   - filter:
       header_filter:
         header:
           name: test-header
           exact_match: exact-match-value
-    rewriter:
-      status_code: 552
-format:
+    status_code: 552
+body_format:
   json_format:
     level: TRACE
     response_flags: "%RESPONSE_FLAGS%"
@@ -163,23 +159,20 @@ mappers:
         header:
           name: test-header
           exact_match: exact-match-value-1
-    rewriter:
-      status_code: 550
+    status_code: 550
   - filter:
       header_filter:
         header:
           name: test-header
           exact_match: exact-match-value-2
-    rewriter:
-      status_code: 551
+    status_code: 551
   - filter:
       header_filter:
         header:
           name: test-header
           exact_match: exact-match-value-3
-    rewriter:
-      status_code: 552
-format:
+    status_code: 552
+body_format:
   json_format:
     level: TRACE
     response_flags: "%RESPONSE_FLAGS%"
@@ -238,22 +231,19 @@ mappers:
         header:
           name: test-header
           exact_match: exact-match-value-1
-    rewriter:
-      status_code: 550
+    status_code: 550
   - filter:
       header_filter:
         header:
           name: test-header
           exact_match: exact-match-value-2
-    rewriter:
-      status_code: 551
+    status_code: 551
   - filter:
       header_filter:
         header:
           name: test-header
           exact_match: exact-match-value-3
-    rewriter:
-      status_code: 552
+    status_code: 552
   )EOF";
   setLocalReplyConfig(yaml);
   initialize();
@@ -298,7 +288,7 @@ mappers:
 // Should return formatted text/plain response.
 TEST_P(LocalReplyIntegrationTest, ShouldFormatResponseToCustomString) {
   const std::string yaml = R"EOF(
-format:
+body_format:
   text_format: "%RESPONSE_FLAGS% - %RESP_BODY% - custom response"
 )EOF";
   setLocalReplyConfig(yaml);

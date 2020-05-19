@@ -15,7 +15,7 @@ Features:
 Local reply content modification
 --------------------------------
 
-The local response content returned by Envoy can be customized. A list of :ref:`mappers <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.LocalReplyConfig.mappers>` can be specified. Each mapper must have a :ref:`filter <envoy_v3_api_field_config.accesslog.v3.AccessLog.filter>`, a :ref:`rewriter <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ResponseMapper.rewriter>` rule and optional :ref:`format <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ResponseMapper.format>`. Envoy checks each `mapper` according to the specified order until the first one is matched. If a `mapper` is matched, its `rewriter` rule will apply. Each `rewriter` rule supports rewritting status_code and response body. If a matched mapper has the `format` field specified, the `format` will apply too.
+The local response content returned by Envoy can be customized. A list of :ref:`mappers <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.LocalReplyConfig.mappers>` can be specified. Each mapper must have a :ref:`filter <envoy_v3_api_field_config.accesslog.v3.AccessLog.filter>`, a :ref:`rewriter <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ResponseMapper.rewriter>` rule and optional :ref:`body_format <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ResponseMapper.body_format>`. Envoy checks each `mapper` according to the specified order until the first one is matched. If a `mapper` is matched, its `rewriter` rule will apply. Each `rewriter` rule supports rewritting status_code and response body. If a matched mapper has the `body_format` field specified, the `body_format` will apply too.
 
 Example of a LocalReplyConfig
 
@@ -29,10 +29,9 @@ Example of a LocalReplyConfig
           value:
             default_value: 400
             runtime_key: key_b
-      rewriter:
-         status_code: 401
-	 body:
-	   inline_string: "not allowed"
+    status_code: 401
+    body:
+      inline_string: "not allowed"
 
 In above example, if the response_code is 400,  it will be rewritten to 401, the error messsage will be rewritten to "not allowed".
 
@@ -41,6 +40,34 @@ In above example, if the response_code is 400,  it will be rewritten to 401, the
 Local reply format modification
 -------------------------------
 
-The response body content type can be customized. If no specified, the content type is plain/text. There are two `format` fields; one is the :ref:`format <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.LocalReplyConfig.format>` field in the :ref:`LocalReplyConfig <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.LocalReplyConfig>` message and the other :ref:`format <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ResponseMapper.format>` field in the `mapper`. The latter is only used when its mapper is matched. The former is used if there is no any matched mappers, or the matched mapper doesn't have the `format` specified.
+The response body content type can be customized. If not specified, the content type is plain/text. There are two `body_format` fields; one is the :ref:`body_format <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.LocalReplyConfig.body_format>` field in the :ref:`LocalReplyConfig <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.LocalReplyConfig>` message and the other :ref:`body_format <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ResponseMapper.body_format>` field in the `mapper`. The latter is only used when its mapper is matched. The former is used if there is no any matched mappers, or the matched mapper doesn't have the `body_format` specified.
 
 Local reply format can be specified as :ref:`SubstitutionFormatString <envoy_v3_api_msg_config.core.v3.SubstitutionFormatString>`. It supports :ref:`text_format <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.text_format>` and :ref:`json_format <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.json_format>`.
+
+Example of a LocalReplyConfig with `body_format` field.
+
+.. code-block::
+
+  mappers:
+  - filter:
+      status_code_filter:
+        comparison:
+          op: EQ
+          value:
+            default_value: 400
+            runtime_key: key_b
+    status_code: 401
+    body_format:
+      text_format: "%RESP_BODY% %REQ(:path)%"
+  - filter:
+      status_code_filter:
+        comparison:
+          op: EQ
+          value:
+            default_value: 500
+            runtime_key: key_b
+    status_code: 501
+  body_format:
+    text_format: "%RESP_BODY% %RESPONSE_CODE%"
+
+In above example, there are two `body_format` fields. The first one is inside the first `mapper` with a filter matching `status_code == 400`. It generates the response body in plain text format by concatenating %RESP_BODY% with the `:path` request header. It is only used when the first mapper is matched. The second `body_format` is at the bottom of the config and at the same level as field `mappers`. It is called catch-all `body_format` and is used when non of the mappers is matched or the matched mapper doesn't have its own `body_format` specified.

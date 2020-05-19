@@ -13,36 +13,6 @@
 namespace Envoy {
 namespace LocalReply {
 
-class ResponseRewriter {
-public:
-  ResponseRewriter(
-      const envoy::extensions::filters::network::http_connection_manager::v3::ResponseRewriter&
-          config,
-      Api::Api& api) {
-    if (config.has_status_code()) {
-      status_code_ = static_cast<Http::Code>(config.status_code().value());
-    }
-    if (config.has_body()) {
-      body_ = Config::DataSource::read(config.body(), true, api);
-    }
-  }
-
-  void rewrite(Http::Code& code, std::string& body) const {
-    if (status_code_.has_value()) {
-      code = status_code_.value();
-    }
-    if (body_.has_value()) {
-      body = body_.value();
-    }
-  }
-
-private:
-  absl::optional<Http::Code> status_code_;
-  absl::optional<std::string> body_;
-};
-
-using ResponseRewriterPtr = std::unique_ptr<ResponseRewriter>;
-
 class BodyFormatter {
 public:
   BodyFormatter() { formatter_ = std::make_unique<Envoy::AccessLog::FormatterImpl>("%RESP_BODY%"); }
@@ -72,9 +42,6 @@ private:
 
 using BodyFormatterPtr = std::unique_ptr<BodyFormatter>;
 
-/**
- * Configuration of response mapper which contains pair of filter and definition of rewriter.
- */
 class ResponseMapper {
 public:
   ResponseMapper(
@@ -84,18 +51,49 @@ public:
     filter_ = AccessLog::FilterFactory::fromProto(
         config.filter(), context.runtime(), context.random(), context.messageValidationVisitor());
 
-    if (config.has_rewriter()) {
-      rewriter_ = std::make_unique<ResponseRewriter>(config.rewriter(), context.api());
+    if (config.has_status_code()) {
+      status_code_ = static_cast<Http::Code>(config.status_code().value());
+    }
+    if (config.has_body()) {
+      body_ = Config::DataSource::read(config.body(), true, context.api());
     }
 
-    if (config.has_format()) {
-      formatter_ = std::make_unique<BodyFormatter>(config.format());
+    if (config.has_body_format()) {
+      body_formatter_ = std::make_unique<BodyFormatter>(config.body_format());
     }
   }
 
+  bool matchAndRewrite(const Http::RequestHeaderMap& request_headers,
+                       Http::ResponseHeaderMap& response_headers,
+                       const Http::ResponseTrailerMap& response_trailers,
+                       StreamInfo::StreamInfoImpl& stream_info, Http::Code& code, std::string& body,
+                       BodyFormatter*& final_formatter) const {
+    // If not matched, just bail out.
+    if (!filter_->evaluate(stream_info, request_headers, response_headers, response_trailers)) {
+      return false;
+    }
+
+    if (body_.has_value()) {
+      body = body_.value();
+    }
+
+    if (status_code_.has_value() && code != status_code_.value()) {
+      code = status_code_.value();
+      response_headers.setReferenceStatus(std::to_string(enumToInt(code)));
+      stream_info.response_code_ = static_cast<uint32_t>(code);
+    }
+
+    if (body_formatter_) {
+      final_formatter = body_formatter_.get();
+    }
+    return true;
+  }
+
+private:
   AccessLog::FilterPtr filter_;
-  ResponseRewriterPtr rewriter_;
-  BodyFormatterPtr formatter_;
+  absl::optional<Http::Code> status_code_;
+  absl::optional<std::string> body_;
+  BodyFormatterPtr body_formatter_;
 };
 
 using ResponseMapperPtr = std::unique_ptr<ResponseMapper>;
@@ -110,10 +108,10 @@ public:
       mappers_.emplace_back(std::make_unique<ResponseMapper>(mapper, context));
     }
 
-    if (config.has_format()) {
-      formatter_ = std::make_unique<BodyFormatter>(config.format());
+    if (config.has_body_format()) {
+      body_formatter_ = std::make_unique<BodyFormatter>(config.body_format());
     } else {
-      formatter_ = std::make_unique<BodyFormatter>();
+      body_formatter_ = std::make_unique<BodyFormatter>();
     }
   }
 
@@ -134,26 +132,14 @@ public:
 
     BodyFormatter* final_formatter{};
     for (const auto& mapper : mappers_) {
-      if (mapper->filter_->evaluate(stream_info, *request_headers, *response_headers,
-                                    *response_trailers)) {
-        if (mapper->rewriter_) {
-          Http::Code old_code = code;
-          mapper->rewriter_->rewrite(code, body);
-          if (code != old_code) {
-            response_headers->setReferenceStatus(std::to_string(enumToInt(code)));
-            stream_info.response_code_ = static_cast<uint32_t>(code);
-          }
-        }
-
-        if (mapper->formatter_) {
-          final_formatter = mapper->formatter_.get();
-        }
+      if (mapper->matchAndRewrite(*request_headers, *response_headers, *response_trailers,
+                                  stream_info, code, body, final_formatter)) {
         break;
       }
     }
 
     if (!final_formatter) {
-      final_formatter = formatter_.get();
+      final_formatter = body_formatter_.get();
     }
     return final_formatter->format(*request_headers, *response_headers, *response_trailers,
                                    stream_info, body, content_type);
@@ -161,7 +147,7 @@ public:
 
 private:
   std::list<ResponseMapperPtr> mappers_;
-  BodyFormatterPtr formatter_;
+  BodyFormatterPtr body_formatter_;
 };
 
 LocalReplyPtr Factory::create(

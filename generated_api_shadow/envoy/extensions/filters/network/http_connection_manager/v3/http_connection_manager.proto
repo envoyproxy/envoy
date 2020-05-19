@@ -537,32 +537,26 @@ message LocalReplyConfig {
   // The configuration to form response body from the :ref:`command operators <config_access_log_command_operators>`
   // and to specify response content type as one of: plain/text or application/json.
   // If the matched `mapper <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.LocalReplyConfig.mapper>`
-  // has a valid `format <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ResponseMapper.format>`,
+  // has a valid `format <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ResponseMapper.body_format>`,
   // it will be used, this one will not be used.
-  config.core.v3.SubstitutionFormatString format = 2;
+  config.core.v3.SubstitutionFormatString body_format = 2;
 }
 
 // The configuration to filter and change local response.
 message ResponseMapper {
-  // Filter to determine if the response should be changed.
+  // Filter to determine if this mapper should apply.
   config.accesslog.v3.AccessLogFilter filter = 1 [(validate.rules).message = {required: true}];
 
-  // Rewriter defines how the response should be changed.
-  ResponseRewriter rewriter = 2 [(validate.rules).message = {required: true}];
+  // The new response status code if specified.
+  google.protobuf.UInt32Value status_code = 2 [(validate.rules).uint32 = {lt: 600 gte: 100}];
+
+  // The new response body if specified.
+  config.core.v3.DataSource body = 3;
 
   // The configuration to form new response body from the :ref:`command operators <config_access_log_command_operators>`
   // and to specify response content type as one of: plain/text or application/json.
   // It is only used when this mapper is matched.
-  config.core.v3.SubstitutionFormatString format = 3;
-}
-
-// Configuration on how to change the response.
-message ResponseRewriter {
-  // The new status code for matched response.
-  google.protobuf.UInt32Value status_code = 1 [(validate.rules).uint32 = {lt: 600 gte: 300}];
-
-  // The new response body for matched response.
-  config.core.v3.DataSource body = 2;
+  config.core.v3.SubstitutionFormatString body_format = 4;
 }
 
 message Rds {

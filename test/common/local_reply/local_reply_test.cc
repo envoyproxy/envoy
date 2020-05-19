@@ -57,7 +57,7 @@ TEST_F(LocalReplyTest, TestEmptyConfig) {
 TEST_F(LocalReplyTest, TestDefaultTextFormatter) {
   // Default text formatter without any mappers
   const std::string yaml = R"(
-  format:
+  body_format:
      text_format: "%RESP_BODY% %RESPONSE_CODE%"
 )";
   TestUtility::loadFromYaml(yaml, config_);
@@ -72,7 +72,7 @@ TEST_F(LocalReplyTest, TestDefaultTextFormatter) {
 TEST_F(LocalReplyTest, TestDefaultJsonFormatter) {
   // Default json formatter without any mappers
   const std::string yaml = R"(
-  format:
+  body_format:
     json_format:
       text: "plain text"
       path: "%REQ(:path)%"
@@ -106,10 +106,9 @@ TEST_F(LocalReplyTest, TestMapperRewrite) {
             value:
               default_value: 400
               runtime_key: key_b
-      rewriter:
-         status_code: 401
-         body:
-           inline_string: "400 body text"
+      status_code: 401
+      body:
+        inline_string: "400 body text"
     - filter:
         status_code_filter:
           comparison:
@@ -117,9 +116,8 @@ TEST_F(LocalReplyTest, TestMapperRewrite) {
             value:
               default_value: 410
               runtime_key: key_b
-      rewriter:
-         body:
-           inline_string: "410 body text"
+      body:
+        inline_string: "410 body text"
     - filter:
         status_code_filter:
           comparison:
@@ -127,8 +125,7 @@ TEST_F(LocalReplyTest, TestMapperRewrite) {
             value:
               default_value: 420
               runtime_key: key_b
-      rewriter:
-         status_code: 421
+      status_code: 421
     - filter:
         status_code_filter:
           comparison:
@@ -183,11 +180,10 @@ TEST_F(LocalReplyTest, TestMapperFormat) {
             value:
               default_value: 400
               runtime_key: key_b
-      rewriter:
-         status_code: 401
-         body:
-           inline_string: "401 body text"
-      format:
+      status_code: 401
+      body:
+        inline_string: "401 body text"
+      body_format:
         json_format:
           text: "401 filter formatter"
           path: "%REQ(:path)%"
@@ -200,11 +196,10 @@ TEST_F(LocalReplyTest, TestMapperFormat) {
             value:
               default_value: 410
               runtime_key: key_b
-      rewriter:
-         status_code: 411
-         body:
-           inline_string: "411 body text"
-    format:
+      status_code: 411
+      body:
+        inline_string: "411 body text"
+    body_format:
       text_format: "%RESP_BODY% %RESPONSE_CODE% default formatter"
 )";
   TestUtility::loadFromYaml(yaml, config_);
