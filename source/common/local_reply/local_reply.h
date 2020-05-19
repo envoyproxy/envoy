@@ -12,7 +12,7 @@ namespace LocalReply {
 
 class LocalReply {
 public:
-  virtual ~LocalReply() {}
+  virtual ~LocalReply() = default;
 
   /**
    * rewrite the response status code, body and content_type.
