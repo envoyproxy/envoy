@@ -58,13 +58,12 @@ Http::FilterHeadersStatus DecompressorFilter::decodeHeaders(Http::RequestHeaderM
   // Two responsibilities on the request side:
   //   1. If response decompression is enabled (and advertisement is enabled), then advertise to
   //      the upstream that this hop is able to decompress responses via the Accept-Encoding header.
-  if (config_->responseDirectionConfig().decompressionEnabled()) {
-    if (config_->requestDirectionConfig().advertiseAcceptEncoding()) {
-      headers.appendAcceptEncoding(config_->contentEncoding(), ",");
-      ENVOY_STREAM_LOG(
-          debug, "DecompressorFilter::decodeHeaders advertise Accept-Encoding with value '{}'",
-          *decoder_callbacks_, headers.AcceptEncoding()->value().getStringView());
-    }
+  if (config_->responseDirectionConfig().decompressionEnabled() &&
+      config_->requestDirectionConfig().advertiseAcceptEncoding()) {
+    headers.appendAcceptEncoding(config_->contentEncoding(), ",");
+    ENVOY_STREAM_LOG(debug,
+                     "DecompressorFilter::decodeHeaders advertise Accept-Encoding with value '{}'",
+                     *decoder_callbacks_, headers.AcceptEncoding()->value().getStringView());
   }
 
   //   2. If request decompression is enabled, then decompress the request.
@@ -73,12 +72,8 @@ Http::FilterHeadersStatus DecompressorFilter::decodeHeaders(Http::RequestHeaderM
 };
 
 Http::FilterDataStatus DecompressorFilter::decodeData(Buffer::Instance& data, bool) {
-  return maybeDecompress(
-      config_->requestDirectionConfig(),
-      request_decompressor_
-          ? Envoy::Compression::Decompressor::DecompressorOptRef(std::ref(*request_decompressor_))
-          : absl::nullopt,
-      *decoder_callbacks_, data);
+  return maybeDecompress(config_->requestDirectionConfig(), request_decompressor_,
+                         *decoder_callbacks_, data);
 }
 
 Http::FilterHeadersStatus DecompressorFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
@@ -94,12 +89,8 @@ Http::FilterHeadersStatus DecompressorFilter::encodeHeaders(Http::ResponseHeader
 }
 
 Http::FilterDataStatus DecompressorFilter::encodeData(Buffer::Instance& data, bool) {
-  return maybeDecompress(
-      config_->requestDirectionConfig(),
-      response_decompressor_
-          ? Envoy::Compression::Decompressor::DecompressorOptRef(std::ref(*response_decompressor_))
-          : absl::nullopt,
-      *decoder_callbacks_, data);
+  return maybeDecompress(config_->requestDirectionConfig(), response_decompressor_,
+                         *encoder_callbacks_, data);
 }
 
 Http::FilterHeadersStatus DecompressorFilter::maybeInitDecompress(
@@ -114,7 +105,6 @@ Http::FilterHeadersStatus DecompressorFilter::maybeInitDecompress(
     // Update headers.
     headers.removeContentLength();
     modifyContentEncoding(headers);
-    modifyTransferEncoding(headers);
 
     ENVOY_STREAM_LOG(debug, "do decompress (without buffering) {}: {}", callbacks,
                      direction_config.logString(), headers);
@@ -129,11 +119,11 @@ Http::FilterHeadersStatus DecompressorFilter::maybeInitDecompress(
 
 Http::FilterDataStatus DecompressorFilter::maybeDecompress(
     const DecompressorFilterConfig::DirectionConfig& direction_config,
-    Compression::Decompressor::DecompressorOptRef decompressor,
+    const Compression::Decompressor::DecompressorPtr& decompressor,
     Http::StreamFilterCallbacks& callbacks, Buffer::Instance& input_buffer) const {
-  if (decompressor.has_value()) {
+  if (decompressor) {
     Buffer::OwnedImpl output_buffer;
-    decompressor->get().decompress(input_buffer, output_buffer);
+    decompressor->decompress(input_buffer, output_buffer);
 
     // Report decompression via stats and logging before modifying the input buffer.
     direction_config.stats().total_compressed_bytes_.add(input_buffer.length());
@@ -163,9 +153,7 @@ bool DecompressorFilter::contentEncodingMatches(Http::RequestOrResponseHeaderMap
   if (headers.ContentEncoding()) {
     absl::string_view coding = StringUtil::trim(
         StringUtil::cropRight(headers.ContentEncoding()->value().getStringView(), ","));
-    if (StringUtil::CaseInsensitiveCompare()(config_->contentEncoding(), coding)) {
-      return true;
-    }
+    return StringUtil::CaseInsensitiveCompare()(config_->contentEncoding(), coding);
   }
   return false;
 }
@@ -178,19 +166,6 @@ void DecompressorFilter::modifyContentEncoding(Http::RequestOrResponseHeaderMap&
     headers.setContentEncoding(remaining_codings);
   } else {
     headers.removeContentEncoding();
-  }
-}
-
-/**
- * Add "chunked" to the Transfer-Encoding header if it's not there yet.
- */
-void DecompressorFilter::modifyTransferEncoding(Http::RequestOrResponseHeaderMap& headers) const {
-  const Http::HeaderEntry* transfer_encoding = headers.TransferEncoding();
-  if (!(transfer_encoding &&
-        StringUtil::caseFindToken(transfer_encoding->value().getStringView(), ",",
-                                  Http::Headers::get().TransferEncodingValues.Chunked,
-                                  true /* trim_whitespace */))) {
-    headers.appendTransferEncoding(Http::Headers::get().TransferEncodingValues.Chunked, ",");
   }
 }
 

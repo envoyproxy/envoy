@@ -134,7 +134,7 @@ private:
 
   Http::FilterDataStatus
   maybeDecompress(const DecompressorFilterConfig::DirectionConfig& direction_config,
-                  Compression::Decompressor::DecompressorOptRef decompressor,
+                  const Compression::Decompressor::DecompressorPtr& decompressor,
                   Http::StreamFilterCallbacks& callbacks, Buffer::Instance& input_buffer) const;
 
   // TODO(junr03): these do not need to be member functions. They can all be part of a static

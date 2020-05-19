@@ -23,7 +23,6 @@ public:
 };
 
 using DecompressorPtr = std::unique_ptr<Decompressor>;
-using DecompressorOptRef = absl::optional<std::reference_wrapper<Decompressor>>;
 
 } // namespace Decompressor
 } // namespace Compression
