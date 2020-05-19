@@ -32,4 +32,4 @@ pip3 install -I https://github.com/lizan/lcov-to-cobertura-xml/archive/e4c27b8dc
 COVERAGE_DATA="${ENVOY_BUILD_DIR}/generated/coverage/coverage.dat"
 COVERAGE_XML="${ENVOY_BUILD_DIR}/coverage.xml"
 
-python3 -m lcov_cobertura -b ${PWD} ${COVERAGE_DATA} -o ${COVERAGE_XML}
+python3 -m lcov_cobertura -d -b ${PWD} ${COVERAGE_DATA} -o ${COVERAGE_XML}
