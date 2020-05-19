@@ -42,13 +42,15 @@ public:
                Runtime::RandomGenerator& random, Runtime::Loader& loader, Stats::Scope& root_scope,
                const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config);
   ~DnsCacheImpl() override;
+  static DnsCacheCircuitBreakersStats generateDnsCacheCircuitBreakersStats(Stats::Scope& scope);
 
   // DnsCache
   LoadDnsCacheEntryResult loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
                                             LoadDnsCacheEntryCallbacks& callbacks) override;
   AddUpdateCallbacksHandlePtr addUpdateCallbacks(UpdateCallbacks& callbacks) override;
   absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> hosts() override;
-  DnsCacheResourceManagerPtr& dnsCacheResourceManager() override { return resource_manager_; }
+  DnsCacheResourceManager& dnsCacheResourceManager() override { return resource_manager_; }
+  bool useDnsCacheResourceManager() const override { return use_dns_cache_resource_manager_; }
 
 private:
   using TlsHostMap = absl::flat_hash_map<std::string, DnsHostInfoSharedPtr>;
@@ -122,7 +124,6 @@ private:
     UpdateCallbacks& callbacks_;
   };
 
-  DnsCacheCircuitBreakersStats generateDnsCacheCircuitBreakersStats(Stats::Scope& scope);
   void startCacheLoad(const std::string& host, uint16_t default_port);
   void startResolve(const std::string& host, PrimaryHostInfo& host_info);
   void finishResolve(const std::string& host, Network::DnsResolver::ResolutionStatus status,
@@ -140,11 +141,12 @@ private:
   DnsCacheStats stats_;
   std::list<AddUpdateCallbacksHandleImpl*> update_callbacks_;
   absl::flat_hash_map<std::string, PrimaryHostInfoPtr> primary_hosts_;
-  DnsCacheResourceManagerPtr resource_manager_;
+  DnsCacheResourceManager resource_manager_;
   const std::chrono::milliseconds refresh_interval_;
   const BackOffStrategyPtr failure_backoff_strategy_;
   const std::chrono::milliseconds host_ttl_;
   const uint32_t max_hosts_;
+  const bool use_dns_cache_resource_manager_;
 };
 
 } // namespace DynamicForwardProxy

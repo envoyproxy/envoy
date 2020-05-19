@@ -3,6 +3,8 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
 
+#include "common/runtime/runtime_features.h"
+
 #include "extensions/common/dynamic_forward_proxy/dns_cache.h"
 #include "extensions/filters/http/well_known_names.h"
 
@@ -53,19 +55,24 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   }
   cluster_info_ = cluster->info();
 
-  Upstream::ResourceManager* resource_manager_ =
-      &cluster_info_->resourceManager(route_entry->priority());
-  auto& cache_resource_manager = config_->cache().dnsCacheResourceManager();
-  if (cache_resource_manager != nullptr) {
-    resource_manager_ = cache_resource_manager.get();
-  }
-  auto& pending_requests = resource_manager_->pendingRequests();
+  // By default, envoy doesn't allow to use dns cache circuit breakers even if configured. But this
+  // runtime feature will enable you to use this feature. This runtime feature is prepared to
+  // guarantee backward compatibility.
+  const auto should_use_dns_cache_circuit_breakers =
+      !Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.disallow_dns_cache_circuit_breakers") &&
+      config_->cache().useDnsCacheResourceManager();
+  Upstream::ResourceManager& resource_manager =
+      should_use_dns_cache_circuit_breakers
+          ? config_->cache().dnsCacheResourceManager()
+          : cluster_info_->resourceManager(route_entry->priority());
+  auto& pending_requests = resource_manager.pendingRequests();
 
   if (!pending_requests.canCreate()) {
     // When we use DNS Cache manager circuit breakers, we don't have to take care of upstream
     // pending counter. Because DNSCacheCircuitBreakersStats will do that by counting
     // rq_pending_remaining_.
-    if (cache_resource_manager == nullptr) {
+    if (!should_use_dns_cache_circuit_breakers) {
       cluster_info_->stats().upstream_rq_pending_overflow_.inc();
     }
 

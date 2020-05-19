@@ -154,7 +154,13 @@ public:
   /**
    * @return A pointer to resource manager for dns cache.
    */
-  virtual DnsCacheResourceManagerPtr& dnsCacheResourceManager() PURE;
+  virtual DnsCacheResourceManager& dnsCacheResourceManager() PURE;
+
+  /**
+   * @return Whether dns cahce use dns cache resource manager for request restrictions. e.g. Circuit
+   * Breaking
+   */
+  virtual bool useDnsCacheResourceManager() const PURE;
 };
 
 using DnsCacheSharedPtr = std::shared_ptr<DnsCache>;

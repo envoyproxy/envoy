@@ -11,6 +11,7 @@
 #include "envoy/upstream/resource_manager.h"
 
 #include "common/common/assert.h"
+#include "common/common/basic_resource_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -25,71 +26,53 @@ struct DnsCacheCircuitBreakersStats {
   ALL_DNS_CACHE_CIRCUIT_BREAKERS_STATS(GENERATE_GAUGE_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
-class DnsResource : public Envoy::Upstream::Resource {
+class DnsCacheResourceImpl : public BasicResourceLimitImpl {
 public:
-  DnsResource(uint64_t max, Runtime::Loader& runtime, const std::string& runtime_key,
-              Stats::Gauge& opening, Stats::Gauge& remaining)
-      : max_(max), runtime_(runtime), opening_(opening), remaining_(remaining),
-        runtime_key_(runtime_key) {
+  using Base = BasicResourceLimitImpl;
+  explicit DnsCacheResourceImpl(uint64_t max, Runtime::Loader& runtime,
+                                const std::string& runtime_key, Stats::Gauge& opening,
+                                Stats::Gauge& remaining)
+      : Envoy::BasicResourceLimitImpl(max, runtime, runtime_key), opening_(opening),
+        remaining_(remaining) {
     remaining_.set(max);
   }
-  ~DnsResource() override { ASSERT(current_ == 0); }
 
-  // Envoy::Upstream::Resource
-  bool canCreate() override { return current_ < max(); }
   void inc() override {
-    current_++;
-    std::cout << "inc" << std::endl;
-    std::cout << max_ << std::endl;
-    std::cout << current_ << std::endl;
-    remaining_.set(max() > current_ ? max() - current_ : 0);
-    opening_.set(max() > current_ ? 0 : 1);
+    Base::inc();
+    remaining_.set(Base::canCreate() ? Base::max() - current_ : 0);
+    opening_.set(Base::canCreate() ? 0 : 1);
   }
-
-  void dec() override { decBy(1); }
 
   void decBy(uint64_t amount) override {
-    ASSERT(current_ >= amount);
-    current_ -= amount;
-    std::cout << "dec" << std::endl;
-    std::cout << max_ << std::endl;
-    std::cout << current_ << std::endl;
-    remaining_.set(max() > current_ ? max() - current_ : 0);
-    opening_.set(max() > current_ ? 0 : 1);
+    Base::decBy(amount);
+    remaining_.set(Base::canCreate() ? Base::max() - current_ : 0);
+    opening_.set(Base::canCreate() ? 0 : 1);
   }
 
-  uint64_t max() override { return runtime_.snapshot().getInteger(runtime_key_, max_); }
-  uint64_t count() const override { return current_.load(); }
-
 private:
-  uint64_t max_;
-  std::atomic<uint64_t> current_{};
-  Runtime::Loader& runtime_;
   Stats::Gauge& opening_;
   Stats::Gauge& remaining_;
-  const std::string runtime_key_;
 };
 
 class DnsCacheResourceManager : public Envoy::Upstream::ResourceManager {
 public:
   DnsCacheResourceManager(
-      DnsCacheCircuitBreakersStats& cb_stats, Runtime::Loader& loader,
+      DnsCacheCircuitBreakersStats&& cb_stats, Runtime::Loader& loader,
       const std::string& config_name,
-      const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheCircuitBreakers&
+      const absl::optional<
+          envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheCircuitBreakers>&
           cb_config);
 
   // Envoy::Upstream::ResourceManager
-  Envoy::Upstream::Resource& pendingRequests() override { return *pending_requests_; }
-  Envoy::Upstream::Resource& connections() override { NOT_REACHED_GCOVR_EXCL_LINE; }
-  Envoy::Upstream::Resource& requests() override { NOT_REACHED_GCOVR_EXCL_LINE; }
-  Envoy::Upstream::Resource& retries() override { NOT_REACHED_GCOVR_EXCL_LINE; }
-  Envoy::Upstream::Resource& connectionPools() override { NOT_REACHED_GCOVR_EXCL_LINE; }
+  ResourceLimit& pendingRequests() override { return *pending_requests_; }
+  ResourceLimit& connections() override { NOT_REACHED_GCOVR_EXCL_LINE; }
+  ResourceLimit& requests() override { NOT_REACHED_GCOVR_EXCL_LINE; }
+  ResourceLimit& retries() override { NOT_REACHED_GCOVR_EXCL_LINE; }
+  ResourceLimit& connectionPools() override { NOT_REACHED_GCOVR_EXCL_LINE; }
 
 private:
-  std::unique_ptr<DnsResource> pending_requests_;
+  std::unique_ptr<DnsCacheResourceImpl> pending_requests_;
 };
-
-using DnsCacheResourceManagerPtr = std::unique_ptr<DnsCacheResourceManager>;
 
 } // namespace DynamicForwardProxy
 } // namespace Common

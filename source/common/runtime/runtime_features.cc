@@ -61,6 +61,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.reject_unsupported_transfer_encodings",
     // Begin alphabetically sorted section.
     "envoy.deprecated_features.allow_deprecated_extension_names",
+    "envoy.reloadable_features.disallow_dns_cache_circuit_breakers",
     "envoy.reloadable_features.disallow_unbounded_access_logs",
     "envoy.reloadable_features.ext_authz_http_service_enable_case_sensitive_string_matcher",
     "envoy.reloadable_features.fix_upgrade_response",

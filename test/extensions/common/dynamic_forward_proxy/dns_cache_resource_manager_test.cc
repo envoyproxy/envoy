@@ -2,6 +2,7 @@
 
 #include "common/config/utility.h"
 
+#include "extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
 #include "extensions/common/dynamic_forward_proxy/dns_cache_resource_manager.h"
 
 #include "test/extensions/common/dynamic_forward_proxy/mocks.h"
@@ -23,14 +24,13 @@ public:
   DnsCacheResourceManagerTest() { ON_CALL(store_, gauge(_, _)).WillByDefault(ReturnRef(gauge_)); }
 
   void setupResourceManager(std::string& config_yaml) {
-    auto cb_stats = DnsCacheCircuitBreakersStats{
-        ALL_DNS_CACHE_CIRCUIT_BREAKERS_STATS(POOL_GAUGE_PREFIX(store_, "circuit_breakers"),
-                                             POOL_GAUGE_PREFIX(store_, "circuit_breakers"))};
+    auto cb_stats = DnsCacheImpl::generateDnsCacheCircuitBreakersStats(store_);
+
     envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheCircuitBreakers cb_config;
     TestUtility::loadFromYaml(config_yaml, cb_config);
 
     resource_manager_ =
-        std::make_unique<DnsCacheResourceManager>(cb_stats, loader_, "dummy", cb_config);
+        std::make_unique<DnsCacheResourceManager>(std::move(cb_stats), loader_, "dummy", cb_config);
   }
 
   void cleanup() {

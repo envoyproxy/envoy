@@ -55,6 +55,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:basic_resource_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/upstream:resource_manager_lib",
         "@envoy_api//envoy/extensions/common/dynamic_forward_proxy/v3:pkg_cc_proto",
