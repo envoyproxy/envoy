@@ -263,7 +263,7 @@ TEST_P(DecompressorFilterTest, NoDecompressionContentEncodingDoesNotMatch) {
 TEST_P(DecompressorFilterTest, NoDecompressionContentEncodingNotCurrent) {
   EXPECT_CALL(*decompressor_factory_, createDecompressor()).Times(0);
   // The decompressor's content scheme is not the first value in the comma-delimited list in the
-  // Content-Encoding header. Therefore, compression will not occurr.
+  // Content-Encoding header. Therefore, compression will not occur.
   Http::TestHeaderMapImpl headers_before_filter{{"content-encoding", "gzip,mock"},
                                                 {"content-length", "256"}};
   std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
