@@ -1583,6 +1583,19 @@ void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
   response_encoder_->encode100ContinueHeaders(headers);
 }
 
+void ConnectionManagerImpl::ActiveStream::maybeContinueEncoding(
+    const std::list<ActiveStreamEncoderFilterPtr>::iterator& continue_data_entry) {
+  if (continue_data_entry != encoder_filters_.end()) {
+    // We use the continueEncoding() code since it will correctly handle not calling
+    // encodeHeaders() again. Fake setting StopSingleIteration since the continueEncoding() code
+    // expects it.
+    ASSERT(buffered_response_data_);
+    (*continue_data_entry)->iteration_state_ =
+        ActiveStreamFilterBase::IterationState::StopSingleIteration;
+    (*continue_data_entry)->continueEncoding();
+  }
+}
+
 void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilter* filter,
                                                         ResponseHeaderMap& headers,
                                                         bool end_stream) {
@@ -1618,6 +1631,9 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
     }
 
     if (!continue_iteration) {
+      if (!(*entry)->end_stream_) {
+        maybeContinueEncoding(continue_data_entry);
+      }
       return;
     }
 
@@ -1632,14 +1648,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
                                    (end_stream && continue_data_entry == encoder_filters_.end());
   encodeHeadersInternal(headers, modified_end_stream);
 
-  if (continue_data_entry != encoder_filters_.end() && !modified_end_stream) {
-    // We use the continueEncoding() code since it will correctly handle not calling
-    // encodeHeaders() again. Fake setting StopSingleIteration since the continueEncoding() code
-    // expects it.
-    ASSERT(buffered_response_data_);
-    (*continue_data_entry)->iteration_state_ =
-        ActiveStreamFilterBase::IterationState::StopSingleIteration;
-    (*continue_data_entry)->continueEncoding();
+  if (!modified_end_stream) {
+    maybeContinueEncoding(continue_data_entry);
   }
 }
 

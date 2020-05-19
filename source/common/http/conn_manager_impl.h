@@ -500,6 +500,8 @@ private:
     // As with most of the encode functions, this runs encodeHeaders on various
     // filters before calling encodeHeadersInternal which does final header munging and passes the
     // headers to the encoder.
+    void maybeContinueEncoding(
+        const std::list<ActiveStreamEncoderFilterPtr>::iterator& maybe_continue_data_entry);
     void encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHeaderMap& headers,
                        bool end_stream);
     // Sends data through encoding filter chains. filter_iteration_start_state indicates which
