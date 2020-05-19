@@ -86,9 +86,8 @@ TEST_F(FaultTest, NoFaults) {
   TestScopedRuntime scoped_runtime;
   FaultManagerImpl fault_manager = FaultManagerImpl(random_, runtime_, *faults);
 
-  absl::optional<std::pair<FaultType, std::chrono::milliseconds>> fault_opt =
-      fault_manager.getFaultForCommand("get");
-  ASSERT_FALSE(fault_opt.has_value());
+  FaultSharedPtr fault_ptr = fault_manager.getFaultForCommand("get");
+  ASSERT_TRUE(fault_ptr == nullptr);
 }
 
 TEST_F(FaultTest, SingleCommandFaultNotEnabled) {
@@ -101,9 +100,8 @@ TEST_F(FaultTest, SingleCommandFaultNotEnabled) {
 
   EXPECT_CALL(random_, random()).WillOnce(Return(0));
   EXPECT_CALL(runtime_, snapshot());
-  absl::optional<std::pair<FaultType, std::chrono::milliseconds>> fault_opt =
-      fault_manager.getFaultForCommand("get");
-  ASSERT_FALSE(fault_opt.has_value());
+  FaultSharedPtr fault_ptr = fault_manager.getFaultForCommand("get");
+  ASSERT_TRUE(fault_ptr == nullptr);
 }
 
 TEST_F(FaultTest, SingleCommandFault) {
@@ -118,9 +116,8 @@ TEST_F(FaultTest, SingleCommandFault) {
 
   EXPECT_CALL(random_, random()).WillOnce(Return(1));
   EXPECT_CALL(runtime_, snapshot());
-  absl::optional<std::pair<FaultType, std::chrono::milliseconds>> fault_opt =
-      fault_manager.getFaultForCommand("ttl");
-  ASSERT_TRUE(fault_opt.has_value());
+  FaultSharedPtr fault_ptr = fault_manager.getFaultForCommand("ttl");
+  ASSERT_TRUE(fault_ptr != nullptr);
 }
 
 TEST_F(FaultTest, SingleCommandFaultWithNoDefaultValueOrRuntimeValue) {
@@ -134,9 +131,8 @@ TEST_F(FaultTest, SingleCommandFaultWithNoDefaultValueOrRuntimeValue) {
 
   EXPECT_CALL(random_, random()).WillOnce(Return(1));
   EXPECT_CALL(runtime_, snapshot());
-  absl::optional<std::pair<FaultType, std::chrono::milliseconds>> fault_opt =
-      fault_manager.getFaultForCommand("ttl");
-  ASSERT_FALSE(fault_opt.has_value());
+  FaultSharedPtr fault_ptr = fault_manager.getFaultForCommand("ttl");
+  ASSERT_TRUE(fault_ptr == nullptr);
 }
 
 TEST_F(FaultTest, MultipleFaults) {
@@ -151,42 +147,42 @@ TEST_F(FaultTest, MultipleFaults) {
 
   TestScopedRuntime scoped_runtime;
   FaultManagerImpl fault_manager = FaultManagerImpl(random_, runtime_, *faults);
-  absl::optional<std::pair<FaultType, std::chrono::milliseconds>> fault_opt;
+  FaultSharedPtr fault_ptr;
 
   // Get command - should have a fault 50% of time
   // For the first call we mock the random percentage to be 1%, which will give us the first fault
   // with 0s delay.
   EXPECT_CALL(random_, random()).WillOnce(Return(1));
   EXPECT_CALL(runtime_, snapshot());
-  fault_opt = fault_manager.getFaultForCommand("get");
-  ASSERT_TRUE(fault_opt.has_value());
-  ASSERT_EQ(fault_opt.value().second, std::chrono::milliseconds(0));
+  fault_ptr = fault_manager.getFaultForCommand("get");
+  ASSERT_TRUE(fault_ptr != nullptr);
+  ASSERT_EQ(fault_ptr->delayMs(), std::chrono::milliseconds(0));
 
   // Another Get; we mock the random percentage to be 25%, giving us the ALL_KEY fault
   EXPECT_CALL(random_, random()).WillOnce(Return(25));
   EXPECT_CALL(runtime_, snapshot()).Times(2);
-  fault_opt = fault_manager.getFaultForCommand("get");
-  ASSERT_TRUE(fault_opt.has_value());
-  ASSERT_EQ(fault_opt.value().second, std::chrono::milliseconds(2000));
+  fault_ptr = fault_manager.getFaultForCommand("get");
+  ASSERT_TRUE(fault_ptr != nullptr);
+  ASSERT_EQ(fault_ptr->delayMs(), std::chrono::milliseconds(2000));
 
   // No fault for Get command with mocked random percentage >= 50%.
   EXPECT_CALL(random_, random()).WillOnce(Return(50));
   EXPECT_CALL(runtime_, snapshot()).Times(2);
-  fault_opt = fault_manager.getFaultForCommand("get");
-  ASSERT_FALSE(fault_opt.has_value());
+  fault_ptr = fault_manager.getFaultForCommand("get");
+  ASSERT_TRUE(fault_ptr == nullptr);
 
   // Any other command; we mock the random percentage to be 1%, giving us the ALL_KEY fault
   EXPECT_CALL(random_, random()).WillOnce(Return(1));
   EXPECT_CALL(runtime_, snapshot()).Times(1);
-  fault_opt = fault_manager.getFaultForCommand("ttl");
-  ASSERT_TRUE(fault_opt.has_value());
-  ASSERT_EQ(fault_opt.value().second, std::chrono::milliseconds(2000));
+  fault_ptr = fault_manager.getFaultForCommand("ttl");
+  ASSERT_TRUE(fault_ptr != nullptr);
+  ASSERT_EQ(fault_ptr->delayMs(), std::chrono::milliseconds(2000));
 
   // No fault for any other command with mocked random percentage >= 25%.
   EXPECT_CALL(random_, random()).WillOnce(Return(25));
   EXPECT_CALL(runtime_, snapshot()).Times(1);
-  fault_opt = fault_manager.getFaultForCommand("ttl");
-  ASSERT_FALSE(fault_opt.has_value());
+  fault_ptr = fault_manager.getFaultForCommand("ttl");
+  ASSERT_TRUE(fault_ptr == nullptr);
 }
 
 } // namespace Redis

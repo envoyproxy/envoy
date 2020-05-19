@@ -58,8 +58,7 @@ public:
   MockFaultManager(const MockFaultManager& other);
   ~MockFaultManager() override;
 
-  MOCK_METHOD((absl::optional<std::pair<Common::Redis::FaultType, std::chrono::milliseconds>>),
-              getFaultForCommand, (std::string), (const));
+  MOCK_METHOD(Common::Redis::FaultSharedPtr, getFaultForCommand, (std::string), (const));
 };
 
 namespace ConnPool {

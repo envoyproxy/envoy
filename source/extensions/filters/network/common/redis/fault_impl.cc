@@ -6,7 +6,8 @@ namespace NetworkFilters {
 namespace Common {
 namespace Redis {
 
-Fault::Fault(envoy::extensions::filters::network::redis_proxy::v3::RedisProxy_RedisFault base_fault)
+FaultManagerImpl::FaultImpl::FaultImpl(
+    envoy::extensions::filters::network::redis_proxy::v3::RedisProxy_RedisFault base_fault)
     : commands_(buildCommands(base_fault)) {
   // // Get delay
   delay_ms_ = std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(base_fault, delay, 0));
@@ -40,7 +41,7 @@ Fault::Fault(envoy::extensions::filters::network::redis_proxy::v3::RedisProxy_Re
   runtime_key_ = base_fault.fault_enabled().runtime_key();
 };
 
-std::vector<std::string> Fault::buildCommands(
+std::vector<std::string> FaultManagerImpl::FaultImpl::buildCommands(
     envoy::extensions::filters::network::redis_proxy::v3::RedisProxy_RedisFault base_fault) {
   std::vector<std::string> commands;
   for (const std::string& command : base_fault.commands()) {
@@ -66,7 +67,7 @@ FaultMap FaultManagerImpl::buildFaultMap(
   // Group faults by command
   FaultMap fault_map;
   for (auto base_fault : faults) {
-    auto fault_ptr = std::make_shared<Fault>(base_fault);
+    auto fault_ptr = std::make_shared<FaultImpl>(base_fault);
     if (!fault_ptr->commands().empty()) {
       for (const std::string& command : fault_ptr->commands()) {
         fault_map[command].emplace_back(fault_ptr);
@@ -82,7 +83,7 @@ FaultMap FaultManagerImpl::buildFaultMap(
   FaultMap::iterator it_outer = fault_map.find(FaultManagerImpl::ALL_KEY);
   if (it_outer != fault_map.end()) {
     // For each ALL_KEY fault...
-    for (const FaultPtr& fault_ptr : it_outer->second) {
+    for (const FaultSharedPtr& fault_ptr : it_outer->second) {
       // Loop through all unique commands other than ALL_KEY and add the fault.
       FaultMap::iterator it_inner;
       for (it_inner = fault_map.begin(); it_inner != fault_map.end(); it_inner++) {
@@ -107,14 +108,13 @@ FaultMap FaultManagerImpl::buildFaultMap(
 // 2. For each fault, calculate the amortized fault injection percentage.
 //
 // Note that we do not check to make sure the probabilities of faults are <= 100%!
-absl::optional<std::pair<FaultType, std::chrono::milliseconds>>
-FaultManagerImpl::getFaultForCommandInternal(std::string command) const {
+FaultSharedPtr FaultManagerImpl::getFaultForCommandInternal(std::string command) const {
   FaultMap::const_iterator it_outer = fault_map_.find(command);
   if (it_outer != fault_map_.end()) {
     auto random_number = random_.random() % 100;
     int amortized_fault = 0;
 
-    for (const FaultPtr& fault_ptr : it_outer->second) {
+    for (const FaultSharedPtr& fault_ptr : it_outer->second) {
       uint64_t fault_injection_percentage;
       if (fault_ptr->runtimeKey().has_value()) {
         fault_injection_percentage = runtime_.snapshot().getInteger(fault_ptr->runtimeKey().value(),
@@ -124,18 +124,17 @@ FaultManagerImpl::getFaultForCommandInternal(std::string command) const {
       }
 
       if (random_number < (fault_injection_percentage + amortized_fault)) {
-        return std::make_pair(fault_ptr->faultType(), fault_ptr->delayMs());
+        return fault_ptr;
       } else {
         amortized_fault += fault_injection_percentage;
       }
     }
   }
 
-  return absl::nullopt;
+  return nullptr;
 }
 
-absl::optional<std::pair<FaultType, std::chrono::milliseconds>>
-FaultManagerImpl::getFaultForCommand(std::string command) const {
+FaultSharedPtr FaultManagerImpl::getFaultForCommand(std::string command) const {
   // Check if faults exist for given command; else use ALL_KEY and search for general faults.
   if (!fault_map_.empty()) {
     if (fault_map_.count(command) > 0) {
@@ -145,7 +144,7 @@ FaultManagerImpl::getFaultForCommand(std::string command) const {
     }
   }
 
-  return absl::nullopt;
+  return nullptr;
 }
 
 } // namespace Redis

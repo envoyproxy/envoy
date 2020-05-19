@@ -18,6 +18,19 @@ namespace Redis {
  */
 enum class FaultType { Delay, Error };
 
+class Fault {
+public:
+  virtual ~Fault() = default;
+
+  virtual FaultType faultType() const PURE;
+  virtual std::chrono::milliseconds delayMs() const PURE;
+  virtual const std::vector<std::string> commands() const PURE;
+  virtual uint64_t defaultValue() const PURE;
+  virtual absl::optional<std::string> runtimeKey() const PURE;
+};
+
+using FaultSharedPtr = std::shared_ptr<const Fault>;
+
 class FaultManager {
 public:
   virtual ~FaultManager() = default;
@@ -26,11 +39,10 @@ public:
    * Get fault type and delay given a Redis command.
    * @param command supplies the Redis command string.
    */
-  virtual absl::optional<std::pair<FaultType, std::chrono::milliseconds>>
-  getFaultForCommand(std::string command) const PURE;
+  virtual FaultSharedPtr getFaultForCommand(std::string command) const PURE;
 };
 
-using FaultManagerPtr = std::shared_ptr<FaultManager>;
+using FaultManagerPtr = std::unique_ptr<FaultManager>;
 
 } // namespace Redis
 } // namespace Common

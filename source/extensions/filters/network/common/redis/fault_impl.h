@@ -18,29 +18,7 @@ namespace NetworkFilters {
 namespace Common {
 namespace Redis {
 
-class Fault {
-public:
-  Fault(envoy::extensions::filters::network::redis_proxy::v3::RedisProxy_RedisFault base_fault);
-
-  FaultType faultType() const { return fault_type_; };
-  std::chrono::milliseconds delayMs() const { return delay_ms_; };
-  const std::vector<std::string> commands() const { return commands_; };
-  uint64_t defaultValue() const { return default_value_; };
-  absl::optional<std::string> runtimeKey() const { return runtime_key_; };
-
-private:
-  static std::vector<std::string> buildCommands(
-      envoy::extensions::filters::network::redis_proxy::v3::RedisProxy_RedisFault base_fault);
-
-  FaultType fault_type_;
-  std::chrono::milliseconds delay_ms_;
-  const std::vector<std::string> commands_;
-  uint64_t default_value_;
-  absl::optional<std::string> runtime_key_;
-};
-
-using FaultPtr = std::shared_ptr<Fault>;
-using FaultMap = std::unordered_map<std::string, std::vector<FaultPtr>>;
+using FaultMap = std::unordered_map<std::string, std::vector<FaultSharedPtr>>;
 
 /**
  * Fault management- creation, storage and retrieval. Faults are queried for by command,
@@ -50,27 +28,58 @@ using FaultMap = std::unordered_map<std::string, std::vector<FaultPtr>>;
 class FaultManagerImpl : public FaultManager {
 public:
   FaultManagerImpl(Runtime::RandomGenerator& random, Runtime::Loader& runtime)
-      : random_(random), runtime_(runtime){}; // For testing
+      : random_(random), runtime_(runtime){}; // For testing only
   FaultManagerImpl(
       Runtime::RandomGenerator& random, Runtime::Loader& runtime,
       const Protobuf::RepeatedPtrField<
           ::envoy::extensions::filters::network::redis_proxy::v3::RedisProxy_RedisFault>
           base_faults);
 
-  absl::optional<std::pair<FaultType, std::chrono::milliseconds>>
-  getFaultForCommand(std::string command) const override;
+  FaultSharedPtr getFaultForCommand(std::string command) const override;
+
+  static FaultSharedPtr makeFault(Common::Redis::FaultType faultType,
+                                  std::chrono::milliseconds delay_ms) {
+    FaultImpl fault = FaultImpl(faultType, delay_ms, std::vector<std::string>(), 0, "foo");
+    return std::make_shared<FaultImpl>(fault);
+  } // For testing only
 
   // Allow the unit test to have access to private members.
   friend class FaultTest;
 
 private:
+  class FaultImpl : public Fault {
+  public:
+    FaultImpl(
+        envoy::extensions::filters::network::redis_proxy::v3::RedisProxy_RedisFault base_fault);
+    FaultImpl(FaultType fault_type, std::chrono::milliseconds delay_ms,
+              const std::vector<std::string> commands, uint64_t default_value,
+              absl::optional<std::string> runtime_key)
+        : fault_type_(fault_type), delay_ms_(delay_ms), commands_(commands),
+          default_value_(default_value), runtime_key_(runtime_key) {} // For testing only
+
+    FaultType faultType() const override { return fault_type_; };
+    std::chrono::milliseconds delayMs() const override { return delay_ms_; };
+    const std::vector<std::string> commands() const override { return commands_; };
+    uint64_t defaultValue() const override { return default_value_; };
+    absl::optional<std::string> runtimeKey() const override { return runtime_key_; };
+
+  private:
+    static std::vector<std::string> buildCommands(
+        envoy::extensions::filters::network::redis_proxy::v3::RedisProxy_RedisFault base_fault);
+
+    FaultType fault_type_;
+    std::chrono::milliseconds delay_ms_;
+    const std::vector<std::string> commands_;
+    uint64_t default_value_;
+    absl::optional<std::string> runtime_key_;
+  };
+
   static FaultMap
   buildFaultMap(const Protobuf::RepeatedPtrField<
                 ::envoy::extensions::filters::network::redis_proxy::v3::RedisProxy_RedisFault>
                     faults);
 
-  absl::optional<std::pair<FaultType, std::chrono::milliseconds>>
-  getFaultForCommandInternal(std::string command) const;
+  FaultSharedPtr getFaultForCommandInternal(std::string command) const;
   const FaultMap fault_map_;
 
 public:
