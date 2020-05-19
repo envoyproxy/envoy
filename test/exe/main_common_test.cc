@@ -146,7 +146,9 @@ TEST_P(MainCommonDeathTest, OutOfMemoryHandler) {
         for (uint64_t size = initial;
              size >= initial; // Disallow wraparound to avoid infinite loops on failure.
              size *= 1000) {
-          new int[size];
+          int* p = new int[size];
+          // Use the pointer to prevent clang from optimizing the allocation away in opt mode.
+          ENVOY_LOG_MISC(debug, "p={}", reinterpret_cast<intptr_t>(p));
         }
       }(),
       ".*panic: out of memory.*");
