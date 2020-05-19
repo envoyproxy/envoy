@@ -13,6 +13,7 @@
 #include "test/common/upstream/utility.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -1530,6 +1531,30 @@ TEST_P(LeastRequestLoadBalancerTest, WeightImbalance) {
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
+}
+
+TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceWithAlternativeWeights) {
+  auto scoped_runtime = std::make_unique<TestScopedRuntime>();
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.alternative_least_request_weights", "true"}});
+
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", 1),
+                              makeTestHost(info_, "tcp://127.0.0.1:81", 2)};
+  stats_.max_host_weight_.set(2UL);
+
+  hostSet().hosts_ = hostSet().healthy_hosts_;
+  hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
+
+  EXPECT_CALL(random_, random()).WillRepeatedly(Return(0));
+
+  // We should see 2:1 ratio for hosts[1] to hosts[0], regardless of the active request count.
+  hostSet().healthy_hosts_[1]->stats().rq_active_.set(1);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
 }
 
 TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceCallbacks) {

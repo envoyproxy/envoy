@@ -11,6 +11,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/protobuf/utility.h"
+#include "common/runtime/runtime_features.h"
 #include "common/upstream/edf_scheduler.h"
 
 namespace Envoy {
@@ -367,6 +368,8 @@ protected:
 
   void initialize();
 
+  virtual void refresh(uint32_t priority);
+
   // Seed to allow us to desynchronize load balancers across a fleet. If we don't
   // do this, multiple Envoys that receive an update at the same time (or even
   // multiple load balancers on the same host) will send requests to
@@ -375,7 +378,6 @@ protected:
   const uint64_t seed_;
 
 private:
-  void refresh(uint32_t priority);
   virtual void refreshHostSource(const HostsSource& source) PURE;
   virtual double hostWeight(const Host& host) PURE;
   virtual HostConstSharedPtr unweightedHostPick(const HostVector& hosts_to_use,
@@ -454,9 +456,25 @@ public:
     initialize();
   }
 
+  HostConstSharedPtr chooseHost(LoadBalancerContext* context) override {
+    alternativeWeights_ = Runtime::runtimeFeatureEnabled(
+        "envoy.reloadable_features.alternative_least_request_weights");
+    return EdfLoadBalancerBase::chooseHost(context);
+  }
+
+  void refresh(uint32_t priority) override {
+    alternativeWeights_ = Runtime::runtimeFeatureEnabled(
+        "envoy.reloadable_features.alternative_least_request_weights");
+    EdfLoadBalancerBase::refresh(priority);
+  }
+
 private:
   void refreshHostSource(const HostsSource&) override {}
   double hostWeight(const Host& host) override {
+    if (alternativeWeights_) {
+      return host.weight();
+    }
+
     // Here we scale host weight by the number of active requests at the time we do the pick. We
     // always add 1 to avoid division by 0. It might be possible to do better by picking two hosts
     // off of the schedule, and selecting the one with fewer active requests at the time of
@@ -469,7 +487,9 @@ private:
   }
   HostConstSharedPtr unweightedHostPick(const HostVector& hosts_to_use,
                                         const HostsSource& source) override;
+
   const uint32_t choice_count_;
+  bool alternativeWeights_;
 };
 
 /**

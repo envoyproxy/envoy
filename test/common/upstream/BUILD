@@ -189,6 +189,7 @@ envoy_cc_test(
         "//source/common/upstream:upstream_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )
