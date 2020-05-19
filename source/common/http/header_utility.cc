@@ -5,6 +5,7 @@
 #include "common/common/regex.h"
 #include "common/common/utility.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/runtime/runtime_features.h"
 
@@ -159,6 +160,13 @@ bool HeaderUtility::authorityIsValid(const absl::string_view header_value) {
 
 bool HeaderUtility::isConnect(const RequestHeaderMap& headers) {
   return headers.Method() && headers.Method()->value() == Http::Headers::get().MethodValues.Connect;
+}
+
+bool HeaderUtility::isConnectResponse(const RequestHeaderMapPtr& request_headers,
+                                      const ResponseHeaderMap& response_headers) {
+  return request_headers.get() && isConnect(*request_headers) &&
+         static_cast<Http::Code>(Http::Utility::getResponseStatus(response_headers)) ==
+             Http::Code::OK;
 }
 
 void HeaderUtility::addHeaders(HeaderMap& headers, const HeaderMap& headers_to_add) {

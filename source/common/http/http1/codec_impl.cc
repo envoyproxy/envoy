@@ -165,8 +165,12 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
     } else if (connection_.protocol() == Protocol::Http10) {
       chunk_encoding_ = false;
     } else {
-      encodeFormattedHeader(Headers::get().TransferEncoding.get(),
-                            Headers::get().TransferEncodingValues.Chunked);
+      // For responses to connect requests, do not send the chunked encoding header:
+      // https://tools.ietf.org/html/rfc7231#section-4.3.6
+      if (!is_response_to_connect_request_) {
+        encodeFormattedHeader(Headers::get().TransferEncoding.get(),
+                              Headers::get().TransferEncodingValues.Chunked);
+      }
       // We do not apply chunk encoding for HTTP upgrades, including CONNECT style upgrades.
       // If there is a body in a response on the upgrade path, the chunks will be
       // passed through via maybeDirectDispatch so we need to avoid appending
@@ -1050,6 +1054,15 @@ int ClientConnectionImpl::onHeadersComplete() {
         pending_response_.value().encoder_.connectRequest()) {
       ENVOY_CONN_LOG(trace, "codec entering upgrade mode for CONNECT response.", connection_);
       handling_upgrade_ = true;
+
+      // For responses to connect requests, do not accept the chunked
+      // encoding header: https://tools.ietf.org/html/rfc7231#section-4.3.6
+      if (headers->TransferEncoding() &&
+          absl::EqualsIgnoreCase(headers->TransferEncoding()->value().getStringView(),
+                                 Headers::get().TransferEncodingValues.Chunked)) {
+        sendProtocolError(Http1ResponseCodeDetails::get().InvalidTransferEncoding);
+        throw CodecProtocolException("http/1.1 protocol error: unsupported transfer encoding");
+      }
     }
 
     if (parser_.status_code == 100) {
