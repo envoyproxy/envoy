@@ -99,6 +99,7 @@ server_config:
     - suffix: foo1.com
     - suffix: foo2.com
     - suffix: foo3.com
+    - suffix: foo16.com
     - suffix: thisismydomainforafivehundredandtwelvebytetest.com
     virtual_domains:
     - name: "www.foo1.com"
@@ -119,6 +120,26 @@ server_config:
         address_list:
           address:
           - "10.0.3.1"
+    - name: "www.foo16.com"
+      endpoint:
+        address_list:
+          address:
+          - "10.0.16.1"
+          - "10.0.16.2"
+          - "10.0.16.3"
+          - "10.0.16.4"
+          - "10.0.16.5"
+          - "10.0.16.6"
+          - "10.0.16.7"
+          - "10.0.16.8"
+          - "10.0.16.9"
+          - "10.0.16.10"
+          - "10.0.16.11"
+          - "10.0.16.12"
+          - "10.0.16.13"
+          - "10.0.16.14"
+          - "10.0.16.15"
+          - "10.0.16.16"
     - name: www.supercalifragilisticexpialidocious.thisismydomainforafivehundredandtwelvebytetest.com
       endpoint:
         address_list:
@@ -463,7 +484,6 @@ TEST_F(DnsFilterTest, RawBufferTest) {
   query_ctx_ = response_parser_->createQueryContext(udp_response_);
   EXPECT_TRUE(query_ctx_->parse_status_);
   EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_parser_->getQueryResponseCode());
-  EXPECT_EQ(0, response_parser_->getQueryResponseCode());
   EXPECT_EQ(1, query_ctx_->answers_.size());
 
   // Verify that we have an answer record for the queried domain
@@ -676,6 +696,40 @@ TEST_F(DnsFilterTest, InvalidShortBufferTest) {
   EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, response_parser_->getQueryResponseCode());
 }
 
+TEST_F(DnsFilterTest, RandomizeFirstAnswerTest) {
+  InSequence s;
+
+  setup(forward_query_off_config);
+  const std::string domain("www.foo16.com");
+
+  const std::string query =
+      Utils::buildQueryForDomain(domain, DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN);
+  ASSERT_FALSE(query.empty());
+  sendQueryFromClient("10.0.0.1:1000", query);
+
+  query_ctx_ = response_parser_->createQueryContext(udp_response_);
+  EXPECT_TRUE(query_ctx_->parse_status_);
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_parser_->getQueryResponseCode());
+
+  // Although 16 addresses are defined, only 8 are returned
+  EXPECT_EQ(8, query_ctx_->answers_.size());
+
+  // We shuffle the list of addresses when we read the config, and in the case of more than
+  // 8 defined addresses, we randomize the initial starting index. We should not end up with
+  // the first answer being the first defined address, or the answers appearing in the same
+  // order as they are defined. There does exist a non-zero probability that both orders match.
+  size_t matched_count = 0;
+  size_t index = 0;
+  char address[32];
+  for (const auto& answer : query_ctx_->answers_) {
+    const auto resolved_address = answer.second->ip_addr_->ip()->addressAsString();
+    snprintf(address, sizeof(address), "10.0.16.%ld", ++index);
+    if (resolved_address.compare(address) == 0) {
+      ++matched_count;
+    }
+  }
+  EXPECT_TRUE(matched_count == 0);
+}
 } // namespace
 } // namespace DnsFilter
 } // namespace UdpFilters
