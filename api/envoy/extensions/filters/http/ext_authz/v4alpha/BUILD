@@ -8,6 +8,7 @@ api_proto_package(
     deps = [
         "//envoy/annotations:pkg",
         "//envoy/config/core/v4alpha:pkg",
+        "//envoy/config/runtime/v3:pkg",
         "//envoy/extensions/filters/http/ext_authz/v3:pkg",
         "//envoy/type/matcher/v4alpha:pkg",
         "//envoy/type/v3:pkg",

@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.config.filter.http.compressor.v2;
 
-import "envoy/api/v2/core/base.proto";
+import "envoy/api/v2/runtime/runtime.proto";
 
 import "google/protobuf/wrappers.proto";
 
@@ -44,5 +44,5 @@ message Compressor {
 
   // Runtime flag that controls whether the filter is enabled or not. If set to false, the
   // filter will operate as a pass-through filter. If not specified, defaults to enabled.
-  api.v2.core.RuntimeFeatureFlag runtime_enabled = 5;
+  api.v2.runtime.RuntimeFeatureFlag runtime_enabled = 5;
 }

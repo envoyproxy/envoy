@@ -47,6 +47,11 @@ public:
       throw EnvoyException(regex_.error());
     }
 
+    // uint32_t max_program_size_error_level = config.google_re2().max_program_size_error_level();
+    // if (!config.google_re2().max_program_size_error_level().empty()) {
+    //   max_program_size_error_level = runtime_.snapshot().getInteger(config.google_re2().max_program_size_error_level().runtime_key(), max_program_size_error_level);
+    // }
+
     if (config.google_re2().has_max_program_size()) {
       const uint32_t max_program_size =
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.google_re2(), max_program_size, 100);

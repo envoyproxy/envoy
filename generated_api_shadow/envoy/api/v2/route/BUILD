@@ -8,6 +8,7 @@ api_proto_package(
     deps = [
         "//envoy/annotations:pkg",
         "//envoy/api/v2/core:pkg",
+        "//envoy/api/v2/runtime:pkg",
         "//envoy/type:pkg",
         "//envoy/type/matcher:pkg",
         "//envoy/type/tracing/v2:pkg",

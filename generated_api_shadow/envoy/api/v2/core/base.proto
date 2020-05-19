@@ -5,7 +5,6 @@ package envoy.api.v2.core;
 import "envoy/api/v2/core/address.proto";
 import "envoy/api/v2/core/backoff.proto";
 import "envoy/api/v2/core/http_uri.proto";
-import "envoy/type/percent.proto";
 import "envoy/type/semantic_version.proto";
 
 import "google/protobuf/any.proto";
@@ -223,35 +222,6 @@ message Metadata {
   map<string, google.protobuf.Struct> filter_metadata = 1;
 }
 
-// Runtime derived uint32 with a default when not specified.
-message RuntimeUInt32 {
-  // Default value if runtime value is not available.
-  uint32 default_value = 2;
-
-  // Runtime key to get value for comparison. This value is used if defined.
-  string runtime_key = 3 [(validate.rules).string = {min_bytes: 1}];
-}
-
-// Runtime derived double with a default when not specified.
-message RuntimeDouble {
-  // Default value if runtime value is not available.
-  double default_value = 1;
-
-  // Runtime key to get value for comparison. This value is used if defined.
-  string runtime_key = 2 [(validate.rules).string = {min_bytes: 1}];
-}
-
-// Runtime derived bool with a default when not specified.
-message RuntimeFeatureFlag {
-  // Default value if runtime value is not available.
-  google.protobuf.BoolValue default_value = 1 [(validate.rules).message = {required: true}];
-
-  // Runtime key to get value for comparison. This value is used if defined. The boolean value must
-  // be represented via its
-  // `canonical JSON encoding <https://developers.google.com/protocol-buffers/docs/proto3#json>`_.
-  string runtime_key = 2 [(validate.rules).string = {min_bytes: 1}];
-}
-
 // Header name/value pair.
 message HeaderValue {
   // Header name.
@@ -353,24 +323,6 @@ message TransportSocket {
 
     google.protobuf.Any typed_config = 3;
   }
-}
-
-// Runtime derived FractionalPercent with defaults for when the numerator or denominator is not
-// specified via a runtime key.
-//
-// .. note::
-//
-//   Parsing of the runtime key's data is implemented such that it may be represented as a
-//   :ref:`FractionalPercent <envoy_api_msg_type.FractionalPercent>` proto represented as JSON/YAML
-//   and may also be represented as an integer with the assumption that the value is an integral
-//   percentage out of 100. For instance, a runtime key lookup returning the value "42" would parse
-//   as a `FractionalPercent` whose numerator is 42 and denominator is HUNDRED.
-message RuntimeFractionalPercent {
-  // Default value if the runtime value's for the numerator/denominator keys are not available.
-  type.FractionalPercent default_value = 1 [(validate.rules).message = {required: true}];
-
-  // Runtime key for a YAML representation of a FractionalPercent.
-  string runtime_key = 2;
 }
 
 // Identifies a specific ControlPlane instance that Envoy is connected to.

@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.adaptive_concurrency.v3;
 
-import "envoy/config/core/v3/base.proto";
+import "envoy/config/runtime/v3/runtime.proto";
 import "envoy/type/v3/percent.proto";
 
 import "google/api/annotations.proto";
@@ -103,5 +103,5 @@ message AdaptiveConcurrency {
 
   // If set to false, the adaptive concurrency filter will operate as a pass-through filter. If the
   // message is unspecified, the filter will be enabled.
-  config.core.v3.RuntimeFeatureFlag enabled = 2;
+  config.runtime.v3.RuntimeFeatureFlag enabled = 2;
 }

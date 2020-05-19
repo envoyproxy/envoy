@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.network.local_ratelimit.v3;
 
-import "envoy/config/core/v3/base.proto";
+import "envoy/config/runtime/v3/runtime.proto";
 import "envoy/type/v3/token_bucket.proto";
 
 import "udpa/annotations/status.proto";
@@ -42,5 +42,5 @@ message LocalRateLimit {
 
   // Runtime flag that controls whether the filter is enabled or not. If not specified, defaults
   // to enabled.
-  config.core.v3.RuntimeFeatureFlag runtime_enabled = 3;
+  config.runtime.v3.RuntimeFeatureFlag runtime_enabled = 3;
 }
