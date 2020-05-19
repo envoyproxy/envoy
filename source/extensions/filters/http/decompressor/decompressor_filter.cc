@@ -1,6 +1,7 @@
 #include "extensions/filters/http/decompressor/decompressor_filter.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/common/empty_string.h"
 #include "common/common/macros.h"
 #include "common/http/headers.h"
 
@@ -112,8 +113,8 @@ Http::FilterHeadersStatus DecompressorFilter::maybeInitDecompress(
 
     // Update headers.
     headers.removeContentLength();
-    removeContentEncoding(headers);
-    sanitizeTransferEncoding(headers);
+    modifyContentEncoding(headers);
+    modifyTransferEncoding(headers);
 
     ENVOY_STREAM_LOG(debug, "do decompress (without buffering) {}: {}", callbacks,
                      direction_config.logString(), headers);
@@ -154,6 +155,10 @@ bool DecompressorFilter::hasCacheControlNoTransform(
              : false;
 }
 
+/**
+ * Content-Encoding matches if the configured encoding is the first value in the comma-delimented
+ * Content-Encoding header, regardless of spacing and casing.
+ */
 bool DecompressorFilter::contentEncodingMatches(Http::RequestOrResponseHeaderMap& headers) const {
   if (headers.ContentEncoding()) {
     absl::string_view coding = StringUtil::trim(
@@ -165,8 +170,8 @@ bool DecompressorFilter::contentEncodingMatches(Http::RequestOrResponseHeaderMap
   return false;
 }
 
-void DecompressorFilter::removeContentEncoding(Http::RequestOrResponseHeaderMap& headers) const {
-  const auto all_codings = headers.ContentEncoding()->value().getStringView();
+void DecompressorFilter::modifyContentEncoding(Http::RequestOrResponseHeaderMap& headers) const {
+  const auto all_codings = StringUtil::trim(headers.ContentEncoding()->value().getStringView());
   const auto remaining_codings = StringUtil::trim(StringUtil::cropLeft(all_codings, ","));
 
   if (remaining_codings != all_codings) {
@@ -179,7 +184,7 @@ void DecompressorFilter::removeContentEncoding(Http::RequestOrResponseHeaderMap&
 /**
  * Add "chunked" to the Transfer-Encoding header if it's not there yet.
  */
-void DecompressorFilter::sanitizeTransferEncoding(Http::RequestOrResponseHeaderMap& headers) const {
+void DecompressorFilter::modifyTransferEncoding(Http::RequestOrResponseHeaderMap& headers) const {
   const Http::HeaderEntry* transfer_encoding = headers.TransferEncoding();
   if (!(transfer_encoding &&
         StringUtil::caseFindToken(transfer_encoding->value().getStringView(), ",",

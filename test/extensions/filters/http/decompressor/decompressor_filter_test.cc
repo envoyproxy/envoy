@@ -51,15 +51,15 @@ decompressor_library:
 
   bool isRequestDirection() { return GetParam(); }
 
-  std::unique_ptr<Http::RequestOrResponseHeaderMap> doHeaders(const Http::HeaderMap& rhs,
+  std::unique_ptr<Http::RequestOrResponseHeaderMap> doHeaders(const Http::HeaderMap& headers,
                                                               const bool end_stream) {
     if (isRequestDirection()) {
-      auto request_headers = Http::createHeaderMap<Http::TestRequestHeaderMapImpl>(rhs);
+      auto request_headers = Http::createHeaderMap<Http::TestRequestHeaderMapImpl>(headers);
       EXPECT_EQ(Http::FilterHeadersStatus::Continue,
                 filter_->decodeHeaders(*request_headers, end_stream));
       return std::move(request_headers);
     } else {
-      auto response_headers = Http::createHeaderMap<Http::TestResponseHeaderMapImpl>(rhs);
+      auto response_headers = Http::createHeaderMap<Http::TestResponseHeaderMapImpl>(headers);
       EXPECT_EQ(Http::FilterHeadersStatus::Continue,
                 filter_->encodeHeaders(*response_headers, end_stream));
       return std::move(response_headers);
@@ -98,6 +98,39 @@ decompressor_library:
     EXPECT_EQ(10, buffer.length());
   }
 
+  void
+  decompressionActive(const Http::HeaderMap& headers_before_filter,
+                      const absl::optional<std::string> expected_content_encoding = absl::nullopt) {
+    // Keep the decompressor to set expectations about it
+    auto decompressor = std::make_unique<Compression::Decompressor::MockDecompressor>();
+    auto* decompressor_ptr = decompressor.get();
+    EXPECT_CALL(*decompressor_factory_, createDecompressor())
+        .WillOnce(Return(ByMove(std::move(decompressor))));
+
+    std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
+        doHeaders(headers_before_filter, false /* end_stream */);
+
+    if (expected_content_encoding.has_value()) {
+      EXPECT_EQ(expected_content_encoding.value(),
+                headers_after_filter->ContentEncoding()->value().getStringView());
+    } else {
+      EXPECT_EQ(nullptr, headers_after_filter->ContentEncoding());
+    }
+
+    // FIX ME: pending decision on this.
+    EXPECT_EQ(nullptr, headers_after_filter->ContentLength());
+    EXPECT_EQ("chunked", headers_after_filter->TransferEncoding()->value().getStringView());
+    const auto* accept_encoding =
+        headers_after_filter->get(Http::LowerCaseString{"accept-encoding"});
+    if (isRequestDirection()) {
+      EXPECT_EQ("mock", accept_encoding->value().getStringView());
+    } else {
+      EXPECT_EQ(nullptr, accept_encoding);
+    }
+
+    expectDecompression(decompressor_ptr);
+  }
+
   Compression::Decompressor::MockDecompressorFactory* decompressor_factory_{};
   DecompressorFilterConfigSharedPtr config_;
   std::unique_ptr<DecompressorFilter> filter_;
@@ -111,70 +144,33 @@ INSTANTIATE_TEST_SUITE_P(IsRequestDirection, DecompressorFilterTest,
                          ::testing::Values(true, false));
 
 TEST_P(DecompressorFilterTest, DecompressionActive) {
-  // Keep the decompressor to set expectations about it
-  auto decompressor = std::make_unique<Compression::Decompressor::MockDecompressor>();
-  auto* decompressor_ptr = decompressor.get();
-  EXPECT_CALL(*decompressor_factory_, createDecompressor())
-      .WillOnce(Return(ByMove(std::move(decompressor))));
   Http::TestHeaderMapImpl headers_before_filter{{"content-encoding", "mock"},
                                                 {"content-length", "256"}};
-  std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
-      doHeaders(headers_before_filter, false /* end_stream */);
+  decompressionActive(headers_before_filter);
+}
 
-  EXPECT_EQ(nullptr, headers_after_filter->ContentEncoding());
-
-  // FIX ME: pending decision on this.
-  EXPECT_EQ(nullptr, headers_after_filter->ContentLength());
-  EXPECT_EQ("chunked", headers_after_filter->TransferEncoding()->value().getStringView());
-  const auto* accept_encoding = headers_after_filter->get(Http::LowerCaseString{"accept-encoding"});
-  if (isRequestDirection()) {
-    EXPECT_EQ("mock", accept_encoding->value().getStringView());
-  } else {
-    EXPECT_EQ(nullptr, accept_encoding);
-  }
-
-  expectDecompression(decompressor_ptr);
+TEST_P(DecompressorFilterTest, DecompressionActiveHeaderSpacing) {
+  // Additional spacing should still match.
+  Http::TestHeaderMapImpl headers_before_filter{{"content-encoding", " mock "},
+                                                {"content-length", "256"}};
+  decompressionActive(headers_before_filter);
 }
 
 TEST_P(DecompressorFilterTest, DecompressionActiveMultipleEncodings) {
-  // Keep the decompressor to set expectations about it
-  auto decompressor = std::make_unique<Compression::Decompressor::MockDecompressor>();
-  auto* decompressor_ptr = decompressor.get();
-  EXPECT_CALL(*decompressor_factory_, createDecompressor())
-      .WillOnce(Return(ByMove(std::move(decompressor))));
+  // If the first encoding in the Content-Encoding header is the configured value, the filter should
+  // still be active.
   Http::TestHeaderMapImpl headers_before_filter{{"content-encoding", "mock, br"},
                                                 {"content-length", "256"}};
-  std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
-      doHeaders(headers_before_filter, false /* end_stream */);
-
-  EXPECT_EQ("br", headers_after_filter->ContentEncoding()->value().getStringView());
-
-  // FIX ME: pending decision on this.
-  EXPECT_EQ(nullptr, headers_after_filter->ContentLength());
-  EXPECT_EQ("chunked", headers_after_filter->TransferEncoding()->value().getStringView());
-
-  expectDecompression(decompressor_ptr);
+  decompressionActive(headers_before_filter, "br");
 }
 
 TEST_P(DecompressorFilterTest, DecompressionActiveTransferEncodingPresentAlready) {
-  // Keep the decompressor to set expectations about it
-  auto decompressor = std::make_unique<Compression::Decompressor::MockDecompressor>();
-  auto* decompressor_ptr = decompressor.get();
-  EXPECT_CALL(*decompressor_factory_, createDecompressor())
-      .WillOnce(Return(ByMove(std::move(decompressor))));
-  Http::TestHeaderMapImpl headers_before_filter{{"content-encoding", "mock, br"},
+  // The filter should still be active even if the headers indicate that transfer encoding is
+  // chunked.
+  Http::TestHeaderMapImpl headers_before_filter{{"content-encoding", " mock, br, gzip "},
                                                 {"content-length", "256"},
                                                 {"transfer-encoding", "chunked"}};
-  std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
-      doHeaders(headers_before_filter, false /* end_stream */);
-
-  EXPECT_EQ("br", headers_after_filter->ContentEncoding()->value().getStringView());
-
-  // FIX ME: pending decision on this.
-  EXPECT_EQ(nullptr, headers_after_filter->ContentLength());
-  EXPECT_EQ("chunked", headers_after_filter->TransferEncoding()->value().getStringView());
-
-  expectDecompression(decompressor_ptr);
+  decompressionActive(headers_before_filter, "br, gzip");
 }
 
 TEST_P(DecompressorFilterTest, DecompressionDisabled) {

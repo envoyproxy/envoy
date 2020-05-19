@@ -141,8 +141,8 @@ private:
   // utility class. Moreover, they can be shared between compressor and decompressor.
   bool hasCacheControlNoTransform(Http::RequestOrResponseHeaderMap& headers) const;
   bool contentEncodingMatches(Http::RequestOrResponseHeaderMap& headers) const;
-  void removeContentEncoding(Http::RequestOrResponseHeaderMap& headers) const;
-  void sanitizeTransferEncoding(Http::RequestOrResponseHeaderMap& headers) const;
+  void modifyContentEncoding(Http::RequestOrResponseHeaderMap& headers) const;
+  void modifyTransferEncoding(Http::RequestOrResponseHeaderMap& headers) const;
 
   DecompressorFilterConfigSharedPtr config_;
   Compression::Decompressor::DecompressorPtr request_decompressor_{};
