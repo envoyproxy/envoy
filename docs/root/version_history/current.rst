@@ -2,13 +2,15 @@
 ================
 
 
-Incompatible Behavior Changes (things that expected to cause an incompatibility if they apply; changes required)
+Incompatible Behavior Changes
 -----------------------------
+*Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 
 * build: official released binary is now built on Ubuntu 18.04, requires glibc >= 2.27.
 
-Minor Behavior Changes (things that may cause issues for some users, but should not for most)
-----------------
+Minor Behavior Changes
+----------------------
+*Changes that may cause incompatibilities for some users, but should not for most*
 
 * access loggers: applied existing buffer limits to access logs, as well as :ref:`stats <config_access_log_stats>` for logged / dropped logs. This can be reverted temporarily by setting runtime feature `envoy.reloadable_features.disallow_unbounded_access_logs` to false.
 * http: fixed several bugs with applying correct connection close behavior across the http connection manager, health checker, and connection pool. This behavior may be temporarily reverted by setting runtime feature `envoy.reloadable_features.fix_connection_close` to false.
@@ -19,25 +21,25 @@ Minor Behavior Changes (things that may cause issues for some users, but should 
 * router: allow retries of streaming or incomplete requests. This removes stat `rq_retry_skipped_request_not_complete`.
 * router: allow retries by default when upstream responds with :ref:`x-envoy-overloaded <config_http_filters_router_x-envoy-overloaded_set>`.
 
-Bug fixes (expected to improve things; unlikely to have negative effects)
+Bug Fixes
 ---------
+*Changes expected to improve the state of the world and are unlikely to have negative effects*
 
 * http: fixed a bug in the grpc_http1_reverse_bridge filter where header-only requests were forwarded with a non-zero content length.
 * http: fixed a bug where in some cases slash was moved from path to query string when :ref:`merging of adjacent slashes<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.merge_slashes>` is enabled.
 * http: fixed several bugs with applying correct connection close behavior across the http connection manager, health checker, and connection pool. This behavior may be temporarily reverted by setting runtime feature `envoy.reloadable_features.fix_connection_close` to false.
-* http: fixed a bug where the upgrade header was not cleared on responses to non-upgrade requests.
-  Can be reverted temporarily by setting runtime feature `envoy.reloadable_features.fix_upgrade_response` to false.
 * prometheus stats: fix the sort order of output lines to comply with the standard.
 * upstream: fixed a bug where Envoy would panic when receiving a GRPC SERVICE_UNKNOWN status on the health check.
 
-Removed config or runtime
+Removed Config or Runtime
 -------------------------
+*Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 * http: remove legacy connection pool code and their runtime features: `envoy.reloadable_features.new_http1_connection_pool_behavior` and
   `envoy.reloadable_features.new_http2_connection_pool_behavior`.
 
 New Features
--------
+------------
 
 * access loggers: added GRPC_STATUS operator on logging format.
 * access loggers: extened specifier for FilterStateFormatter to output :ref:`unstructured log string <config_access_log_format_filter_state>`.
