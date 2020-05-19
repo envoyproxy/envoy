@@ -1533,10 +1533,10 @@ TEST_P(LeastRequestLoadBalancerTest, WeightImbalance) {
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
 }
 
-TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceWithAlternativeWeights) {
-  auto scoped_runtime = std::make_unique<TestScopedRuntime>();
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.alternative_least_request_weights", "true"}});
+TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceWithCustomExponent) {
+  EXPECT_CALL(runtime_.snapshot_,
+              getDouble("upstream.least_requests.active_requests_exponent", 1.0))
+      .WillRepeatedly(Return(0.0));
 
   hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", 1),
                               makeTestHost(info_, "tcp://127.0.0.1:81", 2)};
