@@ -45,7 +45,7 @@ message SocketAddress {
   // to the address. An empty address is not allowed. Specify ``0.0.0.0`` or ``::``
   // to bind to any address. [#comment:TODO(zuercher) reinstate when implemented:
   // It is possible to distinguish a Listener address via the prefix/suffix matching
-  // in :ref:`FilterChainMatch <envoy_api_msg_config.listener.v3.FilterChainMatch>`.] When used
+  // in :ref:`FilterChainMatch <envoy_api_msg_config.listener.v4alpha.FilterChainMatch>`.] When used
   // within an upstream :ref:`BindConfig <envoy_api_msg_config.core.v4alpha.BindConfig>`, the address
   // controls the source address of outbound connections. For :ref:`clusters
   // <envoy_api_msg_config.cluster.v4alpha.Cluster>`, the cluster type determines whether the

@@ -34,6 +34,7 @@ namespace Logger {
   FUNCTION(conn_handler)                                                                           \
   FUNCTION(decompression)                                                                          \
   FUNCTION(dubbo)                                                                                  \
+  FUNCTION(ext_authz)                                                                              \
   FUNCTION(rocketmq)                                                                               \
   FUNCTION(file)                                                                                   \
   FUNCTION(filter)                                                                                 \
@@ -123,7 +124,6 @@ public:
   bool hasLock() const { return lock_ != nullptr; }
   void setLock(Thread::BasicLockable& lock) { lock_ = &lock; }
   void clearLock() { lock_ = nullptr; }
-  Thread::BasicLockable* lock() { return lock_; }
 
 private:
   Thread::BasicLockable* lock_{};

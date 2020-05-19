@@ -55,6 +55,8 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, eds_service_name()).WillByDefault(ReturnPointee(&eds_service_name_));
   ON_CALL(*this, http1Settings()).WillByDefault(ReturnRef(http1_settings_));
   ON_CALL(*this, http2Options()).WillByDefault(ReturnRef(http2_options_));
+  ON_CALL(*this, commonHttpProtocolOptions())
+      .WillByDefault(ReturnRef(common_http_protocol_options_));
   ON_CALL(*this, extensionProtocolOptions(_)).WillByDefault(Return(extension_protocol_options_));
   ON_CALL(*this, maxResponseHeadersCount())
       .WillByDefault(ReturnPointee(&max_response_headers_count_));
@@ -98,6 +100,14 @@ MockClusterInfo::MockClusterInfo()
 }
 
 MockClusterInfo::~MockClusterInfo() = default;
+
+Http::Http1::CodecStats& MockClusterInfo::http1CodecStats() const {
+  return Http::Http1::CodecStats::atomicGet(http1_codec_stats_, statsScope());
+}
+
+Http::Http2::CodecStats& MockClusterInfo::http2CodecStats() const {
+  return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, statsScope());
+}
 
 } // namespace Upstream
 } // namespace Envoy

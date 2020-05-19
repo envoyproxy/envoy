@@ -16,6 +16,8 @@ public:
   const std::string Buffer = "envoy.filters.http.buffer";
   // Cache filter
   const std::string Cache = "envoy.filters.http.cache";
+  // Compressor filter
+  const std::string Compressor = "envoy.filters.http.compressor";
   // CORS filter
   const std::string Cors = "envoy.filters.http.cors";
   // CSRF filter

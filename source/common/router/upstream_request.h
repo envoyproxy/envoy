@@ -107,6 +107,7 @@ public:
   UpstreamRequest* upstreamRequest() override { return this; }
 
   void clearRequestEncoder();
+  void onStreamMaxDurationReached();
 
   struct DownstreamWatermarkManager : public Http::DownstreamWatermarkCallbacks {
     DownstreamWatermarkManager(UpstreamRequest& parent) : parent_(parent) {}
@@ -119,6 +120,7 @@ public:
   };
 
   void readEnable();
+  void encodeBodyAndTrailers();
 
   // Getters and setters
   Upstream::HostDescriptionConstSharedPtr& upstreamHost() { return upstream_host_; }
@@ -138,8 +140,17 @@ public:
   bool createPerTryTimeoutOnRequestComplete() {
     return create_per_try_timeout_on_request_complete_;
   }
+  bool encodeComplete() const { return encode_complete_; }
+  RouterFilterInterface& parent() { return parent_; }
 
 private:
+  bool shouldSendEndStream() {
+    // Only encode end stream if the full request has been received, the body
+    // has been sent, and any trailers or metadata have also been sent.
+    return encode_complete_ && !buffered_request_body_ && !encode_trailers_ &&
+           downstream_metadata_map_vector_.empty();
+  }
+
   RouterFilterInterface& parent_;
   std::unique_ptr<GenericConnPool> conn_pool_;
   bool grpc_rq_success_deferred_;
@@ -172,10 +183,15 @@ private:
   // Tracks whether we deferred a per try timeout because the downstream request
   // had not been completed yet.
   bool create_per_try_timeout_on_request_complete_ : 1;
+  // True if the CONNECT headers have been sent but proxying payload is paused
+  // waiting for response headers.
+  bool paused_for_connect_ : 1;
 
   // Sentinel to indicate if timeout budget tracking is configured for the cluster,
   // and if so, if the per-try histogram should record a value.
   bool record_timeout_budget_ : 1;
+
+  Event::TimerPtr max_stream_duration_timer_;
 };
 
 class HttpConnPool : public GenericConnPool, public Http::ConnectionPool::Callbacks {
@@ -317,7 +333,6 @@ public:
 private:
   UpstreamRequest* upstream_request_;
   Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
-  bool sent_headers_{};
 };
 
 } // namespace Router

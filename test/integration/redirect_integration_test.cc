@@ -1,5 +1,8 @@
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/internal_redirect/allow_listed_routes/v3/allow_listed_routes_config.pb.h"
+#include "envoy/extensions/internal_redirect/previous_routes/v3/previous_routes_config.pb.h"
+#include "envoy/extensions/internal_redirect/safe_cross_scheme/v3/safe_cross_scheme_config.pb.h"
 
 #include "test/integration/http_protocol_integration.h"
 
@@ -19,16 +22,17 @@ public:
     config_helper_.addVirtualHost(pass_through);
 
     auto handle = config_helper_.createVirtualHost("handle.internal.redirect");
-    handle.mutable_routes(0)->mutable_route()->set_internal_redirect_action(
-        envoy::config::route::v3::RouteAction::HANDLE_INTERNAL_REDIRECT);
+    handle.mutable_routes(0)->set_name("redirect");
+    handle.mutable_routes(0)->mutable_route()->mutable_internal_redirect_policy();
     config_helper_.addVirtualHost(handle);
 
     auto handle_max_3_hop =
         config_helper_.createVirtualHost("handle.internal.redirect.max.three.hop");
-    handle_max_3_hop.mutable_routes(0)->mutable_route()->set_internal_redirect_action(
-        envoy::config::route::v3::RouteAction::HANDLE_INTERNAL_REDIRECT);
+    handle_max_3_hop.mutable_routes(0)->set_name("max_three_hop");
+    handle_max_3_hop.mutable_routes(0)->mutable_route()->mutable_internal_redirect_policy();
     handle_max_3_hop.mutable_routes(0)
         ->mutable_route()
+        ->mutable_internal_redirect_policy()
         ->mutable_max_internal_redirects()
         ->set_value(3);
     config_helper_.addVirtualHost(handle_max_3_hop);
@@ -176,6 +180,9 @@ TEST_P(RedirectIntegrationTest, InternalRedirectWithThreeHopLimit) {
   EXPECT_EQ(
       1,
       test_server_->counter("cluster.cluster_0.upstream_internal_redirect_failed_total")->value());
+  EXPECT_EQ(
+      1, test_server_->counter("http.config_test.passthrough_internal_redirect_too_many_redirects")
+             ->value());
 }
 
 TEST_P(RedirectIntegrationTest, InternalRedirectToDestinationWithBody) {
@@ -218,6 +225,180 @@ TEST_P(RedirectIntegrationTest, InternalRedirectToDestinationWithBody) {
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_internal_redirect_succeeded_total")
                    ->value());
+}
+
+TEST_P(RedirectIntegrationTest, InternalRedirectPreventedByPreviousRoutesPredicate) {
+  auto handle_prevent_repeated_target =
+      config_helper_.createVirtualHost("handle.internal.redirect.no.repeated.target");
+  auto* internal_redirect_policy = handle_prevent_repeated_target.mutable_routes(0)
+                                       ->mutable_route()
+                                       ->mutable_internal_redirect_policy();
+  internal_redirect_policy->mutable_max_internal_redirects()->set_value(10);
+  envoy::extensions::internal_redirect::previous_routes::v3::PreviousRoutesConfig
+      previous_routes_config;
+  auto* predicate = internal_redirect_policy->add_predicates();
+  predicate->set_name("previous_routes");
+  predicate->mutable_typed_config()->PackFrom(previous_routes_config);
+  config_helper_.addVirtualHost(handle_prevent_repeated_target);
+
+  // Validate that header sanitization is only called once.
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.set_via("via_value"); });
+  initialize();
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  default_request_headers_.setHost("handle.internal.redirect.no.repeated.target");
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  auto first_request = waitForNextStream();
+  // Redirect to another route
+  redirect_response_.setLocation("http://handle.internal.redirect.max.three.hop/random/path");
+  first_request->encodeHeaders(redirect_response_, true);
+
+  auto second_request = waitForNextStream();
+  // Redirect back to the original route.
+  redirect_response_.setLocation("http://handle.internal.redirect.no.repeated.target/another/path");
+  second_request->encodeHeaders(redirect_response_, true);
+
+  auto third_request = waitForNextStream();
+  // Redirect to the same route as the first redirect. This should fail.
+  redirect_response_.setLocation("http://handle.internal.redirect.max.three.hop/yet/another/path");
+  third_request->encodeHeaders(redirect_response_, true);
+
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("302", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("http://handle.internal.redirect.max.three.hop/yet/another/path",
+            response->headers().Location()->value().getStringView());
+  EXPECT_EQ(2, test_server_->counter("cluster.cluster_0.upstream_internal_redirect_succeeded_total")
+                   ->value());
+  EXPECT_EQ(
+      1,
+      test_server_->counter("http.config_test.passthrough_internal_redirect_predicate")->value());
+}
+
+TEST_P(RedirectIntegrationTest, InternalRedirectPreventedByAllowListedRoutesPredicate) {
+  auto handle_allow_listed_redirect_route =
+      config_helper_.createVirtualHost("handle.internal.redirect.only.allow.listed.target");
+  auto* internal_redirect_policy = handle_allow_listed_redirect_route.mutable_routes(0)
+                                       ->mutable_route()
+                                       ->mutable_internal_redirect_policy();
+
+  auto* allow_listed_routes_predicate = internal_redirect_policy->add_predicates();
+  allow_listed_routes_predicate->set_name("allow_listed_routes");
+  envoy::extensions::internal_redirect::allow_listed_routes::v3::AllowListedRoutesConfig
+      allow_listed_routes_config;
+  *allow_listed_routes_config.add_allowed_route_names() = "max_three_hop";
+  allow_listed_routes_predicate->mutable_typed_config()->PackFrom(allow_listed_routes_config);
+
+  internal_redirect_policy->mutable_max_internal_redirects()->set_value(10);
+
+  config_helper_.addVirtualHost(handle_allow_listed_redirect_route);
+
+  // Validate that header sanitization is only called once.
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.set_via("via_value"); });
+  initialize();
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  default_request_headers_.setHost("handle.internal.redirect.only.allow.listed.target");
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  auto first_request = waitForNextStream();
+  // Redirect to another route
+  redirect_response_.setLocation("http://handle.internal.redirect.max.three.hop/random/path");
+  first_request->encodeHeaders(redirect_response_, true);
+
+  auto second_request = waitForNextStream();
+  // Redirect back to the original route.
+  redirect_response_.setLocation(
+      "http://handle.internal.redirect.only.allow.listed.target/another/path");
+  second_request->encodeHeaders(redirect_response_, true);
+
+  auto third_request = waitForNextStream();
+  // Redirect to the non-allow-listed route. This should fail.
+  redirect_response_.setLocation("http://handle.internal.redirect/yet/another/path");
+  third_request->encodeHeaders(redirect_response_, true);
+
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("302", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("http://handle.internal.redirect/yet/another/path",
+            response->headers().Location()->value().getStringView());
+  EXPECT_EQ(2, test_server_->counter("cluster.cluster_0.upstream_internal_redirect_succeeded_total")
+                   ->value());
+  EXPECT_EQ(
+      1,
+      test_server_->counter("http.config_test.passthrough_internal_redirect_predicate")->value());
+}
+
+TEST_P(RedirectIntegrationTest, InternalRedirectPreventedBySafeCrossSchemePredicate) {
+  auto handle_safe_cross_scheme_route = config_helper_.createVirtualHost(
+      "handle.internal.redirect.only.allow.safe.cross.scheme.redirect");
+  auto* internal_redirect_policy = handle_safe_cross_scheme_route.mutable_routes(0)
+                                       ->mutable_route()
+                                       ->mutable_internal_redirect_policy();
+
+  internal_redirect_policy->set_allow_cross_scheme_redirect(true);
+
+  auto* predicate = internal_redirect_policy->add_predicates();
+  predicate->set_name("safe_cross_scheme_predicate");
+  envoy::extensions::internal_redirect::safe_cross_scheme::v3::SafeCrossSchemeConfig
+      predicate_config;
+  predicate->mutable_typed_config()->PackFrom(predicate_config);
+
+  internal_redirect_policy->mutable_max_internal_redirects()->set_value(10);
+
+  config_helper_.addVirtualHost(handle_safe_cross_scheme_route);
+
+  // Validate that header sanitization is only called once.
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.set_via("via_value"); });
+  initialize();
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  default_request_headers_.setHost(
+      "handle.internal.redirect.only.allow.safe.cross.scheme.redirect");
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  auto first_request = waitForNextStream();
+  // Redirect to another route
+  redirect_response_.setLocation("http://handle.internal.redirect.max.three.hop/random/path");
+  first_request->encodeHeaders(redirect_response_, true);
+
+  auto second_request = waitForNextStream();
+  // Redirect back to the original route.
+  redirect_response_.setLocation(
+      "http://handle.internal.redirect.only.allow.safe.cross.scheme.redirect/another/path");
+  second_request->encodeHeaders(redirect_response_, true);
+
+  auto third_request = waitForNextStream();
+  // Redirect to https target. This should fail.
+  redirect_response_.setLocation("https://handle.internal.redirect/yet/another/path");
+  third_request->encodeHeaders(redirect_response_, true);
+
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("302", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("https://handle.internal.redirect/yet/another/path",
+            response->headers().Location()->value().getStringView());
+  EXPECT_EQ(2, test_server_->counter("cluster.cluster_0.upstream_internal_redirect_succeeded_total")
+                   ->value());
+  EXPECT_EQ(
+      1,
+      test_server_->counter("http.config_test.passthrough_internal_redirect_predicate")->value());
 }
 
 TEST_P(RedirectIntegrationTest, InvalidRedirect) {

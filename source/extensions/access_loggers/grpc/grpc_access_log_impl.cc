@@ -6,6 +6,7 @@
 
 #include "common/common/assert.h"
 #include "common/network/utility.h"
+#include "common/runtime/runtime_features.h"
 #include "common/stream_info/utility.h"
 
 namespace Envoy {
@@ -51,8 +52,12 @@ bool GrpcAccessLoggerImpl::canLogMore() {
     stats_.logs_written_.inc();
     return true;
   }
-  stats_.logs_dropped_.inc();
-  return false;
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.disallow_unbounded_access_logs")) {
+    stats_.logs_dropped_.inc();
+    return false;
+  }
+  stats_.logs_written_.inc();
+  return true;
 }
 
 void GrpcAccessLoggerImpl::log(envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry) {
