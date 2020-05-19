@@ -37,9 +37,9 @@ public:
 
   FaultSharedPtr getFaultForCommand(std::string command) const override;
 
-  static FaultSharedPtr makeFault(Common::Redis::FaultType faultType,
+  static FaultSharedPtr makeFault(Common::Redis::FaultType fault_type,
                                   std::chrono::milliseconds delay_ms) {
-    FaultImpl fault = FaultImpl(faultType, delay_ms, std::vector<std::string>(), 0, "foo");
+    FaultImpl fault = FaultImpl(fault_type, delay_ms, std::vector<std::string>(), 0, "foo");
     return std::make_shared<FaultImpl>(fault);
   } // For testing only
 
