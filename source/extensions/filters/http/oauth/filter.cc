@@ -38,10 +38,6 @@ const Http::LowerCaseString& xForwardedUser() {
   CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "x-forwarded-user");
 }
 
-const Http::LowerCaseString& SkipEnvoyOauthHeader() {
-  CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "x-envoy-oauth");
-}
-
 const std::string& SignoutCookieValue() {
   CONSTRUCT_ON_FIRST_USE(std::string,
                          "OauthHMAC=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT");
