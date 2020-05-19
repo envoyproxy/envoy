@@ -21,8 +21,8 @@ public:
   }
 
   void setupResponseParser() {
-    response_parser_ =
-        std::make_unique<DnsMessageParser>(true /*recursive queries */, 0 /* retry_count */, random_);
+    response_parser_ = std::make_unique<DnsMessageParser>(true /*recursive queries */,
+                                                          0 /* retry_count */, random_);
   }
 
   static std::string configToUse() {
