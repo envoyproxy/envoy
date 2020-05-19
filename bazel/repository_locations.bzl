@@ -223,9 +223,9 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "N/A",
     ),
     com_github_datadog_dd_opentracing_cpp = dict(
-        sha256 = "6dc1088ab7f788b6c849fbaa6300517c8fdf88991a70b778be79c284c36857bf",
-        strip_prefix = "dd-opentracing-cpp-1.1.3",
-        urls = ["https://github.com/DataDog/dd-opentracing-cpp/archive/v1.1.3.tar.gz"],
+        sha256 = "b84fd2fb0bb0578af4901db31d1c0ae909b532a1016fe6534cbe31a6c3ad6924",
+        strip_prefix = "dd-opentracing-cpp-1.1.5",
+        urls = ["https://github.com/DataDog/dd-opentracing-cpp/archive/v1.1.5.tar.gz"],
         use_category = ["observability"],
         cpe = "N/A",
     ),
