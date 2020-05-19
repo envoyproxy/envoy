@@ -52,6 +52,8 @@ public:
   /**
    * Invoked when deprecated field is encountered.
    * @param description human readable description of the field.
+   * @param soft_deprecation is set to true, visitor would log a warning message, otherwise would
+   * throw an exception.
    */
   virtual void onDeprecatedField(absl::string_view description, bool soft_deprecation) PURE;
 };
