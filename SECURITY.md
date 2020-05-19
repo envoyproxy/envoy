@@ -127,7 +127,7 @@ security issue is public or embargo is broken.
 ### Fix and disclosure SLOs
 
 * All reports to envoy-security@googlegroups.com will be triaged and have an
-  initial response within 24H.
+  initial response within 1 business day.
 
 * Privately disclosed issues will be fixed or publicly disclosed within 90 days
   by the Envoy security team. In exceptional circumstances we reserve the right
