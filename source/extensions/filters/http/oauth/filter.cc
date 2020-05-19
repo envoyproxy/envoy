@@ -1,0 +1,508 @@
+#include "extensions/filters/http/oauth/filter.h"
+
+#include <algorithm>
+#include <cstdlib>
+#include <ctime>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "common/common/assert.h"
+#include "common/common/empty_string.h"
+#include "common/common/enum_to_int.h"
+#include "common/common/fmt.h"
+#include "common/common/hex.h"
+#include "common/common/matchers.h"
+#include "common/crypto/utility.h"
+#include "common/http/header_map_impl.h"
+#include "common/http/headers.h"
+#include "common/http/message_impl.h"
+#include "common/http/utility.h"
+#include "common/protobuf/utility.h"
+
+#include "absl/strings/escaping.h"
+#include "absl/strings/match.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/str_join.h"
+#include "absl/strings/str_replace.h"
+#include "absl/strings/str_split.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace Oauth {
+
+// X-Forwarded Oauth headers
+const std::string Token{"token"};
+const Http::LowerCaseString& xForwardedUser() {
+  CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "x-forwarded-user");
+}
+
+const Http::LowerCaseString& SkipEnvoyOauthHeader() {
+  CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "x-envoy-oauth");
+}
+
+const std::string& SignoutCookieValue() {
+  CONSTRUCT_ON_FIRST_USE(std::string,
+                         "OauthHMAC=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT");
+}
+
+const std::string& SignoutBearerTokenValue() {
+  CONSTRUCT_ON_FIRST_USE(std::string,
+                         "BearerToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT");
+}
+
+const std::string& StatsFailureString() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "http.oauth.failure");
+}
+
+const std::string& StatsSuccessString() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "http.oauth.success");
+}
+
+const std::string& CookieTailFormatString() {
+  CONSTRUCT_ON_FIRST_USE(std::string, ";version=1;path=/;Max-Age={};secure");
+}
+
+const std::string& CookieTailHttpOnlyFormatString() {
+  CONSTRUCT_ON_FIRST_USE(std::string, ";version=1;path=/;Max-Age={};secure;HttpOnly");
+}
+
+const std::string& AuthClusterUriParameters() {
+  CONSTRUCT_ON_FIRST_USE(
+      std::string,
+      "https://{}/oauth/"
+      "authorize/?client_id={}&scope=user&response_type=code&redirect_uri={}&state={}");
+}
+
+const std::string& UnauthorizedBodyMessage() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "OAuth flow failed.");
+}
+
+const std::string& DefaultOauthCallback() { CONSTRUCT_ON_FIRST_USE(std::string, "/_oauth"); }
+const std::string& DefaultOauthSignout() { CONSTRUCT_ON_FIRST_USE(std::string, "/_signout"); }
+
+const std::string& QueryParamsError() { CONSTRUCT_ON_FIRST_USE(std::string, "error"); }
+const std::string& QueryParamsCode() { CONSTRUCT_ON_FIRST_USE(std::string, "code"); }
+const std::string& QueryParamsState() { CONSTRUCT_ON_FIRST_USE(std::string, "state"); }
+
+OAuth2FilterConfig::OAuth2FilterConfig(
+    const envoy::extensions::filters::http::oauth::v3::OAuth2& proto_config,
+    Upstream::ClusterManager& cluster_manager, std::shared_ptr<SecretReader> secret_reader)
+    : cluster_name_(proto_config.cluster()), client_id_(proto_config.credentials().client_id()),
+      oauth_server_hostname_(proto_config.hostname()),
+      callback_path_(
+          PROTOBUF_GET_STRING_OR_DEFAULT(proto_config, callback_path, DefaultOauthCallback())),
+      signout_path_(
+          PROTOBUF_GET_STRING_OR_DEFAULT(proto_config, signout_path, DefaultOauthSignout())),
+      forward_bearer_token_(proto_config.forward_bearer_token()),
+      use_x_envoy_oauth_(proto_config.use_x_envoy_oauth()),
+      pass_through_options_method_(proto_config.pass_through_options_method()),
+      secret_reader_(secret_reader) {
+  if (!cluster_manager.get(cluster_name_)) {
+    throw EnvoyException(fmt::format("OAuth2 filter: unknown cluster '{}' in config. Please "
+                                     "specify which cluster to direct OAuth requests to.",
+                                     cluster_name_));
+  }
+
+  // Add each custom whitelisted path into the unordered_set of preconfigured paths.
+  for (const auto& entry : proto_config.whitelisted_paths()) {
+    whitelisted_paths_.emplace_back(entry);
+  }
+}
+
+void OAuth2CookieValidator::setParams(const Http::RequestHeaderMap& headers,
+                                      const std::string& secret) {
+  expires_ = Http::Utility::parseCookieValue(headers, "OauthExpires");
+  username_ = Http::Utility::parseCookieValue(headers, "OauthUsername");
+  token_ = Http::Utility::parseCookieValue(headers, "BearerToken");
+  hmac_ = Http::Utility::parseCookieValue(headers, "OauthHMAC");
+  host_ = headers.Host()->value().getStringView();
+
+  std::vector<uint8_t> vec(secret.begin(), secret.end());
+  secret_ = std::move(vec);
+}
+
+bool OAuth2CookieValidator::hmacIsValid() const {
+  auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
+  const std::string hmac_payload = absl::StrCat(host_, username_, expires_, token_);
+  const std::string pre_encoded_hmac =
+      Hex::encode(crypto_util.getSha256Hmac(secret_, hmac_payload));
+  std::string encoded_hmac;
+  absl::Base64Escape(pre_encoded_hmac, &encoded_hmac);
+
+  return encoded_hmac == hmac_;
+}
+
+bool OAuth2CookieValidator::timestampIsValid() const {
+  std::time_t epoch = std::time(nullptr);
+  int expires;
+  try {
+    expires = std::stoi(expires_);
+  } catch (const std::exception&) {
+    return false;
+  }
+
+  return expires > epoch;
+}
+
+bool OAuth2CookieValidator::isValid() const { return hmacIsValid() && timestampIsValid(); }
+
+OAuth2Filter::OAuth2Filter(OAuth2FilterConfigSharedPtr config,
+                           std::unique_ptr<OAuth2Client>&& oauth_client, Stats::Scope& scope)
+    : validator_(std::make_shared<OAuth2CookieValidator>()), oauth_client_(std::move(oauth_client)),
+      config_(std::move(config)), scope_(scope) {
+
+  oauth_client_->setCallbacks(*this);
+}
+
+const std::string& OAuth2Filter::bearerPrefix() const {
+  CONSTRUCT_ON_FIRST_USE(std::string, "bearer ");
+}
+
+std::string OAuth2Filter::extractAccessToken(const Http::RequestHeaderMap& headers,
+                                             const std::string& parameter_name) const {
+  ASSERT(headers.Path() != nullptr);
+
+  // Start by looking for a bearer token in the Authorization header.
+  const Http::HeaderEntry* authorization = headers.Authorization();
+  if (authorization != nullptr) {
+    const auto value = StringUtil::trim(authorization->value().getStringView());
+    const auto& bearer_prefix = bearerPrefix();
+    if (absl::StartsWithIgnoreCase(value, bearer_prefix)) {
+      const size_t start = bearer_prefix.length();
+      return std::string(StringUtil::ltrim(value.substr(start)));
+    }
+  }
+
+  // Check for the named query string parameter.
+  const auto path = headers.Path()->value().getStringView();
+  const auto params = Http::Utility::parseQueryString(path);
+  const auto param = params.find(parameter_name);
+  if (param != params.end()) {
+    return param->second;
+  }
+
+  return EMPTY_STRING;
+}
+
+/**
+ * primary cases:
+ * 1) user is signing out
+ * 2) /_oauth redirect
+ * 3) user is authorized
+ * 4) user is unauthorized
+ */
+Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
+
+  // The following 2 headers are guaranteed for regular requests. The asserts are helpful when
+  // writing test code to not forget these important variables in mock requests
+  const Http::HeaderEntry* host_header = headers.Host();
+  ASSERT(host_header != nullptr);
+  host_ = host_header->value().getStringView();
+
+  const Http::HeaderEntry* path_header = headers.Path();
+  ASSERT(path_header != nullptr);
+  const absl::string_view path_str = path_header->value().getStringView();
+
+  // Keep track of how many initial 302s (to the auth server) we initially distribute.
+  // The goal is to keep this number in line with the number of successful logins at the conclusion
+  // of this filter.
+  const auto* user_agent_header = headers.UserAgent();
+  const absl::string_view user_agent_value =
+      user_agent_header != nullptr ? user_agent_header->value().getStringView() : EMPTY_STRING;
+  const std::vector<std::string> v = absl::StrSplit(user_agent_value, '.');
+  user_agent_ = v[0];
+
+  // First thing we should do is sanitize the x-forwarded LDAP headers.
+  sanitizeXForwardedOauthHeaders(headers);
+
+  // We should check if this is a signout request.
+  if (path_str == config_->signoutPath()) {
+    return signOutUser(headers);
+  }
+
+  if (canSkipOAuth(headers)) {
+    // Update the path header with the query string parameters after a successful OAuth login.
+    // This is necessary if a website requests mutliple resources which get redirected to the
+    // auth server. A cached login on the authentication server side will set cookies
+    // correctly but cause a race condition on future requests that have their location set
+    // to the callback path.
+    if (absl::StartsWith(path_str, config_->callbackPath())) {
+      Http::Utility::QueryParams query_parameters = Http::Utility::parseQueryString(path_str);
+
+      const auto state =
+          absl::StrReplaceAll(query_parameters.at(QueryParamsState()), unescapedReplacements());
+      Http::Utility::Url state_url;
+      if (!state_url.initialize(state, false)) {
+        sendUnauthorizedResponse();
+        return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
+      }
+      // Avoid infinite redirect storm
+      if (absl::StartsWith(state_url.pathAndQueryParams(), config_->callbackPath())) {
+        sendUnauthorizedResponse();
+        return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
+      }
+      Http::ResponseHeaderMapPtr response_headers{
+          Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
+              {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Found))},
+               {Http::Headers::get().Location, state}})};
+      decoder_callbacks_->encodeHeaders(std::move(response_headers), true);
+    }
+
+    // Continue on with the filter stack.
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  // If a bearer token is supplied as a header or param, we ingest it here and kick off the
+  // user resolution immediately. Note this comes after HMAC validation, so technically this
+  // header is sanitized in a way, as the validation check forces the correct Bearer Cookie value.
+  access_token_ = extractAccessToken(headers, Token);
+  if (!access_token_.empty()) {
+    found_bearer_token_ = true;
+    request_headers_ = &headers;
+    oauth_client_->asyncGetIdentity(access_token_);
+
+    return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
+  }
+
+  // If no access token and this isn't the callback URI, redirect to oauth to acquire credentials
+  //
+  // The following conditional could be replaced with a regex pattern-match
+  // if we're concerned about matching strictly `/_oauth`
+  if (!absl::StartsWith(path_str, config_->callbackPath())) {
+    Http::ResponseHeaderMapPtr response_headers{Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
+        {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Found))}})};
+
+    // Construct the correct scheme. We default to https since this is a requirement for OAuth to
+    // succeed. However, if a downstream client explicitly declares the "http" scheme for whatever
+    // reason, we also use "http" when constructing our redirect uri to the authorization server.
+    auto scheme = Http::Headers::get().SchemeValues.Https;
+
+    const auto* scheme_header = headers.Scheme();
+    if ((scheme_header != nullptr &&
+         scheme_header->value().getStringView() == Http::Headers::get().SchemeValues.Http)) {
+      scheme = Http::Headers::get().SchemeValues.Http;
+    }
+
+    const std::string base_path = absl::StrCat(scheme, "://", host_);
+    const std::string callback_path = base_path + config_->callbackPath();
+    const std::string state_path = absl::StrCat(base_path, headers.Path()->value().getStringView());
+
+    const std::string escaped_redirect_uri =
+        absl::StrReplaceAll(callback_path, escapedReplacements());
+    const std::string escaped_state = absl::StrReplaceAll(state_path, escapedReplacements());
+
+    const std::string new_url =
+        fmt::format(AuthClusterUriParameters(), config_->oauthServerHostname(), config_->clientId(),
+                    escaped_redirect_uri, escaped_state);
+    response_headers->setReferenceKey(Http::Headers::get().Location, new_url);
+    decoder_callbacks_->encodeHeaders(std::move(response_headers), true);
+
+    return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
+  }
+
+  // At this point, we *are* on /_oauth. We believe this request comes from the authorization
+  // server and we expect the query strings to contain the information required to get the access
+  // token
+  Http::Utility::QueryParams query_parameters = Http::Utility::parseQueryString(path_str);
+  if (query_parameters.find(QueryParamsError()) != query_parameters.end()) {
+    sendUnauthorizedResponse();
+    return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
+  }
+
+  // if the data we need is not present on the URL, stop execution
+  if (query_parameters.find(QueryParamsCode()) == query_parameters.end() ||
+      query_parameters.find(QueryParamsState()) == query_parameters.end()) {
+    sendUnauthorizedResponse();
+    return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
+  }
+
+  auth_code_ = query_parameters.at(QueryParamsCode());
+  state_ = absl::StrReplaceAll(query_parameters.at(QueryParamsState()), unescapedReplacements());
+
+  Http::Utility::Url state_url;
+  if (!state_url.initialize(state_, false)) {
+    sendUnauthorizedResponse();
+    return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
+  }
+  const auto scheme = state_url.scheme();
+
+  const std::string cb_url = absl::StrCat(scheme, "://", host_, config_->callbackPath());
+  oauth_client_->asyncGetAccessToken(auth_code_, config_->clientId(), config_->clientSecret(),
+                                     cb_url);
+
+  // pause while we await the next step from the OAuth server
+  return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
+}
+
+// Always sanitize these legacy Oauth headers that may be maliciously injected to mess with
+// Jenkins's built-in authentication. These will be readded later in the filter after
+// a successful auth flow.
+void OAuth2Filter::sanitizeXForwardedOauthHeaders(Http::RequestHeaderMap& headers) {
+  headers.remove(xForwardedUser());
+}
+
+// Set the legacy Oauth headers that can be used to beautify the underlying UI.
+void OAuth2Filter::setXForwardedOauthHeaders(Http::RequestHeaderMap& headers,
+                                             const std::string& token,
+                                             const std::string& username) {
+  // Add the x-forwarded headers after inspecting the corresponding cookie values.
+  headers.setReferenceKey(Http::Headers::get().Authorization, absl::StrCat("Bearer ", token));
+  headers.setReferenceKey(xForwardedUser(), username);
+}
+
+// Defines a sequence of checks determining whether we should initiate a new OAuth flow or skip to
+// the next filter in the chain.
+bool OAuth2Filter::canSkipOAuth(Http::RequestHeaderMap& headers) const {
+  // We can skip OAuth if the supplied HMAC cookie is valid. Apply the OAuth details as headers
+  // if we successfully validate the cookie.
+  validator_->setParams(headers, config_->tokenSecret());
+  if (validator_->isValid()) {
+    scope_.counterFromString(StatsSuccessString()).inc();
+    setXForwardedOauthHeaders(headers, validator_->token(), validator_->username());
+    return true;
+  }
+
+  // Skip authentication for machines that already engage in mTLS with Envoy listeners.
+  // This behavior must be opted in from the proto configuration.
+  if (config_->useXEnvoyOauth()) {
+    const auto* skip_envoy_oauth_header = headers.get(SkipEnvoyOauthHeader());
+    if (skip_envoy_oauth_header != nullptr) {
+      if (skip_envoy_oauth_header->value().getStringView() == "true") {
+        return true;
+      }
+    }
+  }
+
+  // Skip authentication for HTTP method OPTIONS for CORS preflight requests to skip forbidden
+  // redirects to the auth server. Must be opted in from the proto configuration.
+  if (config_->passThroughOptionsMethod()) {
+    const Http::HeaderEntry* method_header = headers.Method();
+    if (method_header != nullptr &&
+        method_header->value().getStringView() == Http::Headers::get().MethodValues.Options) {
+      return true;
+    }
+  }
+
+  // Kill some noise for static requests. These paths are defined in OAuthConfig.
+  // Do not copy over the set with each request. All entries are treated as prefixes.
+  const auto header_path = headers.Path()->value().getStringView();
+  for (const auto& whitelisted_path : config_->whitelistedPaths()) {
+    if (absl::StartsWith(header_path, whitelisted_path)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Modifies the state of the filter by adding response headers to the decoder_callbacks
+ */
+Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap& headers) {
+  Http::ResponseHeaderMapPtr response_headers{Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
+      {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Found))}})};
+
+  const std::string new_path =
+      absl::StrCat(headers.ForwardedProto()->value().getStringView(), "://", host_, "/");
+  response_headers->addReference(Http::Headers::get().SetCookie, SignoutCookieValue());
+  response_headers->addReference(Http::Headers::get().SetCookie, SignoutBearerTokenValue());
+  response_headers->setReferenceKey(Http::Headers::get().Location, new_path);
+  decoder_callbacks_->encodeHeaders(std::move(response_headers), true);
+
+  return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
+}
+
+// First callback in OAuth.
+void OAuth2Filter::onGetAccessTokenSuccess(const std::string& access_code,
+                                           const std::string& expires_in) {
+  std::istringstream iss(expires_in);
+  time_t expires_in_t;
+  iss >> expires_in_t;
+  time_t new_epoch = std::time(nullptr) + expires_in_t;
+
+  access_token_ = access_code;
+  new_expires_ = std::to_string(new_epoch);
+
+  oauth_client_->asyncGetIdentity(access_token_);
+}
+
+// Second callback in OAuth.
+void OAuth2Filter::onGetIdentitySuccess(const std::string& username) {
+  username_ = username;
+
+  // We have fully completed the entire OAuth flow, whether through Authorization header or from
+  // user redirection to the auth server.
+  if (found_bearer_token_) {
+    setXForwardedOauthHeaders(*request_headers_, access_token_, username_);
+    scope_.counterFromString(StatsSuccessString()).inc();
+    decoder_callbacks_->continueDecoding();
+    return;
+  }
+
+  std::string token_payload;
+  if (config_->forwardBearerToken()) {
+    token_payload = absl::StrCat(host_, username_, new_expires_, access_token_);
+  } else {
+    token_payload = absl::StrCat(host_, username_, new_expires_);
+  }
+
+  auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
+
+  auto token_secret = config_->tokenSecret();
+  std::vector<uint8_t> token_secret_vec(token_secret.begin(), token_secret.end());
+  const std::string pre_encoded_token =
+      Hex::encode(crypto_util.getSha256Hmac(token_secret_vec, token_payload));
+  std::string encoded_token;
+  absl::Base64Escape(pre_encoded_token, &encoded_token);
+
+  // We use HTTP Only cookies for the HMAC and Expiry. These should be more private and restricted
+  // from free view in scripts. However, as username is extracted by the underlying
+  // service, we can expose these values.
+  const std::string cookie_tail = fmt::format(CookieTailFormatString(), new_expires_);
+  const std::string cookie_tail_http_only =
+      fmt::format(CookieTailHttpOnlyFormatString(), new_expires_);
+
+  /**
+   * At this point we have all of the pieces needed to authenticate a user that did not originally
+   * have a bearer access token. Now, we construct a redirect request to return the user to their
+   * previous state and additionally set the OAuth cookies in browser.
+   * The redirection should result in successfully passing this filer.
+   */
+  Http::ResponseHeaderMapPtr response_headers{Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
+      {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Found))}})};
+
+  static const Http::LowerCaseString set_cookie_key = Http::Headers::get().SetCookie;
+
+  response_headers->addReferenceKey(
+      set_cookie_key, absl::StrCat("OauthHMAC=", encoded_token, cookie_tail_http_only));
+  response_headers->addReferenceKey(
+      set_cookie_key, absl::StrCat("OauthExpires=", new_expires_, cookie_tail_http_only));
+  response_headers->addReferenceKey(set_cookie_key,
+                                    absl::StrCat("OauthUsername=", username_, cookie_tail));
+
+  // If opted-in, we also create a new Bearer cookie for the authorization token provided by the
+  // auth server.
+  if (config_->forwardBearerToken()) {
+    response_headers->addReferenceKey(set_cookie_key,
+                                      absl::StrCat("BearerToken=", access_token_, cookie_tail));
+  }
+
+  response_headers->setReferenceKey(Http::Headers::get().Location, state_);
+  response_headers->setReferenceKey(Http::Headers::get().UserAgent, "Auth/Redirect");
+
+  decoder_callbacks_->encodeHeaders(std::move(response_headers), true);
+  scope_.counterFromString(StatsSuccessString()).inc();
+  decoder_callbacks_->continueDecoding();
+}
+
+void OAuth2Filter::sendUnauthorizedResponse() {
+  scope_.counterFromString(StatsFailureString()).inc();
+  decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, UnauthorizedBodyMessage(), nullptr,
+                                     absl::nullopt, EMPTY_STRING);
+}
+
+} // namespace Oauth
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy
