@@ -118,7 +118,10 @@ message CommonTlsContext {
     // to maintain a single certificate-provider instance. The sharing can happen, for
     // example, among multiple clusters or between the tls_certificate and validation_context
     // certificate providers of a cluster.
-    config.core.v4alpha.TypedExtensionConfig typed_config = 2;
+    oneof config {
+      // This config could be supplied inline or it could be a named xDS resource (in future).
+      config.core.v4alpha.TypedExtensionConfig typed_config = 2;
+    }
   }
 
   message CombinedCertificateValidationContext {
