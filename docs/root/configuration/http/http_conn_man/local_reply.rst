@@ -15,7 +15,7 @@ Features:
 Local reply content modification
 --------------------------------
 
-The local response content returned by Envoy can be customized. A list of :ref:`mappers <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.LocalReplyConfig.mappers>` can be specified. Each mapper must have a :ref:`filter <envoy_v3_api_field_config.accesslog.v3.AccessLog.filter>`, a :ref:`rewriter <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ResponseMapper.rewriter>` rule and optional :ref:`body_format <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ResponseMapper.body_format>`. Envoy checks each `mapper` according to the specified order until the first one is matched. If a `mapper` is matched, its `rewriter` rule will apply. Each `rewriter` rule supports rewritting status_code and response body. If a matched mapper has the `body_format` field specified, the `body_format` will apply too.
+The local response content returned by Envoy can be customized. A list of :ref:`mappers <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.LocalReplyConfig.mappers>` can be specified. Each mapper must have a :ref:`filter <envoy_v3_api_field_config.accesslog.v3.AccessLog.filter>`. It may have following rewrite rules; a :ref:`status_code <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ResponseMapper.status_code>` rule to rewrite response code, a :ref:`body <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ResponseMapper.body>` rule to rewrite response body and a :ref:`body_format <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ResponseMapper.body_format>` to specify the response body format. Envoy checks each `mapper` according to the specified order until the first one is matched. If a `mapper` is matched, all its rewrite rules will apply.
 
 Example of a LocalReplyConfig
 
@@ -33,7 +33,7 @@ Example of a LocalReplyConfig
     body:
       inline_string: "not allowed"
 
-In above example, if the response_code is 400,  it will be rewritten to 401, the error messsage will be rewritten to "not allowed".
+In above example, if the status_code is 400,  it will be rewritten to 401, the response body will be rewritten to as "not allowed".
 
 .. _config_http_conn_man_local_reply_format:
 
