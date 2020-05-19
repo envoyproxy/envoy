@@ -113,7 +113,7 @@ private:
 
   AdmissionControlFilterConfigSharedPtr config_;
   AdmissionControlStats stats_;
-  std::unique_ptr<Cleanup> deferred_record_failure_;
+  absl::optional<Cleanup> deferred_record_failure_;
   bool expect_grpc_status_in_trailer_;
 };
 

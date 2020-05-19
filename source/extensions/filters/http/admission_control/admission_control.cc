@@ -11,7 +11,6 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/common/assert.h"
 #include "common/common/cleanup.h"
 #include "common/common/enum_to_int.h"
 #include "common/grpc/common.h"
@@ -49,9 +48,11 @@ double AdmissionControlFilterConfig::aggression() const {
 
 AdmissionControlFilter::AdmissionControlFilter(AdmissionControlFilterConfigSharedPtr config,
                                                const std::string& stats_prefix)
-    : config_(std::move(config)), stats_(generateStats(config_->scope(), stats_prefix)) {}
+    : config_(std::move(config)), stats_(generateStats(config_->scope(), stats_prefix)),
+      deferred_record_failure_([this]() { config_->getController().recordFailure(); }) {}
 
 Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
+  // TODO(tonya11en): Ensure we document the fact that healthchecks are ignored.
   if (!config_->filterEnabled() || decoder_callbacks_->streamInfo().healthCheck()) {
     return Http::FilterHeadersStatus::Continue;
   }
@@ -62,14 +63,6 @@ Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::RequestHea
     stats_.rq_rejected_.inc();
     return Http::FilterHeadersStatus::StopIteration;
   }
-
-  if (deferred_record_failure_ != nullptr) {
-    // To give a new value to the Cleanup() variable, we must cancel it first to avoid triggering
-    // the function it wraps.
-    deferred_record_failure_->cancel();
-  }
-  deferred_record_failure_ =
-      std::make_unique<Cleanup>([this]() { config_->getController().recordFailure(); });
 
   return Http::FilterHeadersStatus::Continue;
 }
@@ -108,10 +101,7 @@ AdmissionControlFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
   if (expect_grpc_status_in_trailer_) {
     absl::optional<GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(trailers, false);
 
-    // Status code must be sent in trailers.
-    ASSERT(grpc_status.has_value());
-
-    if (config_->responseEvalutor().isGrpcSuccess(grpc_status.value())) {
+    if (grpc_status.has_value() && config_->responseEvalutor().isGrpcSuccess(grpc_status.value())) {
       recordSuccess();
     } else {
       recordFailure();

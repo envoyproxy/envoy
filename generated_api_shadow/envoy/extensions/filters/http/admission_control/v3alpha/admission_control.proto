@@ -46,8 +46,8 @@ message AdmissionControl {
     DefaultEvaluationCriteria default_eval_criteria = 2;
   }
 
-  // The time window over which the success rate is calculated. The window is rounded to the nearest
-  // second. Defaults to 120s.
+  // The sliding time window over which the success rate is calculated. The window is rounded to the
+  // nearest second. Defaults to 120s.
   google.protobuf.Duration sampling_window = 3;
 
   // Rejection probability is defined by the formula::

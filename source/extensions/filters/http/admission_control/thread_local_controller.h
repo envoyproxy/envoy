@@ -34,6 +34,9 @@ public:
  * data for the time window is kept recent via a circular buffer that phases out old request/success
  * counts when recording new samples.
  *
+ * This controller is thread-local so that we do not need to take any locks on the sample histories
+ * to update them, at the cost of decreasing the number of samples.
+ *
  * The look-back window for request samples is accurate up to a hard-coded 1-second granularity.
  * TODO (tonya11en): Allow the granularity to be configurable.
  */

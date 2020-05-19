@@ -21,7 +21,7 @@ Http::FilterFactoryCb AdmissionControlFilterFactory::createFilterFactoryFromProt
     const envoy::extensions::filters::http::admission_control::v3alpha::AdmissionControl& config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
 
-  std::string prefix = stats_prefix + "admission_control.";
+  const std::string prefix = stats_prefix + "admission_control.";
 
   // Create the thread-local controller.
   auto tls = context.threadLocal().allocateSlot();
@@ -39,7 +39,6 @@ Http::FilterFactoryCb AdmissionControlFilterFactory::createFilterFactoryFromProt
     response_evaluator = std::make_unique<DefaultResponseEvaluator>(config.default_eval_criteria());
     break;
   case AdmissionControlProto::EvaluationCriteriaCase::EVALUATION_CRITERIA_NOT_SET:
-  default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
