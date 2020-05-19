@@ -4,20 +4,19 @@
 #include <string>
 #include <vector>
 
-#include "absl/strings/string_view.h"
+#include "envoy/extensions/filters/http/oauth/v3/oauth.pb.h"
+#include "envoy/server/filter_config.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/assert.h"
 #include "common/config/datasource.h"
 #include "common/http/rest_api_fetcher.h"
 
-#include "envoy/upstream/cluster_manager.h"
-#include "envoy/server/filter_config.h"
-
 #include "extensions/filters/http/common/pass_through_filter.h"
-
-#include "envoy/extensions/filters/http/oauth/v3/oauth.pb.h"
 #include "extensions/filters/http/oauth/oauth.h"
 #include "extensions/filters/http/oauth/oauth_client.h"
+
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -81,7 +80,6 @@ public:
   const std::string& clusterName() const { return cluster_name_; }
   const std::string& clientId() const { return client_id_; }
   bool forwardBearerToken() const { return forward_bearer_token_; }
-  bool useXEnvoyOauth() const { return use_x_envoy_oauth_; }
   bool passThroughOptionsMethod() const { return pass_through_options_method_; }
   const std::vector<std::string>& whitelistedPaths() const { return whitelisted_paths_; }
   const std::string& oauthServerHostname() const { return oauth_server_hostname_; }
@@ -98,7 +96,6 @@ private:
   const std::string signout_path_;
   std::vector<std::string> whitelisted_paths_{"/robots.txt", "/favicon.ico", "/manifest.json"};
   const bool forward_bearer_token_ : 1;
-  const bool use_x_envoy_oauth_ : 1;
   const bool pass_through_options_method_ : 1;
   std::shared_ptr<SecretReader> secret_reader_;
 };

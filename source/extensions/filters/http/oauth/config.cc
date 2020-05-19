@@ -1,18 +1,19 @@
-#include "envoy/extensions/filters/http/oauth/v3/oauth.pb.h"
 #include "extensions/filters/http/oauth/config.h"
-#include "extensions/filters/http/oauth/filter.h"
-#include "extensions/filters/http/oauth/oauth.h"
 
 #include <chrono>
 #include <memory>
 #include <string>
 
 #include "envoy/common/exception.h"
+#include "envoy/extensions/filters/http/oauth/v3/oauth.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/assert.h"
 #include "common/protobuf/utility.h"
+
+#include "extensions/filters/http/oauth/filter.h"
+#include "extensions/filters/http/oauth/oauth.h"
 
 namespace Envoy {
 namespace Extensions {

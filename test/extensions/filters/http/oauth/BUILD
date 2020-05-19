@@ -16,13 +16,14 @@ envoy_extension_cc_test(
     srcs = ["filter_test.cc"],
     extension_name = "envoy.filters.http.oauth",
     deps = [
+        "//source/extensions/filters/http/oauth:config",
         "//source/extensions/filters/http/oauth:oauth_callback_interface",
         "//source/extensions/filters/http/oauth:oauth_client",
         "//source/extensions/filters/http/oauth:oauth_lib",
-        "//source/extensions/filters/http/oauth:config",
         "//test/integration:http_integration_lib",
         "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "@envoy_api//envoy/extensions/filters/http/oauth/v3:pkg_cc_proto",
     ],
 )
 

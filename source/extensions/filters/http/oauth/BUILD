@@ -30,7 +30,7 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/http:message_lib",
         "//source/common/json:json_loader_lib",
-        "//source/extensions/filters/http/oauth:oauth_callback_interface"
+        "//source/extensions/filters/http/oauth:oauth_callback_interface",
     ],
 )
 

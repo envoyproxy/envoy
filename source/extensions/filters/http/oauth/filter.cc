@@ -96,7 +96,6 @@ OAuth2FilterConfig::OAuth2FilterConfig(
       signout_path_(
           PROTOBUF_GET_STRING_OR_DEFAULT(proto_config, signout_path, DefaultOauthSignout())),
       forward_bearer_token_(proto_config.forward_bearer_token()),
-      use_x_envoy_oauth_(proto_config.use_x_envoy_oauth()),
       pass_through_options_method_(proto_config.pass_through_options_method()),
       secret_reader_(secret_reader) {
   if (!cluster_manager.get(cluster_name_)) {
@@ -224,7 +223,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
 
   if (canSkipOAuth(headers)) {
     // Update the path header with the query string parameters after a successful OAuth login.
-    // This is necessary if a website requests mutliple resources which get redirected to the
+    // This is necessary if a website requests multiple resources which get redirected to the
     // auth server. A cached login on the authentication server side will set cookies
     // correctly but cause a race condition on future requests that have their location set
     // to the callback path.
@@ -362,17 +361,6 @@ bool OAuth2Filter::canSkipOAuth(Http::RequestHeaderMap& headers) const {
     scope_.counterFromString(StatsSuccessString()).inc();
     setXForwardedOauthHeaders(headers, validator_->token(), validator_->username());
     return true;
-  }
-
-  // Skip authentication for machines that already engage in mTLS with Envoy listeners.
-  // This behavior must be opted in from the proto configuration.
-  if (config_->useXEnvoyOauth()) {
-    const auto* skip_envoy_oauth_header = headers.get(SkipEnvoyOauthHeader());
-    if (skip_envoy_oauth_header != nullptr) {
-      if (skip_envoy_oauth_header->value().getStringView() == "true") {
-        return true;
-      }
-    }
   }
 
   // Skip authentication for HTTP method OPTIONS for CORS preflight requests to skip forbidden

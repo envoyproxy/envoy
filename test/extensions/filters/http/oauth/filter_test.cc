@@ -1,12 +1,11 @@
 #include <memory>
 #include <string>
 
+#include "envoy/extensions/filters/http/oauth/v3/oauth.pb.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/message.h"
 
 #include "common/http/message_impl.h"
-
-#include "envoy/extensions/filters/http/oauth/v3/oauth.pb.h"
 
 #include "extensions/filters/http/oauth/filter.h"
 
@@ -16,9 +15,8 @@
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
-
 #include "google/protobuf/repeated_field.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -81,7 +79,6 @@ public:
     p.set_callback_path(TEST_CALLBACK);
     p.set_signout_path("/_signout");
     p.set_forward_bearer_token(true);
-    p.set_use_x_envoy_oauth(true);
     p.set_pass_through_options_method(true);
     p.mutable_credentials()->set_client_id(TEST_CLIENT_ID);
     p.mutable_credentials()->set_client_secret(TEST_CLIENT_SECRET_ID);
@@ -294,28 +291,6 @@ TEST_F(OAuth2Test, OAuthCallbackStartsAuthentication) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
             filter_->decodeHeaders(request_headers, false));
-}
-
-/**
- * Scenario: The client engages with mTLS with the tls_context portion of the filter chain. This
- * logic is guaranteed to occur before the initiation of the http filter stack. For most IWE
- * configs we have enforced the SANITIZE_SET setting for XFCC headers, but we have some use cases
- * of utilizing an edge proxy to forward all user and machine authenticated requests. When the mesh
- * 19194 port is used, we should excuse the OAuth flow and inspect the client certificate instead.
- * Therefore, we pass-through whenever this header is detected and set to true. (Opt-in protoc)
- */
-TEST_F(OAuth2Test, OAuthHasXEnvoyOAuthHeaderAndContinue) {
-  Http::TestRequestHeaderMapImpl request_headers{
-      {Http::Headers::get().Host.get(), "traffic.example.com"},
-      {Http::Headers::get().Path.get(), "/anypath"},
-      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().UserAgent.get(), "CurlAgent/v7.12.3"},
-      {"x-envoy-oauth", "true"},
-  };
-
-  EXPECT_CALL(*validator_, setParams(_, _)).Times(1);
-  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 }
 
 /**

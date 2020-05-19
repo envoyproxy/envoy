@@ -12,7 +12,6 @@
 #include "test/test_common/utility.h"
 
 #include "absl/types/optional.h"
-
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

@@ -29,7 +29,7 @@ message OAuth2Credentials {
 
 // OAuth filter config
 //
-// [#next-free-field: 12]
+// [#next-free-field: 11]
 message OAuth2 {
   // The cluster that has the SDS generic secrets.
   string secrets_cluster = 1 [(validate.rules).string = {min_bytes: 1}];
@@ -56,16 +56,13 @@ message OAuth2 {
   // Forward the OAuth token as a Bearer to upstream web service.
   bool forward_bearer_token = 8;
 
-  // Accept x-envoy-oauth header=true as a valid canSkipOauth condition.
-  bool use_x_envoy_oauth = 9;
-
   // Whitelisted paths.
   //
   // TODO: We shouldn't continue doing this. We definitely should not
   // whitelist on any other parameter, especially method. However, as many clients of Envoy
   // have implementations where adding mTLS would be nontrivial, we expose this option.
-  repeated string whitelisted_paths = 10;
+  repeated string whitelisted_paths = 9;
 
   // Allow HTTP OPTIONS requests to pass-through (CORS preflight workaround).
-  bool pass_through_options_method = 11;
+  bool pass_through_options_method = 10;
 }
