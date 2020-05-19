@@ -165,7 +165,8 @@ bool HeaderUtility::isConnect(const RequestHeaderMap& headers) {
 bool HeaderUtility::isConnectResponse(const RequestHeaderMapPtr& request_headers,
                                       const ResponseHeaderMap& response_headers) {
   return request_headers.get() && isConnect(*request_headers) &&
-      Http::Utility::getResponseStatus(response_headers) == 200;
+         static_cast<Http::Code>(Http::Utility::getResponseStatus(response_headers)) ==
+             Http::Code::OK;
 }
 
 void HeaderUtility::addHeaders(HeaderMap& headers, const HeaderMap& headers_to_add) {

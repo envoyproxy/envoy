@@ -1716,7 +1716,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeadersInternal(ResponseHeaderMa
     // If the connection manager is draining send "Connection: Close" on HTTP/1.1 connections.
     // Do not do this for H2 (which drains via GOAWAY) or Upgrade or CONNECT (as the
     // payload is no longer HTTP/1.1)
-    if (!Utility::isUpgrade(headers) && !HeaderUtility::isConnectResponse(request_headers_, *response_headers_)) {
+    if (!Utility::isUpgrade(headers) &&
+        !HeaderUtility::isConnectResponse(request_headers_, *response_headers_)) {
       headers.setReferenceConnection(Headers::get().ConnectionValues.Close);
     }
   }
