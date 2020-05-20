@@ -39,8 +39,9 @@ bool RequestHeadersAction::populateDescriptor(const Router::RouteEntry&,
                                               const Network::Address::Instance&) const {
   const Http::HeaderEntry* header_value = headers.get(header_name_);
 
-  // If header is not present in the request and if skip_if_absent is true skip this descriptor, 
-  // while calling rate limiting service. If skip_if_absent is false, do not call rate limiting service.
+  // If header is not present in the request and if skip_if_absent is true skip this descriptor,
+  // while calling rate limiting service. If skip_if_absent is false, do not call rate limiting
+  // service.
   if (!header_value) {
     return skip_if_absent_;
   }
