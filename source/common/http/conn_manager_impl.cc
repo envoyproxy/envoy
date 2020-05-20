@@ -781,8 +781,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
     state_.saw_connection_close_ =
         HeaderUtility::shouldCloseConnection(protocol, *request_headers_);
   }
-  if (request_headers_->Method() && Http::Headers::get().MethodValues.Head ==
-                                        request_headers_->Method()->value().getStringView()) {
+  if (Http::Headers::get().MethodValues.Head == request_headers_->getMethodValue()) {
     state_.is_head_request_ = true;
   }
 
@@ -857,8 +856,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
       // HTTP/1.0 defaults to single-use connections. Make sure the connection
       // will be closed unless Keep-Alive is present.
       state_.saw_connection_close_ = true;
-      if (request_headers_->Connection() &&
-          absl::EqualsIgnoreCase(request_headers_->Connection()->value().getStringView(),
+      if (absl::EqualsIgnoreCase(request_headers_->getConnectionValue(),
                                  Http::Headers::get().ConnectionValues.KeepAlive)) {
         state_.saw_connection_close_ = false;
       }
@@ -882,11 +880,12 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   // Verify header sanity checks which should have been performed by the codec.
   ASSERT(HeaderUtility::requestHeadersValid(*request_headers_).has_value() == false);
 
-  // Check for the existence of the :path header for non-CONNECT requests. We expect the codec to
-  // have broken the path into pieces if applicable. NOTE: Currently the HTTP/1.1 codec only does
-  // this when the allow_absolute_url flag is enabled on the HCM.
-  if ((!HeaderUtility::isConnect(*request_headers_) && !request_headers_->Path()) ||
-      (request_headers_->Path() && request_headers_->Path()->value().getStringView().empty())) {
+  // Check for the existence of the :path header for non-CONNECT requests, or present-but-empty
+  // :path header for CONNECT requests. We expect the codec to have broken the path into pieces if
+  // applicable. NOTE: Currently the HTTP/1.1 codec only does this when the allow_absolute_url flag
+  // is enabled on the HCM.
+  if ((!HeaderUtility::isConnect(*request_headers_) || request_headers_->Path()) &&
+      request_headers_->getPathValue().empty()) {
     sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::NotFound, "", nullptr,
                    state_.is_head_request_, absl::nullopt,
                    StreamInfo::ResponseCodeDetails::get().MissingPath);
@@ -894,7 +893,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   }
 
   // Currently we only support relative paths at the application layer.
-  if (request_headers_->Path() && request_headers_->Path()->value().getStringView()[0] != '/') {
+  if (!request_headers_->getPathValue().empty() && request_headers_->getPathValue()[0] != '/') {
     connection_manager_.stats_.named_.downstream_rq_non_relative_path_.inc();
     sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::NotFound, "", nullptr,
                    state_.is_head_request_, absl::nullopt,
@@ -914,8 +913,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   ConnectionManagerUtility::maybeNormalizeHost(*request_headers_, connection_manager_.config_,
                                                localPort());
 
-  if (!fixed_connection_close && protocol == Protocol::Http11 && request_headers_->Connection() &&
-      absl::EqualsIgnoreCase(request_headers_->Connection()->value().getStringView(),
+  if (!fixed_connection_close && protocol == Protocol::Http11 &&
+      absl::EqualsIgnoreCase(request_headers_->getConnectionValue(),
                              Http::Headers::get().ConnectionValues.Close)) {
     state_.saw_connection_close_ = true;
   }
@@ -923,8 +922,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   // since it is supported by http-parser the underlying parser for http
   // requests.
   if (!fixed_connection_close && protocol < Protocol::Http2 && !state_.saw_connection_close_ &&
-      request_headers_->ProxyConnection() &&
-      absl::EqualsIgnoreCase(request_headers_->ProxyConnection()->value().getStringView(),
+      absl::EqualsIgnoreCase(request_headers_->getProxyConnectionValue(),
                              Http::Headers::get().ConnectionValues.Close)) {
     state_.saw_connection_close_ = true;
   }
@@ -1057,6 +1055,19 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
   }
 }
 
+void ConnectionManagerImpl::ActiveStream::maybeContinueDecoding(
+    const std::list<ActiveStreamDecoderFilterPtr>::iterator& continue_data_entry) {
+  if (continue_data_entry != decoder_filters_.end()) {
+    // We use the continueDecoding() code since it will correctly handle not calling
+    // decodeHeaders() again. Fake setting StopSingleIteration since the continueDecoding() code
+    // expects it.
+    ASSERT(buffered_request_data_);
+    (*continue_data_entry)->iteration_state_ =
+        ActiveStreamFilterBase::IterationState::StopSingleIteration;
+    (*continue_data_entry)->continueDecoding();
+  }
+}
+
 void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilter* filter,
                                                         RequestHeaderMap& headers,
                                                         bool end_stream) {
@@ -1096,6 +1107,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
       // Stop iteration IFF this is not the last filter. If it is the last filter, continue with
       // processing since we need to handle the case where a terminal filter wants to buffer, but
       // a previous filter has added body.
+      maybeContinueDecoding(continue_data_entry);
       return;
     }
 
@@ -1106,15 +1118,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
     }
   }
 
-  if (continue_data_entry != decoder_filters_.end()) {
-    // We use the continueDecoding() code since it will correctly handle not calling
-    // decodeHeaders() again. Fake setting StopSingleIteration since the continueDecoding() code
-    // expects it.
-    ASSERT(buffered_request_data_);
-    (*continue_data_entry)->iteration_state_ =
-        ActiveStreamFilterBase::IterationState::StopSingleIteration;
-    (*continue_data_entry)->continueDecoding();
-  }
+  maybeContinueDecoding(continue_data_entry);
 
   if (end_stream) {
     disarmRequestTimeout();
@@ -1492,8 +1496,7 @@ void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
     Event::Dispatcher& thread_local_dispatcher,
     Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
   ASSERT(!request_headers_->Host()->value().empty());
-  const auto& host_header =
-      absl::AsciiStrToLower(request_headers_->Host()->value().getStringView());
+  const auto& host_header = absl::AsciiStrToLower(request_headers_->getHostValue());
   route_config_update_requester_->requestRouteConfigUpdate(host_header, thread_local_dispatcher,
                                                            std::move(route_config_updated_cb));
 }
@@ -1577,6 +1580,19 @@ void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
   response_encoder_->encode100ContinueHeaders(headers);
 }
 
+void ConnectionManagerImpl::ActiveStream::maybeContinueEncoding(
+    const std::list<ActiveStreamEncoderFilterPtr>::iterator& continue_data_entry) {
+  if (continue_data_entry != encoder_filters_.end()) {
+    // We use the continueEncoding() code since it will correctly handle not calling
+    // encodeHeaders() again. Fake setting StopSingleIteration since the continueEncoding() code
+    // expects it.
+    ASSERT(buffered_response_data_);
+    (*continue_data_entry)->iteration_state_ =
+        ActiveStreamFilterBase::IterationState::StopSingleIteration;
+    (*continue_data_entry)->continueEncoding();
+  }
+}
+
 void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilter* filter,
                                                         ResponseHeaderMap& headers,
                                                         bool end_stream) {
@@ -1612,6 +1628,9 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
     }
 
     if (!continue_iteration) {
+      if (!(*entry)->end_stream_) {
+        maybeContinueEncoding(continue_data_entry);
+      }
       return;
     }
 
@@ -1626,14 +1645,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
                                    (end_stream && continue_data_entry == encoder_filters_.end());
   encodeHeadersInternal(headers, modified_end_stream);
 
-  if (continue_data_entry != encoder_filters_.end() && !modified_end_stream) {
-    // We use the continueEncoding() code since it will correctly handle not calling
-    // encodeHeaders() again. Fake setting StopSingleIteration since the continueEncoding() code
-    // expects it.
-    ASSERT(buffered_response_data_);
-    (*continue_data_entry)->iteration_state_ =
-        ActiveStreamFilterBase::IterationState::StopSingleIteration;
-    (*continue_data_entry)->continueEncoding();
+  if (!modified_end_stream) {
+    maybeContinueEncoding(continue_data_entry);
   }
 }
 
