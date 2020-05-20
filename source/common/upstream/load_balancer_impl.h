@@ -478,10 +478,21 @@ private:
     // be the only/best way of doing this. Essentially, it makes weight and active requests equally
     // important. Are they equally important in practice? There is no right answer here and we might
     // want to iterate on this as we gain more experience.
-    const double weight = static_cast<double>(host.weight()) /
-                          std::pow(host.stats().rq_active_.value() + 1, active_requests_exponent_);
 
-    ENVOY_LOG(debug, "cluster={} address={} active_requests_exponent={} weight={}",
+    // TODO(gkleiman): the final PR will not log anything and will return directly instead of using
+    // a temporary variable.
+    double weight;
+
+    if (active_requests_exponent_ == 0.0) {
+      weight = host.weight();
+    } else if (active_requests_exponent_ == 1.0) {
+      weight = static_cast<double>(host.weight()) / (host.stats().rq_active_.value() + 1);
+    } else {
+      weight = static_cast<double>(host.weight()) /
+               std::pow(host.stats().rq_active_.value() + 1, active_requests_exponent_);
+    }
+
+    ENVOY_LOG(trace, "cluster={} address={} active_requests_exponent={} weight={}",
               host.cluster().name(), host.address()->asString(), active_requests_exponent_, weight);
 
     return weight;
