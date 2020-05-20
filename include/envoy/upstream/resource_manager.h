@@ -5,6 +5,7 @@
 #include <memory>
 
 #include "envoy/common/pure.h"
+#include "envoy/common/resource.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -17,53 +18,15 @@ enum class ResourcePriority { Default, High };
 const size_t NumResourcePriorities = 2;
 
 /**
- * An individual resource tracked by the resource manager.
- */
-class Resource {
-public:
-  virtual ~Resource() = default;
-
-  /**
-   * @return true if the resource can be created.
-   */
-  virtual bool canCreate() PURE;
-
-  /**
-   * Increment the resource count.
-   */
-  virtual void inc() PURE;
-
-  /**
-   * Decrement the resource count.
-   */
-  virtual void dec() PURE;
-
-  /**
-   * Decrement the resource count by a specific amount.
-   */
-  virtual void decBy(uint64_t amount) PURE;
-
-  /**
-   * @return the current maximum allowed number of this resource.
-   */
-  virtual uint64_t max() PURE;
-
-  /**
-   * @return the current resource count.
-   */
-  virtual uint64_t count() const PURE;
-};
-
-/**
  * RAII wrapper that increments a resource on construction and decrements it on destruction.
  */
 class ResourceAutoIncDec {
 public:
-  ResourceAutoIncDec(Resource& resource) : resource_(resource) { resource_.inc(); }
+  ResourceAutoIncDec(ResourceLimit& resource) : resource_(resource) { resource_.inc(); }
   ~ResourceAutoIncDec() { resource_.dec(); }
 
 private:
-  Resource& resource_;
+  ResourceLimit& resource_;
 };
 
 using ResourceAutoIncDecPtr = std::unique_ptr<ResourceAutoIncDec>;
@@ -78,31 +41,31 @@ public:
   virtual ~ResourceManager() = default;
 
   /**
-   * @return Resource& active TCP connections and UDP sessions.
+   * @return ResourceLimit& active TCP connections and UDP sessions.
    */
-  virtual Resource& connections() PURE;
+  virtual ResourceLimit& connections() PURE;
 
   /**
-   * @return Resource& active pending requests (requests that have not yet been attached to a
+   * @return ResourceLimit& active pending requests (requests that have not yet been attached to a
    *         connection pool connection).
    */
-  virtual Resource& pendingRequests() PURE;
+  virtual ResourceLimit& pendingRequests() PURE;
 
   /**
-   * @return Resource& active requests (requests that are currently bound to a connection pool
+   * @return ResourceLimit& active requests (requests that are currently bound to a connection pool
    *         connection and are awaiting response).
    */
-  virtual Resource& requests() PURE;
+  virtual ResourceLimit& requests() PURE;
 
   /**
-   * @return Resource& active retries.
+   * @return ResourceLimit& active retries.
    */
-  virtual Resource& retries() PURE;
+  virtual ResourceLimit& retries() PURE;
 
   /**
-   * @return Resource& active connection pools.
+   * @return ResourceLimit& active connection pools.
    */
-  virtual Resource& connectionPools() PURE;
+  virtual ResourceLimit& connectionPools() PURE;
 };
 
 } // namespace Upstream
