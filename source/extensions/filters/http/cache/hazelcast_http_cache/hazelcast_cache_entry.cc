@@ -44,7 +44,10 @@ void HazelcastHeaderEntry::writeUnifiedData(ObjectDataOutput& writer) const {
       &writer);
   std::string serialized;
   variant_key_.SerializeToString(&serialized);
-  writer.writeUTF(&serialized);
+  // Serialized bytes are binary, not text. String is used as a container only
+  // during protobuf serialization. Hence ObjectDataOutput::writeUTF might fail.
+  std::vector<hazelcast::byte> bytes(serialized.begin(), serialized.end());
+  writer.writeByteArray(&bytes);
 }
 
 void HazelcastHeaderEntry::readUnifiedData(ObjectDataInput& reader) {
@@ -58,8 +61,8 @@ void HazelcastHeaderEntry::readUnifiedData(ObjectDataInput& reader) {
     val.append(val_vector.data(), val_vector.size());
     header_map_->addViaMove(std::move(key), std::move(val));
   }
-  std::string serialized = *reader.readUTF();
-  variant_key_.ParseFromString(serialized);
+  std::vector<hazelcast::byte> bytes = *reader.readByteArray();
+  variant_key_.ParseFromString(std::string(reinterpret_cast<char*>(bytes.data()), bytes.size()));
 }
 
 HazelcastHeaderEntry::HazelcastHeaderEntry() = default;
