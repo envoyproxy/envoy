@@ -48,14 +48,6 @@ const std::string& SignoutBearerTokenValue() {
                          "BearerToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT");
 }
 
-const std::string& StatsFailureString() {
-  CONSTRUCT_ON_FIRST_USE(std::string, "http.oauth.failure");
-}
-
-const std::string& StatsSuccessString() {
-  CONSTRUCT_ON_FIRST_USE(std::string, "http.oauth.success");
-}
-
 const std::string& CookieTailFormatString() {
   CONSTRUCT_ON_FIRST_USE(std::string, ";version=1;path=/;Max-Age={};secure");
 }
@@ -84,7 +76,8 @@ const std::string& QueryParamsState() { CONSTRUCT_ON_FIRST_USE(std::string, "sta
 
 OAuth2FilterConfig::OAuth2FilterConfig(
     const envoy::extensions::filters::http::oauth::v3::OAuth2& proto_config,
-    Upstream::ClusterManager& cluster_manager, std::shared_ptr<SecretReader> secret_reader)
+    Upstream::ClusterManager& cluster_manager, std::shared_ptr<SecretReader> secret_reader,
+    Stats::Scope& scope, const std::string& stats_prefix)
     : cluster_name_(proto_config.cluster()), client_id_(proto_config.credentials().client_id()),
       oauth_server_hostname_(proto_config.hostname()),
       callback_path_(
@@ -93,7 +86,8 @@ OAuth2FilterConfig::OAuth2FilterConfig(
           PROTOBUF_GET_STRING_OR_DEFAULT(proto_config, signout_path, DefaultOauthSignout())),
       forward_bearer_token_(proto_config.forward_bearer_token()),
       pass_through_options_method_(proto_config.pass_through_options_method()),
-      secret_reader_(secret_reader) {
+      secret_reader_(secret_reader),
+      stats_(OAuth2FilterConfig::generateStats(stats_prefix, scope)) {
   if (!cluster_manager.get(cluster_name_)) {
     throw EnvoyException(fmt::format("OAuth2 filter: unknown cluster '{}' in config. Please "
                                      "specify which cluster to direct OAuth requests to.",
@@ -104,6 +98,10 @@ OAuth2FilterConfig::OAuth2FilterConfig(
   for (const auto& entry : proto_config.whitelisted_paths()) {
     whitelisted_paths_.emplace_back(entry);
   }
+}
+
+FilterStats OAuth2FilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
+  return {ALL_OAUTH_FILTER_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
 }
 
 void OAuth2CookieValidator::setParams(const Http::RequestHeaderMap& headers,
@@ -144,9 +142,9 @@ bool OAuth2CookieValidator::timestampIsValid() const {
 bool OAuth2CookieValidator::isValid() const { return hmacIsValid() && timestampIsValid(); }
 
 OAuth2Filter::OAuth2Filter(OAuth2FilterConfigSharedPtr config,
-                           std::unique_ptr<OAuth2Client>&& oauth_client, Stats::Scope& scope)
+                           std::unique_ptr<OAuth2Client>&& oauth_client)
     : validator_(std::make_shared<OAuth2CookieValidator>()), oauth_client_(std::move(oauth_client)),
-      config_(std::move(config)), scope_(scope) {
+      config_(std::move(config)) {
 
   oauth_client_->setCallbacks(*this);
 }
@@ -354,7 +352,7 @@ bool OAuth2Filter::canSkipOAuth(Http::RequestHeaderMap& headers) const {
   // if we successfully validate the cookie.
   validator_->setParams(headers, config_->tokenSecret());
   if (validator_->isValid()) {
-    scope_.counterFromString(StatsSuccessString()).inc();
+    config_->stats().oauth_success_.inc();
     setXForwardedOauthHeaders(headers, validator_->token(), validator_->username());
     return true;
   }
@@ -419,7 +417,7 @@ void OAuth2Filter::onGetIdentitySuccess(const std::string& username) {
   // user redirection to the auth server.
   if (found_bearer_token_) {
     setXForwardedOauthHeaders(*request_headers_, access_token_, username_);
-    scope_.counterFromString(StatsSuccessString()).inc();
+    config_->stats().oauth_success_.inc();
     decoder_callbacks_->continueDecoding();
     return;
   }
@@ -476,12 +474,12 @@ void OAuth2Filter::onGetIdentitySuccess(const std::string& username) {
   response_headers->setReferenceKey(Http::Headers::get().UserAgent, "Auth/Redirect");
 
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true);
-  scope_.counterFromString(StatsSuccessString()).inc();
+  config_->stats().oauth_success_.inc();
   decoder_callbacks_->continueDecoding();
 }
 
 void OAuth2Filter::sendUnauthorizedResponse() {
-  scope_.counterFromString(StatsFailureString()).inc();
+  config_->stats().oauth_failure_.inc();
   decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, UnauthorizedBodyMessage(), nullptr,
                                      absl::nullopt, EMPTY_STRING);
 }

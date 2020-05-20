@@ -6,6 +6,7 @@
 
 #include "envoy/extensions/filters/http/oauth/v3/oauth.pb.h"
 #include "envoy/server/filter_config.h"
+#include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/assert.h"
@@ -69,6 +70,22 @@ private:
 };
 
 /**
+ * All stats for the OAuth filter. @see stats_macros.h
+ */
+// clang-format off
+#define ALL_OAUTH_FILTER_STATS(COUNTER)                                                         \
+  COUNTER(oauth_failure)                                                                        \
+  COUNTER(oauth_success)
+// clang-format on
+
+/**
+ * Wrapper struct filter stats. @see stats_macros.h
+ */
+struct FilterStats {
+  ALL_OAUTH_FILTER_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+/**
  * This class encapsulates all data needed for the filter to operate so that we don't pass around
  * raw protobufs and other arbitrary data.
  */
@@ -76,7 +93,8 @@ class OAuth2FilterConfig {
 public:
   OAuth2FilterConfig(const envoy::extensions::filters::http::oauth::v3::OAuth2& proto_config,
                      Upstream::ClusterManager& cluster_manager,
-                     std::shared_ptr<SecretReader> secret_reader);
+                     std::shared_ptr<SecretReader> secret_reader, Stats::Scope& scope,
+                     const std::string& stats_prefix);
   const std::string& clusterName() const { return cluster_name_; }
   const std::string& clientId() const { return client_id_; }
   bool forwardBearerToken() const { return forward_bearer_token_; }
@@ -87,8 +105,11 @@ public:
   const std::string& signoutPath() const { return signout_path_; }
   std::string clientSecret() const { return secret_reader_->clientSecret(); }
   std::string tokenSecret() const { return secret_reader_->tokenSecret(); }
+  FilterStats& stats() { return stats_; }
 
 private:
+  static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
+
   const std::string cluster_name_;
   const std::string client_id_;
   const std::string oauth_server_hostname_;
@@ -98,6 +119,7 @@ private:
   const bool forward_bearer_token_ : 1;
   const bool pass_through_options_method_ : 1;
   std::shared_ptr<SecretReader> secret_reader_;
+  FilterStats stats_;
 };
 
 using OAuth2FilterConfigSharedPtr = std::shared_ptr<OAuth2FilterConfig>;
@@ -149,8 +171,7 @@ private:
  */
 class OAuth2Filter : public Http::PassThroughDecoderFilter, public OAuth2FilterCallbacks {
 public:
-  OAuth2Filter(OAuth2FilterConfigSharedPtr config, std::unique_ptr<OAuth2Client>&& oauth_client,
-               Stats::Scope& scope);
+  OAuth2Filter(OAuth2FilterConfigSharedPtr config, std::unique_ptr<OAuth2Client>&& oauth_client);
   ~OAuth2Filter() override = default;
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;
@@ -185,7 +206,6 @@ private:
 
   std::unique_ptr<OAuth2Client> oauth_client_;
   OAuth2FilterConfigSharedPtr config_;
-  Stats::Scope& scope_;
 
   const RequirementsMap& escapedReplacements() const {
     CONSTRUCT_ON_FIRST_USE(RequirementsMap,

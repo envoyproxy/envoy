@@ -84,13 +84,12 @@ public:
     p.mutable_credentials()->set_token_secret(TEST_TOKEN_SECRET_ID);
     p.add_whitelisted_paths("/whitelist/path/healthchecker");
 
-    // Create the OAuth config
+    // Create the OAuth config.
     auto secret_reader = std::make_shared<MockSecretReader>();
-    config_ =
-        std::make_shared<OAuth2FilterConfig>(p, factory_context_.cluster_manager_, secret_reader);
+    config_ = std::make_shared<OAuth2FilterConfig>(p, factory_context_.cluster_manager_,
+                                                   secret_reader, scope_, "test.");
 
-    // Instantiate the filter
-    filter_ = std::make_shared<OAuth2Filter>(config_, std::move(oauth_client_ptr), scope_);
+    filter_ = std::make_shared<OAuth2Filter>(config_, std::move(oauth_client_ptr));
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     validator_ = std::make_shared<MockOAuth2CookieValidator>();
     filter_->validator_ = validator_;
@@ -193,8 +192,8 @@ TEST_F(OAuth2Test, OAuthOkPass) {
   // Ensure that existing OAuth forwarded headers got sanitized.
   EXPECT_EQ(mock_request_headers, expected_headers);
 
-  EXPECT_EQ(scope_.counterFromString("http.oauth.failure").value(), 0);
-  EXPECT_EQ(scope_.counterFromString("http.oauth.success").value(), 1);
+  EXPECT_EQ(scope_.counterFromString("test.oauth_failure").value(), 0);
+  EXPECT_EQ(scope_.counterFromString("test.oauth_success").value(), 1);
 }
 
 /**
@@ -261,8 +260,8 @@ TEST_F(OAuth2Test, OAuthErrorQueryString) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
             filter_->decodeHeaders(request_headers, false));
 
-  EXPECT_EQ(scope_.counterFromString("http.oauth.failure").value(), 1);
-  EXPECT_EQ(scope_.counterFromString("http.oauth.success").value(), 0);
+  EXPECT_EQ(scope_.counterFromString("test.oauth_failure").value(), 1);
+  EXPECT_EQ(scope_.counterFromString("test.oauth_success").value(), 0);
 }
 
 /**

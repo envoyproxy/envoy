@@ -21,8 +21,8 @@ namespace HttpFilters {
 namespace Oauth {
 
 Http::FilterFactoryCb OAuth2Config::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::oauth::v3::OAuth2& proto_config, const std::string&,
-    Server::Configuration::FactoryContext& context) {
+    const envoy::extensions::filters::http::oauth::v3::OAuth2& proto_config,
+    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
   const auto client_secret = proto_config.credentials().client_secret();
   const auto token_secret = proto_config.credentials().token_secret();
 
@@ -41,8 +41,8 @@ Http::FilterFactoryCb OAuth2Config::createFilterFactoryFromProtoTyped(
 
   auto secret_reader = std::make_shared<SDSSecretReader>(
       secret_provider_client_secret, secret_provider_token_secret, context.api());
-  OAuth2FilterConfigSharedPtr config =
-      std::make_shared<OAuth2FilterConfig>(proto_config, context.clusterManager(), secret_reader);
+  OAuth2FilterConfigSharedPtr config = std::make_shared<OAuth2FilterConfig>(
+      proto_config, context.clusterManager(), secret_reader, context.scope(), stats_prefix);
 
   const std::chrono::milliseconds timeout_duration(
       PROTOBUF_GET_MS_OR_DEFAULT(proto_config, timeout, 3000));
@@ -52,7 +52,7 @@ Http::FilterFactoryCb OAuth2Config::createFilterFactoryFromProtoTyped(
         std::unique_ptr<OAuth2Client> oauth_client = std::make_unique<OAuth2ClientImpl>(
             context.clusterManager(), config->clusterName(), timeout_duration);
         callbacks.addStreamDecoderFilter(
-            std::make_shared<OAuth2Filter>(config, std::move(oauth_client), context.scope()));
+            std::make_shared<OAuth2Filter>(config, std::move(oauth_client)));
       };
 }
 
