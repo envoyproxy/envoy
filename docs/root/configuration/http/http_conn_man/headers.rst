@@ -644,3 +644,11 @@ Supported variable names are:
             key: "x-request-start"
             value: "%START_TIME(%s.%3f)%"
           append: true
+
+%RESPONSE_FLAGS%
+    Additional details about the response or connection, if any. Possible values and their meanings
+    are listed in the access log formatter :ref:`documentation<config_access_log_format_response_flags>`.
+
+%RESPONSE_CODE_DETAILS%
+    Response code details provides additional information about the HTTP response code, such as
+    who set it (the upstream or envoy) and why.
