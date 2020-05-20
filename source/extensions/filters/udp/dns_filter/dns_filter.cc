@@ -45,7 +45,7 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
       size_t i = random_.random();
 
       // Creating the IP address will throw an exception if the address string is malformed
-      for (auto index = 0;  index < address_list.size(); index++) {
+      for (auto index = 0; index < address_list.size(); index++) {
         const auto address_iter = std::next(address_list.begin(), (i++ % address_list.size()));
         auto ipaddr = Network::Utility::parseInternetAddress(*address_iter, 0 /* port */);
         addrs.push_back(std::move(ipaddr));
