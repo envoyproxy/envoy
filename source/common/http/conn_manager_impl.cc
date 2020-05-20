@@ -880,11 +880,12 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   // Verify header sanity checks which should have been performed by the codec.
   ASSERT(HeaderUtility::requestHeadersValid(*request_headers_).has_value() == false);
 
-  // Check for the existence of the :path header for non-CONNECT requests. We expect the codec to
-  // have broken the path into pieces if applicable. NOTE: Currently the HTTP/1.1 codec only does
-  // this when the allow_absolute_url flag is enabled on the HCM.
-  if ((!HeaderUtility::isConnect(*request_headers_) && !request_headers_->Path()) ||
-      (request_headers_->Path() && request_headers_->getPathValue().empty())) {
+  // Check for the existence of the :path header for non-CONNECT requests, or present-but-empty
+  // :path header for CONNECT requests. We expect the codec to have broken the path into pieces if
+  // applicable. NOTE: Currently the HTTP/1.1 codec only does this when the allow_absolute_url flag
+  // is enabled on the HCM.
+  if ((!HeaderUtility::isConnect(*request_headers_) || request_headers_->Path()) &&
+      request_headers_->getPathValue().empty()) {
     sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::NotFound, "", nullptr,
                    state_.is_head_request_, absl::nullopt,
                    StreamInfo::ResponseCodeDetails::get().MissingPath);
