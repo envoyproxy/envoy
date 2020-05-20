@@ -50,7 +50,7 @@ void UserAgent::initializeFromHeaders(const RequestHeaderMap& headers, Stats::St
   if (stats_ == nullptr && !initialized_) {
     initialized_ = true;
 
-    absl::string_view user_agent = headers.getUserAgentValue();
+    const absl::string_view user_agent = headers.getUserAgentValue();
     if (!user_agent.empty()) {
       if (user_agent.find("iOS") != absl::string_view::npos) {
         stats_ = std::make_unique<UserAgentStats>(prefix, context_.ios_, scope, context_);
