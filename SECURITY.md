@@ -118,11 +118,35 @@ score](https://www.first.org/cvss/specification-document#i5)) the Fix Team can d
 release process down in the face of holidays, developer bandwidth, etc. These decisions must be
 discussed on the envoy-security mailing list.
 
-A two week window will be provided to members of the private distributor list from candidate patch
+A three week window will be provided to members of the private distributor list from candidate patch
 availability until the security release date. It is expected that distributors will normally be able
 to perform a release within this time window. If there are exceptional circumstances, the Envoy
 security team will raise this window to four weeks. The release window will be reduced if the
 security issue is public or embargo is broken.
+
+### Fix and disclosure SLOs
+
+* All reports to envoy-security@googlegroups.com will be triaged and have an
+  initial response within 1 business day.
+
+* Privately disclosed issues will be fixed or publicly disclosed within 90 days
+  by the Envoy security team. In exceptional circumstances we reserve the right
+  to work with the discloser to coordinate on an extension, but this will be
+  rarely used.
+
+* Any issue discovered by the Envoy security team and raised in our private bug
+  tracker will be converted to a public issue within 90 days. We will regularly
+  audit these issues to ensure that no major vulnerability (from the perspective
+  of the threat model) is accidentally leaked.
+
+* Fuzz bugs are subject to a 90 day disclosure deadline.
+
+* Three weeks notice will be provided to private distributors from patch
+  availability until the embargo deadline.
+
+* Public zero days will be fixed ASAP, but there is no SLO for this, since this
+  will depend on the severity and impact to the organizations backing the Envoy
+  security team.
 
 ### Fix Disclosure Process
 
