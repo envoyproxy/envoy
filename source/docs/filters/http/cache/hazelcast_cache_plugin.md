@@ -1,8 +1,8 @@
 ### Hazelcast Http Cache Plugin
 Work in Progress--Cache filter has not implemented features. The corresponding ones are not ready for the plugin too.
 
-Hazelcast Http Cache provides a pluggable storage implementation backed by Hazelcast In Memory Data Grid for the http
-cache filter. Using Hazelcast C++ client, the plugin does not store any http response locally but in a distributed map
+Hazelcast Http Cache provides a pluggable storage implementation backed by Hazelcast In Memory Data Grid for the Http
+cache filter. Using Hazelcast C++ client, the plugin does not store any Http response locally but in a distributed map
 provided by Hazelcast cluster. To enable the cache plugin, the network configuration belongs to a cluster to be
 connected must be set on the cache plugin configuration.
 
@@ -10,13 +10,13 @@ connected must be set on the cache plugin configuration.
 The plugin comes with two modes:
 
  - **Unified**
-A cached http response is stored as a single entry in the cache. On a range http request, regardless of the requested
+A cached Http response is stored as a single entry in the cache. On a range Http request, regardless of the requested
 range, the whole response body is fetched from the cache and then only the desired bytes are served along with the
 headers and trailers (if any). This mode is handy where response body sizes are reasonably large (up to 10 KB), or
 range requests are not frequent, or they are not allowed at all.
 
  - **Divided**
-A cached http response is stored as multiple entries in the cache. Two separate maps are used to store a single
+A cached Http response is stored as multiple entries in the cache. Two separate maps are used to store a single
 response. In one of them, response headers, body size, and trailers (if any) are stored. In the other one, the
 corresponding response body is stored in multiple entries each of which has a certain size configured via `partition
 size` in the plugin configuration. That is, for a response of size 50 KB, if the configured partition size is 20 KB,
@@ -40,8 +40,8 @@ as a sidecar to Envoy, form up a cluster using Hazelcast Kubernetes plugin, etc.
 will be the addresses and ports of the cluster members and the group information of the cluster. Providing the address
 of only one member in the cluster will be enough for the connection but using more than one is recommended.
 
-Related links: [Hazelcast Docker Hub](https://hub.docker.com/r/hazelcast/hazelcast/), [Hazelcast Kubernetes Plugin]
-(https://github.com/hazelcast/hazelcast-kubernetes)
+Related links: [Hazelcast Docker Hub](https://hub.docker.com/r/hazelcast/hazelcast/),
+[Hazelcast Kubernetes Plugin](https://github.com/hazelcast/hazelcast-kubernetes)
 
 ## Configuring Hazelcast cluster for the cache
 Eviction, maximum size, and other related properties for the cache must be configured on the server-side
@@ -55,12 +55,14 @@ via programmatic configuration or `hazelcast.xml`.
 
     <!--
 
-    Customizable http cache configurations.
+    Customizable Http cache configurations.
     For instance, for the configuration below:
 
-    - 25% of the http responses will be evicted according to LRU policy when the map size hits 1000.
-    - Each http responses will live at most 180 seconds in the cache.
-    - If an http responses is not called for the last 90 seconds, it will be evicted immediately regardless of the TTL.
+    - 25% of the Http responses will be evicted per node according to LRU policy when the map size hits
+      1000 on this node.
+    - Each Http response will live at most 180 seconds in the cache.
+    - If an Http responses is not called for the last 90 seconds, it will be evicted immediately
+      regardless of the TTL.
 
      -->
     <max-size policy="PER_NODE">1000</max-size>
@@ -87,18 +89,19 @@ via programmatic configuration or `hazelcast.xml`.
  - **Divided Mode**
 
 ```xml
-<!-- use wildcard for the map name to configure the cache since the full name is determined by the plugin.default -->
+<!-- use wildcard for the map name to configure the cache since the full name is determined by the plugin -->
 <map name="<app_prefix>*div">
 
     <!--
 
-    Customizable http cache configurations for header map. The properties below will determine the
-    characteristics of the http cache, not only response headers cache.
+    Customizable Http cache configurations for header map. The properties below will determine the
+    characteristics of the Http cache, not only response headers cache.
 
     For instance, for the configuration below:
 
-    - 25% of the http responses will be evicted according to LRU policy when the map size hits 100.
-    - Each http responses will live at most 180 seconds in the cache.
+    - 25% of the Http responses will be evicted per node according to LRU policy when the map size hits
+      1000 on this node.
+    - Each Http response will live at most 180 seconds in the cache.
 
     NOTE: Although works fine, divided mode is not optimized for idle-time based eviction.
 
@@ -126,7 +129,7 @@ via programmatic configuration or `hazelcast.xml`.
 
     <!--
 
-    Customizable http cache configurations for body map.
+    Customizable Http cache configurations for body map.
 
     Do not set the cache configuration here. Instead, configure `<app_prefix>*div` first and set
     the properties here accordingly.
@@ -134,15 +137,13 @@ via programmatic configuration or `hazelcast.xml`.
     - Do not use max-size configuration here. They will be evicted according to TTL when their header is evicted.
       Instead, the max size is (indirectly) ensured with max allowed body size configuration along with the partition
       size.
-    - Use the same eviction configuration with the header map.
+    - There is no need for an eviction policy to be set here.
     - Keep TTL slightly longer than the header map (i.e. 15 seconds).
 
     NOTE: Although works fine, divided mode is not optimized for idle-time based eviction.
 
      -->
     <max-size policy="PER_NODE">0</max-size>
-    <eviction-percentage>25</eviction-percentage>
-    <eviction-policy>LRU</eviction-policy>
     <time-to-live-seconds>195</time-to-live-seconds>
 
     <!--
@@ -172,7 +173,7 @@ be unusable permanently:
     ...
 </properties>
 ```
-**NOTE**: Setting this property will affect not only the http cache but all other data structures in the cluster.
+**NOTE**: Setting this property will affect not only the Http cache but all other data structures in the cluster.
 
 ## Statistics
 Cache statistics are not collected locally. Instead, cluster-wide statistics should be observed on Hazelcast
@@ -183,4 +184,4 @@ the cache. The statistics can be observed with that name under the `maps` sectio
 Each distributed map in a Hazelcast cluster is differentiated by its name for the same key and value types. Thus,
 all the plugins connected to the same cluster will use the same map for responses only if they have the same cache
 mode and the app prefix (and the same partition size for divided mode) in the plugin configuration. The filters
-configured with the same partition size and cache mode but different prefixes will create two different http caches.
+configured with the same partition size and cache mode but different prefixes will create two different Http caches.
