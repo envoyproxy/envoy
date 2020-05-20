@@ -71,7 +71,7 @@ public:
     std::unique_ptr<OAuth2Client> oauth_client_ptr{oauth_client_};
 
     // Set up proto fields
-    envoy::extensions::filters::http::oauth::v3::OAuth2 p;
+    envoy::extensions::filters::http::oauth::v3::OAuth2Config p;
     p.set_cluster("auth.example.com");
     p.set_hostname("auth.example.com");
     p.set_callback_path(TEST_CALLBACK);
@@ -79,9 +79,6 @@ public:
     p.set_forward_bearer_token(true);
     p.set_pass_through_options_method(true);
     p.mutable_credentials()->set_client_id(TEST_CLIENT_ID);
-    p.mutable_credentials()->set_client_secret_config_name(TEST_CLIENT_SECRET_ID);
-    p.mutable_credentials()->set_token_secret_config_name(TEST_TOKEN_SECRET_ID);
-    p.add_whitelisted_paths("/whitelist/path/healthchecker");
 
     // Create the OAuth config.
     auto secret_reader = std::make_shared<MockSecretReader>();
@@ -197,7 +194,7 @@ TEST_F(OAuth2Test, OAuthOkPass) {
 
 /**
  * Scenario: The OAuth filter receives a request without valid OAuth cookies to a non-callback URL
- * (indicating that the user needs to re-validate cookies or get 401'd)
+ * (indicating that the user needs to re-validate cookies or get 401'd).
  * This also tests both a forwarded http protocol from upstream and a plaintext connection.
  *
  * Expected behavior: the filter should redirect the user to the OAuth server with the credentials
@@ -333,50 +330,6 @@ TEST_F(OAuth2Test, OAuthValidatedCookieAndContinue) {
   cookie_validator->setParams(request_headers, "mock-secret");
 
   EXPECT_EQ(cookie_validator->hmacIsValid(), true);
-}
-
-/**
- * Testing the whitelisted paths functionality. Give no authentication, but see if we still
- * continue through the filter chain.
- * We try once with a whitelisted path, and then with the custom path defined in the test class.
- */
-TEST_F(OAuth2Test, OAuthTestWhitelistedPaths) {
-  Http::TestRequestHeaderMapImpl request_headers_1{
-      {Http::Headers::get().Host.get(), "traffic.example.com"},
-      {Http::Headers::get().Path.get(), "/favicon.ico"},
-  };
-  EXPECT_CALL(*validator_, setParams(_, _)).Times(1);
-  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_1, false));
-
-  // Custom path to whitelist that matches exactly
-  Http::TestRequestHeaderMapImpl request_headers_2{
-      {Http::Headers::get().Host.get(), "traffic.example.com"},
-      {Http::Headers::get().Path.get(), "/whitelist/path/healthchecker"},
-  };
-  EXPECT_CALL(*validator_, setParams(_, _)).Times(1);
-  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_2, false));
-
-  // Custom path to whitelist with added suffix
-  Http::TestRequestHeaderMapImpl request_headers_3{
-      {Http::Headers::get().Host.get(), "traffic.example.com"},
-      {Http::Headers::get().Path.get(), "/whitelist/path/healthchecker?retry=3"},
-  };
-  EXPECT_CALL(*validator_, setParams(_, _)).Times(1);
-  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_3, false));
-
-  // Negative test - path outside of the whitelist
-  Http::TestRequestHeaderMapImpl request_headers_4{
-      {Http::Headers::get().Host.get(), "traffic.example.com"},
-      {Http::Headers::get().Path.get(), "/blacklist/path/"},
-      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Post},
-  };
-  EXPECT_CALL(*validator_, setParams(_, _)).Times(1);
-  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
-  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
-            filter_->decodeHeaders(request_headers_4, false));
 }
 
 /**

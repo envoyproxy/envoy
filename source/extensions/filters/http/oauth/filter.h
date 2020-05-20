@@ -91,7 +91,7 @@ struct FilterStats {
  */
 class FilterConfig {
 public:
-  FilterConfig(const envoy::extensions::filters::http::oauth::v3::OAuth2& proto_config,
+  FilterConfig(const envoy::extensions::filters::http::oauth::v3::OAuth2Config& proto_config,
                Upstream::ClusterManager& cluster_manager,
                std::shared_ptr<SecretReader> secret_reader, Stats::Scope& scope,
                const std::string& stats_prefix);
@@ -99,7 +99,6 @@ public:
   const std::string& clientId() const { return client_id_; }
   bool forwardBearerToken() const { return forward_bearer_token_; }
   bool passThroughOptionsMethod() const { return pass_through_options_method_; }
-  const std::vector<std::string>& whitelistedPaths() const { return whitelisted_paths_; }
   const std::string& oauthServerHostname() const { return oauth_server_hostname_; }
   const std::string& callbackPath() const { return callback_path_; }
   const std::string& signoutPath() const { return signout_path_; }
@@ -115,7 +114,6 @@ private:
   const std::string oauth_server_hostname_;
   const std::string callback_path_;
   const std::string signout_path_;
-  std::vector<std::string> whitelisted_paths_{"/robots.txt", "/favicon.ico", "/manifest.json"};
   const bool forward_bearer_token_ : 1;
   const bool pass_through_options_method_ : 1;
   std::shared_ptr<SecretReader> secret_reader_;

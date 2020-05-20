@@ -21,16 +21,23 @@ namespace HttpFilters {
 namespace Oauth {
 
 Http::FilterFactoryCb OAuth2Config::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::oauth::v3::OAuth2& proto_config,
+    const envoy::extensions::filters::http::oauth::v3::OAuth2& proto,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
-  const auto client_secret_config_name = proto_config.credentials().client_secret_config_name();
-  const auto token_secret_config_name = proto_config.credentials().token_secret_config_name();
+  if (!proto.has_config()) {
+    throw EnvoyException("config must be present for global config");
+  }
+
+  const auto& proto_config = proto.config();
+  const auto& credentials = proto_config.credentials();
+
+  const auto client_secret_config_name = credentials.client_secret_config_name();
+  const auto token_secret_config_name = credentials.token_secret_config_name();
 
   envoy::config::core::v3::ConfigSource config_source;
   auto* const api_config_source = config_source.mutable_api_config_source();
   api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
   auto* const grpc_service = api_config_source->add_grpc_services();
-  grpc_service->mutable_envoy_grpc()->set_cluster_name(proto_config.secrets_cluster());
+  grpc_service->mutable_envoy_grpc()->set_cluster_name(credentials.secrets_cluster());
 
   auto& secret_manager = context.clusterManager().clusterManagerFactory().secretManager();
   auto& transport_socket_factory = context.getTransportSocketFactoryContext();

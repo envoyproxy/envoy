@@ -74,10 +74,10 @@ const std::string& queryParamsError() { CONSTRUCT_ON_FIRST_USE(std::string, "err
 const std::string& queryParamsCode() { CONSTRUCT_ON_FIRST_USE(std::string, "code"); }
 const std::string& queryParamsState() { CONSTRUCT_ON_FIRST_USE(std::string, "state"); }
 
-FilterConfig::FilterConfig(const envoy::extensions::filters::http::oauth::v3::OAuth2& proto_config,
-                           Upstream::ClusterManager& cluster_manager,
-                           std::shared_ptr<SecretReader> secret_reader, Stats::Scope& scope,
-                           const std::string& stats_prefix)
+FilterConfig::FilterConfig(
+    const envoy::extensions::filters::http::oauth::v3::OAuth2Config& proto_config,
+    Upstream::ClusterManager& cluster_manager, std::shared_ptr<SecretReader> secret_reader,
+    Stats::Scope& scope, const std::string& stats_prefix)
     : cluster_name_(proto_config.cluster()), client_id_(proto_config.credentials().client_id()),
       oauth_server_hostname_(proto_config.hostname()),
       callback_path_(
@@ -91,10 +91,6 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::oauth::v3::OA
     throw EnvoyException(fmt::format("OAuth2 filter: unknown cluster '{}' in config. Please "
                                      "specify which cluster to direct OAuth requests to.",
                                      cluster_name_));
-  }
-
-  for (const auto& entry : proto_config.whitelisted_paths()) {
-    whitelisted_paths_.emplace_back(entry);
   }
 }
 
@@ -364,14 +360,6 @@ bool OAuth2Filter::canSkipOAuth(Http::RequestHeaderMap& headers) const {
     }
   }
 
-  // Kill some noise for static requests. These paths are defined in OAuthConfig.
-  // Do not copy over the set with each request. All entries are treated as prefixes.
-  const auto header_path = headers.Path()->value().getStringView();
-  for (const auto& whitelisted_path : config_->whitelistedPaths()) {
-    if (absl::StartsWith(header_path, whitelisted_path)) {
-      return true;
-    }
-  }
   return false;
 }
 

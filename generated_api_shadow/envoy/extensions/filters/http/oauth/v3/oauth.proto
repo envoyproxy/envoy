@@ -29,44 +29,43 @@ message OAuth2Credentials {
   // The config name in SDS that contains the token secret that will be used
   // to perform the HMAC validation.
   string token_secret_config_name = 3;
+
+  // The cluster that has the SDS generic secrets.
+  string secrets_cluster = 4 [(validate.rules).string = {min_bytes: 1}];
 }
 
-// OAuth filter config
+// OAuth config
 //
-// [#next-free-field: 11]
-message OAuth2 {
-  // The cluster that has the SDS generic secrets.
-  string secrets_cluster = 1 [(validate.rules).string = {min_bytes: 1}];
-
+// [#next-free-field: 9]
+message OAuth2Config {
   // The upstream cluster where the OAuth server is defined. This is required due limitations
   // in Envoy's HTTP AsyncClient implementation.
-  string cluster = 2 [(validate.rules).string = {min_bytes: 1}];
+  string cluster = 1 [(validate.rules).string = {min_bytes: 1}];
 
   // The full domain of the OAuth server.
-  string hostname = 3 [(validate.rules).string = {min_bytes: 1}];
+  string hostname = 2 [(validate.rules).string = {min_bytes: 1}];
 
   // A struct with the credentials required for OAuth
-  OAuth2Credentials credentials = 4;
+  OAuth2Credentials credentials = 3;
 
   // The callback path the OAuth server should use. Default is /_oauth.
-  string callback_path = 5;
+  string callback_path = 4;
 
   // The path to sign a user out, clearing their credential cookies. Default is /_signout.
-  string signout_path = 6;
+  string signout_path = 5;
 
   // The duration for outgoing auth requests. Default is 3s.
-  google.protobuf.Duration timeout = 7;
+  google.protobuf.Duration timeout = 6;
 
   // Forward the OAuth token as a Bearer to upstream web service.
-  bool forward_bearer_token = 8;
-
-  // Whitelisted paths.
-  //
-  // TODO: We shouldn't continue doing this. We definitely should not
-  // whitelist on any other parameter, especially method. However, as many clients of Envoy
-  // have implementations where adding mTLS would be nontrivial, we expose this option.
-  repeated string whitelisted_paths = 9;
+  bool forward_bearer_token = 7;
 
   // Allow HTTP OPTIONS requests to pass-through (CORS preflight workaround).
-  bool pass_through_options_method = 10;
+  bool pass_through_options_method = 8;
+}
+
+// Filter config
+message OAuth2 {
+  // Leave this empty to disable OAuth2 for a specific route, using per filter config.
+  OAuth2Config config = 1;
 }
