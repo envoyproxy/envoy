@@ -178,18 +178,23 @@ void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion vers
                           lock, *this, std::move(random_generator), process_object);
 }
 
+IntegrationTestServerImpl::IntegrationTestServerImpl(Event::TestTimeSystem& time_system,
+                                                     Api::Api& api, const std::string& config_path)
+    : IntegrationTestServer(time_system, api, config_path),
+      symbol_table_(Stats::SymbolTableCreator::makeSymbolTable()),
+      stats_allocator_(*symbol_table_) {}
+
 void IntegrationTestServerImpl::createAndRunEnvoyServer(
     OptionsImpl& options, Event::TimeSystem& time_system,
     Network::Address::InstanceConstSharedPtr local_address, ListenerHooks& hooks,
     Thread::BasicLockable& access_log_lock, Server::ComponentFactory& component_factory,
     Runtime::RandomGeneratorPtr&& random_generator, ProcessObjectOptRef process_object) {
   {
+
     Init::ManagerImpl init_manager{"Server"};
-    Stats::SymbolTablePtr symbol_table = Stats::SymbolTableCreator::makeSymbolTable();
     Server::HotRestartNopImpl restarter;
     ThreadLocal::InstanceImpl tls;
-    Stats::AllocatorImpl stats_allocator(*symbol_table);
-    Stats::ThreadLocalStoreImpl stat_store(stats_allocator);
+    Stats::ThreadLocalStoreImpl stat_store(stats_allocator_);
     std::unique_ptr<ProcessContext> process_context;
     if (process_object.has_value()) {
       process_context = std::make_unique<ProcessContextImpl>(process_object->get());

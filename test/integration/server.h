@@ -15,6 +15,7 @@
 #include "common/common/lock_guard.h"
 #include "common/common/logger.h"
 #include "common/common/thread.h"
+#include "common/stats/allocator_impl.h"
 
 #include "server/drain_manager_impl.h"
 #include "server/listener_hooks.h"
@@ -149,6 +150,60 @@ public:
 private:
   Thread::MutexBasicLockable& lock_;
   ScopePtr wrapped_scope_;
+};
+
+// A counter which signals on a condition variable when it is incremented.
+class NotifyingCounter : public Stats::CounterImpl {
+public:
+  NotifyingCounter(Stats::StatName name, Stats::AllocatorImpl& alloc,
+                   Stats::StatName tag_extracted_name,
+                   const Stats::StatNameTagVector& stat_name_tags, absl::CondVar& condvar)
+      : Stats::CounterImpl(name, alloc, tag_extracted_name, stat_name_tags), condvar_(condvar) {}
+
+  void add(uint64_t amount) override {
+    Stats::CounterImpl::add(amount);
+    condvar_.Signal();
+  }
+
+private:
+  absl::CondVar& condvar_;
+};
+
+// A stats allocator which creates NotifyingCounters rather than regular CounterImpls.
+class NotifyingAllocatorImpl : public Stats::AllocatorImpl {
+public:
+  using Stats::AllocatorImpl::AllocatorImpl;
+
+  virtual Stats::CounterImpl* makeCounterImpl(StatName name, StatName tag_extracted_name,
+                                              const StatNameTagVector& stat_name_tags) {
+    Stats::CounterImpl* counter =
+        new NotifyingCounter(name, *this, tag_extracted_name, stat_name_tags, condvar_);
+    {
+      absl::MutexLock l(&mutex_);
+      counters_.emplace(counter->name(), counter);
+    }
+    condvar_.Signal();
+    return counter;
+  }
+
+  // Allow getting the counter directly from the allocator, since it's harder to
+  // signal when the counter has been added to a given stats store.
+  virtual Stats::CounterImpl* getCounter(std::string name) {
+    absl::MutexLock l(&mutex_);
+    auto it = counters_.find(name);
+    if (it != counters_.end()) {
+      return it->second;
+    }
+    return nullptr;
+  }
+
+  absl::CondVar& condvar() { return condvar_; }
+  absl::Mutex& mutex() { return mutex_; }
+
+private:
+  absl::flat_hash_map<std::string, Stats::CounterImpl*> counters_;
+  absl::Mutex mutex_;
+  absl::CondVar condvar_;
 };
 
 /**
@@ -299,10 +354,19 @@ public:
              Server::FieldValidationConfig validation_config, uint32_t concurrency);
 
   void waitForCounterEq(const std::string& name, uint64_t value) override {
-    TestUtility::waitForCounterEq(statStore(), name, value, time_system_);
+    while (statsAllocator().getCounter(name) == nullptr ||
+           statsAllocator().getCounter(name)->value() != value) {
+      absl::MutexLock l(&statsAllocator().mutex());
+      statsAllocator().condvar().Wait(&statsAllocator().mutex());
+    }
   }
 
   void waitForCounterGe(const std::string& name, uint64_t value) override {
+    while (statsAllocator().getCounter(name) == nullptr ||
+           statsAllocator().getCounter(name)->value() < value) {
+      absl::MutexLock l(&statsAllocator().mutex());
+      statsAllocator().condvar().Wait(&statsAllocator().mutex());
+    }
     TestUtility::waitForCounterGe(statStore(), name, value, time_system_);
   }
 
@@ -349,6 +413,7 @@ public:
   virtual Server::Instance& server() PURE;
   virtual Stats::Store& statStore() PURE;
   virtual Network::Address::InstanceConstSharedPtr adminAddress() PURE;
+  virtual Stats::NotifyingAllocatorImpl& statsAllocator() PURE;
   void useAdminInterfaceToQuit(bool use) { use_admin_interface_to_quit_ = use; }
   bool useAdminInterfaceToQuit() { return use_admin_interface_to_quit_; }
 
@@ -401,8 +466,7 @@ private:
 class IntegrationTestServerImpl : public IntegrationTestServer {
 public:
   IntegrationTestServerImpl(Event::TestTimeSystem& time_system, Api::Api& api,
-                            const std::string& config_path)
-      : IntegrationTestServer(time_system, api, config_path) {}
+                            const std::string& config_path);
 
   ~IntegrationTestServerImpl() override;
 
@@ -415,6 +479,7 @@ public:
     return *stat_store_;
   }
   Network::Address::InstanceConstSharedPtr adminAddress() override { return admin_address_; }
+  Stats::NotifyingAllocatorImpl& statsAllocator() override { return stats_allocator_; }
 
 private:
   void createAndRunEnvoyServer(OptionsImpl& options, Event::TimeSystem& time_system,
@@ -430,6 +495,8 @@ private:
   Stats::Store* stat_store_{};
   Network::Address::InstanceConstSharedPtr admin_address_;
   absl::Notification server_gone_;
+  Stats::SymbolTablePtr symbol_table_;
+  Stats::NotifyingAllocatorImpl stats_allocator_;
 };
 
 } // namespace Envoy
