@@ -40,6 +40,7 @@ PENDING_AUTHORIZED_GROUPS -> USER_AUTHORIZED
  */
 class OAuth2Client : public Http::AsyncClient::Callbacks {
 public:
+  ~OAuth2Client() override = default;
   virtual void asyncGetAccessToken(const std::string& auth_code, const std::string& client_id,
                                    const std::string& secret, const std::string& cb_url) PURE;
   virtual void asyncGetIdentity(const std::string& access_token) PURE;
@@ -47,7 +48,6 @@ public:
   void onFailure(const Http::AsyncClient::Request&,
                  Http::AsyncClient::FailureReason f) override PURE;
   virtual void setCallbacks(OAuth2FilterCallbacks& callbacks) PURE;
-  ~OAuth2Client() override = default;
 };
 
 class OAuth2ClientImpl : public OAuth2Client, Logger::Loggable<Logger::Id::upstream> {
