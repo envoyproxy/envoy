@@ -4,7 +4,7 @@
 Changes
 -------
 
-* api v2: added `envoy.api.enable_deprecated_v2_api_warning` runtime feature to enable warnings on api v2 use.  
+* api v2: A warning is now logged when v2 xDS api is used. This behavior can be temporarily disabled by setting `envoy.reloadable_features.enable_deprecated_v2_api_warning` to `false`.
 * access loggers: added GRPC_STATUS operator on logging format.
 * access loggers: applied existing buffer limits to access logs, as well as :ref:`stats <config_access_log_stats>` for logged / dropped logs. This can be reverted temporarily by setting runtime feature `envoy.reloadable_features.disallow_unbounded_access_logs` to false.
 * access loggers: extened specifier for FilterStateFormatter to output :ref:`unstructured log string <config_access_log_format_filter_state>`.
