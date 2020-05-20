@@ -75,8 +75,6 @@ New Features
   tracing is not forced.
 * router: add support for RESPONSE_FLAGS and RESPONSE_CODE_DETAILS :ref:`header formatters
   <config_http_conn_man_headers_custom_request_headers>`.
-* router: allow retries of streaming or incomplete requests. This removes stat `rq_retry_skipped_request_not_complete`.
-* router: allow retries by default when upstream responds with :ref:`x-envoy-overloaded <config_http_filters_router_x-envoy-overloaded_set>`.
 * router: more fine grained internal redirect configs are added to the :ref`internal_redirect_policy
   <envoy_api_field_router.RouterAction.internal_redirect_policy>` field.
 * runtime: add new gauge :ref:`deprecated_feature_seen_since_process_start <runtime_stats>` that gets reset across hot restarts.
