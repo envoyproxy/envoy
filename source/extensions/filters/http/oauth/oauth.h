@@ -16,7 +16,6 @@ namespace Oauth {
  */
 class OAuth2FilterCallbacks {
 public:
-  OAuth2FilterCallbacks() = default;
   virtual ~OAuth2FilterCallbacks() = default;
 
   virtual void onGetAccessTokenSuccess(const std::string& access_token,
