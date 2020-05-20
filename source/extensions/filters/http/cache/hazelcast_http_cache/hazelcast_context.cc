@@ -12,15 +12,15 @@ namespace HazelcastHttpCache {
 
 using Envoy::Protobuf::util::MessageDifferencer;
 
-HazelcastLookupContextBase::HazelcastLookupContextBase(HazelcastCache& cache,
+HazelcastLookupContextBase::HazelcastLookupContextBase(HazelcastHttpCache& cache,
                                                        LookupRequest&& request)
     : hz_cache_(cache), lookup_request_(std::move(request)) {
   createVariantKey(lookup_request_.key());
   variant_hash_key_ = stableHashKey(lookup_request_.key());
 }
 
+// TODO(enozcan): Support trailers when implemented on the filter side.
 void HazelcastLookupContextBase::getTrailers(LookupTrailersCallback&&) {
-  // TODO(enozcan): Support trailers when implemented on the filter side.
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 
@@ -43,12 +43,16 @@ void HazelcastLookupContextBase::createVariantKey(Key& raw_key) {
     return;
   }
   std::vector<std::pair<std::string, std::string>> header_strings;
-
   for (const Http::HeaderEntry& header : lookup_request_.varyHeaders()) {
     header_strings.push_back(std::make_pair(std::string(header.key().getStringView()),
                                             std::string(header.value().getStringView())));
   }
+  arrangeVariantHeaders(raw_key, header_strings);
+}
 
+// Decoupled from HazelcastLookupContextBase::createVariantKey to be able to test.
+void HazelcastLookupContextBase::arrangeVariantHeaders(
+    Key& raw_key, std::vector<std::pair<std::string, std::string>>& header_strings) {
   // Different order of headers causes different hash keys even if their both key and value
   // are the same. That is, the following two header lists will cause different hashes for
   // the same response and hence they are sorted before insertion.
@@ -64,16 +68,15 @@ void HazelcastLookupContextBase::createVariantKey(Key& raw_key) {
     return left.first == right.first ? false : left.first < right.first;
   });
 
-  // stableHashKey now creates variant hash for the key since its custom_fields are like:
+  // stableHashKey will create the same variant hashes for the above keys since both
+  // have the same custom_fields:
   // [ "Accept-Encoding", "gzip", "User-Agent", "desktop"]
   for (auto& header : header_strings) {
     raw_key.add_custom_fields(std::move(header.first));
     raw_key.add_custom_fields(std::move(header.second));
   }
-
   // TODO(enozcan): Ensure the generation of the same key for the same response independent
   //  from the header orders.
-  //
   //  Different hash keys will be created if the order of values differ for the same
   //  vary header key. The response will not be affected but the same response will
   //  be cached with different keys. i.e. two different hashes exist for the followings
@@ -83,18 +86,18 @@ void HazelcastLookupContextBase::createVariantKey(Key& raw_key) {
 }
 
 HazelcastInsertContextBase::HazelcastInsertContextBase(LookupContext& lookup_context,
-                                                       HazelcastCache& cache)
+                                                       HazelcastHttpCache& cache)
     : hz_cache_(cache), max_body_size_(cache.maxBodySize()),
       variant_hash_key_(static_cast<HazelcastLookupContextBase&>(lookup_context).variantHashKey()),
       variant_key_(static_cast<HazelcastLookupContextBase&>(lookup_context).variantKey()),
       abort_insertion_(static_cast<HazelcastLookupContextBase&>(lookup_context).isAborted()) {}
 
+// TODO(enozcan): Support trailers when implemented on the filter side.
 void HazelcastInsertContextBase::insertTrailers(const Http::ResponseTrailerMap&) {
-  // TODO(enozcan): Support trailers when implemented on the filter side.
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 
-UnifiedLookupContext::UnifiedLookupContext(HazelcastCache& cache, LookupRequest&& request)
+UnifiedLookupContext::UnifiedLookupContext(HazelcastHttpCache& cache, LookupRequest&& request)
     : HazelcastLookupContextBase(cache, std::move(request)) {}
 
 void UnifiedLookupContext::getHeaders(LookupHeadersCallback&& cb) {
@@ -102,7 +105,7 @@ void UnifiedLookupContext::getHeaders(LookupHeadersCallback&& cb) {
   try {
     response_ = hz_cache_.getResponse(variant_hash_key_);
   } catch (HazelcastClientOfflineException& e) {
-    handleLookupFailure("Hazelcast cluster connection is lost! Aborting lookups and "
+    handleLookupFailure("Hazelcast cluster connection is lost! Aborting all lookups and "
                         "insertions until the connection is restored...",
                         cb);
     return;
@@ -148,7 +151,7 @@ void UnifiedLookupContext::getBody(const AdjustedByteRange& range, LookupBodyCal
   cb(std::make_unique<Buffer::OwnedImpl>(data, range.length()));
 }
 
-UnifiedInsertContext::UnifiedInsertContext(LookupContext& lookup_context, HazelcastCache& cache)
+UnifiedInsertContext::UnifiedInsertContext(LookupContext& lookup_context, HazelcastHttpCache& cache)
     : HazelcastInsertContextBase(lookup_context, cache) {}
 
 void UnifiedInsertContext::insertHeaders(const Http::ResponseHeaderMap& response_headers,
@@ -178,7 +181,7 @@ void UnifiedInsertContext::insertBody(const Buffer::Instance& chunk,
     buffer_vector_.resize(buffer_length + chunk.length());
     chunk.copyOut(0, chunk.length(), buffer_vector_.data() + buffer_length);
   } else {
-    // Store the body copied until now and abort the further attempted.
+    // Store the body copied until now and abort the further attempts.
     buffer_vector_.resize(max_body_size_);
     chunk.copyOut(0, allowed_size, buffer_vector_.data() + buffer_length);
     insertResponse();
@@ -216,7 +219,7 @@ void UnifiedInsertContext::insertResponse() {
   }
 }
 
-DividedLookupContext::DividedLookupContext(HazelcastCache& cache, LookupRequest&& request)
+DividedLookupContext::DividedLookupContext(HazelcastHttpCache& cache, LookupRequest&& request)
     : HazelcastLookupContextBase(cache, std::move(request)),
       body_partition_size_(cache.bodySizePerEntry()){};
 
@@ -245,8 +248,6 @@ void DividedLookupContext::getHeaders(LookupHeadersCallback&& cb) {
       handleLookupFailure("Mismatched keys found for unsigned hash: " +
                               std::to_string(variant_hash_key_),
                           cb, false);
-      // Unsigned hash is denoted here since entries are stored with signed keys correspond
-      // to the unsigned ones. This is because of Hazelcast behavior.
       return;
     }
     this->total_body_size_ = header_entry->bodySize();
@@ -255,18 +256,21 @@ void DividedLookupContext::getHeaders(LookupHeadersCallback&& cb) {
     cb(lookup_request_.makeLookupResult(std::move(header_entry->headerMap()), total_body_size_));
   } else {
     ENVOY_LOG(debug, "Missed divided response lookup for key: {}u", variant_hash_key_);
-    // To prevent multiple insertion contexts to create the same response in the cache,
-    // mark only one of them responsible for the insertion using Hazelcast map key locks.
-    // If key is not locked, it will be acquired here and only one insertion context
-    // created for this lookup will be responsible for the insertion. This is also valid
-    // when multiple cache filters from different proxies are connected to the same
-    // Hazelcast cluster.
     try {
+      // To prevent multiple insertion contexts to create the same response in the cache,
+      // mark only one of them responsible for the insertion using Hazelcast map key locks.
+      // If key is not locked, it will be acquired here and only one insertion context
+      // created for this lookup will be responsible for the insertion. This is also valid
+      // when multiple cache filters from different proxies are connected to the same
+      // Hazelcast cluster.
       abort_insertion_ = !hz_cache_.tryLock(variant_hash_key_);
     } catch (HazelcastClientOfflineException& e) {
       handleLookupFailure("Hazelcast cluster connection is lost! Aborting lookups and insertions"
                           " until the connection is restored...",
                           cb);
+      return;
+    } catch (OperationTimeoutException& e) {
+      handleLookupFailure("Operation timed out during tryLock!", cb);
       return;
     } catch (std::exception& e) {
       handleLookupFailure(fmt::format("Lock trial has failed: {}", e.what()), cb);
@@ -357,7 +361,7 @@ void DividedLookupContext::handleBodyLookupFailure(absl::string_view message,
   cb(nullptr);
 }
 
-DividedInsertContext::DividedInsertContext(LookupContext& lookup_context, HazelcastCache& cache)
+DividedInsertContext::DividedInsertContext(LookupContext& lookup_context, HazelcastHttpCache& cache)
     : HazelcastInsertContextBase(lookup_context, cache),
       body_partition_size_(cache.bodySizePerEntry()), version_(createVersion()) {}
 
@@ -478,14 +482,14 @@ void DividedInsertContext::insertHeader() {
     hz_cache_.putHeader(variant_hash_key_, header);
     hz_cache_.unlock(variant_hash_key_);
     ENVOY_LOG(debug, "Inserted header entry with key {}u", variant_hash_key_);
-  } catch (HazelcastClientOfflineException& e) {
-    ENVOY_LOG(warn, "Hazelcast Connection is offline!");
-    // To handle leftover locks, hazelcast.lock.max.lease.time.seconds property must
-    // be set to a reasonable value on the server side. It is Long.MAX by default.
+    // To handle leftover locks in a failure, hazelcast.lock.max.lease.time.seconds property
+    // must be set to a reasonable value on the server side. It is Long.MAX by default.
     // To make this independent from the server configuration, tryLock with leaseTime
     // option can be used when available in a future release of cpp client. The related
     // issue can be tracked at: https://github.com/hazelcast/hazelcast-cpp-client/issues/579
     // TODO(enozcan): Use tryLock with leaseTime when released for Hazelcast cpp client.
+  } catch (HazelcastClientOfflineException& e) {
+    ENVOY_LOG(warn, "Hazelcast Connection is offline!");
   } catch (std::exception& e) {
     ENVOY_LOG(warn, "Failed to complete response insertion: {}", e.what());
   }
@@ -496,8 +500,8 @@ int32_t DividedInsertContext::createVersion() {
   // the versions of two different header entries with distinct
   // hash keys are the same, this will not cause a problem at all.
   // We only need a stamp for bodies which inserted for this context.
-  // Since this version is stored in cache entries, 32 bit random
-  // derived from the 64 bit is preferred here.
+  // Since this version is stored in cache entries, a 32-bit random
+  // derived from the 64-bit one is preferred here.
   // Range: from (int32.MIN + 1) to (int32.MAX - 1), inclusive.
   uint64_t rand64 = hz_cache_.random();
   uint64_t max = std::numeric_limits<int32_t>::max();

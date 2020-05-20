@@ -2,7 +2,7 @@
 
 #include "extensions/filters/http/cache/hazelcast_http_cache/hazelcast_context.h"
 
-#include "test/extensions/filters/http/cache/hazelcast_http_cache/util.h"
+#include "test/extensions/filters/http/cache/hazelcast_http_cache/test_util.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -18,12 +18,19 @@ class HazelcastHttpCacheTest : public HazelcastHttpCacheTestBase,
 protected:
   void SetUp() override {
     HazelcastHttpCacheConfig config = HazelcastTestUtil::getTestConfig(GetParam());
-    // To test the cache with a real Hazelcast instance, remote cache
-    // must be used during tests.
-    // cache_ = std::make_unique<HazelcastTestableRemoteCache>(config);
-    cache_ = std::make_unique<HazelcastTestableLocalCache>(config);
-    cache_->restoreTestConnection();
-    cache_->clearTestMaps();
+    // To test the cache with a real Hazelcast instance, use remote test cache.
+    // cache_ = std::make_unique<RemoteTestCache>(config);
+    cache_ = std::make_unique<LocalTestCache>(config);
+    cache_->start();
+    cache_->getTestAccessor().clearMaps();
+  }
+
+  Key getVariantKey(LookupContextPtr& lookup,
+                    std::vector<std::pair<std::string, std::string>>& headers) {
+    HazelcastLookupContextBase& hz_lookup = static_cast<HazelcastLookupContextBase&>(*lookup);
+    Key variant_key = hz_lookup.variantKey();
+    hz_lookup.arrangeVariantHeaders(variant_key, headers);
+    return variant_key;
   }
 };
 
@@ -32,7 +39,7 @@ INSTANTIATE_TEST_SUITE_P(CommonCacheTests, HazelcastHttpCacheTest, ::testing::Bo
 TEST_P(HazelcastHttpCacheTest, MissPutAndGetEntries) {
   // To test divided body behavior as well, bodies having sizes near the limit are preferred.
   const std::string RequestPath1("/body/with/limit/size/plus/one");
-  const std::string RequestPath2("/body/with/exactly/limit/size");
+  const std::string RequestPath2("/body/with/exact/limit/size");
   const std::string RequestPath3("/body/with/limit/size/minus/one");
 
   LookupContextPtr lookup_context1 = lookup(RequestPath1);
@@ -58,40 +65,53 @@ TEST_P(HazelcastHttpCacheTest, MissPutAndGetEntries) {
 
 TEST_P(HazelcastHttpCacheTest, HandleRangedResponses) {
   const std::string RequestPath("/ranged/responses");
-
-  LookupContextPtr lookup_context1 = lookup(RequestPath);
+  LookupContextPtr lookup_context = lookup(RequestPath);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 
   int size = HazelcastTestUtil::TEST_PARTITION_SIZE;
-  const std::string Body1 = std::string(size, 'h');
-  const std::string Body2 = std::string(size, 'z');
-  const std::string Body3 = std::string(size, 'c');
-  const std::string Body = Body1 + Body2 + Body3;
-
-  insert(move(lookup_context1), getResponseHeaders(), Body);
-  lookup_context1 = lookup(RequestPath);
+  const std::string Body = std::string(size, 'h') + std::string(size, 'z') + std::string(size, 'c');
+  insert(move(lookup_context), getResponseHeaders(), Body);
+  lookup_context = lookup(RequestPath);
 
   // 'h' * (size)
-  EXPECT_EQ(absl::string_view(Body.c_str(), size), getBody(*lookup_context1, 0, size));
+  EXPECT_EQ(absl::string_view(Body.c_str(), size), getBody(*lookup_context, 0, size));
 
   // 'z' * (size)
-  EXPECT_EQ(absl::string_view(Body.c_str() + size, size),
-            getBody(*lookup_context1, size, size * 2));
+  EXPECT_EQ(absl::string_view(Body.c_str() + size, size), getBody(*lookup_context, size, size * 2));
 
   // 'h' * (size/2) + 'z' * (size/2)
   EXPECT_EQ(absl::string_view(Body.c_str() + size / 2, size),
-            getBody(*lookup_context1, size / 2, size + size / 2));
+            getBody(*lookup_context, size / 2, size + size / 2));
 
   // 'h' + 'z' * (size) + 'c'
   EXPECT_EQ(absl::string_view(Body.c_str() + size - 1, size + 2),
-            getBody(*lookup_context1, size - 1, 2 * size + 1));
+            getBody(*lookup_context, size - 1, 2 * size + 1));
 
   // 'h' * (size) + 'z' * (size) + 'c' * (size)
-  EXPECT_EQ(absl::string_view(Body.c_str(), size * 3), getBody(*lookup_context1, 0, size * 3));
+  EXPECT_EQ(absl::string_view(Body.c_str(), size * 3), getBody(*lookup_context, 0, size * 3));
+}
+
+TEST_P(HazelcastHttpCacheTest, VariantKeyTest) {
+  // The same key should be created for the same vary headers even if their
+  // order is different.
+  LookupContextPtr lookup_context = lookup("/variant/key/test/");
+  std::vector<std::pair<std::string, std::string>> vary_headers;
+  vary_headers.push_back(std::make_pair("Accept-Language", "tr;q=0.8"));
+  vary_headers.push_back(std::make_pair("User-Agent", "desktop"));
+  auto key1 = getVariantKey(lookup_context, vary_headers);
+  vary_headers.clear();
+  vary_headers.push_back(std::make_pair("User-Agent", "desktop"));
+  vary_headers.push_back(std::make_pair("Accept-Language", "tr;q=0.8"));
+  auto key2 = getVariantKey(lookup_context, vary_headers);
+
+  EXPECT_EQ(4, key1.custom_fields_size()); // 2 keys, 2 values, 4 in total
+  EXPECT_EQ(4, key2.custom_fields_size());
+  EXPECT_TRUE(Envoy::Protobuf::util::MessageDifferencer::Equals(key1, key2));
+  EXPECT_EQ(stableHashKey(key1), stableHashKey(key2));
 }
 
 //
-// Tests belong to SimpleHttpCache are applied below with minor changes on the test body.
+// Tests belong to SimpleHttpCache are applied below with minor changes on the test bodies.
 //
 TEST_P(HazelcastHttpCacheTest, SimplePutGet) {
   const std::string RequestPath1("/simple/put/first");
@@ -130,7 +150,8 @@ TEST_P(HazelcastHttpCacheTest, Miss) {
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 
   // Do not left over a missed lookup without inserting or releasing its lock.
-  cache_->base().unlock(variant_hash_key);
+  // This is required for RemoteTestCache.
+  cache_->unlock(variant_hash_key);
 }
 
 TEST_P(HazelcastHttpCacheTest, Fresh) {
@@ -178,7 +199,7 @@ TEST_P(HazelcastHttpCacheTest, ResponseStaleWithRequestLargeMaxStale) {
 }
 
 TEST_P(HazelcastHttpCacheTest, StreamingPutAndRangeGet) {
-  InsertContextPtr inserter = cache_->base().makeInsertContext(lookup("/streaming/put"));
+  InsertContextPtr inserter = cache_->makeInsertContext(lookup("/streaming/put"));
   inserter->insertHeaders(getResponseHeaders(), false);
   inserter->insertBody(
       Buffer::OwnedImpl("Hello, "), [](bool ready) { EXPECT_TRUE(ready); }, false);
@@ -203,10 +224,11 @@ TEST(Registration, GetFactory) {
   config.mutable_typed_config()->PackFrom(hz_cache_config);
 
   // getOfflineCache() call is for testing. It creates a HazelcastHttpCache but does
-  // not make it operational until a connect() call.
+  // not make it operational until a start() call.
   HttpCache& cache = static_cast<HazelcastHttpCacheFactory*>(factory)->getOfflineCache(config);
   EXPECT_EQ(cache.cacheInfo().name_, "envoy.extensions.http.cache.hazelcast");
-  EXPECT_THROW_WITH_MESSAGE(static_cast<HazelcastHttpCache&>(cache).connect(), EnvoyException,
+  HazelcastHttpCache& hz_cache = static_cast<HazelcastHttpCache&>(cache);
+  EXPECT_THROW_WITH_MESSAGE(hz_cache.start(), EnvoyException,
                             "Hazelcast Client could not connect to any cluster.");
 }
 

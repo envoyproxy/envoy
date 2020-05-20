@@ -14,13 +14,14 @@ envoy_cc_extension(
     srcs = [
         "hazelcast_cache_entry.cc",
         "hazelcast_context.cc",
-        "hazelcast_http_cache_impl.cc",
+        "hazelcast_http_cache.cc",
+        "hazelcast_storage_accessor.cc",
     ],
     hdrs = [
-        "hazelcast_cache.h",
         "hazelcast_cache_entry.h",
         "hazelcast_context.h",
-        "hazelcast_http_cache_impl.h",
+        "hazelcast_http_cache.h",
+        "hazelcast_storage_accessor.h",
         "util.h",
     ],
     external_deps = ["hazelcast_cpp_client"],

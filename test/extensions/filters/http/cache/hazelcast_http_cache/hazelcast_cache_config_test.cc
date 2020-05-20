@@ -12,6 +12,7 @@ using envoy::source::extensions::filters::http::cache::HazelcastHttpCacheConfig;
 
 class ConfigUtilsTest : public testing::Test {
 protected:
+  // Private configuration values from HazelcastHttpCache::ConfigUtil
   uint64_t defaultPartitionSize() { return ConfigUtil::DEFAULT_PARTITION_SIZE; }
   uint64_t maxPartitionSize() { return ConfigUtil::MAX_ALLOWED_PARTITION_SIZE; }
   uint64_t maxUnifiedBodySize() { return ConfigUtil::MAX_ALLOWED_UNIFIED_BODY_SIZE; }

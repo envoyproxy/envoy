@@ -1,6 +1,6 @@
 #include "extensions/filters/http/cache/hazelcast_http_cache/hazelcast_context.h"
 
-#include "test/extensions/filters/http/cache/hazelcast_http_cache/util.h"
+#include "test/extensions/filters/http/cache/hazelcast_http_cache/test_util.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -15,18 +15,17 @@ class HazelcastDividedCacheTest : public HazelcastHttpCacheTestBase {
 protected:
   void SetUp() override {
     HazelcastHttpCacheConfig config = HazelcastTestUtil::getTestConfig(false);
-    // To test the cache with a real Hazelcast instance, remote cache
-    // must be used during tests.
-    // cache_ = std::make_unique<HazelcastTestableRemoteCache>(config);
-    cache_ = std::make_unique<HazelcastTestableLocalCache>(config);
-    cache_->restoreTestConnection();
-    cache_->clearTestMaps();
+    // To test the cache with a real Hazelcast instance, use remote test cache.
+    // cache_ = std::make_unique<RemoteTestCache>(config);
+    cache_ = std::make_unique<LocalTestCache>(config);
+    cache_->start();
+    cache_->getTestAccessor().clearMaps();
   }
 };
 
 TEST_F(HazelcastDividedCacheTest, AbortDividedInsertionWhenMaxSizeReached) {
   const std::string RequestPath("/abort/when/max/size/reached");
-  InsertContextPtr insert_context = cache_->base().makeInsertContext(lookup(RequestPath));
+  InsertContextPtr insert_context = cache_->makeInsertContext(lookup(RequestPath));
   insert_context->insertHeaders(getResponseHeaders(), false);
   bool ready_for_next = true;
   while (ready_for_next) {
@@ -37,7 +36,7 @@ TEST_F(HazelcastDividedCacheTest, AbortDividedInsertionWhenMaxSizeReached) {
 
   EXPECT_EQ(((HazelcastTestUtil::TEST_MAX_BODY_SIZE + HazelcastTestUtil::TEST_PARTITION_SIZE - 1) /
              HazelcastTestUtil::TEST_PARTITION_SIZE),
-            cache_->bodyTestMapSize());
+            cache_->getTestAccessor().bodyMapSize());
   EXPECT_TRUE(expectLookupSuccessWithFullBody(
       lookup(RequestPath).get(), std::string(HazelcastTestUtil::TEST_MAX_BODY_SIZE, 'h')));
 }
@@ -52,13 +51,13 @@ TEST_F(HazelcastDividedCacheTest, PreventOverridingCacheEntries) {
   lookup_context = lookup(RequestPath);
   EXPECT_EQ(CacheEntryStatus::Ok, lookup_result_.cache_entry_status_);
 
-  // A possible call to insertion below (using a success lookup context) would be the filter's
-  // fault, not an expected behavior.
+  // A possible call to insertion - made on purpose below, would be the filter's
+  // fault, not an expected behavior. Cache prevents the insertion in such a case.
   const std::string OverriddenBody(HazelcastTestUtil::TEST_PARTITION_SIZE * 3, 'z');
   insert(move(lookup_context), getResponseHeaders(), OverriddenBody);
   EXPECT_TRUE(expectLookupSuccessWithFullBody(lookup(RequestPath).get(), OriginalBody));
-  EXPECT_EQ(2, cache_->bodyTestMapSize());
-  EXPECT_EQ(1, cache_->headerTestMapSize());
+  EXPECT_EQ(2, cache_->getTestAccessor().bodyMapSize());
+  EXPECT_EQ(1, cache_->getTestAccessor().headerMapSize());
 }
 
 TEST_F(HazelcastDividedCacheTest, AbortInsertionIfKeyIsLocked) {
@@ -107,10 +106,10 @@ TEST_F(HazelcastDividedCacheTest, MissLookupOnVersionMismatch) {
   EXPECT_TRUE(expectLookupSuccessWithFullBody(lookup(RequestPath1).get(), Body));
 
   // Change version of the second partition.
-  auto body2 = cache_->base().getBody(variant_hash_key, 1);
+  auto body2 = cache_->getBody(variant_hash_key, 1);
   EXPECT_NE(body2, nullptr);
   body2->version(body2->version() + 1);
-  cache_->base().putBody(variant_hash_key, 1, *body2);
+  cache_->putBody(variant_hash_key, 1, *body2);
 
   // Change happened in the second partition. Lookup to the first one should be successful.
   lookup_context = lookup(RequestPath1);
@@ -121,8 +120,8 @@ TEST_F(HazelcastDividedCacheTest, MissLookupOnVersionMismatch) {
   EXPECT_EQ(fullBody, HazelcastTestUtil::abortedBodyResponse());
 
   // Clean up must be performed for malformed entries.
-  EXPECT_EQ(0, cache_->bodyTestMapSize());
-  EXPECT_EQ(0, cache_->headerTestMapSize());
+  EXPECT_EQ(0, cache_->getTestAccessor().bodyMapSize());
+  EXPECT_EQ(0, cache_->getTestAccessor().headerMapSize());
 }
 
 TEST_F(HazelcastDividedCacheTest, MissDividedLookupOnDifferentKey) {
@@ -141,12 +140,12 @@ TEST_F(HazelcastDividedCacheTest, MissDividedLookupOnDifferentKey) {
 
   // Manipulate the cache entry directly. Cache is not aware of that.
   // The cached key will not be the same with the created one by filter.
-  auto header = cache_->base().getHeader(variant_hash_key);
+  auto header = cache_->getHeader(variant_hash_key);
   Key modified = header->variantKey();
   modified.add_custom_fields("custom1");
   modified.add_custom_fields("custom2");
   header->variantKey(std::move(modified));
-  cache_->base().putHeader(variant_hash_key, *header);
+  cache_->putHeader(variant_hash_key, *header);
 
   lookup_context = lookup(RequestPath);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
@@ -157,10 +156,10 @@ TEST_F(HazelcastDividedCacheTest, MissDividedLookupOnDifferentKey) {
   insert(move(lookup_context), getResponseHeaders(), Body);
   lookup_context = lookup(RequestPath);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
-  EXPECT_EQ(1, cache_->headerTestMapSize());
+  EXPECT_EQ(1, cache_->getTestAccessor().headerMapSize());
 
-  auto modified_header = cache_->base().getHeader(variant_hash_key);
-  EXPECT_EQ(2, modified_header->variantKey().custom_fields_size());
+  auto modified_header = cache_->getHeader(variant_hash_key);
+  EXPECT_EQ(*header, *modified_header);
 }
 
 TEST_F(HazelcastDividedCacheTest, CleanUpCachedResponseOnMissingBody) {
@@ -184,7 +183,7 @@ TEST_F(HazelcastDividedCacheTest, CleanUpCachedResponseOnMissingBody) {
   // variant_hash_key "2" -> Body3 (in body map)
   EXPECT_TRUE(expectLookupSuccessWithFullBody(lookup_context1.get(), Body));
 
-  cache_->removeTestBody(variant_hash_key, 1); // evict Body2.
+  cache_->getTestAccessor().removeBody(cache_->orderedMapKey(variant_hash_key, 1)); // evict Body2.
 
   lookup_context1 = lookup(RequestPath1);
   EXPECT_EQ(CacheEntryStatus::Ok, lookup_result_.cache_entry_status_);
@@ -193,24 +192,63 @@ TEST_F(HazelcastDividedCacheTest, CleanUpCachedResponseOnMissingBody) {
   lookup_context1->getBody({0, HazelcastTestUtil::TEST_PARTITION_SIZE * 3},
                            [](Buffer::InstancePtr&& data) { EXPECT_NE(data, nullptr); });
 
-  // Lookup for Body2 must fail and trigger clean up.
-  lookup_context1->getBody(
-      {HazelcastTestUtil::TEST_PARTITION_SIZE, HazelcastTestUtil::TEST_PARTITION_SIZE * 3},
-      [](Buffer::InstancePtr&& data) { EXPECT_EQ(data, nullptr); });
+  {
+    std::thread t1([&] {
+      // If another thread locks the key, then the current one should not perform
+      // clean up. The lock here will serve the purpose.
+      EXPECT_TRUE(cache_->tryLock(variant_hash_key));
+    });
+    t1.join();
 
-  lookup_context1 = lookup(RequestPath1);
-  EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
+    // Lookup for Body2 must fail and trigger clean up. But due to locked key (might
+    // be acquired by another clean up process for this entry), clean up must do no-op.
+    lookup_context1->getBody(
+        {HazelcastTestUtil::TEST_PARTITION_SIZE, HazelcastTestUtil::TEST_PARTITION_SIZE * 3},
+        [](Buffer::InstancePtr&& data) { EXPECT_EQ(data, nullptr); });
 
-  // On lookup miss, lock is being acquired. It must be released
-  // explicitly or let context do the insertion and then release.
-  // If not released, the second run for the test fails. Since no
-  // insertion follows the missed lookup here, the lock is explicitly
-  // released.
-  cache_->base().unlock(variant_hash_key);
+    EXPECT_NE(0, cache_->getTestAccessor().bodyMapSize()); // clean up is not performed.
 
-  // Assert clean up
-  EXPECT_EQ(0, cache_->bodyTestMapSize());
-  EXPECT_EQ(0, cache_->headerTestMapSize());
+    cache_->unlock(variant_hash_key);
+  }
+
+  {
+    // Clean up must be aborted when header versions are mismatched.
+    // This prevents clean up operation for wrong entries.
+    auto header = cache_->getHeader(variant_hash_key);
+    int32_t original_version = header->version();
+    header->version(original_version - 1);
+    cache_->putHeader(variant_hash_key, *header);
+
+    lookup_context1->getBody(
+        {HazelcastTestUtil::TEST_PARTITION_SIZE, HazelcastTestUtil::TEST_PARTITION_SIZE * 3},
+        [](Buffer::InstancePtr&& data) { EXPECT_EQ(data, nullptr); });
+
+    EXPECT_NE(0, cache_->getTestAccessor().bodyMapSize());
+
+    header->version(original_version);
+    cache_->putHeader(variant_hash_key, *header);
+  }
+
+  {
+    // Clean up must be performed after body miss.
+    lookup_context1->getBody(
+        {HazelcastTestUtil::TEST_PARTITION_SIZE, HazelcastTestUtil::TEST_PARTITION_SIZE * 3},
+        [](Buffer::InstancePtr&& data) { EXPECT_EQ(data, nullptr); });
+
+    lookup_context1 = lookup(RequestPath1);
+    EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
+
+    // On lookup miss, lock is being acquired. It must be released
+    // explicitly or let context do the insertion and then release.
+    // If not released, the second run for the test fails. Since no
+    // insertion follows the missed lookup here, the lock is explicitly
+    // released.
+    cache_->unlock(variant_hash_key);
+
+    // Assert clean up
+    EXPECT_EQ(0, cache_->getTestAccessor().bodyMapSize());
+    EXPECT_EQ(0, cache_->getTestAccessor().headerMapSize());
+  }
 }
 
 TEST_F(HazelcastDividedCacheTest, NotCreateBodyOnHeaderOnlyResponse) {
@@ -230,11 +268,13 @@ TEST_F(HazelcastDividedCacheTest, NotCreateBodyOnHeaderOnlyResponse) {
   // then empty body for body insertion.
   headerOnlyTest("/empty/body/response", true);
 
-  EXPECT_EQ(0, cache_->bodyTestMapSize());
-  EXPECT_EQ(2, cache_->headerTestMapSize());
+  EXPECT_EQ(0, cache_->getTestAccessor().bodyMapSize());
+  EXPECT_EQ(2, cache_->getTestAccessor().headerMapSize());
 }
 
 TEST_F(HazelcastDividedCacheTest, AbortDividedOperationsWhenOffline) {
+  // Operations are arranged to test all exception using Local Test Accessor.
+  // Changing the order might not cause test to fail but to uncover some exceptions.
   {
     const std::string RequestPath("/connection/lost/after/insertion");
     LookupContextPtr lookup_context = lookup(RequestPath);
@@ -245,13 +285,23 @@ TEST_F(HazelcastDividedCacheTest, AbortDividedOperationsWhenOffline) {
     lookup_context = lookup(RequestPath);
     EXPECT_TRUE(expectLookupSuccessWithFullBody(lookup_context.get(), Body));
 
-    cache_->dropTestConnection();
+    cache_->getTestAccessor().dropConnection();
 
+    // std::exception case.
     lookup_context = lookup(RequestPath);
     EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
+
+    // HazelcastClientOfflineException case.
+    lookup_context = lookup(RequestPath);
+    EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
+
+    // OperationTimeoutException case.
+    lookup_context = lookup(RequestPath);
+    EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
+
     insert(move(lookup_context), getResponseHeaders(), Body);
 
-    cache_->restoreTestConnection();
+    cache_->getTestAccessor().restoreConnection();
 
     lookup_context = lookup(RequestPath);
     EXPECT_TRUE(expectLookupSuccessWithFullBody(lookup_context.get(), Body));
@@ -259,7 +309,7 @@ TEST_F(HazelcastDividedCacheTest, AbortDividedOperationsWhenOffline) {
 
   {
     const std::string RequestPath("/connection/lost/during/insertion");
-    InsertContextPtr insert_context = cache_->base().makeInsertContext(lookup(RequestPath));
+    InsertContextPtr insert_context = cache_->makeInsertContext(lookup(RequestPath));
     insert_context->insertHeaders(getResponseHeaders(), false);
     auto insert = [&insert_context](std::string body, bool end_stream) {
       insert_context->insertBody(
@@ -269,19 +319,125 @@ TEST_F(HazelcastDividedCacheTest, AbortDividedOperationsWhenOffline) {
     insert(std::string(HazelcastTestUtil::TEST_PARTITION_SIZE, 'h'), false);
     insert(std::string(HazelcastTestUtil::TEST_PARTITION_SIZE, 'z'), false);
 
-    cache_->dropTestConnection();
+    cache_->getTestAccessor().dropConnection();
 
-    insert(std::string(HazelcastTestUtil::TEST_PARTITION_SIZE, 'c'), false);
+    // testing std::exception case.
+    insert(std::string(HazelcastTestUtil::TEST_PARTITION_SIZE, 'c'), true);
+    // testing HazelcastClientOfflineException case.
     insert(std::string(HazelcastTestUtil::TEST_PARTITION_SIZE, 's'), true);
+    // testing OperationTimeoutException case.
+    insert(std::string(HazelcastTestUtil::TEST_PARTITION_SIZE, 't'), true);
 
     LookupContextPtr lookup_context = lookup(RequestPath);
     EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 
-    cache_->restoreTestConnection();
+    cache_->getTestAccessor().restoreConnection();
 
     lookup_context = lookup(RequestPath);
     EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
   }
+}
+
+TEST_F(HazelcastDividedCacheTest, FailDuringLock) {
+  // Tests the case when header lookup is performed without exception but tryLock for
+  // the insertion permission is failed. Operations are arranged to test all exception
+  // using Local Test Accessor. Changing the order might not cause test to fail but
+  // to uncover some exceptions.
+
+  const std::string RequestPath("/failed/during/try/lock");
+
+  // This will cause LocalTestAccessor::tryLock to raise error.
+  cache_->getTestAccessor().failOnLock();
+
+  std::thread t1([&] {
+    // To make RemoteTestCache failOnLock as LocalTestCache does, HazelcastHttpCache
+    // must be modified. In order to prevent this modification, making a lookup here
+    // to make the key locked. Hence the lookups below will throw exception for local
+    // cache and return false for remote cache. This has no effect on local test but
+    // lack of this lookup causes remote test to fail.
+    lookup(RequestPath);
+  });
+  t1.join();
+
+  lookup(RequestPath); // std::exception
+  lookup(RequestPath); // HazelcastClientOfflineException
+  LookupContextPtr lookup_context = lookup(RequestPath);
+  EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
+
+  insert(move(lookup_context), getResponseHeaders(), ""); // must be aborted.
+  lookup_context = lookup(RequestPath);
+  EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
+}
+
+TEST_F(HazelcastDividedCacheTest, FailDuringBodyLookupWhenHeaderSucceeds) {
+  // Tests the case when header lookup succeeds but body lookup fails.
+  const int body_size = HazelcastTestUtil::TEST_PARTITION_SIZE * 2;
+  const std::string RequestPath("/fail/on/body");
+  const std::string Body('h', body_size);
+
+  LookupContextPtr lookup_context = lookup(RequestPath);
+  EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
+
+  insert(move(lookup_context), getResponseHeaders(), Body);
+  lookup_context = lookup(RequestPath);
+  // lookup for header is OK.
+  EXPECT_EQ(CacheEntryStatus::Ok, lookup_result_.cache_entry_status_);
+
+  // Lookup for Body1 is OK.
+  lookup_context->getBody({0, HazelcastTestUtil::TEST_PARTITION_SIZE},
+                          [](Buffer::InstancePtr&& data) { EXPECT_NE(data, nullptr); });
+
+  cache_->getTestAccessor().dropConnection();
+
+  // Lookup for body should be aborted on HazelcastOffline exception.
+  lookup_context->getBody({0, body_size},
+                          [](Buffer::InstancePtr&& data) { EXPECT_EQ(data, nullptr); });
+
+  // Lookup for body should be aborted on TimeOut exception.
+  lookup_context->getBody({0, body_size},
+                          [](Buffer::InstancePtr&& data) { EXPECT_EQ(data, nullptr); });
+
+  // Lookup for body should be aborted on std::exception.
+  lookup_context->getBody({0, body_size},
+                          [](Buffer::InstancePtr&& data) { EXPECT_EQ(data, nullptr); });
+
+  cache_->getTestAccessor().restoreConnection();
+
+  EXPECT_TRUE(expectLookupSuccessWithFullBody(lookup_context.get(), Body));
+}
+
+TEST_F(HazelcastDividedCacheTest, AbortInsertionWhenLockLeftover) {
+  // Happens when a lookup context acquires the lock for insertion but fails to
+  // unlock before insertion. In such a case, the fail over must be done by
+  // max.leaseTime of locks set on the Hazelcast server.
+  const std::string RequestPath1("/connection/lost/on/lock/acquisition/1");
+  const std::string RequestPath2("/connection/lost/on/lock/acquisition/2");
+  LookupContextPtr lookup_context1 = lookup(RequestPath1);
+  EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
+  LookupContextPtr lookup_context2 = lookup(RequestPath2);
+  EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
+
+  InsertContextPtr insert_context1 = cache_->makeInsertContext(std::move(lookup_context1));
+  InsertContextPtr insert_context2 = cache_->makeInsertContext(std::move(lookup_context2));
+
+  cache_->getTestAccessor().dropConnection();
+  insert_context1->insertHeaders(getResponseHeaders(), true);
+  insert_context2->insertHeaders(getResponseHeaders(), true);
+  cache_->getTestAccessor().restoreConnection();
+
+  lookup_context1 = lookup(RequestPath1);
+  EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
+  insert(move(lookup_context1), getResponseHeaders(), "");
+  // insertion fails since the key is still locked.
+  lookup_context1 = lookup(RequestPath1);
+  EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
+
+  lookup_context2 = lookup(RequestPath2);
+  EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
+  insert(move(lookup_context2), getResponseHeaders(), "");
+  // insertion fails since the key is still locked.
+  lookup_context2 = lookup(RequestPath2);
+  EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 }
 
 } // namespace HazelcastHttpCache

@@ -10,17 +10,8 @@ load(
 envoy_package()
 
 envoy_extension_cc_test(
-    name = "hazelcast_unified_cache_test",
-    srcs = ["hazelcast_unified_cache_test.cc"],
-    extension_name = "envoy.filters.http.cache.hazelcast_http_cache",
-    deps = [
-        ":hazelcast_test_lib",
-    ],
-)
-
-envoy_extension_cc_test(
-    name = "hazelcast_divided_cache_test",
-    srcs = ["hazelcast_divided_cache_test.cc"],
+    name = "hazelcast_cache_config_test",
+    srcs = ["hazelcast_cache_config_test.cc"],
     extension_name = "envoy.filters.http.cache.hazelcast_http_cache",
     deps = [
         ":hazelcast_test_lib",
@@ -37,8 +28,8 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
-    name = "hazelcast_config_utils_test",
-    srcs = ["config_utils_test.cc"],
+    name = "hazelcast_divided_cache_test",
+    srcs = ["hazelcast_divided_cache_test.cc"],
     extension_name = "envoy.filters.http.cache.hazelcast_http_cache",
     deps = [
         ":hazelcast_test_lib",
@@ -46,8 +37,17 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
-    name = "hazelcast_serialization_test",
-    srcs = ["serialization_test.cc"],
+    name = "hazelcast_entry_serialization_test",
+    srcs = ["hazelcast_entry_serialization_test.cc"],
+    extension_name = "envoy.filters.http.cache.hazelcast_http_cache",
+    deps = [
+        ":hazelcast_test_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "hazelcast_unified_cache_test",
+    srcs = ["hazelcast_unified_cache_test.cc"],
     extension_name = "envoy.filters.http.cache.hazelcast_http_cache",
     deps = [
         ":hazelcast_test_lib",
@@ -56,10 +56,10 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test_library(
     name = "hazelcast_test_lib",
-    srcs = ["hazelcast_test_cache.cc"],
     hdrs = [
-        "hazelcast_test_cache.h",
-        "util.h",
+        "test_accessors.h",
+        "test_caches.h",
+        "test_util.h",
     ],
     extension_name = "envoy.filters.http.cache.hazelcast_http_cache",
     deps = [

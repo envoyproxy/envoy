@@ -1,6 +1,6 @@
 #pragma once
 
-#include "extensions/filters/http/cache/hazelcast_http_cache/hazelcast_http_cache_impl.h"
+#include "extensions/filters/http/cache/hazelcast_http_cache/hazelcast_http_cache.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -14,12 +14,11 @@ namespace HazelcastHttpCache {
 class HazelcastLookupContextBase : public LookupContext,
                                    public Logger::Loggable<Logger::Id::hazelcast_http_cache> {
 public:
-  HazelcastLookupContextBase(HazelcastCache& cache, LookupRequest&& request);
+  HazelcastLookupContextBase(HazelcastHttpCache& cache, LookupRequest&& request);
 
   // LookupContext
   void getTrailers(LookupTrailersCallback&&) override;
 
-  const LookupRequest& request() const { return lookup_request_; }
   const Key& variantKey() const { return lookup_request_.key(); }
   uint64_t variantHashKey() const { return variant_hash_key_; }
   bool isAborted() const { return abort_insertion_; }
@@ -28,16 +27,19 @@ protected:
   void handleLookupFailure(absl::string_view message, const LookupHeadersCallback& cb,
                            bool warn_log = true);
 
-  HazelcastCache& hz_cache_;
+  HazelcastHttpCache& hz_cache_;
   LookupRequest lookup_request_;
 
-  /** Hash key aware of vary headers. Lookup will be performed using this. */
+  /** Hash key aware of vary headers. Lookup to header and response entry is performed using this
+   * key. */
   uint64_t variant_hash_key_;
 
-  /** Flag to notice insert context created with this lookup. */
+  /** Flag to notice insert context created for this lookup */
   bool abort_insertion_ = false;
 
 private:
+  friend class HazelcastHttpCacheTest;
+
   /**
    * The keys created by the cache filter for lookups and inserts are not aware
    * of the vary headers of the request. Instead, cache filter expects a
@@ -45,11 +47,21 @@ private:
    * headers. Rather than storing multiple responses with the same key and
    * then querying them according to vary headers, a different key for each
    * response including vary headers in custom fields is created here. Hence
-   * responses can be found by their <variant_hash> directly.
+   * responses can be found by their <variant_hash> directly without querying.
    *
-   * @param raw_key     Key created by the filter.
+   * @param raw_key     Key to be modified created by the filter.
    */
   void createVariantKey(Key& raw_key);
+
+  /**
+   * Fills the custom_fields of a key with given headers in alphabetical order.
+   *
+   * @note  Decoupled from createVariantKey for testing.
+   * @param raw_key     Key to be modified created by the filter.
+   * @param headers     Vary headers to be included in the key.
+   */
+  void arrangeVariantHeaders(Key& raw_key,
+                             std::vector<std::pair<std::string, std::string>>& headers);
 };
 
 /**
@@ -58,20 +70,20 @@ private:
 class HazelcastInsertContextBase : public InsertContext,
                                    public Logger::Loggable<Logger::Id::hazelcast_http_cache> {
 public:
-  HazelcastInsertContextBase(LookupContext& lookup_context, HazelcastCache& cache);
+  HazelcastInsertContextBase(LookupContext& lookup_context, HazelcastHttpCache& cache);
 
   // InsertContext
   void insertTrailers(const Http::ResponseTrailerMap&) override;
 
 protected:
-  HazelcastCache& hz_cache_;
+  HazelcastHttpCache& hz_cache_;
 
-  // From plugin configuration
+  // From HazelcastHttpCache configuration
   const uint64_t max_body_size_;
 
   bool committed_end_stream_ = false;
 
-  // From lookup context
+  // Derived from lookup context
   const uint64_t variant_hash_key_;
   Key variant_key_;
   const bool abort_insertion_;
@@ -89,7 +101,7 @@ protected:
  */
 class UnifiedLookupContext : public HazelcastLookupContextBase {
 public:
-  UnifiedLookupContext(HazelcastCache& cache, LookupRequest&& request);
+  UnifiedLookupContext(HazelcastHttpCache& cache, LookupRequest&& request);
   void getHeaders(LookupHeadersCallback&& cb) override;
   void getBody(const AdjustedByteRange& range, LookupBodyCallback&& cb) override;
 
@@ -103,7 +115,7 @@ private:
  */
 class UnifiedInsertContext : public HazelcastInsertContextBase {
 public:
-  UnifiedInsertContext(LookupContext& lookup_context, HazelcastCache& cache);
+  UnifiedInsertContext(LookupContext& lookup_context, HazelcastHttpCache& cache);
   void insertHeaders(const Http::ResponseHeaderMap& response_headers, bool end_stream) override;
   void insertBody(const Buffer::Instance& chunk, InsertCallback ready_for_next_chunk,
                   bool end_stream) override;
@@ -121,7 +133,7 @@ private:
  */
 class DividedLookupContext : public HazelcastLookupContextBase {
 public:
-  DividedLookupContext(HazelcastCache& cache, LookupRequest&& request);
+  DividedLookupContext(HazelcastHttpCache& cache, LookupRequest&& request);
   void getHeaders(LookupHeadersCallback&& cb) override;
   void getBody(const AdjustedByteRange& range, LookupBodyCallback&& cb) override;
 
@@ -134,7 +146,7 @@ private:
   int32_t version_;
   uint64_t total_body_size_;
 
-  /** Max body size per body entry defined via config. */
+  /** Max body size per body entry defined via cache config. */
   const uint64_t body_partition_size_;
 };
 
@@ -143,7 +155,7 @@ private:
  */
 class DividedInsertContext : public HazelcastInsertContextBase {
 public:
-  DividedInsertContext(LookupContext& lookup_context, HazelcastCache& cache);
+  DividedInsertContext(LookupContext& lookup_context, HazelcastHttpCache& cache);
   void insertHeaders(const Http::ResponseHeaderMap& response_headers, bool end_stream) override;
   void insertBody(const Buffer::Instance& chunk, InsertCallback ready_for_next_chunk,
                   bool end_stream) override;
@@ -152,7 +164,7 @@ private:
   /**
    * Copies bytes from source to local buffer. Insertion to the cache happens after
    * the local buffer is full or the end stream is committed by the filter.
-   * @param offset      Byte offset for the source. Updated <size> much after copy.
+   * @param offset      Byte offset for the source. Updated <size> much after copying.
    * @param size        Number of bytes to be copied into the local buffer.
    * @param source      Body content given by the filter.
    */

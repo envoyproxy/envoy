@@ -64,6 +64,8 @@ public:
   static uint16_t partitionWarnLimit() { return PARTITION_WARN_LIMIT; }
 
 private:
+  friend class ConfigUtilsTest;
+
   // After this much body partitions stored for a response in DIVIDED mode,
   // a suggestion log will be appeared to increase partition size.
   static constexpr uint16_t PARTITION_WARN_LIMIT = 16;
@@ -94,8 +96,6 @@ private:
 
   // Duration for an invocation to be cancelled.
   static constexpr uint32_t DEFAULT_INVOCATION_TIMEOUT_SEC = 8;
-
-  friend class ConfigUtilsTest;
 };
 
 } // namespace HazelcastHttpCache

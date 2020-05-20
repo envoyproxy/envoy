@@ -1,6 +1,11 @@
 #pragma once
 
-#include "extensions/filters/http/cache/hazelcast_http_cache/hazelcast_cache_entry.h"
+#include "common/common/logger.h"
+#include "common/runtime/runtime_impl.h"
+
+#include "source/extensions/filters/http/cache/hazelcast_http_cache/config.pb.h"
+
+#include "extensions/filters/http/cache/hazelcast_http_cache/hazelcast_storage_accessor.h"
 #include "extensions/filters/http/cache/http_cache.h"
 
 namespace Envoy {
@@ -9,8 +14,17 @@ namespace HttpFilters {
 namespace Cache {
 namespace HazelcastHttpCache {
 
+// TODO(enozcan): Consider putting responses into cache with TTL derived from `max-age` header
+//  instead of using a common TTL for all. This is possible during insertion by passing TTL
+//  amount regardless of the configured TTL on Hazelcast server side.
+//  i.e: IMap::put(const K &key, const V &value, int64_t ttlInMilliseconds);
+
+using envoy::source::extensions::filters::http::cache::HazelcastHttpCacheConfig;
+
 /**
- * Cache abstraction to support DIVIDED and UNIFIED cache modes.
+ * HttpCache implementation backed by Hazelcast.
+ *
+ * Supports two cache modes: UNIFIED and DIVIDED.
  *
  * In UNIFIED mode, an HTTP response is wrapped by a HazelcastResponseEntry
  * with its all fields (headers, body, trailers, request key) and stored in
@@ -25,10 +39,10 @@ namespace HazelcastHttpCache {
  * number named <version> to interrelate multiple entries belong to the same response.
  *
  */
-class HazelcastCache : public HttpCache {
+class HazelcastHttpCache : public HttpCache,
+                           public Logger::Loggable<Logger::Id::hazelcast_http_cache> {
 public:
-  HazelcastCache(bool unified, uint64_t partition_size, uint64_t max_body_size)
-      : unified_(unified), body_partition_size_(partition_size), max_body_size_(max_body_size) {}
+  HazelcastHttpCache(HazelcastHttpCacheConfig config);
 
   /// Divided mode
 
@@ -41,32 +55,37 @@ public:
    *                same Hazelcast cluster might store the same response with different
    *                keys.
    */
-  virtual void putHeader(const uint64_t key, const HazelcastHeaderEntry& entry) PURE;
+  void putHeader(const uint64_t key, const HazelcastHeaderEntry& entry) {
+    accessor_->putHeader(mapKey(key), entry);
+  }
 
   /**
    * Puts a body entry into body cache.
-   * @note          The key for a body partition must be obtainable from its header key.
-   * @param key     Hash key for the whole body
-   * @param order   Order of the body chunk among other partitions
+   * @param key     Hash key for the whole body derived from the header
+   * @param order   Order of the body chunk among other partitions starting from 0
    * @param entry   Entry to be inserted
+   * @note          The key for a body partition must be obtainable from its header key.
    */
-  virtual void putBody(const uint64_t key, const uint64_t order,
-                       const HazelcastBodyEntry& entry) PURE;
+  void putBody(const uint64_t key, const uint64_t order, const HazelcastBodyEntry& entry) {
+    accessor_->putBody(orderedMapKey(key, order), entry);
+  }
 
   /**
    * Performs a lookup to header cache for the given key.
    * @param key     Hash key for the entry
    * @return        HazelcastHeaderPtr to cached entry if found, nullptr otherwise
    */
-  virtual HazelcastHeaderPtr getHeader(const uint64_t key) PURE;
+  HazelcastHeaderPtr getHeader(const uint64_t key) { return accessor_->getHeader(mapKey(key)); }
 
   /**
    * Performs a lookup to body cache for the given key and order pair.
    * @param key     Hash key for the whole body
    * @param order   Order of the body chunk among other partitions
-   * @return        HazelcastBodyPtr to cached entry if found, nullptr otherwise.
+   * @return        HazelcastBodyPtr to cached entry if found, nullptr otherwise
    */
-  virtual HazelcastBodyPtr getBody(const uint64_t key, const uint64_t order) PURE;
+  HazelcastBodyPtr getBody(const uint64_t key, const uint64_t order) {
+    return accessor_->getBody(orderedMapKey(key, order));
+  }
 
   /**
    * Cleans up a malformed response when at least one of the body chunks are missed
@@ -77,7 +96,7 @@ public:
    * @param version     Version for the key and body
    * @param body_size   Total body size for the response
    */
-  virtual void onMissingBody(uint64_t key, int32_t version, uint64_t body_size) PURE;
+  void onMissingBody(uint64_t key, int32_t version, uint64_t body_size);
 
   /**
    * Cleans up a malformed response when a body partition with different version
@@ -86,59 +105,64 @@ public:
    * @param version     Version for the key and body
    * @param body_size   Total body size for the response
    */
-  virtual void onVersionMismatch(uint64_t key, int32_t version, uint64_t body_size) PURE;
+  void onVersionMismatch(uint64_t key, int32_t version, uint64_t body_size);
 
   /// Unified mode
 
   /**
    * Puts a unified entry into unified cache if no other entry associated with the key
    * is found.
+   * @param key     Hash key for the entry
+   * @param entry   Entry to be inserted
    * @note          IfAbsent is to prevent race between multiple filters. Overriding
    *                an existing entry is forbidden. HttpCache::updateHeaders() should
    *                be used if changing the header content is necessary.
-   * @param key     Hash key for the entry
-   * @param entry   Entry to be inserted
    */
-  virtual void putResponseIfAbsent(const uint64_t key, const HazelcastResponseEntry& entry) PURE;
+  void putResponseIfAbsent(const uint64_t key, const HazelcastResponseEntry& entry) {
+    accessor_->putResponseIfAbsent(mapKey(key), entry);
+  }
 
   /**
    * Performs a lookup to unified cache for the given key.
-   * @param key     Hash key for the entry.
-   * @return        HazelcastResponsePtr to cached entry if found, nullptr otherwise.
+   * @param key     Hash key for the entry
+   * @return        HazelcastResponsePtr to cached entry if found, nullptr otherwise
    */
-  virtual HazelcastResponsePtr getResponse(const uint64_t key) PURE;
+  HazelcastResponsePtr getResponse(const uint64_t key) {
+    return accessor_->getResponse(mapKey(key));
+  }
 
   /// Common
 
   /**
    * Attempts to lock the given key in the cache. When a key is locked, a lookup
-   * can be performed but an insertion or update for the key must be prevented.
+   * can be performed but an insertion or update for the key must be prevented
+   * for threads other than the lock holder.
+   * @param key     Key to be locked
+   * @return        True if acquired, false otherwise
    * @note          Used to prevent multiple insertions or updates by different
    *                contexts at a time.
-   * @param key     Key to be locked.
-   * @return        True if acquired, false otherwise.
    */
-  virtual bool tryLock(const uint64_t key) PURE;
+  bool tryLock(const uint64_t key) { return accessor_->tryLock(mapKey(key), unified_); }
 
   /**
    * Releases the lock for the key.
    * @param     Key to be unlocked
    */
-  virtual void unlock(const uint64_t key) PURE;
+  void unlock(const uint64_t key) { accessor_->unlock(mapKey(key), unified_); }
 
   /**
    * Produces a random number.
-   * @return    Random unsigned long.
-   * @note      The primary use case for the random number is to generate version
-   *            for header and body entries.
+   * @return    Random unsigned long
+   * @note      The primary use case of the random number is to generate version
+   *            for header and body entries in DIVIDED mode.
    */
-  virtual uint64_t random() PURE;
+  uint64_t random() { return rand_.random(); }
 
   /**
-   * @note      Ignored in UNIFIED mode.
    * @return    Size in bytes for a single body entry configured for the cache
+   * @note      Ignored in UNIFIED mode.
    */
-  uint64_t bodySizePerEntry() { return body_partition_size_; };
+  uint64_t bodySizePerEntry() { return body_partition_size_; }
 
   /**
    * @return    Allowed max size in bytes for a response configured for the cache
@@ -146,13 +170,13 @@ public:
    *            than this limit, the first max_body_size_ bytes of the response
    *            will be cached only.
    */
-  uint64_t maxBodySize() { return max_body_size_; };
+  uint64_t maxBodySize() { return max_body_size_; }
 
   /**
    * Generates a unique signed key for an unsigned one.
    * @param unsigned_key    Unsigned hash key
    * @return                Signed unique key
-   * @note                  Hazelcast client accepts signed keys only.
+   * @note                  Hazelcast client accepts signed map keys only.
    */
   inline int64_t mapKey(const uint64_t unsigned_key) {
     // The reason for not static casting directly is a possible overflow
@@ -168,7 +192,6 @@ public:
    * @param key     Unsigned hash key for the header
    * @param order   Order of the body among other partitions starting from 0
    * @return        Body partition key unique for header and order pair
-   *
    * @note          Appending '#' or any other marker between the key and order
    *                string is required. Otherwise, for instance, the 11th order
    *                body for key 1 and the 1st order body for key 11 will have
@@ -178,7 +201,30 @@ public:
     return std::to_string(key).append("#").append(std::to_string(order));
   }
 
-  ~HazelcastCache() override = default;
+  /**
+   * Makes the cache ready to serve. Storage accessor connection must be established
+   * via StorageAccessor#connect() when the cache is started.
+   *
+   * @note Keeping this virtual allows tests to override access strategy.
+   * Using a local accessor will make the cache behavior testable without
+   * starting a Hazelcast instance.
+   */
+  virtual void start();
+
+  /**
+   * Drops accessor connection to the storage.
+   * @param destroy     True if accessor_ also should be destroyed.
+   */
+  void shutdown(bool destroy);
+
+  // from Cache::HttpCache
+  LookupContextPtr makeLookupContext(LookupRequest&& request) override;
+  InsertContextPtr makeInsertContext(LookupContextPtr&& lookup_context) override;
+  void updateHeaders(LookupContextPtr&& lookup_context,
+                     Http::ResponseHeaderMapPtr&& response_headers) override;
+  CacheInfo cacheInfo() const override;
+
+  ~HazelcastHttpCache() override;
 
 protected:
   /** Cache mode */
@@ -187,8 +233,35 @@ protected:
   /** Partition size in bytes for a single body entry */
   const uint64_t body_partition_size_;
 
-  /** Allowed max size in bytes for a response */
+  /** Allowed max body size in bytes for a response */
   const uint64_t max_body_size_;
+
+  /** Storage access */
+  std::unique_ptr<StorageAccessor> accessor_;
+
+  /** typed config from CacheConfig */
+  HazelcastHttpCacheConfig cache_config_;
+
+  Runtime::RandomGeneratorImpl rand_;
+};
+
+class HazelcastHttpCacheFactory : public HttpCacheFactory {
+public:
+  // UntypedFactory
+  std::string name() const override;
+
+  // TypedFactory
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override;
+
+  // HttpCacheFactory
+  HttpCache&
+  getCache(const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& config) override;
+
+  HttpCache& // For testing only.
+  getOfflineCache(const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& config);
+
+private:
+  std::unique_ptr<HazelcastHttpCache> cache_;
 };
 
 } // namespace HazelcastHttpCache

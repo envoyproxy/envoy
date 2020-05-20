@@ -1,6 +1,6 @@
 #pragma once
 
-#include "test/extensions/filters/http/cache/hazelcast_http_cache/hazelcast_test_cache.h"
+#include "test/extensions/filters/http/cache/hazelcast_http_cache/test_caches.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
@@ -98,14 +98,14 @@ protected:
 
   LookupContextPtr lookup(absl::string_view request_path) {
     LookupRequest request = makeLookupRequest(request_path);
-    LookupContextPtr context = cache_->base().makeLookupContext(std::move(request));
+    LookupContextPtr context = cache_->makeLookupContext(std::move(request));
     context->getHeaders([this](LookupResult&& result) { lookup_result_ = std::move(result); });
     return context;
   }
 
   void insert(LookupContextPtr lookup, const Http::TestResponseHeaderMapImpl& response_headers,
               const absl::string_view response_body) {
-    InsertContextPtr insert_context = cache_->base().makeInsertContext(move(lookup));
+    InsertContextPtr insert_context = cache_->makeInsertContext(move(lookup));
     insert_context->insertHeaders(response_headers, response_body == nullptr);
     if (response_body == nullptr) {
       return;
@@ -150,7 +150,7 @@ protected:
     return AssertionSuccess();
   }
 
-  std::unique_ptr<HazelcastTestableHttpCache> cache_;
+  std::unique_ptr<HazelcastHttpTestCache> cache_;
   LookupResult lookup_result_;
   Http::TestRequestHeaderMapImpl request_headers_;
   Event::SimulatedTimeSystem time_source_;
