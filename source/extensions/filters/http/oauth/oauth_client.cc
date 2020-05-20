@@ -99,10 +99,10 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
     parent_->sendUnauthorizedResponse();
     return;
   }
-  // the current state of the client dictates how we interpret the response
+  // The current state of the client dictates how we interpret the response.
   if (prior_state == OAuthState::PendingAccessToken) {
-    if (!(json_object->hasObject(kAccessToken()) && json_object->hasObject(kExpiresIn()))) {
-      ENVOY_LOG(debug, "No access token or expiration after asyncGetAccessToken.");
+    if (!json_object->hasObject(kAccessToken()) || !json_object->hasObject(kExpiresIn())) {
+      ENVOY_LOG(debug, "No access token or expiration after asyncGetAccessToken");
       parent_->sendUnauthorizedResponse();
       return;
     }
@@ -123,7 +123,7 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
     // NOTE this JSON object also comes with an "email" field but that is unused in OAuth logic so
     // we ignore it.
     if (!json_object->hasObject(kUser())) {
-      ENVOY_LOG(debug, "No user field received from asyncGetIdentity.");
+      ENVOY_LOG(debug, "No user field received from asyncGetIdentity");
       parent_->sendUnauthorizedResponse();
       return;
     }
