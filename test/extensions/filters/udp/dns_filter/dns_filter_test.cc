@@ -720,9 +720,9 @@ TEST_F(DnsFilterTest, RandomizeFirstAnswerTest) {
   // 8 defined addresses, we randomize the initial starting index. We should not end up with
   // the first answer being the first defined address, or the answers appearing in the same
   // order as they are defined.
-  const std::list<std::string> resolved_order{"10.0.16.5",  "10.0.16.6", "10.0.16.7",
-                                              "10.0.16.8",  "10.0.16.9", "10.0.16.10",
-                                              "10.0.16.11", "10.0.16.12"};
+  const std::list<std::string> resolved_order{"10.0.16.7",  "10.0.16.8",  "10.0.16.9",
+                                              "10.0.16.10", "10.0.16.11", "10.0.16.12",
+                                              "10.0.16.13", "10.0.16.14"};
 
   auto resolved_answer_iter = resolved_order.begin();
   for (const auto& answer : query_ctx_->answers_) {

@@ -39,14 +39,14 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
       const auto& address_list = virtual_domain.endpoint().address_list().address();
       addrs.reserve(address_list.size());
 
-      // Randomize the configured addresses
-      std::vector<size_t> indices(address_list.size());
-      std::iota(indices.begin(), indices.end(), 0);
-      std::shuffle(indices.begin(), indices.end(), random_);
+      // Shuffle the configured addresses. We store the addresses starting at a random
+      // list index so that we do not always return answers in the same order as the IPs
+      // are configured.
+      size_t i = random_.random();
 
       // Creating the IP address will throw an exception if the address string is malformed
-      for (const auto index : indices) {
-        const auto address_iter = std::next(address_list.begin(), index);
+      for (auto index = 0;  index < address_list.size(); index++) {
+        const auto address_iter = std::next(address_list.begin(), (i++ % address_list.size()));
         auto ipaddr = Network::Utility::parseInternetAddress(*address_iter, 0 /* port */);
         addrs.push_back(std::move(ipaddr));
       }
