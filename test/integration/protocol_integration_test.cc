@@ -199,6 +199,53 @@ typed_config:
   EXPECT_EQ("503", response->headers().Status()->value().getStringView());
 }
 
+// Verifies behavior for https://github.com/envoyproxy/envoy/pull/11248
+TEST_P(ProtocolIntegrationTest, AddBodyToRequestAndWaitForIt) {
+  // filters are prepended, so add them in reverse order
+  config_helper_.addFilter(R"EOF(
+  name: wait-for-whole-request-and-response-filter
+  )EOF");
+  config_helper_.addFilter(R"EOF(
+  name: add-body-filter
+  )EOF");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  EXPECT_EQ("body", upstream_request_->body().toString());
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  // encode data, as we have a separate test for the transforming header only response.
+  upstream_request_->encodeData(128, true);
+  response->waitForEndStream();
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+}
+
+TEST_P(ProtocolIntegrationTest, AddBodyToResponseAndWaitForIt) {
+  // filters are prepended, so add them in reverse order
+  config_helper_.addFilter(R"EOF(
+  name: add-body-filter
+  )EOF");
+  config_helper_.addFilter(R"EOF(
+  name: wait-for-whole-request-and-response-filter
+  )EOF");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 128);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  response->waitForEndStream();
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("body", response->body());
+}
+
 TEST_P(ProtocolIntegrationTest, AddEncodedTrailers) {
   config_helper_.addFilter(R"EOF(
 name: add-trailers-filter

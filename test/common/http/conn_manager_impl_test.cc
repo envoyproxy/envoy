@@ -3237,6 +3237,54 @@ TEST_F(HttpConnectionManagerImplTest, DrainCloseRaceWithClose) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
 }
 
+TEST_F(HttpConnectionManagerImplTest,
+       FilterThatWaitsForBodyCanBeCalledAfterFilterThatAddsBodyEvenIfItIsNotLast) {
+  InSequence s;
+  setup(false, "");
+
+  NiceMock<MockResponseEncoder> encoder;
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
+    RequestDecoder* decoder = &conn_manager_->newStream(encoder);
+    RequestHeaderMapPtr headers{
+        new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+    decoder->decodeHeaders(std::move(headers), true);
+    return Http::okStatus();
+  }));
+
+  // 3 filters:
+  // 1st filter adds a body
+  // 2nd filter waits for the body
+  // 3rd filter simulates router filter.
+  setupFilterChain(3, 0);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(Invoke([&](RequestHeaderMap&, bool) -> FilterHeadersStatus {
+        Buffer::OwnedImpl body("body");
+        decoder_filters_[0]->callbacks_->addDecodedData(body, false);
+        return FilterHeadersStatus::Continue;
+      }));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, false))
+      .WillOnce(Invoke([](RequestHeaderMap&, bool) -> FilterHeadersStatus {
+        return FilterHeadersStatus::StopIteration;
+      }));
+  EXPECT_CALL(*decoder_filters_[1], decodeData(_, true))
+      .WillOnce(Invoke(
+          [](Buffer::Instance&, bool) -> FilterDataStatus { return FilterDataStatus::Continue; }));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
+  EXPECT_CALL(*decoder_filters_[2], decodeHeaders(_, false))
+      .WillOnce(Invoke([](RequestHeaderMap&, bool) -> FilterHeadersStatus {
+        return FilterHeadersStatus::Continue;
+      }));
+  EXPECT_CALL(*decoder_filters_[2], decodeData(_, true))
+      .WillOnce(Invoke(
+          [](Buffer::Instance&, bool) -> FilterDataStatus { return FilterDataStatus::Continue; }));
+  EXPECT_CALL(*decoder_filters_[2], decodeComplete());
+
+  Buffer::OwnedImpl fake_input;
+  conn_manager_->onData(fake_input, false);
+}
+
 TEST_F(HttpConnectionManagerImplTest, DrainClose) {
   setup(true, "");
 
