@@ -26,7 +26,9 @@ to be eligible for the program:
    program's :ref:`threat model <arch_overview_bug_bounty_threat_model>`.
 
 2. Vulnerabilities must be reported to envoy-security@googlegroups.com and be kept under embargo
-   while triage and potential security releases occur.
+   while triage and potential security releases occur. Please follow the :repo:`disclosure guidance
+   <SECURITY.md#disclosures>` when submitting reports. Disclosure SLOs are documented :repo:`here
+   <SECURITY.md#fix-and-disclosure-slos>`.
 
 3. Vulnerabilities must not be previously known in a public forum, e.g. GitHub issues trackers,
    CVE databases (when previously associated with Envoy), etc. Existing CVEs that have not been
