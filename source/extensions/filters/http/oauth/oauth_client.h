@@ -7,6 +7,7 @@
 #include "envoy/http/message.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/http/headers.h"
 #include "common/http/message_impl.h"
 
 #include "extensions/filters/http/oauth/oauth.h"
@@ -118,11 +119,9 @@ private:
   }
 
   Http::RequestMessagePtr createPostRequest() {
-    static const std::string FormUrlEncodedContentType = "application/x-www-form-urlencoded";
-
     auto request = createBasicRequest();
     request->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
-    request->headers().setContentType(FormUrlEncodedContentType);
+    request->headers().setContentType(Http::Headers::get().ContentTypeValues.FormUrlEncoded);
     return request;
   }
 };
