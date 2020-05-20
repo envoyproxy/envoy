@@ -371,6 +371,7 @@ envoy_cc_library(
     ],
     deps = [
         ":header_map_lib",
+        ":utility_lib",
         "//include/envoy/common:regex_interface",
         "//include/envoy/http:header_map_interface",
         "//include/envoy/json:json_object_interface",

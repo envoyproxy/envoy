@@ -232,9 +232,9 @@ envoy_sh_test(
     srcs = envoy_select_hot_restart([
         "hotrestart_test.sh",
     ]),
+    cc_binary = ["//source/exe:envoy-static"],
     data = [
         "test_utility.sh",
-        "//source/exe:envoy-static",
         "//test/config/integration:server_config_files",
         "//tools:socket_passing",
     ],
@@ -245,9 +245,9 @@ envoy_sh_test(
 envoy_sh_test(
     name = "run_envoy_test",
     srcs = ["run_envoy_test.sh"],
+    cc_binary = ["//source/exe:envoy-static"],
     data = [
         "test_utility.sh",
-        "//source/exe:envoy-static",
         "//test/config/integration:server_config_files",
     ],
     # TODO: This script invocation does not work on Windows, see: https://github.com/bazelbuild/bazel/issues/10959

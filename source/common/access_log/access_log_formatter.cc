@@ -107,8 +107,8 @@ std::string FormatterImpl::format(const Http::RequestHeaderMap& request_headers,
   return log_line;
 }
 
-JsonFormatterImpl::JsonFormatterImpl(std::unordered_map<std::string, std::string>& format_mapping,
-                                     bool preserve_types)
+JsonFormatterImpl::JsonFormatterImpl(
+    const absl::flat_hash_map<std::string, std::string>& format_mapping, bool preserve_types)
     : preserve_types_(preserve_types) {
   for (const auto& pair : format_mapping) {
     json_output_format_.emplace(pair.first, AccessLogFormatParser::parse(pair.second));
@@ -231,7 +231,7 @@ std::vector<FormatterProviderPtr> AccessLogFormatParser::parse(const std::string
   std::vector<FormatterProviderPtr> formatters;
   static constexpr absl::string_view DYNAMIC_META_TOKEN{"DYNAMIC_METADATA("};
   static constexpr absl::string_view FILTER_STATE_TOKEN{"FILTER_STATE("};
-  const std::regex command_w_args_regex(R"EOF(%([A-Z]|_)+(\([^\)]*\))?(:[0-9]+)?(%))EOF");
+  const std::regex command_w_args_regex(R"EOF(^%([A-Z]|_)+(\([^\)]*\))?(:[0-9]+)?(%))EOF");
 
   static constexpr absl::string_view PLAIN_SERIALIZATION{"PLAIN"};
   static constexpr absl::string_view TYPED_SERIALIZATION{"TYPED"};
@@ -245,7 +245,7 @@ std::vector<FormatterProviderPtr> AccessLogFormatParser::parse(const std::string
 
       std::smatch m;
       const std::string search_space = format.substr(pos);
-      if (!(std::regex_search(search_space, m, command_w_args_regex) || m.position() == 0)) {
+      if (!std::regex_search(search_space, m, command_w_args_regex)) {
         throw EnvoyException(
             fmt::format("Incorrect configuration: {}. Couldn't find valid command at position {}",
                         format, pos));

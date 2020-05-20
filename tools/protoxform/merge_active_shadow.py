@@ -20,6 +20,7 @@ from validate import validate_pb2 as _
 from envoy.annotations import deprecation_pb2 as _
 from envoy.annotations import resource_pb2 as _
 from udpa.annotations import migrate_pb2 as _
+from udpa.annotations import security_pb2 as _
 from udpa.annotations import sensitive_pb2 as _
 from udpa.annotations import status_pb2 as _
 from udpa.annotations import versioning_pb2 as _
