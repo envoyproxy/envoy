@@ -69,7 +69,7 @@ message DnsTable {
   }
 
   // Control how many times Envoy makes an attempt to forward a query to an external DNS server
-  uint32 external_retry_count = 1;
+  uint32 external_retry_count = 1 [(validate.rules).uint32 = {lte: 3}];
 
   // Fully qualified domain names for which Envoy will respond to DNS queries. By leaving this
   // list empty, Envoy will forward all queries to external resolvers

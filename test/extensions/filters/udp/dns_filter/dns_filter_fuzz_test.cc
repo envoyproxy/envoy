@@ -26,11 +26,10 @@ const std::string generateQuery(FuzzedDataProvider* data_provider) {
 
 DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   FuzzedDataProvider data_provider(buf, len);
-  const bool recurse = data_provider.ConsumeIntegralInRange<bool>(0, 1);
+  const bool recurse = data_provider.ConsumeBool();
   const uint16_t retry_count = data_provider.ConsumeIntegralInRange<uint16_t>(0, 3);
 
-  NiceMock<Runtime::MockRandomGenerator> random;
-  ON_CALL(random, random()).WillByDefault(Return(7));
+  static NiceMock<Runtime::MockRandomGenerator> random;
   DnsMessageParser message_parser(recurse, retry_count, random);
 
   const auto local = Network::Utility::parseInternetAddressAndPort("127.0.2.1:5353");
