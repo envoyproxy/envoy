@@ -11,9 +11,7 @@
 #include "envoy/admin/v3/certs.pb.h"
 #include "envoy/admin/v3/clusters.pb.h"
 #include "envoy/admin/v3/config_dump.pb.h"
-#include "envoy/admin/v3/memory.pb.h"
 #include "envoy/admin/v3/metrics.pb.h"
-#include "envoy/admin/v3/mutex_stats.pb.h"
 #include "envoy/admin/v3/server_info.pb.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/filesystem/filesystem.h"
@@ -31,13 +29,11 @@
 #include "common/common/fmt.h"
 #include "common/common/mutex_tracer_impl.h"
 #include "common/common/utility.h"
-#include "common/common/version.h"
 #include "common/html/utility.h"
 #include "common/http/codes.h"
 #include "common/http/conn_manager_utility.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
-#include "common/memory/stats.h"
 #include "common/memory/utils.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/utility.h"
@@ -535,126 +531,6 @@ Http::Code AdminImpl::handlerConfigDump(absl::string_view url,
   return Http::Code::OK;
 }
 
-// TODO(ambuc) Export this as a server (?) stat for monitoring.
-Http::Code AdminImpl::handlerContention(absl::string_view,
-                                        Http::ResponseHeaderMap& response_headers,
-                                        Buffer::Instance& response, AdminStream&) {
-
-  if (server_.options().mutexTracingEnabled() && server_.mutexTracer() != nullptr) {
-    response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-
-    envoy::admin::v3::MutexStats mutex_stats;
-    mutex_stats.set_num_contentions(server_.mutexTracer()->numContentions());
-    mutex_stats.set_current_wait_cycles(server_.mutexTracer()->currentWaitCycles());
-    mutex_stats.set_lifetime_wait_cycles(server_.mutexTracer()->lifetimeWaitCycles());
-    response.add(MessageUtil::getJsonStringFromMessage(mutex_stats, true, true));
-  } else {
-    response.add("Mutex contention tracing is not enabled. To enable, run Envoy with flag "
-                 "--enable-mutex-tracing.");
-  }
-  return Http::Code::OK;
-}
-
-Http::Code AdminImpl::handlerHealthcheckFail(absl::string_view, Http::ResponseHeaderMap&,
-                                             Buffer::Instance& response, AdminStream&) {
-  server_.failHealthcheck(true);
-  response.add("OK\n");
-  return Http::Code::OK;
-}
-
-Http::Code AdminImpl::handlerHealthcheckOk(absl::string_view, Http::ResponseHeaderMap&,
-                                           Buffer::Instance& response, AdminStream&) {
-  server_.failHealthcheck(false);
-  response.add("OK\n");
-  return Http::Code::OK;
-}
-
-Http::Code AdminImpl::handlerHotRestartVersion(absl::string_view, Http::ResponseHeaderMap&,
-                                               Buffer::Instance& response, AdminStream&) {
-  response.add(server_.hotRestart().version());
-  return Http::Code::OK;
-}
-
-// TODO(ambuc): Add more tcmalloc stats, export proto details based on allocator.
-Http::Code AdminImpl::handlerMemory(absl::string_view, Http::ResponseHeaderMap& response_headers,
-                                    Buffer::Instance& response, AdminStream&) {
-  response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-  envoy::admin::v3::Memory memory;
-  memory.set_allocated(Memory::Stats::totalCurrentlyAllocated());
-  memory.set_heap_size(Memory::Stats::totalCurrentlyReserved());
-  memory.set_total_thread_cache(Memory::Stats::totalThreadCacheBytes());
-  memory.set_pageheap_unmapped(Memory::Stats::totalPageHeapUnmapped());
-  memory.set_pageheap_free(Memory::Stats::totalPageHeapFree());
-  memory.set_total_physical_bytes(Memory::Stats::totalPhysicalBytes());
-  response.add(MessageUtil::getJsonStringFromMessage(memory, true, true)); // pretty-print
-  return Http::Code::OK;
-}
-
-Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::ResponseHeaderMap& headers,
-                                        Buffer::Instance& response, AdminStream&) {
-  const std::time_t current_time =
-      std::chrono::system_clock::to_time_t(server_.timeSource().systemTime());
-  const std::time_t uptime_current_epoch = current_time - server_.startTimeCurrentEpoch();
-  const std::time_t uptime_all_epochs = current_time - server_.startTimeFirstEpoch();
-
-  ASSERT(uptime_current_epoch >= 0);
-  ASSERT(uptime_all_epochs >= 0);
-
-  envoy::admin::v3::ServerInfo server_info;
-  server_info.set_version(VersionInfo::version());
-  server_info.set_hot_restart_version(server_.hotRestart().version());
-  server_info.set_state(
-      Utility::serverState(server_.initManager().state(), server_.healthCheckFailed()));
-
-  server_info.mutable_uptime_current_epoch()->set_seconds(uptime_current_epoch);
-  server_info.mutable_uptime_all_epochs()->set_seconds(uptime_all_epochs);
-  envoy::admin::v3::CommandLineOptions* command_line_options =
-      server_info.mutable_command_line_options();
-  *command_line_options = *server_.options().toCommandLineOptions();
-  response.add(MessageUtil::getJsonStringFromMessage(server_info, true, true));
-  headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-  return Http::Code::OK;
-}
-
-Http::Code AdminImpl::handlerReady(absl::string_view, Http::ResponseHeaderMap&,
-                                   Buffer::Instance& response, AdminStream&) {
-  const envoy::admin::v3::ServerInfo::State state =
-      Utility::serverState(server_.initManager().state(), server_.healthCheckFailed());
-
-  response.add(envoy::admin::v3::ServerInfo::State_Name(state) + "\n");
-  Http::Code code =
-      state == envoy::admin::v3::ServerInfo::LIVE ? Http::Code::OK : Http::Code::ServiceUnavailable;
-  return code;
-}
-
-Http::Code AdminImpl::handlerQuitQuitQuit(absl::string_view, Http::ResponseHeaderMap&,
-                                          Buffer::Instance& response, AdminStream&) {
-  server_.shutdown();
-  response.add("OK\n");
-  return Http::Code::OK;
-}
-
-Http::Code AdminImpl::handlerCerts(absl::string_view, Http::ResponseHeaderMap& response_headers,
-                                   Buffer::Instance& response, AdminStream&) {
-  // This set is used to track distinct certificates. We may have multiple listeners, upstreams, etc
-  // using the same cert.
-  response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-  envoy::admin::v3::Certificates certificates;
-  server_.sslContextManager().iterateContexts([&](const Ssl::Context& context) -> void {
-    envoy::admin::v3::Certificate& certificate = *certificates.add_certificates();
-    if (context.getCaCertInformation() != nullptr) {
-      envoy::admin::v3::CertificateDetails* ca_certificate = certificate.add_ca_cert();
-      *ca_certificate = *context.getCaCertInformation();
-    }
-    for (const auto& cert_details : context.getCertChainInformation()) {
-      envoy::admin::v3::CertificateDetails* cert_chain = certificate.add_cert_chain();
-      *cert_chain = *cert_details;
-    }
-  });
-  response.add(MessageUtil::getJsonStringFromMessage(certificates, true, true));
-  return Http::Code::OK;
-}
-
 ConfigTracker& AdminImpl::getConfigTracker() { return config_tracker_; }
 
 AdminImpl::NullRouteConfigProvider::NullRouteConfigProvider(TimeSource& time_source)
@@ -694,43 +570,44 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
       route_config_provider_(server.timeSource()),
       scoped_route_config_provider_(server.timeSource()), stats_handler_(server),
       logs_handler_(server), profiling_handler_(profile_path), runtime_handler_(server),
-      listeners_handler_(server),
+      listeners_handler_(server), server_cmd_handler_(server), server_info_handler_(server),
       // TODO(jsedgwick) add /runtime_reset endpoint that removes all admin-set values
       handlers_{
           {"/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false, false},
-          {"/certs", "print certs on machine", MAKE_ADMIN_HANDLER(handlerCerts), false, false},
+          {"/certs", "print certs on machine",
+           MAKE_ADMIN_HANDLER(server_info_handler_.handlerCerts), false, false},
           {"/clusters", "upstream cluster status", MAKE_ADMIN_HANDLER(handlerClusters), false,
            false},
           {"/config_dump", "dump current Envoy configs (experimental)",
            MAKE_ADMIN_HANDLER(handlerConfigDump), false, false},
           {"/contention", "dump current Envoy mutex contention stats (if enabled)",
-           MAKE_ADMIN_HANDLER(handlerContention), false, false},
+           MAKE_ADMIN_HANDLER(stats_handler_.handlerContention), false, false},
           {"/cpuprofiler", "enable/disable the CPU profiler",
            MAKE_ADMIN_HANDLER(profiling_handler_.handlerCpuProfiler), false, true},
           {"/heapprofiler", "enable/disable the heap profiler",
            MAKE_ADMIN_HANDLER(profiling_handler_.handlerHeapProfiler), false, true},
           {"/healthcheck/fail", "cause the server to fail health checks",
-           MAKE_ADMIN_HANDLER(handlerHealthcheckFail), false, true},
+           MAKE_ADMIN_HANDLER(server_cmd_handler_.handlerHealthcheckFail), false, true},
           {"/healthcheck/ok", "cause the server to pass health checks",
-           MAKE_ADMIN_HANDLER(handlerHealthcheckOk), false, true},
+           MAKE_ADMIN_HANDLER(server_cmd_handler_.handlerHealthcheckOk), false, true},
           {"/help", "print out list of admin commands", MAKE_ADMIN_HANDLER(handlerHelp), false,
            false},
           {"/hot_restart_version", "print the hot restart compatibility version",
-           MAKE_ADMIN_HANDLER(handlerHotRestartVersion), false, false},
+           MAKE_ADMIN_HANDLER(server_info_handler_.handlerHotRestartVersion), false, false},
           {"/logging", "query/change logging levels",
            MAKE_ADMIN_HANDLER(logs_handler_.handlerLogging), false, true},
-          {"/memory", "print current allocation/heap usage", MAKE_ADMIN_HANDLER(handlerMemory),
-           false, false},
-          {"/quitquitquit", "exit the server", MAKE_ADMIN_HANDLER(handlerQuitQuitQuit), false,
-           true},
+          {"/memory", "print current allocation/heap usage",
+           MAKE_ADMIN_HANDLER(server_info_handler_.handlerMemory), false, false},
+          {"/quitquitquit", "exit the server",
+           MAKE_ADMIN_HANDLER(server_cmd_handler_.handlerQuitQuitQuit), false, true},
           {"/reset_counters", "reset all counters to zero",
            MAKE_ADMIN_HANDLER(stats_handler_.handlerResetCounters), false, true},
           {"/drain_listeners", "drain listeners",
            MAKE_ADMIN_HANDLER(listeners_handler_.handlerDrainListeners), false, true},
           {"/server_info", "print server version/status information",
-           MAKE_ADMIN_HANDLER(handlerServerInfo), false, false},
+           MAKE_ADMIN_HANDLER(server_info_handler_.handlerServerInfo), false, false},
           {"/ready", "print server state, return 200 if LIVE, otherwise return 503",
-           MAKE_ADMIN_HANDLER(handlerReady), false, false},
+           MAKE_ADMIN_HANDLER(server_info_handler_.handlerReady), false, false},
           {"/stats", "print server stats", MAKE_ADMIN_HANDLER(stats_handler_.handlerStats), false,
            false},
           {"/stats/prometheus", "print server stats in prometheus format",

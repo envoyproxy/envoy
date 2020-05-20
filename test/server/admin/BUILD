@@ -35,7 +35,6 @@ envoy_cc_test(
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:symbol_table_creator_lib",
         "//source/common/stats:thread_local_store_lib",
-        "//source/extensions/transport_sockets/tls:context_config_lib",
         "//source/server/admin:admin_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:server_mocks",
@@ -101,6 +100,17 @@ envoy_cc_test(
     deps = [
         ":admin_instance_lib",
         "//test/test_common:logging_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "server_info_handler_test",
+    srcs = ["server_info_handler_test.cc"],
+    deps = [
+        ":admin_instance_lib",
+        "//source/extensions/transport_sockets/tls:context_config_lib",
+        "//test/test_common:logging_lib",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
     ],
 )
 
