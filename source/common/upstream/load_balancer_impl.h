@@ -14,10 +14,12 @@
 #include "common/protobuf/utility.h"
 #include "common/upstream/edf_scheduler.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Upstream {
 
-static const std::string RuntimeLeastRequestsActiveRequestsExponent =
+constexpr absl::string_view RuntimeLeastRequestsActiveRequestsExponent =
     "upstream.least_requests.active_requests_exponent";
 
 // Priority levels and localities are considered overprovisioned with this factor.
