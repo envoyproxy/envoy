@@ -5,6 +5,7 @@
 #include "common/common/regex.h"
 #include "common/common/utility.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/runtime/runtime_features.h"
 
@@ -161,6 +162,13 @@ bool HeaderUtility::isConnect(const RequestHeaderMap& headers) {
   return headers.Method() && headers.Method()->value() == Http::Headers::get().MethodValues.Connect;
 }
 
+bool HeaderUtility::isConnectResponse(const RequestHeaderMapPtr& request_headers,
+                                      const ResponseHeaderMap& response_headers) {
+  return request_headers.get() && isConnect(*request_headers) &&
+         static_cast<Http::Code>(Http::Utility::getResponseStatus(response_headers)) ==
+             Http::Code::OK;
+}
+
 void HeaderUtility::addHeaders(HeaderMap& headers, const HeaderMap& headers_to_add) {
   headers_to_add.iterate(
       [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
@@ -221,6 +229,34 @@ HeaderUtility::requestHeadersValid(const RequestHeaderMap& headers) {
     return SharedResponseCodeDetails::get().InvalidAuthority;
   }
   return absl::nullopt;
+}
+
+bool HeaderUtility::shouldCloseConnection(Http::Protocol protocol,
+                                          const RequestOrResponseHeaderMap& headers) {
+  // HTTP/1.0 defaults to single-use connections. Make sure the connection will be closed unless
+  // Keep-Alive is present.
+  if (protocol == Protocol::Http10 &&
+      (!headers.Connection() ||
+       !Envoy::StringUtil::caseFindToken(headers.Connection()->value().getStringView(), ",",
+                                         Http::Headers::get().ConnectionValues.KeepAlive))) {
+    return true;
+  }
+
+  if (protocol == Protocol::Http11 && headers.Connection() &&
+      Envoy::StringUtil::caseFindToken(headers.Connection()->value().getStringView(), ",",
+                                       Http::Headers::get().ConnectionValues.Close)) {
+    return true;
+  }
+
+  // Note: Proxy-Connection is not a standard header, but is supported here
+  // since it is supported by http-parser the underlying parser for http
+  // requests.
+  if (protocol < Protocol::Http2 && headers.ProxyConnection() &&
+      Envoy::StringUtil::caseFindToken(headers.ProxyConnection()->value().getStringView(), ",",
+                                       Http::Headers::get().ConnectionValues.Close)) {
+    return true;
+  }
+  return false;
 }
 
 } // namespace Http

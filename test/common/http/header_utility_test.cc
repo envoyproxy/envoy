@@ -2,6 +2,7 @@
 #include <vector>
 
 #include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/http/protocol.h"
 #include "envoy/json/json_object.h"
 
 #include "common/http/header_utility.h"
@@ -525,6 +526,18 @@ TEST(HeaderIsValidTest, IsConnect) {
   EXPECT_FALSE(HeaderUtility::isConnect(Http::TestRequestHeaderMapImpl{}));
 }
 
+TEST(HeaderIsValidTest, IsConnectResponse) {
+  RequestHeaderMapPtr connect_request{new TestRequestHeaderMapImpl{{":method", "CONNECT"}}};
+  RequestHeaderMapPtr get_request{new TestRequestHeaderMapImpl{{":method", "GET"}}};
+  TestResponseHeaderMapImpl success_response{{":status", "200"}};
+  TestResponseHeaderMapImpl failure_response{{":status", "500"}};
+
+  EXPECT_TRUE(HeaderUtility::isConnectResponse(connect_request, success_response));
+  EXPECT_FALSE(HeaderUtility::isConnectResponse(connect_request, failure_response));
+  EXPECT_FALSE(HeaderUtility::isConnectResponse(nullptr, success_response));
+  EXPECT_FALSE(HeaderUtility::isConnectResponse(get_request, success_response));
+}
+
 TEST(HeaderAddTest, HeaderAdd) {
   TestHeaderMapImpl headers{{"myheader1", "123value"}};
   TestHeaderMapImpl headers_to_add{{"myheader2", "456value"}};
@@ -547,6 +560,26 @@ TEST(HeaderIsValidTest, HeaderNameContainsUnderscore) {
   EXPECT_TRUE(HeaderUtility::headerNameContainsUnderscore("_cookie"));
   EXPECT_TRUE(HeaderUtility::headerNameContainsUnderscore("cookie_"));
   EXPECT_TRUE(HeaderUtility::headerNameContainsUnderscore("x_something"));
+}
+
+TEST(PercentEncoding, ShouldCloseConnection) {
+  EXPECT_TRUE(HeaderUtility::shouldCloseConnection(Protocol::Http10,
+                                                   TestRequestHeaderMapImpl{{"foo", "bar"}}));
+  EXPECT_FALSE(HeaderUtility::shouldCloseConnection(
+      Protocol::Http10, TestRequestHeaderMapImpl{{"connection", "keep-alive"}}));
+  EXPECT_FALSE(HeaderUtility::shouldCloseConnection(
+      Protocol::Http10, TestRequestHeaderMapImpl{{"connection", "foo, keep-alive"}}));
+
+  EXPECT_FALSE(HeaderUtility::shouldCloseConnection(Protocol::Http11,
+                                                    TestRequestHeaderMapImpl{{"foo", "bar"}}));
+  EXPECT_TRUE(HeaderUtility::shouldCloseConnection(
+      Protocol::Http11, TestRequestHeaderMapImpl{{"connection", "close"}}));
+  EXPECT_TRUE(HeaderUtility::shouldCloseConnection(
+      Protocol::Http11, TestRequestHeaderMapImpl{{"connection", "te,close"}}));
+  EXPECT_TRUE(HeaderUtility::shouldCloseConnection(
+      Protocol::Http11, TestRequestHeaderMapImpl{{"proxy-connection", "close"}}));
+  EXPECT_TRUE(HeaderUtility::shouldCloseConnection(
+      Protocol::Http11, TestRequestHeaderMapImpl{{"proxy-connection", "foo,close"}}));
 }
 
 } // namespace Http
