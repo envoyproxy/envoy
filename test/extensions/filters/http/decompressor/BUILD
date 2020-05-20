@@ -29,3 +29,20 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/extensions/filters/http/decompressor/v3:pkg_cc_proto",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "decompressor_filter_integration_test",
+    srcs = [
+        "decompressor_filter_integration_test.cc",
+    ],
+    extension_name = "envoy.filters.http.decompressor",
+    deps = [
+        "//source/extensions/compression/gzip/compressor:config",
+        "//source/extensions/compression/gzip/decompressor:config",
+        "//source/extensions/filters/http/decompressor:config",
+        "//test/integration:http_integration_lib",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+    ],
+)

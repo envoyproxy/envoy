@@ -241,6 +241,62 @@ response_direction_config:
   expectNoDecompression();
 }
 
+TEST_P(DecompressorFilterTest, RequestDecompressionDisabled) {
+  setUpFilter(R"EOF(
+decompressor_library:
+  typed_config:
+    "@type": "type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip"
+request_direction_config:
+  common_config:
+    enabled:
+      default_value: false
+      runtime_key: does_not_exist
+)EOF");
+
+  Http::TestHeaderMapImpl headers_before_filter{{"content-encoding", "mock"},
+                                                {"content-length", "256"}};
+
+  if (isRequestDirection()) {
+    EXPECT_CALL(*decompressor_factory_, createDecompressor()).Times(0);
+    std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
+        doHeaders(headers_before_filter, false /* end_stream */);
+    TestUtility::headerMapEqualIgnoreOrder(headers_before_filter, *headers_after_filter);
+    expectNoDecompression();
+  } else {
+    decompressionActive(headers_before_filter, absl::nullopt /* expected_content_encoding*/,
+                        "mock" /* expected_accept_encoding */);
+  }
+}
+
+TEST_P(DecompressorFilterTest, ResponseDecompressionDisabled) {
+  setUpFilter(R"EOF(
+decompressor_library:
+  typed_config:
+    "@type": "type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip"
+response_direction_config:
+  common_config:
+    enabled:
+      default_value: false
+      runtime_key: does_not_exist
+)EOF");
+
+  Http::TestHeaderMapImpl headers_before_filter{{"content-encoding", "mock"},
+                                                {"content-length", "256"}};
+
+  if (isRequestDirection()) {
+    // Accept-Encoding is not advertised in the request headers when response decompression is
+    // disabled.
+    decompressionActive(headers_before_filter, absl::nullopt /* expected_content_encoding*/,
+                        absl::nullopt /* expected_accept_encoding */);
+  } else {
+    EXPECT_CALL(*decompressor_factory_, createDecompressor()).Times(0);
+    std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
+        doHeaders(headers_before_filter, false /* end_stream */);
+    TestUtility::headerMapEqualIgnoreOrder(headers_before_filter, *headers_after_filter);
+    expectNoDecompression();
+  }
+}
+
 TEST_P(DecompressorFilterTest, NoDecompressionHeadersOnly) {
   EXPECT_CALL(*decompressor_factory_, createDecompressor()).Times(0);
   Http::TestHeaderMapImpl headers_before_filter;

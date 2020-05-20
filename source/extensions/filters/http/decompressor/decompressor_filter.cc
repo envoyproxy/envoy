@@ -14,7 +14,7 @@ DecompressorFilterConfig::DecompressorFilterConfig(
     const envoy::extensions::filters::http::decompressor::v3::Decompressor& proto_config,
     const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
     Compression::Decompressor::DecompressorFactoryPtr decompressor_factory)
-    : stats_prefix_(fmt::format("{}decompressor.{}.{}.", stats_prefix,
+    : stats_prefix_(fmt::format("{}decompressor.{}.{}", stats_prefix,
                                 proto_config.decompressor_library().name(),
                                 decompressor_factory->statsPrefix())),
       decompressor_factory_(std::move(decompressor_factory)),
@@ -89,7 +89,7 @@ Http::FilterHeadersStatus DecompressorFilter::encodeHeaders(Http::ResponseHeader
 }
 
 Http::FilterDataStatus DecompressorFilter::encodeData(Buffer::Instance& data, bool) {
-  return maybeDecompress(config_->requestDirectionConfig(), response_decompressor_,
+  return maybeDecompress(config_->responseDirectionConfig(), response_decompressor_,
                          *encoder_callbacks_, data);
 }
 
