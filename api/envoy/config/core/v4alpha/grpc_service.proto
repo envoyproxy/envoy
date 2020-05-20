@@ -208,16 +208,21 @@ message GrpcService {
       option (udpa.annotations.versioning).previous_message_type =
           "envoy.config.core.v3.GrpcService.GoogleGrpc.ChannelArgs";
 
-      // See grpc_types.h GRPC_ARG #defines for values that work here.
-      string key = 1;
+      message Value {
+        option (udpa.annotations.versioning).previous_message_type =
+            "envoy.config.core.v3.GrpcService.GoogleGrpc.ChannelArgs.Value";
 
-      // Pointer values are not supported, since they don't make any sense when
-      // delivered via the API.
-      oneof value_specifier {
-        string string_value = 2;
+        // Pointer values are not supported, since they don't make any sense when
+        // delivered via the API.
+        oneof value_specifier {
+          string string_value = 1;
 
-        int64 int_value = 3;
+          int64 int_value = 2;
+        }
       }
+
+      // See grpc_types.h GRPC_ARG #defines for keys that work here.
+      map<string, Value> args = 1;
     }
 
     // The target URI when using the `Google C++ gRPC client
@@ -256,7 +261,7 @@ message GrpcService {
     google.protobuf.UInt32Value per_stream_buffer_limit_bytes = 7;
 
     // Custom channels args.
-    repeated ChannelArgs channel_args = 8;
+    ChannelArgs channel_args = 8;
   }
 
   reserved 4;

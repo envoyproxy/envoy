@@ -32,7 +32,7 @@ public:
   static Buffer::InstancePtr makeBufferInstance(const grpc::ByteBuffer& buffer);
 
   /**
-   * Build grpc::ChannelAruments from gRPC service config.
+   * Build grpc::ChannelArguments from gRPC service config.
    * @param config Google gRPC config.
    * @return grpc::ChannelArguments corresponding to config.
    */

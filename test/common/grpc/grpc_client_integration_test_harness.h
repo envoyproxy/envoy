@@ -308,9 +308,8 @@ public:
     google_grpc->set_target_uri(fake_upstream_->localAddress()->asString());
     google_grpc->set_stat_prefix("fake_cluster");
     for (const auto& config_arg : channel_args_) {
-      auto* channel_arg = google_grpc->add_channel_args();
-      channel_arg->set_key(config_arg.first);
-      channel_arg->set_string_value(config_arg.second);
+      (*google_grpc->mutable_channel_args()->mutable_args())[config_arg.first].set_string_value(
+          config_arg.second);
     }
     fillServiceWideInitialMetadata(config);
     return config;
