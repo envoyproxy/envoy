@@ -634,8 +634,7 @@ int ConnectionImpl::onHeadersCompleteBase() {
   if (Utility::isUpgrade(request_or_response_headers) && upgradeAllowed()) {
     // Ignore h2c upgrade requests until we support them.
     // See https://github.com/envoyproxy/envoy/issues/7161 for details.
-    if (request_or_response_headers.Upgrade() &&
-        absl::EqualsIgnoreCase(request_or_response_headers.getUpgradeValue(),
+    if (absl::EqualsIgnoreCase(request_or_response_headers.getUpgradeValue(),
                                Http::Headers::get().UpgradeValues.H2c)) {
       ENVOY_CONN_LOG(trace, "removing unsupported h2c upgrade headers.", connection_);
       request_or_response_headers.removeUpgrade();
