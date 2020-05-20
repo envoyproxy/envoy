@@ -33,7 +33,8 @@ public:
 
 class OAuth2ClientTest : public testing::Test {
 public:
-  OAuth2ClientTest() : mock_callbacks_(new MockCallbacks), request_(&cm_.async_client_) {
+  OAuth2ClientTest()
+      : mock_callbacks_(std::make_shared<MockCallbacks>()), request_(&cm_.async_client_) {
     client_ = std::make_shared<OAuth2ClientImpl>(cm_, "auth", std::chrono::milliseconds(3000));
   }
 
