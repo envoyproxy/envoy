@@ -12,7 +12,8 @@
 #include "test/integration/filters/common.h"
 
 namespace Envoy {
-// A test filter that inserts trailers at the end of encode/decode
+
+// A test filter that inserts body to a header only request/response.
 class AddBodyStreamFilter : public Http::PassThroughFilter {
 public:
   constexpr static char name[] = "add-body-filter";

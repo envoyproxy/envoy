@@ -11,9 +11,10 @@
 
 namespace Envoy {
 
-class WaitForWholeRequestStreamFilter : public Http::PassThroughFilter {
+// A test filter that waits for the request/response to finish before continuing.
+class WaitForWholeRequestAndResponseStreamFilter : public Http::PassThroughFilter {
 public:
-  constexpr static char name[] = "wait-for-whole-request-filter";
+  constexpr static char name[] = "wait-for-whole-request-and-response-filter";
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool end_stream) override {
     if (end_stream) {
@@ -43,9 +44,9 @@ public:
   }
 };
 
-constexpr char WaitForWholeRequestStreamFilter::name[];
+constexpr char WaitForWholeRequestAndResponseStreamFilter::name[];
 
-static Registry::RegisterFactory<SimpleFilterConfig<WaitForWholeRequestStreamFilter>,
+static Registry::RegisterFactory<SimpleFilterConfig<WaitForWholeRequestAndResponseStreamFilter>,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     encoder_register_;
 } // namespace Envoy

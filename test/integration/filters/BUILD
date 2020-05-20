@@ -24,9 +24,9 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
-    name = "wait_for_whole_request_config_lib",
+    name = "wait_for_whole_request_and_response_config_lib",
     srcs = [
-        "wait_for_whole_request.cc",
+        "wait_for_whole_request_and_response.cc",
     ],
     deps = [
         ":common_lib",

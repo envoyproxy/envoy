@@ -467,7 +467,7 @@ envoy_cc_test_library(
         "//test/integration/filters:modify_buffer_filter_config_lib",
         "//test/integration/filters:passthrough_filter_config_lib",
         "//test/integration/filters:pause_filter_lib",
-        "//test/integration/filters:wait_for_whole_request_config_lib",
+        "//test/integration/filters:wait_for_whole_request_and_response_config_lib",
         "//test/test_common:registry_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",

@@ -203,7 +203,7 @@ typed_config:
 TEST_P(ProtocolIntegrationTest, AddBodyToRequestAndWaitForIt) {
   // filters are prepended, so add them in reverse order
   config_helper_.addFilter(R"EOF(
-  name: wait-for-whole-request-filter
+  name: wait-for-whole-request-and-response-filter
   )EOF");
   config_helper_.addFilter(R"EOF(
   name: add-body-filter
@@ -230,7 +230,7 @@ TEST_P(ProtocolIntegrationTest, AddBodyToResponseAndWaitForIt) {
   name: add-body-filter
   )EOF");
   config_helper_.addFilter(R"EOF(
-  name: wait-for-whole-request-filter
+  name: wait-for-whole-request-and-response-filter
   )EOF");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
