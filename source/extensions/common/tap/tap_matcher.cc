@@ -71,7 +71,6 @@ SetLogicMatcher::SetLogicMatcher(const envoy::config::tap::v3::MatchPredicate::M
                                  std::vector<MatcherPtr>& matchers, Type type)
     : LogicMatcherBase(matchers), matchers_(matchers), type_(type) {
   for (const auto& config : configs.rules()) {
-    printf("SETTING LOGIC MATCHER: %d\n", static_cast<int>(matchers_.size()));
     indexes_.push_back(matchers_.size());
     buildMatcher(config, matchers_);
   }
@@ -138,8 +137,8 @@ HttpGenericBodyMatcher::HttpGenericBodyMatcher(
   for (auto i : config.patterns()) {
     switch (i.rule_case()) {
     case envoy::config::tap::v3::HttpGenericBodyMatch::GenericTextMatch::kContainsHex: {
-      // convert the hex string to real hex values
-      // string containing "01" will be converted to 1 byte: 0x01
+      // Convert the hex string to real hex values.
+      // String containing "01" will be converted to 1 byte: 0x01
       const std::vector<unsigned char> hex = Hex::decode(i.contains_hex());
       if (hex.empty()) {
         throw EnvoyException(fmt::format("invalid hex string '{}'", i.contains_hex()));
@@ -148,6 +147,7 @@ HttpGenericBodyMatcher::HttpGenericBodyMatcher(
       hex_string.assign(reinterpret_cast<const char*>(hex.data()), hex.size());
       patterns_.push_back(hex_string);
     } break;
+    // For text pattern just add the string to vector of patterns the matcher will look for.
     case envoy::config::tap::v3::HttpGenericBodyMatch::GenericTextMatch::kContainsText:
       patterns_.push_back(i.contains_text());
       break;
@@ -160,6 +160,7 @@ HttpGenericBodyMatcher::HttpGenericBodyMatcher(
 
 void HttpGenericBodyMatcher::onBody(const Buffer::Instance& data,
                                     MatchStatusVector& statuses) const {
+  // Look for all patterns stored in patterns_.
   bool found = std::all_of(patterns_.begin(), patterns_.end(), [&data, this](std::string pattern) {
     return (-1 !=
             data.search(static_cast<const void*>(pattern.c_str()), pattern.length(), 0, limit_));

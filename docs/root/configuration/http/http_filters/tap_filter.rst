@@ -122,6 +122,37 @@ Another example POST body:
 The preceding configuration instructs the tap filter to match any HTTP requests. All requests will
 be tapped and streamed out the admin endpoint.
 
+Another example POST body:
+
+.. code-block:: yaml
+
+  config_id: test_config_id
+  tap_config:
+    match_config:
+      and_match:
+        rules:
+          - http_request_headers_match:
+              headers:
+                - name: foo
+                  exact_match: bar
+          - http_request_generic_body_match:
+              patterns:
+                - contains_text: test
+                - contains_hex: deadbeef
+              bytes_limit: 128
+          - http_response_generic_body_match:
+              patterns:
+                - contains_hex: beef
+              bytes_limit: 64
+    output_config:
+      sinks:
+        - streaming_admin: {}
+
+The preceding configuration instructs the tap filter to match any HTTP requests in which a request
+header ``foo: bar`` is present AND request body contains string ``test`` and hex bytes ``deadbeef``
+in the first 128 bytes AND response body contains hex bytes ``beef`` in the first 64 bytes. If all of these
+conditions are met, the request will be tapped and streamed out to the admin endpoint.
+
 Output format
 -------------
 

@@ -90,10 +90,10 @@ message MatchPredicate {
     // HTTP response trailers match configuration.
     HttpHeadersMatch http_response_trailers_match = 8;
 
-    // HTTP request body match configuration.
+    // HTTP request generic body match configuration.
     HttpGenericBodyMatch http_request_generic_body_match = 9;
 
-    // HTTP response body match configuration.
+    // HTTP response generic body match configuration.
     HttpGenericBodyMatch http_response_generic_body_match = 10;
   }
 }
@@ -107,20 +107,24 @@ message HttpHeadersMatch {
   repeated route.v3.HeaderMatcher headers = 1;
 }
 
+// HTTP generic body match configuration.
+// List of text strings and hex strings to be located in HTTP body.
+// All specified strings must be found in the HTTP body for positive match.
+// The search may be limited to specified number of bytes from the body start.
 message HttpGenericBodyMatch {
   message GenericTextMatch {
     oneof rule {
       option (validate.required) = true;
 
-      // text string
+      // Text string to be located in HTTP body.
       string contains_text = 1;
 
-      // text with hex digits
+      // Text with hex digits to be located in HTTP body.
       string contains_hex = 2;
     }
   }
 
-  // Limit search to specified number of bytes - default zero (not limit - match entire captured buffer).
+  // Limits search to specified number of bytes - default zero (not limit - match entire captured buffer).
   uint32 bytes_limit = 1;
 
   // List of patterns to match.

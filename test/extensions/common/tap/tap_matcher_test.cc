@@ -117,7 +117,7 @@ and_match:
 // Method creates a body with the following patterns in it:
 // - string "envoy"
 // - string "proxy"
-// - hex string "BEEFA"
+// - hex string "BEEFAE"
 void TapMatcherGenericBodyTest::createTestBody() {
   data_.drain(data_.length());
   std::string body = " This is test body which contains string ";

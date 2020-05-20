@@ -105,7 +105,20 @@ public:
   virtual void onHttpResponseTrailers(const Http::ResponseTrailerMap& response_trailers,
                                       MatchStatusVector& statuses) const PURE;
 
+  /**
+   * Update match status given HTTP request body.
+   * @param data supplies the request body.
+   * @param statuses supplies the per-stream-request match status vector which must be the same
+   *                 size as the match tree vector (see above).
+   */
   virtual void onRequestBody(const Buffer::Instance& data, MatchStatusVector& statuses) const PURE;
+
+  /**
+   * Update match status given HTTP response body.
+   * @param data supplies the response body.
+   * @param statuses supplies the per-stream-request match status vector which must be the same
+   *                 size as the match tree vector (see above).
+   */
   virtual void onResponseBody(const Buffer::Instance& data, MatchStatusVector& statuses) const PURE;
 
   /**
