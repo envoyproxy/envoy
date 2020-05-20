@@ -23,7 +23,6 @@ swift_static_framework(
         "RequestTrailers.swift",
         "RequestTrailersBuilder.swift",
         "ResponseHandler.swift",
-        # TODO: add builders for ResponseHeaders/Trailers.
         "ResponseHeaders.swift",
         "ResponseHeadersBuilder.swift",
         "ResponseTrailers.swift",
