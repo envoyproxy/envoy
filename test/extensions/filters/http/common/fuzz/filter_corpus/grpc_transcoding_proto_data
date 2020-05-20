@@ -6,16 +6,16 @@ config {
 data {
   headers {
     headers {
-      key: "content-type"
-      value: "application/json"
-    }
-    headers {
       key: ":method"
       value: "POST"
     }
     headers {
       key: ":path"
       value: "/bookstore.Bookstore/CreateShelf"
+    }
+    headers {
+      key: "content-type"
+      value: "application/grpc"
     }
   }
   proto_body {
@@ -28,5 +28,11 @@ data {
       }
     }
     chunk_size: 3
+  }
+  trailers {
+    headers {
+      key: "grpc-status"
+      value: "0"
+    }
   }
 }

@@ -50,7 +50,7 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::http::FilterFuzzTestCase& i
     TestUtility::validate(input);
     // Fuzz filter.
     static UberFilterFuzzer fuzzer;
-    fuzzer.fuzz(input.config(), input.data());
+    fuzzer.fuzz(input.config(), input.data(), input.upstream_data());
   } catch (const ProtoValidationException& e) {
     ENVOY_LOG_MISC(debug, "ProtoValidationException: {}", e.what());
   }

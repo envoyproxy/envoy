@@ -32,7 +32,7 @@ message ProtoBody {
   google.protobuf.Any message = 1 [(validate.rules).any.required = true];
 
   // The size (in bytes) of each buffer when forming the requests.
-  uint64 chunk_size = 2 [(validate.rules).uint64.gt = 0];
+  uint64 chunk_size = 2 [(validate.rules).uint64 = {gt: 0, lt: 8192}];
 }
 
 message HttpData {
