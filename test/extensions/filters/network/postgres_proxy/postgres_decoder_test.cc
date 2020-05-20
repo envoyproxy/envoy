@@ -23,6 +23,7 @@ public:
   MOCK_METHOD(void, incTransactionsRollback, (), (override));
   MOCK_METHOD(void, incNotices, (NoticeType), (override));
   MOCK_METHOD(void, incErrors, (ErrorType), (override));
+  MOCK_METHOD(void, processQuery, (const std::string&), (override));
 };
 
 // Define fixture class with decoder and mock callbacks.
@@ -181,7 +182,7 @@ TEST_F(PostgresProxyDecoderTest, Unknown) {
 // Test if each frontend command calls incMessagesFrontend() method.
 TEST_P(PostgresProxyFrontendDecoderTest, FrontendInc) {
   EXPECT_CALL(callbacks_, incMessagesFrontend()).Times(1);
-  createPostgresMsg(data_, GetParam(), "Some message just to create payload");
+  createPostgresMsg(data_, GetParam(), "SELECT 1;");
   decoder_->onData(data_, true);
 }
 

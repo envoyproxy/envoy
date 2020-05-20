@@ -25,6 +25,7 @@ envoy_cc_library(
         "postgres_filter.h",
         "postgres_session.h",
     ],
+    external_deps = ["sqlparser"],
     repository = "@envoy",
     deps = [
         "//include/envoy/network:filter_interface",
@@ -33,6 +34,7 @@ envoy_cc_library(
         "//include/envoy/stats:stats_macros",
         "//source/common/buffer:buffer_lib",
         "//source/common/network:filter_lib",
+        "//source/extensions/filters/network:well_known_names",
     ],
 )
 

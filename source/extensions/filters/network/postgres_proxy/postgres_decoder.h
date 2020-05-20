@@ -39,6 +39,8 @@ public:
 
   enum class ErrorType { Error, Fatal, Panic, Unknown };
   virtual void incErrors(ErrorType) PURE;
+
+  virtual void processQuery(const std::string&) PURE;
 };
 
 // Postgres message decoder.
@@ -113,6 +115,7 @@ protected:
   void decodeBackendNoticeResponse();
   void decodeFrontendTerminate();
   void decodeErrorNotice(MsgParserDict& types);
+  void onQuery();
 
   void incMessagesUnknown() { callbacks_->incMessagesUnknown(); }
   void incSessionsEncrypted() { callbacks_->incSessionsEncrypted(); }

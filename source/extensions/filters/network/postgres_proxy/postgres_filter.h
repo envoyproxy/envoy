@@ -101,6 +101,7 @@ public:
   void incTransactions() override;
   void incTransactionsCommit() override;
   void incTransactionsRollback() override;
+  void processQuery(const std::string&) override;
 
   void doDecode(Buffer::Instance& data, bool);
   DecoderPtr createDecoder(DecoderCallbacks* callbacks);

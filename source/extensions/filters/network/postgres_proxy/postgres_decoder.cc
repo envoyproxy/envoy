@@ -30,7 +30,7 @@ void DecoderImpl::initialize() {
   FE_known_msgs['p'] =
       MsgProcessor{"PasswordMessage/GSSResponse/SASLInitialResponse/SASLResponse", {}};
   FE_known_msgs['P'] = MsgProcessor{"Parse", {}};
-  FE_known_msgs['Q'] = MsgProcessor{"Query", {}};
+  FE_known_msgs['Q'] = MsgProcessor{"Query", {&DecoderImpl::onQuery}};
   FE_known_msgs['S'] = MsgProcessor{"Sync", {}};
   FE_known_msgs['X'] = MsgProcessor{"Terminate", {&DecoderImpl::decodeFrontendTerminate}};
 
@@ -323,6 +323,8 @@ void DecoderImpl::decodeBackendErrorResponse() { decodeErrorNotice(BE_errors_); 
 // Method parses N (Notice) message and looks for string
 // indicating its meaning. It can be warning, notice, info, debug or log.
 void DecoderImpl::decodeBackendNoticeResponse() { decodeErrorNotice(BE_notices_); }
+
+void DecoderImpl::onQuery() { callbacks_->processQuery(message_); }
 
 } // namespace PostgresProxy
 } // namespace NetworkFilters

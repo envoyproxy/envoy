@@ -4,6 +4,9 @@
 #include "envoy/network/connection.h"
 
 #include "extensions/filters/network/postgres_proxy/postgres_decoder.h"
+#include "extensions/filters/network/well_known_names.h"
+
+#include "include/sqlparser/SQLParser.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -157,6 +160,44 @@ void PostgresFilter::incStatements(StatementType type) {
   case DecoderCallbacks::StatementType::Noop:
     break;
   }
+}
+
+void PostgresFilter::processQuery(const std::string& sql) {
+  hsql::SQLParserResult result;
+  hsql::SQLParser::parse(sql, &result);
+
+  // ENVOY_CONN_LOG(trace, "postgres_proxy: query processed {}", read_callbacks_->connection(),
+  //		                     command.getData());
+
+  if (!result.isValid()) {
+    // config_->stats_.queries_parse_error_.inc();
+    ENVOY_CONN_LOG(trace, "Cannot parse SQL: {}", read_callbacks_->connection(), sql.c_str());
+    return;
+  }
+
+  // Set dynamic metadata
+  envoy::config::core::v3::Metadata& dynamic_metadata =
+      read_callbacks_->connection().streamInfo().dynamicMetadata();
+  ProtobufWkt::Struct metadata(
+      (*dynamic_metadata.mutable_filter_metadata())[NetworkFilterNames::get().PostgresProxy]);
+  auto& fields = *metadata.mutable_fields();
+
+  for (auto i = 0u; i < result.size(); ++i) {
+    if (result.getStatement(i)->type() == hsql::StatementType::kStmtShow) {
+      continue;
+    }
+    hsql::TableAccessMap table_access_map;
+    result.getStatement(i)->tablesAccessed(table_access_map);
+    for (auto& it : table_access_map) {
+      auto& operations = *fields[it.first].mutable_list_value();
+      for (const auto& ot : it.second) {
+        operations.add_values()->set_string_value(ot);
+      }
+    }
+  }
+
+  read_callbacks_->connection().streamInfo().setDynamicMetadata(
+      NetworkFilterNames::get().PostgresProxy, metadata);
 }
 
 void PostgresFilter::doDecode(Buffer::Instance& data, bool frontend) {
