@@ -411,7 +411,7 @@ def hasInvalidAngleBracketDirectory(line):
 
 
 VERSION_HISTORY_NEW_LINE_REGEX = re.compile("\* ([a-z \-_]+): ([a-z:`]+)")
-VERSION_HISTORY_NEW_SECTION_REGEX = re.compile("^-----[-]+$")
+VERSION_HISTORY_SECTION_NAME = re.compile("^[A-Z][A-Za-z ]*$")
 RELOADABLE_FLAG_REGEX = re.compile(".*(.)(envoy.reloadable_features.[^ ]*)\s.*")
 # Check for punctuation in a terminal ref clause, e.g.
 # :ref:`panic mode. <arch_overview_load_balancing_panic_threshold>`
@@ -419,8 +419,6 @@ REF_WITH_PUNCTUATION_REGEX = re.compile(".*\. <[^<]*>`\s*")
 
 
 def checkCurrentReleaseNotes(file_path, error_messages):
-  in_changes_section = False
-
   first_word_of_prior_line = ''
   next_word_to_check = ''  # first word after :
   prior_line = ''
@@ -439,12 +437,15 @@ def checkCurrentReleaseNotes(file_path, error_messages):
     def reportError(message):
       error_messages.append("%s:%d: %s" % (file_path, line_number + 1, message))
 
-    if VERSION_HISTORY_NEW_SECTION_REGEX.match(line):
-      # The second section is deprecations, which are not sorted.
-      if in_changes_section:
+    if VERSION_HISTORY_SECTION_NAME.match(line):
+      if line == "Deprecated":
+        # The deprecations section is last, and does not have enforced formatting.
         break
-      # If we see a section marker we are now in the changes section.
-      in_changes_section = True
+
+      # Reset all parsing at the start of a section.
+      first_word_of_prior_line = ''
+      next_word_to_check = ''  # first word after :
+      prior_line = ''
 
     # make sure flags are surrounded by ``s
     flag_match = RELOADABLE_FLAG_REGEX.match(line)
@@ -452,7 +453,7 @@ def checkCurrentReleaseNotes(file_path, error_messages):
       if not flag_match.groups()[0].startswith('`'):
         reportError("Flag `%s` should be enclosed in back ticks" % flag_match.groups()[1])
 
-    if line.startswith("*"):
+    if line.startswith("* "):
       if not endsWithPeriod(prior_line):
         reportError("The following release note does not end with a '.'\n %s" % prior_line)
 
