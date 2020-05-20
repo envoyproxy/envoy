@@ -88,7 +88,7 @@ TEST_P(DecompressorIntegrationTest, BidirectionalDecompression) {
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
-  // Assert that the total bytes recieved upstream equal the sum of the uncompressed byte buffers
+  // Assert that the total bytes received upstream equal the sum of the uncompressed byte buffers
   // sent.
   EXPECT_TRUE(upstream_request_->complete());
   TestUtility::headerMapEqualIgnoreOrder(
