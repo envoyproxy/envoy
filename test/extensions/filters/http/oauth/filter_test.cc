@@ -79,8 +79,8 @@ public:
     p.set_forward_bearer_token(true);
     p.set_pass_through_options_method(true);
     p.mutable_credentials()->set_client_id(TEST_CLIENT_ID);
-    p.mutable_credentials()->set_client_secret(TEST_CLIENT_SECRET_ID);
-    p.mutable_credentials()->set_token_secret(TEST_TOKEN_SECRET_ID);
+    p.mutable_credentials()->set_client_secret_config_name(TEST_CLIENT_SECRET_ID);
+    p.mutable_credentials()->set_token_secret_config_name(TEST_TOKEN_SECRET_ID);
     p.add_whitelisted_paths("/whitelist/path/healthchecker");
 
     // Create the OAuth config.

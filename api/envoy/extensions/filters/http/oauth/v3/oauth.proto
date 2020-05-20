@@ -19,12 +19,16 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 
 message OAuth2Credentials {
-  // The client_id and client_secret should be provided by the OAuth provider.
+  // The client_id to be used in the authorize calls.
   string client_id = 1;
 
-  string client_secret = 2;
+  // The config name in SDS that contains the client secret that will be used
+  // to get an access token.
+  string client_secret_config_name = 2;
 
-  string token_secret = 3;
+  // The config name in SDS that contains the token secret that will be used
+  // to perform the HMAC validation.
+  string token_secret_config_name = 3;
 }
 
 // OAuth filter config

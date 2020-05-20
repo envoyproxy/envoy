@@ -23,8 +23,8 @@ namespace Oauth {
 Http::FilterFactoryCb OAuth2Config::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::oauth::v3::OAuth2& proto_config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
-  const auto client_secret = proto_config.credentials().client_secret();
-  const auto token_secret = proto_config.credentials().token_secret();
+  const auto client_secret_config_name = proto_config.credentials().client_secret_config_name();
+  const auto token_secret_config_name = proto_config.credentials().token_secret_config_name();
 
   envoy::config::core::v3::ConfigSource config_source;
   auto* const api_config_source = config_source.mutable_api_config_source();
@@ -35,9 +35,9 @@ Http::FilterFactoryCb OAuth2Config::createFilterFactoryFromProtoTyped(
   auto& secret_manager = context.clusterManager().clusterManagerFactory().secretManager();
   auto& transport_socket_factory = context.getTransportSocketFactoryContext();
   auto secret_provider_client_secret = secret_manager.findOrCreateGenericSecretProvider(
-      config_source, client_secret, transport_socket_factory);
+      config_source, client_secret_config_name, transport_socket_factory);
   auto secret_provider_token_secret = secret_manager.findOrCreateGenericSecretProvider(
-      config_source, token_secret, transport_socket_factory);
+      config_source, token_secret_config_name, transport_socket_factory);
 
   auto secret_reader = std::make_shared<SDSSecretReader>(
       secret_provider_client_secret, secret_provider_token_secret, context.api());
