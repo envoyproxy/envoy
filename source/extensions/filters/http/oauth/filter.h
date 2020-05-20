@@ -89,12 +89,12 @@ struct FilterStats {
  * This class encapsulates all data needed for the filter to operate so that we don't pass around
  * raw protobufs and other arbitrary data.
  */
-class OAuth2FilterConfig {
+class FilterConfig {
 public:
-  OAuth2FilterConfig(const envoy::extensions::filters::http::oauth::v3::OAuth2& proto_config,
-                     Upstream::ClusterManager& cluster_manager,
-                     std::shared_ptr<SecretReader> secret_reader, Stats::Scope& scope,
-                     const std::string& stats_prefix);
+  FilterConfig(const envoy::extensions::filters::http::oauth::v3::OAuth2& proto_config,
+               Upstream::ClusterManager& cluster_manager,
+               std::shared_ptr<SecretReader> secret_reader, Stats::Scope& scope,
+               const std::string& stats_prefix);
   const std::string& clusterName() const { return cluster_name_; }
   const std::string& clientId() const { return client_id_; }
   bool forwardBearerToken() const { return forward_bearer_token_; }
@@ -122,7 +122,7 @@ private:
   FilterStats stats_;
 };
 
-using OAuth2FilterConfigSharedPtr = std::shared_ptr<OAuth2FilterConfig>;
+using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
 /**
  * An OAuth cookie validator:
@@ -171,7 +171,7 @@ private:
  */
 class OAuth2Filter : public Http::PassThroughDecoderFilter, public OAuth2FilterCallbacks {
 public:
-  OAuth2Filter(OAuth2FilterConfigSharedPtr config, std::unique_ptr<OAuth2Client>&& oauth_client);
+  OAuth2Filter(FilterConfigSharedPtr config, std::unique_ptr<OAuth2Client>&& oauth_client);
   ~OAuth2Filter() override = default;
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;
@@ -205,7 +205,7 @@ private:
   Http::RequestHeaderMap* request_headers_{nullptr};
 
   std::unique_ptr<OAuth2Client> oauth_client_;
-  OAuth2FilterConfigSharedPtr config_;
+  FilterConfigSharedPtr config_;
 
   const RequirementsMap& escapedReplacements() const {
     CONSTRUCT_ON_FIRST_USE(RequirementsMap,

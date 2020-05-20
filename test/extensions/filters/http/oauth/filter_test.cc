@@ -23,7 +23,6 @@ namespace HttpFilters {
 namespace Oauth {
 
 using testing::_;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -35,7 +34,7 @@ static const std::string TEST_TOKEN_SECRET_ID = "MyTokenSecretKnoxID";
 
 class MockSecretReader : public SecretReader {
 public:
-  MockSecretReader() {}
+  MockSecretReader() = default;
   std::string clientSecret() const override { return "asdf_client_secret_fdsa"; }
   std::string tokenSecret() const override { return "asdf_token_secret_fdsa"; }
 };
@@ -86,8 +85,8 @@ public:
 
     // Create the OAuth config.
     auto secret_reader = std::make_shared<MockSecretReader>();
-    config_ = std::make_shared<OAuth2FilterConfig>(p, factory_context_.cluster_manager_,
-                                                   secret_reader, scope_, "test.");
+    config_ = std::make_shared<FilterConfig>(p, factory_context_.cluster_manager_, secret_reader,
+                                             scope_, "test.");
 
     filter_ = std::make_shared<OAuth2Filter>(config_, std::move(oauth_client_ptr));
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -113,7 +112,7 @@ public:
   std::shared_ptr<MockOAuth2CookieValidator> validator_;
   std::shared_ptr<OAuth2Filter> filter_;
   MockOAuth2Client* oauth_client_;
-  OAuth2FilterConfigSharedPtr config_;
+  FilterConfigSharedPtr config_;
   Http::MockAsyncClientRequest request_;
   std::deque<Http::AsyncClient::Callbacks*> callbacks_;
   Stats::IsolatedStoreImpl scope_;

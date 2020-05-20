@@ -41,8 +41,8 @@ Http::FilterFactoryCb OAuth2Config::createFilterFactoryFromProtoTyped(
 
   auto secret_reader = std::make_shared<SDSSecretReader>(
       secret_provider_client_secret, secret_provider_token_secret, context.api());
-  OAuth2FilterConfigSharedPtr config = std::make_shared<OAuth2FilterConfig>(
-      proto_config, context.clusterManager(), secret_reader, context.scope(), stats_prefix);
+  auto config = std::make_shared<FilterConfig>(proto_config, context.clusterManager(),
+                                               secret_reader, context.scope(), stats_prefix);
 
   const std::chrono::milliseconds timeout_duration(
       PROTOBUF_GET_MS_OR_DEFAULT(proto_config, timeout, 3000));

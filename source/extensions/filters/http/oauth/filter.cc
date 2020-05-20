@@ -38,56 +38,55 @@ const Http::LowerCaseString& xForwardedUser() {
   CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "x-forwarded-user");
 }
 
-const std::string& SignoutCookieValue() {
+const std::string& signoutCookieValue() {
   CONSTRUCT_ON_FIRST_USE(std::string,
                          "OauthHMAC=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT");
 }
 
-const std::string& SignoutBearerTokenValue() {
+const std::string& signoutBearerTokenValue() {
   CONSTRUCT_ON_FIRST_USE(std::string,
                          "BearerToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT");
 }
 
-const std::string& CookieTailFormatString() {
+const std::string& cookieTailFormatString() {
   CONSTRUCT_ON_FIRST_USE(std::string, ";version=1;path=/;Max-Age={};secure");
 }
 
-const std::string& CookieTailHttpOnlyFormatString() {
+const std::string& cookieTailHttpOnlyFormatString() {
   CONSTRUCT_ON_FIRST_USE(std::string, ";version=1;path=/;Max-Age={};secure;HttpOnly");
 }
 
-const std::string& AuthClusterUriParameters() {
+const std::string& authClusterUriParameters() {
   CONSTRUCT_ON_FIRST_USE(
       std::string,
       "https://{}/oauth/"
       "authorize/?client_id={}&scope=user&response_type=code&redirect_uri={}&state={}");
 }
 
-const std::string& UnauthorizedBodyMessage() {
+const std::string& unauthorizedBodyMessage() {
   CONSTRUCT_ON_FIRST_USE(std::string, "OAuth flow failed.");
 }
 
-const std::string& DefaultOauthCallback() { CONSTRUCT_ON_FIRST_USE(std::string, "/_oauth"); }
-const std::string& DefaultOauthSignout() { CONSTRUCT_ON_FIRST_USE(std::string, "/_signout"); }
+const std::string& defaultOauthCallback() { CONSTRUCT_ON_FIRST_USE(std::string, "/_oauth"); }
+const std::string& defaultOauthSignout() { CONSTRUCT_ON_FIRST_USE(std::string, "/_signout"); }
 
-const std::string& QueryParamsError() { CONSTRUCT_ON_FIRST_USE(std::string, "error"); }
-const std::string& QueryParamsCode() { CONSTRUCT_ON_FIRST_USE(std::string, "code"); }
-const std::string& QueryParamsState() { CONSTRUCT_ON_FIRST_USE(std::string, "state"); }
+const std::string& queryParamsError() { CONSTRUCT_ON_FIRST_USE(std::string, "error"); }
+const std::string& queryParamsCode() { CONSTRUCT_ON_FIRST_USE(std::string, "code"); }
+const std::string& queryParamsState() { CONSTRUCT_ON_FIRST_USE(std::string, "state"); }
 
-OAuth2FilterConfig::OAuth2FilterConfig(
-    const envoy::extensions::filters::http::oauth::v3::OAuth2& proto_config,
-    Upstream::ClusterManager& cluster_manager, std::shared_ptr<SecretReader> secret_reader,
-    Stats::Scope& scope, const std::string& stats_prefix)
+FilterConfig::FilterConfig(const envoy::extensions::filters::http::oauth::v3::OAuth2& proto_config,
+                           Upstream::ClusterManager& cluster_manager,
+                           std::shared_ptr<SecretReader> secret_reader, Stats::Scope& scope,
+                           const std::string& stats_prefix)
     : cluster_name_(proto_config.cluster()), client_id_(proto_config.credentials().client_id()),
       oauth_server_hostname_(proto_config.hostname()),
       callback_path_(
-          PROTOBUF_GET_STRING_OR_DEFAULT(proto_config, callback_path, DefaultOauthCallback())),
+          PROTOBUF_GET_STRING_OR_DEFAULT(proto_config, callback_path, defaultOauthCallback())),
       signout_path_(
-          PROTOBUF_GET_STRING_OR_DEFAULT(proto_config, signout_path, DefaultOauthSignout())),
+          PROTOBUF_GET_STRING_OR_DEFAULT(proto_config, signout_path, defaultOauthSignout())),
       forward_bearer_token_(proto_config.forward_bearer_token()),
       pass_through_options_method_(proto_config.pass_through_options_method()),
-      secret_reader_(secret_reader),
-      stats_(OAuth2FilterConfig::generateStats(stats_prefix, scope)) {
+      secret_reader_(secret_reader), stats_(FilterConfig::generateStats(stats_prefix, scope)) {
   if (!cluster_manager.get(cluster_name_)) {
     throw EnvoyException(fmt::format("OAuth2 filter: unknown cluster '{}' in config. Please "
                                      "specify which cluster to direct OAuth requests to.",
@@ -99,7 +98,7 @@ OAuth2FilterConfig::OAuth2FilterConfig(
   }
 }
 
-FilterStats OAuth2FilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
+FilterStats FilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
   return {ALL_OAUTH_FILTER_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
 }
 
@@ -140,7 +139,7 @@ bool OAuth2CookieValidator::timestampIsValid() const {
 
 bool OAuth2CookieValidator::isValid() const { return hmacIsValid() && timestampIsValid(); }
 
-OAuth2Filter::OAuth2Filter(OAuth2FilterConfigSharedPtr config,
+OAuth2Filter::OAuth2Filter(FilterConfigSharedPtr config,
                            std::unique_ptr<OAuth2Client>&& oauth_client)
     : validator_(std::make_shared<OAuth2CookieValidator>()), oauth_client_(std::move(oauth_client)),
       config_(std::move(config)) {
@@ -223,7 +222,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
       Http::Utility::QueryParams query_parameters = Http::Utility::parseQueryString(path_str);
 
       const auto state =
-          absl::StrReplaceAll(query_parameters.at(QueryParamsState()), unescapedReplacements());
+          absl::StrReplaceAll(query_parameters.at(queryParamsState()), unescapedReplacements());
       Http::Utility::Url state_url;
       if (!state_url.initialize(state, false)) {
         sendUnauthorizedResponse();
@@ -285,7 +284,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     const std::string escaped_state = absl::StrReplaceAll(state_path, escapedReplacements());
 
     const std::string new_url =
-        fmt::format(AuthClusterUriParameters(), config_->oauthServerHostname(), config_->clientId(),
+        fmt::format(authClusterUriParameters(), config_->oauthServerHostname(), config_->clientId(),
                     escaped_redirect_uri, escaped_state);
     response_headers->setReferenceKey(Http::Headers::get().Location, new_url);
     decoder_callbacks_->encodeHeaders(std::move(response_headers), true);
@@ -297,20 +296,20 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   // server and we expect the query strings to contain the information required to get the access
   // token
   Http::Utility::QueryParams query_parameters = Http::Utility::parseQueryString(path_str);
-  if (query_parameters.find(QueryParamsError()) != query_parameters.end()) {
+  if (query_parameters.find(queryParamsError()) != query_parameters.end()) {
     sendUnauthorizedResponse();
     return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
   }
 
   // if the data we need is not present on the URL, stop execution
-  if (query_parameters.find(QueryParamsCode()) == query_parameters.end() ||
-      query_parameters.find(QueryParamsState()) == query_parameters.end()) {
+  if (query_parameters.find(queryParamsCode()) == query_parameters.end() ||
+      query_parameters.find(queryParamsState()) == query_parameters.end()) {
     sendUnauthorizedResponse();
     return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
   }
 
-  auth_code_ = query_parameters.at(QueryParamsCode());
-  state_ = absl::StrReplaceAll(query_parameters.at(QueryParamsState()), unescapedReplacements());
+  auth_code_ = query_parameters.at(queryParamsCode());
+  state_ = absl::StrReplaceAll(query_parameters.at(queryParamsState()), unescapedReplacements());
 
   Http::Utility::Url state_url;
   if (!state_url.initialize(state_, false)) {
@@ -385,8 +384,8 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
 
   const std::string new_path =
       absl::StrCat(headers.ForwardedProto()->value().getStringView(), "://", host_, "/");
-  response_headers->addReference(Http::Headers::get().SetCookie, SignoutCookieValue());
-  response_headers->addReference(Http::Headers::get().SetCookie, SignoutBearerTokenValue());
+  response_headers->addReference(Http::Headers::get().SetCookie, signoutCookieValue());
+  response_headers->addReference(Http::Headers::get().SetCookie, signoutBearerTokenValue());
   response_headers->setReferenceKey(Http::Headers::get().Location, new_path);
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true);
 
@@ -439,9 +438,9 @@ void OAuth2Filter::onGetIdentitySuccess(const std::string& username) {
   // We use HTTP Only cookies for the HMAC and Expiry. These should be more private and restricted
   // from free view in scripts. However, as username is extracted by the underlying
   // service, we can expose these values.
-  const std::string cookie_tail = fmt::format(CookieTailFormatString(), new_expires_);
+  const std::string cookie_tail = fmt::format(cookieTailFormatString(), new_expires_);
   const std::string cookie_tail_http_only =
-      fmt::format(CookieTailHttpOnlyFormatString(), new_expires_);
+      fmt::format(cookieTailHttpOnlyFormatString(), new_expires_);
 
   /**
    * At this point we have all of the pieces needed to authenticate a user that did not originally
@@ -478,7 +477,7 @@ void OAuth2Filter::onGetIdentitySuccess(const std::string& username) {
 
 void OAuth2Filter::sendUnauthorizedResponse() {
   config_->stats().oauth_failure_.inc();
-  decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, UnauthorizedBodyMessage(), nullptr,
+  decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, unauthorizedBodyMessage(), nullptr,
                                      absl::nullopt, EMPTY_STRING);
 }
 

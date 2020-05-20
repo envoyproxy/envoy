@@ -52,7 +52,7 @@ The service must be served over HTTPS for this filter to work, as the cookies us
 Statistics
 ----------
 
-The OAuth filter outputs statistics in the *http.oauth.* namespace.
+The OAuth filter outputs statistics in the *<stat_prefix>.* namespace.
 
 .. csv-table::
   :header: Name, Type, Description
