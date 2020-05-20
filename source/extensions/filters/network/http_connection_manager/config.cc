@@ -196,6 +196,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       drain_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, drain_timeout, 5000)),
       generate_request_id_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, generate_request_id, true)),
       preserve_external_request_id_(config.preserve_external_request_id()),
+      always_set_request_id_in_response_(config.always_set_request_id_in_response()),
       date_provider_(date_provider),
       listener_stats_(Http::ConnectionManagerImpl::generateListenerStats(stats_prefix_,
                                                                          context_.listenerScope())),
@@ -215,6 +216,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
                                                       0))),
 #endif
       merge_slashes_(config.merge_slashes()),
+      strip_matching_port_(config.strip_matching_host_port()),
       headers_with_underscores_action_(
           config.common_http_protocol_options().headers_with_underscores_action()) {
   // If idle_timeout_ was not configured in common_http_protocol_options, use value in deprecated
@@ -472,14 +474,20 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
                                          const Buffer::Instance& data,
                                          Http::ServerConnectionCallbacks& callbacks) {
   switch (codec_type_) {
-  case CodecType::HTTP1:
+  case CodecType::HTTP1: {
+    Http::Http1::CodecStats& stats =
+        Http::Http1::CodecStats::atomicGet(http1_codec_stats_, context_.scope());
     return std::make_unique<Http::Http1::ServerConnectionImpl>(
-        connection, context_.scope(), callbacks, http1_settings_, maxRequestHeadersKb(),
+        connection, stats, callbacks, http1_settings_, maxRequestHeadersKb(),
         maxRequestHeadersCount(), headersWithUnderscoresAction());
-  case CodecType::HTTP2:
+  }
+  case CodecType::HTTP2: {
+    Http::Http2::CodecStats& stats =
+        Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.scope());
     return std::make_unique<Http::Http2::ServerConnectionImpl>(
-        connection, callbacks, context_.scope(), http2_options_, maxRequestHeadersKb(),
+        connection, callbacks, stats, http2_options_, maxRequestHeadersKb(),
         maxRequestHeadersCount(), headersWithUnderscoresAction());
+  }
   case CodecType::HTTP3:
     // Hard code Quiche factory name here to instantiate a QUIC codec implemented.
     // TODO(danzh) Add support to get the factory name from config, possibly
@@ -491,10 +499,10 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
             .createQuicServerConnection(connection, callbacks));
   case CodecType::AUTO:
     return Http::ConnectionManagerUtility::autoCreateCodec(
-        connection, data, callbacks, context_.scope(), http1_settings_, http2_options_,
-        maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
+        connection, data, callbacks, context_.scope(), http1_codec_stats_, http2_codec_stats_,
+        http1_settings_, http2_options_, maxRequestHeadersKb(), maxRequestHeadersCount(),
+        headersWithUnderscoresAction());
   }
-
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 

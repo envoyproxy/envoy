@@ -12,13 +12,14 @@ import "envoy/config/listener/v3/listener.proto";
 import "envoy/config/metrics/v3/stats.proto";
 import "envoy/config/overload/v3/overload.proto";
 import "envoy/config/trace/v3/http_tracer.proto";
-import "envoy/extensions/transport_sockets/tls/v3/cert.proto";
+import "envoy/extensions/transport_sockets/tls/v3/secret.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
 import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -143,7 +144,10 @@ message Bootstrap {
   Admin admin = 12;
 
   // Optional overload manager configuration.
-  overload.v3.OverloadManager overload_manager = 15;
+  overload.v3.OverloadManager overload_manager = 15 [
+    (udpa.annotations.security).configure_for_untrusted_downstream = true,
+    (udpa.annotations.security).configure_for_untrusted_upstream = true
+  ];
 
   // Enable :ref:`stats for event dispatcher <operations_performance>`, defaults to false.
   // Note that this records a value for each iteration of the event loop on every thread. This

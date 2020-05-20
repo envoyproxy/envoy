@@ -163,12 +163,12 @@ TEST_P(TlsInspectorTest, MultipleReads) {
         }));
     for (size_t i = 1; i <= client_hello.size(); i++) {
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-          .WillOnce(Invoke(
-              [&client_hello, i](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-                ASSERT(length >= client_hello.size());
-                memcpy(buffer, client_hello.data(), client_hello.size());
-                return Api::SysCallSizeResult{ssize_t(i), 0};
-              }));
+          .WillOnce(Invoke([&client_hello, i](os_fd_t, void* buffer, size_t length,
+                                              int) -> Api::SysCallSizeResult {
+            ASSERT(length >= client_hello.size());
+            memcpy(buffer, client_hello.data(), client_hello.size());
+            return Api::SysCallSizeResult{ssize_t(i), 0};
+          }));
     }
   }
 

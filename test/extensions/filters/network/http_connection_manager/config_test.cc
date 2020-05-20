@@ -978,6 +978,56 @@ TEST_F(HttpConnectionManagerConfigTest, MergeSlashesFalse) {
   EXPECT_FALSE(config.shouldMergeSlashes());
 }
 
+// Validated that by default we don't remove port.
+TEST_F(HttpConnectionManagerConfigTest, RemovePortDefault) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_);
+  EXPECT_FALSE(config.shouldStripMatchingPort());
+}
+
+// Validated that when configured, we remove port.
+TEST_F(HttpConnectionManagerConfigTest, RemovePortTrue) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  strip_matching_host_port: true
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_);
+  EXPECT_TRUE(config.shouldStripMatchingPort());
+}
+
+// Validated that when explicitly set false, we don't remove port.
+TEST_F(HttpConnectionManagerConfigTest, RemovePortFalse) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  strip_matching_host_port: false
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_);
+  EXPECT_FALSE(config.shouldStripMatchingPort());
+}
+
 // Validated that by default we allow requests with header names containing underscores.
 TEST_F(HttpConnectionManagerConfigTest, HeadersWithUnderscoresAllowedByDefault) {
   const std::string yaml_string = R"EOF(
@@ -1456,6 +1506,37 @@ TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtens
       nullptr,
       Registry::FactoryRegistry<Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(
           deprecated_name));
+}
+
+TEST_F(HttpConnectionManagerConfigTest, AlwaysSetRequestIdInResponseDefault) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_);
+  EXPECT_FALSE(config.alwaysSetRequestIdInResponse());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, AlwaysSetRequestIdInResponseConfigured) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  always_set_request_id_in_response: true
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_);
+  EXPECT_TRUE(config.alwaysSetRequestIdInResponse());
 }
 
 namespace {

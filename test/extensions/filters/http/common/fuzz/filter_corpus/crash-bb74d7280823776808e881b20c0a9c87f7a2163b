@@ -1,0 +1,18 @@
+config {
+  name: "envoy.grpc_json_transcoder"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder"
+    value: "\n\001%8\001"
+  }
+}
+data {
+  http_body {
+    data: "\001\000\000\t"
+  }
+  trailers {
+    headers {
+      key: "0"
+      value: "||||||||||||||||||||||||||||||||||||||||"
+    }
+  }
+}

@@ -36,8 +36,6 @@ cc_library(
     ],
 )
 
-# autotools packages are unusable on Windows as-is
-# TODO: Consider our own luajit.BUILD file as we do with many other packages
 configure_make(
     name = "luajit",
     configure_command = "build.py",
@@ -51,9 +49,10 @@ configure_make(
     lib_source = "@com_github_luajit_luajit//:all",
     make_commands = [],
     out_include_dir = "include/luajit-2.1",
-    static_libraries = [
-        "libluajit-5.1.a",
-    ],
+    static_libraries = select({
+        "//bazel:windows_x86_64": ["lua51.lib"],
+        "//conditions:default": ["libluajit-5.1.a"],
+    }),
     tags = ["skip_on_windows"],
 )
 
@@ -70,9 +69,10 @@ configure_make(
     lib_source = "@com_github_moonjit_moonjit//:all",
     make_commands = [],
     out_include_dir = "include/moonjit-2.2",
-    static_libraries = [
-        "libluajit-5.1.a",
-    ],
+    static_libraries = select({
+        "//bazel:windows_x86_64": ["lua51.lib"],
+        "//conditions:default": ["libluajit-5.1.a"],
+    }),
     tags = ["skip_on_windows"],
 )
 
@@ -82,9 +82,18 @@ envoy_cmake_external(
         "CARES_SHARED": "no",
         "CARES_STATIC": "on",
         "CMAKE_CXX_COMPILER_FORCED": "on",
+        "CMAKE_INSTALL_LIBDIR": "lib",
     },
     defines = ["CARES_STATICLIB"],
     lib_source = "@com_github_c_ares_c_ares//:all",
+    linkopts = select({
+        "//bazel:apple": ["-lresolv"],
+        "//conditions:default": [],
+    }),
+    postfix_script = select({
+        "//bazel:windows_x86_64": "cp -L $EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/nameser.h $INSTALLDIR/include/nameser.h",
+        "//conditions:default": "",
+    }),
     static_libraries = select({
         "//bazel:windows_x86_64": ["cares.lib"],
         "//conditions:default": ["libcares.a"],
@@ -103,6 +112,9 @@ envoy_cmake_external(
         "CMAKE_USE_GSSAPI": "off",
         "HTTP_ONLY": "on",
         "CMAKE_INSTALL_LIBDIR": "lib",
+        # Explicitly enable Unix sockets and disable crypto for Windows
+        "USE_UNIX_SOCKETS": "on",
+        "CURL_DISABLE_CRYPTO_AUTH": "on",
         # C-Ares.
         "ENABLE_ARES": "on",
         "CARES_LIBRARY": "$EXT_BUILD_DEPS/ares",
@@ -214,6 +226,8 @@ envoy_cmake_external(
     cache_entries = {
         "BUILD_SHARED_LIBS": "off",
         "CMAKE_CXX_COMPILER_FORCED": "on",
+        "CMAKE_C_COMPILER_FORCED": "on",
+        "SKIP_BUILD_EXAMPLES": "on",
     },
     lib_source = "@net_zlib//:all",
     static_libraries = select({

@@ -8,6 +8,9 @@
 #include <unordered_set>
 
 #include "envoy/admin/v3/config_dump.pb.h"
+#include "envoy/common/exception.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.validate.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.validate.h"
 #include "envoy/event/dispatcher.h"
@@ -24,8 +27,8 @@
 #include "common/common/mutex_tracer_impl.h"
 #include "common/common/utility.h"
 #include "common/common/version.h"
-#include "common/config/resources.h"
 #include "common/config/utility.h"
+#include "common/config/version_converter.h"
 #include "common/http/codes.h"
 #include "common/local_info/local_info_impl.h"
 #include "common/memory/stats.h"
@@ -38,10 +41,10 @@
 #include "common/stats/timespan_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
 
+#include "server/admin/utils.h"
 #include "server/configuration_impl.h"
 #include "server/connection_handler_impl.h"
 #include "server/guarddog_impl.h"
-#include "server/http/utils.h"
 #include "server/listener_hooks.h"
 #include "server/ssl_context_manager.h"
 
@@ -57,7 +60,8 @@ InstanceImpl::InstanceImpl(
     Filesystem::Instance& file_system, std::unique_ptr<ProcessContext> process_context)
     : init_manager_(init_manager), workers_started_(false), live_(false), shutdown_(false),
       options_(options), validation_context_(options_.allowUnknownStaticFields(),
-                                             !options.rejectUnknownDynamicFields()),
+                                             !options.rejectUnknownDynamicFields(),
+                                             options.ignoreUnknownDynamicFields()),
       time_source_(time_system), restarter_(restarter), start_time_(time(nullptr)),
       original_start_time_(start_time_), stats_store_(store), thread_local_(tls),
       api_(new Api::Impl(thread_factory, store, time_system, file_system,
@@ -159,6 +163,12 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store) {
   for (const auto& histogram : snapped_histograms_) {
     histograms_.push_back(*histogram);
   }
+
+  snapped_text_readouts_ = store.textReadouts();
+  text_readouts_.reserve(snapped_text_readouts_.size());
+  for (const auto& text_readout : snapped_text_readouts_) {
+    text_readouts_.push_back(*text_readout);
+  }
 }
 
 void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks,
@@ -220,6 +230,26 @@ void InstanceImpl::flushStatsInternal() {
 
 bool InstanceImpl::healthCheckFailed() { return !live_.load(); }
 
+namespace {
+// Loads a bootstrap object, potentially at a specific version (upgrading if necessary).
+void loadBootsrap(absl::optional<uint32_t> bootstrap_version,
+                  envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                  std::function<void(Protobuf::Message&, bool)> load_function) {
+
+  if (!bootstrap_version.has_value()) {
+    load_function(bootstrap, true);
+  } else if (*bootstrap_version == 3) {
+    load_function(bootstrap, false);
+  } else if (*bootstrap_version == 2) {
+    envoy::config::bootstrap::v2::Bootstrap bootstrap_v2;
+    load_function(bootstrap_v2, false);
+    Config::VersionConverter::upgrade(bootstrap_v2, bootstrap);
+  } else {
+    throw EnvoyException(fmt::format("Unknown bootstrap version {}.", *bootstrap_version));
+  }
+}
+} // namespace
+
 void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                                        const Options& options,
                                        ProtobufMessage::ValidationVisitor& validation_visitor,
@@ -235,11 +265,19 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
   }
 
   if (!config_path.empty()) {
-    MessageUtil::loadFromFile(config_path, bootstrap, validation_visitor, api);
+    loadBootsrap(
+        options.bootstrapVersion(), bootstrap,
+        [&config_path, &validation_visitor, &api](Protobuf::Message& message, bool do_boosting) {
+          MessageUtil::loadFromFile(config_path, message, validation_visitor, api, do_boosting);
+        });
   }
   if (!config_yaml.empty()) {
     envoy::config::bootstrap::v3::Bootstrap bootstrap_override;
-    MessageUtil::loadFromYaml(config_yaml, bootstrap_override, validation_visitor);
+    loadBootsrap(options.bootstrapVersion(), bootstrap_override,
+                 [&config_yaml, &validation_visitor](Protobuf::Message& message, bool do_boosting) {
+                   MessageUtil::loadFromYaml(config_yaml, message, validation_visitor, do_boosting);
+                 });
+    // TODO(snowp): The fact that we do a merge here doesn't seem to be covered under test.
     bootstrap.MergeFrom(bootstrap_override);
   }
   if (config_proto.ByteSize() != 0) {
@@ -428,8 +466,8 @@ void InstanceImpl::initialize(const Options& options,
   // instantiated (which in turn relies on runtime...).
   Runtime::LoaderSingleton::get().initialize(clusterManager());
 
-  // If RTDS was not configured the `onRuntimeReady` callback is immediately invoked.
-  Runtime::LoaderSingleton::get().startRtdsSubscriptions([this]() { onRuntimeReady(); });
+  clusterManager().setPrimaryClustersInitializedCb(
+      [this]() { onClusterManagerPrimaryInitializationComplete(); });
 
   for (Stats::SinkPtr& sink : config_.statsSinks()) {
     stats_store_.addSink(*sink);
@@ -443,6 +481,11 @@ void InstanceImpl::initialize(const Options& options,
   // GuardDog (deadlock detection) object and thread setup before workers are
   // started and before our own run() loop runs.
   guard_dog_ = std::make_unique<Server::GuardDogImpl>(stats_store_, config_, *api_);
+}
+
+void InstanceImpl::onClusterManagerPrimaryInitializationComplete() {
+  // If RTDS was not configured the `onRuntimeReady` callback is immediately invoked.
+  Runtime::LoaderSingleton::get().startRtdsSubscriptions([this]() { onRuntimeReady(); });
 }
 
 void InstanceImpl::onRuntimeReady() {
@@ -546,11 +589,13 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
       return;
     }
 
+    const auto type_url = Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>(
+        envoy::config::core::v3::ApiVersion::V2);
     // Pause RDS to ensure that we don't send any requests until we've
     // subscribed to all the RDS resources. The subscriptions happen in the init callbacks,
     // so we pause RDS until we've completed all the callbacks.
     if (cm.adsMux()) {
-      cm.adsMux()->pause(Config::TypeUrl::get().RouteConfiguration);
+      cm.adsMux()->pause(type_url);
     }
 
     ENVOY_LOG(info, "all clusters initialized. initializing init manager");
@@ -559,7 +604,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
     // Now that we're execute all the init callbacks we can resume RDS
     // as we've subscribed to all the statically defined RDS resources.
     if (cm.adsMux()) {
-      cm.adsMux()->resume(Config::TypeUrl::get().RouteConfiguration);
+      cm.adsMux()->resume(type_url);
     }
   });
 }

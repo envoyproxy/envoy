@@ -22,14 +22,10 @@ public:
   }
 
   void initialize() override {
-    auto host = config_helper_.createVirtualHost("host", "/");
-    //    host.mutable_proxying_config();
-    config_helper_.addVirtualHost(host);
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-                hcm) -> void {
-          hcm.add_upgrade_configs()->set_upgrade_type("CONNECT");
-          hcm.mutable_http2_protocol_options()->set_allow_connect(true);
+                hcm) {
+          ConfigHelper::setConnectConfig(hcm, true);
 
           if (enable_timeout_) {
             hcm.mutable_stream_idle_timeout()->set_seconds(0);
@@ -45,6 +41,7 @@ public:
     request_encoder_ = &encoder_decoder.first;
     response_ = std::move(encoder_decoder.second);
     ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_raw_upstream_connection_));
+    response_->waitForHeaders();
   }
 
   void sendBidirectionalData(const char* downstream_send_data = "hello",
@@ -66,15 +63,13 @@ public:
                                                   {":path", "/"},
                                                   {":protocol", "bytestream"},
                                                   {":scheme", "https"},
-                                                  {":authority", "host"}};
+                                                  {":authority", "host:80"}};
   FakeRawConnectionPtr fake_raw_upstream_connection_;
   IntegrationStreamDecoderPtr response_;
   bool enable_timeout_{};
 };
 
-// TODO(alyssawilk) make sure that if data is sent with the connect it does not go upstream
-// until the 200 headers are sent before unhiding ANY config.
-TEST_P(ConnectTerminationIntegrationTest, DISABLED_Basic) {
+TEST_P(ConnectTerminationIntegrationTest, Basic) {
   initialize();
 
   setUpConnection();
@@ -92,7 +87,7 @@ TEST_P(ConnectTerminationIntegrationTest, DISABLED_Basic) {
   ASSERT_FALSE(response_->reset());
 }
 
-TEST_P(ConnectTerminationIntegrationTest, DISABLED_DownstreamClose) {
+TEST_P(ConnectTerminationIntegrationTest, DownstreamClose) {
   initialize();
 
   setUpConnection();
@@ -103,7 +98,7 @@ TEST_P(ConnectTerminationIntegrationTest, DISABLED_DownstreamClose) {
   ASSERT_TRUE(fake_raw_upstream_connection_->waitForHalfClose());
 }
 
-TEST_P(ConnectTerminationIntegrationTest, DISABLED_DownstreamReset) {
+TEST_P(ConnectTerminationIntegrationTest, DownstreamReset) {
   initialize();
 
   setUpConnection();
@@ -114,7 +109,7 @@ TEST_P(ConnectTerminationIntegrationTest, DISABLED_DownstreamReset) {
   ASSERT_TRUE(fake_raw_upstream_connection_->waitForHalfClose());
 }
 
-TEST_P(ConnectTerminationIntegrationTest, DISABLED_UpstreamClose) {
+TEST_P(ConnectTerminationIntegrationTest, UpstreamClose) {
   initialize();
 
   setUpConnection();
@@ -125,18 +120,18 @@ TEST_P(ConnectTerminationIntegrationTest, DISABLED_UpstreamClose) {
   response_->waitForReset();
 }
 
-TEST_P(ConnectTerminationIntegrationTest, DISABLED_TestTimeout) {
+TEST_P(ConnectTerminationIntegrationTest, TestTimeout) {
   enable_timeout_ = true;
   initialize();
 
   setUpConnection();
 
   // Wait for the timeout to close the connection.
-  response_->waitForEndStream();
+  response_->waitForReset();
   ASSERT_TRUE(fake_raw_upstream_connection_->waitForHalfClose());
 }
 
-TEST_P(ConnectTerminationIntegrationTest, DISABLED_BuggyHeaders) {
+TEST_P(ConnectTerminationIntegrationTest, BuggyHeaders) {
   initialize();
   // It's possible that the FIN is received before we set half close on the
   // upstream connection, so allow unexpected disconnects.
@@ -150,7 +145,7 @@ TEST_P(ConnectTerminationIntegrationTest, DISABLED_BuggyHeaders) {
                                      {":path", "/"},
                                      {":protocol", "bytestream"},
                                      {":scheme", "https"},
-                                     {":authority", "host"}});
+                                     {":authority", "host:80"}});
   // If the connection is established (created, set to half close, and then the
   // FIN arrives), make sure the FIN arrives, and send a FIN from upstream.
   if (fake_upstreams_[0]->waitForRawConnection(fake_raw_upstream_connection_) &&
@@ -165,16 +160,37 @@ TEST_P(ConnectTerminationIntegrationTest, DISABLED_BuggyHeaders) {
   ASSERT_FALSE(response_->reset());
 }
 
+TEST_P(ConnectTerminationIntegrationTest, BasicMaxStreamDuration) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* static_resources = bootstrap.mutable_static_resources();
+    auto* cluster = static_resources->mutable_clusters(0);
+    auto* http_protocol_options = cluster->mutable_common_http_protocol_options();
+    http_protocol_options->mutable_max_stream_duration()->MergeFrom(
+        ProtobufUtil::TimeUtil::MillisecondsToDuration(1000));
+  });
+
+  initialize();
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+  setUpConnection();
+  sendBidirectionalData();
+
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_max_duration_reached", 1);
+
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+    codec_client_->waitForDisconnect();
+  } else {
+    response_->waitForReset();
+    codec_client_->close();
+  }
+}
+
 // For this class, forward the CONNECT request upstream
 class ProxyingConnectIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   void initialize() override {
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-                hcm) -> void {
-          hcm.add_upgrade_configs()->set_upgrade_type("CONNECT");
-          hcm.mutable_http2_protocol_options()->set_allow_connect(true);
-        });
+                hcm) -> void { ConfigHelper::setConnectConfig(hcm, false); });
     HttpProtocolIntegrationTest::initialize();
   }
 

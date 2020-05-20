@@ -51,7 +51,7 @@ Retry plugin configuration
 Normally during retries, host selection follows the same process as the original request. Retry plugins
 can be used to modify this behavior, and they fall into two categories:
 
-* :ref:`Host Predicates <envoy_api_field_route.RetryPolicy.retry_host_predicate>`:
+* :ref:`Host Predicates <envoy_v3_api_field_config.route.v3.RetryPolicy.retry_host_predicate>`:
   These predicates can be used to "reject" a host, which will cause host selection to be reattempted.
   Any number of these predicates can be specified, and the host will be rejected if any of the predicates reject the host.
 
@@ -62,22 +62,22 @@ can be used to modify this behavior, and they fall into two categories:
 
   * *envoy.retry_host_predicates.omit_canary_hosts*: This will reject any host that is a marked as canary host.
     Hosts are marked by setting ``canary: true`` for the ``envoy.lb`` filter in the endpoint's filter metadata.
-    See :ref:`LbEndpoint <envoy_api_msg_endpoint.LbEndpoint>` for more details.
+    See :ref:`LbEndpoint <envoy_v3_api_msg_config.endpoint.v3.LbEndpoint>` for more details.
 
   * *envoy.retry_host_predicates.omit_host_metadata*: This will reject any host based on predefined metadata match criteria. 
     See the configuration example below for more details.
 
-* :ref:`Priority Predicates<envoy_api_field_route.RetryPolicy.retry_priority>`: These predicates can
+* :ref:`Priority Predicates<envoy_v3_api_field_config.route.v3.RetryPolicy.retry_priority>`: These predicates can
   be used to adjust the priority load used when selecting a priority for a retry attempt. Only one such
   predicate may be specified.
 
   Envoy supports the following built-in priority predicates
 
-  * *envoy.retry_priority.previous_priorities*: This will keep track of previously attempted priorities,
+  * *envoy.retry_priorities.previous_priorities*: This will keep track of previously attempted priorities,
     and adjust the priority load such that other priorities will be targeted in subsequent retry attempts.
 
 Host selection will continue until either the configured predicates accept the host or a configurable
-:ref:`max attempts <envoy_api_field_route.RetryPolicy.host_selection_retry_max_attempts>` has been reached.
+:ref:`max attempts <envoy_v3_api_field_config.route.v3.RetryPolicy.host_selection_retry_max_attempts>` has been reached.
 
 These plugins can be combined to affect both host selection and priority load. Envoy can also be extended
 with custom retry plugins similar to how custom filters can be added.
@@ -108,7 +108,7 @@ To reject a host based on its metadata, ``envoy.retry_host_predicates.omit_host_
     retry_host_predicate:
     - name: envoy.retry_host_predicates.omit_host_metadata
       typed_config:
-        "@type": type.googleapis.com/envoy.config.retry.omit_host_metadata.v2.OmitHostMetadataConfig
+        "@type": type.googleapis.com/envoy.extensions.retry.host.omit_host_metadata.v3.OmitHostMetadataConfig
         metadata_match:
           filter_metadata:
             envoy.lb:
@@ -117,7 +117,7 @@ To reject a host based on its metadata, ``envoy.retry_host_predicates.omit_host_
 This will reject any host with matching (key, value) in its metadata.
 
 To configure retries to attempt other priorities during retries, the built-in
-``envoy.retry_priority.previous_priorities`` can be used.
+``envoy.retry_priorities.previous_priorities`` can be used.
 
 .. code-block:: yaml
 
@@ -125,7 +125,7 @@ To configure retries to attempt other priorities during retries, the built-in
     retry_priority:
       name: envoy.retry_priorities.previous_priorities
       typed_config:
-        "@type": type.googleapis.com/envoy.config.retry.previous_priorities.PreviousPrioritiesConfig
+        "@type": type.googleapis.com/envoy.extensions.retry.priority.previous_priorities.v3.PreviousPrioritiesConfig
         update_frequency: 2
 
 This will target priorities in subsequent retry attempts that haven't been already used. The ``update_frequency`` parameter decides how
@@ -143,7 +143,7 @@ previously attempted priorities.
     retry_priority:
       name: envoy.retry_priorities.previous_priorities
       typed_config:
-        "@type": type.googleapis.com/envoy.config.retry.previous_priorities.PreviousPrioritiesConfig
+        "@type": type.googleapis.com/envoy.extensions.retry.priority.previous_priorities.v3.PreviousPrioritiesConfig
         update_frequency: 2
 
 .. _arch_overview_internal_redirects:
@@ -151,36 +151,59 @@ previously attempted priorities.
 Internal redirects
 --------------------------
 
-Envoy supports handling 302 redirects internally, that is capturing a 302 redirect response,
-synthesizing a new request, sending it to the upstream specified by the new route match, and
-returning the redirected response as the response to the original request.
+Envoy supports handling 3xx redirects internally, that is capturing a configurable 3xx redirect
+response, synthesizing a new request, sending it to the upstream specified by the new route match,
+and returning the redirected response as the response to the original request.
 
-Internal redirects are configured via the ref:`internal redirect action
-<envoy_api_field_route.RouteAction.internal_redirect_action>` field and
-`max internal redirects <envoy_api_field_route.RouteAction.max_internal_redirects>` field in
-route configuration. When redirect handling is on, any 302 response from upstream is
-subject to the redirect being handled by Envoy.
+Internal redirects are configured via the :ref:`internal redirect policy
+<envoy_v3_api_field_config.route.v3.RouteAction.internal_redirect_policy>` field in route configuration.
+When redirect handling is on, any 3xx response from upstream, that matches
+:ref:`redirect_response_codes
+<envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.redirect_response_codes>`
+is subject to the redirect being handled by Envoy.
 
 For a redirect to be handled successfully it must pass the following checks:
 
-1. Be a 302 response.
-2. Have a *location* header with a valid, fully qualified URL matching the scheme of the original request.
+1. Have a response code matching one of :ref:`redirect_response_codes
+   <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.redirect_response_codes>`, which is
+   either 302 (by default), or a set of 3xx codes (301, 302, 303, 307, 308).
+2. Have a *location* header with a valid, fully qualified URL.
 3. The request must have been fully processed by Envoy.
 4. The request must not have a body.
-5. The number of previously handled internal redirect within a given downstream request does not exceed
-   `max internal redirects <envoy_api_field_route.RouteAction.max_internal_redirects>` of the route
-   that the request or redirected request is hitting.
+5. :ref:`allow_cross_scheme_redirect
+   <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.allow_cross_scheme_redirect>` is true (default to false),
+   or the scheme of the downstream request and the *location* header are the same.
+6. The number of previously handled internal redirect within a given downstream request does not
+   exceed :ref:`max internal redirects
+   <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.max_internal_redirects>`
+   of the route that the request or redirected request is hitting.
+7. All :ref:`predicates <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.predicates>` accept
+   the target route.
 
 Any failure will result in redirect being passed downstream instead.
 
 Since a redirected request may be bounced between different routes, any route in the chain of redirects that
 
 1. does not have internal redirect enabled
-2. or has a `max internal redirects
-   <envoy_api_field_route.RouteAction.max_internal_redirects>`
+2. or has a :ref:`max internal redirects
+   <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.max_internal_redirects>`
    smaller or equal to the redirect chain length when the redirect chain hits it
+3. or is disallowed by any of the :ref:`predicates
+   <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.predicates>`
 
 will cause the redirect to be passed downstream.
+
+Two predicates can be used to create a DAG that defines the redirect chain, the :ref:`previous routes
+<envoy_v3_api_msg_extensions.internal_redirect.previous_routes.v3.PreviousRoutesConfig>` predicate, and
+the :ref:`allow_listed_routes
+<envoy_v3_api_msg_extensions.internal_redirect.allow_listed_routes.v3.AllowListedRoutesConfig>`.
+Specifically, the *allow listed routes* predicate defines edges of individual node in the DAG
+and the *previous routes* predicate defines "visited" state of the edges, so that loop can be avoided
+if so desired.
+
+A third predicate :ref:`safe_cross_scheme                                      
+<envoy_v3_api_msg_extensions.internal_redirect.safe_cross_scheme.v3.SafeCrossSchemeConfig>`
+can be used to prevent HTTP -> HTTPS redirect.
 
 Once the redirect has passed these checks, the request headers which were shipped to the original
 upstream will be modified by:

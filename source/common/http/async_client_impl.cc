@@ -20,6 +20,7 @@ const std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>>
 const AsyncStreamImpl::NullHedgePolicy AsyncStreamImpl::RouteEntryImpl::hedge_policy_;
 const AsyncStreamImpl::NullRateLimitPolicy AsyncStreamImpl::RouteEntryImpl::rate_limit_policy_;
 const AsyncStreamImpl::NullRetryPolicy AsyncStreamImpl::RouteEntryImpl::retry_policy_;
+const Router::InternalRedirectPolicyImpl AsyncStreamImpl::RouteEntryImpl::internal_redirect_policy_;
 const std::vector<Router::ShadowPolicyPtr> AsyncStreamImpl::RouteEntryImpl::shadow_policies_;
 const AsyncStreamImpl::NullVirtualHost AsyncStreamImpl::RouteEntryImpl::virtual_host_;
 const AsyncStreamImpl::NullRateLimitPolicy AsyncStreamImpl::NullVirtualHost::rate_limit_policy_;
@@ -30,6 +31,8 @@ const Config::TypedMetadataImpl<Envoy::Config::TypedMetadataFactory>
     AsyncStreamImpl::RouteEntryImpl::typed_metadata_({});
 const AsyncStreamImpl::NullPathMatchCriterion
     AsyncStreamImpl::RouteEntryImpl::path_match_criterion_;
+const absl::optional<envoy::config::route::v3::RouteAction::UpgradeConfig::ConnectConfig>
+    AsyncStreamImpl::RouteEntryImpl::connect_config_nullopt_;
 const std::list<LowerCaseString> AsyncStreamImpl::NullConfig::internal_only_headers_;
 
 AsyncClientImpl::AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster,
@@ -133,7 +136,7 @@ void AsyncStreamImpl::sendHeaders(RequestHeaderMap& headers, bool end_stream) {
     is_head_request_ = true;
   }
 
-  is_grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
+  is_grpc_request_ = Grpc::Common::isGrpcRequestHeaders(headers);
   headers.setReferenceEnvoyInternalRequest(Headers::get().EnvoyInternalRequestValues.True);
   if (send_xff_) {
     Utility::appendXff(headers, *parent_.config_.local_info_.address());

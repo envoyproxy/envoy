@@ -16,8 +16,10 @@
 #include "common/config/well_known_names.h"
 #include "common/grpc/common.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/header_utility.h"
 #include "common/network/address_impl.h"
 #include "common/router/router.h"
+#include "common/runtime/runtime_features.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/upstream/host_utility.h"
 
@@ -250,7 +252,8 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onEvent(Network::Conne
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
   if (!client_) {
     Upstream::Host::CreateConnectionData conn =
-        host_->createHealthCheckConnection(parent_.dispatcher_, parent_.transportSocketOptions());
+        host_->createHealthCheckConnection(parent_.dispatcher_, parent_.transportSocketOptions(),
+                                           parent_.transportSocketMatchMetadata().get());
     client_.reset(parent_.createCodecClient(conn));
     client_->addConnectionCallbacks(connection_callback_impl_);
     expect_reset_ = false;
@@ -343,6 +346,14 @@ bool HttpHealthCheckerImpl::HttpActiveHealthCheckSession::shouldClose() const {
     return false;
   }
 
+  if (!parent_.reuse_connection_) {
+    return true;
+  }
+
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.fixed_connection_close")) {
+    return Http::HeaderUtility::shouldCloseConnection(client_->protocol(), *response_headers_);
+  }
+
   if (response_headers_->Connection()) {
     const bool close =
         absl::EqualsIgnoreCase(response_headers_->Connection()->value().getStringView(),
@@ -359,10 +370,6 @@ bool HttpHealthCheckerImpl::HttpActiveHealthCheckSession::shouldClose() const {
     if (close) {
       return true;
     }
-  }
-
-  if (!parent_.reuse_connection_) {
-    return true;
   }
 
   return false;
@@ -419,7 +426,7 @@ TcpHealthCheckMatcher::MatchSegments TcpHealthCheckMatcher::loadProtoBytes(
 bool TcpHealthCheckMatcher::match(const MatchSegments& expected, const Buffer::Instance& buffer) {
   uint64_t start_index = 0;
   for (const std::vector<uint8_t>& segment : expected) {
-    ssize_t search_result = buffer.search(&segment[0], segment.size(), start_index, 0);
+    ssize_t search_result = buffer.search(segment.data(), segment.size(), start_index, 0);
     if (search_result == -1) {
       return false;
     }
@@ -505,7 +512,9 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onEvent(Network::Connect
 void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onInterval() {
   if (!client_) {
     client_ =
-        host_->createHealthCheckConnection(parent_.dispatcher_, parent_.transportSocketOptions())
+        host_
+            ->createHealthCheckConnection(parent_.dispatcher_, parent_.transportSocketOptions(),
+                                          parent_.transportSocketMatchMetadata().get())
             .connection_;
     session_callbacks_ = std::make_shared<TcpSessionCallbacks>(*this);
     client_->addConnectionCallbacks(*session_callbacks_);
@@ -519,7 +528,7 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onInterval() {
   if (!parent_.send_bytes_.empty()) {
     Buffer::OwnedImpl data;
     for (const std::vector<uint8_t>& segment : parent_.send_bytes_) {
-      data.add(&segment[0], segment.size());
+      data.add(segment.data(), segment.size());
     }
 
     client_->write(data, false);
@@ -583,8 +592,8 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::decodeHeaders(
                   end_stream);
     return;
   }
-  if (!Grpc::Common::hasGrpcContentType(*headers)) {
-    onRpcComplete(Grpc::Status::WellKnownGrpcStatus::Internal, "invalid gRPC content-type", false);
+  if (!Grpc::Common::isGrpcResponseHeaders(*headers, end_stream)) {
+    onRpcComplete(Grpc::Status::WellKnownGrpcStatus::Internal, "not a gRPC request", false);
     return;
   }
   if (end_stream) {
@@ -659,7 +668,8 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onEvent(Network::Conne
 void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
   if (!client_) {
     Upstream::Host::CreateConnectionData conn =
-        host_->createHealthCheckConnection(parent_.dispatcher_, parent_.transportSocketOptions());
+        host_->createHealthCheckConnection(parent_.dispatcher_, parent_.transportSocketOptions(),
+                                           parent_.transportSocketMatchMetadata().get());
     client_ = parent_.createCodecClient(conn);
     client_->addConnectionCallbacks(connection_callback_impl_);
     client_->setCodecConnectionCallbacks(http_connection_callback_impl_);
@@ -793,9 +803,11 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::logHealthCheckStatus(
     case grpc::health::v1::HealthCheckResponse::UNKNOWN:
       service_status = "unknown";
       break;
+    case grpc::health::v1::HealthCheckResponse::SERVICE_UNKNOWN:
+      service_status = "service_unknown";
+      break;
     default:
-      // Should not happen really, Protobuf should not parse undefined enums values.
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      service_status = "unknown_healthcheck_response";
       break;
     }
   }

@@ -111,12 +111,16 @@ public:
 
   enum class State {
     // Initial state. During this state all static clusters are loaded. Any primary clusters
-    // are immediately initialized.
+    // immediately begin initialization.
     Loading,
+    // In this state cluster manager waits for all primary clusters to finish initialization.
+    // This state may immediately transition to the next state iff all clusters are STATIC and
+    // without health checks enabled or health checks have failed immediately, since their
+    // initialization completes immediately.
+    WaitingForPrimaryInitializationToComplete,
     // During this state cluster manager waits to start initializing secondary clusters. In this
-    // state all
-    // primary clusters have completed initialization. Initialization of the secondary clusters
-    // is started by the `initializeSecondaryClusters` method.
+    // state all primary clusters have completed initialization. Initialization of the
+    // secondary clusters is started by the `initializeSecondaryClusters` method.
     WaitingToStartSecondaryInitialization,
     // In this state cluster manager waits for all secondary clusters (if configured) to finish
     // initialization. Then, if CDS is configured, this state tracks waiting for the first CDS
@@ -133,7 +137,8 @@ public:
   void onStaticLoadComplete();
   void removeCluster(Cluster& cluster);
   void setCds(CdsApi* cds);
-  void setInitializedCb(std::function<void()> callback);
+  void setPrimaryClustersInitializedCb(ClusterManager::PrimaryClustersReadyCallback callback);
+  void setInitializedCb(ClusterManager::InitializationCompleteCallback callback);
   State state() const { return state_; }
 
   void startInitializingSecondaryClusters();
@@ -149,7 +154,8 @@ private:
   ClusterManager& cm_;
   std::function<void(Cluster& cluster)> per_cluster_init_callback_;
   CdsApi* cds_{};
-  std::function<void()> initialized_callback_;
+  ClusterManager::PrimaryClustersReadyCallback primary_clusters_initialized_callback_;
+  ClusterManager::InitializationCompleteCallback initialized_callback_;
   std::list<Cluster*> primary_init_clusters_;
   std::list<Cluster*> secondary_init_clusters_;
   State state_{State::Loading};
@@ -197,7 +203,12 @@ public:
   // Upstream::ClusterManager
   bool addOrUpdateCluster(const envoy::config::cluster::v3::Cluster& cluster,
                           const std::string& version_info) override;
-  void setInitializedCb(std::function<void()> callback) override {
+
+  void setPrimaryClustersInitializedCb(PrimaryClustersReadyCallback callback) override {
+    init_helper_.setPrimaryClustersInitializedCb(callback);
+  }
+
+  void setInitializedCb(InitializationCompleteCallback callback) override {
     init_helper_.setInitializedCb(callback);
   }
 

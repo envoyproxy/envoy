@@ -15,7 +15,6 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/assert.h"
-#include "common/config/resources.h"
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
 
@@ -23,6 +22,7 @@
 #include "test/config/integration/certs/clientcert_hash.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/resources.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_replace.h"
@@ -433,6 +433,26 @@ void ConfigHelper::addClusterFilterMetadata(absl::string_view metadata_yaml,
   }
 }
 
+void ConfigHelper::setConnectConfig(
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager& hcm,
+    bool terminate_connect) {
+  auto* route_config = hcm.mutable_route_config();
+  ASSERT_EQ(1, route_config->virtual_hosts_size());
+  auto* route = route_config->mutable_virtual_hosts(0)->mutable_routes(0);
+  auto* match = route->mutable_match();
+  match->Clear();
+  match->mutable_connect_matcher();
+
+  if (terminate_connect) {
+    auto* upgrade = route->mutable_route()->add_upgrade_configs();
+    upgrade->set_upgrade_type("CONNECT");
+    upgrade->mutable_connect_config();
+  }
+
+  hcm.add_upgrade_configs()->set_upgrade_type("CONNECT");
+  hcm.mutable_http2_protocol_options()->set_allow_connect(true);
+}
+
 void ConfigHelper::applyConfigModifiers() {
   for (const auto& config_modifier : config_modifiers_) {
     config_modifier(bootstrap_);
@@ -746,7 +766,7 @@ bool ConfigHelper::setAccessLog(const std::string& filename, absl::string_view f
   loadHttpConnectionManager(hcm_config);
   envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
   if (!format.empty()) {
-    access_log_config.set_format(std::string(format));
+    access_log_config.mutable_log_format()->set_text_format(absl::StrCat(format, "\n"));
   }
   access_log_config.set_path(filename);
   hcm_config.mutable_access_log(0)->mutable_typed_config()->PackFrom(access_log_config);
@@ -761,7 +781,7 @@ bool ConfigHelper::setListenerAccessLog(const std::string& filename, absl::strin
   }
   envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
   if (!format.empty()) {
-    access_log_config.set_format(std::string(format));
+    access_log_config.mutable_log_format()->set_text_format(std::string(format));
   }
   access_log_config.set_path(filename);
   bootstrap_.mutable_static_resources()
