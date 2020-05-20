@@ -48,7 +48,7 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
   ASSERT_NE(addr_port->ip(), nullptr);
 
   // Create a socket on which we'll listen for connections from clients.
-  IoHandlePtr io_handle = addr_port->socket(SocketType::Stream);
+  IoHandlePtr io_handle = SocketInterface::socket(SocketType::Stream, addr_port);
   ASSERT_GE(io_handle->fd(), 0) << addr_port->asString();
   auto& os_sys_calls = Api::OsSysCallsSingleton::get();
 
@@ -74,7 +74,7 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
 
   auto client_connect = [&os_sys_calls](Address::InstanceConstSharedPtr addr_port) {
     // Create a client socket and connect to the server.
-    IoHandlePtr client_handle = addr_port->socket(SocketType::Stream);
+    IoHandlePtr client_handle = SocketInterface::socket(SocketType::Stream, addr_port);
     ASSERT_GE(client_handle->fd(), 0) << addr_port->asString();
 
     // Instance::socket creates a non-blocking socket, which that extends all the way to the
@@ -327,7 +327,8 @@ TEST(PipeInstanceTest, BasicPermission) {
   const mode_t mode = 0777;
   PipeInstance address(path, mode);
 
-  IoHandlePtr io_handle = address.socket(SocketType::Stream);
+  IoHandlePtr io_handle =
+      SocketInterface::socket(SocketType::Stream, Address::Type::Pipe, Address::IpVersion::v4);
   ASSERT_GE(io_handle->fd(), 0) << address.asString();
 
   Api::SysCallIntResult result = address.bind(io_handle->fd());
@@ -352,7 +353,9 @@ TEST(PipeInstanceTest, PermissionFail) {
   const mode_t mode = 0777;
   PipeInstance address(path, mode);
 
-  IoHandlePtr io_handle = address.socket(SocketType::Stream);
+  IoHandlePtr io_handle =
+      SocketInterface::socket(SocketType::Stream, Address::Type::Pipe, Address::IpVersion::v4);
+  ;
   ASSERT_GE(io_handle->fd(), 0) << address.asString();
   EXPECT_CALL(os_sys_calls, bind(_, _, _)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
   EXPECT_CALL(os_sys_calls, chmod(_, _)).WillOnce(Return(Api::SysCallIntResult{-1, 0}));
@@ -422,7 +425,8 @@ TEST(PipeInstanceTest, EmbeddedNullPathError) {
 TEST(PipeInstanceTest, UnlinksExistingFile) {
   const auto bind_uds_socket = [](const std::string& path) {
     PipeInstance address(path);
-    IoHandlePtr io_handle = address.socket(SocketType::Stream);
+    IoHandlePtr io_handle =
+        SocketInterface::socket(SocketType::Stream, Address::Type::Pipe, Address::IpVersion::v4);
     ASSERT_GE(io_handle->fd(), 0) << address.asString();
 
     const Api::SysCallIntResult result = address.bind(io_handle->fd());

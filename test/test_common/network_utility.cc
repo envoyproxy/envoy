@@ -27,7 +27,7 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
                   << (addr_port == nullptr ? "nullptr" : addr_port->asString());
     return nullptr;
   }
-  IoHandlePtr io_handle = addr_port->socket(type);
+  IoHandlePtr io_handle = SocketInterface::socket(type, addr_port);
   // Not setting REUSEADDR, therefore if the address has been recently used we won't reuse it here.
   // However, because we're going to use the address while checking if it is available, we'll need
   // to set REUSEADDR on listener sockets created by tests using an address validated by this means.
@@ -58,7 +58,7 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
   // If the port we bind is zero, then the OS will pick a free port for us (assuming there are
   // any), and we need to find out the port number that the OS picked so we can return it.
   if (addr_port->ip()->port() == 0) {
-    return Address::addressFromFd(io_handle->fd());
+    return SocketInterface::addressFromFd(io_handle->fd());
   }
   return addr_port;
 }
@@ -149,7 +149,7 @@ Address::InstanceConstSharedPtr getAnyAddress(const Address::IpVersion version, 
 
 bool supportsIpVersion(const Address::IpVersion version) {
   Address::InstanceConstSharedPtr addr = getCanonicalLoopbackAddress(version);
-  IoHandlePtr io_handle = addr->socket(Address::SocketType::Stream);
+  IoHandlePtr io_handle = SocketInterface::socket(Address::SocketType::Stream, addr);
   if (0 != addr->bind(io_handle->fd()).rc_) {
     // Socket bind failed.
     RELEASE_ASSERT(io_handle->close().err_ == nullptr, "");
@@ -174,7 +174,7 @@ std::string ipVersionToDnsFamily(Network::Address::IpVersion version) {
 std::pair<Address::InstanceConstSharedPtr, Network::IoHandlePtr>
 bindFreeLoopbackPort(Address::IpVersion version, Address::SocketType type) {
   Address::InstanceConstSharedPtr addr = getCanonicalLoopbackAddress(version);
-  IoHandlePtr io_handle = addr->socket(type);
+  IoHandlePtr io_handle = SocketInterface::socket(type, addr);
   Api::SysCallIntResult result = addr->bind(io_handle->fd());
   if (0 != result.rc_) {
     io_handle->close();
@@ -183,7 +183,7 @@ bindFreeLoopbackPort(Address::IpVersion version, Address::SocketType type) {
     ADD_FAILURE() << msg;
     throw EnvoyException(msg);
   }
-  return std::make_pair(Address::addressFromFd(io_handle->fd()), std::move(io_handle));
+  return std::make_pair(SocketInterface::addressFromFd(io_handle->fd()), std::move(io_handle));
 }
 
 TransportSocketPtr createRawBufferSocket() { return std::make_unique<RawBufferSocket>(); }

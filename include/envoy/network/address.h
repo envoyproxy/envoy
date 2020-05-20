@@ -91,6 +91,11 @@ public:
    * @return the version of IP address.
    */
   virtual IpVersion version() const PURE;
+
+  /**
+   * @return true if address is Ipv6 and Ipv4 compatibility is disabled, false otherwise
+   */
+  virtual bool v6only() const PURE;
 };
 
 enum class Type { Ip, Pipe };
@@ -154,14 +159,6 @@ public:
    * @return the IP address information IFF type() == Type::Ip, otherwise nullptr.
    */
   virtual const Ip* ip() const PURE;
-
-  /**
-   * Create a socket for this address.
-   * @param type supplies the socket type to create.
-   * @return the IoHandlePtr naming the socket. In case of a failure, the program would be
-   *   aborted.
-   */
-  virtual IoHandlePtr socket(SocketType type) const PURE;
 
   /**
    * @return the type of address.

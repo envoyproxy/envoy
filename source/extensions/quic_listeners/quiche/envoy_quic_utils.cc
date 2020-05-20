@@ -112,7 +112,7 @@ createConnectionSocket(Network::Address::InstanceConstSharedPtr& peer_addr,
   ASSERT(local_addr->ip());
   if (local_addr->ip()->port() == 0) {
     // Get ephemeral port number.
-    local_addr = Network::Address::addressFromFd(connection_socket->ioHandle().fd());
+    local_addr = Network::SocketInterface::addressFromFd(connection_socket->ioHandle().fd());
   }
   if (!Network::Socket::applyOptions(connection_socket->options(), *connection_socket,
                                      envoy::config::core::v3::SocketOption::STATE_BOUND)) {
