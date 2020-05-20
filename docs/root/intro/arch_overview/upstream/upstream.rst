@@ -13,3 +13,4 @@ Upstream clusters
   outlier
   circuit_breaking
   upstream_filters
+  load_reporting_service
