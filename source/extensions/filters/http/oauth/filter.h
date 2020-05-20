@@ -132,7 +132,7 @@ using OAuth2FilterConfigSharedPtr = std::shared_ptr<OAuth2FilterConfig>;
  * 4. Checks that the `expires` value is valid relative to current time
  *
  * Required components:
- * - headermap
+ * - header map
  * - secret
  */
 class CookieValidator {
@@ -165,7 +165,7 @@ private:
 };
 
 /**
- * The filter is the primary entrypoint for the OAuth workflow. Its responsibilities are to
+ * The filter is the primary entry point for the OAuth workflow. Its responsibilities are to
  * receive incoming requests and decide at what state of the OAuth workflow they are in. Logic
  * beyond that is broken into component classes.
  */

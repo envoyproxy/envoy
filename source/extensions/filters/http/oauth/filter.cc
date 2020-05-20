@@ -94,7 +94,6 @@ OAuth2FilterConfig::OAuth2FilterConfig(
                                      cluster_name_));
   }
 
-  // Add each custom whitelisted path into the unordered_set of preconfigured paths.
   for (const auto& entry : proto_config.whitelisted_paths()) {
     whitelisted_paths_.emplace_back(entry);
   }
@@ -207,10 +206,9 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   const std::vector<std::string> v = absl::StrSplit(user_agent_value, '.');
   user_agent_ = v[0];
 
-  // First thing we should do is sanitize the x-forwarded LDAP headers.
   sanitizeXForwardedOauthHeaders(headers);
 
-  // We should check if this is a signout request.
+  // We should check if this is a sign out request.
   if (path_str == config_->signoutPath()) {
     return signOutUser(headers);
   }
@@ -259,10 +257,10 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
   }
 
-  // If no access token and this isn't the callback URI, redirect to oauth to acquire credentials
+  // If no access token and this isn't the callback URI, redirect to acquire credentials.
   //
-  // The following conditional could be replaced with a regex pattern-match
-  // if we're concerned about matching strictly `/_oauth`
+  // The following conditional could be replaced with a regex pattern-match,
+  // if we're concerned about matching strictly `/_oauth`.
   if (!absl::StartsWith(path_str, config_->callbackPath())) {
     Http::ResponseHeaderMapPtr response_headers{Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
         {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Found))}})};
@@ -336,7 +334,7 @@ void OAuth2Filter::sanitizeXForwardedOauthHeaders(Http::RequestHeaderMap& header
   headers.remove(xForwardedUser());
 }
 
-// Set the legacy Oauth headers that can be used to beautify the underlying UI.
+// Set the legacy Oauth headers.
 void OAuth2Filter::setXForwardedOauthHeaders(Http::RequestHeaderMap& headers,
                                              const std::string& token,
                                              const std::string& username) {

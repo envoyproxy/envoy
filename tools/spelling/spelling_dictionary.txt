@@ -202,6 +202,7 @@ NS
 NUL
 Nilsson
 Nonhashable
+Oauth
 OCSP
 OK
 OOM
@@ -790,6 +791,7 @@ nullopt
 nullptr
 num
 numkeys
+oauth
 observability
 ocagent
 offsetof

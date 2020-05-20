@@ -63,7 +63,7 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
   in_flight_request_ = nullptr;
 
   /**
-   * Due to the asynchonous nature of this client, it's important to immediately update the state
+   * Due to the asynchronous nature of this client, it's important to immediately update the state
    * that we are not waiting on anything, otherwise a painful debugging session may ensue.
    */
   OAuthState prior_state = state_;

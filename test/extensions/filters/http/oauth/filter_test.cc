@@ -120,9 +120,9 @@ public:
 };
 
 /**
- * Scenario: The OAuth filter receives a signout request
+ * Scenario: The OAuth filter receives a sign out request.
  *
- * Expected behavior: the filter should redirect to the server name with cleared OAuth cookies
+ * Expected behavior: the filter should redirect to the server name with cleared OAuth cookies.
  */
 TEST_F(OAuth2Test, RequestSignout) {
   Http::TestRequestHeaderMapImpl request_headers{
@@ -198,7 +198,7 @@ TEST_F(OAuth2Test, OAuthOkPass) {
 
 /**
  * Scenario: The OAuth filter receives a request without valid OAuth cookies to a non-callback URL
- * (indicating that the user needs to revalidate cookies or get 401'd)
+ * (indicating that the user needs to re-validate cookies or get 401'd)
  * This also tests both a forwarded http protocol from upstream and a plaintext connection.
  *
  * Expected behavior: the filter should redirect the user to the OAuth server with the credentials
@@ -339,10 +339,9 @@ TEST_F(OAuth2Test, OAuthValidatedCookieAndContinue) {
 /**
  * Testing the whitelisted paths functionality. Give no authentication, but see if we still
  * continue through the filter chain.
- * We try once with a preconfigured path, and then with the custom path defined in the test class.
+ * We try once with a whitelisted path, and then with the custom path defined in the test class.
  */
 TEST_F(OAuth2Test, OAuthTestWhitelistedPaths) {
-  // Preconfigured path to whitelist
   Http::TestRequestHeaderMapImpl request_headers_1{
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Path.get(), "/favicon.ico"},
