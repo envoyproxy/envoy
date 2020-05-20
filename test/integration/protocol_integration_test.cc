@@ -248,6 +248,8 @@ TEST_P(ProtocolIntegrationTest, DrainClose) {
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP2) {
     EXPECT_TRUE(codec_client_->sawGoAway());
+  } else {
+    EXPECT_EQ("close", response->headers().Connection()->value().getStringView());
   }
 }
 
@@ -965,6 +967,51 @@ TEST_P(DownstreamProtocolIntegrationTest, ValidZeroLengthContent) {
 
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+}
+
+// Test we're following https://tools.ietf.org/html/rfc7230#section-3.3.2
+// as best we can.
+TEST_P(ProtocolIntegrationTest, 304WithBody) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  waitForNextUpstreamRequest();
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "304"}, {"content-length", "2"}};
+  ASSERT(upstream_request_ != nullptr);
+  upstream_request_->encodeHeaders(response_headers, false);
+  response->waitForHeaders();
+  EXPECT_EQ("304", response->headers().Status()->value().getStringView());
+
+  // For HTTP/1.1 http_parser is explicitly told that 304s are header-only
+  // requests.
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1 ||
+      upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+    ASSERT_TRUE(response->complete());
+  } else {
+    ASSERT_FALSE(response->complete());
+  }
+
+  upstream_request_->encodeData(2, true);
+  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+    // Any body sent after the request is considered complete will not be handled as part of the
+    // active request, but will be flagged as a protocol error for the no-longer-associated
+    // connection.
+    // Ideally if we got the body with the headers we would instead reset the
+    // stream, but it turns out that's complicated so instead we consistently
+    // forward the headers and error out after.
+    test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_protocol_error", 1);
+  }
+
+  // Only for HTTP/2, where streams are ended with an explicit end-stream so we
+  // can differentiate between 304-with-advertised-but-absent-body and
+  // 304-with-body, is there a protocol error on the active stream.
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP2 &&
+      upstreamProtocol() == FakeHttpConnection::Type::HTTP2) {
+    response->waitForReset();
+  }
 }
 
 // Validate that lots of tiny cookies doesn't cause a DoS (single cookie header).
