@@ -15,7 +15,6 @@
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "google/protobuf/repeated_field.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -83,10 +82,7 @@ public:
     p.mutable_credentials()->set_client_id(TEST_CLIENT_ID);
     p.mutable_credentials()->set_client_secret(TEST_CLIENT_SECRET_ID);
     p.mutable_credentials()->set_token_secret(TEST_TOKEN_SECRET_ID);
-    std::vector<std::string> whitelisted_paths{"/whitelist/path/healthchecker"};
-    google::protobuf::RepeatedPtrField<std::string> r(whitelisted_paths.begin(),
-                                                      whitelisted_paths.end());
-    p.mutable_whitelisted_paths()->Swap(&r);
+    p.add_whitelisted_paths("/whitelist/path/healthchecker");
 
     // Create the OAuth config
     auto secret_reader = std::make_shared<MockSecretReader>();
