@@ -96,7 +96,7 @@ Every Redis cluster has its own extra statistics tree rooted at *cluster.<name>.
 
 .. _arch_overview_redis_cluster_command_stats:
 
-Per-cluster command statistics can be enabled via the setting :ref:`enable_command_stats <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.enable_command_stats>`:
+Per-cluster command statistics can be enabled via the setting :ref:`enable_command_stats <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.enable_command_stats>`.:
 
 .. csv-table::
   :header: Name, Type, Description

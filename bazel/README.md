@@ -108,7 +108,9 @@ for how to update or override dependencies.
     `Git` is required. The version installable via MSYS2 is sufficient.
 
     Install the Windows-native [python3](https://www.python.org/downloads/), the POSIX flavor
-    available via MSYS2 will not work.
+    available via MSYS2 will not work. You need to add a symlink for `python3.exe` pointing to
+    the installed `python.exe` for Bazel rules which follow POSIX conventions. Be sure to add
+    `pip.exe` to the PATH and install the `wheel` package.
     
     For building with MSVC (the `msvc-cl` config option), you must install at least the VC++
     workload from the
@@ -126,7 +128,11 @@ for how to update or override dependencies.
     In addition, because of the behavior of the `rules_foreign_cc` component of Bazel, set the
     `TMPDIR` environment variable to a path usable as a temporary directory (e.g.
     `C:\Windows\TEMP`). This variable is used frequently by `mktemp` from MSYS2 in the Envoy Bazel
-    build and can cause problems if not set to a value outside the MSYS2 filesystem.
+    build and can cause problems if not set to a value outside the MSYS2 filesystem. Note that
+    using the `ci/windows_ci_steps.sh` script (to build and run tests) will create a directory
+    symlink linking `C:\c` to `C:\` in order to enable build scripts run via MSYS2 to access
+    dependencies in the temporary directory specified above. If you are not using that script, you
+    will need to create that symlink manually.
 
 1. Install Golang on your machine. This is required as part of building [BoringSSL](https://boringssl.googlesource.com/boringssl/+/HEAD/BUILDING.md)
    and also for [Buildifer](https://github.com/bazelbuild/buildtools) which is used for formatting bazel BUILD files.

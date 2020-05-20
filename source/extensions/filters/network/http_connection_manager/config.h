@@ -18,6 +18,8 @@
 #include "common/common/logger.h"
 #include "common/http/conn_manager_impl.h"
 #include "common/http/date_provider_impl.h"
+#include "common/http/http1/codec_impl.h"
+#include "common/http/http2/codec_impl.h"
 #include "common/json/json_loader.h"
 #include "common/router/rds_impl.h"
 #include "common/router/scoped_rds.h"
@@ -157,6 +159,7 @@ public:
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   bool shouldNormalizePath() const override { return normalize_path_; }
   bool shouldMergeSlashes() const override { return merge_slashes_; }
+  bool shouldStripMatchingPort() const override { return strip_matching_port_; }
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
   headersWithUnderscoresAction() const override {
     return headers_with_underscores_action_;
@@ -186,6 +189,8 @@ private:
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
   const std::string stats_prefix_;
   Http::ConnectionManagerStats stats_;
+  mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
+  mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   Http::ConnectionManagerTracingStats tracing_stats_;
   const bool use_remote_address_{};
   const std::unique_ptr<Http::InternalAddressConfig> internal_address_config_;
@@ -224,6 +229,7 @@ private:
   std::chrono::milliseconds delayed_close_timeout_;
   const bool normalize_path_;
   const bool merge_slashes_;
+  const bool strip_matching_port_;
   const envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
 

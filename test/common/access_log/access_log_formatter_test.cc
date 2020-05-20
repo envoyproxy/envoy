@@ -1473,7 +1473,7 @@ TEST(AccessLogFormatterTest, JsonFormatterPlainStringTest) {
   std::unordered_map<std::string, std::string> expected_json_map = {
       {"plain_string", "plain_string_value"}};
 
-  std::unordered_map<std::string, std::string> key_mapping = {
+  absl::flat_hash_map<std::string, std::string> key_mapping = {
       {"plain_string", "plain_string_value"}};
   JsonFormatterImpl formatter(key_mapping, false);
 
@@ -1494,7 +1494,7 @@ TEST(AccessLogFormatterTest, JsonFormatterSingleOperatorTest) {
 
   std::unordered_map<std::string, std::string> expected_json_map = {{"protocol", "HTTP/1.1"}};
 
-  std::unordered_map<std::string, std::string> key_mapping = {{"protocol", "%PROTOCOL%"}};
+  absl::flat_hash_map<std::string, std::string> key_mapping = {{"protocol", "%PROTOCOL%"}};
   JsonFormatterImpl formatter(key_mapping, false);
 
   verifyJsonOutput(formatter.format(request_header, response_header, response_trailer, stream_info),
@@ -1513,7 +1513,7 @@ TEST(AccessLogFormatterTest, JsonFormatterNonExistentHeaderTest) {
       {"nonexistent_response_header", "-"},
       {"some_response_header", "SOME_RESPONSE_HEADER"}};
 
-  std::unordered_map<std::string, std::string> key_mapping = {
+  absl::flat_hash_map<std::string, std::string> key_mapping = {
       {"protocol", "%PROTOCOL%"},
       {"some_request_header", "%REQ(some_request_header)%"},
       {"nonexistent_response_header", "%RESP(nonexistent_response_header)%"},
@@ -1541,7 +1541,7 @@ TEST(AccessLogFormatterTest, JsonFormatterAlternateHeaderTest) {
       {"response_absent_header_or_response_absent_header", "RESPONSE_PRESENT_HEADER"},
       {"response_present_header_or_response_absent_header", "RESPONSE_PRESENT_HEADER"}};
 
-  std::unordered_map<std::string, std::string> key_mapping = {
+  absl::flat_hash_map<std::string, std::string> key_mapping = {
       {"request_present_header_or_request_absent_header",
        "%REQ(request_present_header?request_absent_header)%"},
       {"request_absent_header_or_request_present_header",
@@ -1575,7 +1575,7 @@ TEST(AccessLogFormatterTest, JsonFormatterDynamicMetadataTest) {
       {"test_obj", "{\"inner_key\":\"inner_value\"}"},
       {"test_obj.inner_key", "\"inner_value\""}};
 
-  std::unordered_map<std::string, std::string> key_mapping = {
+  absl::flat_hash_map<std::string, std::string> key_mapping = {
       {"test_key", "%DYNAMIC_METADATA(com.test:test_key)%"},
       {"test_obj", "%DYNAMIC_METADATA(com.test:test_obj)%"},
       {"test_obj.inner_key", "%DYNAMIC_METADATA(com.test:test_obj:inner_key)%"}};
@@ -1597,7 +1597,7 @@ TEST(AccessLogFormatterTest, JsonFormatterTypedDynamicMetadataTest) {
   EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
   EXPECT_CALL(Const(stream_info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
 
-  std::unordered_map<std::string, std::string> key_mapping = {
+  absl::flat_hash_map<std::string, std::string> key_mapping = {
       {"test_key", "%DYNAMIC_METADATA(com.test:test_key)%"},
       {"test_obj", "%DYNAMIC_METADATA(com.test:test_obj)%"},
       {"test_obj.inner_key", "%DYNAMIC_METADATA(com.test:test_obj:inner_key)%"}};
@@ -1632,7 +1632,7 @@ TEST(AccessLogFormatterTest, JsonFormatterFilterStateTest) {
   std::unordered_map<std::string, std::string> expected_json_map = {
       {"test_key", "\"test_value\""}, {"test_obj", "{\"inner_key\":\"inner_value\"}"}};
 
-  std::unordered_map<std::string, std::string> key_mapping = {
+  absl::flat_hash_map<std::string, std::string> key_mapping = {
       {"test_key", "%FILTER_STATE(test_key)%"}, {"test_obj", "%FILTER_STATE(test_obj)%"}};
 
   JsonFormatterImpl formatter(key_mapping, false);
@@ -1655,7 +1655,7 @@ TEST(AccessLogFormatterTest, JsonFormatterTypedFilterStateTest) {
                                      StreamInfo::FilterState::StateType::ReadOnly);
   EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
 
-  std::unordered_map<std::string, std::string> key_mapping = {
+  absl::flat_hash_map<std::string, std::string> key_mapping = {
       {"test_key", "%FILTER_STATE(test_key)%"}, {"test_obj", "%FILTER_STATE(test_obj)%"}};
 
   JsonFormatterImpl formatter(key_mapping, true);
@@ -1688,7 +1688,7 @@ TEST(AccessLogFormatterTest, FilterStateSpeciferTest) {
       {"test_key_typed", "\"test_value By TYPED\""},
   };
 
-  std::unordered_map<std::string, std::string> key_mapping = {
+  absl::flat_hash_map<std::string, std::string> key_mapping = {
       {"test_key_plain", "%FILTER_STATE(test_key:PLAIN)%"},
       {"test_key_typed", "%FILTER_STATE(test_key:TYPED)%"}};
 
@@ -1711,7 +1711,7 @@ TEST(AccessLogFormatterTest, TypedFilterStateSpeciferTest) {
       StreamInfo::FilterState::StateType::ReadOnly);
   EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
 
-  std::unordered_map<std::string, std::string> key_mapping = {
+  absl::flat_hash_map<std::string, std::string> key_mapping = {
       {"test_key_plain", "%FILTER_STATE(test_key:PLAIN)%"},
       {"test_key_typed", "%FILTER_STATE(test_key:TYPED)%"}};
 
@@ -1739,7 +1739,7 @@ TEST(AccessLogFormatterTest, FilterStateErrorSpeciferTest) {
       StreamInfo::FilterState::StateType::ReadOnly);
 
   // 'ABCDE' is error specifier.
-  std::unordered_map<std::string, std::string> key_mapping = {
+  absl::flat_hash_map<std::string, std::string> key_mapping = {
       {"test_key_plain", "%FILTER_STATE(test_key:ABCDE)%"},
       {"test_key_typed", "%FILTER_STATE(test_key:TYPED)%"}};
 
@@ -1764,7 +1764,7 @@ TEST(AccessLogFormatterTest, JsonFormatterStartTimeTest) {
       {"default", "2018-03-28T23:35:58.000Z"},
       {"all_zeroes", "000000000.0.00.000"}};
 
-  std::unordered_map<std::string, std::string> key_mapping = {
+  absl::flat_hash_map<std::string, std::string> key_mapping = {
       {"simple_date", "%START_TIME(%Y/%m/%d)%"},
       {"test_time", "%START_TIME(%s)%"},
       {"bad_format", "%START_TIME(bad_format)%"},
@@ -1787,7 +1787,7 @@ TEST(AccessLogFormatterTest, JsonFormatterMultiTokenTest) {
     std::unordered_map<std::string, std::string> expected_json_map = {
         {"multi_token_field", "HTTP/1.1 plainstring SOME_REQUEST_HEADER SOME_RESPONSE_HEADER"}};
 
-    std::unordered_map<std::string, std::string> key_mapping = {
+    absl::flat_hash_map<std::string, std::string> key_mapping = {
         {"multi_token_field",
          "%PROTOCOL% plainstring %REQ(some_request_header)% %RESP(some_response_header)%"}};
 
@@ -1827,7 +1827,7 @@ TEST(AccessLogFormatterTest, JsonFormatterTypedTest) {
                                      StreamInfo::FilterState::StateType::ReadOnly);
   EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
 
-  std::unordered_map<std::string, std::string> key_mapping = {
+  absl::flat_hash_map<std::string, std::string> key_mapping = {
       {"request_duration", "%REQUEST_DURATION%"},
       {"request_duration_multi", "%REQUEST_DURATION%ms"},
       {"filter_state", "%FILTER_STATE(test_obj)%"},
@@ -1988,6 +1988,7 @@ TEST(AccessLogFormatterTest, ParserFailures) {
       "%REQ(valid)% %NOT_VALID%",
       "%REQ(FIRST?SECOND%",
       "%%",
+      "%%HOSTNAME%PROTOCOL%",
       "%protocol%",
       "%REQ(TEST):%",
       "%REQ(TEST):3q4%",

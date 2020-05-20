@@ -493,6 +493,21 @@ TEST_P(IntegrationTest, Http09Enabled) {
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("HTTP/1.0"));
 }
 
+TEST_P(IntegrationTest, Http09WithKeepalive) {
+  useAccessLog();
+  autonomous_upstream_ = true;
+  config_helper_.addConfigModifier(&setAllowHttp10WithDefaultHost);
+  initialize();
+  reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())
+      ->setResponseHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(
+          Http::TestHeaderMapImpl({{":status", "200"}, {"content-length", "0"}})));
+  std::string response;
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET /\r\nConnection: keep-alive\r\n\r\n",
+                                &response, true);
+  EXPECT_THAT(response, HasSubstr("HTTP/1.0 200 OK\r\n"));
+  EXPECT_THAT(response, HasSubstr("connection: keep-alive\r\n"));
+}
+
 // Turn HTTP/1.0 support on and verify the request is proxied and the default host is sent upstream.
 TEST_P(IntegrationTest, Http10Enabled) {
   autonomous_upstream_ = true;
@@ -756,7 +771,7 @@ TEST_P(IntegrationTest, AbsolutePathWithoutPort) {
 
 // Ensure that connect behaves the same with allow_absolute_url enabled and without
 TEST_P(IntegrationTest, Connect) {
-  const std::string& request = "CONNECT www.somewhere.com:80 HTTP/1.1\r\nHost: host\r\n\r\n";
+  const std::string& request = "CONNECT www.somewhere.com:80 HTTP/1.1\r\n\r\n";
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     // Clone the whole listener.
     auto static_resources = bootstrap.mutable_static_resources();
@@ -1286,14 +1301,13 @@ TEST_P(IntegrationTest, TestUpgradeHeaderInResponse) {
 TEST_P(IntegrationTest, ConnectWithNoBody) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-              hcm) -> void {
-        hcm.add_upgrade_configs()->set_upgrade_type("CONNECT");
-        hcm.mutable_http2_protocol_options()->set_allow_connect(true);
-      });
+              hcm) -> void { ConfigHelper::setConnectConfig(hcm, false); });
   initialize();
 
+  // Send the payload early so we can regression test that body data does not
+  // get proxied until after the response headers are sent.
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("http"));
-  tcp_client->write("CONNECT host.com:80 HTTP/1.1\r\nHost: host\r\n\r\n", false);
+  tcp_client->write("CONNECT host.com:80 HTTP/1.1\r\n\r\npayload", false);
 
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
@@ -1301,20 +1315,22 @@ TEST_P(IntegrationTest, ConnectWithNoBody) {
   ASSERT_TRUE(fake_upstream_connection->waitForData(
       FakeRawConnection::waitForInexactMatch("\r\n\r\n"), &data));
   EXPECT_TRUE(absl::StartsWith(data, "CONNECT host.com:80 HTTP/1.1"));
+  // The payload should not be present as the response headers have not been sent.
+  EXPECT_FALSE(absl::StrContains(data, "payload")) << data;
   // No transfer-encoding: chunked or connection: close
   EXPECT_FALSE(absl::StrContains(data, "hunked")) << data;
   EXPECT_FALSE(absl::StrContains(data, "onnection")) << data;
 
-  ASSERT_TRUE(fake_upstream_connection->write("HTTP/1.1 200 OK\r\nContent-length: 0\r\n\r\n"));
+  ASSERT_TRUE(fake_upstream_connection->write("HTTP/1.1 200 OK\r\n\r\n"));
   tcp_client->waitForData("\r\n\r\n", false);
   EXPECT_TRUE(absl::StartsWith(tcp_client->data(), "HTTP/1.1 200 OK\r\n")) << tcp_client->data();
   // Make sure the following payload is proxied without chunks or any other modifications.
-  tcp_client->write("payload");
   ASSERT_TRUE(fake_upstream_connection->waitForData(
       FakeRawConnection::waitForInexactMatch("\r\n\r\npayload"), &data));
 
   ASSERT_TRUE(fake_upstream_connection->write("return-payload"));
   tcp_client->waitForData("\r\n\r\nreturn-payload", false);
+  EXPECT_FALSE(absl::StrContains(tcp_client->data(), "hunked"));
 
   tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
@@ -1323,16 +1339,11 @@ TEST_P(IntegrationTest, ConnectWithNoBody) {
 TEST_P(IntegrationTest, ConnectWithChunkedBody) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-              hcm) -> void {
-        hcm.add_upgrade_configs()->set_upgrade_type("CONNECT");
-        hcm.mutable_http2_protocol_options()->set_allow_connect(true);
-      });
+              hcm) -> void { ConfigHelper::setConnectConfig(hcm, false); });
   initialize();
 
-  // Send the payload early so we can regression test that body data does not
-  // get proxied until after the response headers are sent.
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("http"));
-  tcp_client->write("CONNECT host.com:80 HTTP/1.1\r\nHost: host\r\n\r\npayload", false);
+  tcp_client->write("CONNECT host.com:80 HTTP/1.1\r\n\r\npayload", false);
 
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
@@ -1342,26 +1353,18 @@ TEST_P(IntegrationTest, ConnectWithChunkedBody) {
   // No transfer-encoding: chunked or connection: close
   EXPECT_FALSE(absl::StrContains(data, "hunked")) << data;
   EXPECT_FALSE(absl::StrContains(data, "onnection")) << data;
-  // The payload should not be present as the response headers have not been sent.
-  EXPECT_FALSE(absl::StrContains(data, "payload")) << data;
-
   ASSERT_TRUE(fake_upstream_connection->write(
       "HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\n\r\nb\r\nHello World\r\n0\r\n\r\n"));
-  tcp_client->waitForData("0\r\n\r\n", false);
-  EXPECT_TRUE(absl::StartsWith(tcp_client->data(), "HTTP/1.1 200 OK\r\n"));
-  EXPECT_TRUE(absl::StrContains(tcp_client->data(), "hunked")) << tcp_client->data();
-  EXPECT_TRUE(absl::StrContains(tcp_client->data(), "\r\n\r\nb\r\nHello World\r\n0\r\n\r\n"))
-      << tcp_client->data();
-
-  // Make sure the early payload is proxied without chunks or any other modifications.
-  ASSERT_TRUE(fake_upstream_connection->waitForData(
-      FakeRawConnection::waitForInexactMatch("\r\n\r\npayload")));
-
-  ASSERT_TRUE(fake_upstream_connection->write("return-payload"));
-  tcp_client->waitForData("\r\n\r\nreturn-payload", false);
-
-  tcp_client->close();
+  // The response will be rejected because chunked headers are not allowed with CONNECT upgrades.
+  // Envoy will send a local reply due to the invalid upstream response.
+  tcp_client->waitForDisconnect(false);
+  EXPECT_TRUE(absl::StartsWith(tcp_client->data(), "HTTP/1.1 503 Service Unavailable\r\n"));
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+}
+
+TEST_P(IntegrationTest, QuitQuitQuit) {
+  initialize();
+  test_server_->useAdminInterfaceToQuit(true);
 }
 
 } // namespace Envoy

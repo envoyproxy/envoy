@@ -20,6 +20,9 @@ public:
     config_helper_.addFilter("name: envoy.filters.http.grpc_web");
   }
 };
+INSTANTIATE_TEST_SUITE_P(IpVersions, GrpcWebFilterIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(GrpcWebFilterIntegrationTest, GRPCWebTrailersNotDuplicated) {
   config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
