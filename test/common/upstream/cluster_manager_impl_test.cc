@@ -3032,7 +3032,7 @@ public:
     TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
     bool expect_success = true;
     for (const auto& name_val : names_vals) {
-      if (!name_val.first.has_value()) {
+      if (!name_val.first.hasValue()) {
         expect_success = false;
         continue;
       }
@@ -3283,7 +3283,7 @@ public:
   void expectSetsockoptSoKeepalive(absl::optional<int> keepalive_probes,
                                    absl::optional<int> keepalive_time,
                                    absl::optional<int> keepalive_interval) {
-    if (!ENVOY_SOCKET_SO_KEEPALIVE.has_value()) {
+    if (!ENVOY_SOCKET_SO_KEEPALIVE.hasValue()) {
       EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
           .WillOnce(
               Invoke([this](Network::Address::InstanceConstSharedPtr,

@@ -43,7 +43,7 @@ protected:
 };
 
 #define CHECK_OPTION_SUPPORTED(option)                                                             \
-  if (!option.has_value()) {                                                                       \
+  if (!option.hasValue()) {                                                                        \
     return;                                                                                        \
   }
 

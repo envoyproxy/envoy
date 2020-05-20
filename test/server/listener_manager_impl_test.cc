@@ -75,7 +75,7 @@ public:
                         const Network::SocketOptionName& expected_option, int expected_value,
                         uint32_t expected_num_options = 1,
                         ListenSocketCreationParams expected_creation_params = {true, true}) {
-    if (expected_option.has_value()) {
+    if (expected_option.hasValue()) {
       expectCreateListenSocket(expected_state, expected_num_options, expected_creation_params);
       expectSetsockopt(os_sys_calls_, expected_option.level(), expected_option.option(),
                        expected_value, expected_num_options);

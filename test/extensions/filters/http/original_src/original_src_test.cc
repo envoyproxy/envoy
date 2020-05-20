@@ -134,7 +134,7 @@ TEST_F(OriginalSrcHttpTest, DecodeHeadersIpv4AddressBleachesPort) {
 }
 
 TEST_F(OriginalSrcHttpTest, FilterAddsTransparentOption) {
-  if (!ENVOY_SOCKET_IP_TRANSPARENT.has_value()) {
+  if (!ENVOY_SOCKET_IP_TRANSPARENT.hasValue()) {
     // The option isn't supported on this platform. Just skip the test.
     return;
   }
@@ -153,7 +153,7 @@ TEST_F(OriginalSrcHttpTest, FilterAddsTransparentOption) {
 }
 
 TEST_F(OriginalSrcHttpTest, FilterAddsMarkOption) {
-  if (!ENVOY_SOCKET_SO_MARK.has_value()) {
+  if (!ENVOY_SOCKET_SO_MARK.hasValue()) {
     // The option isn't supported on this platform. Just skip the test.
     return;
   }
@@ -175,7 +175,7 @@ TEST_F(OriginalSrcHttpTest, FilterAddsMarkOption) {
 }
 
 TEST_F(OriginalSrcHttpTest, Mark0NotAdded) {
-  if (!ENVOY_SOCKET_SO_MARK.has_value()) {
+  if (!ENVOY_SOCKET_SO_MARK.hasValue()) {
     // The option isn't supported on this platform. Just skip the test.
     return;
   }

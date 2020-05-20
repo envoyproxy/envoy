@@ -20,14 +20,14 @@ TEST_F(SocketOptionImplTest, HasName) {
   auto optname = ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_SNDBUF);
 
   // Verify that the constructor macro sets all the fields correctly.
-  EXPECT_TRUE(optname.has_value());
+  EXPECT_TRUE(optname.hasValue());
   EXPECT_EQ(SOL_SOCKET, optname.level());
   EXPECT_EQ(SO_SNDBUF, optname.option());
   EXPECT_EQ("SOL_SOCKET/SO_SNDBUF", optname.name());
 
   // The default constructor should not have a value, i.e. should
   // be unsupported.
-  EXPECT_FALSE(SocketOptionName().has_value());
+  EXPECT_FALSE(SocketOptionName().hasValue());
 
   // If we fail to set an option, verify that the log message
   // contains the option name so the operator can debug.
