@@ -33,13 +33,14 @@ namespace {
 class SdsApiTest : public testing::Test {
 protected:
   SdsApiTest()
-      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
+
+  void initialize() { init_target_handle_->initialize(init_watcher_); }
+  void setupMocks() {
     EXPECT_CALL(init_manager_, add(_)).WillOnce(Invoke([this](const Init::Target& target) {
       init_target_handle_ = target.createHandle("test");
     }));
   }
-
-  void initialize() { init_target_handle_->initialize(init_watcher_); }
 
   Api::ApiPtr api_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
@@ -58,14 +59,15 @@ TEST_F(SdsApiTest, BasicTest) {
   NiceMock<Server::MockInstance> server;
 
   envoy::config::core::v3::ConfigSource config_source;
+  setupMocks();
   TlsCertificateSdsApi sds_api(
       config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_,
       server.stats(), init_manager_, []() {}, *dispatcher_, *api_);
   initialize();
 }
 
-// Validate that bad ConfigSources are caught at construction time. This is a
-// regression test for https://github.com/envoyproxy/envoy/issues/10976.
+// Validate that bad ConfigSources are caught at construction time. This is a regression test for
+// https://github.com/envoyproxy/envoy/issues/10976.
 TEST_F(SdsApiTest, BadConfigSource) {
   ::testing::InSequence s;
   NiceMock<Server::MockInstance> server;
@@ -87,6 +89,7 @@ TEST_F(SdsApiTest, BadConfigSource) {
 TEST_F(SdsApiTest, DynamicTlsCertificateUpdateSuccess) {
   NiceMock<Server::MockInstance> server;
   envoy::config::core::v3::ConfigSource config_source;
+  setupMocks();
   TlsCertificateSdsApi sds_api(
       config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_,
       server.stats(), init_manager_, []() {}, *dispatcher_, *api_);
@@ -168,6 +171,7 @@ TEST_F(SdsApiTest, Delta) {
   NiceMock<Server::MockInstance> server;
   envoy::config::core::v3::ConfigSource config_source;
   Event::GlobalTimeSystem time_system;
+  setupMocks();
   PartialMockSds sds(server, init_manager_, config_source, subscription_factory_, time_system,
                      *dispatcher_, *api_);
   initialize();
@@ -187,6 +191,7 @@ TEST_F(SdsApiTest, Delta) {
 TEST_F(SdsApiTest, DeltaUpdateSuccess) {
   NiceMock<Server::MockInstance> server;
   envoy::config::core::v3::ConfigSource config_source;
+  setupMocks();
   TlsCertificateSdsApi sds_api(
       config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_,
       server.stats(), init_manager_, []() {}, *dispatcher_, *api_);
@@ -232,6 +237,7 @@ TEST_F(SdsApiTest, DeltaUpdateSuccess) {
 TEST_F(SdsApiTest, DynamicCertificateValidationContextUpdateSuccess) {
   NiceMock<Server::MockInstance> server;
   envoy::config::core::v3::ConfigSource config_source;
+  setupMocks();
   CertificateValidationContextSdsApi sds_api(
       config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_,
       server.stats(), init_manager_, []() {}, *dispatcher_, *api_);
@@ -286,6 +292,7 @@ public:
 TEST_F(SdsApiTest, DefaultCertificateValidationContextTest) {
   NiceMock<Server::MockInstance> server;
   envoy::config::core::v3::ConfigSource config_source;
+  setupMocks();
   CertificateValidationContextSdsApi sds_api(
       config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_,
       server.stats(), init_manager_, []() {}, *dispatcher_, *api_);
@@ -374,6 +381,7 @@ public:
 TEST_F(SdsApiTest, GenericSecretSdsApiTest) {
   NiceMock<Server::MockInstance> server;
   envoy::config::core::v3::ConfigSource config_source;
+  setupMocks();
   GenericSecretSdsApi sds_api(
       config_source, "encryption_key", subscription_factory_, time_system_, validation_visitor_,
       server.stats(), init_manager_, []() {}, *dispatcher_, *api_);
@@ -419,6 +427,7 @@ generic_secret:
 TEST_F(SdsApiTest, EmptyResource) {
   NiceMock<Server::MockInstance> server;
   envoy::config::core::v3::ConfigSource config_source;
+  setupMocks();
   TlsCertificateSdsApi sds_api(
       config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_,
       server.stats(), init_manager_, []() {}, *dispatcher_, *api_);
@@ -435,6 +444,7 @@ TEST_F(SdsApiTest, EmptyResource) {
 TEST_F(SdsApiTest, SecretUpdateWrongSize) {
   NiceMock<Server::MockInstance> server;
   envoy::config::core::v3::ConfigSource config_source;
+  setupMocks();
   TlsCertificateSdsApi sds_api(
       config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_,
       server.stats(), init_manager_, []() {}, *dispatcher_, *api_);
@@ -465,6 +475,7 @@ TEST_F(SdsApiTest, SecretUpdateWrongSize) {
 TEST_F(SdsApiTest, SecretUpdateWrongSecretName) {
   NiceMock<Server::MockInstance> server;
   envoy::config::core::v3::ConfigSource config_source;
+  setupMocks();
   TlsCertificateSdsApi sds_api(
       config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_,
       server.stats(), init_manager_, []() {}, *dispatcher_, *api_);
