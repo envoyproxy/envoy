@@ -385,7 +385,13 @@ private:
   virtual void setReference##name(absl::string_view value) PURE;                                   \
   virtual void set##name(absl::string_view value) PURE;                                            \
   virtual void set##name(uint64_t value) PURE;                                                     \
-  virtual size_t remove##name() PURE;
+  virtual size_t remove##name() PURE;                                                              \
+  absl::string_view get##name##Value() const {                                                     \
+    if (name() != nullptr) {                                                                       \
+      return name()->value().getStringView();                                                      \
+    }                                                                                              \
+    return "";                                                                                     \
+  }
 
 /**
  * Wraps a set of HTTP headers.

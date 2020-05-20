@@ -190,13 +190,12 @@ bool HeaderUtility::isEnvoyInternalRequest(const RequestHeaderMap& headers) {
 
 void HeaderUtility::stripPortFromHost(RequestHeaderMap& headers, uint32_t listener_port) {
 
-  if (headers.Method() &&
-      headers.Method()->value().getStringView() == Http::Headers::get().MethodValues.Connect) {
+  if (headers.getMethodValue() == Http::Headers::get().MethodValues.Connect) {
     // According to RFC 2817 Connect method should have port part in host header.
     // In this case we won't strip it even if configured to do so.
     return;
   }
-  const auto original_host = headers.Host()->value().getStringView();
+  const absl::string_view original_host = headers.getHostValue();
   const absl::string_view::size_type port_start = original_host.rfind(':');
   if (port_start == absl::string_view::npos) {
     return;

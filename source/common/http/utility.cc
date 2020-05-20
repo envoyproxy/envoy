@@ -261,8 +261,7 @@ void Utility::appendVia(RequestOrResponseHeaderMap& headers, const std::string& 
 std::string Utility::createSslRedirectPath(const RequestHeaderMap& headers) {
   ASSERT(headers.Host());
   ASSERT(headers.Path());
-  return fmt::format("https://{}{}", headers.Host()->value().getStringView(),
-                     headers.Path()->value().getStringView());
+  return fmt::format("https://{}{}", headers.getHostValue(), headers.getPathValue());
 }
 
 Utility::QueryParams Utility::parseQueryString(absl::string_view url) {
@@ -385,7 +384,7 @@ std::string Utility::makeSetCookieValue(const std::string& key, const std::strin
 uint64_t Utility::getResponseStatus(const ResponseHeaderMap& headers) {
   const HeaderEntry* header = headers.Status();
   uint64_t response_code;
-  if (!header || !absl::SimpleAtoi(headers.Status()->value().getStringView(), &response_code)) {
+  if (!header || !absl::SimpleAtoi(headers.getStatusValue(), &response_code)) {
     throw CodecClientException(":status must be specified and a valid unsigned long");
   }
   return response_code;
@@ -394,21 +393,20 @@ uint64_t Utility::getResponseStatus(const ResponseHeaderMap& headers) {
 bool Utility::isUpgrade(const RequestOrResponseHeaderMap& headers) {
   // In firefox the "Connection" request header value is "keep-alive, Upgrade",
   // we should check if it contains the "Upgrade" token.
-  return (headers.Connection() && headers.Upgrade() &&
-          Envoy::StringUtil::caseFindToken(headers.Connection()->value().getStringView(), ",",
+  return (headers.Upgrade() &&
+          Envoy::StringUtil::caseFindToken(headers.getConnectionValue(), ",",
                                            Http::Headers::get().ConnectionValues.Upgrade.c_str()));
 }
 
 bool Utility::isH2UpgradeRequest(const RequestHeaderMap& headers) {
-  return headers.Method() &&
-         headers.Method()->value().getStringView() == Http::Headers::get().MethodValues.Connect &&
+  return headers.getMethodValue() == Http::Headers::get().MethodValues.Connect &&
          headers.Protocol() && !headers.Protocol()->value().empty() &&
          headers.Protocol()->value() != Headers::get().ProtocolValues.Bytestream;
 }
 
 bool Utility::isWebSocketUpgradeRequest(const RequestHeaderMap& headers) {
   return (isUpgrade(headers) &&
-          absl::EqualsIgnoreCase(headers.Upgrade()->value().getStringView(),
+          absl::EqualsIgnoreCase(headers.getUpgradeValue(),
                                  Http::Headers::get().UpgradeValues.WebSocket));
 }
 
@@ -744,15 +742,13 @@ const std::string Utility::resetReasonToString(const Http::StreamResetReason res
 void Utility::transformUpgradeRequestFromH1toH2(RequestHeaderMap& headers) {
   ASSERT(Utility::isUpgrade(headers));
 
-  const HeaderString& upgrade = headers.Upgrade()->value();
   headers.setReferenceMethod(Http::Headers::get().MethodValues.Connect);
-  headers.setProtocol(upgrade.getStringView());
+  headers.setProtocol(headers.getUpgradeValue());
   headers.removeUpgrade();
   headers.removeConnection();
   // nghttp2 rejects upgrade requests/responses with content length, so strip
   // any unnecessary content length header.
-  if (headers.ContentLength() != nullptr &&
-      headers.ContentLength()->value().getStringView() == "0") {
+  if (headers.getContentLengthValue() == "0") {
     headers.removeContentLength();
   }
 }
@@ -763,8 +759,7 @@ void Utility::transformUpgradeResponseFromH1toH2(ResponseHeaderMap& headers) {
   }
   headers.removeUpgrade();
   headers.removeConnection();
-  if (headers.ContentLength() != nullptr &&
-      headers.ContentLength()->value().getStringView() == "0") {
+  if (headers.getContentLengthValue() == "0") {
     headers.removeContentLength();
   }
 }
@@ -772,9 +767,8 @@ void Utility::transformUpgradeResponseFromH1toH2(ResponseHeaderMap& headers) {
 void Utility::transformUpgradeRequestFromH2toH1(RequestHeaderMap& headers) {
   ASSERT(Utility::isH2UpgradeRequest(headers));
 
-  const HeaderString& protocol = headers.Protocol()->value();
   headers.setReferenceMethod(Http::Headers::get().MethodValues.Get);
-  headers.setUpgrade(protocol.getStringView());
+  headers.setUpgrade(headers.getProtocolValue());
   headers.setReferenceConnection(Http::Headers::get().ConnectionValues.Upgrade);
   headers.removeProtocol();
 }

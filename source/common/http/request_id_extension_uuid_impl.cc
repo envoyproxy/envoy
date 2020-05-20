@@ -27,7 +27,7 @@ void UUIDRequestIDExtension::set(RequestHeaderMap& request_headers, bool force) 
 void UUIDRequestIDExtension::setInResponse(ResponseHeaderMap& response_headers,
                                            const RequestHeaderMap& request_headers) {
   if (request_headers.RequestId()) {
-    response_headers.setRequestId(request_headers.RequestId()->value().getStringView());
+    response_headers.setRequestId(request_headers.getRequestIdValue());
   }
 }
 
@@ -36,7 +36,7 @@ bool UUIDRequestIDExtension::modBy(const RequestHeaderMap& request_headers, uint
   if (request_headers.RequestId() == nullptr) {
     return false;
   }
-  const std::string uuid(request_headers.RequestId()->value().getStringView());
+  const std::string uuid(request_headers.getRequestIdValue());
   if (uuid.length() < 8) {
     return false;
   }
@@ -54,7 +54,7 @@ TraceStatus UUIDRequestIDExtension::getTraceStatus(const RequestHeaderMap& reque
   if (request_headers.RequestId() == nullptr) {
     return TraceStatus::NoTrace;
   }
-  absl::string_view uuid = request_headers.RequestId()->value().getStringView();
+  absl::string_view uuid = request_headers.getRequestIdValue();
   if (uuid.length() != Runtime::RandomGeneratorImpl::UUID_LENGTH) {
     return TraceStatus::NoTrace;
   }
@@ -75,7 +75,7 @@ void UUIDRequestIDExtension::setTraceStatus(RequestHeaderMap& request_headers, T
   if (request_headers.RequestId() == nullptr) {
     return;
   }
-  absl::string_view uuid_view = request_headers.RequestId()->value().getStringView();
+  absl::string_view uuid_view = request_headers.getRequestIdValue();
   if (uuid_view.length() != Runtime::RandomGeneratorImpl::UUID_LENGTH) {
     return;
   }
