@@ -349,6 +349,7 @@ void ConnectionImpl::readDisable(bool disable) {
       file_event_->setEnabled(Event::FileReadyType::Write);
     }
   } else {
+    ASSERT(read_disable_count_ != 0);
     --read_disable_count_;
     if (state() != State::Open || file_event_ == nullptr) {
       // If readDisable is called on a closed connection, do not crash.

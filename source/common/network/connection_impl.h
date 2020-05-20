@@ -124,8 +124,11 @@ public:
 protected:
   // A convenience function which returns true if
   // 1) The read disable count is zero or
-  // 2) The read disable count is one, due to the read buffer being overrun.
+  // 2) The read disable count is one due to the read buffer being overrun.
   // In either case the consumer of the data would like to read from the buffer.
+  // If the read count is greater than one, or equal to one when the buffer is
+  // not overrun, then the consumer of the data has called readDisable, and does
+  // not want to read.
   bool consumerWantsToRead();
 
   // Network::ConnectionImplBase
