@@ -10,11 +10,24 @@ import os
 import pathlib
 import re
 import string
+import sys
+
+from bazel_tools.tools.python.runfiles import runfiles
+import yaml
+
+# We have to do some evil things to sys.path due to the way that Python module
+# resolution works; we have both tools/ trees in bazel_tools and envoy. By
+# default, Bazel leaves us with a sys.path in which the @bazel_tools repository
+# takes precedence. Now that we're done with importing runfiles above, we can
+# just remove it from the sys.path.
+sys.path = [p for p in sys.path if not p.endswith('bazel_tools')]
 
 from tools.api_proto_plugin import annotations
 from tools.api_proto_plugin import plugin
 from tools.api_proto_plugin import visitor
+from tools.config_validation import validate_fragment
 
+from udpa.annotations import security_pb2
 from udpa.annotations import status_pb2
 from validate import validate_pb2
 
@@ -388,7 +401,30 @@ def FormatAnchor(label):
   return '.. _%s:\n\n' % label
 
 
-def FormatFieldAsDefinitionListItem(outer_type_context, type_context, field):
+def FormatSecurityOptions(security_option, field, type_context, edge_default_yaml):
+  sections = []
+
+  if security_option.configure_for_untrusted_downstream:
+    sections.append(
+        Indent(4, 'This field should be configured in the presence of untrusted *downstreams*.'))
+  if security_option.configure_for_untrusted_upstream:
+    sections.append(
+        Indent(4, 'This field should be configured in the presence of untrusted *upstreams*.'))
+
+  validate_fragment.ValidateFragment(field.type_name[1:], edge_default_yaml)
+  field_name = type_context.name.split('.')[-1]
+  example = {field_name: edge_default_yaml}
+  sections.append(
+      Indent(4, 'Example configuration for untrusted environments:\n\n') +
+      Indent(4, '.. code-block:: yaml\n\n') +
+      '\n'.join(IndentLines(6,
+                            yaml.dump(example).split('\n'))))
+
+  return '.. attention::\n' + '\n\n'.join(sections)
+
+
+def FormatFieldAsDefinitionListItem(outer_type_context, type_context, field,
+                                    edge_defaults_manifest):
   """Format a FieldDescriptorProto as RST definition list item.
 
   Args:
@@ -441,13 +477,23 @@ def FormatFieldAsDefinitionListItem(outer_type_context, type_context, field):
   else:
     formatted_oneof_comment = ''
 
+  # If there is a udpa.annotations.security option, include it after the comment.
+  if field.options.HasExtension(security_pb2.security):
+    edge_default_yaml = edge_defaults_manifest.get(type_context.name)
+    if not edge_default_yaml:
+      raise ProtodocError('Missing edge default YAML example for %s' % type_context.name)
+    formatted_security_options = FormatSecurityOptions(
+        field.options.Extensions[security_pb2.security], field, type_context, edge_default_yaml)
+  else:
+    formatted_security_options = ''
+
   comment = '(%s) ' % ', '.join([FormatFieldType(type_context, field)] +
                                 field_annotations) + formatted_leading_comment
-  return anchor + field.name + '\n' + MapLines(functools.partial(Indent, 2),
-                                               comment + formatted_oneof_comment)
+  return anchor + field.name + '\n' + MapLines(functools.partial(
+      Indent, 2), comment + formatted_oneof_comment) + formatted_security_options
 
 
-def FormatMessageAsDefinitionList(type_context, msg):
+def FormatMessageAsDefinitionList(type_context, msg, edge_defaults_manifest):
   """Format a DescriptorProto as RST definition list.
 
   Args:
@@ -472,7 +518,8 @@ def FormatMessageAsDefinitionList(type_context, msg):
     type_context.oneof_names[index] = oneof_decl.name
   return '\n'.join(
       FormatFieldAsDefinitionListItem(type_context, type_context.ExtendField(index, field.name),
-                                      field) for index, field in enumerate(msg.field)) + '\n'
+                                      field, edge_defaults_manifest)
+      for index, field in enumerate(msg.field)) + '\n'
 
 
 def FormatEnumValueAsDefinitionListItem(type_context, enum_value):
@@ -525,6 +572,11 @@ class RstFormatVisitor(visitor.Visitor):
   See visitor.Visitor for visitor method docs comments.
   """
 
+  def __init__(self):
+    r = runfiles.Create()
+    with open(r.Rlocation('envoy/docs/edge_defaults_manifest.yaml'), 'r') as f:
+      self.edge_defaults_manifest = yaml.load(f.read())
+
   def VisitEnum(self, enum_proto, type_context):
     normal_enum_type = NormalizeTypeContextName(type_context.name)
     anchor = FormatAnchor(EnumCrossRefLabel(normal_enum_type))
@@ -553,7 +605,8 @@ class RstFormatVisitor(visitor.Visitor):
       return ''
     return anchor + header + proto_link + formatted_leading_comment + FormatMessageAsJson(
         type_context, msg_proto) + FormatMessageAsDefinitionList(
-            type_context, msg_proto) + '\n'.join(nested_msgs) + '\n' + '\n'.join(nested_enums)
+            type_context, msg_proto,
+            self.edge_defaults_manifest) + '\n'.join(nested_msgs) + '\n' + '\n'.join(nested_enums)
 
   def VisitFile(self, file_proto, type_context, services, msgs, enums):
     has_messages = True
