@@ -8,6 +8,9 @@
 
 #include "gtest/gtest.h"
 
+using testing::Pair;
+using testing::UnorderedElementsAre;
+
 namespace Envoy {
 namespace Grpc {
 namespace {
@@ -81,6 +84,50 @@ TEST(GoogleGrpcUtilsTest, ByteBufferInstanceRoundTrip) {
   auto byte_buffer2 = GoogleGrpcUtils::makeByteBuffer(std::move(buffer_instance1));
   auto buffer_instance2 = GoogleGrpcUtils::makeBufferInstance(byte_buffer2);
   EXPECT_EQ(buffer_instance2->toString(), "test this");
+}
+
+// Validate that we build the grpc::ChannelArguments as expected.
+TEST(GoogleGrpcUtilsTest, ChannelArgsFromConfig) {
+  envoy::config::core::v3::GrpcService config;
+  auto* grpc_config = config.mutable_google_grpc();
+  {
+    auto* arg_config = grpc_config->add_channel_args();
+    arg_config->set_key("grpc.http2.max_pings_without_data");
+    arg_config->set_int_value(3);
+  }
+  {
+    auto* arg_config = grpc_config->add_channel_args();
+    arg_config->set_key("grpc.default_authority");
+    arg_config->set_string_value("foo");
+  }
+  {
+    auto* arg_config = grpc_config->add_channel_args();
+    arg_config->set_key("grpc.http2.max_ping_strikes");
+    arg_config->set_int_value(5);
+  }
+  {
+    auto* arg_config = grpc_config->add_channel_args();
+    arg_config->set_key("grpc.ssl_target_name_override");
+    arg_config->set_string_value("bar");
+  }
+  const grpc::ChannelArguments channel_args = GoogleGrpcUtils::channelArgsFromConfig(config);
+  grpc_channel_args effective_args = channel_args.c_channel_args();
+  std::unordered_map<std::string, std::string> string_args;
+  std::unordered_map<std::string, int> int_args;
+  for (uint32_t n = 0; n < effective_args.num_args; ++n) {
+    const grpc_arg arg = effective_args.args[n];
+    ASSERT_TRUE(arg.type == GRPC_ARG_STRING || arg.type == GRPC_ARG_INTEGER);
+    if (arg.type == GRPC_ARG_STRING) {
+      string_args[arg.key] = arg.value.string;
+    } else if (arg.type == GRPC_ARG_INTEGER) {
+      int_args[arg.key] = arg.value.integer;
+    }
+  }
+  EXPECT_THAT(string_args, UnorderedElementsAre(Pair("grpc.ssl_target_name_override", "bar"),
+                                                Pair("grpc.primary_user_agent", "grpc-c++/1.25.0"),
+                                                Pair("grpc.default_authority", "foo")));
+  EXPECT_THAT(int_args, UnorderedElementsAre(Pair("grpc.http2.max_ping_strikes", 5),
+                                             Pair("grpc.http2.max_pings_without_data", 3)));
 }
 
 } // namespace

@@ -307,6 +307,11 @@ public:
     auto* google_grpc = config.mutable_google_grpc();
     google_grpc->set_target_uri(fake_upstream_->localAddress()->asString());
     google_grpc->set_stat_prefix("fake_cluster");
+    for (const auto& config_arg : channel_args_) {
+      auto* channel_arg = google_grpc->add_channel_args();
+      channel_arg->set_key(config_arg.first);
+      channel_arg->set_string_value(config_arg.second);
+    }
     fillServiceWideInitialMetadata(config);
     return config;
   }
@@ -326,16 +331,16 @@ public:
   void expectInitialHeaders(FakeStream& fake_stream, const TestMetadata& initial_metadata) {
     AssertionResult result = fake_stream.waitForHeadersComplete();
     RELEASE_ASSERT(result, result.message());
-    Http::TestHeaderMapImpl stream_headers(fake_stream.headers());
-    EXPECT_EQ("POST", stream_headers.get_(":method"));
-    EXPECT_EQ("/helloworld.Greeter/SayHello", stream_headers.get_(":path"));
-    EXPECT_EQ("application/grpc", stream_headers.get_("content-type"));
-    EXPECT_EQ("trailers", stream_headers.get_("te"));
+    stream_headers_ = std::make_unique<Http::TestHeaderMapImpl>(fake_stream.headers());
+    EXPECT_EQ("POST", stream_headers_->get_(":method"));
+    EXPECT_EQ("/helloworld.Greeter/SayHello", stream_headers_->get_(":path"));
+    EXPECT_EQ("application/grpc", stream_headers_->get_("content-type"));
+    EXPECT_EQ("trailers", stream_headers_->get_("te"));
     for (const auto& value : initial_metadata) {
-      EXPECT_EQ(value.second, stream_headers.get_(value.first));
+      EXPECT_EQ(value.second, stream_headers_->get_(value.first));
     }
     for (const auto& value : service_wide_initial_metadata_) {
-      EXPECT_EQ(value.second, stream_headers.get_(value.first));
+      EXPECT_EQ(value.second, stream_headers_->get_(value.first));
     }
   }
 
@@ -430,6 +435,8 @@ public:
   Stats::ScopeSharedPtr stats_scope_{stats_store_};
   Grpc::StatNames google_grpc_stat_names_{stats_store_->symbolTable()};
   TestMetadata service_wide_initial_metadata_;
+  std::unique_ptr<Http::TestHeaderMapImpl> stream_headers_;
+  std::vector<std::pair<std::string, std::string>> channel_args_;
 #ifdef ENVOY_GOOGLE_GRPC
   std::unique_ptr<GoogleAsyncClientThreadLocal> google_tls_;
 #endif
