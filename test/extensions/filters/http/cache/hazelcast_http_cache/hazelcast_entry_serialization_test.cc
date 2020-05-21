@@ -16,23 +16,23 @@ using hazelcast::client::serialization::ObjectDataInput;
 using hazelcast::client::serialization::ObjectDataOutput;
 using hazelcast::client::serialization::pimpl::DataInput;
 using hazelcast::client::serialization::pimpl::DataOutput;
+using hazelcast::client::serialization::pimpl::SerializationService;
 
 class SerializationTest : public testing::Test {
 protected:
-  void SetUp() override { null_serializer = nullptr; }
-
   template <typename T> std::vector<hazelcast::byte> serialize(const T& deserialized) {
     DataOutput data_output;
-    ObjectDataOutput object_data_output(data_output, null_serializer);
+    ObjectDataOutput object_data_output(data_output, nullptr);
     deserialized.writeData(object_data_output);
     return *object_data_output.toByteArray();
   }
 
   template <typename T> T deserialize(const std::vector<hazelcast::byte>& serialized) {
     T object;
+    SerializationConfig serializationConfig;
+    serialization::pimpl::SerializationService serializationService(serializationConfig);
     DataInput data_input(serialized);
-    // the behavior of (*null_serializer) here has no effect on tests.
-    ObjectDataInput objectDataInput(data_input, *null_serializer);
+    ObjectDataInput objectDataInput(data_input, serializationService.getSerializerHolder());
     object.readData(objectDataInput);
     return object;
   }
@@ -58,7 +58,6 @@ protected:
     return HazelcastResponseEntry(createTestHeader(), createTestBody());
   }
 
-  SerializerHolder* null_serializer;
 };
 
 TEST_F(SerializationTest, HeaderEntry) {

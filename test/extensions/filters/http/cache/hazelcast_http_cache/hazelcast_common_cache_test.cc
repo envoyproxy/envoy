@@ -50,7 +50,7 @@ TEST_P(HazelcastHttpCacheTest, MissPutAndGetEntries) {
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 
   int length = HazelcastTestUtil::TEST_PARTITION_SIZE * 2;
-  const std::string Body1("s", length + 1);
+  const std::string Body1(length + 1, 's');
   absl::string_view Body2(Body1.c_str(), length);
   absl::string_view Body3(Body1.c_str(), length - 1);
 

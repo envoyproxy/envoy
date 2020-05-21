@@ -128,7 +128,7 @@ TEST_F(HazelcastUnifiedCacheTest, AbortUnifiedOperationsWhenOffline) {
   LookupContextPtr lookup_context1 = lookup(RequestPath1);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 
-  const std::string Body("s", HazelcastTestUtil::TEST_PARTITION_SIZE);
+  const std::string Body(HazelcastTestUtil::TEST_PARTITION_SIZE, 's');
   insert(move(lookup_context1), getResponseHeaders(), Body);
   lookup_context1 = lookup(RequestPath1);
   EXPECT_TRUE(expectLookupSuccessWithFullBody(lookup_context1.get(), Body));

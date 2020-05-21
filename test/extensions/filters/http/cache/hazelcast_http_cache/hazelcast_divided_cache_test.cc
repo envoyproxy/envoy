@@ -280,7 +280,7 @@ TEST_F(HazelcastDividedCacheTest, AbortDividedOperationsWhenOffline) {
     LookupContextPtr lookup_context = lookup(RequestPath);
     EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 
-    const std::string Body("s", HazelcastTestUtil::TEST_PARTITION_SIZE);
+    const std::string Body(HazelcastTestUtil::TEST_PARTITION_SIZE, 's');
     insert(move(lookup_context), getResponseHeaders(), Body);
     lookup_context = lookup(RequestPath);
     EXPECT_TRUE(expectLookupSuccessWithFullBody(lookup_context.get(), Body));
@@ -373,7 +373,7 @@ TEST_F(HazelcastDividedCacheTest, FailDuringBodyLookupWhenHeaderSucceeds) {
   // Tests the case when header lookup succeeds but body lookup fails.
   const int body_size = HazelcastTestUtil::TEST_PARTITION_SIZE * 2;
   const std::string RequestPath("/fail/on/body");
-  const std::string Body('h', body_size);
+  const std::string Body(body_size, 'h');
 
   LookupContextPtr lookup_context = lookup(RequestPath);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
