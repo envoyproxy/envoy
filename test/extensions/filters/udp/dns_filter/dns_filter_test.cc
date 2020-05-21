@@ -35,7 +35,6 @@ public:
       : listener_address_(Network::Utility::parseInternetAddressAndPort("127.0.2.1:5353")),
         api_(Api::createApiForTest()) {
 
-    EXPECT_CALL(random_, random()).WillRepeatedly(Return(3));
     response_parser_ =
         std::make_unique<DnsMessageParser>(true /* recursive queries */, 0 /* retries */, random_);
     udp_response_.addresses_.local_ = listener_address_;
@@ -62,6 +61,7 @@ public:
     EXPECT_CALL(listener_factory_, dispatcher()).Times(AtLeast(0));
     EXPECT_CALL(listener_factory_, clusterManager()).Times(AtLeast(0));
     EXPECT_CALL(listener_factory_, api()).WillOnce(ReturnRef(*api_));
+    ON_CALL(random_, random()).WillByDefault(Return(3));
     EXPECT_CALL(listener_factory_, random()).WillOnce(ReturnRef(random_));
 
     config_ = std::make_shared<DnsFilterEnvoyConfig>(listener_factory_, config);
