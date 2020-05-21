@@ -25,7 +25,7 @@
 namespace Envoy {
 namespace Tracing {
 
-// TODO(mattklein123) PERF: Avoid string creations/copies in this entire file.
+// TODO(perf): Avoid string creations/copies in this entire file.
 static std::string buildResponseCode(const StreamInfo::StreamInfo& info) {
   return info.responseCode() ? std::to_string(info.responseCode().value()) : "0";
 }

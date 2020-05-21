@@ -573,6 +573,7 @@ void RouteEntryImplBase::finalizePathHeader(Http::RequestHeaderMap& headers,
     return;
   }
 
+  // TODO(perf): can we avoid the string copy for the common case?
   std::string path(headers.getPathValue());
   if (insert_envoy_original_path) {
     headers.setEnvoyOriginalPath(path);
@@ -1247,7 +1248,7 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMa
   // TODO (@rshriram) Match Origin header in WebSocket
   // request with VHost, using wildcard match
   // Lower-case the value of the host header, as hostnames are case insensitive.
-  const std::string host = Http::LowerCaseString(std::string(headers.getHostValue())).get();
+  const std::string host = absl::AsciiStrToLower(headers.getHostValue());
   const auto& iter = virtual_hosts_.find(host);
   if (iter != virtual_hosts_.end()) {
     return iter->second.get();
