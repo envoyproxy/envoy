@@ -45,6 +45,8 @@
 #include "server/admin/perf_stats_handler.h"
 #include "server/admin/profiling_handler.h"
 #include "server/admin/runtime_handler.h"
+#include "server/admin/server_cmd_handler.h"
+#include "server/admin/server_info_handler.h"
 #include "server/admin/stats_handler.h"
 
 #include "extensions/filters/http/common/pass_through_filter.h"
@@ -275,49 +277,15 @@ private:
   Http::Code handlerAdminHome(absl::string_view path_and_query,
                               Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                               AdminStream&);
-  Http::Code handlerCerts(absl::string_view path_and_query,
-                          Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
-                          AdminStream&);
   Http::Code handlerClusters(absl::string_view path_and_query,
                              Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                              AdminStream&);
   Http::Code handlerConfigDump(absl::string_view path_and_query,
                                Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream&) const;
-  Http::Code handlerContention(absl::string_view path_and_query,
-                               Http::ResponseHeaderMap& response_headers,
-                               Buffer::Instance& response, AdminStream&);
-  Http::Code handlerCpuProfiler(absl::string_view path_and_query,
-                                Http::ResponseHeaderMap& response_headers,
-                                Buffer::Instance& response, AdminStream&);
-  Http::Code handlerHeapProfiler(absl::string_view path_and_query,
-                                 Http::ResponseHeaderMap& response_headers,
-                                 Buffer::Instance& response, AdminStream&);
-  Http::Code handlerHealthcheckFail(absl::string_view path_and_query,
-                                    Http::ResponseHeaderMap& response_headers,
-                                    Buffer::Instance& response, AdminStream&);
-  Http::Code handlerHealthcheckOk(absl::string_view path_and_query,
-                                  Http::ResponseHeaderMap& response_headers,
-                                  Buffer::Instance& response, AdminStream&);
   Http::Code handlerHelp(absl::string_view path_and_query,
                          Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                          AdminStream&);
-  Http::Code handlerHotRestartVersion(absl::string_view path_and_query,
-                                      Http::ResponseHeaderMap& response_headers,
-                                      Buffer::Instance& response, AdminStream&);
-  Http::Code handlerMemory(absl::string_view path_and_query,
-                           Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
-                           AdminStream&);
-  Http::Code handlerMain(const std::string& path, Buffer::Instance& response, AdminStream&);
-  Http::Code handlerQuitQuitQuit(absl::string_view path_and_query,
-                                 Http::ResponseHeaderMap& response_headers,
-                                 Buffer::Instance& response, AdminStream&);
-  Http::Code handlerServerInfo(absl::string_view path_and_query,
-                               Http::ResponseHeaderMap& response_headers,
-                               Buffer::Instance& response, AdminStream&);
-  Http::Code handlerReady(absl::string_view path_and_query,
-                          Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
-                          AdminStream&);
 
   class AdminListenSocketFactory : public Network::ListenSocketFactory {
   public:
@@ -422,6 +390,8 @@ private:
   Server::ProfilingHandler profiling_handler_;
   Server::RuntimeHandler runtime_handler_;
   Server::ListenersHandler listeners_handler_;
+  Server::ServerCmdHandler server_cmd_handler_;
+  Server::ServerInfoHandler server_info_handler_;
   Server::PerfStatsHandler perf_stats_handler_;
   std::list<UrlHandler> handlers_;
   const uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
