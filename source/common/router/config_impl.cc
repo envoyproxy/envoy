@@ -1246,6 +1246,7 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMa
 
   // TODO (@rshriram) Match Origin header in WebSocket
   // request with VHost, using wildcard match
+  // Lower-case the value of the host header, as hostnames are case insensitive.
   const std::string host = Http::LowerCaseString(std::string(headers.getHostValue())).get();
   const auto& iter = virtual_hosts_.find(host);
   if (iter != virtual_hosts_.end()) {

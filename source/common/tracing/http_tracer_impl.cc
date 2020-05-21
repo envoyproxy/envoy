@@ -30,8 +30,9 @@ static std::string buildResponseCode(const StreamInfo::StreamInfo& info) {
   return info.responseCode() ? std::to_string(info.responseCode().value()) : "0";
 }
 
-static std::string valueOrDefault(const Http::HeaderEntry* header, const char* default_value) {
-  return header ? std::string(header->value().getStringView()) : default_value;
+static absl::string_view valueOrDefault(const Http::HeaderEntry* header,
+                                        const char* default_value) {
+  return header ? header->value().getStringView() : default_value;
 }
 
 static std::string buildUrl(const Http::RequestHeaderMap& request_headers,
@@ -39,8 +40,9 @@ static std::string buildUrl(const Http::RequestHeaderMap& request_headers,
   if (!request_headers.Path()) {
     return "";
   }
-  std::string path(request_headers.EnvoyOriginalPath() ? request_headers.getEnvoyOriginalPathValue()
-                                                       : request_headers.getPathValue());
+  absl::string_view path(request_headers.EnvoyOriginalPath()
+                             ? request_headers.getEnvoyOriginalPathValue()
+                             : request_headers.getPathValue());
 
   if (path.length() > max_path_length) {
     path = path.substr(0, max_path_length);
@@ -159,12 +161,11 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
   // Pre response data.
   if (request_headers) {
     if (request_headers->RequestId()) {
-      span.setTag(Tracing::Tags::get().GuidXRequestId,
-                  std::string(request_headers->getRequestIdValue()));
+      span.setTag(Tracing::Tags::get().GuidXRequestId, request_headers->getRequestIdValue());
     }
     span.setTag(Tracing::Tags::get().HttpUrl,
                 buildUrl(*request_headers, tracing_config.maxPathTagLength()));
-    span.setTag(Tracing::Tags::get().HttpMethod, std::string(request_headers->getMethodValue()));
+    span.setTag(Tracing::Tags::get().HttpMethod, request_headers->getMethodValue());
     span.setTag(Tracing::Tags::get().DownstreamCluster,
                 valueOrDefault(request_headers->EnvoyDownstreamServiceCluster(), "-"));
     span.setTag(Tracing::Tags::get().UserAgent, valueOrDefault(request_headers->UserAgent(), "-"));
@@ -182,7 +183,7 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
 
     if (request_headers->ClientTraceId()) {
       span.setTag(Tracing::Tags::get().GuidXClientTraceId,
-                  std::string(request_headers->getClientTraceIdValue()));
+                  request_headers->getClientTraceIdValue());
     }
 
     if (Grpc::Common::isGrpcRequestHeaders(*request_headers)) {

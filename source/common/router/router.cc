@@ -1489,8 +1489,9 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
     config_.stats_.passthrough_internal_redirect_too_many_redirects_.inc();
     return false;
   }
-  std::string original_host(downstream_headers.getHostValue());
-  std::string original_path(downstream_headers.getPathValue());
+  // Copy the old values, so they can be restored if the redirect fails.
+  const std::string original_host(downstream_headers.getHostValue());
+  const std::string original_path(downstream_headers.getPathValue());
   const bool scheme_is_set = (downstream_headers.Scheme() != nullptr);
   Cleanup restore_original_headers(
       [&downstream_headers, original_host, original_path, scheme_is_set, scheme_is_http]() {
