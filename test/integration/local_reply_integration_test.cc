@@ -32,7 +32,7 @@ body_format:
   json_format:
     level: TRACE
     user_agent: "%REQ(USER-AGENT)%"
-    response_body: "%RESP_BODY%"
+    response_body: "%LOCAL_REPLY_BODY%"
   )EOF";
   setLocalReplyConfig(yaml);
   initialize();
@@ -97,7 +97,7 @@ mappers:
     body:
       inline_string: "customized body text"
     body_format:
-      text_format: "%RESP_BODY% %RESPONSE_CODE%"
+      text_format: "%LOCAL_REPLY_BODY% %RESPONSE_CODE%"
   - filter:
       header_filter:
         header:
@@ -108,7 +108,7 @@ body_format:
   json_format:
     level: TRACE
     response_flags: "%RESPONSE_FLAGS%"
-    response_body: "%RESP_BODY%"
+    response_body: "%LOCAL_REPLY_BODY%"
   )EOF";
   setLocalReplyConfig(yaml);
   initialize();
@@ -176,7 +176,7 @@ body_format:
   json_format:
     level: TRACE
     response_flags: "%RESPONSE_FLAGS%"
-    response_body: "%RESP_BODY%"
+    response_body: "%LOCAL_REPLY_BODY%"
   )EOF";
   setLocalReplyConfig(yaml);
   initialize();
@@ -289,7 +289,7 @@ mappers:
 TEST_P(LocalReplyIntegrationTest, ShouldFormatResponseToCustomString) {
   const std::string yaml = R"EOF(
 body_format:
-  text_format: "%RESPONSE_FLAGS% - %RESP_BODY% - custom response"
+  text_format: "%RESPONSE_FLAGS% - %LOCAL_REPLY_BODY% - custom response"
 )EOF";
   setLocalReplyConfig(yaml);
   initialize();

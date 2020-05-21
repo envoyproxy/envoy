@@ -96,7 +96,8 @@ public:
                "", fake_stats_),
         tracing_stats_{CONN_MAN_TRACING_STATS(POOL_COUNTER(fake_stats_))},
         listener_stats_{CONN_MAN_LISTENER_STATS(POOL_COUNTER(fake_listener_stats_))},
-        request_id_extension_(RequestIDExtensionFactory::defaultInstance(random_)) {
+        request_id_extension_(RequestIDExtensionFactory::defaultInstance(random_)),
+        local_reply_(LocalReply::Factory::createDefault()) {
 
     ON_CALL(route_config_provider_, lastUpdated())
         .WillByDefault(Return(test_time_.timeSystem().systemTime()));
@@ -355,7 +356,7 @@ public:
   headersWithUnderscoresAction() const override {
     return headers_with_underscores_action_;
   }
-  LocalReply::LocalReply* localReply() const override { return nullptr; }
+  const LocalReply::LocalReply& localReply() const override { return *local_reply_; }
 
   Envoy::Event::SimulatedTimeSystem test_time_;
   NiceMock<Router::MockRouteConfigProvider> route_config_provider_;
@@ -418,6 +419,7 @@ public:
   NiceMock<Network::MockClientConnection> upstream_conn_; // for websocket tests
   NiceMock<Tcp::ConnectionPool::MockInstance> conn_pool_; // for websocket tests
   RequestIDExtensionSharedPtr request_id_extension_;
+  const LocalReply::LocalReplyPtr local_reply_;
 
   // TODO(mattklein123): Not all tests have been converted over to better setup. Convert the rest.
   MockResponseEncoder response_encoder_;

@@ -109,14 +109,14 @@ public:
    * @param response_headers supplies the response headers.
    * @param response_trailers supplies the response trailers.
    * @param stream_info supplies the stream info.
-   * @param response_body supplies the response body.
+   * @param local_reply_body supplies the local reply body.
    * @return std::string string containing the complete formatted access log line.
    */
   virtual std::string format(const Http::RequestHeaderMap& request_headers,
                              const Http::ResponseHeaderMap& response_headers,
                              const Http::ResponseTrailerMap& response_trailers,
                              const StreamInfo::StreamInfo& stream_info,
-                             const absl::string_view& response_body) const PURE;
+                             absl::string_view local_reply_body) const PURE;
 };
 
 using FormatterPtr = std::unique_ptr<Formatter>;
@@ -135,21 +135,21 @@ public:
    * @param response_headers supplies the response headers.
    * @param response_trailers supplies the response trailers.
    * @param stream_info supplies the stream info.
-   * @param response_body supplies the response body.
+   * @param local_reply_body supplies the local reply body.
    * @return std::string containing a single value extracted from the given headers/trailers/stream.
    */
   virtual std::string format(const Http::RequestHeaderMap& request_headers,
                              const Http::ResponseHeaderMap& response_headers,
                              const Http::ResponseTrailerMap& response_trailers,
                              const StreamInfo::StreamInfo& stream_info,
-                             const absl::string_view& response_body) const PURE;
+                             absl::string_view local_reply_body) const PURE;
   /**
    * Extract a value from the provided headers/trailers/stream, preserving the value's type.
    * @param request_headers supplies the request headers.
    * @param response_headers supplies the response headers.
    * @param response_trailers supplies the response trailers.
    * @param stream_info supplies the stream info.
-   * @param response_body supplies the response body.
+   * @param local_reply_body supplies the local reply body.
    * @return ProtobufWkt::Value containing a single value extracted from the given
    *         headers/trailers/stream.
    */
@@ -157,7 +157,7 @@ public:
                                          const Http::ResponseHeaderMap& response_headers,
                                          const Http::ResponseTrailerMap& response_trailers,
                                          const StreamInfo::StreamInfo& stream_info,
-                                         const absl::string_view& response_body) const PURE;
+                                         absl::string_view local_reply_body) const PURE;
 };
 
 using FormatterProviderPtr = std::unique_ptr<FormatterProvider>;

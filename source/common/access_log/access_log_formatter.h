@@ -18,6 +18,8 @@
 namespace Envoy {
 namespace AccessLog {
 
+// TODO(qiwzhang): move this to source/common/common to be shared
+
 /**
  * Access log format parser.
  */
@@ -95,7 +97,7 @@ public:
                      const Http::ResponseHeaderMap& response_headers,
                      const Http::ResponseTrailerMap& response_trailers,
                      const StreamInfo::StreamInfo& stream_info,
-                     const absl::string_view& response_body) const override;
+                     absl::string_view local_reply_body) const override;
 
 private:
   std::vector<FormatterProviderPtr> providers_;
@@ -111,7 +113,7 @@ public:
                      const Http::ResponseHeaderMap& response_headers,
                      const Http::ResponseTrailerMap& response_trailers,
                      const StreamInfo::StreamInfo& stream_info,
-                     const absl::string_view& response_body) const override;
+                     absl::string_view local_reply_body) const override;
 
 private:
   const bool preserve_types_;
@@ -121,7 +123,7 @@ private:
                                const Http::ResponseHeaderMap& response_headers,
                                const Http::ResponseTrailerMap& response_trailers,
                                const StreamInfo::StreamInfo& stream_info,
-                               const absl::string_view& body) const;
+                               absl::string_view local_reply_body) const;
 };
 
 /**
@@ -135,10 +137,10 @@ public:
   // FormatterProvider
   std::string format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
                      const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                     const absl::string_view&) const override;
+                     absl::string_view) const override;
   ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
                                  const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                 const absl::string_view&) const override;
+                                 absl::string_view) const override;
 
 private:
   ProtobufWkt::Value str_;
@@ -148,17 +150,17 @@ private:
  * Formatter for string literal. It ignores headers and stream info and returns string by which it
  * was initialized.
  */
-class BodyFormatter : public FormatterProvider {
+class LocalReplyBodyFormatter : public FormatterProvider {
 public:
-  BodyFormatter() = default;
+  LocalReplyBodyFormatter() = default;
 
   // Formatter::format
   std::string format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
                      const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                     const absl::string_view& response_body) const override;
+                     absl::string_view local_reply_body) const override;
   ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
                                  const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                 const absl::string_view& body) const override;
+                                 absl::string_view local_reply_body) const override;
 };
 
 class HeaderFormatter {
@@ -189,10 +191,10 @@ public:
   // FormatterProvider
   std::string format(const Http::RequestHeaderMap& request_headers, const Http::ResponseHeaderMap&,
                      const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                     const absl::string_view&) const override;
+                     absl::string_view) const override;
   ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
                                  const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                 const absl::string_view&) const override;
+                                 absl::string_view) const override;
 };
 
 /**
@@ -206,10 +208,10 @@ public:
   // FormatterProvider
   std::string format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap& response_headers,
                      const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                     const absl::string_view&) const override;
+                     absl::string_view) const override;
   ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
                                  const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                 const absl::string_view&) const override;
+                                 absl::string_view) const override;
 };
 
 /**
@@ -223,10 +225,10 @@ public:
   // FormatterProvider
   std::string format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
                      const Http::ResponseTrailerMap& response_trailers,
-                     const StreamInfo::StreamInfo&, const absl::string_view&) const override;
+                     const StreamInfo::StreamInfo&, absl::string_view) const override;
   ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
                                  const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                 const absl::string_view&) const override;
+                                 absl::string_view) const override;
 };
 
 /**
@@ -240,10 +242,10 @@ public:
   // FormatterProvider
   std::string format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap& response_headers,
                      const Http::ResponseTrailerMap& response_trailers,
-                     const StreamInfo::StreamInfo&, const absl::string_view&) const override;
+                     const StreamInfo::StreamInfo&, absl::string_view) const override;
   ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
                                  const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                 const absl::string_view&) const override;
+                                 absl::string_view) const override;
 };
 
 /**
@@ -256,10 +258,10 @@ public:
   // FormatterProvider
   std::string format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
                      const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                     const absl::string_view&) const override;
+                     absl::string_view) const override;
   ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
                                  const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                 const absl::string_view&) const override;
+                                 absl::string_view) const override;
 
   class FieldExtractor {
   public:
@@ -305,10 +307,10 @@ public:
   // FormatterProvider
   std::string format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
                      const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                     const absl::string_view&) const override;
+                     absl::string_view) const override;
   ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
                                  const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                 const absl::string_view&) const override;
+                                 absl::string_view) const override;
 };
 
 /**
@@ -322,10 +324,10 @@ public:
   // FormatterProvider
   std::string format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
                      const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                     const absl::string_view&) const override;
+                     absl::string_view) const override;
   ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
                                  const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                 const absl::string_view&) const override;
+                                 absl::string_view) const override;
 
 private:
   const Envoy::StreamInfo::FilterState::Object*
@@ -347,10 +349,10 @@ public:
   // FormatterProvider
   std::string format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
                      const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                     const absl::string_view&) const override;
+                     absl::string_view) const override;
   ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
                                  const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                 const absl::string_view&) const override;
+                                 absl::string_view) const override;
 
 private:
   const Envoy::DateFormatter date_formatter_;

@@ -41,6 +41,12 @@ public:
   create(const envoy::extensions::filters::network::http_connection_manager::v3::LocalReplyConfig&
              config,
          Server::Configuration::FactoryContext& context);
+
+  /**
+   * Create a default LocalReply object with empty config.
+   * It is used at places without Server::Configuration::FactoryContext.
+   */
+  static LocalReplyPtr createDefault();
 };
 
 } // namespace LocalReply

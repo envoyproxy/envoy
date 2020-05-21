@@ -1,3 +1,4 @@
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
 #include "envoy/http/codes.h"
 
 #include "common/local_reply/local_reply.h"
@@ -54,11 +55,52 @@ TEST_F(LocalReplyTest, TestEmptyConfig) {
   EXPECT_EQ(content_type_, "text/plain");
 }
 
+TEST_F(LocalReplyTest, TestDefaultLocalReply) {
+  // Default LocalReply should be the same as empty config.
+  auto local = Factory::createDefault();
+
+  local->rewrite(nullptr, stream_info_, code_, body_, content_type_);
+  EXPECT_EQ(code_, TestInitCode);
+  EXPECT_EQ(body_, TestInitBody);
+  EXPECT_EQ(content_type_, "text/plain");
+}
+
+TEST_F(LocalReplyTest, TestInvalidConfigEmptyFilter) {
+  // Invalid config: a mapper should have a valid filter
+  const std::string yaml = R"(
+    mappers:
+    - status_code: 401
+)";
+  TestUtility::loadFromYaml(yaml, config_);
+
+  std::string err;
+  EXPECT_FALSE(Validate(config_, &err));
+}
+
+TEST_F(LocalReplyTest, TestInvalidConfigStatusCode) {
+  // Invalid config: status_code should be at range [200, 600)
+  const std::string yaml = R"(
+    mappers:
+    - filter:
+        status_code_filter:
+          comparison:
+            op: EQ
+            value:
+              default_value: 400
+              runtime_key: key_b
+      status_code: 100
+)";
+  TestUtility::loadFromYaml(yaml, config_);
+
+  std::string err;
+  EXPECT_FALSE(Validate(config_, &err));
+}
+
 TEST_F(LocalReplyTest, TestDefaultTextFormatter) {
   // Default text formatter without any mappers
   const std::string yaml = R"(
   body_format:
-     text_format: "%RESP_BODY% %RESPONSE_CODE%"
+     text_format: "%LOCAL_REPLY_BODY% %RESPONSE_CODE%"
 )";
   TestUtility::loadFromYaml(yaml, config_);
   auto local = Factory::create(config_, context_);
@@ -77,7 +119,7 @@ TEST_F(LocalReplyTest, TestDefaultJsonFormatter) {
       text: "plain text"
       path: "%REQ(:path)%"
       code: "%RESPONSE_CODE%"
-      body: "%RESP_BODY%"
+      body: "%LOCAL_REPLY_BODY%"
 )";
   TestUtility::loadFromYaml(yaml, config_);
   auto local = Factory::create(config_, context_);
@@ -188,7 +230,7 @@ TEST_F(LocalReplyTest, TestMapperFormat) {
           text: "401 filter formatter"
           path: "%REQ(:path)%"
           code: "%RESPONSE_CODE%"
-          body: "%RESP_BODY%"
+          body: "%LOCAL_REPLY_BODY%"
     - filter:
         status_code_filter:
           comparison:
@@ -200,7 +242,7 @@ TEST_F(LocalReplyTest, TestMapperFormat) {
       body:
         inline_string: "411 body text"
     body_format:
-      text_format: "%RESP_BODY% %RESPONSE_CODE% default formatter"
+      text_format: "%LOCAL_REPLY_BODY% %RESPONSE_CODE% default formatter"
 )";
   TestUtility::loadFromYaml(yaml, config_);
   auto local = Factory::create(config_, context_);

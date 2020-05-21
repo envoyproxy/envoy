@@ -548,7 +548,7 @@ message ResponseMapper {
   config.accesslog.v3.AccessLogFilter filter = 1 [(validate.rules).message = {required: true}];
 
   // The new response status code if specified.
-  google.protobuf.UInt32Value status_code = 2 [(validate.rules).uint32 = {lt: 600 gte: 100}];
+  google.protobuf.UInt32Value status_code = 2 [(validate.rules).uint32 = {lt: 600 gte: 200}];
 
   // The new response body if specified.
   config.core.v3.DataSource body = 3;

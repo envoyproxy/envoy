@@ -58,7 +58,7 @@ Example of a LocalReplyConfig with `body_format` field.
             runtime_key: key_b
     status_code: 401
     body_format:
-      text_format: "%RESP_BODY% %REQ(:path)%"
+      text_format: "%LOCAL_REPLY_BODY% %REQ(:path)%"
   - filter:
       status_code_filter:
         comparison:
@@ -68,6 +68,6 @@ Example of a LocalReplyConfig with `body_format` field.
             runtime_key: key_b
     status_code: 501
   body_format:
-    text_format: "%RESP_BODY% %RESPONSE_CODE%"
+    text_format: "%LOCAL_REPLY_BODY% %RESPONSE_CODE%"
 
-In above example, there are two `body_format` fields. The first one is inside the first `mapper` with a filter matching `status_code == 400`. It generates the response body in plain text format by concatenating %RESP_BODY% with the `:path` request header. It is only used when the first mapper is matched. The second `body_format` is at the bottom of the config and at the same level as field `mappers`. It is called catch-all `body_format` and is used when non of the mappers is matched or the matched mapper doesn't have its own `body_format` specified.
+In above example, there are two `body_format` fields. The first one is inside the first `mapper` with a filter matching `status_code == 400`. It generates the response body in plain text format by concatenating %LOCAL_REPLY_BODY% with the `:path` request header. It is only used when the first mapper is matched. The second `body_format` is at the bottom of the config and at the same level as field `mappers`. It is called catch-all `body_format` and is used when non of the mappers is matched or the matched mapper doesn't have its own `body_format` specified.

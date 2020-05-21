@@ -166,7 +166,7 @@ public:
     return headers_with_underscores_action_;
   }
   std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
-  const LocalReply::LocalReply* localReply() const override { return local_reply_.get(); }
+  const LocalReply::LocalReply& localReply() const override { return *local_reply_; }
 
 private:
   enum class CodecType { HTTP1, HTTP2, HTTP3, AUTO };
@@ -234,7 +234,7 @@ private:
   const bool strip_matching_port_;
   const envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
-  LocalReply::LocalReplyPtr local_reply_;
+  const LocalReply::LocalReplyPtr local_reply_;
 
   // Default idle timeout is 5 minutes if nothing is specified in the HCM config.
   static const uint64_t StreamIdleTimeoutMs = 5 * 60 * 1000;
