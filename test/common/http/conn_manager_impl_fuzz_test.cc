@@ -234,11 +234,10 @@ public:
             headers->setReferenceKey(Headers::get().Method, "GET");
           }
           if (headers->Host() != nullptr &&
-              !HeaderUtility::authorityIsValid(headers->Host()->value().getStringView())) {
+              !HeaderUtility::authorityIsValid(headers->getHostValue())) {
             // Sanitize host header so we don't fail at ASSERTs that verify header sanity checks
             // which should have been performed by the codec.
-            headers->setHost(
-                Fuzz::replaceInvalidHostCharacters(headers->Host()->value().getStringView()));
+            headers->setHost(Fuzz::replaceInvalidHostCharacters(headers->getHostValue()));
           }
           // If sendLocalReply is called:
           ON_CALL(encoder_, encodeHeaders(_, true))
