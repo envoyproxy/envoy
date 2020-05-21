@@ -970,6 +970,9 @@ TEST_P(IntegrationTest, ViaAppendWith100Continue) {
 // sent by Envoy, it will wait for response acknowledgment (via FIN/RST) from the client before
 // closing the socket (with a timeout for ensuring cleanup).
 TEST_P(IntegrationTest, TestDelayedConnectionTeardownOnGracefulClose) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(1); });
   // This test will trigger an early 413 Payload Too Large response due to buffer limits being
   // exceeded. The following filter is needed since the router filter will never trigger a 413.
   config_helper_.addFilter("{ name: encoder-decoder-buffer-filter, typed_config: { \"@type\": "
@@ -1213,6 +1216,9 @@ TEST_P(IntegrationTest, TestFlood) {
 }
 
 TEST_P(IntegrationTest, TestFloodUpstreamErrors) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(1); });
   autonomous_upstream_ = true;
   initialize();
 

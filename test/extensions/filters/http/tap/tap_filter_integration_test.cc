@@ -308,6 +308,7 @@ tap_config:
 
   admin_client_->close();
   EXPECT_EQ(3UL, test_server_->counter("http.config_test.tap.rq_tapped")->value());
+  test_server_->waitForGaugeEq("http.admin.downstream_rq_active", 0);
 }
 
 // Verify both request and response trailer matching works.
