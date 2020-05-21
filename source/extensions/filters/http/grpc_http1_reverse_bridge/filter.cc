@@ -193,6 +193,10 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& buffer, bool end_str
 }
 
 Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
+  if (!enabled_) {
+    return Http::FilterTrailersStatus::Continue;
+  }
+
   trailers.setGrpcStatus(grpc_status_);
 
   if (withhold_grpc_frames_) {
