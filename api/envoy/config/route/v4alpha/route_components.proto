@@ -1376,6 +1376,11 @@ message RateLimit {
 
       // The key to use in the descriptor entry.
       string descriptor_key = 2 [(validate.rules).string = {min_bytes: 1}];
+
+      // If set to true, Envoy skips the descriptor while calling rate limiting service
+      // when header is not present in the request. By default it skips calling the
+      // rate limiting service if this header is not present in the request.
+      bool skip_if_absent = 3;
     }
 
     // The following descriptor entry is appended to the descriptor and is populated using the
