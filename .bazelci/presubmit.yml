@@ -21,7 +21,6 @@ tasks:
       - "//test/integration/..."
       - "//test/exe/..."
     test_flags:
-      - "--config=remote-clang"
-      - "--config=remote-ci"
+      - "--action_env=CC=clang"
+      - "--action_env=CXX=clang++"
       - "--config=coverage"
-      - "--jobs=75"
