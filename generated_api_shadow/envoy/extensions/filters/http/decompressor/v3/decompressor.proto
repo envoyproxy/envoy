@@ -43,13 +43,15 @@ message Decompressor {
     CommonDirectionConfig common_config = 1;
   }
 
-  // A decompressor library to use for decompression. Currently only
+  // A decompressor library to use for both request and response decompression. Currently only
   // :ref:`envoy.compression.gzip.compressor<envoy_api_msg_extensions.compression.gzip.decompressor.v3.Gzip>`
   // is included in Envoy.
   config.core.v3.TypedExtensionConfig decompressor_library = 1
       [(validate.rules).message = {required: true}];
 
+  // Configuration for request decompression. Decompression is enabled by default if left empty.
   RequestDirectionConfig request_direction_config = 2;
 
+  // Configuration for response decompression. Decompression is enabled by default if left empty.
   ResponseDirectionConfig response_direction_config = 3;
 }

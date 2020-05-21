@@ -43,6 +43,14 @@ By *default* decompression will be *skipped* when:
 When decompression is *applied*:
 
 - The *content-length* is removed from headers.
+
+  .. note::
+
+    If an updated *content-length* header is desired, the buffer filter can be installed as part
+    of the filter chain to buffer decompressed frames, and ultimately update the header. Due to
+    :ref:`filter ordering <arch_overview_http_filters_ordering>` a buffer filter needs to be
+    installed after the decompressor for requests and prior to the decompressor for responses.
+
 - The *content-encoding* header is modified to remove the decompression that was applied.
 
 .. _decompressor-statistics:
