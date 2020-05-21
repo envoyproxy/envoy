@@ -355,7 +355,6 @@ TEST(PipeInstanceTest, PermissionFail) {
 
   IoHandlePtr io_handle =
       SocketInterface::socket(SocketType::Stream, Address::Type::Pipe, Address::IpVersion::v4);
-  ;
   ASSERT_GE(io_handle->fd(), 0) << address.asString();
   EXPECT_CALL(os_sys_calls, bind(_, _, _)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
   EXPECT_CALL(os_sys_calls, chmod(_, _)).WillOnce(Return(Api::SysCallIntResult{-1, 0}));

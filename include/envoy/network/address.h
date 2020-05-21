@@ -43,6 +43,11 @@ public:
    * @return the absl::uint128 IPv6 address in network byte order.
    */
   virtual absl::uint128 address() const PURE;
+
+  /**
+   * @return true if address is Ipv6 and Ipv4 compatibility is disabled, false otherwise
+   */
+  virtual bool v6only() const PURE;
 };
 
 enum class IpVersion { v4, v6 }; // NOLINT(readability-identifier-naming)
@@ -91,11 +96,6 @@ public:
    * @return the version of IP address.
    */
   virtual IpVersion version() const PURE;
-
-  /**
-   * @return true if address is Ipv6 and Ipv4 compatibility is disabled, false otherwise
-   */
-  virtual bool v6only() const PURE;
 };
 
 enum class Type { Ip, Pipe };

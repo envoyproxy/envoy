@@ -115,7 +115,6 @@ private:
     const Ipv6* ipv6() const override { return nullptr; }
     uint32_t port() const override { return ntohs(ipv4_.address_.sin_port); }
     IpVersion version() const override { return IpVersion::v4; }
-    bool v6only() const override { return false; }
 
     Ipv4Helper ipv4_;
     std::string friendly_address_;
@@ -166,11 +165,16 @@ private:
   struct Ipv6Helper : public Ipv6 {
     Ipv6Helper() { memset(&address_, 0, sizeof(address_)); }
     absl::uint128 address() const override;
+    bool v6only() const override;
     uint32_t port() const;
 
     std::string makeFriendlyAddress() const;
 
     sockaddr_in6 address_;
+    // Is IPv4 compatibility (https://tools.ietf.org/html/rfc3493#page-11) disabled?
+    // Default initialized to true to preserve extant Envoy behavior where we don't explicitly set
+    // this in the constructor.
+    bool v6only_{true};
   };
 
   struct IpHelper : public Ip {
@@ -185,14 +189,9 @@ private:
     const Ipv6* ipv6() const override { return &ipv6_; }
     uint32_t port() const override { return ipv6_.port(); }
     IpVersion version() const override { return IpVersion::v6; }
-    bool v6only() const override { return v6only_; }
 
     Ipv6Helper ipv6_;
     std::string friendly_address_;
-    // Is IPv4 compatibility (https://tools.ietf.org/html/rfc3493#page-11) disabled?
-    // Default initialized to true to preserve extant Envoy behavior where we don't explicitly set
-    // this in the constructor.
-    bool v6only_{true};
   };
 
   IpHelper ip_;
