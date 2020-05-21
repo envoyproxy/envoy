@@ -221,7 +221,7 @@ public:
 
     return clusters_map;
   }
-  virtual const ClusterSet& primaryClusters() override { return primary_clusters_; }
+  const ClusterSet& primaryClusters() override { return primary_clusters_; }
   ThreadLocalCluster* get(absl::string_view cluster) override;
   Http::ConnectionPool::Instance* httpConnPoolForCluster(const std::string& cluster,
                                                          ResourcePriority priority,
