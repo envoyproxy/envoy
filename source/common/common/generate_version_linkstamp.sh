@@ -11,8 +11,13 @@
 # envoy_cc_library -- and the underlying cc_library rule -- does not support "stamping".
 # This makes sense as stamping mainly makes sense in the context of binaries for production releases, not static libraries.
 build_scm_revision=$(grep BUILD_SCM_REVISION bazel-out/volatile-status.txt | sed 's/^BUILD_SCM_REVISION //' | tr -d '\\n')
+if [ -z "$1" ]; then
+  build_scm_status=$(grep BUILD_SCM_STATUS bazel-out/volatile-status.txt | sed 's/^BUILD_SCM_STATUS //' | tr -d '\\n')
+else
+  build_scm_status=$1
+fi
 
 echo "extern const char build_scm_revision[];"
 echo "extern const char build_scm_status[];"
 echo "const char build_scm_revision[] = \"$build_scm_revision\";"
-echo "const char build_scm_status[] = \"Library\";"
+echo "const char build_scm_status[] = \"$build_scm_status\";"

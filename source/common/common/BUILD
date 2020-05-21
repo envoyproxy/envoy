@@ -360,7 +360,10 @@ genrule(
 genrule(
     name = "generate_version_linkstamp",
     outs = ["lib/version_linkstamp.h"],
-    cmd = "$(location :generate_version_linkstamp.sh) >> $@",
+    cmd = select({
+        "//bazel:apple": "$(location :generate_version_linkstamp.sh) Library >> $@",
+        "//conditions:default": "$(location :generate_version_linkstamp.sh) >> $@",
+    }),
     # Undocumented attr to depend on workspace status files.
     # https://github.com/bazelbuild/bazel/issues/4942
     # Used here because generate_version_linkstamp.sh depends on the workspace status files.
