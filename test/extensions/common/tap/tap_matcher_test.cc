@@ -161,7 +161,7 @@ TEST_P(TapMatcherGenericBodyTest, GenericBodyTest) {
 
   auto text_and_result = std::get<1>(GetParam());
   // Append vector of matchers
-  for (auto i : std::get<0>(text_and_result)) {
+  for (const auto& i : std::get<0>(text_and_result)) {
     matcher_yaml += '\n';
     matcher_yaml += i;
     matcher_yaml += '\n';

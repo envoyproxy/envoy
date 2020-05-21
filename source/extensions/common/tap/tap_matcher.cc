@@ -134,7 +134,7 @@ HttpGenericBodyMatcher::HttpGenericBodyMatcher(
     const envoy::config::tap::v3::HttpGenericBodyMatch& config,
     const std::vector<MatcherPtr>& matchers)
     : HttpBodyMatcherBase(matchers) {
-  for (auto i : config.patterns()) {
+  for (const auto& i : config.patterns()) {
     switch (i.rule_case()) {
     case envoy::config::tap::v3::HttpGenericBodyMatch::GenericTextMatch::kContainsHex: {
       // Convert the hex string to real hex values.
