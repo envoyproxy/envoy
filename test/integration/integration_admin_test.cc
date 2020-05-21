@@ -21,6 +21,7 @@
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
+using testing::ContainsRegex;
 using testing::Eq;
 using testing::HasSubstr;
 using testing::Not;
@@ -278,6 +279,28 @@ TEST_P(IntegrationAdminTest, Admin) {
   case Http::CodecClient::Type::HTTP3:
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
+
+#ifdef ENVOY_PERF_ANNOTATION
+  EXPECT_EQ("200", request("admin", "GET", "/perf_stats", response));
+  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
+  EXPECT_THAT(response->body(), testing::HasSubstr("Mean(ns)"));
+  // Clear results
+  EXPECT_EQ("200", request("admin", "POST", "/perf_stats/clear", response));
+  // Fetch perf stats, verify that the request headers should be there
+  EXPECT_EQ("200", request("admin", "GET", "/perf_stats", response));
+  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
+  EXPECT_THAT(response->body(), testing::HasSubstr("Mean(ns)"));
+  EXPECT_THAT(response->body(), testing::ContainsRegex("\\n.+ 1 .+content-type.*"));
+  // Fetch perf stats again, verify that stats were updated
+  EXPECT_EQ("200", request("admin", "GET", "/perf_stats", response));
+  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
+  EXPECT_THAT(response->body(), testing::HasSubstr("Mean(ns)"));
+  EXPECT_THAT(response->body(), testing::ContainsRegex("\\n.+ 2 .+content-type.*"));
+#else // !ENVOY_PERF_ANNOTATION
+  EXPECT_EQ("200", request("admin", "GET", "/perf_stats", response));
+  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
+  EXPECT_THAT(response->body(), testing::HasSubstr("Header-Map perf stats is not enabled"));
+#endif
 
   EXPECT_EQ("200", request("admin", "GET", "/certs", response));
   EXPECT_EQ("application/json", ContentType(response));
