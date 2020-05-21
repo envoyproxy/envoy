@@ -12,7 +12,7 @@ fi
 COVERAGE_FILE="${ENVOY_BUILD_DIR}/envoy/generated/coverage/index.html"
 FUZZ_COVERAGE_FILE="${ENVOY_BUILD_DIR}/envoy/generated/fuzz_coverage/index.html"
 
-if [ ! -f "${COVERAGE_FILE}" || ! -f "${FUZZ_COVERAGE_FILE}" ]; then
+if [ ! -f "${COVERAGE_FILE}" ] || [ ! -f "${FUZZ_COVERAGE_FILE}" ]; then
   echo "ERROR: Coverage file(s) not found."
   exit 1
 fi
