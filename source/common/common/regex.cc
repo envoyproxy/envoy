@@ -6,6 +6,7 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/protobuf/utility.h"
+#include "envoy/runtime/runtime.h"
 
 #include "re2/re2.h"
 
@@ -42,23 +43,59 @@ private:
 class CompiledGoogleReMatcher : public CompiledMatcher {
 public:
   CompiledGoogleReMatcher(const envoy::type::matcher::v3::RegexMatcher& config)
-      : regex_(config.regex(), re2::RE2::Quiet) {
+      : regex_(config.regex(), re2::RE2::Quiet), runtime_(Runtime::LoaderSingleton::getExisting()) {
     if (!regex_.ok()) {
       throw EnvoyException(regex_.error());
     }
 
-    // uint32_t max_program_size_error_level = config.google_re2().max_program_size_error_level();
-    // if (!config.google_re2().max_program_size_error_level().empty()) {
-    //   max_program_size_error_level = runtime_.snapshot().getInteger(config.google_re2().max_program_size_error_level().runtime_key(), max_program_size_error_level);
-    // }
+    const uint32_t regex_program_size = static_cast<uint32_t>(regex_.ProgramSize());
 
+    // Check if the deprecated field max_program_size is set first, and follow that logic if so.
     if (config.google_re2().has_max_program_size()) {
       const uint32_t max_program_size =
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.google_re2(), max_program_size, 100);
-      if (static_cast<uint32_t>(regex_.ProgramSize()) > max_program_size) {
+      if (regex_program_size > max_program_size) {
         throw EnvoyException(fmt::format("regex '{}' RE2 program size of {} > max program size of "
                                          "{}. Increase configured max program size if necessary.",
-                                         config.regex(), regex_.ProgramSize(), max_program_size));
+                                         config.regex(), regex_program_size, max_program_size));
+      }
+      return;
+    }
+
+    if (runtime_) {
+      // Check the error level threshold for the max program size.
+      if (config.google_re2().has_max_program_size_error_level()) {
+        // If the default value isn't set by the user, it defaults to 100 to emulate the old behavior.
+        uint32_t max_program_size_error_level = config.google_re2().max_program_size_error_level().default_value();
+        if (max_program_size_error_level == 0) {
+          max_program_size_error_level = 100;
+        }
+        if (!config.google_re2().max_program_size_error_level().runtime_key().empty()) {
+          max_program_size_error_level = runtime_->snapshot().getInteger(config.google_re2().max_program_size_error_level().runtime_key(), max_program_size_error_level);
+        }
+        if (regex_program_size > max_program_size_error_level) {
+          // Increment stat.
+          throw EnvoyException(fmt::format("regex '{}' RE2 program size of {} > max program size of "
+                                          "{} set for the error level threshold. Increase configured max program size if necessary.",
+                                          config.regex(), regex_program_size, max_program_size_error_level));          
+        }
+      }
+
+      // Check the warn level threshold for the max program size.
+      if (config.google_re2().has_max_program_size_warn_level()) {
+        // If the default value isn't set by the user, no check is enforced by it (unlimited).
+        uint32_t max_program_size_warn_level = config.google_re2().max_program_size_warn_level().default_value();
+        if (max_program_size_warn_level == 0) {
+          max_program_size_warn_level = UINT32_MAX;
+        }
+        if (!config.google_re2().max_program_size_warn_level().runtime_key().empty()) {
+          max_program_size_warn_level = runtime_->snapshot().getInteger(config.google_re2().max_program_size_warn_level().runtime_key(), max_program_size_warn_level);
+        }
+        if (regex_program_size > max_program_size_warn_level) {
+          // Increment stat.
+          ENVOY_LOG_MISC(warn, "regex '{}' RE2 program size of {} > max program size of {} set for the warning level threshold. Increase configured max program size if necessary.",
+          config.regex(), regex_program_size, max_program_size_warn_level);
+        }
       }
     }
   }
@@ -78,6 +115,7 @@ public:
 
 private:
   const re2::RE2 regex_;
+  Runtime::Loader* runtime_;
 };
 
 } // namespace
