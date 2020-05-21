@@ -39,16 +39,15 @@ static std::string buildUrl(const Http::RequestHeaderMap& request_headers,
   if (!request_headers.Path()) {
     return "";
   }
-  std::string path(request_headers.EnvoyOriginalPath()
-                       ? request_headers.EnvoyOriginalPath()->value().getStringView()
-                       : request_headers.Path()->value().getStringView());
+  std::string path(request_headers.EnvoyOriginalPath() ? request_headers.getEnvoyOriginalPathValue()
+                                                       : request_headers.getPathValue());
 
   if (path.length() > max_path_length) {
     path = path.substr(0, max_path_length);
   }
 
-  return absl::StrCat(valueOrDefault(request_headers.ForwardedProto(), ""), "://",
-                      valueOrDefault(request_headers.Host(), ""), path);
+  return absl::StrCat(request_headers.getForwardedProtoValue(), "://",
+                      request_headers.getHostValue(), path);
 }
 
 const std::string HttpTracerUtility::IngressOperation = "ingress";
@@ -161,12 +160,11 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
   if (request_headers) {
     if (request_headers->RequestId()) {
       span.setTag(Tracing::Tags::get().GuidXRequestId,
-                  std::string(request_headers->RequestId()->value().getStringView()));
+                  std::string(request_headers->getRequestIdValue()));
     }
     span.setTag(Tracing::Tags::get().HttpUrl,
                 buildUrl(*request_headers, tracing_config.maxPathTagLength()));
-    span.setTag(Tracing::Tags::get().HttpMethod,
-                std::string(request_headers->Method()->value().getStringView()));
+    span.setTag(Tracing::Tags::get().HttpMethod, std::string(request_headers->getMethodValue()));
     span.setTag(Tracing::Tags::get().DownstreamCluster,
                 valueOrDefault(request_headers->EnvoyDownstreamServiceCluster(), "-"));
     span.setTag(Tracing::Tags::get().UserAgent, valueOrDefault(request_headers->UserAgent(), "-"));
@@ -184,7 +182,7 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
 
     if (request_headers->ClientTraceId()) {
       span.setTag(Tracing::Tags::get().GuidXClientTraceId,
-                  std::string(request_headers->ClientTraceId()->value().getStringView()));
+                  std::string(request_headers->getClientTraceIdValue()));
     }
 
     if (Grpc::Common::isGrpcRequestHeaders(*request_headers)) {
@@ -283,7 +281,7 @@ SpanPtr HttpTracerImpl::startSpan(const Config& config, Http::RequestHeaderMap& 
 
   if (config.operationName() == OperationName::Egress) {
     span_name.append(" ");
-    span_name.append(std::string(request_headers.Host()->value().getStringView()));
+    span_name.append(std::string(request_headers.getHostValue()));
   }
 
   SpanPtr active_span = driver_->startSpan(config, request_headers, span_name,

@@ -673,8 +673,7 @@ Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
     if (path_and_query.compare(0, query_index, handler.prefix_) == 0) {
       found_handler = true;
       if (handler.mutates_server_state_) {
-        const absl::string_view method =
-            admin_stream.getRequestHeaders().Method()->value().getStringView();
+        const absl::string_view method = admin_stream.getRequestHeaders().getMethodValue();
         if (method != Http::Headers::get().MethodValues.Post) {
           ENVOY_LOG(error, "admin path \"{}\" mutates state, method={} rather than POST",
                     handler.prefix_, method);
