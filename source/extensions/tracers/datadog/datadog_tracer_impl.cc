@@ -5,6 +5,7 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
+#include "common/common/version.h"
 #include "common/config/utility.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
@@ -34,6 +35,7 @@ Driver::Driver(const envoy::config::trace::v3::DatadogConfig& datadog_config,
   cluster_ = datadog_config.collector_cluster();
 
   // Default tracer options.
+  tracer_options_.version = absl::StrCat("envoy ", Envoy::VersionInfo::version());
   tracer_options_.operation_name_override = "envoy.proxy";
   tracer_options_.service = "envoy";
   tracer_options_.inject = std::set<datadog::opentracing::PropagationStyle>{
