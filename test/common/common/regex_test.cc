@@ -4,13 +4,14 @@
 #include "common/common/regex.h"
 #include "common/runtime/runtime_impl.h"
 
-#include "test/test_common/utility.h"
-#include "test/test_common/logging.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/logging.h"
+#include "test/test_common/utility.h"
+
 #include "gtest/gtest.h"
 
 using testing::NiceMock;
@@ -58,9 +59,9 @@ TEST(Utility, ParseRegex) {
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   envoy::config::bootstrap::v3::LayeredRuntime config;
   config.add_layers()->mutable_admin_layer();
-  std::unique_ptr<Runtime::ScopedLoaderSingleton> loader_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
-      Runtime::LoaderPtr{new Runtime::LoaderImpl(dispatcher_, tls_, config, local_info_, store_,
-                                                  generator_, validation_visitor_, *api_)});
+  std::unique_ptr<Runtime::ScopedLoaderSingleton> loader_ =
+      std::make_unique<Runtime::ScopedLoaderSingleton>(Runtime::LoaderPtr{new Runtime::LoaderImpl(
+          dispatcher_, tls_, config, local_info_, store_, generator_, validation_visitor_, *api_)});
   {
     envoy::type::matcher::v3::RegexMatcher matcher;
     matcher.mutable_google_re2();
@@ -91,11 +92,12 @@ TEST(Utility, ParseRegex) {
   // The deprecated field codepath precedes any runtime settings.
   {
     Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"regex.max_program_size_error_level", "3"}});
+        {{"regex.max_program_size_error_level", "3"}});
     envoy::type::matcher::v3::RegexMatcher matcher;
     matcher.set_regex("/asdf/.*");
     matcher.mutable_google_re2()->mutable_max_program_size_error_level()->set_default_value(5);
-    matcher.mutable_google_re2()->mutable_max_program_size_error_level()->set_runtime_key("regex.max_program_size_error_level");
+    matcher.mutable_google_re2()->mutable_max_program_size_error_level()->set_runtime_key(
+        "regex.max_program_size_error_level");
     matcher.mutable_google_re2()->mutable_max_program_size()->set_value(1);
 #ifndef GTEST_USES_SIMPLE_RE
     EXPECT_THROW_WITH_REGEX(Utility::parseRegex(matcher), EnvoyException,
@@ -109,50 +111,58 @@ TEST(Utility, ParseRegex) {
   // Verify that an exception is thrown for the error level threshold max program size.
   {
     Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"regex.max_program_size_error_level", "1"}});
+        {{"regex.max_program_size_error_level", "1"}});
     envoy::type::matcher::v3::RegexMatcher matcher;
     matcher.set_regex("/asdf/.*");
     matcher.mutable_google_re2()->mutable_max_program_size_error_level()->set_default_value(5);
-    matcher.mutable_google_re2()->mutable_max_program_size_error_level()->set_runtime_key("regex.max_program_size_error_level");
+    matcher.mutable_google_re2()->mutable_max_program_size_error_level()->set_runtime_key(
+        "regex.max_program_size_error_level");
 #ifndef GTEST_USES_SIMPLE_RE
-    EXPECT_THROW_WITH_REGEX(Utility::parseRegex(matcher), EnvoyException,
-                            "RE2 program size of [0-9]+ > max program size of 1 set for the error level threshold\\.");
+    EXPECT_THROW_WITH_REGEX(
+        Utility::parseRegex(matcher), EnvoyException,
+        "RE2 program size of [0-9]+ > max program size of 1 set for the error level threshold\\.");
 #else
-    EXPECT_THROW_WITH_REGEX(Utility::parseRegex(matcher), EnvoyException,
-                            "RE2 program size of \\d+ > max program size of 1 set for the error level threshold\\.");
+    EXPECT_THROW_WITH_REGEX(
+        Utility::parseRegex(matcher), EnvoyException,
+        "RE2 program size of \\d+ > max program size of 1 set for the error level threshold\\.");
 #endif
   }
 
-  // Verify that an exception is thrown for the error level threshold max program size without default value.
+  // Verify that an exception is thrown for the error level threshold max program size without
+  // default value.
   {
     Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"regex.max_program_size_error_level", "1"}});
+        {{"regex.max_program_size_error_level", "1"}});
     envoy::type::matcher::v3::RegexMatcher matcher;
     matcher.set_regex("/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*");
     matcher.mutable_google_re2()->mutable_max_program_size_error_level();
 #ifndef GTEST_USES_SIMPLE_RE
     EXPECT_THROW_WITH_REGEX(Utility::parseRegex(matcher), EnvoyException,
-                            "RE2 program size of [0-9]+ > max program size of 100 set for the error level threshold\\.");
+                            "RE2 program size of [0-9]+ > max program size of 100 set for the "
+                            "error level threshold\\.");
 #else
-    EXPECT_THROW_WITH_REGEX(Utility::parseRegex(matcher), EnvoyException,
-                            "RE2 program size of \\d+ > max program size of 100 set for the error level threshold\\.");
+    EXPECT_THROW_WITH_REGEX(
+        Utility::parseRegex(matcher), EnvoyException,
+        "RE2 program size of \\d+ > max program size of 100 set for the error level threshold\\.");
 #endif
   }
 
   // Verify that a warning is logged for the warning level threshold max program size.
   {
     Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"regex.max_program_size_warning_level", "1"}});
+        {{"regex.max_program_size_warning_level", "1"}});
     envoy::type::matcher::v3::RegexMatcher matcher;
     matcher.set_regex("/asdf/.*");
     matcher.mutable_google_re2()->mutable_max_program_size_warn_level()->set_default_value(5);
-    matcher.mutable_google_re2()->mutable_max_program_size_warn_level()->set_runtime_key("regex.max_program_size_warning_level");
+    matcher.mutable_google_re2()->mutable_max_program_size_warn_level()->set_runtime_key(
+        "regex.max_program_size_warning_level");
     EXPECT_NO_THROW(Utility::parseRegex(matcher));
     EXPECT_LOG_CONTAINS("warn", "> max program size of 1 set for the warning level threshold",
-                      Utility::parseRegex(matcher));
+                        Utility::parseRegex(matcher));
   }
 
-  // Verify that no check is performed if there is no default value or runtime key set for the warning level max program size.
+  // Verify that no check is performed if there is no default value or runtime key set for the
+  // warning level max program size.
   {
     envoy::type::matcher::v3::RegexMatcher matcher;
     matcher.set_regex("/asdf/.*");

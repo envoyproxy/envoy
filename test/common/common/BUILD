@@ -173,14 +173,14 @@ envoy_cc_test(
     srcs = ["regex_test.cc"],
     deps = [
         "//source/common/common:regex_lib",
-        "//test/test_common:utility_lib",
-        "//test/test_common:logging_lib",
-        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
-        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/init:init_mocks",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
+        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:server_mocks",
+        "//test/test_common:logging_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )
 

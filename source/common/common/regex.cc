@@ -1,12 +1,12 @@
 #include "common/common/regex.h"
 
 #include "envoy/common/exception.h"
+#include "envoy/runtime/runtime.h"
 #include "envoy/type/matcher/v3/regex.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/protobuf/utility.h"
-#include "envoy/runtime/runtime.h"
 
 #include "re2/re2.h"
 
@@ -65,36 +65,48 @@ public:
     if (runtime_) {
       // Check the error level threshold for the max program size.
       if (config.google_re2().has_max_program_size_error_level()) {
-        // If the default value isn't set by the user, it defaults to 100 to emulate the old behavior.
-        uint32_t max_program_size_error_level = config.google_re2().max_program_size_error_level().default_value();
+        // If the default value isn't set by the user, it defaults to 100 to emulate the old
+        // behavior.
+        uint32_t max_program_size_error_level =
+            config.google_re2().max_program_size_error_level().default_value();
         if (max_program_size_error_level == 0) {
           max_program_size_error_level = 100;
         }
         if (!config.google_re2().max_program_size_error_level().runtime_key().empty()) {
-          max_program_size_error_level = runtime_->snapshot().getInteger(config.google_re2().max_program_size_error_level().runtime_key(), max_program_size_error_level);
+          max_program_size_error_level = runtime_->snapshot().getInteger(
+              config.google_re2().max_program_size_error_level().runtime_key(),
+              max_program_size_error_level);
         }
         if (regex_program_size > max_program_size_error_level) {
           // Increment stat.
-          throw EnvoyException(fmt::format("regex '{}' RE2 program size of {} > max program size of "
-                                          "{} set for the error level threshold. Increase configured max program size if necessary.",
-                                          config.regex(), regex_program_size, max_program_size_error_level));          
+          throw EnvoyException(
+              fmt::format("regex '{}' RE2 program size of {} > max program size of "
+                          "{} set for the error level threshold. Increase configured max program "
+                          "size if necessary.",
+                          config.regex(), regex_program_size, max_program_size_error_level));
         }
       }
 
       // Check the warn level threshold for the max program size.
       if (config.google_re2().has_max_program_size_warn_level()) {
         // If the default value isn't set by the user, no check is enforced by it (unlimited).
-        uint32_t max_program_size_warn_level = config.google_re2().max_program_size_warn_level().default_value();
+        uint32_t max_program_size_warn_level =
+            config.google_re2().max_program_size_warn_level().default_value();
         if (max_program_size_warn_level == 0) {
           max_program_size_warn_level = UINT32_MAX;
         }
         if (!config.google_re2().max_program_size_warn_level().runtime_key().empty()) {
-          max_program_size_warn_level = runtime_->snapshot().getInteger(config.google_re2().max_program_size_warn_level().runtime_key(), max_program_size_warn_level);
+          max_program_size_warn_level = runtime_->snapshot().getInteger(
+              config.google_re2().max_program_size_warn_level().runtime_key(),
+              max_program_size_warn_level);
         }
         if (regex_program_size > max_program_size_warn_level) {
           // Increment stat.
-          ENVOY_LOG_MISC(warn, "regex '{}' RE2 program size of {} > max program size of {} set for the warning level threshold. Increase configured max program size if necessary.",
-          config.regex(), regex_program_size, max_program_size_warn_level);
+          ENVOY_LOG_MISC(
+              warn,
+              "regex '{}' RE2 program size of {} > max program size of {} set for the warning "
+              "level threshold. Increase configured max program size if necessary.",
+              config.regex(), regex_program_size, max_program_size_warn_level);
         }
       }
     }
