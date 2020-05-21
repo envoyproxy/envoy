@@ -95,6 +95,18 @@ TEST(HealthCheckerFactoryTest, CreateGrpc) {
                              .get()));
 }
 
+class HealthCheckerTestBase {
+public:
+  std::shared_ptr<MockClusterMockPrioritySet> cluster_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
+  MockHealthCheckEventLogger* event_logger_{};
+  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Runtime::MockLoader> runtime_;
+  HealthCheckerTestBase()
+      : cluster_(new NiceMock<MockClusterMockPrioritySet>()),
+        event_logger_(new MockHealthCheckEventLogger()) {}
+};
+
 class TestHttpHealthCheckerImpl : public HttpHealthCheckerImpl {
 public:
   using HttpHealthCheckerImpl::HttpHealthCheckerImpl;
@@ -109,7 +121,7 @@ public:
   Http::CodecClient::Type codecClientType() { return codec_client_type_; }
 };
 
-class HttpHealthCheckerImplTest : public testing::Test {
+class HttpHealthCheckerImplTest : public testing::Test, public HealthCheckerTestBase {
 public:
   struct TestSession {
     Event::MockTimer* interval_timer_{};
@@ -126,16 +138,13 @@ public:
       std::unordered_map<std::string,
                          const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig>;
 
-  HttpHealthCheckerImplTest()
-      : cluster_(new NiceMock<MockClusterMockPrioritySet>()),
-        event_logger_(new MockHealthCheckEventLogger()) {}
-
-  virtual void allocHealthChecker(const std::string& yaml) {
+  void allocHealthChecker(const std::string& yaml) {
     health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
         *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
         HealthCheckEventLoggerPtr(event_logger_));
   }
-  virtual void addCompletionCallback() {
+
+  void addCompletionCallback() {
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
           onHostStatus(host, changed_state);
@@ -629,13 +638,8 @@ public:
 
   MOCK_METHOD(void, onHostStatus, (HostSharedPtr host, HealthTransition changed_state));
 
-  std::shared_ptr<MockClusterMockPrioritySet> cluster_;
-  NiceMock<Event::MockDispatcher> dispatcher_;
   std::vector<TestSessionPtr> test_sessions_;
   std::shared_ptr<TestHttpHealthCheckerImpl> health_checker_;
-  NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
-  MockHealthCheckEventLogger* event_logger_{};
   std::list<uint32_t> connection_index_{};
   std::list<uint32_t> codec_index_{};
   const HostWithHealthCheckMap health_checker_map_{};
@@ -2516,7 +2520,7 @@ public:
   }
 };
 
-class ProdHttpHealthCheckerTest : public HttpHealthCheckerImplTest {
+class ProdHttpHealthCheckerTest : public testing::Test, public HealthCheckerTestBase {
 public:
   void allocHealthChecker(const std::string& yaml) {
     health_checker_ = std::make_shared<TestProdHttpHealthChecker>(
@@ -2568,6 +2572,7 @@ public:
     addCompletionCallback();
   }
 
+  MOCK_METHOD(void, onHostStatus, (HostSharedPtr host, HealthTransition changed_state));
   std::unique_ptr<Network::MockClientConnection> connection_ =
       std::make_unique<NiceMock<Network::MockClientConnection>>();
   std::shared_ptr<TestProdHttpHealthChecker> health_checker_;
@@ -2935,12 +2940,8 @@ TEST(TcpHealthCheckMatcher, match) {
   EXPECT_TRUE(TcpHealthCheckMatcher::match(segments, buffer));
 }
 
-class TcpHealthCheckerImplTest : public testing::Test {
+class TcpHealthCheckerImplTest : public testing::Test, public HealthCheckerTestBase {
 public:
-  TcpHealthCheckerImplTest()
-      : cluster_(new NiceMock<MockClusterMockPrioritySet>()),
-        event_logger_(new MockHealthCheckEventLogger()) {}
-
   void allocHealthChecker(const std::string& yaml) {
     health_checker_ = std::make_shared<TcpHealthCheckerImpl>(
         *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
@@ -3005,16 +3006,11 @@ public:
     EXPECT_CALL(*connection_, addReadFilter(_)).WillOnce(SaveArg<0>(&read_filter_));
   }
 
-  std::shared_ptr<MockClusterMockPrioritySet> cluster_;
-  NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<TcpHealthCheckerImpl> health_checker_;
-  MockHealthCheckEventLogger* event_logger_{};
   Network::MockClientConnection* connection_{};
   Event::MockTimer* timeout_timer_{};
   Event::MockTimer* interval_timer_{};
   Network::ReadFilterSharedPtr read_filter_;
-  NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
 };
 
 TEST_F(TcpHealthCheckerImplTest, Success) {
@@ -3481,7 +3477,7 @@ public:
   MOCK_METHOD(Http::CodecClient*, createCodecClient_, (Upstream::Host::CreateConnectionData&));
 };
 
-class GrpcHealthCheckerImplTestBase {
+class GrpcHealthCheckerImplTestBase : public HealthCheckerTestBase {
 public:
   struct TestSession {
     TestSession() = default;
@@ -3552,9 +3548,7 @@ public:
     std::vector<std::pair<std::string, std::string>> trailers;
   };
 
-  GrpcHealthCheckerImplTestBase()
-      : cluster_(new NiceMock<MockClusterMockPrioritySet>()),
-        event_logger_(new MockHealthCheckEventLogger()) {
+  GrpcHealthCheckerImplTestBase() : HealthCheckerTestBase() {
     EXPECT_CALL(*cluster_->info_, features())
         .WillRepeatedly(Return(Upstream::ClusterInfo::Features::HTTP2));
   }
@@ -3820,13 +3814,8 @@ public:
 
   MOCK_METHOD(void, onHostStatus, (HostSharedPtr host, HealthTransition changed_state));
 
-  std::shared_ptr<MockClusterMockPrioritySet> cluster_;
-  NiceMock<Event::MockDispatcher> dispatcher_;
   std::vector<TestSessionPtr> test_sessions_;
   std::shared_ptr<TestGrpcHealthCheckerImpl> health_checker_;
-  NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
-  MockHealthCheckEventLogger* event_logger_{};
   std::list<uint32_t> connection_index_{};
   std::list<uint32_t> codec_index_{};
 };
