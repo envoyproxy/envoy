@@ -88,16 +88,15 @@ TEST(GoogleGrpcUtilsTest, ByteBufferInstanceRoundTrip) {
 
 // Validate that we build the grpc::ChannelArguments as expected.
 TEST(GoogleGrpcUtilsTest, ChannelArgsFromConfig) {
-  envoy::config::core::v3::GrpcService config;
-  auto* grpc_config = config.mutable_google_grpc();
-  (*grpc_config->mutable_channel_args()->mutable_args())["grpc.http2.max_pings_without_data"]
-      .set_int_value(3);
-  (*grpc_config->mutable_channel_args()->mutable_args())["grpc.default_authority"].set_string_value(
-      "foo");
-  (*grpc_config->mutable_channel_args()->mutable_args())["grpc.http2.max_ping_strikes"]
-      .set_int_value(5);
-  (*grpc_config->mutable_channel_args()->mutable_args())["grpc.ssl_target_name_override"]
-      .set_string_value("bar");
+  const auto config = TestUtility::parseYaml<envoy::config::core::v3::GrpcService>(R"EOF(
+  google_grpc:
+    channel_args:
+      args:
+        grpc.http2.max_pings_without_data: { int_value: 3 }
+        grpc.default_authority: { string_value: foo }
+        grpc.http2.max_ping_strikes: { int_value: 5 }
+        grpc.ssl_target_name_override: { string_value: bar }
+  )EOF");
   const grpc::ChannelArguments channel_args = GoogleGrpcUtils::channelArgsFromConfig(config);
   grpc_channel_args effective_args = channel_args.c_channel_args();
   std::unordered_map<std::string, std::string> string_args;
