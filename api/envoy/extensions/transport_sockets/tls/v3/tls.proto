@@ -108,13 +108,14 @@ message CommonTlsContext {
   message CertificateProvider {
     // opaque name used to specify certificate instances or types. For example, "ROOTCA" to specify
     // a root-certificate (validation context) or "TLS" to specify a new tls-certificate.
-    string name = 1 [(validate.rules).message = {required: true}];
+    string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
     // Provider specific config.
     // Note: an implementation is expected to dedup multiple instances of the same config
     // to maintain a single certificate-provider instance. The sharing can happen, for
     // example, among multiple clusters or between the tls_certificate and validation_context
     // certificate providers of a cluster.
+    // This config could be supplied inline or (in future) a named xDS resource.
     oneof config {
       option (validate.required) = true;
 
