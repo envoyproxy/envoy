@@ -236,15 +236,20 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   std::unique_ptr<Cleanup> resume_rds;
   // if local init manager is initialized, the parent init manager may have gone away.
   if (localInitManager().state() == Init::Manager::State::Initialized) {
-    const auto type_url = Envoy::Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>(
-        envoy::config::core::v3::ApiVersion::V2);
+    const auto type_url_v2 =
+        Envoy::Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>(
+            envoy::config::core::v3::ApiVersion::V2);
+    const auto type_url_v3 =
+        Envoy::Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>(
+            envoy::config::core::v3::ApiVersion::V3);
     noop_init_manager =
         std::make_unique<Init::ManagerImpl>(fmt::format("SRDS {}:{}", name_, version_info));
     // Pause RDS to not send a burst of RDS requests until we start all the new subscriptions.
     // In the case if factory_context_.init_manager() is uninitialized, RDS is already paused
     // either by Server init or LDS init.
     if (factory_context_.clusterManager().adsMux()) {
-      factory_context_.clusterManager().adsMux()->pause(type_url);
+      factory_context_.clusterManager().adsMux()->pause(type_url_v2);
+      factory_context_.clusterManager().adsMux()->pause(type_url_v3);
     }
     resume_rds = std::make_unique<Cleanup>([this, &noop_init_manager, version_info, type_url] {
       // For new RDS subscriptions created after listener warming up, we don't wait for them to
@@ -258,7 +263,8 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
       // Note in the case of partial acceptance, accepted RDS subscriptions should be started
       // despite of any error.
       if (factory_context_.clusterManager().adsMux()) {
-        factory_context_.clusterManager().adsMux()->resume(type_url);
+        factory_context_.clusterManager().adsMux()->resume(type_url_v2);
+        factory_context_.clusterManager().adsMux()->resume(type_url_v3);
       }
     });
   }

@@ -589,13 +589,16 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
       return;
     }
 
-    const auto type_url = Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>(
+    const auto type_url_v2 = Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>(
         envoy::config::core::v3::ApiVersion::V2);
+    const auto type_url_v3 = Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>(
+        envoy::config::core::v3::ApiVersion::V3);
     // Pause RDS to ensure that we don't send any requests until we've
     // subscribed to all the RDS resources. The subscriptions happen in the init callbacks,
     // so we pause RDS until we've completed all the callbacks.
     if (cm.adsMux()) {
-      cm.adsMux()->pause(type_url);
+      cm.adsMux()->pause(type_url_v2);
+      cm.adsMux()->pause(type_url_v3);
     }
 
     ENVOY_LOG(info, "all clusters initialized. initializing init manager");
@@ -604,7 +607,8 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
     // Now that we're execute all the init callbacks we can resume RDS
     // as we've subscribed to all the statically defined RDS resources.
     if (cm.adsMux()) {
-      cm.adsMux()->resume(type_url);
+      cm.adsMux()->resume(type_url_v2);
+      cm.adsMux()->resume(type_url_v3);
     }
   });
 }
