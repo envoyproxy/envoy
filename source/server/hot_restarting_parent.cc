@@ -5,6 +5,7 @@
 #include "common/memory/stats.h"
 #include "common/network/utility.h"
 #include "common/stats/stat_merger.h"
+#include "common/stats/utility.h"
 #include "common/stats/symbol_table_impl.h"
 
 #include "server/listener_impl.h"
@@ -85,16 +86,10 @@ void HotRestartingParent::onSocketEvent() {
 void HotRestartingParent::shutdown() { socket_event_.reset(); }
 
 HotRestartingParent::Internal::Internal(Server::Instance* server) : server_(server) {
-  // Track the hot-restart generation. Using gauge's accumulate semantics,
-  // the increments will be combined across hot-restart. This may be useful
-  // at some point, though the main motivation for this stat is to enable
-  // an integration test showing that dynamic stat-names can be coalesced
-  // across hot-restarts. There's no other reason this particular stat-name
-  // needs to be created dynamically.
-  Stats::StatNameDynamicPool pool(server_->stats().symbolTable());
-  Stats::Gauge& gauge = server_->stats().gaugeFromStatName(
-      pool.add("server.hot_restart_generation"), Stats::Gauge::ImportMode::Accumulate);
-  gauge.inc();
+  //Stats::Utility::gaugeFromElements(
+  //    server->stats(), {Stats::DynamicName("server.hot_restart_generation")}, Stats::Gauge::ImportMode::Accumulate).inc();
+  Stats::Gauge& hot_restart_generation = hotRestartGeneration(server->stats());
+  hot_restart_generation.inc();
 }
 
 HotRestartMessage HotRestartingParent::Internal::shutdownAdmin() {

@@ -178,6 +178,7 @@ public:
   void dec() override { sub(1); }
   void inc() override { add(1); }
   void set(uint64_t value) override {
+    ASSERT(value == 0 || importMode() != ImportMode::Accumulate, name());
     value_ = value;
     flags_ |= Flags::Used;
   }

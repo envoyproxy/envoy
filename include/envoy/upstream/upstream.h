@@ -611,16 +611,16 @@ public:
  * can be handled differently by passing in different macros.
  */
 #define ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(OPEN_GAUGE, REMAINING_GAUGE)                            \
-  OPEN_GAUGE(cx_open, Accumulate)                                                                  \
-  OPEN_GAUGE(cx_pool_open, Accumulate)                                                             \
-  OPEN_GAUGE(rq_open, Accumulate)                                                                  \
-  OPEN_GAUGE(rq_pending_open, Accumulate)                                                          \
-  OPEN_GAUGE(rq_retry_open, Accumulate)                                                            \
-  REMAINING_GAUGE(remaining_cx, Accumulate)                                                        \
-  REMAINING_GAUGE(remaining_cx_pools, Accumulate)                                                  \
-  REMAINING_GAUGE(remaining_pending, Accumulate)                                                   \
-  REMAINING_GAUGE(remaining_retries, Accumulate)                                                   \
-  REMAINING_GAUGE(remaining_rq, Accumulate)
+  OPEN_GAUGE(cx_open, NeverImport)                                                                 \
+  OPEN_GAUGE(cx_pool_open, NeverImport)                                                            \
+  OPEN_GAUGE(rq_open, NeverImport)                                                                 \
+  OPEN_GAUGE(rq_pending_open, NeverImport)                                                         \
+  OPEN_GAUGE(rq_retry_open, NeverImport)                                                           \
+  REMAINING_GAUGE(remaining_cx, NeverImport)                                                       \
+  REMAINING_GAUGE(remaining_cx_pools, NeverImport)                                                 \
+  REMAINING_GAUGE(remaining_pending, NeverImport)                                                  \
+  REMAINING_GAUGE(remaining_retries, NeverImport)                                                  \
+  REMAINING_GAUGE(remaining_rq, NeverImport)
 
 /**
  * All stats around timeout budgets. Not used by default.

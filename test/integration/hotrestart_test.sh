@@ -195,6 +195,11 @@ function run_testsuite() {
   kill -SIGUSR1 ${SECOND_SERVER_PID}
   sleep 3
 
+  start_test Checking server.hot_restart_generation 3
+  ADMIN_ADDRESS_2=$(cat "${ADMIN_ADDRESS_PATH_2}")
+  GENERATION_2=$(curl -sg http://${ADMIN_ADDRESS_2}/stats | grep server.hot_restart_generation)
+  check [ "$GENERATION_2" = "server.hot_restart_generation: 3" ];
+
   # Now term the last server, and the other one should exit also.
   start_test Killing and waiting for epoch 2
   kill ${THIRD_SERVER_PID}

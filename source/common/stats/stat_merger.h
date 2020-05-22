@@ -42,11 +42,29 @@ public:
 
   StatMerger(Stats::Store& target_store);
 
-  // Merge the values of stats_proto into stats_store. Counters are always straightforward
-  // addition, while gauges default to addition but have exceptions.
+  /**
+   * Merge the values of stats_proto into stats_store. Counters are always
+   * straightforward addition, while gauges default to addition but have
+   * exceptions.
+   *
+   * @param counter_deltas map of counter changes from parent
+   * @param counter_deltas map of gauge changes from parent
+   * @param dynamics information about which segments of the names are dynamic.
+   */
   void mergeStats(const Protobuf::Map<std::string, uint64_t>& counter_deltas,
                   const Protobuf::Map<std::string, uint64_t>& gauges,
                   const DynamicsMap& dynamics = DynamicsMap());
+
+
+  /**
+   * By the time a parent exits, all its contributions to accumulated gauges
+   * should be zero. But depending on the timing of the stat-merger communication
+   * shutdown and other shutdown activities on the parent, the gauges may not
+   * all be zero yet. So simply erase all the parent contributions.
+   */
+  void removeParentContributionToGauges();
+
+  void dropParentGaugeValue(Stats::StatName gauge_name);
 
 private:
   void mergeCounters(const Protobuf::Map<std::string, uint64_t>& counter_deltas,

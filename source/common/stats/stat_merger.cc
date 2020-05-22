@@ -136,6 +136,24 @@ void StatMerger::mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges,
   }
 }
 
+void StatMerger::dropParentGaugeValue(Stats::StatName gauge_name) {
+  ENVOY_LOG_MISC(error, "JOSH: erasing gauge: {}", parent_gauge_values_.erase(gauge_name));
+}
+
+void StatMerger::removeParentContributionToGauges() {
+  for (auto& iter : parent_gauge_values_) {
+    Gauge& gauge = temp_scope_->gaugeFromStatName(iter.first, Gauge::ImportMode::Accumulate);
+    if (gauge.importMode() != Gauge::ImportMode::Accumulate) {
+      continue;
+    }
+
+    uint64_t parent_value = iter.second;
+    ENVOY_LOG_MISC(error, "JOSH: subtracting {} from gauge {} with current value {}", parent_value, gauge.name(), gauge.value());
+    gauge.add(-parent_value);
+  }
+  parent_gauge_values_.clear();
+}
+
 void StatMerger::mergeStats(const Protobuf::Map<std::string, uint64_t>& counter_deltas,
                             const Protobuf::Map<std::string, uint64_t>& gauges,
                             const DynamicsMap& dynamics) {

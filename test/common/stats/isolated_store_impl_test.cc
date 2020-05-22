@@ -75,12 +75,12 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
   // behavior should be.
 
   StatNameManagedStorage g1_name("g1", store_->symbolTable());
-  g1.set(100);
+  g1.add(100);
   auto found_gauge = store_->findGauge(g1_name.statName());
   ASSERT_TRUE(found_gauge.has_value());
   EXPECT_EQ(&g1, &found_gauge->get());
   EXPECT_EQ(100, found_gauge->get().value());
-  g1.set(0);
+  g1.sub(100);
   EXPECT_EQ(0, found_gauge->get().value());
 
   Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);

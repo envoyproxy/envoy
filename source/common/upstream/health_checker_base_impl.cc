@@ -79,15 +79,11 @@ HealthCheckerImplBase::~HealthCheckerImplBase() {
 }
 
 void HealthCheckerImplBase::decHealthy() {
-  ASSERT(local_process_healthy_ > 0);
-  local_process_healthy_--;
-  refreshHealthyStat();
+  stats_.healthy_.dec();
 }
 
 void HealthCheckerImplBase::decDegraded() {
-  ASSERT(local_process_degraded_ > 0);
-  local_process_degraded_--;
-  refreshHealthyStat();
+  stats_.degraded_.dec();
 }
 
 HealthCheckerStats HealthCheckerImplBase::generateStats(Stats::Scope& scope) {
@@ -97,13 +93,11 @@ HealthCheckerStats HealthCheckerImplBase::generateStats(Stats::Scope& scope) {
 }
 
 void HealthCheckerImplBase::incHealthy() {
-  local_process_healthy_++;
-  refreshHealthyStat();
+  stats_.healthy_.inc();
 }
 
 void HealthCheckerImplBase::incDegraded() {
-  local_process_degraded_++;
-  refreshHealthyStat();
+  stats_.degraded_.inc();
 }
 
 std::chrono::milliseconds HealthCheckerImplBase::interval(HealthState state,
@@ -187,20 +181,7 @@ void HealthCheckerImplBase::onClusterMemberUpdate(const HostVector& hosts_added,
   }
 }
 
-void HealthCheckerImplBase::refreshHealthyStat() {
-  // Each hot restarted process health checks independently. To make the stats easier to read,
-  // we assume that both processes will converge and the last one that writes wins for the host.
-  stats_.healthy_.set(local_process_healthy_);
-  stats_.degraded_.set(local_process_degraded_);
-}
-
 void HealthCheckerImplBase::runCallbacks(HostSharedPtr host, HealthTransition changed_state) {
-  // When a parent process shuts down, it will kill all of the active health checking sessions,
-  // which will decrement the healthy count and the healthy stat in the parent. If the child is
-  // stable and does not update, the healthy stat will be wrong. This routine is called any time
-  // any HC happens against a host so just refresh the healthy stat here so that it is correct.
-  refreshHealthyStat();
-
   for (const HostStatusCb& cb : callbacks_) {
     cb(host, changed_state);
   }

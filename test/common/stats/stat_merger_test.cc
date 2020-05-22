@@ -19,7 +19,7 @@ public:
   StatMergerTest()
       : stat_merger_(store_), whywassixafraidofseven_(store_.gaugeFromString(
                                   "whywassixafraidofseven", Gauge::ImportMode::Accumulate)) {
-    whywassixafraidofseven_.set(678);
+    whywassixafraidofseven_.add(678);
   }
 
   void mergeTest(const std::string& name, Gauge::ImportMode initial, Gauge::ImportMode merge) {
@@ -95,6 +95,31 @@ TEST_F(StatMergerTest, CounterMerge) {
   stat_merger_.mergeStats(counter_deltas, empty_gauges_);
   EXPECT_EQ(11, store_.counterFromString("draculaer").value());
   EXPECT_EQ(4, store_.counterFromString("draculaer").latch());
+}
+
+TEST_F(StatMergerTest, GaugeMerge) {
+  Gauge& g1 = store_.gaugeFromString("g1", Gauge::ImportMode::Accumulate);
+  Gauge& g2 = store_.gaugeFromString("g2", Gauge::ImportMode::NeverImport);
+  g1.add(1);
+  g2.add(2);
+
+  Protobuf::Map<std::string, uint64_t> gauge_values;
+  gauge_values["g1"] = 4;
+  gauge_values["g2"] = 8;
+  stat_merger_.mergeStats(empty_counter_deltas_, gauge_values);
+  // Initial combined value: 1+1.
+  EXPECT_EQ(5, g1.value());
+  EXPECT_EQ(2, g2.value());  // delta of 8 from parent ignored.
+
+  // Simulate a decrement of the gauge from the parent.
+  --gauge_values["g1"];
+  stat_merger_.mergeStats(empty_counter_deltas_, gauge_values);
+  EXPECT_EQ(4, g1.value());
+  EXPECT_EQ(2, g2.value());  // delta of 8 from parent ignored.
+
+  stat_merger_.removeParentContributionToGauges();
+  EXPECT_EQ(1, g1.value());  // Back to the original value of 1.
+  EXPECT_EQ(2, g2.value());  // delta of 8 from parent ignored.
 }
 
 TEST_F(StatMergerTest, BasicDefaultAccumulationImport) {
@@ -391,7 +416,7 @@ TEST_F(StatMergerThreadLocalTest, NewStatFromParent) {
 // value. https://github.com/envoyproxy/envoy/issues/7227
 TEST_F(StatMergerThreadLocalTest, RetainImportModeAfterMerge) {
   Gauge& gauge = store_.gaugeFromString("mygauge", Gauge::ImportMode::Accumulate);
-  gauge.set(42);
+  gauge.add(42);
   EXPECT_EQ(Gauge::ImportMode::Accumulate, gauge.importMode());
   EXPECT_EQ(42, gauge.value());
   {
