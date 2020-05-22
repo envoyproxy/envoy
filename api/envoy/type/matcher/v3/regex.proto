@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package envoy.type.matcher.v3;
 
-import "envoy/config/runtime/v3/runtime.proto";
-
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
@@ -36,10 +34,6 @@ message RegexMatcher {
     // This field is deprecated; regexp validation should be performed on the management server
     // instead of being done by each individual client.
     google.protobuf.UInt32Value max_program_size = 1 [deprecated = true];
-
-    config.runtime.v3.RuntimeUInt32 max_program_size_warn_level = 2;
-
-    config.runtime.v3.RuntimeUInt32 max_program_size_error_level = 3;
   }
 
   oneof engine_type {

@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.config.filter.http.csrf.v2;
 
-import "envoy/api/v2/runtime/runtime.proto";
+import "envoy/api/v2/core/base.proto";
 import "envoy/type/matcher/string.proto";
 
 import "udpa/annotations/migrate.proto";
@@ -30,7 +30,7 @@ message CsrfPolicy {
   //
   //   This field defaults to 100/:ref:`HUNDRED
   //   <envoy_api_enum_type.FractionalPercent.DenominatorType>`.
-  api.v2.runtime.RuntimeFractionalPercent filter_enabled = 1
+  api.v2.core.RuntimeFractionalPercent filter_enabled = 1
       [(validate.rules).message = {required: true}];
 
   // Specifies that CSRF policies will be evaluated and tracked, but not enforced.
@@ -41,7 +41,7 @@ message CsrfPolicy {
   // Envoy will lookup the runtime key to get the percentage of requests for which it will evaluate
   // and track the request's *Origin* and *Destination* to determine if it's valid, but will not
   // enforce any policies.
-  api.v2.runtime.RuntimeFractionalPercent shadow_enabled = 2;
+  api.v2.core.RuntimeFractionalPercent shadow_enabled = 2;
 
   // Specifies additional source origins that will be allowed in addition to
   // the destination origin.

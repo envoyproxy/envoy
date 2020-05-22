@@ -5,7 +5,6 @@ package envoy.config.filter.http.ext_authz.v2;
 import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/core/grpc_service.proto";
 import "envoy/api/v2/core/http_uri.proto";
-import "envoy/api/v2/runtime/runtime.proto";
 import "envoy/type/http_status.proto";
 import "envoy/type/matcher/string.proto";
 
@@ -97,7 +96,7 @@ message ExtAuthz {
   // Envoy will lookup the runtime key to get the percentage of requests to filter.
   //
   // If this field is not specified, the filter will be enabled for all requests.
-  api.v2.runtime.RuntimeFractionalPercent filter_enabled = 9;
+  api.v2.core.RuntimeFractionalPercent filter_enabled = 9;
 
   // Specifies if the peer certificate is sent to the external service.
   //

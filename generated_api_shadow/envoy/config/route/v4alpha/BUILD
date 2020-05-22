@@ -9,7 +9,6 @@ api_proto_package(
         "//envoy/annotations:pkg",
         "//envoy/config/core/v4alpha:pkg",
         "//envoy/config/route/v3:pkg",
-        "//envoy/config/runtime/v3:pkg",
         "//envoy/type/matcher/v4alpha:pkg",
         "//envoy/type/tracing/v3:pkg",
         "//envoy/type/v3:pkg",

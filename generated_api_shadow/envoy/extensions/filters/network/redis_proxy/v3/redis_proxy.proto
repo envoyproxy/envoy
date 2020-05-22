@@ -3,7 +3,6 @@ syntax = "proto3";
 package envoy.extensions.filters.network.redis_proxy.v3;
 
 import "envoy/config/core/v3/base.proto";
-import "envoy/config/runtime/v3/runtime.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
@@ -147,7 +146,7 @@ message RedisProxy {
         //
         // If specified, Envoy will lookup the runtime key to get the percentage of requests to the
         // mirror.
-        config.runtime.v3.RuntimeFractionalPercent runtime_fraction = 2;
+        config.core.v3.RuntimeFractionalPercent runtime_fraction = 2;
 
         // Set this to TRUE to only mirror write commands, this is effectively replicating the
         // writes in a "fire and forget" manner.

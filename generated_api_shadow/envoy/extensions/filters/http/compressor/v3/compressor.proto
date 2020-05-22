@@ -2,8 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.compressor.v3;
 
+import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/extension.proto";
-import "envoy/config/runtime/v3/runtime.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/wrappers.proto";
@@ -50,7 +50,7 @@ message Compressor {
 
   // Runtime flag that controls whether the filter is enabled or not. If set to false, the
   // filter will operate as a pass-through filter. If not specified, defaults to enabled.
-  config.runtime.v3.RuntimeFeatureFlag runtime_enabled = 5;
+  config.core.v3.RuntimeFeatureFlag runtime_enabled = 5;
 
   // A compressor library to use for compression. Currently only
   // :ref:`envoy.filters.http.compressor.gzip<envoy_api_msg_extensions.compression.gzip.compressor.v3.Gzip>`

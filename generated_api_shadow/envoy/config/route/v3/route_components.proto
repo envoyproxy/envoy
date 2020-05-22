@@ -4,7 +4,6 @@ package envoy.config.route.v3;
 
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/proxy_protocol.proto";
-import "envoy/config/runtime/v3/runtime.proto";
 import "envoy/type/matcher/v3/regex.proto";
 import "envoy/type/matcher/v3/string.proto";
 import "envoy/type/tracing/v3/custom_tag.proto";
@@ -466,7 +465,7 @@ message RouteMatch {
   //    integer with the assumption that the value is an integral percentage out of 100. For
   //    instance, a runtime key lookup returning the value "42" would parse as a FractionalPercent
   //    whose numerator is 42 and denominator is HUNDRED. This preserves legacy semantics.
-  runtime.v3.RuntimeFractionalPercent runtime_fraction = 9;
+  core.v3.RuntimeFractionalPercent runtime_fraction = 9;
 
   // Specifies a set of headers that the route should match on. The router will
   // check the request’s headers against all the specified headers in the route
@@ -523,9 +522,9 @@ message CorsPolicy {
     // If neither ``enabled``, ``filter_enabled``, nor ``shadow_enabled`` are specified, the CORS
     // filter will be enabled for 100% of the requests.
     //
-    // If :ref:`runtime_key <envoy_api_field_config.runtime.v3.RuntimeFractionalPercent.runtime_key>` is
+    // If :ref:`runtime_key <envoy_api_field_config.core.v3.RuntimeFractionalPercent.runtime_key>` is
     // specified, Envoy will lookup the runtime key to get the percentage of requests to filter.
-    runtime.v3.RuntimeFractionalPercent filter_enabled = 9;
+    core.v3.RuntimeFractionalPercent filter_enabled = 9;
 
     google.protobuf.BoolValue hidden_envoy_deprecated_enabled = 7
         [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
@@ -537,10 +536,10 @@ message CorsPolicy {
   // This field is intended to be used when ``filter_enabled`` and ``enabled`` are off. One of those
   // fields have to explicitly disable the filter in order for this setting to take effect.
   //
-  // If :ref:`runtime_key <envoy_api_field_config.runtime.v3.RuntimeFractionalPercent.runtime_key>` is specified,
+  // If :ref:`runtime_key <envoy_api_field_config.core.v3.RuntimeFractionalPercent.runtime_key>` is specified,
   // Envoy will lookup the runtime key to get the percentage of requests for which it will evaluate
   // and track the request's *Origin* to determine if it's valid but will not enforce any policies.
-  runtime.v3.RuntimeFractionalPercent shadow_enabled = 10;
+  core.v3.RuntimeFractionalPercent shadow_enabled = 10;
 
   repeated string hidden_envoy_deprecated_allow_origin = 1
       [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
@@ -594,7 +593,7 @@ message RouteAction {
     // For some fraction N/D, a random number in the range [0,D) is selected. If the
     // number is <= the value of the numerator N, or if the key is not present, the default
     // value, the request will be mirrored.
-    runtime.v3.RuntimeFractionalPercent runtime_fraction = 3;
+    core.v3.RuntimeFractionalPercent runtime_fraction = 3;
 
     // Determines if the trace span should be sampled. Defaults to true.
     google.protobuf.BoolValue trace_sampled = 4;
