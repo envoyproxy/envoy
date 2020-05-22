@@ -74,8 +74,7 @@ TEST(Utility, ParseRegex) {
   {
     TestScopedRuntime scoped_runtime;
     Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"regex.max_program_size_error_level", "3"}}
-    );
+        {{"regex.max_program_size_error_level", "3"}});
     envoy::type::matcher::v3::RegexMatcher matcher;
     matcher.set_regex("/asdf/.*");
     matcher.mutable_google_re2()->mutable_max_program_size()->set_value(1);
@@ -92,47 +91,50 @@ TEST(Utility, ParseRegex) {
   {
     TestScopedRuntime scoped_runtime;
     Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"regex.max_program_size_error_level", "1"}}
-    );
+        {{"regex.max_program_size_error_level", "1"}});
     envoy::type::matcher::v3::RegexMatcher matcher;
     matcher.set_regex("/asdf/.*");
     matcher.mutable_google_re2();
 #ifndef GTEST_USES_SIMPLE_RE
-    EXPECT_THROW_WITH_REGEX(Utility::parseRegex(matcher), EnvoyException,
-                            "RE2 program size of [0-9]+ > max program size of 1 set for the error level threshold\\.");
+    EXPECT_THROW_WITH_REGEX(
+        Utility::parseRegex(matcher), EnvoyException,
+        "RE2 program size of [0-9]+ > max program size of 1 set for the error level threshold\\.");
 #else
-    EXPECT_THROW_WITH_REGEX(Utility::parseRegex(matcher), EnvoyException,
-                            "RE2 program size of \\d+ > max program size of 1 set for the error level threshold\\.");  
-#endif  
+    EXPECT_THROW_WITH_REGEX(
+        Utility::parseRegex(matcher), EnvoyException,
+        "RE2 program size of \\d+ > max program size of 1 set for the error level threshold\\.");
+#endif
   }
 
   // Verify that the error level max program size defaults to 100 if not set by runtime.
   {
     TestScopedRuntime scoped_runtime;
     envoy::type::matcher::v3::RegexMatcher matcher;
-    matcher.set_regex("/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*");
+    matcher.set_regex(
+        "/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*");
     matcher.mutable_google_re2();
 #ifndef GTEST_USES_SIMPLE_RE
     EXPECT_THROW_WITH_REGEX(Utility::parseRegex(matcher), EnvoyException,
-                            "RE2 program size of [0-9]+ > max program size of 100 set for the error level threshold\\.");
+                            "RE2 program size of [0-9]+ > max program size of 100 set for the "
+                            "error level threshold\\.");
 #else
-    EXPECT_THROW_WITH_REGEX(Utility::parseRegex(matcher), EnvoyException,
-                            "RE2 program size of \\d+ > max program size of 100 set for the error level threshold\\.");  
-#endif  
+    EXPECT_THROW_WITH_REGEX(
+        Utility::parseRegex(matcher), EnvoyException,
+        "RE2 program size of \\d+ > max program size of 100 set for the error level threshold\\.");
+#endif
   }
 
   // Verify that a warning is logged for the warn level max program size.
   {
     TestScopedRuntime scoped_runtime;
     Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"regex.max_program_size_warn_level", "1"}}
-    );
+        {{"regex.max_program_size_warn_level", "1"}});
     envoy::type::matcher::v3::RegexMatcher matcher;
     matcher.set_regex("/asdf/.*");
     matcher.mutable_google_re2();
     EXPECT_NO_THROW(Utility::parseRegex(matcher));
     EXPECT_LOG_CONTAINS("warn", "> max program size of 1 set for the warn level threshold",
-                        Utility::parseRegex(matcher));    
+                        Utility::parseRegex(matcher));
   }
 
   // Verify that no check is performed if the warn level max program size is not set by runtime.

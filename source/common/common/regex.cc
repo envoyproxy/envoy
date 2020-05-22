@@ -63,19 +63,23 @@ public:
     }
 
     if (runtime_) {
-      const uint32_t max_program_size_error_level = runtime_->snapshot().getInteger("regex.max_program_size_error_level", 100);
+      const uint32_t max_program_size_error_level =
+          runtime_->snapshot().getInteger("regex.max_program_size_error_level", 100);
       if (regex_program_size > max_program_size_error_level) {
         throw EnvoyException(fmt::format("regex '{}' RE2 program size of {} > max program size of "
-                                         "{} set for the error level threshold. Increase configured max program size if necessary.",
-                                         config.regex(), regex_program_size, max_program_size_error_level));      
+                                         "{} set for the error level threshold. Increase "
+                                         "configured max program size if necessary.",
+                                         config.regex(), regex_program_size,
+                                         max_program_size_error_level));
       }
-      const uint32_t max_program_size_warn_level = runtime_->snapshot().getInteger("regex.max_program_size_warn_level", UINT32_MAX);
+      const uint32_t max_program_size_warn_level =
+          runtime_->snapshot().getInteger("regex.max_program_size_warn_level", UINT32_MAX);
       if (regex_program_size > max_program_size_warn_level) {
         ENVOY_LOG_MISC(
-          warn,
-          "regex '{}' RE2 program size of {} > max program size of {} set for the warn "
-          "level threshold. Increase configured max program size if necessary.",
-          config.regex(), regex_program_size, max_program_size_warn_level);
+            warn,
+            "regex '{}' RE2 program size of {} > max program size of {} set for the warn "
+            "level threshold. Increase configured max program size if necessary.",
+            config.regex(), regex_program_size, max_program_size_warn_level);
       }
     }
   }
