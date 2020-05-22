@@ -580,7 +580,7 @@ message ResponseMapper {
   // command operator in the `body_foramt`.
   config.core.v3.DataSource body = 3;
 
-  // A per mapper `body_format` to override the :ref:`body_format <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.LocalReplayConfig.body_format`.
+  // A per mapper `body_format` to override the :ref:`body_format <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.LocalReplyConfig.body_format>`.
   // It will be used when this mapper is matched.
   config.core.v3.SubstitutionFormatString body_format_override = 4;
 }
