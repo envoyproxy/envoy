@@ -147,8 +147,7 @@ private:
 };
 
 /**
- * Formatter for string literal. It ignores headers and stream info and returns string by which it
- * was initialized.
+ * FormatterProvider for local_reply_body. It returns the string from `local_reply_body` argument.
  */
 class LocalReplyBodyFormatter : public FormatterProvider {
 public:

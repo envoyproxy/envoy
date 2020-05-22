@@ -257,7 +257,9 @@ Http1Settings parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOpt
 
 struct EncodeFunctions {
   // Function to rewrite locally generated response.
-  std::function<void(Code& code, std::string& body, absl::string_view& content_type)> rewrite_;
+  std::function<void(ResponseHeaderMap& response_headers, Code& code, std::string& body,
+                     absl::string_view& content_type)>
+      rewrite_;
   // Function to encode response headers.
   std::function<void(ResponseHeaderMapPtr&& headers, bool end_stream)> encode_headers_;
   // Function to encode the response body.
@@ -297,7 +299,7 @@ void sendLocalReply(const bool& is_reset, StreamDecoderFilterCallbacks& callback
  * @param encode_functions supplies the functions to encode response body and headers.
  * @param local_reply_data struct which keeps data related to generate reply.
  */
-void sendLocalReply(const bool& is_reset, EncodeFunctions encode_functions,
+void sendLocalReply(const bool& is_reset, const EncodeFunctions& encode_functions,
                     const LocalReplyData& local_reply_data);
 
 struct GetLastAddressFromXffInfo {

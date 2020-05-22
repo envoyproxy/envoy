@@ -23,6 +23,7 @@ public:
    * @param content_type response content_type.
    */
   virtual void rewrite(const Http::RequestHeaderMap* request_headers,
+                       Http::ResponseHeaderMap& response_headers,
                        StreamInfo::StreamInfoImpl& stream_info, Http::Code& code, std::string& body,
                        absl::string_view& content_type) const PURE;
 };

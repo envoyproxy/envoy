@@ -286,7 +286,7 @@ std::vector<FormatterProviderPtr> AccessLogFormatParser::parse(const std::string
         formatters.emplace_back(FormatterProviderPtr{
             new ResponseTrailerFormatter(main_header, alternative_header, max_length)});
       } else if (absl::StartsWith(token, "LOCAL_REPLY_BODY")) {
-        formatters.emplace_back(FormatterProviderPtr{new LocalReplyBodyFormatter()});
+        formatters.emplace_back(std::make_unique<LocalReplyBodyFormatter>());
       } else if (absl::StartsWith(token, DYNAMIC_META_TOKEN)) {
         std::string filter_namespace;
         absl::optional<size_t> max_length;
@@ -805,7 +805,7 @@ std::string LocalReplyBodyFormatter::format(const Http::RequestHeaderMap&,
                                             const Http::ResponseTrailerMap&,
                                             const StreamInfo::StreamInfo&,
                                             absl::string_view local_reply_body) const {
-  return local_reply_body.data();
+  return std::string(local_reply_body);
 }
 
 ProtobufWkt::Value LocalReplyBodyFormatter::formatValue(const Http::RequestHeaderMap&,

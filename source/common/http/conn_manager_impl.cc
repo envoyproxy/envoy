@@ -1521,9 +1521,10 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
   Utility::sendLocalReply(
       state_.destroyed_,
       Utility::EncodeFunctions{
-          [this](Code& code, std::string& body, absl::string_view& content_type) -> void {
-            connection_manager_.config_.localReply().rewrite(request_headers_.get(), stream_info_,
-                                                             code, body, content_type);
+          [this](ResponseHeaderMap& response_headers, Code& code, std::string& body,
+                 absl::string_view& content_type) -> void {
+            connection_manager_.config_.localReply().rewrite(
+                request_headers_.get(), response_headers, stream_info_, code, body, content_type);
           },
           [this, modify_headers](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
             if (modify_headers != nullptr) {
@@ -2545,9 +2546,11 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataTooLarge() {
       Http::Utility::sendLocalReply(
           parent_.state_.destroyed_,
           Utility::EncodeFunctions{
-              [&](Code& code, std::string& body, absl::string_view& content_type) -> void {
+              [&](ResponseHeaderMap& response_headers, Code& code, std::string& body,
+                  absl::string_view& content_type) -> void {
                 parent_.connection_manager_.config_.localReply().rewrite(
-                    parent_.request_headers_.get(), parent_.stream_info_, code, body, content_type);
+                    parent_.request_headers_.get(), response_headers, parent_.stream_info_, code,
+                    body, content_type);
               },
               [&](ResponseHeaderMapPtr&& response_headers, bool end_stream) -> void {
                 parent_.response_headers_ = std::move(response_headers);

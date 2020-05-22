@@ -288,8 +288,19 @@ mappers:
 // Should return formatted text/plain response.
 TEST_P(LocalReplyIntegrationTest, ShouldFormatResponseToCustomString) {
   const std::string yaml = R"EOF(
-body_format:
-  text_format: "%RESPONSE_FLAGS% - %LOCAL_REPLY_BODY% - custom response"
+    mappers:
+    - filter:
+        status_code_filter:
+          comparison:
+            op: EQ
+            value:
+              default_value: 503
+              runtime_key: key_b
+      status_code: 513
+      body:
+        inline_string: "customized body text"
+    body_format:
+      text_format: "%RESPONSE_CODE% - %LOCAL_REPLY_BODY%"
 )EOF";
   setLocalReplyConfig(yaml);
   initialize();
@@ -324,12 +335,11 @@ body_format:
   EXPECT_TRUE(response->complete());
 
   EXPECT_EQ("text/plain", response->headers().ContentType()->value().getStringView());
-  EXPECT_EQ("118", response->headers().ContentLength()->value().getStringView());
+  EXPECT_EQ("26", response->headers().ContentLength()->value().getStringView());
 
-  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("513", response->headers().Status()->value().getStringView());
 
-  EXPECT_EQ(response->body(), "UC - upstream connect error or disconnect/reset before headers. "
-                              "reset reason: connection termination - custom response");
+  EXPECT_EQ(response->body(), "513 - customized body text");
 }
 
 } // namespace Envoy

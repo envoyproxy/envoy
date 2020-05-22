@@ -12,6 +12,16 @@
 
 namespace Envoy {
 namespace LocalReply {
+namespace {
+
+struct EmptyHeaders {
+  Http::RequestHeaderMapImpl request_headers;
+  Http::ResponseTrailerMapImpl response_trailers;
+};
+
+using StaticEmptyHeaders = ConstSingleton<EmptyHeaders>;
+
+} // namespace
 
 class BodyFormatter {
 public:
@@ -81,7 +91,7 @@ public:
 
     if (status_code_.has_value() && code != status_code_.value()) {
       code = status_code_.value();
-      response_headers.setReferenceStatus(std::to_string(enumToInt(code)));
+      response_headers.setStatus(std::to_string(enumToInt(code)));
       stream_info.response_code_ = static_cast<uint32_t>(code);
     }
 
@@ -117,21 +127,24 @@ public:
   }
 
   void rewrite(const Http::RequestHeaderMap* request_headers,
-               StreamInfo::StreamInfoImpl& stream_info, Http::Code& code, std::string& body,
+               Http::ResponseHeaderMap& response_headers, StreamInfo::StreamInfoImpl& stream_info,
+               Http::Code& code, std::string& body,
                absl::string_view& content_type) const override {
-    Http::RequestHeaderMapImpl empty_request_headers;
-    if (request_headers == nullptr) {
-      request_headers = &empty_request_headers;
-    }
+    // Set response code to stream_info and response_headers due to:
+    // 1) StatusCode filter is using response_code from stream_info,
+    // 2) %RESP(:status)% is from Status() in response_headers.
+    response_headers.setStatus(std::to_string(enumToInt(code)));
+    stream_info.response_code_ = static_cast<uint32_t>(code);
 
-    Http::ResponseHeaderMapImpl response_headers;
-    response_headers.setReferenceStatus(std::to_string(enumToInt(code)));
-    Http::ResponseTrailerMapImpl response_trailers;
+    if (request_headers == nullptr) {
+      request_headers = &StaticEmptyHeaders::get().request_headers;
+    }
 
     BodyFormatter* final_formatter{};
     for (const auto& mapper : mappers_) {
-      if (mapper->matchAndRewrite(*request_headers, response_headers, response_trailers,
-                                  stream_info, code, body, final_formatter)) {
+      if (mapper->matchAndRewrite(*request_headers, response_headers,
+                                  StaticEmptyHeaders::get().response_trailers, stream_info, code,
+                                  body, final_formatter)) {
         break;
       }
     }
@@ -139,8 +152,9 @@ public:
     if (!final_formatter) {
       final_formatter = body_formatter_.get();
     }
-    return final_formatter->format(*request_headers, response_headers, response_trailers,
-                                   stream_info, body, content_type);
+    return final_formatter->format(*request_headers, response_headers,
+                                   StaticEmptyHeaders::get().response_trailers, stream_info, body,
+                                   content_type);
   }
 
 private:

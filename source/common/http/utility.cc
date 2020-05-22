@@ -443,7 +443,7 @@ void Utility::sendLocalReply(const bool& is_reset, StreamDecoderFilterCallbacks&
       local_reply_data);
 }
 
-void Utility::sendLocalReply(const bool& is_reset, EncodeFunctions encode_functions,
+void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode_functions,
                              const LocalReplyData& local_reply_data) {
   // encode_headers() may reset the stream, so the stream must not be reset before calling it.
   ASSERT(!is_reset);
@@ -452,20 +452,22 @@ void Utility::sendLocalReply(const bool& is_reset, EncodeFunctions encode_functi
   Code response_code = local_reply_data.response_code_;
   std::string body_text(local_reply_data.body_text_);
   absl::string_view content_type(Headers::get().ContentTypeValues.Text);
+
+  ResponseHeaderMapPtr response_headers{createHeaderMap<ResponseHeaderMapImpl>(
+      {{Headers::get().Status, std::to_string(enumToInt(response_code))}})};
+
   if (encode_functions.rewrite_) {
-    encode_functions.rewrite_(response_code, body_text, content_type);
+    encode_functions.rewrite_(*response_headers, response_code, body_text, content_type);
   }
 
   // Respond with a gRPC trailers-only response if the request is gRPC
   if (local_reply_data.is_grpc_) {
-    ResponseHeaderMapPtr response_headers{createHeaderMap<ResponseHeaderMapImpl>(
-        {{Headers::get().Status, std::to_string(enumToInt(Code::OK))},
-         {Headers::get().ContentType, Headers::get().ContentTypeValues.Grpc},
-         {Headers::get().GrpcStatus,
-          std::to_string(
-              enumToInt(local_reply_data.grpc_status_
-                            ? local_reply_data.grpc_status_.value()
-                            : Grpc::Utility::httpToGrpcStatus(enumToInt(response_code))))}})};
+    response_headers->setStatus(std::to_string(enumToInt(Code::OK)));
+    response_headers->setReferenceContentType(Headers::get().ContentTypeValues.Grpc);
+    response_headers->setGrpcStatus(
+        std::to_string(enumToInt(local_reply_data.grpc_status_
+                                     ? local_reply_data.grpc_status_.value()
+                                     : Grpc::Utility::httpToGrpcStatus(enumToInt(response_code)))));
     if (!body_text.empty() && !local_reply_data.is_head_request_) {
       // TODO(dio): Probably it is worth to consider caching the encoded message based on gRPC
       // status.
@@ -474,9 +476,6 @@ void Utility::sendLocalReply(const bool& is_reset, EncodeFunctions encode_functi
     encode_functions.encode_headers_(std::move(response_headers), true); // Trailers only response
     return;
   }
-
-  ResponseHeaderMapPtr response_headers{createHeaderMap<ResponseHeaderMapImpl>(
-      {{Headers::get().Status, std::to_string(enumToInt(response_code))}})};
 
   if (!body_text.empty()) {
     response_headers->setContentLength(body_text.size());
