@@ -86,6 +86,7 @@ envoy_cc_library(
     hdrs = ["process_wide.h"],
     external_deps = ["ares"],
     deps = [
+        "//include/envoy/http:header_map_interface",
         "//source/common/common:assert_lib",
         "//source/common/event:libevent_lib",
         "//source/common/http/http2:nghttp2_lib",

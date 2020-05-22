@@ -633,26 +633,26 @@ namespace Http {
  */
 #define DEFINE_TEST_INLINE_HEADER_FUNCS(name)                                                      \
 public:                                                                                            \
-  const HeaderEntry* name() const override { return header_map_.name(); }                          \
+  const HeaderEntry* name() const override { return header_map_->name(); }                         \
   void append##name(absl::string_view data, absl::string_view delimiter) override {                \
-    header_map_.append##name(data, delimiter);                                                     \
-    header_map_.verifyByteSizeInternalForTest();                                                   \
+    header_map_->append##name(data, delimiter);                                                    \
+    header_map_->verifyByteSizeInternalForTest();                                                  \
   }                                                                                                \
   void setReference##name(absl::string_view value) override {                                      \
-    header_map_.setReference##name(value);                                                         \
-    header_map_.verifyByteSizeInternalForTest();                                                   \
+    header_map_->setReference##name(value);                                                        \
+    header_map_->verifyByteSizeInternalForTest();                                                  \
   }                                                                                                \
   void set##name(absl::string_view value) override {                                               \
-    header_map_.set##name(value);                                                                  \
-    header_map_.verifyByteSizeInternalForTest();                                                   \
+    header_map_->set##name(value);                                                                 \
+    header_map_->verifyByteSizeInternalForTest();                                                  \
   }                                                                                                \
   void set##name(uint64_t value) override {                                                        \
-    header_map_.set##name(value);                                                                  \
-    header_map_.verifyByteSizeInternalForTest();                                                   \
+    header_map_->set##name(value);                                                                 \
+    header_map_->verifyByteSizeInternalForTest();                                                  \
   }                                                                                                \
   size_t remove##name() override {                                                                 \
-    size_t headers_removed = header_map_.remove##name();                                           \
-    header_map_.verifyByteSizeInternalForTest();                                                   \
+    const size_t headers_removed = header_map_->remove##name();                                    \
+    header_map_->verifyByteSizeInternalForTest();                                                  \
     return headers_removed;                                                                        \
   }
 
@@ -668,23 +668,30 @@ public:
   TestHeaderMapImplBase() = default;
   TestHeaderMapImplBase(const std::initializer_list<std::pair<std::string, std::string>>& values) {
     for (auto& value : values) {
-      header_map_.addCopy(LowerCaseString(value.first), value.second);
+      header_map_->addCopy(LowerCaseString(value.first), value.second);
     }
-    header_map_.verifyByteSizeInternalForTest();
+    header_map_->verifyByteSizeInternalForTest();
+  }
+  TestHeaderMapImplBase(
+      const std::initializer_list<std::pair<Http::LowerCaseString, std::string>>& values) {
+    for (auto& value : values) {
+      header_map_->addCopy(value.first, value.second);
+    }
+    header_map_->verifyByteSizeInternalForTest();
   }
   TestHeaderMapImplBase(const TestHeaderMapImplBase& rhs)
-      : TestHeaderMapImplBase(rhs.header_map_) {}
+      : TestHeaderMapImplBase(*rhs.header_map_) {}
   TestHeaderMapImplBase(const HeaderMap& rhs) {
-    HeaderMapImpl::copyFrom(header_map_, rhs);
-    header_map_.verifyByteSizeInternalForTest();
+    HeaderMapImpl::copyFrom(*header_map_, rhs);
+    header_map_->verifyByteSizeInternalForTest();
   }
   TestHeaderMapImplBase& operator=(const TestHeaderMapImplBase& rhs) {
     if (this == &rhs) {
       return *this;
     }
     clear();
-    HeaderMapImpl::copyFrom(header_map_, rhs);
-    header_map_.verifyByteSizeInternalForTest();
+    HeaderMapImpl::copyFrom(*header_map_, rhs);
+    header_map_->verifyByteSizeInternalForTest();
     return *this;
   }
 
@@ -706,86 +713,112 @@ public:
   size_t remove(const std::string& key) { return remove(LowerCaseString(key)); }
 
   // HeaderMap
-  bool operator==(const HeaderMap& rhs) const override { return header_map_.operator==(rhs); }
-  bool operator!=(const HeaderMap& rhs) const override { return header_map_.operator!=(rhs); }
+  bool operator==(const HeaderMap& rhs) const override { return header_map_->operator==(rhs); }
+  bool operator!=(const HeaderMap& rhs) const override { return header_map_->operator!=(rhs); }
   void addViaMove(HeaderString&& key, HeaderString&& value) override {
-    header_map_.addViaMove(std::move(key), std::move(value));
-    header_map_.verifyByteSizeInternalForTest();
+    header_map_->addViaMove(std::move(key), std::move(value));
+    header_map_->verifyByteSizeInternalForTest();
   }
   void addReference(const LowerCaseString& key, absl::string_view value) override {
-    header_map_.addReference(key, value);
-    header_map_.verifyByteSizeInternalForTest();
+    header_map_->addReference(key, value);
+    header_map_->verifyByteSizeInternalForTest();
   }
   void addReferenceKey(const LowerCaseString& key, uint64_t value) override {
-    header_map_.addReferenceKey(key, value);
-    header_map_.verifyByteSizeInternalForTest();
+    header_map_->addReferenceKey(key, value);
+    header_map_->verifyByteSizeInternalForTest();
   }
   void addReferenceKey(const LowerCaseString& key, absl::string_view value) override {
-    header_map_.addReferenceKey(key, value);
-    header_map_.verifyByteSizeInternalForTest();
+    header_map_->addReferenceKey(key, value);
+    header_map_->verifyByteSizeInternalForTest();
   }
   void addCopy(const LowerCaseString& key, uint64_t value) override {
-    header_map_.addCopy(key, value);
-    header_map_.verifyByteSizeInternalForTest();
+    header_map_->addCopy(key, value);
+    header_map_->verifyByteSizeInternalForTest();
   }
   void addCopy(const LowerCaseString& key, absl::string_view value) override {
-    header_map_.addCopy(key, value);
-    header_map_.verifyByteSizeInternalForTest();
+    header_map_->addCopy(key, value);
+    header_map_->verifyByteSizeInternalForTest();
   }
   void appendCopy(const LowerCaseString& key, absl::string_view value) override {
-    header_map_.appendCopy(key, value);
-    header_map_.verifyByteSizeInternalForTest();
+    header_map_->appendCopy(key, value);
+    header_map_->verifyByteSizeInternalForTest();
   }
   void setReference(const LowerCaseString& key, absl::string_view value) override {
-    header_map_.setReference(key, value);
-    header_map_.verifyByteSizeInternalForTest();
+    header_map_->setReference(key, value);
+    header_map_->verifyByteSizeInternalForTest();
   }
   void setReferenceKey(const LowerCaseString& key, absl::string_view value) override {
-    header_map_.setReferenceKey(key, value);
+    header_map_->setReferenceKey(key, value);
   }
   void setCopy(const LowerCaseString& key, absl::string_view value) override {
-    header_map_.setCopy(key, value);
-    header_map_.verifyByteSizeInternalForTest();
+    header_map_->setCopy(key, value);
+    header_map_->verifyByteSizeInternalForTest();
   }
-  uint64_t byteSize() const override { return header_map_.byteSize(); }
-  const HeaderEntry* get(const LowerCaseString& key) const override { return header_map_.get(key); }
+  uint64_t byteSize() const override { return header_map_->byteSize(); }
+  const HeaderEntry* get(const LowerCaseString& key) const override {
+    return header_map_->get(key);
+  }
   void iterate(HeaderMap::ConstIterateCb cb, void* context) const override {
-    header_map_.iterate(cb, context);
+    header_map_->iterate(cb, context);
   }
   void iterateReverse(HeaderMap::ConstIterateCb cb, void* context) const override {
-    header_map_.iterateReverse(cb, context);
+    header_map_->iterateReverse(cb, context);
   }
   HeaderMap::Lookup lookup(const LowerCaseString& key, const HeaderEntry** entry) const override {
-    return header_map_.lookup(key, entry);
+    return header_map_->lookup(key, entry);
   }
   void clear() override {
-    header_map_.clear();
-    header_map_.verifyByteSizeInternalForTest();
+    header_map_->clear();
+    header_map_->verifyByteSizeInternalForTest();
   }
   size_t remove(const LowerCaseString& key) override {
-    size_t headers_removed = header_map_.remove(key);
-    header_map_.verifyByteSizeInternalForTest();
+    size_t headers_removed = header_map_->remove(key);
+    header_map_->verifyByteSizeInternalForTest();
     return headers_removed;
   }
   size_t removePrefix(const LowerCaseString& key) override {
-    size_t headers_removed = header_map_.removePrefix(key);
-    header_map_.verifyByteSizeInternalForTest();
+    size_t headers_removed = header_map_->removePrefix(key);
+    header_map_->verifyByteSizeInternalForTest();
     return headers_removed;
   }
-  size_t size() const override { return header_map_.size(); }
-  bool empty() const override { return header_map_.empty(); }
+  size_t size() const override { return header_map_->size(); }
+  bool empty() const override { return header_map_->empty(); }
   void dumpState(std::ostream& os, int indent_level = 0) const override {
-    header_map_.dumpState(os, indent_level);
+    header_map_->dumpState(os, indent_level);
   }
 
-  Impl header_map_;
+  using Handle = typename CustomInlineHeaderRegistry<Interface>::Handle;
+  const HeaderEntry* getInline(Handle handle) const override {
+    return header_map_->getInline(handle);
+  }
+  void appendInline(Handle handle, absl::string_view data, absl::string_view delimiter) override {
+    header_map_->appendInline(handle, data, delimiter);
+    header_map_->verifyByteSizeInternalForTest();
+  }
+  void setReferenceInline(Handle handle, absl::string_view value) override {
+    header_map_->setReferenceInline(handle, value);
+    header_map_->verifyByteSizeInternalForTest();
+  }
+  void setInline(Handle handle, absl::string_view value) override {
+    header_map_->setInline(handle, value);
+    header_map_->verifyByteSizeInternalForTest();
+  }
+  void setInline(Handle handle, uint64_t value) override {
+    header_map_->setInline(handle, value);
+    header_map_->verifyByteSizeInternalForTest();
+  }
+  size_t removeInline(Handle handle) override {
+    const size_t rc = header_map_->removeInline(handle);
+    header_map_->verifyByteSizeInternalForTest();
+    return rc;
+  }
+
+  std::unique_ptr<Impl> header_map_{Impl::create()};
 };
 
 /**
  * Typed test implementations for all of the concrete header types.
  */
-using TestHeaderMapImpl = TestHeaderMapImplBase<HeaderMap, HeaderMapImpl>;
-
 class TestRequestHeaderMapImpl
     : public TestHeaderMapImplBase<RequestHeaderMap, RequestHeaderMapImpl> {
 public:

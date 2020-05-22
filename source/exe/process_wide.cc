@@ -1,5 +1,7 @@
 #include "exe/process_wide.h"
 
+#include "envoy/http/header_map.h"
+
 #include "common/common/assert.h"
 #include "common/event/libevent.h"
 #include "common/http/http2/nghttp2.h"
@@ -22,6 +24,11 @@ ProcessWide::ProcessWide() : initialization_depth_(process_wide_initialized) {
     Event::Libevent::Global::initialize();
     Envoy::Server::validateProtoDescriptors();
     Http::Http2::initializeNghttp2Logging();
+
+    // After this call no more statically registered custom headers are allowed.
+    // TODO(mattklein123): This call can almost definitely be moved later to allow for custom
+    // headers to be registered via CLI and probably even bootstrap.
+    Http::CustomInlineHeaderUtility::finalize();
 
     // We do not initialize Google gRPC here -- we instead instantiate
     // Grpc::GoogleGrpcContext in MainCommon immediately after instantiating

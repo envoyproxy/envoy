@@ -13,6 +13,21 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cors {
 
+Http::RegisterCustomInlineHeader<Http::RequestHeaderMap>
+    access_control_request_method(Http::Headers::get().AccessControlRequestMethod);
+Http::RegisterCustomInlineHeader<Http::ResponseHeaderMap>
+    access_control_allow_origin(Http::Headers::get().AccessControlAllowOrigin);
+Http::RegisterCustomInlineHeader<Http::ResponseHeaderMap>
+    access_control_allow_credentials(Http::Headers::get().AccessControlAllowCredentials);
+Http::RegisterCustomInlineHeader<Http::ResponseHeaderMap>
+    access_control_allow_methods(Http::Headers::get().AccessControlAllowMethods);
+Http::RegisterCustomInlineHeader<Http::ResponseHeaderMap>
+    access_control_allow_headers(Http::Headers::get().AccessControlAllowHeaders);
+Http::RegisterCustomInlineHeader<Http::ResponseHeaderMap>
+    access_control_max_age(Http::Headers::get().AccessControlMaxAge);
+Http::RegisterCustomInlineHeader<Http::ResponseHeaderMap>
+    access_control_expose_headers(Http::Headers::get().AccessControlExposeHeaders);
+
 CorsFilterConfig::CorsFilterConfig(const std::string& stats_prefix, Stats::Scope& scope)
     : stats_(generateStats(stats_prefix + "cors.", scope)) {}
 
@@ -59,31 +74,32 @@ Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::RequestHeaderMap& head
     return Http::FilterHeadersStatus::Continue;
   }
 
-  const auto requestMethod = headers.AccessControlRequestMethod();
-  if (requestMethod == nullptr || requestMethod->value().empty()) {
+  const auto request_method = headers.getInline(access_control_request_method.handle());
+  if (request_method == nullptr || request_method->value().empty()) {
     return Http::FilterHeadersStatus::Continue;
   }
 
   auto response_headers{Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
       {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::OK))}})};
 
-  response_headers->setAccessControlAllowOrigin(origin_->value().getStringView());
+  response_headers->setInline(access_control_allow_origin.handle(),
+                              origin_->value().getStringView());
 
   if (allowCredentials()) {
-    response_headers->setReferenceAccessControlAllowCredentials(
-        Http::Headers::get().CORSValues.True);
+    response_headers->setReferenceInline(access_control_allow_credentials.handle(),
+                                         Http::Headers::get().CORSValues.True);
   }
 
   if (!allowMethods().empty()) {
-    response_headers->setAccessControlAllowMethods(allowMethods());
+    response_headers->setInline(access_control_allow_methods.handle(), allowMethods());
   }
 
   if (!allowHeaders().empty()) {
-    response_headers->setAccessControlAllowHeaders(allowHeaders());
+    response_headers->setInline(access_control_allow_headers.handle(), allowHeaders());
   }
 
   if (!maxAge().empty()) {
-    response_headers->setAccessControlMaxAge(maxAge());
+    response_headers->setInline(access_control_max_age.handle(), maxAge());
   }
 
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true);
@@ -98,13 +114,14 @@ Http::FilterHeadersStatus CorsFilter::encodeHeaders(Http::ResponseHeaderMap& hea
     return Http::FilterHeadersStatus::Continue;
   }
 
-  headers.setAccessControlAllowOrigin(origin_->value().getStringView());
+  headers.setInline(access_control_allow_origin.handle(), origin_->value().getStringView());
   if (allowCredentials()) {
-    headers.setReferenceAccessControlAllowCredentials(Http::Headers::get().CORSValues.True);
+    headers.setReferenceInline(access_control_allow_credentials.handle(),
+                               Http::Headers::get().CORSValues.True);
   }
 
   if (!exposeHeaders().empty()) {
-    headers.setAccessControlExposeHeaders(exposeHeaders());
+    headers.setInline(access_control_expose_headers.handle(), exposeHeaders());
   }
 
   return Http::FilterHeadersStatus::Continue;

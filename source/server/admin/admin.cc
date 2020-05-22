@@ -812,9 +812,9 @@ Http::Code AdminImpl::request(absl::string_view path_and_query, absl::string_vie
                               Http::ResponseHeaderMap& response_headers, std::string& body) {
   AdminFilter filter(createCallbackFunction());
 
-  Http::RequestHeaderMapImpl request_headers;
-  request_headers.setMethod(method);
-  filter.decodeHeaders(request_headers, false);
+  auto request_headers = Http::RequestHeaderMapImpl::create();
+  request_headers->setMethod(method);
+  filter.decodeHeaders(*request_headers, false);
   Buffer::OwnedImpl response;
 
   Http::Code code = runCallback(path_and_query, response_headers, response, filter);
