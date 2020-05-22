@@ -97,14 +97,13 @@ TEST(HealthCheckerFactoryTest, CreateGrpc) {
 
 class HealthCheckerTestBase {
 public:
-  std::shared_ptr<MockClusterMockPrioritySet> cluster_;
+  std::shared_ptr<MockClusterMockPrioritySet> cluster_{
+      std::make_shared<NiceMock<MockClusterMockPrioritySet>>()};
   NiceMock<Event::MockDispatcher> dispatcher_;
-  MockHealthCheckEventLogger* event_logger_{};
+  std::unique_ptr<MockHealthCheckEventLogger> event_logger_{
+      std::make_unique<MockHealthCheckEventLogger>()};
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<Runtime::MockLoader> runtime_;
-  HealthCheckerTestBase()
-      : cluster_(new NiceMock<MockClusterMockPrioritySet>()),
-        event_logger_(new MockHealthCheckEventLogger()) {}
 };
 
 class TestHttpHealthCheckerImpl : public HttpHealthCheckerImpl {
@@ -141,7 +140,7 @@ public:
   void allocHealthChecker(const std::string& yaml) {
     health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
         *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
-        HealthCheckEventLoggerPtr(event_logger_));
+        HealthCheckEventLoggerPtr(event_logger_.release()));
   }
 
   void addCompletionCallback() {
@@ -2525,7 +2524,7 @@ public:
   void allocHealthChecker(const std::string& yaml) {
     health_checker_ = std::make_shared<TestProdHttpHealthChecker>(
         *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
-        HealthCheckEventLoggerPtr(event_logger_));
+        HealthCheckEventLoggerPtr(event_logger_.release()));
   }
 
   void addCompletionCallback() {
@@ -2945,7 +2944,7 @@ public:
   void allocHealthChecker(const std::string& yaml) {
     health_checker_ = std::make_shared<TcpHealthCheckerImpl>(
         *cluster_, parseHealthCheckFromV2Yaml(yaml), dispatcher_, runtime_, random_,
-        HealthCheckEventLoggerPtr(event_logger_));
+        HealthCheckEventLoggerPtr(event_logger_.release()));
   }
 
   void setupData(unsigned int unhealthy_threshold = 2) {
@@ -3548,7 +3547,7 @@ public:
     std::vector<std::pair<std::string, std::string>> trailers;
   };
 
-  GrpcHealthCheckerImplTestBase() : HealthCheckerTestBase() {
+  GrpcHealthCheckerImplTestBase() {
     EXPECT_CALL(*cluster_->info_, features())
         .WillRepeatedly(Return(Upstream::ClusterInfo::Features::HTTP2));
   }
@@ -3556,7 +3555,7 @@ public:
   void allocHealthChecker(const envoy::config::core::v3::HealthCheck& config) {
     health_checker_ = std::make_shared<TestGrpcHealthCheckerImpl>(
         *cluster_, config, dispatcher_, runtime_, random_,
-        HealthCheckEventLoggerPtr(event_logger_));
+        HealthCheckEventLoggerPtr(event_logger_.release()));
   }
 
   void addCompletionCallback() {
