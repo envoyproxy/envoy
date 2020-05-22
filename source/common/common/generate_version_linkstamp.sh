@@ -10,9 +10,9 @@
 # But following the implicit trail one can deduce that linkstamp is in effect when "stamping" (https://github.com/bazelbuild/bazel/issues/2893) is on.
 # envoy_cc_library -- and the underlying cc_library rule -- does not support "stamping".
 # This makes sense as stamping mainly makes sense in the context of binaries for production releases, not static libraries.
-build_scm_revision=$(grep BUILD_SCM_REVISION bazel-out/volatile-status.txt | sed 's/^BUILD_SCM_REVISION //' | tr -d '\\n')
+build_scm_revision=$(sed -n -E 's/^BUILD_SCM_REVISION ([0-9a-f]{40})$/\1/p' < bazel-out/volatile-status.txt)
 if [ -z "$1" ]; then
-  build_scm_status=$(grep BUILD_SCM_STATUS bazel-out/volatile-status.txt | sed 's/^BUILD_SCM_STATUS //' | tr -d '\\n')
+  build_scm_status=$(sed -n -E 's/^BUILD_SCM_STATUS ([a-zA-Z]*)$/\1/p' < bazel-out/volatile-status.txt)
 else
   build_scm_status=$1
 fi
