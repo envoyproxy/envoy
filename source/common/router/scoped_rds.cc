@@ -251,22 +251,23 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
       factory_context_.clusterManager().adsMux()->pause(type_url_v2);
       factory_context_.clusterManager().adsMux()->pause(type_url_v3);
     }
-    resume_rds = std::make_unique<Cleanup>([this, &noop_init_manager, version_info, type_url] {
-      // For new RDS subscriptions created after listener warming up, we don't wait for them to
-      // warm up.
-      Init::WatcherImpl noop_watcher(
-          // Note: we just throw it away.
-          fmt::format("SRDS ConfigUpdate watcher {}:{}", name_, version_info),
-          []() { /*Do nothing.*/ });
-      noop_init_manager->initialize(noop_watcher);
-      // New RDS subscriptions should have been created, now lift the floodgate.
-      // Note in the case of partial acceptance, accepted RDS subscriptions should be started
-      // despite of any error.
-      if (factory_context_.clusterManager().adsMux()) {
-        factory_context_.clusterManager().adsMux()->resume(type_url_v2);
-        factory_context_.clusterManager().adsMux()->resume(type_url_v3);
-      }
-    });
+    resume_rds = std::make_unique<Cleanup>(
+        [this, &noop_init_manager, version_info, type_url_v2, type_url_v3] {
+          // For new RDS subscriptions created after listener warming up, we don't wait for them to
+          // warm up.
+          Init::WatcherImpl noop_watcher(
+              // Note: we just throw it away.
+              fmt::format("SRDS ConfigUpdate watcher {}:{}", name_, version_info),
+              []() { /*Do nothing.*/ });
+          noop_init_manager->initialize(noop_watcher);
+          // New RDS subscriptions should have been created, now lift the floodgate.
+          // Note in the case of partial acceptance, accepted RDS subscriptions should be started
+          // despite of any error.
+          if (factory_context_.clusterManager().adsMux()) {
+            factory_context_.clusterManager().adsMux()->resume(type_url_v2);
+            factory_context_.clusterManager().adsMux()->resume(type_url_v3);
+          }
+        });
   }
 
   std::vector<std::string> exception_msgs;
