@@ -102,10 +102,10 @@ public:
   }
 
   // Network::TransportSocketCallbacks
-  IoHandle& ioHandle() override { return socket_->ioHandle(); }
+  IoHandle& ioHandle() final { return socket_->ioHandle(); }
   const IoHandle& ioHandle() const override { return socket_->ioHandle(); }
   Connection& connection() override { return *this; }
-  void raiseEvent(ConnectionEvent event) override;
+  void raiseEvent(ConnectionEvent event) final;
   // Should the read buffer be drained?
   bool shouldDrainReadBuffer() override {
     return read_buffer_limit_ > 0 && read_buffer_.length() >= read_buffer_limit_;
@@ -122,11 +122,22 @@ public:
   static uint64_t nextGlobalIdForTest() { return next_global_id_; }
 
 protected:
+  // A convenience function which returns true if
+  // 1) The read disable count is zero or
+  // 2) The read disable count is one due to the read buffer being overrun.
+  // In either case the consumer of the data would like to read from the buffer.
+  // If the read count is greater than one, or equal to one when the buffer is
+  // not overrun, then the consumer of the data has called readDisable, and does
+  // not want to read.
+  bool consumerWantsToRead();
+
   // Network::ConnectionImplBase
   void closeConnectionImmediately() override;
 
   void closeSocket(ConnectionEvent close_type);
 
+  void onReadBufferLowWatermark();
+  void onReadBufferHighWatermark();
   void onWriteBufferLowWatermark();
   void onWriteBufferHighWatermark();
 
@@ -135,7 +146,9 @@ protected:
   StreamInfo::StreamInfo& stream_info_;
   FilterManagerImpl filter_manager_;
 
-  Buffer::OwnedImpl read_buffer_;
+  // Ensure that if the consumer of the data from this connection isn't
+  // consuming, that the connection eventually stops reading from the wire.
+  Buffer::WatermarkBuffer read_buffer_;
   // This must be a WatermarkBuffer, but as it is created by a factory the ConnectionImpl only has
   // a generic pointer.
   // It MUST be defined after the filter_manager_ as some filters may have callbacks that

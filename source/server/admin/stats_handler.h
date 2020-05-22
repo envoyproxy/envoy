@@ -44,6 +44,9 @@ public:
   Http::Code handlerPrometheusStats(absl::string_view path_and_query,
                                     Http::ResponseHeaderMap& response_headers,
                                     Buffer::Instance& response, AdminStream&);
+  Http::Code handlerContention(absl::string_view path_and_query,
+                               Http::ResponseHeaderMap& response_headers,
+                               Buffer::Instance& response, AdminStream&);
 
 private:
   template <class StatType>
