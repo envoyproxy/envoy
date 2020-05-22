@@ -15,12 +15,6 @@ namespace Network {
 namespace Address {
 
 /**
- * Returns true if the given family is supported on this machine.
- * @param domain the IP family.
- */
-bool ipFamilySupported(int domain);
-
-/**
  * Convert an address in the form of the socket address struct defined by Posix, Linux, etc. into
  * a Network::Address::Instance and return a pointer to it. Raises an EnvoyException on failure.
  * @param ss a valid address with family AF_INET, AF_INET6 or AF_UNIX.
@@ -31,21 +25,6 @@ bool ipFamilySupported(int domain);
  */
 InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, socklen_t len,
                                            bool v6only = true);
-
-/**
- * Obtain an address from a bound file descriptor. Raises an EnvoyException on failure.
- * @param fd socket file descriptor
- * @return InstanceConstSharedPtr for bound address.
- */
-InstanceConstSharedPtr addressFromFd(os_fd_t fd);
-
-/**
- * Obtain the address of the peer of the socket with the specified file descriptor.
- * Raises an EnvoyException on failure.
- * @param fd socket file descriptor
- * @return InstanceConstSharedPtr for peer address.
- */
-InstanceConstSharedPtr peerAddressFromFd(os_fd_t fd);
 
 /**
  * Base class for all address types.
@@ -64,7 +43,6 @@ public:
 
 protected:
   InstanceBase(Type type) : type_(type) {}
-  IoHandlePtr socketFromSocketType(SocketType type) const;
 
   std::string friendly_name_;
 
@@ -103,7 +81,6 @@ public:
   Api::SysCallIntResult bind(os_fd_t fd) const override;
   Api::SysCallIntResult connect(os_fd_t fd) const override;
   const Ip* ip() const override { return &ip_; }
-  IoHandlePtr socket(SocketType type) const override;
 
   // Network::Address::InstanceBase
   const sockaddr* sockAddr() const override {
@@ -177,7 +154,6 @@ public:
   Api::SysCallIntResult bind(os_fd_t fd) const override;
   Api::SysCallIntResult connect(os_fd_t fd) const override;
   const Ip* ip() const override { return &ip_; }
-  IoHandlePtr socket(SocketType type) const override;
 
   // Network::Address::InstanceBase
   const sockaddr* sockAddr() const override {
@@ -189,11 +165,16 @@ private:
   struct Ipv6Helper : public Ipv6 {
     Ipv6Helper() { memset(&address_, 0, sizeof(address_)); }
     absl::uint128 address() const override;
+    bool v6only() const override;
     uint32_t port() const;
 
     std::string makeFriendlyAddress() const;
 
     sockaddr_in6 address_;
+    // Is IPv4 compatibility (https://tools.ietf.org/html/rfc3493#page-11) disabled?
+    // Default initialized to true to preserve extant Envoy behavior where we don't explicitly set
+    // this in the constructor.
+    bool v6only_{true};
   };
 
   struct IpHelper : public Ip {
@@ -211,10 +192,6 @@ private:
 
     Ipv6Helper ipv6_;
     std::string friendly_address_;
-    // Is IPv4 compatibility (https://tools.ietf.org/html/rfc3493#page-11) disabled?
-    // Default initialized to true to preserve extant Envoy behavior where we don't explicitly set
-    // this in the constructor.
-    bool v6only_{true};
   };
 
   IpHelper ip_;
@@ -240,7 +217,6 @@ public:
   Api::SysCallIntResult bind(os_fd_t fd) const override;
   Api::SysCallIntResult connect(os_fd_t fd) const override;
   const Ip* ip() const override { return nullptr; }
-  IoHandlePtr socket(SocketType type) const override;
 
   // Network::Address::InstanceBase
   const sockaddr* sockAddr() const override { return reinterpret_cast<const sockaddr*>(&address_); }

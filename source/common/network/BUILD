@@ -171,6 +171,7 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "socket_lib",
+    srcs = ["socket_impl.cc"],
     hdrs = ["socket_impl.h"],
     deps = [
         ":address_lib",

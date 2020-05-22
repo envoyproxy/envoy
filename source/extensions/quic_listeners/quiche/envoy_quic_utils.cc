@@ -94,7 +94,8 @@ Network::ConnectionSocketPtr
 createConnectionSocket(Network::Address::InstanceConstSharedPtr& peer_addr,
                        Network::Address::InstanceConstSharedPtr& local_addr,
                        const Network::ConnectionSocket::OptionsSharedPtr& options) {
-  Network::IoHandlePtr io_handle = peer_addr->socket(Network::Address::SocketType::Datagram);
+  Network::IoHandlePtr io_handle =
+      Network::SocketInterface::socket(Network::Address::SocketType::Datagram, peer_addr);
   auto connection_socket =
       std::make_unique<Network::ConnectionSocketImpl>(std::move(io_handle), local_addr, peer_addr);
   connection_socket->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
@@ -112,7 +113,7 @@ createConnectionSocket(Network::Address::InstanceConstSharedPtr& peer_addr,
   ASSERT(local_addr->ip());
   if (local_addr->ip()->port() == 0) {
     // Get ephemeral port number.
-    local_addr = Network::Address::addressFromFd(connection_socket->ioHandle().fd());
+    local_addr = Network::SocketInterface::addressFromFd(connection_socket->ioHandle().fd());
   }
   if (!Network::Socket::applyOptions(connection_socket->options(), *connection_socket,
                                      envoy::config::core::v3::SocketOption::STATE_BOUND)) {

@@ -55,7 +55,8 @@ TEST(UdpOverUdsStatsdSinkTest, InitWithPipeAddress) {
   // modification back to the abstraction layer so it will work for multiple platforms. Additionally
   // this uses low level networking calls because our abstractions in this area only work for IP
   // sockets. Revisit this also.
-  auto io_handle = uds_address->socket(Network::Address::SocketType::Datagram);
+  auto io_handle =
+      Network::SocketInterface::socket(Network::Address::SocketType::Datagram, uds_address);
   RELEASE_ASSERT(
       Api::OsSysCallsSingleton::get().setsocketblocking(io_handle->fd(), false).rc_ != -1, "");
   uds_address->bind(io_handle->fd());

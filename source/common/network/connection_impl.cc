@@ -781,7 +781,7 @@ void ClientConnectionImpl::connect() {
   // The local address can only be retrieved for IP connections. Other
   // types, such as UDS, don't have a notion of a local address.
   if (socket_->remoteAddress()->type() == Address::Type::Ip) {
-    socket_->setLocalAddress(Address::addressFromFd(ioHandle().fd()));
+    socket_->setLocalAddress(SocketInterface::addressFromFd(ioHandle().fd()));
   }
 }
 } // namespace Network
