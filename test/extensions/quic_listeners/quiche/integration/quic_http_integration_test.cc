@@ -3,7 +3,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/overload/v3/overload.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
-#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+#include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 
 #include "test/config/utility.h"
 #include "test/integration/http_integration.h"
@@ -74,7 +74,9 @@ public:
         crypto_config_(std::make_unique<EnvoyQuicFakeProofVerifier>()), conn_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *conn_helper_.GetClock()),
         injected_resource_filename_(TestEnvironment::temporaryPath("injected_resource")),
-        file_updater_(injected_resource_filename_) {}
+        file_updater_(injected_resource_filename_) {
+        // quic::SetVerbosityLogThreshold(1);
+        }
 
   Network::ClientConnectionPtr makeClientConnectionWithOptions(
       uint32_t port, const Network::ConnectionSocket::OptionsSharedPtr& options) override {
@@ -128,15 +130,16 @@ public:
 
   void initialize() override {
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+      envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport quic_transport_socket_config;
+      auto tls_context = quic_transport_socket_config.mutable_downstream_tls_context();
       ConfigHelper::initializeTls(ConfigHelper::ServerSslOptions()
                                   .setRsaCert(true)
                                   .setTlsV13(true),
-                                  *tls_context.mutable_common_tls_context());
+                                  *tls_context->mutable_common_tls_context());
       auto* filter_chain =
           bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
       auto* transport_socket = filter_chain->mutable_transport_socket();
-      transport_socket->mutable_typed_config()->PackFrom(tls_context);
+      transport_socket->mutable_typed_config()->PackFrom(quic_transport_socket_config);
 
       bootstrap.mutable_static_resources()->mutable_listeners(0)->set_reuse_port(set_reuse_port_);
 

@@ -84,6 +84,7 @@ envoy_cc_library(
         ":quic_transport_socket_factory_lib",
         "//include/envoy/ssl:tls_certificate_config_interface",
    "//source/extensions/transport_sockets:well_known_names",
+   "@com_googlesource_quiche//:quic_core_crypto_certificate_view_lib",
     ],
 )
 

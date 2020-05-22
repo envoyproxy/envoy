@@ -25,7 +25,7 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_connection_helper.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_alarm_factory.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
-#include "extensions/quic_listeners/quiche/envoy_quic_fake_proof_source.h"
+#include "test/extensions/quic_listeners/quiche/test_proof_source.h"
 #include "extensions/transport_sockets/well_known_names.h"
 
 #include "envoy/stats/stats_macros.h"
@@ -113,7 +113,7 @@ public:
             connection_helper_, alarm_factory_, writer_, quic_version_, listener_config_,
             listener_stats_, *listener_config_.socket_)),
         crypto_config_(quic::QuicCryptoServerConfig::TESTING, quic::QuicRandom::GetInstance(),
-                       std::make_unique<EnvoyQuicFakeProofSource>(),
+                       std::make_unique<TestProofSource>(),
                        quic::KeyExchangeSource::Default()),
         envoy_quic_session_(quic_config_, quic_version_,
                             std::unique_ptr<TestEnvoyQuicServerConnection>(quic_connection_),

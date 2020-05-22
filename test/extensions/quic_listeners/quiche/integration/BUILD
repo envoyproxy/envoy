@@ -17,6 +17,7 @@ envoy_cc_test(
         "nofips",
         "skip_on_windows",
     ],
+    size = "small",
     deps = [
         "//source/extensions/filters/http/dynamo:config",
         "//source/extensions/quic_listeners/quiche:active_quic_listener_config_lib",
@@ -32,6 +33,6 @@ envoy_cc_test(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
     ],
 )

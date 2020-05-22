@@ -211,6 +211,7 @@ HttpIntegrationTest::makeRawHttpConnection(Network::ClientConnectionPtr&& conn) 
   cluster->http1_settings_.enable_trailers_ = true;
   Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
       cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)))};
+
   return std::make_unique<IntegrationCodecClient>(*dispatcher_, std::move(conn), host_description,
                                                   downstream_protocol_);
 }

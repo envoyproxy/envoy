@@ -15,6 +15,7 @@
 
 #pragma GCC diagnostic pop
 
+#include "openssl/ssl.h"
 #include "envoy/network/filter.h"
 #include "quiche/quic/platform/api/quic_reference_counted.h"
 #include "quiche/quic/platform/api/quic_socket_address.h"
@@ -42,28 +43,12 @@ public:
     quic::QuicCryptoProof proof;
     bool success = false;
     auto signature_callback = std::make_unique<FakeSignatureCallback>(success, proof.signature);
-    ComputeTlsSignature(server_address, client_address, hostname, 0, server_config, std::move(signature_callback));
+    ComputeTlsSignature(server_address, client_address, hostname, SSL_SIGN_RSA_PSS_RSAE_SHA256, server_config, std::move(signature_callback));
     ASSERT(success);
     proof.leaf_cert_scts = "Fake timestamp";
     callback->Run(true, chain, proof, nullptr /* details */);
   }
-
-  // Returns a certs chain with a fake certificate "Fake cert from [host_name]".
-  quic::QuicReferenceCountedPointer<quic::ProofSource::Chain>
-  GetCertChain(const quic::QuicSocketAddress& /*server_address*/,
-               const quic::QuicSocketAddress& /*client_address*/,
-               const std::string& /*hostname*/) override = 0;
-
-  // Always call callback with a signature "Fake signature for { [server_config] }".
-  void
-  ComputeTlsSignature(const quic::QuicSocketAddress& /*server_address*/,
-                       const quic::QuicSocketAddress& /*client_address*/,
-                      const std::string& /*hostname*/, uint16_t /*signature_algorithm*/,
-                      quiche::QuicheStringPiece in,
-                      std::unique_ptr<quic::ProofSource::SignatureCallback> callback) override {
-    callback->Run(true, absl::StrCat("Fake signature for { ", in, " }"), nullptr);
-  }
-
+  
   TicketCrypter* GetTicketCrypter() override {
     return nullptr;
   }

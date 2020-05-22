@@ -12,7 +12,6 @@ Network::TransportSocketFactoryPtr
 QuicServerTransportSocketConfigFactory::createTransportSocketFactory(
     const Protobuf::Message& config, Server::Configuration::TransportSocketFactoryContext& context,
     const std::vector<std::string>& /*server_names*/) {
-  std::cerr << "========================================== Create QuicServerTransportSocketFactory\n";
   auto quic_transport = MessageUtil::downcastAndValidate<
           const envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport&>(
           config, context.messageValidationVisitor());

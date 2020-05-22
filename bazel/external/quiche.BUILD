@@ -1818,6 +1818,36 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "quic_core_crypto_boring_utils_lib",
+    hdrs = ["quiche/quic/core/crypto/boring_utils.h"],
+    copts = quiche_copts,
+    external_deps = ["ssl"],
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [
+        ":quic_platform_export",
+        ":quiche_common_platform",
+    ],
+)
+
+envoy_cc_library(
+    name = "quic_core_crypto_certificate_view_lib",
+    srcs = ["quiche/quic/core/crypto/certificate_view.cc"],
+    hdrs = ["quiche/quic/core/crypto/certificate_view.h"],
+copts = quiche_copts,
+    external_deps = ["ssl"],
+    repository = "@envoy",
+    tags = ["nofips"],
+        visibility = ["//visibility:public"],
+    deps = [
+        ":quic_core_crypto_boring_utils_lib",
+	":quic_platform_ip_address",
+        ":quic_platform",
+        ":quiche_common_platform",
+    ],
+)
+
+envoy_cc_library(
     name = "quic_core_crypto_encryption_lib",
     srcs = [
         "quiche/quic/core/crypto/aead_base_decrypter.cc",

@@ -26,6 +26,14 @@ class TestProofSource : public Quic::EnvoyQuicFakeProofSource {
     return cert_chain_;
   }
 
+ void ComputeTlsSignature(const quic::QuicSocketAddress& /*server_address*/,
+                       const quic::QuicSocketAddress& /*client_address*/,
+                      const std::string& /*hostname*/, uint16_t /*signature_algorithm*/,
+                      quiche::QuicheStringPiece in,
+                      std::unique_ptr<quic::ProofSource::SignatureCallback> callback) override {
+    callback->Run(true, absl::StrCat("Fake signature for { ", in, " }"), nullptr);
+}
+  
  private:
  quic::QuicReferenceCountedPointer<quic::ProofSource::Chain> cert_chain_{
       new quic::ProofSource::Chain(std::vector<std::string>{std::string(quic::test::kTestCertificate)})};

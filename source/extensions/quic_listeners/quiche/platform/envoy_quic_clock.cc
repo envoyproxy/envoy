@@ -4,8 +4,9 @@ namespace Envoy {
 namespace Quic {
 
 quic::QuicTime EnvoyQuicClock::ApproximateNow() const {
-  return quic::QuicTime::Zero() + quic::QuicTime::Delta::FromMicroseconds(microsecondsSinceEpoch(
+  auto time =  quic::QuicTime::Zero() + quic::QuicTime::Delta::FromMicroseconds(microsecondsSinceEpoch(
                                       dispatcher_.approximateMonotonicTime()));
+  return time;
 }
 
 quic::QuicTime EnvoyQuicClock::Now() const {
