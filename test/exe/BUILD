@@ -31,8 +31,8 @@ envoy_sh_test(
     #   https://github.com/envoyproxy/envoy/pull/8280#pullrequestreview-290187328
     # Sanitizers doesn't like statically linked lib(std)c++ and libgcc, skip this test in that context.
     tags = [
-        "skip_on_windows",
         "no_san",
+        "skip_on_windows",
     ],
 )
 
