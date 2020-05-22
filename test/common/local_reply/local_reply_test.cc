@@ -241,7 +241,7 @@ TEST_F(LocalReplyTest, TestMapperFormat) {
       status_code: 401
       body:
         inline_string: "401 body text"
-      body_format:
+      body_format_override:
         json_format:
           text: "401 filter formatter"
           path: "%REQ(:path)%"

@@ -96,7 +96,7 @@ mappers:
     status_code: 551
     body:
       inline_string: "customized body text"
-    body_format:
+    body_format_override:
       text_format: "%LOCAL_REPLY_BODY% %RESPONSE_CODE%"
   - filter:
       header_filter:
@@ -288,19 +288,19 @@ mappers:
 // Should return formatted text/plain response.
 TEST_P(LocalReplyIntegrationTest, ShouldFormatResponseToCustomString) {
   const std::string yaml = R"EOF(
-    mappers:
-    - filter:
-        status_code_filter:
-          comparison:
-            op: EQ
-            value:
-              default_value: 503
-              runtime_key: key_b
-      status_code: 513
-      body:
-        inline_string: "customized body text"
-    body_format:
-      text_format: "%RESPONSE_CODE% - %LOCAL_REPLY_BODY%"
+mappers:
+- filter:
+    status_code_filter:
+      comparison:
+        op: EQ
+        value:
+          default_value: 503
+          runtime_key: key_b
+  status_code: 513
+  body:
+    inline_string: "customized body text"
+body_format:
+  text_format: "%RESPONSE_CODE% - %LOCAL_REPLY_BODY%"
 )EOF";
   setLocalReplyConfig(yaml);
   initialize();

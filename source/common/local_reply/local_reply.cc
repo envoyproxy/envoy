@@ -70,8 +70,8 @@ public:
       body_ = Config::DataSource::read(config.body(), true, context.api());
     }
 
-    if (config.has_body_format()) {
-      body_formatter_ = std::make_unique<BodyFormatter>(config.body_format());
+    if (config.has_body_format_override()) {
+      body_formatter_ = std::make_unique<BodyFormatter>(config.body_format_override());
     }
   }
 
