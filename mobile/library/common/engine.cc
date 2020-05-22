@@ -4,29 +4,13 @@
 
 namespace Envoy {
 
-// As a server, Envoy's static factory registration happens when main is run. However, when compiled
-// as a library, there is no guarantee that such registration will happen before the names are
-// needed. The following calls ensure that registration happens before the entities are needed. Note
-// that as more registrations are needed, explicit initialization calls will need to be added here.
-static void registerFactories() {
-  Envoy::Extensions::Clusters::DynamicForwardProxy::forceRegisterClusterFactory();
-  Envoy::Extensions::HttpFilters::DynamicForwardProxy::
-      forceRegisterDynamicForwardProxyFilterFactory();
-  Envoy::Extensions::HttpFilters::RouterFilter::forceRegisterRouterFilterConfig();
-  Envoy::Extensions::NetworkFilters::HttpConnectionManager::
-      forceRegisterHttpConnectionManagerFilterConfigFactory();
-  Envoy::Extensions::StatSinks::MetricsService::forceRegisterMetricsServiceSinkFactory();
-  Envoy::Extensions::TransportSockets::Tls::forceRegisterUpstreamSslSocketFactory();
-  Envoy::Upstream::forceRegisterLogicalDnsClusterFactory();
-}
-
 Engine::Engine(envoy_engine_callbacks callbacks, const char* config, const char* log_level,
                std::atomic<envoy_network_t>& preferred_network)
     : callbacks_(callbacks) {
   // Ensure static factory registration occurs on time.
   // TODO: ensure this is only called one time once multiple Engine objects can be allocated.
   // https://github.com/lyft/envoy-mobile/issues/332
-  registerFactories();
+  ExtensionRegistry::registerFactories();
 
   // Create the Http::Dispatcher first since it contains initial queueing logic.
   // TODO: consider centralizing initial queueing in this class.
