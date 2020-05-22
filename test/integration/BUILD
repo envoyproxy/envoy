@@ -250,8 +250,6 @@ envoy_sh_test(
         "test_utility.sh",
         "//test/config/integration:server_config_files",
     ],
-    # TODO: This script invocation does not work on Windows, see: https://github.com/bazelbuild/bazel/issues/10959
-    tags = ["fails_on_windows"],
 )
 
 envoy_cc_test(
