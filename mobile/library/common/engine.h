@@ -4,15 +4,9 @@
 
 #include "common/upstream/logical_dns_cluster.h"
 
-#include "extensions/clusters/dynamic_forward_proxy/cluster.h"
-#include "extensions/filters/http/dynamic_forward_proxy/config.h"
-#include "extensions/filters/http/router/config.h"
-#include "extensions/filters/network/http_connection_manager/config.h"
-#include "extensions/stat_sinks/metrics_service/config.h"
-#include "extensions/transport_sockets/tls/config.h"
-
 #include "absl/base/call_once.h"
 #include "library/common/envoy_mobile_main_common.h"
+#include "library/common/extensions/registry.h"
 #include "library/common/http/dispatcher.h"
 #include "library/common/types/c_types.h"
 
