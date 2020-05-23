@@ -113,7 +113,7 @@ message RedisProxy {
     google.protobuf.UInt32Value max_upstream_unknown_connections = 6;
 
     // Enable per-command statistics per upstream cluster, in addition to the filter level aggregate
-    // count.
+    // count. These commands are measured in microseconds.
     bool enable_command_stats = 8;
 
     // Read policy. The default is to read from the master.
@@ -193,7 +193,7 @@ message RedisProxy {
   ConnPoolSettings settings = 3 [(validate.rules).message = {required: true}];
 
   // Indicates that latency stat should be computed in microseconds. By default it is computed in
-  // milliseconds.
+  // milliseconds. This does not apply to upstream command stats currently.
   bool latency_in_micros = 4;
 
   // List of **unique** prefixes used to separate keys from different workloads to different
