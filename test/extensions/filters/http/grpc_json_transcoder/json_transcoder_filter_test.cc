@@ -334,7 +334,8 @@ protected:
 
   void routeLocalConfig(const Router::RouteSpecificFilterConfig* route_settings,
                         const Router::RouteSpecificFilterConfig* vhost_settings) {
-    ON_CALL(decoder_callbacks_.route_->route_entry_, perFilterConfig(HttpFilterNames::get().GrpcJsonTranscoder))
+    ON_CALL(decoder_callbacks_.route_->route_entry_,
+            perFilterConfig(HttpFilterNames::get().GrpcJsonTranscoder))
         .WillByDefault(Return(route_settings));
     ON_CALL(decoder_callbacks_.route_->route_entry_.virtual_host_,
             perFilterConfig(HttpFilterNames::get().GrpcJsonTranscoder))

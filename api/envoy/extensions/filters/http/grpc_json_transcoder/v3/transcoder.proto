@@ -166,7 +166,7 @@ message GrpcJsonTranscoderPerRoute {
   oneof override {
     option (validate.required) = true;
 
-    // Disable the grpc json trasncoder filter for this particular vhost or route.
+    // Disable the grpc json transcoder filter for this particular vhost or route.
     bool disabled = 1 [(validate.rules).bool = {const: true}];
 
     // Override the global configuration of the filter with this new config.

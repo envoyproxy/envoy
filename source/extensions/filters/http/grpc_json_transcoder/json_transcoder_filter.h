@@ -56,7 +56,8 @@ void createHttpBodyEnvelope(Buffer::Instance& output,
 /**
  * Global configuration for the gRPC JSON transcoder filter. Factory for the Transcoder interface.
  */
-class JsonTranscoderConfig : public Logger::Loggable<Logger::Id::config>, public Router::RouteSpecificFilterConfig {
+class JsonTranscoderConfig : public Logger::Loggable<Logger::Id::config>,
+                             public Router::RouteSpecificFilterConfig {
 
 public:
   /**
@@ -121,7 +122,6 @@ private:
       const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder&
           proto_config,
       Api::Api& api, bool disabled);
-
 
 private:
   void addFileDescriptor(const Protobuf::FileDescriptorProto& file);

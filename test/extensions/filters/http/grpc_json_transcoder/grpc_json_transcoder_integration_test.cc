@@ -1,7 +1,11 @@
+#include "envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.pb.h"
+
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
 #include "common/http/message_impl.h"
 #include "common/protobuf/protobuf.h"
+
+#include "extensions/filters/http/well_known_names.h"
 
 #include "test/integration/http_integration.h"
 #include "test/mocks/http/mocks.h"
@@ -10,8 +14,6 @@
 
 #include "absl/strings/match.h"
 #include "gtest/gtest.h"
-#include "envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.pb.h"
-#include "extensions/filters/http/well_known_names.h"
 
 using Envoy::Protobuf::TextFormat;
 using Envoy::ProtobufUtil::Status;
@@ -171,17 +173,20 @@ protected:
   // override configuration on per-route basis
   void overrideConfig(const std::string& json_config) {
 
-    envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoderPerRoute per_route_config;
+    envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoderPerRoute
+        per_route_config;
     TestUtility::loadFromJson(json_config, per_route_config);
-    ConfigHelper::HttpModifierFunction modifier = [per_route_config](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-               cfg) {
-
+    ConfigHelper::HttpModifierFunction modifier =
+        [per_route_config](
+            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                cfg) {
           auto* config = cfg.mutable_route_config()
                              ->mutable_virtual_hosts()
                              ->Mutable(0)
                              ->mutable_typed_per_filter_config();
 
-          (*config)[Extensions::HttpFilters::HttpFilterNames::get().GrpcJsonTranscoder].PackFrom(per_route_config);
+          (*config)[Extensions::HttpFilters::HttpFilterNames::get().GrpcJsonTranscoder].PackFrom(
+              per_route_config);
         };
 
     config_helper_.addConfigModifier(modifier);
@@ -873,10 +878,8 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, RouteDisabled) {
   HttpIntegrationTest::initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/shelves"},
-                                     {":authority", "host"}});
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"}, {":path", "/shelves"}, {":authority", "host"}});
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   response->waitForEndStream();
@@ -884,8 +887,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, RouteDisabled) {
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 };
 
-class OverrideConfigGrpcJsonTranscoderIntegrationTest
-    : public GrpcJsonTranscoderIntegrationTest {
+class OverrideConfigGrpcJsonTranscoderIntegrationTest : public GrpcJsonTranscoderIntegrationTest {
 public:
   OverrideConfigGrpcJsonTranscoderIntegrationTest() : GrpcJsonTranscoderIntegrationTest() {}
   /**
@@ -919,7 +921,8 @@ TEST_P(OverrideConfigGrpcJsonTranscoderIntegrationTest, RouteOverride) {
               "proto_descriptor": "{}"
             }}
           }})EOF";
-  overrideConfig(fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
+  overrideConfig(
+      fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
 
   HttpIntegrationTest::initialize();
 
@@ -936,9 +939,7 @@ TEST_P(OverrideConfigGrpcJsonTranscoderIntegrationTest, RouteOverride) {
                                       {"content-length", "69"},
                                       {"grpc-status", "0"}},
       R"({"shelves":[{"id":"20","theme":"Children"},{"id":"1","theme":"Foo"}]})");
-
 };
-
 
 } // namespace
 } // namespace Envoy

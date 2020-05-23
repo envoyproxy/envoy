@@ -17,6 +17,7 @@
 #include "common/protobuf/utility.h"
 
 #include "extensions/filters/http/grpc_json_transcoder/http_body_utils.h"
+#include "extensions/filters/http/well_known_names.h"
 
 #include "google/api/annotations.pb.h"
 #include "google/api/http.pb.h"
@@ -24,7 +25,6 @@
 #include "grpc_transcoding/json_request_translator.h"
 #include "grpc_transcoding/path_matcher_utility.h"
 #include "grpc_transcoding/response_to_json_translator.h"
-#include "extensions/filters/http/well_known_names.h"
 
 using Envoy::Protobuf::FileDescriptorSet;
 using Envoy::Protobuf::io::ZeroCopyInputStream;
@@ -106,7 +106,8 @@ private:
 JsonTranscoderConfig::JsonTranscoderConfig(
     const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder&
         proto_config,
-    Api::Api& api, bool disabled) : disabled_(disabled) {
+    Api::Api& api, bool disabled)
+    : disabled_(disabled) {
 
   if (disabled) {
     return;
@@ -198,14 +199,16 @@ JsonTranscoderConfig::JsonTranscoderConfig(
 }
 
 JsonTranscoderConfig::JsonTranscoderConfig(
-    const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoderPerRoute& per_route_config,
+    const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoderPerRoute&
+        per_route_config,
     Api::Api& api)
-  : JsonTranscoderConfig(per_route_config.transcoder(), api, per_route_config.disabled()) {}
+    : JsonTranscoderConfig(per_route_config.transcoder(), api, per_route_config.disabled()) {}
 
 JsonTranscoderConfig::JsonTranscoderConfig(
     const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder&
         proto_config,
-    Api::Api& api) : JsonTranscoderConfig(proto_config, api, false) {}
+    Api::Api& api)
+    : JsonTranscoderConfig(proto_config, api, false) {}
 
 void JsonTranscoderConfig::addFileDescriptor(const Protobuf::FileDescriptorProto& file) {
   if (descriptor_pool_.BuildFile(file) == nullptr) {
@@ -375,6 +378,7 @@ JsonTranscoderFilter::JsonTranscoderFilter(JsonTranscoderConfig& config) : confi
 
 void JsonTranscoderFilter::initPerRouteConfig() {
   if (!decoder_callbacks_->route() || !decoder_callbacks_->route()->routeEntry()) {
+    per_route_config_ = &config_;
     return;
   }
 
@@ -771,7 +775,8 @@ bool JsonTranscoderFilter::maybeConvertGrpcStatus(Grpc::Status::GrpcStatus grpc_
   }
 
   std::string json_status;
-  auto translate_status = per_route_config_->translateProtoMessageToJson(*status_details, &json_status);
+  auto translate_status =
+      per_route_config_->translateProtoMessageToJson(*status_details, &json_status);
   if (!translate_status.ok()) {
     ENVOY_LOG(debug, "Transcoding status error {}", translate_status.ToString());
     return false;

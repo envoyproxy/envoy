@@ -29,7 +29,8 @@ private:
 
   Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
       const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoderPerRoute&,
-      Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor& validator) override;
+      Server::Configuration::ServerFactoryContext& context,
+      ProtobufMessage::ValidationVisitor& validator) override;
 };
 
 } // namespace GrpcJsonTranscoder
