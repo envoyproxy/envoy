@@ -4,7 +4,8 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "hazelcast/client/HazelcastAll.h"
+#include "hazelcast/client/SerializationConfig.h"
+#include "hazelcast/client/serialization/pimpl/SerializationService.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -29,8 +30,8 @@ protected:
 
   template <typename T> T deserialize(const std::vector<hazelcast::byte>& serialized) {
     T object;
-    SerializationConfig serializationConfig;
-    serialization::pimpl::SerializationService serializationService(serializationConfig);
+    hazelcast::client::SerializationConfig serializationConfig;
+    SerializationService serializationService(serializationConfig);
     DataInput data_input(serialized);
     ObjectDataInput objectDataInput(data_input, serializationService.getSerializerHolder());
     object.readData(objectDataInput);
@@ -57,7 +58,6 @@ protected:
   HazelcastResponseEntry createTestResponse() {
     return HazelcastResponseEntry(createTestHeader(), createTestBody());
   }
-
 };
 
 TEST_F(SerializationTest, HeaderEntry) {

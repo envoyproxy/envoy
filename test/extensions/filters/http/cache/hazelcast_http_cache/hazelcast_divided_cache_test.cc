@@ -2,6 +2,8 @@
 
 #include "test/extensions/filters/http/cache/hazelcast_http_cache/test_util.h"
 
+#include "gmock/gmock.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -21,6 +23,14 @@ protected:
     cache_->start();
     cache_->getTestAccessor().clearMaps();
   }
+};
+
+template <typename K, typename V> class MockEntryEvictedEvent : public EntryEvent<K, V> {
+public:
+  MockEntryEvictedEvent(const Member& member)
+      : EntryEvent<K, V>("MockEntryEvent", member, EntryEventType::EVICTED) {}
+  MOCK_METHOD(const K*, getKeyObject, (), (const));
+  MOCK_METHOD(const V*, getOldValueObject, (), (const));
 };
 
 TEST_F(HazelcastDividedCacheTest, AbortDividedInsertionWhenMaxSizeReached) {
@@ -58,6 +68,38 @@ TEST_F(HazelcastDividedCacheTest, PreventOverridingCacheEntries) {
   EXPECT_TRUE(expectLookupSuccessWithFullBody(lookup(RequestPath).get(), OriginalBody));
   EXPECT_EQ(2, cache_->getTestAccessor().bodyMapSize());
   EXPECT_EQ(1, cache_->getTestAccessor().headerMapSize());
+}
+
+TEST_F(HazelcastDividedCacheTest, CleanBodyOnHeaderEviction) {
+  LookupContextPtr lookup_context = lookup("/header/eviction/");
+  uint64_t variant_hash_key =
+      static_cast<HazelcastLookupContextBase&>(*lookup_context).variantHashKey();
+  const int BodyCount = 3;
+  insert(move(lookup_context), getResponseHeaders(),
+         std::string(HazelcastTestUtil::TEST_PARTITION_SIZE * BodyCount, 'h'));
+  EXPECT_EQ(1, cache_->getTestAccessor().headerMapSize());
+  EXPECT_EQ(BodyCount, cache_->getTestAccessor().bodyMapSize());
+
+  auto keyObject = std::unique_ptr<int64_t>(new int64_t(cache_->mapKey(variant_hash_key)));
+  auto valueObject = cache_->getHeader(variant_hash_key);
+  EXPECT_NE(nullptr, valueObject);
+
+  Member m;
+  MockEntryEvictedEvent<int64_t, HazelcastHeaderEntry> mock_event(m);
+  EXPECT_CALL(mock_event, getOldValueObject()).WillRepeatedly(testing::Return(valueObject.get()));
+  EXPECT_CALL(mock_event, getKeyObject()).WillRepeatedly(testing::Return(keyObject.get()));
+
+  EXPECT_EQ(BodyCount, cache_->getTestAccessor().bodyMapSize());
+
+  HeaderMapEntryListener listener(*cache_);
+  listener.entryAdded(mock_event);   // no-op
+  listener.entryRemoved(mock_event); // no-op
+  listener.entryUpdated(mock_event); // no-op
+  listener.entryExpired(mock_event); // no-op
+  listener.entryMerged(mock_event);  // no-op
+  EXPECT_EQ(BodyCount, cache_->getTestAccessor().bodyMapSize());
+  listener.entryEvicted(mock_event);
+  EXPECT_EQ(0, cache_->getTestAccessor().bodyMapSize());
 }
 
 TEST_F(HazelcastDividedCacheTest, AbortInsertionIfKeyIsLocked) {

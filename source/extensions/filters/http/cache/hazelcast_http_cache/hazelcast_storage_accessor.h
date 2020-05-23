@@ -44,6 +44,9 @@ public:
   virtual ~StorageAccessor() = default;
 };
 
+class HazelcastHttpCache;
+class HeaderMapEntryListener;
+
 /**
  * Accessor to Hazelcast Cluster.
  *
@@ -51,8 +54,8 @@ public:
  */
 class HazelcastClusterAccessor : public StorageAccessor {
 public:
-  HazelcastClusterAccessor(ClientConfig&& client_config, const std::string& app_prefix,
-                           const uint64_t partition_size);
+  HazelcastClusterAccessor(HazelcastHttpCache& cache, ClientConfig&& client_config,
+                           const std::string& app_prefix, const uint64_t partition_size);
 
   void putHeader(const int64_t key, const HazelcastHeaderEntry& value) override;
   void putBody(const std::string& key, const HazelcastBodyEntry& value) override;
@@ -109,6 +112,8 @@ private:
   }
 
   std::unique_ptr<HazelcastClient> hazelcast_client_;
+  std::unique_ptr<HeaderMapEntryListener> listener_;
+  HazelcastHttpCache& cache_;
 
   // From HazelcastCacheConfig
   const std::string& app_prefix_;
@@ -119,6 +124,33 @@ private:
   std::string body_map_name_;
   std::string header_map_name_;
   std::string response_map_name_;
+};
+
+using hazelcast::client::EntryEvent;
+
+/**
+ * HeaderMap listener to clean up orphan bodies of which header is evicted.
+ *
+ * @note This handler is kicked only when a header entry is evicted, i.e. max configured
+ * size is reached on HeaderMap and then eviction is performed. On a TTL or idleTime based
+ * expiration, this listener will not take an action since it should be handled by the
+ * TTL/maxIdleTime configuration of BodyMap configured on the server side.
+ */
+class HeaderMapEntryListener
+    : public hazelcast::client::EntryListener<int64_t, HazelcastHeaderEntry> {
+public:
+  HeaderMapEntryListener(HazelcastHttpCache& cache) : cache_(cache) {}
+  void entryEvicted(const EntryEvent<int64_t, HazelcastHeaderEntry>& event) override;
+  void entryAdded(const EntryEvent<int64_t, HazelcastHeaderEntry>&) override {}
+  void entryRemoved(const EntryEvent<int64_t, HazelcastHeaderEntry>&) override {}
+  void entryUpdated(const EntryEvent<int64_t, HazelcastHeaderEntry>&) override {}
+  void entryExpired(const EntryEvent<int64_t, HazelcastHeaderEntry>&) override {}
+  void entryMerged(const EntryEvent<int64_t, HazelcastHeaderEntry>&) override {}
+  void mapEvicted(const MapEvent&) override {}
+  void mapCleared(const MapEvent&) override {}
+
+private:
+  HazelcastHttpCache& cache_;
 };
 
 } // namespace HazelcastHttpCache

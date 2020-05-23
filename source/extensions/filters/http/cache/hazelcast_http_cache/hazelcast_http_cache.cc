@@ -66,7 +66,7 @@ void HazelcastHttpCache::start() {
 
   if (!accessor_) {
     accessor_ = std::make_unique<HazelcastClusterAccessor>(
-        std::move(client_config), cache_config_.app_prefix(), body_partition_size_);
+        *this, std::move(client_config), cache_config_.app_prefix(), body_partition_size_);
     ENVOY_LOG(debug, "New HazelcastClusterAccessor created.");
   }
 

@@ -1,5 +1,7 @@
 #include "extensions/filters/http/cache/hazelcast_http_cache/hazelcast_storage_accessor.h"
 
+#include "extensions/filters/http/cache/hazelcast_http_cache/hazelcast_http_cache.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -76,10 +78,11 @@ const std::string& HazelcastClusterAccessor::headerMapName() { return header_map
 
 const std::string& HazelcastClusterAccessor::responseMapName() { return response_map_name_; }
 
-HazelcastClusterAccessor::HazelcastClusterAccessor(ClientConfig&& client_config,
+HazelcastClusterAccessor::HazelcastClusterAccessor(HazelcastHttpCache& cache,
+                                                   ClientConfig&& client_config,
                                                    const std::string& app_prefix,
                                                    const uint64_t partition_size)
-    : app_prefix_(app_prefix), partition_size_(partition_size),
+    : cache_(cache), app_prefix_(app_prefix), partition_size_(partition_size),
       client_config_(std::move(client_config)) {
   body_map_name_ = constructMapName("body", false);
   header_map_name_ = constructMapName("div", false);
@@ -91,6 +94,8 @@ void HazelcastClusterAccessor::connect() {
     return;
   }
   hazelcast_client_ = std::make_unique<HazelcastClient>(client_config_);
+  listener_ = std::make_unique<HeaderMapEntryListener>(cache_);
+  getHeaderMap().addEntryListener(*listener_, true);
 }
 
 std::string HazelcastClusterAccessor::constructMapName(const std::string& postfix, bool unified) {
@@ -99,6 +104,15 @@ std::string HazelcastClusterAccessor::constructMapName(const std::string& postfi
     name.append(":").append(std::to_string(partition_size_));
   }
   return name.append("-").append(postfix);
+}
+
+void HeaderMapEntryListener::entryEvicted(const EntryEvent<int64_t, HazelcastHeaderEntry>& event) {
+  auto header = event.getOldValueObject();
+  int64_t map_key = *event.getKeyObject();
+  uint64_t unsigned_key;
+  std::memcpy(&unsigned_key, &map_key, sizeof(uint64_t));
+  // Clean up all bodies of this header via onMissingBody procedure.
+  cache_.onMissingBody(unsigned_key, header->version(), header->bodySize());
 }
 
 } // namespace HazelcastHttpCache

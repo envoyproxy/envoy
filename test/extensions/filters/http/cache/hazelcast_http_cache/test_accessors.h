@@ -41,9 +41,9 @@ public:
  */
 class RemoteTestAccessor : public TestAccessor, public HazelcastClusterAccessor {
 public:
-  RemoteTestAccessor(ClientConfig&& client_config, const std::string& app_prefix,
-                     const uint64_t partition_size)
-      : HazelcastClusterAccessor(std::move(client_config), app_prefix, partition_size){};
+  RemoteTestAccessor(HazelcastHttpCache& cache, ClientConfig&& client_config,
+                     const std::string& app_prefix, const uint64_t partition_size)
+      : HazelcastClusterAccessor(cache, std::move(client_config), app_prefix, partition_size){};
 
   void clearMaps() override {
     getResponseMap().clear();
