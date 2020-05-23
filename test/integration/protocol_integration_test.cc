@@ -276,6 +276,7 @@ typed_config:
 
 // Add a health check filter and verify correct behavior when draining.
 TEST_P(ProtocolIntegrationTest, DrainClose) {
+  drain_time_ = std::chrono::seconds(10);
   config_helper_.addFilter(ConfigHelper::defaultHealthCheckFilter());
   initialize();
 
