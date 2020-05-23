@@ -57,12 +57,19 @@ public:
 
   /**
    * By the time a parent exits, all its contributions to accumulated gauges
-   * should be zero. But depending on the timing of the stat-merger communication
-   * shutdown and other shutdown activities on the parent, the gauges may not
-   * all be zero yet. So simply erase all the parent contributions.
+   * should be zero. But depending on the timing of the stat-merger
+   * communication shutdown and other shutdown activities on the parent, the
+   * gauges may not all be zero yet. So simply erase all the parent
+   * contributions.
    */
   void removeParentContributionToGauges();
 
+  /**
+   * Removes a gauge from the map of parent values. This can be used to exclude
+   * specific gauges from the effects of removeParentContributionToGauges, so
+   * that the cumulative value collected the parent can persist through
+   * children.
+   */
   void dropParentGaugeValue(Stats::StatName gauge_name);
 
 private:
