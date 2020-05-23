@@ -22,6 +22,11 @@ message RegexMatcher {
   // Google's `RE2 <https://github.com/google/re2>`_ regex engine. The regex string must adhere to
   // the documented `syntax <https://github.com/google/re2/wiki/Syntax>`_. The engine is designed
   // to complete execution in linear time as well as limit the amount of memory used.
+  // Envoy supports program size checking via runtime. The runtime keys `regex.max_program_size_error_level`
+  // and `regex.max_program_size_warn_level` can be set to integers as the maximum program size or
+  // complexity that a regex can have to be compiled before an exception is thrown or a warning is
+  // logged, respectively. `regex.max_program_size_error_level` defaults to 100, and
+  // `regex.max_program_size_warn_level` has no default if unset (will not check/log a warning).
   message GoogleRE2 {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.type.matcher.RegexMatcher.GoogleRE2";
@@ -29,7 +34,7 @@ message RegexMatcher {
     // This field controls the RE2 "program size" which is a rough estimate of how complex a
     // compiled regex is to evaluate. A regex that has a program size greater than the configured
     // value will fail to compile. In this case, the configured max program size can be increased
-    // or the regex can be simplified. If not specified, no max program size is enforced.
+    // or the regex can be simplified. If not specified, the default is 100.
     //
     // This field is deprecated; regexp validation should be performed on the management server
     // instead of being done by each individual client.
