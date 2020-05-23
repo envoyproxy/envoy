@@ -24,6 +24,7 @@ public:
   Http::TestResponseHeaderMapImpl response_headers_;
   Http::TestResponseTrailerMapImpl response_trailers_;
   StreamInfo::MockStreamInfo stream_info_;
+  std::string body_;
 
   envoy::config::core::v3::SubstitutionFormatString config_;
 };
@@ -41,9 +42,9 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigText) {
   TestUtility::loadFromYaml(yaml, config_);
 
   auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_);
-  EXPECT_EQ(
-      "plain text, path=/bar/foo, code=200",
-      formatter->format(request_headers_, response_headers_, response_trailers_, stream_info_));
+  EXPECT_EQ("plain text, path=/bar/foo, code=200",
+            formatter->format(request_headers_, response_headers_, response_trailers_, stream_info_,
+                              body_));
 }
 
 TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigJson) {
@@ -56,8 +57,8 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigJson) {
   TestUtility::loadFromYaml(yaml, config_);
 
   auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_);
-  const auto out_json =
-      formatter->format(request_headers_, response_headers_, response_trailers_, stream_info_);
+  const auto out_json = formatter->format(request_headers_, response_headers_, response_trailers_,
+                                          stream_info_, body_);
 
   const std::string expected = R"EOF({
     "text": "plain text",
