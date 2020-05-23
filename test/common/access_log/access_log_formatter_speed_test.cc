@@ -51,9 +51,10 @@ static void BM_AccessLogFormatter(benchmark::State& state) {
   Http::TestRequestHeaderMapImpl request_headers;
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
+  std::string body;
   for (auto _ : state) {
     output_bytes +=
-        formatter->format(request_headers, response_headers, response_trailers, *stream_info)
+        formatter->format(request_headers, response_headers, response_trailers, *stream_info, body)
             .length();
   }
   benchmark::DoNotOptimize(output_bytes);
@@ -69,9 +70,11 @@ static void BM_JsonAccessLogFormatter(benchmark::State& state) {
   Http::TestRequestHeaderMapImpl request_headers;
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
+  std::string body;
   for (auto _ : state) {
     output_bytes +=
-        json_formatter->format(request_headers, response_headers, response_trailers, *stream_info)
+        json_formatter
+            ->format(request_headers, response_headers, response_trailers, *stream_info, body)
             .length();
   }
   benchmark::DoNotOptimize(output_bytes);
@@ -88,10 +91,12 @@ static void BM_TypedJsonAccessLogFormatter(benchmark::State& state) {
   Http::TestRequestHeaderMapImpl request_headers;
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
+  std::string body;
   for (auto _ : state) {
-    output_bytes += typed_json_formatter
-                        ->format(request_headers, response_headers, response_trailers, *stream_info)
-                        .length();
+    output_bytes +=
+        typed_json_formatter
+            ->format(request_headers, response_headers, response_trailers, *stream_info, body)
+            .length();
   }
   benchmark::DoNotOptimize(output_bytes);
 }

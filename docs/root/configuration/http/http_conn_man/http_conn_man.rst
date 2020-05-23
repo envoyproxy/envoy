@@ -12,6 +12,7 @@ HTTP connection manager
   header_casing
   headers
   header_sanitizing
+  local_reply
   stats
   runtime
   rds

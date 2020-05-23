@@ -521,3 +521,6 @@ The following command operators are supported:
 
 %HOSTNAME%
   The system hostname.
+
+%LOCAL_REPLY_BODY%
+  The body text for the requests rejected by the Envoy.

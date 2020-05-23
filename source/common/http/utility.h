@@ -255,43 +255,52 @@ bool isWebSocketUpgradeRequest(const RequestHeaderMap& headers);
  */
 Http1Settings parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions& config);
 
+struct EncodeFunctions {
+  // Function to rewrite locally generated response.
+  std::function<void(ResponseHeaderMap& response_headers, Code& code, std::string& body,
+                     absl::string_view& content_type)>
+      rewrite_;
+  // Function to encode response headers.
+  std::function<void(ResponseHeaderMapPtr&& headers, bool end_stream)> encode_headers_;
+  // Function to encode the response body.
+  std::function<void(Buffer::Instance& data, bool end_stream)> encode_data_;
+};
+
+struct LocalReplyData {
+  // Tells if this is a response to a gRPC request.
+  bool is_grpc_;
+  // Supplies the HTTP response code.
+  Code response_code_;
+  // Supplies the optional body text which is returned.
+  absl::string_view body_text_;
+  // gRPC status code to override the httpToGrpcStatus mapping with.
+  const absl::optional<Grpc::Status::GrpcStatus> grpc_status_;
+  // Tells if this is a response to a HEAD request.
+  bool is_head_request_ = false;
+};
+
 /**
  * Create a locally generated response using filter callbacks.
- * @param is_grpc tells if this is a response to a gRPC request.
- * @param callbacks supplies the filter callbacks to use.
  * @param is_reset boolean reference that indicates whether a stream has been reset. It is the
- *                 responsibility of the caller to ensure that this is set to false if onDestroy()
- *                 is invoked in the context of sendLocalReply().
- * @param response_code supplies the HTTP response code.
- * @param body_text supplies the optional body text which is sent using the text/plain content
- *                  type.
- * @param grpc_status the gRPC status code to override the httpToGrpcStatus mapping with.
- * @param is_head_request tells if this is a response to a HEAD request
+ *        responsibility of the caller to ensure that this is set to false if onDestroy()
+ *        is invoked in the context of sendLocalReply().
+ * @param callbacks supplies the filter callbacks to use.
+ * @param local_reply_data struct which keeps data related to generate reply.
  */
-void sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbacks, const bool& is_reset,
-                    Code response_code, absl::string_view body_text,
-                    const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
-                    bool is_head_request);
+void sendLocalReply(const bool& is_reset, StreamDecoderFilterCallbacks& callbacks,
+                    const LocalReplyData& local_reply_data);
 
 /**
  * Create a locally generated response using the provided lambdas.
- * @param is_grpc tells if this is a response to a gRPC request.
- * @param encode_headers supplies the function to encode response headers.
- * @param encode_data supplies the function to encode the response body.
+
  * @param is_reset boolean reference that indicates whether a stream has been reset. It is the
  *                 responsibility of the caller to ensure that this is set to false if onDestroy()
  *                 is invoked in the context of sendLocalReply().
- * @param response_code supplies the HTTP response code.
- * @param body_text supplies the optional body text which is sent using the text/plain content
- *                  type.
- * @param grpc_status the gRPC status code to override the httpToGrpcStatus mapping with.
+ * @param encode_functions supplies the functions to encode response body and headers.
+ * @param local_reply_data struct which keeps data related to generate reply.
  */
-void sendLocalReply(
-    bool is_grpc,
-    std::function<void(ResponseHeaderMapPtr&& headers, bool end_stream)> encode_headers,
-    std::function<void(Buffer::Instance& data, bool end_stream)> encode_data, const bool& is_reset,
-    Code response_code, absl::string_view body_text,
-    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, bool is_head_request = false);
+void sendLocalReply(const bool& is_reset, const EncodeFunctions& encode_functions,
+                    const LocalReplyData& local_reply_data);
 
 struct GetLastAddressFromXffInfo {
   // Last valid address pulled from the XFF header.

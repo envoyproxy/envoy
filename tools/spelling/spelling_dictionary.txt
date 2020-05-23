@@ -946,6 +946,7 @@ retriable
 retriggers
 rmdir
 rocketmq
+rewriter
 rollout
 roundtrip
 rpcs
