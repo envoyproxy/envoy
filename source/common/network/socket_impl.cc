@@ -147,7 +147,7 @@ Api::SysCallIntResult SocketImpl::bind(Network::Address::InstanceConstSharedPtr 
 
   if (address->type() == Address::Type::Pipe) {
     const auto* pipe_sa = reinterpret_cast<const sockaddr_un*>(sa);
-    const auto* pipe_base = dynamic_cast<const Network::Address::PipeInstance*>(address_base);
+    const auto* pipe_base = dynamic_cast<const Network::Address::PipeInstance*>(address.get());
     bool abstract_namespace = pipe_base->abstractNamespace();
     if (!abstract_namespace) {
       // Try to unlink an existing filesystem object at the requested path. Ignore
