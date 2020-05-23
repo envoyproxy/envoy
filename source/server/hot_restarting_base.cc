@@ -219,6 +219,10 @@ Stats::Gauge& HotRestartingBase::hotRestartGeneration(Stats::Scope& scope) {
   // an integration test showing that dynamic stat-names can be coalesced
   // across hot-restarts. There's no other reason this particular stat-name
   // needs to be created dynamically.
+  //
+  // Note also, this stat cannot currently be represented as a counter due to
+  // the way stats get latched on sink update. See the comment in
+  // InstanceUtil::flushMetricsToSinks.
   return Stats::Utility::gaugeFromElements(scope,
                                            {Stats::DynamicName("server.hot_restart_generation")},
                                            Stats::Gauge::ImportMode::Accumulate);

@@ -86,9 +86,6 @@ void HotRestartingParent::onSocketEvent() {
 void HotRestartingParent::shutdown() { socket_event_.reset(); }
 
 HotRestartingParent::Internal::Internal(Server::Instance* server) : server_(server) {
-  // Stats::Utility::gaugeFromElements(
-  //    server->stats(), {Stats::DynamicName("server.hot_restart_generation")},
-  //    Stats::Gauge::ImportMode::Accumulate).inc();
   Stats::Gauge& hot_restart_generation = hotRestartGeneration(server->stats());
   hot_restart_generation.inc();
 }

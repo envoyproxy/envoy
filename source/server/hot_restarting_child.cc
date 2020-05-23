@@ -83,7 +83,7 @@ void HotRestartingChild::sendParentTerminateRequest() {
 
   // Note that we the 'generation' counter needs to retain the contribution
   // from the parent....
-  stat_merger_->dropParentGaugeValue(hot_restart_generation_stat_name_);
+  stat_merger_->retainParentGaugeValue(hot_restart_generation_stat_name_);
 
   // Once setting parent_terminated_ == true, we can send no more hot restart
   // RPCs, and therefore receive no more responses, including stats. We should

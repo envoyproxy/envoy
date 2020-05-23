@@ -65,12 +65,19 @@ public:
   void removeParentContributionToGauges();
 
   /**
-   * Removes a gauge from the map of parent values. This can be used to exclude
-   * specific gauges from the effects of removeParentContributionToGauges, so
-   * that the cumulative value collected the parent can persist through
-   * children.
+   * Indicates that a gauge's value from the hot-restart parent should be
+   * retained, combining it with the child data, By default, data is transferred
+   * from parent gauges only during the hot-restart process, but the parent
+   * contribution is subtracted from the child when the parent terminates. This
+   * makes sense for gauges such as active connection counts, but is not appropriate
+   * for server.hot_restart_generation.
+   *
+   * This function must be called immediately prior to
+   * removeParentContributionToGauges.
+   *
+   * @param gauge_name The gauge to be retained.
    */
-  void dropParentGaugeValue(Stats::StatName gauge_name);
+  void retainParentGaugeValue(Stats::StatName gauge_name);
 
 private:
   void mergeCounters(const Protobuf::Map<std::string, uint64_t>& counter_deltas,
