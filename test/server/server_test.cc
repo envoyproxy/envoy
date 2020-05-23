@@ -45,7 +45,7 @@ TEST(ServerInstanceUtil, flushHelper) {
   Stats::TestUtil::TestStore store;
   Stats::Counter& c = store.counter("hello");
   c.inc();
-  store.gauge("world", Stats::Gauge::ImportMode::Accumulate).set(5);
+  store.gauge("world", Stats::Gauge::ImportMode::NeverImport).set(5);
   store.histogram("histogram", Stats::Histogram::Unit::Unspecified);
   store.textReadout("text").set("is important");
 

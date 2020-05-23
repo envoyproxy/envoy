@@ -148,7 +148,8 @@ void StatMerger::removeParentContributionToGauges() {
     }
 
     uint64_t parent_value = iter.second;
-    ENVOY_LOG_MISC(error, "JOSH: subtracting {} from gauge {} with current value {}", parent_value, gauge.name(), gauge.value());
+    ENVOY_LOG_MISC(error, "JOSH: subtracting {} from gauge {} with current value {}", parent_value,
+                   gauge.name(), gauge.value());
     gauge.add(-parent_value);
   }
   parent_gauge_values_.clear();

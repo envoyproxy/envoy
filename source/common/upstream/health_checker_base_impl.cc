@@ -78,13 +78,9 @@ HealthCheckerImplBase::~HealthCheckerImplBase() {
   }
 }
 
-void HealthCheckerImplBase::decHealthy() {
-  stats_.healthy_.dec();
-}
+void HealthCheckerImplBase::decHealthy() { stats_.healthy_.dec(); }
 
-void HealthCheckerImplBase::decDegraded() {
-  stats_.degraded_.dec();
-}
+void HealthCheckerImplBase::decDegraded() { stats_.degraded_.dec(); }
 
 HealthCheckerStats HealthCheckerImplBase::generateStats(Stats::Scope& scope) {
   std::string prefix("health_check.");
@@ -92,13 +88,9 @@ HealthCheckerStats HealthCheckerImplBase::generateStats(Stats::Scope& scope) {
                                    POOL_GAUGE_PREFIX(scope, prefix))};
 }
 
-void HealthCheckerImplBase::incHealthy() {
-  stats_.healthy_.inc();
-}
+void HealthCheckerImplBase::incHealthy() { stats_.healthy_.inc(); }
 
-void HealthCheckerImplBase::incDegraded() {
-  stats_.degraded_.inc();
-}
+void HealthCheckerImplBase::incDegraded() { stats_.degraded_.inc(); }
 
 std::chrono::milliseconds HealthCheckerImplBase::interval(HealthState state,
                                                           HealthTransition changed_state) const {

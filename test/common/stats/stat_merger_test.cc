@@ -109,17 +109,17 @@ TEST_F(StatMergerTest, GaugeMerge) {
   stat_merger_.mergeStats(empty_counter_deltas_, gauge_values);
   // Initial combined value: 1+1.
   EXPECT_EQ(5, g1.value());
-  EXPECT_EQ(2, g2.value());  // delta of 8 from parent ignored.
+  EXPECT_EQ(2, g2.value()); // delta of 8 from parent ignored.
 
   // Simulate a decrement of the gauge from the parent.
   --gauge_values["g1"];
   stat_merger_.mergeStats(empty_counter_deltas_, gauge_values);
   EXPECT_EQ(4, g1.value());
-  EXPECT_EQ(2, g2.value());  // delta of 8 from parent ignored.
+  EXPECT_EQ(2, g2.value()); // delta of 8 from parent ignored.
 
   stat_merger_.removeParentContributionToGauges();
-  EXPECT_EQ(1, g1.value());  // Back to the original value of 1.
-  EXPECT_EQ(2, g2.value());  // delta of 8 from parent ignored.
+  EXPECT_EQ(1, g1.value()); // Back to the original value of 1.
+  EXPECT_EQ(2, g2.value()); // delta of 8 from parent ignored.
 }
 
 TEST_F(StatMergerTest, BasicDefaultAccumulationImport) {

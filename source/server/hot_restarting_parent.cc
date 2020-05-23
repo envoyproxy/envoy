@@ -5,8 +5,8 @@
 #include "common/memory/stats.h"
 #include "common/network/utility.h"
 #include "common/stats/stat_merger.h"
-#include "common/stats/utility.h"
 #include "common/stats/symbol_table_impl.h"
+#include "common/stats/utility.h"
 
 #include "server/listener_impl.h"
 
@@ -86,8 +86,9 @@ void HotRestartingParent::onSocketEvent() {
 void HotRestartingParent::shutdown() { socket_event_.reset(); }
 
 HotRestartingParent::Internal::Internal(Server::Instance* server) : server_(server) {
-  //Stats::Utility::gaugeFromElements(
-  //    server->stats(), {Stats::DynamicName("server.hot_restart_generation")}, Stats::Gauge::ImportMode::Accumulate).inc();
+  // Stats::Utility::gaugeFromElements(
+  //    server->stats(), {Stats::DynamicName("server.hot_restart_generation")},
+  //    Stats::Gauge::ImportMode::Accumulate).inc();
   Stats::Gauge& hot_restart_generation = hotRestartGeneration(server->stats());
   hot_restart_generation.inc();
 }

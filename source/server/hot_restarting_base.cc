@@ -213,15 +213,15 @@ std::unique_ptr<HotRestartMessage> HotRestartingBase::receiveHotRestartMessage(B
 }
 
 Stats::Gauge& HotRestartingBase::hotRestartGeneration(Stats::Scope& scope) {
-  // Track the hot-restart generationp. Using gauge's accumulate semantics,
+  // Track the hot-restart generation. Using gauge's accumulate semantics,
   // the increments will be combined across hot-restart. This may be useful
   // at some point, though the main motivation for this stat is to enable
   // an integration test showing that dynamic stat-names can be coalesced
   // across hot-restarts. There's no other reason this particular stat-name
   // needs to be created dynamically.
-  return Stats::Utility::gaugeFromElements(
-      scope, {Stats::DynamicName("server.hot_restart_generation")},
-      Stats::Gauge::ImportMode::Accumulate);
+  return Stats::Utility::gaugeFromElements(scope,
+                                           {Stats::DynamicName("server.hot_restart_generation")},
+                                           Stats::Gauge::ImportMode::Accumulate);
 }
 
 } // namespace Server

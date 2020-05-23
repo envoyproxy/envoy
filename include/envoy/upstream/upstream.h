@@ -591,8 +591,8 @@ public:
   GAUGE(membership_healthy, NeverImport)                                                           \
   GAUGE(membership_total, NeverImport)                                                             \
   GAUGE(upstream_cx_active, Accumulate)                                                            \
-  GAUGE(upstream_cx_rx_bytes_buffered, Accumulate)                                                 \
-  GAUGE(upstream_cx_tx_bytes_buffered, Accumulate)                                                 \
+  GAUGE(upstream_cx_rx_bytes_buffered, NeverImport)                                                \
+  GAUGE(upstream_cx_tx_bytes_buffered, NeverImport)                                                \
   GAUGE(upstream_rq_active, Accumulate)                                                            \
   GAUGE(upstream_rq_pending_active, Accumulate)                                                    \
   GAUGE(version, NeverImport)                                                                      \

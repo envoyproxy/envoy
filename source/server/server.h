@@ -56,18 +56,18 @@ namespace Server {
   COUNTER(dynamic_unknown_fields)                                                                  \
   COUNTER(static_unknown_fields)                                                                   \
   GAUGE(concurrency, NeverImport)                                                                  \
-  GAUGE(days_until_first_cert_expiring, Accumulate)                                                \
+  GAUGE(days_until_first_cert_expiring, NeverImport)                                               \
   GAUGE(hot_restart_epoch, NeverImport)                                                            \
   /* hot_restart_generation is an Accumulate gauge; we omit it here for testing dynamics. */       \
   GAUGE(live, NeverImport)                                                                         \
-  GAUGE(memory_allocated, Accumulate)                                                              \
-  GAUGE(memory_heap_size, Accumulate)                                                              \
-  GAUGE(memory_physical_size, Accumulate)                                                          \
-  GAUGE(parent_connections, Accumulate)                                                            \
+  GAUGE(memory_allocated, NeverImport)                                                             \
+  GAUGE(memory_heap_size, NeverImport)                                                             \
+  GAUGE(memory_physical_size, NeverImport)                                                         \
+  GAUGE(parent_connections, NeverImport)                                                           \
   GAUGE(state, NeverImport)                                                                        \
   GAUGE(stats_recent_lookups, NeverImport)                                                         \
-  GAUGE(total_connections, Accumulate)                                                             \
-  GAUGE(uptime, Accumulate)                                                                        \
+  GAUGE(total_connections, NeverImport)                                                            \
+  GAUGE(uptime, NeverImport)                                                                       \
   GAUGE(version, NeverImport)                                                                      \
   HISTOGRAM(initialization_time_ms, Milliseconds)
 

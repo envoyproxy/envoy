@@ -55,7 +55,6 @@ public:
                   const Protobuf::Map<std::string, uint64_t>& gauges,
                   const DynamicsMap& dynamics = DynamicsMap());
 
-
   /**
    * By the time a parent exits, all its contributions to accumulated gauges
    * should be zero. But depending on the timing of the stat-merger communication
