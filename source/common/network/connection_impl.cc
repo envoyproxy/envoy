@@ -10,7 +10,6 @@
 #include "envoy/event/timer.h"
 #include "envoy/network/filter.h"
 
-#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
@@ -240,23 +239,14 @@ void ConnectionImpl::noDelay(bool enable) {
   }
 
   // Don't set NODELAY for unix domain sockets
-  sockaddr_storage addr;
-  socklen_t len = sizeof(addr);
-
-  auto os_sys_calls = Api::OsSysCallsSingleton::get();
-  Api::SysCallIntResult result =
-      os_sys_calls.getsockname(ioHandle().fd(), reinterpret_cast<struct sockaddr*>(&addr), &len);
-
-  RELEASE_ASSERT(result.rc_ == 0, "");
-
-  if (addr.ss_family == AF_UNIX) {
+  if (socket_->addressType() == Address::Type::Pipe) {
     return;
   }
 
   // Set NODELAY
   int new_value = enable;
-  result = os_sys_calls.setsockopt(ioHandle().fd(), IPPROTO_TCP, TCP_NODELAY, &new_value,
-                                   sizeof(new_value));
+  Api::SysCallIntResult result =
+      socket_->setSocketOption(IPPROTO_TCP, TCP_NODELAY, &new_value, sizeof(new_value));
 #if defined(__APPLE__)
   if (SOCKET_FAILURE(result.rc_) && result.errno_ == EINVAL) {
     // Sometimes occurs when the connection is not yet fully formed. Empirically, TCP_NODELAY is
@@ -602,7 +592,7 @@ ConnectionImpl::unixSocketPeerCredentials() const {
 #else
   struct ucred ucred;
   socklen_t ucred_size = sizeof(ucred);
-  int rc = getsockopt(ioHandle().fd(), SOL_SOCKET, SO_PEERCRED, &ucred, &ucred_size);
+  int rc = socket_->getSocketOption(SOL_SOCKET, SO_PEERCRED, &ucred, &ucred_size).rc_;
   if (rc == -1) {
     return absl::nullopt;
   }
@@ -617,9 +607,7 @@ void ConnectionImpl::onWriteReady() {
   if (connecting_) {
     int error;
     socklen_t error_size = sizeof(error);
-    RELEASE_ASSERT(Api::OsSysCallsSingleton::get()
-                           .getsockopt(ioHandle().fd(), SOL_SOCKET, SO_ERROR, &error, &error_size)
-                           .rc_ == 0,
+    RELEASE_ASSERT(socket_->getSocketOption(SOL_SOCKET, SO_ERROR, &error, &error_size).rc_ == 0,
                    "");
 
     if (error == 0) {
