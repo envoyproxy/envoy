@@ -1,0 +1,28 @@
+diff --git a/src/exp.h b/src/exp.h
+index fe36535..33c4b7b 100644
+--- a/src/exp.h
++++ b/src/exp.h
+@@ -155,7 +155,7 @@ inline const RegEx& PlainScalar() {
+ inline const RegEx& PlainScalarInFlow() {
+   static const RegEx e =
+       !(BlankOrBreak() | RegEx("?,[]{}#&*!|>\'\"%@`", REGEX_OR) |
+-        (RegEx("-:", REGEX_OR) + Blank()));
++        (RegEx("-:", REGEX_OR) + (Blank() | RegEx())));
+   return e;
+ }
+ inline const RegEx& EndScalar() {
+diff --git a/test/integration/node_spec_test.cpp b/test/integration/node_spec_test.cpp
+index aedf38b..bfc8578 100644
+--- a/test/integration/node_spec_test.cpp
++++ b/test/integration/node_spec_test.cpp
+@@ -1127,5 +1127,10 @@ TEST(NodeSpecTest, Ex8_22_BlockCollectionNodes) {
+   EXPECT_EQ(1, doc["mapping"].size());
+   EXPECT_EQ("bar", doc["mapping"]["foo"].as<std::string>());
+ }
++
++TEST(NodeSpecTest, FlowMapNotClosed) {
++  EXPECT_THROW_PARSER_EXCEPTION(Load("{x:"), ErrorMsg::UNKNOWN_TOKEN);
++}
++
+ }
+ }
