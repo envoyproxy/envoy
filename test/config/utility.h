@@ -201,6 +201,10 @@ public:
   // CONNECT requests.
   static void setConnectConfig(HttpConnectionManager& hcm, bool terminate_connect);
 
+  void setLocalReply(
+      const envoy::extensions::filters::network::http_connection_manager::v3::LocalReplyConfig&
+          config);
+
 private:
   // Load the first HCM struct from the first listener into a parsed proto.
   bool loadHttpConnectionManager(HttpConnectionManager& hcm);
