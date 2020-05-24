@@ -114,10 +114,10 @@ private:
   const std::string oauth_server_hostname_;
   const std::string callback_path_;
   const std::string signout_path_;
-  const bool forward_bearer_token_ : 1;
-  const bool pass_through_options_method_ : 1;
   std::shared_ptr<SecretReader> secret_reader_;
   FilterStats stats_;
+  const bool forward_bearer_token_ : 1;
+  const bool pass_through_options_method_ : 1;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;

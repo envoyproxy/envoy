@@ -84,9 +84,9 @@ FilterConfig::FilterConfig(
           PROTOBUF_GET_STRING_OR_DEFAULT(proto_config, callback_path, defaultOauthCallback())),
       signout_path_(
           PROTOBUF_GET_STRING_OR_DEFAULT(proto_config, signout_path, defaultOauthSignout())),
+      secret_reader_(secret_reader), stats_(FilterConfig::generateStats(stats_prefix, scope)),
       forward_bearer_token_(proto_config.forward_bearer_token()),
-      pass_through_options_method_(proto_config.pass_through_options_method()),
-      secret_reader_(secret_reader), stats_(FilterConfig::generateStats(stats_prefix, scope)) {
+      pass_through_options_method_(proto_config.pass_through_options_method()) {
   if (!cluster_manager.get(cluster_name_)) {
     throw EnvoyException(fmt::format("OAuth2 filter: unknown cluster '{}' in config. Please "
                                      "specify which cluster to direct OAuth requests to.",
