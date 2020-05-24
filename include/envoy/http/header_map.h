@@ -654,9 +654,7 @@ public:
     ASSERT(!mutableFinalized());
     auto entry = headerNameToIndex().find(header_name);
     if (entry == headerNameToIndex().end()) {
-      // The stored index is pre-offset by sizeof(pointer) to allow for immediate index into a
-      // variable length array of pointers.
-      headerNameToIndex()[header_name] = (inline_header_index++ * sizeof(void*));
+      headerNameToIndex()[header_name] = inline_header_index++;
     }
     return Handle(headerNameToIndex().find(header_name));
   }

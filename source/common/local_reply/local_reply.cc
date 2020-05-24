@@ -12,7 +12,6 @@
 
 namespace Envoy {
 namespace LocalReply {
-namespace {} // namespace
 
 class BodyFormatter {
 public:

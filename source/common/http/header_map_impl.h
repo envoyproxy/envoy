@@ -325,7 +325,7 @@ public:
 
 protected:
   static size_t inlineHeadersSize() {
-    return CustomInlineHeaderRegistry<Interface>::headers().size() * sizeof(HeaderEntryImpl);
+    return CustomInlineHeaderRegistry<Interface>::headers().size() * sizeof(HeaderEntryImpl*);
   }
 
   virtual const HeaderEntryImpl* const* constInlineHeaders() const PURE;
