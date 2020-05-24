@@ -27,7 +27,6 @@ using testing::NiceMock;
 class MockCallbacks : public OAuth2FilterCallbacks {
 public:
   MOCK_METHOD(void, sendUnauthorizedResponse, ());
-  MOCK_METHOD(void, onGetIdentitySuccess, (const std::string&));
   MOCK_METHOD(void, onGetAccessTokenSuccess, (const std::string&, const std::string&));
 };
 
@@ -117,39 +116,6 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenIncompleteResponse) {
   popPendingCallback()->onSuccess(request, std::move(mock_response));
 }
 
-TEST_F(OAuth2ClientTest, RequestIdentitySuccess) {
-  std::string json = R"EOF(
-    {
-      "user": {
-        "username": "foo",
-        "email": "bar"
-      }
-    }
-    )EOF";
-  Http::ResponseHeaderMapPtr mock_response_headers{new Http::TestResponseHeaderMapImpl{
-      {Http::Headers::get().Status.get(), "200"},
-      {Http::Headers::get().ContentType.get(), "application/json"},
-  }};
-  Http::ResponseMessagePtr mock_response(
-      new Http::ResponseMessageImpl(std::move(mock_response_headers)));
-  mock_response->body() = std::make_unique<Buffer::OwnedImpl>(json);
-
-  EXPECT_CALL(cm_.async_client_, send_(_, _, _))
-      .WillRepeatedly(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks_.push_back(&cb);
-            return &request_;
-          }));
-
-  client_->setCallbacks(*mock_callbacks_);
-  client_->asyncGetIdentity("a");
-  EXPECT_EQ(1, callbacks_.size());
-  EXPECT_CALL(*mock_callbacks_, onGetIdentitySuccess(_));
-  Http::MockAsyncClientRequest request(&cm_.async_client_);
-  popPendingCallback()->onSuccess(request, std::move(mock_response));
-}
-
 TEST_F(OAuth2ClientTest, NetworkError) {
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))
       .WillRepeatedly(
@@ -160,7 +126,7 @@ TEST_F(OAuth2ClientTest, NetworkError) {
           }));
 
   client_->setCallbacks(*mock_callbacks_);
-  client_->asyncGetIdentity("a");
+  client_->asyncGetAccessToken("a", "b", "c", "d");
   EXPECT_EQ(1, callbacks_.size());
 
   EXPECT_CALL(*mock_callbacks_, sendUnauthorizedResponse());

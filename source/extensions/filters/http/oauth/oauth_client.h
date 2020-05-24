@@ -17,7 +17,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Oauth {
 
-enum class OAuthState { Idle, PendingAccessToken, PendingIdentity };
+enum class OAuthState { Idle, PendingAccessToken };
 
 /*
   OAuth states
@@ -25,12 +25,9 @@ enum class OAuthState { Idle, PendingAccessToken, PendingIdentity };
   - USER_AUTHORIZED (continue)
   - USER_UNAUTHORIZED
   - PENDING_ACCESS_TOKEN
-  - PENDING_USER_IDENTITY
-  - PENDING_AUTHORIZED_GROUPS
 
 example flow:
-START -> USER_UNAUTHORIZED -> PENDING_ACCESS_TOKEN -> PENDING_USER_IDENTITY ->
-PENDING_AUTHORIZED_GROUPS -> USER_AUTHORIZED
+START -> USER_UNAUTHORIZED -> PENDING_ACCESS_TOKEN -> USER_AUTHORIZED
 */
 
 /**
@@ -43,7 +40,6 @@ public:
   ~OAuth2Client() override = default;
   virtual void asyncGetAccessToken(const std::string& auth_code, const std::string& client_id,
                                    const std::string& secret, const std::string& cb_url) PURE;
-  virtual void asyncGetIdentity(const std::string& access_token) PURE;
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&& m) override PURE;
   void onFailure(const Http::AsyncClient::Request&,
                  Http::AsyncClient::FailureReason f) override PURE;
@@ -67,12 +63,6 @@ public:
    */
   void asyncGetAccessToken(const std::string& auth_code, const std::string& client_id,
                            const std::string& secret, const std::string& cb_url) override;
-
-  /**
-   * Request the user's identity from the OAuth server. Calls the `onSuccess` on `onFailure`
-   * callbacks.
-   */
-  void asyncGetIdentity(const std::string& access_token) override;
 
   void setCallbacks(OAuth2FilterCallbacks& callbacks) override { parent_ = &callbacks; }
 

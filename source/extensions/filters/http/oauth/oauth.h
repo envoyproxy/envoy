@@ -21,7 +21,6 @@ public:
   virtual void onGetAccessTokenSuccess(const std::string& access_token,
                                        const std::string& expires_in) PURE;
 
-  virtual void onGetIdentitySuccess(const std::string& username) PURE;
   virtual void sendUnauthorizedResponse() PURE;
 };
 

@@ -58,7 +58,6 @@ public:
   void onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason) override {}
   void setCallbacks(OAuth2FilterCallbacks&) override {}
 
-  MOCK_METHOD(void, asyncGetIdentity, (const std::string&));
   MOCK_METHOD(void, asyncGetAccessToken,
               (const std::string&, const std::string&, const std::string&, const std::string&));
 };
@@ -159,7 +158,6 @@ TEST_F(OAuth2Test, OAuthOkPass) {
       {Http::Headers::get().UserAgent.get(), "CurlAgent"},
       {Http::Headers::get().ForwardedProto.get(), "https"},
       {Http::Headers::get().Authorization.get(), "Bearer injected_malice!"},
-      {"x-forwarded-user", "injected_user"},
   };
 
   Http::TestRequestHeaderMapImpl expected_headers{
@@ -169,7 +167,6 @@ TEST_F(OAuth2Test, OAuthOkPass) {
       {Http::Headers::get().UserAgent.get(), "CurlAgent"},
       {Http::Headers::get().ForwardedProto.get(), "https"},
       {Http::Headers::get().Authorization.get(), "Bearer legit_token"},
-      {"x-forwarded-user", "legit_user"},
   };
 
   // cookie-validation mocking
@@ -177,9 +174,7 @@ TEST_F(OAuth2Test, OAuthOkPass) {
   EXPECT_CALL(*validator_, isValid()).WillOnce(Return(true));
 
   // Sanitized return reference mocking
-  std::string legit_user{"legit_user"};
   std::string legit_token{"legit_token"};
-  EXPECT_CALL(*validator_, username()).WillRepeatedly(ReturnRef(legit_user));
   EXPECT_CALL(*validator_, token()).WillOnce(ReturnRef(legit_token));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
@@ -317,12 +312,11 @@ TEST_F(OAuth2Test, OAuthValidatedCookieAndContinue) {
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Path.get(), "/anypath"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().Cookie.get(), "OauthUsername=user;version=test"},
       {Http::Headers::get().Cookie.get(), "OauthExpires=123;version=test"},
       {Http::Headers::get().Cookie.get(), "BearerToken=xyztoken;version=test"},
       {Http::Headers::get().Cookie.get(),
        "OauthHMAC="
-       "MzRlNTUyOWQ4YWU3ZmUyZGViNmMwODMxYTFmN2ZlNzhiZTc2NjFlYmIwODlmNGQxZDNjMmVjMjFjNWYyMzkxMQ=="
+       "NmU4ZjFjMWNkYzQwOTA5YzUwMmYwN2U1MDcxZjA2Y2VlNmZlODczNmRhYjA5ZjZiZGQ0ODVkNjAzODljYmM0NA=="
        ";version=test"},
   };
 
@@ -342,7 +336,6 @@ TEST_F(OAuth2Test, OAuthTestSetOAuthHeaders) {
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Path.get(), "/anypath"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().Cookie.get(), "OauthUsername=real_user;version=test"},
       {Http::Headers::get().Cookie.get(), "OauthExpires=123;version=test"},
       {Http::Headers::get().Cookie.get(), "BearerToken=xyztoken;version=test"},
       {Http::Headers::get().Cookie.get(),
@@ -355,7 +348,6 @@ TEST_F(OAuth2Test, OAuthTestSetOAuthHeaders) {
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Path.get(), "/anypath"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().Cookie.get(), "OauthUsername=real_user;version=test"},
       {Http::Headers::get().Cookie.get(), "OauthExpires=123;version=test"},
       {Http::Headers::get().Cookie.get(), "BearerToken=xyztoken;version=test"},
       {Http::Headers::get().Cookie.get(),
@@ -363,13 +355,11 @@ TEST_F(OAuth2Test, OAuthTestSetOAuthHeaders) {
        "ZTRlMzU5N2Q4ZDIwZWE5ZTU5NTg3YTU3YTcxZTU0NDFkMzY1ZTc1NjMyODYyMj"
        "RlNjMxZTJmNTZkYzRmZTM0ZQ====;version=test"},
       {Http::Headers::get().Authorization.get(), "Bearer xyztoken"},
-      {"x-forwarded-user", "real_user"},
   };
 
   auto cookie_validator = std::make_shared<OAuth2CookieValidator>();
   cookie_validator->setParams(request_headers, "mock-secret");
-  filter_->setXForwardedOauthHeaders(request_headers, cookie_validator->token(),
-                                     cookie_validator->username());
+  filter_->setXForwardedOauthHeaders(request_headers, cookie_validator->token());
 
   EXPECT_EQ(request_headers, expected_headers);
 }
@@ -387,7 +377,6 @@ TEST_F(OAuth2Test, OAuthTestUpdatePathAfterSuccess) {
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Path.get(), "/_oauth?code=abcdefxyz123&scope=user&"
                                         "state=https%3A%2F%2Ftraffic.example.com%2Foriginal_path"},
-      {Http::Headers::get().Cookie.get(), "OauthUsername=legit_user;version=test"},
       {Http::Headers::get().Cookie.get(), "OauthExpires=123;version=test"},
       {Http::Headers::get().Cookie.get(), "BearerToken=legit_token;version=test"},
       {Http::Headers::get().Cookie.get(),
@@ -405,9 +394,7 @@ TEST_F(OAuth2Test, OAuthTestUpdatePathAfterSuccess) {
   EXPECT_CALL(*validator_, setParams(_, _)).Times(1);
   EXPECT_CALL(*validator_, isValid()).WillOnce(Return(true));
 
-  std::string legit_user{"legit_user"};
   std::string legit_token{"legit_token"};
-  EXPECT_CALL(*validator_, username()).WillRepeatedly(ReturnRef(legit_user));
   EXPECT_CALL(*validator_, token()).WillOnce(ReturnRef(legit_token));
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
@@ -479,12 +466,10 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
        "OauthHMAC="
-       "ZTRjODllZjgyMmUzZWNmM2FlOTY0NTMxNDkyYWI1YTI1ODlkNDZmMTZlNDFkYTg5NzcxMzAyY2NlN2ExYTFiMQ==;"
+       "NWUzNzE5MWQwYTg0ZjA2NjIyMjVjMzk3MzY3MzMyZmE0NjZmMWI2MjI1NWFhNDhkYjQ4NDFlZmRiMTVmMTk0MQ==;"
        "version=1;path=/;Max-Age=;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
        "OauthExpires=;version=1;path=/;Max-Age=;secure;HttpOnly"},
-      {Http::Headers::get().SetCookie.get(),
-       "OauthUsername=test_bearer_user;version=1;path=/;Max-Age=;secure"},
       {Http::Headers::get().SetCookie.get(), "BearerToken=;version=1;path=/;Max-Age=;secure"},
       {Http::Headers::get().Location.get(),
        "https://traffic.example.com/test?name=admin&level=trace"},
@@ -495,7 +480,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
               encodeHeaders_(HeaderMapEqualRef(&second_response_headers), true));
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
 
-  filter_->onGetIdentitySuccess("test_bearer_user");
+  filter_->finishFlow();
 }
 
 TEST_F(OAuth2Test, OAuthBearerTokenFlowFromHeader) {
@@ -515,22 +500,14 @@ TEST_F(OAuth2Test, OAuthBearerTokenFlowFromHeader) {
       {Http::Headers::get().UserAgent.get(), "LoadBalancer"},
       {Http::Headers::get().ForwardedProto.get(), "https"},
       {Http::Headers::get().Authorization.get(), "Bearer xyz-header-token"},
-      {"x-forwarded-user", "test_bearer_user"},
   };
 
   // Fail the validation to trigger the OAuth flow.
   EXPECT_CALL(*validator_, setParams(_, _)).Times(1);
   EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
 
-  // Expect that we detect a bearer token in the incoming request headers.
-  EXPECT_CALL(*oauth_client_, asyncGetIdentity("xyz-header-token"));
-  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter_->decodeHeaders(request_headers_before, false));
-
-  EXPECT_CALL(decoder_callbacks_, continueDecoding());
-
-  // Invoke the username retrieval step within the OAuth flow.
-  filter_->onGetIdentitySuccess("test_bearer_user");
 
   // Finally, expect that the header map had OAuth information appended to it.
   EXPECT_EQ(request_headers_before, request_headers_after);
@@ -551,21 +528,14 @@ TEST_F(OAuth2Test, OAuthBearerTokenFlowFromQueryParameters) {
       {Http::Headers::get().UserAgent.get(), "LoadBalancer"},
       {Http::Headers::get().ForwardedProto.get(), "https"},
       {Http::Headers::get().Authorization.get(), "Bearer xyz-queryparam-token"},
-      {"x-forwarded-user", "test_bearer_user"},
   };
 
   // Fail the validation to trigger the OAuth flow.
   EXPECT_CALL(*validator_, setParams(_, _)).Times(1);
   EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
 
-  // Expect that we detect a bearer token in the incoming request headers.
-  EXPECT_CALL(*oauth_client_, asyncGetIdentity("xyz-queryparam-token"));
-  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter_->decodeHeaders(request_headers_before, false));
-
-  // Invoke the username retrieval step within the OAuth flow.
-  EXPECT_CALL(decoder_callbacks_, continueDecoding());
-  filter_->onGetIdentitySuccess("test_bearer_user");
 
   // Expected decoded headers after the callback & validation of the bearer token is complete.
   EXPECT_EQ(request_headers_before, request_headers_after);

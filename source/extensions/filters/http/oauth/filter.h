@@ -136,7 +136,6 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 class CookieValidator {
 public:
   virtual ~CookieValidator() = default;
-  virtual const std::string& username() const PURE;
   virtual const std::string& token() const PURE;
   virtual void setParams(const Http::RequestHeaderMap& headers, const std::string& secret) PURE;
   virtual bool isValid() const PURE;
@@ -146,7 +145,6 @@ class OAuth2CookieValidator : public CookieValidator {
 public:
   OAuth2CookieValidator() = default;
   ~OAuth2CookieValidator() override = default;
-  const std::string& username() const override { return username_; }
   const std::string& token() const override { return token_; }
   void setParams(const Http::RequestHeaderMap& headers, const std::string& secret) override;
   bool isValid() const override;
@@ -154,7 +152,6 @@ public:
   bool timestampIsValid() const;
 
 private:
-  std::string username_;
   std::string token_;
   std::string expires_;
   std::string hmac_;
@@ -175,14 +172,14 @@ public:
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;
   void onGetAccessTokenSuccess(const std::string& access_code,
                                const std::string& expires_in) override;
-  void onGetIdentitySuccess(const std::string& username) override;
   // a catch-all function used for request failures. we don't retry, as a user can simply refresh
   // the page in the case of a network blip.
   void sendUnauthorizedResponse() override;
 
   // Set the x-forwarded-user after successfully validating the client cookies.
-  static void setXForwardedOauthHeaders(Http::RequestHeaderMap& headers, const std::string& token,
-                                        const std::string& username);
+  static void setXForwardedOauthHeaders(Http::RequestHeaderMap& headers, const std::string& token);
+
+  void finishFlow();
 
 private:
   friend class OAuth2Test;
@@ -194,7 +191,6 @@ private:
   // wrap up some of these in a UserData struct or something...
   std::string auth_code_{};
   std::string access_token_{}; // TODO - see if we can avoid this being a member variable
-  std::string username_;
   std::string new_expires_;
   absl::string_view host_;
   std::string user_agent_;
@@ -214,9 +210,6 @@ private:
     CONSTRUCT_ON_FIRST_USE(RequirementsMap,
                            {{"%2F", "/"}, {"%3A", ":"}, {"%3F", "?"}, {"%26", "&"}, {"%3D", "="}});
   }
-
-  // Sanitize the x-forwarded-user headers before the main filter logic.
-  static void sanitizeXForwardedOauthHeaders(Http::RequestHeaderMap& headers);
 
   // Determines whether or not the current request can skip the entire OAuth flow (HMAC is valid,
   // connection is mTLS, etc.)

@@ -16,17 +16,12 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Oauth {
 
-constexpr absl::string_view authMeApiEndpoint = "/api/me/";
 constexpr absl::string_view authTokenEndpoint = "/oauth/token/";
 
 // JSON keys for the various responses
 const std::string& kAccessToken() { CONSTRUCT_ON_FIRST_USE(std::string, "access_token"); }
 
 const std::string& kExpiresIn() { CONSTRUCT_ON_FIRST_USE(std::string, "expires_in"); }
-
-const std::string& kUser() { CONSTRUCT_ON_FIRST_USE(std::string, "user"); }
-
-const std::string& kUsername() { CONSTRUCT_ON_FIRST_USE(std::string, "username"); }
 
 const std::string& getAccessTokenBodyFormatString() {
   CONSTRUCT_ON_FIRST_USE(
@@ -46,15 +41,6 @@ void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
   ENVOY_LOG(debug, "Dispatching OAuth request for access token.");
   dispatchRequest(std::move(request));
   state_ = OAuthState::PendingAccessToken;
-}
-
-void OAuth2ClientImpl::asyncGetIdentity(const std::string& access_token) {
-  Http::RequestMessagePtr request = createAuthGetRequest(access_token);
-  request->headers().setPath(authMeApiEndpoint);
-
-  ENVOY_LOG(debug, "Dispatching OAuth request for user identity.");
-  dispatchRequest(std::move(request));
-  state_ = OAuthState::PendingIdentity;
 }
 
 void OAuth2ClientImpl::dispatchRequest(Http::RequestMessagePtr&& msg) {
@@ -117,26 +103,6 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
     const std::string access_token = json_object->getString(kAccessToken());
     const std::string new_expires = std::to_string(json_object->getInteger(kExpiresIn(), 0));
     parent_->onGetAccessTokenSuccess(access_token, new_expires);
-  }
-
-  if (prior_state == OAuthState::PendingIdentity) {
-    // NOTE this JSON object also comes with an "email" field but that is unused in OAuth logic so
-    // we ignore it.
-    if (!json_object->hasObject(kUser())) {
-      ENVOY_LOG(debug, "No user field received from asyncGetIdentity");
-      parent_->sendUnauthorizedResponse();
-      return;
-    }
-
-    const Json::ObjectSharedPtr user_object = json_object->getObject(kUser(), false);
-    if (!(user_object->hasObject(kUsername()))) {
-      ENVOY_LOG(debug, "No user->username field inside response from asyncGetIdentity.");
-      parent_->sendUnauthorizedResponse();
-      return;
-    }
-
-    const std::string username = user_object->getString(kUsername());
-    parent_->onGetIdentitySuccess(username);
   }
 }
 
