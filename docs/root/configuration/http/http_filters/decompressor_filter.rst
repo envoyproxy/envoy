@@ -55,6 +55,46 @@ When decompression is *applied*:
 
 .. _decompressor-statistics:
 
+Using different decompressors for requests and responses
+--------------------------------------------------------
+
+If different compression libraries are desired for requests and responses, it is possible to install
+multiple decompressor filters enabled only for requests or responses. For instance:
+
+.. code-block:: yaml
+
+  http_filters:
+  # This filter is only enabled for requests.
+  - name: envoy.filters.http.decompressor
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.decompressor.v3.Decompressor
+      decompressor_library:
+        name: small
+        typed_config:
+          "@type": "type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip"
+          window_bits: 9
+          chunk_size: 8192
+      response_direction_config:
+        common_config:
+          enabled:
+            default_value: false
+            runtime_key: response_decompressor_enabled
+  # This filter is only enabled for responses.
+  - name: envoy.filters.http.decompressor
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.decompressor.v3.Decompressor
+      decompressor_library:
+        name: large
+        typed_config:
+          "@type": "type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip"
+          window_bits: 12
+          chunk_size: 16384
+      request_direction_config:
+        common_config:
+          enabled:
+            default_value: false
+            runtime_key: request_decompressor_enabled
+
 Statistics
 ----------
 
