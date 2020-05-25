@@ -1,6 +1,9 @@
 #include <unordered_set>
 
 #include "envoy/api/v2/cluster.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.validate.h"
@@ -38,6 +41,18 @@ protected:
   ProtobufUtilityTest() : api_(Api::createApiForTest()) {}
 
   Api::ApiPtr api_;
+
+public:
+  void print(const ProtobufWkt::Message& msg) {
+    std::string text_format;
+
+    Protobuf::TextFormat::Printer printer;
+    printer.SetExpandAny(true);
+    printer.SetUseFieldNumber(true);
+    printer.SetSingleLineMode(false);
+    printer.PrintToString(msg, &text_format);
+    ENVOY_LOG_MISC(debug, "lambdai: text in next line\n{}", text_format);
+  }
 };
 
 TEST_F(ProtobufUtilityTest, ConvertPercentNaNDouble) {
@@ -133,6 +148,26 @@ TEST_F(ProtobufUtilityTest, EvaluateFractionalPercent) {
 }
 
 } // namespace ProtobufPercentHelper
+
+TEST_F(ProtobufUtilityTest, LambdaiMessageUtilHash) {
+  ProtobufWkt::Struct s;
+  //(*s.mutable_fields())["ab"].set_string_value("fgh");
+  EXPECT_EQ(3, s.fields_size());
+  envoy::api::v2::core::Metadata mv2;
+  mv2.mutable_filter_metadata()->insert({"xyz", s});
+  //(*s.mutable_fields())["cde"].set_string_value("ij");
+
+  // mv2.mutable_filter_metadata()->insert({"uvw", s});
+
+  EXPECT_EQ(1, mv2.filter_metadata_size());
+  print(mv2);
+  envoy::config::core::v3::Metadata mv3;
+  Config::VersionConverter::upgrade(mv2, mv3);
+  print(mv3);
+
+  envoy::config::core::v3::Metadata mv3dup = mv3;
+  print(mv3dup);
+}
 
 TEST_F(ProtobufUtilityTest, MessageUtilHash) {
   ProtobufWkt::Struct s;
