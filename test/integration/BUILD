@@ -981,7 +981,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "version_integration_test",
     srcs = ["version_integration_test.cc"],
-    tags = ["fails_on_windows"],
     deps = [
         ":http_integration_lib",
         "//source/extensions/filters/http/ip_tagging:config",
