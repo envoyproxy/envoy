@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Script to rebuild Dockerfile-envoy-bugbounty locally (i.e. not in CI) for development purposes.
+# Script to rebuild Dockerfile-envoy-google-vrp locally (i.e. not in CI) for development purposes.
 # This makes use of the latest envoy-dev base image on Docker Hub as the base and takes an
 # optional local path for an Envoy binary. When a custom local Envoy binary is used, the script
 # switches to using ${BASE_DOCKER_IMAGE} for the build, which should be configured to provide
@@ -8,14 +8,14 @@
 #
 # Usage:
 #
-# Basic rebuild of Docker image (tagged envoy-bugbounty:local):
+# Basic rebuild of Docker image (tagged envoy-google-vrp:local):
 #
-#   ./ci/docker_rebuild_bugbounty.sh
+#   ./ci/docker_rebuild_google-vrp.sh
 #
-# Basic rebuild of Docker image (tagged envoy-bugbounty:local) with some local Envoy binary:
+# Basic rebuild of Docker image (tagged envoy-google-vrp:local) with some local Envoy binary:
 #
 #   bazel build //source/exe:envoy-static --config=libc++ -copt
-#   ./ci/docker_rebuild_bugbounty.sh bazel-bin/source/exe/envoy-static
+#   ./ci/docker_rebuild_google-vrp.sh bazel-bin/source/exe/envoy-static
 
 set -e
 
@@ -23,8 +23,8 @@ set -e
 BASE_DOCKER_IMAGE="ubuntu:20.04"
 
 declare -r BUILD_DIR="$(mktemp -d)"
-cp ci/Dockerfile-envoy-bugbounty "${BUILD_DIR}"
-declare -r DOCKER_BUILD_FILE="${BUILD_DIR}"/Dockerfile-envoy-bugbounty
+cp ci/Dockerfile-envoy-google-vrp "${BUILD_DIR}"
+declare -r DOCKER_BUILD_FILE="${BUILD_DIR}"/Dockerfile-envoy-google-vrp
 
 # If we have a local Envoy binary, use a variant of the build environment that supports it.
 if [[ -n "$1" ]]
@@ -44,7 +44,7 @@ fi
 
 cat "${DOCKER_BUILD_FILE}"
 
-docker build -t "envoy-bugbounty:local" -f "${DOCKER_BUILD_FILE}" .
+docker build -t "envoy-google-vrp:local" -f "${DOCKER_BUILD_FILE}" .
 
 if [[ -n "$1" ]]
 then

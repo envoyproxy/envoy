@@ -25,8 +25,8 @@ HTTP proxies should additionally configure:
 * :ref:`HTTP/2 initial connection window size limit <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.initial_connection_window_size>` to 1 MiB.
 * :ref:`headers_with_underscores_action setting <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.headers_with_underscores_action>` to REJECT_REQUEST, to protect upstream services that treat '_' and '-' as interchangeable.
 
-The following is a YAML example of the above recommendation (taken from the :ref:`bug bounty
-<arch_overview_bug_bounty>` edge server configuration):
+The following is a YAML example of the above recommendation (taken from the :ref:`Google VRP
+<arch_overview_google_vrp>` edge server configuration):
 
 .. literalinclude:: envoy-edge.yaml
   :language: yaml

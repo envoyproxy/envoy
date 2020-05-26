@@ -7,8 +7,8 @@ set -e
 # This prefix is altered for the private security images on setec builds.
 DOCKER_IMAGE_PREFIX="${DOCKER_IMAGE_PREFIX:-envoyproxy/envoy}"
 
-# "-bugbounty" must come afer "" to ensure we rebuild the local base image dependency.
-BUILD_TYPES=("" "-alpine" "-alpine-debug" "-bugbounty")
+# "-google-vrp" must come afer "" to ensure we rebuild the local base image dependency.
+BUILD_TYPES=("" "-alpine" "-alpine-debug" "-google-vrp")
 
 # Test the docker build in all cases, but use a local tag that we will overwrite before push in the
 # cases where we do push.

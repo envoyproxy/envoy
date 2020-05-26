@@ -59,7 +59,7 @@ static_resources:
             - name: local_service
               domains: ["*"]
               # The exact route table is not super important in this example (this is the model
-              # for the bug bounty scenario).
+              # for the Google VRP scenario).
               routes:
               - match:
                   prefix: "/content"

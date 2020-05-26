@@ -8,10 +8,10 @@ RUN apt-get update \
     && rm -rf /tmp/* /var/tmp/* \
     && rm -rf /var/lib/apt/lists/*
 
-ADD configs/bugbounty/envoy-edge.yaml /etc/envoy/envoy-edge.yaml
-ADD configs/bugbounty/envoy-origin.yaml /etc/envoy/envoy-origin.yaml
-ADD configs/bugbounty/launch_envoy.sh /usr/local/bin/launch_envoy.sh
-ADD configs/bugbounty/supervisor.conf /etc/supervisor.conf
+ADD configs/google-vrp/envoy-edge.yaml /etc/envoy/envoy-edge.yaml
+ADD configs/google-vrp/envoy-origin.yaml /etc/envoy/envoy-origin.yaml
+ADD configs/google-vrp/launch_envoy.sh /usr/local/bin/launch_envoy.sh
+ADD configs/google-vrp/supervisor.conf /etc/supervisor.conf
 ADD test/config/integration/certs/serverkey.pem /etc/envoy/certs/serverkey.pem
 ADD test/config/integration/certs/servercert.pem /etc/envoy/certs/servercert.pem
 # ADD %local envoy bin% /usr/local/bin/envoy

@@ -122,7 +122,7 @@ mkdir -p ${GENERATED_RST_DIR}/api-docs
 cp -f "${API_DIR}"/xds_protocol.rst "${GENERATED_RST_DIR}/api-docs/xds_protocol.rst"
 # Edge hardening example YAML.
 mkdir -p "${GENERATED_RST_DIR}"/configuration/best_practices
-cp -f "${CONFIGS_DIR}"/bugbounty/envoy-edge.yaml "${GENERATED_RST_DIR}"/configuration/best_practices
+cp -f "${CONFIGS_DIR}"/google-vrp/envoy-edge.yaml "${GENERATED_RST_DIR}"/configuration/best_practices
 
 rsync -rav  $API_DIR/diagrams "${GENERATED_RST_DIR}/api-docs"
 
