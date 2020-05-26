@@ -169,7 +169,7 @@ uint32_t run(const std::string& directory) {
     OptionsImpl options(
         Envoy::Server::createTestOptionsImpl(filename, "", Network::Address::IpVersion::v6));
     // Avoid contention issues with other tests over the hot restart domain socket.
-    options.setHotRestartDisabled(true);
+    options.setBaseId(TestEnvironment::chooseBaseId(4000000));
     ConfigTest test1(options);
     envoy::config::bootstrap::v3::Bootstrap bootstrap;
     Server::InstanceUtil::loadBootstrapConfig(bootstrap, options,
