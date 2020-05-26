@@ -120,6 +120,7 @@ public:
   const Http::InternalAddressConfig& internalAddressConfig() const override {
     return *internal_address_config_;
   }
+
   MOCK_METHOD(bool, unixSocketInternal, ());
   MOCK_METHOD(uint32_t, xffNumTrustedHops, (), (const));
   MOCK_METHOD(bool, skipXffAppend, (), (const));
@@ -136,8 +137,10 @@ public:
   MOCK_METHOD(const Http::Http1Settings&, http1Settings, (), (const));
   MOCK_METHOD(bool, shouldNormalizePath, (), (const));
   MOCK_METHOD(bool, shouldMergeSlashes, (), (const));
+  MOCK_METHOD(bool, shouldStripMatchingPort, (), (const));
   MOCK_METHOD(envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction,
               headersWithUnderscoresAction, (), (const));
+  MOCK_METHOD(const LocalReply::LocalReply&, localReply, (), (const));
 
   std::unique_ptr<Http::InternalAddressConfig> internal_address_config_ =
       std::make_unique<DefaultInternalAddressConfig>();
@@ -151,7 +154,8 @@ const Http::LowerCaseString& traceStatusHeader() {
 class ConnectionManagerUtilityTest : public testing::Test {
 public:
   ConnectionManagerUtilityTest()
-      : request_id_extension_(std::make_shared<NiceMock<MockRequestIDExtension>>(random_)) {
+      : request_id_extension_(std::make_shared<NiceMock<MockRequestIDExtension>>(random_)),
+        local_reply_(LocalReply::Factory::createDefault()) {
     ON_CALL(config_, userAgent()).WillByDefault(ReturnRef(user_agent_));
 
     envoy::type::v3::FractionalPercent percent1;
@@ -162,6 +166,7 @@ public:
     tracing_config_ = {
         Tracing::OperationName::Ingress, {}, percent1, percent2, percent1, false, 256};
     ON_CALL(config_, tracingConfig()).WillByDefault(Return(&tracing_config_));
+    ON_CALL(config_, localReply()).WillByDefault(ReturnRef(*local_reply_));
 
     ON_CALL(config_, via()).WillByDefault(ReturnRef(via_));
     ON_CALL(config_, requestIDExtension()).WillByDefault(Return(request_id_extension_));
@@ -199,6 +204,7 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
   Http::TracingConnectionManagerConfig tracing_config_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  LocalReply::LocalReplyPtr local_reply_;
   std::string canary_node_{"canary"};
   std::string empty_node_;
   std::string via_;
@@ -1495,6 +1501,17 @@ TEST_F(ConnectionManagerUtilityTest, MergeSlashesWithoutNormalization) {
   TestRequestHeaderMapImpl header_map(original_headers);
   ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
   EXPECT_EQ(header_map.Path()->value().getStringView(), "/xyz/../abc");
+}
+
+// maybeNormalizeHost() removes port part from host header.
+TEST_F(ConnectionManagerUtilityTest, RemovePort) {
+  ON_CALL(config_, shouldStripMatchingPort()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl original_headers;
+  original_headers.setHost("host:443");
+
+  TestRequestHeaderMapImpl header_map(original_headers);
+  ConnectionManagerUtility::maybeNormalizeHost(header_map, config_, 443);
+  EXPECT_EQ(header_map.Host()->value().getStringView(), "host");
 }
 
 // test preserve_external_request_id true does not reset the passed requestId if passed

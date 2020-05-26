@@ -23,9 +23,6 @@ envoy_cc_test_library(
         "test_runner.h",
     ],
     hdrs = ["test_listener.h"],
-    external_deps = [
-        "abseil_symbolize",
-    ],
     deps = [
         "//source/common/common:logger_lib",
         "//source/common/common:thread_lib",
@@ -37,8 +34,5 @@ envoy_cc_test_library(
         "//test/test_common:environment_lib",
         "//test/test_common:global_lib",
         "//test/test_common:printers_lib",
-    ] + select({
-        "//bazel:disable_signal_trace": [],
-        "//conditions:default": ["//source/common/signal:sigaction_lib"],
-    }),
+    ],
 )

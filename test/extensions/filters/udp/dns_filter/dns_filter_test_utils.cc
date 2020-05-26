@@ -10,6 +10,14 @@ namespace UdpFilters {
 namespace DnsFilter {
 namespace Utils {
 
+std::string buildQueryFromBytes(const char* bytes, const size_t count) {
+  std::string query;
+  for (size_t i = 0; i < count; i++) {
+    query.append(static_cast<const char*>(&bytes[i]), 1);
+  }
+  return query;
+}
+
 std::string buildQueryForDomain(const std::string& name, uint16_t rec_type, uint16_t rec_class) {
   Runtime::RandomGeneratorImpl random_;
   struct DnsMessageParser::DnsHeader query {};
@@ -43,21 +51,36 @@ std::string buildQueryForDomain(const std::string& name, uint16_t rec_type, uint
   query.authority_rrs = 0;
   query.additional_rrs = 0;
 
-  Buffer::OwnedImpl buffer_;
-  buffer_.writeBEInt<uint16_t>(query.id);
+  Buffer::OwnedImpl buffer;
+  buffer.writeBEInt<uint16_t>(query.id);
 
   uint16_t flags;
   ::memcpy(&flags, static_cast<void*>(&query.flags), sizeof(uint16_t));
-  buffer_.writeBEInt<uint16_t>(flags);
+  buffer.writeBEInt<uint16_t>(flags);
 
-  buffer_.writeBEInt<uint16_t>(query.questions);
-  buffer_.writeBEInt<uint16_t>(query.answers);
-  buffer_.writeBEInt<uint16_t>(query.authority_rrs);
-  buffer_.writeBEInt<uint16_t>(query.additional_rrs);
+  buffer.writeBEInt<uint16_t>(query.questions);
+  buffer.writeBEInt<uint16_t>(query.answers);
+  buffer.writeBEInt<uint16_t>(query.authority_rrs);
+  buffer.writeBEInt<uint16_t>(query.additional_rrs);
 
   DnsQueryRecord query_rec(name, rec_type, rec_class);
-  query_rec.serialize(buffer_);
-  return buffer_.toString();
+  query_rec.serialize(buffer);
+  return buffer.toString();
+}
+
+void verifyAddress(const std::list<std::string>& addresses, const DnsAnswerRecordPtr& answer) {
+  ASSERT_TRUE(answer != nullptr);
+  ASSERT_TRUE(answer->ip_addr_ != nullptr);
+
+  const auto resolved_address = answer->ip_addr_->ip()->addressAsString();
+  if (addresses.size() == 1) {
+    const auto expected = addresses.begin();
+    ASSERT_EQ(*expected, resolved_address);
+    return;
+  }
+
+  const auto iter = std::find(addresses.begin(), addresses.end(), resolved_address);
+  ASSERT_TRUE(iter != addresses.end());
 }
 
 } // namespace Utils

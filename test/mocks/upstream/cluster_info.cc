@@ -101,5 +101,13 @@ MockClusterInfo::MockClusterInfo()
 
 MockClusterInfo::~MockClusterInfo() = default;
 
+Http::Http1::CodecStats& MockClusterInfo::http1CodecStats() const {
+  return Http::Http1::CodecStats::atomicGet(http1_codec_stats_, statsScope());
+}
+
+Http::Http2::CodecStats& MockClusterInfo::http2CodecStats() const {
+  return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, statsScope());
+}
+
 } // namespace Upstream
 } // namespace Envoy

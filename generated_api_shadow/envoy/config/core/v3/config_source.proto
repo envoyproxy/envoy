@@ -136,30 +136,30 @@ message RateLimitSettings {
 message ConfigSource {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.ConfigSource";
 
-  // Path on the filesystem to source and watch for configuration updates.
-  // When sourcing configuration for :ref:`secret <envoy_api_msg_extensions.transport_sockets.tls.v3.Secret>`,
-  // the certificate and key files are also watched for updates.
-  //
-  // .. note::
-  //
-  //  The path to the source must exist at config load time.
-  //
-  // .. note::
-  //
-  //   Envoy will only watch the file path for *moves.* This is because in general only moves
-  //   are atomic. The same method of swapping files as is demonstrated in the
-  //   :ref:`runtime documentation <config_runtime_symbolic_link_swap>` can be used here also.
-  google.protobuf.Duration initial_fetch_timeout = 4;
-
-  // API configuration source.
-  ApiVersion resource_api_version = 6 [(validate.rules).enum = {defined_only: true}];
-
   oneof config_source_specifier {
     option (validate.required) = true;
 
+    // Path on the filesystem to source and watch for configuration updates.
+    // When sourcing configuration for :ref:`secret <envoy_api_msg_extensions.transport_sockets.tls.v3.Secret>`,
+    // the certificate and key files are also watched for updates.
+    //
+    // .. note::
+    //
+    //  The path to the source must exist at config load time.
+    //
+    // .. note::
+    //
+    //   Envoy will only watch the file path for *moves.* This is because in general only moves
+    //   are atomic. The same method of swapping files as is demonstrated in the
+    //   :ref:`runtime documentation <config_runtime_symbolic_link_swap>` can be used here also.
+    string path = 1;
+
+    // API configuration source.
+    ApiConfigSource api_config_source = 2;
+
     // When set, ADS will be used to fetch resources. The ADS API configuration
     // source in the bootstrap configuration is used.
-    string path = 1;
+    AggregatedConfigSource ads = 3;
 
     // [#not-implemented-hide:]
     // When set, the client will access the resources from the same server it got the
@@ -172,20 +172,20 @@ message ConfigSource {
     // [#next-major-version: In xDS v3, consider replacing the ads field with this one, since
     // this field can implicitly mean to use the same stream in the case where the ConfigSource
     // is provided via ADS and the specified data can also be obtained via ADS.]
-    ApiConfigSource api_config_source = 2;
-
-    // When this timeout is specified, Envoy will wait no longer than the specified time for first
-    // config response on this xDS subscription during the :ref:`initialization process
-    // <arch_overview_initialization>`. After reaching the timeout, Envoy will move to the next
-    // initialization phase, even if the first config is not delivered yet. The timer is activated
-    // when the xDS API subscription starts, and is disarmed on first config update or on error. 0
-    // means no timeout - Envoy will wait indefinitely for the first xDS config (unless another
-    // timeout applies). The default is 15s.
-    AggregatedConfigSource ads = 3;
-
-    // API version for xDS resources. This implies the type URLs that the client
-    // will request for resources and the resource type that the client will in
-    // turn expect to be delivered.
     SelfConfigSource self = 5;
   }
+
+  // When this timeout is specified, Envoy will wait no longer than the specified time for first
+  // config response on this xDS subscription during the :ref:`initialization process
+  // <arch_overview_initialization>`. After reaching the timeout, Envoy will move to the next
+  // initialization phase, even if the first config is not delivered yet. The timer is activated
+  // when the xDS API subscription starts, and is disarmed on first config update or on error. 0
+  // means no timeout - Envoy will wait indefinitely for the first xDS config (unless another
+  // timeout applies). The default is 15s.
+  google.protobuf.Duration initial_fetch_timeout = 4;
+
+  // API version for xDS resources. This implies the type URLs that the client
+  // will request for resources and the resource type that the client will in
+  // turn expect to be delivered.
+  ApiVersion resource_api_version = 6 [(validate.rules).enum = {defined_only: true}];
 }

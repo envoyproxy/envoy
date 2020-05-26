@@ -40,26 +40,26 @@ message FaultDelay {
 
   reserved 2;
 
-  // Add a fixed delay before forwarding the operation upstream. See
-  // https://developers.google.com/protocol-buffers/docs/proto3#json for
-  // the JSON/YAML Duration mapping. For HTTP/Mongo/Redis, the specified
-  // delay will be injected before a new request/operation. For TCP
-  // connections, the proxying of the connection upstream will be delayed
-  // for the specified period. This is required if type is FIXED.
-  type.v3.FractionalPercent percentage = 4;
-
-  // Fault delays are controlled via an HTTP header (if applicable).
-  FaultDelayType hidden_envoy_deprecated_type = 1
-      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
-
   oneof fault_delay_secifier {
     option (validate.required) = true;
 
-    // The percentage of operations/connections/requests on which the delay will be injected.
+    // Add a fixed delay before forwarding the operation upstream. See
+    // https://developers.google.com/protocol-buffers/docs/proto3#json for
+    // the JSON/YAML Duration mapping. For HTTP/Mongo/Redis, the specified
+    // delay will be injected before a new request/operation. For TCP
+    // connections, the proxying of the connection upstream will be delayed
+    // for the specified period. This is required if type is FIXED.
     google.protobuf.Duration fixed_delay = 3 [(validate.rules).duration = {gt {}}];
 
+    // Fault delays are controlled via an HTTP header (if applicable).
     HeaderDelay header_delay = 5;
   }
+
+  // The percentage of operations/connections/requests on which the delay will be injected.
+  type.v3.FractionalPercent percentage = 4;
+
+  FaultDelayType hidden_envoy_deprecated_type = 1
+      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 }
 
 // Describes a rate limit to be applied.
@@ -84,16 +84,16 @@ message FaultRateLimit {
         "envoy.config.filter.fault.v2.FaultRateLimit.HeaderLimit";
   }
 
-  // A fixed rate limit.
-  type.v3.FractionalPercent percentage = 2;
-
   oneof limit_type {
     option (validate.required) = true;
 
-    // Rate limits are controlled via an HTTP header (if applicable).
+    // A fixed rate limit.
     FixedLimit fixed_limit = 1;
 
-    // The percentage of operations/connections/requests on which the rate limit will be injected.
+    // Rate limits are controlled via an HTTP header (if applicable).
     HeaderLimit header_limit = 3;
   }
+
+  // The percentage of operations/connections/requests on which the rate limit will be injected.
+  type.v3.FractionalPercent percentage = 2;
 }

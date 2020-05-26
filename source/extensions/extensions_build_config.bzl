@@ -17,6 +17,13 @@ EXTENSIONS = {
     "envoy.clusters.redis":                             "//source/extensions/clusters/redis:redis_cluster",
 
     #
+    # Compression
+    #
+
+    "envoy.compression.gzip.compressor":                "//source/extensions/compression/gzip/compressor:config",
+    "envoy.compression.gzip.decompressor":              "//source/extensions/compression/gzip/decompressor:config",
+
+    #
     # gRPC Credentials Plugins
     #
 
@@ -38,6 +45,7 @@ EXTENSIONS = {
     "envoy.filters.http.aws_request_signing":           "//source/extensions/filters/http/aws_request_signing:config",
     "envoy.filters.http.buffer":                        "//source/extensions/filters/http/buffer:config",
     "envoy.filters.http.cache":                         "//source/extensions/filters/http/cache:config",
+    "envoy.filters.http.compressor":                    "//source/extensions/filters/http/compressor:config",
     "envoy.filters.http.cors":                          "//source/extensions/filters/http/cors:config",
     "envoy.filters.http.csrf":                          "//source/extensions/filters/http/csrf:config",
     "envoy.filters.http.dynamic_forward_proxy":         "//source/extensions/filters/http/dynamic_forward_proxy:config",
@@ -107,7 +115,7 @@ EXTENSIONS = {
     # UDP filters
     #
 
-    "envoy.filters.udp_listener.dns_filter":             "//source/extensions/filters/udp/dns_filter:config",
+    "envoy.filters.udp_listener.dns_filter":            "//source/extensions/filters/udp/dns_filter:config",
     "envoy.filters.udp_listener.udp_proxy":             "//source/extensions/filters/udp/udp_proxy:config",
 
     #
@@ -172,4 +180,11 @@ EXTENSIONS = {
     #
 
     "envoy.filters.http.cache.simple_http_cache":       "//source/extensions/filters/http/cache/simple_http_cache:simple_http_cache_lib",
+
+    #
+    # Internal redirect predicates
+    #
+    "envoy.internal_redirect_predicates.allow_listed_routes": "//source/extensions/internal_redirect/allow_listed_routes:config",
+    "envoy.internal_redirect_predicates.previous_routes":     "//source/extensions/internal_redirect/previous_routes:config",
+    "envoy.internal_redirect_predicates.safe_cross_scheme":   "//source/extensions/internal_redirect/safe_cross_scheme:config",
 }

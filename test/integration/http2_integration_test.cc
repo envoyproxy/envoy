@@ -1117,6 +1117,9 @@ TEST_P(Http2IntegrationTest, SimultaneousRequestWithBufferLimits) {
 
 // Test downstream connection delayed close processing.
 TEST_P(Http2IntegrationTest, DelayedCloseAfterBadFrame) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.mutable_delayed_close_timeout()->set_nanos(1000 * 1000); });
   initialize();
   std::string response;
 

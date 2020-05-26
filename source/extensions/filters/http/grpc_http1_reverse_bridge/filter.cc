@@ -57,7 +57,9 @@ void adjustContentLength(Http::RequestOrResponseHeaderMap& headers,
   if (length_header != nullptr) {
     uint64_t length;
     if (absl::SimpleAtoi(length_header->value().getStringView(), &length)) {
-      headers.setContentLength(adjustment(length));
+      if (length != 0) {
+        headers.setContentLength(adjustment(length));
+      }
     }
   }
 }
@@ -191,6 +193,10 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& buffer, bool end_str
 }
 
 Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
+  if (!enabled_) {
+    return Http::FilterTrailersStatus::Continue;
+  }
+
   trailers.setGrpcStatus(grpc_status_);
 
   if (withhold_grpc_frames_) {

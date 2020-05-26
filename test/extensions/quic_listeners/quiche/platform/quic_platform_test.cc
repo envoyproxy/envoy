@@ -239,7 +239,11 @@ TEST_F(QuicPlatformTest, QuicServerStats) {
 }
 
 TEST_F(QuicPlatformTest, QuicStackTraceTest) {
+#ifndef ENVOY_CONFIG_COVERAGE
+  // This doesn't work in coverage build because part of the stacktrace will be overwritten by
+  // __llvm_coverage_mapping
   EXPECT_THAT(QuicStackTrace(), HasSubstr("QuicStackTraceTest"));
+#endif
 }
 
 TEST_F(QuicPlatformTest, QuicSleep) { QuicSleep(QuicTime::Delta::FromMilliseconds(20)); }
@@ -665,8 +669,8 @@ TEST_F(QuicPlatformTest, PickUnsedPort) {
         Envoy::Network::Test::getCanonicalLoopbackAddress(ip_version);
     Envoy::Network::Address::InstanceConstSharedPtr addr_with_port =
         Envoy::Network::Utility::getAddressWithPort(*addr, port);
-    Envoy::Network::IoHandlePtr io_handle =
-        addr_with_port->socket(Envoy::Network::Address::SocketType::Datagram);
+    Envoy::Network::IoHandlePtr io_handle = Envoy::Network::SocketInterface::socket(
+        Envoy::Network::Address::SocketType::Datagram, addr_with_port);
     // binding of given port should success.
     EXPECT_EQ(0, addr_with_port->bind(io_handle->fd()).rc_);
   }

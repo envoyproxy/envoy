@@ -156,7 +156,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_EQ("200", request("admin", "GET", "/stats/recentlookups", response));
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
   EXPECT_TRUE(absl::StartsWith(response->body(), "   Count Lookup\n")) << response->body();
-  EXPECT_LT(30, response->body().size());
+  EXPECT_LT(28, response->body().size());
 
   // Now disable recent-lookups tracking and check that we get the error again.
   EXPECT_EQ("200", request("admin", "POST", "/stats/recentlookups/disable", response));
@@ -262,37 +262,17 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_EQ("200", request("admin", "GET", "/stats/recentlookups", response));
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
 
-  // TODO(#8324): "http1.metadata_not_supported_error" should not still be in
-  // the 'recent lookups' output after reset_counters.
   switch (GetParam().downstream_protocol) {
   case Http::CodecClient::Type::HTTP1:
     EXPECT_EQ("   Count Lookup\n"
-              "       1 http1.dropped_headers_with_underscores\n"
-              "       1 http1.metadata_not_supported_error\n"
-              "       1 http1.requests_rejected_with_underscores_in_headers\n"
-              "       1 http1.response_flood\n"
               "\n"
-              "total: 4\n",
+              "total: 0\n",
               response->body());
     break;
   case Http::CodecClient::Type::HTTP2:
     EXPECT_EQ("   Count Lookup\n"
-              "       1 http2.dropped_headers_with_underscores\n"
-              "       1 http2.header_overflow\n"
-              "       1 http2.headers_cb_no_stream\n"
-              "       1 http2.inbound_empty_frames_flood\n"
-              "       1 http2.inbound_priority_frames_flood\n"
-              "       1 http2.inbound_window_update_frames_flood\n"
-              "       1 http2.outbound_control_flood\n"
-              "       1 http2.outbound_flood\n"
-              "       1 http2.requests_rejected_with_underscores_in_headers\n"
-              "       1 http2.rx_messaging_error\n"
-              "       1 http2.rx_reset\n"
-              "       1 http2.too_many_header_frames\n"
-              "       1 http2.trailers\n"
-              "       1 http2.tx_reset\n"
               "\n"
-              "total: 14\n",
+              "total: 0\n",
               response->body());
     break;
   case Http::CodecClient::Type::HTTP3:

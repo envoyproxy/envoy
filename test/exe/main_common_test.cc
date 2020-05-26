@@ -64,6 +64,9 @@ protected:
   std::string base_id_;
   std::vector<const char*> argv_;
 };
+INSTANTIATE_TEST_SUITE_P(IpVersions, MainCommonTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Exercise the codepath to instantiate MainCommon and destruct it, with hot restart.
 TEST_P(MainCommonTest, ConstructDestructHotRestartEnabled) {
@@ -94,6 +97,9 @@ TEST_P(MainCommonTest, ConstructDestructHotRestartDisabledNoInit) {
 //   of 0x10000000000 (thread T0)
 
 class MainCommonDeathTest : public MainCommonTest {};
+INSTANTIATE_TEST_SUITE_P(IpVersions, MainCommonDeathTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(MainCommonDeathTest, OutOfMemoryHandler) {
 #if defined(__has_feature) && (__has_feature(thread_sanitizer) || __has_feature(address_sanitizer))
@@ -115,16 +121,14 @@ TEST_P(MainCommonDeathTest, OutOfMemoryHandler) {
         for (uint64_t size = initial;
              size >= initial; // Disallow wraparound to avoid infinite loops on failure.
              size *= 1000) {
-          new int[size];
+          int* p = new int[size];
+          // Use the pointer to prevent clang from optimizing the allocation away in opt mode.
+          ENVOY_LOG_MISC(debug, "p={}", reinterpret_cast<intptr_t>(p));
         }
       }(),
       ".*panic: out of memory.*");
 #endif
 }
-
-INSTANTIATE_TEST_SUITE_P(IpVersions, MainCommonTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
 
 class AdminRequestTest : public MainCommonTest {
 protected:
@@ -217,6 +221,9 @@ protected:
   bool pause_before_run_{false};
   bool pause_after_run_{false};
 };
+INSTANTIATE_TEST_SUITE_P(IpVersions, AdminRequestTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(AdminRequestTest, AdminRequestGetStatsAndQuit) {
   startEnvoy();
@@ -379,9 +386,5 @@ TEST_P(MainCommonTest, ConstructDestructLogger) {
   spdlog::details::log_msg log_msg(logger_name, spdlog::level::level_enum::err, "error");
   Logger::Registry::getSink()->log(log_msg);
 }
-
-INSTANTIATE_TEST_SUITE_P(IpVersions, AdminRequestTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
 
 } // namespace Envoy

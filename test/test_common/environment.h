@@ -23,6 +23,13 @@ public:
   using ParamMap = std::unordered_map<std::string, std::string>;
 
   /**
+   * Perform common initialization steps needed to run a test binary. This
+   * method should be called first in all test main functions.
+   * @param program_name argv[0] test program is invoked with
+   */
+  static void initializeTestMain(char* program_name);
+
+  /**
    * Initialize command-line options for later access by tests in getOptions().
    * @param argc number of command-line args.
    * @param argv array of command-line args.
