@@ -202,7 +202,6 @@ void EnvoyQuicClientStream::OnConnectionClosed(quic::QuicErrorCode error,
 void EnvoyQuicClientStream::OnClose() {
   quic::QuicSpdyClientStream::OnClose();
   if (BufferedDataBytes() > 0) {
-    std::cerr << "=========== OnClose() " << BufferedDataBytes() << "\n";
     // If the stream is closed without sending out all buffered data, regard
     // them as sent now and adjust connection buffer book keeping.
     filterManagerConnection()->adjustBytesToSend(0 - BufferedDataBytes());

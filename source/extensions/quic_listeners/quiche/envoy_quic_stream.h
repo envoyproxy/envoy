@@ -94,8 +94,6 @@ public:
     } else {
       send_buffer_simulation_.checkLowWatermark(buffered_data_new);
     }
-    std::cerr << "=========== maybeCheckWatermark buffered_data_new " << buffered_data_new
-              << " buffered_data_old " << buffered_data_old << " \n";
     connection.adjustBytesToSend(buffered_data_new - buffered_data_old);
   }
 
