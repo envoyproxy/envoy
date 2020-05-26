@@ -6,10 +6,12 @@
 
 #include "benchmark/benchmark.h"
 
+namespace Envoy {
+
 namespace {
 
-std::unique_ptr<Envoy::AccessLog::JsonFormatterImpl> MakeJsonFormatter(bool typed) {
-  std::unordered_map<std::string, std::string> JsonLogFormat = {
+std::unique_ptr<Envoy::AccessLog::JsonFormatterImpl> makeJsonFormatter(bool typed) {
+  absl::flat_hash_map<std::string, std::string> JsonLogFormat = {
       {"remote_address", "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"},
       {"start_time", "%START_TIME(%Y/%m/%dT%H:%M:%S%z %s)%"},
       {"method", "%REQ(:METHOD)%"},
@@ -33,8 +35,7 @@ std::unique_ptr<Envoy::TestStreamInfo> makeStreamInfo() {
 
 } // namespace
 
-namespace Envoy {
-
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_AccessLogFormatter(benchmark::State& state) {
   std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo();
   static const char* LogFormat =
@@ -50,45 +51,52 @@ static void BM_AccessLogFormatter(benchmark::State& state) {
   Http::TestRequestHeaderMapImpl request_headers;
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
+  std::string body;
   for (auto _ : state) {
     output_bytes +=
-        formatter->format(request_headers, response_headers, response_trailers, *stream_info)
+        formatter->format(request_headers, response_headers, response_trailers, *stream_info, body)
             .length();
   }
   benchmark::DoNotOptimize(output_bytes);
 }
 BENCHMARK(BM_AccessLogFormatter);
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_JsonAccessLogFormatter(benchmark::State& state) {
   std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo();
-  std::unique_ptr<Envoy::AccessLog::JsonFormatterImpl> json_formatter = MakeJsonFormatter(false);
+  std::unique_ptr<Envoy::AccessLog::JsonFormatterImpl> json_formatter = makeJsonFormatter(false);
 
   size_t output_bytes = 0;
   Http::TestRequestHeaderMapImpl request_headers;
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
+  std::string body;
   for (auto _ : state) {
     output_bytes +=
-        json_formatter->format(request_headers, response_headers, response_trailers, *stream_info)
+        json_formatter
+            ->format(request_headers, response_headers, response_trailers, *stream_info, body)
             .length();
   }
   benchmark::DoNotOptimize(output_bytes);
 }
 BENCHMARK(BM_JsonAccessLogFormatter);
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_TypedJsonAccessLogFormatter(benchmark::State& state) {
   std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo();
   std::unique_ptr<Envoy::AccessLog::JsonFormatterImpl> typed_json_formatter =
-      MakeJsonFormatter(true);
+      makeJsonFormatter(true);
 
   size_t output_bytes = 0;
   Http::TestRequestHeaderMapImpl request_headers;
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
+  std::string body;
   for (auto _ : state) {
-    output_bytes += typed_json_formatter
-                        ->format(request_headers, response_headers, response_trailers, *stream_info)
-                        .length();
+    output_bytes +=
+        typed_json_formatter
+            ->format(request_headers, response_headers, response_trailers, *stream_info, body)
+            .length();
   }
   benchmark::DoNotOptimize(output_bytes);
 }

@@ -83,11 +83,21 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "listen_socket_interface",
-    hdrs = ["listen_socket.h"],
+    name = "socket_interface",
+    hdrs = ["socket.h"],
     deps = [
         ":address_interface",
         ":io_handle_interface",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "listen_socket_interface",
+    hdrs = ["listen_socket.h"],
+    deps = [
+        ":io_handle_interface",
+        ":socket_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -118,6 +128,7 @@ envoy_cc_library(
         ":connection_interface",
         ":listen_socket_interface",
         "//include/envoy/access_log:access_log_interface",
+        "//include/envoy/common:resource_interface",
         "//include/envoy/stats:stats_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],

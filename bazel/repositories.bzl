@@ -245,7 +245,6 @@ def _com_github_c_ares_c_ares():
     location = _get_location("com_github_c_ares_c_ares")
     http_archive(
         name = "com_github_c_ares_c_ares",
-        patches = ["@envoy//bazel/foreign_cc:cares-win32-nameser.patch"],
         build_file_content = BUILD_ALL_CONTENT,
         **location
     )

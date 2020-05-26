@@ -526,6 +526,18 @@ TEST(HeaderIsValidTest, IsConnect) {
   EXPECT_FALSE(HeaderUtility::isConnect(Http::TestRequestHeaderMapImpl{}));
 }
 
+TEST(HeaderIsValidTest, IsConnectResponse) {
+  RequestHeaderMapPtr connect_request{new TestRequestHeaderMapImpl{{":method", "CONNECT"}}};
+  RequestHeaderMapPtr get_request{new TestRequestHeaderMapImpl{{":method", "GET"}}};
+  TestResponseHeaderMapImpl success_response{{":status", "200"}};
+  TestResponseHeaderMapImpl failure_response{{":status", "500"}};
+
+  EXPECT_TRUE(HeaderUtility::isConnectResponse(connect_request, success_response));
+  EXPECT_FALSE(HeaderUtility::isConnectResponse(connect_request, failure_response));
+  EXPECT_FALSE(HeaderUtility::isConnectResponse(nullptr, success_response));
+  EXPECT_FALSE(HeaderUtility::isConnectResponse(get_request, success_response));
+}
+
 TEST(HeaderAddTest, HeaderAdd) {
   TestHeaderMapImpl headers{{"myheader1", "123value"}};
   TestHeaderMapImpl headers_to_add{{"myheader2", "456value"}};

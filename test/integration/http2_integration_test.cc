@@ -1117,6 +1117,9 @@ TEST_P(Http2IntegrationTest, SimultaneousRequestWithBufferLimits) {
 
 // Test downstream connection delayed close processing.
 TEST_P(Http2IntegrationTest, DelayedCloseAfterBadFrame) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.mutable_delayed_close_timeout()->set_nanos(1000 * 1000); });
   initialize();
   std::string response;
 
@@ -1560,8 +1563,6 @@ void Http2FloodMitigationTest::floodServer(const Http2Frame& frame, const std::s
 
   EXPECT_LE(total_bytes_sent, TransmitThreshold) << "Flood mitigation is broken.";
   EXPECT_EQ(1, test_server_->counter(flood_stat)->value());
-  EXPECT_EQ(1,
-            test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
 }
 
 // Verify that the server detects the flood using specified request parameters.
@@ -1585,8 +1586,6 @@ void Http2FloodMitigationTest::floodServer(absl::string_view host, absl::string_
   if (!flood_stat.empty()) {
     EXPECT_EQ(1, test_server_->counter(flood_stat)->value());
   }
-  EXPECT_EQ(1,
-            test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http2FloodMitigationTest,
@@ -1654,8 +1653,6 @@ TEST_P(Http2FloodMitigationTest, RST_STREAM) {
   }
   EXPECT_LE(total_bytes_sent, TransmitThreshold) << "Flood mitigation is broken.";
   EXPECT_EQ(1, test_server_->counter("http2.outbound_control_flood")->value());
-  EXPECT_EQ(1,
-            test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
 }
 
 // Verify that the server stop reading downstream connection on protocol error.
@@ -1691,8 +1688,6 @@ TEST_P(Http2FloodMitigationTest, EmptyHeaders) {
   tcp_client_->waitForDisconnect();
 
   EXPECT_EQ(1, test_server_->counter("http2.inbound_empty_frames_flood")->value());
-  EXPECT_EQ(1,
-            test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
 }
 
 TEST_P(Http2FloodMitigationTest, EmptyHeadersContinuation) {
@@ -1710,8 +1705,6 @@ TEST_P(Http2FloodMitigationTest, EmptyHeadersContinuation) {
   tcp_client_->waitForDisconnect();
 
   EXPECT_EQ(1, test_server_->counter("http2.inbound_empty_frames_flood")->value());
-  EXPECT_EQ(1,
-            test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
 }
 
 TEST_P(Http2FloodMitigationTest, EmptyData) {
@@ -1730,8 +1723,6 @@ TEST_P(Http2FloodMitigationTest, EmptyData) {
   tcp_client_->waitForDisconnect();
 
   EXPECT_EQ(1, test_server_->counter("http2.inbound_empty_frames_flood")->value());
-  EXPECT_EQ(1,
-            test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
 }
 
 TEST_P(Http2FloodMitigationTest, PriorityIdleStream) {
@@ -1796,8 +1787,6 @@ TEST_P(Http2FloodMitigationTest, ZerolenHeader) {
   tcp_client_->waitForDisconnect();
 
   EXPECT_EQ(1, test_server_->counter("http2.rx_messaging_error")->value());
-  EXPECT_EQ(1,
-            test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("http2.invalid.header.field"));
   // expect a downstream protocol error.
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("DPE"));
@@ -1834,8 +1823,6 @@ TEST_P(Http2FloodMitigationTest, ZerolenHeaderAllowed) {
   tcp_client_->close();
 
   EXPECT_EQ(1, test_server_->counter("http2.rx_messaging_error")->value());
-  EXPECT_EQ(0,
-            test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("http2.invalid.header.field"));
   // expect Downstream Protocol Error
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("DPE"));
