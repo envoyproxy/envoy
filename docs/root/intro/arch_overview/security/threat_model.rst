@@ -1,4 +1,4 @@
-.. _arch_overview_threat_model:
+'0;256;0c.. _arch_overview_threat_model:
 
 Threat model
 ============
@@ -18,21 +18,23 @@ Envoy in edge deployments.
 We will activate the security release process for disclosures that meet the following criteria:
 
 * All issues that lead to loss of data confidentiality or integrity trigger the security release process.
-* An availability issue needs to meet all of the following criteria to trigger the security release process:
+* An availability issue, such as Query-of-Death (QoD) or resource exhaustion needs to meet all of the
+  following criteria to trigger the security release process:
   
   - A component tagged as hardened is affected (see `Core and extensions`_ for the list of hardened components).
     
-  - The type of traffic (upstream or downstream) that exhibits the issue matches component's hardening tag.
+  - The type of traffic (upstream or downstream) that exhibits the issue matches the component's hardening tag.
     I.e. component tagged as “hardened to untrusted downstream” is affected by downstream request.
     
   - A resource exhaustion issue needs to meet these additional criteria:
     
     + Not covered by an existing timeout or where applying short timeout values is impractical and either
       
-    + Memory exhaustion with amplification factor of 100 or more. I.e. 100 byte client request leading to
-      10000 bytes of memory consumed by Envoy or
+    + Per-request memory use 100x or more above the configured header or high watermark limit. I.e. 10 KiB
+      client request leading to 1 MiB bytes of memory consumed by Envoy or
       
-    + CPU exhaustion where 100 or fewer HTTP/1 connections or HTTP/2 streams consume an entire CPU core.
+    + CPU exhaustion where 100 or fewer HTTP/1 connections or HTTP/2 streams with requests sent at 50Mbit/s
+      or less consume an entire CPU core.
 
 The Envoy availability stance around CPU and memory DoS is still evolving, especially for brute force
 attacks. We acknowledge that brute force (i.e. these with amplification factor less than 100) attacks are
