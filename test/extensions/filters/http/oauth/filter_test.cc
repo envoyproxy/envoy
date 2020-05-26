@@ -125,7 +125,6 @@ TEST_F(OAuth2Test, RequestSignout) {
       {Http::Headers::get().Path.get(), "/_signout"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().UserAgent.get(), "CurlAgent/v7.12.3"},
       {Http::Headers::get().ForwardedProto.get(), "https"},
   };
 
@@ -156,7 +155,6 @@ TEST_F(OAuth2Test, OAuthOkPass) {
       {Http::Headers::get().Path.get(), "/anypath"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().UserAgent.get(), "CurlAgent"},
       {Http::Headers::get().ForwardedProto.get(), "https"},
       {Http::Headers::get().Authorization.get(), "Bearer injected_malice!"},
       {"x-forwarded-user", "injected_user"},
@@ -166,7 +164,6 @@ TEST_F(OAuth2Test, OAuthOkPass) {
       {Http::Headers::get().Path.get(), "/anypath"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().UserAgent.get(), "CurlAgent"},
       {Http::Headers::get().ForwardedProto.get(), "https"},
       {Http::Headers::get().Authorization.get(), "Bearer legit_token"},
       {"x-forwarded-user", "legit_user"},
@@ -205,7 +202,6 @@ TEST_F(OAuth2Test, OAuthErrorNonOAuthHttpCallback) {
       {Http::Headers::get().Path.get(), "/not/_oauth"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().UserAgent.get(), "CurlAgent"},
       {Http::Headers::get().Scheme.get(), "http"},
       {Http::Headers::get().ForwardedProto.get(), "http"},
   };
@@ -296,7 +292,6 @@ TEST_F(OAuth2Test, OAuthOptionsRequestAndContinue) {
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Path.get(), "/anypath"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Options},
-      {Http::Headers::get().UserAgent.get(), "CurlAgent/v7.12.3"},
   };
 
   EXPECT_CALL(*validator_, setParams(_, _)).Times(1);
@@ -425,7 +420,6 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
       {Http::Headers::get().Path.get(), "/test?name=admin&level=trace"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Post},
-      {Http::Headers::get().UserAgent.get(), "LoadBalancer"},
       {Http::Headers::get().ForwardedProto.get(), "https"},
   };
 
@@ -459,7 +453,6 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
                                         "2Ftest%3Fname%3Dadmin%26level%3Dtrace"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().UserAgent.get(), "LoadBalancer"},
   };
 
   // Deliberately fail the HMAC validation check.
@@ -488,7 +481,6 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
       {Http::Headers::get().SetCookie.get(), "BearerToken=;version=1;path=/;Max-Age=;secure"},
       {Http::Headers::get().Location.get(),
        "https://traffic.example.com/test?name=admin&level=trace"},
-      {Http::Headers::get().UserAgent.get(), "Auth/Redirect"},
   };
 
   EXPECT_CALL(decoder_callbacks_,
@@ -503,7 +495,6 @@ TEST_F(OAuth2Test, OAuthBearerTokenFlowFromHeader) {
       {Http::Headers::get().Path.get(), "/test?role=bearer"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().UserAgent.get(), "LoadBalancer"},
       {Http::Headers::get().ForwardedProto.get(), "https"},
       {Http::Headers::get().Authorization.get(), "Bearer xyz-header-token"},
   };
@@ -512,7 +503,6 @@ TEST_F(OAuth2Test, OAuthBearerTokenFlowFromHeader) {
       {Http::Headers::get().Path.get(), "/test?role=bearer"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().UserAgent.get(), "LoadBalancer"},
       {Http::Headers::get().ForwardedProto.get(), "https"},
       {Http::Headers::get().Authorization.get(), "Bearer xyz-header-token"},
       {"x-forwarded-user", "test_bearer_user"},
@@ -541,14 +531,12 @@ TEST_F(OAuth2Test, OAuthBearerTokenFlowFromQueryParameters) {
       {Http::Headers::get().Path.get(), "/test?role=bearer&token=xyz-queryparam-token"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().UserAgent.get(), "LoadBalancer"},
       {Http::Headers::get().ForwardedProto.get(), "https"},
   };
   Http::TestRequestHeaderMapImpl request_headers_after{
       {Http::Headers::get().Path.get(), "/test?role=bearer&token=xyz-queryparam-token"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().UserAgent.get(), "LoadBalancer"},
       {Http::Headers::get().ForwardedProto.get(), "https"},
       {Http::Headers::get().Authorization.get(), "Bearer xyz-queryparam-token"},
       {"x-forwarded-user", "test_bearer_user"},

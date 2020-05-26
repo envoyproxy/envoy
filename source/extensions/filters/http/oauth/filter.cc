@@ -192,15 +192,6 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   ASSERT(path_header != nullptr);
   const absl::string_view path_str = path_header->value().getStringView();
 
-  // Keep track of how many initial 302s (to the auth server) we initially distribute.
-  // The goal is to keep this number in line with the number of successful logins at the conclusion
-  // of this filter.
-  const auto* user_agent_header = headers.UserAgent();
-  const absl::string_view user_agent_value =
-      user_agent_header != nullptr ? user_agent_header->value().getStringView() : EMPTY_STRING;
-  const std::vector<std::string> v = absl::StrSplit(user_agent_value, '.');
-  user_agent_ = v[0];
-
   sanitizeXForwardedOauthHeaders(headers);
 
   // We should check if this is a sign out request.
@@ -456,7 +447,6 @@ void OAuth2Filter::onGetIdentitySuccess(const std::string& username) {
   }
 
   response_headers->setReferenceKey(Http::Headers::get().Location, state_);
-  response_headers->setReferenceKey(Http::Headers::get().UserAgent, "Auth/Redirect");
 
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true);
   config_->stats().oauth_success_.inc();
