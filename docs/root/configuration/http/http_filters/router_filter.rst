@@ -59,7 +59,7 @@ A few notes on how Envoy does retries:
 x-envoy-retry-on
 ^^^^^^^^^^^^^^^^
 
-Setting this header requests will cause Envoy to attempt to retry failed requests (number
+Setting this header will cause Envoy to attempt to retry failed requests (number
 of retries defaults to 1 and can be controlled by :ref:`x-envoy-max-retries
 <config_http_filters_router_x-envoy-max-retries>` header or the :ref:`route config retry policy
 <envoy_v3_api_field_config.route.v3.RouteAction.retry_policy>` or the :ref:`virtual host retry policy <envoy_v3_api_field_config.route.v3.VirtualHost.retry_policy>`).
@@ -245,7 +245,7 @@ the downstream, which normally happens after the upstream has sent response head
 x-envoy-hedge-on-per-try-timeout
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Setting this header on cause Envoy to use a request hedging strategy in the case of a per try timeout.
+Setting this header will cause Envoy to use a request hedging strategy in the case of a per try timeout.
 This overrides the value set in the :ref:`route configuration
 <envoy_v3_api_field_config.route.v3.HedgePolicy.hedge_on_per_try_timeout>`. This means that a retry
 will be issued without resetting the original request, leaving multiple upstream requests
