@@ -360,11 +360,11 @@ std::pair<T, std::vector<Network::Address::CidrRange>> makeCidrListEntry(const s
                                                                          const T& data) {
   std::vector<Network::Address::CidrRange> subnets;
   if (cidr == EMPTY_STRING) {
-    if (Network::Address::ipFamilySupported(AF_INET)) {
+    if (Network::SocketInterface::ipFamilySupported(AF_INET)) {
       subnets.push_back(
           Network::Address::CidrRange::create(Network::Utility::getIpv4CidrCatchAllAddress()));
     }
-    if (Network::Address::ipFamilySupported(AF_INET6)) {
+    if (Network::SocketInterface::ipFamilySupported(AF_INET6)) {
       subnets.push_back(
           Network::Address::CidrRange::create(Network::Utility::getIpv6CidrCatchAllAddress()));
     }
