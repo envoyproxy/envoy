@@ -70,6 +70,7 @@ TEST_F(DynamicOpenTracingDriverTest, InitializeDriver) {
   }
 }
 
+//#ifndef GCC_COMPILER
 TEST_F(DynamicOpenTracingDriverTest, FlushSpans) {
   setupValidDriver();
 
@@ -87,6 +88,7 @@ TEST_F(DynamicOpenTracingDriverTest, FlushSpans) {
   EXPECT_NE(spans_json, nullptr);
   EXPECT_EQ(spans_json->asObjectArray().size(), 1);
 }
+//#endif
 
 } // namespace
 } // namespace DynamicOt
