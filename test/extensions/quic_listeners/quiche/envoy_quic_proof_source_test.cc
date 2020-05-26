@@ -45,9 +45,9 @@ private:
   absl::string_view expected_leaf_cert_;
 };
 
-class EnvoyQuicFakeProofSourceTest : public ::testing::Test {
+class EnvoyQuicProofSourceTest : public ::testing::Test {
 public:
-  EnvoyQuicFakeProofSourceTest()
+  EnvoyQuicProofSourceTest()
       : server_address_(quic::QuicIpAddress::Loopback4(), 12345),
         client_address_(quic::QuicIpAddress::Loopback4(), 54321),
         listen_socket_(std::make_shared<Network::MockListenSocket>()),
@@ -69,7 +69,7 @@ protected:
   EnvoyQuicFakeProofVerifier proof_verifier_;
 };
 
-TEST_F(EnvoyQuicFakeProofSourceTest, TestGetProof) {
+TEST_F(EnvoyQuicProofSourceTest, TestGetProof) {
   bool called = false;
   auto callback = std::make_unique<TestGetProofCallback>(called, "Fake timestamp",
                                                          quic::test::kTestCertificate);
