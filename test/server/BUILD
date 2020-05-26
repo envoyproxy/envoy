@@ -163,7 +163,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "overload_manager_impl_test",
     srcs = ["overload_manager_impl_test.cc"],
-    tags = ["fails_on_windows"],
     deps = [
         "//include/envoy/registry",
         "//source/common/stats:isolated_store_lib",
