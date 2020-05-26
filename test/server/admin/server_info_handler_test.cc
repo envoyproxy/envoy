@@ -71,8 +71,7 @@ TEST_P(AdminInstanceTest, GetReadyRequest) {
     ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Initialized));
     EXPECT_EQ(Http::Code::OK, admin_.request("/ready", "GET", response_headers, body));
     EXPECT_EQ(body, "LIVE\n");
-    EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
-                HasSubstr("text/plain"));
+    EXPECT_THAT(std::string(response_headers.getContentTypeValue()), HasSubstr("text/plain"));
   }
 
   {
@@ -83,8 +82,7 @@ TEST_P(AdminInstanceTest, GetReadyRequest) {
     EXPECT_EQ(Http::Code::ServiceUnavailable,
               admin_.request("/ready", "GET", response_headers, body));
     EXPECT_EQ(body, "PRE_INITIALIZING\n");
-    EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
-                HasSubstr("text/plain"));
+    EXPECT_THAT(std::string(response_headers.getContentTypeValue()), HasSubstr("text/plain"));
   }
 
   Http::ResponseHeaderMapImpl response_headers;
@@ -94,8 +92,7 @@ TEST_P(AdminInstanceTest, GetReadyRequest) {
   EXPECT_EQ(Http::Code::ServiceUnavailable,
             admin_.request("/ready", "GET", response_headers, body));
   EXPECT_EQ(body, "INITIALIZING\n");
-  EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
-              HasSubstr("text/plain"));
+  EXPECT_THAT(std::string(response_headers.getContentTypeValue()), HasSubstr("text/plain"));
 }
 
 TEST_P(AdminInstanceTest, GetRequest) {
@@ -117,8 +114,7 @@ TEST_P(AdminInstanceTest, GetRequest) {
     ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Initialized));
     EXPECT_EQ(Http::Code::OK, admin_.request("/server_info", "GET", response_headers, body));
     envoy::admin::v3::ServerInfo server_info_proto;
-    EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
-                HasSubstr("application/json"));
+    EXPECT_THAT(std::string(response_headers.getContentTypeValue()), HasSubstr("application/json"));
 
     // We only test that it parses as the proto and that some fields are correct, since
     // values such as timestamps + Envoy version are tricky to test for.
@@ -136,8 +132,7 @@ TEST_P(AdminInstanceTest, GetRequest) {
     ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Uninitialized));
     EXPECT_EQ(Http::Code::OK, admin_.request("/server_info", "GET", response_headers, body));
     envoy::admin::v3::ServerInfo server_info_proto;
-    EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
-                HasSubstr("application/json"));
+    EXPECT_THAT(std::string(response_headers.getContentTypeValue()), HasSubstr("application/json"));
 
     // We only test that it parses as the proto and that some fields are correct, since
     // values such as timestamps + Envoy version are tricky to test for.
@@ -153,8 +148,7 @@ TEST_P(AdminInstanceTest, GetRequest) {
   ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Initializing));
   EXPECT_EQ(Http::Code::OK, admin_.request("/server_info", "GET", response_headers, body));
   envoy::admin::v3::ServerInfo server_info_proto;
-  EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
-              HasSubstr("application/json"));
+  EXPECT_THAT(std::string(response_headers.getContentTypeValue()), HasSubstr("application/json"));
 
   // We only test that it parses as the proto and that some fields are correct, since
   // values such as timestamps + Envoy version are tricky to test for.
@@ -170,8 +164,7 @@ TEST_P(AdminInstanceTest, PostRequest) {
   EXPECT_NO_LOGS(EXPECT_EQ(Http::Code::OK,
                            admin_.request("/healthcheck/fail", "POST", response_headers, body)));
   EXPECT_EQ(body, "OK\n");
-  EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
-              HasSubstr("text/plain"));
+  EXPECT_THAT(std::string(response_headers.getContentTypeValue()), HasSubstr("text/plain"));
 }
 
 } // namespace Server
