@@ -14,7 +14,8 @@ using namespace Envoy::Http::Http2;
 
 namespace {
 
-static Http2Frame::HeadersFlags unifyHeadersFlags(const ::google::protobuf::RepeatedField<int>& headers_flags) {
+static Http2Frame::HeadersFlags
+unifyHeadersFlags(const Protobuf::RepeatedField<int>& headers_flags) {
   int unified_flags = 0;
   for (const auto& flag : headers_flags) {
     unified_flags |= flag;
@@ -40,8 +41,7 @@ void H2FuzzIntegrationTest::sendFrame(const test::integration::H2TestFrame& prot
     break;
   }
   case test::integration::H2TestFrame::kHeaders: {
-    const Http2Frame::HeadersFlags headers_flags =
-        unifyHeadersFlags(proto_frame.headers().flags());
+    const Http2Frame::HeadersFlags headers_flags = unifyHeadersFlags(proto_frame.headers().flags());
     const uint32_t stream_idx = proto_frame.headers().stream_index();
     ENVOY_LOG_MISC(trace, "Sending headers frame");
     h2_frame = Http2Frame::makeEmptyHeadersFrame(stream_idx, headers_flags);
@@ -143,8 +143,12 @@ void H2FuzzIntegrationTest::sendFrame(const test::integration::H2TestFrame& prot
 
 void H2FuzzIntegrationTest::replay(const test::integration::H2CaptureFuzzTestCase& input,
                                    bool ignore_response) {
-  initialize();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+  PERSISTENT_FUZZ_VAR bool initialized = [this]() -> bool {
+    initialize();
+    fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+    return true;
+  }();
+  UNREFERENCED_PARAMETER(initialized);
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("http"));
   FakeRawConnectionPtr fake_upstream_connection;
   bool stop_further_inputs = false;
