@@ -259,9 +259,9 @@ TEST_F(SubscriptionFactoryTest, HttpSubscription) {
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))
       .WillOnce(Invoke([this](Http::RequestMessagePtr& request, Http::AsyncClient::Callbacks&,
                               const Http::AsyncClient::RequestOptions&) {
-        EXPECT_EQ("POST", std::string(request->headers().getMethodValue()));
-        EXPECT_EQ("static_cluster", std::string(request->headers().getHostValue()));
-        EXPECT_EQ("/v2/discovery:endpoints", std::string(request->headers().getPathValue()));
+        EXPECT_EQ("POST", request->headers().getMethodValue());
+        EXPECT_EQ("static_cluster", request->headers().getHostValue());
+        EXPECT_EQ("/v2/discovery:endpoints", request->headers().getPathValue());
         return &http_request_;
       }));
   EXPECT_CALL(http_request_, cancel());
