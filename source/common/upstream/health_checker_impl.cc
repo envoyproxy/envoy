@@ -703,12 +703,19 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
 void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onResetStream(Http::StreamResetReason,
                                                                         absl::string_view) {
   const bool expected_reset = expect_reset_;
+  const bool goaway = received_goaway_;
   resetState();
 
   if (expected_reset) {
     // Stream reset was initiated by us (bogus gRPC response, timeout or cluster host is going
-    // away). In these cases health check failure has already been reported, so just return.
+    // away). In these cases health check failure has already been reported and a GOAWAY (if any)
+    // has already been handled, so just return.
     return;
+  }
+
+  if (goaway) {
+    // Stream reset was unexpected, so GOAWAY hasn't been handled yet.
+    client_->close();
   }
 
   ENVOY_CONN_LOG(debug, "connection/stream error health_flags={}", *client_,
@@ -725,13 +732,12 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onResetStream(Http::St
 void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onGoAway() {
   ENVOY_CONN_LOG(debug, "connection going away health_flags={}", *client_,
                  HostUtility::healthFlagsToString(*host_));
-  // Even if we have active health check probe, fail it on GOAWAY and schedule new one.
+  // If we have an active health check probe, allow it to complete before closing the connection.
   if (request_encoder_) {
-    handleFailure(envoy::data::core::v3::NETWORK);
-    expect_reset_ = true;
-    request_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
+    received_goaway_ = true;
+  } else {
+    client_->close();
   }
-  client_->close();
 }
 
 bool GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::isHealthCheckSucceeded(
@@ -757,6 +763,8 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onRpcComplete(
     handleFailure(envoy::data::core::v3::ACTIVE);
   }
 
+  const bool goaway = received_goaway_;
+
   // |end_stream| will be false if we decided to stop healthcheck before HTTP stream has ended -
   // invalid gRPC payload, unexpected message stream or wrong content-type.
   if (end_stream) {
@@ -767,7 +775,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onRpcComplete(
     request_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
   }
 
-  if (!parent_.reuse_connection_) {
+  if (!parent_.reuse_connection_ || goaway) {
     client_->close();
   }
 }
@@ -777,13 +785,18 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::resetState() {
   request_encoder_ = nullptr;
   decoder_ = Grpc::Decoder();
   health_check_response_.reset();
+  received_goaway_ = false;
 }
 
 void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onTimeout() {
   ENVOY_CONN_LOG(debug, "connection/stream timeout health_flags={}", *client_,
                  HostUtility::healthFlagsToString(*host_));
   expect_reset_ = true;
-  request_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
+  if (received_goaway_) {
+    client_->close();
+  } else {
+    request_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
+  }
 }
 
 void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::logHealthCheckStatus(

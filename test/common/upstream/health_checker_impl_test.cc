@@ -4529,21 +4529,141 @@ TEST_F(GrpcHealthCheckerImplTest, GrpcFailUnknownHealthStatus) {
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 }
 
-// Test receiving GOAWAY is interpreted as connection close event.
+// Test receiving GOAWAY is handled gracefully while a check is in progress.
 TEST_F(GrpcHealthCheckerImplTest, GoAwayProbeInProgress) {
-  // FailureType::Network will be issued, it will render host unhealthy only if unhealthy_threshold
-  // is reached.
-  setupHCWithUnhealthyThreshold(1);
-  expectSingleHealthcheck(HealthTransition::Changed);
-  EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _));
-  EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
+  setupHCWithUnhealthyThreshold(/*threshold=*/1);
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
 
+  expectSessionCreate();
+  expectHealthcheckStart(0);
+  health_checker_->start();
+
+  expectHealthcheckStop(0);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+
+  // GOAWAY during check should be handle gracefully.
   test_sessions_[0]->codec_client_->raiseGoAway();
+  respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
+  expectHostHealthy(true);
 
-  EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
-      Host::HealthFlag::FAILED_ACTIVE_HC));
-  EXPECT_EQ(Host::Health::Unhealthy,
-            cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+  // GOAWAY should cause a new connection to be created.
+  expectClientCreate(0);
+  expectHealthcheckStart(0);
+  test_sessions_[0]->interval_timer_->invokeCallback();
+
+  expectHealthcheckStop(0);
+  // Test host state haven't changed.
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+  respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
+  expectHostHealthy(true);
+}
+
+// Test receiving GOAWAY closes connection after an in progress probe times outs.
+TEST_F(GrpcHealthCheckerImplTest, GoAwayProbeInProgressTimeout) {
+  setupHCWithUnhealthyThreshold(/*threshold=*/1);
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+
+  expectSessionCreate();
+  expectHealthcheckStart(0);
+  EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
+  health_checker_->start();
+
+  expectHealthcheckStop(0);
+  // Unhealthy threshold is 1 so first timeout causes unhealthy
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
+  EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _));
+
+  // GOAWAY during check should be handled gracefully.
+  test_sessions_[0]->codec_client_->raiseGoAway();
+  expectHostHealthy(true);
+
+  test_sessions_[0]->timeout_timer_->invokeCallback();
+  expectHostHealthy(false);
+
+  // GOAWAY should cause a new connection to be created.
+  expectClientCreate(0);
+  expectHealthcheckStart(0);
+  test_sessions_[0]->interval_timer_->invokeCallback();
+
+  expectHealthcheckStop(0);
+  // Healthy threshold is 2, so the we'ere pending a state change.
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::ChangePending));
+  respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
+  expectHostHealthy(false);
+}
+
+// Test receiving GOAWAY closes connection after an unexpected stream reset.
+TEST_F(GrpcHealthCheckerImplTest, GoAwayProbeInProgressStreamReset) {
+  setupHCWithUnhealthyThreshold(/*threshold=*/1);
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+
+  expectSessionCreate();
+  expectHealthcheckStart(0);
+  EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
+  health_checker_->start();
+
+  expectHealthcheckStop(0);
+  // Unhealthy threshold is 1 so first stream reset causes unhealthy
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
+  EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _));
+
+  // GOAWAY during check should be handled gracefully.
+  test_sessions_[0]->codec_client_->raiseGoAway();
+  expectHostHealthy(true);
+
+  test_sessions_[0]->request_encoder_.stream_.resetStream(Http::StreamResetReason::RemoteReset);
+  expectHostHealthy(false);
+
+  // GOAWAY should cause a new connection to be created.
+  expectClientCreate(0);
+  expectHealthcheckStart(0);
+  test_sessions_[0]->interval_timer_->invokeCallback();
+
+  expectHealthcheckStop(0);
+  // Healthy threshold is 2, so the we'ere pending a state change.
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::ChangePending));
+  respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
+  expectHostHealthy(false);
+}
+
+// Test receiving GOAWAY closes connection after a bad response.
+TEST_F(GrpcHealthCheckerImplTest, GoAwayProbeInProgressBadResponse) {
+  setupHCWithUnhealthyThreshold(/*threshold=*/1);
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+
+  expectSessionCreate();
+  expectHealthcheckStart(0);
+  EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
+  health_checker_->start();
+
+  expectHealthcheckStop(0);
+  // Unhealthy threshold is 1 so first bad response causes unhealthy
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
+  EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _));
+
+  // GOAWAY during check should be handled gracefully.
+  test_sessions_[0]->codec_client_->raiseGoAway();
+  expectHostHealthy(true);
+
+  respondResponseSpec(0, ResponseSpec{{{":status", "200"}, {"content-type", "application/grpc"}},
+                                      {ResponseSpec::invalidChunk()},
+                                      {}});
+  expectHostHealthy(false);
+
+  // GOAWAY should cause a new connection to be created.
+  expectClientCreate(0);
+  expectHealthcheckStart(0);
+  test_sessions_[0]->interval_timer_->invokeCallback();
+
+  expectHealthcheckStop(0);
+  // Healthy threshold is 2, so the we'ere pending a state change.
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::ChangePending));
+  respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
+  expectHostHealthy(false);
 }
 
 // Test receiving GOAWAY between checks affects nothing.

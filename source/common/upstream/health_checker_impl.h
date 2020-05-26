@@ -358,6 +358,7 @@ private:
     // e.g. remote reset. In this case healthcheck status has already been reported, only state
     // cleanup is required.
     bool expect_reset_ = false;
+    bool received_goaway_ = false;
   };
 
   virtual Http::CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
