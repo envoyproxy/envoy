@@ -889,7 +889,6 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, RouteDisabled) {
 
 class OverrideConfigGrpcJsonTranscoderIntegrationTest : public GrpcJsonTranscoderIntegrationTest {
 public:
-  OverrideConfigGrpcJsonTranscoderIntegrationTest() : GrpcJsonTranscoderIntegrationTest() {}
   /**
    * Global initializer for all integration tests.
    */
