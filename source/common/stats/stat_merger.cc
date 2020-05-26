@@ -147,7 +147,7 @@ void StatMerger::removeParentContributionToGauges() {
       continue;
     }
 
-    uint64_t parent_value = iter.second;
+    const uint64_t parent_value = iter.second;
     gauge.sub(parent_value);
   }
   parent_gauge_values_.clear();
