@@ -160,7 +160,7 @@ TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "GET", "/cluster1", "", downstream_protocol_, version_, "foo.com");
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("503", response->headers().getStatusValue());
 
   cleanupUpstreamAndDownstream();
   codec_client_->waitForDisconnect();

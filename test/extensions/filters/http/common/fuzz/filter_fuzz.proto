@@ -8,5 +8,9 @@ import "envoy/extensions/filters/network/http_connection_manager/v3/http_connect
 message FilterFuzzTestCase {
   envoy.extensions.filters.network.http_connection_manager.v3.HttpFilter config = 1;
 
+  // Downstream data (named for backwards compatibility).
   test.fuzz.HttpData data = 2;
+
+  // Upstream data.
+  test.fuzz.HttpData upstream_data = 3;
 }
