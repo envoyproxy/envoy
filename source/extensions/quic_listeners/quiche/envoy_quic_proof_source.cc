@@ -56,15 +56,6 @@ void EnvoyQuicProofSource::ComputeTlsSignature(
   std::stringstream pem_str(pkey);
   std::unique_ptr<quic::CertificatePrivateKey> pem_key =
       quic::CertificatePrivateKey::LoadPemFromStream(&pem_str);
-  /*
-  bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(cert_config.privateKey().data()),
-                                           cert_config.privateKey().size()));
-  RELEASE_ASSERT(bio != nullptr, "");
-  bssl::UniquePtr<EVP_PKEY> pkey(PEM_read_bio_PrivateKey(
-      bio.get(), nullptr, nullptr,
-      !cert_config.password().empty() ? const_cast<char*>(cert_config.password().c_str())
-                                      : nullptr));
-*/
 
   // Sign.
   std::string sig = pem_key->Sign(in, signature_algorithm);
@@ -74,30 +65,6 @@ void EnvoyQuicProofSource::ComputeTlsSignature(
   } else {
     callback->Run(true, sig, nullptr);
   }
-  /*
-  bssl::ScopedEVP_MD_CTX sign_context;
-  EVP_PKEY_CTX* pkey_ctx;
-  size_t siglen;
-  std::string sig;
-  if (!EVP_DigestSignInit(sign_context.get(), &pkey_ctx, EVP_sha256(), nullptr, pkey.get()) ||
-      !EVP_PKEY_CTX_set_rsa_padding(pkey_ctx, RSA_PKCS1_PSS_PADDING) ||
-      !EVP_PKEY_CTX_set_rsa_pss_saltlen(pkey_ctx, -1) ||
-      !EVP_DigestSignUpdate(sign_context.get(), reinterpret_cast<const uint8_t*>(in.data()),
-                            in.size()) ||
-      !EVP_DigestSignFinal(sign_context.get(), nullptr, &siglen)) {
-    callback->Run(false, sig, nullptr);
-    return;
-  }
-  sig.resize(siglen);
-  if (!EVP_DigestSignFinal(sign_context.get(),
-                           reinterpret_cast<uint8_t*>(const_cast<char*>(sig.data())), &siglen)) {
-    callback->Run(false, sig, nullptr);
-    return;
-  }
-  sig.resize(siglen);
-
-  callback->Run(true, sig, nullptr);
-  */
 }
 
 absl::optional<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>>
