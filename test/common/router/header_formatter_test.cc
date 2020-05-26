@@ -750,6 +750,8 @@ TEST(HeaderParserTest, TestParseInternal) {
       {"%PER_REQUEST_STATE(testing)%", {"test_value"}, {}},
       {"%REQ(x-request-id)%", {"123"}, {}},
       {"%START_TIME%", {"2018-04-03T23:06:09.123Z"}, {}},
+      {"%RESPONSE_FLAGS%", {"LR"}, {}},
+      {"%RESPONSE_CODE_DETAILS%", {"via_upstream"}, {}},
 
       // Unescaped %
       {"%", {}, {"Invalid header configuration. Un-escaped % at position 0"}},
@@ -874,6 +876,12 @@ TEST(HeaderParserTest, TestParseInternal) {
                         StreamInfo::FilterState::LifeSpan::FilterChain);
   ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
   ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(*filter_state));
+
+  ON_CALL(stream_info, hasResponseFlag(StreamInfo::ResponseFlag::LocalReset))
+      .WillByDefault(Return(true));
+
+  absl::optional<std::string> rc_details{"via_upstream"};
+  ON_CALL(stream_info, responseCodeDetails()).WillByDefault(ReturnRef(rc_details));
 
   for (const auto& test_case : test_cases) {
     Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption> to_add;
