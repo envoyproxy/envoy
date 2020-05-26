@@ -67,9 +67,6 @@ const std::string& unauthorizedBodyMessage() {
   CONSTRUCT_ON_FIRST_USE(std::string, "OAuth flow failed.");
 }
 
-const std::string& defaultOauthCallback() { CONSTRUCT_ON_FIRST_USE(std::string, "/_oauth"); }
-const std::string& defaultOauthSignout() { CONSTRUCT_ON_FIRST_USE(std::string, "/_signout"); }
-
 const std::string& queryParamsError() { CONSTRUCT_ON_FIRST_USE(std::string, "error"); }
 const std::string& queryParamsCode() { CONSTRUCT_ON_FIRST_USE(std::string, "code"); }
 const std::string& queryParamsState() { CONSTRUCT_ON_FIRST_USE(std::string, "state"); }
@@ -79,11 +76,8 @@ FilterConfig::FilterConfig(
     Upstream::ClusterManager& cluster_manager, std::shared_ptr<SecretReader> secret_reader,
     Stats::Scope& scope, const std::string& stats_prefix)
     : cluster_name_(proto_config.cluster()), client_id_(proto_config.credentials().client_id()),
-      oauth_server_hostname_(proto_config.hostname()),
-      callback_path_(
-          PROTOBUF_GET_STRING_OR_DEFAULT(proto_config, callback_path, defaultOauthCallback())),
-      signout_path_(
-          PROTOBUF_GET_STRING_OR_DEFAULT(proto_config, signout_path, defaultOauthSignout())),
+      oauth_server_hostname_(proto_config.hostname()), callback_path_(proto_config.callback_path()),
+      signout_path_(proto_config.signout_path()),
       forward_bearer_token_(proto_config.forward_bearer_token()),
       pass_through_options_method_(proto_config.pass_through_options_method()),
       secret_reader_(secret_reader), stats_(FilterConfig::generateStats(stats_prefix, scope)) {

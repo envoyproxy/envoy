@@ -48,11 +48,11 @@ message OAuth2Config {
   // A struct with the credentials required for OAuth
   OAuth2Credentials credentials = 3;
 
-  // The callback path the OAuth server should use. Default is /_oauth.
-  string callback_path = 4;
+  // The callback path the OAuth server should use.
+  string callback_path = 4 [(validate.rules).string = {min_bytes: 1}];
 
-  // The path to sign a user out, clearing their credential cookies. Default is /_signout.
-  string signout_path = 5;
+  // The path to sign a user out, clearing their credential cookies.
+  string signout_path = 5 [(validate.rules).string = {min_bytes: 1}];
 
   // The duration for outgoing auth requests. Default is 3s.
   google.protobuf.Duration timeout = 6;
