@@ -53,7 +53,7 @@ message Compressor {
   config.core.v3.RuntimeFeatureFlag runtime_enabled = 5;
 
   // A compressor library to use for compression. Currently only
-  // :ref:`envoy.filters.http.compressor.gzip<envoy_api_msg_extensions.compression.gzip.compressor.v3.Gzip>`
+  // :ref:`envoy.compression.gzip.compressor<envoy_api_msg_extensions.compression.gzip.compressor.v3.Gzip>`
   // is included in Envoy.
   // This field is ignored if used in the context of the gzip http-filter, but is mandatory otherwise.
   config.core.v3.TypedExtensionConfig compressor_library = 6;

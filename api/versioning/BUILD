@@ -55,6 +55,7 @@ proto_library(
         "//envoy/extensions/filters/http/compressor/v3:pkg",
         "//envoy/extensions/filters/http/cors/v3:pkg",
         "//envoy/extensions/filters/http/csrf/v3:pkg",
+        "//envoy/extensions/filters/http/decompressor/v3:pkg",
         "//envoy/extensions/filters/http/dynamic_forward_proxy/v3:pkg",
         "//envoy/extensions/filters/http/dynamo/v3:pkg",
         "//envoy/extensions/filters/http/ext_authz/v3:pkg",

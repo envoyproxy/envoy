@@ -46,7 +46,7 @@
   * Regular pointers (e.g. `int* foo`) should not be type aliased.
 * `absl::optional<std::reference_wrapper<T>> is type aliased:
   * `using FooOptRef = absl::optional<std::reference_wrapper<T>>;`
-  * `using FooOptConstRef = absl::optional<std::reference_wrapper<T>>;`
+  * `using FooOptConstRef = absl::optional<std::reference_wrapper<const T>>;`
 * If move semantics are intended, prefer specifying function arguments with `&&`.
   E.g., `void onHeaders(Http::HeaderMapPtr&& headers, ...)`. The rationale for this is that it
   forces the caller to specify `std::move(...)` or pass a temporary and makes the intention at
