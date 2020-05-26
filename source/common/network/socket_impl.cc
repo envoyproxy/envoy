@@ -142,13 +142,10 @@ SocketImpl::SocketImpl(Address::SocketType socket_type, const Address::InstanceC
     : io_handle_(SocketInterface::socket(socket_type, addr)) {}
 
 Api::SysCallIntResult SocketImpl::bind(Network::Address::InstanceConstSharedPtr address) {
-  const auto* address_base = dynamic_cast<const Network::Address::InstanceBase*>(address.get());
-  const auto* sa = reinterpret_cast<const sockaddr*>(address_base->sockAddr());
-
   if (address->type() == Address::Type::Pipe) {
-    const auto* pipe_sa = reinterpret_cast<const sockaddr_un*>(sa);
-    const auto* pipe_base = dynamic_cast<const Network::Address::PipeInstance*>(address.get());
-    bool abstract_namespace = pipe_base->abstractNamespace();
+    const Address::Pipe* pipe = address->pipe();
+    const auto* pipe_sa = reinterpret_cast<const sockaddr_un*>(address->sockAddr());
+    bool abstract_namespace = address->pipe()->abstractNamespace();
     if (!abstract_namespace) {
       // Try to unlink an existing filesystem object at the requested path. Ignore
       // errors -- it's fine if the path doesn't exist, and if it exists but can't
@@ -156,20 +153,19 @@ Api::SysCallIntResult SocketImpl::bind(Network::Address::InstanceConstSharedPtr 
       unlink(pipe_sa->sun_path);
     }
     // Not storing a reference to syscalls singleton because of unit test mocks
-    auto bind_result =
-        Api::OsSysCallsSingleton::get().bind(io_handle_->fd(), sa, address_base->sockAddrLen());
-    if (pipe_base->getMode() != 0 && !abstract_namespace && bind_result.rc_ == 0) {
-      auto set_permissions =
-          Api::OsSysCallsSingleton::get().chmod(pipe_sa->sun_path, pipe_base->getMode());
+    auto bind_result = Api::OsSysCallsSingleton::get().bind(io_handle_->fd(), address->sockAddr(),
+                                                            address->sockAddrLen());
+    if (pipe->mode() != 0 && !abstract_namespace && bind_result.rc_ == 0) {
+      auto set_permissions = Api::OsSysCallsSingleton::get().chmod(pipe_sa->sun_path, pipe->mode());
       if (set_permissions.rc_ != 0) {
-        throw EnvoyException("Failed to create socket with mode " +
-                             std::to_string(pipe_base->getMode()));
+        throw EnvoyException("Failed to create socket with mode " + std::to_string(pipe->mode()));
       }
     }
     return bind_result;
   }
 
-  return Api::OsSysCallsSingleton::get().bind(io_handle_->fd(), sa, address_base->sockAddrLen());
+  return Api::OsSysCallsSingleton::get().bind(io_handle_->fd(), address->sockAddr(),
+                                              address->sockAddrLen());
 }
 
 Api::SysCallIntResult SocketImpl::listen(int backlog) {

@@ -37,9 +37,6 @@ public:
   const std::string& logicalName() const override { return asString(); }
   Type type() const override { return type_; }
 
-  virtual const sockaddr* sockAddr() const PURE;
-  virtual socklen_t sockAddrLen() const PURE;
-
 protected:
   InstanceBase(Type type) : type_(type) {}
 
@@ -78,8 +75,7 @@ public:
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
   const Ip* ip() const override { return &ip_; }
-
-  // Network::Address::InstanceBase
+  const Pipe* pipe() const override { return nullptr; }
   const sockaddr* sockAddr() const override {
     return reinterpret_cast<const sockaddr*>(&ip_.ipv4_.address_);
   }
@@ -149,8 +145,7 @@ public:
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
   const Ip* ip() const override { return &ip_; }
-
-  // Network::Address::InstanceBase
+  const Pipe* pipe() const override { return nullptr; }
   const sockaddr* sockAddr() const override {
     return reinterpret_cast<const sockaddr*>(&ip_.ipv6_.address_);
   }
@@ -210,32 +205,31 @@ public:
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
   const Ip* ip() const override { return nullptr; }
-
-  // Network::Address::InstanceBase
-  const sockaddr* sockAddr() const override { return reinterpret_cast<const sockaddr*>(&address_); }
+  const Pipe* pipe() const override { return &pipe_; }
+  const sockaddr* sockAddr() const override {
+    return reinterpret_cast<const sockaddr*>(&pipe_.address_);
+  }
   socklen_t sockAddrLen() const override {
-    if (abstract_namespace_) {
-      return offsetof(struct sockaddr_un, sun_path) + address_length_;
+    if (pipe_.abstract_namespace_) {
+      return offsetof(struct sockaddr_un, sun_path) + pipe_.address_length_;
     }
-    return sizeof(address_);
+    return sizeof(pipe_.address_);
   }
 
-  /**
-   * Accessor for abstract_namespace
-   */
-  bool abstractNamespace() const { return abstract_namespace_; }
-
-  /**
-   * Accessor for mode
-   */
-  mode_t getMode() const { return mode_; }
-
 private:
-  sockaddr_un address_;
-  // For abstract namespaces.
-  bool abstract_namespace_{false};
-  uint32_t address_length_{0};
-  mode_t mode_{0};
+  struct PipeHelper : public Pipe {
+
+    bool abstractNamespace() const override { return abstract_namespace_; }
+    mode_t mode() const override { return mode_; }
+
+    sockaddr_un address_;
+    // For abstract namespaces.
+    bool abstract_namespace_{false};
+    uint32_t address_length_{0};
+    mode_t mode_{0};
+  };
+
+  PipeHelper pipe_;
 };
 
 } // namespace Address

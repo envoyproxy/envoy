@@ -102,16 +102,9 @@ public:
   void addOptions(const OptionsSharedPtr&) override {}
   const OptionsSharedPtr& options() const override { return options_; }
   void setRequestedServerName(absl::string_view) override {}
-  Api::SysCallIntResult bind(Network::Address::InstanceConstSharedPtr address) override {
-    (void)address;
-    return {0, 0};
-  }
-  Api::SysCallIntResult listen(int backlog) override {
-    (void)backlog;
-    return {0, 0};
-  }
-  Api::SysCallIntResult connect(const Network::Address::InstanceConstSharedPtr addr) override {
-    (void)addr;
+  Api::SysCallIntResult bind(Network::Address::InstanceConstSharedPtr) override { return {0, 0}; }
+  Api::SysCallIntResult listen(int) override { return {0, 0}; }
+  Api::SysCallIntResult connect(const Network::Address::InstanceConstSharedPtr) override {
     return {0, 0};
   }
 

@@ -98,6 +98,23 @@ public:
   virtual IpVersion version() const PURE;
 };
 
+/**
+ * Interface for a generic Pipe address
+ */
+class Pipe {
+public:
+  virtual ~Pipe() = default;
+  /**
+   * @return abstract namespace flag
+   */
+  virtual bool abstractNamespace() const PURE;
+
+  /**
+   * @return pipe mode
+   */
+  virtual mode_t mode() const PURE;
+};
+
 enum class Type { Ip, Pipe };
 enum class SocketType { Stream, Datagram };
 
@@ -141,6 +158,21 @@ public:
    * @return the IP address information IFF type() == Type::Ip, otherwise nullptr.
    */
   virtual const Ip* ip() const PURE;
+
+  /**
+   * @return the pipe address information IFF type() == Type::Pipe, otherwise nullptr.
+   */
+  virtual const Pipe* pipe() const PURE;
+
+  /**
+   * @return the underlying structure wherein the address is stored
+   */
+  virtual const sockaddr* sockAddr() const PURE;
+
+  /**
+   * @return length of the address container
+   */
+  virtual socklen_t sockAddrLen() const PURE;
 
   /**
    * @return the type of address.
