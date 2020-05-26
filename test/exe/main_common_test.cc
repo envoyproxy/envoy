@@ -81,7 +81,7 @@ TEST_P(MainCommonTest, ConstructDestructHotRestartDisabled) {
 
 // Exercise init_only explicitly.
 TEST_P(MainCommonTest, ConstructDestructHotRestartDisabledNoInit) {
-  addArg("--disable-hot-restart");
+  //  addArg("--disable-hot-restart");
   initOnly();
   MainCommon main_common(argc(), argv());
   EXPECT_TRUE(main_common.run());
@@ -106,6 +106,9 @@ TEST_P(MainCommonDeathTest, OutOfMemoryHandler) {
   ENVOY_LOG_MISC(critical,
                  "MainCommonTest::OutOfMemoryHandler not supported by this compiler configuration");
 #else
+  // Death test forks and restarts the test with special arguments. Since we're meant to choose
+  // the same base-id on the second attempt we can't succeed with hot restart enabled.
+  addArg("--disable-hot-restart");
   MainCommon main_common(argc(), argv());
 #if !defined(WIN32)
   // Resolving symbols for a backtrace takes longer than the timeout in coverage builds,
