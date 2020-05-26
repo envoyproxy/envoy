@@ -28,22 +28,19 @@ message DnsTable {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.data.dns.v2alpha.DnsTable.AddressList";
 
-    // This field contains a well formed IP address that is returned
-    // in the answer for a name query. The address field can be an
-    // IPv4 or IPv6 address. Address family detection is done automatically
-    // when Envoy parses the string. Since this field is repeated,
-    // Envoy will return one randomly chosen entry from this list in the
-    // DNS response. The random index will vary per query so that we prevent
-    // clients pinning on a single address for a configured domain
+    // This field contains a well formed IP address that is returned in the answer for a
+    // name query. The address field can be an IPv4 or IPv6 address. Address family
+    // detection is done automatically when Envoy parses the string. Since this field is
+    // repeated, Envoy will return as many entries from this list in the DNS response while
+    // keeping the response under 512 bytes
     repeated string address = 1 [(validate.rules).repeated = {
       min_items: 1
       items {string {min_len: 3}}
     }];
   }
 
-  // This message type is extensible and can contain a list of addresses
-  // or dictate some other method for resolving the addresses for an
-  // endpoint
+  // This message type is extensible and can contain a list of addresses, clusters or
+  // dictate a different method for resolving the addresses for an endpoint
   message DnsEndpoint {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.data.dns.v2alpha.DnsTable.DnsEndpoint";
@@ -52,6 +49,8 @@ message DnsTable {
       option (validate.required) = true;
 
       AddressList address_list = 1;
+
+      string cluster_name = 2;
     }
   }
 
@@ -59,27 +58,25 @@ message DnsTable {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.data.dns.v2alpha.DnsTable.DnsVirtualDomain";
 
-    // The domain name for which Envoy will respond to query requests
+    // A domain name for which Envoy will respond to query requests
     string name = 1 [(validate.rules).string = {min_len: 2 well_known_regex: HTTP_HEADER_NAME}];
 
-    // The configuration containing the method to determine the address
-    // of this endpoint
+    // The configuration containing the method to determine the address of this endpoint
     DnsEndpoint endpoint = 2;
 
-    // Sets the TTL in dns answers from Envoy returned to the client
-    google.protobuf.Duration answer_ttl = 3 [(validate.rules).duration = {gt {}}];
+    // Sets the TTL in DNS answers from Envoy returned to the client. The default TTL is 300s
+    google.protobuf.Duration answer_ttl = 3 [(validate.rules).duration = {gte {seconds: 60}}];
   }
 
-  // Control how many times envoy makes an attempt to forward a query to
-  // an external server
-  uint32 external_retry_count = 1;
+  // Control how many times Envoy makes an attempt to forward a query to an external DNS server
+  uint32 external_retry_count = 1 [(validate.rules).uint32 = {lte: 3}];
 
-  // Fully qualified domain names for which Envoy will respond to queries
-  repeated DnsVirtualDomain virtual_domains = 2 [(validate.rules).repeated = {min_items: 1}];
+  // Fully qualified domain names for which Envoy will respond to DNS queries. By leaving this
+  // list empty, Envoy will forward all queries to external resolvers
+  repeated DnsVirtualDomain virtual_domains = 2;
 
-  // This field serves to help Envoy determine whether it can authoritatively
-  // answer a query for a name matching a suffix in this list. If the query
-  // name does not match a suffix in this list, Envoy will forward
-  // the query to an upstream DNS server
+  // This field serves to help Envoy determine whether it can authoritatively answer a query
+  // for a name matching a suffix in this list. If the query name does not match a suffix in
+  // this list, Envoy will forward the query to an upstream DNS server
   repeated type.matcher.v3.StringMatcher known_suffixes = 3;
 }
