@@ -18,7 +18,7 @@ public:
 
   void initialize() override;
   void replay(const test::integration::H2CaptureFuzzTestCase&, bool ignore_response);
-  const std::chrono::milliseconds max_wait_ms_{1500};
+  const std::chrono::milliseconds max_wait_ms_{10};
 
 private:
   void sendFrame(const test::integration::H2TestFrame&,
