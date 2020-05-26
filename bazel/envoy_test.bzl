@@ -58,6 +58,7 @@ def _envoy_test_linkopts():
         "@envoy//bazel:windows_x86_64": [
             "-DEFAULTLIB:advapi32.lib",
             "-DEFAULTLIB:ws2_32.lib",
+            "-DEFAULTLIB:iphlpapi.lib",
             "-WX",
         ],
 
@@ -143,7 +144,10 @@ def envoy_cc_fuzz_test(
         copts = fuzz_copts + envoy_copts("@envoy", test = True),
         linkopts = ["-fsanitize=fuzzer"] + _envoy_test_linkopts(),
         linkstatic = 1,
-        testonly = 1,
+        args = select({
+            "@envoy//bazel:coverage_build": ["$(locations %s)" % corpus_name],
+            "//conditions:default": [],
+        }),
         data = [corpus_name],
         deps = [":" + test_lib_name],
         tags = ["manual", "fuzzer"] + tags,
@@ -166,32 +170,17 @@ def envoy_cc_test(
         local = False,
         size = "medium",
         flaky = False):
-    if coverage:
-        coverage_tags = tags + ["coverage_test_lib"]
-    else:
-        coverage_tags = tags
-    _envoy_cc_test_infrastructure_library(
-        name = name + "_lib_internal_only",
-        srcs = srcs,
-        data = data,
-        external_deps = external_deps,
-        deps = deps + [repository + "//test/test_common:printers_includes"],
-        repository = repository,
-        tags = coverage_tags,
-        copts = copts,
-        # Allow public visibility so these can be consumed in coverage tests in external projects.
-        visibility = ["//visibility:public"],
-    )
-    if coverage:
-        coverage_tags = tags + ["coverage_test"]
+    coverage_tags = tags + ([] if coverage else ["nocoverage"])
+
     native.cc_test(
         name = name,
+        srcs = srcs,
+        data = data,
         copts = envoy_copts(repository, test = True) + copts,
         linkopts = _envoy_test_linkopts(),
         linkstatic = envoy_linkstatic(),
         malloc = tcmalloc_external_dep(repository),
-        deps = envoy_stdlib_deps() + [
-            ":" + name + "_lib_internal_only",
+        deps = envoy_stdlib_deps() + deps + [envoy_external_dep_path(dep) for dep in external_deps + ["googletest"]] + [
             repository + "//test:main",
         ],
         # from https://github.com/google/googletest/blob/6e1970e2376c14bf658eb88f655a054030353f9f/googlemock/src/gmock.cc#L51
@@ -271,12 +260,14 @@ def envoy_benchmark_test(
         name,
         benchmark_binary,
         data = [],
+        tags = [],
         **kargs):
     native.sh_test(
         name = name,
         srcs = ["//bazel:test_for_benchmark_wrapper.sh"],
         data = [":" + benchmark_binary] + data,
         args = ["%s/%s" % (native.package_name(), benchmark_binary)],
+        tags = tags + ["nocoverage"],
         **kargs
     )
 
@@ -302,9 +293,12 @@ def envoy_sh_test(
         srcs = [],
         data = [],
         coverage = True,
+        cc_binary = [],
         tags = [],
         **kargs):
     if coverage:
+        if cc_binary == []:
+            fail("cc_binary is required for coverage-enabled test.")
         test_runner_cc = name + "_test_runner.cc"
         native.genrule(
             name = name + "_gen_test_runner",
@@ -313,18 +307,20 @@ def envoy_sh_test(
             cmd = "$(location //bazel:gen_sh_test_runner.sh) $(SRCS) >> $@",
             tools = ["//bazel:gen_sh_test_runner.sh"],
         )
-        envoy_cc_test_library(
-            name = name + "_lib",
+        envoy_cc_test(
+            name = name,
             srcs = [test_runner_cc],
-            data = srcs + data,
-            tags = tags + ["coverage_test_lib"],
-            deps = ["//test/test_common:environment_lib"],
+            data = srcs + data + cc_binary,
+            tags = tags,
+            deps = ["//test/test_common:environment_lib"] + cc_binary,
         )
-    native.sh_test(
-        name = name,
-        srcs = ["//bazel:sh_test_wrapper.sh"],
-        data = srcs + data,
-        args = srcs,
-        tags = tags,
-        **kargs
-    )
+
+    else:
+        native.sh_test(
+            name = name,
+            srcs = ["//bazel:sh_test_wrapper.sh"],
+            data = srcs + data + cc_binary,
+            args = srcs,
+            tags = tags + ["nocoverage"],
+            **kargs
+        )

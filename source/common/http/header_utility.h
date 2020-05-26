@@ -118,6 +118,12 @@ public:
   static bool isConnect(const RequestHeaderMap& headers);
 
   /**
+   * @brief a helper function to determine if the headers represent an accepted CONNECT response.
+   */
+  static bool isConnectResponse(const RequestHeaderMapPtr& request_headers,
+                                const ResponseHeaderMap& response_headers);
+
+  /**
    * Add headers from one HeaderMap to another
    * @param headers target where headers will be added
    * @param headers_to_add supplies the headers to be added

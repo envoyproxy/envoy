@@ -17,6 +17,7 @@
 #include "envoy/http/codes.h"
 #include "envoy/http/hash_policy.h"
 #include "envoy/http/header_map.h"
+#include "envoy/router/internal_redirect.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/type/v3/percent.pb.h"
 #include "envoy/upstream/resource_manager.h"
@@ -237,9 +238,42 @@ public:
 enum class RetryStatus { No, NoOverflow, NoRetryLimitExceeded, Yes };
 
 /**
- * InternalRedirectAction from the route configuration.
+ * InternalRedirectPolicy from the route configuration.
  */
-enum class InternalRedirectAction { PassThrough, Handle };
+class InternalRedirectPolicy {
+public:
+  virtual ~InternalRedirectPolicy() = default;
+
+  /**
+   * @return whether internal redirect is enabled on this route.
+   */
+  virtual bool enabled() const PURE;
+
+  /**
+   * @param response_code the response code from the upstream.
+   * @return whether the given response_code should trigger an internal redirect on this route.
+   */
+  virtual bool shouldRedirectForResponseCode(const Http::Code& response_code) const PURE;
+
+  /**
+   * Creates the target route predicates. This should really be called only once for each upstream
+   * redirect response. Creating the predicates lazily to avoid wasting CPU cycles on non-redirect
+   * responses, which should be the most common case.
+   * @return a vector of newly constructed InternalRedirectPredicate instances.
+   */
+  virtual std::vector<InternalRedirectPredicateSharedPtr> predicates() const PURE;
+
+  /**
+   * @return the maximum number of allowed internal redirects on this route.
+   */
+  virtual uint32_t maxInternalRedirects() const PURE;
+
+  /**
+   * @return if it is allowed to follow the redirect with a different scheme in
+   *         the target URI than the downstream request.
+   */
+  virtual bool isCrossSchemeRedirectAllowed() const PURE;
+};
 
 /**
  * Wraps retry state for an active routed request.
@@ -323,11 +357,13 @@ public:
    * Returns a reference to the PriorityLoad that should be used for the next retry.
    * @param priority_set current priority set.
    * @param original_priority_load original priority load.
+   * @param priority_mapping_func see @Upstream::RetryPriority::PriorityMappingFunc.
    * @return HealthyAndDegradedLoad that should be used to select a priority for the next retry.
    */
-  virtual const Upstream::HealthyAndDegradedLoad&
-  priorityLoadForRetry(const Upstream::PrioritySet& priority_set,
-                       const Upstream::HealthyAndDegradedLoad& original_priority_load) PURE;
+  virtual const Upstream::HealthyAndDegradedLoad& priorityLoadForRetry(
+      const Upstream::PrioritySet& priority_set,
+      const Upstream::HealthyAndDegradedLoad& original_priority_load,
+      const Upstream::RetryPriority::PriorityMappingFunc& priority_mapping_func) PURE;
   /**
    * return how many times host selection should be reattempted during host selection.
    */
@@ -685,6 +721,13 @@ public:
   virtual const RetryPolicy& retryPolicy() const PURE;
 
   /**
+   * @return const InternalRedirectPolicy& the internal redirect policy for the route. All routes
+   *         have a internal redirect policy even if it is not enabled, which means redirects are
+   *         simply proxied as normal responses.
+   */
+  virtual const InternalRedirectPolicy& internalRedirectPolicy() const PURE;
+
+  /**
    * @return uint32_t any route cap on bytes which should be buffered for shadowing or retries.
    *         This is an upper bound so does not necessarily reflect the bytes which will be buffered
    *         as other limits may apply.
@@ -831,17 +874,6 @@ public:
    * If present, informs how to handle proxying CONNECT requests on this route.
    */
   virtual const absl::optional<ConnectConfig>& connectConfig() const PURE;
-
-  /**
-   * @returns the internal redirect action which should be taken on this route.
-   */
-  virtual InternalRedirectAction internalRedirectAction() const PURE;
-
-  /**
-   * @returns the threshold of number of previously handled internal redirects, for this route to
-   * stop handle internal redirects.
-   */
-  virtual uint32_t maxInternalRedirects() const PURE;
 
   /**
    * @return std::string& the name of the route.

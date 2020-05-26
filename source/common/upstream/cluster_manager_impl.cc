@@ -248,7 +248,7 @@ ClusterManagerImpl::ClusterManagerImpl(
       time_source_(main_thread_dispatcher.timeSource()), dispatcher_(main_thread_dispatcher),
       http_context_(http_context),
       subscription_factory_(local_info, main_thread_dispatcher, *this, random,
-                            validation_context.dynamicValidationVisitor(), api) {
+                            validation_context.dynamicValidationVisitor(), api, runtime_) {
   async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
       *this, tls, time_source_, api, grpc_context.statNames());
   const auto& cm_config = bootstrap.cluster_manager();

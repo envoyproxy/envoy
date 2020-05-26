@@ -53,8 +53,17 @@ uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
 // problem of the bugs being found after the old code path has been removed.
 constexpr const char* runtime_features[] = {
     // Enabled
-    "envoy.deprecated_features.allow_deprecated_extension_names",
     "envoy.reloadable_features.connection_header_sanitization",
+    "envoy.reloadable_features.http1_flood_protection",
+    "envoy.reloadable_features.test_feature_true",
+    "envoy.reloadable_features.strict_header_validation",
+    "envoy.reloadable_features.connection_header_sanitization",
+    "envoy.reloadable_features.strict_authority_validation",
+    "envoy.reloadable_features.reject_unsupported_transfer_encodings",
+    // Begin alphabetically sorted section.
+    "envoy.deprecated_features.allow_deprecated_extension_names",
+    "envoy.reloadable_features.disallow_unbounded_access_logs",
+    "envoy.reloadable_features.enable_deprecated_v2_api_warning",
     "envoy.reloadable_features.ext_authz_http_service_enable_case_sensitive_string_matcher",
     "envoy.reloadable_features.fix_upgrade_response",
     "envoy.reloadable_features.fixed_connection_close",
@@ -66,6 +75,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.strict_authority_validation",
     "envoy.reloadable_features.strict_header_validation",
     "envoy.reloadable_features.test_feature_true",
+    "envoy.reloadable_features.preserve_upstream_date",
 };
 
 // This is a section for officially sanctioned runtime features which are too
