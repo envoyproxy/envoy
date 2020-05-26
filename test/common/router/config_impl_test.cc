@@ -2813,6 +2813,50 @@ virtual_hosts:
                                ->grpcTimeoutOffset());
 }
 
+TEST_F(RouteMatcherTest, GrpcTimeoutOffsetOfDynamicRoute) {
+  // A DynamicRouteEntry will be created when 'cluster_header' is set.
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains:
+  - "*"
+  routes:
+  - match:
+      prefix: "/foo"
+    route:
+      cluster: local_service_grpc
+      max_grpc_timeout: 0.1s
+      grpc_timeout_offset: 0.01s
+  - match:
+      prefix: "/"
+    route:
+      max_grpc_timeout: 0.2s
+      grpc_timeout_offset: 0.02s
+      cluster_header: request_to
+      )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
+
+  {
+    Http::TestRequestHeaderMapImpl reqeust_headers = genHeaders("www.lyft.com", "/", "GET");
+    reqeust_headers.addCopy(Http::LowerCaseString("reqeust_to"), "dynamic_grpc_service");
+    EXPECT_EQ(absl::make_optional(std::chrono::milliseconds(20)),
+              config.route(reqeust_headers, 0)->routeEntry()->grpcTimeoutOffset());
+    EXPECT_EQ(absl::make_optional(std::chrono::milliseconds(200)),
+              config.route(reqeust_headers, 0)->routeEntry()->maxGrpcTimeout());
+  }
+  {
+
+    EXPECT_EQ(absl::make_optional(std::chrono::milliseconds(10)),
+              config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                  ->routeEntry()
+                  ->grpcTimeoutOffset());
+    EXPECT_EQ(
+        absl::make_optional(std::chrono::milliseconds(100)),
+        config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)->routeEntry()->maxGrpcTimeout());
+  }
+}
+
 TEST_F(RouteMatcherTest, FractionalRuntime) {
   const std::string yaml = R"EOF(
 virtual_hosts:
