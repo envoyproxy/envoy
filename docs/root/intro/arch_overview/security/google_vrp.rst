@@ -171,7 +171,7 @@ Rebuilding the Docker image
 ---------------------------
 
 It's helpful to be able to regenerate your own Docker base image for research purposes.
-To do this without relying on CI, following the instructions at the top of
+To do this without relying on CI, follow the instructions at the top of
 :repo:`ci/docker_rebuild_google-vrp.sh`. An example of this flow looks like:
 
 .. code-block:: bash
