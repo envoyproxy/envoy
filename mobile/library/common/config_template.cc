@@ -42,6 +42,19 @@ static_resources:
                 dns_failure_refresh_rate:
                   base_interval: {{ dns_failure_refresh_rate_seconds_base }}s
                   max_interval: {{ dns_failure_refresh_rate_seconds_max }}s
+          # TODO: make this configurable for users.
+          - name: envoy.filters.http.decompressor
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.decompressor.v3.Decompressor
+              decompressor_library:
+                name: basic
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip
+              request_direction_config:
+                common_config:
+                  enabled:
+                    default_value: false
+                    runtime_key: request_decompressor_enabled
           - name: envoy.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
@@ -202,6 +215,9 @@ stats_config:
         - safe_regex:
             google_re2: {}
             regex: 'cluster\.[\w]+?\.upstream_rq_unknown'
+        - safe_regex:
+            google_re2: {}
+            regex: '^http.hcm.decompressor.*'
         - safe_regex:
             google_re2: {}
             regex: 'http.hcm.downstream_rq_[1|2|3|4|5]xx'
