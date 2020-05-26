@@ -630,7 +630,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
            MAKE_ADMIN_HANDLER(logs_handler_.handlerReopenLogs), false, true},
       },
       date_provider_(server.dispatcher().timeSource()),
-      admin_filter_chain_(std::make_shared<AdminFilterChain>()) {}
+      admin_filter_chain_(std::make_shared<AdminFilterChain>()),
+      local_reply_(LocalReply::Factory::createDefault()) {}
 
 Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection,
                                                  const Buffer::Instance& data,

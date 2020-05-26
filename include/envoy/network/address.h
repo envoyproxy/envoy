@@ -43,6 +43,11 @@ public:
    * @return the absl::uint128 IPv6 address in network byte order.
    */
   virtual absl::uint128 address() const PURE;
+
+  /**
+   * @return true if address is Ipv6 and Ipv4 compatibility is disabled, false otherwise
+   */
+  virtual bool v6only() const PURE;
 };
 
 enum class IpVersion { v4, v6 }; // NOLINT(readability-identifier-naming)
@@ -154,14 +159,6 @@ public:
    * @return the IP address information IFF type() == Type::Ip, otherwise nullptr.
    */
   virtual const Ip* ip() const PURE;
-
-  /**
-   * Create a socket for this address.
-   * @param type supplies the socket type to create.
-   * @return the IoHandlePtr naming the socket. In case of a failure, the program would be
-   *   aborted.
-   */
-  virtual IoHandlePtr socket(SocketType type) const PURE;
 
   /**
    * @return the type of address.
