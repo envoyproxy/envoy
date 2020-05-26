@@ -11,7 +11,6 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.transport_sockets.quic.v4alpha";
 option java_outer_classname = "QuicTransportProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).work_in_progress = true;
 option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
 
 // [#protodoc-title: QUIC_TRANSPORT]
