@@ -74,7 +74,7 @@ public:
       Socket::Option& socket_option, Network::SocketOptionName option_name, int option_val,
       const std::set<envoy::config::core::v3::SocketOption::SocketState>& when) {
     for (auto state : when) {
-      if (option_name.has_value()) {
+      if (option_name.hasValue()) {
         EXPECT_CALL(os_sys_calls_,
                     setsockopt_(_, option_name.level(), option_name.option(), _, sizeof(int)))
             .WillOnce(Invoke([option_val](os_fd_t, int, int, const void* optval, socklen_t) -> int {

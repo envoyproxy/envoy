@@ -165,8 +165,12 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
     } else if (connection_.protocol() == Protocol::Http10) {
       chunk_encoding_ = false;
     } else {
-      encodeFormattedHeader(Headers::get().TransferEncoding.get(),
-                            Headers::get().TransferEncodingValues.Chunked);
+      // For responses to connect requests, do not send the chunked encoding header:
+      // https://tools.ietf.org/html/rfc7231#section-4.3.6
+      if (!is_response_to_connect_request_) {
+        encodeFormattedHeader(Headers::get().TransferEncoding.get(),
+                              Headers::get().TransferEncodingValues.Chunked);
+      }
       // We do not apply chunk encoding for HTTP upgrades, including CONNECT style upgrades.
       // If there is a body in a response on the upgrade path, the chunks will be
       // passed through via maybeDirectDispatch so we need to avoid appending
@@ -634,16 +638,14 @@ int ConnectionImpl::onHeadersCompleteBase() {
   if (Utility::isUpgrade(request_or_response_headers) && upgradeAllowed()) {
     // Ignore h2c upgrade requests until we support them.
     // See https://github.com/envoyproxy/envoy/issues/7161 for details.
-    if (request_or_response_headers.Upgrade() &&
-        absl::EqualsIgnoreCase(request_or_response_headers.Upgrade()->value().getStringView(),
+    if (absl::EqualsIgnoreCase(request_or_response_headers.getUpgradeValue(),
                                Http::Headers::get().UpgradeValues.H2c)) {
       ENVOY_CONN_LOG(trace, "removing unsupported h2c upgrade headers.", connection_);
       request_or_response_headers.removeUpgrade();
       if (request_or_response_headers.Connection()) {
         const auto& tokens_to_remove = caseUnorderdSetContainingUpgradeAndHttp2Settings();
         std::string new_value = StringUtil::removeTokens(
-            request_or_response_headers.Connection()->value().getStringView(), ",",
-            tokens_to_remove, ",");
+            request_or_response_headers.getConnectionValue(), ",", tokens_to_remove, ",");
         if (new_value.empty()) {
           request_or_response_headers.removeConnection();
         } else {
@@ -664,8 +666,7 @@ int ConnectionImpl::onHeadersCompleteBase() {
   // Per https://tools.ietf.org/html/rfc7230#section-3.3.1 Envoy should reject
   // transfer-codings it does not understand.
   if (request_or_response_headers.TransferEncoding()) {
-    const absl::string_view encoding =
-        request_or_response_headers.TransferEncoding()->value().getStringView();
+    const absl::string_view encoding = request_or_response_headers.getTransferEncodingValue();
     if (reject_unsupported_transfer_encodings_ &&
         !absl::EqualsIgnoreCase(encoding, Headers::get().TransferEncodingValues.Chunked)) {
       error_code_ = Http::Code::NotImplemented;
@@ -829,7 +830,7 @@ int ServerConnectionImpl::onHeadersComplete() {
     if (!handling_upgrade_ && connection_header_sanitization_ && headers->Connection()) {
       // If we fail to sanitize the request, return a 400 to the client
       if (!Utility::sanitizeConnectionHeader(*headers)) {
-        absl::string_view header_value = headers->Connection()->value().getStringView();
+        absl::string_view header_value = headers->getConnectionValue();
         ENVOY_CONN_LOG(debug, "Invalid nominated headers in Connection: {}", connection_,
                        header_value);
         error_code_ = Http::Code::BadRequest;
@@ -1050,6 +1051,15 @@ int ClientConnectionImpl::onHeadersComplete() {
         pending_response_.value().encoder_.connectRequest()) {
       ENVOY_CONN_LOG(trace, "codec entering upgrade mode for CONNECT response.", connection_);
       handling_upgrade_ = true;
+
+      // For responses to connect requests, do not accept the chunked
+      // encoding header: https://tools.ietf.org/html/rfc7231#section-4.3.6
+      if (headers->TransferEncoding() &&
+          absl::EqualsIgnoreCase(headers->TransferEncoding()->value().getStringView(),
+                                 Headers::get().TransferEncodingValues.Chunked)) {
+        sendProtocolError(Http1ResponseCodeDetails::get().InvalidTransferEncoding);
+        throw CodecProtocolException("http/1.1 protocol error: unsupported transfer encoding");
+      }
     }
 
     if (parser_.status_code == 100) {
