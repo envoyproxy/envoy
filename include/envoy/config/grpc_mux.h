@@ -16,7 +16,7 @@ namespace Config {
 #define ALL_CONTROL_PLANE_STATS(COUNTER, GAUGE)                                                    \
   COUNTER(rate_limit_enforced)                                                                     \
   GAUGE(connected_state, NeverImport)                                                              \
-  GAUGE(pending_requests, NeverImport)
+  GAUGE(pending_requests, Accumulate)
 
 /**
  * Struct definition for all control plane stats. @see stats_macros.h

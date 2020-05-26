@@ -228,7 +228,7 @@ min_rtt_calc_params:
   // min concurrency).
   EXPECT_EQ(
       1,
-      stats_.gauge("test_prefix.min_rtt_calculation_active", Stats::Gauge::ImportMode::NeverImport)
+      stats_.gauge("test_prefix.min_rtt_calculation_active", Stats::Gauge::ImportMode::Accumulate)
           .value());
   EXPECT_EQ(controller->concurrencyLimit(), 7);
   for (int i = 0; i < 7; ++i) {
@@ -250,7 +250,7 @@ min_rtt_calc_params:
   // Verify the minRTT value measured is accurate.
   EXPECT_EQ(
       0,
-      stats_.gauge("test_prefix.min_rtt_calculation_active", Stats::Gauge::ImportMode::NeverImport)
+      stats_.gauge("test_prefix.min_rtt_calculation_active", Stats::Gauge::ImportMode::Accumulate)
           .value());
   EXPECT_EQ(
       13, stats_.gauge("test_prefix.min_rtt_msecs", Stats::Gauge::ImportMode::NeverImport).value());

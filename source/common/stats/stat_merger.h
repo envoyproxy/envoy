@@ -85,7 +85,7 @@ private:
   void mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges,
                    const DynamicsMap& dynamics_map);
 
-  StatNameHashMap<uint64_t> parent_gauge_values_;
+  StatNameHashSet parent_gauges_;
   // A stats Scope for our in-the-merging-process counters to live in. Scopes conceptually hold
   // shared_ptrs to the stats that live in them, with the question of which stats are living in a
   // given scope determined by which stat names have been accessed via that scope. E.g., if you

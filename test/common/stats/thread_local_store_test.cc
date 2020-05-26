@@ -196,8 +196,8 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
   c1.add(100);
   EXPECT_EQ(200, found_counter->get().value());
 
-  Gauge& g1 = store_->gaugeFromString("g1", Gauge::ImportMode::NeverImport);
-  EXPECT_EQ(&g1, &store_->gaugeFromString("g1", Gauge::ImportMode::NeverImport));
+  Gauge& g1 = store_->gaugeFromString("g1", Gauge::ImportMode::Accumulate);
+  EXPECT_EQ(&g1, &store_->gaugeFromString("g1", Gauge::ImportMode::Accumulate));
   StatNameManagedStorage g1_name("g1", *symbol_table_);
   g1.set(100);
   auto found_gauge = store_->findGauge(g1_name.statName());
@@ -250,8 +250,8 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
   c1.add(100);
   EXPECT_EQ(200, found_counter->get().value());
 
-  Gauge& g1 = store_->gaugeFromString("g1", Gauge::ImportMode::NeverImport);
-  EXPECT_EQ(&g1, &store_->gaugeFromString("g1", Gauge::ImportMode::NeverImport));
+  Gauge& g1 = store_->gaugeFromString("g1", Gauge::ImportMode::Accumulate);
+  EXPECT_EQ(&g1, &store_->gaugeFromString("g1", Gauge::ImportMode::Accumulate));
   StatNameManagedStorage g1_name("g1", *symbol_table_);
   g1.set(100);
   auto found_gauge = store_->findGauge(g1_name.statName());
@@ -487,8 +487,8 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
   EXPECT_EQ(1UL, store_->counters().size());
 
   // Gauges should work the same way.
-  Gauge& g1 = scope1->gaugeFromString("g", Gauge::ImportMode::NeverImport);
-  Gauge& g2 = scope2->gaugeFromString("g", Gauge::ImportMode::NeverImport);
+  Gauge& g1 = scope1->gaugeFromString("g", Gauge::ImportMode::Accumulate);
+  Gauge& g2 = scope2->gaugeFromString("g", Gauge::ImportMode::Accumulate);
   EXPECT_EQ(&g1, &g2);
   g1.set(5);
   EXPECT_EQ(5UL, g1.value());
@@ -796,7 +796,7 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
   EXPECT_EQ(invalid_counter_2.value(), 0);
 
   // And we expect the same behavior from gauges and histograms.
-  Gauge& valid_gauge = store_->gaugeFromString("valid_gauge", Gauge::ImportMode::NeverImport);
+  Gauge& valid_gauge = store_->gaugeFromString("valid_gauge", Gauge::ImportMode::Accumulate);
   valid_gauge.set(2);
   EXPECT_EQ(valid_gauge.value(), 2);
 

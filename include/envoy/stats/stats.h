@@ -136,6 +136,7 @@ public:
   virtual void set(uint64_t value) PURE;
   virtual void sub(uint64_t amount) PURE;
   virtual uint64_t value() const PURE;
+  virtual void setParentValue(uint64_t) {}
 
   /**
    * @return the import mode, dictating behavior of the gauge across hot restarts.

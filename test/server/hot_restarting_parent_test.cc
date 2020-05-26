@@ -71,9 +71,9 @@ TEST_F(HotRestartingParentTest, ExportStatsToChild) {
   {
     store.counter("c1").inc();
     store.counter("c2").add(2);
-    store.gauge("g0", Stats::Gauge::ImportMode::Accumulate).add(0);
-    store.gauge("g1", Stats::Gauge::ImportMode::Accumulate).add(123);
-    store.gauge("g2", Stats::Gauge::ImportMode::Accumulate).add(456);
+    store.gauge("g0", Stats::Gauge::ImportMode::Accumulate).set(0);
+    store.gauge("g1", Stats::Gauge::ImportMode::Accumulate).set(123);
+    store.gauge("g2", Stats::Gauge::ImportMode::Accumulate).set(456);
     HotRestartMessage::Reply::Stats stats;
     hot_restarting_parent_.exportStatsToChild(&stats);
     EXPECT_EQ(1, stats.counter_deltas().at("c1"));
@@ -125,8 +125,8 @@ TEST_F(HotRestartingParentTest, RetainDynamicStats) {
     Stats::StatNameDynamicPool dynamic(parent_store.symbolTable());
     parent_store.counter("c1").inc();
     parent_store.counterFromStatName(dynamic.add("c2")).inc();
-    parent_store.gauge("g1", Stats::Gauge::ImportMode::Accumulate).add(123);
-    parent_store.gaugeFromStatName(dynamic.add("g2"), Stats::Gauge::ImportMode::Accumulate).add(42);
+    parent_store.gauge("g1", Stats::Gauge::ImportMode::Accumulate).set(123);
+    parent_store.gaugeFromStatName(dynamic.add("g2"), Stats::Gauge::ImportMode::Accumulate).set(42);
     hot_restarting_parent_.exportStatsToChild(&stats_proto);
   }
 
