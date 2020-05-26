@@ -18,8 +18,6 @@ public:
 
   void initialize() override;
   void replay(const test::integration::H2CaptureFuzzTestCase&, bool ignore_response);
-  // TODO(adip): The H1 fuzzer uses a short max_wait_ms_ when calling this function. When
-  // trying to do so with H2, an ABORT happens in FileEventImpl::assignEvents
   const std::chrono::milliseconds max_wait_ms_{1500};
 
 private:

@@ -4,8 +4,8 @@ package test.integration;
 
 message H2FramePing {
   enum Flags {
-    None = 0;
-    Ack = 1;
+    NONE = 0;
+    ACK = 1;
   }
   Flags flags = 1;
   bytes data = 2;
@@ -13,32 +13,32 @@ message H2FramePing {
 
 message H2FrameSettings {
   enum Flags {
-    None = 0;
-    Ack = 1;
+    NONE = 0;
+    ACK = 1;
   }
   Flags flags = 1;
 }
 
-enum HeadersFlags {
-  None = 0;
-  EndStream = 1;
-  EndHeaders = 4;
+enum H2HeadersFlags {
+  NONE = 0;
+  END_STREAM = 1;
+  END_HEADERS = 4;
 }
 
 message H2FrameHeaders {
-  HeadersFlags flags = 1;
+  repeated H2HeadersFlags flags = 1;
   uint32 stream_index = 2;
 }
 
 message H2FrameContinuation {
-  HeadersFlags flags = 1;
+  repeated H2HeadersFlags flags = 1;
   uint32 stream_index = 2;
 }
 
 message H2FrameData {
   enum Flags {
-    None = 0;
-    EndStream = 1;
+    NONE = 0;
+    END_STREAM = 1;
   }
   Flags flags = 1;
   uint32 stream_index = 2;
@@ -49,25 +49,26 @@ message H2FramePriority {
   uint32 dependent_index = 2;
 }
 
+// These map to the errors defined in: https://tools.ietf.org/html/rfc7540#section-7
 enum H2ErrorCode {
-  NoError = 0;
-  ProtocolError = 1;
-  InternalError = 2;
-  FlowControlError = 3;
-  SettingsTimeout = 4;
-  StreamClosed = 5;
-  FrameSizeError = 6;
-  RefusedStream = 7;
-  Cancel = 8;
-  CompressionError = 9;
-  ConnectError = 10;
-  EnhanceYourCalm = 11;
-  InadequateSecurity = 12;
-  Http11Required = 13;
+  NO_ERROR = 0;
+  PROTOCOL_ERROR = 1;
+  INTERNAL_ERROR = 2;
+  FLOW_CONTROL_ERROR = 3;
+  SETTINGS_TIMEOUT = 4;
+  STREAM_CLOSED = 5;
+  FRAME_SIZE_ERROR = 6;
+  REFUSED_STREAM = 7;
+  CANCEL = 8;
+  COMPRESSION_ERROR = 9;
+  CONNECT_ERROR = 10;
+  ENHANCE_YOUR_CLAIM = 11;
+  INADEQUATE_SECURITY = 12;
+  HTTP_1_1_REQUIRED = 13;
 }
 
 message H2FramePushPromise {
-  HeadersFlags flags = 1;
+  repeated H2HeadersFlags flags = 1;
   uint32 stream_index = 2;
   uint32 promised_stream_index = 3;
 }

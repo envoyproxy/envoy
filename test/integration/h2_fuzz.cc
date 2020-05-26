@@ -12,6 +12,18 @@ namespace Envoy {
 
 using namespace Envoy::Http::Http2;
 
+namespace {
+
+static Http2Frame::HeadersFlags unifyHeadersFlags(const ::google::protobuf::RepeatedField<int>& headers_flags) {
+  int unified_flags = 0;
+  for (const auto& flag : headers_flags) {
+    unified_flags |= flag;
+  }
+  return static_cast<Http2Frame::HeadersFlags>(unified_flags);
+}
+
+} // namespace
+
 void H2FuzzIntegrationTest::sendFrame(const test::integration::H2TestFrame& proto_frame,
                                       std::function<void(const Http2Frame&)> write_func) {
   Http2Frame h2_frame;
@@ -25,89 +37,102 @@ void H2FuzzIntegrationTest::sendFrame(const test::integration::H2TestFrame& prot
         static_cast<Http2Frame::SettingsFlags>(proto_frame.settings().flags());
     ENVOY_LOG_MISC(trace, "Sending settings frame");
     h2_frame = Http2Frame::makeEmptySettingsFrame(settings_flags);
-  } break;
+    break;
+  }
   case test::integration::H2TestFrame::kHeaders: {
     const Http2Frame::HeadersFlags headers_flags =
-        static_cast<Http2Frame::HeadersFlags>(proto_frame.headers().flags());
-    uint32_t stream_idx = proto_frame.headers().stream_index();
+        unifyHeadersFlags(proto_frame.headers().flags());
+    const uint32_t stream_idx = proto_frame.headers().stream_index();
     ENVOY_LOG_MISC(trace, "Sending headers frame");
     h2_frame = Http2Frame::makeEmptyHeadersFrame(stream_idx, headers_flags);
-  } break;
+    break;
+  }
   case test::integration::H2TestFrame::kContinuation: {
     const Http2Frame::HeadersFlags headers_flags =
-        static_cast<Http2Frame::HeadersFlags>(proto_frame.continuation().flags());
-    uint32_t stream_idx = proto_frame.continuation().stream_index();
+        unifyHeadersFlags(proto_frame.continuation().flags());
+    const uint32_t stream_idx = proto_frame.continuation().stream_index();
     ENVOY_LOG_MISC(trace, "Sending continuation frame");
     h2_frame = Http2Frame::makeEmptyContinuationFrame(stream_idx, headers_flags);
-  } break;
+    break;
+  }
   case test::integration::H2TestFrame::kData: {
     const Http2Frame::DataFlags data_flags =
         static_cast<Http2Frame::DataFlags>(proto_frame.data().flags());
-    uint32_t stream_idx = proto_frame.data().stream_index();
+    const uint32_t stream_idx = proto_frame.data().stream_index();
     ENVOY_LOG_MISC(trace, "Sending data frame");
     h2_frame = Http2Frame::makeEmptyDataFrame(stream_idx, data_flags);
-  } break;
+    break;
+  }
   case test::integration::H2TestFrame::kPriority: {
-    uint32_t stream_idx = proto_frame.priority().stream_index();
-    uint32_t dependent_idx = proto_frame.priority().dependent_index();
+    const uint32_t stream_idx = proto_frame.priority().stream_index();
+    const uint32_t dependent_idx = proto_frame.priority().dependent_index();
     ENVOY_LOG_MISC(trace, "Sending priority frame");
     h2_frame = Http2Frame::makePriorityFrame(stream_idx, dependent_idx);
-  } break;
+    break;
+  }
   case test::integration::H2TestFrame::kPushPromise: {
     const Http2Frame::HeadersFlags headers_flags =
-        static_cast<Http2Frame::HeadersFlags>(proto_frame.push_promise().flags());
-    uint32_t stream_idx = proto_frame.push_promise().stream_index();
-    uint32_t promised_stream_idx = proto_frame.push_promise().promised_stream_index();
+        unifyHeadersFlags(proto_frame.push_promise().flags());
+    const uint32_t stream_idx = proto_frame.push_promise().stream_index();
+    const uint32_t promised_stream_idx = proto_frame.push_promise().promised_stream_index();
     ENVOY_LOG_MISC(trace, "Sending push promise frame");
     h2_frame =
         Http2Frame::makeEmptyPushPromiseFrame(stream_idx, promised_stream_idx, headers_flags);
-  } break;
+    break;
+  }
   case test::integration::H2TestFrame::kResetStream: {
-    uint32_t stream_idx = proto_frame.reset_stream().stream_index();
+    const uint32_t stream_idx = proto_frame.reset_stream().stream_index();
     const Http2Frame::ErrorCode error_code =
         static_cast<Http2Frame::ErrorCode>(proto_frame.reset_stream().error_code());
     ENVOY_LOG_MISC(trace, "Sending reset stream frame");
     h2_frame = Http2Frame::makeResetStreamFrame(stream_idx, error_code);
-  } break;
+    break;
+  }
   case test::integration::H2TestFrame::kGoAway: {
-    uint32_t last_stream_idx = proto_frame.go_away().last_stream_index();
+    const uint32_t last_stream_idx = proto_frame.go_away().last_stream_index();
     const Http2Frame::ErrorCode error_code =
         static_cast<Http2Frame::ErrorCode>(proto_frame.go_away().error_code());
     ENVOY_LOG_MISC(trace, "Sending go-away frame");
     h2_frame = Http2Frame::makeEmptyGoAwayFrame(last_stream_idx, error_code);
-  } break;
+    break;
+  }
   case test::integration::H2TestFrame::kWindowUpdate: {
-    uint32_t stream_idx = proto_frame.window_update().stream_index();
-    uint32_t increment = proto_frame.window_update().increment();
+    const uint32_t stream_idx = proto_frame.window_update().stream_index();
+    const uint32_t increment = proto_frame.window_update().increment();
     ENVOY_LOG_MISC(trace, "Sending windows_update frame");
     h2_frame = Http2Frame::makeWindowUpdateFrame(stream_idx, increment);
-  } break;
+    break;
+  }
   case test::integration::H2TestFrame::kMalformedRequest: {
-    uint32_t stream_idx = proto_frame.malformed_request().stream_index();
+    const uint32_t stream_idx = proto_frame.malformed_request().stream_index();
     ENVOY_LOG_MISC(trace, "Sending malformed_request frame");
     h2_frame = Http2Frame::makeMalformedRequest(stream_idx);
-  } break;
+    break;
+  }
   case test::integration::H2TestFrame::kMalformedRequestWithZerolenHeader: {
-    uint32_t stream_idx = proto_frame.malformed_request_with_zerolen_header().stream_index();
-    absl::string_view host = proto_frame.malformed_request_with_zerolen_header().host();
-    absl::string_view path = proto_frame.malformed_request_with_zerolen_header().path();
+    const uint32_t stream_idx = proto_frame.malformed_request_with_zerolen_header().stream_index();
+    const absl::string_view host = proto_frame.malformed_request_with_zerolen_header().host();
+    const absl::string_view path = proto_frame.malformed_request_with_zerolen_header().path();
     ENVOY_LOG_MISC(trace, "Sending malformed_request_with_zerolen_header");
     h2_frame = Http2Frame::makeMalformedRequestWithZerolenHeader(stream_idx, host, path);
-  } break;
+    break;
+  }
   case test::integration::H2TestFrame::kRequest: {
-    uint32_t stream_idx = proto_frame.request().stream_index();
-    absl::string_view host = proto_frame.request().host();
-    absl::string_view path = proto_frame.request().path();
+    const uint32_t stream_idx = proto_frame.request().stream_index();
+    const absl::string_view host = proto_frame.request().host();
+    const absl::string_view path = proto_frame.request().path();
     ENVOY_LOG_MISC(trace, "Sending request");
     h2_frame = Http2Frame::makeRequest(stream_idx, host, path);
-  } break;
+    break;
+  }
   case test::integration::H2TestFrame::kPostRequest: {
-    uint32_t stream_idx = proto_frame.post_request().stream_index();
-    absl::string_view host = proto_frame.post_request().host();
-    absl::string_view path = proto_frame.post_request().path();
+    const uint32_t stream_idx = proto_frame.post_request().stream_index();
+    const absl::string_view host = proto_frame.post_request().host();
+    const absl::string_view path = proto_frame.post_request().path();
     ENVOY_LOG_MISC(trace, "Sending post request");
     h2_frame = Http2Frame::makePostRequest(stream_idx, host, path);
-  } break;
+    break;
+  }
   default:
     ENVOY_LOG_MISC(debug, "Proto-frame not supported!");
     break;
@@ -135,7 +160,6 @@ void H2FuzzIntegrationTest::replay(const test::integration::H2CaptureFuzzTestCas
       break;
     }
     switch (event.event_selector_case()) {
-    // TODO(adip): Add ability to test complex interactions when receiving data
     case test::integration::Event::kDownstreamSendEvent: {
       auto downstream_write_func = [&](const Http2Frame& h2_frame) -> void {
         tcp_client->write(std::string(h2_frame), false, false);

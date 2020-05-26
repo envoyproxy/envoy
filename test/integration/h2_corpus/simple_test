@@ -2,12 +2,12 @@ events {
   downstream_send_event {
     h2_frames {
       settings {
-        flags: None
+        flags: NONE
       }
     }
     h2_frames {
       settings {
-        flags: Ack
+        flags: ACK
       }
     }
     h2_frames {
@@ -23,23 +23,24 @@ events {
   upstream_send_event {
     h2_frames {
       settings {
-        flags: None
+        flags: NONE
       }
     }
     h2_frames {
       settings {
-        flags: Ack
+        flags: ACK
       }
     }
     h2_frames {
       headers {
-      	flags: None
+      	flags: NONE
+      	flags: END_STREAM
 	stream_index: 1
       }
     }
     h2_frames {
       data {
-        flags: None
+        flags: NONE
 	stream_index: 1
       }
     }
