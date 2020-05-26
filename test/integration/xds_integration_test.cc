@@ -321,9 +321,9 @@ public:
 
     response->waitForEndStream();
     EXPECT_TRUE(response->complete());
-    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+    EXPECT_EQ("200", response->headers().getStatusValue());
     if (expect_close) {
-      EXPECT_EQ("close", response->headers().Connection()->value().getStringView());
+      EXPECT_EQ("close", response->headers().getConnectionValue());
 
     } else {
       EXPECT_EQ(nullptr, response->headers().Connection());

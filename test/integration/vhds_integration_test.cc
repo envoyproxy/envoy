@@ -457,7 +457,7 @@ TEST_P(VhdsIntegrationTest, VhdsVirtualHostAddUpdateRemove) {
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
   response->waitForHeaders();
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 
   cleanupUpstreamAndDownstream();
 }
@@ -524,7 +524,7 @@ TEST_P(VhdsIntegrationTest, RdsWithVirtualHostsVhdsVirtualHostAddUpdateRemove) {
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
   response->waitForHeaders();
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 
   cleanupUpstreamAndDownstream();
 }
@@ -565,7 +565,7 @@ TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateWithResourceNameAsAlias) {
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
   response->waitForHeaders();
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 
   cleanupUpstreamAndDownstream();
 }
@@ -606,7 +606,7 @@ TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateFailToResolveTheAlias) {
   notifyAboutAliasResolutionFailure("4", vhds_stream_, {"my_route/vhost.third"});
 
   response->waitForHeaders();
-  EXPECT_EQ("404", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("404", response->headers().getStatusValue());
 
   cleanupUpstreamAndDownstream();
 }
@@ -648,7 +648,7 @@ TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateFailToResolveOneAliasOutOfSeveral)
                                                   {"vhost.first"}, {"my_route/vhost.third"});
 
   response->waitForHeaders();
-  EXPECT_EQ("404", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("404", response->headers().getStatusValue());
 
   cleanupUpstreamAndDownstream();
 }

@@ -214,7 +214,7 @@ TEST_P(ProxyFilterIntegrationTest, DNSCacheHostOverflow) {
       {":authority", fmt::format("localhost2", fake_upstreams_[0]->localAddress()->ip()->port())}};
   response = codec_client_->makeHeaderOnlyRequest(request_headers2);
   response->waitForEndStream();
-  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("503", response->headers().getStatusValue());
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_overflow")->value());
 }
 
@@ -289,7 +289,7 @@ TEST_P(ProxyFilterIntegrationTest, UpstreamTlsInvalidSAN) {
 
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
   response->waitForEndStream();
-  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("503", response->headers().getStatusValue());
 
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ssl.fail_verify_san")->value());
 }

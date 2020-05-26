@@ -106,8 +106,7 @@ TEST_F(BufferFilterTest, ContentLengthPopulation) {
 
   Buffer::OwnedImpl data2(" world");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data2, true));
-  ASSERT_NE(headers.ContentLength(), nullptr);
-  EXPECT_EQ(headers.ContentLength()->value().getStringView(), "11");
+  EXPECT_EQ(headers.getContentLengthValue(), "11");
 }
 
 TEST_F(BufferFilterTest, ContentLengthPopulationInTrailers) {
@@ -122,8 +121,7 @@ TEST_F(BufferFilterTest, ContentLengthPopulationInTrailers) {
 
   Http::TestRequestTrailerMapImpl trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(trailers));
-  ASSERT_NE(headers.ContentLength(), nullptr);
-  EXPECT_EQ(headers.ContentLength()->value().getStringView(), "5");
+  EXPECT_EQ(headers.getContentLengthValue(), "5");
 }
 
 TEST_F(BufferFilterTest, ContentLengthPopulationAlreadyPresent) {
@@ -134,8 +132,7 @@ TEST_F(BufferFilterTest, ContentLengthPopulationAlreadyPresent) {
 
   Buffer::OwnedImpl data("foo");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, true));
-  ASSERT_NE(headers.ContentLength(), nullptr);
-  EXPECT_EQ(headers.ContentLength()->value().getStringView(), "3");
+  EXPECT_EQ(headers.getContentLengthValue(), "3");
 }
 
 TEST_F(BufferFilterTest, RouteConfigOverride) {

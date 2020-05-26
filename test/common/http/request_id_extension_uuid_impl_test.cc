@@ -175,7 +175,7 @@ TEST(UUIDRequestIDExtensionTest, SetTraceStatus) {
   // Invalid request ID.
   request_headers.setRequestId("");
   uuid_utils.setTraceStatus(request_headers, TraceStatus::Forced);
-  EXPECT_EQ(request_headers.RequestId()->value().getStringView(), "");
+  EXPECT_EQ(request_headers.getRequestIdValue(), "");
 }
 
 } // namespace Http

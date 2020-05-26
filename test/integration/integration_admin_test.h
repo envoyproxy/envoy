@@ -32,7 +32,7 @@ public:
     response = IntegrationUtil::makeSingleRequest(lookupPort(port_key), method, endpoint, "",
                                                   downstreamProtocol(), version_);
     EXPECT_TRUE(response->complete());
-    return response->headers().Status()->value().getStringView();
+    return response->headers().getStatusValue();
   }
 
   /**

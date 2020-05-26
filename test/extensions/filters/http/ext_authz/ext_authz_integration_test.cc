@@ -71,11 +71,10 @@ public:
     result = ext_authz_request_->waitForGrpcMessage(*dispatcher_, check_request);
     RELEASE_ASSERT(result, result.message());
 
-    EXPECT_EQ("POST", ext_authz_request_->headers().Method()->value().getStringView());
+    EXPECT_EQ("POST", ext_authz_request_->headers().getMethodValue());
     EXPECT_EQ("/envoy.service.auth.v2.Authorization/Check",
-              ext_authz_request_->headers().Path()->value().getStringView());
-    EXPECT_EQ("application/grpc",
-              ext_authz_request_->headers().ContentType()->value().getStringView());
+              ext_authz_request_->headers().getPathValue());
+    EXPECT_EQ("application/grpc", ext_authz_request_->headers().getContentTypeValue());
 
     envoy::service::auth::v3::CheckRequest expected_check_request;
     TestUtility::loadFromYaml(expected_check_request_yaml, expected_check_request);
@@ -117,7 +116,7 @@ public:
     EXPECT_EQ(request_body_.length(), upstream_request_->bodyLength());
 
     EXPECT_TRUE(response_->complete());
-    EXPECT_EQ("200", response_->headers().Status()->value().getStringView());
+    EXPECT_EQ("200", response_->headers().getStatusValue());
     EXPECT_EQ(response_size_, response_->body().size());
   }
 

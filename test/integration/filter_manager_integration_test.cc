@@ -603,7 +603,7 @@ TEST_P(InjectDataWithHttpConnectionManagerIntegrationTest,
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ("greetings", response->body());
 }
 

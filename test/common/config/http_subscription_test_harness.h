@@ -70,12 +70,11 @@ public:
                                                         Http::AsyncClient::Callbacks& callbacks,
                                                         const Http::AsyncClient::RequestOptions&) {
           http_callbacks_ = &callbacks;
-          EXPECT_EQ("POST", std::string(request->headers().Method()->value().getStringView()));
+          EXPECT_EQ("POST", request->headers().getMethodValue());
           EXPECT_EQ(Http::Headers::get().ContentTypeValues.Json,
-                    std::string(request->headers().ContentType()->value().getStringView()));
-          EXPECT_EQ("eds_cluster", std::string(request->headers().Host()->value().getStringView()));
-          EXPECT_EQ("/v2/discovery:endpoints",
-                    std::string(request->headers().Path()->value().getStringView()));
+                    request->headers().getContentTypeValue());
+          EXPECT_EQ("eds_cluster", request->headers().getHostValue());
+          EXPECT_EQ("/v2/discovery:endpoints", request->headers().getPathValue());
           std::string expected_request = "{";
           if (!version_.empty()) {
             expected_request += "\"version_info\":\"" + version + "\",";
@@ -98,7 +97,7 @@ public:
           expected_request += "}";
           EXPECT_EQ(expected_request, request->bodyAsString());
           EXPECT_EQ(fmt::format_int(expected_request.size()).str(),
-                    std::string(request->headers().ContentLength()->value().getStringView()));
+                    request->headers().getContentLengthValue());
           request_in_progress_ = true;
           return &http_request_;
         }));

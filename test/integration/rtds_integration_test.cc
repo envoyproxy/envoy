@@ -106,7 +106,7 @@ public:
     auto response = IntegrationUtil::makeSingleRequest(
         lookupPort("admin"), "GET", "/runtime?format=json", "", downstreamProtocol(), version_);
     EXPECT_TRUE(response->complete());
-    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+    EXPECT_EQ("200", response->headers().getStatusValue());
     Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(response->body());
     auto entries = loader->getObject("entries");
     if (entries->hasObject(key)) {

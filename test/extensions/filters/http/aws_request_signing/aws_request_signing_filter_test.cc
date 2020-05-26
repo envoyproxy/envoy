@@ -56,7 +56,7 @@ TEST_F(AwsRequestSigningFilterTest, SignWithHostRewrite) {
 
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
-  EXPECT_EQ("foo", headers.Host()->value().getStringView());
+  EXPECT_EQ("foo", headers.getHostValue());
   EXPECT_EQ(1UL, filter_config_->stats_.signing_added_.value());
 }
 

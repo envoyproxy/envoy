@@ -432,12 +432,12 @@ TEST_P(QuicHttpIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
   upstream_request_->encodeData(10, true);
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 
   // New request should be rejected.
   auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   response2->waitForEndStream();
-  EXPECT_EQ("503", response2->headers().Status()->value().getStringView());
+  EXPECT_EQ("503", response2->headers().getStatusValue());
   EXPECT_EQ("envoy overloaded", response2->body());
   codec_client_->close();
 

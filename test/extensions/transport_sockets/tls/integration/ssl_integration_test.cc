@@ -174,7 +174,7 @@ TEST_P(SslIntegrationTest, AdminCertEndpoint) {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "GET", "/certs", "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 // Validate certificate selection across different certificate types and client TLS versions.
@@ -444,7 +444,7 @@ TEST_P(SslTapIntegrationTest, TwoRequestsWithBinaryProto) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(128, upstream_request_->bodyLength());
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ(256, response->body().size());
   checkStats();
   envoy::config::core::v3::Address expected_local_address;
@@ -482,7 +482,7 @@ TEST_P(SslTapIntegrationTest, TwoRequestsWithBinaryProto) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(128, upstream_request_->bodyLength());
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ(256, response->body().size());
   checkStats();
   codec_client_->close();

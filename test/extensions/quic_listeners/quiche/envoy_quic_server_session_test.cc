@@ -237,10 +237,9 @@ TEST_P(EnvoyQuicServerSessionTest, NewStream) {
   // Request headers should be propagated to decoder.
   EXPECT_CALL(request_decoder, decodeHeaders_(_, /*end_stream=*/true))
       .WillOnce(Invoke([&host](const Http::RequestHeaderMapPtr& decoded_headers, bool) {
-        EXPECT_EQ(host, decoded_headers->Host()->value().getStringView());
-        EXPECT_EQ("/", decoded_headers->Path()->value().getStringView());
-        EXPECT_EQ(Http::Headers::get().MethodValues.Get,
-                  decoded_headers->Method()->value().getStringView());
+        EXPECT_EQ(host, decoded_headers->getHostValue());
+        EXPECT_EQ("/", decoded_headers->getPathValue());
+        EXPECT_EQ(Http::Headers::get().MethodValues.Get, decoded_headers->getMethodValue());
       }));
   stream->OnStreamHeaderList(/*fin=*/true, headers.uncompressed_header_bytes(), headers);
 }
@@ -427,10 +426,9 @@ TEST_P(EnvoyQuicServerSessionTest, WriteUpdatesDelayCloseTimer) {
   // Request headers should be propagated to decoder.
   EXPECT_CALL(request_decoder, decodeHeaders_(_, /*end_stream=*/true))
       .WillOnce(Invoke([&host](const Http::RequestHeaderMapPtr& decoded_headers, bool) {
-        EXPECT_EQ(host, decoded_headers->Host()->value().getStringView());
-        EXPECT_EQ("/", decoded_headers->Path()->value().getStringView());
-        EXPECT_EQ(Http::Headers::get().MethodValues.Get,
-                  decoded_headers->Method()->value().getStringView());
+        EXPECT_EQ(host, decoded_headers->getHostValue());
+        EXPECT_EQ("/", decoded_headers->getPathValue());
+        EXPECT_EQ(Http::Headers::get().MethodValues.Get, decoded_headers->getMethodValue());
       }));
   stream->OnStreamHeaderList(/*fin=*/true, request_headers.uncompressed_header_bytes(),
                              request_headers);
@@ -522,10 +520,9 @@ TEST_P(EnvoyQuicServerSessionTest, FlushCloseNoTimeout) {
   // Request headers should be propagated to decoder.
   EXPECT_CALL(request_decoder, decodeHeaders_(_, /*end_stream=*/true))
       .WillOnce(Invoke([&host](const Http::RequestHeaderMapPtr& decoded_headers, bool) {
-        EXPECT_EQ(host, decoded_headers->Host()->value().getStringView());
-        EXPECT_EQ("/", decoded_headers->Path()->value().getStringView());
-        EXPECT_EQ(Http::Headers::get().MethodValues.Get,
-                  decoded_headers->Method()->value().getStringView());
+        EXPECT_EQ(host, decoded_headers->getHostValue());
+        EXPECT_EQ("/", decoded_headers->getPathValue());
+        EXPECT_EQ(Http::Headers::get().MethodValues.Get, decoded_headers->getMethodValue());
       }));
   stream->OnStreamHeaderList(/*fin=*/true, request_headers.uncompressed_header_bytes(),
                              request_headers);
@@ -817,10 +814,9 @@ TEST_P(EnvoyQuicServerSessionTest, SendBufferWatermark) {
   // Request headers should be propagated to decoder.
   EXPECT_CALL(request_decoder, decodeHeaders_(_, /*end_stream=*/true))
       .WillOnce(Invoke([&host](const Http::RequestHeaderMapPtr& decoded_headers, bool) {
-        EXPECT_EQ(host, decoded_headers->Host()->value().getStringView());
-        EXPECT_EQ("/", decoded_headers->Path()->value().getStringView());
-        EXPECT_EQ(Http::Headers::get().MethodValues.Get,
-                  decoded_headers->Method()->value().getStringView());
+        EXPECT_EQ(host, decoded_headers->getHostValue());
+        EXPECT_EQ("/", decoded_headers->getPathValue());
+        EXPECT_EQ(Http::Headers::get().MethodValues.Get, decoded_headers->getMethodValue());
       }));
   stream1->OnStreamHeaderList(/*fin=*/true, request_headers.uncompressed_header_bytes(),
                               request_headers);
@@ -850,10 +846,9 @@ TEST_P(EnvoyQuicServerSessionTest, SendBufferWatermark) {
       dynamic_cast<EnvoyQuicServerStream*>(envoy_quic_session_.GetOrCreateStream(stream_id + 4));
   EXPECT_CALL(request_decoder2, decodeHeaders_(_, /*end_stream=*/true))
       .WillOnce(Invoke([&host](const Http::RequestHeaderMapPtr& decoded_headers, bool) {
-        EXPECT_EQ(host, decoded_headers->Host()->value().getStringView());
-        EXPECT_EQ("/", decoded_headers->Path()->value().getStringView());
-        EXPECT_EQ(Http::Headers::get().MethodValues.Get,
-                  decoded_headers->Method()->value().getStringView());
+        EXPECT_EQ(host, decoded_headers->getHostValue());
+        EXPECT_EQ("/", decoded_headers->getPathValue());
+        EXPECT_EQ(Http::Headers::get().MethodValues.Get, decoded_headers->getMethodValue());
       }));
   stream2->OnStreamHeaderList(/*fin=*/true, request_headers.uncompressed_header_bytes(),
                               request_headers);
@@ -882,10 +877,9 @@ TEST_P(EnvoyQuicServerSessionTest, SendBufferWatermark) {
       dynamic_cast<EnvoyQuicServerStream*>(envoy_quic_session_.GetOrCreateStream(stream_id + 8));
   EXPECT_CALL(request_decoder3, decodeHeaders_(_, /*end_stream=*/true))
       .WillOnce(Invoke([&host](const Http::RequestHeaderMapPtr& decoded_headers, bool) {
-        EXPECT_EQ(host, decoded_headers->Host()->value().getStringView());
-        EXPECT_EQ("/", decoded_headers->Path()->value().getStringView());
-        EXPECT_EQ(Http::Headers::get().MethodValues.Get,
-                  decoded_headers->Method()->value().getStringView());
+        EXPECT_EQ(host, decoded_headers->getHostValue());
+        EXPECT_EQ("/", decoded_headers->getPathValue());
+        EXPECT_EQ(Http::Headers::get().MethodValues.Get, decoded_headers->getMethodValue());
       }));
   stream3->OnStreamHeaderList(/*fin=*/true, request_headers.uncompressed_header_bytes(),
                               request_headers);
