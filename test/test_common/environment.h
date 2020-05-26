@@ -80,6 +80,13 @@ public:
    * - TEST_RANDOM_SEED to handle concurrent runs via the Bazel --runs_per_test flag
    * - TEST_SHARD_INDEX to handle concurrent runs in coverage tests
    *
+   * We require a unique base test id because random seeds are reused across
+   * multiple tests. For example, running:
+   *     bazel --runs_per_test=3 //test:foo_test //test:bar_test
+   * results in 3 unique seeds. Each set of tests is run once with each
+   * seed. Thus, the base test id is used to differentiate between tests run in
+   * parallel with the same seed.
+   *
    * @param base_test_id a uint32_t, larger than 1000000, to uniquely identify a test
    */
   static std::string chooseBaseId(uint32_t base_test_id);

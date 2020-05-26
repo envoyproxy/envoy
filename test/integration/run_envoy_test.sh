@@ -2,8 +2,9 @@
 
 source "${TEST_SRCDIR}/envoy/test/integration/test_utility.sh"
 
-# When runs-per-test is set, use TEST_RANDOM_SEED.
-# or TEST_SHARD_INEX to mutate the base id.
+# Use TEST_RANDOM_SEED or TEST_SHARD_INDEX to choose a base id. This
+# replicates the logic of TestEnvironment::chooseBaseId. See that method
+# for details.
 let BASE_ID=2000000+${TEST_RANDOM_SEED:-${TEST_SHARD_INDEX:-0}}
 
 function expect_fail_with_error() {
