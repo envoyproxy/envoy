@@ -20,6 +20,7 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/scope_tracker.h"
 #include "common/common/utility.h"
+#include "common/config/utility.h"
 #include "common/grpc/common.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
@@ -39,6 +40,7 @@
 #include "common/tracing/http_tracer_impl.h"
 
 #include "extensions/filters/http/well_known_names.h"
+#include "extensions/upstreams/http/well_known_names.h"
 
 namespace Envoy {
 namespace Router {
@@ -633,12 +635,15 @@ Filter::HttpOrTcpPool Filter::createConnPool(Upstream::HostDescriptionConstShare
 }
 
 UpstreamRequestPtr Filter::createUpstreamRequest(Filter::HttpOrTcpPool conn_pool) {
+  GenericConnPoolFactory* factory;
   if (absl::holds_alternative<Http::ConnectionPool::Instance*>(conn_pool)) {
-    return std::make_unique<UpstreamRequest>(*this,
-                                             std::make_unique<HttpConnPool>(*httpPool(conn_pool)));
+    factory = &Envoy::Config::Utility::getAndCheckFactoryByName<GenericConnPoolFactory>(
+        Extensions::Upstreams::Http::HttpUpstreamsNames::get().Http);
+  } else {
+    factory = &Envoy::Config::Utility::getAndCheckFactoryByName<GenericConnPoolFactory>(
+        Extensions::Upstreams::Http::HttpUpstreamsNames::get().Tcp);
   }
-  return std::make_unique<UpstreamRequest>(*this,
-                                           std::make_unique<TcpConnPool>(tcpPool(conn_pool)));
+  return std::make_unique<UpstreamRequest>(*this, factory->createGenericConnPool(conn_pool));
 }
 
 Http::ConnectionPool::Instance* Filter::getHttpConnPool() {

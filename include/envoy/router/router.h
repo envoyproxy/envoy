@@ -9,15 +9,19 @@
 #include <string>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/common/conn_pool.h"
 #include "envoy/common/matchers.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/config/typed_config.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
+#include "envoy/http/conn_pool.h"
 #include "envoy/http/hash_policy.h"
 #include "envoy/http/header_map.h"
 #include "envoy/router/internal_redirect.h"
+#include "envoy/tcp/conn_pool.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/type/v3/percent.pb.h"
 #include "envoy/upstream/resource_manager.h"
@@ -1090,6 +1094,75 @@ public:
 };
 
 using ConfigConstSharedPtr = std::shared_ptr<const Config>;
+class GenericConnectionPoolCallbacks;
+class UpstreamRequest;
+class GenericUpstream;
+
+// An API for wrapping either an HTTP or a TCP connection pool.
+class GenericConnPool : public Logger::Loggable<Logger::Id::router> {
+public:
+  virtual ~GenericConnPool() = default;
+
+  // Called to create a new HTTP stream or TCP connection. The implementation
+  // is then responsible for calling either onPoolReady or onPoolFailure on the
+  // supplied GenericConnectionPoolCallbacks.
+  virtual void newStream(GenericConnectionPoolCallbacks* callbacks) PURE;
+  // Called to cancel a call to newStream. Returns true if a newStream request
+  // was canceled, false otherwise.
+  virtual bool cancelAnyPendingRequest() PURE;
+  // Optionally returns the protocol for the connection pool.
+  virtual absl::optional<Http::Protocol> protocol() const PURE;
+};
+
+// An API for the UpstreamRequest to get callbacks from either an HTTP or TCP
+// connection pool.
+class GenericConnectionPoolCallbacks {
+public:
+  virtual ~GenericConnectionPoolCallbacks() = default;
+
+  virtual void onPoolFailure(ConnectionPool::PoolFailureReason reason,
+                             absl::string_view transport_failure_reason,
+                             Upstream::HostDescriptionConstSharedPtr host) PURE;
+  virtual void onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
+                           Upstream::HostDescriptionConstSharedPtr host,
+                           const Network::Address::InstanceConstSharedPtr& upstream_local_address,
+                           const StreamInfo::StreamInfo& info) PURE;
+  virtual UpstreamRequest* upstreamRequest() PURE;
+};
+
+// A generic API which covers common functionality between HTTP and TCP upstreams.
+class GenericUpstream {
+public:
+  virtual ~GenericUpstream() = default;
+  virtual void encodeData(Buffer::Instance& data, bool end_stream) PURE;
+  virtual void encodeMetadata(const Http::MetadataMapVector& metadata_map_vector) PURE;
+  virtual void encodeHeaders(const Http::RequestHeaderMap& headers, bool end_stream) PURE;
+  virtual void encodeTrailers(const Http::RequestTrailerMap& trailers) PURE;
+  virtual void readDisable(bool disable) PURE;
+  virtual void resetStream() PURE;
+};
+
+using GenericConnPoolPtr = std::unique_ptr<GenericConnPool>;
+/*
+ * A factory for FIXME creating transport socket. It will be associated to filter chains and
+ * clusters.
+ */
+class GenericConnPoolFactory : public Envoy::Config::UntypedFactory {
+public:
+  virtual ~GenericConnPoolFactory() = default;
+
+  // FIXME pass in a closure to get either.
+  using HttpOrTcpPool =
+      absl::variant<Http::ConnectionPool::Instance*, Tcp::ConnectionPool::Instance*>;
+
+  /*
+   * @param options for creating the transport socket
+   * @return Network::UpstreamRequestPtr a transport socket to be passed to connection.
+   */
+  virtual GenericConnPoolPtr createGenericConnPool(HttpOrTcpPool pool) const PURE;
+};
+
+using GenericConnPoolFactoryPtr = std::unique_ptr<GenericConnPoolFactory>;
 
 } // namespace Router
 } // namespace Envoy
