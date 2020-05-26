@@ -178,7 +178,7 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterDownstreamHeaders) {
   EXPECT_FALSE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("408", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("408", response->headers().getStatusValue());
   EXPECT_EQ("stream timeout", response->body());
 
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("stream_idle_timeout"));
@@ -193,9 +193,9 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutHeadRequestAfterDownstrea
   EXPECT_FALSE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("408", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("408", response->headers().getStatusValue());
   EXPECT_EQ(fmt::format("{}", strlen("stream timeout")),
-            response->headers().ContentLength()->value().getStringView());
+            response->headers().getContentLengthValue());
   EXPECT_EQ("", response->body());
 }
 
@@ -210,7 +210,7 @@ TEST_P(IdleTimeoutIntegrationTest, GlobalPerStreamIdleTimeoutAfterDownstreamHead
   EXPECT_FALSE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("408", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("408", response->headers().getStatusValue());
   EXPECT_EQ("stream timeout", response->body());
 }
 
@@ -227,7 +227,7 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterDownstreamHeadersAnd
   EXPECT_FALSE(upstream_request_->complete());
   EXPECT_EQ(1U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("408", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("408", response->headers().getStatusValue());
   EXPECT_EQ("stream timeout", response->body());
 }
 
@@ -243,7 +243,7 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterUpstreamHeaders) {
   EXPECT_FALSE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_FALSE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ("", response->body());
 }
 
@@ -277,7 +277,7 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterBidiData) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(1U, upstream_request_->bodyLength());
   EXPECT_FALSE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ("aa", response->body());
 }
 
@@ -307,7 +307,7 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutTriggersOnBodilessPost) {
   EXPECT_FALSE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("408", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("408", response->headers().getStatusValue());
   EXPECT_EQ("request timeout", response->body());
 }
 
@@ -323,7 +323,7 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutUnconfiguredDoesNotTriggerOnBod
   EXPECT_FALSE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("408", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("408", response->headers().getStatusValue());
   EXPECT_NE("request timeout", response->body());
 }
 
@@ -381,7 +381,7 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutIsNotDisarmedByEncode100Continu
   EXPECT_FALSE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("408", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("408", response->headers().getStatusValue());
   EXPECT_EQ("request timeout", response->body());
 }
 
