@@ -115,17 +115,17 @@ public:
 };
 
 class MockTlsCertificateConfig : public TlsCertificateConfig {
- public:
+public:
   MockTlsCertificateConfig() {}
   ~MockTlsCertificateConfig() override {}
 
   MOCK_METHOD(const std::string&, certificateChain, (), (const));
-    MOCK_METHOD(const std::string&, certificateChainPath, (), (const));
+  MOCK_METHOD(const std::string&, certificateChainPath, (), (const));
   MOCK_METHOD(const std::string&, privateKey, (), (const));
   MOCK_METHOD(const std::string&, privateKeyPath, (), (const));
-   MOCK_METHOD(const std::string&, password,(),  (const));
-   MOCK_METHOD(const std::string&, passwordPath, (), (const));
-   MOCK_METHOD(Envoy::Ssl::PrivateKeyMethodProviderSharedPtr, privateKeyMethod, (), (const));
+  MOCK_METHOD(const std::string&, password, (), (const));
+  MOCK_METHOD(const std::string&, passwordPath, (), (const));
+  MOCK_METHOD(Envoy::Ssl::PrivateKeyMethodProviderSharedPtr, privateKeyMethod, (), (const));
 };
 
 class MockPrivateKeyMethodManager : public PrivateKeyMethodManager {

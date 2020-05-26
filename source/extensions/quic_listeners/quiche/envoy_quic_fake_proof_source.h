@@ -43,15 +43,14 @@ public:
     quic::QuicCryptoProof proof;
     bool success = false;
     auto signature_callback = std::make_unique<FakeSignatureCallback>(success, proof.signature);
-    ComputeTlsSignature(server_address, client_address, hostname, SSL_SIGN_RSA_PSS_RSAE_SHA256, server_config, std::move(signature_callback));
+    ComputeTlsSignature(server_address, client_address, hostname, SSL_SIGN_RSA_PSS_RSAE_SHA256,
+                        server_config, std::move(signature_callback));
     ASSERT(success);
     proof.leaf_cert_scts = "Fake timestamp";
     callback->Run(true, chain, proof, nullptr /* details */);
   }
-  
-  TicketCrypter* GetTicketCrypter() override {
-    return nullptr;
-  }
+
+  TicketCrypter* GetTicketCrypter() override { return nullptr; }
 
 private:
   // Used by GetProof() to get fake signature.

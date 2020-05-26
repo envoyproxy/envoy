@@ -43,7 +43,6 @@ public:
   Http::StreamResetReason last_stream_reset_reason_{Http::StreamResetReason::LocalReset};
 };
 
-
 std::vector<std::pair<Network::Address::IpVersion, bool>> generateTestParam() {
   std::vector<std::pair<Network::Address::IpVersion, bool>> param;
   for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
@@ -61,13 +60,14 @@ static std::string testParamsToString(
   return absl::StrCat(ip_version, params.param.second ? "_UseHttp3" : "_UseGQuic");
 }
 
-class QuicHttpIntegrationTest : public HttpIntegrationTest,
-                                public testing::TestWithParam<std::pair<Network::Address::IpVersion, bool>> {
+class QuicHttpIntegrationTest
+    : public HttpIntegrationTest,
+      public testing::TestWithParam<std::pair<Network::Address::IpVersion, bool>> {
 public:
   QuicHttpIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP3, GetParam().first,
                             ConfigHelper::quicHttpProxyConfig()),
-        supported_versions_([] () {
+        supported_versions_([]() {
           SetQuicReloadableFlag(quic_enable_version_draft_27, GetParam().second);
           return quic::CurrentSupportedVersions();
         }()),
@@ -75,8 +75,8 @@ public:
         alarm_factory_(*dispatcher_, *conn_helper_.GetClock()),
         injected_resource_filename_(TestEnvironment::temporaryPath("injected_resource")),
         file_updater_(injected_resource_filename_) {
-        // quic::SetVerbosityLogThreshold(1);
-        }
+    // quic::SetVerbosityLogThreshold(1);
+  }
 
   Network::ClientConnectionPtr makeClientConnectionWithOptions(
       uint32_t port, const Network::ConnectionSocket::OptionsSharedPtr& options) override {
@@ -130,11 +130,10 @@ public:
 
   void initialize() override {
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport quic_transport_socket_config;
+      envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport
+          quic_transport_socket_config;
       auto tls_context = quic_transport_socket_config.mutable_downstream_tls_context();
-      ConfigHelper::initializeTls(ConfigHelper::ServerSslOptions()
-                                  .setRsaCert(true)
-                                  .setTlsV13(true),
+      ConfigHelper::initializeTls(ConfigHelper::ServerSslOptions().setRsaCert(true).setTlsV13(true),
                                   *tls_context->mutable_common_tls_context());
       auto* filter_chain =
           bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
@@ -204,8 +203,7 @@ protected:
 };
 
 INSTANTIATE_TEST_SUITE_P(QuicHttpIntegrationTests, QuicHttpIntegrationTest,
-                         testing::ValuesIn(generateTestParam()),
-                         testParamsToString );
+                         testing::ValuesIn(generateTestParam()), testParamsToString);
 
 TEST_P(QuicHttpIntegrationTest, GetRequestAndEmptyResponse) {
   testRouterHeaderOnlyRequestAndResponse();

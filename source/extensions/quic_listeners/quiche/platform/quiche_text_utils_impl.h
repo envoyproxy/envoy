@@ -25,7 +25,7 @@ public:
     return absl::StartsWith(data, prefix);
   }
 
-static bool EndsWith(QuicheStringPiece data, QuicheStringPiece suffix) {
+  static bool EndsWith(QuicheStringPiece data, QuicheStringPiece suffix) {
     return absl::EndsWith(data, suffix);
   }
 
@@ -65,7 +65,7 @@ static bool EndsWith(QuicheStringPiece data, QuicheStringPiece suffix) {
     return quiche::Base64Encode(data, data_len, output);
   }
 
-static QuicheOptional<std::string> Base64Decode(QuicheStringPiece input) {
+  static QuicheOptional<std::string> Base64Decode(QuicheStringPiece input) {
     std::string output;
     if (!absl::Base64Unescape(input, &output)) {
       return QuicheOptional<std::string>();

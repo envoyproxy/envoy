@@ -102,14 +102,12 @@ private:
   quic::QuicCryptoClientConfig crypto_config_;
 };
 
-Buffer::OwnedImpl generateChloPacketToSend(quic::ParsedQuicVersion quic_version,
-                                           quic::QuicConfig& quic_config,
-                                           quic::QuicCryptoServerConfig& crypto_config,
-                                           quic::QuicConnectionId connection_id,
-                                           quic::QuicClock& clock,
-                                           const quic::QuicSocketAddress& server_address,
-                                           const quic::QuicSocketAddress& client_address,
-                                           std::string sni) {
+Buffer::OwnedImpl
+generateChloPacketToSend(quic::ParsedQuicVersion quic_version, quic::QuicConfig& quic_config,
+                         quic::QuicCryptoServerConfig& crypto_config,
+                         quic::QuicConnectionId connection_id, quic::QuicClock& clock,
+                         const quic::QuicSocketAddress& server_address,
+                         const quic::QuicSocketAddress& client_address, std::string sni) {
   if (quic::VersionUsesHttp3(quic_version.transport_version)) {
     std::unique_ptr<quic::QuicReceivedPacket> packet =
         std::move(quic::test::GetFirstFlightOfPackets(quic_version, quic_config, connection_id)[0]);
@@ -125,11 +123,9 @@ Buffer::OwnedImpl generateChloPacketToSend(quic::ParsedQuicVersion quic_version,
       new quic::QuicSignedServerConfig);
   quic::QuicCompressedCertsCache cache(
       quic::QuicCompressedCertsCache::kQuicCompressedCertsCacheSize);
-  quic::test::crypto_test_utils::GenerateFullCHLO(
-      chlo, &crypto_config, server_address,
-      client_address,
-      quic_version.transport_version, &clock, signed_config, &cache,
-      &full_chlo);
+  quic::test::crypto_test_utils::GenerateFullCHLO(chlo, &crypto_config, server_address,
+                                                  client_address, quic_version.transport_version,
+                                                  &clock, signed_config, &cache, &full_chlo);
   // Overwrite version label to highest current supported version.
   full_chlo.SetVersion(quic::kVER, quic_version);
   quic::QuicConfig quic_config_tmp;

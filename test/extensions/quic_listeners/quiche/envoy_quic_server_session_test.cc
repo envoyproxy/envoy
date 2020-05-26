@@ -113,8 +113,7 @@ public:
             connection_helper_, alarm_factory_, writer_, quic_version_, listener_config_,
             listener_stats_, *listener_config_.socket_)),
         crypto_config_(quic::QuicCryptoServerConfig::TESTING, quic::QuicRandom::GetInstance(),
-                       std::make_unique<TestProofSource>(),
-                       quic::KeyExchangeSource::Default()),
+                       std::make_unique<TestProofSource>(), quic::KeyExchangeSource::Default()),
         envoy_quic_session_(quic_config_, quic_version_,
                             std::unique_ptr<TestEnvoyQuicServerConnection>(quic_connection_),
                             /*visitor=*/nullptr, &crypto_stream_helper_, &crypto_config_,
@@ -138,31 +137,32 @@ public:
     ON_CALL(crypto_stream_helper_, CanAcceptClientHello(_, _, _, _, _)).WillByDefault(Return(true));
   }
 
-  void SetUp() override { envoy_quic_session_.Initialize();
+  void SetUp() override {
+    envoy_quic_session_.Initialize();
     quic::test::QuicConfigPeer::SetReceivedMaxBidirectionalStreams(
-          envoy_quic_session_.config(), quic::kDefaultMaxStreamsPerConnection);
-      quic::test::QuicConfigPeer::SetReceivedMaxUnidirectionalStreams(
-          envoy_quic_session_.config(), quic::kDefaultMaxStreamsPerConnection);
-       quic::test::QuicConfigPeer::SetReceivedInitialMaxStreamDataBytesUnidirectional(
-          envoy_quic_session_.config(), quic::kMinimumFlowControlSendWindow);
-       quic::test::QuicConfigPeer::SetReceivedInitialMaxStreamDataBytesIncomingBidirectional(
-          envoy_quic_session_.config(), quic::kMinimumFlowControlSendWindow);
-       quic::test::QuicConfigPeer::SetReceivedInitialMaxStreamDataBytesOutgoingBidirectional(
-          envoy_quic_session_.config(), quic::kMinimumFlowControlSendWindow);
-       quic::test::QuicConfigPeer::SetReceivedInitialSessionFlowControlWindow(
-          envoy_quic_session_.config(), quic::kMinimumFlowControlSendWindow);
+        envoy_quic_session_.config(), quic::kDefaultMaxStreamsPerConnection);
+    quic::test::QuicConfigPeer::SetReceivedMaxUnidirectionalStreams(
+        envoy_quic_session_.config(), quic::kDefaultMaxStreamsPerConnection);
+    quic::test::QuicConfigPeer::SetReceivedInitialMaxStreamDataBytesUnidirectional(
+        envoy_quic_session_.config(), quic::kMinimumFlowControlSendWindow);
+    quic::test::QuicConfigPeer::SetReceivedInitialMaxStreamDataBytesIncomingBidirectional(
+        envoy_quic_session_.config(), quic::kMinimumFlowControlSendWindow);
+    quic::test::QuicConfigPeer::SetReceivedInitialMaxStreamDataBytesOutgoingBidirectional(
+        envoy_quic_session_.config(), quic::kMinimumFlowControlSendWindow);
+    quic::test::QuicConfigPeer::SetReceivedInitialSessionFlowControlWindow(
+        envoy_quic_session_.config(), quic::kMinimumFlowControlSendWindow);
     envoy_quic_session_.OnConfigNegotiated();
 
     // Switch to a encryption forward secure crypto stream.
-  quic::test::QuicServerSessionBasePeer::SetCryptoStream(&envoy_quic_session_, nullptr);
-  quic::test::QuicServerSessionBasePeer::SetCryptoStream(
-      &envoy_quic_session_,
-      new TestQuicCryptoServerStream(&crypto_config_, &compressed_certs_cache_,
-                                     &envoy_quic_session_, &crypto_stream_helper_));
-  quic_connection_->SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
-  quic_connection_->SetEncrypter(
-      quic::ENCRYPTION_FORWARD_SECURE,
-      std::make_unique<quic::NullEncrypter>(quic::Perspective::IS_SERVER));
+    quic::test::QuicServerSessionBasePeer::SetCryptoStream(&envoy_quic_session_, nullptr);
+    quic::test::QuicServerSessionBasePeer::SetCryptoStream(
+        &envoy_quic_session_,
+        new TestQuicCryptoServerStream(&crypto_config_, &compressed_certs_cache_,
+                                       &envoy_quic_session_, &crypto_stream_helper_));
+    quic_connection_->SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
+    quic_connection_->SetEncrypter(
+        quic::ENCRYPTION_FORWARD_SECURE,
+        std::make_unique<quic::NullEncrypter>(quic::Perspective::IS_SERVER));
   }
 
   bool installReadFilter() {
@@ -195,8 +195,8 @@ public:
           encoder.getStream().addCallbacks(stream_callbacks);
           return request_decoder;
         }));
-    quic::QuicStreamId stream_id =quic::VersionUsesHttp3(
-      quic_version_[0].transport_version) ? 4u : 5u;
+    quic::QuicStreamId stream_id =
+        quic::VersionUsesHttp3(quic_version_[0].transport_version) ? 4u : 5u;
     return envoy_quic_session_.GetOrCreateStream(stream_id);
   }
 
@@ -247,8 +247,8 @@ TEST_P(EnvoyQuicServerSessionTest, NewStream) {
   Http::MockRequestDecoder request_decoder;
   EXPECT_CALL(http_connection_callbacks_, newStream(_, false))
       .WillOnce(testing::ReturnRef(request_decoder));
-  quic::QuicStreamId stream_id = quic::VersionUsesHttp3(
-      quic_version_[0].transport_version) ? 4u : 5u;
+  quic::QuicStreamId stream_id =
+      quic::VersionUsesHttp3(quic_version_[0].transport_version) ? 4u : 5u;
   auto stream =
       reinterpret_cast<quic::QuicSpdyStream*>(envoy_quic_session_.GetOrCreateStream(stream_id));
   // Receive a GET request on created stream.
@@ -276,14 +276,16 @@ TEST_P(EnvoyQuicServerSessionTest, InvalidIncomingStreamId) {
   Http::MockRequestDecoder request_decoder;
   Http::MockStreamCallbacks stream_callbacks;
   // IETF stream 5 and G-Quic stream 2 are server initiated.
-  quic::QuicStreamId stream_id = quic::VersionUsesHttp3(
-      quic_version_[0].transport_version) ? 5u : 2u;
+  quic::QuicStreamId stream_id =
+      quic::VersionUsesHttp3(quic_version_[0].transport_version) ? 5u : 2u;
   std::string data("aaaa");
   quic::QuicStreamFrame stream_frame(stream_id, false, 0, data);
   EXPECT_CALL(http_connection_callbacks_, newStream(_, false)).Times(0);
-  EXPECT_CALL(*quic_connection_, SendConnectionClosePacket(
-      (quic::VersionUsesHttp3(quic_version_[0].transport_version) ? quic::QUIC_HTTP_STREAM_WRONG_DIRECTION : quic::QUIC_INVALID_STREAM_ID),
-                                                           "Data for nonexistent stream"));
+  EXPECT_CALL(*quic_connection_,
+              SendConnectionClosePacket((quic::VersionUsesHttp3(quic_version_[0].transport_version)
+                                             ? quic::QUIC_HTTP_STREAM_WRONG_DIRECTION
+                                             : quic::QUIC_INVALID_STREAM_ID),
+                                        "Data for nonexistent stream"));
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
 
   envoy_quic_session_.OnStreamFrame(stream_frame);
@@ -294,11 +296,14 @@ TEST_P(EnvoyQuicServerSessionTest, NoNewStreamForInvalidIncomingStream) {
   Http::MockRequestDecoder request_decoder;
   Http::MockStreamCallbacks stream_callbacks;
   // IETF stream 5 and G-Quic stream 2 are server initiated.
-  quic::QuicStreamId stream_id = quic::VersionUsesHttp3(
-      quic_version_[0].transport_version) ? 5u : 2u;
+  quic::QuicStreamId stream_id =
+      quic::VersionUsesHttp3(quic_version_[0].transport_version) ? 5u : 2u;
   EXPECT_CALL(http_connection_callbacks_, newStream(_, false)).Times(0);
-  EXPECT_CALL(*quic_connection_, SendConnectionClosePacket(quic::VersionUsesHttp3(quic_version_[0].transport_version) ? quic::QUIC_HTTP_STREAM_WRONG_DIRECTION : quic::QUIC_INVALID_STREAM_ID,
-                                                           "Data for nonexistent stream"));
+  EXPECT_CALL(*quic_connection_,
+              SendConnectionClosePacket(quic::VersionUsesHttp3(quic_version_[0].transport_version)
+                                            ? quic::QUIC_HTTP_STREAM_WRONG_DIRECTION
+                                            : quic::QUIC_INVALID_STREAM_ID,
+                                        "Data for nonexistent stream"));
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
 
   // Stream creation on closed connection should fail.
@@ -313,8 +318,7 @@ TEST_P(EnvoyQuicServerSessionTest, OnResetFrame) {
   quic::QuicRstStreamFrame rst1(/*control_frame_id=*/1u, stream1->id(),
                                 quic::QUIC_ERROR_PROCESSING_STREAM, /*bytes_written=*/0u);
   EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::RemoteReset, _));
-  if (!quic::VersionUsesHttp3(
-      quic_version_[0].transport_version)) {
+  if (!quic::VersionUsesHttp3(quic_version_[0].transport_version)) {
     EXPECT_CALL(*quic_connection_, SendControlFrame(_))
         .WillOnce(Invoke([stream_id = stream1->id()](const quic::QuicFrame& frame) {
           EXPECT_EQ(stream_id, frame.rst_stream_frame->stream_id);
@@ -719,7 +723,7 @@ TEST_P(EnvoyQuicServerSessionTest, GoAway) {
   if (quic::VersionUsesHttp3(quic_version_[0].transport_version)) {
     EXPECT_CALL(debug_visitor, OnGoAwayFrameSent(_));
   } else {
-  EXPECT_CALL(*quic_connection_, SendControlFrame(_));
+    EXPECT_CALL(*quic_connection_, SendControlFrame(_));
   }
   http_connection_->goAway();
 }
@@ -819,8 +823,8 @@ TEST_P(EnvoyQuicServerSessionTest, SendBufferWatermark) {
         encoder.getStream().addCallbacks(stream_callbacks);
         return request_decoder;
       }));
-  quic::QuicStreamId stream_id = quic::VersionUsesHttp3(
-      quic_version_[0].transport_version) ? 4u : 5u;
+  quic::QuicStreamId stream_id =
+      quic::VersionUsesHttp3(quic_version_[0].transport_version) ? 4u : 5u;
   auto stream1 =
       dynamic_cast<EnvoyQuicServerStream*>(envoy_quic_session_.GetOrCreateStream(stream_id));
 

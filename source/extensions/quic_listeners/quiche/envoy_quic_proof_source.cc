@@ -1,39 +1,42 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_proof_source.h"
 
-#include "quiche/quic/core/crypto/certificate_view.h"
+#include <openssl/bio.h>
 
 #include "envoy/ssl/tls_certificate_config.h"
+
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
 #include "extensions/quic_listeners/quiche/quic_io_handle_wrapper.h"
 #include "extensions/transport_sockets/well_known_names.h"
+
 #include "openssl/bytestring.h"
-#include <openssl/bio.h>
+#include "quiche/quic/core/crypto/certificate_view.h"
 
 namespace Envoy {
 namespace Quic {
 
 quic::QuicReferenceCountedPointer<quic::ProofSource::Chain>
-  EnvoyQuicProofSource::GetCertChain(const quic::QuicSocketAddress& server_address,
-               const quic::QuicSocketAddress& client_address,
-               const std::string& hostname) {
-  absl::optional<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> cert_config_ref = GetTlsCertConfig(server_address, client_address, hostname);
-   // Only return the first TLS cert config.
-   if (!cert_config_ref.has_value()) {
-     ENVOY_LOG(warn, "No matching filter chain found for handshake.");
-     return quic::QuicReferenceCountedPointer<quic::ProofSource::Chain>(new quic::ProofSource::Chain({}));
-   }
-   auto& cert_config = cert_config_ref.value().get();
-   const std::string& chain_str = cert_config.certificateChain();
-   std::string pem_str = std::string(const_cast<char*>(chain_str.data()),
-                             chain_str.size());
-     std::stringstream pem_stream(chain_str);
-  std::vector<std::string> chain =
-      quic::CertificateView::LoadPemFromStream(&pem_stream);
-  if (chain.empty()) {
-   throw EnvoyException(
-          absl::StrCat("Failed to load certificate chain from ", cert_config.certificateChainPath()));
+EnvoyQuicProofSource::GetCertChain(const quic::QuicSocketAddress& server_address,
+                                   const quic::QuicSocketAddress& client_address,
+                                   const std::string& hostname) {
+  absl::optional<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> cert_config_ref =
+      GetTlsCertConfig(server_address, client_address, hostname);
+  // Only return the first TLS cert config.
+  if (!cert_config_ref.has_value()) {
+    ENVOY_LOG(warn, "No matching filter chain found for handshake.");
+    return quic::QuicReferenceCountedPointer<quic::ProofSource::Chain>(
+        new quic::ProofSource::Chain({}));
   }
-  return quic::QuicReferenceCountedPointer<quic::ProofSource::Chain>(new quic::ProofSource::Chain(chain));
+  auto& cert_config = cert_config_ref.value().get();
+  const std::string& chain_str = cert_config.certificateChain();
+  std::string pem_str = std::string(const_cast<char*>(chain_str.data()), chain_str.size());
+  std::stringstream pem_stream(chain_str);
+  std::vector<std::string> chain = quic::CertificateView::LoadPemFromStream(&pem_stream);
+  if (chain.empty()) {
+    throw EnvoyException(
+        absl::StrCat("Failed to load certificate chain from ", cert_config.certificateChainPath()));
+  }
+  return quic::QuicReferenceCountedPointer<quic::ProofSource::Chain>(
+      new quic::ProofSource::Chain(chain));
 }
 
 void EnvoyQuicProofSource::ComputeTlsSignature(
@@ -50,7 +53,7 @@ void EnvoyQuicProofSource::ComputeTlsSignature(
   auto& cert_config = cert_config_ref.value().get();
   // Load private key.
   const std::string& pkey = cert_config.privateKey();
-    std::stringstream pem_str(pkey);
+  std::stringstream pem_str(pkey);
   std::unique_ptr<quic::CertificatePrivateKey> pem_key =
       quic::CertificatePrivateKey::LoadPemFromStream(&pem_str);
   /*
@@ -99,12 +102,13 @@ void EnvoyQuicProofSource::ComputeTlsSignature(
 
 absl::optional<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>>
 EnvoyQuicProofSource::GetTlsCertConfig(const quic::QuicSocketAddress& server_address,
-                 const quic::QuicSocketAddress& client_address, const std::string& hostname) {
+                                       const quic::QuicSocketAddress& client_address,
+                                       const std::string& hostname) {
   ENVOY_LOG(trace, "Getting cert chain for {}", hostname);
   Network::ConnectionSocketImpl connection_socket(
-                              std::make_unique<QuicIoHandleWrapper>(listen_socket_->ioHandle()),
-                              quicAddressToEnvoyAddressInstance(server_address),
-                              quicAddressToEnvoyAddressInstance(client_address));
+      std::make_unique<QuicIoHandleWrapper>(listen_socket_->ioHandle()),
+      quicAddressToEnvoyAddressInstance(server_address),
+      quicAddressToEnvoyAddressInstance(client_address));
 
   connection_socket.setDetectedTransportProtocol(
       Extensions::TransportSockets::TransportProtocolNames::get().Quic);
@@ -124,7 +128,8 @@ EnvoyQuicProofSource::GetTlsCertConfig(const quic::QuicSocketAddress& server_add
           .tlsCertificates();
 
   // Only return the first TLS cert config.
-  return absl::optional<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>>(tls_cert_configs[0].get());
+  return absl::optional<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>>(
+      tls_cert_configs[0].get());
 }
 
 } // namespace Quic

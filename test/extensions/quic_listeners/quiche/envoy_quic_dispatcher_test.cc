@@ -48,23 +48,24 @@ const size_t kNumSessionsToCreatePerLoopForTests = 16;
 
 std::vector<std::pair<Network::Address::IpVersion, bool>> generateTestParam() {
   std::vector<std::pair<Network::Address::IpVersion, bool>> param;
-for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
-  for (bool use_http3 : {true, false}) {
-  param.emplace_back(ip_version, use_http3);
+  for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
+    for (bool use_http3 : {true, false}) {
+      param.emplace_back(ip_version, use_http3);
+    }
   }
-}
 
   return param;
 }
 
-static std::string
-  testParamsToString(const ::testing::TestParamInfo<std::pair<Network::Address::IpVersion, bool> >& params) {
-    std::string ip_version = params.param.first == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6";
-      return absl::StrCat(ip_version, params.param.second ? "_UseHttp3" : "_UseGQuic");
-  }
+static std::string testParamsToString(
+    const ::testing::TestParamInfo<std::pair<Network::Address::IpVersion, bool>>& params) {
+  std::string ip_version = params.param.first == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6";
+  return absl::StrCat(ip_version, params.param.second ? "_UseHttp3" : "_UseGQuic");
+}
 
-class EnvoyQuicDispatcherTest : public testing::TestWithParam<std::pair<Network::Address::IpVersion, bool>>,
-                                protected Logger::Loggable<Logger::Id::main> {
+class EnvoyQuicDispatcherTest
+    : public testing::TestWithParam<std::pair<Network::Address::IpVersion, bool>>,
+      protected Logger::Loggable<Logger::Id::main> {
 public:
   EnvoyQuicDispatcherTest()
       : version_(GetParam().first), api_(Api::createApiForTest(time_system_)),
@@ -74,9 +75,11 @@ public:
             Network::Test::getCanonicalLoopbackAddress(version_), nullptr, /*bind*/ true)),
         connection_helper_(*dispatcher_),
         crypto_config_(quic::QuicCryptoServerConfig::TESTING, quic::QuicRandom::GetInstance(),
-                       std::make_unique<TestProofSource>(),
-                       quic::KeyExchangeSource::Default()),
-        version_manager_([]() {  SetQuicReloadableFlag(quic_enable_version_draft_27, GetParam().second); return quic::CurrentSupportedVersions(); }()),
+                       std::make_unique<TestProofSource>(), quic::KeyExchangeSource::Default()),
+        version_manager_([]() {
+          SetQuicReloadableFlag(quic_enable_version_draft_27, GetParam().second);
+          return quic::CurrentSupportedVersions();
+        }()),
         quic_version_(quic::CurrentSupportedVersions()[0]),
         listener_stats_({ALL_LISTENER_STATS(POOL_COUNTER(listener_config_.listenerScope()),
                                             POOL_GAUGE(listener_config_.listenerScope()),
@@ -92,7 +95,7 @@ public:
             quic::kQuicDefaultConnectionIdLength, connection_handler_, listener_config_,
             listener_stats_, per_worker_stats_, *dispatcher_, *listen_socket_),
         connection_id_(quic::test::TestConnectionId(1)) {
-      quic::SetVerbosityLogThreshold(1);
+    quic::SetVerbosityLogThreshold(1);
 
     auto writer = new testing::NiceMock<quic::test::MockPacketWriter>();
     envoy_quic_dispatcher_.InitializeWithWriter(writer);
@@ -119,23 +122,20 @@ public:
 
   std::unique_ptr<quic::QuicReceivedPacket>
   createChloReceivedPacket(quic::QuicSocketAddress client_address) {
-  EnvoyQuicClock clock(*dispatcher_);
+    EnvoyQuicClock clock(*dispatcher_);
     Buffer::OwnedImpl payload = generateChloPacketToSend(
-        quic_version_, quic_config_,
-        crypto_config_, connection_id_, clock,
-        envoyAddressInstanceToQuicSocketAddress(listen_socket_->localAddress()),
-        client_address,
+        quic_version_, quic_config_, crypto_config_, connection_id_, clock,
+        envoyAddressInstanceToQuicSocketAddress(listen_socket_->localAddress()), client_address,
         "test.example.org");
     Buffer::RawSliceVector slice = payload.getRawSlices();
     ASSERT(slice.size() == 1);
-    auto encrypted_packet = std::make_unique<quic::QuicEncryptedPacket>(static_cast<char*>(slice[0].mem_), slice[0].len_);
+    auto encrypted_packet = std::make_unique<quic::QuicEncryptedPacket>(
+        static_cast<char*>(slice[0].mem_), slice[0].len_);
     return std::unique_ptr<quic::QuicReceivedPacket>(
-         quic::test::ConstructReceivedPacket(*encrypted_packet, clock.Now()));
+        quic::test::ConstructReceivedPacket(*encrypted_packet, clock.Now()));
   }
 
-  bool quicVersionUsesHttp3() {
-    return quic::VersionUsesHttp3(quic_version_.transport_version);
-  }
+  bool quicVersionUsesHttp3() { return quic::VersionUsesHttp3(quic_version_.transport_version); }
 
 protected:
   Network::Address::IpVersion version_;
@@ -157,8 +157,7 @@ protected:
 };
 
 INSTANTIATE_TEST_SUITE_P(EnvoyQuicDispatcherTests, EnvoyQuicDispatcherTest,
-                         testing::ValuesIn(generateTestParam()),
-                         testParamsToString);
+                         testing::ValuesIn(generateTestParam()), testParamsToString);
 
 TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponCHLO) {
   quic::QuicSocketAddress peer_addr(version_ == Network::Address::IpVersion::v4
@@ -204,7 +203,7 @@ TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponCHLO) {
       .WillOnce(Return(Network::FilterStatus::StopIteration));
   if (!quicVersionUsesHttp3()) {
     // QUICHE doesn't support 0-RTT TLS1.3 handshake yet.
-  EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
+    EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
   }
 
   quic::QuicBufferedPacketStore* buffered_packets =
@@ -217,8 +216,7 @@ TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponCHLO) {
   // processed immediately.
   envoy_quic_dispatcher_.ProcessBufferedChlos(kNumSessionsToCreatePerLoopForTests);
 
-  std::unique_ptr<quic::QuicReceivedPacket> received_packet =
-         createChloReceivedPacket(peer_addr);
+  std::unique_ptr<quic::QuicReceivedPacket> received_packet = createChloReceivedPacket(peer_addr);
   envoy_quic_dispatcher_.ProcessPacket(
       envoyAddressInstanceToQuicSocketAddress(listen_socket_->localAddress()), peer_addr,
       *received_packet);
@@ -283,7 +281,7 @@ TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponBufferedCHLO) {
       // Stop iteration to avoid calling getRead/WriteBuffer().
       .WillOnce(Return(Network::FilterStatus::StopIteration));
   if (!quicVersionUsesHttp3()) {
-  EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
+    EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
   }
   quic::QuicBufferedPacketStore* buffered_packets =
       quic::test::QuicDispatcherPeer::GetBufferedPackets(&envoy_quic_dispatcher_);

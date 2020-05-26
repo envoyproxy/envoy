@@ -84,7 +84,7 @@ EnvoyQuicClientSession::CreateIncomingStream(quic::PendingStream* /*pending*/) {
 bool EnvoyQuicClientSession::hasDataToWrite() { return HasDataToWrite(); }
 
 void EnvoyQuicClientSession::OnOneRttKeysAvailable() {
-   raiseConnectionEvent(Network::ConnectionEvent::Connected);
+  raiseConnectionEvent(Network::ConnectionEvent::Connected);
 }
 
 } // namespace Quic

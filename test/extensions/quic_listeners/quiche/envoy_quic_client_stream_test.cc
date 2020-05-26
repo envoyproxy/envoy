@@ -1,5 +1,3 @@
-#include "quiche/quic/test_tools/quic_config_peer.h"
-
 #include "extensions/quic_listeners/quiche/envoy_quic_alarm_factory.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_client_connection.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_client_stream.h"
@@ -14,6 +12,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "quiche/quic/test_tools/quic_config_peer.h"
 
 namespace Envoy {
 namespace Quic {
@@ -63,9 +62,9 @@ public:
   void SetUp() override {
     quic_session_.Initialize();
     quic::test::QuicConfigPeer::SetReceivedMaxBidirectionalStreams(
-          quic_session_.config(), quic::kDefaultMaxStreamsPerConnection);
-      quic::test::QuicConfigPeer::SetReceivedMaxUnidirectionalStreams(
-          quic_session_.config(), quic::kDefaultMaxStreamsPerConnection);
+        quic_session_.config(), quic::kDefaultMaxStreamsPerConnection);
+    quic::test::QuicConfigPeer::SetReceivedMaxUnidirectionalStreams(
+        quic_session_.config(), quic::kDefaultMaxStreamsPerConnection);
     quic::test::QuicConfigPeer::SetReceivedInitialSessionFlowControlWindow(
         quic_session_.config(), quic::kMinimumFlowControlSendWindow);
     quic::test::QuicConfigPeer::SetReceivedInitialMaxStreamDataBytesUnidirectional(

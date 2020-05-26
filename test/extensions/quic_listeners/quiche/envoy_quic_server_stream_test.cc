@@ -1,7 +1,5 @@
 #include <string>
 
-#include "quiche/quic/test_tools/quic_config_peer.h"
-
 #include "common/event/libevent_scheduler.h"
 #include "common/http/headers.h"
 
@@ -19,6 +17,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "quiche/quic/test_tools/quic_config_peer.h"
 
 using testing::_;
 using testing::Invoke;
@@ -68,9 +67,9 @@ public:
   void SetUp() override {
     quic_session_.Initialize();
     quic::test::QuicConfigPeer::SetReceivedMaxBidirectionalStreams(
-          quic_session_.config(), quic::kDefaultMaxStreamsPerConnection);
-      quic::test::QuicConfigPeer::SetReceivedMaxUnidirectionalStreams(
-          quic_session_.config(), quic::kDefaultMaxStreamsPerConnection);
+        quic_session_.config(), quic::kDefaultMaxStreamsPerConnection);
+    quic::test::QuicConfigPeer::SetReceivedMaxUnidirectionalStreams(
+        quic_session_.config(), quic::kDefaultMaxStreamsPerConnection);
     quic::test::QuicConfigPeer::SetReceivedInitialSessionFlowControlWindow(
         quic_session_.config(), quic::kMinimumFlowControlSendWindow);
     quic::test::QuicConfigPeer::SetReceivedInitialMaxStreamDataBytesUnidirectional(

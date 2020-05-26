@@ -30,8 +30,7 @@ using QuicUnorderedMapImpl = absl::node_hash_map<Key, Value, Hash>;
 template <typename Key, typename Value, typename Hash>
 using QuicHashMapImpl = absl::flat_hash_map<Key, Value, Hash>;
 
-template <typename Key, typename Hash>
-using QuicHashSetImpl = absl::flat_hash_set<Key, Hash>;
+template <typename Key, typename Hash> using QuicHashSetImpl = absl::flat_hash_set<Key, Hash>;
 
 template <typename Key, typename Hash> using QuicUnorderedSetImpl = absl::node_hash_set<Key, Hash>;
 

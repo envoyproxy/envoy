@@ -19,7 +19,8 @@ void EnvoyQuicAlarm::SetImpl() {
   // scheduled in current event loop. This bit is a bummer in QUICHE, and we are
   // working on the fix. Once upstream is fixed, we no longer need to round up
   // the duration.
-  timer_->enableTimer(std::chrono::milliseconds((duration + quic::QuicTime::Delta::FromMicroseconds(999)).ToMilliseconds()));
+  timer_->enableTimer(std::chrono::milliseconds(
+      (duration + quic::QuicTime::Delta::FromMicroseconds(999)).ToMilliseconds()));
 }
 
 void EnvoyQuicAlarm::UpdateImpl() {
