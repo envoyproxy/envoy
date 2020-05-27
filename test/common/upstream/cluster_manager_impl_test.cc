@@ -352,6 +352,54 @@ static_resources:
   EXPECT_EQ(1UL, factory_.stats_.counter("cluster.cluster_name.foo").value());
 }
 
+// Validate that the primary clusters are derived from the bootstrap and don't
+// include EDS.
+TEST_F(ClusterManagerImplTest, PrimaryClusters) {
+  const std::string yaml = R"EOF(
+static_resources:
+  clusters:
+  - name: static_cluster
+    connect_timeout: 0.250s
+    type: static
+  - name: logical_dns_cluster
+    connect_timeout: 0.250s
+    type: logical_dns
+    load_assignment:
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: foo.com
+                  port_value: 11001
+  - name: strict_dns_cluster
+    connect_timeout: 0.250s
+    type: strict_dns
+    load_assignment:
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: foo.com
+                  port_value: 11001
+  - name: rest_eds_cluster
+    connect_timeout: 0.250s
+    type: eds
+    eds_cluster_config:
+      eds_config:
+        api_config_source:
+          api_type: GRPC
+          grpc_services:
+            envoy_grpc:
+              cluster_name: static_cluster
+  )EOF";
+  create(parseBootstrapFromV2Yaml(yaml));
+  const auto& primary_clusters = cluster_manager_->primaryClusters();
+  EXPECT_THAT(primary_clusters, testing::UnorderedElementsAre(
+                                    "static_cluster", "strict_dns_cluster", "logical_dns_cluster"));
+}
+
 TEST_F(ClusterManagerImplTest, OriginalDstLbRestriction) {
   const std::string yaml = R"EOF(
 static_resources:
