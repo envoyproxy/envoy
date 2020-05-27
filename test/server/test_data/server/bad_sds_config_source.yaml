@@ -1,0 +1,32 @@
+node:
+  id: bootstrap_id
+  cluster: bootstrap_cluster
+static_resources:
+  clusters:
+  - name: xds-grpc
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    connect_timeout: 1s
+    load_assignment:
+      cluster_name: xds-grpc
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: localhost
+                port_value: 12345
+    transport_socket:
+      name: "envoy.transport_sockets.tls"
+      typed_config:
+        "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext"
+        common_tls_context:
+          tls_certificate_sds_secret_configs:
+          - name: default
+            sds_config:
+              api_config_source:
+                api_type: GRPC
+                grpc_services:
+                  envoy_grpc:
+                    cluster_name: "sds-grpc"
+          validation_context: {}

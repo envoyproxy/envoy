@@ -136,13 +136,11 @@ void Utility::checkApiConfigSourceNames(
   }
 }
 
-void Utility::validateClusterName(const Upstream::ClusterManager::ClusterInfoMap& clusters,
+void Utility::validateClusterName(const Upstream::ClusterManager::ClusterSet& primary_clusters,
                                   const std::string& cluster_name,
                                   const std::string& config_source) {
-  const auto& it = clusters.find(cluster_name);
-
-  if (it == clusters.end() || it->second.get().info()->addedViaApi() ||
-      it->second.get().info()->type() == envoy::config::cluster::v3::Cluster::EDS) {
+  const auto& it = primary_clusters.find(cluster_name);
+  if (it == primary_clusters.end()) {
     throw EnvoyException(fmt::format("{} must have a statically defined non-EDS cluster: '{}' does "
                                      "not exist, was added via api, or is an EDS cluster",
                                      config_source, cluster_name));
@@ -150,7 +148,7 @@ void Utility::validateClusterName(const Upstream::ClusterManager::ClusterInfoMap
 }
 
 void Utility::checkApiConfigSourceSubscriptionBackingCluster(
-    const Upstream::ClusterManager::ClusterInfoMap& clusters,
+    const Upstream::ClusterManager::ClusterSet& primary_clusters,
     const envoy::config::core::v3::ApiConfigSource& api_config_source) {
   Utility::checkApiConfigSourceNames(api_config_source);
 
@@ -161,14 +159,14 @@ void Utility::checkApiConfigSourceSubscriptionBackingCluster(
     // All API configs of type REST and UNSUPPORTED_REST_LEGACY should have cluster names.
     // Additionally, some gRPC API configs might have a cluster name set instead
     // of an envoy gRPC.
-    Utility::validateClusterName(clusters, api_config_source.cluster_names()[0],
+    Utility::validateClusterName(primary_clusters, api_config_source.cluster_names()[0],
                                  api_config_source.GetTypeName());
   } else if (is_grpc) {
     // Some ApiConfigSources of type GRPC won't have a cluster name, such as if
     // they've been configured with google_grpc.
     if (api_config_source.grpc_services()[0].has_envoy_grpc()) {
       // If an Envoy gRPC exists, we take its cluster name.
-      Utility::validateClusterName(clusters,
+      Utility::validateClusterName(primary_clusters,
                                    api_config_source.grpc_services()[0].envoy_grpc().cluster_name(),
                                    api_config_source.GetTypeName());
     }
