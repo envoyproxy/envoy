@@ -153,19 +153,36 @@ private:
 };
 
 // A counter which signals on a condition variable when it is incremented.
-class NotifyingCounter : public Stats::CounterImpl {
+class NotifyingCounter : public Stats::Counter {
 public:
-  NotifyingCounter(Stats::StatName name, Stats::AllocatorImpl& alloc,
-                   Stats::StatName tag_extracted_name,
-                   const Stats::StatNameTagVector& stat_name_tags, absl::CondVar& condvar)
-      : Stats::CounterImpl(name, alloc, tag_extracted_name, stat_name_tags), condvar_(condvar) {}
+  NotifyingCounter(Stats::Counter* counter, absl::CondVar& condvar)
+      : counter_(counter), condvar_(condvar) {}
 
+  std::string name() const override { return counter_->name(); }
+  StatName statName() const override { return counter_->statName(); }
+  TagVector tags() const override { return counter_->tags(); }
+  std::string tagExtractedName() const override { return counter_->tagExtractedName(); }
+  void iterateTagStatNames(const TagStatNameIterFn& fn) const override {
+    counter_->iterateTagStatNames(fn);
+  }
   void add(uint64_t amount) override {
-    Stats::CounterImpl::add(amount);
+    counter_->add(amount);
     condvar_.Signal();
   }
+  void inc() override { add(1); }
+  uint64_t latch() override { return counter_->latch(); }
+  void reset() override { return counter_->reset(); }
+  uint64_t value() const override { return counter_->value(); }
+  void incRefCount() override { counter_->incRefCount(); }
+  bool decRefCount() override { return counter_->decRefCount(); }
+  uint32_t use_count() const override { return counter_->use_count(); }
+  StatName tagExtractedStatName() const override { return counter_->tagExtractedStatName(); }
+  bool used() const override { return counter_->used(); }
+  SymbolTable& symbolTable() override { return counter_->symbolTable(); }
+  const SymbolTable& constSymbolTable() const override { return counter_->constSymbolTable(); }
 
 private:
+  std::unique_ptr<Stats::Counter> counter_;
   absl::CondVar& condvar_;
 };
 
@@ -174,10 +191,11 @@ class NotifyingAllocatorImpl : public Stats::AllocatorImpl {
 public:
   using Stats::AllocatorImpl::AllocatorImpl;
 
-  virtual Stats::CounterImpl* makeCounterImpl(StatName name, StatName tag_extracted_name,
+  virtual Stats::Counter* makeCounterInternal(StatName name, StatName tag_extracted_name,
                                               const StatNameTagVector& stat_name_tags) {
-    Stats::CounterImpl* counter =
-        new NotifyingCounter(name, *this, tag_extracted_name, stat_name_tags, condvar_);
+    Stats::Counter* counter = new NotifyingCounter(
+        Stats::AllocatorImpl::makeCounterInternal(name, tag_extracted_name, stat_name_tags),
+        condvar_);
     {
       absl::MutexLock l(&mutex_);
       counters_.emplace(counter->name(), counter);
@@ -188,7 +206,7 @@ public:
 
   // Allow getting the counter directly from the allocator, since it's harder to
   // signal when the counter has been added to a given stats store.
-  virtual Stats::CounterImpl* getCounter(std::string name) {
+  virtual Stats::Counter* getCounter(std::string name) {
     absl::MutexLock l(&mutex_);
     auto it = counters_.find(name);
     if (it != counters_.end()) {
@@ -201,7 +219,7 @@ public:
   absl::Mutex& mutex() { return mutex_; }
 
 private:
-  absl::flat_hash_map<std::string, Stats::CounterImpl*> counters_;
+  absl::flat_hash_map<std::string, Stats::Counter*> counters_;
   absl::Mutex mutex_;
   absl::CondVar condvar_;
 };
