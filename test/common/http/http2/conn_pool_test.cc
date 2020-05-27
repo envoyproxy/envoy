@@ -267,7 +267,7 @@ TEST_F(Http2ConnPoolImplTest, VerifyAlpnFallback) {
       .WillOnce(Invoke(
           [](Network::TransportSocketOptionsSharedPtr options) -> Network::TransportSocketPtr {
             EXPECT_TRUE(options != nullptr);
-            EXPECT_EQ(options->applicationProtocolListFallback(), std::vector<std::string>{"h2"});
+            EXPECT_EQ(options->applicationProtocolFallback(), "h2");
             return std::make_unique<Network::RawBufferSocket>();
           }));
   expectConnectionSetupForClient(client);

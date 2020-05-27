@@ -1,5 +1,6 @@
 #include "common/http/conn_pool_base.h"
 
+#include "common/common/assert.h"
 #include "common/network/transport_socket_options_impl.h"
 #include "common/runtime/runtime_features.h"
 #include "common/stats/timespan_impl.h"
@@ -16,18 +17,18 @@ wrapTransportSocketOptions(Network::TransportSocketOptionsSharedPtr transport_so
 
   // If configured to do so, we override the ALPN to use for the upstream connection to match the
   // selected protocol.
-  std::vector<std::string> alpn;
+  std::string alpn;
   switch (protocol) {
   case Http::Protocol::Http10:
     NOT_REACHED_GCOVR_EXCL_LINE;
   case Http::Protocol::Http11:
-    alpn.push_back("http/1.1");
+    alpn = "http/1.1";
     break;
   case Http::Protocol::Http2:
-    alpn.push_back("h2");
+    alpn = "h2";
     break;
   case Http::Protocol::Http3:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     break;
   }
 

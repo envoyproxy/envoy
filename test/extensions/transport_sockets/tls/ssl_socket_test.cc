@@ -4200,8 +4200,7 @@ TEST_P(SslSocketTest, OverrideApplicationProtocols) {
   // Set fallback ALPN on the client side ALPN, "test" ALPN is used since no ALPN is specified
   // in the config.
   server_ctx->add_alpn_protocols("test");
-  transport_socket_options.reset(
-      new Network::TransportSocketOptionsImpl("", {}, {}, {"foo", "test", "bar"}));
+  transport_socket_options.reset(new Network::TransportSocketOptionsImpl("", {}, {}, "test"));
   testUtilV2(test_options.setExpectedALPNProtocol("test").setTransportSocketOptions(
       transport_socket_options));
 

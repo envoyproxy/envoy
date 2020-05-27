@@ -34,11 +34,9 @@ void commonHashKey(const TransportSocketOptions& options, std::vector<std::uint8
       pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(protocol), key);
     }
   }
-  const auto& alpn_fallback_list = options.applicationProtocolListFallback();
-  if (!alpn_fallback_list.empty()) {
-    for (const auto& protocol : alpn_fallback_list) {
-      pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(protocol), key);
-    }
+  const auto& alpn_fallback = options.applicationProtocolFallback();
+  if (!alpn_fallback.has_value()) {
+    pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(*alpn_fallback), key);
   }
 }
 } // namespace

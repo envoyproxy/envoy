@@ -280,8 +280,7 @@ TEST_F(Http1ConnPoolImplTest, VerifyAlpnFallback) {
       .WillOnce(Invoke(
           [](Network::TransportSocketOptionsSharedPtr options) -> Network::TransportSocketPtr {
             EXPECT_TRUE(options != nullptr);
-            EXPECT_EQ(options->applicationProtocolListFallback(),
-                      std::vector<std::string>{"http/1.1"});
+            EXPECT_EQ(options->applicationProtocolFallback(), "http/1.1");
             return std::make_unique<Network::RawBufferSocket>();
           }));
   cluster_->transport_socket_matcher_ =

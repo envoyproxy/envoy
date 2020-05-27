@@ -855,10 +855,9 @@ bool ContextImpl::parseAndSetAlpn(const std::vector<std::string>& alpn, SSL& ssl
   if (alpn.empty()) {
     return false;
   }
-  std::vector<uint8_t> parsed_override_alpn = parseAlpnProtocols(absl::StrJoin(alpn, ","));
-  if (!parsed_override_alpn.empty()) {
-    const int rc =
-        SSL_set_alpn_protos(&ssl, parsed_override_alpn.data(), parsed_override_alpn.size());
+  std::vector<uint8_t> parsed_alpn = parseAlpnProtocols(absl::StrJoin(alpn, ","));
+  if (!parsed_alpn.empty()) {
+    const int rc = SSL_set_alpn_protos(&ssl, parsed_alpn.data(), parsed_alpn.size());
     RELEASE_ASSERT(rc == 0, Utility::getLastCryptoError().value_or(""));
     return true;
   }
@@ -883,13 +882,23 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl(const Network::TransportSocketOpt
     SSL_set_verify(ssl_con.get(), SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, nullptr);
   }
 
+  // We determine what ALPN using the following precedence:
+  // 1. Option-provided ALPN override.
+  // 2. ALPN statically configured in the upstream TLS context.
+  // 3. option-provided ALPN fallback.
+
+  // At this point in the code the ALPN has already been set (if present) to the value specifed in
+  // the TLS context. We've stored this value in parsed_alpn_protocols_ so we can check that to see
+  // if it's already been set.
   bool has_alpn_defined = !parsed_alpn_protocols_.empty();
   if (options) {
+    // ALPN override takes precedence over TLS context specified, so blindly overwrite it.
     has_alpn_defined |= parseAndSetAlpn(options->applicationProtocolListOverride(), *ssl_con);
   }
 
-  if (options && !has_alpn_defined) {
-    parseAndSetAlpn(options->applicationProtocolListFallback(), *ssl_con);
+  if (options && !has_alpn_defined && options->applicationProtocolFallback().has_value()) {
+    // If ALPN hasn't already been set (either through TLS context or override), use the fallback.
+    parseAndSetAlpn({*options->applicationProtocolFallback()}, *ssl_con);
   }
 
   if (allow_renegotiation_) {
