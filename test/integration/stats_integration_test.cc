@@ -274,8 +274,6 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // 2020/04/23  10531    44169       44600   http: max stream duration upstream support.
   // 2020/05/05  10908    44233       44600   router: add InternalRedirectPolicy and predicate
   // 2020/05/13  10531    44425       44600   Refactor resource manager
-  // 2020/05/26  11301    44418       44600   Clear hot-restart parent contributions from child
-  // gauges
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -289,9 +287,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  if (GetParam() == Network::Address::IpVersion::v4) {
-    EXPECT_MEMORY_EQ(m_per_cluster, 44418);
-  }
+  EXPECT_MEMORY_EQ(m_per_cluster, 44425);
   EXPECT_MEMORY_LE(m_per_cluster, 44600);
 }
 
@@ -339,8 +335,6 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // 2020/04/23  10531    36281       36800   http: max stream duration upstream support.
   // 2020/05/05  10908    36345       36800   router: add InternalRedirectPolicy and predicate
   // 2020/05/13  10531    36537       44600   Refactor resource manager
-  // 2020/05/26  11301    36530       44600   Clear hot-restart parent contributions from child
-  // gauges
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -354,9 +348,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  if (GetParam() == Network::Address::IpVersion::v4) {
-    EXPECT_MEMORY_EQ(m_per_cluster, 36530);
-  }
+  EXPECT_MEMORY_EQ(m_per_cluster, 36537);
   EXPECT_MEMORY_LE(m_per_cluster, 36800);
 }
 
