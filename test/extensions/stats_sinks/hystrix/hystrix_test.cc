@@ -532,7 +532,7 @@ TEST_F(HystrixSinkTest, HystrixEventStreamHandler) {
   EXPECT_EQ(response_headers.AccessControlAllowOrigin()->value(), "*");
 
   std::string access_control_allow_headers =
-      std::string(response_headers.AccessControlAllowHeaders()->value().getStringView());
+      std::string(response_headers.getAccessControlAllowHeadersValue());
   EXPECT_THAT(access_control_allow_headers, HasSubstr("Accept"));
 }
 
