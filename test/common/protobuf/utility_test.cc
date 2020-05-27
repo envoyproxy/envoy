@@ -176,7 +176,7 @@ TEST_F(ProtobufUtilityTest, MessageUtilHashAndEqualToIgnoreOriginalTypeField) {
     // 183412668 is the magic number OriginalTypeFieldNumber. The successor number should not be
     // occupied.
     unknown_field_set->AddFixed32(183412668 + 1, 1);
-    EXPECT_NE(set_size + 1, unknown_field_set->field_count()) << "Fail to add an unknown field";
+    EXPECT_EQ(set_size + 1, unknown_field_set->field_count()) << "Fail to add an unknown field";
   }
 
   envoy::config::core::v3::Metadata mv3dup = mv3;
