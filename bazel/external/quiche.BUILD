@@ -2021,9 +2021,9 @@ envoy_cc_library(
     srcs = ["quiche/quic/core/quic_error_codes.cc"],
     hdrs = ["quiche/quic/core/quic_error_codes.h"],
     copts = quiche_copts,
+    external_deps = ["ssl"],
     repository = "@envoy",
     tags = ["nofips"],
-    external_deps = ["ssl"],
     visibility = ["//visibility:public"],
     deps = [
         ":quic_platform_base",
