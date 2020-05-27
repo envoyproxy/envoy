@@ -188,10 +188,10 @@ TEST_F(TransportSockeMatchIntegrationTest, TlsAndPlaintextSucceed) {
     IntegrationStreamDecoderPtr response =
         codec_client_->makeHeaderOnlyRequest(type_a_request_headers_);
     response->waitForEndStream();
-    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+    EXPECT_EQ("200", response->headers().getStatusValue());
     response = codec_client_->makeHeaderOnlyRequest(type_b_request_headers_);
     response->waitForEndStream();
-    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+    EXPECT_EQ("200", response->headers().getStatusValue());
   }
 }
 
@@ -203,10 +203,10 @@ TEST_F(TransportSockeMatchIntegrationTest, TlsAndPlaintextFailsWithoutSocketMatc
     IntegrationStreamDecoderPtr response =
         codec_client_->makeHeaderOnlyRequest(type_a_request_headers_);
     response->waitForEndStream();
-    EXPECT_EQ("503", response->headers().Status()->value().getStringView());
+    EXPECT_EQ("503", response->headers().getStatusValue());
     response = codec_client_->makeHeaderOnlyRequest(type_b_request_headers_);
     response->waitForEndStream();
-    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+    EXPECT_EQ("200", response->headers().getStatusValue());
   }
 }
 } // namespace Envoy

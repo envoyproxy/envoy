@@ -70,11 +70,10 @@ public:
   AssertionResult waitForAccessLogRequest(const std::string& expected_request_msg_yaml) {
     envoy::service::accesslog::v3::StreamAccessLogsMessage request_msg;
     VERIFY_ASSERTION(access_log_request_->waitForGrpcMessage(*dispatcher_, request_msg));
-    EXPECT_EQ("POST", access_log_request_->headers().Method()->value().getStringView());
+    EXPECT_EQ("POST", access_log_request_->headers().getMethodValue());
     EXPECT_EQ("/envoy.service.accesslog.v2.AccessLogService/StreamAccessLogs",
-              access_log_request_->headers().Path()->value().getStringView());
-    EXPECT_EQ("application/grpc",
-              access_log_request_->headers().ContentType()->value().getStringView());
+              access_log_request_->headers().getPathValue());
+    EXPECT_EQ("application/grpc", access_log_request_->headers().getContentTypeValue());
 
     envoy::service::accesslog::v3::StreamAccessLogsMessage expected_request_msg;
     TestUtility::loadFromYaml(expected_request_msg_yaml, expected_request_msg);
@@ -152,7 +151,7 @@ http_logs:
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "GET", "/notfound", "", downstream_protocol_, version_);
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("404", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("404", response->headers().getStatusValue());
   ASSERT_TRUE(waitForAccessLogRequest(R"EOF(
 http_logs:
   log_entry:
@@ -191,7 +190,7 @@ http_logs:
   response = IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/notfound", "",
                                                 downstream_protocol_, version_);
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("404", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("404", response->headers().getStatusValue());
   ASSERT_TRUE(waitForAccessLogStream());
   ASSERT_TRUE(waitForAccessLogRequest(fmt::format(R"EOF(
 identifier:
