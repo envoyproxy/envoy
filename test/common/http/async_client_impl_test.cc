@@ -67,7 +67,7 @@ public:
                              bool end_stream) {
     EXPECT_CALL(callbacks, onHeaders_(_, end_stream))
         .WillOnce(Invoke([code](ResponseHeaderMap& headers, bool) -> void {
-          EXPECT_EQ(std::to_string(code), headers.Status()->value().getStringView());
+          EXPECT_EQ(std::to_string(code), headers.getStatusValue());
         }));
   }
 
