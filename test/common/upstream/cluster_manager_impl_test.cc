@@ -41,6 +41,8 @@ public:
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
         *api_, http_context_, grpc_context_);
+    cluster_manager_->setPrimaryClustersInitializedCb(
+        [this, bootstrap]() { cluster_manager_->initializeSecondaryClusters(bootstrap); });
   }
 
   void createWithLocalClusterUpdate(const bool enable_merge_window = true) {
@@ -348,6 +350,54 @@ static_resources:
       .counterFromString("foo")
       .inc();
   EXPECT_EQ(1UL, factory_.stats_.counter("cluster.cluster_name.foo").value());
+}
+
+// Validate that the primary clusters are derived from the bootstrap and don't
+// include EDS.
+TEST_F(ClusterManagerImplTest, PrimaryClusters) {
+  const std::string yaml = R"EOF(
+static_resources:
+  clusters:
+  - name: static_cluster
+    connect_timeout: 0.250s
+    type: static
+  - name: logical_dns_cluster
+    connect_timeout: 0.250s
+    type: logical_dns
+    load_assignment:
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: foo.com
+                  port_value: 11001
+  - name: strict_dns_cluster
+    connect_timeout: 0.250s
+    type: strict_dns
+    load_assignment:
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: foo.com
+                  port_value: 11001
+  - name: rest_eds_cluster
+    connect_timeout: 0.250s
+    type: eds
+    eds_cluster_config:
+      eds_config:
+        api_config_source:
+          api_type: GRPC
+          grpc_services:
+            envoy_grpc:
+              cluster_name: static_cluster
+  )EOF";
+  create(parseBootstrapFromV2Yaml(yaml));
+  const auto& primary_clusters = cluster_manager_->primaryClusters();
+  EXPECT_THAT(primary_clusters, testing::UnorderedElementsAre(
+                                    "static_cluster", "strict_dns_cluster", "logical_dns_cluster"));
 }
 
 TEST_F(ClusterManagerImplTest, OriginalDstLbRestriction) {
@@ -2829,6 +2879,7 @@ TEST_F(ClusterManagerInitHelperTest, ImmediateInitialize) {
   cluster1.initialize_callback_();
 
   init_helper_.onStaticLoadComplete();
+  init_helper_.startInitializingSecondaryClusters();
 
   ReadyWatcher cm_initialized;
   EXPECT_CALL(cm_initialized, ready());
@@ -2849,8 +2900,10 @@ TEST_F(ClusterManagerInitHelperTest, StaticSdsInitialize) {
   ON_CALL(cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
   init_helper_.addCluster(cluster1);
 
-  EXPECT_CALL(cluster1, initialize(_));
   init_helper_.onStaticLoadComplete();
+
+  EXPECT_CALL(cluster1, initialize(_));
+  init_helper_.startInitializingSecondaryClusters();
 
   ReadyWatcher cm_initialized;
   init_helper_.setInitializedCb([&]() -> void { cm_initialized.ready(); });
@@ -2863,6 +2916,9 @@ TEST_F(ClusterManagerInitHelperTest, StaticSdsInitialize) {
 TEST_F(ClusterManagerInitHelperTest, UpdateAlreadyInitialized) {
   InSequence s;
 
+  ReadyWatcher primary_clusters_initialized;
+  init_helper_.setPrimaryClustersInitializedCb(
+      [&]() -> void { primary_clusters_initialized.ready(); });
   ReadyWatcher cm_initialized;
   init_helper_.setInitializedCb([&]() -> void { cm_initialized.ready(); });
 
@@ -2883,8 +2939,11 @@ TEST_F(ClusterManagerInitHelperTest, UpdateAlreadyInitialized) {
   init_helper_.removeCluster(cluster1);
 
   EXPECT_CALL(*this, onClusterInit(Ref(cluster2)));
-  EXPECT_CALL(cm_initialized, ready());
+  EXPECT_CALL(primary_clusters_initialized, ready());
   cluster2.initialize_callback_();
+
+  EXPECT_CALL(cm_initialized, ready());
+  init_helper_.startInitializingSecondaryClusters();
 }
 
 // If secondary clusters initialization triggered outside of CdsApiImpl::onConfigUpdate()'s
@@ -2894,6 +2953,9 @@ TEST_F(ClusterManagerInitHelperTest, UpdateAlreadyInitialized) {
 TEST_F(ClusterManagerInitHelperTest, InitSecondaryWithoutEdsPaused) {
   InSequence s;
 
+  ReadyWatcher primary_clusters_initialized;
+  init_helper_.setPrimaryClustersInitializedCb(
+      [&]() -> void { primary_clusters_initialized.ready(); });
   ReadyWatcher cm_initialized;
   init_helper_.setInitializedCb([&]() -> void { cm_initialized.ready(); });
 
@@ -2901,8 +2963,10 @@ TEST_F(ClusterManagerInitHelperTest, InitSecondaryWithoutEdsPaused) {
   ON_CALL(cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
   init_helper_.addCluster(cluster1);
 
-  EXPECT_CALL(cluster1, initialize(_));
+  EXPECT_CALL(primary_clusters_initialized, ready());
   init_helper_.onStaticLoadComplete();
+  EXPECT_CALL(cluster1, initialize(_));
+  init_helper_.startInitializingSecondaryClusters();
 
   EXPECT_CALL(*this, onClusterInit(Ref(cluster1)));
   EXPECT_CALL(cm_initialized, ready());
@@ -2916,6 +2980,9 @@ TEST_F(ClusterManagerInitHelperTest, InitSecondaryWithoutEdsPaused) {
 TEST_F(ClusterManagerInitHelperTest, InitSecondaryWithEdsPaused) {
   InSequence s;
 
+  ReadyWatcher primary_clusters_initialized;
+  init_helper_.setPrimaryClustersInitializedCb(
+      [&]() -> void { primary_clusters_initialized.ready(); });
   ReadyWatcher cm_initialized;
   init_helper_.setInitializedCb([&]() -> void { cm_initialized.ready(); });
 
@@ -2923,8 +2990,11 @@ TEST_F(ClusterManagerInitHelperTest, InitSecondaryWithEdsPaused) {
   ON_CALL(cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
   init_helper_.addCluster(cluster1);
 
-  EXPECT_CALL(cluster1, initialize(_));
+  EXPECT_CALL(primary_clusters_initialized, ready());
   init_helper_.onStaticLoadComplete();
+
+  EXPECT_CALL(cluster1, initialize(_));
+  init_helper_.startInitializingSecondaryClusters();
 
   EXPECT_CALL(*this, onClusterInit(Ref(cluster1)));
   EXPECT_CALL(cm_initialized, ready());
@@ -2934,6 +3004,9 @@ TEST_F(ClusterManagerInitHelperTest, InitSecondaryWithEdsPaused) {
 TEST_F(ClusterManagerInitHelperTest, AddSecondaryAfterSecondaryInit) {
   InSequence s;
 
+  ReadyWatcher primary_clusters_initialized;
+  init_helper_.setPrimaryClustersInitializedCb(
+      [&]() -> void { primary_clusters_initialized.ready(); });
   ReadyWatcher cm_initialized;
   init_helper_.setInitializedCb([&]() -> void { cm_initialized.ready(); });
 
@@ -2949,8 +3022,10 @@ TEST_F(ClusterManagerInitHelperTest, AddSecondaryAfterSecondaryInit) {
   init_helper_.onStaticLoadComplete();
 
   EXPECT_CALL(*this, onClusterInit(Ref(cluster1)));
+  EXPECT_CALL(primary_clusters_initialized, ready());
   EXPECT_CALL(cluster2, initialize(_));
   cluster1.initialize_callback_();
+  init_helper_.startInitializingSecondaryClusters();
 
   NiceMock<MockClusterMockPrioritySet> cluster3;
   ON_CALL(cluster3, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
@@ -2972,6 +3047,9 @@ TEST_F(ClusterManagerInitHelperTest, RemoveClusterWithinInitLoop) {
   ON_CALL(cluster, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
   init_helper_.addCluster(cluster);
 
+  // onStaticLoadComplete() must not initialize secondary clusters
+  init_helper_.onStaticLoadComplete();
+
   // Set up the scenario seen in Issue 903 where initialize() ultimately results
   // in the removeCluster() call. In the real bug this was a long and complex call
   // chain.
@@ -2979,9 +3057,9 @@ TEST_F(ClusterManagerInitHelperTest, RemoveClusterWithinInitLoop) {
     init_helper_.removeCluster(cluster);
   }));
 
-  // Now call onStaticLoadComplete which will exercise maybeFinishInitialize()
+  // Now call initializeSecondaryClusters which will exercise maybeFinishInitialize()
   // which calls initialize() on the members of the secondary init list.
-  init_helper_.onStaticLoadComplete();
+  init_helper_.startInitializingSecondaryClusters();
 }
 
 // Validate that when options are set in the ClusterManager and/or Cluster, we see the socket option
@@ -3002,7 +3080,7 @@ public:
     TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
     bool expect_success = true;
     for (const auto& name_val : names_vals) {
-      if (!name_val.first.has_value()) {
+      if (!name_val.first.hasValue()) {
         expect_success = false;
         continue;
       }
@@ -3253,7 +3331,7 @@ public:
   void expectSetsockoptSoKeepalive(absl::optional<int> keepalive_probes,
                                    absl::optional<int> keepalive_time,
                                    absl::optional<int> keepalive_interval) {
-    if (!ENVOY_SOCKET_SO_KEEPALIVE.has_value()) {
+    if (!ENVOY_SOCKET_SO_KEEPALIVE.hasValue()) {
       EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
           .WillOnce(
               Invoke([this](Network::Address::InstanceConstSharedPtr,

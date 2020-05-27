@@ -1,7 +1,3 @@
-#include "common/config/utility.h"
-#include "common/config/version_converter.h"
-#include "common/protobuf/utility.h"
-
 #include "test/fuzz/utility.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
@@ -13,133 +9,67 @@ namespace HttpFilters {
 
 class UberFilterFuzzer {
 public:
-  UberFilterFuzzer() {
-    // Need to set for both a decoder filter and an encoder/decoder filter.
-    ON_CALL(filter_callback_, addStreamDecoderFilter(_))
-        .WillByDefault(
-            Invoke([&](std::shared_ptr<Envoy::Http::StreamDecoderFilter> filter) -> void {
-              filter_ = filter;
-              filter_->setDecoderFilterCallbacks(callbacks_);
-            }));
-    ON_CALL(filter_callback_, addStreamFilter(_))
-        .WillByDefault(
-            Invoke([&](std::shared_ptr<Envoy::Http::StreamDecoderFilter> filter) -> void {
-              filter_ = filter;
-              filter_->setDecoderFilterCallbacks(callbacks_);
-            }));
-    setExpectations();
-  }
+  UberFilterFuzzer();
 
-  void setExpectations() {
-    // Ext-authz setup
-    prepareExtAuthz();
-    prepareCache();
-    prepareTap();
-  }
-
-  void prepareExtAuthz() {
-    // Preparing the expectations for the ext_authz filter.
-    addr_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
-    ON_CALL(connection_, remoteAddress()).WillByDefault(testing::ReturnRef(addr_));
-    ON_CALL(connection_, localAddress()).WillByDefault(testing::ReturnRef(addr_));
-    ON_CALL(callbacks_, connection()).WillByDefault(testing::Return(&connection_));
-    ON_CALL(callbacks_, activeSpan())
-        .WillByDefault(testing::ReturnRef(Tracing::NullSpan::instance()));
-    callbacks_.stream_info_.protocol_ = Envoy::Http::Protocol::Http2;
-  }
-
-  void prepareCache() {
-    // Prepare expectations for dynamic forward proxy.
-    ON_CALL(factory_context_.dispatcher_, createDnsResolver(_, _))
-        .WillByDefault(testing::Return(resolver_));
-  }
-
-  void prepareTap() {
-    ON_CALL(factory_context_.admin_, addHandler(_, _, _, _, _))
-        .WillByDefault(testing::Return(true));
-    ON_CALL(factory_context_.admin_, removeHandler(_)).WillByDefault(testing::Return(true));
-  }
-
-  // This executes the decode methods to be fuzzed.
-  void decode(Http::StreamDecoderFilter* filter, const test::fuzz::HttpData& data) {
-    bool end_stream = false;
-
-    auto headers = Fuzz::fromHeaders<Http::TestRequestHeaderMapImpl>(data.headers());
-    if (headers.Path() == nullptr) {
-      headers.setPath("/foo");
-    }
-    if (headers.Method() == nullptr) {
-      headers.setMethod("GET");
-    }
-    if (headers.Host() == nullptr) {
-      headers.setHost("foo.com");
-    }
-
-    if (data.data().empty() && !data.has_trailers()) {
-      end_stream = true;
-    }
-    ENVOY_LOG_MISC(debug, "Decoding headers: {} ", data.headers().DebugString());
-    const auto& headersStatus = filter->decodeHeaders(headers, end_stream);
-    if (headersStatus != Http::FilterHeadersStatus::Continue &&
-        headersStatus != Http::FilterHeadersStatus::StopIteration) {
-      return;
-    }
-
-    for (int i = 0; i < data.data().size(); i++) {
-      if (i == data.data().size() - 1 && !data.has_trailers()) {
-        end_stream = true;
-      }
-      Buffer::OwnedImpl buffer(data.data().Get(i));
-      ENVOY_LOG_MISC(debug, "Decoding data: {} ", buffer.toString());
-      if (filter->decodeData(buffer, end_stream) != Http::FilterDataStatus::Continue) {
-        return;
-      }
-    }
-
-    if (data.has_trailers()) {
-      ENVOY_LOG_MISC(debug, "Decoding trailers: {} ", data.trailers().DebugString());
-      auto trailers = Fuzz::fromHeaders<Http::TestRequestTrailerMapImpl>(data.trailers());
-      filter->decodeTrailers(trailers);
-    }
-  }
-
-  // This creates the filter config and runs decode.
+  // This creates the filter config and runs the fuzzed data against the filter.
   void fuzz(const envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter&
                 proto_config,
-            const test::fuzz::HttpData& data) {
-    try {
-      // Try to create the filter. Exit early if the config is invalid or violates PGV constraints.
-      ENVOY_LOG_MISC(info, "filter name {}", proto_config.name());
-      auto& factory = Config::Utility::getAndCheckFactoryByName<
-          Server::Configuration::NamedHttpFilterConfigFactory>(proto_config.name());
-      ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-          proto_config, factory_context_.messageValidationVisitor(), factory);
-      cb_ = factory.createFilterFactoryFromProto(*message, "stats", factory_context_);
-      cb_(filter_callback_);
-    } catch (const EnvoyException& e) {
-      ENVOY_LOG_MISC(debug, "Controlled exception {}", e.what());
-      return;
-    }
+            const test::fuzz::HttpData& downstream_data, const test::fuzz::HttpData& upstream_data);
 
-    decode(filter_.get(), data);
-    reset();
-  }
+  // This executes the filter decoders/encoders with the fuzzed data.
+  template <class FilterType> void runData(FilterType* filter, const test::fuzz::HttpData& data);
 
-  void reset() {
-    if (filter_ != nullptr) {
-      filter_->onDestroy();
-    }
-    filter_.reset();
-  }
+  // For fuzzing proto data, guide the mutator to useful 'Any' types.
+  static void guideAnyProtoType(test::fuzz::HttpData* mutable_data, uint choice);
 
+protected:
+  // Set-up filter specific mock expectations in constructor.
+  void perFilterSetup();
+  // Filter specific input cleanup.
+  void cleanFuzzedConfig(absl::string_view filter_name, Protobuf::Message* message);
+
+  // Parses http or proto body into chunks.
+  static std::vector<std::string> parseHttpData(const test::fuzz::HttpData& data);
+
+  // Templated functions to validate and send headers/data/trailers for decoders/encoders.
+  // General functions are deleted, but templated specializations for encoders/decoders are defined
+  // in the cc file.
+  template <class FilterType>
+  Http::FilterHeadersStatus sendHeaders(FilterType* filter, const test::fuzz::HttpData& data,
+                                        bool end_stream) = delete;
+
+  template <class FilterType>
+  Http::FilterDataStatus sendData(FilterType* filter, Buffer::Instance& buffer,
+                                  bool end_stream) = delete;
+
+  template <class FilterType>
+  void sendTrailers(FilterType* filter, const test::fuzz::HttpData& data) = delete;
+
+  void reset();
+
+private:
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
-  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callback_;
   std::shared_ptr<Network::MockDnsResolver> resolver_{std::make_shared<Network::MockDnsResolver>()};
-  std::shared_ptr<Http::StreamDecoderFilter> filter_;
   Http::FilterFactoryCb cb_;
   NiceMock<Envoy::Network::MockConnection> connection_;
   Network::Address::InstanceConstSharedPtr addr_;
+
+  // Mocked callbacks.
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
+
+  // Filter constructed from the config.
+  Http::StreamDecoderFilterSharedPtr decoder_filter_;
+  Http::StreamEncoderFilterSharedPtr encoder_filter_;
+
+  // Headers/trailers need to be saved for the lifetime of the the filter,
+  // so save them as member variables.
+  // TODO(nareddyt): Use for access logging in a followup PR.
+  Http::TestRequestHeaderMapImpl request_headers_;
+  Http::TestResponseHeaderMapImpl response_headers_;
+  Http::TestRequestTrailerMapImpl request_trailers_;
+  Http::TestResponseTrailerMapImpl response_trailers_;
 };
 
 } // namespace HttpFilters

@@ -36,6 +36,7 @@ envoy_cc_library(
         ":protocol_interface",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/network:address_interface",
+        "//source/common/http:status_lib",
     ],
 )
 
@@ -50,6 +51,7 @@ envoy_cc_library(
     hdrs = ["conn_pool.h"],
     deps = [
         ":codec_interface",
+        "//include/envoy/common:conn_pool_interface",
         "//include/envoy/event:deferred_deletable",
         "//include/envoy/upstream:upstream_interface",
     ],

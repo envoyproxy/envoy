@@ -4,6 +4,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/route.pb.validate.h"
@@ -58,9 +59,7 @@ public:
                    validate_clusters_default),
         config_(config) {}
 
-  RouteConstSharedPtr route(const Http::RequestHeaderMap& headers,
-                            const Envoy::StreamInfo::StreamInfo& stream_info,
-                            uint64_t random_value) const override {
+  void setupRouteConfig(const Http::RequestHeaderMap& headers, uint64_t random_value) const {
     absl::optional<std::string> corpus_path =
         TestEnvironment::getOptionalEnvVar("GENRULE_OUTPUT_DIR");
     if (corpus_path) {
@@ -77,7 +76,26 @@ public:
         corpus_file << corpus;
       }
     }
+  }
+
+  RouteConstSharedPtr route(const Http::RequestHeaderMap& headers,
+                            const Envoy::StreamInfo::StreamInfo& stream_info,
+                            uint64_t random_value) const override {
+
+    setupRouteConfig(headers, random_value);
     return ConfigImpl::route(headers, stream_info, random_value);
+  }
+
+  RouteConstSharedPtr route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
+                            const StreamInfo::StreamInfo& stream_info,
+                            uint64_t random_value) const override {
+
+    setupRouteConfig(headers, random_value);
+    return ConfigImpl::route(cb, headers, stream_info, random_value);
+  }
+
+  RouteConstSharedPtr route(const RouteCallback& cb, const Http::RequestHeaderMap& headers) const {
+    return route(cb, headers, NiceMock<Envoy::StreamInfo::MockStreamInfo>(), 0);
   }
 
   RouteConstSharedPtr route(const Http::RequestHeaderMap& headers, uint64_t random_value) const {
@@ -87,12 +105,33 @@ public:
   const envoy::config::route::v3::RouteConfiguration config_;
 };
 
+Http::TestRequestHeaderMapImpl genPathlessHeaders(const std::string& host,
+                                                  const std::string& method) {
+  return Http::TestRequestHeaderMapImpl{{":authority", host},         {":method", method},
+                                        {"x-safe", "safe"},           {"x-global-nope", "global"},
+                                        {"x-vhost-nope", "vhost"},    {"x-route-nope", "route"},
+                                        {"x-forwarded-proto", "http"}};
+}
+
+Http::TestRequestHeaderMapImpl genHeaders(const std::string& host, const std::string& path,
+                                          const std::string& method,
+                                          const std::string& forwarded_proto) {
+  auto hdrs = Http::TestRequestHeaderMapImpl{
+      {":authority", host},        {":path", path},
+      {":method", method},         {"x-safe", "safe"},
+      {"x-global-nope", "global"}, {"x-vhost-nope", "vhost"},
+      {"x-route-nope", "route"},   {"x-forwarded-proto", forwarded_proto}};
+
+  if (forwarded_proto.empty()) {
+    hdrs.remove("x-forwarded-proto");
+  }
+
+  return hdrs;
+}
+
 Http::TestRequestHeaderMapImpl genHeaders(const std::string& host, const std::string& path,
                                           const std::string& method) {
-  return Http::TestRequestHeaderMapImpl{{":authority", host},        {":path", path},
-                                        {":method", method},         {"x-safe", "safe"},
-                                        {"x-global-nope", "global"}, {"x-vhost-nope", "vhost"},
-                                        {"x-route-nope", "route"},   {"x-forwarded-proto", "http"}};
+  return genHeaders(host, path, method, "http");
 }
 
 envoy::config::route::v3::RouteConfiguration
@@ -368,6 +407,7 @@ virtual_hosts:
             config.route(genHeaders("bat2.com", "/foo", "GET"), 0)->routeEntry()->clusterName());
   EXPECT_EQ("regex_default",
             config.route(genHeaders("bat2.com", " ", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_TRUE(config.route(genPathlessHeaders("bat2.com", "GET"), 0) == nullptr);
 
   // Regular Expression matching with query string params
   EXPECT_EQ(
@@ -429,6 +469,88 @@ virtual_hosts:
   {
     Http::TestRequestHeaderMapImpl headers = genHeaders("api.lyft.com", "/something/else", "GET");
     EXPECT_EQ("other", virtualClusterName(config.route(headers, 0)->routeEntry(), headers));
+  }
+}
+
+TEST_F(RouteMatcherTest, TestConnectRoutes) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: connect
+  domains:
+  - bat3.com
+  routes:
+  - match:
+      safe_regex:
+        google_re2: {}
+        regex: "foobar"
+    route:
+      cluster: connect_break
+  - match:
+        connect_matcher:
+          {}
+    route:
+      cluster: connect_match
+      prefix_rewrite: "/rewrote"
+  - match:
+      safe_regex:
+        google_re2: {}
+        regex: ".*"
+    route:
+      cluster: connect_fallthrough
+- name: connect2
+  domains:
+  - bat4.com
+  routes:
+  - match:
+        connect_matcher:
+          {}
+    redirect: { path_redirect: /new_path }
+- name: default
+  domains:
+  - "*"
+  routes:
+  - match:
+      prefix: "/"
+    route:
+      cluster: instant-server
+      timeout: 30s
+  virtual_clusters:
+  - headers:
+    - name: ":path"
+      safe_regex_match:
+        google_re2: {}
+        regex: "^/users/\\d+/location$"
+    - name: ":method"
+      exact_match: POST
+    name: ulu
+  )EOF";
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
+
+  // Connect matching
+  EXPECT_EQ("connect_match",
+            config.route(genHeaders("bat3.com", " ", "CONNECT"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ(
+      "connect_match",
+      config.route(genPathlessHeaders("bat3.com", "CONNECT"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("connect_fallthrough",
+            config.route(genHeaders("bat3.com", " ", "GET"), 0)->routeEntry()->clusterName());
+
+  // Prefix rewrite for CONNECT with path (for HTTP/2)
+  {
+    Http::TestRequestHeaderMapImpl headers =
+        genHeaders("bat3.com", "/api/locations?works=true", "CONNECT");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    route->finalizeRequestHeaders(headers, stream_info, true);
+    EXPECT_EQ("/rewrote?works=true", headers.get_(Http::Headers::get().Path));
+  }
+  // Prefix rewrite for CONNECT without path (for non-crashing)
+  {
+    Http::TestRequestHeaderMapImpl headers = genPathlessHeaders("bat4.com", "CONNECT");
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    ASSERT(redirect != nullptr);
+    redirect->rewritePathHeader(headers, true);
+    EXPECT_EQ("http://bat4.com/new_path", redirect->newPath(headers));
   }
 }
 
@@ -687,7 +809,6 @@ virtual_hosts:
       exact_match: POST
     name: ulu
   )EOF";
-
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
 
@@ -2618,8 +2739,7 @@ virtual_hosts:
     route->routeEntry()->maxGrpcTimeout();
     route->routeEntry()->grpcTimeoutOffset();
     route->routeEntry()->upgradeMap();
-    route->routeEntry()->internalRedirectAction();
-    route->routeEntry()->maxInternalRedirects();
+    route->routeEntry()->internalRedirectPolicy();
   }
 }
 
@@ -2691,6 +2811,50 @@ virtual_hosts:
   EXPECT_EQ(absl::nullopt, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
                                ->routeEntry()
                                ->grpcTimeoutOffset());
+}
+
+TEST_F(RouteMatcherTest, GrpcTimeoutOffsetOfDynamicRoute) {
+  // A DynamicRouteEntry will be created when 'cluster_header' is set.
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains:
+  - "*"
+  routes:
+  - match:
+      prefix: "/foo"
+    route:
+      cluster: local_service_grpc
+      max_grpc_timeout: 0.1s
+      grpc_timeout_offset: 0.01s
+  - match:
+      prefix: "/"
+    route:
+      max_grpc_timeout: 0.2s
+      grpc_timeout_offset: 0.02s
+      cluster_header: request_to
+      )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
+
+  {
+    Http::TestRequestHeaderMapImpl reqeust_headers = genHeaders("www.lyft.com", "/", "GET");
+    reqeust_headers.addCopy(Http::LowerCaseString("reqeust_to"), "dynamic_grpc_service");
+    EXPECT_EQ(absl::make_optional(std::chrono::milliseconds(20)),
+              config.route(reqeust_headers, 0)->routeEntry()->grpcTimeoutOffset());
+    EXPECT_EQ(absl::make_optional(std::chrono::milliseconds(200)),
+              config.route(reqeust_headers, 0)->routeEntry()->maxGrpcTimeout());
+  }
+  {
+
+    EXPECT_EQ(absl::make_optional(std::chrono::milliseconds(10)),
+              config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                  ->routeEntry()
+                  ->grpcTimeoutOffset());
+    EXPECT_EQ(
+        absl::make_optional(std::chrono::milliseconds(100)),
+        config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)->routeEntry()->maxGrpcTimeout());
+  }
 }
 
 TEST_F(RouteMatcherTest, FractionalRuntime) {
@@ -6698,6 +6862,30 @@ virtual_hosts:
       EnvoyException, "Duplicate upgrade WebSocket");
 }
 
+TEST_F(RouteConfigurationV2, BadConnectConfig) {
+  const std::string yaml = R"EOF(
+name: RetriableStatusCodes
+virtual_hosts:
+  - name: regex
+    domains: [idle.lyft.com]
+    routes:
+      - match:
+          safe_regex:
+            google_re2: {}
+            regex: "/regex"
+        route:
+          cluster: some-cluster
+          upgrade_configs:
+            - upgrade_type: Websocket
+              connect_config: {}
+              enabled: false
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+      EnvoyException, "Non-CONNECT upgrade type Websocket has ConnectConfig");
+}
+
 // Verifies that we're creating a new instance of the retry plugins on each call instead of always
 // returning the same one.
 TEST_F(RouteConfigurationV2, RetryPluginsAreNotReused) {
@@ -6739,6 +6927,130 @@ virtual_hosts:
   const auto predicates1 = retry_policy.retryHostPredicates();
   const auto predicates2 = retry_policy.retryHostPredicates();
   EXPECT_NE(predicates1, predicates2);
+}
+
+TEST_F(RouteConfigurationV2, InternalRedirctIsDisabledWhenNotSpecifiedInRouteAction) {
+  const std::string InternalRedirectEnabled = R"EOF(
+name: InternalRedirectEnabled
+virtual_hosts:
+  - name: regex
+    domains: [idle.lyft.com]
+    routes:
+      - match:
+          safe_regex:
+            google_re2: {}
+            regex: "/regex"
+        route:
+          cluster: some-cluster
+  )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(InternalRedirectEnabled),
+                        factory_context_, true);
+  Http::TestRequestHeaderMapImpl headers =
+      genRedirectHeaders("idle.lyft.com", "/regex", true, false);
+  const auto& internal_redirect_policy =
+      config.route(headers, 0)->routeEntry()->internalRedirectPolicy();
+  EXPECT_FALSE(internal_redirect_policy.enabled());
+}
+
+TEST_F(RouteConfigurationV2, DefaultInternalRedirctPolicyIsSensible) {
+  const std::string InternalRedirectEnabled = R"EOF(
+name: InternalRedirectEnabled
+virtual_hosts:
+  - name: regex
+    domains: [idle.lyft.com]
+    routes:
+      - match:
+          safe_regex:
+            google_re2: {}
+            regex: "/regex"
+        route:
+          cluster: some-cluster
+          internal_redirect_policy: {}
+  )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(InternalRedirectEnabled),
+                        factory_context_, true);
+  Http::TestRequestHeaderMapImpl headers =
+      genRedirectHeaders("idle.lyft.com", "/regex", true, false);
+  const auto& internal_redirect_policy =
+      config.route(headers, 0)->routeEntry()->internalRedirectPolicy();
+  EXPECT_TRUE(internal_redirect_policy.enabled());
+  EXPECT_TRUE(internal_redirect_policy.shouldRedirectForResponseCode(static_cast<Http::Code>(302)));
+  EXPECT_FALSE(
+      internal_redirect_policy.shouldRedirectForResponseCode(static_cast<Http::Code>(200)));
+  EXPECT_EQ(1, internal_redirect_policy.maxInternalRedirects());
+  EXPECT_TRUE(internal_redirect_policy.predicates().empty());
+  EXPECT_FALSE(internal_redirect_policy.isCrossSchemeRedirectAllowed());
+}
+
+TEST_F(RouteConfigurationV2, InternalRedirctPolicyDropsInvalidRedirectCode) {
+  const std::string InternalRedirectEnabled = R"EOF(
+name: InternalRedirectEnabled
+virtual_hosts:
+  - name: regex
+    domains: [idle.lyft.com]
+    routes:
+      - match:
+          safe_regex:
+            google_re2: {}
+            regex: "/regex"
+        route:
+          cluster: some-cluster
+          internal_redirect_policy:
+            redirect_response_codes: [301, 302, 303, 304]
+  )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(InternalRedirectEnabled),
+                        factory_context_, true);
+  Http::TestRequestHeaderMapImpl headers =
+      genRedirectHeaders("idle.lyft.com", "/regex", true, false);
+  const auto& internal_redirect_policy =
+      config.route(headers, 0)->routeEntry()->internalRedirectPolicy();
+  EXPECT_TRUE(internal_redirect_policy.enabled());
+  EXPECT_TRUE(internal_redirect_policy.shouldRedirectForResponseCode(static_cast<Http::Code>(301)));
+  EXPECT_TRUE(internal_redirect_policy.shouldRedirectForResponseCode(static_cast<Http::Code>(302)));
+  EXPECT_TRUE(internal_redirect_policy.shouldRedirectForResponseCode(static_cast<Http::Code>(303)));
+  EXPECT_FALSE(
+      internal_redirect_policy.shouldRedirectForResponseCode(static_cast<Http::Code>(304)));
+  EXPECT_FALSE(
+      internal_redirect_policy.shouldRedirectForResponseCode(static_cast<Http::Code>(305)));
+  EXPECT_FALSE(
+      internal_redirect_policy.shouldRedirectForResponseCode(static_cast<Http::Code>(306)));
+  EXPECT_FALSE(
+      internal_redirect_policy.shouldRedirectForResponseCode(static_cast<Http::Code>(307)));
+}
+
+TEST_F(RouteConfigurationV2, InternalRedirctPolicyDropsInvalidRedirectCodeCauseEmptySet) {
+  const std::string InternalRedirectEnabled = R"EOF(
+name: InternalRedirectEnabled
+virtual_hosts:
+  - name: regex
+    domains: [idle.lyft.com]
+    routes:
+      - match:
+          safe_regex:
+            google_re2: {}
+            regex: "/regex"
+        route:
+          cluster: some-cluster
+          internal_redirect_policy:
+            redirect_response_codes: [200, 304]
+  )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(InternalRedirectEnabled),
+                        factory_context_, true);
+  Http::TestRequestHeaderMapImpl headers =
+      genRedirectHeaders("idle.lyft.com", "/regex", true, false);
+  const auto& internal_redirect_policy =
+      config.route(headers, 0)->routeEntry()->internalRedirectPolicy();
+  EXPECT_TRUE(internal_redirect_policy.enabled());
+  EXPECT_FALSE(
+      internal_redirect_policy.shouldRedirectForResponseCode(static_cast<Http::Code>(302)));
+  EXPECT_FALSE(
+      internal_redirect_policy.shouldRedirectForResponseCode(static_cast<Http::Code>(304)));
+  EXPECT_FALSE(
+      internal_redirect_policy.shouldRedirectForResponseCode(static_cast<Http::Code>(200)));
 }
 
 class PerFilterConfigsTest : public testing::Test, public ConfigImplTestBase {
@@ -7076,6 +7388,280 @@ virtual_hosts:
 )EOF";
 
   checkEach(yaml, 1213, 1213, 1415);
+}
+
+class RouteMatchOverrideTest : public testing::Test, public ConfigImplTestBase {};
+
+TEST_F(RouteMatchOverrideTest, VerifyAllMatchableRoutes) {
+  const std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/foo/bar/baz" }
+        route:
+          cluster: foo_bar_baz
+      - match: { prefix: "/foo/bar" }
+        route:
+          cluster: foo_bar
+      - match: { prefix: "/foo" }
+        route:
+          cluster: foo
+      - match: { prefix: "/" }
+        route:
+          cluster: default
+)EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
+  std::vector<std::string> clusters{"default", "foo", "foo_bar", "foo_bar_baz"};
+
+  RouteConstSharedPtr accepted_route = config.route(
+      [&clusters](RouteConstSharedPtr route,
+                  RouteEvalStatus route_eval_status) -> RouteMatchStatus {
+        EXPECT_FALSE(clusters.empty());
+        EXPECT_EQ(clusters[clusters.size() - 1], route->routeEntry()->clusterName());
+        clusters.pop_back();
+        if (clusters.empty()) {
+          EXPECT_EQ(route_eval_status, RouteEvalStatus::NoMoreRoutes);
+          return RouteMatchStatus::Accept;
+        }
+        EXPECT_EQ(route_eval_status, RouteEvalStatus::HasMoreRoutes);
+        return RouteMatchStatus::Continue;
+      },
+      genHeaders("bat.com", "/foo/bar/baz", "GET"));
+  EXPECT_EQ(accepted_route->routeEntry()->clusterName(), "default");
+}
+
+TEST_F(RouteMatchOverrideTest, VerifyRouteOverrideStops) {
+  const std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/foo/bar/baz" }
+        route:
+          cluster: foo_bar_baz
+      - match: { prefix: "/foo/bar" }
+        route:
+          cluster: foo_bar
+      - match: { prefix: "/foo" }
+        route:
+          cluster: foo
+      - match: { prefix: "/" }
+        route:
+          cluster: default
+)EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
+  std::vector<std::string> clusters{"foo", "foo_bar"};
+
+  RouteConstSharedPtr accepted_route = config.route(
+      [&clusters](RouteConstSharedPtr route,
+                  RouteEvalStatus route_eval_status) -> RouteMatchStatus {
+        EXPECT_FALSE(clusters.empty());
+        EXPECT_EQ(clusters[clusters.size() - 1], route->routeEntry()->clusterName());
+        clusters.pop_back();
+        EXPECT_EQ(route_eval_status, RouteEvalStatus::HasMoreRoutes);
+
+        if (clusters.empty()) {
+          return RouteMatchStatus::Accept; // Do not match default route
+        }
+        return RouteMatchStatus::Continue;
+      },
+      genHeaders("bat.com", "/foo/bar", "GET"));
+  EXPECT_EQ(accepted_route->routeEntry()->clusterName(), "foo");
+}
+
+TEST_F(RouteMatchOverrideTest, StopWhenNoMoreRoutes) {
+  const std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/foo/bar/baz" }
+        route:
+          cluster: foo_bar_baz
+      - match: { prefix: "/foo/bar" }
+        route:
+          cluster: foo_bar
+      - match: { prefix: "/foo" }
+        route:
+          cluster: foo
+      - match: { prefix: "/" }
+        route:
+          cluster: default
+)EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
+  std::vector<std::string> clusters{"default", "foo", "foo_bar", "foo_bar_baz"};
+
+  RouteConstSharedPtr accepted_route = config.route(
+      [&clusters](RouteConstSharedPtr route,
+                  RouteEvalStatus route_eval_status) -> RouteMatchStatus {
+        EXPECT_FALSE(clusters.empty());
+        EXPECT_EQ(clusters[clusters.size() - 1], route->routeEntry()->clusterName());
+        clusters.pop_back();
+
+        if (clusters.empty()) {
+          EXPECT_EQ(route_eval_status, RouteEvalStatus::NoMoreRoutes);
+        } else {
+          EXPECT_EQ(route_eval_status, RouteEvalStatus::HasMoreRoutes);
+        }
+        // Returning continue when no more routes are available will be ignored by ConfigImpl::route
+        return RouteMatchStatus::Continue;
+      },
+      genHeaders("bat.com", "/foo/bar/baz", "GET"));
+  EXPECT_EQ(accepted_route, nullptr);
+}
+
+TEST_F(RouteMatchOverrideTest, NullRouteOnNoRouteMatch) {
+  const std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/foo/bar/baz" }
+        route:
+          cluster: foo_bar_baz
+      - match: { prefix: "/foo/bar" }
+        route:
+          cluster: foo_bar
+      - match: { prefix: "/foo" }
+        route:
+          cluster: foo
+)EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
+  RouteConstSharedPtr accepted_route = config.route(
+      [](RouteConstSharedPtr, RouteEvalStatus) -> RouteMatchStatus {
+        ADD_FAILURE()
+            << "RouteCallback should not be invoked since there are no matching route to override";
+        return RouteMatchStatus::Continue;
+      },
+      genHeaders("bat.com", "/", "GET"));
+  EXPECT_EQ(accepted_route, nullptr);
+}
+
+TEST_F(RouteMatchOverrideTest, NullRouteOnNoHostMatch) {
+  const std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: bar
+    domains: ["www.acme.com"]
+    routes:
+      - match: { prefix: "/foo/bar/baz" }
+        route:
+          cluster: foo_bar_baz
+      - match: { prefix: "/foo/bar" }
+        route:
+          cluster: foo_bar
+      - match: { prefix: "/" }
+        route:
+          cluster: default
+)EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
+  RouteConstSharedPtr accepted_route = config.route(
+      [](RouteConstSharedPtr, RouteEvalStatus) -> RouteMatchStatus {
+        ADD_FAILURE()
+            << "RouteCallback should not be invoked since there are no matching route to override";
+        return RouteMatchStatus::Continue;
+      },
+      genHeaders("bat.com", "/", "GET"));
+  EXPECT_EQ(accepted_route, nullptr);
+}
+
+TEST_F(RouteMatchOverrideTest, NullRouteOnNullXForwardedProto) {
+  const std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/foo/bar/baz" }
+        route:
+          cluster: foo_bar_baz
+      - match: { prefix: "/foo/bar" }
+        route:
+          cluster: foo_bar
+      - match: { prefix: "/" }
+        route:
+          cluster: default
+)EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
+  RouteConstSharedPtr accepted_route = config.route(
+      [](RouteConstSharedPtr, RouteEvalStatus) -> RouteMatchStatus {
+        ADD_FAILURE()
+            << "RouteCallback should not be invoked since there are no matching route to override";
+        return RouteMatchStatus::Continue;
+      },
+      genHeaders("bat.com", "/", "GET", ""));
+  EXPECT_EQ(accepted_route, nullptr);
+}
+
+TEST_F(RouteMatchOverrideTest, NullRouteOnRequireTlsAll) {
+  const std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/foo/bar/baz" }
+        route:
+          cluster: foo_bar_baz
+      - match: { prefix: "/foo/bar" }
+        route:
+          cluster: foo_bar
+      - match: { prefix: "/" }
+        route:
+          cluster: default
+    require_tls: ALL
+)EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
+  RouteConstSharedPtr accepted_route = config.route(
+      [](RouteConstSharedPtr, RouteEvalStatus) -> RouteMatchStatus {
+        ADD_FAILURE()
+            << "RouteCallback should not be invoked since there are no matching route to override";
+        return RouteMatchStatus::Continue;
+      },
+      genHeaders("bat.com", "/", "GET"));
+  EXPECT_NE(nullptr, dynamic_cast<const SslRedirectRoute*>(accepted_route.get()));
+}
+
+TEST_F(RouteMatchOverrideTest, NullRouteOnRequireTlsInternal) {
+  const std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/foo/bar/baz" }
+        route:
+          cluster: foo_bar_baz
+      - match: { prefix: "/foo/bar" }
+        route:
+          cluster: foo_bar
+      - match: { prefix: "/" }
+        route:
+          cluster: default
+    require_tls: EXTERNAL_ONLY
+)EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
+  RouteConstSharedPtr accepted_route = config.route(
+      [](RouteConstSharedPtr, RouteEvalStatus) -> RouteMatchStatus {
+        ADD_FAILURE()
+            << "RouteCallback should not be invoked since there are no matching route to override";
+        return RouteMatchStatus::Continue;
+      },
+      genHeaders("bat.com", "/", "GET"));
+  EXPECT_NE(nullptr, dynamic_cast<const SslRedirectRoute*>(accepted_route.get()));
 }
 
 } // namespace

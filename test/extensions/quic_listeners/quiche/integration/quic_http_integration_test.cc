@@ -265,7 +265,7 @@ TEST_P(QuicHttpIntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
   response->waitForEndStream();
   // The delayed close timeout should trigger since client is not closing the connection.
   EXPECT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(5000)));
-  EXPECT_EQ(codec_client_->last_connection_event(), Network::ConnectionEvent::RemoteClose);
+  EXPECT_EQ(codec_client_->lastConnectionEvent(), Network::ConnectionEvent::RemoteClose);
   EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value(),
             1);
 }
@@ -432,12 +432,12 @@ TEST_P(QuicHttpIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
   upstream_request_->encodeData(10, true);
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 
   // New request should be rejected.
   auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   response2->waitForEndStream();
-  EXPECT_EQ("503", response2->headers().Status()->value().getStringView());
+  EXPECT_EQ("503", response2->headers().getStatusValue());
   EXPECT_EQ("envoy overloaded", response2->body());
   codec_client_->close();
 

@@ -2,7 +2,7 @@
 
 Envoy Header-To-Metadata Filter
 ===============================
-* :ref:`v2 API reference <envoy_api_msg_config.filter.http.header_to_metadata.v2.Config>`
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.header_to_metadata.v3.Config>`
 * This filter should be configured with the name *envoy.filters.http.header_to_metadata*.
 
 This filter is configured with rules that will be matched against requests and responses.
@@ -25,7 +25,7 @@ absence of a version header could be:
   http_filters:
     - name: envoy.filters.http.header_to_metadata
       typed_config:
-        "@type": type.googleapis.com/envoy.config.filter.http.header_to_metadata.v2.Config
+        "@type": type.googleapis.com/envoy.extensions.filters.http.header_to_metadata.v3.Config
         request_rules:
           - header: x-version
             on_header_present:
@@ -59,6 +59,34 @@ A corresponding upstream cluster configuration could be:
 This would then allow requests with the `x-version` header set to be matched against
 endpoints with the corresponding version. Whereas requests with that header missing
 would be matched with the default endpoints.
+
+Note that this filter also supports per route configuration:
+
+.. code-block:: yaml
+
+  route_config:
+    name: local_route
+    virtual_hosts:
+    - name: local_service
+      domains: ["*"]
+      routes:
+      - match: { prefix: "/version-to-metadata" }
+        route: { cluster: service }
+        typed_per_filter_config:
+          envoy.filters.http.header_to_metadata:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.header_to_metadata.v3.Config
+            request_rules:
+              - header: x-version
+                on_header_present:
+                  metadata_namespace: envoy.lb
+                  key: version
+                  type: STRING
+                remove: false
+      - match: { prefix: "/" }
+        route: { cluster: some_service }
+
+This can be used to either override the global configuration or if the global configuration
+is empty (no rules), it can be used to only enable the filter at a per route level.
 
 Statistics
 ----------

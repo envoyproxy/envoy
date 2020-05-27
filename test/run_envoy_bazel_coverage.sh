@@ -4,6 +4,7 @@ set -e
 
 [[ -z "${SRCDIR}" ]] && SRCDIR="${PWD}"
 [[ -z "${VALIDATE_COVERAGE}" ]] && VALIDATE_COVERAGE=true
+[[ -z "${FUZZ_COVERAGE}" ]] && FUZZ_COVERAGE=false
 
 echo "Starting run_envoy_bazel_coverage.sh..."
 echo "    PWD=$(pwd)"
@@ -18,44 +19,38 @@ if [[ $# -gt 0 ]]; then
 elif [[ -n "${COVERAGE_TARGET}" ]]; then
   COVERAGE_TARGETS=${COVERAGE_TARGET}
 else
-  COVERAGE_TARGETS=//test/...
+  # For fuzz builds, this overrides to just fuzz targets.
+  COVERAGE_TARGETS=//test/... && [[ ${FUZZ_COVERAGE} == "true" ]] &&
+    COVERAGE_TARGETS="$(bazel query 'attr("tags", "fuzzer", //test/...)')"
 fi
 
-# Make sure //test/coverage:coverage_tests is up-to-date.
-SCRIPT_DIR="$(realpath "$(dirname "$0")")"
-"${SCRIPT_DIR}"/coverage/gen_build.sh ${COVERAGE_TARGETS}
+if [[ "${FUZZ_COVERAGE}" == "true" ]]; then
+  BAZEL_BUILD_OPTIONS+=" --config=fuzz-coverage --test_tag_filters=-nocoverage"
+else
+  BAZEL_BUILD_OPTIONS+=" --config=test-coverage --test_tag_filters=-nocoverage,-fuzz_target"
+fi
 
-# Using GTEST_SHUFFLE here to workaround https://github.com/envoyproxy/envoy/issues/10108
-BAZEL_USE_LLVM_NATIVE_COVERAGE=1 GCOV=llvm-profdata bazel coverage ${BAZEL_BUILD_OPTIONS} \
-    -c fastbuild --copt=-DNDEBUG --instrumentation_filter=//source/...,//include/... \
-    --test_timeout=2000 --cxxopt="-DENVOY_CONFIG_COVERAGE=1" --test_output=errors \
-    --test_arg="--log-path /dev/null" --test_arg="-l trace" --test_env=HEAPCHECK= \
-    --test_env=GTEST_SHUFFLE=1 //test/coverage:coverage_tests
+bazel coverage ${BAZEL_BUILD_OPTIONS} --test_output=all ${COVERAGE_TARGETS}
 
 COVERAGE_DIR="${SRCDIR}"/generated/coverage
+
+rm -rf "${COVERAGE_DIR}"
 mkdir -p "${COVERAGE_DIR}"
 
-COVERAGE_IGNORE_REGEX="(/external/|pb\.(validate\.)?(h|cc)|/chromium_url/|/test/|/tmp|/tools/|/third_party/|/source/extensions/quic_listeners/quiche/)"
-COVERAGE_BINARY="bazel-bin/test/coverage/coverage_tests"
 COVERAGE_DATA="${COVERAGE_DIR}/coverage.dat"
+cp bazel-out/_coverage/_coverage_report.dat "${COVERAGE_DATA}"
 
-echo "Merging coverage data..."
-llvm-profdata merge -sparse -o ${COVERAGE_DATA} $(find -L bazel-out/k8-fastbuild/testlogs/test/coverage/coverage_tests/ -name coverage.dat)
-
-echo "Generating report..."
-llvm-cov show "${COVERAGE_BINARY}" -instr-profile="${COVERAGE_DATA}" -Xdemangler=c++filt \
-  -ignore-filename-regex="${COVERAGE_IGNORE_REGEX}" -output-dir=${COVERAGE_DIR} -format=html
-sed -i -e 's|>proc/self/cwd/|>|g' "${COVERAGE_DIR}/index.html"
-sed -i -e 's|>bazel-out/[^/]*/bin/\([^/]*\)/[^<]*/_virtual_includes/[^/]*|>\1|g' "${COVERAGE_DIR}/index.html"
+COVERAGE_VALUE=$(genhtml --prefix ${PWD} --output "${COVERAGE_DIR}" "${COVERAGE_DATA}" | tee /dev/stderr | grep lines... | cut -d ' ' -f 4)
+COVERAGE_VALUE=${COVERAGE_VALUE%?}
 
 [[ -z "${ENVOY_COVERAGE_DIR}" ]] || rsync -av "${COVERAGE_DIR}"/ "${ENVOY_COVERAGE_DIR}"
 
-if [ "$VALIDATE_COVERAGE" == "true" ]
-then
-  COVERAGE_VALUE=$(llvm-cov export "${COVERAGE_BINARY}" -instr-profile="${COVERAGE_DATA}" \
-    -ignore-filename-regex="${COVERAGE_IGNORE_REGEX}" -summary-only | \
-    python3 -c "import sys, json; print(json.load(sys.stdin)['data'][0]['totals']['lines']['percent'])")
-  COVERAGE_THRESHOLD=97.0
+if [[ "$VALIDATE_COVERAGE" == "true" ]]; then
+  if [[ "${FUZZ_COVERAGE}" == "true" ]]; then
+    COVERAGE_THRESHOLD=27.0
+  else
+    COVERAGE_THRESHOLD=97.0
+  fi
   COVERAGE_FAILED=$(echo "${COVERAGE_VALUE}<${COVERAGE_THRESHOLD}" | bc)
   if test ${COVERAGE_FAILED} -eq 1; then
       echo Code coverage ${COVERAGE_VALUE} is lower than limit of ${COVERAGE_THRESHOLD}

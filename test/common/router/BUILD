@@ -15,6 +15,7 @@ envoy_package()
 
 envoy_cc_test(
     name = "config_impl_test",
+    tags = ["fails_on_windows"],
     deps = [":config_impl_test_lib"],
 )
 
@@ -68,7 +69,7 @@ envoy_cc_test(
         "//source/common/config:utility_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/router:rds_lib",
-        "//source/server/http:admin_lib",
+        "//source/server/admin:admin_lib",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/server:server_mocks",
@@ -112,7 +113,7 @@ envoy_cc_test(
         "//source/common/http:message_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/router:scoped_rds_lib",
-        "//source/server/http:admin_lib",
+        "//source/server/admin:admin_lib",
         "//test/mocks/config:config_mocks",
         "//test/mocks/init:init_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
@@ -137,7 +138,7 @@ envoy_cc_test(
         "//source/common/protobuf",
         "//source/common/router:rds_lib",
         "//source/common/router:vhds_lib",
-        "//source/server/http:admin_lib",
+        "//source/server/admin:admin_lib",
         "//test/mocks/config:config_mocks",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/server:server_mocks",
@@ -221,6 +222,8 @@ envoy_cc_fuzz_test(
     name = "route_fuzz_test",
     srcs = ["route_fuzz_test.cc"],
     corpus = ":route_corpus",
+    # The corpus_from_config_impl currently does not work, the tests it runs do not pass
+    tags = ["skip_on_windows"],
     deps = [
         ":route_fuzz_proto_cc_proto",
         "//source/common/router:config_lib",
@@ -250,6 +253,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "router_test",
     srcs = ["router_test.cc"],
+    tags = ["fails_on_windows"],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:context_lib",
@@ -281,6 +285,7 @@ envoy_cc_test(
     name = "router_upstream_log_test",
     srcs = ["router_upstream_log_test.cc"],
     external_deps = ["abseil_optional"],
+    tags = ["fails_on_windows"],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/network:utility_lib",
@@ -314,6 +319,26 @@ envoy_cc_test(
         "//source/common/http:message_lib",
         "//source/common/router:shadow_writer_lib",
         "//test/mocks/upstream:upstream_mocks",
+    ],
+)
+
+envoy_cc_test(
+    name = "upstream_request_test",
+    srcs = ["upstream_request_test.cc"],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/router:router_lib",
+        "//source/common/upstream:upstream_includes",
+        "//source/common/upstream:upstream_lib",
+        "//test/common/http:common_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/router:router_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 

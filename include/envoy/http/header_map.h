@@ -149,6 +149,12 @@ public:
   }
 
   /**
+   * Trim trailing whitespaces from the HeaderString. Only supported by the "Inline" HeaderString
+   * representation.
+   */
+  void rtrim();
+
+  /**
    * Get an absl::string_view. It will NOT be NUL terminated!
    *
    * @return an absl::string_view.
@@ -320,12 +326,10 @@ private:
   HEADER_FUNC(AccessControlAllowOrigin)                                                            \
   HEADER_FUNC(AccessControlExposeHeaders)                                                          \
   HEADER_FUNC(AccessControlMaxAge)                                                                 \
-  HEADER_FUNC(ContentEncoding)                                                                     \
   HEADER_FUNC(Date)                                                                                \
   HEADER_FUNC(Etag)                                                                                \
   HEADER_FUNC(EnvoyDegraded)                                                                       \
   HEADER_FUNC(EnvoyImmediateHealthCheckFail)                                                       \
-  HEADER_FUNC(EnvoyOverloaded)                                                                     \
   HEADER_FUNC(EnvoyRateLimited)                                                                    \
   HEADER_FUNC(EnvoyUpstreamCanary)                                                                 \
   HEADER_FUNC(EnvoyUpstreamHealthCheckedCluster)                                                   \
@@ -341,6 +345,7 @@ private:
 #define INLINE_REQ_RESP_HEADERS(HEADER_FUNC)                                                       \
   HEADER_FUNC(CacheControl)                                                                        \
   HEADER_FUNC(Connection)                                                                          \
+  HEADER_FUNC(ContentEncoding)                                                                     \
   HEADER_FUNC(ContentLength)                                                                       \
   HEADER_FUNC(ContentType)                                                                         \
   HEADER_FUNC(EnvoyAttemptCount)                                                                   \
@@ -380,7 +385,13 @@ private:
   virtual void setReference##name(absl::string_view value) PURE;                                   \
   virtual void set##name(absl::string_view value) PURE;                                            \
   virtual void set##name(uint64_t value) PURE;                                                     \
-  virtual size_t remove##name() PURE;
+  virtual size_t remove##name() PURE;                                                              \
+  absl::string_view get##name##Value() const {                                                     \
+    if (name() != nullptr) {                                                                       \
+      return name()->value().getStringView();                                                      \
+    }                                                                                              \
+    return "";                                                                                     \
+  }
 
 /**
  * Wraps a set of HTTP headers.

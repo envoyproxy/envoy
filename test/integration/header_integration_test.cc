@@ -8,12 +8,12 @@
 
 #include "common/config/api_version.h"
 #include "common/config/metadata.h"
-#include "common/config/resources.h"
 #include "common/http/exception.h"
 #include "common/protobuf/protobuf.h"
 
 #include "test/integration/http_integration.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/resources.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -1114,6 +1114,7 @@ TEST_P(HeaderIntegrationTest, TestTeHeaderPassthrough) {
           {"server", "envoy"},
           {"x-return-foo", "upstream"},
           {":status", "200"},
+          {"connection", "close"},
       });
 }
 

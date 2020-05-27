@@ -52,6 +52,7 @@ envoy_extension_cc_test(
     name = "tap_filter_integration_test",
     srcs = ["tap_filter_integration_test.cc"],
     extension_name = "envoy.filters.http.tap",
+    tags = ["fails_on_windows"],
     deps = [
         "//source/extensions/filters/http/tap:config",
         "//test/integration:http_integration_lib",

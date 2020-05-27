@@ -92,6 +92,10 @@ public:
   void setRejectUnknownFieldsDynamic(bool reject_unknown_dynamic_fields) {
     reject_unknown_dynamic_fields_ = reject_unknown_dynamic_fields;
   }
+  void setIgnoreUnknownFieldsDynamic(bool ignore_unknown_dynamic_fields) {
+    ignore_unknown_dynamic_fields_ = ignore_unknown_dynamic_fields;
+  }
+
   void setFakeSymbolTableEnabled(bool fake_symbol_table_enabled) {
     fake_symbol_table_enabled_ = fake_symbol_table_enabled;
   }
@@ -103,9 +107,11 @@ public:
   const envoy::config::bootstrap::v3::Bootstrap& configProto() const override {
     return config_proto_;
   }
+  const absl::optional<uint32_t>& bootstrapVersion() const override { return bootstrap_version_; }
   const std::string& configYaml() const override { return config_yaml_; }
   bool allowUnknownStaticFields() const override { return allow_unknown_static_fields_; }
   bool rejectUnknownDynamicFields() const override { return reject_unknown_dynamic_fields_; }
+  bool ignoreUnknownDynamicFields() const override { return ignore_unknown_dynamic_fields_; }
   const std::string& adminAddressPath() const override { return admin_address_path_; }
   Network::Address::IpVersion localAddressIpVersion() const override {
     return local_address_ip_version_;
@@ -156,9 +162,11 @@ private:
   uint32_t concurrency_;
   std::string config_path_;
   envoy::config::bootstrap::v3::Bootstrap config_proto_;
+  absl::optional<uint32_t> bootstrap_version_;
   std::string config_yaml_;
   bool allow_unknown_static_fields_{false};
   bool reject_unknown_dynamic_fields_{false};
+  bool ignore_unknown_dynamic_fields_{false};
   std::string admin_address_path_;
   Network::Address::IpVersion local_address_ip_version_;
   spdlog::level::level_enum log_level_;

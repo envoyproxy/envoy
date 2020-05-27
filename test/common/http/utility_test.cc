@@ -123,6 +123,11 @@ TEST(HttpUtility, H2H1H2Request) {
   ASSERT_EQ(converted_headers, original_headers);
 }
 
+TEST(HttpUtility, ConnectBytestreamSpecialCased) {
+  TestRequestHeaderMapImpl headers = {{":method", "CONNECT"}, {":protocol", "bytestream"}};
+  ASSERT_FALSE(Utility::isH2UpgradeRequest(headers));
+}
+
 // Start with H1 style websocket response headers. Transform to H2 and back.
 TEST(HttpUtility, H1H2H1Response) {
   TestResponseHeaderMapImpl converted_headers = {
@@ -455,8 +460,9 @@ TEST(HttpUtility, SendLocalReply) {
 
   EXPECT_CALL(callbacks, encodeHeaders_(_, false));
   EXPECT_CALL(callbacks, encodeData(_, true));
-  Utility::sendLocalReply(false, callbacks, is_reset, Http::Code::PayloadTooLarge, "large",
-                          absl::nullopt, false);
+  Utility::sendLocalReply(
+      is_reset, callbacks,
+      Utility::LocalReplyData{false, Http::Code::PayloadTooLarge, "large", absl::nullopt, false});
 }
 
 TEST(HttpUtility, SendLocalGrpcReply) {
@@ -465,15 +471,16 @@ TEST(HttpUtility, SendLocalGrpcReply) {
 
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
-        EXPECT_EQ(headers.Status()->value().getStringView(), "200");
+        EXPECT_EQ(headers.getStatusValue(), "200");
         EXPECT_NE(headers.GrpcStatus(), nullptr);
-        EXPECT_EQ(headers.GrpcStatus()->value().getStringView(),
+        EXPECT_EQ(headers.getGrpcStatusValue(),
                   std::to_string(enumToInt(Grpc::Status::WellKnownGrpcStatus::Unknown)));
         EXPECT_NE(headers.GrpcMessage(), nullptr);
-        EXPECT_EQ(headers.GrpcMessage()->value().getStringView(), "large");
+        EXPECT_EQ(headers.getGrpcMessageValue(), "large");
       }));
-  Utility::sendLocalReply(true, callbacks, is_reset, Http::Code::PayloadTooLarge, "large",
-                          absl::nullopt, false);
+  Utility::sendLocalReply(
+      is_reset, callbacks,
+      Utility::LocalReplyData{true, Http::Code::PayloadTooLarge, "large", absl::nullopt, false});
 }
 
 TEST(HttpUtility, SendLocalGrpcReplyWithUpstreamJsonPayload) {
@@ -491,16 +498,17 @@ TEST(HttpUtility, SendLocalGrpcReplyWithUpstreamJsonPayload) {
 
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
-        EXPECT_EQ(headers.Status()->value().getStringView(), "200");
+        EXPECT_EQ(headers.getStatusValue(), "200");
         EXPECT_NE(headers.GrpcStatus(), nullptr);
-        EXPECT_EQ(headers.GrpcStatus()->value().getStringView(),
+        EXPECT_EQ(headers.getGrpcStatusValue(),
                   std::to_string(enumToInt(Grpc::Status::WellKnownGrpcStatus::Unauthenticated)));
         EXPECT_NE(headers.GrpcMessage(), nullptr);
         const auto& encoded = Utility::PercentEncoding::encode(json);
-        EXPECT_EQ(headers.GrpcMessage()->value().getStringView(), encoded);
+        EXPECT_EQ(headers.getGrpcMessageValue(), encoded);
       }));
-  Utility::sendLocalReply(true, callbacks, is_reset, Http::Code::Unauthorized, json, absl::nullopt,
-                          false);
+  Utility::sendLocalReply(
+      is_reset, callbacks,
+      Utility::LocalReplyData{true, Http::Code::Unauthorized, json, absl::nullopt, false});
 }
 
 TEST(HttpUtility, RateLimitedGrpcStatus) {
@@ -509,22 +517,25 @@ TEST(HttpUtility, RateLimitedGrpcStatus) {
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_NE(headers.GrpcStatus(), nullptr);
-        EXPECT_EQ(headers.GrpcStatus()->value().getStringView(),
+        EXPECT_EQ(headers.getGrpcStatusValue(),
                   std::to_string(enumToInt(Grpc::Status::WellKnownGrpcStatus::Unavailable)));
       }));
-  Utility::sendLocalReply(true, callbacks, false, Http::Code::TooManyRequests, "", absl::nullopt,
-                          false);
+  Utility::sendLocalReply(
+      false, callbacks,
+      Utility::LocalReplyData{true, Http::Code::TooManyRequests, "", absl::nullopt, false});
 
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_NE(headers.GrpcStatus(), nullptr);
-        EXPECT_EQ(headers.GrpcStatus()->value().getStringView(),
+        EXPECT_EQ(headers.getGrpcStatusValue(),
                   std::to_string(enumToInt(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted)));
       }));
-  Utility::sendLocalReply(true, callbacks, false, Http::Code::TooManyRequests, "",
-                          absl::make_optional<Grpc::Status::GrpcStatus>(
-                              Grpc::Status::WellKnownGrpcStatus::ResourceExhausted),
-                          false);
+  Utility::sendLocalReply(
+      false, callbacks,
+      Utility::LocalReplyData{true, Http::Code::TooManyRequests, "",
+                              absl::make_optional<Grpc::Status::GrpcStatus>(
+                                  Grpc::Status::WellKnownGrpcStatus::ResourceExhausted),
+                              false});
 }
 
 TEST(HttpUtility, SendLocalReplyDestroyedEarly) {
@@ -535,8 +546,9 @@ TEST(HttpUtility, SendLocalReplyDestroyedEarly) {
     is_reset = true;
   }));
   EXPECT_CALL(callbacks, encodeData(_, true)).Times(0);
-  Utility::sendLocalReply(false, callbacks, is_reset, Http::Code::PayloadTooLarge, "large",
-                          absl::nullopt, false);
+  Utility::sendLocalReply(
+      is_reset, callbacks,
+      Utility::LocalReplyData{false, Http::Code::PayloadTooLarge, "large", absl::nullopt, false});
 }
 
 TEST(HttpUtility, SendLocalReplyHeadRequest) {
@@ -544,11 +556,11 @@ TEST(HttpUtility, SendLocalReplyHeadRequest) {
   bool is_reset = false;
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
-        EXPECT_EQ(headers.ContentLength()->value().getStringView(),
-                  fmt::format("{}", strlen("large")));
+        EXPECT_EQ(headers.getContentLengthValue(), fmt::format("{}", strlen("large")));
       }));
-  Utility::sendLocalReply(false, callbacks, is_reset, Http::Code::PayloadTooLarge, "large",
-                          absl::nullopt, true);
+  Utility::sendLocalReply(
+      is_reset, callbacks,
+      Utility::LocalReplyData{false, Http::Code::PayloadTooLarge, "large", absl::nullopt, true});
 }
 
 TEST(HttpUtility, TestExtractHostPathFromUri) {
@@ -594,8 +606,8 @@ TEST(HttpUtility, TestPrepareHeaders) {
 
   Http::RequestMessagePtr message = Utility::prepareHeaders(http_uri);
 
-  EXPECT_EQ("/x/y/z", message->headers().Path()->value().getStringView());
-  EXPECT_EQ("dns.name", message->headers().Host()->value().getStringView());
+  EXPECT_EQ("/x/y/z", message->headers().getPathValue());
+  EXPECT_EQ("dns.name", message->headers().getHostValue());
 }
 
 TEST(HttpUtility, QueryParamsToString) {
@@ -1073,72 +1085,87 @@ TEST(HttpUtility, TestRejectTeHeaderTooLong) {
 
 TEST(Url, ParsingFails) {
   Utility::Url url;
-  EXPECT_FALSE(url.initialize(""));
-  EXPECT_FALSE(url.initialize("foo"));
-  EXPECT_FALSE(url.initialize("http://"));
-  EXPECT_FALSE(url.initialize("random_scheme://host.com/path"));
+  EXPECT_FALSE(url.initialize("", false));
+  EXPECT_FALSE(url.initialize("foo", false));
+  EXPECT_FALSE(url.initialize("http://", false));
+  EXPECT_FALSE(url.initialize("random_scheme://host.com/path", false));
+  EXPECT_FALSE(url.initialize("http://www.foo.com", true));
+  EXPECT_FALSE(url.initialize("foo.com", true));
 }
 
-void ValidateUrl(absl::string_view raw_url, absl::string_view expected_scheme,
+void validateUrl(absl::string_view raw_url, absl::string_view expected_scheme,
                  absl::string_view expected_host_port, absl::string_view expected_path) {
   Utility::Url url;
-  ASSERT_TRUE(url.initialize(raw_url)) << "Failed to initialize " << raw_url;
+  ASSERT_TRUE(url.initialize(raw_url, false)) << "Failed to initialize " << raw_url;
   EXPECT_EQ(url.scheme(), expected_scheme);
-  EXPECT_EQ(url.host_and_port(), expected_host_port);
-  EXPECT_EQ(url.path_and_query_params(), expected_path);
+  EXPECT_EQ(url.hostAndPort(), expected_host_port);
+  EXPECT_EQ(url.pathAndQueryParams(), expected_path);
+}
+
+void validateConnectUrl(absl::string_view raw_url, absl::string_view expected_host_port) {
+  Utility::Url url;
+  ASSERT_TRUE(url.initialize(raw_url, true)) << "Failed to initialize " << raw_url;
+  EXPECT_TRUE(url.scheme().empty());
+  EXPECT_TRUE(url.pathAndQueryParams().empty());
+  EXPECT_EQ(url.hostAndPort(), expected_host_port);
 }
 
 TEST(Url, ParsingTest) {
   // Test url with no explicit path (with and without port)
-  ValidateUrl("http://www.host.com", "http", "www.host.com", "/");
-  ValidateUrl("http://www.host.com:80", "http", "www.host.com:80", "/");
+  validateUrl("http://www.host.com", "http", "www.host.com", "/");
+  validateUrl("http://www.host.com:80", "http", "www.host.com:80", "/");
 
   // Test url with "/" path.
-  ValidateUrl("http://www.host.com:80/", "http", "www.host.com:80", "/");
-  ValidateUrl("http://www.host.com/", "http", "www.host.com", "/");
+  validateUrl("http://www.host.com:80/", "http", "www.host.com:80", "/");
+  validateUrl("http://www.host.com/", "http", "www.host.com", "/");
 
   // Test url with "?".
-  ValidateUrl("http://www.host.com:80/?", "http", "www.host.com:80", "/?");
-  ValidateUrl("http://www.host.com/?", "http", "www.host.com", "/?");
+  validateUrl("http://www.host.com:80/?", "http", "www.host.com:80", "/?");
+  validateUrl("http://www.host.com/?", "http", "www.host.com", "/?");
 
   // Test url with "?" but without slash.
-  ValidateUrl("http://www.host.com:80?", "http", "www.host.com:80", "?");
-  ValidateUrl("http://www.host.com?", "http", "www.host.com", "?");
+  validateUrl("http://www.host.com:80?", "http", "www.host.com:80", "?");
+  validateUrl("http://www.host.com?", "http", "www.host.com", "?");
 
   // Test url with multi-character path
-  ValidateUrl("http://www.host.com:80/path", "http", "www.host.com:80", "/path");
-  ValidateUrl("http://www.host.com/path", "http", "www.host.com", "/path");
+  validateUrl("http://www.host.com:80/path", "http", "www.host.com:80", "/path");
+  validateUrl("http://www.host.com/path", "http", "www.host.com", "/path");
 
   // Test url with multi-character path and ? at the end
-  ValidateUrl("http://www.host.com:80/path?", "http", "www.host.com:80", "/path?");
-  ValidateUrl("http://www.host.com/path?", "http", "www.host.com", "/path?");
+  validateUrl("http://www.host.com:80/path?", "http", "www.host.com:80", "/path?");
+  validateUrl("http://www.host.com/path?", "http", "www.host.com", "/path?");
 
   // Test https scheme
-  ValidateUrl("https://www.host.com", "https", "www.host.com", "/");
+  validateUrl("https://www.host.com", "https", "www.host.com", "/");
 
   // Test url with query parameter
-  ValidateUrl("http://www.host.com:80/?query=param", "http", "www.host.com:80", "/?query=param");
-  ValidateUrl("http://www.host.com/?query=param", "http", "www.host.com", "/?query=param");
+  validateUrl("http://www.host.com:80/?query=param", "http", "www.host.com:80", "/?query=param");
+  validateUrl("http://www.host.com/?query=param", "http", "www.host.com", "/?query=param");
 
   // Test url with query parameter but without slash
-  ValidateUrl("http://www.host.com:80?query=param", "http", "www.host.com:80", "?query=param");
-  ValidateUrl("http://www.host.com?query=param", "http", "www.host.com", "?query=param");
+  validateUrl("http://www.host.com:80?query=param", "http", "www.host.com:80", "?query=param");
+  validateUrl("http://www.host.com?query=param", "http", "www.host.com", "?query=param");
 
   // Test url with multi-character path and query parameter
-  ValidateUrl("http://www.host.com:80/path?query=param", "http", "www.host.com:80",
+  validateUrl("http://www.host.com:80/path?query=param", "http", "www.host.com:80",
               "/path?query=param");
-  ValidateUrl("http://www.host.com/path?query=param", "http", "www.host.com", "/path?query=param");
+  validateUrl("http://www.host.com/path?query=param", "http", "www.host.com", "/path?query=param");
 
   // Test url with multi-character path and more than one query parameter
-  ValidateUrl("http://www.host.com:80/path?query=param&query2=param2", "http", "www.host.com:80",
+  validateUrl("http://www.host.com:80/path?query=param&query2=param2", "http", "www.host.com:80",
               "/path?query=param&query2=param2");
-  ValidateUrl("http://www.host.com/path?query=param&query2=param2", "http", "www.host.com",
+  validateUrl("http://www.host.com/path?query=param&query2=param2", "http", "www.host.com",
               "/path?query=param&query2=param2");
   // Test url with multi-character path, more than one query parameter and fragment
-  ValidateUrl("http://www.host.com:80/path?query=param&query2=param2#fragment", "http",
+  validateUrl("http://www.host.com:80/path?query=param&query2=param2#fragment", "http",
               "www.host.com:80", "/path?query=param&query2=param2#fragment");
-  ValidateUrl("http://www.host.com/path?query=param&query2=param2#fragment", "http", "www.host.com",
+  validateUrl("http://www.host.com/path?query=param&query2=param2#fragment", "http", "www.host.com",
               "/path?query=param&query2=param2#fragment");
+}
+
+TEST(Url, ParsingForConnectTest) {
+  validateConnectUrl("host.com:443", "host.com:443");
+  validateConnectUrl("host.com:80", "host.com:80");
 }
 
 void validatePercentEncodingEncodeDecode(absl::string_view source,

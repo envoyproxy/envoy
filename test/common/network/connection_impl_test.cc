@@ -90,8 +90,14 @@ TEST_P(ConnectionImplDeathTest, BadFd) {
       ConnectionImpl(*dispatcher,
                      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
                      Network::Test::createRawBufferSocket(), stream_info, false),
-      ".*assert failure: SOCKET_VALID\\(ioHandle\\(\\)\\.fd\\(\\)\\).*");
+      ".*assert failure: SOCKET_VALID\\(ConnectionImpl::ioHandle\\(\\)\\.fd\\(\\)\\).*");
 }
+
+class TestClientConnectionImpl : public Network::ClientConnectionImpl {
+public:
+  using ClientConnectionImpl::ClientConnectionImpl;
+  Buffer::WatermarkBuffer& readBuffer() { return read_buffer_; }
+};
 
 class ConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {
 protected:
@@ -104,9 +110,9 @@ protected:
     socket_ = std::make_shared<Network::TcpListenSocket>(Network::Test::getAnyAddress(GetParam()),
                                                          nullptr, true);
     listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true);
-    client_connection_ = dispatcher_->createClientConnection(
-        socket_->localAddress(), source_address_, Network::Test::createRawBufferSocket(),
-        socket_options_);
+    client_connection_ = std::make_unique<Network::TestClientConnectionImpl>(
+        *dispatcher_, socket_->localAddress(), source_address_,
+        Network::Test::createRawBufferSocket(), socket_options_);
     client_connection_->addConnectionCallbacks(client_callbacks_);
     EXPECT_EQ(nullptr, client_connection_->ssl());
     const Network::ClientConnection& const_connection = *client_connection_;
@@ -188,7 +194,7 @@ protected:
     Event::FileReadyCb* file_ready_cb_;
   };
 
-  ConnectionMocks createConnectionMocks() {
+  ConnectionMocks createConnectionMocks(bool create_timer = true) {
     auto dispatcher = std::make_unique<NiceMock<Event::MockDispatcher>>();
     EXPECT_CALL(dispatcher->buffer_factory_, create_(_, _))
         .WillRepeatedly(Invoke([](std::function<void()> below_low,
@@ -198,9 +204,12 @@ protected:
           return new Buffer::WatermarkBuffer(below_low, above_high);
         }));
 
-    // This timer will be returned (transferring ownership) to the ConnectionImpl when createTimer()
-    // is called to allocate the delayed close timer.
-    Event::MockTimer* timer = new Event::MockTimer(dispatcher.get());
+    Event::MockTimer* timer = nullptr;
+    if (create_timer) {
+      // This timer will be returned (transferring ownership) to the ConnectionImpl when
+      // createTimer() is called to allocate the delayed close timer.
+      timer = new Event::MockTimer(dispatcher.get());
+    }
 
     NiceMock<Event::MockFileEvent>* file_event = new NiceMock<Event::MockFileEvent>;
     EXPECT_CALL(*dispatcher, createFileEvent_(0, _, _, _))
@@ -211,6 +220,9 @@ protected:
 
     return ConnectionMocks{std::move(dispatcher), timer, std::move(transport_socket), file_event,
                            &file_ready_cb_};
+  }
+  Network::TestClientConnectionImpl* testClientConnection() {
+    return dynamic_cast<Network::TestClientConnectionImpl*>(client_connection_.get());
   }
 
   Event::FileReadyCb file_ready_cb_;
@@ -482,24 +494,41 @@ TEST_P(ConnectionImplTest, ConnectionStats) {
 // Ensure the new counter logic in ReadDisable avoids tripping asserts in ReadDisable guarding
 // against actual enabling twice in a row.
 TEST_P(ConnectionImplTest, ReadDisable) {
-  setUpBasicConnection();
+  ConnectionMocks mocks = createConnectionMocks(false);
+  IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
+  auto connection = std::make_unique<Network::ConnectionImpl>(
+      *mocks.dispatcher_,
+      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
+      std::move(mocks.transport_socket_), stream_info_, true);
 
-  client_connection_->readDisable(true);
-  client_connection_->readDisable(false);
+  EXPECT_CALL(*mocks.file_event_, setEnabled(_));
+  connection->readDisable(true);
+  EXPECT_CALL(*mocks.file_event_, setEnabled(_));
+  connection->readDisable(false);
 
-  client_connection_->readDisable(true);
-  client_connection_->readDisable(true);
-  client_connection_->readDisable(false);
-  client_connection_->readDisable(false);
+  EXPECT_CALL(*mocks.file_event_, setEnabled(_));
+  connection->readDisable(true);
+  EXPECT_CALL(*mocks.file_event_, setEnabled(_)).Times(0);
+  connection->readDisable(true);
+  EXPECT_CALL(*mocks.file_event_, setEnabled(_)).Times(0);
+  connection->readDisable(false);
+  EXPECT_CALL(*mocks.file_event_, setEnabled(_));
+  connection->readDisable(false);
 
-  client_connection_->readDisable(true);
-  client_connection_->readDisable(true);
-  client_connection_->readDisable(false);
-  client_connection_->readDisable(true);
-  client_connection_->readDisable(false);
-  client_connection_->readDisable(false);
+  EXPECT_CALL(*mocks.file_event_, setEnabled(_));
+  connection->readDisable(true);
+  EXPECT_CALL(*mocks.file_event_, setEnabled(_)).Times(0);
+  connection->readDisable(true);
+  EXPECT_CALL(*mocks.file_event_, setEnabled(_)).Times(0);
+  connection->readDisable(false);
+  EXPECT_CALL(*mocks.file_event_, setEnabled(_)).Times(0);
+  connection->readDisable(true);
+  EXPECT_CALL(*mocks.file_event_, setEnabled(_)).Times(0);
+  connection->readDisable(false);
+  EXPECT_CALL(*mocks.file_event_, setEnabled(_));
+  connection->readDisable(false);
 
-  disconnect(false);
+  connection->close(ConnectionCloseType::NoFlush);
 }
 
 // The HTTP/1 codec handles pipelined connections by relying on readDisable(false) resulting in the
@@ -722,7 +751,7 @@ TEST_P(ConnectionImplTest, HalfCloseNoEarlyCloseDetection) {
 }
 
 // Test that as watermark levels are changed, the appropriate callbacks are triggered.
-TEST_P(ConnectionImplTest, Watermarks) {
+TEST_P(ConnectionImplTest, WriteWatermarks) {
   useMockBuffer();
 
   setUpBasicConnection();
@@ -769,6 +798,123 @@ TEST_P(ConnectionImplTest, Watermarks) {
   }
 
   disconnect(false);
+}
+
+// Test that as watermark levels are changed, the appropriate callbacks are triggered.
+TEST_P(ConnectionImplTest, ReadWatermarks) {
+
+  setUpBasicConnection();
+  client_connection_->setBufferLimits(2);
+  std::shared_ptr<MockReadFilter> client_read_filter(new NiceMock<MockReadFilter>());
+  client_connection_->addReadFilter(client_read_filter);
+  connect();
+
+  EXPECT_FALSE(testClientConnection()->readBuffer().highWatermarkTriggered());
+  EXPECT_TRUE(client_connection_->readEnabled());
+  // Add 4 bytes to the buffer and verify the connection becomes read disabled.
+  {
+    Buffer::OwnedImpl buffer("data");
+    server_connection_->write(buffer, false);
+    EXPECT_CALL(*client_read_filter, onData(_, false))
+        .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
+          dispatcher_->exit();
+          return FilterStatus::StopIteration;
+        }));
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+    EXPECT_TRUE(testClientConnection()->readBuffer().highWatermarkTriggered());
+    EXPECT_FALSE(client_connection_->readEnabled());
+  }
+
+  // Drain 3 bytes from the buffer. This bring sit below the low watermark, and
+  // read enables, as well as triggering a kick for the remaining byte.
+  {
+    testClientConnection()->readBuffer().drain(3);
+    EXPECT_FALSE(testClientConnection()->readBuffer().highWatermarkTriggered());
+    EXPECT_TRUE(client_connection_->readEnabled());
+
+    EXPECT_CALL(*client_read_filter, onData(_, false));
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  // Add 3 bytes to the buffer and verify the connection becomes read disabled
+  // again.
+  {
+    Buffer::OwnedImpl buffer("bye");
+    server_connection_->write(buffer, false);
+    EXPECT_CALL(*client_read_filter, onData(_, false))
+        .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
+          dispatcher_->exit();
+          return FilterStatus::StopIteration;
+        }));
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+    EXPECT_TRUE(testClientConnection()->readBuffer().highWatermarkTriggered());
+    EXPECT_FALSE(client_connection_->readEnabled());
+  }
+
+  // Now have the consumer read disable.
+  // This time when the buffer is drained, there will be no kick as the consumer
+  // does not want to read.
+  {
+    client_connection_->readDisable(true);
+    testClientConnection()->readBuffer().drain(3);
+    EXPECT_FALSE(testClientConnection()->readBuffer().highWatermarkTriggered());
+    EXPECT_FALSE(client_connection_->readEnabled());
+
+    EXPECT_CALL(*client_read_filter, onData(_, false)).Times(0);
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  // Now read enable again.
+  // Inside the onData call, readDisable and readEnable. This should trigger
+  // another kick on the next dispatcher loop, so onData gets called twice.
+  {
+    client_connection_->readDisable(false);
+    EXPECT_CALL(*client_read_filter, onData(_, false))
+        .Times(2)
+        .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
+          client_connection_->readDisable(true);
+          client_connection_->readDisable(false);
+          return FilterStatus::StopIteration;
+        }))
+        .WillRepeatedly(Return(FilterStatus::StopIteration));
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  // Test the same logic for dispatched_buffered_data from the
+  // onReadReady() (read_disable_count_ != 0) path.
+  {
+    // Fill the buffer and verify the socket is read disabled.
+    Buffer::OwnedImpl buffer("bye");
+    server_connection_->write(buffer, false);
+    EXPECT_CALL(*client_read_filter, onData(_, false))
+        .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
+          dispatcher_->exit();
+          return FilterStatus::StopIteration;
+        }));
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+    EXPECT_TRUE(testClientConnection()->readBuffer().highWatermarkTriggered());
+    EXPECT_FALSE(client_connection_->readEnabled());
+
+    // Read disable and read enable, to set dispatch_buffered_data_ true.
+    client_connection_->readDisable(true);
+    client_connection_->readDisable(false);
+    // Now event loop. This hits the early on-Read path. As above, read
+    // disable and read enable from inside the stack of onData, to ensure that
+    // dispatch_buffered_data_ works correctly.
+    EXPECT_CALL(*client_read_filter, onData(_, false))
+        .Times(2)
+        .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
+          client_connection_->readDisable(true);
+          client_connection_->readDisable(false);
+          return FilterStatus::StopIteration;
+        }))
+        .WillRepeatedly(Return(FilterStatus::StopIteration));
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  disconnect(true);
 }
 
 // Write some data to the connection. It will automatically attempt to flush

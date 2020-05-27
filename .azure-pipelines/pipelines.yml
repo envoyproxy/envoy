@@ -14,7 +14,7 @@ jobs:
   - job: format
     dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
     pool:
-      vmImage: "ubuntu-16.04"
+      vmImage: "ubuntu-18.04"
     steps:
       - task: Cache@2
         inputs:
@@ -44,11 +44,24 @@ jobs:
     condition: and(not(canceled()), or(succeeded(), ne(variables['Build.Reason'], 'PullRequest')))
     timeoutInMinutes: 360
     pool:
-      vmImage: "ubuntu-16.04"
+      vmImage: "ubuntu-18.04"
     steps:
       - template: bazel.yml
         parameters:
           ciTarget: bazel.release
+
+  - job: release_arm64
+    displayName: "Linux-arm64 release.server_only"
+    dependsOn: ["format"]
+    condition: ne(variables['Build.Reason'], 'PullRequest')
+    pool: "arm-large"
+    steps:
+      - template: bazel.yml
+        parameters:
+          managedAgent: false
+          ciTarget: bazel.release.server_only
+          rbe: ""
+          bazelBuildExtraOptions: "--curses=no"
 
   - job: bazel
     displayName: "Linux-x64"
@@ -70,18 +83,39 @@ jobs:
           CI_TARGET: "bazel.compile_time_options"
     timeoutInMinutes: 360
     pool:
-      vmImage: "Ubuntu 16.04"
+      vmImage: "ubuntu-18.04"
     steps:
       - template: bazel.yml
         parameters:
           ciTarget: $(CI_TARGET)
+
+  - job: coverage
+    displayName: "Linux-x64 coverage"
+    dependsOn: ["format"]
+    timeoutInMinutes: 360
+    pool: "x64-large"
+    steps:
+      - template: bazel.yml
+        parameters:
+          managedAgent: false
+          ciTarget: bazel.coverage
+          rbe: ""
+          bazelBuildExtraOptions: "--test_env=ENVOY_IP_TEST_VERSIONS=v4only --curses=no"
+
+      - script: ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /build/envoy/generated/coverage coverage'
+        displayName: "Upload Report to GCS"
+        env:
+          ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+          GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+          GCS_ARTIFACT_BUCKET: $(GcsArtifactBucket)
+        condition: always()
 
   - job: docker
     displayName: "Linux-x64 docker"
     dependsOn: ["release"]
     condition: and(succeeded(), eq(variables['PostSubmit'], 'true'), ne(variables['Build.Reason'], 'PullRequest'))
     pool:
-      vmImage: "ubuntu-16.04"
+      vmImage: "ubuntu-18.04"
     steps:
       - task: DownloadBuildArtifacts@0
         inputs:
@@ -130,19 +164,9 @@ jobs:
     pool:
       vmImage: "windows-latest"
     steps:
-      - powershell: |
-          .\ci\windows_ci_setup.ps1
-          Write-Host "##vso[task.prependpath]$env:TOOLS_BIN_DIR"
-        displayName: "Install dependencies"
-        env:
-          TOOLS_BIN_DIR: $(Pipeline.Workspace)\bin
-
-      - bash: ci/windows_ci_steps.sh
+      - bash: ci/run_envoy_docker_windows.sh ci/windows_ci_steps.sh
         displayName: "Run Windows CI"
         env:
-          TMPDIR: $(Agent.TempDirectory)
-          BAZEL_VC: "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Enterprise\\VC"
-          BAZEL_SH: "C:\\Program Files\\Git\\bin\\bash.exe"
           BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
           BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
           GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)

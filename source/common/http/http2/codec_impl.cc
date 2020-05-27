@@ -8,7 +8,6 @@
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
-#include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
 #include "common/common/cleanup.h"
@@ -158,8 +157,21 @@ void ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& hea
   Http::RequestHeaderMapPtr modified_headers;
   if (Http::Utility::isUpgrade(headers)) {
     modified_headers = createHeaderMap<RequestHeaderMapImpl>(headers);
-    upgrade_type_ = std::string(headers.Upgrade()->value().getStringView());
+    upgrade_type_ = std::string(headers.getUpgradeValue());
     Http::Utility::transformUpgradeRequestFromH1toH2(*modified_headers);
+    buildHeaders(final_headers, *modified_headers);
+  } else if (headers.Method() && headers.Method()->value() == "CONNECT") {
+    // If this is not an upgrade style connect (above branch) it is a bytestream
+    // connect and should have :path and :protocol set accordingly
+    // As HTTP/1.1 does not require a path for CONNECT, we may have to add one
+    // if shifting codecs. For now, default to "/" - this can be made
+    // configurable if necessary.
+    // https://tools.ietf.org/html/draft-kinnear-httpbis-http2-transport-02
+    modified_headers = createHeaderMap<RequestHeaderMapImpl>(headers);
+    modified_headers->setProtocol(Headers::get().ProtocolValues.Bytestream);
+    if (!headers.Path()) {
+      modified_headers->setPath("/");
+    }
     buildHeaders(final_headers, *modified_headers);
   } else {
     buildHeaders(final_headers, headers);
@@ -304,8 +316,8 @@ void ConnectionImpl::StreamImpl::saveHeader(HeaderString&& name, HeaderString&& 
 void ConnectionImpl::StreamImpl::submitTrailers(const HeaderMap& trailers) {
   std::vector<nghttp2_nv> final_headers;
   buildHeaders(final_headers, trailers);
-  int rc =
-      nghttp2_submit_trailer(parent_.session_, stream_id_, &final_headers[0], final_headers.size());
+  int rc = nghttp2_submit_trailer(parent_.session_, stream_id_, final_headers.data(),
+                                  final_headers.size());
   ASSERT(rc == 0);
 }
 
@@ -360,7 +372,7 @@ int ConnectionImpl::StreamImpl::onDataSourceSend(const uint8_t* framehd, size_t 
 void ConnectionImpl::ClientStreamImpl::submitHeaders(const std::vector<nghttp2_nv>& final_headers,
                                                      nghttp2_data_provider* provider) {
   ASSERT(stream_id_ == -1);
-  stream_id_ = nghttp2_submit_request(parent_.session_, nullptr, &final_headers.data()[0],
+  stream_id_ = nghttp2_submit_request(parent_.session_, nullptr, final_headers.data(),
                                       final_headers.size(), provider, base());
   ASSERT(stream_id_ > 0);
 }
@@ -368,7 +380,7 @@ void ConnectionImpl::ClientStreamImpl::submitHeaders(const std::vector<nghttp2_n
 void ConnectionImpl::ServerStreamImpl::submitHeaders(const std::vector<nghttp2_nv>& final_headers,
                                                      nghttp2_data_provider* provider) {
   ASSERT(stream_id_ != -1);
-  int rc = nghttp2_submit_response(parent_.session_, stream_id_, &final_headers.data()[0],
+  int rc = nghttp2_submit_response(parent_.session_, stream_id_, final_headers.data(),
                                    final_headers.size(), provider);
   ASSERT(rc == 0);
 }
@@ -437,11 +449,11 @@ void ConnectionImpl::StreamImpl::onMetadataDecoded(MetadataMapPtr&& metadata_map
   decoder().decodeMetadata(std::move(metadata_map_ptr));
 }
 
-ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
+ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stats,
                                const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                                const uint32_t max_headers_kb, const uint32_t max_headers_count)
-    : stats_{ALL_HTTP2_CODEC_STATS(POOL_COUNTER_PREFIX(stats, "http2."))}, connection_(connection),
-      max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count),
+    : stats_(stats), connection_(connection), max_headers_kb_(max_headers_kb),
+      max_headers_count_(max_headers_count),
       per_stream_buffer_limit_(http2_options.initial_stream_window_size().value()),
       stream_error_on_invalid_http_messaging_(
           http2_options.stream_error_on_invalid_http_messaging()),
@@ -463,8 +475,20 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& st
 
 ConnectionImpl::~ConnectionImpl() { nghttp2_session_del(session_); }
 
-void ConnectionImpl::dispatch(Buffer::Instance& data) {
+Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
+  // TODO(#10878): Remove this wrapper when exception removal is complete. innerDispatch may either
+  // throw an exception or return an error status. The utility wrapper catches exceptions and
+  // converts them to error statuses.
+  return Http::Utility::exceptionToStatus(
+      [&](Buffer::Instance& data) -> Http::Status { return innerDispatch(data); }, data);
+}
+
+Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
   ENVOY_CONN_LOG(trace, "dispatching {} bytes", connection_, data.length());
+  // Make sure that dispatching_ is set to false after dispatching, even when
+  // ConnectionImpl::dispatch returns early or throws an exception (consider removing if there is a
+  // single return after exception removal (#10878)).
+  Cleanup cleanup([this]() { dispatching_ = false; });
   for (const Buffer::RawSlice& slice : data.getRawSlices()) {
     dispatching_ = true;
     ssize_t rc =
@@ -485,6 +509,7 @@ void ConnectionImpl::dispatch(Buffer::Instance& data) {
 
   // Decoding incoming frames can generate outbound frames so flush pending.
   sendPendingFrames();
+  return Http::okStatus();
 }
 
 ConnectionImpl::StreamImpl* ConnectionImpl::getStream(int32_t stream_id) {
@@ -970,7 +995,7 @@ void ConnectionImpl::sendSettings(
        {NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, http2_options.max_concurrent_streams().value()},
        {NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE, http2_options.initial_stream_window_size().value()}});
   if (!settings.empty()) {
-    int rc = nghttp2_submit_settings(session_, NGHTTP2_FLAG_NONE, &settings[0], settings.size());
+    int rc = nghttp2_submit_settings(session_, NGHTTP2_FLAG_NONE, settings.data(), settings.size());
     ASSERT(rc == 0);
   } else {
     // nghttp2_submit_settings need to be called at least once
@@ -1145,7 +1170,7 @@ ConnectionImpl::ClientHttp2Options::ClientHttp2Options(
 }
 
 ClientConnectionImpl::ClientConnectionImpl(
-    Network::Connection& connection, Http::ConnectionCallbacks& callbacks, Stats::Scope& stats,
+    Network::Connection& connection, Http::ConnectionCallbacks& callbacks, CodecStats& stats,
     const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
     const uint32_t max_response_headers_kb, const uint32_t max_response_headers_count,
     Nghttp2SessionFactory& http2_session_factory)
@@ -1195,12 +1220,12 @@ int ClientConnectionImpl::onHeader(const nghttp2_frame* frame, HeaderString&& na
 }
 
 ServerConnectionImpl::ServerConnectionImpl(
-    Network::Connection& connection, Http::ServerConnectionCallbacks& callbacks,
-    Stats::Scope& scope, const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
+    Network::Connection& connection, Http::ServerConnectionCallbacks& callbacks, CodecStats& stats,
+    const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
     const uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
         headers_with_underscores_action)
-    : ConnectionImpl(connection, scope, http2_options, max_request_headers_kb,
+    : ConnectionImpl(connection, stats, http2_options, max_request_headers_kb,
                      max_request_headers_count),
       callbacks_(callbacks), headers_with_underscores_action_(headers_with_underscores_action) {
   Http2Options h2_options(http2_options);
@@ -1335,7 +1360,15 @@ void ServerConnectionImpl::checkOutboundQueueLimits() {
   }
 }
 
-void ServerConnectionImpl::dispatch(Buffer::Instance& data) {
+Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
+  // TODO(#10878): Remove this wrapper when exception removal is complete. innerDispatch may either
+  // throw an exception or return an error status. The utility wrapper catches exceptions and
+  // converts them to error statuses.
+  return Http::Utility::exceptionToStatus(
+      [&](Buffer::Instance& data) -> Http::Status { return innerDispatch(data); }, data);
+}
+
+Http::Status ServerConnectionImpl::innerDispatch(Buffer::Instance& data) {
   ASSERT(!dispatching_downstream_data_);
   dispatching_downstream_data_ = true;
 
@@ -1346,7 +1379,7 @@ void ServerConnectionImpl::dispatch(Buffer::Instance& data) {
   // Make sure downstream outbound queue was not flooded by the upstream frames.
   checkOutboundQueueLimits();
 
-  ConnectionImpl::dispatch(data);
+  return ConnectionImpl::innerDispatch(data);
 }
 
 absl::optional<int>

@@ -4,7 +4,6 @@
 #include "envoy/stats/scope.h"
 
 #include "common/config/protobuf_link_hacks.h"
-#include "common/config/resources.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 
@@ -13,6 +12,7 @@
 #include "test/integration/utility.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/resources.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
@@ -457,7 +457,7 @@ TEST_P(VhdsIntegrationTest, VhdsVirtualHostAddUpdateRemove) {
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
   response->waitForHeaders();
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 
   cleanupUpstreamAndDownstream();
 }
@@ -524,7 +524,7 @@ TEST_P(VhdsIntegrationTest, RdsWithVirtualHostsVhdsVirtualHostAddUpdateRemove) {
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
   response->waitForHeaders();
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 
   cleanupUpstreamAndDownstream();
 }
@@ -565,7 +565,7 @@ TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateWithResourceNameAsAlias) {
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
   response->waitForHeaders();
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 
   cleanupUpstreamAndDownstream();
 }
@@ -606,7 +606,7 @@ TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateFailToResolveTheAlias) {
   notifyAboutAliasResolutionFailure("4", vhds_stream_, {"my_route/vhost.third"});
 
   response->waitForHeaders();
-  EXPECT_EQ("404", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("404", response->headers().getStatusValue());
 
   cleanupUpstreamAndDownstream();
 }
@@ -648,7 +648,7 @@ TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateFailToResolveOneAliasOutOfSeveral)
                                                   {"vhost.first"}, {"my_route/vhost.third"});
 
   response->waitForHeaders();
-  EXPECT_EQ("404", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("404", response->headers().getStatusValue());
 
   cleanupUpstreamAndDownstream();
 }

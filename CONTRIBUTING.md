@@ -89,7 +89,10 @@ versioning guidelines:
   open it.
 * Any PR that changes user-facing behavior **must** have associated documentation in [docs](docs) as
   well as [release notes](docs/root/version_history/current.rst). API changes should be documented
-  inline with protos as per the [API contribution guidelines](api/CONTRIBUTING.md).
+  inline with protos as per the [API contribution guidelines](api/CONTRIBUTING.md). If a change applies
+  to multiple sections of the release notes, it should be noted in the first (most important) section
+  that applies. For instance, a bug fix that introduces incompatible behavior should be noted in
+  `Incompatible Behavior Changes` but not in `Bug Fixes`.
 * All code comments and documentation are expected to have proper English grammar and punctuation.
   If you are not a fluent English speaker (or a bad writer ;-)) please let us know and we will try
   to find some help but there are no guarantees.
@@ -97,6 +100,8 @@ versioning guidelines:
   colon. Examples:
   * "docs: fix grammar error"
   * "http conn man: add new feature"
+* Your PR commit message will be used as the commit message when your PR is merged. You should 
+  update this field if your PR diverges during review.
 * Your PR description should have details on what the PR does. If it fixes an existing issue it
   should end with "Fixes #XXX".
 * When all of the tests are passing and all other conditions described herein are satisfied, a
@@ -123,10 +128,14 @@ versioning guidelines:
 
 # Runtime guarding
 
-Some high risk changes in Envoy are deemed worthy of runtime guarding. Instead of just replacing
+Some changes in Envoy are deemed worthy of runtime guarding. Instead of just replacing
 old code with new code, both code paths are supported for between one Envoy release (if it is
 guarded due to performance concerns) and a full deprecation cycle (if it is a high risk behavioral
-change).
+change). Generally as a community we try to guard both high risk changes (major
+refactors such as replacing Envoy's buffer implementation) and most user-visible
+non-config-guarded changes to protocol processing (for example additions or changes to HTTP headers or
+how HTTP is serialized out) for non-alpha features. Feel free to tag @envoyproxy/maintainers
+if you aren't sure if a given change merits runtime guarding.
 
 The canonical way to runtime guard a feature is
 ```
@@ -154,8 +163,9 @@ time.
 Runtime guarded features may either set true (running the new code by default) in the initial PR,
 after a testing interval, or during the next release cycle, at the PR author's and reviewing
 maintainer's discretion. Generally all runtime guarded features will be set true when a
-release is cut, and the old code path will be deprecated at that time. Runtime features
-are set true by default by inclusion in
+release is cut. Old code paths for refactors can be cleaned up after a release and there has been
+some production run time. Old code for behavioral changes will be deprecated after six months.
+Runtime features are set true by default by inclusion in
 [source/common/runtime/runtime_features.h](https://github.com/envoyproxy/envoy/blob/master/source/common/runtime/runtime_features.h)
 
 There are four suggested options for testing new runtime features:
@@ -190,10 +200,12 @@ and false.
   organization specific shortcuts into the code.
 * If there is a question on who should review a PR please discuss in Slack.
 * Anyone is welcome to review any PR that they want, whether they are a maintainer or not.
+* Please make sure that the PR title, commit message, and description are updated if the PR changes 
+  significantly during review.
 * Please **clean up the title and body** before merging. By default, GitHub fills the squash merge
   title with the original title, and the commit body with every individual commit from the PR.
   The maintainer doing the merge should make sure the title follows the guidelines above and should
-  overwrite the body with the original extended description from the PR (cleaning it up if necessary)
+  overwrite the body with the original commit message from the PR (cleaning it up if necessary)
   while preserving the PR author's final DCO sign-off.
 * If a PR includes a deprecation/breaking change, notification should be sent to the
   [envoy-announce](https://groups.google.com/forum/#!forum/envoy-announce) email list.

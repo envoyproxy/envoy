@@ -9,6 +9,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/network/address.h"
 
+#include "absl/types/optional.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -86,6 +87,11 @@ public:
   virtual const envoy::config::bootstrap::v3::Bootstrap& configProto() const PURE;
 
   /**
+   * @return const absl::optional<uint32_t>& the bootstrap version to use, if specified.
+   */
+  virtual const absl::optional<uint32_t>& bootstrapVersion() const PURE;
+
+  /**
    * @return bool allow unknown fields in the static configuration?
    */
   virtual bool allowUnknownStaticFields() const PURE;
@@ -94,6 +100,11 @@ public:
    * @return bool allow unknown fields in the dynamic configuration?
    */
   virtual bool rejectUnknownDynamicFields() const PURE;
+
+  /**
+   * @return bool ignore unknown fields in the dynamic configuration?
+   **/
+  virtual bool ignoreUnknownDynamicFields() const PURE;
 
   /**
    * @return const std::string& the admin address output file.

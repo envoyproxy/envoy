@@ -34,7 +34,7 @@ public:
 
     // Encode the input name into a joined StatName, using "D:" to indicate
     // a dynamic component.
-    std::vector<StatName> components;
+    StatNameVec components;
     StatNamePool symbolic_pool(symbol_table);
     StatNameDynamicPool dynamic_pool(symbol_table);
 
@@ -233,7 +233,7 @@ public:
   uint32_t dynamicEncodeDecodeTest(absl::string_view input_descriptor) {
     // Encode the input name into a joined StatName, using "D:" to indicate
     // a dynamic component.
-    std::vector<StatName> components;
+    StatNameVec components;
     StatNamePool symbolic_pool(*symbol_table_);
     StatNameDynamicPool dynamic_pool(*symbol_table_);
 
@@ -328,6 +328,7 @@ TEST_F(StatMergerDynamicTest, DynamicsWithFakeSymbolTable) {
   EXPECT_EQ(0, dynamicEncodeDecodeTest("hello..D:world"));
   EXPECT_EQ(0, dynamicEncodeDecodeTest("D:hello..D:world"));
   EXPECT_EQ(0, dynamicEncodeDecodeTest("D:hello.D:.D:world"));
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("aV.D:,b"));
 
   // TODO(#10008): these tests fail because fake/real symbol tables
   // deal with empty components differently.

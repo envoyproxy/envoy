@@ -19,6 +19,7 @@
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
 #include "common/protobuf/utility.h"
+#include "common/stats/utility.h"
 
 #include "extensions/transport_sockets/tls/utility.h"
 
@@ -450,7 +451,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
 int ServerContextImpl::alpnSelectCallback(const unsigned char** out, unsigned char* outlen,
                                           const unsigned char* in, unsigned int inlen) {
   // Currently this uses the standard selection algorithm in priority order.
-  const uint8_t* alpn_data = &parsed_alpn_protocols_[0];
+  const uint8_t* alpn_data = parsed_alpn_protocols_.data();
   size_t alpn_data_size = parsed_alpn_protocols_.size();
 
   if (SSL_select_next_proto(const_cast<unsigned char**>(out), outlen, alpn_data, alpn_data_size, in,
@@ -594,10 +595,9 @@ Envoy::Ssl::ClientValidationStatus ContextImpl::verifyCertificate(
 
 void ContextImpl::incCounter(const Stats::StatName name, absl::string_view value,
                              const Stats::StatName fallback) const {
-  Stats::SymbolTable& symbol_table = scope_.symbolTable();
-  Stats::SymbolTable::StoragePtr storage =
-      symbol_table.join({name, stat_name_set_->getBuiltin(value, fallback)});
-  scope_.counterFromStatName(Stats::StatName(storage.get())).inc();
+  Stats::Counter& counter = Stats::Utility::counterFromElements(
+      scope_, {name, stat_name_set_->getBuiltin(value, fallback)});
+  counter.inc();
 
 #ifdef LOG_BUILTIN_STAT_NAMES
   std::cerr << absl::StrCat("Builtin ", symbol_table.toString(name), ": ", value, "\n")
@@ -821,7 +821,7 @@ ClientContextImpl::ClientContextImpl(Stats::Scope& scope,
   ASSERT(tls_contexts_.size() == 1);
   if (!parsed_alpn_protocols_.empty()) {
     for (auto& ctx : tls_contexts_) {
-      const int rc = SSL_CTX_set_alpn_protos(ctx.ssl_ctx_.get(), &parsed_alpn_protocols_[0],
+      const int rc = SSL_CTX_set_alpn_protos(ctx.ssl_ctx_.get(), parsed_alpn_protocols_.data(),
                                              parsed_alpn_protocols_.size());
       RELEASE_ASSERT(rc == 0, Utility::getLastCryptoError().value_or(""));
     }

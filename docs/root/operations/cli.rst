@@ -21,7 +21,7 @@ following are the command line options that Envoy supports.
 
 .. option:: --config-yaml <yaml string>
 
-  *(optional)* The YAML string for a v2 bootstrap configuration. If :option:`--config-path` is also set,
+  *(optional)* The YAML string for a bootstrap configuration. If :option:`--config-path` is also set,
   the values in this YAML string will override and merge with the bootstrap loaded from :option:`--config-path`.
   Because YAML is a superset of JSON, a JSON string may also be passed to :option:`--config-yaml`.
 
@@ -30,6 +30,13 @@ following are the command line options that Envoy supports.
     .. code-block:: console
 
       ./envoy -c bootstrap.yaml --config-yaml "node: {id: 'node1'}"
+
+.. option:: --bootstrap-version <integer>
+
+   *(optional)* The API version to load the bootstrap as. The value should be a single integer, e.g.
+   to parse the bootstrap configuration as V3, specify ``--bootstrap-version 3``. If unset, Envoy will
+   attempt to load the bootstrap as the previous API version and upgrade it to the latest. If that fails,
+   Envoy will attempt to load the configuration as the latest version.
 
 .. option:: --mode <string>
 
@@ -62,7 +69,8 @@ following are the command line options that Envoy supports.
 .. option:: --concurrency <integer>
 
   *(optional)* The number of :ref:`worker threads <arch_overview_threading>` to run. If not
-  specified defaults to the number of hardware threads on the machine.
+  specified defaults to the number of hardware threads on the machine. If set to zero, Envoy will 
+  still run one worker thread.
 
 .. option:: -l <string>, --log-level <string>
 
@@ -94,7 +102,13 @@ following are the command line options that Envoy supports.
    *(optional)* The format string to use for laying out the log message metadata. If this is not
    set, a default format string ``"[%Y-%m-%d %T.%e][%t][%l][%n] %v"`` is used.
 
-   When used in conjunction with ``--log-format-escaped``, the logger can be configured
+   When used in conjunction with :option:`--log-format-prefix-with-location` set to 0, the logger can be
+   configured to not prefix ``%v`` by a file path and a line number.
+
+   **NOTE**: The default log format will be changed to ``"[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v"``
+   together with the default value of :option:`--log-format-prefix-with-location` to 0 at 1.16.0 release.
+
+   When used in conjunction with :option:`--log-format-escaped`, the logger can be configured
    to log in a format that is parsable by log viewers. Known integrations are documented
    in the :ref:`application logging configuration <config_application_logs>` section.
 
@@ -129,6 +143,20 @@ following are the command line options that Envoy supports.
    :%T, %X:	ISO 8601 time format (HH:MM:SS), equivalent to %H:%M:%S ("13:25:06")
    :%z:	ISO 8601 offset from UTC in timezone ([+/-]HH:MM) ("-07:00")
    :%%:	The % sign ("%")
+   :%@: Source file and line ("my_file.cc:123")
+   :%s: Basename of the source file ("my_file.cc")
+   :%g: Full relative path of the source file ("/some/dir/my_file.cc")
+   :%#: Source line ("123")
+   :%!: Source function ("myFunc")
+
+.. option:: --log-format-prefix-with-location <1|0>
+
+   *(optional)* This temporary flag allows replacing all entries of ``"%v"`` in the log format by
+   ``"[%g:%#] %v"``. This flag is provided for migration purposes only. If this is not set, a
+   default value 1 is used.
+
+   **NOTE**: The default value will be changed to 0 at 1.16.0 release and the flag will be
+   removed at 1.17.0 release.
 
 .. option:: --log-format-escaped
 
@@ -156,15 +184,15 @@ following are the command line options that Envoy supports.
 
   *(optional)* Defines the local service cluster name where Envoy is running. The
   local service cluster name is first sourced from the :ref:`Bootstrap node
-  <envoy_api_field_config.bootstrap.v2.Bootstrap.node>` message's :ref:`cluster
-  <envoy_api_field_core.Node.cluster>` field. This CLI option provides an alternative
+  <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.node>` message's :ref:`cluster
+  <envoy_v3_api_field_config.core.v3.Node.cluster>` field. This CLI option provides an alternative
   method for specifying this value and will override any value set in bootstrap
   configuration. It should be set if any of the following features are used:
   :ref:`statsd <arch_overview_statistics>`, :ref:`health check cluster
-  verification <envoy_api_field_core.HealthCheck.HttpHealthCheck.service_name>`,
-  :ref:`runtime override directory <envoy_api_msg_config.bootstrap.v2.Runtime>`,
+  verification <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.service_name_matcher>`,
+  :ref:`runtime override directory <envoy_v3_api_msg_config.bootstrap.v3.Runtime>`,
   :ref:`user agent addition
-  <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.add_user_agent>`,
+  <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.add_user_agent>`,
   :ref:`HTTP global rate limiting <config_http_filters_rate_limit>`,
   :ref:`CDS <config_cluster_manager_cds>`, and :ref:`HTTP tracing
   <arch_overview_tracing>`, either via this CLI option or in the bootstrap
@@ -174,8 +202,8 @@ following are the command line options that Envoy supports.
 
   *(optional)* Defines the local service node name where Envoy is running. The
   local service node name is first sourced from the :ref:`Bootstrap node
-  <envoy_api_field_config.bootstrap.v2.Bootstrap.node>` message's :ref:`id
-  <envoy_api_field_core.Node.id>` field. This CLI option provides an alternative
+  <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.node>` message's :ref:`id
+  <envoy_v3_api_field_config.core.v3.Node.id>` field. This CLI option provides an alternative
   method for specifying this value and will override any value set in bootstrap
   configuration. It should be set if any of the following features are used:
   :ref:`statsd <arch_overview_statistics>`, :ref:`CDS
@@ -187,12 +215,12 @@ following are the command line options that Envoy supports.
 
   *(optional)* Defines the local service zone where Envoy is running. The local
   service zone is first sourced from the :ref:`Bootstrap node
-  <envoy_api_field_config.bootstrap.v2.Bootstrap.node>` message's :ref:`locality.zone
-  <envoy_api_field_core.Locality.zone>` field. This CLI option provides an
+  <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.node>` message's :ref:`locality.zone
+  <envoy_v3_api_field_config.core.v3.Locality.zone>` field. This CLI option provides an
   alternative method for specifying this value and will override any value set
   in bootstrap configuration. It should be set if discovery service routing is
   used and the discovery service exposes :ref:`zone data
-  <envoy_api_msg_endpoint.LocalityLbEndpoints>`, either via this CLI option or in
+  <envoy_v3_api_msg_config.endpoint.v3.LocalityLbEndpoints>`, either via this CLI option or in
   the bootstrap configuration. The meaning of zone is context dependent, e.g.
   `Availability Zone (AZ)
   <https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html>`_
@@ -234,7 +262,7 @@ following are the command line options that Envoy supports.
 .. option:: --enable-mutex-tracing
 
   *(optional)* This flag enables the collection of mutex contention statistics
-  (:ref:`MutexStats <envoy_api_msg_admin.v2alpha.MutexStats>`) as well as a contention endpoint
+  (:ref:`MutexStats <envoy_v3_api_msg_admin.v3.MutexStats>`) as well as a contention endpoint
   (:http:get:`/contention`). Mutex tracing is not enabled by default, since it incurs a slight performance
   penalty for those Envoys which already experience mutex contention.
 
@@ -259,6 +287,13 @@ following are the command line options that Envoy supports.
   desirable for most Envoy deployments. Warnings are logged for the first use of any unknown field
   and these occurrences are counted in the :ref:`server.dynamic_unknown_fields <server_statistics>`
   statistic.
+
+.. option:: --ignore-unknown-dynamic-fields
+
+  *(optional)* This flag disables validation of protobuf configuration for unknown fields in dynamic
+   configuration. Unlike setting --reject-unknown-dynamic-fields to false, it does not log warnings or
+   count occurrences of unknown fields, in the interest of configuration processing speed. If
+   --reject-unknown-dynamic-fields is set to true, this flag has no effect.
 
 .. option:: --disable-extensions <extension list>
 

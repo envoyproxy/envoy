@@ -24,14 +24,12 @@ public:
       Upstream::ClusterManager& cluster_manager);
 
   Extensions::Common::DynamicForwardProxy::DnsCache& cache() { return *dns_cache_; }
-  Upstream::ClusterManager& clusterManager() { return cluster_manager_; }
   uint32_t port() { return port_; }
 
 private:
   const uint32_t port_;
   const Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr dns_cache_manager_;
   const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache_;
-  Upstream::ClusterManager& cluster_manager_;
 };
 
 using ProxyFilterConfigSharedPtr = std::shared_ptr<ProxyFilterConfig>;

@@ -7,7 +7,6 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/config/metadata.h"
-#include "common/config/resources.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/upstream/health_checker_impl.h"
@@ -17,6 +16,7 @@
 #include "test/config/utility.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/resources.h"
 #include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"
@@ -80,9 +80,9 @@ public:
     ASSERT_TRUE(host_stream_->waitForEndStream(*dispatcher_));
 
     host_upstream_->set_allow_unexpected_disconnects(true);
-    EXPECT_EQ(host_stream_->headers().Path()->value().getStringView(), "/healthcheck");
-    EXPECT_EQ(host_stream_->headers().Method()->value().getStringView(), "GET");
-    EXPECT_EQ(host_stream_->headers().Host()->value().getStringView(), "anna");
+    EXPECT_EQ(host_stream_->headers().getPathValue(), "/healthcheck");
+    EXPECT_EQ(host_stream_->headers().getMethodValue(), "GET");
+    EXPECT_EQ(host_stream_->headers().getHostValue(), "anna");
 
     if (!cluster2.empty()) {
       ASSERT_TRUE(host2_upstream_->waitForHttpConnection(*dispatcher_, host2_fake_connection_));
@@ -90,9 +90,9 @@ public:
       ASSERT_TRUE(host2_stream_->waitForEndStream(*dispatcher_));
 
       host2_upstream_->set_allow_unexpected_disconnects(true);
-      EXPECT_EQ(host2_stream_->headers().Path()->value().getStringView(), "/healthcheck");
-      EXPECT_EQ(host2_stream_->headers().Method()->value().getStringView(), "GET");
-      EXPECT_EQ(host2_stream_->headers().Host()->value().getStringView(), cluster2);
+      EXPECT_EQ(host2_stream_->headers().getPathValue(), "/healthcheck");
+      EXPECT_EQ(host2_stream_->headers().getMethodValue(), "GET");
+      EXPECT_EQ(host2_stream_->headers().getHostValue(), cluster2);
     }
   }
 

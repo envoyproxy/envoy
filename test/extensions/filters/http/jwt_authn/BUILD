@@ -117,6 +117,7 @@ envoy_extension_cc_test(
     name = "filter_integration_test",
     srcs = ["filter_integration_test.cc"],
     extension_name = "envoy.filters.http.jwt_authn",
+    tags = ["fails_on_windows"],
     deps = [
         "//source/common/router:string_accessor_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
