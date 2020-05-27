@@ -101,7 +101,7 @@ SysCallIntResult OsSysCallsImpl::bind(os_fd_t sockfd, const sockaddr* addr, sock
 
 SysCallIntResult OsSysCallsImpl::chmod(const std::string& path, mode_t mode) {
   //
-  // Windows only supports _S_IWRITE and _S_IREAD bits, other bits might will be ignored.
+  // Windows only supports _S_IWRITE and _S_IREAD bits, other bits will be ignored.
   // Also all files are always readable; it is not possible to give write-only permission.
   // For more granular security we need to rely on access-control-list (ACL) on Windows.
   //
