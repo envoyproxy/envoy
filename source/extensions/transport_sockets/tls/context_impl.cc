@@ -887,7 +887,7 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl(const Network::TransportSocketOpt
   // 2. ALPN statically configured in the upstream TLS context.
   // 3. option-provided ALPN fallback.
 
-  // At this point in the code the ALPN has already been set (if present) to the value specifed in
+  // At this point in the code the ALPN has already been set (if present) to the value specified in
   // the TLS context. We've stored this value in parsed_alpn_protocols_ so we can check that to see
   // if it's already been set.
   bool has_alpn_defined = !parsed_alpn_protocols_.empty();
