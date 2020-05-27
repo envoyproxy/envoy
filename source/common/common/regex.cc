@@ -7,6 +7,7 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/protobuf/utility.h"
+#include "common/stats/symbol_table_impl.h"
 
 #include "re2/re2.h"
 
@@ -63,6 +64,12 @@ public:
     }
 
     if (runtime_) {
+      Stats::Store& stats_store = runtime_->getStore();
+      Stats::StatNameManagedStorage program_size_stat_name("regex.program_size",
+                                                           stats_store.symbolTable());
+      Stats::Histogram& program_size_stat = stats_store.histogramFromStatName(
+          program_size_stat_name.statName(), Stats::Histogram::Unit::Unspecified);
+      program_size_stat.recordValue(regex_program_size);
       const uint32_t max_program_size_error_level =
           runtime_->snapshot().getInteger("regex.max_program_size_error_level", 100);
       if (regex_program_size > max_program_size_error_level) {

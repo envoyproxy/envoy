@@ -254,6 +254,7 @@ public:
   std::shared_ptr<const Snapshot> threadsafeSnapshot() override;
   void mergeValues(const std::unordered_map<std::string, std::string>& values) override;
   void startRtdsSubscriptions(ReadyCallback on_done) override;
+  Stats::Store& getStore() override;
 
 private:
   friend RtdsSubscription;
@@ -278,6 +279,7 @@ private:
   Init::ManagerImpl init_manager_{"RTDS"};
   std::vector<RtdsSubscriptionPtr> subscriptions_;
   Upstream::ClusterManager* cm_{};
+  Stats::Store& store_;
 
   absl::Mutex snapshot_mutex_;
   std::shared_ptr<const Snapshot> thread_safe_snapshot_ ABSL_GUARDED_BY(snapshot_mutex_);
