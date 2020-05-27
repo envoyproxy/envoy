@@ -100,7 +100,7 @@ public:
    * - TEST_SHARD_INDEX is used to handle concurrent runs when tests are run in
    *                    shards, such as in coverage testing
    *
-   * This algorithm is reimplemented in the following test scripts:
+   * This algorithm is re-implemented in the following test scripts:
    * - test/integration/hot_restart_test.sh
    * - test/integration/run_envoy_test.sh
    *
