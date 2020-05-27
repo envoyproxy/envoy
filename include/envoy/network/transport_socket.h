@@ -187,9 +187,9 @@ public:
   virtual const std::vector<std::string>& applicationProtocolListOverride() const PURE;
 
   /**
-   * The application protocol to use when negotatiing an upstream connection and no other
-   * application protocol has been configureed. Both
-   * TransportSocketOptions::applicationProtocolListOverrride and application protocols configured
+   * The application protocol to use when negotiating an upstream connection and no other
+   * application protocol has been configured. Both
+   * TransportSocketOptions::applicationProtocolListOverride and application protocols configured
    * in the CommonTlsContext on the Cluster will take precedence.
    *
    * Note that this option is intended for intermediate code (e.g. the HTTP connection pools) to
