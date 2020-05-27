@@ -72,18 +72,18 @@ severity.
 
 If a vulnerability does not affect any point release but only master, additional caveats apply:
 
-* If the issue is detected and a fix is available within 5 days of the introduction of the
-  vulnerability, the fix will be publicly reviewed and landed on master. A courtesy e-mail will be
-  sent to envoy-users@googlegroups.com, envoy-dev@googlegroups.com,
-  envoy-security-announce@googlegroups.com and cncf-envoy-distributors-announce@lists.cncf.io if 
-  the severity is medium or greater.
-* If the vulnerability has been in existence for more than 5 days, we will activate the security
-  release process for any medium or higher vulnerabilities. Low severity vulnerabilities will still
-  be merged onto master as soon as a fix is available.
+* If the issue is detected and a fix is available within 7 days of the introduction of the
+  vulnerability, or the issue is deemed a low severity vulnerability by the Envoy maintainer and
+  security teams, the fix will be publicly reviewed and landed on master. If the severity is at least
+  medium or at maintainer discretion a courtesy e-mail will be sent to envoy-users@googlegroups.com,
+  envoy-dev@googlegroups.com, envoy-security-announce@googlegroups.com and
+  cncf-envoy-distributors-announce@lists.cncf.io.
+* If the vulnerability has been in existence for more than 7 days and is medium or higher, we will
+  activate the security release process.
 
-We advise distributors and operators working from the master branch to allow at least 3 days soak
+We advise distributors and operators working from the master branch to allow at least 5 days soak
 time after cutting a binary release before distribution or rollout, to allow time for our fuzzers to
-detect issues during their execution on ClusterFuzz. A soak period of 5 days provides an even stronger
+detect issues during their execution on ClusterFuzz. A soak period of 7 days provides an even stronger
 guarantee, since we will invoke the security release process for medium or higher severity issues
 for these older bugs.
 
@@ -118,11 +118,35 @@ score](https://www.first.org/cvss/specification-document#i5)) the Fix Team can d
 release process down in the face of holidays, developer bandwidth, etc. These decisions must be
 discussed on the envoy-security mailing list.
 
-A two week window will be provided to members of the private distributor list from candidate patch
+A three week window will be provided to members of the private distributor list from candidate patch
 availability until the security release date. It is expected that distributors will normally be able
 to perform a release within this time window. If there are exceptional circumstances, the Envoy
 security team will raise this window to four weeks. The release window will be reduced if the
 security issue is public or embargo is broken.
+
+### Fix and disclosure SLOs
+
+* All reports to envoy-security@googlegroups.com will be triaged and have an
+  initial response within 1 business day.
+
+* Privately disclosed issues will be fixed or publicly disclosed within 90 days
+  by the Envoy security team. In exceptional circumstances we reserve the right
+  to work with the discloser to coordinate on an extension, but this will be
+  rarely used.
+
+* Any issue discovered by the Envoy security team and raised in our private bug
+  tracker will be converted to a public issue within 90 days. We will regularly
+  audit these issues to ensure that no major vulnerability (from the perspective
+  of the threat model) is accidentally leaked.
+
+* Fuzz bugs are subject to a 90 day disclosure deadline.
+
+* Three weeks notice will be provided to private distributors from patch
+  availability until the embargo deadline.
+
+* Public zero days will be fixed ASAP, but there is no SLO for this, since this
+  will depend on the severity and impact to the organizations backing the Envoy
+  security team.
 
 ### Fix Disclosure Process
 

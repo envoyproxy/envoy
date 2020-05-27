@@ -5,32 +5,33 @@
 
 namespace Envoy {
 namespace Thread {
+namespace {
 
-class ThreadTest : public testing::Test {
+class LockGuardTest : public testing::Test {
 protected:
-  ThreadTest() = default;
+  LockGuardTest() = default;
   int a_ ABSL_GUARDED_BY(a_mutex_){0};
   MutexBasicLockable a_mutex_;
   int b_{0};
 };
 
-TEST_F(ThreadTest, TestLockGuard) {
+TEST_F(LockGuardTest, TestLockGuard) {
   LockGuard lock(a_mutex_);
   EXPECT_EQ(1, ++a_);
 }
 
-TEST_F(ThreadTest, TestOptionalLockGuard) {
+TEST_F(LockGuardTest, TestOptionalLockGuard) {
   OptionalLockGuard lock(nullptr);
   EXPECT_EQ(1, ++b_);
 }
 
-TEST_F(ThreadTest, TestReleasableLockGuard) {
+TEST_F(LockGuardTest, TestReleasableLockGuard) {
   ReleasableLockGuard lock(a_mutex_);
   EXPECT_EQ(1, ++a_);
   lock.release();
 }
 
-TEST_F(ThreadTest, TestTryLockGuard) {
+TEST_F(LockGuardTest, TestTryLockGuard) {
   TryLockGuard lock(a_mutex_);
 
   if (lock.tryLock()) {
@@ -44,5 +45,6 @@ TEST_F(ThreadTest, TestTryLockGuard) {
   }
 }
 
+} // namespace
 } // namespace Thread
 } // namespace Envoy

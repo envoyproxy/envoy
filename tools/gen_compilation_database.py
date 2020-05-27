@@ -3,6 +3,7 @@
 import argparse
 import glob
 import json
+import logging
 import os
 import shlex
 import subprocess
@@ -30,8 +31,16 @@ def generateCompilationDatabase(args):
       "--config=compdb",
       "--remote_download_outputs=all",
   ]
+  if args.keep_going:
+    bazel_options.append("-k")
   if args.run_bazel_build:
-    runBazelBuildForCompilationDatabase(bazel_options, args.bazel_targets)
+    try:
+      runBazelBuildForCompilationDatabase(bazel_options, args.bazel_targets)
+    except subprocess.CalledProcessError as e:
+      if not args.keep_going:
+        raise
+      else:
+        logging.warning("bazel build failed {}: {}".format(e.returncode, e.cmd))
 
   subprocess.check_call(["bazel", "build"] + bazel_options + [
       "--aspects=@bazel_compdb//:aspects.bzl%compilation_database_aspect",
@@ -102,6 +111,7 @@ def fixCompilationDatabase(args, db):
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description='Generate JSON compilation database')
   parser.add_argument('--run_bazel_build', action='store_true')
+  parser.add_argument('-k', '--keep_going', action='store_true')
   parser.add_argument('--include_external', action='store_true')
   parser.add_argument('--include_genfiles', action='store_true')
   parser.add_argument('--include_headers', action='store_true')

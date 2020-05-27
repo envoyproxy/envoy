@@ -140,6 +140,7 @@ public:
   bool createPerTryTimeoutOnRequestComplete() {
     return create_per_try_timeout_on_request_complete_;
   }
+  bool encodeComplete() const { return encode_complete_; }
   RouterFilterInterface& parent() { return parent_; }
 
 private:
@@ -332,7 +333,6 @@ public:
 private:
   UpstreamRequest* upstream_request_;
   Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
-  bool sent_headers_{};
 };
 
 } // namespace Router

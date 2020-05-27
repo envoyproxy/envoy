@@ -154,6 +154,7 @@ private:
     Event::Dispatcher& dispatcher() override;
     void resetStream() override;
     Router::RouteConstSharedPtr route() override;
+    Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) override;
     Upstream::ClusterInfoConstSharedPtr clusterInfo() override;
     void clearRouteCache() override;
     uint64_t streamId() const override;
@@ -474,6 +475,10 @@ private:
     void addDecodedData(ActiveStreamDecoderFilter& filter, Buffer::Instance& data, bool streaming);
     RequestTrailerMap& addDecodedTrailers();
     MetadataMapVector& addDecodedMetadata();
+    // Helper function for the case where we have a header only request, but a filter adds a body
+    // to it.
+    void maybeContinueDecoding(
+        const std::list<ActiveStreamDecoderFilterPtr>::iterator& maybe_continue_data_entry);
     void decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHeaderMap& headers,
                        bool end_stream);
     // Sends data through decoding filter chains. filter_iteration_start_state indicates which
@@ -495,6 +500,8 @@ private:
     // As with most of the encode functions, this runs encodeHeaders on various
     // filters before calling encodeHeadersInternal which does final header munging and passes the
     // headers to the encoder.
+    void maybeContinueEncoding(
+        const std::list<ActiveStreamEncoderFilterPtr>::iterator& maybe_continue_data_entry);
     void encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHeaderMap& headers,
                        bool end_stream);
     // Sends data through encoding filter chains. filter_iteration_start_state indicates which
@@ -579,6 +586,7 @@ private:
     void snapScopedRouteConfig();
 
     void refreshCachedRoute();
+    void refreshCachedRoute(const Router::RouteCallback& cb);
     void
     requestRouteConfigUpdate(Event::Dispatcher& thread_local_dispatcher,
                              Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb);
@@ -667,11 +675,14 @@ private:
     void onIdleTimeout();
     // Reset per-stream idle timer.
     void resetIdleTimer();
-    // Per-stream request timeout callback
+    // Per-stream request timeout callback.
     void onRequestTimeout();
     // Per-stream alive duration reached.
     void onStreamMaxDurationReached();
     bool hasCachedRoute() { return cached_route_.has_value() && cached_route_.value(); }
+
+    // Return local port of the connection.
+    uint32_t localPort();
 
     friend std::ostream& operator<<(std::ostream& os, const ActiveStream& s) {
       s.dumpState(os);

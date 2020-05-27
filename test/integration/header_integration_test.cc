@@ -1114,6 +1114,7 @@ TEST_P(HeaderIntegrationTest, TestTeHeaderPassthrough) {
           {"server", "envoy"},
           {"x-return-foo", "upstream"},
           {":status", "200"},
+          {"connection", "close"},
       });
 }
 

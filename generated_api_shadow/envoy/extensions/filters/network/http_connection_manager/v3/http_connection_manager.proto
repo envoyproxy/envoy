@@ -3,8 +3,10 @@ syntax = "proto3";
 package envoy.extensions.filters.network.http_connection_manager.v3;
 
 import "envoy/config/accesslog/v3/accesslog.proto";
+import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/protocol.proto";
+import "envoy/config/core/v3/substitution_format_string.proto";
 import "envoy/config/route/v3/route.proto";
 import "envoy/config/route/v3/scoped_route.proto";
 import "envoy/config/trace/v3/http_tracer.proto";
@@ -30,7 +32,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 39]
+// [#next-free-field: 40]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager";
@@ -235,7 +237,7 @@ message HttpConnectionManager {
     // Determines if upgrades are enabled or disabled by default. Defaults to true.
     // This can be overridden on a per-route basis with :ref:`cluster
     // <envoy_api_field_config.route.v3.RouteAction.upgrade_configs>` as documented in the
-    // :ref:`upgrade documentation <arch_overview_websocket>`.
+    // :ref:`upgrade documentation <arch_overview_upgrades>`.
     google.protobuf.BoolValue enabled = 3;
   }
 
@@ -509,13 +511,83 @@ message HttpConnectionManager {
   // 3. Tracing decision (sampled, forced, etc) is set in 14th byte of the UUID.
   RequestIDExtension request_id_extension = 36;
 
-  // If `preserve_upstream_date` is true, the value of the `date` header sent by the upstream
-  // host will not be overwritten by the HTTP Connection Manager. The default behaviour is
-  // to overwrite the `date` header unconditionally.
-  bool preserve_upstream_date = 38;
+  // The configuration to customize local reply returned by Envoy. It can customize status code,
+  // body text and response content type. If not specified, status code and text body are hard
+  // coded in Envoy, the response content type is plain text.
+  LocalReplyConfig local_reply_config = 38;
+
+  // Determines if the port part should be removed from host/authority header before any processing
+  // of request by HTTP filters or routing. The port would be removed only if it is equal to the :ref:`listener's<envoy_api_field_config.listener.v3.Listener.address>`
+  // local port and request method is not CONNECT. This affects the upstream host header as well.
+  // Without setting this option, incoming requests with host `example:443` will not match against
+  // route with :ref:`domains<envoy_api_field_config.route.v3.VirtualHost.domains>` match set to `example`. Defaults to `false`. Note that port removal is not part
+  // of `HTTP spec <https://tools.ietf.org/html/rfc3986>` and is provided for convenience.
+  bool strip_matching_host_port = 39;
 
   google.protobuf.Duration hidden_envoy_deprecated_idle_timeout = 11
       [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
+}
+
+// The configuration to customize local reply returned by Envoy.
+message LocalReplyConfig {
+  // Configuration of list of mappers which allows to filter and change local response.
+  // The mappers will be checked by the specified order until one is matched.
+  repeated ResponseMapper mappers = 1;
+
+  // The configuration to form response body from the :ref:`command operators <config_access_log_command_operators>`
+  // and to specify response content type as one of: plain/text or application/json.
+  //
+  // Example one: plain/text body_format.
+  //
+  // .. code-block::
+  //
+  //   text_format: %LOCAL_REPLY_BODY%:%RESPONSE_CODE%:path=$REQ(:path)%
+  //
+  // The following response body in `plain/text` format will be generated for a request with
+  // local reply body of "upstream connection error", response_code=503 and path=/foo.
+  //
+  // .. code-block::
+  //
+  //   upstream connect error:503:path=/foo
+  //
+  //  Example two: application/json body_format.
+  //
+  // .. code-block::
+  //
+  //  json_format:
+  //    status: %RESPONSE_CODE%
+  //    message: %LOCAL_REPLY_BODY%
+  //    path: $REQ(:path)%
+  //
+  // The following response body in "application/json" format would be generated for a request with
+  // local reply body of "upstream connection error", response_code=503 and path=/foo.
+  //
+  // .. code-block:: json
+  //
+  //  {
+  //    "status": 503,
+  //    "message": "upstream connection error",
+  //    "path": "/foo"
+  //  }
+  //
+  config.core.v3.SubstitutionFormatString body_format = 2;
+}
+
+// The configuration to filter and change local response.
+message ResponseMapper {
+  // Filter to determine if this mapper should apply.
+  config.accesslog.v3.AccessLogFilter filter = 1 [(validate.rules).message = {required: true}];
+
+  // The new response status code if specified.
+  google.protobuf.UInt32Value status_code = 2 [(validate.rules).uint32 = {lt: 600 gte: 200}];
+
+  // The new local reply body text if specified. It will be used in the `%LOCAL_REPLY_BODY%`
+  // command operator in the `body_foramt`.
+  config.core.v3.DataSource body = 3;
+
+  // A per mapper `body_format` to override the :ref:`body_format <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.LocalReplyConfig.body_format>`.
+  // It will be used when this mapper is matched.
+  config.core.v3.SubstitutionFormatString body_format_override = 4;
 }
 
 message Rds {

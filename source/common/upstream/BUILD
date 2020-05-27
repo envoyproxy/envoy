@@ -310,6 +310,7 @@ envoy_cc_library(
         "//include/envoy/upstream:resource_manager_interface",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:basic_resource_lib",
     ],
 )
 
@@ -426,7 +427,10 @@ envoy_cc_library(
         "//include/envoy/ssl:context_interface",
         "//include/envoy/upstream:health_checker_interface",
         "//source/common/common:enum_to_int",
+        "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
+        "//source/common/http/http1:codec_lib",
+        "//source/common/http/http2:codec_lib",
         "//source/common/http:utility_lib",
         "//source/common/network:address_lib",
         "//source/common/network:resolver_lib",
@@ -509,6 +513,8 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:metadata_lib",
         "//source/common/config:well_known_names",
+        "//source/common/http/http1:codec_lib",
+        "//source/common/http/http2:codec_lib",
         "//source/common/init:manager_lib",
         "//source/common/shared_pool:shared_pool_lib",
         "//source/common/stats:isolated_store_lib",

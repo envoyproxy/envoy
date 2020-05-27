@@ -13,7 +13,7 @@
 #include "common/json/json_loader.h"
 #include "common/router/rds_impl.h"
 
-#include "server/http/admin.h"
+#include "server/admin/admin.h"
 
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"
