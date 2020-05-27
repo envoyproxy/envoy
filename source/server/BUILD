@@ -345,6 +345,7 @@ envoy_cc_library(
         "//source/common/init:manager_lib",
         "//source/common/network:cidr_range_lib",
         "//source/common/network:lc_trie_lib",
+        "//source/common/network:socket_interface_singleton_lib",
         "//source/server:configuration_lib",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],

@@ -222,8 +222,8 @@ private:
 
   virtual Network::IoHandlePtr createIoHandle(const Upstream::HostConstSharedPtr& host) {
     // Virtual so this can be overridden in unit tests.
-    return Network::SocketInterface::socket(Network::Address::SocketType::Datagram,
-                                            host->address());
+    return Network::SocketInterfaceSingleton::get().socket(Network::Address::SocketType::Datagram,
+                                                           host->address());
   }
 
   // Upstream::ClusterUpdateCallbacks

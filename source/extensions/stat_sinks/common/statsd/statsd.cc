@@ -27,7 +27,7 @@ namespace Common {
 namespace Statsd {
 
 UdpStatsdSink::WriterImpl::WriterImpl(UdpStatsdSink& parent)
-    : parent_(parent), io_handle_(Network::SocketInterface::socket(
+    : parent_(parent), io_handle_(Network::SocketInterfaceSingleton::get().socket(
                            Network::Address::SocketType::Datagram, parent_.server_address_)) {}
 
 void UdpStatsdSink::WriterImpl::write(const std::string& message) {
