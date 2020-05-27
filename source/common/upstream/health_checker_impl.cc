@@ -713,13 +713,13 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onResetStream(Http::St
     return;
   }
 
+  ENVOY_CONN_LOG(debug, "connection/stream error health_flags={}", *client_,
+                 HostUtility::healthFlagsToString(*host_));
+
   if (goaway) {
     // Stream reset was unexpected, so GOAWAY hasn't been handled yet.
     client_->close();
   }
-
-  ENVOY_CONN_LOG(debug, "connection/stream error health_flags={}", *client_,
-                 HostUtility::healthFlagsToString(*host_));
 
   // TODO(baranov1ch): according to all HTTP standards, we should check if reason is one of
   // Http::StreamResetReason::RemoteRefusedStreamReset (which may mean GOAWAY),
