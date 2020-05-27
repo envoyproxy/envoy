@@ -158,7 +158,9 @@ Api::SysCallIntResult SocketImpl::bind(Network::Address::InstanceConstSharedPtr 
     if (pipe->mode() != 0 && !abstract_namespace && bind_result.rc_ == 0) {
       auto set_permissions = Api::OsSysCallsSingleton::get().chmod(pipe_sa->sun_path, pipe->mode());
       if (set_permissions.rc_ != 0) {
-        throw EnvoyException("Failed to create socket with mode " + std::to_string(pipe->mode()));
+        throw EnvoyException(fmt::format("Failed to create socket with mode {}: {}",
+                                         std::to_string(pipe->mode()),
+                                         strerror(set_permissions.errno_)));
       }
     }
     return bind_result;
@@ -173,9 +175,8 @@ Api::SysCallIntResult SocketImpl::listen(int backlog) {
 }
 
 Api::SysCallIntResult SocketImpl::connect(const Network::Address::InstanceConstSharedPtr address) {
-  const auto* address_base = dynamic_cast<const Network::Address::InstanceBase*>(address.get());
-  return Api::OsSysCallsSingleton::get().connect(io_handle_->fd(), address_base->sockAddr(),
-                                                 address_base->sockAddrLen());
+  return Api::OsSysCallsSingleton::get().connect(io_handle_->fd(), address->sockAddr(),
+                                                 address->sockAddrLen());
 }
 
 } // namespace Network

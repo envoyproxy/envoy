@@ -128,8 +128,8 @@ Ipv4Instance::Ipv4Instance(const std::string& address, uint32_t port) : Instance
   }
 
   friendly_name_ = absl::StrCat(address, ":", port);
-  ip_.friendly_address_ = address;
   validateIpv4Supported(friendly_name_);
+  ip_.friendly_address_ = address;
 }
 
 Ipv4Instance::Ipv4Instance(uint32_t port) : InstanceBase(Type::Ip) {
