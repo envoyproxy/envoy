@@ -75,8 +75,8 @@ public:
   InstancePtr create(std::function<void()> below_low_watermark,
                      std::function<void()> above_high_watermark,
                      std::function<void()> above_overflow_watermark) override {
-    return InstancePtr{
-        new WatermarkBuffer(below_low_watermark, above_high_watermark, above_overflow_watermark)};
+    return std::make_unique<WatermarkBuffer>(below_low_watermark, above_high_watermark,
+                                             above_overflow_watermark);
   }
 };
 
