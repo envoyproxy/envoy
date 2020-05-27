@@ -360,7 +360,7 @@ IoHandlePtr Ipv6Instance::socket(SocketType type) const {
 PipeInstance::PipeInstance(const sockaddr_un* address, socklen_t ss_len, mode_t mode)
     : InstanceBase(Type::Pipe) {
   if (address->sun_path[0] == '\0') {
-#if !defined(__linux__)
+#if defined(__APPLE__)
     throw EnvoyException("Abstract AF_UNIX sockets are only supported on linux.");
 #endif
     RELEASE_ASSERT(static_cast<unsigned int>(ss_len) >= offsetof(struct sockaddr_un, sun_path) + 1,
@@ -396,7 +396,7 @@ PipeInstance::PipeInstance(const std::string& pipe_path, mode_t mode) : Instance
     // characters of pipe_path to sun_path, including null bytes in the name. The pathname must also
     // be null terminated. The friendly name is the address path with embedded nulls replaced with
     // '@' for consistency with the first character.
-#if !defined(__linux__)
+#if defined(__APPLE__)
     throw EnvoyException("Abstract AF_UNIX sockets are only supported on linux.");
 #endif
     if (mode != 0) {

@@ -323,8 +323,8 @@ TEST(PipeInstanceTest, Basic) {
 
 TEST(PipeInstanceTest, BasicPermission) {
   std::string path = TestEnvironment::unixDomainSocketPath("foo.sock");
-
-  const mode_t mode = 0777;
+  
+  const mode_t mode = 0666;
   PipeInstance address(path, mode);
 
   IoHandlePtr io_handle = address.socket(SocketType::Stream);
@@ -361,7 +361,7 @@ TEST(PipeInstanceTest, PermissionFail) {
 }
 
 TEST(PipeInstanceTest, AbstractNamespacePermission) {
-#if defined(__linux__)
+#if defined(__linux__) || defined(WIN32)
   std::string path = "@/foo";
   const mode_t mode = 0777;
   EXPECT_THROW_WITH_REGEX(PipeInstance address(path, mode), EnvoyException,
@@ -379,7 +379,7 @@ TEST(PipeInstanceTest, AbstractNamespacePermission) {
 }
 
 TEST(PipeInstanceTest, AbstractNamespace) {
-#if defined(__linux__)
+#if defined(__linux__) || defined(WIN32)
   PipeInstance address("@/foo");
   EXPECT_EQ("@/foo", address.asString());
   EXPECT_EQ("@/foo", address.asStringView());
@@ -398,9 +398,9 @@ TEST(PipeInstanceTest, BadAddress) {
 
 // Validate that embedded nulls in abstract socket addresses are included and represented with '@'.
 TEST(PipeInstanceTest, EmbeddedNullAbstractNamespace) {
+#if defined(__linux__) || defined(WIN32)
   std::string embedded_null("@/foo/bar");
   embedded_null[5] = '\0'; // Set embedded null.
-#if defined(__linux__)
   PipeInstance address(embedded_null);
   EXPECT_EQ("@/foo@bar", address.asString());
   EXPECT_EQ("@/foo@bar", address.asStringView());
@@ -496,7 +496,7 @@ TEST(AddressFromSockAddrDeathTest, Pipe) {
   StringUtil::strlcpy(&sun.sun_path[1], "/some/abstract/path", sizeof sun.sun_path);
   sun.sun_path[0] = '\0';
   ss_len = offsetof(struct sockaddr_un, sun_path) + 1 + strlen("/some/abstract/path");
-#if defined(__linux__)
+#if defined(__linux__) || defined(WIN32)
   EXPECT_EQ("@/some/abstract/path", addressFromSockAddr(ss, ss_len)->asString());
 #else
   EXPECT_THROW(addressFromSockAddr(ss, ss_len), EnvoyException);
