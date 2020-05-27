@@ -7,9 +7,12 @@ set -e
 # This prefix is altered for the private security images on setec builds.
 DOCKER_IMAGE_PREFIX="${DOCKER_IMAGE_PREFIX:-envoyproxy/envoy}"
 
+# "-google-vrp" must come afer "" to ensure we rebuild the local base image dependency.
+BUILD_TYPES=("" "-alpine" "-alpine-debug" "-google-vrp")
+
 # Test the docker build in all cases, but use a local tag that we will overwrite before push in the
 # cases where we do push.
-for BUILD_TYPE in "" "-alpine" "-alpine-debug"; do
+for BUILD_TYPE in "${BUILD_TYPES[@]}"; do
     docker build -f ci/Dockerfile-envoy"${BUILD_TYPE}" -t "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}:local" .
 done
 
@@ -38,7 +41,7 @@ fi
 
 docker login -u "$DOCKERHUB_USERNAME" -p "$DOCKERHUB_PASSWORD"
 
-for BUILD_TYPE in "" "-alpine" "-alpine-debug"; do
+for BUILD_TYPE in ${BUILD_TYPES}; do
     docker tag "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}:local" "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:${IMAGE_NAME}"
     docker push "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:${IMAGE_NAME}"
 
