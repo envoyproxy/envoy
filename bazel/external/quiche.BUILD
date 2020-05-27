@@ -2023,6 +2023,7 @@ envoy_cc_library(
     copts = quiche_copts,
     repository = "@envoy",
     tags = ["nofips"],
+    external_deps = ["ssl"],
     visibility = ["//visibility:public"],
     deps = [
         ":quic_platform_base",
