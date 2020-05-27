@@ -329,7 +329,8 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
       std::string formatted;
       for (const auto& formatter : formatters) {
         absl::StrAppend(&formatted, formatter->format(empty_request_headers, empty_response_headers,
-                                                      empty_response_trailers, stream_info));
+                                                      empty_response_trailers, stream_info,
+                                                      absl::string_view()));
       }
       return formatted;
     };
@@ -344,6 +345,17 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
   } else if (field_name == "HOSTNAME") {
     std::string hostname = Envoy::AccessLog::AccessLogFormatUtils::getHostname();
     field_extractor_ = [hostname](const StreamInfo::StreamInfo&) { return hostname; };
+  } else if (field_name == "RESPONSE_FLAGS") {
+    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
+      return StreamInfo::ResponseFlagUtils::toShortString(stream_info);
+    };
+  } else if (field_name == "RESPONSE_CODE_DETAILS") {
+    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) -> std::string {
+      if (stream_info.responseCodeDetails().has_value()) {
+        return stream_info.responseCodeDetails().value();
+      }
+      return "";
+    };
   } else {
     throw EnvoyException(fmt::format("field '{}' not supported as custom header", field_name));
   }

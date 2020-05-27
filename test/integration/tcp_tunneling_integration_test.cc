@@ -235,7 +235,7 @@ TEST_P(ProxyingConnectIntegrationTest, ProxyConnect) {
 
   // Wait for them to arrive downstream.
   response_->waitForHeaders();
-  EXPECT_EQ("200", response_->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response_->headers().getStatusValue());
 
   // Make sure that even once the response has started, that data can continue to go upstream.
   codec_client_->sendData(*request_encoder_, "hello", false);

@@ -50,11 +50,11 @@ void UserAgent::initializeFromHeaders(const RequestHeaderMap& headers, Stats::St
   if (stats_ == nullptr && !initialized_) {
     initialized_ = true;
 
-    const HeaderEntry* user_agent = headers.UserAgent();
-    if (user_agent != nullptr) {
-      if (user_agent->value().getStringView().find("iOS") != absl::string_view::npos) {
+    const absl::string_view user_agent = headers.getUserAgentValue();
+    if (!user_agent.empty()) {
+      if (user_agent.find("iOS") != absl::string_view::npos) {
         stats_ = std::make_unique<UserAgentStats>(prefix, context_.ios_, scope, context_);
-      } else if (user_agent->value().getStringView().find("android") != absl::string_view::npos) {
+      } else if (user_agent.find("android") != absl::string_view::npos) {
         stats_ = std::make_unique<UserAgentStats>(prefix, context_.android_, scope, context_);
       }
     }

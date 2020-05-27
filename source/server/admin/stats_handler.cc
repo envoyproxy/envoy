@@ -1,5 +1,7 @@
 #include "server/admin/stats_handler.h"
 
+#include "envoy/admin/v3/mutex_stats.pb.h"
+
 #include "common/common/empty_string.h"
 #include "common/html/utility.h"
 #include "common/http/headers.h"
@@ -147,6 +149,26 @@ Http::Code StatsHandler::handlerPrometheusStats(absl::string_view path_and_query
   PrometheusStatsFormatter::statsAsPrometheus(server_.stats().counters(), server_.stats().gauges(),
                                               server_.stats().histograms(), response, used_only,
                                               regex);
+  return Http::Code::OK;
+}
+
+// TODO(ambuc) Export this as a server (?) stat for monitoring.
+Http::Code StatsHandler::handlerContention(absl::string_view,
+                                           Http::ResponseHeaderMap& response_headers,
+                                           Buffer::Instance& response, AdminStream&) {
+
+  if (server_.options().mutexTracingEnabled() && server_.mutexTracer() != nullptr) {
+    response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
+
+    envoy::admin::v3::MutexStats mutex_stats;
+    mutex_stats.set_num_contentions(server_.mutexTracer()->numContentions());
+    mutex_stats.set_current_wait_cycles(server_.mutexTracer()->currentWaitCycles());
+    mutex_stats.set_lifetime_wait_cycles(server_.mutexTracer()->lifetimeWaitCycles());
+    response.add(MessageUtil::getJsonStringFromMessage(mutex_stats, true, true));
+  } else {
+    response.add("Mutex contention tracing is not enabled. To enable, run Envoy with flag "
+                 "--enable-mutex-tracing.");
+  }
   return Http::Code::OK;
 }
 
