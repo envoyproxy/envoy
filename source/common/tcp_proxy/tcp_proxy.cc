@@ -409,8 +409,8 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
     transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
         downstreamConnection()->streamInfo().filterState());
   }
-
-  if (!config_->tunnelingConfig()) {
+  const auto& tunnel_config_opt = config_->tunnelingConfig();
+  if (!tunnel_config_opt.has_value()) {
     Tcp::ConnectionPool::Instance* conn_pool = cluster_manager_.tcpConnPoolForCluster(
         cluster_name, Upstream::ResourcePriority::Default, this);
     if (conn_pool) {
@@ -434,8 +434,7 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
     auto* thread_local_cluster = cluster_manager_.get(cluster_name);
     auto host = thread_local_cluster->loadBalancer().chooseHost(this);
     if (host) {
-      if (host->metadata()->filter_metadata().find("envoy.plaintcponly") !=
-          host->metadata()->filter_metadata().end()) {
+      if (config_->useRawTcpPoolForHost(*host)) {
         auto* conn_pool = thread_local_cluster->getTcpPool(
             std::move(host), Upstream::ResourcePriority::Default, this);
         if (conn_pool) {
