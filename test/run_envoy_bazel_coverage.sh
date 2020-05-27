@@ -58,4 +58,14 @@ if [[ "$VALIDATE_COVERAGE" == "true" ]]; then
       echo Code coverage ${COVERAGE_VALUE} is good and higher than limit of ${COVERAGE_THRESHOLD}
   fi
 fi
+
+if [[ "$VALIDATE_COVERAGE" == "true" ]]; then
+  echo "Checking per-file coverage"
+  SUCCESS=`${SRCDIR}/test/per_file_coverage.sh`
+  if ${SUCCESS} -eq 1; then
+    echo Per file coverage failed.
+    exit 1
+  fi
+fi
+
 echo "HTML coverage report is in ${COVERAGE_DIR}/index.html"
