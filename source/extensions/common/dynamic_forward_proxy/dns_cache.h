@@ -157,7 +157,7 @@ public:
   virtual DnsCacheResourceManager& dnsCacheResourceManager() PURE;
 
   /**
-   * @return Whether dns cahce use dns cache resource manager for request restrictions. e.g. Circuit
+   * @return Whether dns cache use dns cache resource manager for request restrictions. e.g. Circuit
    * Breaking
    */
   virtual bool useDnsCacheResourceManager() const PURE;

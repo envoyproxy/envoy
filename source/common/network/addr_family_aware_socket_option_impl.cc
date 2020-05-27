@@ -7,6 +7,7 @@
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/network/address_impl.h"
+#include "common/network/socket_impl.h"
 #include "common/network/socket_option_impl.h"
 
 namespace Envoy {
@@ -29,7 +30,7 @@ absl::optional<Address::IpVersion> getVersionFromSocket(const Socket& socket) {
     if (socket.localAddress()) {
       return {getVersionFromAddress(socket.localAddress())};
     } else {
-      return {getVersionFromAddress(Address::addressFromFd(socket.ioHandle().fd()))};
+      return {getVersionFromAddress(SocketInterface::addressFromFd(socket.ioHandle().fd()))};
     }
   } catch (const EnvoyException&) {
     // Ignore, we get here because we failed in getsockname().

@@ -42,7 +42,8 @@ public:
 class RequestHeadersAction : public RateLimitAction {
 public:
   RequestHeadersAction(const envoy::config::route::v3::RateLimit::Action::RequestHeaders& action)
-      : header_name_(action.header_name()), descriptor_key_(action.descriptor_key()) {}
+      : header_name_(action.header_name()), descriptor_key_(action.descriptor_key()),
+        skip_if_absent_(action.skip_if_absent()) {}
 
   // Router::RateLimitAction
   bool populateDescriptor(const Router::RouteEntry& route, RateLimit::Descriptor& descriptor,
@@ -52,6 +53,7 @@ public:
 private:
   const Http::LowerCaseString header_name_;
   const std::string descriptor_key_;
+  const bool skip_if_absent_;
 };
 
 /**

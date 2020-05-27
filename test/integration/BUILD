@@ -458,6 +458,7 @@ envoy_cc_test_library(
         "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//test/common/upstream:utility_lib",
+        "//test/integration/filters:add_body_filter_config_lib",
         "//test/integration/filters:add_trailers_filter_config_lib",
         "//test/integration/filters:call_decodedata_once_filter_config_lib",
         "//test/integration/filters:decode_headers_return_stop_all_filter_config_lib",
@@ -466,6 +467,7 @@ envoy_cc_test_library(
         "//test/integration/filters:modify_buffer_filter_config_lib",
         "//test/integration/filters:passthrough_filter_config_lib",
         "//test/integration/filters:pause_filter_lib",
+        "//test/integration/filters:wait_for_whole_request_and_response_config_lib",
         "//test/test_common:registry_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
@@ -1185,5 +1187,17 @@ envoy_cc_test(
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "local_reply_integration_test",
+    srcs = [
+        "local_reply_integration_test.cc",
+    ],
+    deps = [
+        ":http_integration_lib",
+        ":http_protocol_integration_lib",
+        "//test/test_common:utility_lib",
     ],
 )
