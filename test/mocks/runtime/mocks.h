@@ -41,6 +41,7 @@ public:
     }
   }
 
+  MOCK_METHOD(void, countDeprecatedFeatureUse, (), (const));
   MOCK_METHOD(bool, deprecatedFeatureEnabled, (absl::string_view key, bool default_enabled),
               (const));
   MOCK_METHOD(bool, runtimeFeatureEnabled, (absl::string_view key), (const));
