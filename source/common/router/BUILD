@@ -365,12 +365,12 @@ envoy_cc_library(
         "//include/envoy/router:string_accessor_interface",
         "//include/envoy/stream_info:filter_state_interface",
         "//include/envoy/stream_info:stream_info_interface",
-        "//source/common/access_log:access_log_formatter_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:metadata_lib",
         "//source/common/http:header_map_lib",
         "//source/common/json:json_loader_lib",
+        "//source/common/substitution:substitution_formatter_lib",
     ],
 )
 

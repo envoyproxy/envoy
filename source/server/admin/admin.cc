@@ -21,7 +21,6 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/access_log/access_log_formatter.h"
 #include "common/access_log/access_log_impl.h"
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
@@ -40,6 +39,7 @@
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 #include "common/router/config_impl.h"
+#include "common/substitution/substitution_formatter.h"
 #include "common/upstream/host_utility.h"
 
 #include "server/admin/utils.h"
@@ -544,7 +544,7 @@ void AdminImpl::startHttpListener(const std::string& access_log_path,
   // TODO(mattklein123): Allow admin to use normal access logger extension loading and avoid the
   // hard dependency here.
   access_logs_.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
-      access_log_path, {}, AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter(),
+      access_log_path, {}, Substitution::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
       server_.accessLogManager()));
   socket_ = std::make_shared<Network::TcpListenSocket>(address, socket_options, true);
   socket_factory_ = std::make_shared<AdminListenSocketFactory>(socket_);

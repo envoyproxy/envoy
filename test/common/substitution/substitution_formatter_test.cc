@@ -5,11 +5,11 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "common/access_log/access_log_formatter.h"
 #include "common/common/utility.h"
 #include "common/http/header_map_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/router/string_accessor_impl.h"
+#include "common/substitution/substitution_formatter.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/http/mocks.h"
@@ -30,7 +30,7 @@ using testing::Return;
 using testing::ReturnRef;
 
 namespace Envoy {
-namespace AccessLog {
+namespace Substitution {
 namespace {
 
 class TestSerializedUnknownFilterState : public StreamInfo::FilterState::Object {
@@ -92,14 +92,14 @@ private:
   std::string raw_string_;
 };
 
-TEST(AccessLogFormatUtilsTest, protocolToString) {
-  EXPECT_EQ("HTTP/1.0", AccessLogFormatUtils::protocolToString(Http::Protocol::Http10));
-  EXPECT_EQ("HTTP/1.1", AccessLogFormatUtils::protocolToString(Http::Protocol::Http11));
-  EXPECT_EQ("HTTP/2", AccessLogFormatUtils::protocolToString(Http::Protocol::Http2));
-  EXPECT_EQ("-", AccessLogFormatUtils::protocolToString({}));
+TEST(SubstitutionFormatUtilsTest, protocolToString) {
+  EXPECT_EQ("HTTP/1.0", SubstitutionFormatUtils::protocolToString(Http::Protocol::Http10));
+  EXPECT_EQ("HTTP/1.1", SubstitutionFormatUtils::protocolToString(Http::Protocol::Http11));
+  EXPECT_EQ("HTTP/2", SubstitutionFormatUtils::protocolToString(Http::Protocol::Http2));
+  EXPECT_EQ("-", SubstitutionFormatUtils::protocolToString({}));
 }
 
-TEST(AccessLogFormatterTest, plainStringFormatter) {
+TEST(SubstitutionFormatterTest, plainStringFormatter) {
   PlainStringFormatter formatter("plain");
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
   Http::TestResponseHeaderMapImpl response_headers;
@@ -114,7 +114,7 @@ TEST(AccessLogFormatterTest, plainStringFormatter) {
               ProtoEq(ValueUtil::stringValue("plain")));
 }
 
-TEST(AccessLogFormatterTest, streamInfoFormatter) {
+TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   EXPECT_THROW(StreamInfoFormatter formatter("unknown_field"), EnvoyException);
 
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
@@ -979,7 +979,7 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
   }
 }
 
-TEST(AccessLogFormatterTest, requestHeaderFormatter) {
+TEST(SubstitutionFormatterTest, requestHeaderFormatter) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header{{":method", "GET"}, {":path", "/"}};
   Http::TestResponseHeaderMapImpl response_header{{":method", "PUT"}};
@@ -1032,7 +1032,7 @@ TEST(AccessLogFormatterTest, requestHeaderFormatter) {
   }
 }
 
-TEST(AccessLogFormatterTest, responseHeaderFormatter) {
+TEST(SubstitutionFormatterTest, responseHeaderFormatter) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header{{":method", "GET"}, {":path", "/"}};
   Http::TestResponseHeaderMapImpl response_header{{":method", "PUT"}, {"test", "test"}};
@@ -1085,7 +1085,7 @@ TEST(AccessLogFormatterTest, responseHeaderFormatter) {
   }
 }
 
-TEST(AccessLogFormatterTest, responseTrailerFormatter) {
+TEST(SubstitutionFormatterTest, responseTrailerFormatter) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header{{":method", "GET"}, {":path", "/"}};
   Http::TestResponseHeaderMapImpl response_header{{":method", "PUT"}, {"test", "test"}};
@@ -1154,7 +1154,7 @@ void populateMetadataTestData(envoy::config::core::v3::Metadata& metadata) {
   (*metadata.mutable_filter_metadata())["com.test"] = struct_obj;
 }
 
-TEST(AccessLogFormatterTest, DynamicMetadataFormatter) {
+TEST(SubstitutionFormatterTest, DynamicMetadataFormatter) {
   envoy::config::core::v3::Metadata metadata;
   populateMetadataTestData(metadata);
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
@@ -1249,7 +1249,7 @@ TEST(AccessLogFormatterTest, DynamicMetadataFormatter) {
   }
 }
 
-TEST(AccessLogFormatterTest, FilterStateFormatter) {
+TEST(SubstitutionFormatterTest, FilterStateFormatter) {
   Http::TestRequestHeaderMapImpl request_headers;
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
@@ -1373,7 +1373,7 @@ TEST(AccessLogFormatterTest, FilterStateFormatter) {
   }
 }
 
-TEST(AccessLogFormatterTest, StartTimeFormatter) {
+TEST(SubstitutionFormatterTest, StartTimeFormatter) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
   Http::TestResponseHeaderMapImpl response_headers;
@@ -1405,7 +1405,7 @@ TEST(AccessLogFormatterTest, StartTimeFormatter) {
   }
 }
 
-TEST(AccessLogFormatterTest, GrpcStatusFormatterTest) {
+TEST(SubstitutionFormatterTest, GrpcStatusFormatterTest) {
   GrpcStatusFormatter formatter("grpc-status", "", absl::optional<size_t>());
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   Http::TestRequestHeaderMapImpl request_header;
@@ -1473,7 +1473,7 @@ void verifyJsonOutput(std::string json_string,
   }
 }
 
-TEST(AccessLogFormatterTest, JsonFormatterPlainStringTest) {
+TEST(SubstitutionFormatterTest, JsonFormatterPlainStringTest) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header;
   Http::TestResponseHeaderMapImpl response_header;
@@ -1497,7 +1497,7 @@ TEST(AccessLogFormatterTest, JsonFormatterPlainStringTest) {
       expected_json_map);
 }
 
-TEST(AccessLogFormatterTest, JsonFormatterSingleOperatorTest) {
+TEST(SubstitutionFormatterTest, JsonFormatterSingleOperatorTest) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header;
   Http::TestResponseHeaderMapImpl response_header;
@@ -1519,7 +1519,7 @@ TEST(AccessLogFormatterTest, JsonFormatterSingleOperatorTest) {
       expected_json_map);
 }
 
-TEST(AccessLogFormatterTest, JsonFormatterNonExistentHeaderTest) {
+TEST(SubstitutionFormatterTest, JsonFormatterNonExistentHeaderTest) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header{{"some_request_header", "SOME_REQUEST_HEADER"}};
   Http::TestResponseHeaderMapImpl response_header{{"some_response_header", "SOME_RESPONSE_HEADER"}};
@@ -1547,7 +1547,7 @@ TEST(AccessLogFormatterTest, JsonFormatterNonExistentHeaderTest) {
       expected_json_map);
 }
 
-TEST(AccessLogFormatterTest, JsonFormatterAlternateHeaderTest) {
+TEST(SubstitutionFormatterTest, JsonFormatterAlternateHeaderTest) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header{
       {"request_present_header", "REQUEST_PRESENT_HEADER"}};
@@ -1581,7 +1581,7 @@ TEST(AccessLogFormatterTest, JsonFormatterAlternateHeaderTest) {
       expected_json_map);
 }
 
-TEST(AccessLogFormatterTest, JsonFormatterDynamicMetadataTest) {
+TEST(SubstitutionFormatterTest, JsonFormatterDynamicMetadataTest) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
   Http::TestResponseHeaderMapImpl response_header{{"second", "PUT"}, {"test", "test"}};
@@ -1610,7 +1610,7 @@ TEST(AccessLogFormatterTest, JsonFormatterDynamicMetadataTest) {
       expected_json_map);
 }
 
-TEST(AccessLogFormatterTest, JsonFormatterTypedDynamicMetadataTest) {
+TEST(SubstitutionFormatterTest, JsonFormatterTypedDynamicMetadataTest) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
   Http::TestResponseHeaderMapImpl response_header{{"second", "PUT"}, {"test", "test"}};
@@ -1641,7 +1641,7 @@ TEST(AccessLogFormatterTest, JsonFormatterTypedDynamicMetadataTest) {
             fields.at("test_obj").struct_value().fields().at("inner_key").string_value());
 }
 
-TEST(AccessLogFormatterTest, JsonFormatterFilterStateTest) {
+TEST(SubstitutionFormatterTest, JsonFormatterFilterStateTest) {
   Http::TestRequestHeaderMapImpl request_headers;
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
@@ -1668,7 +1668,7 @@ TEST(AccessLogFormatterTest, JsonFormatterFilterStateTest) {
       expected_json_map);
 }
 
-TEST(AccessLogFormatterTest, JsonFormatterTypedFilterStateTest) {
+TEST(SubstitutionFormatterTest, JsonFormatterTypedFilterStateTest) {
   Http::TestRequestHeaderMapImpl request_headers;
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
@@ -1700,7 +1700,7 @@ TEST(AccessLogFormatterTest, JsonFormatterTypedFilterStateTest) {
 
 // Test new specifier (PLAIN/TYPED) of FilterState. Ensure that after adding additional specifier,
 // the FilterState can call the serializeAsProto or serializeAsString methods correctly.
-TEST(AccessLogFormatterTest, FilterStateSpeciferTest) {
+TEST(SubstitutionFormatterTest, FilterStateSpeciferTest) {
   Http::TestRequestHeaderMapImpl request_headers;
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
@@ -1729,7 +1729,7 @@ TEST(AccessLogFormatterTest, FilterStateSpeciferTest) {
 
 // Test new specifier (PLAIN/TYPED) of FilterState and convert the output log string to proto
 // and then verify the result.
-TEST(AccessLogFormatterTest, TypedFilterStateSpeciferTest) {
+TEST(SubstitutionFormatterTest, TypedFilterStateSpeciferTest) {
   Http::TestRequestHeaderMapImpl request_headers;
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
@@ -1758,7 +1758,7 @@ TEST(AccessLogFormatterTest, TypedFilterStateSpeciferTest) {
 }
 
 // Error specifier will cause an exception to be thrown.
-TEST(AccessLogFormatterTest, FilterStateErrorSpeciferTest) {
+TEST(SubstitutionFormatterTest, FilterStateErrorSpeciferTest) {
   Http::TestRequestHeaderMapImpl request_headers;
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
@@ -1777,7 +1777,7 @@ TEST(AccessLogFormatterTest, FilterStateErrorSpeciferTest) {
                             "Invalid filter state serialize type, only support PLAIN/TYPED.");
 }
 
-TEST(AccessLogFormatterTest, JsonFormatterStartTimeTest) {
+TEST(SubstitutionFormatterTest, JsonFormatterStartTimeTest) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header;
   Http::TestResponseHeaderMapImpl response_header;
@@ -1808,7 +1808,7 @@ TEST(AccessLogFormatterTest, JsonFormatterStartTimeTest) {
       expected_json_map);
 }
 
-TEST(AccessLogFormatterTest, JsonFormatterMultiTokenTest) {
+TEST(SubstitutionFormatterTest, JsonFormatterMultiTokenTest) {
   {
     StreamInfo::MockStreamInfo stream_info;
     Http::TestRequestHeaderMapImpl request_header{{"some_request_header", "SOME_REQUEST_HEADER"}};
@@ -1839,7 +1839,7 @@ TEST(AccessLogFormatterTest, JsonFormatterMultiTokenTest) {
   }
 }
 
-TEST(AccessLogFormatterTest, JsonFormatterTypedTest) {
+TEST(SubstitutionFormatterTest, JsonFormatterTypedTest) {
   Http::TestRequestHeaderMapImpl request_headers;
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
@@ -1882,7 +1882,7 @@ TEST(AccessLogFormatterTest, JsonFormatterTypedTest) {
   EXPECT_THAT(output.fields().at("filter_state"), ProtoEq(expected));
 }
 
-TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
+TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
   Http::TestResponseHeaderMapImpl response_header{{"second", "PUT"}, {"test", "test"}};
@@ -2021,8 +2021,8 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
   }
 }
 
-TEST(AccessLogFormatterTest, ParserFailures) {
-  AccessLogFormatParser parser;
+TEST(SubstitutionFormatterTest, ParserFailures) {
+  SubstitutionFormatParser parser;
 
   std::vector<std::string> test_cases = {
       "{{%PROTOCOL%}}   ++ %REQ(FIRST?SECOND)% %RESP(FIRST?SECOND)",
@@ -2061,5 +2061,5 @@ TEST(AccessLogFormatterTest, ParserFailures) {
 }
 
 } // namespace
-} // namespace AccessLog
+} // namespace Substitution
 } // namespace Envoy

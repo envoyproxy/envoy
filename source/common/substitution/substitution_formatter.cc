@@ -1,4 +1,4 @@
-#include "common/access_log/access_log_formatter.h"
+#include "common/substitution/substitution_formatter.h"
 
 #include <climits>
 #include <cstdint>
@@ -27,7 +27,7 @@
 using Envoy::Config::Metadata;
 
 namespace Envoy {
-namespace AccessLog {
+namespace Substitution {
 
 static const std::string UnspecifiedValueString = "-";
 
@@ -51,26 +51,26 @@ const std::regex& getNewlinePattern() { CONSTRUCT_ON_FIRST_USE(std::regex, "\n")
 
 } // namespace
 
-const std::string AccessLogFormatUtils::DEFAULT_FORMAT =
+const std::string SubstitutionFormatUtils::DEFAULT_FORMAT =
     "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%\" "
     "%RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% "
     "%RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% "
     "\"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\" "
     "\"%REQ(:AUTHORITY)%\" \"%UPSTREAM_HOST%\"\n";
 
-FormatterPtr AccessLogFormatUtils::defaultAccessLogFormatter() {
+FormatterPtr SubstitutionFormatUtils::defaultSubstitutionFormatter() {
   return FormatterPtr{new FormatterImpl(DEFAULT_FORMAT)};
 }
 
 const std::string&
-AccessLogFormatUtils::protocolToString(const absl::optional<Http::Protocol>& protocol) {
+SubstitutionFormatUtils::protocolToString(const absl::optional<Http::Protocol>& protocol) {
   if (protocol) {
     return Http::Utility::getProtocolString(protocol.value());
   }
   return UnspecifiedValueString;
 }
 
-const std::string AccessLogFormatUtils::getHostname() {
+const std::string SubstitutionFormatUtils::getHostname() {
 #ifdef HOST_NAME_MAX
   const size_t len = HOST_NAME_MAX;
 #else
@@ -90,7 +90,7 @@ const std::string AccessLogFormatUtils::getHostname() {
 }
 
 FormatterImpl::FormatterImpl(const std::string& format) {
-  providers_ = AccessLogFormatParser::parse(format);
+  providers_ = SubstitutionFormatParser::parse(format);
 }
 
 std::string FormatterImpl::format(const Http::RequestHeaderMap& request_headers,
@@ -113,7 +113,7 @@ JsonFormatterImpl::JsonFormatterImpl(
     const absl::flat_hash_map<std::string, std::string>& format_mapping, bool preserve_types)
     : preserve_types_(preserve_types) {
   for (const auto& pair : format_mapping) {
-    json_output_format_.emplace(pair.first, AccessLogFormatParser::parse(pair.second));
+    json_output_format_.emplace(pair.first, SubstitutionFormatParser::parse(pair.second));
   }
 }
 
@@ -162,10 +162,10 @@ ProtobufWkt::Struct JsonFormatterImpl::toStruct(const Http::RequestHeaderMap& re
   return output;
 }
 
-void AccessLogFormatParser::parseCommandHeader(const std::string& token, const size_t start,
-                                               std::string& main_header,
-                                               std::string& alternative_header,
-                                               absl::optional<size_t>& max_length) {
+void SubstitutionFormatParser::parseCommandHeader(const std::string& token, const size_t start,
+                                                  std::string& main_header,
+                                                  std::string& alternative_header,
+                                                  absl::optional<size_t>& max_length) {
   std::vector<std::string> subs;
   parseCommand(token, start, "?", main_header, subs, max_length);
   if (subs.size() > 1) {
@@ -186,10 +186,10 @@ void AccessLogFormatParser::parseCommandHeader(const std::string& token, const s
   }
 }
 
-void AccessLogFormatParser::parseCommand(const std::string& token, const size_t start,
-                                         const std::string& separator, std::string& main,
-                                         std::vector<std::string>& sub_items,
-                                         absl::optional<size_t>& max_length) {
+void SubstitutionFormatParser::parseCommand(const std::string& token, const size_t start,
+                                            const std::string& separator, std::string& main,
+                                            std::vector<std::string>& sub_items,
+                                            absl::optional<size_t>& max_length) {
   // TODO(dnoe): Convert this to use string_view throughout.
   const size_t end_request = token.find(')', start);
   sub_items.clear();
@@ -230,8 +230,8 @@ void AccessLogFormatParser::parseCommand(const std::string& token, const size_t 
   }
 }
 
-// TODO(derekargueta): #2967 - Rewrite AccessLogFormatter with parser library & formal grammar
-std::vector<FormatterProviderPtr> AccessLogFormatParser::parse(const std::string& format) {
+// TODO(derekargueta): #2967 - Rewrite SubstitutionFormatter with parser library & formal grammar
+std::vector<FormatterProviderPtr> SubstitutionFormatParser::parse(const std::string& format) {
   std::string current_token;
   std::vector<FormatterProviderPtr> formatters;
   static constexpr absl::string_view DYNAMIC_META_TOKEN{"DYNAMIC_METADATA("};
@@ -581,7 +581,7 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
   } else if (field_name == "PROTOCOL") {
     field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) {
-          return AccessLogFormatUtils::protocolToString(stream_info.protocol());
+          return SubstitutionFormatUtils::protocolToString(stream_info.protocol());
         });
   } else if (field_name == "RESPONSE_CODE") {
     field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
@@ -759,7 +759,7 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
           return result;
         });
   } else if (field_name == "HOSTNAME") {
-    std::string hostname = AccessLogFormatUtils::getHostname();
+    std::string hostname = SubstitutionFormatUtils::getHostname();
     field_extractor_ = std::make_unique<StreamInfoOptionalStringFieldExtractor>(
         [hostname](const StreamInfo::StreamInfo&) { return hostname; });
   } else {
@@ -1115,5 +1115,5 @@ ProtobufWkt::Value StartTimeFormatter::formatValue(
       format(request_headers, response_headers, response_trailers, stream_info, local_reply_body));
 }
 
-} // namespace AccessLog
+} // namespace Substitution
 } // namespace Envoy

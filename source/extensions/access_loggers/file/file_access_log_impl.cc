@@ -6,7 +6,7 @@ namespace AccessLoggers {
 namespace File {
 
 FileAccessLog::FileAccessLog(const std::string& access_log_path, AccessLog::FilterPtr&& filter,
-                             AccessLog::FormatterPtr&& formatter,
+                             Substitution::FormatterPtr&& formatter,
                              AccessLog::AccessLogManager& log_manager)
     : ImplBase(std::move(filter)), formatter_(std::move(formatter)) {
   log_file_ = log_manager.createAccessLog(access_log_path);

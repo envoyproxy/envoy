@@ -11,7 +11,6 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/access_log/access_log_formatter.h"
 #include "common/common/assert.h"
 #include "common/common/utility.h"
 #include "common/config/utility.h"
@@ -21,6 +20,7 @@
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/stream_info/utility.h"
+#include "common/substitution/substitution_formatter.h"
 #include "common/tracing/http_tracer_impl.h"
 
 #include "absl/types/optional.h"

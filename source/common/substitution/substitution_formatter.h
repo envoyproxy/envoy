@@ -5,10 +5,10 @@
 #include <unordered_map>
 #include <vector>
 
-#include "envoy/access_log/access_log.h"
 #include "envoy/common/time.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/stream_info/stream_info.h"
+#include "envoy/substitution/substitution_formatter.h"
 
 #include "common/common/utility.h"
 
@@ -16,14 +16,12 @@
 #include "absl/types/optional.h"
 
 namespace Envoy {
-namespace AccessLog {
-
-// TODO(qiwzhang): move this to source/common/common to be shared
+namespace Substitution {
 
 /**
  * Access log format parser.
  */
-class AccessLogFormatParser {
+class SubstitutionFormatParser {
 public:
   static std::vector<FormatterProviderPtr> parse(const std::string& format);
 
@@ -73,14 +71,14 @@ private:
 /**
  * Util class for access log format.
  */
-class AccessLogFormatUtils {
+class SubstitutionFormatUtils {
 public:
-  static FormatterPtr defaultAccessLogFormatter();
+  static FormatterPtr defaultSubstitutionFormatter();
   static const std::string& protocolToString(const absl::optional<Http::Protocol>& protocol);
   static const std::string getHostname();
 
 private:
-  AccessLogFormatUtils();
+  SubstitutionFormatUtils();
 
   static const std::string DEFAULT_FORMAT;
 };
@@ -357,5 +355,5 @@ private:
   const Envoy::DateFormatter date_formatter_;
 };
 
-} // namespace AccessLog
+} // namespace Substitution
 } // namespace Envoy
