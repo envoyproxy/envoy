@@ -11,8 +11,9 @@ namespace Envoy {
 namespace Stats {
 
 HistogramStatisticsImpl::HistogramStatisticsImpl(const histogram_t* histogram_ptr)
-    : computed_quantiles_(supportedQuantiles().size(), 0.0) {
-  hist_approx_quantile(histogram_ptr, supportedQuantiles().data(), supportedQuantiles().size(),
+    : computed_quantiles_(HistogramStatisticsImpl::supportedQuantiles().size(), 0.0) {
+  hist_approx_quantile(histogram_ptr, supportedQuantiles().data(),
+                       HistogramStatisticsImpl::supportedQuantiles().size(),
                        computed_quantiles_.data());
 
   sample_count_ = hist_sample_count(histogram_ptr);

@@ -618,7 +618,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryError) {
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, false))
       .WillOnce(Invoke([](Http::ResponseHeaderMap& headers, bool end_stream) {
-        EXPECT_EQ("400", headers.Status()->value().getStringView());
+        EXPECT_EQ("400", headers.getStatusValue());
         EXPECT_FALSE(end_stream);
       }));
   EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
