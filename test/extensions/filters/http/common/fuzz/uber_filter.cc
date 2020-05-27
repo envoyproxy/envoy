@@ -157,9 +157,10 @@ void UberFilterFuzzer::sendTrailers(Http::StreamEncoderFilter* filter,
   filter->encodeTrailers(response_trailers_);
 }
 
-void UberFilterFuzzer::accessLog(AccessLog::Instance* access_logger) {
+void UberFilterFuzzer::accessLog(AccessLog::Instance* access_logger,
+                                 const StreamInfo::StreamInfo& stream_info) {
   ENVOY_LOG_MISC(debug, "Access logging");
-  access_logger->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+  access_logger->log(&request_headers_, &response_headers_, &response_trailers_, stream_info);
 }
 
 void UberFilterFuzzer::fuzz(
@@ -190,7 +191,7 @@ void UberFilterFuzzer::fuzz(
     runData(encoder_filter_.get(), upstream_data);
   }
   if (access_logger_ != nullptr) {
-    accessLog(access_logger_.get());
+    accessLog(access_logger_.get(), stream_info_);
   }
 
   reset();

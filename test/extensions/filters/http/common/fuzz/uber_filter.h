@@ -21,7 +21,7 @@ public:
   template <class FilterType> void runData(FilterType* filter, const test::fuzz::HttpData& data);
 
   // This executes the access logger with the fuzzed headers/trailers.
-  void accessLog(AccessLog::Instance* access_logger);
+  void accessLog(AccessLog::Instance* access_logger, const StreamInfo::StreamInfo& stream_info);
 
   // For fuzzing proto data, guide the mutator to useful 'Any' types.
   static void guideAnyProtoType(test::fuzz::HttpData* mutable_data, uint choice);
