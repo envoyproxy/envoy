@@ -136,22 +136,6 @@ TEST_F(ProtobufUtilityTest, EvaluateFractionalPercent) {
 
 } // namespace ProtobufPercentHelper
 
-TEST_F(ProtobufUtilityTest, HashAndEqualToIgnoreOriginalTypeField) {
-  ProtobufWkt::Struct s;
-  (*s.mutable_fields())["ab"].set_string_value("fgh");
-  EXPECT_EQ(1, s.fields_size());
-  envoy::api::v2::core::Metadata mv2;
-  mv2.mutable_filter_metadata()->insert({"xyz", s});
-
-  EXPECT_EQ(1, mv2.filter_metadata_size());
-  envoy::config::core::v3::Metadata mv3;
-  Config::VersionConverter::upgrade(mv2, mv3);
-
-  envoy::config::core::v3::Metadata mv3dup = mv3;
-  ASSERT_EQ(MessageUtil::hash(mv3), MessageUtil::hash(mv3dup));
-  ASSERT(MessageUtil()(mv3, mv3dup));
-}
-
 TEST_F(ProtobufUtilityTest, MessageUtilHash) {
   ProtobufWkt::Struct s;
   (*s.mutable_fields())["ab"].set_string_value("fgh");
@@ -170,6 +154,34 @@ TEST_F(ProtobufUtilityTest, MessageUtilHash) {
   EXPECT_EQ(MessageUtil::hash(a2), MessageUtil::hash(a3));
   EXPECT_NE(0, MessageUtil::hash(a1));
   EXPECT_NE(MessageUtil::hash(s), MessageUtil::hash(a1));
+}
+
+TEST_F(ProtobufUtilityTest, MessageUtilHashAndEqualToIgnoreOriginalTypeField) {
+  ProtobufWkt::Struct s;
+  (*s.mutable_fields())["ab"].set_string_value("fgh");
+  EXPECT_EQ(1, s.fields_size());
+  envoy::api::v2::core::Metadata mv2;
+  mv2.mutable_filter_metadata()->insert({"xyz", s});
+  EXPECT_EQ(1, mv2.filter_metadata_size());
+
+  // Add the OriginalTypeFieldNumber as unknown field.
+  envoy::config::core::v3::Metadata mv3;
+  Config::VersionConverter::upgrade(mv2, mv3);
+
+  // Add another unknown field.
+  {
+    const Protobuf::Reflection* reflection = mv3.GetReflection();
+    auto* unknown_field_set = reflection->MutableUnknownFields(&mv3);
+    auto set_size = unknown_field_set->field_count();
+    // 183412668 is the magic number OriginalTypeFieldNumber. The successor number should not be
+    // occupied.
+    unknown_field_set->AddFixed32(183412668 + 1, 1);
+    EXPECT_NE(set_size + 1, unknown_field_set->field_count()) << "Fail to add an unknown field";
+  }
+
+  envoy::config::core::v3::Metadata mv3dup = mv3;
+  ASSERT_EQ(MessageUtil::hash(mv3), MessageUtil::hash(mv3dup));
+  ASSERT(MessageUtil()(mv3, mv3dup));
 }
 
 TEST_F(ProtobufUtilityTest, RepeatedPtrUtilDebugString) {
