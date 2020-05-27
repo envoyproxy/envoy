@@ -330,6 +330,7 @@ envoy_cc_library(
     name = "quic_transport_socket_factory_lib",
     srcs = ["quic_transport_socket_factory.cc"],
     hdrs = ["quic_transport_socket_factory.h"],
+    security_posture = "unknown",
     tags = ["nofips"],
     deps = [
         "//include/envoy/network:transport_socket_interface",
