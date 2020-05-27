@@ -194,8 +194,11 @@ std::string TestEnvironment::getCheckedEnvVar(const std::string& var) {
   return optional.value();
 }
 
-std::string TestEnvironment::chooseBaseId(uint32_t base_test_id) {
-  ASSERT(base_test_id >= 1000000);
+std::string TestEnvironment::chooseBaseId(uint64_t test_base_id) {
+  ASSERT(test_base_id >= 1);
+  ASSERT(test_base_id <= 1L << 44); // Leave room to multiple by 1000000.
+
+  test_base_id *= 1000000;
 
   auto test_random_seed = TestEnvironment::getOptionalEnvVar("TEST_RANDOM_SEED");
   auto test_shard_index = TestEnvironment::getOptionalEnvVar("TEST_SHARD_INDEX");
@@ -203,16 +206,16 @@ std::string TestEnvironment::chooseBaseId(uint32_t base_test_id) {
   if (test_random_seed) {
     int mutator = 0;
     if (absl::SimpleAtoi(test_random_seed.value(), &mutator)) {
-      base_test_id += mutator;
+      test_base_id += mutator;
     }
   } else if (test_shard_index) {
     int mutator = 0;
     if (absl::SimpleAtoi(test_shard_index.value(), &mutator)) {
-      base_test_id += mutator;
+      test_base_id += mutator;
     }
   }
 
-  return absl::StrFormat("%d", base_test_id);
+  return absl::StrFormat("%d", test_base_id);
 }
 
 void TestEnvironment::initializeTestMain(char* program_name) {

@@ -38,7 +38,7 @@ protected:
       : config_file_(TestEnvironment::temporaryFileSubstitute(
             "test/config/integration/google_com_proxy_port_0.v2.yaml", TestEnvironment::ParamMap(),
             TestEnvironment::PortMap(), GetParam())),
-        base_id_(TestEnvironment::chooseBaseId(3000000)), // see docs for chooseBaseId
+        base_id_(TestEnvironment::chooseBaseId(3)), // see docs for chooseBaseId
         argv_(
             {"envoy-static", "--base-id", base_id_.c_str(), "-c", config_file_.c_str(), nullptr}) {}
 
@@ -81,7 +81,7 @@ TEST_P(MainCommonTest, ConstructDestructHotRestartDisabled) {
 
 // Exercise init_only explicitly.
 TEST_P(MainCommonTest, ConstructDestructHotRestartDisabledNoInit) {
-  //  addArg("--disable-hot-restart");
+  addArg("--disable-hot-restart");
   initOnly();
   MainCommon main_common(argc(), argv());
   EXPECT_TRUE(main_common.run());

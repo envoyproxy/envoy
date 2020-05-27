@@ -3,7 +3,7 @@
 source "${TEST_SRCDIR}/envoy/test/integration/test_utility.sh"
 
 # Use TEST_RANDOM_SEED or TEST_SHARD_INDEX to choose a base id. This
-# replicates the logic of TestEnvironment::chooseBaseId. See that method
+# replicates the logic of TestEnvironment::chooseBaseId(2). See that method
 # for details.
 let BASE_ID=2000000+${TEST_RANDOM_SEED:-${TEST_SHARD_INDEX:-0}}
 

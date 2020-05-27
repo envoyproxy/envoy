@@ -73,23 +73,45 @@ public:
   static std::string getCheckedEnvVar(const std::string& var);
 
   /**
-   * Obtain an appropriate base-id (for use as the base id option for an Envoy
-   * server). Each test that needs a base id should invoke this method with
-   * a different value for base_test_id. The base test id is mutated using the
-   * following environment variables:
-   * - TEST_RANDOM_SEED to handle concurrent runs via the Bazel --runs_per_test flag
-   * - TEST_SHARD_INDEX to handle concurrent runs in coverage tests
+   * Generates an appropriate base-id for use as the base id option to an Envoy
+   * server. Each test that requires a unique test base id should invoke this
+   * method with a unique value to get a string value appropriate for use the
+   * value of the --base-id command line argument. In general, tests that
+   * create an Envoy::Server::HotRestartImpl without mocks should use this
+   * function. If all test cases within a grouping, say a single test source
+   * file, are executed consecutively, they may share a test base id. Tests in
+   * separate groupings cannot share a test base id for reasons described
+   * below. Special care must be taken with death tests -- the gtest framework
+   * will fork and invoke a new copy of the same test binary with additional
+   * command line flags. This can result in the re-use of a given base-id from
+   * another process (which causing a failure).
    *
-   * We require a unique base test id because random seeds are reused across
-   * multiple tests. For example, running:
+   * We require a unique test base id because random seeds are reused across
+   * multiple test targets. For example, running:
    *     bazel --runs_per_test=3 //test:foo_test //test:bar_test
-   * results in 3 unique seeds. Each set of tests is run once with each
-   * seed. Thus, the base test id is used to differentiate between tests run in
-   * parallel with the same seed.
+   * results in 3 unique seeds. Each test target is run once with each seed.
+   * Similarly, in coverage tests, the same test may be run concurrently in
+   * multiple coverage shards.
    *
-   * @param base_test_id a uint32_t, larger than 1000000, to uniquely identify a test
+   * This method uses the given test base id and one of the following
+   * environment variables:
+   * - TEST_RANDOM_SEED is used to handle concurrent runs via the Bazel
+   *                    --runs_per_test flag
+   * - TEST_SHARD_INDEX is used to handle concurrent runs when tests are run in
+   *                    shards, such as in coverage testing
+   *
+   * This algorithm is reimplemented in the following test scripts:
+   * - test/integration/hot_restart_test.sh
+   * - test/integration/run_envoy_test.sh
+   *
+   * Currently the in-use test base ids are:
+   *     1: test/integration/hot_restart_test.sh
+   *     2: test/integration/run_envoy_test.sh
+   *     3: test/exe/main_common_test.cc
+   *
+   * @param test_base_id a uint64_t used to unique identify a group of tests
    */
-  static std::string chooseBaseId(uint32_t base_test_id);
+  static std::string chooseBaseId(uint64_t test_base_id);
 
   /**
    * Obtain a private writable temporary directory.

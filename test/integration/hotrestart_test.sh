@@ -65,7 +65,7 @@ cat "${TEST_SRCDIR}/envoy"/test/config/integration/server.yaml |
 JSON_TEST_ARRAY+=("${HOT_RESTART_JSON_REUSE_PORT}")
 
 # Use TEST_RANDOM_SEED or TEST_SHARD_INDEX to choose a base id. This
-# replicates the logic of TestEnvironment::chooseBaseId. See that method
+# replicates the logic of TestEnvironment::chooseBaseId(1). See that method
 # for details.
 let BASE_ID=1000000+${TEST_RANDOM_SEED:-${TEST_SHARD_INDEX:-0}}
 
