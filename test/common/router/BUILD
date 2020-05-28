@@ -343,11 +343,11 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "header_formatter_test",
-    srcs = ["header_formatter_test.cc"],
+    name = "custom_header_formatter_test",
+    srcs = ["custom_header_formatter_test.cc"],
     deps = [
         "//source/common/config:metadata_lib",
-        "//source/common/router:header_formatter_lib",
+        "//source/common/router:custom_header_formatter_lib",
         "//source/common/router:header_parser_lib",
         "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:filter_state_lib",
