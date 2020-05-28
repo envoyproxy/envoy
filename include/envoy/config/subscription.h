@@ -105,7 +105,8 @@ using SubscriptionPtr = std::unique_ptr<Subscription>;
   COUNTER(update_success)                                                                          \
   GAUGE(update_time, NeverImport)                                                                  \
   GAUGE(version, NeverImport)                                                                      \
-  TEXT_READOUT(version_text)
+  TEXT_READOUT(version_text)                                                                       \
+  TEXT_READOUT(control_plane_identifier)
 
 /**
  * Struct definition for per subscription stats. @see stats_macros.h

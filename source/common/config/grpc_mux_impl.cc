@@ -17,11 +17,12 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info,
                          const Protobuf::MethodDescriptor& service_method,
                          envoy::config::core::v3::ApiVersion transport_api_version,
                          Runtime::RandomGenerator& random, Stats::Scope& scope,
-                         const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node)
+                         SubscriptionStats stats, const RateLimitSettings& rate_limit_settings,
+                         bool skip_subsequent_node)
     : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings),
       local_info_(local_info), skip_subsequent_node_(skip_subsequent_node),
-      first_stream_request_(true), transport_api_version_(transport_api_version) {
+      first_stream_request_(true), transport_api_version_(transport_api_version), stats_(stats) {
   Config::Utility::checkLocalInfo("ads", local_info);
 }
 
@@ -127,6 +128,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
     std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message) {
   const std::string& type_url = message->type_url();
   ENVOY_LOG(debug, "Received gRPC message for {} at version {}", type_url, message->version_info());
+  stats_.control_plane_identifier_.set(message->control_plane().identifier());
   if (api_state_.count(type_url) == 0) {
     ENVOY_LOG(warn, "Ignoring the message for type URL {} as it has no current subscribers.",
               type_url);

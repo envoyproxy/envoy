@@ -90,6 +90,7 @@ void HttpSubscriptionImpl::parseResponse(const Http::ResponseMessage& response) 
     stats_.update_time_.set(DateUtil::nowToMilliseconds(dispatcher_.timeSource()));
     stats_.version_.set(HashUtil::xxHash64(request_.version_info()));
     stats_.version_text_.set(request_.version_info());
+    stats_.control_plane_identifier_.set(message.control_plane().identifier());
     stats_.update_success_.inc();
   } catch (const EnvoyException& e) {
     handleFailure(Config::ConfigUpdateFailureReason::UpdateRejected, &e);

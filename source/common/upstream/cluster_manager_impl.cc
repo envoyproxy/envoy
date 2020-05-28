@@ -333,6 +333,7 @@ ClusterManagerImpl::ClusterManagerImpl(
                   : "envoy.service.discovery.v2.AggregatedDiscoveryService."
                     "StreamAggregatedResources"),
           dyn_resources.ads_config().transport_api_version(), random_, stats_,
+          Envoy::Config::Utility::generateStats(stats_),
           Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
           bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only());
     }

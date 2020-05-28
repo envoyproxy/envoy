@@ -69,7 +69,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
                                                      api_config_source, scope, true)
                   ->create(),
               dispatcher_, sotwGrpcMethod(type_url), api_config_source.transport_api_version(),
-              random_, scope, Utility::parseRateLimitSettings(api_config_source),
+              random_, scope, stats, Utility::parseRateLimitSettings(api_config_source),
               api_config_source.set_node_on_first_message_only()),
           callbacks, stats, type_url, dispatcher_, Utility::configSourceInitialFetchTimeout(config),
           /*is_aggregated*/ false);

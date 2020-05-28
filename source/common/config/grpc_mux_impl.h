@@ -31,7 +31,7 @@ public:
   GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::RawAsyncClientPtr async_client,
               Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
               envoy::config::core::v3::ApiVersion transport_api_version,
-              Runtime::RandomGenerator& random, Stats::Scope& scope,
+              Runtime::RandomGenerator& random, Stats::Scope& scope, SubscriptionStats stats,
               const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node);
   ~GrpcMuxImpl() override = default;
 
@@ -134,6 +134,7 @@ private:
   // This string is a type URL.
   std::queue<std::string> request_queue_;
   const envoy::config::core::v3::ApiVersion transport_api_version_;
+  SubscriptionStats stats_;
 };
 
 class NullGrpcMuxImpl : public GrpcMux,
