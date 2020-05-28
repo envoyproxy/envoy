@@ -32,6 +32,8 @@ host when forwarding. See the example below within the configured routes.
   the certificate chain. Additionally, Envoy will automatically perform SAN verification for the
   resolved host name as well as specify the host name via SNI.
 
+.. _dns_cache_circuit_breakers:
+
   Dynamic forward proxy uses circuit breakers prepared for destination cluster for DNS cache. Now we are available to use DNS Cache circuit breaker that enables 
   you to configure the circuit breaking policy for DNS cache specifically. By default, This behavior is disabled by the runtime feature 
   `envoy.reloadable_features.disallow_dns_cache_circuit_breakers`.

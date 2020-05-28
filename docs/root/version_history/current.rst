@@ -49,8 +49,7 @@ New Features
 * config: added :ref:`version_text <config_cluster_manager_cds>` stat that reflects xDS version.
 * decompressor: generic :ref:`decompressor <config_http_filters_decompressor>` filter exposed to users.
 * dynamic forward proxy: added :ref:`SNI based dynamic forward proxy <config_network_filters_sni_dynamic_forward_proxy>` support.
-* dynamic forward proxy: added configurable :ref:`circuit breakers <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheCircuitBreakers>` for resolver on DNS cache. This behavior is disabled by the runtime feature 
-  `envoy.reloadable_features.disallow_dns_cache_circuit_breakers`.
+* dynamic forward proxy: added configurable :ref:`circuit breakers <dns_cache_circuit_breakers>` for resolver on DNS cache. This behavior is disabled by the runtime feature `envoy.reloadable_features.disallow_dns_cache_circuit_breakers`.
 * fault: added support for controlling the percentage of requests that abort, delay and response rate limits faults
   are applied to using :ref:`HTTP headers <config_http_filters_fault_injection_http_header>` to the HTTP fault filter.
 * fault: added support for specifying grpc_status code in abort faults using
