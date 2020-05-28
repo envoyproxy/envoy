@@ -219,8 +219,15 @@ TEST_F(ProtobufUtilityTest, LoadBinaryProtoUnknownFieldFromFile) {
   source_duration.set_seconds(42);
   const std::string filename =
       TestEnvironment::writeStringToFileForTest("proto.pb", source_duration.SerializeAsString());
+  // Verify without boosting
   envoy::config::bootstrap::v3::Bootstrap proto_from_file;
-  EXPECT_THROW_WITH_MESSAGE(TestUtility::loadFromFile(filename, proto_from_file, *api_),
+  EXPECT_THROW_WITH_MESSAGE(TestUtility::loadFromFile(filename, proto_from_file, *api_, false),
+                            EnvoyException,
+                            "Protobuf message (type envoy.config.bootstrap.v3.Bootstrap with "
+                            "unknown field set {1}) has unknown fields");
+
+  // Verify with boosting
+  EXPECT_THROW_WITH_MESSAGE(TestUtility::loadFromFile(filename, proto_from_file, *api_, true),
                             EnvoyException,
                             "Protobuf message (type envoy.config.bootstrap.v3.Bootstrap with "
                             "unknown field set {1}) has unknown fields");
@@ -297,6 +304,33 @@ TEST_F(ProtobufUtilityTest, LoadTextProtoFromFile_Failure) {
                             EnvoyException,
                             "Unable to parse file \"" + filename +
                                 "\" as a text protobuf (type envoy.config.bootstrap.v3.Bootstrap)");
+}
+
+// A deprecated field can be used in previous version binary proto and upgraded.
+TEST_F(ProtobufUtilityTest, DEPRECATED_FEATURE_TEST(LoadV2TextProtoDeprecatedField)) {
+  API_NO_BOOST(envoy::config::bootstrap::v2::Bootstrap) bootstrap;
+  bootstrap.mutable_node()->set_build_version("foo");
+
+  std::string bootstrap_text;
+  ASSERT_TRUE(Protobuf::TextFormat::PrintToString(bootstrap, &bootstrap_text));
+  const std::string filename =
+      TestEnvironment::writeStringToFileForTest("proto.pb_text", bootstrap_text);
+
+  // Loading as previous version should work
+  API_NO_BOOST(envoy::config::bootstrap::v2::Bootstrap) proto_v2_from_file;
+  TestUtility::loadFromFile(filename, proto_v2_from_file, *api_, false);
+  EXPECT_EQ("foo", proto_v2_from_file.node().build_version());
+
+  // Loading as current version should fail
+  API_NO_BOOST(envoy::config::bootstrap::v3::Bootstrap) proto_v3_from_file;
+  EXPECT_THROW_WITH_MESSAGE(TestUtility::loadFromFile(filename, proto_v3_from_file, *api_, false),
+                            EnvoyException,
+                            "Protobuf message (type envoy.config.bootstrap.v3.Bootstrap with "
+                            "unknown field set {1}) has unknown fields");
+
+  // Loading as current version  with boosting should work (and field has deprecated prefix)
+  TestUtility::loadFromFile(filename, proto_v3_from_file, *api_, true);
+  EXPECT_EQ("foo", proto_v3_from_file.node().hidden_envoy_deprecated_build_version());
 }
 
 // String fields annotated as sensitive should be converted to the string "[redacted]". String

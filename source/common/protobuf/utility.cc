@@ -346,13 +346,33 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
   // If the filename ends with .pb, attempt to parse it as a binary proto.
   if (absl::EndsWith(path, FileExtensions::get().ProtoBinary)) {
     // Attempt to parse the binary format.
-    if (message.ParseFromString(contents)) {
-      MessageUtil::checkForUnexpectedFields(message, validation_visitor);
-      return;
+    auto read_proto_binary = [&contents, &path, &validation_visitor](
+                                 Protobuf::Message& message, MessageVersion message_version) {
+      if (message.ParseFromString(contents)) {
+        if (message_version == MessageVersion::LATEST_VERSION) {
+          MessageUtil::checkForUnexpectedFields(message, validation_visitor);
+        }
+        return;
+      }
+      if (message_version == MessageVersion::LATEST_VERSION) {
+        throw EnvoyException("Unable to parse file \"" + path + "\" as a binary protobuf (type " +
+                             message.GetTypeName() + ")");
+      } else {
+        throw ApiBoostRetryException(
+            "Failed to parse at earlier version, trying again at later version.");
+      }
+    };
+
+    if (do_boosting) {
+      // Attempt to read as the latest version (denying deprecated fields), and
+      // if it fails attempts to read as previous version and upgrade.
+      tryWithApiBoosting(read_proto_binary, message);
+    } else {
+      read_proto_binary(message, MessageVersion::LATEST_VERSION);
     }
-    throw EnvoyException("Unable to parse file \"" + path + "\" as a binary protobuf (type " +
-                         message.GetTypeName() + ")");
+    return;
   }
+
   // If the filename ends with .pb_text, attempt to parse it as a text proto.
   if (absl::EndsWith(path, FileExtensions::get().ProtoText)) {
     auto read_proto_text = [&contents, &path](Protobuf::Message& message,

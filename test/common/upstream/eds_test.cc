@@ -1857,7 +1857,7 @@ TEST_F(EdsAssignmentTimeoutTest, AssignmentLeaseExpired) {
 
 // Validate that onConfigUpdate() verifies that no deprecated fields are used.
 TEST_F(EdsTest, DeprecatedFieldsError) {
-  // TODO(adip): This test is only valid in API-v3, and should be updated for
+  // TODO(adisuissa): This test is only valid in API-v3, and should be updated for
   // API-v4, as the deprecated fields of API-v2 will be removed.
   // STOPPED HERE
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment =
