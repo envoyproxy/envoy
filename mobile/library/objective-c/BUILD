@@ -16,6 +16,7 @@ objc_library(
     hdrs = [
         "EnvoyEngine.h",
     ],
+    module_name = "EnvoyEngine",
     sdk_frameworks = [
         "SystemConfiguration",
         "UIKit",

@@ -1,3 +1,4 @@
+@_implementationOnly import EnvoyEngine
 import Foundation
 
 /// Builder used for creating new instances of EnvoyClient.
