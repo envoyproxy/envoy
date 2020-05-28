@@ -116,8 +116,8 @@ public:
 
 class MockTlsCertificateConfig : public TlsCertificateConfig {
 public:
-  MockTlsCertificateConfig() {}
-  ~MockTlsCertificateConfig() override {}
+  MockTlsCertificateConfig() = default;
+  ~MockTlsCertificateConfig() override = default;
 
   MOCK_METHOD(const std::string&, certificateChain, (), (const));
   MOCK_METHOD(const std::string&, certificateChainPath, (), (const));

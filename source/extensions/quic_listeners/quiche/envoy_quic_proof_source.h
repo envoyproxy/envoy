@@ -24,7 +24,7 @@ public:
 
 private:
   absl::optional<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>>
-  GetTlsCertConfig(const quic::QuicSocketAddress& server_address,
+  getTlsCertConfig(const quic::QuicSocketAddress& server_address,
                    const quic::QuicSocketAddress& client_address, const std::string& hostname);
 
   Network::SocketSharedPtr listen_socket_;

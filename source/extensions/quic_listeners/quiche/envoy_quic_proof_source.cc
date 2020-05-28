@@ -19,7 +19,7 @@ EnvoyQuicProofSource::GetCertChain(const quic::QuicSocketAddress& server_address
                                    const quic::QuicSocketAddress& client_address,
                                    const std::string& hostname) {
   absl::optional<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> cert_config_ref =
-      GetTlsCertConfig(server_address, client_address, hostname);
+      getTlsCertConfig(server_address, client_address, hostname);
   // Only return the first TLS cert config.
   if (!cert_config_ref.has_value()) {
     ENVOY_LOG(warn, "No matching filter chain found for handshake.");
@@ -44,7 +44,7 @@ void EnvoyQuicProofSource::ComputeTlsSignature(
     const std::string& hostname, uint16_t signature_algorithm, quiche::QuicheStringPiece in,
     std::unique_ptr<quic::ProofSource::SignatureCallback> callback) {
   absl::optional<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> cert_config_ref =
-      GetTlsCertConfig(server_address, client_address, hostname);
+      getTlsCertConfig(server_address, client_address, hostname);
   if (!cert_config_ref.has_value()) {
     ENVOY_LOG(warn, "No matching filter chain found for handshake.");
     callback->Run(false, "", nullptr);
@@ -68,7 +68,7 @@ void EnvoyQuicProofSource::ComputeTlsSignature(
 }
 
 absl::optional<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>>
-EnvoyQuicProofSource::GetTlsCertConfig(const quic::QuicSocketAddress& server_address,
+EnvoyQuicProofSource::getTlsCertConfig(const quic::QuicSocketAddress& server_address,
                                        const quic::QuicSocketAddress& client_address,
                                        const std::string& hostname) {
   ENVOY_LOG(trace, "Getting cert chain for {}", hostname);
