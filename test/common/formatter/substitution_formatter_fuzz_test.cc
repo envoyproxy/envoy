@@ -1,6 +1,6 @@
-#include "common/access_log/access_log_formatter.h"
+#include "common/formatter/substitution_formatter.h"
 
-#include "test/common/access_log/access_log_formatter_fuzz.pb.validate.h"
+#include "test/common/formatter/substitution_formatter_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
 
@@ -8,11 +8,11 @@ namespace Envoy {
 namespace Fuzz {
 namespace {
 
-DEFINE_PROTO_FUZZER(const test::common::access_log::TestCase& input) {
+DEFINE_PROTO_FUZZER(const test::common::substitution::TestCase& input) {
   try {
     TestUtility::validate(input);
-    std::vector<AccessLog::FormatterProviderPtr> formatters =
-        AccessLog::AccessLogFormatParser::parse(input.format());
+    std::vector<Formatter::FormatterProviderPtr> formatters =
+        Formatter::SubstitutionFormatParser::parse(input.format());
     const auto& request_headers =
         Fuzz::fromHeaders<Http::TestRequestHeaderMapImpl>(input.request_headers());
     const auto& response_headers =
