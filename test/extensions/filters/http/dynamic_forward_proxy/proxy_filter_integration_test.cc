@@ -131,6 +131,10 @@ typed_config:
       bootstrap.mutable_static_resources()->clear_clusters();
     });
 
+    // Enable dns cache circuit breakers.
+    config_helper_.addRuntimeOverride(
+        "envoy.reloadable_features.disallow_dns_cache_circuit_breakers", "false");
+
     // Set validate_clusters to false to allow us to reference a CDS cluster.
     config_helper_.addConfigModifier(
         [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
