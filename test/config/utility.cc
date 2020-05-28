@@ -128,6 +128,8 @@ std::string ConfigHelper::httpProxyConfig() {
         typed_config:
           "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
           stat_prefix: config_test
+          delayed_close_timeout:
+            nanos: 100
           http_filters:
             name: envoy.filters.http.router
           codec_type: HTTP1
@@ -766,7 +768,7 @@ bool ConfigHelper::setAccessLog(const std::string& filename, absl::string_view f
   loadHttpConnectionManager(hcm_config);
   envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
   if (!format.empty()) {
-    access_log_config.set_format(absl::StrCat(format, "\n"));
+    access_log_config.mutable_log_format()->set_text_format(absl::StrCat(format, "\n"));
   }
   access_log_config.set_path(filename);
   hcm_config.mutable_access_log(0)->mutable_typed_config()->PackFrom(access_log_config);
@@ -781,7 +783,7 @@ bool ConfigHelper::setListenerAccessLog(const std::string& filename, absl::strin
   }
   envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
   if (!format.empty()) {
-    access_log_config.set_format(std::string(format));
+    access_log_config.mutable_log_format()->set_text_format(std::string(format));
   }
   access_log_config.set_path(filename);
   bootstrap_.mutable_static_resources()
@@ -943,6 +945,16 @@ void ConfigHelper::setOutboundFramesLimits(uint32_t max_all_frames, uint32_t max
       storeHttpConnectionManager(hcm_config);
     }
   }
+}
+
+void ConfigHelper::setLocalReply(
+    const envoy::extensions::filters::network::http_connection_manager::v3::LocalReplyConfig&
+        config) {
+  envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
+      hcm_config;
+  loadHttpConnectionManager(hcm_config);
+  hcm_config.mutable_local_reply_config()->MergeFrom(config);
+  storeHttpConnectionManager(hcm_config);
 }
 
 CdsHelper::CdsHelper() : cds_path_(TestEnvironment::writeStringToFileForTest("cds.pb_text", "")) {}

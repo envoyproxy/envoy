@@ -18,6 +18,13 @@ enum SomeEnum {
 }
 
 message Sample {
+  enum DeprecateEnum {
+    option deprecated = true;
+
+    FIRST = 0;
+    SECOND = 1;
+  }
+
   message Entry {
     string key = 1;
 

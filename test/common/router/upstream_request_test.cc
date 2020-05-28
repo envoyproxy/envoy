@@ -180,8 +180,9 @@ protected:
 };
 
 TEST_F(TcpUpstreamTest, Basic) {
-  // Swallow the headers.
+  // Swallow the request headers and generate response headers.
   EXPECT_CALL(connection_, write(_, false)).Times(0);
+  EXPECT_CALL(mock_router_filter_, onUpstreamHeaders(200, _, _, false));
   tcp_upstream_->encodeHeaders(request_, false);
 
   // Proxy the data.
@@ -193,13 +194,11 @@ TEST_F(TcpUpstreamTest, Basic) {
   Http::MetadataMapVector metadata_map_vector;
   tcp_upstream_->encodeMetadata(metadata_map_vector);
 
-  // On initial data payload, fake response headers, and forward data.
+  // Forward data.
   Buffer::OwnedImpl response1("bar");
-  EXPECT_CALL(mock_router_filter_, onUpstreamHeaders(200, _, _, false));
   EXPECT_CALL(mock_router_filter_, onUpstreamData(BufferStringEqual("bar"), _, false));
   tcp_upstream_->onUpstreamData(response1, false);
 
-  // On the next batch of payload there won't be additional headers.
   Buffer::OwnedImpl response2("eep");
   EXPECT_CALL(mock_router_filter_, onUpstreamHeaders(_, _, _, _)).Times(0);
   EXPECT_CALL(mock_router_filter_, onUpstreamData(BufferStringEqual("eep"), _, false));

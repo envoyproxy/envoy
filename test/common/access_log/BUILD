@@ -36,7 +36,6 @@ envoy_cc_fuzz_test(
 envoy_cc_test(
     name = "access_log_formatter_test",
     srcs = ["access_log_formatter_test.cc"],
-    tags = ["fails_on_windows"],
     deps = [
         "//source/common/access_log:access_log_formatter_lib",
         "//source/common/common:utility_lib",
@@ -109,5 +108,4 @@ envoy_cc_benchmark_binary(
 envoy_benchmark_test(
     name = "access_log_formatter_speed_test_benchmark_test",
     benchmark_binary = "access_log_formatter_speed_test",
-    tags = ["fails_on_windows"],
 )

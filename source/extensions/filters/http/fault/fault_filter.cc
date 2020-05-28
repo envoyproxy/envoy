@@ -136,8 +136,7 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::RequestHeaderMap& hea
   }
 
   if (headers.EnvoyDownstreamServiceCluster()) {
-    downstream_cluster_ =
-        std::string(headers.EnvoyDownstreamServiceCluster()->value().getStringView());
+    downstream_cluster_ = std::string(headers.getEnvoyDownstreamServiceClusterValue());
     if (!downstream_cluster_.empty()) {
       downstream_cluster_storage_ = std::make_unique<Stats::StatNameDynamicStorage>(
           downstream_cluster_, config_->scope().symbolTable());
@@ -458,8 +457,7 @@ bool FaultFilter::matchesDownstreamNodes(const Http::RequestHeaderMap& headers) 
     return false;
   }
 
-  const absl::string_view downstream_node =
-      headers.EnvoyDownstreamServiceNode()->value().getStringView();
+  const absl::string_view downstream_node = headers.getEnvoyDownstreamServiceNodeValue();
   return fault_settings_->downstreamNodes().find(downstream_node) !=
          fault_settings_->downstreamNodes().end();
 }

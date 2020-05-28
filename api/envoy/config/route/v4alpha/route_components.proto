@@ -552,13 +552,6 @@ message RouteAction {
     NOT_FOUND = 1;
   }
 
-  // Configures :ref:`internal redirect <arch_overview_internal_redirects>` behavior.
-  // [#next-major-version: remove this definition - it's defined in the InternalRedirectPolicy message.]
-  enum InternalRedirectAction {
-    PASS_THROUGH_INTERNAL_REDIRECT = 0;
-    HANDLE_INTERNAL_REDIRECT = 1;
-  }
-
   // The router is capable of shadowing traffic from one cluster to another. The current
   // implementation is "fire and forget," meaning Envoy will not wait for the shadow cluster to
   // respond before returning the response from the primary cluster. All normal statistics are
@@ -1383,6 +1376,11 @@ message RateLimit {
 
       // The key to use in the descriptor entry.
       string descriptor_key = 2 [(validate.rules).string = {min_bytes: 1}];
+
+      // If set to true, Envoy skips the descriptor while calling rate limiting service
+      // when header is not present in the request. By default it skips calling the
+      // rate limiting service if this header is not present in the request.
+      bool skip_if_absent = 3;
     }
 
     // The following descriptor entry is appended to the descriptor and is populated using the

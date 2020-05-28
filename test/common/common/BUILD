@@ -38,6 +38,18 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "substitution_format_string_test",
+    srcs = ["substitution_format_string_test.cc"],
+    deps = [
+        "//source/common/common:substitution_format_string_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
 envoy_cc_fuzz_test(
     name = "base64_fuzz_test",
     srcs = ["base64_fuzz_test.cc"],
@@ -191,6 +203,15 @@ envoy_cc_test(
     srcs = ["perf_annotation_disabled_test.cc"],
     deps = [
         "//source/common/common:perf_annotation_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "basic_resource_impl_test",
+    srcs = ["basic_resource_impl_test.cc"],
+    deps = [
+        "//source/common/common:basic_resource_lib",
+        "//test/mocks/runtime:runtime_mocks",
     ],
 )
 
