@@ -179,6 +179,7 @@ envoy_cmake_external(
     cache_entries = {
         "HZ_LIB_TYPE": "STATIC",
         "CMAKE_BUILD_TYPE": "RELEASE",
+        "CMAKE_CXX_FLAGS": "-Wno-deprecated",
     },
     lib_source = "@com_github_hazelcast_cpp_client//:all",
     static_libraries = select({
