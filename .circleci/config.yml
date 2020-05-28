@@ -44,6 +44,7 @@ jobs:
            fingerprints:
              - "f6:f9:df:90:9c:4b:5f:9c:f4:69:fd:42:94:ff:88:24"
        - run: ci/filter_example_mirror.sh
+
    docs:
      executor: ubuntu-build
      steps:

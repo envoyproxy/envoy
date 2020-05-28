@@ -49,7 +49,7 @@ std::vector<std::string> UberFilterFuzzer::parseHttpData(const test::fuzz::HttpD
   } else if (data.has_proto_body()) {
     const std::string serialized = data.proto_body().message().value();
     data_chunks = absl::StrSplit(serialized,
-                                 absl::ByLength(std::min<int>(1, data.proto_body().chunk_size())));
+                                 absl::ByLength(data.proto_body().chunk_size()));
   }
 
   return data_chunks;
