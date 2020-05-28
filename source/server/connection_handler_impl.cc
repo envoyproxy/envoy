@@ -522,15 +522,16 @@ ConnectionHandlerImpl::ActiveTcpConnection::~ActiveTcpConnection() {
 }
 
 ActiveRawUdpListener::ActiveRawUdpListener(Network::ConnectionHandler& parent,
-                                     Event::Dispatcher& dispatcher, Network::ListenerConfig& config)
+                                           Event::Dispatcher& dispatcher,
+                                           Network::ListenerConfig& config)
     : ActiveRawUdpListener(
           parent,
           dispatcher.createUdpListener(config.listenSocketFactory().getListenSocket(), *this),
           config) {}
 
 ActiveRawUdpListener::ActiveRawUdpListener(Network::ConnectionHandler& parent,
-                                     Network::UdpListenerPtr&& listener,
-                                     Network::ListenerConfig& config)
+                                           Network::UdpListenerPtr&& listener,
+                                           Network::ListenerConfig& config)
     : ConnectionHandlerImpl::ActiveListenerImplBase(parent, &config),
       udp_listener_(std::move(listener)), read_filter_(nullptr) {
   // Create the filter chain on creating a new udp listener
