@@ -64,12 +64,10 @@ cat "${TEST_SRCDIR}/envoy"/test/config/integration/server.yaml |
   cat > "${HOT_RESTART_JSON_REUSE_PORT}"
 JSON_TEST_ARRAY+=("${HOT_RESTART_JSON_REUSE_PORT}")
 
-# Enable this test to work with --runs_per_test
-if [[ -z "${TEST_RANDOM_SEED}" ]]; then
-  BASE_ID=1
-else
-  BASE_ID="${TEST_RANDOM_SEED}"
-fi
+# Use TEST_RANDOM_SEED or TEST_SHARD_INDEX to choose a base id. This
+# replicates the logic of TestEnvironment::chooseBaseId(1). See that method
+# for details.
+let BASE_ID=1000000+${TEST_RANDOM_SEED:-${TEST_SHARD_INDEX:-0}}
 
 echo "Hot restart test using --base-id ${BASE_ID}"
 

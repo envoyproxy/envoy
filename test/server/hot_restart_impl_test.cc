@@ -44,6 +44,9 @@ public:
     // Test we match the correct stat with empty-slots before, after, or both.
     hot_restart_ = std::make_unique<HotRestartImpl>(options_);
     hot_restart_->drainParentListeners();
+
+    // We close both sockets.
+    EXPECT_CALL(os_sys_calls_, close(_)).Times(2);
   }
 
   Api::MockOsSysCalls os_sys_calls_;

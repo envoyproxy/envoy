@@ -38,7 +38,7 @@ struct FieldValidationConfig {
   bool ignore_unknown_dynamic_fields = false;
 };
 
-// Create OptionsImpl structures suitable for tests.
+// Create OptionsImpl structures suitable for tests. Disables hot restart.
 OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::string& config_yaml,
                                   Network::Address::IpVersion ip_version,
                                   FieldValidationConfig validation_config = FieldValidationConfig(),

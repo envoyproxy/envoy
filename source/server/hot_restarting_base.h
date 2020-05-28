@@ -24,6 +24,7 @@ namespace Server {
 class HotRestartingBase {
 protected:
   HotRestartingBase(uint64_t base_id) : base_id_(base_id) {}
+  ~HotRestartingBase();
 
   void initDomainSocketAddress(sockaddr_un* address);
   sockaddr_un createDomainSocketAddress(uint64_t id, const std::string& role);
