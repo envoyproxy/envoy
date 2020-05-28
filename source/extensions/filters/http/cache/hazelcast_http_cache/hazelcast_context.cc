@@ -133,11 +133,6 @@ void UnifiedLookupContext::getHeaders(LookupHeadersCallback&& cb) {
                                         response_->body().length()));
   } else {
     ENVOY_LOG(debug, "Missed unified response lookup for key: {}u", variant_hash_key_);
-    // Unlike DIVIDED mode, lock is not tried to be acquired before insertion.
-    // Instead, when putting a unified response into cache, putIfAbsent is called
-    // and hence only one insertion is performed. Cost for the creation of the
-    // unified entry (simultaneously) by multiple contexts is preferred
-    // over locking mechanism here.
     cb(LookupResult{});
   }
 }
@@ -152,7 +147,14 @@ void UnifiedLookupContext::getBody(const AdjustedByteRange& range, LookupBodyCal
 }
 
 UnifiedInsertContext::UnifiedInsertContext(LookupContext& lookup_context, HazelcastHttpCache& cache)
-    : HazelcastInsertContextBase(lookup_context, cache) {}
+    : HazelcastInsertContextBase(lookup_context, cache) {
+  // Unlike DIVIDED mode, lock is not tried to be acquired before insertion here.
+  // The reason behind tryLock before insertion in DIVIDED context is to prevent
+  // multiple body entry insertions by different contexts simultaneously. Since
+  // there is only one entry is to be inserted in UNIFIED mode, a locking mechanism
+  // is not used here. Multiple contexts can attempt to insert a response for the
+  // same key at the same time and can override an existing one.
+}
 
 void UnifiedInsertContext::insertHeaders(const Http::ResponseHeaderMap& response_headers,
                                          bool end_stream) {
@@ -209,7 +211,7 @@ void UnifiedInsertContext::insertResponse() {
 
   HazelcastResponseEntry entry(std::move(header), std::move(body));
   try {
-    hz_cache_.putResponseIfAbsent(variant_hash_key_, entry);
+    hz_cache_.putResponse(variant_hash_key_, entry);
   } catch (HazelcastClientOfflineException& e) {
     ENVOY_LOG(warn, "Hazelcast cluster connection is lost! Failed to insert response.");
   } catch (OperationTimeoutException& e) {
@@ -241,7 +243,6 @@ void DividedLookupContext::getHeaders(LookupHeadersCallback&& cb) {
     return;
   }
   if (header_entry) {
-    abort_insertion_ = true; // overriding an exiting entry is not allowed.
     ENVOY_LOG(debug, "Found divided response: [key: {}u, version: {}, body size: {}]",
               variant_hash_key_, header_entry->version(), header_entry->bodySize());
     if (!MessageDifferencer::Equals(header_entry->variantKey(), variantKey())) {
@@ -256,26 +257,6 @@ void DividedLookupContext::getHeaders(LookupHeadersCallback&& cb) {
     cb(lookup_request_.makeLookupResult(std::move(header_entry->headerMap()), total_body_size_));
   } else {
     ENVOY_LOG(debug, "Missed divided response lookup for key: {}u", variant_hash_key_);
-    try {
-      // To prevent multiple insertion contexts to create the same response in the cache,
-      // mark only one of them responsible for the insertion using Hazelcast map key locks.
-      // If key is not locked, it will be acquired here and only one insertion context
-      // created for this lookup will be responsible for the insertion. This is also valid
-      // when multiple cache filters from different proxies are connected to the same
-      // Hazelcast cluster.
-      abort_insertion_ = !hz_cache_.tryLock(variant_hash_key_);
-    } catch (HazelcastClientOfflineException& e) {
-      handleLookupFailure("Hazelcast cluster connection is lost! Aborting lookups and insertions"
-                          " until the connection is restored...",
-                          cb);
-      return;
-    } catch (OperationTimeoutException& e) {
-      handleLookupFailure("Operation timed out during tryLock!", cb);
-      return;
-    } catch (std::exception& e) {
-      handleLookupFailure(fmt::format("Lock trial has failed: {}", e.what()), cb);
-      return;
-    }
     cb(LookupResult{});
   }
 }
@@ -363,11 +344,30 @@ void DividedLookupContext::handleBodyLookupFailure(absl::string_view message,
 
 DividedInsertContext::DividedInsertContext(LookupContext& lookup_context, HazelcastHttpCache& cache)
     : HazelcastInsertContextBase(lookup_context, cache),
-      body_partition_size_(cache.bodySizePerEntry()), version_(createVersion()) {}
+      body_partition_size_(cache.bodySizePerEntry()), version_(createVersion()) {
+  try {
+    // To prevent multiple insertion contexts to create the same response in the cache,
+    // mark only one of them responsible for the insertion using Hazelcast map key locks.
+    // If key is not locked, it will be acquired here and only one insertion context
+    // will be responsible for the insertion. This is also valid when multiple cache
+    // filters from different proxies are connected to the same Hazelcast cluster.
+    // There is no such a mechanism for UNIFIED mode.
+    insertion_allowed_ = hz_cache_.tryLock(variant_hash_key_);
+    return;
+  } catch (HazelcastClientOfflineException& e) {
+    ENVOY_LOG(warn, "Hazelcast cluster connection is lost! Aborting lookups and insertions until "
+                    "the connection is restored...");
+  } catch (OperationTimeoutException& e) {
+    ENVOY_LOG(warn, "Operation timed out during tryLock!");
+  } catch (std::exception& e) {
+    ENVOY_LOG(warn, "Lock trial has failed: {}", e.what());
+  }
+  insertion_allowed_ = false;
+}
 
 void DividedInsertContext::insertHeaders(const Http::ResponseHeaderMap& response_headers,
                                          bool end_stream) {
-  if (abort_insertion_) {
+  if (abort_insertion_ || !insertion_allowed_) {
     return;
   }
   ASSERT(!committed_end_stream_);
@@ -383,8 +383,8 @@ void DividedInsertContext::insertHeaders(const Http::ResponseHeaderMap& response
 // flushed when it reaches the maximum capacity (body_partition_size_).
 void DividedInsertContext::insertBody(const Buffer::Instance& chunk,
                                       InsertCallback ready_for_next_chunk, bool end_stream) {
-  if (abort_insertion_) {
-    ENVOY_LOG(debug, "Aborting insertion for the hash key: {}", variant_hash_key_);
+  if (abort_insertion_ || !insertion_allowed_) {
+    ENVOY_LOG(debug, "Skipping insertion for the hash key: {}u", variant_hash_key_);
     if (ready_for_next_chunk) {
       ready_for_next_chunk(false);
     }
@@ -444,6 +444,7 @@ void DividedInsertContext::copyIntoLocalBuffer(uint64_t& offset, uint64_t size,
 
 bool DividedInsertContext::flushBuffer() {
   ASSERT(!abort_insertion_);
+  ASSERT(insertion_allowed_);
   if (buffer_vector_.empty()) {
     return true;
   }
@@ -474,6 +475,7 @@ bool DividedInsertContext::flushBuffer() {
 
 void DividedInsertContext::insertHeader() {
   ASSERT(!abort_insertion_);
+  ASSERT(insertion_allowed_);
   ASSERT(!committed_end_stream_);
   committed_end_stream_ = true;
   HazelcastHeaderEntry header(std::move(header_map_), std::move(variant_key_), total_body_size_,
@@ -485,8 +487,8 @@ void DividedInsertContext::insertHeader() {
     // To handle leftover locks in a failure, hazelcast.lock.max.lease.time.seconds property
     // must be set to a reasonable value on the server side. It is Long.MAX by default.
     // To make this independent from the server configuration, tryLock with leaseTime
-    // option can be used when available in a future release of cpp client. The related
-    // issue can be tracked at: https://github.com/hazelcast/hazelcast-cpp-client/issues/579
+    // option can be used when available in a future release of cpp client as it's implemented
+    // at: https://github.com/hazelcast/hazelcast-cpp-client/issues/579
     // TODO(enozcan): Use tryLock with leaseTime when released for Hazelcast cpp client.
   } catch (HazelcastClientOfflineException& e) {
     ENVOY_LOG(warn, "Hazelcast Connection is offline!");

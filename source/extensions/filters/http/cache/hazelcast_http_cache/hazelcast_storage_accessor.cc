@@ -30,9 +30,8 @@ void HazelcastClusterAccessor::removeBodyAsync(const std::string& key) {
 
 void HazelcastClusterAccessor::removeHeader(const int64_t key) { getHeaderMap().deleteEntry(key); }
 
-void HazelcastClusterAccessor::putResponseIfAbsent(const int64_t key,
-                                                   const HazelcastResponseEntry& value) {
-  getResponseMap().putIfAbsent(key, value);
+void HazelcastClusterAccessor::putResponse(const int64_t key, const HazelcastResponseEntry& value) {
+  getResponseMap().set(key, value);
 }
 
 HazelcastResponsePtr HazelcastClusterAccessor::getResponse(const int64_t key) {

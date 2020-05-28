@@ -51,23 +51,19 @@ TEST_F(HazelcastDividedCacheTest, AbortDividedInsertionWhenMaxSizeReached) {
       lookup(RequestPath).get(), std::string(HazelcastTestUtil::TEST_MAX_BODY_SIZE, 'h')));
 }
 
-TEST_F(HazelcastDividedCacheTest, PreventOverridingCacheEntries) {
-  const std::string RequestPath("/prevent/override/cached/response");
+TEST_F(HazelcastDividedCacheTest, AllowOverridingCacheEntries) {
+  const std::string RequestPath("/allow/override/cached/response");
 
   LookupContextPtr lookup_context = lookup(RequestPath);
-  const std::string OriginalBody(HazelcastTestUtil::TEST_PARTITION_SIZE * 2, 'h');
+  const std::string OriginalBody(HazelcastTestUtil::TEST_PARTITION_SIZE * 3, 'h');
   insert(move(lookup_context), getResponseHeaders(), OriginalBody);
 
   lookup_context = lookup(RequestPath);
   EXPECT_EQ(CacheEntryStatus::Ok, lookup_result_.cache_entry_status_);
 
-  // A possible call to insertion - made on purpose below, would be the filter's
-  // fault, not an expected behavior. Cache prevents the insertion in such a case.
-  const std::string OverriddenBody(HazelcastTestUtil::TEST_PARTITION_SIZE * 3, 'z');
+  const std::string OverriddenBody(HazelcastTestUtil::TEST_PARTITION_SIZE * 2, 'z');
   insert(move(lookup_context), getResponseHeaders(), OverriddenBody);
-  EXPECT_TRUE(expectLookupSuccessWithFullBody(lookup(RequestPath).get(), OriginalBody));
-  EXPECT_EQ(2, cache_->getTestAccessor().bodyMapSize());
-  EXPECT_EQ(1, cache_->getTestAccessor().headerMapSize());
+  EXPECT_TRUE(expectLookupSuccessWithFullBody(lookup(RequestPath).get(), OverriddenBody));
 }
 
 TEST_F(HazelcastDividedCacheTest, CleanBodyOnHeaderEviction) {
@@ -107,31 +103,33 @@ TEST_F(HazelcastDividedCacheTest, AbortInsertionIfKeyIsLocked) {
 
   LookupContextPtr lookup_context1 = lookup(RequestPath);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
-  // The first missed lookup must be allowed to make insertion.
-  ASSERT(!static_cast<HazelcastLookupContextBase&>(*lookup_context1).isAborted());
 
-  // Following ones must abort the insertion.
-  LookupContextPtr lookup_context2;
+  // Insertion starts for lookup_context1.
+  InsertContextPtr insert_context = cache_->makeInsertContext(std::move(lookup_context1));
+  insert_context->insertHeaders(getResponseHeaders(), false);
+  auto context1_insert = [&insert_context](std::string body, bool end_stream) {
+    insert_context->insertBody(
+        Buffer::OwnedImpl(body), [](bool) {}, end_stream);
+  };
+  context1_insert(std::string(HazelcastTestUtil::TEST_PARTITION_SIZE, 'h'), false);
+  context1_insert(std::string(HazelcastTestUtil::TEST_PARTITION_SIZE, 'h'), false);
+  // Insertion has not finished for lookup_context1 yet.
+
   std::thread t1([&] {
-    // If the second lookup would not be performed in a separate thread, it will acquire
-    // the lock even if it's already locked. This is because the key locks on Hazelcast
-    // IMap are re-entrant. A locked key can be acquired by the same thread again and
-    // again based on its pid.
-    lookup_context2 = lookup(RequestPath);
+    // If the second lookup and insertion would not be performed in a separate thread,
+    // it will acquire the lock even if it's already locked. This is because the key
+    // locks on Hazelcast IMap are re-entrant. A locked key can be acquired by the same
+    // thread again and again based on its pid. Using a different thread here simulates
+    // another request that yields cache insertion.
+    LookupContextPtr lookup_context2 = lookup(RequestPath);
+    EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
+    insert(move(lookup_context2), getResponseHeaders(), "ignored");
   });
   t1.join();
-  EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
-  ASSERT(static_cast<HazelcastLookupContextBase&>(*lookup_context2).isAborted());
 
-  const std::string Body("hazelcast");
-  // second context should not insert even if arrives before the first one.
-  insert(move(lookup_context2), getResponseHeaders(), Body);
-  lookup_context2 = lookup(RequestPath);
-  EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
-
-  // first one must do the insertion.
-  insert(move(lookup_context1), getResponseHeaders(), Body);
-  EXPECT_TRUE(expectLookupSuccessWithFullBody(lookup(RequestPath).get(), Body));
+  context1_insert(std::string(HazelcastTestUtil::TEST_PARTITION_SIZE, 'h'), true);
+  EXPECT_TRUE(expectLookupSuccessWithFullBody(
+      lookup(RequestPath).get(), std::string(HazelcastTestUtil::TEST_PARTITION_SIZE * 3, 'h')));
 }
 
 TEST_F(HazelcastDividedCacheTest, MissLookupOnVersionMismatch) {
@@ -385,30 +383,30 @@ TEST_F(HazelcastDividedCacheTest, FailDuringLock) {
   // the insertion permission is failed. Operations are arranged to test all exception
   // using Local Test Accessor. Changing the order might not cause test to fail but
   // to uncover some exceptions.
-
   const std::string RequestPath("/failed/during/try/lock");
+  uint64_t variant_hash_key =
+      static_cast<HazelcastLookupContextBase&>(*lookup(RequestPath)).variantHashKey();
+
+  std::thread t1([&] {
+    // To make this test compatible with RemoteTestCache, the key is locked here
+    // explicitly. This behavior will cause tryLock to return false for further
+    // trials. Hence the lookups below will throw exception for local cache and
+    // return false for remote cache. This has no effect on local test but lack of
+    // this locking causes remote test to fail. Notice that if this locking would not
+    // be performed by a different thread, following insertions in this thread would
+    // be able to lock the key again and again for RemoteTestCache.
+    EXPECT_TRUE(cache_->tryLock(variant_hash_key));
+  });
+  t1.join();
 
   // This will cause LocalTestAccessor::tryLock to raise error.
   cache_->getTestAccessor().failOnLock();
 
-  std::thread t1([&] {
-    // To make RemoteTestCache failOnLock as LocalTestCache does, HazelcastHttpCache
-    // must be modified. In order to prevent this modification, making a lookup here
-    // to make the key locked. Hence the lookups below will throw exception for local
-    // cache and return false for remote cache. This has no effect on local test but
-    // lack of this lookup causes remote test to fail.
-    lookup(RequestPath);
-  });
-  t1.join();
-
-  lookup(RequestPath); // std::exception
-  lookup(RequestPath); // HazelcastClientOfflineException
-  LookupContextPtr lookup_context = lookup(RequestPath);
+  insert(lookup(RequestPath), getResponseHeaders(), "aborted"); // std::exception
+  insert(lookup(RequestPath), getResponseHeaders(), "aborted"); // HazelcastClientOfflineException
+  insert(lookup(RequestPath), getResponseHeaders(), "aborted"); // OperationTimeoutException
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
-
-  insert(move(lookup_context), getResponseHeaders(), ""); // must be aborted.
-  lookup_context = lookup(RequestPath);
-  EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
+  cache_->unlock(variant_hash_key);
 }
 
 TEST_F(HazelcastDividedCacheTest, FailDuringBodyLookupWhenHeaderSucceeds) {

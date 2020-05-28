@@ -26,7 +26,7 @@ public:
   virtual int bodyMapSize() PURE;
   virtual int responseMapSize() PURE;
 
-  virtual void putResponse(int64_t key, const HazelcastResponseEntry& entry) PURE;
+  virtual void insertResponse(int64_t key, const HazelcastResponseEntry& entry) PURE;
   virtual void removeBody(const std::string& key) PURE;
 
   virtual void failOnLock() PURE;
@@ -63,7 +63,7 @@ public:
 
   void removeBody(const std::string& key) override { getBodyMap().remove(key); }
 
-  void putResponse(int64_t key, const HazelcastResponseEntry& entry) override {
+  void insertResponse(int64_t key, const HazelcastResponseEntry& entry) override {
     getResponseMap().put(key, entry);
   }
 
@@ -97,7 +97,7 @@ public:
 
   int responseMapSize() override { return response_map_.size(); }
 
-  void putResponse(int64_t key, const HazelcastResponseEntry& entry) override {
+  void insertResponse(int64_t key, const HazelcastResponseEntry& entry) override {
     checkConnection();
     response_map_[key] = HazelcastResponsePtr(new HazelcastResponseEntry(entry));
   }
@@ -118,12 +118,8 @@ public:
     body_map_[key] = HazelcastBodyPtr(new HazelcastBodyEntry(value));
   }
 
-  void putResponseIfAbsent(const int64_t key, const HazelcastResponseEntry& value) override {
-    checkConnection();
-    if (response_map_.find(key) != response_map_.end()) {
-      return;
-    }
-    response_map_[key] = HazelcastResponsePtr(new HazelcastResponseEntry(value));
+  void putResponse(const int64_t key, const HazelcastResponseEntry& value) override {
+    insertResponse(key, value);
   }
 
   HazelcastHeaderPtr getHeader(const int64_t key) override {

@@ -201,6 +201,8 @@ private:
   /** Response specific values to be used in the cached entries */
   const int32_t version_;
   uint64_t total_body_size_ = 0;
+
+  bool insertion_allowed_ = true;
 };
 
 } // namespace HazelcastHttpCache

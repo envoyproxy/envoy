@@ -110,16 +110,12 @@ public:
   /// Unified mode
 
   /**
-   * Puts a unified entry into unified cache if no other entry associated with the key
-   * is found.
+   * Puts a unified entry into unified cache.
    * @param key     Hash key for the entry
    * @param entry   Entry to be inserted
-   * @note          IfAbsent is to prevent race between multiple filters. Overriding
-   *                an existing entry is forbidden. HttpCache::updateHeaders() should
-   *                be used if changing the header content is necessary.
    */
-  void putResponseIfAbsent(const uint64_t key, const HazelcastResponseEntry& entry) {
-    accessor_->putResponseIfAbsent(mapKey(key), entry);
+  void putResponse(const uint64_t key, const HazelcastResponseEntry& entry) {
+    accessor_->putResponse(mapKey(key), entry);
   }
 
   /**

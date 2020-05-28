@@ -39,44 +39,24 @@ TEST_F(HazelcastUnifiedCacheTest, AbortUnifiedInsertionWhenMaxSizeReached) {
       lookup(RequestPath).get(), std::string(HazelcastTestUtil::TEST_MAX_BODY_SIZE, 'h')));
 }
 
-TEST_F(HazelcastUnifiedCacheTest, PutResponseOnlyWhenAbsent) {
-  const std::string RequestPath("/only/one/must/insert");
+TEST_F(HazelcastUnifiedCacheTest, AllowOverrideExistingResponse) {
+  const std::string RequestPath("/allow/override/unified/response");
 
   LookupContextPtr lookup_context1 = lookup(RequestPath);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
-
   LookupContextPtr lookup_context2 = lookup(RequestPath);
-  EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
-
-  const std::string Body1("hazelcast");
-  const std::string Body2("hazelcast.distributed.caching");
-
-  // The second context should insert if the cache is empty for this request.
-  insert(move(lookup_context1), getResponseHeaders(), Body1);
-  EXPECT_TRUE(expectLookupSuccessWithFullBody(lookup(RequestPath).get(), Body1));
-
-  // The first context should not do the insertion/override the existing value.
-  insert(move(lookup_context2), getResponseHeaders(), Body2);
-  // Response body must remain as Body1
-  EXPECT_TRUE(expectLookupSuccessWithFullBody(lookup(RequestPath).get(), Body1));
-}
-
-TEST_F(HazelcastUnifiedCacheTest, DoNotOverrideExistingResponse) {
-  const std::string RequestPath1("/on/unified/not/override");
-
-  LookupContextPtr lookup_context1 = lookup(RequestPath1);
-  EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
-  LookupContextPtr lookup_context2 = lookup(RequestPath1);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 
   const std::string Body1("hazelcast-first");
   const std::string Body2("hazelcast-second");
 
   insert(move(lookup_context1), getResponseHeaders(), Body1);
-  insert(move(lookup_context2), getResponseHeaders(), Body2);
-
-  lookup_context1 = lookup(RequestPath1);
+  lookup_context1 = lookup(RequestPath);
   EXPECT_TRUE(expectLookupSuccessWithFullBody(lookup_context1.get(), Body1));
+
+  insert(move(lookup_context2), getResponseHeaders(), Body2);
+  lookup_context2 = lookup(RequestPath);
+  EXPECT_TRUE(expectLookupSuccessWithFullBody(lookup_context2.get(), Body2));
 }
 
 TEST_F(HazelcastUnifiedCacheTest, UnifiedHeaderOnlyResponse) {
@@ -109,7 +89,7 @@ TEST_F(HazelcastUnifiedCacheTest, MissUnifiedLookupOnDifferentKey) {
   modified.add_custom_fields("custom1");
   modified.add_custom_fields("custom2");
   response->header().variantKey(std::move(modified));
-  cache_->getTestAccessor().putResponse(cache_->mapKey(variant_hash_key), *response);
+  cache_->getTestAccessor().insertResponse(cache_->mapKey(variant_hash_key), *response);
 
   lookup_context = lookup(RequestPath);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);

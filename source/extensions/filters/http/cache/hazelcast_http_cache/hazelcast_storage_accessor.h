@@ -23,7 +23,7 @@ public:
 
   virtual void putHeader(const int64_t key, const HazelcastHeaderEntry& value) PURE;
   virtual void putBody(const std::string& key, const HazelcastBodyEntry& value) PURE;
-  virtual void putResponseIfAbsent(const int64_t key, const HazelcastResponseEntry& value) PURE;
+  virtual void putResponse(const int64_t key, const HazelcastResponseEntry& value) PURE;
 
   virtual HazelcastHeaderPtr getHeader(const int64_t key) PURE;
   virtual HazelcastBodyPtr getBody(const std::string& key) PURE;
@@ -59,7 +59,7 @@ public:
 
   void putHeader(const int64_t key, const HazelcastHeaderEntry& value) override;
   void putBody(const std::string& key, const HazelcastBodyEntry& value) override;
-  void putResponseIfAbsent(const int64_t key, const HazelcastResponseEntry& value) override;
+  void putResponse(const int64_t key, const HazelcastResponseEntry& value) override;
 
   HazelcastHeaderPtr getHeader(const int64_t key) override;
   HazelcastBodyPtr getBody(const std::string& key) override;
