@@ -29,7 +29,6 @@
 #include "common/http/http1/conn_pool.h"
 #include "common/http/http2/conn_pool.h"
 #include "common/network/resolver_impl.h"
-#include "common/network/transport_socket_options_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/router/shadow_writer_impl.h"
@@ -1304,11 +1303,10 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
     option->hashKey(hash_key);
   }
 
-  Network::TransportSocketOptionsSharedPtr transport_socket_options =
-      context ? context->upstreamTransportSocketOptions() : nullptr;
-
-  if (transport_socket_options) {
-    transport_socket_options->hashKey(hash_key);
+  bool have_transport_socket_options = false;
+  if (context && context->upstreamTransportSocketOptions()) {
+    context->upstreamTransportSocketOptions()->hashKey(hash_key);
+    have_transport_socket_options = true;
   }
 
   ConnPoolsContainer& container = *parent_.getHttpConnPoolsContainer(host, true);
@@ -1319,7 +1317,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
       container.pools_->getPool(priority, hash_key, [&]() {
         return parent_.parent_.factory_.allocateConnPool(
             parent_.thread_local_dispatcher_, host, priority, protocol,
-            !upstream_options->empty() ? upstream_options : nullptr, transport_socket_options);
+            !upstream_options->empty() ? upstream_options : nullptr,
+            have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr);
       });
 
   if (pool.has_value()) {

@@ -7,11 +7,9 @@
 #include "test/common/upstream/test_cluster_manager.h"
 
 using testing::_;
-using testing::ElementsAre;
 using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
-using testing::IsEmpty;
 using testing::Mock;
 using testing::NiceMock;
 using testing::Return;
