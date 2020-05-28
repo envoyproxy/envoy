@@ -190,7 +190,7 @@ parseRequestHeader(absl::string_view param) {
 
 // Helper that handles the case when the ConnectionInfo is missing or if the desired value is
 // empty.
-StreamInfoHeaderFormatter::FieldExtractor sslConnectionInfoStringHeaderExtractor(
+StreamInfoCustomHeaderFormatter::FieldExtractor sslConnectionInfoStringHeaderExtractor(
     std::function<std::string(const Ssl::ConnectionInfo& connection_info)> string_extractor) {
   return [string_extractor](const StreamInfo::StreamInfo& stream_info) {
     if (stream_info.downstreamSslConnection() == nullptr) {
@@ -202,7 +202,7 @@ StreamInfoHeaderFormatter::FieldExtractor sslConnectionInfoStringHeaderExtractor
 }
 
 // Helper that handles the case when the desired time field is empty.
-StreamInfoHeaderFormatter::FieldExtractor sslConnectionInfoStringTimeHeaderExtractor(
+StreamInfoCustomHeaderFormatter::FieldExtractor sslConnectionInfoStringTimeHeaderExtractor(
     std::function<absl::optional<SystemTime>(const Ssl::ConnectionInfo& connection_info)>
         time_extractor) {
   return sslConnectionInfoStringHeaderExtractor(
@@ -218,7 +218,7 @@ StreamInfoHeaderFormatter::FieldExtractor sslConnectionInfoStringTimeHeaderExtra
 
 } // namespace
 
-StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_name, bool append)
+StreamInfoCustomHeaderFormatter::StreamInfoCustomHeaderFormatter(absl::string_view field_name, bool append)
     : append_(append) {
   if (field_name == "PROTOCOL") {
     field_extractor_ = [](const Envoy::StreamInfo::StreamInfo& stream_info) {
@@ -362,7 +362,7 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
 }
 
 const std::string
-StreamInfoHeaderFormatter::format(const Envoy::StreamInfo::StreamInfo& stream_info) const {
+StreamInfoCustomHeaderFormatter::format(const Envoy::StreamInfo::StreamInfo& stream_info) const {
   return field_extractor_(stream_info);
 }
 

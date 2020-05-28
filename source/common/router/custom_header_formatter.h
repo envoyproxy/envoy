@@ -14,9 +14,9 @@ namespace Router {
 /**
  * Interface for all types of header formatters used for custom request headers.
  */
-class HeaderFormatter {
+class CustomHeaderFormatter {
 public:
-  virtual ~HeaderFormatter() = default;
+  virtual ~CustomHeaderFormatter() = default;
 
   virtual const std::string format(const Envoy::StreamInfo::StreamInfo& stream_info) const PURE;
 
@@ -27,16 +27,16 @@ public:
   virtual bool append() const PURE;
 };
 
-using HeaderFormatterPtr = std::unique_ptr<HeaderFormatter>;
+using CustomHeaderFormatterPtr = std::unique_ptr<CustomHeaderFormatter>;
 
 /**
  * A formatter that expands the request header variable to a value based on info in StreamInfo.
  */
-class StreamInfoHeaderFormatter : public HeaderFormatter {
+class StreamInfoCustomHeaderFormatter : public CustomHeaderFormatter {
 public:
-  StreamInfoHeaderFormatter(absl::string_view field_name, bool append);
+  StreamInfoCustomHeaderFormatter(absl::string_view field_name, bool append);
 
-  // HeaderFormatter::format
+  // CustomHeaderFormatter::format
   const std::string format(const Envoy::StreamInfo::StreamInfo& stream_info) const override;
   bool append() const override { return append_; }
 
@@ -52,12 +52,12 @@ private:
 /**
  * A formatter that returns back the same static header value.
  */
-class PlainHeaderFormatter : public HeaderFormatter {
+class PlainCustomHeaderFormatter : public CustomHeaderFormatter {
 public:
-  PlainHeaderFormatter(const std::string& static_header_value, bool append)
+  PlainCustomHeaderFormatter(const std::string& static_header_value, bool append)
       : static_value_(static_header_value), append_(append) {}
 
-  // HeaderFormatter::format
+  // CustomHeaderFormatter::format
   const std::string format(const Envoy::StreamInfo::StreamInfo&) const override {
     return static_value_;
   };
@@ -69,14 +69,14 @@ private:
 };
 
 /**
- * A formatter that produces a value by concatenating the results of multiple HeaderFormatters.
+ * A formatter that produces a value by concatenating the results of multiple CustomHeaderFormatters.
  */
-class CompoundHeaderFormatter : public HeaderFormatter {
+class CompoundCustomHeaderFormatter : public CustomHeaderFormatter {
 public:
-  CompoundHeaderFormatter(std::vector<HeaderFormatterPtr>&& formatters, bool append)
+  CompoundCustomHeaderFormatter(std::vector<CustomHeaderFormatterPtr>&& formatters, bool append)
       : formatters_(std::move(formatters)), append_(append) {}
 
-  // HeaderFormatter::format
+  // CustomHeaderFormatter::format
   const std::string format(const Envoy::StreamInfo::StreamInfo& stream_info) const override {
     std::string buf;
     for (const auto& formatter : formatters_) {
@@ -87,7 +87,7 @@ public:
   bool append() const override { return append_; }
 
 private:
-  const std::vector<HeaderFormatterPtr> formatters_;
+  const std::vector<CustomHeaderFormatterPtr> formatters_;
   const bool append_;
 };
 

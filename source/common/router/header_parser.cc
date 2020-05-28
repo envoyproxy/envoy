@@ -35,8 +35,8 @@ std::string unescape(absl::string_view sv) { return absl::StrReplaceAll(sv, {{"%
 // is either literal text (with % escaped as %%) or part of a %VAR% or %VAR(["args"])% expression.
 // The statement machine does minimal validation of the arguments (if any) and does not know the
 // names of valid variables. Interpretation of the variable name and arguments is delegated to
-// StreamInfoHeaderFormatter.
-HeaderFormatterPtr parseInternal(const envoy::config::core::v3::HeaderValue& header_value,
+// StreamInfoCustomHeaderFormatter.
+CustomHeaderFormatterPtr parseInternal(const envoy::config::core::v3::HeaderValue& header_value,
                                  bool append) {
   const std::string& key = header_value.key();
   // PGV constraints provide this guarantee.
@@ -52,10 +52,10 @@ HeaderFormatterPtr parseInternal(const envoy::config::core::v3::HeaderValue& hea
 
   absl::string_view format(header_value.value());
   if (format.empty()) {
-    return std::make_unique<PlainHeaderFormatter>("", append);
+    return std::make_unique<PlainCustomHeaderFormatter>("", append);
   }
 
-  std::vector<HeaderFormatterPtr> formatters;
+  std::vector<CustomHeaderFormatterPtr> formatters;
 
   size_t pos = 0, start = 0;
   ParserState state = ParserState::Literal;
@@ -86,7 +86,7 @@ HeaderFormatterPtr parseInternal(const envoy::config::core::v3::HeaderValue& hea
       state = ParserState::VariableName;
       if (pos > start) {
         absl::string_view literal = format.substr(start, pos - start);
-        formatters.emplace_back(new PlainHeaderFormatter(unescape(literal), append));
+        formatters.emplace_back(new PlainCustomHeaderFormatter(unescape(literal), append));
       }
       start = pos + 1;
       break;
@@ -96,7 +96,7 @@ HeaderFormatterPtr parseInternal(const envoy::config::core::v3::HeaderValue& hea
       if (ch == '%') {
         // Found complete variable name, add formatter.
         formatters.emplace_back(
-            new StreamInfoHeaderFormatter(format.substr(start, pos - start), append));
+            new StreamInfoCustomHeaderFormatter(format.substr(start, pos - start), append));
         start = pos + 1;
         state = ParserState::Literal;
         break;
@@ -177,7 +177,7 @@ HeaderFormatterPtr parseInternal(const envoy::config::core::v3::HeaderValue& hea
       // Search for closing % of a %VAR(...)% expression
       if (ch == '%') {
         formatters.emplace_back(
-            new StreamInfoHeaderFormatter(format.substr(start, pos - start), append));
+            new StreamInfoCustomHeaderFormatter(format.substr(start, pos - start), append));
         start = pos + 1;
         state = ParserState::Literal;
         break;
@@ -205,7 +205,7 @@ HeaderFormatterPtr parseInternal(const envoy::config::core::v3::HeaderValue& hea
   if (pos > start) {
     // Trailing constant data.
     absl::string_view literal = format.substr(start, pos - start);
-    formatters.emplace_back(new PlainHeaderFormatter(unescape(literal), append));
+    formatters.emplace_back(new PlainCustomHeaderFormatter(unescape(literal), append));
   }
 
   ASSERT(!formatters.empty());
@@ -214,7 +214,7 @@ HeaderFormatterPtr parseInternal(const envoy::config::core::v3::HeaderValue& hea
     return std::move(formatters[0]);
   }
 
-  return std::make_unique<CompoundHeaderFormatter>(std::move(formatters), append);
+  return std::make_unique<CompoundCustomHeaderFormatter>(std::move(formatters), append);
 }
 
 } // namespace
@@ -225,7 +225,7 @@ HeaderParserPtr HeaderParser::configure(
 
   for (const auto& header_value_option : headers_to_add) {
     const bool append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(header_value_option, append, true);
-    HeaderFormatterPtr custom_header_formatter = parseInternal(header_value_option.header(), append);
+    CustomHeaderFormatterPtr custom_header_formatter = parseInternal(header_value_option.header(), append);
 
     header_parser->headers_to_add_.emplace_back(
         Http::LowerCaseString(header_value_option.header().key()), std::move(custom_header_formatter));
@@ -240,7 +240,7 @@ HeaderParserPtr HeaderParser::configure(
   HeaderParserPtr header_parser(new HeaderParser());
 
   for (const auto& header_value : headers_to_add) {
-    HeaderFormatterPtr custom_header_formatter = parseInternal(header_value, append);
+    CustomHeaderFormatterPtr custom_header_formatter = parseInternal(header_value, append);
 
     header_parser->headers_to_add_.emplace_back(Http::LowerCaseString(header_value.key()),
                                                 std::move(custom_header_formatter));
