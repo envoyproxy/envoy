@@ -385,7 +385,6 @@ public:
       absl::MutexLock l(&statsAllocator().mutex());
       statsAllocator().condvar().Wait(&statsAllocator().mutex());
     }
-    TestUtility::waitForCounterGe(statStore(), name, value, time_system_);
   }
 
   void waitForGaugeGe(const std::string& name, uint64_t value) override {
