@@ -158,7 +158,7 @@ Tracing::SpanPtr OpenTracingDriver::startSpan(const Tracing::Config& config,
   if (propagation_mode == PropagationMode::SingleHeader && request_headers.OtSpanContext()) {
     opentracing::expected<std::unique_ptr<opentracing::SpanContext>> parent_span_ctx_maybe;
     std::string parent_context =
-        Base64::decode(std::string(request_headers.OtSpanContext()->value().getStringView()));
+        Base64::decode(std::string(request_headers.getOtSpanContextValue()));
 
     if (!parent_context.empty()) {
       InputConstMemoryStream istream{parent_context.data(), parent_context.size()};

@@ -67,7 +67,7 @@ absl::optional<CelValue> RequestWrapper::operator[](CelValue key) const {
     // (which is not available at the time of the request headers)
     if (headers_.value_ != nullptr && headers_.value_->ContentLength() != nullptr) {
       int64_t length;
-      if (absl::SimpleAtoi(headers_.value_->ContentLength()->value().getStringView(), &length)) {
+      if (absl::SimpleAtoi(headers_.value_->getContentLengthValue(), &length)) {
         return CelValue::CreateInt64(length);
       }
     } else {
@@ -93,7 +93,7 @@ absl::optional<CelValue> RequestWrapper::operator[](CelValue key) const {
     if (value == Path) {
       return convertHeaderEntry(headers_.value_->Path());
     } else if (value == UrlPath) {
-      absl::string_view path = headers_.value_->Path()->value().getStringView();
+      absl::string_view path = headers_.value_->getPathValue();
       size_t query_offset = path.find('?');
       if (query_offset == absl::string_view::npos) {
         return CelValue::CreateStringView(path);

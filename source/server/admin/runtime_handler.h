@@ -24,9 +24,6 @@ public:
   Http::Code handlerRuntimeModify(absl::string_view path_and_query,
                                   Http::ResponseHeaderMap& response_headers,
                                   Buffer::Instance& response, AdminStream&);
-
-private:
-  bool isFormUrlEncoded(const Http::HeaderEntry* content_type);
 };
 
 } // namespace Server

@@ -305,8 +305,7 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
     parent_.stats_.verify_cluster_.inc();
     std::string service_cluster_healthchecked =
         response_headers_->EnvoyUpstreamHealthCheckedCluster()
-            ? std::string(
-                  response_headers_->EnvoyUpstreamHealthCheckedCluster()->value().getStringView())
+            ? std::string(response_headers_->getEnvoyUpstreamHealthCheckedClusterValue())
             : EMPTY_STRING;
     if (parent_.service_name_matcher_->match(service_cluster_healthchecked)) {
       return degraded ? HealthCheckResult::Degraded : HealthCheckResult::Succeeded;

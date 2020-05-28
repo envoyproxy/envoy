@@ -27,15 +27,12 @@ namespace Envoy {
 namespace Grpc {
 
 bool Common::hasGrpcContentType(const Http::RequestOrResponseHeaderMap& headers) {
-  const Http::HeaderEntry* content_type = headers.ContentType();
+  const absl::string_view content_type = headers.getContentTypeValue();
   // Content type is gRPC if it is exactly "application/grpc" or starts with
   // "application/grpc+". Specifically, something like application/grpc-web is not gRPC.
-  return content_type != nullptr &&
-         absl::StartsWith(content_type->value().getStringView(),
-                          Http::Headers::get().ContentTypeValues.Grpc) &&
-         (content_type->value().size() == Http::Headers::get().ContentTypeValues.Grpc.size() ||
-          content_type->value()
-                  .getStringView()[Http::Headers::get().ContentTypeValues.Grpc.size()] == '+');
+  return absl::StartsWith(content_type, Http::Headers::get().ContentTypeValues.Grpc) &&
+         (content_type.size() == Http::Headers::get().ContentTypeValues.Grpc.size() ||
+          content_type[Http::Headers::get().ContentTypeValues.Grpc.size()] == '+');
 }
 
 bool Common::isGrpcRequestHeaders(const Http::RequestHeaderMap& headers) {
@@ -58,13 +55,13 @@ bool Common::isGrpcResponseHeaders(const Http::ResponseHeaderMap& headers, bool 
 
 absl::optional<Status::GrpcStatus>
 Common::getGrpcStatus(const Http::ResponseHeaderOrTrailerMap& trailers, bool allow_user_defined) {
-  const Http::HeaderEntry* grpc_status_header = trailers.GrpcStatus();
+  const absl::string_view grpc_status_header = trailers.getGrpcStatusValue();
   uint64_t grpc_status_code;
 
-  if (!grpc_status_header || grpc_status_header->value().empty()) {
+  if (grpc_status_header.empty()) {
     return absl::nullopt;
   }
-  if (!absl::SimpleAtoi(grpc_status_header->value().getStringView(), &grpc_status_code) ||
+  if (!absl::SimpleAtoi(grpc_status_header, &grpc_status_code) ||
       (grpc_status_code > Status::WellKnownGrpcStatus::MaximumKnown && !allow_user_defined)) {
     return {Status::WellKnownGrpcStatus::InvalidCode};
   }

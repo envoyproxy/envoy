@@ -244,9 +244,7 @@ int StreamHandleWrapper::luaRespond(lua_State* state) {
   buildHeadersFromTable(*headers, state, 2);
 
   uint64_t status;
-  if (headers->Status() == nullptr ||
-      !absl::SimpleAtoi(headers->Status()->value().getStringView(), &status) || status < 200 ||
-      status >= 600) {
+  if (!absl::SimpleAtoi(headers->getStatusValue(), &status) || status < 200 || status >= 600) {
     luaL_error(state, ":status must be between 200-599");
   }
 
