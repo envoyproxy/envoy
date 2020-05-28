@@ -325,9 +325,9 @@ private:
  * Wrapper for an active udp listener owned by this handler.
  */
 class ActiveRawUdpListener : public Network::UdpListenerCallbacks,
-                          public ConnectionHandlerImpl::ActiveListenerImplBase,
-                          public Network::UdpListenerFilterManager,
-                          public Network::UdpReadFilterCallbacks {
+                             public ConnectionHandlerImpl::ActiveListenerImplBase,
+                             public Network::UdpListenerFilterManager,
+                             public Network::UdpReadFilterCallbacks {
 public:
   ActiveRawUdpListener(Network::ConnectionHandler& parent, Event::Dispatcher& dispatcher,
                        Network::ListenerConfig& config);
