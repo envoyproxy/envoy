@@ -288,11 +288,18 @@ TEST_P(ProtocolIntegrationTest, DrainClose) {
   drain_sequence_started.WaitForNotification();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  response->waitForEndStream();
-  codec_client_->waitForDisconnect();
+  EXPECT_FALSE(codec_client_->disconnected());
 
+  IntegrationStreamDecoderPtr response;
+  while (!test_server_->counter("http.config_test.downstream_cx_drain_close")->value()) {
+    response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+    response->waitForEndStream();
+  }
+  EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_drain_close")->value(), 1L);
+
+  codec_client_->waitForDisconnect();
   EXPECT_TRUE(response->complete());
+
   EXPECT_EQ("200", response->headers().getStatusValue());
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP2) {
     EXPECT_TRUE(codec_client_->sawGoAway());
