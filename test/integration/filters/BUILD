@@ -53,6 +53,20 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "backpressure_filter_config_lib",
+    srcs = [
+        "backpressure_filter.cc",
+    ],
+    deps = [
+        "//include/envoy/http:filter_interface",
+        "//include/envoy/registry",
+        "//include/envoy/server:filter_config_interface",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+    ],
+)
+
+envoy_cc_test_library(
     name = "clear_route_cache_filter_lib",
     srcs = [
         "clear_route_cache_filter.cc",
