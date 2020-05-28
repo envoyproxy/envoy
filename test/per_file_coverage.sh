@@ -27,7 +27,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/http/cache/simple_http_cache:84.5"
 "source/extensions/filters/http/csrf:96.6"
 "source/extensions/filters/http/ip_tagging:92.0"
-"source/extensions/filters/http/decompressor:0"
+"source/extensions/filters/http/decompressor:80"
 "source/extensions/filters/http/compressor:84.4"
 "source/extensions/filters/http/header_to_metadata:95.0"
 "source/extensions/filters/http/grpc_json_transcoder:93.3"
@@ -42,7 +42,6 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/common/rbac:93.0"
 "source/extensions/grpc_credentials:93.9"
 "source/extensions/grpc_credentials/aws_iam:88.6"
-"source/extensions/__pycache__:0"
 "source/extensions/quic_listeners:85.1"
 "source/extensions/quic_listeners/quiche:85.1"
 "source/extensions/quic_listeners/quiche/platform:0"
@@ -78,7 +77,7 @@ get_coverage_target() {
   for FILE_PERCENT in ${KNOWN_LOW_COVERAGE[@]}
   do
     if [[ $FILE_PERCENT =~ "$1:" ]]; then
-      DIRECTORY_THRESHOLD=`echo $FILE_PERCENT | sed 's/.*://'`
+      DIRECTORY_THRESHOLD=$(echo $FILE_PERCENT | sed 's/.*://')
       return
     fi
   done
@@ -86,10 +85,10 @@ get_coverage_target() {
 
 # Make sure that for each extension directory with code, coverage doesn't dip
 # below the default coverage threshold.
-for DIRECTORY in `find source/extensions/* -type d`
+for DIRECTORY in $(find source/extensions/* -type d)
 do
   get_coverage_target $DIRECTORY
-  COVERAGE_VALUE=`lcov -e $COVERAGE_DATA  "$DIRECTORY/*" 2>&1 >/dev/null | grep line |  cut -d ' ' -f 4`
+  COVERAGE_VALUE=$(lcov -e $COVERAGE_DATA  "$DIRECTORY/*" -o /dev/null | grep line |  cut -d ' ' -f 4)
   COVERAGE_VALUE=${COVERAGE_VALUE%?}
   if [[ $COVERAGE_VALUE =~ "n" ]]; then
     continue;
