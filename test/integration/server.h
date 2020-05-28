@@ -155,8 +155,8 @@ private:
 // A counter which signals on a condition variable when it is incremented.
 class NotifyingCounter : public Stats::Counter {
 public:
-  NotifyingCounter(Stats::Counter* counter, absl::CondVar& condvar)
-      : counter_(counter), condvar_(condvar) {}
+  NotifyingCounter(Stats::Counter* counter, absl::Mutex& mutex, absl::CondVar& condvar)
+      : counter_(counter), mutex_(mutex), condvar_(condvar) {}
 
   std::string name() const override { return counter_->name(); }
   StatName statName() const override { return counter_->statName(); }
@@ -167,6 +167,10 @@ public:
   }
   void add(uint64_t amount) override {
     counter_->add(amount);
+    if (name() == "cluster_manager.cluster_removed") {
+      std::cerr << "Signaling that " << name() << "is " << counter_->value() << "\n";
+    }
+    absl::MutexLock l(&mutex_);
     condvar_.Signal();
   }
   void inc() override { add(1); }
@@ -183,6 +187,7 @@ public:
 
 private:
   std::unique_ptr<Stats::Counter> counter_;
+  absl::Mutex& mutex_;
   absl::CondVar& condvar_;
 };
 
@@ -195,19 +200,21 @@ public:
                                               const StatNameTagVector& stat_name_tags) {
     Stats::Counter* counter = new NotifyingCounter(
         Stats::AllocatorImpl::makeCounterInternal(name, tag_extracted_name, stat_name_tags),
-        condvar_);
+        mutex_, condvar_);
     {
       absl::MutexLock l(&mutex_);
       counters_.emplace(counter->name(), counter);
+      if (counter->name() == "cluster_manager.cluster_removed") {
+        std::cerr << "Signaling about " << counter->name() << "existing \n";
+      }
+      condvar_.Signal();
     }
-    condvar_.Signal();
     return counter;
   }
 
   // Allow getting the counter directly from the allocator, since it's harder to
   // signal when the counter has been added to a given stats store.
-  virtual Stats::Counter* getCounter(std::string name) {
-    absl::MutexLock l(&mutex_);
+  virtual Stats::Counter* getCounterLockHeld(std::string name) EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
     auto it = counters_.find(name);
     if (it != counters_.end()) {
       return it->second;
@@ -216,11 +223,10 @@ public:
   }
 
   absl::CondVar& condvar() { return condvar_; }
-  absl::Mutex& mutex() { return mutex_; }
+  absl::Mutex mutex_;
 
 private:
   absl::flat_hash_map<std::string, Stats::Counter*> counters_;
-  absl::Mutex mutex_;
   absl::CondVar condvar_;
 };
 
@@ -372,19 +378,47 @@ public:
              Server::FieldValidationConfig validation_config, uint32_t concurrency);
 
   void waitForCounterEq(const std::string& name, uint64_t value) override {
-    while (statsAllocator().getCounter(name) == nullptr ||
-           statsAllocator().getCounter(name)->value() != value) {
-      absl::MutexLock l(&statsAllocator().mutex());
-      statsAllocator().condvar().Wait(&statsAllocator().mutex());
+    absl::MutexLock l(&statsAllocator().mutex_);
+    ENVOY_LOG_MISC(trace, "waiting for {} to be {}", name, value);
+    while (statsAllocator().getCounterLockHeld(name) == nullptr ||
+           statsAllocator().getCounterLockHeld(name)->value() != value) {
+      std::cerr << " waiting for " << name << " to be " << value << "\n";
+      if (statsAllocator().getCounterLockHeld(name)) {
+        std::cerr << " Value " << statsAllocator().getCounterLockHeld(name)->value() << std::endl;
+      } else {
+        std::cerr << " Does not exist\n";
+      }
+      statsAllocator().condvar().Wait(&statsAllocator().mutex_);
+      if (statsAllocator().getCounterLockHeld(name)) {
+        std::cerr << " Value " << statsAllocator().getCounterLockHeld(name)->value() << std::endl;
+      } else {
+        std::cerr << " Does not exist\n";
+      }
     }
+    std::cerr << " done waiting for " << name << " to be " << value;
+    ENVOY_LOG_MISC(trace, "done waiting for {} to be {}", name, value);
   }
 
   void waitForCounterGe(const std::string& name, uint64_t value) override {
-    while (statsAllocator().getCounter(name) == nullptr ||
-           statsAllocator().getCounter(name)->value() < value) {
-      absl::MutexLock l(&statsAllocator().mutex());
-      statsAllocator().condvar().Wait(&statsAllocator().mutex());
+    absl::MutexLock l(&statsAllocator().mutex_);
+    ENVOY_LOG_MISC(trace, "waiting for {} to be at least {}", name, value);
+    while (statsAllocator().getCounterLockHeld(name) == nullptr ||
+           statsAllocator().getCounterLockHeld(name)->value() < value) {
+      std::cerr << " waiting for " << name << " to be at least " << value << std::endl;
+      if (statsAllocator().getCounterLockHeld(name)) {
+        std::cerr << " Value " << statsAllocator().getCounterLockHeld(name)->value() << std::endl;
+      } else {
+        std::cerr << " Does not exist\n";
+      }
+      statsAllocator().condvar().Wait(&statsAllocator().mutex_);
+      if (statsAllocator().getCounterLockHeld(name)) {
+        std::cerr << " Value " << statsAllocator().getCounterLockHeld(name)->value() << std::endl;
+      } else {
+        std::cerr << " Does not exist\n";
+      }
     }
+    std::cerr << " done waiting for " << name << " to be at least " << value;
+    ENVOY_LOG_MISC(trace, "done waiting for {} to be at least {}", name, value);
   }
 
   void waitForGaugeGe(const std::string& name, uint64_t value) override {
