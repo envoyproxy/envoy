@@ -95,6 +95,9 @@ struct ResponseCodeDetailValues {
   // Envoy is doing non-streaming proxying, and the request payload exceeded
   // configured limits.
   const std::string RequestPayloadTooLarge = "request_payload_too_large";
+  // Envoy is doing non-streaming proxying, and the response payload exceeded
+  // configured limits.
+  const std::string ResponsePayloadTooLarge = "response_payload_too_large";
   // Envoy is doing streaming proxying, but too much data arrived while waiting
   // to attempt a retry.
   const std::string RequestPayloadExceededRetryBufferLimit =
@@ -112,8 +115,6 @@ struct ResponseCodeDetailValues {
   const std::string LowVersion = "low_version";
   // The request was rejected due to the Host: or :authority field missing
   const std::string MissingHost = "missing_host_header";
-  // The request was rejected due to the request headers being larger than the configured limit.
-  const std::string RequestHeadersTooLarge = "request_headers_too_large";
   // The request was rejected due to x-envoy-* headers failing strict header validation.
   const std::string InvalidEnvoyRequestHeaders = "request_headers_failed_strict_check";
   // The request was rejected due to the Path or :path header field missing.
