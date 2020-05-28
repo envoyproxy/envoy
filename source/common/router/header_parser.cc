@@ -225,10 +225,10 @@ HeaderParserPtr HeaderParser::configure(
 
   for (const auto& header_value_option : headers_to_add) {
     const bool append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(header_value_option, append, true);
-    HeaderFormatterPtr header_formatter = parseInternal(header_value_option.header(), append);
+    HeaderFormatterPtr custom_header_formatter = parseInternal(header_value_option.header(), append);
 
     header_parser->headers_to_add_.emplace_back(
-        Http::LowerCaseString(header_value_option.header().key()), std::move(header_formatter));
+        Http::LowerCaseString(header_value_option.header().key()), std::move(custom_header_formatter));
   }
 
   return header_parser;
@@ -240,10 +240,10 @@ HeaderParserPtr HeaderParser::configure(
   HeaderParserPtr header_parser(new HeaderParser());
 
   for (const auto& header_value : headers_to_add) {
-    HeaderFormatterPtr header_formatter = parseInternal(header_value, append);
+    HeaderFormatterPtr custom_header_formatter = parseInternal(header_value, append);
 
     header_parser->headers_to_add_.emplace_back(Http::LowerCaseString(header_value.key()),
-                                                std::move(header_formatter));
+                                                std::move(custom_header_formatter));
   }
 
   return header_parser;
