@@ -2554,9 +2554,8 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataTooLarge() {
       // Make sure we won't end up with nested watermark calls from the body buffer.
       parent_.state_.encoder_filters_streaming_ = true;
       allowIteration();
-
       parent_.stream_info_.setResponseCodeDetails(
-          StreamInfo::ResponseCodeDetails::get().RequestHeadersTooLarge);
+          StreamInfo::ResponseCodeDetails::get().ResponsePayloadTooLarge);
       // This does not call the standard sendLocalReply because if there is already response data
       // we do not want to pass a second set of response headers through the filter chain.
       // Instead, call the encodeHeadersInternal / encodeDataInternal helpers
