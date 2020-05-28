@@ -150,7 +150,6 @@ public:
   }
   const Network::HashPolicy* hashPolicy() { return hash_policy_.get(); }
   bool useRawTcpPoolForHost(const Upstream::Host& host) {
-    ASSERT(shared_config_->tunnelingConfig().has_value());
     return shared_config_->tunnelingConfig().value().tunnel_mode_in_endpoint() ==
                TunnelingConfig::EndpointMetadataTunnelMode::
                    TcpProxy_TunnelingConfig_EndpointMetadataTunnelMode_RAW_TCP &&

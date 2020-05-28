@@ -120,10 +120,15 @@ MockLoadBalancer::~MockLoadBalancer() = default;
 MockThreadAwareLoadBalancer::MockThreadAwareLoadBalancer() = default;
 MockThreadAwareLoadBalancer::~MockThreadAwareLoadBalancer() = default;
 
-MockThreadLocalCluster::MockThreadLocalCluster() {
+MockThreadLocalCluster::MockThreadLocalCluster(
+    NiceMock<Http::ConnectionPool::MockInstance>* http_conn_pool,
+    NiceMock<Tcp::ConnectionPool::MockInstance>* tcp_conn_pool)
+    : http_conn_pool_(http_conn_pool), tcp_conn_pool_(tcp_conn_pool) {
   ON_CALL(*this, prioritySet()).WillByDefault(ReturnRef(cluster_.priority_set_));
   ON_CALL(*this, info()).WillByDefault(Return(cluster_.info_));
   ON_CALL(*this, loadBalancer()).WillByDefault(ReturnRef(lb_));
+  ON_CALL(*this, getHttpPool(_, _, _, _)).WillByDefault(Return(http_conn_pool_));
+  ON_CALL(*this, getTcpPool(_, _, _)).WillByDefault(Return(tcp_conn_pool_));
 }
 
 MockThreadLocalCluster::~MockThreadLocalCluster() = default;

@@ -410,64 +410,42 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
         downstreamConnection()->streamInfo().filterState());
   }
   const auto& tunnel_config_opt = config_->tunnelingConfig();
-  if (!tunnel_config_opt.has_value()) {
-    Tcp::ConnectionPool::Instance* conn_pool = cluster_manager_.tcpConnPoolForCluster(
-        cluster_name, Upstream::ResourcePriority::Default, this);
-    if (conn_pool) {
-      connecting_ = true;
-      connect_attempts_++;
-
-      // Given this function is reentrant, make sure we only reset the upstream_handle_ if given a
-      // valid connection handle. If newConnection fails inline it may result in attempting to
-      // select a new host, and a recursive call to initializeUpstreamConnection. In this case the
-      // first call to newConnection will return null and the inner call will persist.
-      Tcp::ConnectionPool::Cancellable* handle = conn_pool->newConnection(*this);
-      if (handle) {
-        ASSERT(upstream_handle_.get() == nullptr);
-        upstream_handle_ = std::make_shared<TcpConnectionHandle>(handle);
+  auto host = thread_local_cluster->loadBalancer().chooseHost(this);
+  if (host) {
+    if (!tunnel_config_opt.has_value() || config_->useRawTcpPoolForHost(*host)) {
+      auto* conn_pool = thread_local_cluster->getTcpPool(std::move(host),
+                                                         Upstream::ResourcePriority::Default, this);
+      if (conn_pool) {
+        connecting_ = true;
+        connect_attempts_++;
+        // Given this function is reentrant, make sure we only reset the upstream_handle_ if given
+        // a valid connection handle. If newConnection fails inline it may result in attempting to
+        // select a new host, and a recursive call to initializeUpstreamConnection. In this case
+        // the first call to newConnection will return null and the inner call will persist.
+        Tcp::ConnectionPool::Cancellable* handle = conn_pool->newConnection(*this);
+        if (handle) {
+          ASSERT(upstream_handle_.get() == nullptr);
+          upstream_handle_ = std::make_shared<TcpConnectionHandle>(handle);
+        }
+        // Because we never return open connections to the pool, this either has a handle waiting
+        // on connection completion, or onPoolFailure has been invoked. Either way, stop
+        // iteration.
+        return Network::FilterStatus::StopIteration;
       }
-      // Because we never return open connections to the pool, this either has a handle waiting on
-      // connection completion, or onPoolFailure has been invoked. Either way, stop iteration.
-      return Network::FilterStatus::StopIteration;
-    }
-  } else {
-    auto* thread_local_cluster = cluster_manager_.get(cluster_name);
-    auto host = thread_local_cluster->loadBalancer().chooseHost(this);
-    if (host) {
-      if (config_->useRawTcpPoolForHost(*host)) {
-        auto* conn_pool = thread_local_cluster->getTcpPool(
-            std::move(host), Upstream::ResourcePriority::Default, this);
-        if (conn_pool) {
-          connecting_ = true;
-          connect_attempts_++;
-          // Given this function is reentrant, make sure we only reset the upstream_handle_ if given
-          // a valid connection handle. If newConnection fails inline it may result in attempting to
-          // select a new host, and a recursive call to initializeUpstreamConnection. In this case
-          // the first call to newConnection will return null and the inner call will persist.
-          Tcp::ConnectionPool::Cancellable* handle = conn_pool->newConnection(*this);
-          if (handle) {
-            ASSERT(upstream_handle_.get() == nullptr);
-            upstream_handle_ = std::make_shared<TcpConnectionHandle>(handle);
-          }
-          // Because we never return open connections to the pool, this either has a handle waiting
-          // on connection completion, or onPoolFailure has been invoked. Either way, stop
-          // iteration.
-          return Network::FilterStatus::StopIteration;
-        }
-      } else {
-        auto* conn_pool = thread_local_cluster->getHttpPool(
-            std::move(host), Upstream::ResourcePriority::Default, Http::Protocol::Http2, this);
-        if (conn_pool) {
-          upstream_ = std::make_unique<HttpUpstream>(*upstream_callbacks_,
-                                                     config_->tunnelingConfig()->hostname());
-          HttpUpstream* http_upstream = static_cast<HttpUpstream*>(upstream_.get());
-          upstream_handle_ = std::make_shared<HttpConnectionHandle>(
-              conn_pool->newStream(http_upstream->responseDecoder(), *this));
-          return Network::FilterStatus::StopIteration;
-        }
+    } else {
+      auto* conn_pool = thread_local_cluster->getHttpPool(
+          std::move(host), Upstream::ResourcePriority::Default, Http::Protocol::Http2, this);
+      if (conn_pool) {
+        upstream_ = std::make_unique<HttpUpstream>(*upstream_callbacks_,
+                                                   config_->tunnelingConfig()->hostname());
+        HttpUpstream* http_upstream = static_cast<HttpUpstream*>(upstream_.get());
+        upstream_handle_ = std::make_shared<HttpConnectionHandle>(
+            conn_pool->newStream(http_upstream->responseDecoder(), *this));
+        return Network::FilterStatus::StopIteration;
       }
     }
   }
+
   // Either cluster is unknown or there are no healthy hosts. tcpConnPoolForCluster() increments
   // cluster->stats().upstream_cx_none_healthy in the latter case.
   getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoHealthyUpstream);

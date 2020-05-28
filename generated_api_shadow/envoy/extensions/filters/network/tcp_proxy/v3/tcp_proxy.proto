@@ -74,7 +74,7 @@ message TcpProxy {
       // method.
       IGNORE = 0;
 
-      // Use raw tcp if endpoint supports so. Fallback to the tunnel method
+      // Use raw tcp if endpoint declares in metadata. Fallback to the tunnel method
       // defined in TcpProxy.
       RAW_TCP = 1;
     }
@@ -83,6 +83,7 @@ message TcpProxy {
     // proxy.
     string hostname = 1 [(validate.rules).string = {min_bytes: 1}];
 
+    // Allows for specification of tunnel method by endpoint.
     EndpointMetadataTunnelMode tunnel_mode_in_endpoint = 2;
   }
 

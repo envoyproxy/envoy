@@ -237,7 +237,8 @@ public:
 
 class MockThreadLocalCluster : public ThreadLocalCluster {
 public:
-  MockThreadLocalCluster();
+  MockThreadLocalCluster(NiceMock<Http::ConnectionPool::MockInstance>* http_conn_pool = nullptr,
+                         NiceMock<Tcp::ConnectionPool::MockInstance>* tcp_conn_pool = nullptr);
   ~MockThreadLocalCluster() override;
 
   // Upstream::ThreadLocalCluster
@@ -245,8 +246,16 @@ public:
   MOCK_METHOD(ClusterInfoConstSharedPtr, info, ());
   MOCK_METHOD(LoadBalancer&, loadBalancer, ());
 
+  MOCK_METHOD(Http::ConnectionPool::Instance*, getHttpPool,
+              (HostConstSharedPtr host, ResourcePriority priority, Http::Protocol protocol,
+               LoadBalancerContext* context));
+  MOCK_METHOD(Tcp::ConnectionPool::Instance*, getTcpPool,
+              (HostConstSharedPtr host, ResourcePriority priority, LoadBalancerContext* context));
+
   NiceMock<MockClusterMockPrioritySet> cluster_;
   NiceMock<MockLoadBalancer> lb_;
+  NiceMock<Http::ConnectionPool::MockInstance>* http_conn_pool_;
+  NiceMock<Tcp::ConnectionPool::MockInstance>* tcp_conn_pool_;
 };
 
 class MockClusterManagerFactory : public ClusterManagerFactory {

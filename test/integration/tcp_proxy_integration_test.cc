@@ -479,17 +479,19 @@ void TcpProxyMetadataMatchIntegrationTest::expectEndpointToMatchRoute() {
 
 // Verifies connection failure.
 void TcpProxyMetadataMatchIntegrationTest::expectEndpointNotToMatchRoute() {
-  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
-  tcp_client->write("hello");
+  std::string response;
 
-  // TODO(yskopets): 'tcp_client->waitForDisconnect(true);' gets stuck indefinitely on Linux builds,
-  // e.g. on 'envoy-linux (bazel compile_time_options)' and 'envoy-linux (bazel release)'
-  // tcp_client->waitForDisconnect(true);
-
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_none_healthy", 1);
-  test_server_->waitForCounterEq("cluster.cluster_0.lb_subsets_selected", 0);
-
-  tcp_client->close();
+  auto connection = createConnectionDriver(
+      lookupPort("tcp_proxy"), "hello",
+      [&response](Network::ClientConnection&, const Buffer::Instance& data) -> void {
+        response.append(data.toString());
+      });
+  connection->waitForConnection();
+  while (!connection->closed()) {
+    connection->waitForConnection();
+  }
+  EXPECT_EQ(Network::ConnectionEvent::RemoteClose, connection->lastConnectionEvent());
+  EXPECT_EQ("", response);
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, TcpProxyMetadataMatchIntegrationTest,

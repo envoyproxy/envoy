@@ -824,7 +824,9 @@ class TcpProxyTest : public testing::Test {
 public:
   TcpProxyTest() {
     ON_CALL(*factory_context_.access_log_manager_.file_, write(_))
-        .WillByDefault(SaveArg<0>(&access_log_data_));
+        .WillByDefault(DoAll(SaveArg<0>(&access_log_data_), Invoke([](absl::string_view log_line) {
+                               ENVOY_LOG_MISC(debug, "lambdai: {}", log_line);
+                             })));
     ON_CALL(filter_callbacks_.connection_.stream_info_, onUpstreamHostSelected(_))
         .WillByDefault(Invoke(
             [this](Upstream::HostDescriptionConstSharedPtr host) { upstream_host_ = host; }));
@@ -891,7 +893,10 @@ public:
     {
       testing::InSequence sequence;
       for (uint32_t i = 0; i < connections; i++) {
-        EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
+        EXPECT_CALL(factory_context_.cluster_manager_, get("fake_cluster"))
+            .WillOnce(Return(&factory_context_.cluster_manager_.thread_local_cluster_))
+            .RetiresOnSaturation();
+        EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, getTcpPool(_, _, _))
             .WillOnce(Return(&conn_pool_))
             .RetiresOnSaturation();
         EXPECT_CALL(conn_pool_, newConnection(_))
@@ -903,8 +908,12 @@ public:
                 }))
             .RetiresOnSaturation();
       }
-      EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
-          .WillRepeatedly(Return(nullptr));
+      EXPECT_CALL(factory_context_.cluster_manager_, get("fake_cluster"))
+          .WillRepeatedly(Return(&factory_context_.cluster_manager_.thread_local_cluster_))
+          .RetiresOnSaturation();
+      EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, getTcpPool(_, _, _))
+          .WillRepeatedly(Return(nullptr))
+          .RetiresOnSaturation();
     }
 
     {
@@ -971,6 +980,7 @@ public:
   std::vector<Tcp::ConnectionPool::Callbacks*> conn_pool_callbacks_;
   std::vector<std::unique_ptr<NiceMock<Tcp::ConnectionPool::MockCancellable>>> conn_pool_handles_;
   NiceMock<Tcp::ConnectionPool::MockInstance> conn_pool_;
+  // NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster_{nullptr, &conn_pool_};
   Tcp::ConnectionPool::UpstreamCallbacks* upstream_callbacks_;
   StringViewSaver access_log_data_;
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
@@ -1314,14 +1324,17 @@ TEST_F(TcpProxyTest, WeightedClusterWithMetadataMatch) {
     Upstream::LoadBalancerContext* context;
 
     EXPECT_CALL(factory_context_.random_, random()).WillOnce(Return(0));
-    EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("cluster1", _, _))
+    EXPECT_CALL(factory_context_.cluster_manager_, get("cluster1"))
+        .WillOnce(Return(&factory_context_.cluster_manager_.thread_local_cluster_))
+        .RetiresOnSaturation();
+    EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, getTcpPool(_, _, _))
         .WillOnce(DoAll(SaveArg<2>(&context), Return(nullptr)));
     EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
-    EXPECT_NE(nullptr, context);
+    ASSERT_NE(nullptr, context);
 
     const auto effective_criteria = context->metadataMatchCriteria();
-    EXPECT_NE(nullptr, effective_criteria);
+    ASSERT_NE(nullptr, effective_criteria);
 
     const auto& effective_criterions = effective_criteria->metadataMatchCriteria();
     EXPECT_EQ(2, effective_criterions.size());
@@ -1338,14 +1351,17 @@ TEST_F(TcpProxyTest, WeightedClusterWithMetadataMatch) {
     Upstream::LoadBalancerContext* context;
 
     EXPECT_CALL(factory_context_.random_, random()).WillOnce(Return(2));
-    EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("cluster2", _, _))
+    EXPECT_CALL(factory_context_.cluster_manager_, get("cluster2"))
+        .WillOnce(Return(&factory_context_.cluster_manager_.thread_local_cluster_))
+        .RetiresOnSaturation();
+    EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, getTcpPool(_, _, _))
         .WillOnce(DoAll(SaveArg<2>(&context), Return(nullptr)));
     EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
-    EXPECT_NE(nullptr, context);
+    ASSERT_NE(nullptr, context);
 
     const auto effective_criteria = context->metadataMatchCriteria();
-    EXPECT_NE(nullptr, effective_criteria);
+    ASSERT_NE(nullptr, effective_criteria);
 
     const auto& effective_criterions = effective_criteria->metadataMatchCriteria();
     EXPECT_EQ(2, effective_criterions.size());
@@ -1783,9 +1799,11 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(NonRoutableConnection)) {
   connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 10000);
 
   // Expect filter to try to open a connection to the fallback cluster.
-  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fallback_cluster", _, _))
+  EXPECT_CALL(factory_context_.cluster_manager_, get("fallback_cluster"))
+      .WillOnce(Return(&factory_context_.cluster_manager_.thread_local_cluster_))
+      .RetiresOnSaturation();
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, getTcpPool(_, _, _))
       .WillOnce(Return(nullptr));
-
   filter_->onNewConnection();
 
   EXPECT_EQ(total_cx + 1, config_->stats().downstream_cx_total_.value());
@@ -1804,7 +1822,10 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(RoutableConnection)) {
   connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999);
 
   // Expect filter to try to open a connection to specified cluster.
-  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
+  EXPECT_CALL(factory_context_.cluster_manager_, get("fake_cluster"))
+      .WillOnce(Return(&factory_context_.cluster_manager_.thread_local_cluster_))
+      .RetiresOnSaturation();
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, getTcpPool(_, _, _))
       .WillOnce(Return(nullptr));
 
   filter_->onNewConnection();
@@ -1823,10 +1844,11 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UseClusterFromPerConnectionC
       StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
 
   // Expect filter to try to open a connection to specified cluster.
-  EXPECT_CALL(factory_context_.cluster_manager_,
-              tcpConnPoolForCluster("filter_state_cluster", _, _))
+  EXPECT_CALL(factory_context_.cluster_manager_, get("filter_state_cluster"))
+      .WillOnce(Return(&factory_context_.cluster_manager_.thread_local_cluster_))
+      .RetiresOnSaturation();
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, getTcpPool(_, _, _))
       .WillOnce(Return(nullptr));
-
   filter_->onNewConnection();
 }
 
@@ -1841,23 +1863,23 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UpstreamServerName)) {
 
   // Expect filter to try to open a connection to a cluster with the transport socket options with
   // override-server-name
-  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster(_, _, _))
-      .WillOnce(
-          Invoke([](const std::string& cluster, Upstream::ResourcePriority,
-                    Upstream::LoadBalancerContext* context) -> Tcp::ConnectionPool::Instance* {
-            EXPECT_EQ(cluster, "fake_cluster");
-            Network::TransportSocketOptionsSharedPtr transport_socket_options =
-                context->upstreamTransportSocketOptions();
-            EXPECT_NE(transport_socket_options, nullptr);
-            EXPECT_TRUE(transport_socket_options->serverNameOverride().has_value());
-            EXPECT_EQ(transport_socket_options->serverNameOverride().value(), "www.example.com");
-            return nullptr;
-          }));
+  EXPECT_CALL(factory_context_.cluster_manager_, get("fake_cluster"))
+      .WillOnce(Return(&factory_context_.cluster_manager_.thread_local_cluster_))
+      .RetiresOnSaturation();
+  Upstream::LoadBalancerContext* context;
+
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, getTcpPool(_, _, _))
+      .WillOnce(DoAll(SaveArg<2>(&context), Return(nullptr)));
 
   // Port 9999 is within the specified destination port range.
   connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999);
 
   filter_->onNewConnection();
+  Network::TransportSocketOptionsSharedPtr transport_socket_options =
+      context->upstreamTransportSocketOptions();
+  EXPECT_NE(transport_socket_options, nullptr);
+  EXPECT_TRUE(transport_socket_options->serverNameOverride().has_value());
+  EXPECT_EQ(transport_socket_options->serverNameOverride().value(), "www.example.com");
 }
 
 // Test that the tcp proxy override ALPN from FilterState if set
@@ -1872,25 +1894,25 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(ApplicationProtocols)) {
 
   // Expect filter to try to open a connection to a cluster with the transport socket options with
   // override-application-protocol
-  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster(_, _, _))
-      .WillOnce(
-          Invoke([](const std::string& cluster, Upstream::ResourcePriority,
-                    Upstream::LoadBalancerContext* context) -> Tcp::ConnectionPool::Instance* {
-            EXPECT_EQ(cluster, "fake_cluster");
-            Network::TransportSocketOptionsSharedPtr transport_socket_options =
-                context->upstreamTransportSocketOptions();
-            EXPECT_NE(transport_socket_options, nullptr);
-            EXPECT_FALSE(transport_socket_options->applicationProtocolListOverride().empty());
-            EXPECT_EQ(transport_socket_options->applicationProtocolListOverride().size(), 2);
-            EXPECT_EQ(transport_socket_options->applicationProtocolListOverride()[0], "foo");
-            EXPECT_EQ(transport_socket_options->applicationProtocolListOverride()[1], "bar");
-            return nullptr;
-          }));
+  EXPECT_CALL(factory_context_.cluster_manager_, get("fake_cluster"))
+      .WillOnce(Return(&factory_context_.cluster_manager_.thread_local_cluster_))
+      .RetiresOnSaturation();
+  Upstream::LoadBalancerContext* context;
+
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, getTcpPool(_, _, _))
+      .WillOnce(DoAll(SaveArg<2>(&context), Return(nullptr)));
 
   // Port 9999 is within the specified destination port range.
   connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999);
 
   filter_->onNewConnection();
+  Network::TransportSocketOptionsSharedPtr transport_socket_options =
+      context->upstreamTransportSocketOptions();
+  EXPECT_NE(transport_socket_options, nullptr);
+  EXPECT_FALSE(transport_socket_options->applicationProtocolListOverride().empty());
+  EXPECT_EQ(transport_socket_options->applicationProtocolListOverride().size(), 2);
+  EXPECT_EQ(transport_socket_options->applicationProtocolListOverride()[0], "foo");
+  EXPECT_EQ(transport_socket_options->applicationProtocolListOverride()[1], "bar");
 }
 
 class TcpProxyNonDeprecatedConfigRoutingTest : public TcpProxyRoutingTest {
@@ -1916,8 +1938,10 @@ TEST_F(TcpProxyNonDeprecatedConfigRoutingTest, ClusterNameSet) {
   connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999);
 
   // Expect filter to try to open a connection to specified cluster.
-  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
-      .WillOnce(Return(nullptr));
+  EXPECT_CALL(factory_context_.cluster_manager_, get("fake_cluster"))
+      .WillOnce(Return(&factory_context_.cluster_manager_.thread_local_cluster_))
+      .RetiresOnSaturation();
+
   absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info;
   EXPECT_CALL(connection_.stream_info_, setUpstreamClusterInfo(_))
       .WillOnce(
@@ -1967,19 +1991,18 @@ public:
 TEST_F(TcpProxyHashingTest, HashWithSourceIp) {
   setup();
   initializeFilter();
-  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster(_, _, _))
-      .WillOnce(
-          Invoke([](const std::string& cluster, Upstream::ResourcePriority,
-                    Upstream::LoadBalancerContext* context) -> Tcp::ConnectionPool::Instance* {
-            EXPECT_EQ(cluster, "fake_cluster");
-            EXPECT_TRUE(context->computeHashKey().has_value());
-            return nullptr;
-          }));
+  EXPECT_CALL(factory_context_.cluster_manager_, get("fake_cluster"))
+      .WillOnce(Return(&factory_context_.cluster_manager_.thread_local_cluster_))
+      .RetiresOnSaturation();
+  Upstream::LoadBalancerContext* context;
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, getTcpPool(_, _, _))
+      .WillOnce(DoAll(SaveArg<2>(&context), Return(nullptr)));
 
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
   connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("2.3.4.5", 2222);
 
   filter_->onNewConnection();
+  EXPECT_TRUE(context->computeHashKey().has_value());
 }
 
 } // namespace
