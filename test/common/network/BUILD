@@ -167,7 +167,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "listen_socket_impl_test",
     srcs = ["listen_socket_impl_test.cc"],
-    tags = ["fails_on_windows"],
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:listen_socket_lib",
