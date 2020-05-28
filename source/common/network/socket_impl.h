@@ -48,11 +48,6 @@ Address::InstanceConstSharedPtr addressFromFd(os_fd_t fd);
  */
 Address::InstanceConstSharedPtr peerAddressFromFd(os_fd_t fd);
 
-/**
- * Retrieve host name (@see man 2 gethostname)
- */
-Api::SysCallIntResult getHostName(char* name, size_t length);
-
 } // namespace SocketInterface
 
 class SocketImpl : public virtual Socket {
@@ -95,7 +90,7 @@ public:
                                         socklen_t optlen) override;
   Api::SysCallIntResult getSocketOption(int level, int optname, void* optval,
                                         socklen_t* optlen) override;
-  Api::SysCallIntResult setBlocking(bool blocking) override;
+  Api::SysCallIntResult setBlockingForTest(bool blocking) override;
 
   const OptionsSharedPtr& options() const override { return options_; }
   Address::SocketType socketType() const override { return sock_type_; }

@@ -230,7 +230,7 @@ Api::IoCallUint64Result readFromSocket(IoHandle& handle, const Address::Instance
 UdpSyncPeer::UdpSyncPeer(Network::Address::IpVersion version)
     : socket_(
           std::make_unique<UdpListenSocket>(getCanonicalLoopbackAddress(version), nullptr, true)) {
-  RELEASE_ASSERT(socket_->setBlocking(true).rc_ != -1, "");
+  RELEASE_ASSERT(socket_->setBlockingForTest(true).rc_ != -1, "");
 }
 
 void UdpSyncPeer::write(const std::string& buffer, const Network::Address::Instance& peer) {

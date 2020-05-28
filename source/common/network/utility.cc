@@ -374,7 +374,7 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(Socket& sock) {
 #else
   // TODO(zuercher): determine if connection redirection is possible under macOS (c.f. pfctl and
   // divert), and whether it's possible to find the learn destination address.
-  UNREFERENCED_PARAMETER(fd);
+  UNREFERENCED_PARAMETER(sock);
   return nullptr;
 #endif
 }

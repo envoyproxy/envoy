@@ -52,7 +52,7 @@ TEST(UdpOverUdsStatsdSinkTest, InitWithPipeAddress) {
 
   // Start the server.
   Network::SocketImpl sock(Network::Address::SocketType::Datagram, uds_address);
-  RELEASE_ASSERT(sock.setBlocking(false).rc_ != -1, "");
+  RELEASE_ASSERT(sock.setBlockingForTest(false).rc_ != -1, "");
   sock.bind(uds_address);
 
   // Do the flush which should have somewhere to write now.

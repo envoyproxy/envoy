@@ -79,7 +79,7 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
     // operation of ::connect(), so connect returns with errno==EWOULDBLOCK before the tcp
     // handshake can complete. For testing convenience, re-enable blocking on the socket
     // so that connect will wait for the handshake to complete.
-    ASSERT_EQ(client_sock.setBlocking(true).rc_, 0);
+    ASSERT_EQ(client_sock.setBlockingForTest(true).rc_, 0);
 
     // Connect to the server.
     const Api::SysCallIntResult result = client_sock.connect(addr_port);

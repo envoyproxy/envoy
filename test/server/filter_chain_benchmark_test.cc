@@ -112,7 +112,7 @@ public:
     return {0, 0};
   }
   Api::SysCallIntResult getSocketOption(int, int, void*, socklen_t*) override { return {0, 0}; }
-  Api::SysCallIntResult setBlocking(bool) override { return {0, 0}; }
+  Api::SysCallIntResult setBlockingForTest(bool) override { return {0, 0}; }
 
 private:
   Network::IoHandlePtr io_handle_;

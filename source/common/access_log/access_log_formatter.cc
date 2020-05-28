@@ -8,6 +8,7 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
@@ -16,7 +17,6 @@
 #include "common/grpc/common.h"
 #include "common/grpc/status.h"
 #include "common/http/utility.h"
-#include "common/network/socket_impl.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/stream_info/utility.h"
@@ -78,7 +78,8 @@ const std::string AccessLogFormatUtils::getHostname() {
   const size_t len = 255;
 #endif
   char name[len];
-  const Api::SysCallIntResult result = Network::SocketInterface::getHostName(name, len);
+  Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
+  const Api::SysCallIntResult result = os_sys_calls.gethostname(name, len);
 
   std::string hostname = "-";
   if (result.rc_ == 0) {

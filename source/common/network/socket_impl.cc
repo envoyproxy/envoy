@@ -134,10 +134,6 @@ Address::InstanceConstSharedPtr SocketInterface::peerAddressFromFd(os_fd_t fd) {
   return Address::addressFromSockAddr(ss, ss_len);
 }
 
-Api::SysCallIntResult SocketInterface::getHostName(char* name, size_t length) {
-  return Api::OsSysCallsSingleton::get().gethostname(name, length);
-}
-
 SocketImpl::SocketImpl(Address::SocketType type, Address::Type addr_type,
                        Address::IpVersion version)
     : io_handle_(SocketInterface::socket(type, addr_type, version)), sock_type_(type),
@@ -225,7 +221,7 @@ Api::SysCallIntResult SocketImpl::getSocketOption(int level, int optname, void* 
                                                     optlen);
 }
 
-Api::SysCallIntResult SocketImpl::setBlocking(bool blocking) {
+Api::SysCallIntResult SocketImpl::setBlockingForTest(bool blocking) {
   return Api::OsSysCallsSingleton::get().setsocketblocking(io_handle_->fd(), blocking);
 }
 

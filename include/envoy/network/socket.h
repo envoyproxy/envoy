@@ -133,7 +133,7 @@ public:
   /**
    * Toggle socket blocking state
    */
-  virtual Api::SysCallIntResult setBlocking(bool blocking) PURE;
+  virtual Api::SysCallIntResult setBlockingForTest(bool blocking) PURE;
 
   /**
    * Visitor class for setting socket options.
