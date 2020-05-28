@@ -289,8 +289,8 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
 void InstanceImpl::initialize(const Options& options,
                               Network::Address::InstanceConstSharedPtr local_address,
                               ComponentFactory& component_factory, ListenerHooks& hooks) {
-  ENVOY_LOG(info, "initializing epoch {} (hot restart version={})", options.restartEpoch(),
-            restarter_.version());
+  ENVOY_LOG(info, "initializing epoch {} (base id={}, hot restart version={})",
+            options.restartEpoch(), restarter_.baseId(), restarter_.version());
 
   ENVOY_LOG(info, "statically linked extensions:");
   for (const auto& ext : Envoy::Registry::FactoryCategoryRegistry::registeredFactories()) {

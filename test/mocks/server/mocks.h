@@ -70,6 +70,8 @@ public:
   ~MockOptions() override;
 
   MOCK_METHOD(uint64_t, baseId, (), (const));
+  MOCK_METHOD(bool, useDynamicBaseId, (), (const));
+  MOCK_METHOD(const std::string&, baseIdPath, (), (const));
   MOCK_METHOD(uint32_t, concurrency, (), (const));
   MOCK_METHOD(const std::string&, configPath, (), (const));
   MOCK_METHOD(const envoy::config::bootstrap::v3::Bootstrap&, configProto, (), (const));
@@ -233,6 +235,7 @@ public:
   MOCK_METHOD(void, sendParentTerminateRequest, ());
   MOCK_METHOD(ServerStatsFromParent, mergeParentStatsIfAny, (Stats::StoreRoot & stats_store));
   MOCK_METHOD(void, shutdown, ());
+  MOCK_METHOD(uint32_t, baseId, ());
   MOCK_METHOD(std::string, version, ());
   MOCK_METHOD(Thread::BasicLockable&, logLock, ());
   MOCK_METHOD(Thread::BasicLockable&, accessLogLock, ());
