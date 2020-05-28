@@ -201,7 +201,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
 
     callbacks_->sendLocalReply(
         response->status_code, response->body,
-        [&headers = response->headers_to_add,
+        [& headers = response->headers_to_add,
          &callbacks = *callbacks_](Http::HeaderMap& response_headers) -> void {
           ENVOY_STREAM_LOG(trace,
                            "ext_authz filter added header(s) to the local response:", callbacks);

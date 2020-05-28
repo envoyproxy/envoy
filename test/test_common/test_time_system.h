@@ -56,10 +56,9 @@ public:
    * @param duration The maximum amount of time to wait.
    * @return Thread::CondVar::WaitStatus whether the condition timed out or not.
    */
-  virtual Thread::CondVar::WaitStatus waitFor(Thread::MutexBasicLockable& mutex,
-                                              Thread::CondVar& condvar,
-                                              const Duration& duration) noexcept
-      EXCLUSIVE_LOCKS_REQUIRED(mutex) PURE;
+  virtual Thread::CondVar::WaitStatus
+  waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
+          const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) PURE;
 
   template <class D>
   Thread::CondVar::WaitStatus waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
@@ -108,9 +107,9 @@ public:
     timeSystem().advanceTimeWait(duration);
   }
 
-  Thread::CondVar::WaitStatus waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
-                                      const Duration& duration) noexcept
-      EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
+  Thread::CondVar::WaitStatus
+  waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
+          const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
     return timeSystem().waitFor(mutex, condvar, duration);
   }
 

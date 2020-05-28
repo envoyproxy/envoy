@@ -1213,6 +1213,9 @@ TEST_F(HttpConnectionManagerImplTest, PreserveUpstreamDateDisabledDateSet) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, PreserveUpstreamDateEnabledDateSet) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.preserve_upstream_date", "true"}});
   setup(false, "");
   setUpEncoderAndDecoder(false, false);
   sendRequestHeadersAndData();
