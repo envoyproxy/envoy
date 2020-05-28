@@ -1,3 +1,4 @@
+@_implementationOnly import EnvoyEngine
 import Foundation
 
 /// Envoy's implementation of `HTTPClient`, buildable using `EnvoyClientBuilder`.

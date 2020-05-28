@@ -1,4 +1,5 @@
 import Envoy
+import EnvoyEngine
 import Foundation
 
 final class MockEnvoyHTTPStream {

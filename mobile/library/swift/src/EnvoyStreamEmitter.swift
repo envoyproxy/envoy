@@ -1,3 +1,4 @@
+@_implementationOnly import EnvoyEngine
 import Foundation
 
 /// Default implementation of the `StreamEmitter` interface.

@@ -17,14 +17,14 @@ load("@build_bazel_rules_swift//swift:swift.bzl", "swift_library")
 #     ],
 # )
 #
-def envoy_mobile_swift_test(name, srcs):
+def envoy_mobile_swift_test(name, srcs, deps = []):
     test_lib_name = name + "_lib"
     swift_library(
         name = test_lib_name,
         srcs = srcs,
         deps = [
             "//library/swift/src:ios_framework_archive",
-        ],
+        ] + deps,
         linkopts = ["-lresolv.9"],
         visibility = ["//visibility:private"],
     )

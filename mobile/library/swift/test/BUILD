@@ -9,6 +9,9 @@ envoy_mobile_swift_test(
         "MockEnvoyEngine.swift",
         "MockEnvoyHTTPStream.swift",
     ],
+    deps = [
+        "//library/objective-c:envoy_engine_objc_lib",
+    ],
 )
 
 envoy_mobile_swift_test(
@@ -17,6 +20,9 @@ envoy_mobile_swift_test(
         "EnvoyClientBuilderTests.swift",
         "MockEnvoyEngine.swift",
         "MockEnvoyHTTPStream.swift",
+    ],
+    deps = [
+        "//library/objective-c:envoy_engine_objc_lib",
     ],
 )
 
@@ -31,6 +37,9 @@ envoy_mobile_swift_test(
     name = "grpc_response_handler_tests",
     srcs = [
         "GRPCResponseHandlerTests.swift",
+    ],
+    deps = [
+        "//library/objective-c:envoy_engine_objc_lib",
     ],
 )
 
