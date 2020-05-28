@@ -331,9 +331,6 @@ def _com_github_jbeder_yaml_cpp():
     http_archive(
         name = "com_github_jbeder_yaml_cpp",
         build_file_content = BUILD_ALL_CONTENT,
-        patch_args = ["-p1"],
-        # Patch to handle out of memory issue https://github.com/jbeder/yaml-cpp/pull/865
-        patches = ["@envoy//bazel/external:yaml_cpp.patch"],
         **location
     )
     native.bind(
