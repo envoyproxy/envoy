@@ -1,8 +1,9 @@
-#include "common/common/substitution_format_string.h"
+#include "common/formatter/substitution_format_string.h"
 
-#include "common/access_log/access_log_formatter.h"
+#include "common/formatter/substitution_formatter.h"
 
 namespace Envoy {
+namespace Formatter {
 namespace {
 
 absl::flat_hash_map<std::string, std::string>
@@ -19,18 +20,18 @@ convertJsonFormatToMap(const ProtobufWkt::Struct& json_format) {
 
 } // namespace
 
-AccessLog::FormatterPtr
+FormatterPtr
 SubstitutionFormatStringUtils::createJsonFormatter(const ProtobufWkt::Struct& struct_format,
                                                    bool preserve_types) {
   auto json_format_map = convertJsonFormatToMap(struct_format);
-  return std::make_unique<AccessLog::JsonFormatterImpl>(json_format_map, preserve_types);
+  return std::make_unique<JsonFormatterImpl>(json_format_map, preserve_types);
 }
 
-AccessLog::FormatterPtr SubstitutionFormatStringUtils::fromProtoConfig(
+FormatterPtr SubstitutionFormatStringUtils::fromProtoConfig(
     const envoy::config::core::v3::SubstitutionFormatString& config) {
   switch (config.format_case()) {
   case envoy::config::core::v3::SubstitutionFormatString::FormatCase::kTextFormat:
-    return std::make_unique<AccessLog::FormatterImpl>(config.text_format());
+    return std::make_unique<FormatterImpl>(config.text_format());
   case envoy::config::core::v3::SubstitutionFormatString::FormatCase::kJsonFormat: {
     return createJsonFormatter(config.json_format(), true);
   }
@@ -40,4 +41,5 @@ AccessLog::FormatterPtr SubstitutionFormatStringUtils::fromProtoConfig(
   return nullptr;
 }
 
+} // namespace Formatter
 } // namespace Envoy

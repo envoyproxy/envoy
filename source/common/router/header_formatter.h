@@ -4,7 +4,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/access_log/access_log.h"
+#include "envoy/formatter/substitution_formatter.h"
 
 #include "absl/strings/string_view.h"
 
@@ -45,7 +45,7 @@ public:
 private:
   FieldExtractor field_extractor_;
   const bool append_;
-  std::unordered_map<std::string, std::vector<Envoy::AccessLog::FormatterProviderPtr>>
+  std::unordered_map<std::string, std::vector<Envoy::Formatter::FormatterProviderPtr>>
       start_time_formatters_;
 };
 
