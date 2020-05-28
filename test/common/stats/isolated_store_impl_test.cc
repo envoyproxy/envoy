@@ -244,6 +244,7 @@ TEST_F(StatsIsolatedStoreImplTest, NullImplCoverage) {
   NullGaugeImpl& g = store_->nullGauge("");
   g.inc();
   EXPECT_EQ(0, g.value());
+  NullTextReadout& t = store_->nullTextReadout
 }
 
 } // namespace Stats
