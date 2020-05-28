@@ -61,12 +61,15 @@ if [[ "$VALIDATE_COVERAGE" == "true" ]]; then
 fi
 
 if [[ "$VALIDATE_COVERAGE" == "true" ]]; then
-  echo "Checking per-file coverage"
-  SUCCESS=`${SRCDIR}/test/per_file_coverage.sh`
-  if ${SUCCESS} -eq 1; then
-    echo Per file coverage failed.
+  echo "Checking per-extension coverage"
+  output=$(./test/per_file_coverage.sh)
+
+  if [ $? -eq 1 ]; then
+    echo Per-extension coverage failed:
+    echo $output
     exit 1
   fi
+  echo Per-extension coverage passed.
 fi
 
 echo "HTML coverage report is in ${COVERAGE_DIR}/index.html"
