@@ -186,7 +186,6 @@ void UberFilterFuzzer::fuzz(
 
 void UberFilterFuzzer::reset() {
   if (decoder_filter_ != nullptr) {
-    ENVOY_LOG_MISC(info, "CALLING ON DESTROY");
     decoder_filter_->onDestroy();
   }
   decoder_filter_.reset();
