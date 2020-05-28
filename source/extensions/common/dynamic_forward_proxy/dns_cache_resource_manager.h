@@ -64,14 +64,14 @@ public:
           cb_config);
 
   // Envoy::Upstream::ResourceManager
-  ResourceLimit& pendingRequests() override { return *pending_requests_; }
+  ResourceLimit& pendingRequests() override { return pending_requests_; }
   ResourceLimit& connections() override { NOT_REACHED_GCOVR_EXCL_LINE; }
   ResourceLimit& requests() override { NOT_REACHED_GCOVR_EXCL_LINE; }
   ResourceLimit& retries() override { NOT_REACHED_GCOVR_EXCL_LINE; }
   ResourceLimit& connectionPools() override { NOT_REACHED_GCOVR_EXCL_LINE; }
 
 private:
-  std::unique_ptr<DnsCacheResourceImpl> pending_requests_;
+  DnsCacheResourceImpl pending_requests_;
 };
 
 } // namespace DynamicForwardProxy

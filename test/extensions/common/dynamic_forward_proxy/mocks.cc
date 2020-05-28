@@ -10,8 +10,11 @@ namespace Extensions {
 namespace Common {
 namespace DynamicForwardProxy {
 
+MockDnsCacheResourceManager::MockDnsCacheResourceManager() = default;
+MockDnsCacheResourceManager::~MockDnsCacheResourceManager() = default;
+
 MockDnsCache::MockDnsCache() {
-  ON_CALL(*this, dnsCacheResourceManager()).WillByDefault(ReturnRef(*resource_manager_));
+  ON_CALL(*this, dnsCacheResourceManager()).WillByDefault(ReturnRef(resource_manager_));
 }
 MockDnsCache::~MockDnsCache() = default;
 

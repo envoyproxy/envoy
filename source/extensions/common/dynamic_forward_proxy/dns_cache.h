@@ -154,7 +154,7 @@ public:
   /**
    * @return A pointer to resource manager for dns cache.
    */
-  virtual DnsCacheResourceManager& dnsCacheResourceManager() PURE;
+  virtual Envoy::Upstream::ResourceManager& dnsCacheResourceManager() PURE;
 
   /**
    * @return Whether dns cache use dns cache resource manager for request restrictions. e.g. Circuit

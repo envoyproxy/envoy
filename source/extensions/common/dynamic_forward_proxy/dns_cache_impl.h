@@ -49,7 +49,7 @@ public:
                                             LoadDnsCacheEntryCallbacks& callbacks) override;
   AddUpdateCallbacksHandlePtr addUpdateCallbacks(UpdateCallbacks& callbacks) override;
   absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> hosts() override;
-  DnsCacheResourceManager& dnsCacheResourceManager() override { return resource_manager_; }
+  Envoy::Upstream::ResourceManager& dnsCacheResourceManager() override { return resource_manager_; }
   bool useDnsCacheResourceManager() const override { return use_dns_cache_resource_manager_; }
 
 private:
