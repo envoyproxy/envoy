@@ -4191,8 +4191,8 @@ TEST_P(SslSocketTest, OverrideApplicationProtocols) {
   server_ctx->clear_alpn_protocols();
   // Override client side ALPN, "test" ALPN is used.
   server_ctx->add_alpn_protocols("test");
-  Network::TransportSocketOptionsSharedPtr transport_socket_options(
-      new Network::TransportSocketOptionsImpl("", {}, {"foo", "test", "bar"}));
+  auto transport_socket_options = std::make_shared<Network::TransportSocketOptionsImpl>(
+      "", std::vector<std::string>{}, std::vector<std::string>{"foo", "test", "bar"});
 
   testUtilV2(test_options.setExpectedALPNProtocol("test").setTransportSocketOptions(
       transport_socket_options));
@@ -4200,7 +4200,8 @@ TEST_P(SslSocketTest, OverrideApplicationProtocols) {
   // Set fallback ALPN on the client side ALPN, "test" ALPN is used since no ALPN is specified
   // in the config.
   server_ctx->add_alpn_protocols("test");
-  transport_socket_options.reset(new Network::TransportSocketOptionsImpl("", {}, {}, "test"));
+  transport_socket_options = std::make_shared<Network::TransportSocketOptionsImpl>(
+      "", std::vector<std::string>{}, std::vector<std::string>{}, "test");
   testUtilV2(test_options.setExpectedALPNProtocol("test").setTransportSocketOptions(
       transport_socket_options));
 
