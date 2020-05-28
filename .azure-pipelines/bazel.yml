@@ -17,6 +17,11 @@ parameters:
     default: true
 
 steps:
+  - bash: |
+      /usr/local/bin/set-instance-protection.sh on
+    displayName: "Set Instance Protection on Agent to prevent scale in"
+    condition:  eq(false, ${{ parameters.managedAgent }})
+
   - task: Cache@2
     inputs:
       key: '"${{ parameters.ciTarget }}" | ./WORKSPACE | **/*.bzl'
@@ -78,3 +83,8 @@ steps:
       chmod -R u+w $(Build.StagingDirectory)
     displayName: "Self hosted agent clean up"
     condition: eq(false, ${{ parameters.managedAgent }})
+
+  - bash: |
+      /usr/local/bin/set-instance-protection.sh off
+    displayName: "Set Instance Protection on Agent to prevent scale in"
+    condition:  eq(false, ${{ parameters.managedAgent }})
