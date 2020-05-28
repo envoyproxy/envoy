@@ -7,6 +7,8 @@
     "--security-opt=seccomp=unconfined",
     "--volume=${env:HOME}:${env:HOME}",
     "--volume=envoy-build:/build",
+    // Cache installed vscode components
+    "--volume=envoy-vscode:/home/vscode"
     // Uncomment next line if you have devcontainer.env
     // "--env-file=.devcontainer/devcontainer.env"
   ],
@@ -16,6 +18,10 @@
     "clangd.path": "/opt/llvm/bin/clangd",
     "python.pythonPath": "/usr/bin/python3",
     "files.exclude": {
+      "**/.clangd/**": true,
+      "**/bazel-*/**": true
+    },
+    "files.watcherExclude": {
       "**/.clangd/**": true,
       "**/bazel-*/**": true
     }
