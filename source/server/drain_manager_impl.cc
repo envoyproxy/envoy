@@ -50,8 +50,7 @@ void DrainManagerImpl::startDrainSequence(std::function<void()> drain_complete_c
   ASSERT(!draining_);
   ASSERT(!drain_tick_timer_);
   draining_ = true;
-  drain_tick_timer_ =
-      server_.dispatcher().createTimer(drain_complete_cb);
+  drain_tick_timer_ = server_.dispatcher().createTimer(drain_complete_cb);
   const std::chrono::seconds drain_delay(server_.options().drainTime());
   drain_tick_timer_->enableTimer(drain_delay);
   drain_deadline_ = server_.dispatcher().timeSource().monotonicTime() + drain_delay;

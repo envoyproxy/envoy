@@ -51,7 +51,9 @@ TEST_F(DrainManagerImplTest, Default) {
 
   // Test drain sequence.
   Event::MockTimer* drain_timer = new Event::MockTimer(&server_.dispatcher_);
-  EXPECT_CALL(*drain_timer, enableTimer(_, _)); // TODO(auni) add arg
+  const std::chrono::milliseconds expected_delay =
+      std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::seconds(DrainTimeSeconds));
+  EXPECT_CALL(*drain_timer, enableTimer(expected_delay, nullptr));
   ReadyWatcher drain_complete;
   drain_manager.startDrainSequence([&drain_complete]() -> void { drain_complete.ready(); });
   EXPECT_CALL(drain_complete, ready());
