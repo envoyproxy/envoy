@@ -47,6 +47,7 @@ cc_binary(
     linkopts = [
         "-lm",
         "-llog",
+        "-Wl,-s",
     ],
     linkshared = True,
     deps = [":envoy_main_interface_lib"],
