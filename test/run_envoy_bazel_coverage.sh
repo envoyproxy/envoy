@@ -33,10 +33,11 @@ fi
 bazel coverage ${BAZEL_BUILD_OPTIONS} --test_output=all ${COVERAGE_TARGETS}
 
 COVERAGE_DIR="${SRCDIR}"/generated/coverage
+
+rm -rf "${COVERAGE_DIR}"
 mkdir -p "${COVERAGE_DIR}"
 
 COVERAGE_DATA="${COVERAGE_DIR}/coverage.dat"
-
 cp bazel-out/_coverage/_coverage_report.dat "${COVERAGE_DATA}"
 
 COVERAGE_VALUE=$(genhtml --prefix ${PWD} --output "${COVERAGE_DIR}" "${COVERAGE_DATA}" | tee /dev/stderr | grep lines... | cut -d ' ' -f 4)
