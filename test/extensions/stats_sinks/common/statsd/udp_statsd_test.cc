@@ -55,16 +55,15 @@ TEST(UdpOverUdsStatsdSinkTest, InitWithPipeAddress) {
   // modification back to the abstraction layer so it will work for multiple platforms. Additionally
   // this uses low level networking calls because our abstractions in this area only work for IP
   // sockets. Revisit this also.
-  auto io_handle =
-      Network::SocketInterface::socket(Network::Address::SocketType::Datagram, uds_address);
+  Network::SocketImpl sock(Network::Address::SocketType::Datagram, uds_address);
   RELEASE_ASSERT(
-      Api::OsSysCallsSingleton::get().setsocketblocking(io_handle->fd(), false).rc_ != -1, "");
-  uds_address->bind(io_handle->fd());
+      Api::OsSysCallsSingleton::get().setsocketblocking(sock.ioHandle().fd(), false).rc_ != -1, "");
+  sock.bind(uds_address);
 
   // Do the flush which should have somewhere to write now.
   sink.flush(snapshot);
   Buffer::OwnedImpl receive_buffer;
-  receive_buffer.read(*io_handle, 32);
+  receive_buffer.read(sock.ioHandle(), 32);
   EXPECT_EQ("envoy.test_counter:1|c", receive_buffer.toString());
 }
 
