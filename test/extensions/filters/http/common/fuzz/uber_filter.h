@@ -54,6 +54,8 @@ private:
   Http::FilterFactoryCb cb_;
   NiceMock<Envoy::Network::MockConnection> connection_;
   Network::Address::InstanceConstSharedPtr addr_;
+  NiceMock<Upstream::MockClusterManager> cluster_manager_;
+  NiceMock<Http::MockAsyncClientRequest> async_request_;
 
   // Mocked callbacks.
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;

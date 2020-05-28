@@ -13,7 +13,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 
-UberFilterFuzzer::UberFilterFuzzer() {
+UberFilterFuzzer::UberFilterFuzzer() : async_request_{&cluster_manager_.async_client_} {
   // This is a decoder filter.
   ON_CALL(filter_callback_, addStreamDecoderFilter(_))
       .WillByDefault(Invoke([&](Http::StreamDecoderFilterSharedPtr filter) -> void {
@@ -186,6 +186,7 @@ void UberFilterFuzzer::fuzz(
 
 void UberFilterFuzzer::reset() {
   if (decoder_filter_ != nullptr) {
+    ENVOY_LOG_MISC(info, "CALLING ON DESTROY");
     decoder_filter_->onDestroy();
   }
   decoder_filter_.reset();
