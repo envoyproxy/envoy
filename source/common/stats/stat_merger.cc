@@ -17,7 +17,6 @@ StatMerger::~StatMerger() {
     Gauge& gauge = temp_scope_->gaugeFromStatName(stat_name, Gauge::ImportMode::Uninitialized);
     gauge.setParentValue(0);
   }
-  parent_gauges_.clear();
 }
 
 StatName StatMerger::DynamicContext::makeDynamicStatName(const std::string& name,

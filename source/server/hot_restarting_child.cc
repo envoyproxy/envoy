@@ -82,7 +82,7 @@ void HotRestartingChild::sendParentTerminateRequest() {
   parent_terminated_ = true;
 
   // Note that the 'generation' counter needs to retain the contribution from
-  // the parent....
+  // the parent.
   stat_merger_->retainParentGaugeValue(hot_restart_generation_stat_name_);
 
   // Now it is safe to forget our stat transferral state.
