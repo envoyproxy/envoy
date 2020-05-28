@@ -37,6 +37,10 @@ void OnDemandRouteUpdate::setDecoderFilterCallbacks(Http::StreamDecoderFilterCal
   callbacks_ = &callbacks;
 }
 
+void OnDemandRouteUpdate::onDestroy() {
+  route_config_updated_callback_.reset();
+}
+
 // This is the callback which is called when an update requested in requestRouteConfigUpdate()
 // has been propagated to workers, at which point the request processing is restarted from the
 // beginning.
