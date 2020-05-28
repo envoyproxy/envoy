@@ -18,7 +18,7 @@ protected:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, NetworkUtilityTest,
-                         testing::ValuesIn(TestEnvironment::getIpTestParameters()));
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
 // This validates Network::Test::bindFreeLoopbackPort behaves as desired, i.e. that we don't have
 // a significant risk of flakes due to re-use of a port over short time intervals. We can't drive
