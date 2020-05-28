@@ -66,7 +66,8 @@ TEST_F(StreamInfoCustomHeaderFormatterTest, TestFormatWithDownstreamRemoteAddres
   testFormatting("DOWNSTREAM_REMOTE_ADDRESS", "127.0.0.1:0");
 }
 
-TEST_F(StreamInfoCustomHeaderFormatterTest, TestFormatWithDownstreamRemoteAddressWithoutPortVariable) {
+TEST_F(StreamInfoCustomHeaderFormatterTest,
+       TestFormatWithDownstreamRemoteAddressWithoutPortVariable) {
   testFormatting("DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT", "127.0.0.1");
 }
 
@@ -94,7 +95,8 @@ TEST_F(StreamInfoCustomHeaderFormatterTest, TestFormatWithDownstreamLocalPortVar
   testFormatting(stream_info, "DOWNSTREAM_LOCAL_PORT", "");
 }
 
-TEST_F(StreamInfoCustomHeaderFormatterTest, TestFormatWithDownstreamLocalAddressWithoutPortVariable) {
+TEST_F(StreamInfoCustomHeaderFormatterTest,
+       TestFormatWithDownstreamLocalAddressWithoutPortVariable) {
   testFormatting("DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT", "127.0.0.2");
 }
 
@@ -146,7 +148,8 @@ TEST_F(StreamInfoCustomHeaderFormatterTest, TestFormatWithDownstreamPeerUriSanVa
   testFormatting(stream_info, "DOWNSTREAM_PEER_URI_SAN", "san");
 }
 
-TEST_F(StreamInfoCustomHeaderFormatterTest, TestFormatWithDownstreamPeerUriSanVariableMultipleSans) {
+TEST_F(StreamInfoCustomHeaderFormatterTest,
+       TestFormatWithDownstreamPeerUriSanVariableMultipleSans) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   const std::vector<std::string> sans{"san1", "san2"};
@@ -179,7 +182,8 @@ TEST_F(StreamInfoCustomHeaderFormatterTest, TestFormatWithDownstreamLocalUriSanV
   testFormatting(stream_info, "DOWNSTREAM_LOCAL_URI_SAN", "san");
 }
 
-TEST_F(StreamInfoCustomHeaderFormatterTest, TestFormatWithDownstreamLocalUriSanVariableMultipleSans) {
+TEST_F(StreamInfoCustomHeaderFormatterTest,
+       TestFormatWithDownstreamLocalUriSanVariableMultipleSans) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   const std::vector<std::string> sans{"san1", "san2"};
@@ -625,7 +629,8 @@ TEST_F(StreamInfoCustomHeaderFormatterTest, TestFormatWithNonStringPerRequestSta
 
 TEST_F(StreamInfoCustomHeaderFormatterTest, WrongFormatOnPerRequestStateVariable) {
   // No parameters
-  EXPECT_THROW_WITH_MESSAGE(StreamInfoCustomHeaderFormatter("PER_REQUEST_STATE()", false), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(StreamInfoCustomHeaderFormatter("PER_REQUEST_STATE()", false),
+                            EnvoyException,
                             "Invalid header configuration. Expected format "
                             "PER_REQUEST_STATE(<data_name>), actual format "
                             "PER_REQUEST_STATE()");
@@ -643,7 +648,9 @@ TEST_F(StreamInfoCustomHeaderFormatterTest, WrongFormatOnPerRequestStateVariable
                             "PER_REQUEST_STATE testing)");
 }
 
-TEST_F(StreamInfoCustomHeaderFormatterTest, UnknownVariable) { testInvalidFormat("INVALID_VARIABLE"); }
+TEST_F(StreamInfoCustomHeaderFormatterTest, UnknownVariable) {
+  testInvalidFormat("INVALID_VARIABLE");
+}
 
 TEST_F(StreamInfoCustomHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
   // Invalid JSON.
@@ -655,12 +662,14 @@ TEST_F(StreamInfoCustomHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariabl
                             "Error(offset 0, line 1): Invalid value.\n");
 
   // No parameters.
-  EXPECT_THROW_WITH_MESSAGE(StreamInfoCustomHeaderFormatter("UPSTREAM_METADATA", false), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(StreamInfoCustomHeaderFormatter("UPSTREAM_METADATA", false),
+                            EnvoyException,
                             "Invalid header configuration. Expected format "
                             "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
                             "UPSTREAM_METADATA");
 
-  EXPECT_THROW_WITH_MESSAGE(StreamInfoCustomHeaderFormatter("UPSTREAM_METADATA()", false), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(StreamInfoCustomHeaderFormatter("UPSTREAM_METADATA()", false),
+                            EnvoyException,
                             "Invalid header configuration. Expected format "
                             "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
                             "UPSTREAM_METADATA(), because JSON supplied is not valid. "
@@ -674,7 +683,8 @@ TEST_F(StreamInfoCustomHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariabl
                             "UPSTREAM_METADATA([\"ns\"])");
 
   // Missing close paren.
-  EXPECT_THROW_WITH_MESSAGE(StreamInfoCustomHeaderFormatter("UPSTREAM_METADATA(", false), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(StreamInfoCustomHeaderFormatter("UPSTREAM_METADATA(", false),
+                            EnvoyException,
                             "Invalid header configuration. Expected format "
                             "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
                             "UPSTREAM_METADATA(");
@@ -685,11 +695,11 @@ TEST_F(StreamInfoCustomHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariabl
                             "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
                             "UPSTREAM_METADATA([a,b,c,d]");
 
-  EXPECT_THROW_WITH_MESSAGE(StreamInfoCustomHeaderFormatter("UPSTREAM_METADATA([\"a\",\"b\"]", false),
-                            EnvoyException,
-                            "Invalid header configuration. Expected format "
-                            "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
-                            "UPSTREAM_METADATA([\"a\",\"b\"]");
+  EXPECT_THROW_WITH_MESSAGE(
+      StreamInfoCustomHeaderFormatter("UPSTREAM_METADATA([\"a\",\"b\"]", false), EnvoyException,
+      "Invalid header configuration. Expected format "
+      "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
+      "UPSTREAM_METADATA([\"a\",\"b\"]");
 
   // Non-string elements.
   EXPECT_THROW_WITH_MESSAGE(
@@ -701,7 +711,8 @@ TEST_F(StreamInfoCustomHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariabl
 
   // Invalid string elements.
   EXPECT_THROW_WITH_MESSAGE(
-      StreamInfoCustomHeaderFormatter("UPSTREAM_METADATA([\"a\", \"\\unothex\"])", false), EnvoyException,
+      StreamInfoCustomHeaderFormatter("UPSTREAM_METADATA([\"a\", \"\\unothex\"])", false),
+      EnvoyException,
       "Invalid header configuration. Expected format "
       "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
       "UPSTREAM_METADATA([\"a\", \"\\unothex\"]), because JSON supplied is not valid. "

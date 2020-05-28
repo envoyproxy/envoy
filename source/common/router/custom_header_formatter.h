@@ -69,7 +69,8 @@ private:
 };
 
 /**
- * A formatter that produces a value by concatenating the results of multiple CustomHeaderFormatters.
+ * A formatter that produces a value by concatenating the results of multiple
+ * CustomHeaderFormatters.
  */
 class CompoundCustomHeaderFormatter : public CustomHeaderFormatter {
 public:

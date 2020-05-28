@@ -218,7 +218,8 @@ StreamInfoCustomHeaderFormatter::FieldExtractor sslConnectionInfoStringTimeHeade
 
 } // namespace
 
-StreamInfoCustomHeaderFormatter::StreamInfoCustomHeaderFormatter(absl::string_view field_name, bool append)
+StreamInfoCustomHeaderFormatter::StreamInfoCustomHeaderFormatter(absl::string_view field_name,
+                                                                 bool append)
     : append_(append) {
   if (field_name == "PROTOCOL") {
     field_extractor_ = [](const Envoy::StreamInfo::StreamInfo& stream_info) {

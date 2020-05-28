@@ -37,7 +37,7 @@ std::string unescape(absl::string_view sv) { return absl::StrReplaceAll(sv, {{"%
 // names of valid variables. Interpretation of the variable name and arguments is delegated to
 // StreamInfoCustomHeaderFormatter.
 CustomHeaderFormatterPtr parseInternal(const envoy::config::core::v3::HeaderValue& header_value,
-                                 bool append) {
+                                       bool append) {
   const std::string& key = header_value.key();
   // PGV constraints provide this guarantee.
   ASSERT(!key.empty());
@@ -225,10 +225,12 @@ HeaderParserPtr HeaderParser::configure(
 
   for (const auto& header_value_option : headers_to_add) {
     const bool append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(header_value_option, append, true);
-    CustomHeaderFormatterPtr custom_header_formatter = parseInternal(header_value_option.header(), append);
+    CustomHeaderFormatterPtr custom_header_formatter =
+        parseInternal(header_value_option.header(), append);
 
     header_parser->headers_to_add_.emplace_back(
-        Http::LowerCaseString(header_value_option.header().key()), std::move(custom_header_formatter));
+        Http::LowerCaseString(header_value_option.header().key()),
+        std::move(custom_header_formatter));
   }
 
   return header_parser;
