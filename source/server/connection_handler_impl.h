@@ -323,7 +323,6 @@ private:
 
 /**
  * Wrapper for an active udp listener owned by this handler.
- * TODO(danzh): rename to ActiveRawUdpListener.
  */
 class ActiveRawUdpListener : public Network::UdpListenerCallbacks,
                           public ConnectionHandlerImpl::ActiveListenerImplBase,
