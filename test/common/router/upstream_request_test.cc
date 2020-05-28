@@ -29,6 +29,10 @@ class MockGenericConnPool : public GenericConnPool {
   MOCK_METHOD(void, newStream, (GenericConnectionPoolCallbacks * request));
   MOCK_METHOD(bool, cancelAnyPendingRequest, ());
   MOCK_METHOD(absl::optional<Http::Protocol>, protocol, (), (const));
+  MOCK_METHOD(bool, initialize,
+              (Upstream::ClusterManager&, const RouteEntry&, Http::Protocol,
+               Upstream::LoadBalancerContext*));
+  MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, host, (), (const));
 };
 
 class MockGenericConnectionPoolCallbacks : public GenericConnectionPoolCallbacks {
@@ -107,8 +111,12 @@ public:
 
 class TcpConnPoolTest : public ::testing::Test {
 public:
-  TcpConnPoolTest()
-      : conn_pool_(&mock_pool_), host_(std::make_shared<NiceMock<Upstream::MockHost>>()) {}
+  TcpConnPoolTest() : conn_pool_(), host_(std::make_shared<NiceMock<Upstream::MockHost>>()) {
+    NiceMock<MockRouteEntry> route_entry;
+    NiceMock<Upstream::MockClusterManager> cm;
+    EXPECT_CALL(cm, tcpConnPoolForCluster(_, _, _)).WillOnce(Return(&mock_pool_));
+    EXPECT_TRUE(conn_pool_.initialize(cm, route_entry, Http::Protocol::Http11, nullptr));
+  }
 
   TcpConnPool conn_pool_;
   Tcp::ConnectionPool::MockInstance mock_pool_;
