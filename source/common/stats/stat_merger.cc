@@ -7,6 +7,19 @@ namespace Stats {
 
 StatMerger::StatMerger(Store& target_store) : temp_scope_(target_store.createScope("")) {}
 
+StatMerger::~StatMerger() {
+  // By the time a parent exits, all its contributions to accumulated gauges
+  // should be zero. But depending on the timing of the stat-merger
+  // communication shutdown and other shutdown activities on the parent, the
+  // gauges may not all be zero yet. So simply erase all the parent
+  // contributions.
+  for (StatName stat_name : parent_gauges_) {
+    Gauge& gauge = temp_scope_->gaugeFromStatName(stat_name, Gauge::ImportMode::Uninitialized);
+    gauge.setParentValue(0);
+  }
+  parent_gauges_.clear();
+}
+
 StatName StatMerger::DynamicContext::makeDynamicStatName(const std::string& name,
                                                          const DynamicsMap& map) {
   auto iter = map.find(name);
@@ -132,14 +145,6 @@ void StatMerger::mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges,
 
 void StatMerger::retainParentGaugeValue(Stats::StatName gauge_name) {
   parent_gauges_.erase(gauge_name);
-}
-
-void StatMerger::removeParentContributionToGauges() {
-  for (StatName stat_name : parent_gauges_) {
-    Gauge& gauge = temp_scope_->gaugeFromStatName(stat_name, Gauge::ImportMode::Accumulate);
-    gauge.setParentValue(0);
-  }
-  parent_gauges_.clear();
 }
 
 void StatMerger::mergeStats(const Protobuf::Map<std::string, uint64_t>& counter_deltas,

@@ -81,15 +81,9 @@ void HotRestartingChild::sendParentTerminateRequest() {
   sendHotRestartMessage(parent_address_, wrapped_request);
   parent_terminated_ = true;
 
-  // Note that we the 'generation' counter needs to retain the contribution
-  // from the parent....
+  // Note that the 'generation' counter needs to retain the contribution from
+  // the parent....
   stat_merger_->retainParentGaugeValue(hot_restart_generation_stat_name_);
-
-  // Once setting parent_terminated_ == true, we can send no more hot restart
-  // RPCs, and therefore receive no more responses, including stats. We should
-  // also zero out parent-stat contribution to child gauges (see
-  // https://github.com/envoyproxy/envoy/issues/10806).
-  stat_merger_->removeParentContributionToGauges();
 
   // Now it is safe to forget our stat transferral state.
   //

@@ -41,6 +41,7 @@ public:
   };
 
   StatMerger(Stats::Store& target_store);
+  ~StatMerger();
 
   /**
    * Merge the values of stats_proto into stats_store. Counters are always
@@ -56,24 +57,15 @@ public:
                   const DynamicsMap& dynamics = DynamicsMap());
 
   /**
-   * By the time a parent exits, all its contributions to accumulated gauges
-   * should be zero. But depending on the timing of the stat-merger
-   * communication shutdown and other shutdown activities on the parent, the
-   * gauges may not all be zero yet. So simply erase all the parent
-   * contributions.
-   */
-  void removeParentContributionToGauges();
-
-  /**
    * Indicates that a gauge's value from the hot-restart parent should be
-   * retained, combining it with the child data, By default, data is transferred
+   * retained, combining it with the child data. By default, data is transferred
    * from parent gauges only during the hot-restart process, but the parent
    * contribution is subtracted from the child when the parent terminates. This
-   * makes sense for gauges such as active connection counts, but is not appropriate
-   * for server.hot_restart_generation.
+   * makes sense for gauges such as active connection counts, but is not
+   * appropriate for server.hot_restart_generation.
    *
-   * This function must be called immediately prior to
-   * removeParentContributionToGauges.
+   * This function must be called immediately prior to destruction of the
+   * StatMerger instance.
    *
    * @param gauge_name The gauge to be retained.
    */
