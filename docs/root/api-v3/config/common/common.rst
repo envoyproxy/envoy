@@ -7,3 +7,4 @@ Common
 
   ../../extensions/common/dynamic_forward_proxy/v3/*
   ../../extensions/common/tap/v3/*
+  accesslog/v3/*

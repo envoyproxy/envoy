@@ -17,4 +17,3 @@ Common messages
   ../api/v2/core/socket_option.proto
   ../api/v2/auth/cert.proto
   ../api/v2/ratelimit/ratelimit.proto
-  ../../api-v3/config/common/accesslog/v3/common.proto
