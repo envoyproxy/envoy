@@ -110,7 +110,7 @@ jobs:
           GCS_ARTIFACT_BUCKET: $(GcsArtifactBucket)
         condition: always()
 
-  - job: fuzz-coverage
+  - job: fuzz_coverage
     displayName: "Linux-x64 fuzz coverage"
     dependsOn: ["format"]
     timeoutInMinutes: 360
