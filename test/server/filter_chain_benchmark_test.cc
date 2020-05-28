@@ -102,6 +102,11 @@ public:
   void addOptions(const OptionsSharedPtr&) override {}
   const OptionsSharedPtr& options() const override { return options_; }
   void setRequestedServerName(absl::string_view) override {}
+  Api::SysCallIntResult bind(Network::Address::InstanceConstSharedPtr) override { return {0, 0}; }
+  Api::SysCallIntResult listen(int) override { return {0, 0}; }
+  Api::SysCallIntResult connect(const Network::Address::InstanceConstSharedPtr) override {
+    return {0, 0};
+  }
 
 private:
   Network::IoHandlePtr io_handle_;

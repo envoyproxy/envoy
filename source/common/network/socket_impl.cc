@@ -134,5 +134,50 @@ Address::InstanceConstSharedPtr SocketInterface::peerAddressFromFd(os_fd_t fd) {
   return Address::addressFromSockAddr(ss, ss_len);
 }
 
+SocketImpl::SocketImpl(Address::SocketType type, Address::Type addr_type,
+                       Address::IpVersion version)
+    : io_handle_(SocketInterface::socket(type, addr_type, version)) {}
+
+SocketImpl::SocketImpl(Address::SocketType socket_type, const Address::InstanceConstSharedPtr addr)
+    : io_handle_(SocketInterface::socket(socket_type, addr)) {}
+
+Api::SysCallIntResult SocketImpl::bind(Network::Address::InstanceConstSharedPtr address) {
+  if (address->type() == Address::Type::Pipe) {
+    const Address::Pipe* pipe = address->pipe();
+    const auto* pipe_sa = reinterpret_cast<const sockaddr_un*>(address->sockAddr());
+    bool abstract_namespace = address->pipe()->abstractNamespace();
+    if (!abstract_namespace) {
+      // Try to unlink an existing filesystem object at the requested path. Ignore
+      // errors -- it's fine if the path doesn't exist, and if it exists but can't
+      // be unlinked then `::bind()` will generate a reasonable errno.
+      unlink(pipe_sa->sun_path);
+    }
+    // Not storing a reference to syscalls singleton because of unit test mocks
+    auto bind_result = Api::OsSysCallsSingleton::get().bind(io_handle_->fd(), address->sockAddr(),
+                                                            address->sockAddrLen());
+    if (pipe->mode() != 0 && !abstract_namespace && bind_result.rc_ == 0) {
+      auto set_permissions = Api::OsSysCallsSingleton::get().chmod(pipe_sa->sun_path, pipe->mode());
+      if (set_permissions.rc_ != 0) {
+        throw EnvoyException(fmt::format("Failed to create socket with mode {}: {}",
+                                         std::to_string(pipe->mode()),
+                                         strerror(set_permissions.errno_)));
+      }
+    }
+    return bind_result;
+  }
+
+  return Api::OsSysCallsSingleton::get().bind(io_handle_->fd(), address->sockAddr(),
+                                              address->sockAddrLen());
+}
+
+Api::SysCallIntResult SocketImpl::listen(int backlog) {
+  return Api::OsSysCallsSingleton::get().listen(io_handle_->fd(), backlog);
+}
+
+Api::SysCallIntResult SocketImpl::connect(const Network::Address::InstanceConstSharedPtr address) {
+  return Api::OsSysCallsSingleton::get().connect(io_handle_->fd(), address->sockAddr(),
+                                                 address->sockAddrLen());
+}
+
 } // namespace Network
 } // namespace Envoy
