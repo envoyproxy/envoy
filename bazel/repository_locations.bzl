@@ -53,18 +53,11 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["build"],
     ),
     bazel_toolchains = dict(
-        sha256 = "996c7a9af75239fa399d0ee795b95069a94a9ec72443406f158300295bbb5cba",
-        strip_prefix = "bazel-toolchains-enable-docker-toolchain-non-linux",
-        urls = [
-            "https://github.com/greenhouse-org/bazel-toolchains/archive/enable-docker-toolchain-non-linux.tar.gz",
-        ],
+        sha256 = "5d48b13686081f5d07dbba1271595d1bb2b5fa1d2f8c049ef15011bd4e6bdd19",
+        strip_prefix = "bazel-toolchains-834b89b3f608a9aa4c212e7ee4a05b323b980a85",
+        # 2020-05-21
+        urls = ["https://github.com/bazelbuild/bazel-toolchains/archive/834b89b3f608a9aa4c212e7ee4a05b323b980a85.tar.gz"],
         use_category = ["build"],
-        # sha256 = "239a1a673861eabf988e9804f45da3b94da28d1aff05c373b013193c315d9d9e",
-        # strip_prefix = "bazel-toolchains-3.0.1",
-        # urls = [
-        #     "https://github.com/bazelbuild/bazel-toolchains/releases/download/3.0.1/bazel-toolchains-3.0.1.tar.gz",
-        #     "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/3.0.1.tar.gz",
-        # ],
     ),
     build_bazel_rules_apple = dict(
         sha256 = "7a7afdd4869bb201c9352eed2daf37294d42b093579b70423490c1b4d4f6ce42",
@@ -72,13 +65,10 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["build"],
     ),
     envoy_build_tools = dict(
-        # sha256 = "9d348f92ae8fb2495393109aac28aea314ad1fb013cdec1ab7b1224f804be1b7",
-        # strip_prefix = "envoy-build-tools-823c2e9386eee5117f7ef9e3d7c90e784cd0d047",
-        # # 2020-04-07
-        # urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/823c2e9386eee5117f7ef9e3d7c90e784cd0d047.tar.gz"],
-        sha256 = "3785e6f56428054ea25c98407996ab0e157a7296f7afd8f6ca39b3daa29897de",
-        strip_prefix = "envoy-build-tools-7d6ebc89394af6e54073753b4a50c1ec5eecc889",
-        urls = ["https://github.com/greenhouse-org/envoy-build-tools/archive/7d6ebc89394af6e54073753b4a50c1ec5eecc889.tar.gz"],
+        sha256 = "6839c15e0c9dd306a977685334c91544050ca7a68705cd5c4aa318df0f1893b3",
+        strip_prefix = "envoy-build-tools-7f64276cf203e391d2519f799bb3e141a6cd8187",
+        # 2020-05-27
+        urls = ["https://github.com/greenhouse-org/envoy-build-tools/archive/7f64276cf203e391d2519f799bb3e141a6cd8187.tar.gz"],
         use_category = ["build"],
     ),
     boringssl = dict(
