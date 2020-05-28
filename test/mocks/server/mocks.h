@@ -13,6 +13,7 @@
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/server/admin.h"
+#include "envoy/server/bootstrap_extension_config.h"
 #include "envoy/server/configuration.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/filter_config.h"
@@ -677,6 +678,17 @@ public:
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
 
   testing::NiceMock<Configuration::MockServerFactoryContext> server_factory_context_;
+};
+
+class MockBootstrapExtensionFactory : public BootstrapExtensionFactory {
+public:
+  MockBootstrapExtensionFactory();
+  ~MockBootstrapExtensionFactory();
+
+  MOCK_METHOD(BootstrapExtensionPtr, createBootstrapExtension,
+              (const Protobuf::Message&, Configuration::ServerFactoryContext&), (override));
+  MOCK_METHOD(ProtobufTypes::MessagePtr, createEmptyConfigProto, (), (override));
+  MOCK_METHOD(std::string, name, (), (const override));
 };
 
 } // namespace Configuration
