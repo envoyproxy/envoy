@@ -196,7 +196,6 @@ envoy_cc_library(
         "//include/envoy/stats:stats_macros",
         "//include/envoy/stats:timespan_interface",
         "//include/envoy/upstream:upstream_interface",
-        "//source/common/access_log:access_log_formatter_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:dump_state_utils",
