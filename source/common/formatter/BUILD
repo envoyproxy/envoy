@@ -14,8 +14,8 @@ envoy_cc_library(
     hdrs = ["substitution_formatter.h"],
     external_deps = ["abseil_str_format"],
     deps = [
+        "//include/envoy/formatter:substitution_formatter_interface",
         "//include/envoy/stream_info:stream_info_interface",
-        "//include/envoy/substitution:substitution_formatter_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:metadata_lib",

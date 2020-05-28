@@ -1,9 +1,9 @@
-#include "common/substitution/substitution_format_string.h"
+#include "common/formatter/substitution_format_string.h"
 
-#include "common/substitution/substitution_formatter.h"
+#include "common/formatter/substitution_formatter.h"
 
 namespace Envoy {
-namespace Substitution {
+namespace Formatter {
 namespace {
 
 absl::flat_hash_map<std::string, std::string>
@@ -27,11 +27,11 @@ SubstitutionFormatStringUtils::createJsonFormatter(const ProtobufWkt::Struct& st
   return std::make_unique<JsonFormatterImpl>(json_format_map, preserve_types);
 }
 
-Substitution::FormatterPtr SubstitutionFormatStringUtils::fromProtoConfig(
+FormatterPtr SubstitutionFormatStringUtils::fromProtoConfig(
     const envoy::config::core::v3::SubstitutionFormatString& config) {
   switch (config.format_case()) {
   case envoy::config::core::v3::SubstitutionFormatString::FormatCase::kTextFormat:
-    return std::make_unique<Substitution::FormatterImpl>(config.text_format());
+    return std::make_unique<FormatterImpl>(config.text_format());
   case envoy::config::core::v3::SubstitutionFormatString::FormatCase::kJsonFormat: {
     return createJsonFormatter(config.json_format(), true);
   }
@@ -41,5 +41,5 @@ Substitution::FormatterPtr SubstitutionFormatStringUtils::fromProtoConfig(
   return nullptr;
 }
 
-} // namespace Substitution
+} // namespace Formatter
 } // namespace Envoy

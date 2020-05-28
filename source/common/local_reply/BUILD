@@ -20,10 +20,10 @@ envoy_cc_library(
         "//source/common/access_log:access_log_lib",
         "//source/common/common:enum_to_int",
         "//source/common/config:datasource_lib",
+        "//source/common/formatter:substitution_format_string_lib",
+        "//source/common/formatter:substitution_formatter_lib",
         "//source/common/http:header_map_lib",
         "//source/common/stream_info:stream_info_lib",
-        "//source/common/substitution:substitution_format_string_lib",
-        "//source/common/substitution:substitution_formatter_lib",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )

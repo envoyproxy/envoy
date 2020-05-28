@@ -28,7 +28,7 @@ envoy_cc_fuzz_test(
     ],
     deps = [
         ":substitution_formatter_fuzz_proto_cc_proto",
-        "//source/common/substitution:substitution_formatter_lib",
+        "//source/common/formatter:substitution_formatter_lib",
         "//test/fuzz:utility_lib",
     ],
 )
@@ -38,9 +38,9 @@ envoy_cc_test(
     srcs = ["substitution_formatter_test.cc"],
     deps = [
         "//source/common/common:utility_lib",
+        "//source/common/formatter:substitution_formatter_lib",
         "//source/common/http:header_map_lib",
         "//source/common/router:string_accessor_lib",
-        "//source/common/substitution:substitution_formatter_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/ssl:ssl_mocks",
@@ -56,7 +56,7 @@ envoy_cc_test(
     name = "substitution_format_string_test",
     srcs = ["substitution_format_string_test.cc"],
     deps = [
-        "//source/common/substitution:substitution_format_string_lib",
+        "//source/common/formatter:substitution_format_string_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:utility_lib",
@@ -71,9 +71,9 @@ envoy_cc_benchmark_binary(
         "benchmark",
     ],
     deps = [
+        "//source/common/formatter:substitution_formatter_lib",
         "//source/common/http:header_map_lib",
         "//source/common/network:address_lib",
-        "//source/common/substitution:substitution_formatter_lib",
         "//test/common/stream_info:test_util",
         "//test/mocks/http:http_mocks",
         "//test/mocks/stream_info:stream_info_mocks",

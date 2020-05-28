@@ -8,7 +8,7 @@
 #include "envoy/stream_info/stream_info.h"
 
 namespace Envoy {
-namespace Substitution {
+namespace Formatter {
 
 /**
  * Interface for substitution formatter.
@@ -77,5 +77,5 @@ public:
 
 using FormatterProviderPtr = std::unique_ptr<FormatterProvider>;
 
-} // namespace Substitution
+} // namespace Formatter
 } // namespace Envoy

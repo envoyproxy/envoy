@@ -9,9 +9,9 @@
 #include "envoy/server/filter_config.h"
 
 #include "common/common/logger.h"
+#include "common/formatter/substitution_format_string.h"
+#include "common/formatter/substitution_formatter.h"
 #include "common/protobuf/protobuf.h"
-#include "common/substitution/substitution_format_string.h"
-#include "common/substitution/substitution_formatter.h"
 
 #include "extensions/access_loggers/file/file_access_log_impl.h"
 #include "extensions/access_loggers/well_known_names.h"
@@ -28,13 +28,12 @@ FileAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
   const auto& fal_config = MessageUtil::downcastAndValidate<
       const envoy::extensions::access_loggers::file::v3::FileAccessLog&>(
       config, context.messageValidationVisitor());
-  Substitution::FormatterPtr formatter;
+  Formatter::FormatterPtr formatter;
 
   if (fal_config.has_log_format()) {
-    formatter =
-        Substitution::SubstitutionFormatStringUtils::fromProtoConfig(fal_config.log_format());
+    formatter = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(fal_config.log_format());
   } else if (fal_config.has_json_format()) {
-    formatter = Substitution::SubstitutionFormatStringUtils::createJsonFormatter(
+    formatter = Formatter::SubstitutionFormatStringUtils::createJsonFormatter(
         fal_config.json_format(), false);
   } else if (fal_config.access_log_format_case() !=
              envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::
@@ -51,10 +50,10 @@ FileAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
-    formatter = Substitution::SubstitutionFormatStringUtils::fromProtoConfig(sff_config);
+    formatter = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(sff_config);
   }
   if (!formatter) {
-    formatter = Substitution::SubstitutionFormatUtils::defaultSubstitutionFormatter();
+    formatter = Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter();
   }
 
   return std::make_shared<FileAccessLog>(fal_config.path(), std::move(filter), std::move(formatter),

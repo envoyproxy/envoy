@@ -7,8 +7,8 @@
 
 #include "envoy/common/time.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/formatter/substitution_formatter.h"
 #include "envoy/stream_info/stream_info.h"
-#include "envoy/substitution/substitution_formatter.h"
 
 #include "common/common/utility.h"
 
@@ -16,7 +16,7 @@
 #include "absl/types/optional.h"
 
 namespace Envoy {
-namespace Substitution {
+namespace Formatter {
 
 /**
  * Access log format parser.
@@ -355,5 +355,5 @@ private:
   const Envoy::DateFormatter date_formatter_;
 };
 
-} // namespace Substitution
+} // namespace Formatter
 } // namespace Envoy

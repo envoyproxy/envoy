@@ -4,12 +4,12 @@
 #include <unordered_map>
 
 #include "envoy/config/core/v3/substitution_format_string.pb.h"
-#include "envoy/substitution/substitution_formatter.h"
+#include "envoy/formatter/substitution_formatter.h"
 
 #include "common/protobuf/protobuf.h"
 
 namespace Envoy {
-namespace Substitution {
+namespace Formatter {
 
 /**
  * Utilities for using envoy::config::core::v3::SubstitutionFormatString
@@ -29,5 +29,5 @@ public:
                                           bool preserve_types);
 };
 
-} // namespace Substitution
+} // namespace Formatter
 } // namespace Envoy

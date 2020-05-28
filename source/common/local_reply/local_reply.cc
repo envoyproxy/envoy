@@ -6,9 +6,9 @@
 #include "common/access_log/access_log_impl.h"
 #include "common/common/enum_to_int.h"
 #include "common/config/datasource.h"
+#include "common/formatter/substitution_format_string.h"
+#include "common/formatter/substitution_formatter.h"
 #include "common/http/header_map_impl.h"
-#include "common/substitution/substitution_format_string.h"
-#include "common/substitution/substitution_formatter.h"
 
 namespace Envoy {
 namespace LocalReply {
@@ -26,11 +26,11 @@ using StaticEmptyHeaders = ConstSingleton<EmptyHeaders>;
 class BodyFormatter {
 public:
   BodyFormatter()
-      : formatter_(std::make_unique<Envoy::Substitution::FormatterImpl>("%LOCAL_REPLY_BODY%")),
+      : formatter_(std::make_unique<Envoy::Formatter::FormatterImpl>("%LOCAL_REPLY_BODY%")),
         content_type_(Http::Headers::get().ContentTypeValues.Text) {}
 
   BodyFormatter(const envoy::config::core::v3::SubstitutionFormatString& config)
-      : formatter_(Substitution::SubstitutionFormatStringUtils::fromProtoConfig(config)),
+      : formatter_(Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config)),
         content_type_(
             config.format_case() ==
                     envoy::config::core::v3::SubstitutionFormatString::FormatCase::kJsonFormat
@@ -48,7 +48,7 @@ public:
   }
 
 private:
-  const Substitution::FormatterPtr formatter_;
+  const Formatter::FormatterPtr formatter_;
   const absl::string_view content_type_;
 };
 

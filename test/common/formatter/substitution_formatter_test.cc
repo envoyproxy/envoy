@@ -6,10 +6,10 @@
 #include "envoy/config/core/v3/base.pb.h"
 
 #include "common/common/utility.h"
+#include "common/formatter/substitution_formatter.h"
 #include "common/http/header_map_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/router/string_accessor_impl.h"
-#include "common/substitution/substitution_formatter.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/http/mocks.h"
@@ -30,7 +30,7 @@ using testing::Return;
 using testing::ReturnRef;
 
 namespace Envoy {
-namespace Substitution {
+namespace Formatter {
 namespace {
 
 class TestSerializedUnknownFilterState : public StreamInfo::FilterState::Object {
@@ -2061,5 +2061,5 @@ TEST(SubstitutionFormatterTest, ParserFailures) {
 }
 
 } // namespace
-} // namespace Substitution
+} // namespace Formatter
 } // namespace Envoy

@@ -1,4 +1,4 @@
-#include "common/substitution/substitution_formatter.h"
+#include "common/formatter/substitution_formatter.h"
 
 #include <climits>
 #include <cstdint>
@@ -27,7 +27,7 @@
 using Envoy::Config::Metadata;
 
 namespace Envoy {
-namespace Substitution {
+namespace Formatter {
 
 static const std::string UnspecifiedValueString = "-";
 
@@ -1115,5 +1115,5 @@ ProtobufWkt::Value StartTimeFormatter::formatValue(
       format(request_headers, response_headers, response_trailers, stream_info, local_reply_body));
 }
 
-} // namespace Substitution
+} // namespace Formatter
 } // namespace Envoy
