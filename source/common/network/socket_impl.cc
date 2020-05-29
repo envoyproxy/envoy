@@ -149,6 +149,11 @@ SocketImpl::SocketImpl(IoHandlePtr&& io_handle,
 
   // Should not happen but some tests inject -1 fds
   if (SOCKET_INVALID(io_handle_->fd())) {
+    if (local_address != nullptr) {
+      addr_type_ = local_address->type();
+    } else {
+      addr_type_ = Address::Type::Ip;
+    }
     return;
   }
 
