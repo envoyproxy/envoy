@@ -19,7 +19,7 @@ namespace HazelcastHttpCache {
  */
 class StorageAccessor {
 public:
-  StorageAccessor() {}
+  StorageAccessor() = default;
 
   virtual void putHeader(const int64_t key, const HazelcastHeaderEntry& value) PURE;
   virtual void putBody(const std::string& key, const HazelcastBodyEntry& value) PURE;
@@ -80,7 +80,7 @@ public:
   const std::string& headerMapName();
   const std::string& responseMapName();
 
-  virtual ~HazelcastClusterAccessor() = default;
+  ~HazelcastClusterAccessor() = default;
 
 private:
   friend class RemoteTestAccessor;

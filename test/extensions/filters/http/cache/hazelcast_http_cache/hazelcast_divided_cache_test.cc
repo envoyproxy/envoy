@@ -76,7 +76,7 @@ TEST_F(HazelcastDividedCacheTest, CleanBodyOnHeaderEviction) {
   EXPECT_EQ(1, cache_->getTestAccessor().headerMapSize());
   EXPECT_EQ(BodyCount, cache_->getTestAccessor().bodyMapSize());
 
-  auto keyObject = std::unique_ptr<int64_t>(new int64_t(cache_->mapKey(variant_hash_key)));
+  auto keyObject = std::make_unique<int64_t>(cache_->mapKey(variant_hash_key));
   auto valueObject = cache_->getHeader(variant_hash_key);
   EXPECT_NE(nullptr, valueObject);
 
@@ -277,13 +277,6 @@ TEST_F(HazelcastDividedCacheTest, CleanUpCachedResponseOnMissingBody) {
 
     lookup_context1 = lookup(RequestPath1);
     EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
-
-    // On lookup miss, lock is being acquired. It must be released
-    // explicitly or let context do the insertion and then release.
-    // If not released, the second run for the test fails. Since no
-    // insertion follows the missed lookup here, the lock is explicitly
-    // released.
-    cache_->unlock(variant_hash_key);
 
     // Assert clean up
     EXPECT_EQ(0, cache_->getTestAccessor().bodyMapSize());

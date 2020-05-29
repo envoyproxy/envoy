@@ -223,12 +223,18 @@ TEST(Registration, GetFactory) {
   hz_cache_config.set_connection_attempt_period(1); // give up immediately.
   config.mutable_typed_config()->PackFrom(hz_cache_config);
 
-  // getOfflineCache() call is for testing. It creates a HazelcastHttpCache but does
-  // not make it operational until a start() call.
-  HttpCache& cache = static_cast<HazelcastHttpCacheFactory*>(factory)->getOfflineCache(config);
-  EXPECT_EQ(cache.cacheInfo().name_, "envoy.extensions.http.cache.hazelcast");
-  HazelcastHttpCache& hz_cache = static_cast<HazelcastHttpCache&>(cache);
-  EXPECT_THROW_WITH_MESSAGE(hz_cache.start(), EnvoyException,
+  {
+    // getOfflineCache() call is for testing. It creates a HazelcastHttpCache but does
+    // not make it operational until a start() call. This is required to make cacheInfo()
+    // behavior testable when using LocalTestCache.
+    HazelcastHttpCache* cache =
+        static_cast<HazelcastHttpCacheFactory*>(factory)->getOfflineCache(config);
+    EXPECT_EQ(cache->cacheInfo().name_, "envoy.extensions.http.cache.hazelcast");
+    EXPECT_THROW_WITH_MESSAGE(cache->start(), EnvoyException,
+                              "Hazelcast Client could not connect to any cluster.");
+    delete cache;
+  }
+  EXPECT_THROW_WITH_MESSAGE(factory->getCache(config), EnvoyException,
                             "Hazelcast Client could not connect to any cluster.");
 }
 

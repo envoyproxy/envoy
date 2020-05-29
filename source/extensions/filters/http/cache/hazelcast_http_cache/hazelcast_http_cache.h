@@ -253,7 +253,7 @@ public:
   HttpCache&
   getCache(const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& config) override;
 
-  HttpCache& // For testing only.
+  HazelcastHttpCache* // For testing only.
   getOfflineCache(const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& config);
 
 private:

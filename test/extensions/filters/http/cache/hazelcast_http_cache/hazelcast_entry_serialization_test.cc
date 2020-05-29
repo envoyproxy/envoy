@@ -95,6 +95,14 @@ TEST_F(SerializationTest, SerializerId) {
   EXPECT_EQ(response.getFactoryId(), HAZELCAST_ENTRY_SERIALIZER_FACTORY_ID);
 }
 
+TEST_F(SerializationTest, SerializableFactoryTest) {
+  HazelcastCacheEntrySerializableFactory factory;
+  EXPECT_EQ(HAZELCAST_HEADER_TYPE_ID, factory.create(HAZELCAST_HEADER_TYPE_ID)->getClassId());
+  EXPECT_EQ(HAZELCAST_BODY_TYPE_ID, factory.create(HAZELCAST_BODY_TYPE_ID)->getClassId());
+  EXPECT_EQ(HAZELCAST_RESPONSE_TYPE_ID, factory.create(HAZELCAST_RESPONSE_TYPE_ID)->getClassId());
+  EXPECT_EQ(nullptr, factory.create(0).get());
+}
+
 } // namespace HazelcastHttpCache
 } // namespace Cache
 } // namespace HttpFilters

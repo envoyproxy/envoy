@@ -16,7 +16,7 @@ namespace HazelcastHttpCache {
  */
 class TestAccessor {
 public:
-  TestAccessor(){};
+  TestAccessor() = default;
 
   virtual void clearMaps() PURE;
   virtual void dropConnection() PURE;
@@ -78,7 +78,7 @@ public:
  */
 class LocalTestAccessor : public StorageAccessor, public TestAccessor {
 public:
-  LocalTestAccessor() {}
+  LocalTestAccessor() = default;
 
   // TestAccessor
   void clearMaps() override {

@@ -11,7 +11,6 @@ namespace HazelcastHttpCache {
 
 using hazelcast::client::ClientConfig;
 using hazelcast::client::exception::HazelcastClientOfflineException;
-using hazelcast::client::exception::OperationTimeoutException;
 using hazelcast::client::serialization::DataSerializableFactory;
 
 HazelcastHttpCache::HazelcastHttpCache(HazelcastHttpCacheConfig config)
@@ -130,10 +129,7 @@ InsertContextPtr HazelcastHttpCache::makeInsertContext(LookupContextPtr&& lookup
 //  variant_key_ must be updated as well. Also, if vary headers
 //  change then the hash key of the response will change and
 //  updating only header map will not be enough in this case.
-void HazelcastHttpCache::updateHeaders(LookupContextPtr&& lookup_context,
-                                       Http::ResponseHeaderMapPtr&& response_headers) {
-  ASSERT(lookup_context);
-  ASSERT(response_headers);
+void HazelcastHttpCache::updateHeaders(LookupContextPtr&&, Http::ResponseHeaderMapPtr&&) {
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 
@@ -165,14 +161,14 @@ HttpCache& HazelcastHttpCacheFactory::getCache(
   return *cache_;
 }
 
-HttpCache& HazelcastHttpCacheFactory::getOfflineCache(
+HazelcastHttpCache* HazelcastHttpCacheFactory::getOfflineCache(
     const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& config) {
   if (!cache_) {
     HazelcastHttpCacheConfig hz_cache_config;
     MessageUtil::unpackTo(config.typed_config(), hz_cache_config);
     cache_ = std::make_unique<HazelcastHttpCache>(hz_cache_config);
   }
-  return *cache_;
+  return cache_.release();
 }
 
 static Registry::RegisterFactory<HazelcastHttpCacheFactory, HttpCacheFactory> register_;
