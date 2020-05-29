@@ -19,7 +19,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/udp/udp_proxy:udp_proxy_filter_lib",
         "//test/mocks/network:io_handle_mocks",
         "//test/mocks/upstream:upstream_mocks",
-        "@envoy_api//envoy/config/filter/udp/udp_proxy/v2alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/udp/udp_proxy/v3:pkg_cc_proto",
     ],
 )
 
