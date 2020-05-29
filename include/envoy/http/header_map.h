@@ -320,7 +320,6 @@ private:
  * Default O(1) response headers.
  */
 #define INLINE_RESP_HEADERS(HEADER_FUNC)                                                           \
-  HEADER_FUNC(ContentEncoding)                                                                     \
   HEADER_FUNC(Date)                                                                                \
   HEADER_FUNC(Etag)                                                                                \
   HEADER_FUNC(EnvoyDegraded)                                                                       \
