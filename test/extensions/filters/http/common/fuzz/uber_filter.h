@@ -22,6 +22,9 @@ public:
   // For fuzzing proto data, guide the mutator to useful 'Any' types.
   static void guideAnyProtoType(test::fuzz::HttpData* mutable_data, uint choice);
 
+  // Resets cached data (request headers, etc.). Should be called for each fuzz iteration.
+  void reset();
+
 protected:
   // Set-up filter specific mock expectations in constructor.
   void perFilterSetup();
@@ -44,8 +47,6 @@ protected:
 
   template <class FilterType>
   void sendTrailers(FilterType* filter, const test::fuzz::HttpData& data) = delete;
-
-  void reset();
 
 private:
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
