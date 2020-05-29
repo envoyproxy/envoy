@@ -3,11 +3,11 @@
 #include <string>
 #include <vector>
 
-#include "common/access_log/access_log_formatter.h"
 #include "common/access_log/access_log_impl.h"
 #include "common/common/enum_to_int.h"
-#include "common/common/substitution_format_string.h"
 #include "common/config/datasource.h"
+#include "common/formatter/substitution_format_string.h"
+#include "common/formatter/substitution_formatter.h"
 #include "common/http/header_map_impl.h"
 
 namespace Envoy {
@@ -16,11 +16,11 @@ namespace LocalReply {
 class BodyFormatter {
 public:
   BodyFormatter()
-      : formatter_(std::make_unique<Envoy::AccessLog::FormatterImpl>("%LOCAL_REPLY_BODY%")),
+      : formatter_(std::make_unique<Envoy::Formatter::FormatterImpl>("%LOCAL_REPLY_BODY%")),
         content_type_(Http::Headers::get().ContentTypeValues.Text) {}
 
   BodyFormatter(const envoy::config::core::v3::SubstitutionFormatString& config)
-      : formatter_(SubstitutionFormatStringUtils::fromProtoConfig(config)),
+      : formatter_(Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config)),
         content_type_(
             config.format_case() ==
                     envoy::config::core::v3::SubstitutionFormatString::FormatCase::kJsonFormat
@@ -38,7 +38,7 @@ public:
   }
 
 private:
-  const AccessLog::FormatterPtr formatter_;
+  const Formatter::FormatterPtr formatter_;
   const absl::string_view content_type_;
 };
 

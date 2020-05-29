@@ -18,7 +18,8 @@ const uint64_t DefaultMemoryLevel = 5;
 // Default and maximum compression window size.
 const uint64_t DefaultWindowBits = 12;
 
-// When summed to window bits, this sets a gzip header and trailer around the compressed data.
+// When logical OR'ed to window bits, this sets a gzip header and trailer around the compressed
+// data.
 const uint64_t GzipHeaderValue = 16;
 
 } // namespace

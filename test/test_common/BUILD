@@ -61,6 +61,15 @@ envoy_cc_test_library(
     ],
 )
 
+envoy_cc_test(
+    name = "network_utility_test",
+    srcs = ["network_utility_test.cc"],
+    deps = [
+        ":environment_lib",
+        ":network_utility_lib",
+    ],
+)
+
 envoy_cc_test_library(
     name = "contention_lib",
     srcs = ["contention.cc"],

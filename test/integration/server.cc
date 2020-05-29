@@ -44,6 +44,7 @@ OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::str
   test_options.setRejectUnknownFieldsDynamic(validation_config.reject_unknown_dynamic_fields);
   test_options.setIgnoreUnknownFieldsDynamic(validation_config.ignore_unknown_dynamic_fields);
   test_options.setConcurrency(concurrency);
+  test_options.setHotRestartDisabled(true);
 
   return test_options;
 }
@@ -219,7 +220,7 @@ IntegrationTestServerImpl::~IntegrationTestServerImpl() {
       BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
           admin_address, "POST", "/quitquitquit", "", Http::CodecClient::Type::HTTP1);
       EXPECT_TRUE(response->complete());
-      EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+      EXPECT_EQ("200", response->headers().getStatusValue());
       server_gone_.WaitForNotification();
     }
   } else {

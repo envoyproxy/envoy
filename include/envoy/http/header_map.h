@@ -340,6 +340,7 @@ private:
 #define INLINE_REQ_RESP_HEADERS(HEADER_FUNC)                                                       \
   HEADER_FUNC(CacheControl)                                                                        \
   HEADER_FUNC(Connection)                                                                          \
+  HEADER_FUNC(ContentEncoding)                                                                     \
   HEADER_FUNC(ContentLength)                                                                       \
   HEADER_FUNC(ContentType)                                                                         \
   HEADER_FUNC(EnvoyAttemptCount)                                                                   \
