@@ -144,10 +144,18 @@ for how to update or override dependencies.
 
 ## Building Envoy with the CI Docker image
 
-Envoy can also be built with the Docker image used for CI, by installing Docker and executing:
+Envoy can also be built with the Docker image used for CI, by installing Docker and executing the following.
+
+On Linux, run:
 
 ```
 ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev'
+```
+
+On Windows:
+
+```
+./ci/run_envoy_docker_windows.sh './ci/windows_ci_steps.sh'
 ```
 
 See also the [documentation](https://github.com/envoyproxy/envoy/tree/master/ci) for developer use of the
