@@ -133,6 +133,18 @@ TEST_P(GrpcClientIntegrationTest, BadReplyGrpcFraming) {
   dispatcher_helper_.runDispatcher();
 }
 
+// Validate that custom channel args can be set on the Google gRPC client.
+//
+TEST_P(GrpcClientIntegrationTest, CustomChannelArgs) {
+  SKIP_IF_GRPC_CLIENT(ClientType::EnvoyGrpc);
+  channel_args_.emplace_back("grpc.primary_user_agent", "test_agent");
+  initialize();
+  auto request = createRequest(empty_metadata_);
+  request->sendReply();
+  dispatcher_helper_.runDispatcher();
+  EXPECT_THAT(stream_headers_->get_("user-agent"), testing::HasSubstr("test_agent"));
+}
+
 // Validate that a reply with bad protobuf is handled as an INTERNAL gRPC error.
 TEST_P(GrpcClientIntegrationTest, BadReplyProtobuf) {
   initialize();
