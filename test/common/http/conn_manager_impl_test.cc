@@ -13,11 +13,11 @@
 #include "envoy/type/tracing/v3/custom_tag.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "common/access_log/access_log_formatter.h"
 #include "common/access_log/access_log_impl.h"
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
 #include "common/common/macros.h"
+#include "common/formatter/substitution_formatter.h"
 #include "common/http/conn_manager_impl.h"
 #include "common/http/context_impl.h"
 #include "common/http/date_provider_impl.h"
@@ -88,8 +88,8 @@ public:
       : http_context_(fake_stats_.symbolTable()), access_log_path_("dummy_path"),
         access_logs_{
             AccessLog::InstanceSharedPtr{new Extensions::AccessLoggers::File::FileAccessLog(
-                access_log_path_, {}, AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter(),
-                log_manager_)}},
+                access_log_path_, {},
+                Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(), log_manager_)}},
         codec_(new NiceMock<MockServerConnection>()),
         stats_({ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(fake_stats_), POOL_GAUGE(fake_stats_),
                                         POOL_HISTOGRAM(fake_stats_))},
