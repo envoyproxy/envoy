@@ -381,8 +381,8 @@ void UpstreamRequest::onPoolReady(
 
   // Make sure that when we are forwarding CONNECT payload we do not do so until
   // the upstream has accepted the CONNECT request.
-  if (conn_pool_->protocol().has_value() && headers->Method() &&
-      headers->Method()->value().getStringView() == Http::Headers::get().MethodValues.Connect) {
+  if (conn_pool_->protocol().has_value() &&
+      headers->getMethodValue() == Http::Headers::get().MethodValues.Connect) {
     paused_for_connect_ = true;
   }
 

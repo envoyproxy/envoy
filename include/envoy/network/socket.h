@@ -89,6 +89,31 @@ public:
   virtual bool isOpen() const PURE;
 
   /**
+   * Bind a socket to this address. The socket should have been created with a call to socket()
+   * @param address address to bind the socket to.
+   * @return a Api::SysCallIntResult with rc_ = 0 for success and rc_ = -1 for failure. If the call
+   *   is successful, errno_ shouldn't be used.
+   */
+  virtual Api::SysCallIntResult bind(const Address::InstanceConstSharedPtr address) PURE;
+
+  /**
+   * Listen on bound socket.
+   * @param backlog maximum number of pending connections for listener
+   * @return a Api::SysCallIntResult with rc_ = 0 for success and rc_ = -1 for failure. If the call
+   *   is successful, errno_ shouldn't be used.
+   */
+  virtual Api::SysCallIntResult listen(int backlog) PURE;
+
+  /**
+   * Connect a socket to this address. The socket should have been created with a call to socket()
+   * on this object.
+   * @param address remote address to connect to.
+   * @return a Api::SysCallIntResult with rc_ = 0 for success and rc_ = -1 for failure. If the call
+   *   is successful, errno_ shouldn't be used.
+   */
+  virtual Api::SysCallIntResult connect(const Address::InstanceConstSharedPtr address) PURE;
+
+  /**
    * Visitor class for setting socket options.
    */
   class Option {
