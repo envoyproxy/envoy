@@ -231,13 +231,13 @@ public:
                                                             uint32_t port);
 
   /**
-   * Retrieve the original destination address from an accepted fd.
+   * Retrieve the original destination address from an accepted socket.
    * The address (IP and port) may be not local and the port may differ from
    * the listener port if the packets were redirected using iptables
-   * @param fd is the descriptor returned by accept()
+   * @param sock is accepted socket
    * @return the original destination or nullptr if not available.
    */
-  static Address::InstanceConstSharedPtr getOriginalDst(os_fd_t fd);
+  static Address::InstanceConstSharedPtr getOriginalDst(Socket& sock);
 
   /**
    * Parses a string containing a comma-separated list of port numbers and/or

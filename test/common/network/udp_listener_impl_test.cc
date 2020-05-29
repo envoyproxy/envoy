@@ -123,10 +123,9 @@ TEST_P(UdpListenerImplTest, UdpSetListeningSocketOptionsSuccess) {
 #ifdef SO_RXQ_OVFL
   // Verify that overflow detection is enabled.
   int get_overflow = 0;
-  auto& os_syscalls = Api::OsSysCallsSingleton::get();
   socklen_t int_size = static_cast<socklen_t>(sizeof(get_overflow));
-  const Api::SysCallIntResult result = os_syscalls.getsockopt(
-      server_socket_->ioHandle().fd(), SOL_SOCKET, SO_RXQ_OVFL, &get_overflow, &int_size);
+  const Api::SysCallIntResult result =
+      server_socket_->getSocketOption(SOL_SOCKET, SO_RXQ_OVFL, &get_overflow, &int_size);
   EXPECT_EQ(0, result.rc_);
   EXPECT_EQ(1, get_overflow);
 #endif

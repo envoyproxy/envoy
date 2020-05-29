@@ -51,17 +51,12 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
   // Create a socket on which we'll listen for connections from clients.
   SocketImpl sock(SocketType::Stream, addr_port);
   ASSERT_GE(sock.ioHandle().fd(), 0) << addr_port->asString();
-  auto& os_sys_calls = Api::OsSysCallsSingleton::get();
 
   // Check that IPv6 sockets accept IPv6 connections only.
   if (addr_port->ip()->version() == IpVersion::v6) {
     int socket_v6only = 0;
     socklen_t size_int = sizeof(socket_v6only);
-    ASSERT_GE(
-        os_sys_calls
-            .getsockopt(sock.ioHandle().fd(), IPPROTO_IPV6, IPV6_V6ONLY, &socket_v6only, &size_int)
-            .rc_,
-        0);
+    ASSERT_GE(sock.getSocketOption(IPPROTO_IPV6, IPV6_V6ONLY, &socket_v6only, &size_int).rc_, 0);
     EXPECT_EQ(v6only, socket_v6only != 0);
   }
 
@@ -74,7 +69,7 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
   // require another thread.
   ASSERT_EQ(sock.listen(128).rc_, 0);
 
-  auto client_connect = [&os_sys_calls](Address::InstanceConstSharedPtr addr_port) {
+  auto client_connect = [](Address::InstanceConstSharedPtr addr_port) {
     // Create a client socket and connect to the server.
     SocketImpl client_sock(SocketType::Stream, addr_port);
 
@@ -84,7 +79,7 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
     // operation of ::connect(), so connect returns with errno==EWOULDBLOCK before the tcp
     // handshake can complete. For testing convenience, re-enable blocking on the socket
     // so that connect will wait for the handshake to complete.
-    ASSERT_EQ(os_sys_calls.setsocketblocking(client_sock.ioHandle().fd(), true).rc_, 0);
+    ASSERT_EQ(client_sock.setBlockingForTest(true).rc_, 0);
 
     // Connect to the server.
     const Api::SysCallIntResult result = client_sock.connect(addr_port);

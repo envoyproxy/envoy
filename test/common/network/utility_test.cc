@@ -169,7 +169,10 @@ TEST_P(NetworkUtilityGetLocalAddress, GetLocalAddress) {
   EXPECT_NE(nullptr, Utility::getLocalAddress(GetParam()));
 }
 
-TEST(NetworkUtility, GetOriginalDst) { EXPECT_EQ(nullptr, Utility::getOriginalDst(-1)); }
+TEST(NetworkUtility, GetOriginalDst) {
+  testing::NiceMock<Network::MockConnectionSocket> socket;
+  EXPECT_EQ(nullptr, Utility::getOriginalDst(socket));
+}
 
 TEST(NetworkUtility, LocalConnection) {
   Network::Address::InstanceConstSharedPtr local_addr;

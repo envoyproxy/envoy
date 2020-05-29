@@ -801,6 +801,7 @@ openssl
 opentracing
 optimizations
 optname
+optval
 ostream
 outlier
 outliers
@@ -987,6 +988,7 @@ snapshotted
 sockaddr
 socketpair
 sockfd
+socklen
 sockopt
 sockopts
 somestring

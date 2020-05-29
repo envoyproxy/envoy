@@ -51,13 +51,8 @@ TEST(UdpOverUdsStatsdSinkTest, InitWithPipeAddress) {
   sink.flush(snapshot);
 
   // Start the server.
-  // TODO(mattklein123): Right now all sockets are non-blocking. Move this non-blocking
-  // modification back to the abstraction layer so it will work for multiple platforms. Additionally
-  // this uses low level networking calls because our abstractions in this area only work for IP
-  // sockets. Revisit this also.
   Network::SocketImpl sock(Network::Address::SocketType::Datagram, uds_address);
-  RELEASE_ASSERT(
-      Api::OsSysCallsSingleton::get().setsocketblocking(sock.ioHandle().fd(), false).rc_ != -1, "");
+  RELEASE_ASSERT(sock.setBlockingForTest(false).rc_ != -1, "");
   sock.bind(uds_address);
 
   // Do the flush which should have somewhere to write now.
