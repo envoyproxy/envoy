@@ -110,7 +110,7 @@ for how to update or override dependencies.
     On Windows, you'll need to install several dependencies manually.
 
     [python3](https://www.python.org/downloads/): Specifically, the Windows-native flavor. The POSIX flavor
-    available via MSYS2 will not work. You need to add a symlink for `python3.exe` pointing to
+    available via MSYS2 will not work, nor will the Windows Store flavor. You need to add a symlink for `python3.exe` pointing to
     the installed `python.exe` for Bazel rules which follow POSIX conventions. Be sure to add
     `pip.exe` to the PATH and install the `wheel` package.
     ```
