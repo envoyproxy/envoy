@@ -40,6 +40,7 @@ bool DrainManagerImpl::drainClose() const {
   // P(return true) = elapsed time / drain timeout
   const auto remaining_time =
       std::chrono::duration_cast<std::chrono::seconds>(drain_deadline_ - current_time);
+  ASSERT(server_.options().drainTime() >= remaining_time);
   const auto elapsed_time = server_.options().drainTime() - remaining_time;
   return static_cast<uint64_t>(elapsed_time.count()) >
          (server_.random().random() % server_.options().drainTime().count());
