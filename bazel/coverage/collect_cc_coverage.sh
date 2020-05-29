@@ -61,7 +61,15 @@ function init_gcov() {
   # we would need to invoke it with "llvm-cov gcov").
   # For more details see https://llvm.org/docs/CommandGuide/llvm-cov.html.
   GCOV="${COVERAGE_DIR}/gcov"
-  ln -s "${COVERAGE_GCOV_PATH}" "${GCOV}"
+  if [ ! -f "${COVERAGE_GCOV_PATH}" ]; then
+    echo "GCov does not exist at the given path: '${COVERAGE_GCOV_PATH}'"
+    exit 1
+  fi
+  # When using a tool from a toolchain COVERAGE_GCOV_PATH will be a relative
+  # path. To make it work on different working directories it's required to
+  # convert the path to an absolute one.
+  COVERAGE_GCOV_PATH_ABS="$(cd "${COVERAGE_GCOV_PATH%/*}" && pwd)/${COVERAGE_GCOV_PATH##*/}"
+  ln -s "${COVERAGE_GCOV_PATH_ABS}" "${GCOV}"
 }
 
 # Computes code coverage data using the clang generated metadata found under
