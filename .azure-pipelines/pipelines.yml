@@ -94,11 +94,18 @@ jobs:
     dependsOn: ["format"]
     timeoutInMinutes: 360
     pool: "x64-large"
+    strategy:
+      maxParallel: 2
+      matrix:
+        coverage:
+          CI_TARGET: "bazel.coverage"
+        fuzz_coverage:
+          CI_TARGET: "bazel.fuzz_coverage"
     steps:
       - template: bazel.yml
         parameters:
           managedAgent: false
-          ciTarget: bazel.coverage
+          ciTarget: $(CI_TARGET)
           rbe: ""
           bazelBuildExtraOptions: "--test_env=ENVOY_IP_TEST_VERSIONS=v4only --curses=no"
 
@@ -109,20 +116,7 @@ jobs:
           GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
           GCS_ARTIFACT_BUCKET: $(GcsArtifactBucket)
         condition: always()
-
-  - job: fuzz_coverage
-    displayName: "Linux-x64 fuzz coverage"
-    dependsOn: ["format"]
-    timeoutInMinutes: 360
-    pool: "x64-large"
-    steps:
-      - template: bazel.yml
-        parameters:
-          managedAgent: false
-          ciTarget: bazel.fuzz_coverage
-          rbe: ""
-          bazelBuildExtraOptions: "--test_env=ENVOY_IP_TEST_VERSIONS=v4only --curses=no"
-
+        
       - script: ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /build/envoy/generated/fuzz_coverage fuzz_coverage'
         displayName: "Upload Fuzz Coverage Report to GCS"
         env:
