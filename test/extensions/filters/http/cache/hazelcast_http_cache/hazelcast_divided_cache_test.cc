@@ -93,6 +93,11 @@ TEST_F(HazelcastDividedCacheTest, CleanBodyOnHeaderEviction) {
   listener.entryUpdated(mock_event); // no-op
   listener.entryExpired(mock_event); // no-op
   listener.entryMerged(mock_event);  // no-op
+
+  MapEvent null_event(m, EntryEventType::UNDEFINED, "null_event", 0);
+  listener.mapEvicted(null_event); // no-op
+  listener.mapCleared(null_event); // no-op
+
   EXPECT_EQ(BodyCount, cache_->getTestAccessor().bodyMapSize());
   listener.entryEvicted(mock_event);
   EXPECT_EQ(0, cache_->getTestAccessor().bodyMapSize());
@@ -282,6 +287,11 @@ TEST_F(HazelcastDividedCacheTest, CleanUpCachedResponseOnMissingBody) {
     EXPECT_EQ(0, cache_->getTestAccessor().bodyMapSize());
     EXPECT_EQ(0, cache_->getTestAccessor().headerMapSize());
   }
+
+  // Cache must handle the connection failure during clean up.
+  cache_->getTestAccessor().failOnLock();
+  cache_->onMissingBody(0, 0, 0); // HazelcastClientOfflineException
+  cache_->onMissingBody(0, 0, 0); // std::exception
 }
 
 TEST_F(HazelcastDividedCacheTest, NotCreateBodyOnHeaderOnlyResponse) {

@@ -153,31 +153,22 @@ TEST_F(HazelcastUnifiedCacheTest, CoverRemoteOperations) {
   // in order to keep the coverage in a desired level this test
   // covers the calls made to Hazelcast cluster. Otherwise the coverage
   // stays at 90% without including the remote calls.
-  ClientConfig config;
-  config.getNetworkConfig().setConnectionAttemptLimit(100);
-  config.getNetworkConfig().setConnectionAttemptPeriod(10000);
-  config.getConnectionStrategyConfig().setAsyncStart(true);
-  std::unique_ptr<HazelcastClient> client = std::make_unique<HazelcastClient>(config);
-  client->shutdown();
   HazelcastClusterAccessor accessor(*cache_, ClientConfig(), "coverage", 10);
   EXPECT_FALSE(accessor.isRunning());
-  accessor.setClient(std::move(client));
-  using exception = hazelcast::client::exception::HazelcastClientOfflineException;
-  EXPECT_FALSE(accessor.isRunning());
-  EXPECT_STREQ("dev", accessor.clusterName().c_str());
+  EXPECT_STREQ("", accessor.clusterName().c_str());
   EXPECT_STREQ("coverage:10-div", accessor.headerMapName().c_str());
   EXPECT_STREQ("coverage-uni", accessor.responseMapName().c_str());
-  EXPECT_THROW(accessor.putHeader(1, HazelcastHeaderEntry()), exception);
-  EXPECT_THROW(accessor.putBody("1", HazelcastBodyEntry()), exception);
-  EXPECT_THROW(accessor.putResponse(1, HazelcastResponseEntry()), exception);
-  EXPECT_THROW(accessor.getHeader(1), exception);
-  EXPECT_THROW(accessor.getBody("1"), exception);
-  EXPECT_THROW(accessor.getResponse(1), exception);
-  EXPECT_THROW(accessor.removeBodyAsync("1"), exception);
-  EXPECT_THROW(accessor.removeHeader(1), exception);
-  EXPECT_THROW(accessor.tryLock(1, true), exception);
-  EXPECT_THROW(accessor.unlock(1, true), exception);
-  EXPECT_THROW(accessor.unlock(1, false), exception);
+  EXPECT_THROW(accessor.putHeader(1, HazelcastHeaderEntry()), EnvoyException);
+  EXPECT_THROW(accessor.putBody("1", HazelcastBodyEntry()), EnvoyException);
+  EXPECT_THROW(accessor.putResponse(1, HazelcastResponseEntry()), EnvoyException);
+  EXPECT_THROW(accessor.getHeader(1), EnvoyException);
+  EXPECT_THROW(accessor.getBody("1"), EnvoyException);
+  EXPECT_THROW(accessor.getResponse(1), EnvoyException);
+  EXPECT_THROW(accessor.removeBodyAsync("1"), EnvoyException);
+  EXPECT_THROW(accessor.removeHeader(1), EnvoyException);
+  EXPECT_THROW(accessor.tryLock(1, true), EnvoyException);
+  EXPECT_THROW(accessor.unlock(1, true), EnvoyException);
+  EXPECT_THROW(accessor.unlock(1, false), EnvoyException);
   accessor.disconnect();
 }
 

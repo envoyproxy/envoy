@@ -75,12 +75,10 @@ void HazelcastHttpCache::start() {
     accessor_.reset();
     throw EnvoyException("Hazelcast Client could not connect to any cluster.");
   }
-
   ENVOY_LOG(info, "HazelcastHttpCache has been started with profile: {}. Max body size: {}.",
             unified_ ? "UNIFIED"
                      : "DIVIDED, partition size: " + std::to_string(body_partition_size_),
             max_body_size_);
-
   HazelcastClusterAccessor& cluster_accessor = static_cast<HazelcastClusterAccessor&>(*accessor_);
   ENVOY_LOG(info,
             "Cache statistics can be observed on Hazelcast Management Center"

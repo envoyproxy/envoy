@@ -61,17 +61,18 @@ void HazelcastClusterAccessor::unlock(const int64_t key, bool unified) {
 }
 
 bool HazelcastClusterAccessor::isRunning() {
-  if (hazelcast_client_) {
-    return hazelcast_client_->getLifecycleService().isRunning();
-  }
-  return false;
+  return hazelcast_client_ ? hazelcast_client_->getLifecycleService().isRunning() : false;
 }
 
 std::string HazelcastClusterAccessor::clusterName() {
-  return hazelcast_client_->getClientConfig().getGroupConfig().getName();
+  return hazelcast_client_ ? hazelcast_client_->getClientConfig().getGroupConfig().getName() : "";
 }
 
-void HazelcastClusterAccessor::disconnect() { hazelcast_client_->shutdown(); }
+void HazelcastClusterAccessor::disconnect() {
+  if (hazelcast_client_) {
+    hazelcast_client_->shutdown();
+  }
+}
 
 const std::string& HazelcastClusterAccessor::headerMapName() { return header_map_name_; }
 
@@ -95,10 +96,6 @@ void HazelcastClusterAccessor::connect() {
   hazelcast_client_ = std::make_unique<HazelcastClient>(client_config_);
   listener_ = std::make_unique<HeaderMapEntryListener>(cache_);
   getHeaderMap().addEntryListener(*listener_, true);
-}
-
-void HazelcastClusterAccessor::setClient(std::unique_ptr<HazelcastClient>&& client) {
-  hazelcast_client_ = std::move(client);
 }
 
 std::string HazelcastClusterAccessor::constructMapName(const std::string& postfix, bool unified) {

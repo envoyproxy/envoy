@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/common/exception.h"
+
 #include "extensions/filters/http/cache/hazelcast_http_cache/hazelcast_cache_entry.h"
 
 #include "hazelcast/client/HazelcastClient.h"
@@ -77,8 +79,6 @@ public:
   void connect() override;
   void disconnect() override;
 
-  void setClient(std::unique_ptr<HazelcastClient>&& client); // for testing
-
   const std::string& headerMapName();
   const std::string& responseMapName();
 
@@ -100,16 +100,25 @@ private:
 
   /** Returns remote header cache proxy */
   inline IMap<int64_t, HazelcastHeaderEntry> getHeaderMap() {
+    if (!hazelcast_client_) {
+      throw EnvoyException("Hazelcast Client is not connected to a cluster.");
+    }
     return hazelcast_client_->getMap<int64_t, HazelcastHeaderEntry>(header_map_name_);
   }
 
   /** Returns remote body cache proxy */
   inline IMap<std::string, HazelcastBodyEntry> getBodyMap() {
+    if (!hazelcast_client_) {
+      throw EnvoyException("Hazelcast Client is not connected to a cluster.");
+    }
     return hazelcast_client_->getMap<std::string, HazelcastBodyEntry>(body_map_name_);
   }
 
   /** Returns remote response cache proxy */
   inline IMap<int64_t, HazelcastResponseEntry> getResponseMap() {
+    if (!hazelcast_client_) {
+      throw EnvoyException("Hazelcast Client is not connected to a cluster.");
+    }
     return hazelcast_client_->getMap<int64_t, HazelcastResponseEntry>(response_map_name_);
   }
 
