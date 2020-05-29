@@ -371,7 +371,7 @@ void InstanceImpl::initialize(const Options& options,
   restarter_.sendParentAdminShutdownRequest(original_start_time_);
   admin_ = std::make_unique<AdminImpl>(initial_config.admin().profilePath(), *this);
   if (bootstrap_.admin().has_listener()) {
-    // handled below
+    // this case is handled later on.
   } else if (initial_config.admin().address()) {
     if (initial_config.admin().accessLogPath().empty()) {
       throw EnvoyException("An admin access log path is required for a listening server.");
@@ -405,9 +405,6 @@ void InstanceImpl::initialize(const Options& options,
   // Workers get created first so they register for thread local updates.
   listener_manager_ = std::make_unique<ListenerManagerImpl>(
       *this, listener_component_factory_, worker_factory_, bootstrap_.enable_dispatcher_stats());
-
-  // TODO: where should this go?
-  listener_manager_->addOrUpdateListener(bootstrap_.admin().listener(), "", false);
 
   // The main thread is also registered for thread local updates so that code that does not care
   // whether it runs on the main thread or on workers can still use TLS.
@@ -459,6 +456,9 @@ void InstanceImpl::initialize(const Options& options,
   // is constructed as part of the InstanceImpl and then populated once
   // cluster_manager_factory_ is available.
   config_.initialize(bootstrap_, *this, *cluster_manager_factory_);
+
+  // TODO: where should this go?
+  listener_manager_->addOrUpdateListener(bootstrap_.admin().listener(), "", false);
 
   // Instruct the listener manager to create the LDS provider if needed. This must be done later
   // because various items do not yet exist when the listener manager is created.
