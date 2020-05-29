@@ -113,10 +113,31 @@ Buffer::InstancePtr GoogleGrpcUtils::makeBufferInstance(const grpc::ByteBuffer& 
   return buffer;
 }
 
+grpc::ChannelArguments
+GoogleGrpcUtils::channelArgsFromConfig(const envoy::config::core::v3::GrpcService& config) {
+  grpc::ChannelArguments args;
+  for (const auto& channel_arg : config.google_grpc().channel_args().args()) {
+    switch (channel_arg.second.value_specifier_case()) {
+    case envoy::config::core::v3::GrpcService::GoogleGrpc::ChannelArgs::Value::kStringValue: {
+      args.SetString(channel_arg.first, channel_arg.second.string_value());
+      break;
+    }
+    case envoy::config::core::v3::GrpcService::GoogleGrpc::ChannelArgs::Value::kIntValue: {
+      args.SetInt(channel_arg.first, channel_arg.second.int_value());
+      break;
+    }
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
+  }
+  return args;
+}
+
 std::shared_ptr<grpc::Channel>
 GoogleGrpcUtils::createChannel(const envoy::config::core::v3::GrpcService& config, Api::Api& api) {
   std::shared_ptr<grpc::ChannelCredentials> creds = getGoogleGrpcChannelCredentials(config, api);
-  return CreateChannel(config.google_grpc().target_uri(), creds);
+  const grpc::ChannelArguments args = channelArgsFromConfig(config);
+  return CreateCustomChannel(config.google_grpc().target_uri(), creds, args);
 }
 
 } // namespace Grpc

@@ -32,8 +32,16 @@ public:
   static Buffer::InstancePtr makeBufferInstance(const grpc::ByteBuffer& buffer);
 
   /**
+   * Build grpc::ChannelArguments from gRPC service config.
+   * @param config Google gRPC config.
+   * @return grpc::ChannelArguments corresponding to config.
+   */
+  static grpc::ChannelArguments
+  channelArgsFromConfig(const envoy::config::core::v3::GrpcService& config);
+
+  /**
    * Build gRPC channel based on the given GrpcService configuration.
-   * @param config  Google gRPC config.
+   * @param config Google gRPC config.
    * @param api reference to the Api object
    * @return static std::shared_ptr<grpc::Channel> a gRPC channel.
    */
