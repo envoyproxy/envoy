@@ -851,6 +851,13 @@ public:
     return config;
   }
 
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy defaultV3Config() {
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config;
+    config.set_stat_prefix("name");
+    config.set_cluster("fake_cluster");
+    return config;
+  }
+
   // Return the default config, plus one file access log with the specified format
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy
   accessLogConfig(const std::string& access_log_format) {
@@ -1242,6 +1249,51 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(NoHost)) {
   setup(0, accessLogConfig("%RESPONSE_FLAGS%"));
   filter_.reset();
   EXPECT_EQ(access_log_data_, "UH");
+}
+
+TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(NoAvailableClusterConfig)) {
+  configure(accessLogConfig("%RESPONSE_FLAGS%"));
+
+  filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
+  filter_->initializeReadFilterCallbacks(filter_callbacks_);
+  EXPECT_CALL(factory_context_.cluster_manager_, get("fake_cluster"))
+      .WillOnce(Return(nullptr))
+      .RetiresOnSaturation();
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+  filter_.reset();
+  EXPECT_EQ(access_log_data_, "NR");
+}
+
+TEST_F(TcpProxyTest, TunnelingConfigUseHttpConnPool) {
+  auto config_message = defaultV3Config();
+  config_message.mutable_tunneling_config();
+  configure(config_message);
+  filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
+  filter_->initializeReadFilterCallbacks(filter_callbacks_);
+  EXPECT_CALL(factory_context_.cluster_manager_, get("fake_cluster"))
+      .WillOnce(Return(&factory_context_.cluster_manager_.thread_local_cluster_))
+      .RetiresOnSaturation();
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, getHttpPool(_, _, _, _))
+      .WillOnce(Return(nullptr));
+  filter_->onNewConnection();
+}
+
+TEST_F(TcpProxyTest, TunnelingConfigUseRawTcpOnHostCapability) {
+  auto config_message = defaultV3Config();
+  config_message.mutable_tunneling_config()->set_tunnel_mode_in_endpoint(TunnelingConfig::RAW_TCP);
+  configure(config_message);
+  filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
+  filter_->initializeReadFilterCallbacks(filter_callbacks_);
+  EXPECT_CALL(factory_context_.cluster_manager_, get("fake_cluster"))
+      .WillOnce(Return(&factory_context_.cluster_manager_.thread_local_cluster_))
+      .RetiresOnSaturation();
+  auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
+  metadata->mutable_filter_metadata()->insert({"envoy.plaintcponly", ProtobufWkt::Struct()});
+  EXPECT_CALL(*factory_context_.cluster_manager_.thread_local_cluster_.lb_.host_, metadata())
+      .WillRepeatedly(Return(metadata));
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, getTcpPool(_, _, _))
+      .WillOnce(Return(nullptr));
+  filter_->onNewConnection();
 }
 
 TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(RouteWithMetadataMatch)) {
