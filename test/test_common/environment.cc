@@ -196,7 +196,7 @@ std::string TestEnvironment::getCheckedEnvVar(const std::string& var) {
 
 std::string TestEnvironment::chooseBaseId(uint64_t test_base_id) {
   ASSERT(test_base_id >= 1);
-  ASSERT(test_base_id <= 1L << 44); // Leave room to multiple by 1000000.
+  ASSERT(test_base_id <= static_cast<uint64_t>(1) << 44); // Leave room to multiple by 1000000.
 
   test_base_id *= 1000000;
 
