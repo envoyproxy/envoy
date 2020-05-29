@@ -1,19 +1,17 @@
 syntax = "proto3";
 
-package envoy.config.filter.udp.udp_proxy.v2alpha;
+package envoy.extensions.filters.udp.udp_proxy.v3;
 
 import "google/protobuf/duration.proto";
 
-import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.config.filter.udp.udp_proxy.v2alpha";
+option java_package = "io.envoyproxy.envoy.extensions.filters.udp.udp_proxy.v3";
 option java_outer_classname = "UdpProxyProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_migrate).move_to_package =
-    "envoy.extensions.filters.udp.udp_proxy.v3";
-option (udpa.annotations.file_status).package_version_status = FROZEN;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: UDP proxy]
 // UDP proxy :ref:`configuration overview <config_udp_listener_filters_udp_proxy>`.
@@ -21,6 +19,9 @@ option (udpa.annotations.file_status).package_version_status = FROZEN;
 
 // Configuration for the UDP proxy filter.
 message UdpProxyConfig {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.filter.udp.udp_proxy.v2alpha.UdpProxyConfig";
+
   // The stat prefix used when emitting UDP proxy filter stats.
   string stat_prefix = 1 [(validate.rules).string = {min_bytes: 1}];
 
