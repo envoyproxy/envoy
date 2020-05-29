@@ -158,8 +158,6 @@ INSTANTIATE_TEST_SUITE_P(
 
             ));
 
-// std::tuple<std::string, bool, std::map<std::string, std::list<std::string>>>{
-//"SELECT 1 FROM tabletest1;", true, {{"tabletest1", {"select"}}}}));
 } // namespace SQLUtils
 } // namespace Common
 } // namespace Extensions

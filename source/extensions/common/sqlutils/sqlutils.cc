@@ -13,7 +13,6 @@ bool SQLutils::setMetadata(const std::string& query, ProtobufWkt::Struct& metada
     return false;
   }
 
-  // Set dynamic metadata
   auto& fields = *metadata.mutable_fields();
 
   for (auto i = 0u; i < result.size(); ++i) {
@@ -21,9 +20,11 @@ bool SQLutils::setMetadata(const std::string& query, ProtobufWkt::Struct& metada
       continue;
     }
     hsql::TableAccessMap table_access_map;
+    // Get names of accessed tables.
     result.getStatement(i)->tablesAccessed(table_access_map);
     for (auto& it : table_access_map) {
       auto& operations = *fields[it.first].mutable_list_value();
+      // For each table get names of operations performed on that table.
       for (const auto& ot : it.second) {
         operations.add_values()->set_string_value(ot);
       }
