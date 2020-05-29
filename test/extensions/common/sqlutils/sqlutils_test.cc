@@ -27,7 +27,7 @@ class MetadataFromSQLTest
 // on the table, like "select", "insert", etc.
 TEST_P(MetadataFromSQLTest, ParsingAndMetadataTest) {
   // Get the SQL query
-  std::string query = std::get<0>(GetParam());
+  const std::string& query = std::get<0>(GetParam());
   ProtobufWkt::Struct metadata;
 
   // Check if the parsing result is what expected.
@@ -49,7 +49,7 @@ TEST_P(MetadataFromSQLTest, ParsingAndMetadataTest) {
     // Get from created metadata the list of operations on the resource
     const auto& operations = i;
     // Get the list of expected operations on the same resource from test param.
-    auto table_name_it = expected_tables.find(operations.first);
+    const auto& table_name_it = expected_tables.find(operations.first);
     // Make sure that a resource (table) found in metadata is expected.
     ASSERT_NE(expected_tables.end(), table_name_it);
     auto& operations_list = table_name_it->second;
@@ -59,7 +59,7 @@ TEST_P(MetadataFromSQLTest, ParsingAndMetadataTest) {
     // is listed as expected in test param.
     for (const auto& j : operations.second.list_value().values()) {
       // Find that operation in test params.
-      auto operation_it =
+      const auto operation_it =
           std::find(operations_list.begin(), operations_list.end(), j.string_value());
       ASSERT_NE(operations_list.end(), operation_it);
       // Erase the operation. At the end of the test this list should be empty what means
