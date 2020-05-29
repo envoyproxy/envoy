@@ -4,7 +4,27 @@
     "library/swift/test/BUILD"
   ],
   "buildTargets" : [
-    "//library/swift/src:ios_framework_archive"
+    "//library/swift/src:ios_framework_archive",
+    "//library/swift/test:envoy_client_builder_tests",
+    "//library/swift/test:envoy_client_builder_tests_lib",
+    "//library/swift/test:envoy_client_tests",
+    "//library/swift/test:envoy_client_tests_lib",
+    "//library/swift/test:grpc_request_builder_tests",
+    "//library/swift/test:grpc_request_builder_tests_lib",
+    "//library/swift/test:grpc_response_handler_tests",
+    "//library/swift/test:grpc_response_handler_tests_lib",
+    "//library/swift/test:grpc_stream_emitter_tests",
+    "//library/swift/test:grpc_stream_emitter_tests_lib",
+    "//library/swift/test:request_builder_tests",
+    "//library/swift/test:request_builder_tests_lib",
+    "//library/swift/test:request_mapper_tests",
+    "//library/swift/test:request_mapper_tests_lib",
+    "//library/swift/test:response_handler_tests",
+    "//library/swift/test:response_handler_tests_lib",
+    "//library/swift/test:retry_policy_mapper_tests",
+    "//library/swift/test:retry_policy_mapper_tests_lib",
+    "//library/swift/test:retry_policy_tests",
+    "//library/swift/test:retry_policy_tests_lib"
   ],
   "optionSet" : {
     "BazelBuildOptionsDebug" : {
@@ -56,6 +76,8 @@
     "library/objective-c",
     "library/swift",
     "library/swift/src",
+    "library/swift/src/filters",
+    "library/swift/src/grpc",
     "library/swift/test"
   ]
 }
