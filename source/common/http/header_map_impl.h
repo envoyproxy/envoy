@@ -63,6 +63,15 @@ public:
   static void
   initFromInitList(HeaderMap& new_header_map,
                    const std::initializer_list<std::pair<LowerCaseString, std::string>>& values);
+  template <class It> static void initFromInitList(HeaderMap& new_header_map, It begin, It end) {
+    for (auto it = begin; it != end; ++it) {
+      HeaderString key_string;
+      key_string.setCopy(it->first.get().c_str(), it->first.get().size());
+      HeaderString value_string;
+      value_string.setCopy(it->second.c_str(), it->second.size());
+      new_header_map.addViaMove(std::move(key_string), std::move(value_string));
+    }
+  }
 
   // Performs a manual byte size count for test verification.
   void verifyByteSizeInternalForTest() const;
@@ -329,6 +338,12 @@ std::unique_ptr<T>
 createHeaderMap(const std::initializer_list<std::pair<LowerCaseString, std::string>>& values) {
   auto new_header_map = std::make_unique<T>();
   HeaderMapImpl::initFromInitList(*new_header_map, values);
+  return new_header_map;
+}
+
+template <class T, class It> std::unique_ptr<T> createHeaderMap(It begin, It end) {
+  auto new_header_map = std::make_unique<T>();
+  HeaderMapImpl::initFromInitList(*new_header_map, begin, end);
   return new_header_map;
 }
 
