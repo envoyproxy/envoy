@@ -9,7 +9,6 @@ BAZELRC_FILE=~/.bazelrc bazel/setup_clang.sh /opt/llvm
 # Not using libc++ here because clangd will raise some tidy issue in libc++ header as of version 9.
 echo "build --config=rbe-toolchain-clang" >> ~/.bazelrc
 echo "build ${BAZEL_BUILD_EXTRA_OPTIONS}" | tee -a ~/.bazelrc
-echo "startup --output_base=/build/tmp"
 
 # Ideally we want this line so bazel doesn't pollute things outside of the devcontainer, but some of
 # API tooling (proto_sync) depends on symlink like bazel-bin.
