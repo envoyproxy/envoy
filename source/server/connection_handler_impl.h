@@ -323,17 +323,16 @@ private:
 
 /**
  * Wrapper for an active udp listener owned by this handler.
- * TODO(danzh): rename to ActiveRawUdpListener.
  */
-class ActiveUdpListener : public Network::UdpListenerCallbacks,
-                          public ConnectionHandlerImpl::ActiveListenerImplBase,
-                          public Network::UdpListenerFilterManager,
-                          public Network::UdpReadFilterCallbacks {
+class ActiveRawUdpListener : public Network::UdpListenerCallbacks,
+                             public ConnectionHandlerImpl::ActiveListenerImplBase,
+                             public Network::UdpListenerFilterManager,
+                             public Network::UdpReadFilterCallbacks {
 public:
-  ActiveUdpListener(Network::ConnectionHandler& parent, Event::Dispatcher& dispatcher,
-                    Network::ListenerConfig& config);
-  ActiveUdpListener(Network::ConnectionHandler& parent, Network::UdpListenerPtr&& listener,
-                    Network::ListenerConfig& config);
+  ActiveRawUdpListener(Network::ConnectionHandler& parent, Event::Dispatcher& dispatcher,
+                       Network::ListenerConfig& config);
+  ActiveRawUdpListener(Network::ConnectionHandler& parent, Network::UdpListenerPtr&& listener,
+                       Network::ListenerConfig& config);
 
   // Network::UdpListenerCallbacks
   void onData(Network::UdpRecvData& data) override;
