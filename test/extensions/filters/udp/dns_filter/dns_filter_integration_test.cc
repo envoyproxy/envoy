@@ -16,13 +16,15 @@ namespace {
 class DnsFilterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                  public BaseIntegrationTest {
 public:
-  DnsFilterIntegrationTest() : BaseIntegrationTest(GetParam(), configToUse()) {
+  DnsFilterIntegrationTest()
+      : BaseIntegrationTest(GetParam(), configToUse()), api_(Api::createApiForTest()) {
     setupResponseParser();
   }
 
   void setupResponseParser() {
-    response_parser_ = std::make_unique<DnsMessageParser>(true /*recursive queries */,
-                                                          0 /* retry_count */, random_);
+    histogram_.unit_ = Stats::Histogram::Unit::Milliseconds;
+    response_parser_ = std::make_unique<DnsMessageParser>(
+        true /* recursive queries */, api_->timeSource(), 3 /* retries */, random_, histogram_);
   }
 
   static std::string configToUse() {
@@ -32,6 +34,10 @@ public:
       typed_config:
         '@type': 'type.googleapis.com/envoy.extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig'
         stat_prefix: "my_prefix"
+        client_config:
+          resolver_timeout: 5s
+          upstream_resolvers:
+          - "8.8.8.8"
         server_config:
           inline_dns_table:
             external_retry_count: 3
@@ -88,7 +94,10 @@ public:
     client.recv(response_datagram);
   }
 
+  Api::ApiPtr api_;
+  NiceMock<Stats::MockHistogram> histogram_;
   NiceMock<Runtime::MockRandomGenerator> random_;
+  DnsParserCounters counters_;
   std::unique_ptr<DnsMessageParser> response_parser_;
   DnsQueryContextPtr query_ctx_;
 };
@@ -96,6 +105,42 @@ public:
 INSTANTIATE_TEST_SUITE_P(IpVersions, DnsFilterIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
+
+TEST_P(DnsFilterIntegrationTest, ExternalLookupTest) {
+  setup(0);
+  const uint32_t port = lookupPort("listener_0");
+  const auto listener_address = Network::Utility::resolveUrl(
+      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
+
+  Network::UdpRecvData response;
+  std::string query =
+      Utils::buildQueryForDomain("www.google.com", DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN);
+  requestResponseWithListenerAddress(*listener_address, query, response);
+
+  query_ctx_ = response_parser_->createQueryContext(response, counters_);
+  EXPECT_TRUE(query_ctx_->parse_status_);
+
+  EXPECT_EQ(1, query_ctx_->answers_.size());
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_parser_->getQueryResponseCode());
+}
+
+TEST_P(DnsFilterIntegrationTest, ExternalLookupTestIPv6) {
+  setup(0);
+  const uint32_t port = lookupPort("listener_0");
+  const auto listener_address = Network::Utility::resolveUrl(
+      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
+
+  Network::UdpRecvData response;
+  std::string query =
+      Utils::buildQueryForDomain("www.google.com", DNS_RECORD_TYPE_AAAA, DNS_RECORD_CLASS_IN);
+  requestResponseWithListenerAddress(*listener_address, query, response);
+
+  query_ctx_ = response_parser_->createQueryContext(response, counters_);
+  EXPECT_TRUE(query_ctx_->parse_status_);
+
+  EXPECT_EQ(1, query_ctx_->answers_.size());
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_parser_->getQueryResponseCode());
+}
 
 TEST_P(DnsFilterIntegrationTest, LocalLookupTest) {
   setup(0);
@@ -108,7 +153,7 @@ TEST_P(DnsFilterIntegrationTest, LocalLookupTest) {
       Utils::buildQueryForDomain("www.foo1.com", DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN);
   requestResponseWithListenerAddress(*listener_address, query, response);
 
-  query_ctx_ = response_parser_->createQueryContext(response);
+  query_ctx_ = response_parser_->createQueryContext(response, counters_);
   EXPECT_TRUE(query_ctx_->parse_status_);
 
   EXPECT_EQ(4, query_ctx_->answers_.size());
@@ -132,7 +177,7 @@ TEST_P(DnsFilterIntegrationTest, ClusterLookupTest) {
   std::string query = Utils::buildQueryForDomain("cluster_0", record_type, DNS_RECORD_CLASS_IN);
   requestResponseWithListenerAddress(*listener_address, query, response);
 
-  query_ctx_ = response_parser_->createQueryContext(response);
+  query_ctx_ = response_parser_->createQueryContext(response, counters_);
   EXPECT_TRUE(query_ctx_->parse_status_);
 
   EXPECT_EQ(2, query_ctx_->answers_.size());
@@ -157,7 +202,7 @@ TEST_P(DnsFilterIntegrationTest, ClusterEndpointLookupTest) {
       Utils::buildQueryForDomain("cluster.foo1.com", record_type, DNS_RECORD_CLASS_IN);
   requestResponseWithListenerAddress(*listener_address, query, response);
 
-  query_ctx_ = response_parser_->createQueryContext(response);
+  query_ctx_ = response_parser_->createQueryContext(response, counters_);
   EXPECT_TRUE(query_ctx_->parse_status_);
 
   EXPECT_EQ(2, query_ctx_->answers_.size());

@@ -3,10 +3,12 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/platform.h"
 #include "envoy/network/address.h"
+#include "envoy/network/dns.h"
 #include "envoy/network/listener.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/runtime/runtime_impl.h"
+#include "common/stats/timespan_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -48,12 +50,13 @@ public:
   DnsQueryRecord(const std::string& rec_name, const uint16_t rec_type, const uint16_t rec_class)
       : BaseDnsRecord(rec_name, rec_type, rec_class) {}
   bool serialize(Buffer::OwnedImpl& output) override;
+
+  std::unique_ptr<Stats::HistogramCompletableTimespanImpl> query_time_ms_;
 };
 
 using DnsQueryRecordPtr = std::unique_ptr<DnsQueryRecord>;
 using DnsQueryPtrVec = std::vector<DnsQueryRecordPtr>;
 using AddressConstPtrVec = std::vector<Network::Address::InstanceConstSharedPtr>;
-using AnswerCallback = std::function<void(DnsQueryRecordPtr& query, AddressConstPtrVec& ipaddr)>;
 
 /**
  * DnsAnswerRecord represents a single answer record for a name that is to be serialized and sent to
@@ -75,25 +78,41 @@ using DnsAnswerRecordPtr = std::unique_ptr<DnsAnswerRecord>;
 using DnsAnswerMap = std::unordered_multimap<std::string, DnsAnswerRecordPtr>;
 
 /**
+ * @brief This struct is used to hold pointers to the counters that are relevant to the
+ * parser. This is done to prevent dependency loops between the parser and filter headers
+ */
+struct DnsParserCounters {
+  Stats::Counter* underflow_counter;
+  Stats::Counter* record_name_overflow;
+  Stats::Counter* query_parsing_failure;
+};
+
+/**
  * DnsQueryContext contains all the data necessary for responding to a query from a given client.
  */
 class DnsQueryContext {
 public:
   DnsQueryContext(Network::Address::InstanceConstSharedPtr local,
-                  Network::Address::InstanceConstSharedPtr peer)
-      : local_(std::move(local)), peer_(std::move(peer)), parse_status_(false),
-        response_code_(DNS_RESPONSE_CODE_NO_ERROR) {}
+                  Network::Address::InstanceConstSharedPtr peer, DnsParserCounters& counters,
+                  uint64_t retry_count)
+      : local_(std::move(local)), peer_(std::move(peer)), counters_(counters), parse_status_(false),
+        response_code_(DNS_RESPONSE_CODE_NO_ERROR), retry_(retry_count) {}
 
   const Network::Address::InstanceConstSharedPtr local_;
   const Network::Address::InstanceConstSharedPtr peer_;
+  DnsParserCounters& counters_;
   bool parse_status_;
   uint16_t response_code_;
+  uint64_t retry_;
   uint16_t id_;
+  Network::DnsResolver::ResolutionStatus resolver_status_;
   DnsQueryPtrVec queries_;
   DnsAnswerMap answers_;
 };
 
 using DnsQueryContextPtr = std::unique_ptr<DnsQueryContext>;
+using DnsFilterResolverCallback = std::function<void(
+    DnsQueryContextPtr context, const DnsQueryRecord* current_query, AddressConstPtrVec& ipaddr)>;
 
 /**
  * This class orchestrates parsing a DNS query and building the response to be sent to a client.
@@ -139,8 +158,10 @@ public:
     uint16_t additional_rrs;
   });
 
-  DnsMessageParser(bool recurse, uint64_t retry_count, Runtime::RandomGenerator& random)
-      : recursion_available_(recurse), retry_count_(retry_count), rng_(random) {}
+  DnsMessageParser(bool recurse, TimeSource& timesource, uint64_t retry_count,
+                   Runtime::RandomGenerator& random, Stats::Histogram& latency_histogram)
+      : recursion_available_(recurse), timesource_(timesource), retry_count_(retry_count),
+        query_latency_histogram_(latency_histogram), rng_(random) {}
 
   /**
    * @brief Builds an Answer record for the active query. The active query transaction ID is at the
@@ -209,7 +230,8 @@ public:
    * @param client_request a structure containing addressing information and the buffer received
    * from a client
    */
-  DnsQueryContextPtr createQueryContext(Network::UdpRecvData& client_request);
+  DnsQueryContextPtr createQueryContext(Network::UdpRecvData& client_request,
+                                        DnsParserCounters& counters);
   /**
    * @param buffer a reference to the incoming request object received by the listener
    * @return bool true if all DNS records and flags were successfully parsed from the buffer
@@ -249,7 +271,9 @@ private:
                                        uint64_t* name_offset);
 
   bool recursion_available_;
+  TimeSource& timesource_;
   uint64_t retry_count_;
+  Stats::Histogram& query_latency_histogram_;
   DnsHeader header_;
   DnsHeader response_header_;
   Runtime::RandomGenerator& rng_;
