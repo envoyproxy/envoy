@@ -8,8 +8,6 @@
 
 #include "gmock/gmock.h"
 
-using testing::NiceMock;
-
 namespace Envoy {
 namespace Extensions {
 namespace Common {
