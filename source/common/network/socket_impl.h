@@ -52,6 +52,9 @@ Address::InstanceConstSharedPtr peerAddressFromFd(os_fd_t fd);
 
 class SocketImpl : public virtual Socket {
 public:
+  SocketImpl(Address::SocketType type, Address::Type addr_type, Address::IpVersion version);
+  SocketImpl(Address::SocketType socket_type, const Address::InstanceConstSharedPtr addr);
+
   // Network::Socket
   const Address::InstanceConstSharedPtr& localAddress() const override { return local_address_; }
   void setLocalAddress(const Address::InstanceConstSharedPtr& local_address) override {
@@ -79,15 +82,28 @@ public:
     ensureOptions();
     Network::Socket::appendOptions(options_, options);
   }
+
+  Api::SysCallIntResult bind(Network::Address::InstanceConstSharedPtr address) override;
+  Api::SysCallIntResult listen(int backlog) override;
+  Api::SysCallIntResult connect(const Address::InstanceConstSharedPtr addr) override;
+  Api::SysCallIntResult setSocketOption(int level, int optname, const void* optval,
+                                        socklen_t optlen) override;
+  Api::SysCallIntResult getSocketOption(int level, int optname, void* optval,
+                                        socklen_t* optlen) override;
+  Api::SysCallIntResult setBlockingForTest(bool blocking) override;
+
   const OptionsSharedPtr& options() const override { return options_; }
+  Address::SocketType socketType() const override { return sock_type_; }
+  Address::Type addressType() const override { return addr_type_; }
 
 protected:
-  SocketImpl(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& local_address)
-      : io_handle_(std::move(io_handle)), local_address_(local_address) {}
+  SocketImpl(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& local_address);
 
   const IoHandlePtr io_handle_;
   Address::InstanceConstSharedPtr local_address_;
   OptionsSharedPtr options_;
+  Address::SocketType sock_type_;
+  Address::Type addr_type_;
 };
 
 } // namespace Network
