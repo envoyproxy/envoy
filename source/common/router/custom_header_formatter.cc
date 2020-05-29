@@ -4,11 +4,11 @@
 
 #include "envoy/router/string_accessor.h"
 
-#include "common/access_log/access_log_formatter.h"
 #include "common/common/fmt.h"
 #include "common/common/logger.h"
 #include "common/common/utility.h"
 #include "common/config/metadata.h"
+#include "common/formatter/substitution_formatter.h"
 #include "common/http/header_map_impl.h"
 #include "common/json/json_loader.h"
 #include "common/stream_info/utility.h"
@@ -223,7 +223,7 @@ StreamInfoCustomHeaderFormatter::StreamInfoCustomHeaderFormatter(absl::string_vi
     : append_(append) {
   if (field_name == "PROTOCOL") {
     field_extractor_ = [](const Envoy::StreamInfo::StreamInfo& stream_info) {
-      return Envoy::AccessLog::AccessLogFormatUtils::protocolToString(stream_info.protocol());
+      return Envoy::Formatter::SubstitutionFormatUtils::protocolToString(stream_info.protocol());
     };
   } else if (field_name == "DOWNSTREAM_REMOTE_ADDRESS") {
     field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
@@ -320,7 +320,7 @@ StreamInfoCustomHeaderFormatter::StreamInfoCustomHeaderFormatter(absl::string_vi
     const std::string pattern = fmt::format("%{}%", field_name);
     if (start_time_formatters_.find(pattern) == start_time_formatters_.end()) {
       start_time_formatters_.emplace(
-          std::make_pair(pattern, AccessLog::AccessLogFormatParser::parse(pattern)));
+          std::make_pair(pattern, Formatter::SubstitutionFormatParser::parse(pattern)));
     }
     field_extractor_ = [this, pattern](const Envoy::StreamInfo::StreamInfo& stream_info) {
       const auto& formatters = start_time_formatters_.at(pattern);
@@ -344,7 +344,7 @@ StreamInfoCustomHeaderFormatter::StreamInfoCustomHeaderFormatter(absl::string_vi
   } else if (absl::StartsWith(field_name, "REQ")) {
     field_extractor_ = parseRequestHeader(field_name.substr(STATIC_STRLEN("REQ")));
   } else if (field_name == "HOSTNAME") {
-    std::string hostname = Envoy::AccessLog::AccessLogFormatUtils::getHostname();
+    std::string hostname = Envoy::Formatter::SubstitutionFormatUtils::getHostname();
     field_extractor_ = [hostname](const StreamInfo::StreamInfo&) { return hostname; };
   } else if (field_name == "RESPONSE_FLAGS") {
     field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
