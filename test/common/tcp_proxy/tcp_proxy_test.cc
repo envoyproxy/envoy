@@ -824,9 +824,7 @@ class TcpProxyTest : public testing::Test {
 public:
   TcpProxyTest() {
     ON_CALL(*factory_context_.access_log_manager_.file_, write(_))
-        .WillByDefault(DoAll(SaveArg<0>(&access_log_data_), Invoke([](absl::string_view log_line) {
-                               ENVOY_LOG_MISC(debug, "lambdai: {}", log_line);
-                             })));
+        .WillByDefault(SaveArg<0>(&access_log_data_));
     ON_CALL(filter_callbacks_.connection_.stream_info_, onUpstreamHostSelected(_))
         .WillByDefault(Invoke(
             [this](Upstream::HostDescriptionConstSharedPtr host) { upstream_host_ = host; }));
