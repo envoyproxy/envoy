@@ -148,6 +148,39 @@ TEST_F(HazelcastUnifiedCacheTest, AbortUnifiedOperationsWhenOffline) {
   EXPECT_TRUE(expectLookupSuccessWithFullBody(lookup_context1.get(), Body));
 }
 
+TEST_F(HazelcastUnifiedCacheTest, CoverRemoteOperations) {
+  // Since not a real Hazelcast instance is used during tests,
+  // in order to keep the coverage in a desired level this test
+  // covers the calls made to Hazelcast cluster. Otherwise the coverage
+  // stays at 90% without including the remote calls.
+  ClientConfig config;
+  config.getNetworkConfig().setConnectionAttemptLimit(100);
+  config.getNetworkConfig().setConnectionAttemptPeriod(10000);
+  config.getConnectionStrategyConfig().setAsyncStart(true);
+  std::unique_ptr<HazelcastClient> client = std::make_unique<HazelcastClient>(config);
+  client->shutdown();
+  HazelcastClusterAccessor accessor(*cache_, ClientConfig(), "coverage", 10);
+  EXPECT_FALSE(accessor.isRunning());
+  accessor.setClient(std::move(client));
+  using exception = hazelcast::client::exception::HazelcastClientOfflineException;
+  EXPECT_FALSE(accessor.isRunning());
+  EXPECT_STREQ("dev", accessor.clusterName().c_str());
+  EXPECT_STREQ("coverage:10-div", accessor.headerMapName().c_str());
+  EXPECT_STREQ("coverage-uni", accessor.responseMapName().c_str());
+  EXPECT_THROW(accessor.putHeader(1, HazelcastHeaderEntry()), exception);
+  EXPECT_THROW(accessor.putBody("1", HazelcastBodyEntry()), exception);
+  EXPECT_THROW(accessor.putResponse(1, HazelcastResponseEntry()), exception);
+  EXPECT_THROW(accessor.getHeader(1), exception);
+  EXPECT_THROW(accessor.getBody("1"), exception);
+  EXPECT_THROW(accessor.getResponse(1), exception);
+  EXPECT_THROW(accessor.removeBodyAsync("1"), exception);
+  EXPECT_THROW(accessor.removeHeader(1), exception);
+  EXPECT_THROW(accessor.tryLock(1, true), exception);
+  EXPECT_THROW(accessor.unlock(1, true), exception);
+  EXPECT_THROW(accessor.unlock(1, false), exception);
+  accessor.disconnect();
+}
+
 } // namespace HazelcastHttpCache
 } // namespace Cache
 } // namespace HttpFilters

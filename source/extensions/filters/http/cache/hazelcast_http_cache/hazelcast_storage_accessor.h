@@ -77,10 +77,12 @@ public:
   void connect() override;
   void disconnect() override;
 
+  void setClient(std::unique_ptr<HazelcastClient>&& client); // for testing
+
   const std::string& headerMapName();
   const std::string& responseMapName();
 
-  ~HazelcastClusterAccessor() = default;
+  ~HazelcastClusterAccessor() override = default;
 
 private:
   friend class RemoteTestAccessor;

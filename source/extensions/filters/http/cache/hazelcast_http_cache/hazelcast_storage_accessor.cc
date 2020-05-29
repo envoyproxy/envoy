@@ -97,6 +97,10 @@ void HazelcastClusterAccessor::connect() {
   getHeaderMap().addEntryListener(*listener_, true);
 }
 
+void HazelcastClusterAccessor::setClient(std::unique_ptr<HazelcastClient>&& client) {
+  hazelcast_client_ = std::move(client);
+}
+
 std::string HazelcastClusterAccessor::constructMapName(const std::string& postfix, bool unified) {
   std::string name(app_prefix_);
   if (!unified) {
