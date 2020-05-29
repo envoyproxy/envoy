@@ -211,7 +211,7 @@ bool PathMatcher::matches(const Network::Connection&, const Envoy::Http::Request
   if (headers.Path() == nullptr) {
     return false;
   }
-  return path_matcher_.match(headers.Path()->value().getStringView());
+  return path_matcher_.match(headers.getPathValue());
 }
 
 } // namespace RBAC

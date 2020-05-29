@@ -2419,7 +2419,11 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::requestDataDrained() {
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::
     onDecoderFilterBelowWriteBufferLowWatermark() {
   ENVOY_STREAM_LOG(debug, "Read-enabling downstream stream due to filter callbacks.", parent_);
-  parent_.response_encoder_->getStream().readDisable(false);
+  // If the state is destroyed, the codec's stream is already torn down. On
+  // teardown the codec will unwind any remaining read disable calls.
+  if (!parent_.state_.destroyed_) {
+    parent_.response_encoder_->getStream().readDisable(false);
+  }
   parent_.connection_manager_.stats_.named_.downstream_flow_control_resumed_reading_total_.inc();
 }
 
@@ -2550,9 +2554,8 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataTooLarge() {
       // Make sure we won't end up with nested watermark calls from the body buffer.
       parent_.state_.encoder_filters_streaming_ = true;
       allowIteration();
-
       parent_.stream_info_.setResponseCodeDetails(
-          StreamInfo::ResponseCodeDetails::get().RequestHeadersTooLarge);
+          StreamInfo::ResponseCodeDetails::get().ResponsePayloadTooLarge);
       // This does not call the standard sendLocalReply because if there is already response data
       // we do not want to pass a second set of response headers through the filter chain.
       // Instead, call the encodeHeadersInternal / encodeDataInternal helpers
