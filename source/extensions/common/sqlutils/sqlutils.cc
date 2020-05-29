@@ -1,4 +1,4 @@
-#include "extensions/common/sql/sqlutils.h"
+#include "extensions/common/sqlutils/sqlutils.h"
 
 namespace Envoy {
 namespace Extensions {
