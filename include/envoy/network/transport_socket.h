@@ -208,8 +208,6 @@ public:
   virtual void hashKey(std::vector<uint8_t>& key) const PURE;
 };
 
-class TransportSocketOptions;
-
 // TODO(mattklein123): Rename to TransportSocketOptionsConstSharedPtr in a dedicated follow up.
 using TransportSocketOptionsSharedPtr = std::shared_ptr<const TransportSocketOptions>;
 

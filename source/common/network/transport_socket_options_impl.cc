@@ -35,7 +35,7 @@ void commonHashKey(const TransportSocketOptions& options, std::vector<std::uint8
     }
   }
   const auto& alpn_fallback = options.applicationProtocolFallback();
-  if (!alpn_fallback.has_value()) {
+  if (alpn_fallback.has_value()) {
     pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(*alpn_fallback), key);
   }
 }
