@@ -221,6 +221,7 @@ public:
 
     return clusters_map;
   }
+  const ClusterSet& primaryClusters() override { return primary_clusters_; }
   ThreadLocalCluster* get(absl::string_view cluster) override;
   Http::ConnectionPool::Instance* httpConnPoolForCluster(const std::string& cluster,
                                                          ResourcePriority priority,
@@ -503,6 +504,7 @@ private:
   Event::Dispatcher& dispatcher_;
   Http::Context& http_context_;
   Config::SubscriptionFactoryImpl subscription_factory_;
+  ClusterSet primary_clusters_;
 };
 
 } // namespace Upstream

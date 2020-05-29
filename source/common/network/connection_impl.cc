@@ -49,10 +49,12 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
       transport_socket_(std::move(transport_socket)), socket_(std::move(socket)),
       stream_info_(stream_info), filter_manager_(*this),
       read_buffer_([this]() -> void { this->onReadBufferLowWatermark(); },
-                   [this]() -> void { this->onReadBufferHighWatermark(); }),
+                   [this]() -> void { this->onReadBufferHighWatermark(); },
+                   []() -> void { /* TODO(adisuissa): Handle overflow watermark */ }),
       write_buffer_(dispatcher.getWatermarkFactory().create(
           [this]() -> void { this->onWriteBufferLowWatermark(); },
-          [this]() -> void { this->onWriteBufferHighWatermark(); })),
+          [this]() -> void { this->onWriteBufferHighWatermark(); },
+          []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
       write_buffer_above_high_watermark_(false), detect_early_close_(true),
       enable_half_close_(false), read_end_stream_raised_(false), read_end_stream_(false),
       write_end_stream_(false), current_write_end_stream_(false), dispatch_buffered_data_(false) {
@@ -734,16 +736,18 @@ ClientConnectionImpl::ClientConnectionImpl(
       file_event_->activate(Event::FileReadyType::Write);
       return;
     }
-    const Network::Address::Instance* source_to_use = source_address.get();
+
+    const Network::Address::InstanceConstSharedPtr* source = &source_address;
+
     if (socket_->localAddress()) {
-      source_to_use = socket_->localAddress().get();
+      source = &socket_->localAddress();
     }
 
-    if (source_to_use != nullptr) {
-      const Api::SysCallIntResult result = source_to_use->bind(ioHandle().fd());
+    if (*source != nullptr) {
+      Api::SysCallIntResult result = socket_->bind(*source);
       if (result.rc_ < 0) {
         // TODO(lizan): consider add this error into transportFailureReason.
-        ENVOY_LOG_MISC(debug, "Bind failure. Failed to bind to {}: {}", source_to_use->asString(),
+        ENVOY_LOG_MISC(debug, "Bind failure. Failed to bind to {}: {}", source->get()->asString(),
                        strerror(result.errno_));
         bind_error_ = true;
         // Set a special error state to ensure asynchronous close to give the owner of the
@@ -759,7 +763,7 @@ ClientConnectionImpl::ClientConnectionImpl(
 
 void ClientConnectionImpl::connect() {
   ENVOY_CONN_LOG(debug, "connecting to {}", *this, socket_->remoteAddress()->asString());
-  const Api::SysCallIntResult result = socket_->remoteAddress()->connect(ioHandle().fd());
+  const Api::SysCallIntResult result = socket_->connect(socket_->remoteAddress());
   if (result.rc_ == 0) {
     // write will become ready.
     ASSERT(connecting_);
@@ -780,6 +784,7 @@ void ClientConnectionImpl::connect() {
 
   // The local address can only be retrieved for IP connections. Other
   // types, such as UDS, don't have a notion of a local address.
+  // TODO(fcoras) move to SocketImpl?
   if (socket_->remoteAddress()->type() == Address::Type::Ip) {
     socket_->setLocalAddress(SocketInterface::addressFromFd(ioHandle().fd()));
   }
