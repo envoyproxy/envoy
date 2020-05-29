@@ -264,7 +264,6 @@ envoy_cc_test(
     name = "socket_option_factory_test",
     srcs = ["socket_option_factory_test.cc"],
     external_deps = ["abseil_str_format"],
-    tags = ["fails_on_windows"],
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:socket_option_factory_lib",
