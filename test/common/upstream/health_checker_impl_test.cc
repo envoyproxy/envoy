@@ -4494,7 +4494,7 @@ TEST_F(GrpcHealthCheckerImplTest, DontReuseConnectionTimeout) {
 
   expectSessionCreate();
   expectHealthcheckStart(0);
-  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, true));
+  EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
   health_checker_->start();
 
   expectHealthcheckStop(0);
@@ -4521,7 +4521,7 @@ TEST_F(GrpcHealthCheckerImplTest, DontReuseConnectionStreamReset) {
 
   expectSessionCreate();
   expectHealthcheckStart(0);
-  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, true));
+  EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
   health_checker_->start();
 
   expectHealthcheckStop(0);
