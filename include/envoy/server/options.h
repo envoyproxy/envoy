@@ -65,9 +65,24 @@ public:
   virtual uint32_t concurrency() const PURE;
 
   /**
-   * @return the number of seconds that envoy will perform draining during a hot restart.
+   * @return the duration of the drain period in seconds.
    */
   virtual std::chrono::seconds drainTime() const PURE;
+
+  /**
+   * @return the delay before shutting down the parent envoy in a hot restart,
+   *         generally longer than drainTime().
+   */
+  virtual std::chrono::seconds parentShutdownTime() const PURE;
+
+  /**
+   * @return the behaviour of calls to DrainManager::drainClose() during the
+   *         drain manager. If false, requests and connections will be
+   *         discouraged for the duration of the drain period. If true, the
+   *         probability of discouraging gradually increases to 100% over the
+   *         course of the drain period.
+   */
+  virtual bool drainIncrementally() const PURE;
 
   /**
    * @return const std::string& the path to the configuration file.
@@ -142,12 +157,6 @@ public:
    * @return const std::string& the log file path.
    */
   virtual const std::string& logPath() const PURE;
-
-  /**
-   * @return the number of seconds that envoy will wait before shutting down the parent envoy during
-   *         a host restart. Generally this will be longer than the drainTime() option.
-   */
-  virtual std::chrono::seconds parentShutdownTime() const PURE;
 
   /**
    * @return the restart epoch. 0 indicates the first server start, 1 the second, and so on.

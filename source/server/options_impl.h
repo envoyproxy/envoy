@@ -63,12 +63,13 @@ public:
     local_address_ip_version_ = local_address_ip_version;
   }
   void setDrainTime(std::chrono::seconds drain_time) { drain_time_ = drain_time; }
-  void setLogLevel(spdlog::level::level_enum log_level) { log_level_ = log_level; }
-  void setLogFormat(const std::string& log_format) { log_format_ = log_format; }
-  void setLogPath(const std::string& log_path) { log_path_ = log_path; }
   void setParentShutdownTime(std::chrono::seconds parent_shutdown_time) {
     parent_shutdown_time_ = parent_shutdown_time;
   }
+  void setDrainIncrementally(bool drain_incrementally) { drain_incrementally_ = drain_incrementally; }
+  void setLogLevel(spdlog::level::level_enum log_level) { log_level_ = log_level; }
+  void setLogFormat(const std::string& log_format) { log_format_ = log_format; }
+  void setLogPath(const std::string& log_path) { log_path_ = log_path; }
   void setRestartEpoch(uint64_t restart_epoch) { restart_epoch_ = restart_epoch; }
   void setMode(Server::Mode mode) { mode_ = mode; }
   void setFileFlushIntervalMsec(std::chrono::milliseconds file_flush_interval_msec) {
@@ -117,6 +118,9 @@ public:
     return local_address_ip_version_;
   }
   std::chrono::seconds drainTime() const override { return drain_time_; }
+  std::chrono::seconds parentShutdownTime() const override { return parent_shutdown_time_; }
+  bool drainIncrementally() const override { return drain_incrementally_; }
+
   spdlog::level::level_enum logLevel() const override { return log_level_; }
   const std::vector<std::pair<std::string, spdlog::level::level_enum>>&
   componentLogLevels() const override {
@@ -125,7 +129,6 @@ public:
   const std::string& logFormat() const override { return log_format_; }
   bool logFormatEscaped() const override { return log_format_escaped_; }
   const std::string& logPath() const override { return log_path_; }
-  std::chrono::seconds parentShutdownTime() const override { return parent_shutdown_time_; }
   uint64_t restartEpoch() const override { return restart_epoch_; }
   Server::Mode mode() const override { return mode_; }
   std::chrono::milliseconds fileFlushIntervalMsec() const override {
@@ -182,6 +185,7 @@ private:
   std::chrono::milliseconds file_flush_interval_msec_;
   std::chrono::seconds drain_time_;
   std::chrono::seconds parent_shutdown_time_;
+  bool drain_incrementally_;
   Server::Mode mode_;
   bool hot_restart_disabled_;
   bool signal_handling_enabled_;
