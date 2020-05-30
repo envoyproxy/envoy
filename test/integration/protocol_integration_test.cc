@@ -311,6 +311,36 @@ TEST_P(ProtocolIntegrationTest, DrainClose) {
   }
 }
 
+TEST_P(ProtocolIntegrationTest, DrainCloseNoIncremental) {
+  drain_time_ = std::chrono::seconds(10);
+  config_helper_.addFilter(ConfigHelper::defaultHealthCheckFilter());
+  initialize();
+
+  absl::Notification drain_sequence_started;
+  test_server_->server().dispatcher().post([this, &drain_sequence_started]() {
+    test_server_->drainManager().startDrainSequence([] {});
+    drain_sequence_started.Notify();
+  });
+  drain_sequence_started.WaitForNotification();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  EXPECT_FALSE(codec_client_->disconnected());
+
+  IntegrationStreamDecoderPtr response;
+  response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  response->waitForEndStream();
+
+  codec_client_->waitForDisconnect();
+  EXPECT_TRUE(response->complete());
+
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP2) {
+    EXPECT_TRUE(codec_client_->sawGoAway());
+  } else {
+    EXPECT_EQ("close", response->headers().getConnectionValue());
+  }
+}
+
 // Regression test for https://github.com/envoyproxy/envoy/issues/9873
 TEST_P(ProtocolIntegrationTest, ResponseWithHostHeader) {
   initialize();
