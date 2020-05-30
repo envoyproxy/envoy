@@ -287,6 +287,14 @@ const std::string& TestEnvironment::temporaryDirectory() {
   CONSTRUCT_ON_FIRST_USE(std::string, getTemporaryDirectory());
 }
 
+const std::string& TestEnvironment::nullDevicePath() {
+#ifdef WIN32
+  CONSTRUCT_ON_FIRST_USE(std::string, "NUL");
+#else
+  CONSTRUCT_ON_FIRST_USE(std::string, "/dev/null");
+#endif
+}
+
 std::string TestEnvironment::runfilesDirectory(const std::string& workspace) {
   RELEASE_ASSERT(runfiles_ != nullptr, "");
   return runfiles_->Rlocation(workspace);
@@ -314,6 +322,10 @@ std::string TestEnvironment::substitute(const std::string& str,
     const std::regex port_regex("\\{\\{ " + it.first + " \\}\\}");
     out_json_string = std::regex_replace(out_json_string, port_regex, it.second);
   }
+
+  // Substitute platform specific null device.
+  const std::regex null_device_regex(R"(\{\{ null_device_path \}\})");
+  out_json_string = std::regex_replace(out_json_string, null_device_regex, nullDevicePath());
 
   // Substitute IP loopback addresses.
   const std::regex loopback_address_regex(R"(\{\{ ip_loopback_address \}\})");
