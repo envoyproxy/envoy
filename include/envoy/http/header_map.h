@@ -71,18 +71,6 @@ private:
 };
 
 /**
- * Lower case string hasher.
- */
-struct LowerCaseStringHash {
-  size_t operator()(const LowerCaseString& value) const { return HashUtil::xxHash64(value.get()); }
-};
-
-/**
- * Convenient type for unordered set of lower case string.
- */
-using LowerCaseStrUnorderedSet = std::unordered_set<LowerCaseString, LowerCaseStringHash>;
-
-/**
  * Convenient type for a vector of lower case string and string pair.
  */
 using LowerCaseStrPairVector =
