@@ -49,6 +49,7 @@ New Features
 * config: added :ref:`version_text <config_cluster_manager_cds>` stat that reflects xDS version.
 * decompressor: generic :ref:`decompressor <config_http_filters_decompressor>` filter exposed to users.
 * dynamic forward proxy: added :ref:`SNI based dynamic forward proxy <config_network_filters_sni_dynamic_forward_proxy>` support.
+* ext_authz filter: added :ref:`v2 deny_at_disable <envoy_api_field_config.filter.http.ext_authz.v2.ExtAuthz.deny_at_disable>`, :ref:`v3 deny_at_disable <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.deny_at_disable>`. This allows to force deny for protected path while filter gets disabled, by setting this key to true.
 * fault: added support for controlling the percentage of requests that abort, delay and response rate limits faults
   are applied to using :ref:`HTTP headers <config_http_filters_fault_injection_http_header>` to the HTTP fault filter.
 * fault: added support for specifying grpc_status code in abort faults using
