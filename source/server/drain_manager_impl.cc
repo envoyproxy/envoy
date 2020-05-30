@@ -32,12 +32,17 @@ bool DrainManagerImpl::drainClose() const {
     return false;
   }
 
+  if (!server_.options().drainIncrementally()) {
+    return true;
+  }
+
+  // P(return true) = elapsed time / drain timeout
+  // If the drain deadline is exceeded, skip the probability calculation.
   const MonotonicTime current_time = server_.dispatcher().timeSource().monotonicTime();
   if (current_time >= drain_deadline_) {
     return true;
   }
 
-  // P(return true) = elapsed time / drain timeout
   const auto remaining_time =
       std::chrono::duration_cast<std::chrono::seconds>(drain_deadline_ - current_time);
   ASSERT(server_.options().drainTime() >= remaining_time);

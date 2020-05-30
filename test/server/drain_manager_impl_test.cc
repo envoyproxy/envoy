@@ -19,8 +19,8 @@ namespace {
 
 constexpr int DrainTimeSeconds(600);
 
-class DrainManagerImplTest : public testing::Test, public Event::TestUsingSimulatedTime {
-public:
+class DrainManagerImplTest : public Event::TestUsingSimulatedTime, public testing::TestWithParam<bool> {
+ protected:
   DrainManagerImplTest() {
     ON_CALL(server_.options_, drainTime())
         .WillByDefault(Return(std::chrono::seconds(DrainTimeSeconds)));
@@ -59,7 +59,18 @@ TEST_F(DrainManagerImplTest, Default) {
   drain_timer->invokeCallback();
 }
 
-TEST_F(DrainManagerImplTest, DrainDeadline) {
+TEST_F(DrainManagerImplTest, ModifyOnly) {
+  InSequence s;
+  DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::MODIFY_ONLY);
+
+  EXPECT_CALL(server_, healthCheckFailed()).Times(0); // Listener check will short-circuit
+  EXPECT_FALSE(drain_manager.drainClose());
+}
+
+TEST_P(DrainManagerImplTest, DrainDeadline) {
+  const bool drain_incrementally = GetParam();
+  ON_CALL(server_.options_, drainIncrementally())
+      .WillByDefault(Return(drain_incrementally));
   // TODO(auni53): Add integration tests for this once TestDrainManager is
   // removed.
   DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::DEFAULT);
@@ -71,22 +82,38 @@ TEST_F(DrainManagerImplTest, DrainDeadline) {
   ON_CALL(server_.options_, drainTime())
       .WillByDefault(Return(std::chrono::seconds(DrainTimeSeconds)));
 
-  // random() should be called when elapsed time < drain timeout
-  EXPECT_CALL(server_.random_, random()).Times(2);
-  EXPECT_FALSE(drain_manager.drainClose());
-  simTime().advanceTimeWait(std::chrono::seconds(DrainTimeSeconds - 1));
-  EXPECT_FALSE(drain_manager.drainClose());
-  simTime().advanceTimeWait(std::chrono::seconds(1));
-  EXPECT_TRUE(drain_manager.drainClose());
+  if (drain_incrementally) {
+    // random() should be called when elapsed time < drain timeout
+    EXPECT_CALL(server_.random_, random()).Times(2);
+    EXPECT_FALSE(drain_manager.drainClose());
+    simTime().advanceTimeWait(std::chrono::seconds(DrainTimeSeconds - 1));
+    EXPECT_FALSE(drain_manager.drainClose());
+    simTime().advanceTimeWait(std::chrono::seconds(1));
+    EXPECT_TRUE(drain_manager.drainClose());
 
-  // Test that this still works if remaining time is negative
-  simTime().advanceTimeWait(std::chrono::seconds(1));
-  EXPECT_TRUE(drain_manager.drainClose());
-  simTime().advanceTimeWait(std::chrono::seconds(500));
-  EXPECT_TRUE(drain_manager.drainClose());
+    // Test that this still works if remaining time is negative
+    simTime().advanceTimeWait(std::chrono::seconds(1));
+    EXPECT_TRUE(drain_manager.drainClose());
+    simTime().advanceTimeWait(std::chrono::seconds(500));
+    EXPECT_TRUE(drain_manager.drainClose());
+  } else {
+    EXPECT_CALL(server_.random_, random()).Times(0);
+    EXPECT_TRUE(drain_manager.drainClose());
+    simTime().advanceTimeWait(std::chrono::seconds(DrainTimeSeconds - 1));
+    EXPECT_TRUE(drain_manager.drainClose());
+    simTime().advanceTimeWait(std::chrono::seconds(1));
+    EXPECT_TRUE(drain_manager.drainClose());
+    simTime().advanceTimeWait(std::chrono::seconds(1));
+    EXPECT_TRUE(drain_manager.drainClose());
+    simTime().advanceTimeWait(std::chrono::seconds(500));
+    EXPECT_TRUE(drain_manager.drainClose());
+  }
 }
 
-TEST_F(DrainManagerImplTest, DrainDeadlineProbability) {
+TEST_P(DrainManagerImplTest, DrainDeadlineProbability) {
+  const bool drain_incrementally = GetParam();
+  ON_CALL(server_.options_, drainIncrementally())
+      .WillByDefault(Return(drain_incrementally));
   ON_CALL(server_.random_, random()).WillByDefault(Return(4));
   ON_CALL(server_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(3)));
 
@@ -98,24 +125,28 @@ TEST_F(DrainManagerImplTest, DrainDeadlineProbability) {
   EXPECT_FALSE(drain_manager.drainClose());
   drain_manager.startDrainSequence([] {});
 
-  // random() should be called when elapsed time < drain timeout
-  EXPECT_CALL(server_.random_, random()).Times(2);
-  // Current elapsed time is 0
-  // drainClose() will return true when elapsed time > (4 % 3 == 1).
-  EXPECT_FALSE(drain_manager.drainClose());
-  simTime().advanceTimeWait(std::chrono::seconds(2));
-  EXPECT_TRUE(drain_manager.drainClose());
-  simTime().advanceTimeWait(std::chrono::seconds(1));
-  EXPECT_TRUE(drain_manager.drainClose());
+  if (drain_incrementally) {
+    // random() should be called when elapsed time < drain timeout
+    EXPECT_CALL(server_.random_, random()).Times(2);
+    // Current elapsed time is 0
+    // drainClose() will return true when elapsed time > (4 % 3 == 1).
+    EXPECT_FALSE(drain_manager.drainClose());
+    simTime().advanceTimeWait(std::chrono::seconds(2));
+    EXPECT_TRUE(drain_manager.drainClose());
+    simTime().advanceTimeWait(std::chrono::seconds(1));
+    EXPECT_TRUE(drain_manager.drainClose());
+  } else {
+    EXPECT_CALL(server_.random_, random()).Times(0);
+    EXPECT_TRUE(drain_manager.drainClose());
+    simTime().advanceTimeWait(std::chrono::seconds(2));
+    EXPECT_TRUE(drain_manager.drainClose());
+    simTime().advanceTimeWait(std::chrono::seconds(1));
+    EXPECT_TRUE(drain_manager.drainClose());
+  }
 }
 
-TEST_F(DrainManagerImplTest, ModifyOnly) {
-  InSequence s;
-  DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::MODIFY_ONLY);
-
-  EXPECT_CALL(server_, healthCheckFailed()).Times(0); // Listener check will short-circuit
-  EXPECT_FALSE(drain_manager.drainClose());
-}
+INSTANTIATE_TEST_SUITE_P(DrainIncrementally, DrainManagerImplTest,
+                                                  testing::Bool());
 
 } // namespace
 } // namespace Server
