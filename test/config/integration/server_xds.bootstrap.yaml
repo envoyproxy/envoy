@@ -4,7 +4,7 @@ dynamic_resources:
   cds_config:
     path: {{ cds_json_path }}
 admin:
-  access_log_path: /dev/null
+  access_log_path: {{ null_device_path }}
   address:
     socket_address:
       address: {{ ntop_ip_loopback_address }}
