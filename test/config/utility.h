@@ -156,7 +156,7 @@ public:
   void addSslConfig() { addSslConfig({}); }
 
   // Set the HTTP access log for the first HCM (if present) to a given file. The default is
-  // /dev/null.
+  // the platform's null device.
   bool setAccessLog(const std::string& filename, absl::string_view format = "");
 
   // Set the listener access log for the first listener to a given file.
