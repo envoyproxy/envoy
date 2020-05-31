@@ -5,3 +5,4 @@ Security
   :maxdepth: 2
 
   secret
+  cert_provider
