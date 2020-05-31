@@ -48,8 +48,7 @@ double AdmissionControlFilterConfig::aggression() const {
 
 AdmissionControlFilter::AdmissionControlFilter(AdmissionControlFilterConfigSharedPtr config,
                                                const std::string& stats_prefix)
-    : config_(std::move(config)), stats_(generateStats(config_->scope(), stats_prefix)),
-      deferred_record_failure_([this]() { config_->getController().recordFailure(); }) {}
+    : config_(std::move(config)), stats_(generateStats(config_->scope(), stats_prefix)) {}
 
 Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
   // TODO(tonya11en): Ensure we document the fact that healthchecks are ignored.
@@ -64,6 +63,7 @@ Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::RequestHea
     return Http::FilterHeadersStatus::StopIteration;
   }
 
+  deferred_record_failure_.emplace([this]() { config_->getController().recordFailure(); });
   return Http::FilterHeadersStatus::Continue;
 }
 
