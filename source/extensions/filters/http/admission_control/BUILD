@@ -16,7 +16,6 @@ envoy_cc_library(
     name = "admission_control_filter_lib",
     srcs = [
         "admission_control.cc",
-        "thread_local_controller.cc",
     ],
     hdrs = [
         "admission_control.h",

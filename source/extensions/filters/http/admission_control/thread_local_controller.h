@@ -30,76 +30,14 @@ public:
 };
 
 /**
- * Thread-local object to track request counts and successes over a rolling time window. Request
- * data for the time window is kept recent via a circular buffer that phases out old request/success
- * counts when recording new samples.
- *
- * This controller is thread-local so that we do not need to take any locks on the sample histories
- * to update them, at the cost of decreasing the number of samples.
- *
- * The look-back window for request samples is accurate up to a hard-coded 1-second granularity.
- * TODO (tonya11en): Allow the granularity to be configurable.
+ * Placeholder admission controller implementation.
  */
-class ThreadLocalControllerImpl : public ThreadLocalController,
-                                  public ThreadLocal::ThreadLocalObject {
-public:
-  ThreadLocalControllerImpl(TimeSource& time_source, std::chrono::seconds sampling_window);
-  ~ThreadLocalControllerImpl() override = default;
-  void recordSuccess() override { recordRequest(true); }
-  void recordFailure() override { recordRequest(false); }
-
-  uint32_t requestTotalCount() override {
-    maybeUpdateHistoricalData();
-    return global_data_.requests;
-  }
-  uint32_t requestSuccessCount() override {
-    maybeUpdateHistoricalData();
-    return global_data_.successes;
-  }
-
-private:
-  struct RequestData {
-    uint32_t requests{0};
-    uint32_t successes{0};
-  };
-
-  void recordRequest(const bool success);
-
-  // Potentially remove any stale samples and record sample aggregates to the historical data.
-  void maybeUpdateHistoricalData();
-
-  // Returns the age of the oldest sample in the historical data.
-  std::chrono::microseconds ageOfOldestSample() const {
-    ASSERT(!historical_data_.empty());
-    using namespace std::chrono;
-    return duration_cast<microseconds>(time_source_.monotonicTime() -
-                                       historical_data_.front().first);
-  }
-
-  // Returns the age of the newest sample in the historical data.
-  std::chrono::microseconds ageOfNewestSample() const {
-    ASSERT(!historical_data_.empty());
-    using namespace std::chrono;
-    return duration_cast<microseconds>(time_source_.monotonicTime() -
-                                       historical_data_.back().first);
-  }
-
-  // Removes the oldest sample in the historical data and reconciles the global data.
-  void removeOldestSample() {
-    ASSERT(!historical_data_.empty());
-    global_data_.successes -= historical_data_.front().second.successes;
-    global_data_.requests -= historical_data_.front().second.requests;
-    historical_data_.pop_front();
-  }
-
-  TimeSource& time_source_;
-  std::deque<std::pair<MonotonicTime, RequestData>> historical_data_;
-
-  // Request data aggregated for the whole look-back window.
-  RequestData global_data_;
-
-  // The rolling time window size.
-  std::chrono::seconds sampling_window_;
+class NoopControllerImpl : public ThreadLocalController {
+  NoopController() = default;
+  void recordSuccess() override {}
+  void recordFailure() override {}
+  uint32_t requestTotalCount() { return 0; }
+  uint32_t requestSuccessCount() { return 0; }
 };
 
 } // namespace AdmissionControl

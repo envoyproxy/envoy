@@ -6,7 +6,6 @@
 #include "common/stats/isolated_store_impl.h"
 
 #include "extensions/filters/http/admission_control/admission_control.h"
-#include "extensions/filters/http/admission_control/evaluators/default_evaluator.h"
 #include "extensions/filters/http/admission_control/evaluators/response_evaluator.h"
 #include "extensions/filters/http/admission_control/thread_local_controller.h"
 
@@ -65,10 +64,9 @@ public:
     AdmissionControlProto proto;
     TestUtility::loadFromYamlAndValidate(yaml, proto);
     auto tls = context_.threadLocal().allocateSlot();
-    auto evaluator = std::make_unique<DefaultResponseEvaluator>(proto.default_eval_criteria());
 
     return std::make_shared<TestConfig>(proto, runtime_, time_system_, random_, scope_,
-                                        std::move(tls), controller_, std::move(evaluator));
+                                        std::move(tls), controller_, std::m);
   }
 
   void setupFilter(std::shared_ptr<AdmissionControlFilterConfig> config) {

@@ -55,7 +55,7 @@ public:
   virtual ~AdmissionControlFilterConfig() = default;
 
   virtual ThreadLocalController& getController() const {
-    return tls_->getTyped<ThreadLocalControllerImpl>();
+    return tls_->getTyped<ThreadLocalController>();
   }
 
   Runtime::Loader& runtime() const { return runtime_; }

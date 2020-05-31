@@ -6,7 +6,6 @@
 #include "common/stats/isolated_store_impl.h"
 
 #include "extensions/filters/http/admission_control/admission_control.h"
-#include "extensions/filters/http/admission_control/evaluators/default_evaluator.h"
 
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/mocks.h"
@@ -34,12 +33,11 @@ public:
     AdmissionControlProto proto;
     TestUtility::loadFromYamlAndValidate(yaml, proto);
     auto tls = context_.threadLocal().allocateSlot();
-    auto evaluator = std::make_unique<DefaultResponseEvaluator>(proto.default_eval_criteria());
     tls->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-      return std::make_shared<ThreadLocalControllerImpl>(time_system_, std::chrono::seconds(10));
+      return std::make_shared<NoopControllerImpl>();
     });
     return std::make_shared<AdmissionControlFilterConfig>(
-        proto, runtime_, time_system_, random_, scope_, std::move(tls), std::move(evaluator));
+        proto, runtime_, time_system_, random_, scope_, std::move(tls), NiceMock<MockEvaluator>());
   }
 
 protected:
@@ -60,9 +58,6 @@ sampling_window: 1337s
 aggression_coefficient:
   default_value: 4.2
   runtime_key: "foo.aggression"
-default_eval_criteria:
-  http_status:
-  grpc_status:
 )EOF";
 
   auto config = makeConfig(yaml);
@@ -76,11 +71,6 @@ TEST_F(AdmissionControlConfigTest, BasicTestMinimumConfigured) {
   // Empty config. No fields are required.
   AdmissionControlProto proto;
 
-  const std::string yaml = R"EOF(
-default_eval_criteria:
-  http_status:
-  grpc_status:
-)EOF";
   auto config = makeConfig(yaml);
 
   EXPECT_TRUE(config->filterEnabled());
@@ -97,9 +87,6 @@ sampling_window: 1337s
 aggression_coefficient:
   default_value: 4.2
   runtime_key: "foo.aggression"
-default_eval_criteria:
-  http_status:
-  grpc_status:
 )EOF";
 
   auto config = makeConfig(yaml);

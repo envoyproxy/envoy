@@ -12,9 +12,7 @@ envoy_package()
 
 envoy_cc_library(
     name = "response_evaluator_lib",
-    srcs = ["default_evaluator.cc"],
     hdrs = [
-        "default_evaluator.h",
         "response_evaluator.h",
     ],
     visibility = ["//visibility:public"],
