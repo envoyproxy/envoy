@@ -53,8 +53,7 @@ private:
 };
 
 /**
- * TODO (tonya11en): If another response evaluator is implemented, the tests should be separated
- * from the filter test.
+ * TODO (@tallen): implement mock evaluator and spit out answers all this needs to be changed
  */
 class AdmissionControlTest : public testing::Test {
 public:
@@ -226,103 +225,9 @@ TEST_F(AdmissionControlTest, FilterBehaviorBasic) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, true));
 }
-
-// Ensure the HTTP error code range configurations are honored.
-TEST_F(AdmissionControlTest, HttpErrorCodes) {
-  const std::string yaml = R"EOF(
-default_eval_criteria:
-  http_status:
-    - start: 300
-      end:   400
-  grpc_status:
-)EOF";
-
-  auto config = makeConfig(yaml);
-  setupFilter(config);
-
-  EXPECT_CALL(controller_, requestTotalCount()).WillRepeatedly(Return(0));
-  EXPECT_CALL(controller_, requestSuccessCount()).WillRepeatedly(Return(0));
-
-  setupFilter(config);
-  expectHttpSuccess("300");
-
-  setupFilter(config);
-  expectHttpSuccess("301");
-
-  setupFilter(config);
-  expectHttpSuccess("302");
-
-  setupFilter(config);
-  expectHttpFail("200");
-
-  setupFilter(config);
-  expectHttpFail("400");
-
-  setupFilter(config);
-  expectHttpFail("500");
-}
-
-// Verify default behavior of the filter.
-TEST_F(AdmissionControlTest, DefaultBehaviorTest) {
-  const std::string yaml = R"EOF(
-default_eval_criteria:
-  http_status:
-  grpc_status:
-)EOF";
-
-  auto config = makeConfig(yaml);
-
-  Http::TestRequestHeaderMapImpl request_headers;
-  EXPECT_CALL(controller_, requestTotalCount()).WillRepeatedly(Return(0));
-  EXPECT_CALL(controller_, requestSuccessCount()).WillRepeatedly(Return(0));
-
-  setupFilter(config);
-  expectGrpcSuccess("0");
-
-  // Aborted.
-  setupFilter(config);
-  expectGrpcFail("10");
-
-  // Data loss.
-  setupFilter(config);
-  expectGrpcFail("15");
-
-  // Deadline exceeded.
-  setupFilter(config);
-  expectGrpcFail("4");
-
-  // Internal
-  setupFilter(config);
-  expectGrpcFail("13");
-
-  // Resource exhausted.
-  setupFilter(config);
-  expectGrpcFail("8");
-
-  // Unavailable.
-  setupFilter(config);
-  expectGrpcFail("14");
-
-  setupFilter(config);
-  expectHttpSuccess("200");
-  setupFilter(config);
-  expectHttpSuccess("201");
-  setupFilter(config);
-  expectHttpSuccess("204");
-  setupFilter(config);
-  expectHttpSuccess("300");
-  setupFilter(config);
-  expectHttpSuccess("301");
-  setupFilter(config);
-  expectHttpSuccess("404");
-
-  // 500 is a failure by default.
-  setupFilter(config);
-  expectHttpFail("500");
-}
-
+//
 // Ensure that HTTP status codes are not considered when evaluating a GRPC request.
-TEST_F(AdmissionControlTest, HttpCodeInfluence) {
+TEST_F(DefaultEvalutorTest, HttpCodeInfluence) {
   const std::string yaml = R"EOF(
 default_eval_criteria:
   http_status:
@@ -331,25 +236,11 @@ default_eval_criteria:
     - 12 # UNIMPLEMENTED
 )EOF";
 
-  auto config = makeConfig(yaml);
-
-  Http::TestRequestHeaderMapImpl request_headers;
-  EXPECT_CALL(controller_, requestTotalCount()).WillRepeatedly(Return(0));
-  EXPECT_CALL(controller_, requestSuccessCount()).WillRepeatedly(Return(0));
-
-  setupFilter(config);
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
-
-  // Verify that the HTTP 200 isn't causing this request to pass as a success even though it's an
-  // unsuccessful GRPC request.
-  EXPECT_CALL(controller_, recordFailure());
-  Http::TestResponseHeaderMapImpl headers{
-      {"content-type", "application/grpc"}, {"grpc-status", "0"}, {":status", "200"}};
-  filter_->encodeHeaders(headers, true);
+  // TODO @tallen
 }
 
 // Ensure that HTTP status codes are not considered when evaluating a GRPC request.
-TEST_F(AdmissionControlTest, HttpCodeInfluence2) {
+TEST_F(DefaultEvalutorTest, HttpCodeInfluence2) {
   const std::string yaml = R"EOF(
 default_eval_criteria:
   http_status:
@@ -359,6 +250,8 @@ default_eval_criteria:
     - 7  # PERMISSION_DENIED
     - 12 # UNIMPLEMENTED
 )EOF";
+
+  // TODO @tallen
 
   auto config = makeConfig(yaml);
 
@@ -377,33 +270,6 @@ default_eval_criteria:
   // config, so let's make sure it actually fails without a GRPC message type.
   expectHttpFail("200");
   expectHttpSuccess("301");
-}
-
-// Check that GRPC error code configurations are honored.
-TEST_F(AdmissionControlTest, GrpcErrorCodes) {
-  const std::string yaml = R"EOF(
-default_eval_criteria:
-  http_status:
-  grpc_status:
-    - 7
-    - 13
-)EOF";
-
-  auto config = makeConfig(yaml);
-
-  Http::TestRequestHeaderMapImpl request_headers;
-  EXPECT_CALL(controller_, requestTotalCount()).WillRepeatedly(Return(0));
-  EXPECT_CALL(controller_, requestSuccessCount()).WillRepeatedly(Return(0));
-
-  setupFilter(config);
-  expectGrpcFail("0");
-  setupFilter(config);
-  expectGrpcFail("2");
-
-  setupFilter(config);
-  expectGrpcSuccess("13");
-  setupFilter(config);
-  expectGrpcSuccess("7");
 }
 
 } // namespace

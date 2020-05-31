@@ -7,6 +7,7 @@
 #include "common/common/enum_to_int.h"
 
 #include "extensions/filters/http/admission_control/admission_control.h"
+#include "extensions/filters/http/admission_control/evaluators/default_evaluator.h"
 #include "extensions/filters/http/admission_control/evaluators/response_evaluator.h"
 
 namespace Envoy {
@@ -24,15 +25,27 @@ Http::FilterFactoryCb AdmissionControlFilterFactory::createFilterFactoryFromProt
 
   // Create the thread-local controller.
   auto tls = context.threadLocal().allocateSlot();
+  auto sampling_window = std::chrono::seconds(
+      PROTOBUF_GET_MS_OR_DEFAULT(config, sampling_window, 1000 * defaultSamplingWindow.count()) /
+      1000);
   tls->set(
-      [](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-        return std::make_shared<NoopControllerImpl>();
+      [sampling_window, &context](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+        return std::make_shared<ThreadLocalControllerImpl>(context.timeSource(), sampling_window);
       });
+
+  std::unique_ptr<ResponseEvaluator> response_evaluator;
+  switch (config.evaluation_criteria_case()) {
+  case AdmissionControlProto::EvaluationCriteriaCase::kDefaultEvalCriteria:
+    response_evaluator = std::make_unique<DefaultResponseEvaluator>(config.default_eval_criteria());
+    break;
+  case AdmissionControlProto::EvaluationCriteriaCase::EVALUATION_CRITERIA_NOT_SET:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
 
   AdmissionControlFilterConfigSharedPtr filter_config =
       std::make_shared<AdmissionControlFilterConfig>(
           config, context.runtime(), context.timeSource(), context.random(), context.scope(),
-          std::move(tls), std::make_unique<NoopEvaluator>());
+          std::move(tls), std::move(response_evaluator));
 
   return [filter_config, prefix](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<AdmissionControlFilter>(filter_config, prefix));

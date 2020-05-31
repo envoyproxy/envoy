@@ -44,3 +44,13 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/extensions/filters/http/admission_control/v3alpha:pkg_cc_proto",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "default_evaluator_test",
+    srcs = ["default_evaluator_test.cc"],
+    extension_name = "envoy.filters.http.admission_control",
+    deps = [
+        "//source/extensions/filters/http/admission_control:admission_control_filter_lib",
+        "@envoy_api//envoy/extensions/filters/http/admission_control/v3alpha:pkg_cc_proto",
+    ],
+)
