@@ -1,22 +1,24 @@
 syntax = "proto3";
 
-package envoy.config.common.accesslog.v3;
+package envoy.config.common.accesslog.v4alpha;
 
-import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.config.common.accesslog.v3";
+option java_package = "io.envoyproxy.envoy.config.common.accesslog.v4alpha";
 option java_outer_classname = "CommonProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_migrate).move_to_package = "envoy.config.common.accesslog.v4alpha";
-option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
 
 // [#protodoc-title: Common configuration for all accesslog filter.]
 
 // Filters requests that received responses with an Envoy response flag set.
 // A list of the response flags can be found in the access log formatter.
 message ResponseFlagFilter {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.common.accesslog.v3.ResponseFlagFilter";
+
   // Only responses with the any of the flags listed in this field will be logged.
   // This field is optional. If it is not specified, then any response flag will pass
   // the filter check.

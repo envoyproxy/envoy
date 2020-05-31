@@ -77,7 +77,7 @@ public:
 
   /**
    * Returns the HTTP Status Code enum parsed from the route's redirect or direct_response.
-   * @param route supplies the Route configuration.
+   * @param route supplies the route configuration.
    * @return absl::optional<Http::Code> the HTTP status from the route's direct_response if
    * specified, or the HTTP status code from the route's redirect if specified, or an empty
    * absl::optional otherwise.
