@@ -4487,6 +4487,7 @@ TEST_F(GrpcHealthCheckerImplTest, DontReuseConnectionBetweenChecks) {
   expectHostHealthy(true);
 }
 
+// Test that we close connections when a timeout occurs and reuse_connection is false.
 TEST_F(GrpcHealthCheckerImplTest, DontReuseConnectionTimeout) {
   setupNoReuseConnectionHC();
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
@@ -4503,6 +4504,8 @@ TEST_F(GrpcHealthCheckerImplTest, DontReuseConnectionTimeout) {
   test_sessions_[0]->timeout_timer_->invokeCallback();
   expectHostHealthy(true);
 
+  // A new client is created because we close the connection
+  // when a timeout occurs and connection reuse is disabled.
   expectClientCreate(0);
   expectHealthcheckStart(0);
   test_sessions_[0]->interval_timer_->invokeCallback();
@@ -4514,6 +4517,7 @@ TEST_F(GrpcHealthCheckerImplTest, DontReuseConnectionTimeout) {
   expectHostHealthy(true);
 }
 
+// Test that we close connections when a stream reset occurs and reuse_connection is false.
 TEST_F(GrpcHealthCheckerImplTest, DontReuseConnectionStreamReset) {
   setupNoReuseConnectionHC();
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
@@ -4530,6 +4534,8 @@ TEST_F(GrpcHealthCheckerImplTest, DontReuseConnectionStreamReset) {
   test_sessions_[0]->request_encoder_.stream_.resetStream(Http::StreamResetReason::RemoteReset);
   expectHostHealthy(true);
 
+  // A new client is created because we close the connection
+  // when a stream reset occurs and connection reuse is disabled.
   expectClientCreate(0);
   expectHealthcheckStart(0);
   test_sessions_[0]->interval_timer_->invokeCallback();
