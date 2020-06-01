@@ -992,7 +992,7 @@ TEST_P(AdsIntegrationTestWithRtdsAndSecondaryClusters, Basic) {
   testBasicFlow();
 }
 
-static std::string AdsV3IntegrationConfig(const std::string& api_type) {
+static std::string adsV3IntegrationConfig(const std::string& api_type) {
   // Note: do not use CONSTRUCT_ON_FIRST_USE here!
   return fmt::format(R"EOF(
 dynamic_resources:
@@ -1038,7 +1038,7 @@ class AdsClusterV3 : public Grpc::DeltaSotwIntegrationParamTest, public HttpInte
 public:
   AdsClusterV3()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(),
-                            AdsV3IntegrationConfig(
+                            adsV3IntegrationConfig(
                                 sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
     use_lds_ = false;
     create_xds_upstream_ = true;
