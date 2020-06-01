@@ -276,7 +276,10 @@ typed_config:
 
 // Add a health check filter and verify correct behavior when draining.
 TEST_P(ProtocolIntegrationTest, DrainClose) {
-  drain_time_ = std::chrono::seconds(10);
+  // The probability of drain close increases over time. With a high timeout,
+  // the probability will be very low, but the rapid retries prevent this from
+  // increasing total test time.
+  drain_time_ = std::chrono::seconds(100);
   config_helper_.addFilter(ConfigHelper::defaultHealthCheckFilter());
   initialize();
 
