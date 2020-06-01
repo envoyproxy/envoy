@@ -100,10 +100,15 @@ versioning guidelines:
   colon. Examples:
   * "docs: fix grammar error"
   * "http conn man: add new feature"
-* Your PR commit message will be used as the commit message when your PR is merged. You should 
+* Your PR commit message will be used as the commit message when your PR is merged. You should
   update this field if your PR diverges during review.
 * Your PR description should have details on what the PR does. If it fixes an existing issue it
   should end with "Fixes #XXX".
+* If your PR is co-authored or based on an earlier PR from another contributor,
+  please attribute them with `Co-authored-by: name <name@example.com>`. See
+  GitHub's [multiple author
+  guidance](https://help.github.com/en/github/committing-changes-to-your-project/creating-a-commit-with-multiple-authors)
+  for further details.
 * When all of the tests are passing and all other conditions described herein are satisfied, a
   maintainer will be assigned to review and merge the PR.
 * Once you submit a PR, *please do not rebase it*. It's much easier to review if subsequent commits
