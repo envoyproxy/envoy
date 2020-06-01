@@ -106,7 +106,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, DnsFilterIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(DnsFilterIntegrationTest, ExternalLookupTest) {
+TEST_P(DnsFilterIntegrationTest, DISABLED_ExternalLookupTest) {
   setup(0);
   const uint32_t port = lookupPort("listener_0");
   const auto listener_address = Network::Utility::resolveUrl(
@@ -124,7 +124,7 @@ TEST_P(DnsFilterIntegrationTest, ExternalLookupTest) {
   EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_parser_->getQueryResponseCode());
 }
 
-TEST_P(DnsFilterIntegrationTest, ExternalLookupTestIPv6) {
+TEST_P(DnsFilterIntegrationTest, DISABLED_ExternalLookupTestIPv6) {
   setup(0);
   const uint32_t port = lookupPort("listener_0");
   const auto listener_address = Network::Utility::resolveUrl(
