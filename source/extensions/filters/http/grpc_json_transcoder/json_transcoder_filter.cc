@@ -389,8 +389,6 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
   headers.setEnvoyOriginalPath(headers.getPathValue());
   headers.addReferenceKey(Http::Headers::get().EnvoyOriginalMethod,
                           headers.getMethodValue());
-  // headers.addReferenceKey(Http::Headers::get().EnvoyOriginalMethod,
-  //                         headers.Method()->value().getStringView());
   headers.setPath("/" + method_->descriptor_->service()->full_name() + "/" +
                   method_->descriptor_->name());
   headers.setReferenceMethod(Http::Headers::get().MethodValues.Post);
