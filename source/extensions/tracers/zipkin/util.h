@@ -57,7 +57,7 @@ public:
    * @param replacements a container to hold the required replacements when serializing this value.
    * @return ProtobufWkt::Value wrapped uint64_t as a string.
    */
-  static ProtobufWkt::Value uint64Value(uint64_t value, std::string name,
+  static ProtobufWkt::Value uint64Value(uint64_t value, absl::string_view name,
                                         Replacements& replacements);
 };
 
