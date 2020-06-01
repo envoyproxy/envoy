@@ -14,14 +14,11 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/compression/common:60.0"
 "source/extensions/compression/common/decompressor:20.0"
 "source/extensions/filters/network/sni_cluster:90.3"
-"source/extensions/filters/network/thrift_proxy/docs:0"
 "source/extensions/filters/network/thrift_proxy/router:96.4"
 "source/extensions/filters/network/sni_dynamic_forward_proxy:92.4"
 "source/extensions/filters/network/dubbo_proxy:96.7"
 "source/extensions/filters/network/dubbo_proxy/router:96.1"
 "source/extensions/filters/network/direct_response:89.3"
-"source/extensions/filters/network/kafka/serialization:0"
-"source/extensions/filters/network/kafka/protocol:0"
 "source/extensions/filters/http/dynamic_forward_proxy:93.2"
 "source/extensions/filters/http/cache:80.8"
 "source/extensions/filters/http/cache/simple_http_cache:84.5"
@@ -90,6 +87,8 @@ do
   get_coverage_target $DIRECTORY
   COVERAGE_VALUE=$(lcov -e $COVERAGE_DATA  "$DIRECTORY/*" -o /dev/null | grep line |  cut -d ' ' -f 4)
   COVERAGE_VALUE=${COVERAGE_VALUE%?}
+  # If the coverage number is 'n' (no data found) there is 0% coverage. This is probably
+  # a directory without source code.
   if [[ $COVERAGE_VALUE =~ "n" ]]; then
     continue;
   fi;
