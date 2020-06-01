@@ -8,6 +8,7 @@ load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_languag
 PPC_SKIP_TARGETS = ["envoy.filters.http.lua"]
 
 WINDOWS_SKIP_TARGETS = [
+    "envoy.filters.http.lua",
     "envoy.tracers.dynamic_ot",
     "envoy.tracers.lightstep",
     "envoy.tracers.datadog",
@@ -24,6 +25,9 @@ BUILD_ALL_CONTENT = """filegroup(name = "all", srcs = glob(["**"]), visibility =
 def _repository_locations():
     locations = dict(DEPENDENCY_REPOSITORIES)
     for key, location in locations.items():
+        if "sha256" not in location or len(location["sha256"]) == 0:
+            fail("SHA256 missing for external dependency " + str(location["urls"]))
+
         if "use_category" not in location:
             fail("The 'use_category' attribute must be defined for external dependecy " + str(location["urls"]))
 
@@ -65,9 +69,9 @@ _default_envoy_build_config = repository_rule(
     },
 )
 
-# Python dependencies. If these become non-trivial, we might be better off using a virtualenv to
-# wrap them, but for now we can treat them as first-class Bazel.
+# Python dependencies.
 def _python_deps():
+    # TODO(htuch): convert these to pip3_import.
     _repository_impl(
         name = "com_github_pallets_markupsafe",
         build_file = "@envoy//bazel/external:markupsafe.BUILD",
@@ -241,7 +245,6 @@ def _com_github_c_ares_c_ares():
     location = _get_location("com_github_c_ares_c_ares")
     http_archive(
         name = "com_github_c_ares_c_ares",
-        patches = ["@envoy//bazel/foreign_cc:cares-win32-nameser.patch"],
         build_file_content = BUILD_ALL_CONTENT,
         **location
     )
@@ -340,8 +343,6 @@ def _com_github_libevent_libevent():
     http_archive(
         name = "com_github_libevent_libevent",
         build_file_content = BUILD_ALL_CONTENT,
-        patch_args = ["-p0"],
-        patches = ["@envoy//bazel/foreign_cc:libevent_msvc.patch"],
         **location
     )
     native.bind(

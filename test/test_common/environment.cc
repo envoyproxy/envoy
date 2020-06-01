@@ -17,12 +17,18 @@
 #include "common/common/utility.h"
 #include "common/filesystem/directory.h"
 
+#ifdef ENVOY_HANDLE_SIGNALS
+#include "common/signal/signal_action.h"
+#endif
+
 #include "server/options_impl.h"
 
 #include "test/test_common/file_system_for_test.h"
 #include "test/test_common/network_utility.h"
 
+#include "absl/debugging/symbolize.h"
 #include "absl/strings/match.h"
+#include "absl/strings/str_format.h"
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
@@ -188,6 +194,55 @@ std::string TestEnvironment::getCheckedEnvVar(const std::string& var) {
   return optional.value();
 }
 
+std::string TestEnvironment::chooseBaseId(uint64_t test_base_id) {
+  ASSERT(test_base_id >= 1);
+  ASSERT(test_base_id <= 1L << 44); // Leave room to multiple by 1000000.
+
+  test_base_id *= 1000000;
+
+  auto test_random_seed = TestEnvironment::getOptionalEnvVar("TEST_RANDOM_SEED");
+  auto test_shard_index = TestEnvironment::getOptionalEnvVar("TEST_SHARD_INDEX");
+
+  if (test_random_seed) {
+    int mutator = 0;
+    if (absl::SimpleAtoi(test_random_seed.value(), &mutator)) {
+      test_base_id += mutator;
+    }
+  } else if (test_shard_index) {
+    int mutator = 0;
+    if (absl::SimpleAtoi(test_shard_index.value(), &mutator)) {
+      test_base_id += mutator;
+    }
+  }
+
+  return absl::StrFormat("%d", test_base_id);
+}
+
+void TestEnvironment::initializeTestMain(char* program_name) {
+#ifdef WIN32
+  _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
+
+  _set_invalid_parameter_handler([](const wchar_t* expression, const wchar_t* function,
+                                    const wchar_t* file, unsigned int line,
+                                    uintptr_t pReserved) {});
+
+  WSADATA wsa_data;
+  const WORD version_requested = MAKEWORD(2, 2);
+  RELEASE_ASSERT(WSAStartup(version_requested, &wsa_data) == 0, "");
+#endif
+
+#ifdef __APPLE__
+  UNREFERENCED_PARAMETER(program_name);
+#else
+  absl::InitializeSymbolizer(program_name);
+#endif
+
+#ifdef ENVOY_HANDLE_SIGNALS
+  // Enabled by default. Control with "bazel --define=signal_trace=disabled"
+  static Envoy::SignalAction handle_sigs;
+#endif
+}
+
 void TestEnvironment::initializeOptions(int argc, char** argv) {
   argc_ = argc;
   argv_ = argv;
@@ -232,6 +287,14 @@ const std::string& TestEnvironment::temporaryDirectory() {
   CONSTRUCT_ON_FIRST_USE(std::string, getTemporaryDirectory());
 }
 
+const std::string& TestEnvironment::nullDevicePath() {
+#ifdef WIN32
+  CONSTRUCT_ON_FIRST_USE(std::string, "NUL");
+#else
+  CONSTRUCT_ON_FIRST_USE(std::string, "/dev/null");
+#endif
+}
+
 std::string TestEnvironment::runfilesDirectory(const std::string& workspace) {
   RELEASE_ASSERT(runfiles_ != nullptr, "");
   return runfiles_->Rlocation(workspace);
@@ -259,6 +322,10 @@ std::string TestEnvironment::substitute(const std::string& str,
     const std::regex port_regex("\\{\\{ " + it.first + " \\}\\}");
     out_json_string = std::regex_replace(out_json_string, port_regex, it.second);
   }
+
+  // Substitute platform specific null device.
+  const std::regex null_device_regex(R"(\{\{ null_device_path \}\})");
+  out_json_string = std::regex_replace(out_json_string, null_device_regex, nullDevicePath());
 
   // Substitute IP loopback addresses.
   const std::regex loopback_address_regex(R"(\{\{ ip_loopback_address \}\})");

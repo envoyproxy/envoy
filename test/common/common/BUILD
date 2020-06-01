@@ -195,6 +195,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "basic_resource_impl_test",
+    srcs = ["basic_resource_impl_test.cc"],
+    deps = [
+        "//source/common/common:basic_resource_lib",
+        "//test/mocks/runtime:runtime_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "token_bucket_impl_test",
     srcs = ["token_bucket_impl_test.cc"],
     deps = [
@@ -243,6 +252,16 @@ envoy_cc_test(
     external_deps = ["abseil_hash_testing"],
     deps = [
         "//source/common/common:thread_lib",
+        "//test/test_common:thread_factory_for_test_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "thread_test",
+    srcs = ["thread_test.cc"],
+    deps = [
+        "//source/common/common:thread_lib",
+        "//source/common/common:thread_synchronizer_lib",
         "//test/test_common:thread_factory_for_test_lib",
     ],
 )

@@ -1,5 +1,15 @@
 actions {
   new_stream {
+      metadata {
+        metadata {
+		 key: ""
+		 value: ""
+	}
+	metadata {
+	 	 key: "new_key"
+		 value: "new_value"
+	}
+      }
     request_headers {
       headers {
         key: ":method"

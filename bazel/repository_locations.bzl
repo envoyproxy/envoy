@@ -53,11 +53,11 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["build"],
     ),
     bazel_toolchains = dict(
-        sha256 = "239a1a673861eabf988e9804f45da3b94da28d1aff05c373b013193c315d9d9e",
-        strip_prefix = "bazel-toolchains-3.0.1",
+        sha256 = "144290c4166bd67e76a54f96cd504ed86416ca3ca82030282760f0823c10be48",
+        strip_prefix = "bazel-toolchains-3.1.1",
         urls = [
-            "https://github.com/bazelbuild/bazel-toolchains/releases/download/3.0.1/bazel-toolchains-3.0.1.tar.gz",
-            "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/3.0.1.tar.gz",
+            "https://github.com/bazelbuild/bazel-toolchains/releases/download/3.1.1/bazel-toolchains-3.1.1.tar.gz",
+            "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/3.1.1.tar.gz",
         ],
         use_category = ["build"],
     ),
@@ -67,22 +67,23 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["build"],
     ),
     envoy_build_tools = dict(
-        sha256 = "9d348f92ae8fb2495393109aac28aea314ad1fb013cdec1ab7b1224f804be1b7",
-        strip_prefix = "envoy-build-tools-823c2e9386eee5117f7ef9e3d7c90e784cd0d047",
-        # 2020-04-07
-        urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/823c2e9386eee5117f7ef9e3d7c90e784cd0d047.tar.gz"],
+        sha256 = "78e794ae1c1197f59b7ecbf8bd62c053ecb1625daaccdbe287581ee6f12ec0fb",
+        strip_prefix = "envoy-build-tools-b47394aa94c45e15c479d18eab18ffd43ec62d89",
+        # 2020-05-14
+        urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/b47394aa94c45e15c479d18eab18ffd43ec62d89.tar.gz"],
         use_category = ["build"],
     ),
     boringssl = dict(
-        sha256 = "a3d4de4f03cb321ef943678d72a045c9a19d26b23d6f4e313f97600c65201a27",
-        strip_prefix = "boringssl-1c2769383f027befac5b75b6cedd25daf3bf4dcf",
+        sha256 = "8ae14b52b7889cf92f3b107610b12afb5011506c77f90c7b3d4a36ed7283905a",
+        strip_prefix = "boringssl-107c03cf6d364939469194396bf7a6b2572d0f9c",
         # To update BoringSSL, which tracks Chromium releases:
         # 1. Open https://omahaproxy.appspot.com/ and note <current_version> of linux/stable release.
         # 2. Open https://chromium.googlesource.com/chromium/src/+/refs/tags/<current_version>/DEPS and note <boringssl_revision>.
         # 3. Find a commit in BoringSSL's "master-with-bazel" branch that merges <boringssl_revision>.
         #
-        # chromium-81.0.4044.69
-        urls = ["https://github.com/google/boringssl/archive/1c2769383f027befac5b75b6cedd25daf3bf4dcf.tar.gz"],
+        # chromium-83.0.4103.62
+        # 2020-03-16
+        urls = ["https://github.com/google/boringssl/archive/107c03cf6d364939469194396bf7a6b2572d0f9c.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),
@@ -94,10 +95,10 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "N/A",
     ),
     com_google_absl = dict(
-        sha256 = "14ee08e2089c2a9b6bf27e1d10abc5629c69c4d0bab4b78ec5b65a29ea1c2af7",
-        strip_prefix = "abseil-cpp-cf3a1998e9d41709d4141e2f13375993cba1130e",
-        # 2020-03-05
-        urls = ["https://github.com/abseil/abseil-cpp/archive/cf3a1998e9d41709d4141e2f13375993cba1130e.tar.gz"],
+        sha256 = "cd477bfd0d19f803f85d118c7943b7908930310d261752730afa981118fee230",
+        strip_prefix = "abseil-cpp-ca9856cabc23d771bcce634677650eb6fc4363ae",
+        # 2020-04-30
+        urls = ["https://github.com/abseil/abseil-cpp/archive/ca9856cabc23d771bcce634677650eb6fc4363ae.tar.gz"],
         use_category = ["dataplane", "controlplane"],
         cpe = "N/A",
     ),
@@ -109,13 +110,9 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "cpe:2.3:a:apache:thrift:*",
     ),
     com_github_c_ares_c_ares = dict(
-        sha256 = "bbaab13d6ad399a278d476f533e4d88a7ec7d729507348bb9c2e3b207ba4c606",
-        strip_prefix = "c-ares-d7e070e7283f822b1d2787903cce3615536c5610",
-        # 2019-06-19
-        # 27 new commits from release-1.15.0. Upgrade for commit 7d3591ee8a1a63e7748e68e6d880bd1763a32885 "getaddrinfo enhancements" and follow up fixes.
-        # Use getaddrinfo to query DNS record and TTL.
-        # TODO(crazyxy): Update to release-1.16.0 when it is released.
-        urls = ["https://github.com/c-ares/c-ares/archive/d7e070e7283f822b1d2787903cce3615536c5610.tar.gz"],
+        sha256 = "d08312d0ecc3bd48eee0a4cc0d2137c9f194e0a28de2028928c0f6cae85f86ce",
+        strip_prefix = "c-ares-1.16.1",
+        urls = ["https://github.com/c-ares/c-ares/releases/download/cares-1_16_1/c-ares-1.16.1.tar.gz"],
         use_category = ["dataplane"],
         cpe = "cpe:2.3:a:c-ares_project:c-ares:*",
     ),
@@ -149,9 +146,10 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["other"],
     ),
     com_github_fmtlib_fmt = dict(
-        sha256 = "f1907a58d5e86e6c382e51441d92ad9e23aea63827ba47fd647eacc0d3a16c78",
-        strip_prefix = "fmt-6.0.0",
-        urls = ["https://github.com/fmtlib/fmt/archive/6.0.0.tar.gz"],
+        sha256 = "5014aacf55285bf79654539791de0d6925063fddf4dfdd597ef76b53eb994f86",
+        strip_prefix = "fmt-e2ff910675c7800e5c4e28e1509ca6a50bdceafa",
+        # 2020-04-29
+        urls = ["https://github.com/fmtlib/fmt/archive/e2ff910675c7800e5c4e28e1509ca6a50bdceafa.tar.gz"],
         use_category = ["observability"],
         cpe = "N/A",
     ),
@@ -163,7 +161,7 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "N/A",
     ),
     com_github_google_libprotobuf_mutator = dict(
-        sha256 = "",
+        sha256 = "f6def6cdf63e29a367d46c0ad9e3e31eed89d031e22e0caac126f1e62d8b3fd0",
         strip_prefix = "libprotobuf-mutator-3521f47a2828da9ace403e4ecc4aece1a84feb36",
         # 2020-02-04
         urls = ["https://github.com/google/libprotobuf-mutator/archive/3521f47a2828da9ace403e4ecc4aece1a84feb36.tar.gz"],
@@ -183,6 +181,7 @@ DEPENDENCY_REPOSITORIES = dict(
         # This sha on grpc:v1.25.x branch is specifically chosen to fix gRPC STS call credential options.
         sha256 = "bbc8f020f4e85ec029b047fab939b8c81f3d67254b5c724e1003a2bc49ddd123",
         strip_prefix = "grpc-d8f4928fa779f6005a7fe55a176bdb373b0f910f",
+        # 2020-02-11
         urls = ["https://github.com/grpc/grpc/archive/d8f4928fa779f6005a7fe55a176bdb373b0f910f.tar.gz"],
         use_category = ["dataplane", "controlplane"],
         cpe = "cpe:2.3:a:grpc:grpc:*",
@@ -224,9 +223,9 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "N/A",
     ),
     com_github_datadog_dd_opentracing_cpp = dict(
-        sha256 = "6dc1088ab7f788b6c849fbaa6300517c8fdf88991a70b778be79c284c36857bf",
-        strip_prefix = "dd-opentracing-cpp-1.1.3",
-        urls = ["https://github.com/DataDog/dd-opentracing-cpp/archive/v1.1.3.tar.gz"],
+        sha256 = "b84fd2fb0bb0578af4901db31d1c0ae909b532a1016fe6534cbe31a6c3ad6924",
+        strip_prefix = "dd-opentracing-cpp-1.1.5",
+        urls = ["https://github.com/DataDog/dd-opentracing-cpp/archive/v1.1.5.tar.gz"],
         use_category = ["observability"],
         cpe = "N/A",
     ),
@@ -237,16 +236,18 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["test"],
     ),
     com_github_libevent_libevent = dict(
-        sha256 = "549d34065eb2485dfad6c8de638caaa6616ed130eec36dd978f73b6bdd5af113",
+        sha256 = "c64156c24602ab7a5c66937d774cc55868911d5bbbf1650792f5877744b1c2d9",
         # This SHA includes the new "prepare" and "check" watchers, used for event loop performance
         # stats (see https://github.com/libevent/libevent/pull/793) and the fix for a race condition
         # in the watchers (see https://github.com/libevent/libevent/pull/802).
         # This also includes the fixes for https://github.com/libevent/libevent/issues/806
         # and https://github.com/lyft/envoy-mobile/issues/215.
-        # TODO(mergeconflict): Update to v2.2 when it is released.
-        strip_prefix = "libevent-0d7d85c2083f7a4c9efe01c061486f332b576d28",
-        # 2019-07-02
-        urls = ["https://github.com/libevent/libevent/archive/0d7d85c2083f7a4c9efe01c061486f332b576d28.tar.gz"],
+        # This also include the fixes for Phantom events with EV_ET (see
+        # https://github.com/libevent/libevent/issues/984).
+        # TODO(adip): Update to v2.2 when it is released.
+        strip_prefix = "libevent-06a11929511bebaaf40c52aaf91de397b1782ba2",
+        # 2020-05-08
+        urls = ["https://github.com/libevent/libevent/archive/06a11929511bebaaf40c52aaf91de397b1782ba2.tar.gz"],
         use_category = ["dataplane"],
         cpe = "cpe:2.3:a:libevent_project:libevent:*",
     ),
@@ -276,10 +277,10 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "N/A",
     ),
     com_github_google_jwt_verify = dict(
-        sha256 = "d422a6eadd4bcdd0f9b122cd843a4015f8b18aebea6e1deb004bd4d401a8ef92",
-        strip_prefix = "jwt_verify_lib-40e2cc938f4bcd059a97dc6c73f59ecfa5a71bac",
-        # 2020-02-11
-        urls = ["https://github.com/google/jwt_verify_lib/archive/40e2cc938f4bcd059a97dc6c73f59ecfa5a71bac.tar.gz"],
+        sha256 = "118f955620509f1634cbd918c63234d2048dce56b1815caf348d78e3c3dc899c",
+        strip_prefix = "jwt_verify_lib-44291b2ee4c19631e5a0a0bf4f965436a9364ca7",
+        # 2020-05-21
+        urls = ["https://github.com/google/jwt_verify_lib/archive/44291b2ee4c19631e5a0a0bf4f965436a9364ca7.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),
@@ -288,7 +289,7 @@ DEPENDENCY_REPOSITORIES = dict(
         strip_prefix = "http-parser-2.9.3",
         urls = ["https://github.com/nodejs/http-parser/archive/v2.9.3.tar.gz"],
         use_category = ["dataplane"],
-        cpe = "N/A",
+        cpe = "cpe:2.3:a:nodejs:node.js:*",
     ),
     com_github_pallets_jinja = dict(
         sha256 = "db49236731373e4f3118af880eb91bb0aa6978bc0cf8b35760f6a026f1a9ffc4",
@@ -365,8 +366,11 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["build"],
     ),
     rules_python = dict(
-        sha256 = "aa96a691d3a8177f3215b14b0edc9641787abaaa30363a080165d06ab65e1161",
-        urls = ["https://github.com/bazelbuild/rules_python/releases/download/0.0.1/rules_python-0.0.1.tar.gz"],
+        sha256 = "76a8fd4e7eca2a3590f816958faa0d83c9b2ce9c32634c5c375bcccf161d3bb5",
+        strip_prefix = "rules_python-a0fbf98d4e3a232144df4d0d80b577c7a693b570",
+        # 2020-04-09
+        # TODO(htuch): revert back to a point releases when pip3_import appears.
+        urls = ["https://github.com/bazelbuild/rules_python/archive/a0fbf98d4e3a232144df4d0d80b577c7a693b570.tar.gz"],
         use_category = ["build"],
     ),
     six = dict(
@@ -392,8 +396,8 @@ DEPENDENCY_REPOSITORIES = dict(
     com_googlesource_chromium_v8 = dict(
         # This archive was created using https://storage.googleapis.com/envoyproxy-wee8/wee8-archive.sh
         # and contains complete checkout of V8 with all dependencies necessary to build wee8.
-        sha256 = "03ff00e41cf259db473dfade9548493e4a2372c0b701a66cd7ff76215bd55a64",
-        urls = ["https://storage.googleapis.com/envoyproxy-wee8/wee8-8.1.307.28.tar.gz"],
+        sha256 = "cc6f5357cd10922bfcf667bd882624ad313e21b009b919ce00f322f390012476",
+        urls = ["https://storage.googleapis.com/envoyproxy-wee8/wee8-8.3.110.9.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),

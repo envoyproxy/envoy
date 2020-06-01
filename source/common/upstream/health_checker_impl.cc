@@ -16,8 +16,10 @@
 #include "common/config/well_known_names.h"
 #include "common/grpc/common.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/header_utility.h"
 #include "common/network/address_impl.h"
 #include "common/router/router.h"
+#include "common/runtime/runtime_features.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/upstream/host_utility.h"
 
@@ -303,8 +305,7 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
     parent_.stats_.verify_cluster_.inc();
     std::string service_cluster_healthchecked =
         response_headers_->EnvoyUpstreamHealthCheckedCluster()
-            ? std::string(
-                  response_headers_->EnvoyUpstreamHealthCheckedCluster()->value().getStringView())
+            ? std::string(response_headers_->getEnvoyUpstreamHealthCheckedClusterValue())
             : EMPTY_STRING;
     if (parent_.service_name_matcher_->match(service_cluster_healthchecked)) {
       return degraded ? HealthCheckResult::Degraded : HealthCheckResult::Succeeded;
@@ -344,6 +345,14 @@ bool HttpHealthCheckerImpl::HttpActiveHealthCheckSession::shouldClose() const {
     return false;
   }
 
+  if (!parent_.reuse_connection_) {
+    return true;
+  }
+
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.fixed_connection_close")) {
+    return Http::HeaderUtility::shouldCloseConnection(client_->protocol(), *response_headers_);
+  }
+
   if (response_headers_->Connection()) {
     const bool close =
         absl::EqualsIgnoreCase(response_headers_->Connection()->value().getStringView(),
@@ -360,10 +369,6 @@ bool HttpHealthCheckerImpl::HttpActiveHealthCheckSession::shouldClose() const {
     if (close) {
       return true;
     }
-  }
-
-  if (!parent_.reuse_connection_) {
-    return true;
   }
 
   return false;
@@ -420,7 +425,7 @@ TcpHealthCheckMatcher::MatchSegments TcpHealthCheckMatcher::loadProtoBytes(
 bool TcpHealthCheckMatcher::match(const MatchSegments& expected, const Buffer::Instance& buffer) {
   uint64_t start_index = 0;
   for (const std::vector<uint8_t>& segment : expected) {
-    ssize_t search_result = buffer.search(&segment[0], segment.size(), start_index);
+    ssize_t search_result = buffer.search(segment.data(), segment.size(), start_index);
     if (search_result == -1) {
       return false;
     }
@@ -522,7 +527,7 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onInterval() {
   if (!parent_.send_bytes_.empty()) {
     Buffer::OwnedImpl data;
     for (const std::vector<uint8_t>& segment : parent_.send_bytes_) {
-      data.add(&segment[0], segment.size());
+      data.add(segment.data(), segment.size());
     }
 
     client_->write(data, false);

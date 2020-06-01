@@ -263,8 +263,8 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
     return ProtobufUtil::Status(Code::INVALID_ARGUMENT,
                                 "Request headers has application/grpc content-type");
   }
-  const std::string method(headers.Method()->value().getStringView());
-  std::string path(headers.Path()->value().getStringView());
+  const std::string method(headers.getMethodValue());
+  std::string path(headers.getPathValue());
   std::string args;
 
   const size_t pos = path.find('?');
@@ -364,7 +364,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
 
   if (method_->request_type_is_http_body_) {
     if (headers.ContentType() != nullptr) {
-      absl::string_view content_type = headers.ContentType()->value().getStringView();
+      absl::string_view content_type = headers.getContentTypeValue();
       content_type_.assign(content_type.begin(), content_type.end());
     }
 
@@ -386,9 +386,11 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
 
   headers.removeContentLength();
   headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Grpc);
-  headers.setEnvoyOriginalPath(headers.Path()->value().getStringView());
+  headers.setEnvoyOriginalPath(headers.getPathValue());
   headers.addReferenceKey(Http::Headers::get().EnvoyOriginalMethod,
-                          headers.Method()->value().getStringView());
+                          headers.getMethodValue());
+  // headers.addReferenceKey(Http::Headers::get().EnvoyOriginalMethod,
+  //                         headers.Method()->value().getStringView());
   headers.setPath("/" + method_->descriptor_->service()->full_name() + "/" +
                   method_->descriptor_->name());
   headers.setReferenceMethod(Http::Headers::get().MethodValues.Post);

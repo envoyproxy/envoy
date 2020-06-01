@@ -201,6 +201,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "basic_resource_lib",
+    hdrs = ["basic_resource_impl.h"],
+    deps = [
+        "//include/envoy/common:resource_interface",
+        "//include/envoy/runtime:runtime_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "macros",
     hdrs = ["macros.h"],
 )
@@ -279,7 +288,9 @@ envoy_cc_library(
     name = "thread_lib",
     hdrs = ["thread.h"],
     external_deps = ["abseil_synchronization"],
-    deps = envoy_cc_platform_dep("thread_impl_lib"),
+    deps = envoy_cc_platform_dep("thread_impl_lib") + [
+        ":non_copyable",
+    ],
 )
 
 envoy_cc_posix_library(
@@ -422,16 +433,6 @@ envoy_cc_library(
         "//include/envoy/common:time_interface",
         "//include/envoy/common:token_bucket_interface",
         "//source/common/common:utility_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "zlib_base_lib",
-    srcs = ["zlib/base.cc"],
-    hdrs = ["zlib/base.h"],
-    external_deps = ["zlib"],
-    deps = [
-        "//source/common/buffer:buffer_lib",
     ],
 )
 

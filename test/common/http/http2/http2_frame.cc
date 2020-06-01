@@ -33,7 +33,7 @@ const char Http2Frame::Preamble[25] = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
 void Http2Frame::setHeader(absl::string_view header) {
   ASSERT(header.size() >= HeaderSize);
   data_.assign(HeaderSize, 0);
-  memcpy(&data_[0], header.data(), HeaderSize);
+  memcpy(data_.data(), header.data(), HeaderSize);
   data_.resize(HeaderSize + payloadSize());
 }
 
