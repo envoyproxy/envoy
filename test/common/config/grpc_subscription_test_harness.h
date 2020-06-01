@@ -125,7 +125,7 @@ public:
       expectSendMessage(last_cluster_names_, version_, false,
                         Grpc::Status::WellKnownGrpcStatus::Internal, "bad config");
     }
-    mux_->onDiscoveryResponse(std::move(response));
+    mux_->onDiscoveryResponse(std::move(response), &control_plane_stats_);
     Mock::VerifyAndClearExpectations(&async_stream_);
   }
 
