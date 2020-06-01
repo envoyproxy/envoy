@@ -478,7 +478,6 @@ private:
                    Event::Dispatcher& dispatcher, Upstream::ResourcePriority priority) PURE;
 
   std::unique_ptr<GenericConnPool> createConnPool();
-  UpstreamRequestPtr createUpstreamRequest(std::unique_ptr<GenericConnPool>&& conn_pool);
 
   void maybeDoShadowing();
   bool maybeRetryReset(Http::StreamResetReason reset_reason, UpstreamRequest& upstream_request);
