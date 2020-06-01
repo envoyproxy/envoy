@@ -348,11 +348,16 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
     // Attempt to parse the binary format.
     auto read_proto_binary = [&contents, &path, &validation_visitor](
                                  Protobuf::Message& message, MessageVersion message_version) {
-      if (message.ParseFromString(contents)) {
-        if (message_version == MessageVersion::LATEST_VERSION) {
+      try {
+        if (message.ParseFromString(contents)) {
           MessageUtil::checkForUnexpectedFields(message, validation_visitor);
         }
         return;
+      } catch (EnvoyException &ex) {
+        if (message_version == MessageVersion::LATEST_VERSION) {
+          // Failed reading the latest version - pass the same error upwards
+          throw ex;
+        }
       }
       if (message_version == MessageVersion::LATEST_VERSION) {
         throw EnvoyException("Unable to parse file \"" + path + "\" as a binary protobuf (type " +
@@ -364,8 +369,8 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
     };
 
     if (do_boosting) {
-      // Attempt to read as the latest version (denying deprecated fields), and
-      // if it fails attempts to read as previous version and upgrade.
+      // Attempts to read as the previous version and upgrade, and if it fails
+      // attempts to read as current version.
       tryWithApiBoosting(read_proto_binary, message);
     } else {
       read_proto_binary(message, MessageVersion::LATEST_VERSION);
