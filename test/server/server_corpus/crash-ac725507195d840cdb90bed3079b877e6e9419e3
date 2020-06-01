@@ -1,0 +1,22 @@
+dynamic_resources {
+}
+cluster_manager {
+  local_cluster_name: "\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000"
+}
+hidden_envoy_deprecated_runtime {
+}
+admin {
+}
+stats_config {
+  use_all_default_tags {
+    value: true
+  }
+}
+layered_runtime {
+  layers {
+    disk_layer {
+      append_service_cluster: true
+    }
+  }
+}
+use_tcp_for_dns_lookups: true

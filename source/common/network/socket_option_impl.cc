@@ -14,7 +14,7 @@ namespace Network {
 bool SocketOptionImpl::setOption(Socket& socket,
                                  envoy::config::core::v3::SocketOption::SocketState state) const {
   if (in_state_ == state) {
-    if (!optname_.has_value()) {
+    if (!optname_.hasValue()) {
       ENVOY_LOG(warn, "Failed to set unsupported option on socket");
       return false;
     }
@@ -44,18 +44,16 @@ SocketOptionImpl::getOptionDetails(const Socket&,
   return absl::make_optional(std::move(info));
 }
 
-bool SocketOptionImpl::isSupported() const { return optname_.has_value(); }
+bool SocketOptionImpl::isSupported() const { return optname_.hasValue(); }
 
 Api::SysCallIntResult SocketOptionImpl::setSocketOption(Socket& socket,
                                                         const Network::SocketOptionName& optname,
                                                         const void* value, size_t size) {
-  if (!optname.has_value()) {
+  if (!optname.hasValue()) {
     return {-1, ENOTSUP};
   }
 
-  auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  return os_syscalls.setsockopt(socket.ioHandle().fd(), optname.level(), optname.option(), value,
-                                size);
+  return socket.setSocketOption(optname.level(), optname.option(), value, size);
 }
 
 } // namespace Network

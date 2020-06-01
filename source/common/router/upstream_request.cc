@@ -192,7 +192,8 @@ void UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream) {
     if (!buffered_request_body_) {
       buffered_request_body_ = std::make_unique<Buffer::WatermarkBuffer>(
           [this]() -> void { this->enableDataFromDownstreamForFlowControl(); },
-          [this]() -> void { this->disableDataFromDownstreamForFlowControl(); });
+          [this]() -> void { this->disableDataFromDownstreamForFlowControl(); },
+          []() -> void { /* TODO(adisuissa): Handle overflow watermark */ });
       buffered_request_body_->setWatermarks(parent_.callbacks()->decoderBufferLimit());
     }
 
@@ -380,8 +381,8 @@ void UpstreamRequest::onPoolReady(
 
   // Make sure that when we are forwarding CONNECT payload we do not do so until
   // the upstream has accepted the CONNECT request.
-  if (conn_pool_->protocol().has_value() && headers->Method() &&
-      headers->Method()->value().getStringView() == Http::Headers::get().MethodValues.Connect) {
+  if (conn_pool_->protocol().has_value() &&
+      headers->getMethodValue() == Http::Headers::get().MethodValues.Connect) {
     paused_for_connect_ = true;
   }
 
@@ -590,6 +591,12 @@ void TcpUpstream::encodeHeaders(const Http::RequestHeaderMap&, bool end_stream) 
   if (data.length() != 0 || end_stream) {
     upstream_conn_data_->connection().write(data, end_stream);
   }
+
+  // TcpUpstream::encodeHeaders is called after the UpstreamRequest is fully initialized. Also use
+  // this time to synthesize the 200 response headers downstream to complete the CONNECT handshake.
+  Http::ResponseHeaderMapPtr headers{
+      Http::createHeaderMap<Http::ResponseHeaderMapImpl>({{Http::Headers::get().Status, "200"}})};
+  upstream_request_->decodeHeaders(std::move(headers), false);
 }
 
 void TcpUpstream::encodeTrailers(const Http::RequestTrailerMap&) {
@@ -610,12 +617,6 @@ void TcpUpstream::resetStream() {
 }
 
 void TcpUpstream::onUpstreamData(Buffer::Instance& data, bool end_stream) {
-  if (!sent_headers_) {
-    Http::ResponseHeaderMapPtr headers{
-        Http::createHeaderMap<Http::ResponseHeaderMapImpl>({{Http::Headers::get().Status, "200"}})};
-    upstream_request_->decodeHeaders(std::move(headers), false);
-    sent_headers_ = true;
-  }
   upstream_request_->decodeData(data, end_stream);
 }
 

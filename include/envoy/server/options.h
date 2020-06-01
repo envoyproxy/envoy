@@ -102,6 +102,11 @@ public:
   virtual bool rejectUnknownDynamicFields() const PURE;
 
   /**
+   * @return bool ignore unknown fields in the dynamic configuration?
+   **/
+  virtual bool ignoreUnknownDynamicFields() const PURE;
+
+  /**
    * @return const std::string& the admin address output file.
    */
   virtual const std::string& adminAddressPath() const PURE;

@@ -2,13 +2,18 @@
 
 source "${TEST_SRCDIR}/envoy/test/integration/test_utility.sh"
 
+# Use TEST_RANDOM_SEED or TEST_SHARD_INDEX to choose a base id. This
+# replicates the logic of TestEnvironment::chooseBaseId(2). See that method
+# for details.
+let BASE_ID=2000000+${TEST_RANDOM_SEED:-${TEST_SHARD_INDEX:-0}}
+
 function expect_fail_with_error() {
   log="${TEST_TMPDIR}/envoy.log"
   rm -f "$log"
   expected_error="$1"
   shift
-  echo ${ENVOY_BIN} "$@" ">&" "$log"
-  ${ENVOY_BIN} "$@" >& "$log"
+  echo ${ENVOY_BIN} --base-id "${BASE_ID}" "$@" ">&" "$log"
+  ${ENVOY_BIN} --base-id "${BASE_ID}" "$@" >& "$log"
   EXIT_CODE=$?
   cat "$log"
   check [ $EXIT_CODE -eq 1 ]
