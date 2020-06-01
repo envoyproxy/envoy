@@ -118,7 +118,9 @@ public:
   int size_;
 
   // Convert data_ buffer into a string
-  std::string data_string() { return std::string(reinterpret_cast<const char*>(data_), size_); }
+  std::string dataString() const {
+    return std::string(reinterpret_cast<const char*>(data_), size_);
+  }
 };
 
 TEST_F(ZeroCopyInputStreamSkipTest, SkipFirstPartialSlice) {
@@ -131,7 +133,7 @@ TEST_F(ZeroCopyInputStreamSkipTest, SkipFirstPartialSlice) {
   // Read the first slice
   EXPECT_TRUE(stream_.Next(&data_, &size_));
   EXPECT_EQ(slice1_.size() - skip_count, size_);
-  EXPECT_EQ(slice1_.substr(skip_count), data_string());
+  EXPECT_EQ(slice1_.substr(skip_count), dataString());
   EXPECT_EQ(slice1_.size(), stream_.ByteCount());
 }
 
@@ -144,7 +146,7 @@ TEST_F(ZeroCopyInputStreamSkipTest, SkipFirstFullSlice) {
   // Read the second slice
   EXPECT_TRUE(stream_.Next(&data_, &size_));
   EXPECT_EQ(slice2_.size(), size_);
-  EXPECT_EQ(slice2_, data_string());
+  EXPECT_EQ(slice2_, dataString());
   EXPECT_EQ(slice1_.size() + slice2_.size(), stream_.ByteCount());
 }
 
@@ -152,7 +154,7 @@ TEST_F(ZeroCopyInputStreamSkipTest, BackUpAndSkipToEndOfSlice) {
   // Read the first slice, backUp 10 byes, skip 10 bytes to the end of the first slice.
   EXPECT_TRUE(stream_.Next(&data_, &size_));
   EXPECT_EQ(slice1_.size(), size_);
-  EXPECT_EQ(slice1_, data_string());
+  EXPECT_EQ(slice1_, dataString());
 
   constexpr int backup_count = 10;
   stream_.BackUp(backup_count);
@@ -163,7 +165,7 @@ TEST_F(ZeroCopyInputStreamSkipTest, BackUpAndSkipToEndOfSlice) {
   // Next read is the second slice
   EXPECT_TRUE(stream_.Next(&data_, &size_));
   EXPECT_EQ(slice2_.size(), size_);
-  EXPECT_EQ(slice2_, data_string());
+  EXPECT_EQ(slice2_, dataString());
   EXPECT_EQ(slice1_.size() + slice2_.size(), stream_.ByteCount());
 }
 
@@ -171,7 +173,7 @@ TEST_F(ZeroCopyInputStreamSkipTest, SkipAcrossTwoSlices) {
   // Read the first slice, backUp 10 byes, skip 15 bytes; 5 bytes into the second slice.
   EXPECT_TRUE(stream_.Next(&data_, &size_));
   EXPECT_EQ(slice1_.size(), size_);
-  EXPECT_EQ(slice1_, data_string());
+  EXPECT_EQ(slice1_, dataString());
 
   constexpr int backup_count = 10; // the backup bytes to the end of first slice.
   constexpr int skip_count = 5;    // The skip bytes in the second slice
@@ -183,7 +185,7 @@ TEST_F(ZeroCopyInputStreamSkipTest, SkipAcrossTwoSlices) {
   // Read the remain second slice
   EXPECT_TRUE(stream_.Next(&data_, &size_));
   EXPECT_EQ(slice2_.size() - skip_count, size_);
-  EXPECT_EQ(slice2_.substr(skip_count), data_string());
+  EXPECT_EQ(slice2_.substr(skip_count), dataString());
   EXPECT_EQ(slice1_.size() + slice2_.size(), stream_.ByteCount());
 }
 
@@ -191,7 +193,7 @@ TEST_F(ZeroCopyInputStreamSkipTest, SkipAcrossThreeSlices) {
   // Read the first slice, backUp 10 byes, skip 10 + slice2.size + 5; 5 bytes into the third slice.
   EXPECT_TRUE(stream_.Next(&data_, &size_));
   EXPECT_EQ(slice1_.size(), size_);
-  EXPECT_EQ(slice1_, data_string());
+  EXPECT_EQ(slice1_, dataString());
 
   constexpr int backup_count = 10; // the backup bytes to the end of first slice.
   constexpr int skip_count = 5;    // The skip bytes in the third slice
@@ -203,7 +205,7 @@ TEST_F(ZeroCopyInputStreamSkipTest, SkipAcrossThreeSlices) {
   // Read the remain third slice
   EXPECT_TRUE(stream_.Next(&data_, &size_));
   EXPECT_EQ(slice3_.size() - skip_count, size_);
-  EXPECT_EQ(slice3_.substr(skip_count), data_string());
+  EXPECT_EQ(slice3_.substr(skip_count), dataString());
   EXPECT_EQ(slice1_.size() + slice2_.size() + slice3_.size(), stream_.ByteCount());
 }
 
@@ -222,7 +224,7 @@ TEST_F(ZeroCopyInputStreamSkipTest, ReadFirstSkipToTheEnd) {
   // Read the first slice, backUp 10 byes, skip to the end of buffer
   EXPECT_TRUE(stream_.Next(&data_, &size_));
   EXPECT_EQ(slice1_.size(), size_);
-  EXPECT_EQ(slice1_, data_string());
+  EXPECT_EQ(slice1_, dataString());
 
   constexpr int backup_count = 10; // the backup bytes to the end of first slice.
   stream_.BackUp(backup_count);
