@@ -59,4 +59,17 @@ if [[ "$VALIDATE_COVERAGE" == "true" ]]; then
       echo Code coverage ${COVERAGE_VALUE} is good and higher than limit of ${COVERAGE_THRESHOLD}
   fi
 fi
+
+if [[ "$VALIDATE_COVERAGE" == "true" ]]; then
+  echo "Checking per-extension coverage"
+  output=$(./test/per_file_coverage.sh)
+
+  if [ $? -eq 1 ]; then
+    echo Per-extension coverage failed:
+    echo $output
+    exit 1
+  fi
+  echo Per-extension coverage passed.
+fi
+
 echo "HTML coverage report is in ${COVERAGE_DIR}/index.html"
