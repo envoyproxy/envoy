@@ -15,8 +15,6 @@ envoy_sh_test(
     data = [
         ":configs",
     ],
-    # TODO: This script invocation does not work on Windows, see: https://github.com/bazelbuild/bazel/issues/10959
-    tags = ["fails_on_windows"],
 )
 
 filegroup(

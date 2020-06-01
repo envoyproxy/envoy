@@ -459,7 +459,8 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       reject_unsupported_transfer_encodings_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.reject_unsupported_transfer_encodings")),
       output_buffer_([&]() -> void { this->onBelowLowWatermark(); },
-                     [&]() -> void { this->onAboveHighWatermark(); }),
+                     [&]() -> void { this->onAboveHighWatermark(); },
+                     []() -> void { /* TODO(adisuissa): Handle overflow watermark */ }),
       max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count) {
   output_buffer_.setWatermarks(connection.bufferLimit());
   http_parser_init(&parser_, type);

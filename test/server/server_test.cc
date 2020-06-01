@@ -186,7 +186,7 @@ protected:
         std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
         Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
         std::move(process_context_));
-    EXPECT_TRUE(server_->api().fileSystem().fileExists("/dev/null"));
+    EXPECT_TRUE(server_->api().fileSystem().fileExists(TestEnvironment::nullDevicePath()));
   }
 
   void initializeWithHealthCheckParams(const std::string& bootstrap_path, const double timeout,
@@ -205,7 +205,7 @@ protected:
         std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
         Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr);
 
-    EXPECT_TRUE(server_->api().fileSystem().fileExists("/dev/null"));
+    EXPECT_TRUE(server_->api().fileSystem().fileExists(TestEnvironment::nullDevicePath()));
   }
 
   Thread::ThreadPtr startTestServer(const std::string& bootstrap_path,
@@ -868,9 +868,10 @@ namespace {
 void bindAndListenTcpSocket(const Network::Address::InstanceConstSharedPtr& address,
                             const Network::Socket::OptionsSharedPtr& options) {
   auto socket = std::make_unique<Network::TcpListenSocket>(address, options, true);
+  auto& os_sys_calls = Api::OsSysCallsSingleton::get();
   // Some kernels erroneously allow `bind` without SO_REUSEPORT for addresses
   // with some other socket already listening on it, see #7636.
-  if (::listen(socket->ioHandle().fd(), 1) != 0) {
+  if (SOCKET_FAILURE(os_sys_calls.listen(socket->ioHandle().fd(), 1).rc_)) {
     // Mimic bind exception for the test simplicity.
     throw Network::SocketBindException(fmt::format("cannot listen: {}", strerror(errno)), errno);
   }
