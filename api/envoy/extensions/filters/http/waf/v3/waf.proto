@@ -1,0 +1,223 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.waf.v3;
+
+import "envoy/config/core/v3/address.proto";
+import "envoy/config/route/v3/route_components.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.waf.v3";
+option java_outer_classname = "WAFProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: WAF]
+// WAF :ref:`configuration overview <config_http_filters_waf_tagging>`.
+// [#extension: envoy.filters.http.waf]
+
+message WAF {
+
+// WAF filter provides ability to allow, block, redirect and modify HTTP
+// requests based on rules. The rules are evaluated in order in which they
+// are present.
+//
+// Here is an example of WAF filter configuration:
+//
+//  .. code-block:: yaml
+//
+//  executor:
+//	name: envoy.priority
+//
+//  policy_groups:
+//  - name: grp_1
+//    policies:
+//    - name: block-admin-pages
+//      match:
+//        header:
+//          name: ":path"
+//          prefix: "/admin"
+//      watcher:
+//        - name: envoy.watcher
+//          action:
+//            reset: truek
+//    - name: ofac-white-list
+//      match:
+//        sourceIp:
+//          cidrs:
+//          - addressPrefix: 2.144.136.0
+//            prefixLength: 21
+//          - addressPrefix: 2.144.144.0
+//            prefixLength: 20
+//          - addressPrefix: 2.144.160.0
+//            prefixLength: 19
+//      watcher:
+//        - name: envoy.watcher
+//          action:
+//            nop:true
+//    - name: ofac-black-list
+//      match:
+//        andRules:
+//          rules:
+//          - header:
+//              name: ":path"
+//              prefix: "/ofac-page"
+//              invertMatch: true
+//          - sourceIp:
+//              cidrs:
+//              - addressPrefix: 2.144.136.0
+//                prefixLength: 21
+//              - addressPrefix: 2.144.144.0
+//                prefixLength: 20
+//              - addressPrefix: 2.144.160.0
+//                prefixLength: 19
+//      watcher:
+//        - name: envoy.watcher
+//          action:
+//            http_redirect:
+//              query_params: >
+//                "name1=value1&ref=%REQ(X-REQUEST-ID)%&name3=val3"
+//              response_code: "302"'
+//              host: "www.acme.com"'
+//      rule_match_cb: envoy.until_first_match
+//  - name: grp_2
+//    policies:
+//	  - name: ciruit-breaker
+//    	match:
+//      	header: {name: "path", prefix_match: "/signup"}
+//    	watcher:
+//      	name: custom.circuit_breaker
+//      	config:
+//        	type : gradient2
+//        	action: drop
+//	 - name: bot-analyzer
+//     match:
+//       header: {name: "path", prefix_match: "/"}
+//     watcher:
+//       name: custom.bot_analyzer
+//   rule_match_cb: envoy.all
+
+message WAF {
+  message PolicySet {
+    repeated Policy policies = 1[(validate.rules).repeated .min_items = 1];
+  }
+
+  message PolicyGroup {
+    // Name of the Policy Group.
+    string name = 1 [(validate.rules).string.pattern = "^[a-zA-Z0-9]([-a-zA-Z0-9]*[a-zA-Z0-9])?$"];
+    PolicySet policies = 2;
+    RuleMatchCB callback = 3;
+  }
+
+  repeated PolicyGroup policy_groups = 1[(validate.rules).repeated .min_items = 1];
+  Executor executor = 2;
+ }
+
+ // Rule defines a match condition and an associated action.
+ message Policy {
+  string name = 1 (validate.rules).string.pattern = "^[a-zA-Z0-9]([-a-zA-Z0-9]*[a-zA-Z0-9])?$"];
+  Match match = 2;
+  Watcher watcher = 3;
+ }
+
+ // Executor that will execute the actions based on priority or another
+ // custom logic
+
+
+ message Executor {
+   string name = 1;
+   google.protobuf.Any config = 2;
+ }
+
+ // RuleMatchCB that will decide if the rule engine should
+ // 1. Continue evaluating remaining rules that are bound to this callback
+ // 2. Possibly apply request header mutations that Watchers may depend on
+ // 3. Pass along the actions recommended by watchers to others
+
+ message RuleMatchCB {
+   string name = 1;
+   google.protobuf.Any config = 2;
+ }
+
+ // Watcher that inspect the HTTP request and recommend one or more Action
+ message Watcher {
+   string name = 1;
+   google.protobuf.Any config = 2;
+ }
+
+ message Match {
+
+  // Used in the `and_rules` and `or_rules` fields in the `rule` oneof. Depending on the context,
+  // each are applied with the associated behavior.
+  message Set {
+    repeated Match rules = 1 [(validate.rules).repeated .min_items = 1];
+  }
+
+  // Use CidrRangeSet rule instead of large number of CidrRanges combined by or_rule
+  // This rule will evaluate to true, if a given IP is matched aginast any one of the CIDR in this
+  // set
+  message CidrRangeSet {
+    // A list of IP address subnets to be matched against IP address
+    repeated core.v3.CidrRange cidrs = 2 [(validate.rules).repeated .min_items = 1];
+    bool invert_match = 3;
+  }
+
+  oneof rule {
+    option (validate.required) = true;
+
+    // A set of rules that all must match in order to define the action.
+    Set and_rules = 1;
+
+    // A set of rules where at least one must match in order to define the action.
+    Set or_rules = 2;
+
+    // A header (or pseudo-header such as :path or :method) on the incoming HTTP request. Only
+    // available for HTTP request.
+    route.v3.HeaderMatcher header = 3;
+
+    // List of CIDR block that is to be matched against the source IP.
+    CidrRangeSet source_ip = 4;
+  }
+}
+
+message WatcherImpl {
+  message Action {
+    oneof rule {
+      option (validate.required) = true;
+
+      bool nop = 1;
+
+      bool drop_request = 2;
+
+      bool reset_connection = 3;
+
+      bool tarpit_connection = 4;
+
+      string cluster_redirect = 5;
+
+      HttpRedirect http_redirect = 6;
+
+      ExternalService external_service = 6;
+    }
+  }
+
+  message HttpRedirect {
+
+    string query_params = 1;
+
+    string response_code = 2 [(validate.rules).string = {in: ["301", "302", "307", "308"]}];
+
+    string path = 3;
+
+    string host = 4 [(validate.rules).string.min_len = 0, (validate.rules).string.hostname = true];
+
+    // default is https
+    string scheme = 5 [(validate.rules).string = {in: ["http", "https"]}];
+  }
+
+  message ExternalService {
+    google.protobuf.Duration timeout = 2 [(gogoproto.stdduration) = true, (validate.rules).message.required = true];
+    core.v3.GrpcService grpc_service = 2 [(validate.rules).message = {required: true}];
+  }
+
+  Action action = 1;
+}
