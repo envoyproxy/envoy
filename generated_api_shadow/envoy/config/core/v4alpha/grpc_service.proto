@@ -38,7 +38,7 @@ message GrpcService {
     string cluster_name = 1 [(validate.rules).string = {min_bytes: 1}];
   }
 
-  // [#next-free-field: 8]
+  // [#next-free-field: 9]
   message GoogleGrpc {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.core.v3.GrpcService.GoogleGrpc";
@@ -203,6 +203,28 @@ message GrpcService {
       }
     }
 
+    // Channel arguments.
+    message ChannelArgs {
+      option (udpa.annotations.versioning).previous_message_type =
+          "envoy.config.core.v3.GrpcService.GoogleGrpc.ChannelArgs";
+
+      message Value {
+        option (udpa.annotations.versioning).previous_message_type =
+            "envoy.config.core.v3.GrpcService.GoogleGrpc.ChannelArgs.Value";
+
+        // Pointer values are not supported, since they don't make any sense when
+        // delivered via the API.
+        oneof value_specifier {
+          string string_value = 1;
+
+          int64 int_value = 2;
+        }
+      }
+
+      // See grpc_types.h GRPC_ARG #defines for keys that work here.
+      map<string, Value> args = 1;
+    }
+
     // The target URI when using the `Google C++ gRPC client
     // <https://github.com/grpc/grpc>`_. SSL credentials will be supplied in
     // :ref:`channel_credentials <envoy_api_field_config.core.v4alpha.GrpcService.GoogleGrpc.channel_credentials>`.
@@ -237,6 +259,9 @@ message GrpcService {
     // How many bytes each stream can buffer internally.
     // If not set an implementation defined default is applied (1MiB).
     google.protobuf.UInt32Value per_stream_buffer_limit_bytes = 7;
+
+    // Custom channels args.
+    ChannelArgs channel_args = 8;
   }
 
   reserved 4;

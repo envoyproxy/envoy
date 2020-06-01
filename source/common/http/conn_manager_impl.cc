@@ -2317,9 +2317,10 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::clearRouteCache() {
 }
 
 Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamDecoderFilter::createBuffer() {
-  auto buffer =
-      std::make_unique<Buffer::WatermarkBuffer>([this]() -> void { this->requestDataDrained(); },
-                                                [this]() -> void { this->requestDataTooLarge(); });
+  auto buffer = std::make_unique<Buffer::WatermarkBuffer>(
+      [this]() -> void { this->requestDataDrained(); },
+      [this]() -> void { this->requestDataTooLarge(); },
+      []() -> void { /* TODO(adisuissa): Handle overflow watermark */ });
   buffer->setWatermarks(parent_.buffer_limit_);
   return buffer;
 }
@@ -2419,7 +2420,11 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::requestDataDrained() {
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::
     onDecoderFilterBelowWriteBufferLowWatermark() {
   ENVOY_STREAM_LOG(debug, "Read-enabling downstream stream due to filter callbacks.", parent_);
-  parent_.response_encoder_->getStream().readDisable(false);
+  // If the state is destroyed, the codec's stream is already torn down. On
+  // teardown the codec will unwind any remaining read disable calls.
+  if (!parent_.state_.destroyed_) {
+    parent_.response_encoder_->getStream().readDisable(false);
+  }
   parent_.connection_manager_.stats_.named_.downstream_flow_control_resumed_reading_total_.inc();
 }
 
@@ -2486,8 +2491,10 @@ ConnectionManagerImpl::ActiveStreamDecoderFilter::routeConfig() {
 }
 
 Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamEncoderFilter::createBuffer() {
-  auto buffer = new Buffer::WatermarkBuffer([this]() -> void { this->responseDataDrained(); },
-                                            [this]() -> void { this->responseDataTooLarge(); });
+  auto buffer = new Buffer::WatermarkBuffer(
+      [this]() -> void { this->responseDataDrained(); },
+      [this]() -> void { this->responseDataTooLarge(); },
+      []() -> void { /* TODO(adisuissa): Handle overflow watermark */ });
   buffer->setWatermarks(parent_.buffer_limit_);
   return Buffer::WatermarkBufferPtr{buffer};
 }
