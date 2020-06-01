@@ -87,8 +87,13 @@ do
   get_coverage_target $DIRECTORY
   COVERAGE_VALUE=$(lcov -e $COVERAGE_DATA  "$DIRECTORY/*" -o /dev/null | grep line |  cut -d ' ' -f 4)
   COVERAGE_VALUE=${COVERAGE_VALUE%?}
-  # If the coverage number is 'n' (no data found) there is 0% coverage. This is probably
-  # a directory without source code.
+  # If the coverage number is 'n' (no data found) there is 0% coverage. This is
+  # probably a directory without source code, so we skip checks.
+  #
+  # We could insist that we validate that 0% coverage directories are in a
+  # documented list, but instead of adding busy-work for folks adding
+  # non-source-containing directories, we trust reviewers to notice if there's
+  # absolutely no tests for a full directory.
   if [[ $COVERAGE_VALUE =~ "n" ]]; then
     continue;
   fi;
