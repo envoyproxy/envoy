@@ -136,10 +136,45 @@ Address::InstanceConstSharedPtr SocketInterface::peerAddressFromFd(os_fd_t fd) {
 
 SocketImpl::SocketImpl(Address::SocketType type, Address::Type addr_type,
                        Address::IpVersion version)
-    : io_handle_(SocketInterface::socket(type, addr_type, version)) {}
+    : io_handle_(SocketInterface::socket(type, addr_type, version)), sock_type_(type),
+      addr_type_(addr_type) {}
 
-SocketImpl::SocketImpl(Address::SocketType socket_type, const Address::InstanceConstSharedPtr addr)
-    : io_handle_(SocketInterface::socket(socket_type, addr)) {}
+SocketImpl::SocketImpl(Address::SocketType sock_type, const Address::InstanceConstSharedPtr addr)
+    : io_handle_(SocketInterface::socket(sock_type, addr)), sock_type_(sock_type),
+      addr_type_(addr->type()) {}
+
+SocketImpl::SocketImpl(IoHandlePtr&& io_handle,
+                       const Address::InstanceConstSharedPtr& local_address)
+    : io_handle_(std::move(io_handle)), local_address_(local_address) {
+
+  // Should not happen but some tests inject -1 fds
+  if (SOCKET_INVALID(io_handle_->fd())) {
+    if (local_address != nullptr) {
+      addr_type_ = local_address->type();
+    } else {
+      addr_type_ = Address::Type::Ip;
+    }
+    return;
+  }
+
+  sockaddr_storage addr;
+  socklen_t len = sizeof(addr);
+  Api::SysCallIntResult result;
+
+  result = Api::OsSysCallsSingleton::get().getsockname(
+      io_handle_->fd(), reinterpret_cast<struct sockaddr*>(&addr), &len);
+
+  // This should never happen in practice but too many tests inject fake fds ...
+  if (result.rc_ < 0) {
+    return;
+  }
+
+  if (addr.ss_family == AF_UNIX) {
+    addr_type_ = Address::Type::Pipe;
+  } else {
+    addr_type_ = Address::Type::Ip;
+  }
+}
 
 Api::SysCallIntResult SocketImpl::bind(Network::Address::InstanceConstSharedPtr address) {
   if (address->type() == Address::Type::Pipe) {
@@ -177,6 +212,22 @@ Api::SysCallIntResult SocketImpl::listen(int backlog) {
 Api::SysCallIntResult SocketImpl::connect(const Network::Address::InstanceConstSharedPtr address) {
   return Api::OsSysCallsSingleton::get().connect(io_handle_->fd(), address->sockAddr(),
                                                  address->sockAddrLen());
+}
+
+Api::SysCallIntResult SocketImpl::setSocketOption(int level, int optname, const void* optval,
+                                                  socklen_t optlen) {
+  return Api::OsSysCallsSingleton::get().setsockopt(io_handle_->fd(), level, optname, optval,
+                                                    optlen);
+}
+
+Api::SysCallIntResult SocketImpl::getSocketOption(int level, int optname, void* optval,
+                                                  socklen_t* optlen) {
+  return Api::OsSysCallsSingleton::get().getsockopt(io_handle_->fd(), level, optname, optval,
+                                                    optlen);
+}
+
+Api::SysCallIntResult SocketImpl::setBlockingForTest(bool blocking) {
+  return Api::OsSysCallsSingleton::get().setsocketblocking(io_handle_->fd(), blocking);
 }
 
 } // namespace Network
