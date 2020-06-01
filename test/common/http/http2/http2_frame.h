@@ -97,8 +97,8 @@ public:
 
   static Http2Frame makeEmptyPushPromiseFrame(uint32_t stream_index, uint32_t promised_stream_index,
                                               HeadersFlags flags = HeadersFlags::None);
-  static Http2Frame makeResetStreamFrame(uint32_t stream_index, ErrorCode errorCode);
-  static Http2Frame makeEmptyGoAwayFrame(uint32_t last_stream_index, ErrorCode errorCode);
+  static Http2Frame makeResetStreamFrame(uint32_t stream_index, ErrorCode error_code);
+  static Http2Frame makeEmptyGoAwayFrame(uint32_t last_stream_index, ErrorCode error_code);
 
   static Http2Frame makeWindowUpdateFrame(uint32_t stream_index, uint32_t increment);
   static Http2Frame makeMalformedRequest(uint32_t stream_index);
