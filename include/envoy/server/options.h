@@ -60,7 +60,7 @@ public:
   virtual uint64_t baseId() const PURE;
 
   /**
-   * @return bool choose a unused base ID dynamically. The chosen base id can be written to a
+   * @return bool choose an unused base ID dynamically. The chosen base id can be written to a
    *         a file using the baseIdPath option.
    */
   virtual bool useDynamicBaseId() const PURE;

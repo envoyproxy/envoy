@@ -89,16 +89,19 @@ TEST_P(MainCommonTest, ConstructDestructHotRestartDisabledNoInit) {
 
 // Exercise base-id-path option.
 TEST_P(MainCommonTest, ConstructWritesBasePathId) {
+#ifdef ENVOY_HOT_RESTART
   const std::string base_id_path = TestEnvironment::temporaryPath("base-id-file");
   addArg("--base-id-path");
   addArg(base_id_path.c_str());
   VERBOSE_EXPECT_NO_THROW(MainCommon main_common(argc(), argv()));
 
   EXPECT_NE("", TestEnvironment::readFileToStringForTest(base_id_path));
+#endif
 }
 
 // Test that an in-use base id triggers a retry and that we eventually give up.
 TEST_P(MainCommonTest, RetryDynamicBaseIdFails) {
+#ifdef ENVOY_HOT_RESTART
   PlatformImpl platform;
   Event::TestRealTimeSystem real_time_system;
   DefaultListenerHooks default_listener_hooks;
@@ -129,6 +132,7 @@ TEST_P(MainCommonTest, RetryDynamicBaseIdFails) {
                      prod_component_factory, std::unique_ptr<Runtime::RandomGenerator>{mock_rng},
                      platform.threadFactory(), platform.fileSystem(), nullptr),
       EnvoyException, "unable to select a dynamic base id");
+#endif
 }
 
 // Test that std::set_new_handler() was called and the callback functions as expected.
