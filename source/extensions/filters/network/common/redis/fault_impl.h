@@ -9,6 +9,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/protobuf/utility.h"
+#include "common/singleton/const_singleton.h"
 
 #include "extensions/filters/network/common/redis/fault.h"
 
@@ -19,6 +20,14 @@ namespace Common {
 namespace Redis {
 
 using FaultMap = std::unordered_map<std::string, std::vector<FaultSharedPtr>>;
+
+/**
+ * Message returned for particular types of faults.
+ */
+struct FaultMessagesValues {
+  const std::string Error = "Fault Injected: Error";
+};
+using FaultMessages = ConstSingleton<FaultMessagesValues>;
 
 /**
  * Fault management- creation, storage and retrieval. Faults are queried for by command,
@@ -35,13 +44,17 @@ public:
           ::envoy::extensions::filters::network::redis_proxy::v3::RedisProxy_RedisFault>
           base_faults);
 
-  FaultSharedPtr getFaultForCommand(std::string command) const override;
+  const Fault* getFaultForCommand(std::string command) const override;
 
-  static FaultSharedPtr makeFault(Common::Redis::FaultType fault_type,
-                                  std::chrono::milliseconds delay_ms) {
-    FaultImpl fault = FaultImpl(fault_type, delay_ms, std::vector<std::string>(), 0, "foo");
+  static FaultSharedPtr makeFaultForTest(Common::Redis::FaultType fault_type,
+                                         std::chrono::milliseconds delay_ms) {
+    envoy::type::v3::FractionalPercent default_value;
+    default_value.set_numerator(100);
+    default_value.set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
+    FaultImpl fault =
+        FaultImpl(fault_type, delay_ms, std::vector<std::string>(), default_value, "foo");
     return std::make_shared<FaultImpl>(fault);
-  } // For testing only
+  }
 
   // Allow the unit test to have access to private members.
   friend class FaultTest;
@@ -52,7 +65,8 @@ private:
     FaultImpl(
         envoy::extensions::filters::network::redis_proxy::v3::RedisProxy_RedisFault base_fault);
     FaultImpl(FaultType fault_type, std::chrono::milliseconds delay_ms,
-              const std::vector<std::string> commands, uint64_t default_value,
+              const std::vector<std::string> commands,
+              envoy::type::v3::FractionalPercent default_value,
               absl::optional<std::string> runtime_key)
         : fault_type_(fault_type), delay_ms_(delay_ms), commands_(commands),
           default_value_(default_value), runtime_key_(runtime_key) {} // For testing only
@@ -60,7 +74,7 @@ private:
     FaultType faultType() const override { return fault_type_; };
     std::chrono::milliseconds delayMs() const override { return delay_ms_; };
     const std::vector<std::string> commands() const override { return commands_; };
-    uint64_t defaultValue() const override { return default_value_; };
+    envoy::type::v3::FractionalPercent defaultValue() const override { return default_value_; };
     absl::optional<std::string> runtimeKey() const override { return runtime_key_; };
 
   private:
@@ -70,7 +84,7 @@ private:
     FaultType fault_type_;
     std::chrono::milliseconds delay_ms_;
     const std::vector<std::string> commands_;
-    uint64_t default_value_;
+    envoy::type::v3::FractionalPercent default_value_;
     absl::optional<std::string> runtime_key_;
   };
 
@@ -79,11 +93,8 @@ private:
                 ::envoy::extensions::filters::network::redis_proxy::v3::RedisProxy_RedisFault>
                     faults);
 
-  FaultSharedPtr getFaultForCommandInternal(std::string command) const;
+  const Fault* getFaultForCommandInternal(std::string command) const;
   const FaultMap fault_map_;
-
-public:
-  static const std::string ALL_KEY;
 
 protected:
   Runtime::RandomGenerator& random_;

@@ -38,7 +38,7 @@ public:
       : RedisCommandSplitterImplTest(latency_in_macro, nullptr) {}
   RedisCommandSplitterImplTest(bool latency_in_macro, Common::Redis::FaultSharedPtr fault_ptr)
       : latency_in_micros_(latency_in_macro) {
-    ON_CALL(fault_manager_, getFaultForCommand(_)).WillByDefault(Return(fault_ptr));
+    ON_CALL(fault_manager_, getFaultForCommand(_)).WillByDefault(Return(fault_ptr.get()));
   }
   void makeBulkStringArray(Common::Redis::RespValue& value,
                            const std::vector<std::string>& strings) {
@@ -1023,9 +1023,9 @@ class RedisSingleServerRequestWithErrorFaultTest : public RedisSingleServerReque
 public:
   RedisSingleServerRequestWithErrorFaultTest() {
     delay_ms_ = 0;
-    Common::Redis::FaultSharedPtr fault_ptr = Common::Redis::FaultManagerImpl::makeFault(
+    Common::Redis::FaultSharedPtr fault_ptr = Common::Redis::FaultManagerImpl::makeFaultForTest(
         Common::Redis::FaultType::Error, std::chrono::milliseconds(delay_ms_));
-    ON_CALL(fault_manager_, getFaultForCommand(_)).WillByDefault(Return(fault_ptr));
+    ON_CALL(fault_manager_, getFaultForCommand(_)).WillByDefault(Return(fault_ptr.get()));
   }
 };
 
@@ -1052,9 +1052,9 @@ class RedisSingleServerRequestWithErrorWithDelayFaultTest
 public:
   RedisSingleServerRequestWithErrorWithDelayFaultTest() {
     delay_ms_ = 13;
-    Common::Redis::FaultSharedPtr fault_ptr = Common::Redis::FaultManagerImpl::makeFault(
+    Common::Redis::FaultSharedPtr fault_ptr = Common::Redis::FaultManagerImpl::makeFaultForTest(
         Common::Redis::FaultType::Error, std::chrono::milliseconds(delay_ms_));
-    ON_CALL(fault_manager_, getFaultForCommand(_)).WillByDefault(Return(fault_ptr));
+    ON_CALL(fault_manager_, getFaultForCommand(_)).WillByDefault(Return(fault_ptr.get()));
     timer_ = new NiceMock<Event::MockTimer>();
   }
 };
@@ -1094,9 +1094,9 @@ class RedisSingleServerRequestWithDelayFaultTest : public RedisSingleServerReque
 public:
   RedisSingleServerRequestWithDelayFaultTest() {
     delay_ms_ = 15;
-    Common::Redis::FaultSharedPtr fault_ptr = Common::Redis::FaultManagerImpl::makeFault(
+    Common::Redis::FaultSharedPtr fault_ptr = Common::Redis::FaultManagerImpl::makeFaultForTest(
         Common::Redis::FaultType::Delay, std::chrono::milliseconds(delay_ms_));
-    ON_CALL(fault_manager_, getFaultForCommand(_)).WillByDefault(Return(fault_ptr));
+    ON_CALL(fault_manager_, getFaultForCommand(_)).WillByDefault(Return(fault_ptr.get()));
     timer_ = new NiceMock<Event::MockTimer>();
   }
 };

@@ -223,6 +223,17 @@ public:
    * Fetch an integer runtime key. Runtime keys larger than ~2^53 may not be accurately converted
    * into integers and will return default_value.
    * @param key supplies the key to fetch.
+   * @param default_value supplies the default value that will be used if either the feature key
+   *        does not exist or it is not a fractional percent.
+   * @return uint64_t the runtime value or the default value.
+   */
+  virtual uint64_t getInteger(absl::string_view key,
+                              const envoy::type::v3::FractionalPercent& default_value) const PURE;
+
+  /**
+   * Fetch an integer runtime key. Runtime keys larger than ~2^53 may not be accurately converted
+   * into integers and will return default_value.
+   * @param key supplies the key to fetch.
    * @param default_value supplies the value to return if the key does not exist or it does not
    *        contain an integer.
    * @return uint64_t the runtime value or the default value.

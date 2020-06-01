@@ -6,10 +6,16 @@ namespace NetworkFilters {
 namespace Common {
 namespace Redis {
 
+struct FaultManagerKeyNamesValues {
+  // The rbac filter rejected the request
+  const std::string AllKey = "ALL_KEY";
+};
+using FaultManagerKeyNames = ConstSingleton<FaultManagerKeyNamesValues>;
+
 FaultManagerImpl::FaultImpl::FaultImpl(
     envoy::extensions::filters::network::redis_proxy::v3::RedisProxy_RedisFault base_fault)
     : commands_(buildCommands(base_fault)) {
-  // // Get delay
+  // Get delay
   delay_ms_ = std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(base_fault, delay, 0));
 
   // Get fault type
@@ -26,18 +32,7 @@ FaultManagerImpl::FaultImpl::FaultImpl(
   }
 
   // Get the default value/runtime key
-  if (base_fault.fault_enabled().has_default_value()) {
-    if (base_fault.fault_enabled().default_value().denominator() ==
-        envoy::type::v3::FractionalPercent::HUNDRED) {
-      default_value_ = base_fault.fault_enabled().default_value().numerator();
-    } else {
-      auto denominator = ProtobufPercentHelper::fractionalPercentDenominatorToInt(
-          base_fault.fault_enabled().default_value().denominator());
-      default_value_ = (base_fault.fault_enabled().default_value().numerator() * 100) / denominator;
-    }
-  } else {
-    default_value_ = 0;
-  }
+  default_value_ = base_fault.fault_enabled().default_value();
   runtime_key_ = base_fault.fault_enabled().runtime_key();
 };
 
@@ -49,8 +44,6 @@ std::vector<std::string> FaultManagerImpl::FaultImpl::buildCommands(
   }
   return commands;
 }
-
-const std::string FaultManagerImpl::ALL_KEY = "ALL_KEY";
 
 FaultManagerImpl::FaultManagerImpl(
     Runtime::RandomGenerator& random, Runtime::Loader& runtime,
@@ -74,13 +67,13 @@ FaultMap FaultManagerImpl::buildFaultMap(
       }
     } else {
       // Generic "ALL" entry in map for faults that map to all keys; also add to each command
-      fault_map[FaultManagerImpl::ALL_KEY].emplace_back(fault_ptr);
+      fault_map[FaultManagerKeyNames::get().AllKey].emplace_back(fault_ptr);
     }
   }
 
   // Add the ALL keys faults to each command too so that we can just query faults by command.
   // Get all ALL_KEY faults.
-  FaultMap::iterator it_outer = fault_map.find(FaultManagerImpl::ALL_KEY);
+  FaultMap::iterator it_outer = fault_map.find(FaultManagerKeyNames::get().AllKey);
   if (it_outer != fault_map.end()) {
     // For each ALL_KEY fault...
     for (const FaultSharedPtr& fault_ptr : it_outer->second) {
@@ -88,7 +81,7 @@ FaultMap FaultManagerImpl::buildFaultMap(
       FaultMap::iterator it_inner;
       for (it_inner = fault_map.begin(); it_inner != fault_map.end(); it_inner++) {
         std::string command = it_inner->first;
-        if (command != FaultManagerImpl::ALL_KEY) {
+        if (command != FaultManagerKeyNames::get().AllKey) {
           fault_map[command].push_back(fault_ptr);
         }
       }
@@ -108,23 +101,17 @@ FaultMap FaultManagerImpl::buildFaultMap(
 // 2. For each fault, calculate the amortized fault injection percentage.
 //
 // Note that we do not check to make sure the probabilities of faults are <= 100%!
-FaultSharedPtr FaultManagerImpl::getFaultForCommandInternal(std::string command) const {
+const Fault* FaultManagerImpl::getFaultForCommandInternal(std::string command) const {
   FaultMap::const_iterator it_outer = fault_map_.find(command);
   if (it_outer != fault_map_.end()) {
     auto random_number = random_.random() % 100;
     int amortized_fault = 0;
 
     for (const FaultSharedPtr& fault_ptr : it_outer->second) {
-      uint64_t fault_injection_percentage;
-      if (fault_ptr->runtimeKey().has_value()) {
-        fault_injection_percentage = runtime_.snapshot().getInteger(fault_ptr->runtimeKey().value(),
-                                                                    fault_ptr->defaultValue());
-      } else {
-        fault_injection_percentage = fault_ptr->defaultValue();
-      }
-
+      uint64_t fault_injection_percentage = runtime_.snapshot().getInteger(
+          fault_ptr->runtimeKey().value(), fault_ptr->defaultValue());
       if (random_number < (fault_injection_percentage + amortized_fault)) {
-        return fault_ptr;
+        return fault_ptr.get();
       } else {
         amortized_fault += fault_injection_percentage;
       }
@@ -134,13 +121,13 @@ FaultSharedPtr FaultManagerImpl::getFaultForCommandInternal(std::string command)
   return nullptr;
 }
 
-FaultSharedPtr FaultManagerImpl::getFaultForCommand(std::string command) const {
+const Fault* FaultManagerImpl::getFaultForCommand(std::string command) const {
   // Check if faults exist for given command; else use ALL_KEY and search for general faults.
   if (!fault_map_.empty()) {
     if (fault_map_.count(command) > 0) {
       return getFaultForCommandInternal(command);
     } else {
-      return getFaultForCommandInternal(ALL_KEY);
+      return getFaultForCommandInternal(FaultManagerKeyNames::get().AllKey);
     }
   }
 

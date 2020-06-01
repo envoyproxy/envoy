@@ -25,7 +25,7 @@ public:
   virtual FaultType faultType() const PURE;
   virtual std::chrono::milliseconds delayMs() const PURE;
   virtual const std::vector<std::string> commands() const PURE;
-  virtual uint64_t defaultValue() const PURE;
+  virtual envoy::type::v3::FractionalPercent defaultValue() const PURE;
   virtual absl::optional<std::string> runtimeKey() const PURE;
 };
 
@@ -39,7 +39,7 @@ public:
    * Get fault type and delay given a Redis command.
    * @param command supplies the Redis command string.
    */
-  virtual FaultSharedPtr getFaultForCommand(std::string command) const PURE;
+  virtual const Fault* getFaultForCommand(std::string command) const PURE;
 };
 
 using FaultManagerPtr = std::unique_ptr<FaultManager>;

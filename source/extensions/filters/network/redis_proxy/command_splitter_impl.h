@@ -11,11 +11,10 @@
 
 #include "common/common/logger.h"
 #include "common/common/utility.h"
-#include "common/singleton/const_singleton.h"
 #include "common/stats/timespan_impl.h"
 
 #include "extensions/filters/network/common/redis/client_impl.h"
-#include "extensions/filters/network/common/redis/fault.h"
+#include "extensions/filters/network/common/redis/fault_impl.h"
 #include "extensions/filters/network/common/redis/utility.h"
 #include "extensions/filters/network/redis_proxy/command_splitter.h"
 #include "extensions/filters/network/redis_proxy/conn_pool_impl.h"
@@ -101,6 +100,7 @@ public:
   // ConnPool::PoolCallbacks
   void onResponse(Common::Redis::RespValuePtr&& response) override;
   void onFailure() override;
+  void onFailure(std::string error_msg);
 
   // RedisProxy::CommandSplitter::SplitRequest
   void cancel() override;
@@ -122,17 +122,13 @@ protected:
  */
 class ErrorFaultRequest : public SingleServerRequest {
 public:
-  static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
-                                SplitCallbacks& callbacks, CommandStats& command_stats,
+  static SplitRequestPtr create(SplitCallbacks& callbacks, CommandStats& command_stats,
                                 TimeSource& time_source, bool has_delaydelay_command_latency_fault);
 
 private:
   ErrorFaultRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
                     bool delay_command_latency)
       : SingleServerRequest(callbacks, command_stats, time_source, delay_command_latency) {}
-
-public:
-  const static std::string FAULT_INJECTED_ERROR;
 };
 
 /**

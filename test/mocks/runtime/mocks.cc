@@ -4,6 +4,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Matcher;
 using testing::Return;
 using testing::ReturnArg;
 
@@ -15,7 +16,9 @@ MockRandomGenerator::MockRandomGenerator() { ON_CALL(*this, uuid()).WillByDefaul
 MockRandomGenerator::~MockRandomGenerator() = default;
 
 MockSnapshot::MockSnapshot() {
-  ON_CALL(*this, getInteger(_, _)).WillByDefault(ReturnArg<1>());
+  ON_CALL(*this, getInteger(_, testing::Matcher<const envoy::type::v3::FractionalPercent&>(_)))
+      .WillByDefault(Return(0));
+  ON_CALL(*this, getInteger(_, testing::Matcher<uint64_t>(_))).WillByDefault(ReturnArg<1>());
   ON_CALL(*this, getDouble(_, _)).WillByDefault(ReturnArg<1>());
   ON_CALL(*this, getBoolean(_, _)).WillByDefault(ReturnArg<1>());
   ON_CALL(*this, get(_)).WillByDefault(Return(absl::nullopt));

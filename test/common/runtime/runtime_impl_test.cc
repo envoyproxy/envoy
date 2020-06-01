@@ -633,7 +633,16 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
   EXPECT_EQ("hello\nworld", loader_->snapshot().get("subdir.file3").value().get());
   EXPECT_FALSE(loader_->snapshot().get("invalid").has_value());
 
-  // Integer getting.
+  // Integer getting (fractional percent default).
+  envoy::type::v3::FractionalPercent fractional_percent;
+  fractional_percent.set_numerator(50);
+  fractional_percent.set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
+
+  EXPECT_EQ(50UL, loader_->snapshot().getInteger("file1", fractional_percent));
+  EXPECT_EQ(2UL, loader_->snapshot().getInteger("file3", fractional_percent));
+  EXPECT_EQ(123UL, loader_->snapshot().getInteger("file4", fractional_percent));
+
+  // Integer getting (integer default).
   EXPECT_EQ(1UL, loader_->snapshot().getInteger("file1", 1));
   EXPECT_EQ(2UL, loader_->snapshot().getInteger("file3", 1));
   EXPECT_EQ(123UL, loader_->snapshot().getInteger("file4", 1));
@@ -676,7 +685,6 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
   EXPECT_EQ(false, snapshot->getBoolean("blah.blah", false));
 
   // Fractional percent feature enablement
-  envoy::type::v3::FractionalPercent fractional_percent;
   fractional_percent.set_numerator(5);
   fractional_percent.set_denominator(envoy::type::v3::FractionalPercent::TEN_THOUSAND);
 

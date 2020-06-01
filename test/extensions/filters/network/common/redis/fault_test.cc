@@ -10,6 +10,7 @@
 
 #include "gtest/gtest.h"
 
+using testing::Matcher;
 using testing::Return;
 
 namespace Envoy {
@@ -77,6 +78,7 @@ public:
 
   testing::NiceMock<Runtime::MockRandomGenerator> random_;
   Runtime::MockLoader runtime_;
+  testing::NiceMock<Runtime::MockSnapshot> snapshot_;
 };
 
 TEST_F(FaultTest, NoFaults) {
@@ -86,7 +88,7 @@ TEST_F(FaultTest, NoFaults) {
   TestScopedRuntime scoped_runtime;
   FaultManagerImpl fault_manager = FaultManagerImpl(random_, runtime_, *faults);
 
-  FaultSharedPtr fault_ptr = fault_manager.getFaultForCommand("get");
+  const Fault* fault_ptr = fault_manager.getFaultForCommand("get");
   ASSERT_TRUE(fault_ptr == nullptr);
 }
 
@@ -100,7 +102,7 @@ TEST_F(FaultTest, SingleCommandFaultNotEnabled) {
 
   EXPECT_CALL(random_, random()).WillOnce(Return(0));
   EXPECT_CALL(runtime_, snapshot());
-  FaultSharedPtr fault_ptr = fault_manager.getFaultForCommand("get");
+  const Fault* fault_ptr = fault_manager.getFaultForCommand("get");
   ASSERT_TRUE(fault_ptr == nullptr);
 }
 
@@ -115,8 +117,12 @@ TEST_F(FaultTest, SingleCommandFault) {
   FaultManagerImpl fault_manager = FaultManagerImpl(random_, runtime_, *faults);
 
   EXPECT_CALL(random_, random()).WillOnce(Return(1));
-  EXPECT_CALL(runtime_, snapshot());
-  FaultSharedPtr fault_ptr = fault_manager.getFaultForCommand("ttl");
+  EXPECT_CALL(runtime_, snapshot()).WillOnce(ReturnRef(snapshot_));
+  EXPECT_CALL(snapshot_,
+              getInteger(_, testing::Matcher<const envoy::type::v3::FractionalPercent&>(_)))
+      .WillOnce(Return(10));
+
+  const Fault* fault_ptr = fault_manager.getFaultForCommand("ttl");
   ASSERT_TRUE(fault_ptr != nullptr);
 }
 
@@ -131,7 +137,7 @@ TEST_F(FaultTest, SingleCommandFaultWithNoDefaultValueOrRuntimeValue) {
 
   EXPECT_CALL(random_, random()).WillOnce(Return(1));
   EXPECT_CALL(runtime_, snapshot());
-  FaultSharedPtr fault_ptr = fault_manager.getFaultForCommand("ttl");
+  const Fault* fault_ptr = fault_manager.getFaultForCommand("ttl");
   ASSERT_TRUE(fault_ptr == nullptr);
 }
 
@@ -147,20 +153,28 @@ TEST_F(FaultTest, MultipleFaults) {
 
   TestScopedRuntime scoped_runtime;
   FaultManagerImpl fault_manager = FaultManagerImpl(random_, runtime_, *faults);
-  FaultSharedPtr fault_ptr;
+  const Fault* fault_ptr;
 
   // Get command - should have a fault 50% of time
   // For the first call we mock the random percentage to be 1%, which will give us the first fault
   // with 0s delay.
   EXPECT_CALL(random_, random()).WillOnce(Return(1));
-  EXPECT_CALL(runtime_, snapshot());
+  EXPECT_CALL(runtime_, snapshot()).WillOnce(ReturnRef(snapshot_));
+  EXPECT_CALL(snapshot_,
+              getInteger(_, testing::Matcher<const envoy::type::v3::FractionalPercent&>(_)))
+      .WillOnce(Return(10));
   fault_ptr = fault_manager.getFaultForCommand("get");
   ASSERT_TRUE(fault_ptr != nullptr);
   ASSERT_EQ(fault_ptr->delayMs(), std::chrono::milliseconds(0));
 
   // Another Get; we mock the random percentage to be 25%, giving us the ALL_KEY fault
   EXPECT_CALL(random_, random()).WillOnce(Return(25));
-  EXPECT_CALL(runtime_, snapshot()).Times(2);
+  EXPECT_CALL(runtime_, snapshot()).Times(2).WillRepeatedly(ReturnRef(snapshot_));
+  EXPECT_CALL(snapshot_,
+              getInteger(_, testing::Matcher<const envoy::type::v3::FractionalPercent&>(_)))
+      .Times(2)
+      .WillOnce(Return(10))
+      .WillOnce(Return(50));
   fault_ptr = fault_manager.getFaultForCommand("get");
   ASSERT_TRUE(fault_ptr != nullptr);
   ASSERT_EQ(fault_ptr->delayMs(), std::chrono::milliseconds(2000));
@@ -173,7 +187,11 @@ TEST_F(FaultTest, MultipleFaults) {
 
   // Any other command; we mock the random percentage to be 1%, giving us the ALL_KEY fault
   EXPECT_CALL(random_, random()).WillOnce(Return(1));
-  EXPECT_CALL(runtime_, snapshot()).Times(1);
+  EXPECT_CALL(runtime_, snapshot()).WillOnce(ReturnRef(snapshot_));
+  EXPECT_CALL(snapshot_,
+              getInteger(_, testing::Matcher<const envoy::type::v3::FractionalPercent&>(_)))
+      .WillOnce(Return(10));
+
   fault_ptr = fault_manager.getFaultForCommand("ttl");
   ASSERT_TRUE(fault_ptr != nullptr);
   ASSERT_EQ(fault_ptr->delayMs(), std::chrono::milliseconds(2000));

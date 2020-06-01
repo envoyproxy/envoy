@@ -92,10 +92,12 @@ void SingleServerRequest::onResponse(Common::Redis::RespValuePtr&& response) {
   callbacks_.onResponse(std::move(response));
 }
 
-void SingleServerRequest::onFailure() {
+void SingleServerRequest::onFailure() { onFailure(Response::get().UpstreamFailure); }
+
+void SingleServerRequest::onFailure(std::string error_msg) {
   handle_ = nullptr;
   updateStats(false);
-  callbacks_.onResponse(Common::Redis::Utility::makeError(Response::get().UpstreamFailure));
+  callbacks_.onResponse(Common::Redis::Utility::makeError(error_msg));
 }
 
 void SingleServerRequest::cancel() {
@@ -103,16 +105,12 @@ void SingleServerRequest::cancel() {
   handle_ = nullptr;
 }
 
-const std::string ErrorFaultRequest::FAULT_INJECTED_ERROR = "Fault Injected: Error";
-
-SplitRequestPtr ErrorFaultRequest::create(Router&, Common::Redis::RespValuePtr&&,
-                                          SplitCallbacks& callbacks, CommandStats& command_stats,
+SplitRequestPtr ErrorFaultRequest::create(SplitCallbacks& callbacks, CommandStats& command_stats,
                                           TimeSource& time_source, bool delay_command_latency) {
   std::unique_ptr<ErrorFaultRequest> request_ptr{
       new ErrorFaultRequest(callbacks, command_stats, time_source, delay_command_latency)};
 
-  request_ptr->onResponse(Common::Redis::Utility::makeError(FAULT_INJECTED_ERROR));
-  command_stats.error_.inc();
+  request_ptr->onFailure(Common::Redis::FaultMessages::get().Error);
   command_stats.error_fault_.inc();
   return request_ptr;
 }
@@ -122,9 +120,8 @@ std::unique_ptr<DelayFaultRequest> DelayFaultRequest::create(SplitCallbacks& cal
                                                              TimeSource& time_source,
                                                              Event::Dispatcher& dispatcher,
                                                              std::chrono::milliseconds delay) {
-  std::unique_ptr<DelayFaultRequest> delay_fault_ptr{
-      new DelayFaultRequest(callbacks, command_stats, time_source, dispatcher, delay)};
-  return delay_fault_ptr;
+  return std::make_unique<DelayFaultRequest>(callbacks, command_stats, time_source, dispatcher,
+                                             delay);
 }
 
 void DelayFaultRequest::onResponse(Common::Redis::RespValuePtr&& response) {
@@ -523,7 +520,7 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
   }
 
   // Fault Injection Check
-  Common::Redis::FaultSharedPtr fault_ptr = fault_manager_->getFaultForCommand(to_lower_string);
+  const Common::Redis::Fault* fault_ptr = fault_manager_->getFaultForCommand(to_lower_string);
 
   // Check if delay, which determines which callbacks to use. If a delay fault is enabled,
   // the delay fault itself wraps the request (or other fault) and the delay fault itself
@@ -546,8 +543,7 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
 
   SplitRequestPtr request_ptr;
   if (fault_ptr != nullptr && fault_ptr->faultType() == Common::Redis::FaultType::Error) {
-    request_ptr = ErrorFaultRequest::create(*router_, std::move(request),
-                                            has_delay_fault ? *delay_fault_ptr : callbacks,
+    request_ptr = ErrorFaultRequest::create(has_delay_fault ? *delay_fault_ptr : callbacks,
                                             handler->command_stats_, time_source_, has_delay_fault);
   } else {
     request_ptr = handler->handler_.get().startRequest(

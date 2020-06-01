@@ -252,6 +252,23 @@ bool SnapshotImpl::featureEnabled(absl::string_view key,
   return ProtobufPercentHelper::evaluateFractionalPercent(percent, random_value);
 }
 
+uint64_t SnapshotImpl::getInteger(absl::string_view key,
+                                  const envoy::type::v3::FractionalPercent& default_value) const {
+  ASSERT(!isRuntimeFeature(key));
+  const auto& entry = key.empty() ? values_.end() : values_.find(key);
+  if (entry == values_.end() || !entry->second.uint_value_) {
+    if (default_value.denominator() == envoy::type::v3::FractionalPercent::HUNDRED) {
+      return default_value.numerator();
+    } else {
+      auto denominator =
+          ProtobufPercentHelper::fractionalPercentDenominatorToInt(default_value.denominator());
+      return (default_value.numerator() * 100) / denominator;
+    }
+  } else {
+    return entry->second.uint_value_.value();
+  }
+}
+
 uint64_t SnapshotImpl::getInteger(absl::string_view key, uint64_t default_value) const {
   ASSERT(!isRuntimeFeature(key));
   const auto& entry = key.empty() ? values_.end() : values_.find(key);
