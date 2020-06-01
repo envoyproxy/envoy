@@ -40,6 +40,10 @@ public:
   ProtobufTypes::Int64 ByteCount() const override { return byte_count_; }
 
 protected:
+  // The last slice is kept to support limited BackUp() calls.
+  // This function will drain it.
+  void drainLastSlice();
+
   Buffer::InstancePtr buffer_;
   uint64_t position_{0};
   bool finished_{false};

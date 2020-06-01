@@ -19,11 +19,15 @@ void ZeroCopyInputStreamImpl::move(Buffer::Instance& instance) {
   buffer_->move(instance);
 }
 
-bool ZeroCopyInputStreamImpl::Next(const void** data, int* size) {
+void ZeroCopyInputStreamImpl::drainLastSlice() {
   if (position_ != 0) {
     buffer_->drain(position_);
     position_ = 0;
   }
+}
+
+bool ZeroCopyInputStreamImpl::Next(const void** data, int* size) {
+  drainLastSlice();
 
   Buffer::RawSliceVector slices = buffer_->getRawSlices(1);
 
@@ -46,10 +50,7 @@ bool ZeroCopyInputStreamImpl::Next(const void** data, int* size) {
 
 bool ZeroCopyInputStreamImpl::Skip(int count) {
   ASSERT(count >= 0);
-  if (position_ != 0) {
-    buffer_->drain(position_);
-    position_ = 0;
-  }
+  drainLastSlice();
 
   // Could not skip more than buffer length.
   if (static_cast<uint64_t>(count) > buffer_->length()) {
