@@ -58,8 +58,6 @@ FileAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
       ACCESS_LOG_FORMAT_NOT_SET:
     formatter = Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter();
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   return std::make_shared<FileAccessLog>(fal_config.path(), std::move(filter), std::move(formatter),
