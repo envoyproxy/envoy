@@ -114,7 +114,7 @@ std::string ipVersionToDnsFamily(Network::Address::IpVersion version);
  * @param type the type of socket to be bound.
  * @returns the address and the fd of the socket bound to that address.
  */
-std::pair<Address::InstanceConstSharedPtr, IoHandlePtr>
+std::pair<Address::InstanceConstSharedPtr, Network::SocketPtr>
 bindFreeLoopbackPort(Address::IpVersion version, Address::SocketType type);
 
 /**

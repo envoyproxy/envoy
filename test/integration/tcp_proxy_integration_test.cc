@@ -250,7 +250,7 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
     access_log->set_name("accesslog");
     envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
     access_log_config.set_path(access_log_path);
-    access_log_config.set_format(
+    access_log_config.mutable_log_format()->set_text_format(
         "upstreamlocal=%UPSTREAM_LOCAL_ADDRESS% "
         "upstreamhost=%UPSTREAM_HOST% downstream=%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT% "
         "sent=%BYTES_SENT% received=%BYTES_RECEIVED%\n");
@@ -692,11 +692,12 @@ void TcpProxySslIntegrationTest::setupConnections() {
   // Set up the mock buffer factory so the newly created SSL client will have a mock write
   // buffer. This allows us to track the bytes actually written to the socket.
 
-  EXPECT_CALL(*mock_buffer_factory_, create_(_, _))
+  EXPECT_CALL(*mock_buffer_factory_, create_(_, _, _))
       .Times(1)
-      .WillOnce(Invoke([&](std::function<void()> below_low,
-                           std::function<void()> above_high) -> Buffer::Instance* {
-        client_write_buffer_ = new NiceMock<MockWatermarkBuffer>(below_low, above_high);
+      .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
+                           std::function<void()> above_overflow) -> Buffer::Instance* {
+        client_write_buffer_ =
+            new NiceMock<MockWatermarkBuffer>(below_low, above_high, above_overflow);
         ON_CALL(*client_write_buffer_, move(_))
             .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove));
         ON_CALL(*client_write_buffer_, drain(_))

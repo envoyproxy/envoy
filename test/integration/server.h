@@ -6,6 +6,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/server/options.h"
 #include "envoy/server/process_context.h"
 #include "envoy/stats/stats.h"
@@ -15,6 +16,7 @@
 #include "common/common/logger.h"
 #include "common/common/thread.h"
 
+#include "server/drain_manager_impl.h"
 #include "server/listener_hooks.h"
 #include "server/options_impl.h"
 #include "server/server.h"
@@ -36,26 +38,17 @@ struct FieldValidationConfig {
   bool ignore_unknown_dynamic_fields = false;
 };
 
-// Create OptionsImpl structures suitable for tests.
+// Create OptionsImpl structures suitable for tests. Disables hot restart.
 OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::string& config_yaml,
                                   Network::Address::IpVersion ip_version,
                                   FieldValidationConfig validation_config = FieldValidationConfig(),
                                   uint32_t concurrency = 1);
 
-class TestDrainManager : public DrainManager {
-public:
-  // Server::DrainManager
-  bool drainClose() const override { return draining_; }
-  void startDrainSequence(std::function<void()>) override {}
-  void startParentShutdownSequence() override {}
-
-  bool draining_{};
-};
-
 class TestComponentFactory : public ComponentFactory {
 public:
-  Server::DrainManagerPtr createDrainManager(Server::Instance&) override {
-    return Server::DrainManagerPtr{new Server::TestDrainManager()};
+  Server::DrainManagerPtr createDrainManager(Server::Instance& server) override {
+    return Server::DrainManagerPtr{
+        new Server::DrainManagerImpl(server, envoy::config::listener::v3::Listener::MODIFY_ONLY)};
   }
   Runtime::LoaderPtr createRuntime(Server::Instance& server,
                                    Server::Configuration::Initial& config) override {
@@ -288,7 +281,7 @@ public:
 
   void waitUntilListenersReady();
 
-  Server::TestDrainManager& drainManager() { return *drain_manager_; }
+  Server::DrainManagerImpl& drainManager() { return *drain_manager_; }
   void setOnWorkerListenerAddedCb(std::function<void()> on_worker_listener_added) {
     on_worker_listener_added_cb_ = std::move(on_worker_listener_added);
   }
@@ -342,8 +335,9 @@ public:
   void onWorkerListenerRemoved() override;
 
   // Server::ComponentFactory
-  Server::DrainManagerPtr createDrainManager(Server::Instance&) override {
-    drain_manager_ = new Server::TestDrainManager();
+  Server::DrainManagerPtr createDrainManager(Server::Instance& server) override {
+    drain_manager_ =
+        new Server::DrainManagerImpl(server, envoy::config::listener::v3::Listener::MODIFY_ONLY);
     return Server::DrainManagerPtr{drain_manager_};
   }
   Runtime::LoaderPtr createRuntime(Server::Instance& server,
@@ -395,7 +389,7 @@ private:
   Thread::MutexBasicLockable listeners_mutex_;
   uint64_t pending_listeners_;
   ConditionalInitializer server_set_;
-  Server::TestDrainManager* drain_manager_{};
+  Server::DrainManagerImpl* drain_manager_{};
   std::function<void()> on_worker_listener_added_cb_;
   std::function<void()> on_worker_listener_removed_cb_;
   TcpDumpPtr tcp_dump_;

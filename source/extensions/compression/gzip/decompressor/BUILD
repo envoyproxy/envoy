@@ -19,7 +19,7 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
-        "//source/common/common:zlib_base_lib",
+        "//source/extensions/compression/gzip/common:zlib_base_lib",
     ],
 )
 

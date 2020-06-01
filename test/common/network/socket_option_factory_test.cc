@@ -43,7 +43,7 @@ protected:
 };
 
 #define CHECK_OPTION_SUPPORTED(option)                                                             \
-  if (!option.has_value()) {                                                                       \
+  if (!option.hasValue()) {                                                                        \
     return;                                                                                        \
   }
 
@@ -59,13 +59,13 @@ TEST_F(SocketOptionFactoryTest, TestBuildSocketMarkOptions) {
 
   const int type = expected_option.level();
   const int option = expected_option.option();
-  EXPECT_CALL(os_sys_calls_mock_, setsockopt_(_, _, _, _, sizeof(int)))
-      .WillOnce(Invoke([type, option](os_fd_t, int input_type, int input_option, const void* optval,
-                                      socklen_t) -> int {
+  EXPECT_CALL(socket_mock_, setSocketOption(_, _, _, sizeof(int)))
+      .WillOnce(Invoke([type, option](int input_type, int input_option, const void* optval,
+                                      socklen_t) -> Api::SysCallIntResult {
         EXPECT_EQ(100, *static_cast<const int*>(optval));
         EXPECT_EQ(type, input_type);
         EXPECT_EQ(option, input_option);
-        return 0;
+        return {0, 0};
       }));
 
   EXPECT_TRUE(Network::Socket::applyOptions(options, socket_mock_,
@@ -83,14 +83,14 @@ TEST_F(SocketOptionFactoryTest, TestBuildIpv4TransparentOptions) {
 
   const int type = expected_option.level();
   const int option = expected_option.option();
-  EXPECT_CALL(os_sys_calls_mock_, setsockopt_(_, _, _, _, sizeof(int)))
+  EXPECT_CALL(socket_mock_, setSocketOption(_, _, _, sizeof(int)))
       .Times(2)
-      .WillRepeatedly(Invoke([type, option](os_fd_t, int input_type, int input_option,
-                                            const void* optval, socklen_t) -> int {
+      .WillRepeatedly(Invoke([type, option](int input_type, int input_option, const void* optval,
+                                            socklen_t) -> Api::SysCallIntResult {
         EXPECT_EQ(type, input_type);
         EXPECT_EQ(option, input_option);
         EXPECT_EQ(1, *static_cast<const int*>(optval));
-        return 0;
+        return {0, 0};
       }));
 
   EXPECT_TRUE(Network::Socket::applyOptions(options, socket_mock_,
@@ -110,14 +110,14 @@ TEST_F(SocketOptionFactoryTest, TestBuildIpv6TransparentOptions) {
 
   const int type = expected_option.level();
   const int option = expected_option.option();
-  EXPECT_CALL(os_sys_calls_mock_, setsockopt_(_, _, _, _, sizeof(int)))
+  EXPECT_CALL(socket_mock_, setSocketOption(_, _, _, sizeof(int)))
       .Times(2)
-      .WillRepeatedly(Invoke([type, option](os_fd_t, int input_type, int input_option,
-                                            const void* optval, socklen_t) -> int {
+      .WillRepeatedly(Invoke([type, option](int input_type, int input_option, const void* optval,
+                                            socklen_t) -> Api::SysCallIntResult {
         EXPECT_EQ(type, input_type);
         EXPECT_EQ(option, input_option);
         EXPECT_EQ(1, *static_cast<const int*>(optval));
-        return 0;
+        return {0, 0};
       }));
 
   EXPECT_TRUE(Network::Socket::applyOptions(options, socket_mock_,

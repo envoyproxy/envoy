@@ -343,15 +343,15 @@ Address::InstanceConstSharedPtr Utility::getAddressWithPort(const Address::Insta
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-Address::InstanceConstSharedPtr Utility::getOriginalDst(os_fd_t fd) {
+Address::InstanceConstSharedPtr Utility::getOriginalDst(Socket& sock) {
 #ifdef SOL_IP
   sockaddr_storage orig_addr;
   socklen_t addr_len = sizeof(sockaddr_storage);
   int socket_domain;
   socklen_t domain_len = sizeof(socket_domain);
-  auto& os_syscalls = Api::OsSysCallsSingleton::get();
+  // TODO(fcoras): improve once we store ip version in socket
   const Api::SysCallIntResult result =
-      os_syscalls.getsockopt(fd, SOL_SOCKET, SO_DOMAIN, &socket_domain, &domain_len);
+      sock.getSocketOption(SOL_SOCKET, SO_DOMAIN, &socket_domain, &domain_len);
   int status = result.rc_;
 
   if (status != 0) {
@@ -359,9 +359,9 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(os_fd_t fd) {
   }
 
   if (socket_domain == AF_INET) {
-    status = os_syscalls.getsockopt(fd, SOL_IP, SO_ORIGINAL_DST, &orig_addr, &addr_len).rc_;
+    status = sock.getSocketOption(SOL_IP, SO_ORIGINAL_DST, &orig_addr, &addr_len).rc_;
   } else if (socket_domain == AF_INET6) {
-    status = os_syscalls.getsockopt(fd, SOL_IPV6, IP6T_SO_ORIGINAL_DST, &orig_addr, &addr_len).rc_;
+    status = sock.getSocketOption(SOL_IPV6, IP6T_SO_ORIGINAL_DST, &orig_addr, &addr_len).rc_;
   } else {
     return nullptr;
   }
@@ -370,20 +370,11 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(os_fd_t fd) {
     return nullptr;
   }
 
-  switch (orig_addr.ss_family) {
-  case AF_INET:
-    return Address::InstanceConstSharedPtr{
-        new Address::Ipv4Instance(reinterpret_cast<sockaddr_in*>(&orig_addr))};
-  case AF_INET6:
-    return Address::InstanceConstSharedPtr{
-        new Address::Ipv6Instance(reinterpret_cast<sockaddr_in6&>(orig_addr))};
-  default:
-    return nullptr;
-  }
+  return Address::addressFromSockAddr(orig_addr, 0, true /* default for v6 constructor */);
 #else
   // TODO(zuercher): determine if connection redirection is possible under macOS (c.f. pfctl and
   // divert), and whether it's possible to find the learn destination address.
-  UNREFERENCED_PARAMETER(fd);
+  UNREFERENCED_PARAMETER(sock);
   return nullptr;
 #endif
 }
@@ -506,8 +497,7 @@ Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, const Buffer::I
                                                const Address::Ip* local_ip,
                                                const Address::Instance& peer_address) {
   Buffer::RawSliceVector slices = buffer.getRawSlices();
-  return writeToSocket(handle, !slices.empty() ? &slices[0] : nullptr, slices.size(), local_ip,
-                       peer_address);
+  return writeToSocket(handle, slices.data(), slices.size(), local_ip, peer_address);
 }
 
 Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, Buffer::RawSlice* slices,

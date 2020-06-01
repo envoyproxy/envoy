@@ -3,7 +3,8 @@
 #include "envoy/compression/decompressor/decompressor.h"
 
 #include "common/common/logger.h"
-#include "common/common/zlib/base.h"
+
+#include "extensions/compression/gzip/common/base.h"
 
 #include "zlib.h"
 

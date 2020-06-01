@@ -41,10 +41,10 @@
 #include "common/stats/timespan_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
 
+#include "server/admin/utils.h"
 #include "server/configuration_impl.h"
 #include "server/connection_handler_impl.h"
 #include "server/guarddog_impl.h"
-#include "server/http/utils.h"
 #include "server/listener_hooks.h"
 #include "server/ssl_context_manager.h"
 
@@ -136,7 +136,7 @@ Upstream::ClusterManager& InstanceImpl::clusterManager() { return *config_.clust
 void InstanceImpl::drainListeners() {
   ENVOY_LOG(info, "closing and draining listeners");
   listener_manager_->stopListeners(ListenerManager::StopListenersType::All);
-  drain_manager_->startDrainSequence(nullptr);
+  drain_manager_->startDrainSequence([] {});
 }
 
 void InstanceImpl::failHealthcheck(bool fail) {
