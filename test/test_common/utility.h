@@ -555,10 +555,12 @@ public:
   }
 
   template <class MessageType>
-  static void loadFromYamlAndValidate(const std::string& yaml, MessageType& message) {
+  static void loadFromYamlAndValidate(const std::string& yaml, MessageType& message, bool preserve_original_type = false) {
     MessageUtil::loadFromYamlAndValidate(yaml, message,
                                          ProtobufMessage::getStrictValidationVisitor());
-    Config::VersionConverter::eraseOriginalTypeInformation(message);
+    if (!preserve_original_type) {
+      Config::VersionConverter::eraseOriginalTypeInformation(message);
+    }
   }
 
   template <class MessageType> static void validate(const MessageType& message) {
