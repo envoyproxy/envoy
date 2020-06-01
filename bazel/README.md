@@ -629,7 +629,7 @@ have seen some issues with seeing the artifacts tab. If you can't see it, log ou
 then log back in and it should start working.
 
 The latest coverage report for master is available
-[here](https://storage.googleapis.com/envoy-postsubmit/master/coverage/index.html). The latest fuzz coverage report for master is availble [here](https://storage.googleapis.com/envoy-postsubmit/master/fuzz_coverage/index.html).
+[here](https://storage.googleapis.com/envoy-postsubmit/master/coverage/index.html). The latest fuzz coverage report for master is available [here](https://storage.googleapis.com/envoy-postsubmit/master/fuzz_coverage/index.html).
 
 It's also possible to specialize the coverage build to a specified test or test dir. This is useful
 when doing things like exploring the coverage of a fuzzer over its corpus. This can be done by
