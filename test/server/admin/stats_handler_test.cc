@@ -553,8 +553,7 @@ TEST_P(AdminInstanceTest, GetRequestJson) {
   std::string body;
   EXPECT_EQ(Http::Code::OK, admin_.request("/stats?format=json", "GET", response_headers, body));
   EXPECT_THAT(body, HasSubstr("{\"stats\":["));
-  EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
-              HasSubstr("application/json"));
+  EXPECT_THAT(std::string(response_headers.getContentTypeValue()), HasSubstr("application/json"));
 }
 
 TEST_P(AdminInstanceTest, RecentLookups) {
@@ -564,8 +563,7 @@ TEST_P(AdminInstanceTest, RecentLookups) {
   // Recent lookup tracking is disabled by default.
   EXPECT_EQ(Http::Code::OK, admin_.request("/stats/recentlookups", "GET", response_headers, body));
   EXPECT_THAT(body, HasSubstr("Lookup tracking is not enabled"));
-  EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
-              HasSubstr("text/plain"));
+  EXPECT_THAT(std::string(response_headers.getContentTypeValue()), HasSubstr("text/plain"));
 
   // We can't test RecentLookups in admin unit tests as it doesn't work with a
   // fake symbol table. However we cover this solidly in integration tests.

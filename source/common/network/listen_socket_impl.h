@@ -7,6 +7,7 @@
 #include "envoy/common/platform.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/listen_socket.h"
+#include "envoy/network/socket.h"
 
 #include "common/common/assert.h"
 #include "common/network/socket_impl.h"
@@ -20,8 +21,8 @@ protected:
       : SocketImpl(std::move(io_handle), local_address) {}
 
   void setupSocket(const Network::Socket::OptionsSharedPtr& options, bool bind_to_port);
-  void doBind();
   void setListenSocketOptions(const Network::Socket::OptionsSharedPtr& options);
+  Api::SysCallIntResult bind(Network::Address::InstanceConstSharedPtr address) override;
 };
 
 /**
@@ -81,6 +82,14 @@ public:
                        const Address::InstanceConstSharedPtr& remote_address)
       : SocketImpl(std::move(io_handle), local_address), remote_address_(remote_address),
         direct_remote_address_(remote_address) {}
+
+  ConnectionSocketImpl(Address::SocketType type,
+                       const Address::InstanceConstSharedPtr& local_address,
+                       const Address::InstanceConstSharedPtr& remote_address)
+      : SocketImpl(type, local_address), remote_address_(remote_address),
+        direct_remote_address_(remote_address) {
+    setLocalAddress(local_address);
+  }
 
   // Network::Socket
   Address::SocketType socketType() const override { return Address::SocketType::Stream; }

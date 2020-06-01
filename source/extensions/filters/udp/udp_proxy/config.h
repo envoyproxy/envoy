@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/config/filter/udp/udp_proxy/v2alpha/udp_proxy.pb.h"
-#include "envoy/config/filter/udp/udp_proxy/v2alpha/udp_proxy.pb.validate.h"
+#include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
+#include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.validate.h"
 #include "envoy/server/filter_config.h"
 
 #include "extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
@@ -24,7 +24,7 @@ public:
     auto shared_config = std::make_shared<UdpProxyFilterConfig>(
         context.clusterManager(), context.timeSource(), context.scope(),
         MessageUtil::downcastAndValidate<
-            const envoy::config::filter::udp::udp_proxy::v2alpha::UdpProxyConfig&>(
+            const envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig&>(
             config, context.messageValidationVisitor()));
     return [shared_config](Network::UdpListenerFilterManager& filter_manager,
                            Network::UdpReadFilterCallbacks& callbacks) -> void {
@@ -33,7 +33,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::config::filter::udp::udp_proxy::v2alpha::UdpProxyConfig>();
+    return std::make_unique<envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig>();
   }
 
   std::string name() const override { return "envoy.filters.udp_listener.udp_proxy"; }
