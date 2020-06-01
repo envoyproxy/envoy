@@ -269,7 +269,7 @@ message BigBook {
   string field3 = 3;
 }
 
-// The BigBook messsage with missing `field1`.
+// The BigBook message with missing `field1`.
 message OldBigBook {
   string field2 = 2;
   string field3 = 3;
