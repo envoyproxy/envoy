@@ -70,7 +70,7 @@ TEST_F(DynamicOpenTracingDriverTest, InitializeDriver) {
   }
 }
 
-// This test fails under gcc + stdlibc++, please see https://github.com/envoyproxy/envoy/issues/7647
+// This test fails under gcc, please see https://github.com/envoyproxy/envoy/issues/7647
 // for more details.
 #ifndef GCC_COMPILER
 TEST_F(DynamicOpenTracingDriverTest, FlushSpans) {
