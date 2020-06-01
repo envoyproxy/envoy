@@ -281,7 +281,7 @@ TEST_P(ProtocolIntegrationTest, DrainClose) {
 
   absl::Notification drain_sequence_started;
   test_server_->server().dispatcher().post([this, &drain_sequence_started]() {
-    test_server_->drainManager().startDrainSequence(nullptr);
+    test_server_->drainManager().startDrainSequence([] {});
     drain_sequence_started.Notify();
   });
   drain_sequence_started.WaitForNotification();

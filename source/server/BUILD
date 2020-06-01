@@ -108,6 +108,7 @@ envoy_cc_library(
     deps = [
         ":watchdog_lib",
         "//include/envoy/api:api_interface",
+        "//include/envoy/common:time_interface",
         "//include/envoy/event:timer_interface",
         "//include/envoy/server:configuration_interface",
         "//include/envoy/server:guarddog_interface",
