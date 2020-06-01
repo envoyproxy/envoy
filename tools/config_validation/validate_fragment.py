@@ -51,6 +51,7 @@ def ValidateFragment(type_name, fragment):
 
 
 if __name__ == '__main__':
-  type_name, yaml_path = sys.argv[1:]
-  ValidateFragment(type_name, yaml.load(pathlib.Path(yaml_path).read_text(),
-                                        Loader=yaml.FullLoader))
+  type_name = sys.argv[1] 
+  yaml_path = sys.argv[2]
+  content = sys.argv[3] if (yaml_path == "-s") else pathlib.Path(yaml_path).read_text()
+  ValidateFragment(type_name, yaml.load(content, Loader=yaml.FullLoader))
