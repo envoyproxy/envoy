@@ -1,4 +1,5 @@
 #include "envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.pb.h"
+#include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 
 #include "extensions/filters/http/well_known_names.h"
 
@@ -70,11 +71,26 @@ void UberFilterFuzzer::guideAnyProtoType(test::fuzz::HttpData* mutable_data, uin
   mutable_any->set_type_url(type_url);
 }
 
+void removeConnectMatcher(Protobuf::Message* message) {
+  envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication& config =
+      dynamic_cast<envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication&>(*message);
+  for (auto& rules : *config.mutable_rules()) {
+    if (rules.match().has_connect_matcher()) {
+      rules.mutable_match()->set_path("/");
+    }
+  }
+}
+
 void UberFilterFuzzer::cleanFuzzedConfig(absl::string_view filter_name,
                                          Protobuf::Message* message) {
   // Map filter name to clean-up function.
   if (filter_name == HttpFilterNames::get().GrpcJsonTranscoder) {
+    // Add a valid service proto descriptor.
     addBookstoreProtoDescriptor(message);
+  }
+  if (filter_name == HttpFilterNames::get().JwtAuthn) {
+    // Remove when connect matcher is implemented for Jwt Authentication filter.
+    removeConnectMatcher(message);
   }
 }
 
