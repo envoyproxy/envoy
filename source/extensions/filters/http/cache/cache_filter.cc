@@ -28,14 +28,11 @@ bool CacheFilter::isCacheableRequest(Http::RequestHeaderMap& headers) {
 }
 
 bool CacheFilter::isCacheableResponse(Http::ResponseHeaderMap& headers) {
-  const Http::HeaderEntry* cache_control = headers.CacheControl();
+  const absl::string_view cache_control = headers.getCacheControlValue();
   // TODO(toddmgreer): fully check for cacheability. See for example
   // https://github.com/apache/incubator-pagespeed-mod/blob/master/pagespeed/kernel/http/caching_headers.h.
-  if (cache_control) {
-    return !StringUtil::caseFindToken(cache_control->value().getStringView(), ",",
-                                      Http::Headers::get().CacheControlValues.Private);
-  }
-  return false;
+  return !StringUtil::caseFindToken(cache_control, ",",
+                                    Http::Headers::get().CacheControlValues.Private);
 }
 
 CacheFilter::CacheFilter(const envoy::extensions::filters::http::cache::v3alpha::CacheConfig&,

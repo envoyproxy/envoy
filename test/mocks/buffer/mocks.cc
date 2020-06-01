@@ -6,16 +6,18 @@ namespace Envoy {
 
 template <>
 MockBufferBase<Buffer::WatermarkBuffer>::MockBufferBase(std::function<void()> below_low,
-                                                        std::function<void()> above_high)
-    : Buffer::WatermarkBuffer(below_low, above_high) {}
+                                                        std::function<void()> above_high,
+                                                        std::function<void()> above_overflow)
+    : Buffer::WatermarkBuffer(below_low, above_high, above_overflow) {}
 
 template <>
 MockBufferBase<Buffer::WatermarkBuffer>::MockBufferBase()
-    : Buffer::WatermarkBuffer([&]() -> void {}, [&]() -> void {}) {
+    : Buffer::WatermarkBuffer([&]() -> void {}, [&]() -> void {}, [&]() -> void {}) {
   ASSERT(0); // This constructor is not supported for WatermarkBuffer.
 }
 template <>
-MockBufferBase<Buffer::OwnedImpl>::MockBufferBase(std::function<void()>, std::function<void()>)
+MockBufferBase<Buffer::OwnedImpl>::MockBufferBase(std::function<void()>, std::function<void()>,
+                                                  std::function<void()>)
     : Buffer::OwnedImpl() {
   ASSERT(0); // This constructor is not supported for OwnedImpl.
 }

@@ -801,6 +801,7 @@ openssl
 opentracing
 optimizations
 optname
+optval
 ostream
 outlier
 outliers
@@ -946,6 +947,7 @@ retriable
 retriggers
 rmdir
 rocketmq
+rewriter
 rollout
 roundtrip
 rpcs
@@ -986,6 +988,7 @@ snapshotted
 sockaddr
 socketpair
 sockfd
+socklen
 sockopt
 sockopts
 somestring
