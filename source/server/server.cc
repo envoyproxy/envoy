@@ -136,7 +136,7 @@ Upstream::ClusterManager& InstanceImpl::clusterManager() { return *config_.clust
 void InstanceImpl::drainListeners() {
   ENVOY_LOG(info, "closing and draining listeners");
   listener_manager_->stopListeners(ListenerManager::StopListenersType::All);
-  drain_manager_->startDrainSequence(nullptr);
+  drain_manager_->startDrainSequence([] {});
 }
 
 void InstanceImpl::failHealthcheck(bool fail) {
