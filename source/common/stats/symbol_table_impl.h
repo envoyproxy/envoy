@@ -761,14 +761,25 @@ private:
   HashSet hash_set_;
 };
 
-// Captures StatNames for lookup by string, keeping two maps: a map of
-// 'built-ins' that is expected to be populated during initialization, and a map
-// of dynamically discovered names. The latter map is protected by a mutex, and
-// can be mutated at runtime.
+// Captures StatNames for lookup by string, keeping a map of 'built-ins' that is
+// expected to be populated during initialization.
 //
 // Ideally, builtins should be added during process initialization, in the
 // outermost relevant context. And as the builtins map is not mutex protected,
-// builtins must *not* be added in the request-path.
+// builtins must *not* be added to an existing StatNameSet in the request-path.
+//
+// It is fine to populate a new StatNameSet when (for example) an xDS
+// message reveals a new set of names to be used as stats. The population must
+// be completed prior to exposing the new StatNameSet to worker threads.
+//
+// To create stats using names discovered in the request path, dynamic stat
+// names must be used (see StatNameDynamicStorage). Consider using helper
+// methods such as Stats::Utility::counterFromElements in common/stats/utility.h
+// to simplify the process of allocating and combining stat names and creating
+// counters, gauges, and histograms from them.
+//
+// For convenience, the StatNameSet offers pass-through thread-safe access to
+// its mutex-protected pool.
 class StatNameSet {
 public:
   // This object must be instantiated via SymbolTable::makeSet(), thus constructor is private.
