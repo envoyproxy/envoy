@@ -992,4 +992,379 @@ TEST_P(AdsIntegrationTestWithRtdsAndSecondaryClusters, Basic) {
   testBasicFlow();
 }
 
+static std::string AdsV3IntegrationConfig(const std::string& api_type) {
+  // Note: do not use CONSTRUCT_ON_FIRST_USE here!
+  return fmt::format(R"EOF(
+dynamic_resources:
+  lds_config:
+    resource_api_version: V3
+    ads: {{}}
+  cds_config:
+    resource_api_version: V3
+    ads: {{}}
+  ads_config:
+    transport_api_version: V3
+    api_type: {}
+    set_node_on_first_message_only: false
+static_resources:
+  clusters:
+    name: dummy_cluster
+    connect_timeout:
+      seconds: 5
+    type: STATIC
+    load_assignment:
+      cluster_name: dummy_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 0
+    lb_policy: ROUND_ROBIN
+    http2_protocol_options: {{}}
+admin:
+  access_log_path: /dev/null
+  address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 0
+)EOF",
+                     api_type);
+}
+
+// Check if EDS cluster defined in file is loaded before ADS request and used as xDS server
+class AdsClusterV3 : public Grpc::DeltaSotwIntegrationParamTest, public HttpIntegrationTest {
+public:
+  AdsClusterV3()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(),
+                            AdsV3IntegrationConfig(
+                                sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
+    use_lds_ = false;
+    create_xds_upstream_ = true;
+    tls_xds_upstream_ = true;
+    sotw_or_delta_ = sotwOrDelta();
+  }
+
+  void TearDown() override {
+    cleanUpXdsConnection();
+    test_server_.reset();
+    fake_upstreams_.clear();
+  }
+
+  void makeSingleRequest() {
+    registerTestServerPorts({"http"});
+    testRouterHeaderOnlyRequestAndResponse();
+    cleanupUpstreamAndDownstream();
+  }
+
+  void initialize() override {
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* ads_config = bootstrap.mutable_dynamic_resources()->mutable_ads_config();
+      auto* grpc_service = ads_config->add_grpc_services();
+      setGrpcService(*grpc_service, "ads_cluster", xds_upstream_->localAddress());
+      auto* ads_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      ads_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      ads_cluster->set_name("ads_cluster");
+      envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext context;
+      auto* validation_context = context.mutable_common_tls_context()->mutable_validation_context();
+      validation_context->mutable_trusted_ca()->set_filename(
+          TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
+      validation_context->add_match_subject_alt_names()->set_suffix("lyft.com");
+      if (clientType() == Grpc::ClientType::GoogleGrpc) {
+        auto* google_grpc = grpc_service->mutable_google_grpc();
+        auto* ssl_creds = google_grpc->mutable_channel_credentials()->mutable_ssl_credentials();
+        ssl_creds->mutable_root_certs()->set_filename(
+            TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
+      }
+      ads_cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
+      ads_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(context);
+    });
+    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+    HttpIntegrationTest::initialize();
+    createXdsConnection();
+    AssertionResult result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
+    RELEASE_ASSERT(result, result.message());
+    xds_stream_->startGrpcStream();
+  }
+
+  envoy::config::cluster::v3::Cluster buildCluster(const std::string& name) {
+    API_NO_BOOST(envoy::config::cluster::v3::Cluster) cluster;
+    TestUtility::loadFromYaml(fmt::format(R"EOF(
+        name: {}
+        connect_timeout: 5s
+        type: EDS
+        eds_cluster_config:
+          eds_config:
+            resource_api_version: V3
+            ads: {{}}
+        lb_policy: ROUND_ROBIN
+        http2_protocol_options: {{}}
+      )EOF",
+                                          name),
+                              cluster, true);
+    return cluster;
+  }
+
+  envoy::config::endpoint::v3::ClusterLoadAssignment
+  buildClusterLoadAssignment(const std::string& name) {
+    API_NO_BOOST(envoy::config::endpoint::v3::ClusterLoadAssignment) cluster_load_assignment;
+    TestUtility::loadFromYaml(fmt::format(R"EOF(
+        cluster_name: {}
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: {}
+                  port_value: {}
+      )EOF",
+                                          name,
+                                          Network::Test::getLoopbackAddressString(ipVersion()),
+                                          fake_upstreams_[0]->localAddress()->ip()->port()),
+                              cluster_load_assignment, true);
+    return cluster_load_assignment;
+  }
+
+  envoy::config::listener::v3::Listener buildListener(const std::string& name,
+                                                      const std::string& route_config,
+                                                      const std::string& stat_prefix = "ads_test") {
+    API_NO_BOOST(envoy::config::listener::v3::Listener) listener;
+    TestUtility::loadFromYaml(fmt::format(
+                                  R"EOF(
+        name: {}
+        address:
+          socket_address:
+            address: {}
+            port_value: 0
+        filter_chains:
+          filters:
+          - name: http
+            typed_config:
+              "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+              stat_prefix: {}
+              codec_type: HTTP2
+              rds:
+                route_config_name: {}
+                config_source:
+                  resource_api_version: V3
+                  ads: {{}}
+              http_filters: [{{ name: envoy.filters.http.router }}]
+      )EOF",
+                                  name, Network::Test::getLoopbackAddressString(ipVersion()),
+                                  stat_prefix, route_config),
+                              listener, true);
+    return listener;
+  }
+
+  envoy::config::route::v3::RouteConfiguration buildRouteConfig(const std::string& name,
+                                                                const std::string& cluster) {
+    API_NO_BOOST(envoy::config::route::v3::RouteConfiguration) route;
+    TestUtility::loadFromYaml(fmt::format(R"EOF(
+        name: {}
+        virtual_hosts:
+        - name: integration
+          domains: ["*"]
+          routes:
+          - match: {{ prefix: "/" }}
+            route: {{ cluster: {} }}
+      )EOF",
+                                          name, cluster),
+                              route, true);
+    return route;
+  }
+
+  std::string xdsResourceName(const ProtobufWkt::Any& resource) {
+    if (resource.type_url() == Config::getTypeUrl<envoy::config::listener::v3::Listener>(
+                                   envoy::config::core::v3::ApiVersion::V3)) {
+      return TestUtility::anyConvert<envoy::config::listener::v3::Listener>(resource).name();
+    }
+    if (resource.type_url() == Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>(
+                                   envoy::config::core::v3::ApiVersion::V3)) {
+      return TestUtility::anyConvert<envoy::config::route::v3::RouteConfiguration>(resource).name();
+    }
+    if (resource.type_url() == Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(
+                                   envoy::config::core::v3::ApiVersion::V3)) {
+      return TestUtility::anyConvert<envoy::config::cluster::v3::Cluster>(resource).name();
+    }
+    if (resource.type_url() ==
+        Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+            envoy::config::core::v3::ApiVersion::V3)) {
+      return TestUtility::anyConvert<envoy::config::endpoint::v3::ClusterLoadAssignment>(resource)
+          .cluster_name();
+    }
+    if (resource.type_url() == Config::getTypeUrl<envoy::config::route::v3::VirtualHost>(
+                                   envoy::config::core::v3::ApiVersion::V3)) {
+      return TestUtility::anyConvert<envoy::config::route::v3::VirtualHost>(resource).name();
+    }
+    if (resource.type_url() == Config::getTypeUrl<envoy::service::runtime::v3::Runtime>(
+                                   envoy::config::core::v3::ApiVersion::V3)) {
+      return TestUtility::anyConvert<envoy::service::runtime::v3::Runtime>(resource).name();
+    }
+    throw EnvoyException(
+        absl::StrCat("xdsResourceName does not know about type URL ", resource.type_url()));
+  }
+
+  template <class T>
+  void sendDiscoveryResponse(const std::string& type_url, const std::vector<T>& state_of_the_world,
+                             const std::vector<T>& added_or_updated,
+                             const std::vector<std::string>& removed, const std::string& version) {
+    if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
+      sendSotwDiscoveryResponse(type_url, state_of_the_world, version);
+    } else {
+      sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version);
+    }
+  }
+
+  template <class T>
+  void sendSotwDiscoveryResponse(const std::string& type_url, const std::vector<T>& messages,
+                                 const std::string& version) {
+    API_NO_BOOST(envoy::service::discovery::v3::DiscoveryResponse) discovery_response;
+    discovery_response.set_version_info(version);
+    discovery_response.set_type_url(type_url);
+    for (const auto& message : messages) {
+      discovery_response.add_resources()->PackFrom(message);
+    }
+    static int next_nonce_counter = 0;
+    discovery_response.set_nonce(absl::StrCat("nonce", next_nonce_counter++));
+    xds_stream_->sendGrpcMessage(discovery_response);
+  }
+
+  template <class T>
+  void
+  sendDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
+                             const std::vector<std::string>& removed, const std::string& version) {
+    sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, xds_stream_);
+  }
+
+  template <class T>
+  void
+  sendDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
+                             const std::vector<std::string>& removed, const std::string& version,
+                             FakeStreamPtr& stream, const std::vector<std::string>& aliases = {}) {
+    auto response =
+        createDeltaDiscoveryResponse<T>(type_url, added_or_updated, removed, version, aliases);
+    stream->sendGrpcMessage(response);
+  }
+
+  template <class T>
+  envoy::service::discovery::v3::DeltaDiscoveryResponse
+  createDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
+                               const std::vector<std::string>& removed, const std::string& version,
+                               const std::vector<std::string>& aliases) {
+
+    API_NO_BOOST(envoy::service::discovery::v3::DeltaDiscoveryResponse) response;
+    response.set_system_version_info("system_version_info_this_is_a_test");
+    response.set_type_url(type_url);
+    for (const auto& message : added_or_updated) {
+      auto* resource = response.add_resources();
+      ProtobufWkt::Any temp_any;
+      temp_any.PackFrom(message);
+      resource->set_name(xdsResourceName(temp_any));
+      resource->set_version(version);
+      resource->mutable_resource()->PackFrom(message);
+      for (const auto& alias : aliases) {
+        resource->add_aliases(alias);
+      }
+    }
+    *response.mutable_removed_resources() = {removed.begin(), removed.end()};
+    static int next_nonce_counter = 0;
+    response.set_nonce(absl::StrCat("nonce", next_nonce_counter++));
+    return response;
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, AdsClusterV3,
+                         DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
+
+// Verify CDS is paused during cluster warming.
+TEST_P(AdsClusterV3, CdsPausedDuringWarming) {
+  initialize();
+
+  const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(
+      envoy::config::core::v3::ApiVersion::V3);
+  const auto eds_type_url = Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      envoy::config::core::v3::ApiVersion::V3);
+  const auto lds_type_url = Config::getTypeUrl<envoy::config::listener::v3::Listener>(
+      envoy::config::core::v3::ApiVersion::V3);
+  const auto rds_type_url = Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>(
+      envoy::config::core::v3::ApiVersion::V3);
+
+  // Send initial configuration, validate we can process a request.
+  EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "", {}, {}, {}, true));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      cds_type_url, {buildCluster("cluster_0")}, {buildCluster("cluster_0")}, {}, "1");
+  EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "", {"cluster_0"}, {"cluster_0"}, {}));
+
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      eds_type_url, {buildClusterLoadAssignment("cluster_0")},
+      {buildClusterLoadAssignment("cluster_0")}, {}, "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "1", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(lds_type_url, "", {}, {}, {}));
+  sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
+      lds_type_url, {buildListener("listener_0", "route_config_0")},
+      {buildListener("listener_0", "route_config_0")}, {}, "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "1", {"cluster_0"}, {}, {}));
+  EXPECT_TRUE(
+      compareDiscoveryRequest(rds_type_url, "", {"route_config_0"}, {"route_config_0"}, {}));
+  sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
+      rds_type_url, {buildRouteConfig("route_config_0", "cluster_0")},
+      {buildRouteConfig("route_config_0", "cluster_0")}, {}, "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(lds_type_url, "1", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(rds_type_url, "1", {"route_config_0"}, {}, {}));
+
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  makeSingleRequest();
+
+  EXPECT_FALSE(test_server_->server().clusterManager().adsMux()->paused(cds_type_url));
+  // Send the first warming cluster.
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      cds_type_url, {buildCluster("warming_cluster_1")}, {buildCluster("warming_cluster_1")},
+      {"cluster_0"}, "2");
+
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
+  EXPECT_TRUE(test_server_->server().clusterManager().adsMux()->paused(cds_type_url));
+
+  EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "1", {"warming_cluster_1"},
+                                      {"warming_cluster_1"}, {"cluster_0"}));
+
+  // Send the second warming cluster.
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      cds_type_url, {buildCluster("warming_cluster_2")}, {buildCluster("warming_cluster_2")}, {},
+      "3");
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 2);
+  // We would've got a Cluster discovery request with version 2 here, had the CDS not been paused.
+
+  EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "1", {"warming_cluster_2", "warming_cluster_1"},
+                                      {"warming_cluster_2"}, {}));
+
+  EXPECT_TRUE(test_server_->server().clusterManager().adsMux()->paused(cds_type_url));
+  // Finish warming the clusters.
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      eds_type_url,
+      {buildClusterLoadAssignment("warming_cluster_1"),
+       buildClusterLoadAssignment("warming_cluster_2")},
+      {buildClusterLoadAssignment("warming_cluster_1"),
+       buildClusterLoadAssignment("warming_cluster_2")},
+      {"cluster_0"}, "2");
+
+  // Validate that clusters are warmed.
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  EXPECT_FALSE(test_server_->server().clusterManager().adsMux()->paused(cds_type_url));
+
+  // CDS is resumed and EDS response was acknowledged.
+  if (sotw_or_delta_ == Grpc::SotwOrDelta::Delta) {
+    // Envoy will ACK both Cluster messages. Since they arrived while CDS was paused, they aren't
+    // sent until CDS is unpaused. Since version 3 has already arrived by the time the version 2
+    // ACK goes out, they're both acknowledging version 3.
+    EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "3", {}, {}, {}));
+  }
+  EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "3", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "2", {"warming_cluster_2", "warming_cluster_1"},
+                                      {}, {}));
+}
+
 } // namespace Envoy
