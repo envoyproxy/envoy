@@ -89,6 +89,27 @@ jobs:
         parameters:
           ciTarget: $(CI_TARGET)
 
+  - job: coverage
+    displayName: "Linux-x64 coverage"
+    dependsOn: ["format"]
+    timeoutInMinutes: 360
+    pool: "x64-large"
+    steps:
+      - template: bazel.yml
+        parameters:
+          managedAgent: false
+          ciTarget: bazel.coverage
+          rbe: ""
+          bazelBuildExtraOptions: "--test_env=ENVOY_IP_TEST_VERSIONS=v4only --curses=no"
+
+      - script: ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /build/envoy/generated/coverage coverage'
+        displayName: "Upload Report to GCS"
+        env:
+          ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+          GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+          GCS_ARTIFACT_BUCKET: $(GcsArtifactBucket)
+        condition: always()
+
   - job: docker
     displayName: "Linux-x64 docker"
     dependsOn: ["release"]

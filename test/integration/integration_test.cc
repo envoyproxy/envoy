@@ -131,12 +131,12 @@ TEST_P(IntegrationTest, RouterDirectResponse) {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "GET", "/", "", downstream_protocol_, version_, "direct.example.com");
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ("example-value", response->headers()
                                  .get(Envoy::Http::LowerCaseString("x-additional-header"))
                                  ->value()
                                  .getStringView());
-  EXPECT_EQ("text/html", response->headers().ContentType()->value().getStringView());
+  EXPECT_EQ("text/html", response->headers().getContentTypeValue());
   EXPECT_EQ(body, response->body());
 }
 
@@ -302,7 +302,7 @@ TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 1);
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 1);
 
@@ -317,7 +317,7 @@ TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response2->complete());
-  EXPECT_EQ("200", response2->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response2->headers().getStatusValue());
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 2);
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 2);
 }
@@ -711,7 +711,7 @@ TEST_P(IntegrationTest, NoHost) {
   response->waitForEndStream();
 
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("400", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("400", response->headers().getStatusValue());
 }
 
 TEST_P(IntegrationTest, BadPath) {
@@ -812,7 +812,7 @@ TEST_P(IntegrationTest, UpstreamProtocolError) {
   codec_client_->waitForDisconnect();
 
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("503", response->headers().getStatusValue());
 }
 
 TEST_P(IntegrationTest, TestHead) {
@@ -970,6 +970,9 @@ TEST_P(IntegrationTest, ViaAppendWith100Continue) {
 // sent by Envoy, it will wait for response acknowledgment (via FIN/RST) from the client before
 // closing the socket (with a timeout for ensuring cleanup).
 TEST_P(IntegrationTest, TestDelayedConnectionTeardownOnGracefulClose) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(1); });
   // This test will trigger an early 413 Payload Too Large response due to buffer limits being
   // exceeded. The following filter is needed since the router filter will never trigger a 413.
   config_helper_.addFilter("{ name: encoder-decoder-buffer-filter, typed_config: { \"@type\": "
@@ -993,7 +996,7 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownOnGracefulClose) {
 
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("413", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("413", response->headers().getStatusValue());
   // With no delayed close processing, Envoy will close the connection immediately after flushing
   // and this should instead return true.
   EXPECT_FALSE(codec_client_->waitForDisconnect(std::chrono::milliseconds(500)));
@@ -1110,7 +1113,7 @@ TEST_P(IntegrationTest, NoConnectionPoolsFree) {
 
   response->waitForEndStream();
 
-  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("503", response->headers().getStatusValue());
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_503", 1);
 
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_pool_overflow")->value(), 1);
@@ -1213,6 +1216,9 @@ TEST_P(IntegrationTest, TestFlood) {
 }
 
 TEST_P(IntegrationTest, TestFloodUpstreamErrors) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(1); });
   autonomous_upstream_ = true;
   initialize();
 

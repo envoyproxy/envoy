@@ -47,6 +47,7 @@ New Features
 * aggregate cluster: make route :ref:`retry_priority <envoy_v3_api_field_config.route.v3.RetryPolicy.retry_priority>` predicates work with :ref:`this cluster type <envoy_v3_api_msg_extensions.clusters.aggregate.v3.ClusterConfig>`.
 * compressor: generic :ref:`compressor <config_http_filters_compressor>` filter exposed to users.
 * config: added :ref:`version_text <config_cluster_manager_cds>` stat that reflects xDS version.
+* decompressor: generic :ref:`decompressor <config_http_filters_decompressor>` filter exposed to users.
 * dynamic forward proxy: added :ref:`SNI based dynamic forward proxy <config_network_filters_sni_dynamic_forward_proxy>` support.
 * fault: added support for controlling the percentage of requests that abort, delay and response rate limits faults
   are applied to using :ref:`HTTP headers <config_http_filters_fault_injection_http_header>` to the HTTP fault filter.
@@ -54,10 +55,12 @@ New Features
   :ref:`HTTP header <config_http_filters_fault_injection_http_header>` or abort fault configuration in HTTP fault filter.
 * filter: add `upstram_rq_time` stats to the GPRC stats filter.
   Disabled by default and can be enabled via :ref:`enable_upstream_stats <envoy_v3_api_field_extensions.filters.http.grpc_stats.v3.FilterConfig.enable_upstream_stats>`.
+* grpc: added support for Google gRPC :ref:`custom channel arguments <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.channel_args>`.
 * grpc-json: added support for streaming response using
   `google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`_.
 * gzip filter: added option to set zlib's next output buffer size.
 * health checks: allow configuring health check transport sockets by specifying :ref:`transport socket match criteria <envoy_v3_api_field_config.core.v3.HealthCheck.transport_socket_match_criteria>`.
+* http: added :ref:`local_reply config <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.local_reply_config>` to http_connection_manager to customize :ref:`local reply <config_http_conn_man_local_reply>`.
 * http: added :ref:`stripping port from host header <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.strip_matching_host_port>` support.
 * http: added support for proxying CONNECT requests, terminating CONNECT requests, and converting raw TCP streams into HTTP/2 CONNECT requests. See :ref:`upgrade documentation<arch_overview_upgrades>` for details.
 * listener: added in place filter chain update flow for tcp listener update which doesn't close connections if the corresponding network filter chain is equivalent during the listener update.
@@ -75,12 +78,14 @@ New Features
   tracing is not forced.
 * router: add support for RESPONSE_FLAGS and RESPONSE_CODE_DETAILS :ref:`header formatters
   <config_http_conn_man_headers_custom_request_headers>`.
-* router: more fine grained internal redirect configs are added to the :ref`internal_redirect_policy
-  <envoy_api_field_router.RouterAction.internal_redirect_policy>` field.
+* router: allow Rate Limiting Service to be called in case of missing request header for a descriptor if the :ref:`skip_if_absent <envoy_v3_api_field_config.route.v3.RateLimit.Action.RequestHeaders.skip_if_absent>` field is set to true.
+* router: more fine grained internal redirect configs are added to the :ref:`internal_redirect_policy
+  <envoy_v3_api_field_config.route.v3.RouteAction.internal_redirect_policy>` field.
 * runtime: add new gauge :ref:`deprecated_feature_seen_since_process_start <runtime_stats>` that gets reset across hot restarts.
 * stats: added the option to :ref:`report counters as deltas <envoy_v3_api_field_config.metrics.v3.MetricsServiceConfig.report_counters_as_deltas>` to the metrics service stats sink.
 * tracing: tracing configuration has been made fully dynamic and every HTTP connection manager
   can now have a separate :ref:`tracing provider <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.provider>`.
+* udp: :ref:`udp_proxy <config_udp_listener_filters_udp_proxy>` filter has been upgraded to v3 and is no longer considered alpha.
 
 Deprecated
 ----------
@@ -101,3 +106,4 @@ Deprecated
   :ref:`safe_cross_scheme<envoy_v3_api_msg_extensions.internal_redirect.safe_cross_scheme.v3.SafeCrossSchemeConfig>`,
   in :ref:`predicates <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.predicates>`.
 * File access logger fields :ref:`format <envoy_v3_api_field_extensions.access_loggers.file.v3.FileAccessLog.format>`, :ref:`json_format <envoy_v3_api_field_extensions.access_loggers.file.v3.FileAccessLog.json_format>` and :ref:`typed_json_format <envoy_v3_api_field_extensions.access_loggers.file.v3.FileAccessLog.typed_json_format>` are deprecated in favor of :ref:`log_format <envoy_v3_api_field_extensions.access_loggers.file.v3.FileAccessLog.log_format>`.
+* A warning is now logged when v2 xDS api is used. This behavior can be temporarily disabled by setting `envoy.reloadable_features.enable_deprecated_v2_api_warning` to `false`.
