@@ -60,16 +60,6 @@ bool schemeIsHttp(const Http::RequestHeaderMap& downstream_headers,
 
 constexpr uint64_t TimeoutPrecisionFactor = 100;
 
-Http::ConnectionPool::Instance*
-httpPool(absl::variant<Http::ConnectionPool::Instance*, Tcp::ConnectionPool::Instance*> pool) {
-  return absl::get<Http::ConnectionPool::Instance*>(pool);
-}
-
-Tcp::ConnectionPool::Instance*
-tcpPool(absl::variant<Http::ConnectionPool::Instance*, Tcp::ConnectionPool::Instance*> pool) {
-  return absl::get<Tcp::ConnectionPool::Instance*>(pool);
-}
-
 } // namespace
 
 // Express percentage as [0, TimeoutPrecisionFactor] because stats do not accept floating point
@@ -499,13 +489,16 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     }
   }
 
-  Upstream::HostDescriptionConstSharedPtr host;
-  Filter::HttpOrTcpPool conn_pool = createConnPool(host);
+  transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
+      *callbacks_->streamInfo().filterState());
+  std::unique_ptr<GenericConnPool> generic_conn_pool = createConnPool();
+  Http::Protocol protocol = cluster_->upstreamHttpProtocol(callbacks_->streamInfo().protocol());
 
-  if (!host) {
+  if (!generic_conn_pool->initialize(config_.cm_, *route_entry_, protocol, this)) {
     sendNoHealthyUpstreamResponse();
     return Http::FilterHeadersStatus::StopIteration;
   }
+  Upstream::HostDescriptionConstSharedPtr host = generic_conn_pool->host();
 
   if (debug_config && debug_config->append_upstream_host_) {
     // The hostname and address will be appended to any local or upstream responses from this point,
@@ -592,7 +585,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // Hang onto the modify_headers function for later use in handling upstream responses.
   modify_headers_ = modify_headers;
 
-  UpstreamRequestPtr upstream_request = createUpstreamRequest(conn_pool);
+  UpstreamRequestPtr upstream_request =
+      std::make_unique<UpstreamRequest>(*this, std::move(generic_conn_pool));
   upstream_request->moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->encodeHeaders(end_stream);
   if (end_stream) {
@@ -602,47 +596,15 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   return Http::FilterHeadersStatus::StopIteration;
 }
 
-Filter::HttpOrTcpPool Filter::createConnPool(Upstream::HostDescriptionConstSharedPtr& host) {
-  Filter::HttpOrTcpPool conn_pool;
+std::unique_ptr<GenericConnPool> Filter::createConnPool() {
   const bool should_tcp_proxy =
       route_entry_->connectConfig().has_value() &&
       downstream_headers_->getMethodValue() == Http::Headers::get().MethodValues.Connect;
 
-  if (!should_tcp_proxy) {
-    conn_pool = getHttpConnPool();
-    if (httpPool(conn_pool)) {
-      host = httpPool(conn_pool)->host();
-    }
-  } else {
-    transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
-        *callbacks_->streamInfo().filterState());
-    conn_pool = config_.cm_.tcpConnPoolForCluster(route_entry_->clusterName(),
-                                                  Upstream::ResourcePriority::Default, this);
-    if (tcpPool(conn_pool)) {
-      host = tcpPool(conn_pool)->host();
-    }
+  if (should_tcp_proxy) {
+    return std::make_unique<TcpConnPool>();
   }
-  return conn_pool;
-}
-
-UpstreamRequestPtr Filter::createUpstreamRequest(Filter::HttpOrTcpPool conn_pool) {
-  if (absl::holds_alternative<Http::ConnectionPool::Instance*>(conn_pool)) {
-    return std::make_unique<UpstreamRequest>(*this,
-                                             std::make_unique<HttpConnPool>(*httpPool(conn_pool)));
-  }
-  return std::make_unique<UpstreamRequest>(*this,
-                                           std::make_unique<TcpConnPool>(tcpPool(conn_pool)));
-}
-
-Http::ConnectionPool::Instance* Filter::getHttpConnPool() {
-  // Choose protocol based on cluster configuration and downstream connection
-  // Note: Cluster may downgrade HTTP2 to HTTP1 based on runtime configuration.
-  Http::Protocol protocol = cluster_->upstreamHttpProtocol(callbacks_->streamInfo().protocol());
-  transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
-      *callbacks_->streamInfo().filterState());
-
-  return config_.cm_.httpConnPoolForCluster(route_entry_->clusterName(), route_entry_->priority(),
-                                            protocol, this);
+  return std::make_unique<HttpConnPool>();
 }
 
 void Filter::sendNoHealthyUpstreamResponse() {
@@ -1546,13 +1508,17 @@ void Filter::doRetry() {
   pending_retries_--;
 
   Upstream::HostDescriptionConstSharedPtr host;
-  Filter::HttpOrTcpPool conn_pool = createConnPool(host);
-  if (!host) {
+
+  std::unique_ptr<GenericConnPool> generic_conn_pool = createConnPool();
+
+  Http::Protocol protocol = cluster_->upstreamHttpProtocol(callbacks_->streamInfo().protocol());
+  if (!generic_conn_pool->initialize(config_.cm_, *route_entry_, protocol, this)) {
     sendNoHealthyUpstreamResponse();
     cleanup();
     return;
   }
-  UpstreamRequestPtr upstream_request = createUpstreamRequest(conn_pool);
+  UpstreamRequestPtr upstream_request =
+      std::make_unique<UpstreamRequest>(*this, std::move(generic_conn_pool));
 
   if (include_attempt_count_in_request_) {
     downstream_headers_->setEnvoyAttemptCount(attempt_count_);
