@@ -251,8 +251,6 @@ envoy_sh_test(
         "test_utility.sh",
         "//test/config/integration:server_config_files",
     ],
-    # TODO: This script invocation does not work on Windows, see: https://github.com/bazelbuild/bazel/issues/10959
-    tags = ["fails_on_windows"],
 )
 
 envoy_cc_test(
@@ -985,7 +983,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "version_integration_test",
     srcs = ["version_integration_test.cc"],
-    tags = ["fails_on_windows"],
     deps = [
         ":http_integration_lib",
         "//source/extensions/filters/http/ip_tagging:config",

@@ -163,7 +163,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "overload_manager_impl_test",
     srcs = ["overload_manager_impl_test.cc"],
-    tags = ["fails_on_windows"],
     deps = [
         "//include/envoy/registry",
         "//source/common/stats:isolated_store_lib",
@@ -428,5 +427,4 @@ envoy_benchmark_test(
     name = "filter_chain_benchmark_test_benchmark_test",
     timeout = "long",
     benchmark_binary = "filter_chain_benchmark_test",
-    tags = ["fails_on_windows"],
 )
