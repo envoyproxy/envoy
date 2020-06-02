@@ -231,18 +231,6 @@ uint64_t HeaderMapImpl::appendToHeader(HeaderString& header, absl::string_view d
   return data.size() + byte_size;
 }
 
-void HeaderMapImpl::initFromInitList(
-    HeaderMap& new_header_map,
-    const std::initializer_list<std::pair<LowerCaseString, std::string>>& values) {
-  for (auto& value : values) {
-    HeaderString key_string;
-    key_string.setCopy(value.first.get().c_str(), value.first.get().size());
-    HeaderString value_string;
-    value_string.setCopy(value.second.c_str(), value.second.size());
-    new_header_map.addViaMove(std::move(key_string), std::move(value_string));
-  }
-}
-
 void HeaderMapImpl::updateSize(uint64_t from_size, uint64_t to_size) {
   ASSERT(cached_byte_size_ >= from_size);
   cached_byte_size_ -= from_size;
