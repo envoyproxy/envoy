@@ -70,6 +70,10 @@ public:
                             ? absl::optional<Runtime::FractionalPercent>(
                                   Runtime::FractionalPercent(config.filter_enabled(), runtime_))
                             : absl::nullopt),
+        deny_at_disable_(config.has_deny_at_disable()
+                             ? absl::optional<Runtime::FeatureFlag>(
+                                   Runtime::FeatureFlag(config.deny_at_disable(), runtime_))
+                             : absl::nullopt),
         pool_(scope_.symbolTable()),
         metadata_context_namespaces_(config.metadata_context_namespaces().begin(),
                                      config.metadata_context_namespaces().end()),
@@ -92,6 +96,10 @@ public:
   Http::Code statusOnError() const { return status_on_error_; }
 
   bool filterEnabled() { return filter_enabled_.has_value() ? filter_enabled_->enabled() : true; }
+
+  bool denyAtDisable() {
+    return deny_at_disable_.has_value() ? deny_at_disable_->enabled() : false;
+  }
 
   Stats::Scope& scope() { return scope_; }
 
@@ -133,6 +141,7 @@ private:
   Http::Context& http_context_;
 
   const absl::optional<Runtime::FractionalPercent> filter_enabled_;
+  const absl::optional<Runtime::FeatureFlag> deny_at_disable_;
 
   // TODO(nezdolik): stop using pool as part of deprecating cluster scope stats.
   Stats::StatNamePool pool_;

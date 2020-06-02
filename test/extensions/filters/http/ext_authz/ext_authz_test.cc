@@ -909,6 +909,69 @@ TEST_F(HttpFilterTest, FilterEnabled) {
             filter_->decodeHeaders(request_headers_, false));
 }
 
+// Test that filter can deny for protected path when filter is disabled via filter_enabled field.
+TEST_F(HttpFilterTest, FilterDenyAtDisable) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  filter_enabled:
+    runtime_key: "http.ext_authz.enabled"
+    default_value:
+      numerator: 0
+      denominator: HUNDRED
+  deny_at_disable:
+    runtime_key: "http.ext_authz.deny_at_disable"
+    default_value:
+      value: true
+  )EOF");
+
+  ON_CALL(runtime_.snapshot_,
+          featureEnabled("http.ext_authz.enabled",
+                         testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0))))
+      .WillByDefault(Return(false));
+
+  ON_CALL(runtime_.snapshot_, featureEnabled("http.ext_authz.enabled", false))
+      .WillByDefault(Return(true));
+
+  // Make sure check is not called.
+  EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
+  // Engage the filter.
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+}
+
+// Test that filter allows for protected path when filter is disabled via filter_enabled field.
+TEST_F(HttpFilterTest, FilterAllowAtDisable) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  filter_enabled:
+    runtime_key: "http.ext_authz.enabled"
+    default_value:
+      numerator: 0
+      denominator: HUNDRED
+  deny_at_disable:
+    runtime_key: "http.ext_authz.deny_at_disable"
+    default_value:
+      value: false
+  )EOF");
+
+  ON_CALL(runtime_.snapshot_,
+          featureEnabled("http.ext_authz.enabled",
+                         testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0))))
+      .WillByDefault(Return(false));
+
+  ON_CALL(runtime_.snapshot_, featureEnabled("http.ext_authz.enabled", false))
+      .WillByDefault(Return(false));
+
+  // Make sure check is not called.
+  EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
+  // Engage the filter.
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+}
+
 // -------------------
 // Parameterized Tests
 // -------------------
