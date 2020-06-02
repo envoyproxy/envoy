@@ -9,43 +9,39 @@ namespace Network {
 
 SocketInterface* createDefaultSocketInterface();
 
-template <class T> class CustomScopedSingleton {
+template <class T> class CustomInjectableSingleton {
 public:
-  CustomScopedSingleton(std::unique_ptr<T>&& instance) {
-    if (InjectableSingleton<T>::getExisting() == nullptr) {
-      instance_ = std::move(instance);
-      InjectableSingleton<T>::initialize(instance_.get());
-    }
+  static void initialize(std::unique_ptr<T>&& instance) {
+    absl::call_once(CustomInjectableSingleton<T>::create_once_, &CustomInjectableSingleton<T>::init,
+                    std::move(instance));
   }
+
   static T& get() {
-    if (InjectableSingleton<T>::getExisting() == nullptr) {
-      absl::call_once(CustomScopedSingleton<T>::create_once_, &CustomScopedSingleton<T>::Create);
-    }
+    absl::call_once(CustomInjectableSingleton<T>::create_once_,
+                    &CustomInjectableSingleton<T>::create);
     return InjectableSingleton<T>::get();
   }
 
-  ~CustomScopedSingleton() {
-    if (default_ == nullptr) {
-      InjectableSingleton<T>::clear();
-    }
-  }
-
 protected:
-  static void Create() {
-    default_ = createDefaultSocketInterface();
+  static void create() {
+    static T* default_ = createDefaultSocketInterface();
     InjectableSingleton<T>::initialize(default_);
   }
 
-  std::unique_ptr<T> instance_;
+  static void init(std::unique_ptr<T>&& instance) {
+    instance_ = std::move(instance);
+    InjectableSingleton<T>::initialize(instance_.get());
+  }
+
+  static std::unique_ptr<T> instance_;
   static absl::once_flag create_once_;
-  static T* default_;
 };
 
-template <class T> absl::once_flag CustomScopedSingleton<T>::create_once_;
+template <class T> absl::once_flag CustomInjectableSingleton<T>::create_once_;
 
-template <class T> T* CustomScopedSingleton<T>::default_ = nullptr;
+template <class T> std::unique_ptr<T> CustomInjectableSingleton<T>::instance_;
 
-using SocketInterfaceSingleton = CustomScopedSingleton<SocketInterface>;
+using SocketInterfaceSingleton = CustomInjectableSingleton<SocketInterface>;
 
 } // namespace Network
 } // namespace Envoy

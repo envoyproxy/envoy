@@ -15,8 +15,9 @@ Impl::Impl(Thread::ThreadFactory& thread_factory, Stats::Store& store,
            const ProcessContextOptRef& process_context)
     : thread_factory_(thread_factory), store_(store), time_system_(time_system),
       file_system_(file_system), process_context_(process_context) {
-  socket_interface_ = std::make_unique<Network::SocketInterfaceSingleton>(
-      std::make_unique<Network::SocketInterfaceImpl>());
+  std::unique_ptr<Network::SocketInterface> socket_interface;
+  socket_interface = std::make_unique<Network::SocketInterfaceImpl>();
+  Network::SocketInterfaceSingleton::initialize(std::move(socket_interface));
 }
 
 Event::DispatcherPtr Impl::allocateDispatcher(const std::string& name) {

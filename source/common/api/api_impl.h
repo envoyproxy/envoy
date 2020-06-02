@@ -9,8 +9,6 @@
 #include "envoy/network/socket.h"
 #include "envoy/thread/thread.h"
 
-#include "common/network/socket_interface_singleton.h"
-
 namespace Envoy {
 namespace Api {
 
@@ -39,7 +37,6 @@ private:
   Event::TimeSystem& time_system_;
   Filesystem::Instance& file_system_;
   ProcessContextOptRef process_context_;
-  std::unique_ptr<Network::SocketInterfaceSingleton> socket_interface_;
 };
 
 } // namespace Api
