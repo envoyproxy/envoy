@@ -1,5 +1,7 @@
 #pragma once
 
+#include "common/common/base64.h"
+
 #include "extensions/quic_listeners/quiche/platform/quiche_optional_impl.h"
 #include "extensions/quic_listeners/quiche/platform/quiche_string_piece_impl.h"
 #include "extensions/quic_listeners/quiche/platform/string_utils.h"
@@ -63,15 +65,12 @@ public:
   static std::string HexDecode(QuicheStringPieceImpl data) { return absl::HexStringToBytes(data); }
 
   static void Base64Encode(const uint8_t* data, size_t data_len, std::string* output) {
-    return quiche::Base64Encode(data, data_len, output);
+    *output =
+        Envoy::Base64::encode(reinterpret_cast<const char*>(data), data_len, /*add_padding=*/false);
   }
 
   static QuicheOptionalImpl<std::string> Base64Decode(QuicheStringPieceImpl input) {
-    std::string output;
-    if (!absl::Base64Unescape(input, &output)) {
-      return QuicheOptionalImpl<std::string>();
-    }
-    return output;
+    return Envoy::Base64::decodeWithoutPadding(input);
   }
 
   static std::string HexDump(QuicheStringPieceImpl binary_data) {
