@@ -1099,64 +1099,136 @@ class GenericConnectionPoolCallbacks;
 class UpstreamRequest;
 class GenericUpstream;
 
-// An API for wrapping either an HTTP or a TCP connection pool.
+/**
+ * An API for wrapping either an HTTP or a TCP connection pool.
+ *
+ * The GenericConnPool exists to create a GenericUpstream handle via a call to
+ * newStream resulting in an eventual call to onPoolReady
+ */
 class GenericConnPool : public Logger::Loggable<Logger::Id::router> {
 public:
   virtual ~GenericConnPool() = default;
 
-  // Called to create a new HTTP stream or TCP connection. The implementation
-  // is then responsible for calling either onPoolReady or onPoolFailure on the
-  // supplied GenericConnectionPoolCallbacks.
+  /**
+   * Called to create a new HTTP stream or TCP connection for "CONNECT streams".
+   *
+   * The implementation of the GenericConnPool will either call
+   * GenericConnectionPoolCallbacks::onPoolReady
+   * when a stream is available or GenericConnectionPoolCallbacks::onPoolFailure
+   * if stream creation fails.
+   *
+   * The caller is responsible for calling cancelAnyPendingRequest() if stream
+   * createation is no longer desired. newStream may only be called once per
+   * GenericConnPool.
+   *
+   * @param callbacks callbacks to communicate stream failure or creation on.
+   */
   virtual void newStream(GenericConnectionPoolCallbacks* callbacks) PURE;
-  // Called to cancel a call to newStream. Returns true if a newStream request
-  // was canceled, false otherwise.
+  /**
+   * Called to cancel any pending newStream request,
+   */
   virtual bool cancelAnyPendingRequest() PURE;
-  // Optionally returns the protocol for the connection pool.
+  /**
+   * @return optionally returns the protocol for the connection pool.
+   */
   virtual absl::optional<Http::Protocol> protocol() const PURE;
-  // Returns the host for this conn pool.
+  /**
+   * @return optionally returns the host for the connection pool.
+   */
   virtual Upstream::HostDescriptionConstSharedPtr host() const PURE;
 };
 
-// An API for the UpstreamRequest to get callbacks from either an HTTP or TCP
-// connection pool.
+/**
+ * An API for wrapping callbacks from either an HTTP or a TCP connection pool.
+ *
+ * Just like the connection pool callbacks, the GenericConnectionPoolCallbacks
+ * will either call onPoolReady when a GenericUpstream is ready, or
+ * onPoolFailure if a connection/stream can not be established.
+ */
 class GenericConnectionPoolCallbacks {
 public:
   virtual ~GenericConnectionPoolCallbacks() = default;
 
+  /**
+   * Called to indicate a failure for GenericConnPool::newStream to establish a stream.
+   *
+   * @param reason supplies the failure reason.
+   * @param transport_failure_reason supplies the details of the transport failure reason.
+   * @param host supplies the description of the host that caused the failure. This may be nullptr
+   *             if no host was involved in the failure (for example overflow).
+   */
   virtual void onPoolFailure(ConnectionPool::PoolFailureReason reason,
                              absl::string_view transport_failure_reason,
                              Upstream::HostDescriptionConstSharedPtr host) PURE;
+  /**
+   * Called when GenericConnPool::newStream has established a new stream.
+   *
+   * @param upstream supplies the generic upstream for the stream.
+   * @param host supplies the description of the host that will carry the request. For logical
+   *             connection pools the description may be different each time this is called.
+   * @param upstream_local_address supplies the local address of the upstream connection.
+   * @param info supplies the stream info object associated with the upstream connection.
+   */
   virtual void onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
                            Upstream::HostDescriptionConstSharedPtr host,
                            const Network::Address::InstanceConstSharedPtr& upstream_local_address,
                            const StreamInfo::StreamInfo& info) PURE;
+
+  // TODO(alyssawilk) This exists because the Connection Pool creates the GenericUpstream, and the
+  // GenericUpstream needs a handle back to the upstream request to pass on events, as upstream data
+  // flows in. I suppose we should split it into a proper interface?
   virtual UpstreamRequest* upstreamRequest() PURE;
 };
 
-// A generic API which covers common functionality between HTTP and TCP upstreams.
+/**
+ * An API for sending information to either a TCP or HTTP upstream.
+ *
+ * It is similar logically to RequestEncoder, only without the getStream interface.
+ */
 class GenericUpstream {
 public:
   virtual ~GenericUpstream() = default;
+  /**
+   * Encode a data frame.
+   * @param data supplies the data to encode. The data may be moved by the encoder.
+   * @param end_stream supplies whether this is the last data frame.
+   */
   virtual void encodeData(Buffer::Instance& data, bool end_stream) PURE;
+  /**
+   * Encode metadata.
+   * @param metadata_map_vector is the vector of metadata maps to encode.
+   */
   virtual void encodeMetadata(const Http::MetadataMapVector& metadata_map_vector) PURE;
+  /**
+   * Encode headers, optionally indicating end of stream.
+   * @param headers supplies the header map to encode.
+   * @param end_stream supplies whether this is a header only request.
+   */
   virtual void encodeHeaders(const Http::RequestHeaderMap& headers, bool end_stream) PURE;
+  /**
+   * Encode trailers. This implicitly ends the stream.
+   * @param trailers supplies the trailers to encode.
+   */
   virtual void encodeTrailers(const Http::RequestTrailerMap& trailers) PURE;
+  /**
+   * Enable/disable further data from this stream.
+   */
   virtual void readDisable(bool disable) PURE;
+  /**
+   * Reset the stream. No events will fire beyond this point.
+   * @param reason supplies the reset reason.
+   */
   virtual void resetStream() PURE;
 };
 
 using GenericConnPoolPtr = std::unique_ptr<GenericConnPool>;
+
 /*
- * A factory for FIXME creating transport socket. It will be associated to filter chains and
- * clusters.
+ * A factory for creating generic connection pools.
  */
 class GenericConnPoolFactory : public Envoy::Config::UntypedFactory {
 public:
   virtual ~GenericConnPoolFactory() = default;
-
-  // FIXME pass in a closure to get either.
-  using HttpOrTcpPool =
-      absl::variant<Http::ConnectionPool::Instance*, Tcp::ConnectionPool::Instance*>;
 
   /*
    * @param options for creating the transport socket
