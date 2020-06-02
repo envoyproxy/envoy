@@ -118,8 +118,8 @@ public:
   int size_;
 
   // Convert data_ buffer into a string
-  std::string dataString() const {
-    return std::string(reinterpret_cast<const char*>(data_), size_);
+  absl::string_view dataString() const {
+    return absl::string_view(reinterpret_cast<const char*>(data_), size_);
   }
 };
 
