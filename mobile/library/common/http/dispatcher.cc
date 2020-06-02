@@ -2,6 +2,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/lock_guard.h"
+#include "common/http/codes.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 
@@ -32,6 +33,13 @@ void Dispatcher::DirectStreamCallbacks::encodeHeaders(const ResponseHeaderMap& h
                                                       bool end_stream) {
   ENVOY_LOG(debug, "[S{}] response headers for stream (end_stream={}):\n{}",
             direct_stream_.stream_handle_, end_stream, headers);
+
+  uint64_t response_status = Utility::getResponseStatus(headers);
+
+  // Record received status to report success or failure stat in
+  // Dispatcher::DirectStreamCallbacks::closeRemote. Not reported here to avoid more complexity with
+  // checking end stream, and the potential for stream reset, thus resulting in mis-reporting.
+  observed_success_ = CodeUtility::is2xx(response_status);
 
   // @see Dispatcher::resetStream's comment on its call to runResetCallbacks.
   // Envoy only deferredDeletes the ActiveStream if it was fully closed otherwise it issues a reset.
@@ -68,7 +76,6 @@ void Dispatcher::DirectStreamCallbacks::encodeHeaders(const ResponseHeaderMap& h
   // successful local responses as actual success. Envoy Mobile surfaces non-200 local responses as
   // errors via callbacks rather than an HTTP response. This is inline with behaviour of other
   // mobile networking libraries.
-  uint64_t response_status = Http::Utility::getResponseStatus(headers);
   switch (response_status) {
   case 200: {
     // @see Dispatcher::DirectStream::dispatch_lock_ for why this lock is necessary.
@@ -174,7 +181,13 @@ void Dispatcher::DirectStreamCallbacks::closeRemote(bool end_stream) {
     // Envoy itself does not currently allow half-open streams where the local half is open
     // but the remote half is closed. Therefore, we fire the on_complete callback
     // to the platform layer whenever remote closes.
-    ENVOY_LOG(debug, "[S{}] complete stream", direct_stream_.stream_handle_);
+    ENVOY_LOG(debug, "[S{}] complete stream (success={})", direct_stream_.stream_handle_,
+              observed_success_);
+    if (observed_success_) {
+      http_dispatcher_.stats().stream_success_.inc();
+    } else {
+      http_dispatcher_.stats().stream_failure_.inc();
+    }
     bridge_callbacks_.on_complete(bridge_callbacks_.context);
     // Likewise cleanup happens whenever remote closes even though
     // local might be open. Note that if local is open Envoy will reset the stream. Calling cleanup
@@ -206,6 +219,9 @@ void Dispatcher::DirectStreamCallbacks::onReset() {
   if (direct_stream_.dispatchable(true)) {
     ENVOY_LOG(debug, "[S{}] dispatching to platform remote reset stream",
               direct_stream_.stream_handle_);
+    // Only count the on error if it is dispatchable. Otherwise, the onReset was caused due to a
+    // client side cancel via Dispatcher::DirectStream::resetStream().
+    http_dispatcher_.stats().stream_failure_.inc();
     bridge_callbacks_.on_error({code, message, attempt_count}, bridge_callbacks_.context);
 
     // All the terminal callbacks only cleanup if they are dispatchable.
@@ -218,6 +234,7 @@ void Dispatcher::DirectStreamCallbacks::onCancel() {
   // This call is guarded at the call-site @see Dispatcher::DirectStream::resetStream().
   // Therefore, it is dispatched here without protection.
   ENVOY_LOG(debug, "[S{}] dispatching to platform cancel stream", direct_stream_.stream_handle_);
+  http_dispatcher_.stats().stream_cancel_.inc();
   bridge_callbacks_.on_cancel(bridge_callbacks_.context);
 }
 
@@ -260,7 +277,12 @@ bool Dispatcher::DirectStream::dispatchable(bool close) {
   return !closed_.load();
 }
 
-void Dispatcher::ready(Event::Dispatcher& event_dispatcher, ApiListener& api_listener) {
+Dispatcher::Dispatcher(std::atomic<envoy_network_t>& preferred_network)
+    : stats_prefix_("http.dispatcher."), preferred_network_(preferred_network),
+      address_(std::make_shared<Network::Address::SyntheticAddressImpl>()) {}
+
+void Dispatcher::ready(Event::Dispatcher& event_dispatcher, Stats::Scope& scope,
+                       ApiListener& api_listener) {
   Thread::LockGuard lock(ready_lock_);
 
   // Drain the init_queue_ into the event_dispatcher_.
@@ -270,6 +292,7 @@ void Dispatcher::ready(Event::Dispatcher& event_dispatcher, ApiListener& api_lis
 
   // Ordering somewhat matters here if concurrency guarantees are loosened (e.g. if
   // we rely on atomics instead of locks).
+  stats_.emplace(generateStats(stats_prefix_, scope));
   event_dispatcher_ = &event_dispatcher;
   api_listener_ = &api_listener;
 }
@@ -287,10 +310,6 @@ void Dispatcher::post(Event::PostCb callback) {
   // event_dispatcher_ is ready.
   init_queue_.push_back(callback);
 }
-
-Dispatcher::Dispatcher(std::atomic<envoy_network_t>& preferred_network)
-    : preferred_network_(preferred_network),
-      address_(std::make_shared<Network::Address::SyntheticAddressImpl>()) {}
 
 envoy_status_t Dispatcher::startStream(envoy_stream_t new_stream_handle,
                                        envoy_http_callbacks bridge_callbacks) {
@@ -457,6 +476,13 @@ envoy_status_t Dispatcher::resetStream(envoy_stream_t stream) {
     return ENVOY_SUCCESS;
   }
   return ENVOY_FAILURE;
+}
+
+const DispatcherStats& Dispatcher::stats() const {
+  // Only the initial setting of the api_listener_ is guarded.
+  // By the time the Http::Dispatcher is using its stats ready must have been called.
+  ASSERT(TS_UNCHECKED_READ(stats_).has_value());
+  return TS_UNCHECKED_READ(stats_).value();
 }
 
 Dispatcher::DirectStreamSharedPtr Dispatcher::getStream(envoy_stream_t stream) {

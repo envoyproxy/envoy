@@ -2,6 +2,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/http/context_impl.h"
+#include "common/stats/isolated_store_impl.h"
 
 #include "test/common/http/common.h"
 #include "test/mocks/buffer/mocks.h"
@@ -42,7 +43,7 @@ ResponseHeaderMapPtr toResponseHeaders(envoy_headers headers) {
 
 class DispatcherTest : public testing::Test {
 public:
-  void ready() { http_dispatcher_.ready(event_dispatcher_, api_listener_); }
+  void ready() { http_dispatcher_.ready(event_dispatcher_, stats_store_, api_listener_); }
 
   typedef struct {
     uint32_t on_headers_calls;
@@ -60,6 +61,7 @@ public:
   envoy_http_callbacks bridge_callbacks_;
   std::atomic<envoy_network_t> preferred_network_{ENVOY_NET_GENERIC};
   Dispatcher http_dispatcher_{preferred_network_};
+  Stats::IsolatedStoreImpl stats_store_;
 };
 
 TEST_F(DispatcherTest, SetDestinationCluster) {
