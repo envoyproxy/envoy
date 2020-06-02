@@ -15,8 +15,8 @@ DefaultResponseEvaluator::DefaultResponseEvaluator(
     envoy::extensions::filters::http::admission_control::v3alpha::AdmissionControl::
         DefaultEvaluationCriteria evaluation_criteria) {
   // HTTP status.
-  if (evaluation_criteria.http_status_size() > 0) {
-    for (const auto& range : evaluation_criteria.http_status()) {
+  if (evaluation_criteria.http_success_status_size() > 0) {
+    for (const auto& range : evaluation_criteria.http_success_status()) {
       http_success_fns_.emplace_back([range](uint64_t status) {
         return (static_cast<uint64_t>(range.start()) <= status) &&
                (status < static_cast<uint64_t>(range.end()));
@@ -28,8 +28,8 @@ DefaultResponseEvaluator::DefaultResponseEvaluator(
   }
 
   // GRPC status.
-  if (evaluation_criteria.grpc_status_size() > 0) {
-    for (const auto& status : evaluation_criteria.grpc_status()) {
+  if (evaluation_criteria.grpc_success_status_size() > 0) {
+    for (const auto& status : evaluation_criteria.grpc_success_status()) {
       grpc_success_codes_.emplace_back(status);
     }
   } else {
@@ -53,13 +53,8 @@ bool DefaultResponseEvaluator::isGrpcSuccess(uint32_t status) const {
 }
 
 bool DefaultResponseEvaluator::isHttpSuccess(uint64_t code) const {
-  for (const auto& fn : http_success_fns_) {
-    if (!fn(code)) {
-      return false;
-    }
-  }
-
-  return true;
+  return std::any_of(http_success_fns_.begin(), http_success_fns_.end(),
+                     [code](auto fn) { return fn(code); });
 }
 
 } // namespace AdmissionControl

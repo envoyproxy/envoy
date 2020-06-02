@@ -3,8 +3,8 @@
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.h"
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.validate.h"
 
-#include "extensions/filters/http/admission_control/evaluators/default_evaluator.h"
 #include "extensions/filters/http/admission_control/admission_control.h"
+#include "extensions/filters/http/admission_control/evaluators/default_evaluator.h"
 
 #include "test/test_common/utility.h"
 
@@ -31,21 +31,13 @@ public:
     evaluator_ = std::make_unique<DefaultResponseEvaluator>(proto);
   }
 
-  void expectHttpSuccess(int code) {
-    EXPECT_TRUE(evaluator_->isHttpSuccess(code));
-  }
+  void expectHttpSuccess(int code) { EXPECT_TRUE(evaluator_->isHttpSuccess(code)); }
 
-  void expectHttpFail(int code) {
-    EXPECT_FALSE(evaluator_->isHttpSuccess(code));
-  }
+  void expectHttpFail(int code) { EXPECT_FALSE(evaluator_->isHttpSuccess(code)); }
 
-  void expectGrpcSuccess(int code) {
-    EXPECT_TRUE(evaluator_->isGrpcSuccess(code));
-  }
+  void expectGrpcSuccess(int code) { EXPECT_TRUE(evaluator_->isGrpcSuccess(code)); }
 
-  void expectGrpcFail(int code) {
-    EXPECT_FALSE(evaluator_->isGrpcSuccess(code));
-  }
+  void expectGrpcFail(int code) { EXPECT_FALSE(evaluator_->isGrpcSuccess(code)); }
 
   void verifyGrpcDefaultEval() {
     // Ok.
@@ -84,32 +76,36 @@ protected:
   std::unique_ptr<DefaultResponseEvaluator> evaluator_;
 };
 
-// Ensure the HTTP error code range configurations are honored.
+// Ensure the HTTP code succesful range configurations are honored.
 TEST_F(DefaultEvaluatorTest, HttpErrorCodes) {
   const std::string yaml = R"EOF(
-http_status:
-  - start: 300
-    end:   400
-grpc_status:
+http_success_status:
+  - start: 200
+    end:   300
+  - start: 400
+    end:   500
+grpc_success_status:
 )EOF";
 
   makeEvaluator(yaml);
 
-  for (int code = 200; code < 500; ++code) {
-    if (code < 400 && code >= 300) {
-      expectHttpFail(code);
+  for (int code = 200; code < 600; ++code) {
+    if ((code < 300 && code >= 200) || (code < 500 && code >= 400)) {
+      expectHttpSuccess(code);
       continue;
     }
 
-    expectHttpSuccess(code);
+    expectHttpFail(code);
   }
+
+  verifyGrpcDefaultEval();
 }
 
-// Verify default behavior of the filter.
+// Verify default success values of the evaluator.
 TEST_F(DefaultEvaluatorTest, DefaultBehaviorTest) {
   const std::string yaml = R"EOF(
-http_status:
-grpc_status:
+http_success_status:
+grpc_success_status:
 )EOF";
 
   makeEvaluator(yaml);
@@ -120,8 +116,8 @@ grpc_status:
 // Check that GRPC error code configurations are honored.
 TEST_F(DefaultEvaluatorTest, GrpcErrorCodes) {
   const std::string yaml = R"EOF(
-http_status:
-grpc_status:
+http_success_status:
+grpc_success_status:
   - 7
   - 13
 )EOF";
@@ -135,6 +131,8 @@ grpc_status:
       expectGrpcFail(code);
     }
   }
+
+  verifyHttpDefaultEval();
 }
 
 } // namespace
@@ -142,4 +140,3 @@ grpc_status:
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy
-

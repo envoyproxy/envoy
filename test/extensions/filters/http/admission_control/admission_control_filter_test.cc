@@ -109,8 +109,8 @@ aggression_coefficient:
   default_value: 1.0
   runtime_key: "foo.aggression"
 default_eval_criteria:
-  http_status:
-  grpc_status:
+  http_success_status:
+  grpc_success_status:
 )EOF"};
 };
 
@@ -125,8 +125,8 @@ aggression_coefficient:
   default_value: 1.0
   runtime_key: "foo.aggression"
 default_eval_criteria:
-  http_status:
-  grpc_status:
+  http_success_status:
+  grpc_success_status:
 )EOF";
 
   auto config = makeConfig(yaml);
@@ -196,8 +196,7 @@ TEST_F(AdmissionControlTest, HttpSuccessBehavior) {
   EXPECT_CALL(*evaluator_, isHttpSuccess(200)).WillRepeatedly(Return(true));
 
   Http::TestRequestHeaderMapImpl request_headers;
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-            filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
   sampleHttpRequest("200");
 
   TestUtility::waitForCounterEq(scope_, "test_prefix.rq_rejected", 0, time_system_);
@@ -237,8 +236,7 @@ TEST_F(AdmissionControlTest, GrpcSuccessBehavior) {
   EXPECT_CALL(*evaluator_, isGrpcSuccess(0)).WillRepeatedly(Return(true));
 
   Http::TestRequestHeaderMapImpl request_headers;
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-            filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
   sampleGrpcRequest("0");
 
   TestUtility::waitForCounterEq(scope_, "test_prefix.rq_rejected", 0, time_system_);
