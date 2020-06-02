@@ -18,6 +18,10 @@
     "files.exclude": {
       "**/.clangd/**": true,
       "**/bazel-*/**": true
+    },
+    "files.watcherExclude": {
+      "**/.clangd/**": true,
+      "**/bazel-*/**": true
     }
   },
   "remoteUser": "vscode",

@@ -2,6 +2,7 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -19,8 +20,14 @@ public:
   // This executes the filter decoders/encoders with the fuzzed data.
   template <class FilterType> void runData(FilterType* filter, const test::fuzz::HttpData& data);
 
+  // This executes the access logger with the fuzzed headers/trailers.
+  void accessLog(AccessLog::Instance* access_logger, const StreamInfo::StreamInfo& stream_info);
+
   // For fuzzing proto data, guide the mutator to useful 'Any' types.
   static void guideAnyProtoType(test::fuzz::HttpData* mutable_data, uint choice);
+
+  // Resets cached data (request headers, etc.). Should be called for each fuzz iteration.
+  void reset();
 
 protected:
   // Set-up filter specific mock expectations in constructor.
@@ -45,8 +52,6 @@ protected:
   template <class FilterType>
   void sendTrailers(FilterType* filter, const test::fuzz::HttpData& data) = delete;
 
-  void reset();
-
 private:
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callback_;
@@ -56,6 +61,7 @@ private:
   Network::Address::InstanceConstSharedPtr addr_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   NiceMock<Http::MockAsyncClientRequest> async_request_;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
 
   // Mocked callbacks.
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
@@ -64,6 +70,7 @@ private:
   // Filter constructed from the config.
   Http::StreamDecoderFilterSharedPtr decoder_filter_;
   Http::StreamEncoderFilterSharedPtr encoder_filter_;
+  AccessLog::InstanceSharedPtr access_logger_;
 
   // Headers/trailers need to be saved for the lifetime of the the filter,
   // so save them as member variables.

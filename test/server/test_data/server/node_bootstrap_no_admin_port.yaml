@@ -5,4 +5,4 @@ node:
     zone: bootstrap_zone
     sub_zone: bootstrap_sub_zone
 admin:
-  access_log_path: /dev/null
+  access_log_path: {{ null_device_path }}
