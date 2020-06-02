@@ -130,6 +130,10 @@ void HttpHeaderMatcherBase::matchHeaders(const Http::HeaderMap& headers,
   statuses[my_index_].might_change_status_ = false;
 }
 
+// HttpGenericBodyMatcher
+// Scans the HTTP body and looks for patterns.
+// HTTP body may be passed to the matcher in chunks. The search logic buffers
+// only as many bytes as is the length of the longest pattern to be found.
 HttpGenericBodyMatcher::HttpGenericBodyMatcher(
     const envoy::config::tap::v3::HttpGenericBodyMatch& config,
     const std::vector<MatcherPtr>& matchers)
@@ -156,18 +160,127 @@ HttpGenericBodyMatcher::HttpGenericBodyMatcher(
     }
   }
   limit_ = config.bytes_limit();
+  auto index = std::max_element(
+      patterns_.begin(), patterns_.end(),
+      [](const std::string& i, const std::string& j) -> bool { return i.length() < j.length(); });
+  longest_pattern_ = (*index).length();
+  overlap_ = (*index).substr(0, (*index).length() - 1);
 }
 
-void HttpGenericBodyMatcher::onBody(const Buffer::Instance& data,
-                                    MatchStatusVector& statuses) const {
-  // Look for all patterns stored in patterns_.
-  bool found = std::all_of(patterns_.begin(), patterns_.end(), [&data, this](std::string pattern) {
-    return (-1 !=
-            data.search(static_cast<const void*>(pattern.c_str()), pattern.length(), 0, limit_));
-  });
+void HttpGenericBodyMatcher::onBody(const Buffer::Instance& data, MatchStatusVector& statuses) {
+  if (((0 != limit_) && (limit_ == processed_bytes_)) || (patterns_.empty())) {
+    // End of search limit has been already reached or all patterns have been found.
+    // Status is not going to change.
+    ASSERT(statuses[my_index_].might_change_status_ == false);
+    return;
+  }
+  if (0 != bytes_in_overlap_) {
+    // Here we handle a situation when a pattern is spread across multiple body buffers.
+    // overlap_ stores number of bytes from previous body chunks equal to longest pattern yet to be
+    // found minus one byte (-1). The logic below tries to find the beginning of the pattern in
+    // overlap_ buffer and the pattern should continue at the beginning of the next buffer. Iterate
+    // through all patterns yet to be find.
+    auto it = patterns_.begin();
+    while(it != patterns_.end()) {
+      const auto& pattern = *it;
+      // Take the first character from the pattern and locate it in overlap_.
+      auto index_pattern = 0;
+      auto index_overlap = overlap_.find(pattern[index_pattern]);
+      if (index_overlap == std::string::npos) {
+        // Pattern not found. Check the next one.
+        it++;
+        continue;
+      }
+      bool match = true;
+      // Continue checking characters until end of overlap_ buffer.
+      while (index_overlap < bytes_in_overlap_) {
+        if (pattern[index_pattern] != overlap_[index_overlap]) {
+          match = false;
+          break;
+        }
+        index_pattern++;
+        index_overlap++;
+      }
+      if (!match) {
+        // Pattern not found. Try the next pattern.
+        it++;
+        continue;
+      }
+      // Now check if the remaining of the pattern matches the beginning of the body
+      // buffer.i Do it only if there is sufficient number of bytes in the data buffer.
+      auto pattern_remainder = pattern.substr(index_pattern);
+      if ((0 != limit_) && (pattern_remainder.length() > (limit_ - processed_bytes_))) {
+        // Even if we got match it would be outside the search limit
+        it++;
+        continue;
+      }
+      if ((pattern_remainder.length() <= data.length()) && data.startsWith(pattern_remainder)) {
+        // Pattern found. Remove it from the list of patterns to be found.
+        // If it was the last one of the patterns to be found update
+        // matcher's state.
+        it = patterns_.erase(it);
+      } else {
+        it++;
+      }
+    }
+  }
 
-  statuses[my_index_].matches_ = found;
-  statuses[my_index_].might_change_status_ = false;
+  auto search_limit = limit_ - processed_bytes_;
+  for (auto it = patterns_.begin(); it != patterns_.end();) {
+    if (-1 != data.search(static_cast<const void*>(it->data()), it->length(), 0, search_limit)) {
+      it = patterns_.erase(it);
+    } else {
+      it++;
+    }
+  }
+
+  if (patterns_.empty()) {
+    // All patterns were found.
+    statuses[my_index_].matches_ = true;
+    statuses[my_index_].might_change_status_ = false;
+    return;
+  }
+
+  if (0 != limit_) {
+    processed_bytes_ = std::min(uint64_t(limit_), processed_bytes_ + data.length());
+    if (limit_ == processed_bytes_) {
+      // End of search limit has been reached and not all patterns have been found.
+      statuses[my_index_].matches_ = false;
+      statuses[my_index_].might_change_status_ = false;
+      return;
+    }
+  }
+
+  // The matcher buffers the last X bytes where X is equal to the length of the
+  // longest pattern - 1. With the arrival of the new 'data' the following situations
+  // are possible:
+  // 1. The new data's length is larger than X-1. In this case just copy last X-1 bytes
+  // from the data to overlap_ buffer.
+  // 2. The new data length is smaller than X-1 and there enough room in overlap buffer to just copy
+  // the bytes from data
+  // 3. The new data length is smaller than X-1 and there is not enough room in overlap buffer.
+  if (data.length() >= longest_pattern_) {
+    // Case 1:
+    // Just overwrite the entire overlap_ buffer with new data.
+    data.copyOut(data.length() - longest_pattern_ + 1, longest_pattern_ - 1,
+                 const_cast<char*>(overlap_.data()));
+    bytes_in_overlap_ = longest_pattern_ - 1;
+  } else {
+    if (data.length() <= (overlap_.length() - bytes_in_overlap_)) {
+      // Case 2. Just add the new data on top of already buffered.
+      data.copyOut(0, data.length(), const_cast<char*>(overlap_.data() + bytes_in_overlap_));
+      bytes_in_overlap_ += data.length();
+    } else {
+      // Case 3. First shift data and then copy the last entire buffer.
+      const size_t shift = bytes_in_overlap_ - ((longest_pattern_ - 1) - data.length());
+      memcpy(const_cast<char*>(overlap_.data()), overlap_.data() + shift,
+             (bytes_in_overlap_ - shift));
+      data.copyOut(0, data.length(),
+                   const_cast<char*>(overlap_.data() + (bytes_in_overlap_ - shift)));
+      bytes_in_overlap_ += data.length() - shift;
+      ASSERT(bytes_in_overlap_ == (longest_pattern_ - 1));
+    }
+  }
 }
 
 } // namespace Tap

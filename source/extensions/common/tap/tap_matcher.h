@@ -111,7 +111,7 @@ public:
    * @param statuses supplies the per-stream-request match status vector which must be the same
    *                 size as the match tree vector (see above).
    */
-  virtual void onRequestBody(const Buffer::Instance& data, MatchStatusVector& statuses) const PURE;
+  virtual void onRequestBody(const Buffer::Instance& data, MatchStatusVector& statuses) PURE;
 
   /**
    * Update match status given HTTP response body.
@@ -119,7 +119,7 @@ public:
    * @param statuses supplies the per-stream-request match status vector which must be the same
    *                 size as the match tree vector (see above).
    */
-  virtual void onResponseBody(const Buffer::Instance& data, MatchStatusVector& statuses) const PURE;
+  virtual void onResponseBody(const Buffer::Instance& data, MatchStatusVector& statuses) PURE;
 
   /**
    * @return whether given currently available information, the matcher matches.
@@ -176,12 +176,12 @@ public:
       m.onHttpResponseTrailers(response_trailers, statuses);
     });
   }
-  void onRequestBody(const Buffer::Instance& data, MatchStatusVector& statuses) const override {
+  void onRequestBody(const Buffer::Instance& data, MatchStatusVector& statuses) override {
     updateLocalStatus(statuses, [&data](Matcher& m, MatchStatusVector& statuses) {
       m.onRequestBody(data, statuses);
     });
   }
-  void onResponseBody(const Buffer::Instance& data, MatchStatusVector& statuses) const override {
+  void onResponseBody(const Buffer::Instance& data, MatchStatusVector& statuses) override {
     updateLocalStatus(statuses, [&data](Matcher& m, MatchStatusVector& statuses) {
       m.onResponseBody(data, statuses);
     });
@@ -240,8 +240,8 @@ public:
   void onHttpRequestTrailers(const Http::RequestTrailerMap&, MatchStatusVector&) const override {}
   void onHttpResponseHeaders(const Http::ResponseHeaderMap&, MatchStatusVector&) const override {}
   void onHttpResponseTrailers(const Http::ResponseTrailerMap&, MatchStatusVector&) const override {}
-  void onRequestBody(const Buffer::Instance&, MatchStatusVector&) const override {}
-  void onResponseBody(const Buffer::Instance&, MatchStatusVector&) const override {}
+  void onRequestBody(const Buffer::Instance&, MatchStatusVector&) override {}
+  void onResponseBody(const Buffer::Instance&, MatchStatusVector&) override {}
 };
 
 /**
@@ -336,28 +336,36 @@ public:
   HttpBodyMatcherBase(const std::vector<MatcherPtr>& matchers) : SimpleMatcher(matchers) {}
 
 protected:
-  // Limit search to specified number of bytes;
+  // Limit search to specified number of bytes.
+  // Value equal to zero means no limit.
   uint32_t limit_{};
+  // Tracks how many bytes has been already processed.
+  // Used only when limit_ is not zero.
+  uint32_t processed_bytes_{};
 };
 
 class HttpGenericBodyMatcher : public HttpBodyMatcherBase {
 public:
   HttpGenericBodyMatcher(const envoy::config::tap::v3::HttpGenericBodyMatch& config,
                          const std::vector<MatcherPtr>& matchers);
+  size_t getLongestPattern() const { return longest_pattern_; }
 
 protected:
-  void onBody(const Buffer::Instance&, MatchStatusVector&) const;
+  void onBody(const Buffer::Instance&, MatchStatusVector&);
 
 private:
   // Vector of strings which body must contain to get match.
-  std::vector<std::string> patterns_;
+  std::list<std::string> patterns_;
+  size_t longest_pattern_;
+  std::string overlap_;
+  size_t bytes_in_overlap_{0};
 };
 
 class HttpRequestGenericBodyMatcher : public HttpGenericBodyMatcher {
 public:
   using HttpGenericBodyMatcher::HttpGenericBodyMatcher;
 
-  void onRequestBody(const Buffer::Instance& data, MatchStatusVector& statuses) const override {
+  void onRequestBody(const Buffer::Instance& data, MatchStatusVector& statuses) override {
     onBody(data, statuses);
   }
 };
@@ -366,7 +374,7 @@ class HttpResponseGenericBodyMatcher : public HttpGenericBodyMatcher {
 public:
   using HttpGenericBodyMatcher::HttpGenericBodyMatcher;
 
-  void onResponseBody(const Buffer::Instance& data, MatchStatusVector& statuses) const override {
+  void onResponseBody(const Buffer::Instance& data, MatchStatusVector& statuses) override {
     onBody(data, statuses);
   }
 };
