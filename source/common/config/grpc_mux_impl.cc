@@ -125,10 +125,12 @@ bool GrpcMuxImpl::paused(const std::string& type_url) const {
 
 void GrpcMuxImpl::onDiscoveryResponse(
     std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message,
-    ControlPlaneStats* control_plane_stats) {
+    ControlPlaneStats& control_plane_stats) {
   const std::string& type_url = message->type_url();
   ENVOY_LOG(debug, "Received gRPC message for {} at version {}", type_url, message->version_info());
-  control_plane_stats->identifier_.set(message->control_plane().identifier());
+  if (message->has_control_plane()) {
+    control_plane_stats.identifier_.set(message->control_plane().identifier());
+  }
   if (api_state_.count(type_url) == 0) {
     ENVOY_LOG(warn, "Ignoring the message for type URL {} as it has no current subscribers.",
               type_url);

@@ -96,10 +96,11 @@ public:
   }
 
   virtual void verifyControlPlaneStats(uint32_t connected_state) {
-    EXPECT_EQ(
-        connected_state,
-        stats_store_.gauge("control_plane.connected_state", Stats::Gauge::ImportMode::NeverImport)
-            .value());
+    EXPECT_EQ(connected_state, control_plane_stats_
+                                   .connected_state_
+                                   // stats_store_.gauge("control_plane.connected_state",
+                                   // Stats::Gauge::ImportMode::NeverImport)
+                                   .value());
   }
 
   virtual void expectConfigUpdateFailed() PURE;

@@ -97,7 +97,7 @@ public:
   MOCK_METHOD(void, onEstablishmentFailure, ());
   MOCK_METHOD(void, onDiscoveryResponse,
               (std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse> && message,
-               ControlPlaneStats* control_plane_stats));
+               ControlPlaneStats& control_plane_stats));
   MOCK_METHOD(void, onWriteable, ());
 };
 

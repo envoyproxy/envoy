@@ -122,7 +122,7 @@ public:
    * For the GrpcStream to pass received protos to the context.
    */
   virtual void onDiscoveryResponse(std::unique_ptr<ResponseProto>&& message,
-                                   ControlPlaneStats* control_plane_stats) PURE;
+                                   ControlPlaneStats& control_plane_stats) PURE;
 
   /**
    * For the GrpcStream to call when its rate limiting logic allows more requests to be sent.

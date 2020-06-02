@@ -55,7 +55,7 @@ public:
   void onEstablishmentFailure() override;
   void
   onDiscoveryResponse(std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message,
-                      ControlPlaneStats* control_plane_stats) override;
+                      ControlPlaneStats& control_plane_stats) override;
   void onWriteable() override;
 
   GrpcStream<envoy::service::discovery::v3::DiscoveryRequest,
@@ -154,7 +154,7 @@ public:
   void onStreamEstablished() override {}
   void onEstablishmentFailure() override {}
   void onDiscoveryResponse(std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&&,
-                           ControlPlaneStats*) override {}
+                           ControlPlaneStats&) override {}
 };
 
 } // namespace Config
