@@ -3,6 +3,8 @@ Version history
 
 1.14.3 (Pending)
 ================
+* listener: Add runtime support for `per-listener limits <config_listeners_runtime>` on
+  active/accepted connections.
 
 1.14.2 (June 8, 2020)
 =====================

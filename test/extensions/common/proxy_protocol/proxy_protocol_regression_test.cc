@@ -1,6 +1,7 @@
 #include "envoy/network/address.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/common/basic_resource_impl.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/network/connection_balancer_impl.h"
 #include "common/network/listen_socket_impl.h"
@@ -70,6 +71,7 @@ public:
   uint64_t listenerTag() const override { return 1; }
   const std::string& name() const override { return name_; }
   Network::ActiveUdpListenerFactory* udpListenerFactory() override { return nullptr; }
+  ResourceLimit& openConnections() override { return open_connections_; }
   envoy::config::core::v3::TrafficDirection direction() const override {
     return envoy::config::core::v3::UNSPECIFIED;
   }
@@ -161,6 +163,7 @@ public:
   Network::MockFilterChainFactory factory_;
   Network::ClientConnectionPtr conn_;
   NiceMock<Network::MockConnectionCallbacks> connection_callbacks_;
+  BasicResourceLimitImpl open_connections_;
   Network::Connection* server_connection_;
   Network::MockConnectionCallbacks server_callbacks_;
   std::shared_ptr<Network::MockReadFilter> read_filter_;

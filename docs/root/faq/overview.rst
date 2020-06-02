@@ -34,6 +34,7 @@ Configuration
   configuration/flow_control
   configuration/timeouts
   configuration/deprecation
+  configuration/resource_limits
 
 Load balancing
 --------------
