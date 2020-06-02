@@ -62,10 +62,6 @@ makeHermeticPathsAndPorts(Fuzz::PerTestEnvironment& test_env,
     for (auto& host : *cluster.mutable_hidden_envoy_deprecated_hosts()) {
       makePortHermetic(test_env, host);
     }
-    // Not implemented
-    if (cluster.lb_policy() == envoy::config::cluster::v3::Cluster::LOAD_BALANCING_POLICY_CONFIG) {
-      cluster.set_lb_policy(envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
-    }
     for (int j = 0; j < cluster.load_assignment().endpoints_size(); ++j) {
       auto* locality_lb = cluster.mutable_load_assignment()->mutable_endpoints(j);
       for (int k = 0; k < locality_lb->lb_endpoints_size(); ++k) {
