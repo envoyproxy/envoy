@@ -301,7 +301,7 @@ TEST_F(RedisProxyFilterTest, AuthWhenNotRequired) {
             error->asString() = "ERR Client sent AUTH, but no password is set";
             EXPECT_CALL(*encoder_, encode(Eq(ByRef(*error)), _));
             EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
-            callbacks.onAuth("foo");
+            callbacks.onAuth("", "foo");
             // callbacks cannot be accessed now.
             EXPECT_TRUE(filter_->connectionAllowed());
             return nullptr;
@@ -344,7 +344,7 @@ TEST_F(RedisProxyFilterWithAuthPasswordTest, AuthPasswordCorrect) {
             reply->asString() = "OK";
             EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
             EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
-            callbacks.onAuth("somepassword");
+            callbacks.onAuth("", "somepassword");
             // callbacks cannot be accessed now.
             EXPECT_TRUE(filter_->connectionAllowed());
             return nullptr;
@@ -371,7 +371,7 @@ TEST_F(RedisProxyFilterWithAuthPasswordTest, AuthPasswordIncorrect) {
             reply->asString() = "ERR invalid password";
             EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
             EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
-            callbacks.onAuth("wrongpassword");
+            callbacks.onAuth("", "wrongpassword");
             // callbacks cannot be accessed now.
             EXPECT_FALSE(filter_->connectionAllowed());
             return nullptr;

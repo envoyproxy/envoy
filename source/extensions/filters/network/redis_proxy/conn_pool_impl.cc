@@ -74,6 +74,7 @@ InstanceImpl::ThreadLocalPool::ThreadLocalPool(InstanceImpl& parent, Event::Disp
   cluster_update_handle_ = parent_.cm_.addThreadLocalClusterUpdateCallbacks(*this);
   Upstream::ThreadLocalCluster* cluster = parent_.cm_.get(cluster_name_);
   if (cluster != nullptr) {
+    auth_username_ = ProtocolOptionsConfigImpl::authUsername(cluster->info(), parent_.api_);
     auth_password_ = ProtocolOptionsConfigImpl::authPassword(cluster->info(), parent_.api_);
     onClusterAddOrUpdateNonVirtual(*cluster);
   }
@@ -214,9 +215,9 @@ InstanceImpl::ThreadLocalPool::threadLocalActiveClient(Upstream::HostConstShared
   if (!client) {
     client = std::make_unique<ThreadLocalActiveClient>(*this);
     client->host_ = host;
-    client->redis_client_ = parent_.client_factory_.create(host, dispatcher_, parent_.config_,
-                                                           parent_.redis_command_stats_,
-                                                           *parent_.stats_scope_, auth_password_);
+    client->redis_client_ = parent_.client_factory_.create(
+        host, dispatcher_, parent_.config_, parent_.redis_command_stats_, *parent_.stats_scope_,
+        auth_username_, auth_password_);
     client->redis_client_->addConnectionCallbacks(*client);
   }
   return client;

@@ -22,7 +22,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Redis Proxy :ref:`configuration overview <config_network_filters_redis_proxy>`.
 // [#extension: envoy.filters.network.redis_proxy]
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message RedisProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.redis_proxy.v2.RedisProxy";
@@ -230,6 +230,8 @@ message RedisProxy {
   // AUTH, but no password is set" error will be returned.
   config.core.v3.DataSource downstream_auth_password = 6 [(udpa.annotations.sensitive) = true];
 
+  config.core.v3.DataSource downstream_auth_username = 7 [(udpa.annotations.sensitive) = true];
+
   string hidden_envoy_deprecated_cluster = 2
       [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 }
@@ -244,4 +246,6 @@ message RedisProtocolOptions {
   // Upstream server password as defined by the `requirepass` directive
   // <https://redis.io/topics/config>`_ in the server's configuration file.
   config.core.v3.DataSource auth_password = 1 [(udpa.annotations.sensitive) = true];
+
+  config.core.v3.DataSource auth_username = 2 [(udpa.annotations.sensitive) = true];
 }

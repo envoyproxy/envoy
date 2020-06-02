@@ -157,6 +157,7 @@ private:
     std::unordered_map<Upstream::HostConstSharedPtr, ThreadLocalActiveClientPtr> client_map_;
     Envoy::Common::CallbackHandle* host_set_member_update_cb_handle_{};
     std::unordered_map<std::string, Upstream::HostConstSharedPtr> host_address_map_;
+    std::string auth_username_;
     std::string auth_password_;
     std::list<Upstream::HostSharedPtr> created_via_redirect_hosts_;
     std::list<ThreadLocalActiveClientPtr> clients_to_drain_;

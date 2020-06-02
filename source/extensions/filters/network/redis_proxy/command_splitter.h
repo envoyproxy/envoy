@@ -44,7 +44,7 @@ public:
    * Called when an authentication command has been received.
    * @param password supplies the AUTH password provided by the downstream client.
    */
-  virtual void onAuth(const std::string& password) PURE;
+  virtual void onAuth(const std::string& username, const std::string& password) PURE;
 
   /**
    * Called when the response is ready.

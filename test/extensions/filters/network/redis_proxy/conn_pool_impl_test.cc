@@ -199,8 +199,9 @@ public:
   Common::Redis::Client::ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher&,
                                           const Common::Redis::Client::Config&,
                                           const Common::Redis::RedisCommandStatsSharedPtr&,
-                                          Stats::Scope&, const std::string& password) override {
-    EXPECT_EQ(auth_password_, password);
+                                          Stats::Scope&, const std::string& username,
+                                          const std::string& password) override {
+    EXPECT_EQ(username, password);
     return Common::Redis::Client::ClientPtr{create_(host)};
   }
 

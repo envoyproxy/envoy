@@ -23,6 +23,8 @@ ProxyFilterConfig::ProxyFilterConfig(
     : drain_decision_(drain_decision), runtime_(runtime),
       stat_prefix_(fmt::format("redis.{}.", config.stat_prefix())),
       stats_(generateStats(stat_prefix_, scope)),
+      downstream_auth_username_(
+          Config::DataSource::read(config.downstream_auth_username(), true, api)),
       downstream_auth_password_(
           Config::DataSource::read(config.downstream_auth_password(), true, api)) {}
 
@@ -38,7 +40,8 @@ ProxyFilter::ProxyFilter(Common::Redis::DecoderFactory& factory,
       config_(config) {
   config_->stats_.downstream_cx_total_.inc();
   config_->stats_.downstream_cx_active_.inc();
-  connection_allowed_ = config_->downstream_auth_password_.empty();
+  connection_allowed_ =
+      config_->downstream_auth_username_.empty() && config_->downstream_auth_password_.empty();
 }
 
 ProxyFilter::~ProxyFilter() {
@@ -79,12 +82,14 @@ void ProxyFilter::onEvent(Network::ConnectionEvent event) {
   }
 }
 
-void ProxyFilter::onAuth(PendingRequest& request, const std::string& password) {
+void ProxyFilter::onAuth(PendingRequest& request, const std::string& username,
+                         const std::string& password) {
   Common::Redis::RespValuePtr response{new Common::Redis::RespValue()};
   if (config_->downstream_auth_password_.empty()) {
     response->type(Common::Redis::RespType::Error);
     response->asString() = "ERR Client sent AUTH, but no password is set";
-  } else if (password == config_->downstream_auth_password_) {
+  } else if (username == config_->downstream_auth_username_ &&
+             password == config_->downstream_auth_password_) {
     response->type(Common::Redis::RespType::SimpleString);
     response->asString() = "OK";
     connection_allowed_ = true;
