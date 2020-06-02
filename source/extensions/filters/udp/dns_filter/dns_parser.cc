@@ -183,7 +183,16 @@ bool DnsMessageParser::parseDnsObject(DnsQueryContextPtr& context,
     }
   }
 
-  // TODO(abaptiste):  Verify that queries do not contain answer records
+  if (!header_.flags.qr && header_.answers) {
+    ENVOY_LOG(debug, "Answer records present in query");
+    return false;
+  }
+
+  if (header_.questions > 1) {
+    ENVOY_LOG(debug, "Multiple [{}] questions in DNS query", header_.questions);
+    return false;
+  }
+
   // Verify that we still have available data in the buffer to read answer and query records
   if (offset > buffer->length()) {
     ENVOY_LOG(debug, "Buffer read offset[{}] is larget than buffer length [{}].", offset,

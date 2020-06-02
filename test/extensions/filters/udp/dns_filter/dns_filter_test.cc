@@ -789,7 +789,9 @@ TEST_F(DnsFilterTest, MultipleQueryCountTest) {
 
   setup(forward_query_off_config);
   // In this buffer we have 2 queries for two different domains. This is a rare case
-  // and serves to validate that we handle the protocol correctly.
+  // and serves to validate that we handle the protocol correctly. We will return an
+  // error to the client since most implementations will send the two questions as two
+  // separate DNS queries
   constexpr char dns_request[] = {
       0x36, 0x6d,                               // Transaction ID
       0x01, 0x20,                               // Flags
@@ -813,59 +815,15 @@ TEST_F(DnsFilterTest, MultipleQueryCountTest) {
   sendQueryFromClient("10.0.0.1:1000", query);
 
   query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
-  EXPECT_TRUE(query_ctx_->parse_status_);
-  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_parser_->getQueryResponseCode());
-
-  EXPECT_EQ(0, config_->stats().downstream_rx_invalid_queries_.value());
-  EXPECT_EQ(2, config_->stats().a_record_queries_.value());
-  EXPECT_EQ(3, query_ctx_->answers_.size());
-
-  // Verify that the answers contain an entry for each domain
-  for (const auto& answer : query_ctx_->answers_) {
-    if (answer.first == "www.foo1.com") {
-      Utils::verifyAddress({"10.0.0.1", "10.0.0.2"}, answer.second);
-    } else if (answer.first == "www.foo3.com") {
-      Utils::verifyAddress({"10.0.3.1"}, answer.second);
-    } else {
-      FAIL() << "Unexpected domain in DNS response: " << answer.first;
-    }
-  }
-}
-
-TEST_F(DnsFilterTest, InvalidQueryCountTest) {
-  InSequence s;
-
-  setup(forward_query_off_config);
-  // In this buffer the Questions count is incorrect. We will abort parsing and return a response
-  // to the client.
-  constexpr char dns_request[] = {
-      0x36, 0x6e,                               // Transaction ID
-      0x01, 0x20,                               // Flags
-      0x00, 0x0a,                               // Questions
-      0x00, 0x00,                               // Answers
-      0x00, 0x00,                               // Authority RRs
-      0x00, 0x00,                               // Additional RRs
-      0x03, 0x77, 0x77, 0x77, 0x04, 0x66, 0x6f, // Query record for
-      0x6f, 0x33, 0x03, 0x63, 0x6f, 0x6d, 0x00, // www.foo3.com
-      0x00, 0x01,                               // Query Type - A
-      0x00, 0x01,                               // Query Class - IN
-  };
-
-  constexpr size_t count = sizeof(dns_request) / sizeof(dns_request[0]);
-  const std::string query = Utils::buildQueryFromBytes(dns_request, count);
-
-  sendQueryFromClient("10.0.0.1:1000", query);
-
-  query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
-  EXPECT_TRUE(query_ctx_->parse_status_);
+  EXPECT_FALSE(query_ctx_->parse_status_);
   EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, response_parser_->getQueryResponseCode());
 
-  EXPECT_EQ(1, config_->stats().a_record_queries_.value());
   EXPECT_EQ(1, config_->stats().downstream_rx_invalid_queries_.value());
+  EXPECT_EQ(0, config_->stats().a_record_queries_.value());
   EXPECT_EQ(0, query_ctx_->answers_.size());
 }
 
-TEST_F(DnsFilterTest, InvalidQueryCountTest2) {
+TEST_F(DnsFilterTest, InvalidQueryCountTest) {
   InSequence s;
 
   setup(forward_query_off_config);
