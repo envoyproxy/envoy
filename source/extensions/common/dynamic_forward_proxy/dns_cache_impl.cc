@@ -1,10 +1,10 @@
-#include "extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
-
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 
 #include "common/config/utility.h"
 #include "common/http/utility.h"
 #include "common/network/utility.h"
+
+#include "extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
 
 // TODO(mattklein123): Move DNS family helpers to a smaller include.
 #include "common/upstream/upstream_impl.h"
@@ -23,19 +23,19 @@ DnsCacheImpl::DnsCacheImpl(
       resolver_(main_thread_dispatcher.createDnsResolver({}, false)), tls_slot_(tls.allocateSlot()),
       scope_(root_scope.createScope(fmt::format("dns_cache.{}.", config.name()))),
       stats_{ALL_DNS_CACHE_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_))},
-      resource_manager_(DnsCacheImpl::generateDnsCacheCircuitBreakersStats(*scope_), loader,
-                        config.name(),
-                        config.has_dns_cache_circuit_breaker()
-                            ? absl::make_optional(std::move(config.dns_cache_circuit_breaker()))
-                            : absl::nullopt),
+      resource_manager_(
+          config.has_dns_cache_circuit_breaker()
+              ? absl::make_optional(std::make_shared<DnsCacheResourceManagerImpl>(
+                    DnsCacheImpl::generateDnsCacheCircuitBreakersStats(*scope_), loader,
+                    config.name(), std::move(config.dns_cache_circuit_breaker())))
+              : absl::nullopt),
       refresh_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_refresh_rate, 60000)),
       failure_backoff_strategy_(
           Config::Utility::prepareDnsRefreshStrategy<
               envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig>(
               config, refresh_interval_.count(), random)),
       host_ttl_(PROTOBUF_GET_MS_OR_DEFAULT(config, host_ttl, 300000)),
-      max_hosts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_hosts, 1024)),
-      use_dns_cache_resource_manager_(config.has_dns_cache_circuit_breaker()) {
+      max_hosts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_hosts, 1024)) {
   tls_slot_->set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalHostInfo>(); });
   updateTlsHostsMap();
 }

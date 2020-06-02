@@ -13,13 +13,15 @@
 #include "common/common/assert.h"
 #include "common/common/basic_resource_impl.h"
 
+#include "extensions/common/dynamic_forward_proxy/dns_cache.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {
 namespace DynamicForwardProxy {
 
 #define ALL_DNS_CACHE_CIRCUIT_BREAKERS_STATS(OPEN_GAUGE, REMAINING_GAUGE)                          \
-  OPEN_GAUGE(rq_pending_opening, Accumulate)                                                       \
+  OPEN_GAUGE(rq_pending_open, Accumulate)                                                          \
   REMAINING_GAUGE(rq_pending_remaining, Accumulate)
 
 struct DnsCacheCircuitBreakersStats {
@@ -54,21 +56,16 @@ private:
   Stats::Gauge& remaining_;
 };
 
-class DnsCacheResourceManager : public Envoy::Upstream::ResourceManager {
+class DnsCacheResourceManagerImpl : public DnsCacheResourceManager {
 public:
-  DnsCacheResourceManager(
+  DnsCacheResourceManagerImpl(
       DnsCacheCircuitBreakersStats&& cb_stats, Runtime::Loader& loader,
       const std::string& config_name,
-      const absl::optional<
-          envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheCircuitBreakers>&
+      const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheCircuitBreakers&
           cb_config);
 
   // Envoy::Upstream::ResourceManager
   ResourceLimit& pendingRequests() override { return pending_requests_; }
-  ResourceLimit& connections() override { NOT_REACHED_GCOVR_EXCL_LINE; }
-  ResourceLimit& requests() override { NOT_REACHED_GCOVR_EXCL_LINE; }
-  ResourceLimit& retries() override { NOT_REACHED_GCOVR_EXCL_LINE; }
-  ResourceLimit& connectionPools() override { NOT_REACHED_GCOVR_EXCL_LINE; }
 
 private:
   DnsCacheResourceImpl pending_requests_;

@@ -1,11 +1,10 @@
 #pragma once
 
+#include "envoy/common/resource.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/thread_local/thread_local.h"
-
-#include "extensions/common/dynamic_forward_proxy/dns_cache_resource_manager.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -44,6 +43,21 @@ public:
 };
 
 using DnsHostInfoSharedPtr = std::shared_ptr<DnsHostInfo>;
+
+/**
+ * A resource manager of DNS Cache.
+ */
+class DnsCacheResourceManager {
+public:
+  virtual ~DnsCacheResourceManager() = default;
+
+  /**
+   * Returns the resource limit of pending requests to DNS.
+   */
+  virtual ResourceLimit& pendingRequests() PURE;
+};
+
+using DnsCacheResourceManagerPtr = std::shared_ptr<DnsCacheResourceManager>;
 
 /**
  * A cache of DNS hosts. Hosts will re-resolve their addresses or be automatically purged
@@ -154,13 +168,7 @@ public:
   /**
    * @return A pointer to resource manager for dns cache.
    */
-  virtual Envoy::Upstream::ResourceManager& dnsCacheResourceManager() PURE;
-
-  /**
-   * @return Whether dns cache use dns cache resource manager for request restrictions. e.g. Circuit
-   * Breaking
-   */
-  virtual bool useDnsCacheResourceManager() const PURE;
+  virtual absl::optional<DnsCacheResourceManagerPtr> dnsCacheResourceManager() PURE;
 };
 
 using DnsCacheSharedPtr = std::shared_ptr<DnsCache>;

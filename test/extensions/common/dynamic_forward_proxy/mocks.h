@@ -13,18 +13,6 @@ namespace Extensions {
 namespace Common {
 namespace DynamicForwardProxy {
 
-class MockDnsCacheResourceManager : public Envoy::Upstream::ResourceManager {
-public:
-  MockDnsCacheResourceManager();
-  ~MockDnsCacheResourceManager() override;
-
-  MOCK_METHOD(ResourceLimit&, pendingRequests, ());
-  MOCK_METHOD(ResourceLimit&, connections, ());
-  MOCK_METHOD(ResourceLimit&, requests, ());
-  MOCK_METHOD(ResourceLimit&, retries, ());
-  MOCK_METHOD(ResourceLimit&, connectionPools, ());
-};
-
 class MockDnsCache : public DnsCache {
 public:
   MockDnsCache();
@@ -51,11 +39,7 @@ public:
               (UpdateCallbacks & callbacks));
 
   MOCK_METHOD((absl::flat_hash_map<std::string, DnsHostInfoSharedPtr>), hosts, ());
-  MOCK_METHOD(Envoy::Upstream::ResourceManager&, dnsCacheResourceManager, ());
-  MOCK_METHOD(bool, useDnsCacheResourceManager, (), (const));
-
-private:
-  MockDnsCacheResourceManager resource_manager_;
+  MOCK_METHOD(absl::optional<DnsCacheResourceManagerPtr>, dnsCacheResourceManager, ());
 };
 
 class MockLoadDnsCacheEntryHandle : public DnsCache::LoadDnsCacheEntryHandle {

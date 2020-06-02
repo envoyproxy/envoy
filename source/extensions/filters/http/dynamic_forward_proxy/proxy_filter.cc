@@ -1,11 +1,10 @@
-#include "extensions/filters/http/dynamic_forward_proxy/proxy_filter.h"
-
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
 
 #include "common/runtime/runtime_features.h"
 
 #include "extensions/common/dynamic_forward_proxy/dns_cache.h"
+#include "extensions/filters/http/dynamic_forward_proxy/proxy_filter.h"
 #include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
@@ -58,15 +57,15 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   // By default, envoy doesn't allow to use dns cache circuit breakers even if configured. But this
   // runtime feature will enable you to use this feature. This runtime feature is prepared to
   // guarantee backward compatibility.
+  const auto dns_cache_resource_manager = config_->cache().dnsCacheResourceManager();
   const auto should_use_dns_cache_circuit_breakers =
-      !Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.disallow_dns_cache_circuit_breakers") &&
-      config_->cache().useDnsCacheResourceManager();
-  Upstream::ResourceManager& resource_manager =
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.enable_dns_cache_circuit_breakers") &&
+      dns_cache_resource_manager.has_value();
+  ResourceLimit& pending_requests =
       should_use_dns_cache_circuit_breakers
-          ? config_->cache().dnsCacheResourceManager()
-          : cluster_info_->resourceManager(route_entry->priority());
-  auto& pending_requests = resource_manager.pendingRequests();
+          ? dns_cache_resource_manager.value()->pendingRequests()
+          : cluster_info_->resourceManager(route_entry->priority()).pendingRequests();
 
   if (!pending_requests.canCreate()) {
     // When we use DNS Cache manager circuit breakers, we don't have to take care of upstream

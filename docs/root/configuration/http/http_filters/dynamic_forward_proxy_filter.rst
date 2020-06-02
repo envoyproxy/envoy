@@ -34,9 +34,8 @@ host when forwarding. See the example below within the configured routes.
 
 .. _dns_cache_circuit_breakers:
 
-  Dynamic forward proxy uses circuit breakers prepared for destination cluster for DNS cache. Now we are available to use DNS Cache circuit breaker that enables 
-  you to configure the circuit breaking policy for DNS cache specifically. By default, This behavior is disabled by the runtime feature 
-  `envoy.reloadable_features.disallow_dns_cache_circuit_breakers`.
+  Dynamic forward proxy uses circuit breakers built in to the DNS cache. This behavior can be temporarily disabled by the runtime feature `envoy.reloadable_features.disallow_dns_cache_circuit_breakers`. In this case, cluster circuit breakers are used. Now we are available to use DNS Cache circuit breaker that enables 
+  you to configure the circuit breaking policy for DNS cache specifically. By default, This behavior is disabled by the runtime feature `envoy.reloadable_features.enable_dns_cache_circuit_breakers`.
 
 .. code-block:: yaml
 
@@ -133,5 +132,5 @@ namespace.
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  rq_pending_opening, Gauge, Whether the requests circuit breaker is closed (0) or open (1)
+  rq_pending_open, Gauge, Whether the requests circuit breaker is closed (0) or open (1)
   rq_pending_remaining, Gauge, Number of remaining requests until the circuit breaker opens

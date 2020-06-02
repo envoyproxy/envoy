@@ -8,6 +8,7 @@
 #include "common/common/cleanup.h"
 
 #include "extensions/common/dynamic_forward_proxy/dns_cache.h"
+#include "extensions/common/dynamic_forward_proxy/dns_cache_resource_manager.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -49,8 +50,9 @@ public:
                                             LoadDnsCacheEntryCallbacks& callbacks) override;
   AddUpdateCallbacksHandlePtr addUpdateCallbacks(UpdateCallbacks& callbacks) override;
   absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> hosts() override;
-  Envoy::Upstream::ResourceManager& dnsCacheResourceManager() override { return resource_manager_; }
-  bool useDnsCacheResourceManager() const override { return use_dns_cache_resource_manager_; }
+  absl::optional<DnsCacheResourceManagerPtr> dnsCacheResourceManager() override {
+    return resource_manager_;
+  }
 
 private:
   using TlsHostMap = absl::flat_hash_map<std::string, DnsHostInfoSharedPtr>;
@@ -141,12 +143,11 @@ private:
   DnsCacheStats stats_;
   std::list<AddUpdateCallbacksHandleImpl*> update_callbacks_;
   absl::flat_hash_map<std::string, PrimaryHostInfoPtr> primary_hosts_;
-  DnsCacheResourceManager resource_manager_;
+  absl::optional<DnsCacheResourceManagerPtr> resource_manager_;
   const std::chrono::milliseconds refresh_interval_;
   const BackOffStrategyPtr failure_backoff_strategy_;
   const std::chrono::milliseconds host_ttl_;
   const uint32_t max_hosts_;
-  const bool use_dns_cache_resource_manager_;
 };
 
 } // namespace DynamicForwardProxy

@@ -132,8 +132,8 @@ typed_config:
     });
 
     // Enable dns cache circuit breakers.
-    config_helper_.addRuntimeOverride(
-        "envoy.reloadable_features.disallow_dns_cache_circuit_breakers", "false");
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_dns_cache_circuit_breakers",
+                                      "true");
 
     // Set validate_clusters to false to allow us to reference a CDS cluster.
     config_helper_.addConfigModifier(
@@ -200,7 +200,7 @@ TEST_P(ProxyFilterCircuitBreakerIntegrationTest, Basic) {
 
   auto response = codec_client_->makeRequestWithBody(request_headers, 1024);
   response->waitForEndStream();
-  EXPECT_EQ(1, test_server_->gauge("dns_cache.foo.circuit_breakers.rq_pending_opening"));
+  EXPECT_EQ(1, test_server_->gauge("dns_cache.foo.circuit_breakers.rq_pending_open"));
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().Status()->value().getStringView());

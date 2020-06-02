@@ -12,7 +12,6 @@ envoy_cc_library(
     name = "dns_cache_interface",
     hdrs = ["dns_cache.h"],
     deps = [
-        ":dns_cache_resource_manager",
         "//include/envoy/common:backoff_strategy_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/singleton:manager_interface",
@@ -38,6 +37,7 @@ envoy_cc_library(
     hdrs = ["dns_cache_impl.h"],
     deps = [
         ":dns_cache_interface",
+        ":dns_cache_resource_manager",
         "//include/envoy/network:dns_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//source/common/common:cleanup_lib",
@@ -53,6 +53,8 @@ envoy_cc_library(
     srcs = ["dns_cache_resource_manager.cc"],
     hdrs = ["dns_cache_resource_manager.h"],
     deps = [
+        ":dns_cache_interface",
+        "//include/envoy/common:resource_interface",
         "//include/envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:basic_resource_lib",

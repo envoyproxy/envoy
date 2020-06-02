@@ -49,7 +49,7 @@ New Features
 * config: added :ref:`version_text <config_cluster_manager_cds>` stat that reflects xDS version.
 * decompressor: generic :ref:`decompressor <config_http_filters_decompressor>` filter exposed to users.
 * dynamic forward proxy: added :ref:`SNI based dynamic forward proxy <config_network_filters_sni_dynamic_forward_proxy>` support.
-* dynamic forward proxy: added configurable :ref:`circuit breakers <dns_cache_circuit_breakers>` for resolver on DNS cache. This behavior is disabled by the runtime feature `envoy.reloadable_features.disallow_dns_cache_circuit_breakers`.
+* dynamic forward proxy: added configurable :ref:`circuit breakers <dns_cache_circuit_breakers>` for resolver on DNS cache. This behavior can be temporarily disabled by the runtime feature `envoy.reloadable_features.enable_dns_cache_circuit_breakers`. If this runtime feature is disabled, we will use circuit breakers for upstream connection as default even if we set :ref:`DNS Cache circuit breakers <dns_cache_circuit_breakers>`.
 * fault: added support for controlling the percentage of requests that abort, delay and response rate limits faults
   are applied to using :ref:`HTTP headers <config_http_filters_fault_injection_http_header>` to the HTTP fault filter.
 * fault: added support for specifying grpc_status code in abort faults using
@@ -106,3 +106,4 @@ Deprecated
   in :ref:`predicates <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.predicates>`.
 * File access logger fields :ref:`format <envoy_v3_api_field_extensions.access_loggers.file.v3.FileAccessLog.format>`, :ref:`json_format <envoy_v3_api_field_extensions.access_loggers.file.v3.FileAccessLog.json_format>` and :ref:`typed_json_format <envoy_v3_api_field_extensions.access_loggers.file.v3.FileAccessLog.typed_json_format>` are deprecated in favor of :ref:`log_format <envoy_v3_api_field_extensions.access_loggers.file.v3.FileAccessLog.log_format>`.
 * A warning is now logged when v2 xDS api is used. This behavior can be temporarily disabled by setting `envoy.reloadable_features.enable_deprecated_v2_api_warning` to `false`.
+* To use cluster circuit breakers for DNS Cache is now deprecated. This behavior can be temporarily disabled by setting `envoy.reloadable_features.enable_dns_cache_circuit_breakers` to `false`.
