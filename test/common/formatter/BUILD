@@ -12,6 +12,28 @@ load(
 
 envoy_package()
 
+envoy_cc_test(
+    name = "header_formatter_test",
+    srcs = ["header_formatter_test.cc"],
+    deps = [
+        "//source/common/config:metadata_lib",
+        "//source/common/formatter:header_formatter_lib",
+        "//source/common/router:header_parser_lib",
+        "//source/common/router:string_accessor_lib",
+        "//source/common/stream_info:filter_state_lib",
+        "//test/common/stream_info:test_int_accessor_lib",
+        "//test/mocks/api:api_mocks",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:threadsafe_singleton_injector_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+    ],
+)
+
 envoy_proto_library(
     name = "substitution_formatter_fuzz_proto",
     srcs = ["substitution_formatter_fuzz.proto"],
