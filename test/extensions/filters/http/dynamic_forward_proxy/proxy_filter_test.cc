@@ -16,7 +16,6 @@ using testing::AtLeast;
 using testing::Eq;
 using testing::InSequence;
 using testing::Return;
-using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
