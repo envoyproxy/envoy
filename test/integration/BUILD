@@ -594,6 +594,7 @@ envoy_cc_test_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/common:assert_lib",
+        "//source/common/common:basic_resource_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:api_version_lib",
         "//source/common/config:version_converter_lib",
