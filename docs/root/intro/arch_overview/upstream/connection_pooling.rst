@@ -49,6 +49,9 @@ connection pools are also allocated for each of the following features:
 * :ref:`Socket options <envoy_v3_api_field_config.core.v3.BindConfig.socket_options>`
 * :ref:`Transport socket (e.g. TLS) options <envoy_v3_api_msg_config.core.v3.TransportSocket>`
 
+Each worker thread maintains its own connection pools for each cluster, so if an Envoy has two
+threads and a cluster with both HTTP/1 and HTTP/2 support, there will be at least 4 connection pools.
+
 .. _arch_overview_conn_pool_health_checking:
 
 Health checking interactions

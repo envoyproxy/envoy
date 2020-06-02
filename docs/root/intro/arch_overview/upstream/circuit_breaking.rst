@@ -20,8 +20,9 @@ configure and code each application independently. Envoy supports various types 
   <config_cluster_manager_cluster_stats>` count for a cluster may be higher than the cluster maximum
   connection circuit breaker, with an upper bound of
   `cluster maximum connections + (number of endpoints in a cluster) * (connection pools for the
-  cluster)`. See :ref:`connection pooling <arch_overview_conn_pool_how_many>` for details on how many
-  connection pools a cluster may have.
+  cluster)`. This bound applies to the sum of connections across all workers threads. See
+  :ref:`connection pooling <arch_overview_conn_pool_how_many>` for details on how many connection
+  pools a cluster may have.
 * **Cluster maximum pending requests**: The maximum number of requests that will be queued while
   waiting for a ready connection pool connection. Requests are added to the list
   of pending requests whenever there aren't enough upstream connections available to immediately dispatch
@@ -65,9 +66,14 @@ the distributed system to be tuned independently and have different limits. The 
 circuit breakers, including the number of resources remaining until a circuit breaker opens, can
 be observed via :ref:`statistics <config_cluster_manager_cluster_stats_circuit_breakers>`.
 
+Workers threads share circuit breaker limits, i.e. if the active connection threshold is 500, worker
+thread 1 has 498 connections active, then worker thread 2 can only allocate 2 more connections.
+Since the implementation is eventually consistent, races between threads may allow limits to be
+potentially exceeded.
+
 Circuit breakers are enabled by default and have modest default values, e.g. 1024 connections per
-cluster. To disable circuit breakers, set the :ref:`thresholds
-<config_cluster_manager_cluster_circuit_breakers>` to the highest allowed values.
+cluster. To disable circuit breakers, set the :ref:`thresholds <faq_disable_circuit_breaking>` to
+the highest allowed values.
 
 Note that circuit breaking will cause the :ref:`x-envoy-overloaded
 <config_http_filters_router_x-envoy-overloaded_set>` header to be set by the router filter in the
