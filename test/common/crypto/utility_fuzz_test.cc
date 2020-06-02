@@ -1,6 +1,8 @@
-#include "common/crypto/utility.h"
 #include "common/buffer/buffer_impl.h"
+#include "common/crypto/utility.h"
+
 #include "test/fuzz/fuzz_runner.h"
+
 namespace Envoy {
 namespace Fuzz {
 
