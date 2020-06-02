@@ -365,5 +365,10 @@ bool IoSocketHandleImpl::supportsMmsg() const {
   return Api::OsSysCallsSingleton::get().supportsMmsg();
 }
 
+// TODO(yugant)
+bool IoSocketHandleImpl::supportsUdpGro() const {
+  return Api::OsSysCallsSingleton::get().supportsUdpGro();
+}
+
 } // namespace Network
 } // namespace Envoy

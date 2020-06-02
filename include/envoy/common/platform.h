@@ -110,6 +110,10 @@ struct msghdr {
 // Following Cygwin's porting example (may not be comprehensive)
 #define SO_REUSEPORT SO_REUSEADDR
 
+/** TODO(yugant)
+#define UDP_GRO This should be imported from the linux udpgso_bench_rx.c
+**/
+
 // Solve for rfc2292 (need to address rfc3542?)
 #ifndef IPV6_RECVPKTINFO
 #define IPV6_RECVPKTINFO IPV6_PKTINFO
@@ -204,4 +208,13 @@ struct mmsghdr {
   struct msghdr msg_hdr;
   unsigned int msg_len;
 };
+#endif
+
+
+// TODO(yugant)
+// UDP_GRO should only be enabled for linux
+#if defined(__linux__)
+#define ENVOY_UDP_GRO_MORE 1
+#else
+#define ENVOY_UDP_GRO_MORE 0
 #endif

@@ -53,6 +53,14 @@ namespace Network {
 #define ENVOY_SOCKET_SO_REUSEPORT Network::SocketOptionName()
 #endif
 
+// TODO(yugant)
+#ifdef UDP_GRO
+#define ENVOY_SOCKET_UDP_GRO ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, UDP_GRO)
+#else
+#define ENVOY_SOCKET_UDP_GRO Network::SocketOptionName()
+#endif
+
+
 #ifdef TCP_KEEPCNT
 #define ENVOY_SOCKET_TCP_KEEPCNT ENVOY_MAKE_SOCKET_OPTION_NAME(IPPROTO_TCP, TCP_KEEPCNT)
 #else

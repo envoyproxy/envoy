@@ -44,6 +44,7 @@ public:
                                    RecvMsgOutput& output) override;
 
   bool supportsMmsg() const override;
+  bool supportsUdpGro() const override;   // TODO(yugant)
 
 private:
   // Converts a SysCallSizeResult to IoCallUint64Result.

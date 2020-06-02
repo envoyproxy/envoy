@@ -32,6 +32,8 @@ public:
   static std::unique_ptr<Socket::Options> buildIpPacketInfoOptions();
   static std::unique_ptr<Socket::Options> buildRxQueueOverFlowOptions();
   static std::unique_ptr<Socket::Options> buildReusePortOptions();
+  static std::unique_ptr<Socket::Options> buildUdpGroOptions();   // TODO(yugant)
+  
 };
 } // namespace Network
 } // namespace Envoy

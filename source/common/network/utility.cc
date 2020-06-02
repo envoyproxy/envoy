@@ -557,6 +557,29 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
                                                 UdpPacketProcessor& udp_packet_processor,
                                                 MonotonicTime receive_time,
                                                 uint32_t* packets_dropped) {
+  // TODO(yugant)
+  if (handle.supportsUdpGro()) {
+    Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
+    Buffer::RawSlice slice;
+    const uint64_t num_slices = buffer->reserve(udp_packet_processor.maxPacketSize(), &slice, 1);
+    ASSERT(num_slices == 1u);
+
+    IoHandle::RecvMsgOutput output(1, packets_dropped);
+    Api::IoCallUint64Result result =
+        handle.recvmsg(&slice, num_slices, local_address.ip()->port(), output);
+
+    if (!result.ok()) {
+      return result;
+    }
+
+    ENVOY_LOG_MISC(trace, "recvmsg bytes {}", result.rc_);
+
+    passPayloadToProcessor(
+        result.rc_, slice, std::move(buffer), std::move(output.msg_[0].peer_address_),
+        std::move(output.msg_[0].local_address_), udp_packet_processor, receive_time);
+    return result;
+  }
+  
   if (handle.supportsMmsg()) {
     const uint32_t num_packets_per_mmsg_call = 16u;
     const uint32_t num_slices_per_packet = 1u;
