@@ -5,6 +5,7 @@
 #include <list>
 #include <memory>
 #include <string>
+#include <type_traits>
 
 #include "envoy/http/header_map.h"
 
@@ -60,9 +61,19 @@ public:
   // The following "constructors" call virtual functions during construction and must use the
   // static factory pattern.
   static void copyFrom(HeaderMap& lhs, const HeaderMap& rhs);
-  static void
-  initFromInitList(HeaderMap& new_header_map,
-                   const std::initializer_list<std::pair<LowerCaseString, std::string>>& values);
+  // The value_type of iterator must be pair, and the first value of them must be LowerCaseString.
+  // If not, it won't be compiled successfully.
+  template <class It> static void initFromInitList(HeaderMap& new_header_map, It begin, It end) {
+    for (auto it = begin; it != end; ++it) {
+      static_assert(std::is_same<decltype(it->first), LowerCaseString>::value,
+                    "iterator must be pair and the first value of them must be LowerCaseString");
+      HeaderString key_string;
+      key_string.setCopy(it->first.get().c_str(), it->first.get().size());
+      HeaderString value_string;
+      value_string.setCopy(it->second.c_str(), it->second.size());
+      new_header_map.addViaMove(std::move(key_string), std::move(value_string));
+    }
+  }
 
   // Performs a manual byte size count for test verification.
   void verifyByteSizeInternalForTest() const;
@@ -328,7 +339,13 @@ template <class T>
 std::unique_ptr<T>
 createHeaderMap(const std::initializer_list<std::pair<LowerCaseString, std::string>>& values) {
   auto new_header_map = std::make_unique<T>();
-  HeaderMapImpl::initFromInitList(*new_header_map, values);
+  HeaderMapImpl::initFromInitList(*new_header_map, values.begin(), values.end());
+  return new_header_map;
+}
+
+template <class T, class It> std::unique_ptr<T> createHeaderMap(It begin, It end) {
+  auto new_header_map = std::make_unique<T>();
+  HeaderMapImpl::initFromInitList(*new_header_map, begin, end);
   return new_header_map;
 }
 
