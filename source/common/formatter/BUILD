@@ -9,6 +9,24 @@ load(
 envoy_package()
 
 envoy_cc_library(
+    name = "header_formatter_lib",
+    srcs = ["header_formatter.cc"],
+    hdrs = ["header_formatter.h"],
+    external_deps = ["abseil_optional"],
+    deps = [
+        "//include/envoy/router:string_accessor_interface",
+        "//include/envoy/stream_info:filter_state_interface",
+        "//include/envoy/stream_info:stream_info_interface",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/common:utility_lib",
+        "//source/common/config:metadata_lib",
+        "//source/common/formatter:substitution_formatter_lib",
+        "//source/common/http:header_map_lib",
+        "//source/common/json:json_loader_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "substitution_formatter_lib",
     srcs = ["substitution_formatter.cc"],
     hdrs = ["substitution_formatter.h"],
