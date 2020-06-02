@@ -137,7 +137,7 @@ elif [[ "$CI_TARGET" == "bazel.sizeopt" ]]; then
   bazel test ${BAZEL_BUILD_OPTIONS} --config=sizeopt ${TEST_TARGETS}
   exit 0
 elif [[ "$CI_TARGET" == "bazel.gcc" ]]; then
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_env=ENVOY_MEMORY_TEST_EXACT=true --test_env=HEAPCHECK="	
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_env=HEAPCHECK="	
   setup_gcc_toolchain
   echo "bazel fastbuild build..."
   bazel_binary_build release
