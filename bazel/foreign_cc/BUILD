@@ -202,8 +202,8 @@ envoy_cmake_external(
     defines = ["NGHTTP2_STATICLIB"],
     lib_source = "@com_github_nghttp2_nghttp2//:all",
     static_libraries = select({
-        "//bazel:windows_x86_64": ["nghttp2_static.lib"],
-        "//conditions:default": ["libnghttp2_static.a"],
+        "//bazel:windows_x86_64": ["nghttp2.lib"],
+        "//conditions:default": ["libnghttp2.a"],
     }),
 )
 
