@@ -9,9 +9,8 @@ namespace Http {
 namespace Tcp {
 
 Router::GenericConnPoolPtr
-TcpGenericConnPoolFactory::createGenericConnPool(HttpOrTcpPool pool) const {
-  return std::make_unique<Router::TcpConnPool>(
-      absl::get<Envoy::Tcp::ConnectionPool::Instance*>(pool));
+TcpGenericConnPoolFactory::createGenericConnPool() const {
+  return std::make_unique<Router::TcpConnPool>();
 }
 
 REGISTER_FACTORY(TcpGenericConnPoolFactory, Router::GenericConnPoolFactory);

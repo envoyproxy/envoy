@@ -31,9 +31,13 @@ namespace Http {
 
 class HttpConnPool : public Router::GenericConnPool, public Envoy::Http::ConnectionPool::Callbacks {
 public:
-  HttpConnPool(Envoy::Http::ConnectionPool::Instance& conn_pool) : conn_pool_(conn_pool) {}
-
   // GenericConnPool
+  bool initialize(Upstream::ClusterManager& cm, const Router::RouteEntry& route_entry,
+                  Envoy::Http::Protocol protocol, Upstream::LoadBalancerContext* ctx) override {
+    conn_pool_ =
+        cm.httpConnPoolForCluster(route_entry.clusterName(), route_entry.priority(), protocol, ctx);
+    return conn_pool_ != nullptr;
+  }
   void newStream(Router::GenericConnectionPoolCallbacks* callbacks) override;
   bool cancelAnyPendingRequest() override;
   absl::optional<Envoy::Http::Protocol> protocol() const override;
@@ -45,10 +49,11 @@ public:
   void onPoolReady(Envoy::Http::RequestEncoder& callbacks_encoder,
                    Upstream::HostDescriptionConstSharedPtr host,
                    const StreamInfo::StreamInfo& info) override;
+  Upstream::HostDescriptionConstSharedPtr host() const override { return conn_pool_->host(); }
 
 private:
   // Points to the actual connection pool to create streams from.
-  Envoy::Http::ConnectionPool::Instance& conn_pool_;
+  Envoy::Http::ConnectionPool::Instance* conn_pool_{};
   Envoy::Http::ConnectionPool::Cancellable* conn_pool_stream_handle_{};
   Router::GenericConnectionPoolCallbacks* callbacks_{};
 };

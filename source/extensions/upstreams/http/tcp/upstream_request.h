@@ -33,7 +33,12 @@ class UpstreamRequest;
 
 class TcpConnPool : public GenericConnPool, public Tcp::ConnectionPool::Callbacks {
 public:
-  TcpConnPool(Tcp::ConnectionPool::Instance* conn_pool) : conn_pool_(conn_pool) {}
+  bool initialize(Upstream::ClusterManager& cm, const Router::RouteEntry& route_entry, Envoy::Http::Protocol,
+                  Upstream::LoadBalancerContext* ctx) override {
+    conn_pool_ = cm.tcpConnPoolForCluster(route_entry.clusterName(),
+                                          Upstream::ResourcePriority::Default, ctx);
+    return conn_pool_ != nullptr;
+  }
 
   void newStream(GenericConnectionPoolCallbacks* callbacks) override {
     callbacks_ = callbacks;
@@ -49,6 +54,7 @@ public:
     return false;
   }
   absl::optional<Http::Protocol> protocol() const override { return absl::nullopt; }
+  Upstream::HostDescriptionConstSharedPtr host() const override { return conn_pool_->host(); }
 
   // Tcp::ConnectionPool::Callbacks
   void onPoolFailure(ConnectionPool::PoolFailureReason reason,

@@ -20,7 +20,7 @@ public:
   ~TcpGenericConnPoolFactory() override = default;
   std::string name() const override { return HttpUpstreamsNames::get().Tcp; }
   std::string category() const override { return "envoy.upstreams"; }
-  Router::GenericConnPoolPtr createGenericConnPool(HttpOrTcpPool pool) const override;
+  Router::GenericConnPoolPtr createGenericConnPool() const override;
 };
 
 DECLARE_FACTORY(TcpGenericConnPoolFactory);

@@ -46,7 +46,7 @@ void HttpConnPool::newStream(GenericConnectionPoolCallbacks* callbacks) {
   // might get deleted inline as well. Only write the returned handle out if it is not nullptr to
   // deal with this case.
   Envoy::Http::ConnectionPool::Cancellable* handle =
-      conn_pool_.newStream(*callbacks->upstreamRequest(), *this);
+      conn_pool_->newStream(*callbacks->upstreamRequest(), *this);
   if (handle) {
     conn_pool_stream_handle_ = handle;
   }
@@ -62,7 +62,7 @@ bool HttpConnPool::cancelAnyPendingRequest() {
 }
 
 absl::optional<Envoy::Http::Protocol> HttpConnPool::protocol() const {
-  return conn_pool_.protocol();
+  return conn_pool_->protocol();
 }
 
 void HttpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason,

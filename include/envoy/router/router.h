@@ -36,6 +36,7 @@ namespace Envoy {
 
 namespace Upstream {
 class ClusterManager;
+class LoadBalancerContext;
 }
 
 namespace Router {
@@ -1103,6 +1104,10 @@ class GenericConnPool : public Logger::Loggable<Logger::Id::router> {
 public:
   virtual ~GenericConnPool() = default;
 
+  // Initializes the connection pool. This must be called before the connection
+  // pool is valid, and can be used.
+  virtual bool initialize(Upstream::ClusterManager& cm, const RouteEntry& route_entry,
+                          Http::Protocol protocol, Upstream::LoadBalancerContext* ctx) PURE;
   // Called to create a new HTTP stream or TCP connection. The implementation
   // is then responsible for calling either onPoolReady or onPoolFailure on the
   // supplied GenericConnectionPoolCallbacks.
@@ -1112,6 +1117,8 @@ public:
   virtual bool cancelAnyPendingRequest() PURE;
   // Optionally returns the protocol for the connection pool.
   virtual absl::optional<Http::Protocol> protocol() const PURE;
+  // Returns the host for this conn pool.
+  virtual Upstream::HostDescriptionConstSharedPtr host() const PURE;
 };
 
 // An API for the UpstreamRequest to get callbacks from either an HTTP or TCP
@@ -1159,7 +1166,7 @@ public:
    * @param options for creating the transport socket
    * @return Network::UpstreamRequestPtr a transport socket to be passed to connection.
    */
-  virtual GenericConnPoolPtr createGenericConnPool(HttpOrTcpPool pool) const PURE;
+  virtual GenericConnPoolPtr createGenericConnPool() const PURE;
 };
 
 using GenericConnPoolFactoryPtr = std::unique_ptr<GenericConnPoolFactory>;
