@@ -126,7 +126,7 @@ generateChloPacketToSend(quic::ParsedQuicVersion quic_version, quic::QuicConfig&
   quic::test::crypto_test_utils::GenerateFullCHLO(chlo, &crypto_config, server_address,
                                                   client_address, quic_version.transport_version,
                                                   &clock, signed_config, &cache, &full_chlo);
-  // Overwrite version label to highest current supported version.
+  // Overwrite version label to the version passed in.
   full_chlo.SetVersion(quic::kVER, quic_version);
   quic::QuicConfig quic_config_tmp;
   quic_config_tmp.ToHandshakeMessage(&full_chlo, quic_version.transport_version);

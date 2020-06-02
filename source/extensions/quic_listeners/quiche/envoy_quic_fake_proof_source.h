@@ -24,14 +24,15 @@
 namespace Envoy {
 namespace Quic {
 
-// A fake implementation of quic::ProofSource which returns a fake cert and
-// a fake signature for a given QUIC server config.
+// A fake implementation of quic::ProofSource which uses only RSA_PSS_RSAE_SHA256 to sign in
+// GetProof().
+// TODO(danzh) Rename it to EnvoyQuicProofSource once it's fully implemented.
 class EnvoyQuicFakeProofSource : public quic::ProofSource {
 public:
   ~EnvoyQuicFakeProofSource() override = default;
 
   // quic::ProofSource
-  // Returns a fake certs chain and its fake SCT "Fake timestamp" and fake TLS signature wrapped
+  // Returns a certs chain and its fake SCT "Fake timestamp" and TLS signature wrapped
   // in QuicCryptoProof.
   void GetProof(const quic::QuicSocketAddress& server_address,
                 const quic::QuicSocketAddress& client_address, const std::string& hostname,
@@ -42,6 +43,7 @@ public:
         GetCertChain(server_address, client_address, hostname);
     quic::QuicCryptoProof proof;
     bool success = false;
+    // TODO(danzh) Get the signature algorithm from leaf cert.
     auto signature_callback = std::make_unique<FakeSignatureCallback>(success, proof.signature);
     ComputeTlsSignature(server_address, client_address, hostname, SSL_SIGN_RSA_PSS_RSAE_SHA256,
                         server_config, std::move(signature_callback));
@@ -56,6 +58,8 @@ private:
   // Used by GetProof() to get fake signature.
   class FakeSignatureCallback : public quic::ProofSource::SignatureCallback {
   public:
+    // TODO(danzh) Pass in Details to retain the certs chain, and quic::ProofSource::Callback to be
+    // triggered in Run().
     FakeSignatureCallback(bool& success, std::string& signature)
         : success_(success), signature_(signature) {}
 

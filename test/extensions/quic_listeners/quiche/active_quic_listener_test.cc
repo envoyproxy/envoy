@@ -197,7 +197,7 @@ protected:
         envoyAddressInstanceToQuicSocketAddress(local_address_),
         envoyAddressInstanceToQuicSocketAddress(local_address_), "test.example.org");
     Buffer::RawSliceVector slice = payload.getRawSlices();
-    ASSERT(slice.size() == 1);
+    ASSERT_EQ(1u, slice.size());
     // Send a full CHLO to finish 0-RTT handshake.
     auto send_rc = Network::Utility::writeToSocket(client_sockets_.back()->ioHandle(), slice.data(),
                                                    1, nullptr, *listen_socket_->localAddress());

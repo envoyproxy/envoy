@@ -106,7 +106,6 @@ TEST_F(EnvoyQuicProofSourceTest, TestGetProof) {
             proof_verifier_.VerifyProof(hostname_, /*port=*/0, server_config_, version_, chlo_hash_,
                                         {"Fake cert"}, "", "fake signature", nullptr, nullptr,
                                         nullptr, nullptr));
-  std::vector<std::string> wrong_certs{"wrong cert"};
   EXPECT_EQ(quic::QUIC_FAILURE,
             proof_verifier_.VerifyProof(hostname_, /*port=*/0, server_config_, version_, chlo_hash_,
                                         {"Fake cert", "Unexpected cert"}, "Fake timestamp",

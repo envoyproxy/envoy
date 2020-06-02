@@ -112,7 +112,6 @@ public:
                             *dispatcher_,
                             /*send_buffer_limit*/ 1024 * 1024),
         http_connection_(envoy_quic_session_, http_connection_callbacks_) {
-    quic::SetVerbosityLogThreshold(1);
     EXPECT_EQ(time_system_.systemTime(), envoy_quic_session_.streamInfo().startTime());
     EXPECT_EQ(EMPTY_STRING, envoy_quic_session_.nextProtocol());
     EXPECT_EQ(Http::Protocol::Http3, http_connection_.protocol());

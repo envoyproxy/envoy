@@ -18,6 +18,8 @@
 namespace Envoy {
 namespace Quic {
 
+// A test ProofSource which always provide a hard-coded test certificate in
+// QUICHE and a fake signature.
 class TestProofSource : public Quic::EnvoyQuicFakeProofSource {
 public:
   quic::QuicReferenceCountedPointer<quic::ProofSource::Chain>

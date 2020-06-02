@@ -11,16 +11,13 @@ EnvoyQuicAlarm::EnvoyQuicAlarm(Event::Dispatcher& dispatcher, const quic::QuicCl
 void EnvoyQuicAlarm::CancelImpl() { timer_->disableTimer(); }
 
 void EnvoyQuicAlarm::SetImpl() {
-  // TODO(#7170) switch to use microseconds if it is supported.
   quic::QuicTime::Delta duration = getDurationBeforeDeadline();
-  // Round up the duration so that any duration < 1ms will not be
-  // triggered within current event loop.
-  // QUICHE alarm has finer granularity than 1ms, and it is not expected to be
-  // scheduled in current event loop. This bit is a bummer in QUICHE, and we are
-  // working on the fix. Once upstream is fixed, we no longer need to round up
-  // the duration.
-  timer_->enableTimer(std::chrono::milliseconds(
-      (duration < quic::QuicTime::Delta::FromMilliseconds(1)) ? 1 : duration.ToMilliseconds()));
+  // Round up the duration so that any duration < 1us will not be triggered within current event
+  // loop. QUICHE alarm is not expected to be scheduled in current event loop. This bit is a bummer
+  // in QUICHE, and we are working on the fix. Once QUICHE is fixed of expecting this behavior, we
+  // no longer need to round up the duration.
+  timer_->enableHRTimer(std::chrono::microseconds(
+      (duration < quic::QuicTime::Delta::FromMicroseconds(1)) ? 1 : duration.ToMicroseconds()));
 }
 
 void EnvoyQuicAlarm::UpdateImpl() {
