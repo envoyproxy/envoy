@@ -119,7 +119,7 @@ public:
 
   // Convert data_ buffer into a string
   absl::string_view dataString() const {
-    return absl::string_view(reinterpret_cast<const char*>(data_), size_);
+    return absl::string_view{reinterpret_cast<const char*>(data_), static_cast<size_t>(size_)};
   }
 };
 
