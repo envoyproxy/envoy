@@ -22,7 +22,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 11]
+// [#next-free-field: 12]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.http.ext_authz.v3.ExtAuthz";
@@ -96,6 +96,15 @@ message ExtAuthz {
   //
   // If this field is not specified, the filter will be enabled for all requests.
   config.core.v4alpha.RuntimeFractionalPercent filter_enabled = 9;
+
+  // Specifies whether to deny the requests, when the filter is disabled.
+  // If :ref:`runtime_key <envoy_api_field_config.core.v4alpha.RuntimeFeatureFlag.runtime_key>` is specified,
+  // Envoy will lookup the runtime key to determine whether to deny request for
+  // filter protected path at filter disabling. If filter is disabled in
+  // typed_per_filter_config for the path, requests will not be denied.
+  //
+  // If this field is not specified, all requests will be allowed when disabled.
+  config.core.v4alpha.RuntimeFeatureFlag deny_at_disable = 11;
 
   // Specifies if the peer certificate is sent to the external service.
   //
