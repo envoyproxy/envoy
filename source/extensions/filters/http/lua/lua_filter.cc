@@ -3,13 +3,13 @@
 #include <atomic>
 #include <memory>
 
-#include "envoy/http/codes.h"
-
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
 #include "common/crypto/utility.h"
+#include "common/http/codes.h"
 #include "common/http/message_impl.h"
+#include "common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -23,6 +23,18 @@ const std::string DEPRECATED_LUA_NAME = "envoy.lua";
 std::atomic<bool>& deprecatedNameLogged() {
   MUTABLE_CONSTRUCT_ON_FIRST_USE(std::atomic<bool>, false);
 }
+
+/**
+ * Constant values used for tracing metadata.
+ */
+struct TracingConstantValues {
+  const std::string Status = "lua_http_call_status";
+  const std::string HttpStatus = "lua_http_call_http_status";
+  const std::string Success = "Success";
+  const std::string Failure = "Failure";
+};
+
+using TracingConstants = ConstSingleton<TracingConstantValues>;
 
 // Checks if deprecated metadata names are allowed. On the first check only it will log either
 // a warning (indicating the name should be updated) or an error (the feature is off and the
@@ -100,43 +112,21 @@ void buildHeadersFromTable(Http::HeaderMap& headers, lua_State* state, int table
   }
 }
 
-Http::AsyncClient::Request* makeHttpCall(lua_State* state, Filter& filter,
+Http::AsyncClient::Request* makeHttpCall(const std::string& upstream_cluster,
+                                         Http::RequestMessagePtr message, int timeout_ms,
+                                         Filter& filter, Tracing::Span& span,
                                          Http::AsyncClient::Callbacks& callbacks) {
-  const std::string cluster = luaL_checkstring(state, 2);
-  luaL_checktype(state, 3, LUA_TTABLE);
-  size_t body_size;
-  const char* body = luaL_optlstring(state, 4, nullptr, &body_size);
-  int timeout_ms = luaL_checkint(state, 5);
-  if (timeout_ms < 0) {
-    luaL_error(state, "http call timeout must be >= 0");
-  }
-
-  if (filter.clusterManager().get(cluster) == nullptr) {
-    luaL_error(state, "http call cluster invalid. Must be configured");
-  }
-
-  auto headers = std::make_unique<Http::RequestHeaderMapImpl>();
-  buildHeadersFromTable(*headers, state, 3);
-  Http::RequestMessagePtr message(new Http::RequestMessageImpl(std::move(headers)));
-
-  // Check that we were provided certain headers.
-  if (message->headers().Path() == nullptr || message->headers().Method() == nullptr ||
-      message->headers().Host() == nullptr) {
-    luaL_error(state, "http call headers must include ':path', ':method', and ':authority'");
-  }
-
-  if (body != nullptr) {
-    message->body() = std::make_unique<Buffer::OwnedImpl>(body, body_size);
-    message->headers().setContentLength(body_size);
-  }
-
   absl::optional<std::chrono::milliseconds> timeout;
   if (timeout_ms > 0) {
     timeout = std::chrono::milliseconds(timeout_ms);
   }
 
-  return filter.clusterManager().httpAsyncClientForCluster(cluster).send(
-      std::move(message), callbacks, Http::AsyncClient::RequestOptions().setTimeout(timeout));
+  span.setTag(Tracing::Tags::get().UpstreamCluster, upstream_cluster);
+  span.injectContext(message->headers());
+
+  return filter.clusterManager()
+      .httpAsyncClientForCluster(upstream_cluster)
+      .send(std::move(message), callbacks, Http::AsyncClient::RequestOptions().setTimeout(timeout));
 }
 } // namespace
 
@@ -264,20 +254,58 @@ int StreamHandleWrapper::luaRespond(lua_State* state) {
 int StreamHandleWrapper::luaHttpCall(lua_State* state) {
   ASSERT(state_ == State::Running);
 
+  luaL_checktype(state, 3, LUA_TTABLE);
+  size_t body_size;
+  const char* body = luaL_optlstring(state, 4, nullptr, &body_size);
+  int timeout_ms = luaL_checkint(state, 5);
+  if (timeout_ms < 0) {
+    luaL_error(state, "http call timeout must be >= 0");
+  }
+
   const int async_flag_index = 6;
   if (!lua_isnone(state, async_flag_index) && !lua_isboolean(state, async_flag_index)) {
     luaL_error(state, "http call asynchronous flag must be 'true', 'false', or empty");
   }
 
+  const std::string upstream_cluster = luaL_checkstring(state, 2);
+  if (filter_.clusterManager().get(upstream_cluster) == nullptr) {
+    luaL_error(state, "http call cluster invalid. Must be configured");
+  }
+
+  auto headers = std::make_unique<Http::RequestHeaderMapImpl>();
+  buildHeadersFromTable(*headers, state, 3);
+  Http::RequestMessagePtr message(new Http::RequestMessageImpl(std::move(headers)));
+
+  // Check that we were provided certain headers.
+  if (message->headers().Path() == nullptr || message->headers().Method() == nullptr ||
+      message->headers().Host() == nullptr) {
+    luaL_error(state, "http call headers must include ':path', ':method', and ':authority'");
+  }
+
+  if (body != nullptr) {
+    message->body() = std::make_unique<Buffer::OwnedImpl>(body, body_size);
+    message->headers().setContentLength(body_size);
+  }
+
+  ASSERT(span_ == nullptr);
+  span_ = callbacks_.activeSpan().spawnChild(
+      Tracing::EgressConfig::get(), fmt::format("Lua HTTP call {} egress", upstream_cluster),
+      filter_.timeSource().systemTime());
+
   if (lua_toboolean(state, async_flag_index)) {
-    return luaHttpCallAsynchronous(state);
+    return doAsynchronousHttpCall(state, upstream_cluster, std::move(message), timeout_ms, *span_);
   } else {
-    return luaHttpCallSynchronous(state);
+    return doSynchronousHttpCall(state, upstream_cluster, std::move(message), timeout_ms, *span_);
   }
 }
 
-int StreamHandleWrapper::luaHttpCallSynchronous(lua_State* state) {
-  http_request_ = makeHttpCall(state, filter_, *this);
+int StreamHandleWrapper::doSynchronousHttpCall(lua_State* state,
+                                               const std::string& upstream_cluster,
+                                               Http::RequestMessagePtr message, int timeout_ms,
+                                               Tracing::Span& span) {
+  ASSERT(http_request_ == nullptr);
+  http_request_ =
+      makeHttpCall(upstream_cluster, std::move(message), timeout_ms, filter_, span, *this);
   if (http_request_) {
     state_ = State::HttpCall;
     return lua_yield(state, 0);
@@ -288,8 +316,14 @@ int StreamHandleWrapper::luaHttpCallSynchronous(lua_State* state) {
   }
 }
 
-int StreamHandleWrapper::luaHttpCallAsynchronous(lua_State* state) {
-  makeHttpCall(state, filter_, noopCallbacks());
+int StreamHandleWrapper::doAsynchronousHttpCall(lua_State*, const std::string& upstream_cluster,
+                                                Http::RequestMessagePtr message, int timeout_ms,
+                                                Tracing::Span& span) {
+  makeHttpCall(upstream_cluster, std::move(message), timeout_ms, filter_, span, noopCallbacks());
+
+  ASSERT(span_ != nullptr);
+  span_->finishSpan();
+
   return 0;
 }
 
@@ -297,7 +331,26 @@ void StreamHandleWrapper::onSuccess(const Http::AsyncClient::Request&,
                                     Http::ResponseMessagePtr&& response) {
   ASSERT(state_ == State::HttpCall || state_ == State::Running);
   ENVOY_LOG(debug, "async HTTP response complete");
+
+  if (!http_call_failed_) {
+    ASSERT(span_ != nullptr);
+    span_->setTag(TracingConstants::get().Status, TracingConstants::get().Success);
+
+    uint64_t status_code{};
+    if (!absl::SimpleAtoi(response->headers().getStatusValue(), &status_code)) {
+      // When parsing status_code is failed, we tag it as an error.
+      span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+    } else {
+      span_->setTag(TracingConstants::get().HttpStatus,
+                    Http::CodeUtility::toString(static_cast<Http::Code>(status_code)));
+    }
+  }
+
+  span_->finishSpan();
+
   http_request_ = nullptr;
+  span_ = nullptr;
+  http_call_failed_ = false;
 
   // We need to build a table with the headers as return param 1. The body will be return param 2.
   lua_newtable(coroutine_.luaState());
@@ -345,12 +398,17 @@ void StreamHandleWrapper::onFailure(const Http::AsyncClient::Request& request,
   ASSERT(state_ == State::HttpCall || state_ == State::Running);
   ENVOY_LOG(debug, "async HTTP failure");
 
+  ASSERT(span_ != nullptr);
+  span_->setTag(TracingConstants::get().Status, TracingConstants::get().Failure);
+  span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+
   // Just fake a basic 503 response.
   Http::ResponseMessagePtr response_message(
       new Http::ResponseMessageImpl(Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
           {{Http::Headers::get().Status,
             std::to_string(enumToInt(Http::Code::ServiceUnavailable))}})));
   response_message->body() = std::make_unique<Buffer::OwnedImpl>("upstream failure");
+  http_call_failed_ = true;
   onSuccess(request, std::move(response_message));
 }
 
@@ -568,8 +626,8 @@ int StreamHandleWrapper::luaImportPublicKey(lua_State* state) {
 }
 
 FilterConfig::FilterConfig(const std::string& lua_code, ThreadLocal::SlotAllocator& tls,
-                           Upstream::ClusterManager& cluster_manager)
-    : cluster_manager_(cluster_manager), lua_state_(lua_code, tls) {
+                           Upstream::ClusterManager& cluster_manager, TimeSource& time_source)
+    : cluster_manager_(cluster_manager), time_source_(time_source), lua_state_(lua_code, tls) {
   lua_state_.registerType<Filters::Common::Lua::BufferWrapper>();
   lua_state_.registerType<Filters::Common::Lua::MetadataMapWrapper>();
   lua_state_.registerType<Filters::Common::Lua::MetadataMapIterator>();

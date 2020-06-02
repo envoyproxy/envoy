@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/http/filter.h"
+#include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/crypto/utility.h"
@@ -69,6 +70,11 @@ public:
    * @return const Network::Connection* the current network connection handle.
    */
   virtual const Network::Connection* connection() const PURE;
+
+  /**
+   * @return const Tracing::Span& the current tracing active span.
+   */
+  virtual Tracing::Span& activeSpan() PURE;
 };
 
 class Filter;
@@ -236,8 +242,10 @@ private:
    */
   DECLARE_LUA_CLOSURE(StreamHandleWrapper, luaBodyIterator);
 
-  int luaHttpCallSynchronous(lua_State* state);
-  int luaHttpCallAsynchronous(lua_State* state);
+  int doSynchronousHttpCall(lua_State* state, const std::string& upstream_cluster,
+                            Http::RequestMessagePtr message, int timeout_ms, Tracing::Span& span);
+  int doAsynchronousHttpCall(lua_State* state, const std::string& upstream_cluster,
+                             Http::RequestMessagePtr message, int timeout_ms, Tracing::Span& span);
 
   // Filters::Common::Lua::BaseLuaObject
   void onMarkDead() override {
@@ -275,6 +283,8 @@ private:
   State state_{State::Running};
   std::function<void()> yield_callback_;
   Http::AsyncClient::Request* http_request_{};
+  Tracing::SpanPtr span_;
+  bool http_call_failed_;
 };
 
 /**
@@ -293,7 +303,7 @@ public:
 class FilterConfig : Logger::Loggable<Logger::Id::lua> {
 public:
   FilterConfig(const std::string& lua_code, ThreadLocal::SlotAllocator& tls,
-               Upstream::ClusterManager& cluster_manager);
+               Upstream::ClusterManager& cluster_manager, TimeSource& time_source);
   Filters::Common::Lua::CoroutinePtr createCoroutine() { return lua_state_.createCoroutine(); }
   int requestFunctionRef() { return lua_state_.getGlobalRef(request_function_slot_); }
   int responseFunctionRef() { return lua_state_.getGlobalRef(response_function_slot_); }
@@ -301,6 +311,7 @@ public:
   void runtimeGC() { return lua_state_.runtimeGC(); }
 
   Upstream::ClusterManager& cluster_manager_;
+  TimeSource& time_source_;
 
 private:
   Filters::Common::Lua::ThreadLocalState lua_state_;
@@ -320,6 +331,7 @@ public:
   Filter(FilterConfigConstSharedPtr config) : config_(config) {}
 
   Upstream::ClusterManager& clusterManager() { return config_->cluster_manager_; }
+  TimeSource& timeSource() { return config_->time_source_; }
   void scriptError(const Filters::Common::Lua::LuaException& e);
   virtual void scriptLog(spdlog::level::level_enum level, const char* message);
 
@@ -381,6 +393,7 @@ private:
     const ProtobufWkt::Struct& metadata() const override;
     StreamInfo::StreamInfo& streamInfo() override { return callbacks_->streamInfo(); }
     const Network::Connection* connection() const override { return callbacks_->connection(); }
+    Tracing::Span& activeSpan() override { return callbacks_->activeSpan(); }
 
     Filter& parent_;
     Http::StreamDecoderFilterCallbacks* callbacks_{};
@@ -402,6 +415,7 @@ private:
     const ProtobufWkt::Struct& metadata() const override;
     StreamInfo::StreamInfo& streamInfo() override { return callbacks_->streamInfo(); }
     const Network::Connection* connection() const override { return callbacks_->connection(); }
+    Tracing::Span& activeSpan() override { return callbacks_->activeSpan(); }
 
     Filter& parent_;
     Http::StreamEncoderFilterCallbacks* callbacks_{};

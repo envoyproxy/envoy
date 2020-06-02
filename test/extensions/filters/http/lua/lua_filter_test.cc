@@ -5,6 +5,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/http/message_impl.h"
 #include "common/stream_info/stream_info_impl.h"
+#include "common/tracing/http_tracer_impl.h"
 
 #include "extensions/filters/http/lua/lua_filter.h"
 
@@ -56,6 +57,9 @@ public:
 
     EXPECT_CALL(decoder_callbacks_, decodingBuffer()).Times(AtLeast(0));
     EXPECT_CALL(decoder_callbacks_, route()).Times(AtLeast(0));
+    EXPECT_CALL(decoder_callbacks_, activeSpan())
+        .Times(AtLeast(0))
+        .WillRepeatedly(ReturnRef(active_span_));
 
     EXPECT_CALL(encoder_callbacks_, addEncodedData(_, _))
         .Times(AtLeast(0))
@@ -70,8 +74,31 @@ public:
 
   ~LuaHttpFilterTest() override { filter_->onDestroy(); }
 
+  Tracing::MockSpan* expectStartedChildSpan(const std::string& cluster) {
+    Tracing::MockSpan* child_span{new Tracing::MockSpan()};
+    // The tracing name format is: "Lua HTTP call <upstream_cluster_name> egress".
+    EXPECT_CALL(active_span_, spawnChild_(_, fmt::format("Lua HTTP call {} egress", cluster), _))
+        .WillOnce(Return(child_span));
+    EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq(cluster)));
+    EXPECT_CALL(*child_span, injectContext(_));
+    return child_span;
+  }
+
+  void expectFinishedChildSpawn(Tracing::MockSpan* child_span) {
+    EXPECT_CALL(*child_span, setTag(Eq("lua_http_call_status"), Eq("Success")));
+    EXPECT_CALL(*child_span, setTag(Eq("lua_http_call_http_status"), Eq("OK")));
+    EXPECT_CALL(*child_span, finishSpan());
+  }
+
+  void expectFinishedChildSpanWithFailure(Tracing::MockSpan* child_span) {
+    EXPECT_CALL(*child_span, setTag(Eq("lua_http_call_status"), Eq("Failure")));
+    EXPECT_CALL(*child_span, setTag(Eq("error"), Eq("true")));
+    EXPECT_CALL(*child_span, finishSpan());
+  }
+
   void setup(const std::string& lua_code) {
-    config_ = std::make_shared<FilterConfig>(lua_code, tls_, cluster_manager_);
+    config_ = std::make_shared<FilterConfig>(
+        lua_code, tls_, cluster_manager_, cluster_manager_.async_client_.dispatcher().timeSource());
     setupFilter();
   }
 
@@ -103,6 +130,7 @@ public:
   std::shared_ptr<NiceMock<Envoy::Ssl::MockConnectionInfo>> ssl_;
   NiceMock<Envoy::Network::MockConnection> connection_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
+  Tracing::MockSpan active_span_;
 
   const std::string HEADER_ONLY_SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
@@ -190,7 +218,8 @@ TEST(LuaHttpFilterConfigTest, BadCode) {
 
   NiceMock<ThreadLocal::MockInstance> tls;
   NiceMock<Upstream::MockClusterManager> cluster_manager;
-  EXPECT_THROW_WITH_MESSAGE(FilterConfig(SCRIPT, tls, cluster_manager),
+  EXPECT_THROW_WITH_MESSAGE(FilterConfig(SCRIPT, tls, cluster_manager,
+                                         cluster_manager.async_client_.dispatcher().timeSource()),
                             Filters::Common::Lua::LuaException,
                             "script load error: [string \"...\"]:3: '=' expected near '<eof>'");
 }
@@ -766,6 +795,7 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
   Http::MockAsyncClientRequest request(&cluster_manager_.async_client_);
   Http::AsyncClient::Callbacks* callbacks;
   EXPECT_CALL(cluster_manager_, get(Eq("cluster")));
+  auto* child_span = expectStartedChildSpan("cluster");
   EXPECT_CALL(cluster_manager_, httpAsyncClientForCluster("cluster"));
   EXPECT_CALL(cluster_manager_.async_client_, send_(_, _, _))
       .WillOnce(
@@ -782,6 +812,7 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
             return &request;
           }));
 
+  expectFinishedChildSpawn(child_span);
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
 
@@ -829,6 +860,7 @@ TEST_F(LuaHttpFilterTest, HttpCallAsyncFalse) {
   Http::MockAsyncClientRequest request(&cluster_manager_.async_client_);
   Http::AsyncClient::Callbacks* callbacks;
   EXPECT_CALL(cluster_manager_, get(Eq("cluster")));
+  auto* child_span = expectStartedChildSpan("cluster");
   EXPECT_CALL(cluster_manager_, httpAsyncClientForCluster("cluster"));
   EXPECT_CALL(cluster_manager_.async_client_, send_(_, _, _))
       .WillOnce(
@@ -847,6 +879,8 @@ TEST_F(LuaHttpFilterTest, HttpCallAsyncFalse) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
+
+  expectFinishedChildSpawn(child_span);
 
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data, false));
@@ -888,6 +922,9 @@ TEST_F(LuaHttpFilterTest, HttpCallAsynchronous) {
   Http::MockAsyncClientRequest request(&cluster_manager_.async_client_);
   Http::AsyncClient::Callbacks* callbacks;
   EXPECT_CALL(cluster_manager_, get(Eq("cluster")));
+
+  auto* child_span = expectStartedChildSpan("cluster");
+
   EXPECT_CALL(cluster_manager_, httpAsyncClientForCluster("cluster"));
   EXPECT_CALL(cluster_manager_.async_client_, send_(_, _, _))
       .WillOnce(
@@ -903,6 +940,8 @@ TEST_F(LuaHttpFilterTest, HttpCallAsynchronous) {
             callbacks = &cb;
             return &request;
           }));
+
+  EXPECT_CALL(*child_span, finishSpan());
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 
@@ -956,6 +995,7 @@ TEST_F(LuaHttpFilterTest, DoubleHttpCall) {
   Http::MockAsyncClientRequest request(&cluster_manager_.async_client_);
   Http::AsyncClient::Callbacks* callbacks;
   EXPECT_CALL(cluster_manager_, get(Eq("cluster")));
+  auto* child_span = expectStartedChildSpan("cluster");
   EXPECT_CALL(cluster_manager_, httpAsyncClientForCluster("cluster"));
   EXPECT_CALL(cluster_manager_.async_client_, send_(_, _, _))
       .WillOnce(
@@ -970,6 +1010,7 @@ TEST_F(LuaHttpFilterTest, DoubleHttpCall) {
             return &request;
           }));
 
+  expectFinishedChildSpawn(child_span);
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
 
@@ -979,6 +1020,7 @@ TEST_F(LuaHttpFilterTest, DoubleHttpCall) {
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(":status 200")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("response")));
   EXPECT_CALL(cluster_manager_, get(Eq("cluster2")));
+  auto* child_span_2 = expectStartedChildSpan("cluster2");
   EXPECT_CALL(cluster_manager_, httpAsyncClientForCluster("cluster2"));
   EXPECT_CALL(cluster_manager_.async_client_, send_(_, _, _))
       .WillOnce(
@@ -990,6 +1032,11 @@ TEST_F(LuaHttpFilterTest, DoubleHttpCall) {
             callbacks = &cb;
             return &request;
           }));
+
+  EXPECT_CALL(*child_span_2, setTag(Eq("lua_http_call_status"), Eq("Success")));
+  EXPECT_CALL(*child_span_2, setTag(Eq("lua_http_call_http_status"), Eq("Forbidden")));
+  EXPECT_CALL(*child_span_2, finishSpan());
+
   callbacks->onSuccess(request, std::move(response_message));
 
   response_message = std::make_unique<Http::ResponseMessageImpl>(
@@ -1035,6 +1082,7 @@ TEST_F(LuaHttpFilterTest, HttpCallNoBody) {
   Http::MockAsyncClientRequest request(&cluster_manager_.async_client_);
   Http::AsyncClient::Callbacks* callbacks;
   EXPECT_CALL(cluster_manager_, get(Eq("cluster")));
+  auto* child_span = expectStartedChildSpan("cluster");
   EXPECT_CALL(cluster_manager_, httpAsyncClientForCluster("cluster"));
   EXPECT_CALL(cluster_manager_.async_client_, send_(_, _, _))
       .WillOnce(
@@ -1047,6 +1095,7 @@ TEST_F(LuaHttpFilterTest, HttpCallNoBody) {
             return &request;
           }));
 
+  expectFinishedChildSpawn(child_span);
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
 
@@ -1093,6 +1142,7 @@ TEST_F(LuaHttpFilterTest, HttpCallImmediateResponse) {
   Http::MockAsyncClientRequest request(&cluster_manager_.async_client_);
   Http::AsyncClient::Callbacks* callbacks;
   EXPECT_CALL(cluster_manager_, get(Eq("cluster")));
+  auto* child_span = expectStartedChildSpan("cluster");
   EXPECT_CALL(cluster_manager_, httpAsyncClientForCluster("cluster"));
   EXPECT_CALL(cluster_manager_.async_client_, send_(_, _, _))
       .WillOnce(
@@ -1105,6 +1155,7 @@ TEST_F(LuaHttpFilterTest, HttpCallImmediateResponse) {
             return &request;
           }));
 
+  expectFinishedChildSpawn(child_span);
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
 
@@ -1143,6 +1194,7 @@ TEST_F(LuaHttpFilterTest, HttpCallErrorAfterResumeSuccess) {
   Http::MockAsyncClientRequest request(&cluster_manager_.async_client_);
   Http::AsyncClient::Callbacks* callbacks;
   EXPECT_CALL(cluster_manager_, get(Eq("cluster")));
+  auto* child_span = expectStartedChildSpan("cluster");
   EXPECT_CALL(cluster_manager_, httpAsyncClientForCluster("cluster"));
   EXPECT_CALL(cluster_manager_.async_client_, send_(_, _, _))
       .WillOnce(
@@ -1152,6 +1204,7 @@ TEST_F(LuaHttpFilterTest, HttpCallErrorAfterResumeSuccess) {
             return &request;
           }));
 
+  expectFinishedChildSpawn(child_span);
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, true));
 
@@ -1193,6 +1246,7 @@ TEST_F(LuaHttpFilterTest, HttpCallFailure) {
   Http::MockAsyncClientRequest request(&cluster_manager_.async_client_);
   Http::AsyncClient::Callbacks* callbacks;
   EXPECT_CALL(cluster_manager_, get(Eq("cluster")));
+  auto* child_span = expectStartedChildSpan("cluster");
   EXPECT_CALL(cluster_manager_, httpAsyncClientForCluster("cluster"));
   EXPECT_CALL(cluster_manager_.async_client_, send_(_, _, _))
       .WillOnce(
@@ -1201,6 +1255,8 @@ TEST_F(LuaHttpFilterTest, HttpCallFailure) {
             callbacks = &cb;
             return &request;
           }));
+
+  expectFinishedChildSpanWithFailure(child_span);
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, true));
@@ -1235,6 +1291,7 @@ TEST_F(LuaHttpFilterTest, HttpCallReset) {
   Http::MockAsyncClientRequest request(&cluster_manager_.async_client_);
   Http::AsyncClient::Callbacks* callbacks;
   EXPECT_CALL(cluster_manager_, get(Eq("cluster")));
+  expectStartedChildSpan("cluster");
   EXPECT_CALL(cluster_manager_, httpAsyncClientForCluster("cluster"));
   EXPECT_CALL(cluster_manager_.async_client_, send_(_, _, _))
       .WillOnce(
@@ -1243,6 +1300,7 @@ TEST_F(LuaHttpFilterTest, HttpCallReset) {
             callbacks = &cb;
             return &request;
           }));
+  // TODO(dio): Allow and handle request cancellation.
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, true));
@@ -1278,6 +1336,7 @@ TEST_F(LuaHttpFilterTest, HttpCallImmediateFailure) {
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   Http::MockAsyncClientRequest request(&cluster_manager_.async_client_);
   EXPECT_CALL(cluster_manager_, get(Eq("cluster")));
+  auto* child_span = expectStartedChildSpan("cluster");
   EXPECT_CALL(cluster_manager_, httpAsyncClientForCluster("cluster"));
   EXPECT_CALL(cluster_manager_.async_client_, send_(_, _, _))
       .WillOnce(
@@ -1288,6 +1347,7 @@ TEST_F(LuaHttpFilterTest, HttpCallImmediateFailure) {
             // code path.
             return nullptr;
           }));
+  expectFinishedChildSpanWithFailure(child_span);
 
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(":status 503")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("upstream failure")));
