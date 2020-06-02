@@ -442,7 +442,7 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
     if (request->asArray().size() == 3) {
       callbacks.onAuth(request->asArray()[1].asString(), request->asArray()[2].asString());
     } else {
-      callbacks.onAuth("", request->asArray()[1].asString());
+      callbacks.onAuth(request->asArray()[1].asString());
     }
 
     return nullptr;

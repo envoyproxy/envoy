@@ -82,12 +82,29 @@ void ProxyFilter::onEvent(Network::ConnectionEvent event) {
   }
 }
 
-void ProxyFilter::onAuth(PendingRequest& request, const std::string& username,
-                         const std::string& password) {
+void ProxyFilter::onAuth(PendingRequest& request, const std::string& password) {
   Common::Redis::RespValuePtr response{new Common::Redis::RespValue()};
   if (config_->downstream_auth_password_.empty()) {
     response->type(Common::Redis::RespType::Error);
     response->asString() = "ERR Client sent AUTH, but no password is set";
+  } else if (password == config_->downstream_auth_password_) {
+    response->type(Common::Redis::RespType::SimpleString);
+    response->asString() = "OK";
+    connection_allowed_ = true;
+  } else {
+    response->type(Common::Redis::RespType::Error);
+    response->asString() = "ERR invalid password";
+    connection_allowed_ = false;
+  }
+  request.onResponse(std::move(response));
+}
+
+void ProxyFilter::onAuth(PendingRequest& request, const std::string& username,
+                         const std::string& password) {
+  Common::Redis::RespValuePtr response{new Common::Redis::RespValue()};
+  if (config_->downstream_auth_username_.empty() && config_->downstream_auth_password_.empty()) {
+    response->type(Common::Redis::RespType::Error);
+    response->asString() = "ERR Client sent AUTH, but no acl is set";
   } else if (username == config_->downstream_auth_username_ &&
              password == config_->downstream_auth_password_) {
     response->type(Common::Redis::RespType::SimpleString);
@@ -95,7 +112,7 @@ void ProxyFilter::onAuth(PendingRequest& request, const std::string& username,
     connection_allowed_ = true;
   } else {
     response->type(Common::Redis::RespType::Error);
-    response->asString() = "ERR invalid password";
+    response->asString() = "ERR invalid acl auth";
     connection_allowed_ = false;
   }
   request.onResponse(std::move(response));

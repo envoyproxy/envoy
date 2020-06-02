@@ -44,6 +44,13 @@ public:
    * Called when an authentication command has been received.
    * @param password supplies the AUTH password provided by the downstream client.
    */
+  virtual void onAuth(const std::string& password) PURE;
+
+  /**
+   * Called when an authentication acl command has been received.
+   * @param username supplies the AUTH username provided by the downstream client.
+   * @param password supplies the AUTH password provided by the downstream client.
+   */
   virtual void onAuth(const std::string& username, const std::string& password) PURE;
 
   /**
