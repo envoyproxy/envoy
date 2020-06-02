@@ -111,8 +111,12 @@ public:
 
 class TcpConnPoolTest : public ::testing::Test {
 public:
-  TcpConnPoolTest()
-      : conn_pool_(&mock_pool_), host_(std::make_shared<NiceMock<Upstream::MockHost>>()) {}
+  TcpConnPoolTest() : host_(std::make_shared<NiceMock<Upstream::MockHost>>()) {
+    NiceMock<MockRouteEntry> route_entry;
+    NiceMock<Upstream::MockClusterManager> cm;
+    EXPECT_CALL(cm, tcpConnPoolForCluster(_, _, _)).WillOnce(Return(&mock_pool_));
+    EXPECT_TRUE(conn_pool_.initialize(cm, route_entry, Http::Protocol::Http11, nullptr));
+  }
 
   TcpConnPool conn_pool_;
   Tcp::ConnectionPool::MockInstance mock_pool_;

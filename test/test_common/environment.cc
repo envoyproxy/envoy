@@ -28,6 +28,7 @@
 
 #include "absl/debugging/symbolize.h"
 #include "absl/strings/match.h"
+#include "absl/strings/str_format.h"
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
@@ -193,6 +194,30 @@ std::string TestEnvironment::getCheckedEnvVar(const std::string& var) {
   return optional.value();
 }
 
+std::string TestEnvironment::chooseBaseId(uint64_t test_base_id) {
+  ASSERT(test_base_id >= 1);
+  ASSERT(test_base_id <= 1L << 44); // Leave room to multiple by 1000000.
+
+  test_base_id *= 1000000;
+
+  auto test_random_seed = TestEnvironment::getOptionalEnvVar("TEST_RANDOM_SEED");
+  auto test_shard_index = TestEnvironment::getOptionalEnvVar("TEST_SHARD_INDEX");
+
+  if (test_random_seed) {
+    int mutator = 0;
+    if (absl::SimpleAtoi(test_random_seed.value(), &mutator)) {
+      test_base_id += mutator;
+    }
+  } else if (test_shard_index) {
+    int mutator = 0;
+    if (absl::SimpleAtoi(test_shard_index.value(), &mutator)) {
+      test_base_id += mutator;
+    }
+  }
+
+  return absl::StrFormat("%d", test_base_id);
+}
+
 void TestEnvironment::initializeTestMain(char* program_name) {
 #ifdef WIN32
   _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
@@ -262,6 +287,14 @@ const std::string& TestEnvironment::temporaryDirectory() {
   CONSTRUCT_ON_FIRST_USE(std::string, getTemporaryDirectory());
 }
 
+const std::string& TestEnvironment::nullDevicePath() {
+#ifdef WIN32
+  CONSTRUCT_ON_FIRST_USE(std::string, "NUL");
+#else
+  CONSTRUCT_ON_FIRST_USE(std::string, "/dev/null");
+#endif
+}
+
 std::string TestEnvironment::runfilesDirectory(const std::string& workspace) {
   RELEASE_ASSERT(runfiles_ != nullptr, "");
   return runfiles_->Rlocation(workspace);
@@ -289,6 +322,10 @@ std::string TestEnvironment::substitute(const std::string& str,
     const std::regex port_regex("\\{\\{ " + it.first + " \\}\\}");
     out_json_string = std::regex_replace(out_json_string, port_regex, it.second);
   }
+
+  // Substitute platform specific null device.
+  const std::regex null_device_regex(R"(\{\{ null_device_path \}\})");
+  out_json_string = std::regex_replace(out_json_string, null_device_regex, nullDevicePath());
 
   // Substitute IP loopback addresses.
   const std::regex loopback_address_regex(R"(\{\{ ip_loopback_address \}\})");
