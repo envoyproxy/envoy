@@ -199,8 +199,8 @@ public:
   virtual Stats::Counter* makeCounterInternal(StatName name, StatName tag_extracted_name,
                                               const StatNameTagVector& stat_name_tags) {
     Stats::Counter* counter = new NotifyingCounter(
-        Stats::AllocatorImpl::makeCounterInternal(name, tag_extracted_name, stat_name_tags),
-        mutex_, condvar_);
+        Stats::AllocatorImpl::makeCounterInternal(name, tag_extracted_name, stat_name_tags), mutex_,
+        condvar_);
     {
       absl::MutexLock l(&mutex_);
       counters_.emplace(counter->name(), counter);
