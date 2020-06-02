@@ -7,11 +7,11 @@
 #include "envoy/type/metadata/v3/metadata.pb.h"
 #include "envoy/type/tracing/v3/custom_tag.pb.h"
 
-#include "common/access_log/access_log_formatter.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/macros.h"
 #include "common/common/utility.h"
+#include "common/formatter/substitution_formatter.h"
 #include "common/grpc/common.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
@@ -170,7 +170,7 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
                 valueOrDefault(request_headers->EnvoyDownstreamServiceCluster(), "-"));
     span.setTag(Tracing::Tags::get().UserAgent, valueOrDefault(request_headers->UserAgent(), "-"));
     span.setTag(Tracing::Tags::get().HttpProtocol,
-                AccessLog::AccessLogFormatUtils::protocolToString(stream_info.protocol()));
+                Formatter::SubstitutionFormatUtils::protocolToString(stream_info.protocol()));
 
     const auto& remote_address = stream_info.downstreamDirectRemoteAddress();
 
@@ -212,7 +212,7 @@ void HttpTracerUtility::finalizeUpstreamSpan(Span& span,
                                              const StreamInfo::StreamInfo& stream_info,
                                              const Config& tracing_config) {
   span.setTag(Tracing::Tags::get().HttpProtocol,
-              AccessLog::AccessLogFormatUtils::protocolToString(stream_info.protocol()));
+              Formatter::SubstitutionFormatUtils::protocolToString(stream_info.protocol()));
 
   if (stream_info.upstreamHost()) {
     span.setTag(Tracing::Tags::get().UpstreamAddress,

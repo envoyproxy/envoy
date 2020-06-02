@@ -92,6 +92,7 @@ public:
   Network::Address::SocketType socketType() const override {
     return Network::Address::SocketType::Stream;
   }
+  Network::Address::Type addressType() const override { return local_address_->type(); }
   void setLocalAddress(const Network::Address::InstanceConstSharedPtr&) override {}
   void restoreLocalAddress(const Network::Address::InstanceConstSharedPtr&) override {}
   void setRemoteAddress(const Network::Address::InstanceConstSharedPtr&) override {}
@@ -102,6 +103,16 @@ public:
   void addOptions(const OptionsSharedPtr&) override {}
   const OptionsSharedPtr& options() const override { return options_; }
   void setRequestedServerName(absl::string_view) override {}
+  Api::SysCallIntResult bind(Network::Address::InstanceConstSharedPtr) override { return {0, 0}; }
+  Api::SysCallIntResult listen(int) override { return {0, 0}; }
+  Api::SysCallIntResult connect(const Network::Address::InstanceConstSharedPtr) override {
+    return {0, 0};
+  }
+  Api::SysCallIntResult setSocketOption(int, int, const void*, socklen_t) override {
+    return {0, 0};
+  }
+  Api::SysCallIntResult getSocketOption(int, int, void*, socklen_t*) override { return {0, 0}; }
+  Api::SysCallIntResult setBlockingForTest(bool) override { return {0, 0}; }
 
 private:
   Network::IoHandlePtr io_handle_;
