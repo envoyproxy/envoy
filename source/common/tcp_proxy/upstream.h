@@ -33,12 +33,7 @@ private:
 class HttpConnectionHandle : public ConnectionHandle {
 public:
   HttpConnectionHandle(Http::ConnectionPool::Cancellable* handle) : upstream_http_handle_(handle) {}
-  void cancel() override {
-    // upstream_http_handle_ could be nullptr if the handle is obtained from ready list.
-    if (upstream_http_handle_) {
-      upstream_http_handle_->cancel();
-    }
-  }
+  void cancel() override { upstream_http_handle_->cancel(); }
 
 private:
   Http::ConnectionPool::Cancellable* upstream_http_handle_{};
