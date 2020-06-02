@@ -10,9 +10,6 @@ namespace Extensions {
 namespace Common {
 namespace DynamicForwardProxy {
 
-MockDnsCacheResourceManager::MockDnsCacheResourceManager() = default;
-MockDnsCacheResourceManager::~MockDnsCacheResourceManager() = default;
-
 MockDnsCache::MockDnsCache() = default;
 MockDnsCache::~MockDnsCache() = default;
 
