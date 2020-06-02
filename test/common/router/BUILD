@@ -343,11 +343,24 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "header_parser_test",
+    srcs = ["header_parser_test.cc"],
+    deps = [
+        "//source/common/router:header_parser_lib",
+        "//source/common/router:string_accessor_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "header_formatter_test",
     srcs = ["header_formatter_test.cc"],
     deps = [
         "//source/common/config:metadata_lib",
-        "//source/common/router:header_formatter_lib",
+        "//source/common/formatter:header_formatter_lib",
         "//source/common/router:header_parser_lib",
         "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:filter_state_lib",

@@ -8,7 +8,7 @@
 #include "envoy/http/header_map.h"
 
 #include "common/protobuf/protobuf.h"
-#include "common/router/header_formatter.h"
+#include "common/formatter/header_formatter.h"
 
 namespace Envoy {
 namespace Router {
