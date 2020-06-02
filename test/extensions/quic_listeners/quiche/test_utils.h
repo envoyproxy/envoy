@@ -12,7 +12,7 @@
 #include "quiche/quic/test_tools/first_flight.h"
 #include "quiche/quic/core/quic_utils.h"
 #include "quiche/quic/test_tools/crypto_test_utils.h"
-
+#include "quiche/quic/test_tools/quic_config_peer.h"
 #pragma GCC diagnostic pop
 
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
@@ -138,6 +138,21 @@ generateChloPacketToSend(quic::ParsedQuicVersion quic_version, quic::QuicConfig&
                                            /*packet_number=*/1, packet_content));
 
   return Buffer::OwnedImpl(encrypted_packet->data(), encrypted_packet->length());
+}
+
+void setQuicConfigWithDefaultValues(quic::QuicConfig* config) {
+  quic::test::QuicConfigPeer::SetReceivedMaxBidirectionalStreams(
+      config, quic::kDefaultMaxStreamsPerConnection);
+  quic::test::QuicConfigPeer::SetReceivedMaxUnidirectionalStreams(
+      config, quic::kDefaultMaxStreamsPerConnection);
+  quic::test::QuicConfigPeer::SetReceivedInitialMaxStreamDataBytesUnidirectional(
+      config, quic::kMinimumFlowControlSendWindow);
+  quic::test::QuicConfigPeer::SetReceivedInitialMaxStreamDataBytesIncomingBidirectional(
+      config, quic::kMinimumFlowControlSendWindow);
+  quic::test::QuicConfigPeer::SetReceivedInitialMaxStreamDataBytesOutgoingBidirectional(
+      config, quic::kMinimumFlowControlSendWindow);
+  quic::test::QuicConfigPeer::SetReceivedInitialSessionFlowControlWindow(
+      config, quic::kMinimumFlowControlSendWindow);
 }
 
 } // namespace Quic

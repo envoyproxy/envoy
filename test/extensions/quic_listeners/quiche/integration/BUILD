@@ -10,7 +10,7 @@ envoy_package()
 
 envoy_cc_test(
     name = "quic_http_integration_test",
-    size = "small",
+    size = "medium",
     srcs = ["quic_http_integration_test.cc"],
     data = ["//test/config/integration/certs"],
     # Skipping as quiche quic_stream_send_buffer.cc does not currently compile on Windows

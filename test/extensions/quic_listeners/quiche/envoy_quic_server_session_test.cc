@@ -9,7 +9,6 @@
 #include "quiche/quic/core/quic_utils.h"
 #include "quiche/quic/core/quic_versions.h"
 #include "quiche/quic/test_tools/crypto_test_utils.h"
-#include "quiche/quic/test_tools/quic_config_peer.h"
 #include "quiche/quic/test_tools/quic_connection_peer.h"
 #include "quiche/quic/test_tools/quic_server_session_base_peer.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
@@ -26,6 +25,7 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_alarm_factory.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
 #include "test/extensions/quic_listeners/quiche/test_proof_source.h"
+#include "test/extensions/quic_listeners/quiche/test_utils.h"
 #include "extensions/transport_sockets/well_known_names.h"
 
 #include "envoy/stats/stats_macros.h"
@@ -139,18 +139,7 @@ public:
 
   void SetUp() override {
     envoy_quic_session_.Initialize();
-    quic::test::QuicConfigPeer::SetReceivedMaxBidirectionalStreams(
-        envoy_quic_session_.config(), quic::kDefaultMaxStreamsPerConnection);
-    quic::test::QuicConfigPeer::SetReceivedMaxUnidirectionalStreams(
-        envoy_quic_session_.config(), quic::kDefaultMaxStreamsPerConnection);
-    quic::test::QuicConfigPeer::SetReceivedInitialMaxStreamDataBytesUnidirectional(
-        envoy_quic_session_.config(), quic::kMinimumFlowControlSendWindow);
-    quic::test::QuicConfigPeer::SetReceivedInitialMaxStreamDataBytesIncomingBidirectional(
-        envoy_quic_session_.config(), quic::kMinimumFlowControlSendWindow);
-    quic::test::QuicConfigPeer::SetReceivedInitialMaxStreamDataBytesOutgoingBidirectional(
-        envoy_quic_session_.config(), quic::kMinimumFlowControlSendWindow);
-    quic::test::QuicConfigPeer::SetReceivedInitialSessionFlowControlWindow(
-        envoy_quic_session_.config(), quic::kMinimumFlowControlSendWindow);
+    setQuicConfigWithDefaultValues(envoy_quic_session_.config());
     envoy_quic_session_.OnConfigNegotiated();
 
     // Switch to a encryption forward secure crypto stream.

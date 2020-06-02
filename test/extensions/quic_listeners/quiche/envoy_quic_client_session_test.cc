@@ -6,7 +6,6 @@
 
 #include "quiche/quic/core/crypto/null_encrypter.h"
 #include "quiche/quic/test_tools/crypto_test_utils.h"
-#include "quiche/quic/test_tools/quic_config_peer.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
 
 #pragma GCC diagnostic pop
@@ -17,6 +16,7 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_connection_helper.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_alarm_factory.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
+#include "test/extensions/quic_listeners/quiche/test_utils.h"
 
 #include "envoy/stats/stats_macros.h"
 #include "test/mocks/event/mocks.h"
@@ -123,18 +123,7 @@ public:
 
   void SetUp() override {
     envoy_quic_session_.Initialize();
-    quic::test::QuicConfigPeer::SetReceivedMaxBidirectionalStreams(
-        envoy_quic_session_.config(), quic::kDefaultMaxStreamsPerConnection);
-    quic::test::QuicConfigPeer::SetReceivedMaxUnidirectionalStreams(
-        envoy_quic_session_.config(), quic::kDefaultMaxStreamsPerConnection);
-    quic::test::QuicConfigPeer::SetReceivedInitialSessionFlowControlWindow(
-        envoy_quic_session_.config(), quic::kMinimumFlowControlSendWindow);
-    quic::test::QuicConfigPeer::SetReceivedInitialMaxStreamDataBytesUnidirectional(
-        envoy_quic_session_.config(), quic::kMinimumFlowControlSendWindow);
-    quic::test::QuicConfigPeer::SetReceivedInitialMaxStreamDataBytesIncomingBidirectional(
-        envoy_quic_session_.config(), quic::kMinimumFlowControlSendWindow);
-    quic::test::QuicConfigPeer::SetReceivedInitialMaxStreamDataBytesOutgoingBidirectional(
-        envoy_quic_session_.config(), quic::kMinimumFlowControlSendWindow);
+    setQuicConfigWithDefaultValues(envoy_quic_session_.config());
     envoy_quic_session_.OnConfigNegotiated();
     envoy_quic_session_.addConnectionCallbacks(network_connection_callbacks_);
     envoy_quic_session_.setConnectionStats(
