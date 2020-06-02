@@ -2,6 +2,7 @@
 
 #include "common/router/header_parser.h"
 #include "common/router/string_accessor_impl.h"
+
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -600,6 +601,6 @@ response_headers_to_remove: ["x-foo-header"]
   EXPECT_EQ("bar", header_map.get_("x-foo-header"));
 }
 
-}  // namespace
-}  // namespace Router
-}  // namespace Envoy
+} // namespace
+} // namespace Router
+} // namespace Envoy

@@ -347,8 +347,8 @@ envoy_cc_library(
     srcs = ["header_parser.cc"],
     hdrs = ["header_parser.h"],
     deps = [
-        "//source/common/formatter:header_formatter_lib",
         "//include/envoy/http:header_map_interface",
+        "//source/common/formatter:header_formatter_lib",
         "//source/common/http:headers_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
