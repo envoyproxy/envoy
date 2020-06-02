@@ -24,7 +24,7 @@ master commit at which the binary was compiled, and `latest` corresponds to a bi
 
 The Windows 2019 based Envoy Docker image at [`envoyproxy/envoy-build-windows2019:<hash>`](https://hub.docker.com/r/envoyproxy/envoy-build-windows2019/)
 is used for CI checks, where `<hash>` is specified in [`envoy_build_sha.sh`](https://github.com/envoyproxy/envoy/blob/master/ci/envoy_build_sha.sh).
-Developers may work with `envoyproxy/envoy-build-windows2019:latest` to provide a self-contained environment for building Envoy binaries and
+Developers may work with the most recent `envoyproxy/envoy-build-windows2019` image to provide a self-contained environment for building Envoy binaries and
 running tests that reflects the latest built Windows 2019 Envoy image.
 
 # Build image base and compiler versions
@@ -40,6 +40,7 @@ The source for these images is located in the [envoyproxy/envoy-build-tools](htt
 repository.
 
 We use the Clang compiler for all Linux CI runs with tests. We have an additional Linux CI run with GCC which builds binary only.
+Currently, Windows CI builds the static Envoy binary only.
 
 # C++ standard library
 
