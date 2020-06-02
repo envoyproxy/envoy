@@ -51,7 +51,7 @@ public:
   AdmissionControlFilterConfig(const AdmissionControlProto& proto_config, Runtime::Loader& runtime,
                                TimeSource& time_source, Runtime::RandomGenerator& random,
                                Stats::Scope& scope, ThreadLocal::SlotPtr&& tls,
-                               std::unique_ptr<ResponseEvaluator> response_evaluator);
+                               std::shared_ptr<ResponseEvaluator> response_evaluator);
   virtual ~AdmissionControlFilterConfig() = default;
 
   virtual ThreadLocalController& getController() const {
@@ -64,7 +64,7 @@ public:
   TimeSource& timeSource() const { return time_source_; }
   Stats::Scope& scope() const { return scope_; }
   double aggression() const;
-  ResponseEvaluator& responseEvalutor() const { return *response_evaluator_; }
+  ResponseEvaluator& responseEvaluator() const { return *response_evaluator_; }
 
 private:
   Runtime::Loader& runtime_;
@@ -74,7 +74,7 @@ private:
   const ThreadLocal::SlotPtr tls_;
   Runtime::FeatureFlag admission_control_feature_;
   std::unique_ptr<Runtime::Double> aggression_;
-  std::unique_ptr<ResponseEvaluator> response_evaluator_;
+  std::shared_ptr<ResponseEvaluator> response_evaluator_;
 };
 
 using AdmissionControlFilterConfigSharedPtr = std::shared_ptr<const AdmissionControlFilterConfig>;

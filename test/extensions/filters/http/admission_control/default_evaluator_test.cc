@@ -4,6 +4,9 @@
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.validate.h"
 
 #include "extensions/filters/http/admission_control/evaluators/default_evaluator.h"
+#include "extensions/filters/http/admission_control/admission_control.h"
+
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -21,7 +24,7 @@ class DefaultEvaluatorTest : public testing::Test {
 public:
   DefaultEvaluatorTest() = default;
 
-  DefaultResponseEvaluator makeEvaluator(const std::string& yaml) {
+  void makeEvaluator(const std::string& yaml) {
     AdmissionControlProto::DefaultEvaluationCriteria proto;
     TestUtility::loadFromYamlAndValidate(yaml, proto);
 
@@ -78,7 +81,7 @@ public:
   }
 
 protected:
-  std::unique_ptr<DefaultResposeEvalutor> evaluator_;
+  std::unique_ptr<DefaultResponseEvaluator> evaluator_;
 };
 
 // Ensure the HTTP error code range configurations are honored.
@@ -103,7 +106,7 @@ grpc_status:
 }
 
 // Verify default behavior of the filter.
-TEST_F(DefaultEvalutorTest, DefaultBehaviorTest) {
+TEST_F(DefaultEvaluatorTest, DefaultBehaviorTest) {
   const std::string yaml = R"EOF(
 http_status:
 grpc_status:
@@ -123,13 +126,13 @@ grpc_status:
   - 13
 )EOF";
 
-  auto evaluator = makeEvaluator(yaml);
+  makeEvaluator(yaml);
 
   for (int code = 0; code < 15; ++code) {
     if (code == 7 || code == 13) {
-      EXPECT_TRUE(evaluator.isGrpcSuccess(code));
+      expectGrpcSuccess(code);
     } else {
-      EXPECT_FALSE(evaluator.isGrpcSuccess(code));
+      expectGrpcFail(code);
     }
   }
 }

@@ -35,9 +35,6 @@ public:
     TestUtility::loadFromYamlAndValidate(yaml, proto);
     auto tls = context_.threadLocal().allocateSlot();
     auto evaluator = std::make_unique<DefaultResponseEvaluator>(proto.default_eval_criteria());
-    tls->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-      return std::make_shared<ThreadLocalControllerImpl>(time_system_, std::chrono::seconds(10));
-    });
     return std::make_shared<AdmissionControlFilterConfig>(
         proto, runtime_, time_system_, random_, scope_, std::move(tls), std::move(evaluator));
   }

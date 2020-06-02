@@ -33,7 +33,7 @@ static constexpr double defaultAggression = 2.0;
 AdmissionControlFilterConfig::AdmissionControlFilterConfig(
     const AdmissionControlProto& proto_config, Runtime::Loader& runtime, TimeSource& time_source,
     Runtime::RandomGenerator& random, Stats::Scope& scope, ThreadLocal::SlotPtr&& tls,
-    std::unique_ptr<ResponseEvaluator> response_evaluator)
+    std::shared_ptr<ResponseEvaluator> response_evaluator)
     : runtime_(runtime), time_source_(time_source), random_(random), scope_(scope),
       tls_(std::move(tls)), admission_control_feature_(proto_config.enabled(), runtime_),
       aggression_(
@@ -80,11 +80,11 @@ Http::FilterHeadersStatus AdmissionControlFilter::encodeHeaders(Http::ResponseHe
     }
 
     const uint32_t status = enumToInt(grpc_status.value());
-    successful_response = config_->responseEvalutor().isGrpcSuccess(status);
+    successful_response = config_->responseEvaluator().isGrpcSuccess(status);
   } else {
     // HTTP response.
     const uint64_t http_status = Http::Utility::getResponseStatus(headers);
-    successful_response = config_->responseEvalutor().isHttpSuccess(http_status);
+    successful_response = config_->responseEvaluator().isHttpSuccess(http_status);
   }
 
   if (successful_response) {
@@ -101,7 +101,7 @@ AdmissionControlFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
   if (expect_grpc_status_in_trailer_) {
     absl::optional<GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(trailers, false);
 
-    if (grpc_status.has_value() && config_->responseEvalutor().isGrpcSuccess(grpc_status.value())) {
+    if (grpc_status.has_value() && config_->responseEvaluator().isGrpcSuccess(grpc_status.value())) {
       recordSuccess();
     } else {
       recordFailure();

@@ -33,10 +33,10 @@ Http::FilterFactoryCb AdmissionControlFilterFactory::createFilterFactoryFromProt
         return std::make_shared<ThreadLocalControllerImpl>(context.timeSource(), sampling_window);
       });
 
-  std::unique_ptr<ResponseEvaluator> response_evaluator;
+  std::shared_ptr<ResponseEvaluator> response_evaluator;
   switch (config.evaluation_criteria_case()) {
   case AdmissionControlProto::EvaluationCriteriaCase::kDefaultEvalCriteria:
-    response_evaluator = std::make_unique<DefaultResponseEvaluator>(config.default_eval_criteria());
+    response_evaluator = std::make_shared<DefaultResponseEvaluator>(config.default_eval_criteria());
     break;
   case AdmissionControlProto::EvaluationCriteriaCase::EVALUATION_CRITERIA_NOT_SET:
     NOT_REACHED_GCOVR_EXCL_LINE;

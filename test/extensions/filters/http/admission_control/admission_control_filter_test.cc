@@ -37,14 +37,21 @@ public:
   MOCK_METHOD(void, recordFailure, (), (override));
 };
 
+class MockResponseEvaluator : public ResponseEvaluator {
+public:
+  MockResponseEvaluator() = default;
+  MOCK_METHOD(bool, isHttpSuccess, (uint64_t code), (const, override));
+  MOCK_METHOD(bool, isGrpcSuccess, (uint32_t status), (const, override));
+};
+
 class TestConfig : public AdmissionControlFilterConfig {
 public:
   TestConfig(const AdmissionControlProto& proto_config, Runtime::Loader& runtime,
              TimeSource& time_source, Runtime::RandomGenerator& random, Stats::Scope& scope,
              ThreadLocal::SlotPtr&& tls, MockThreadLocalController& controller,
-             std::unique_ptr<ResponseEvaluator> evaluator)
+             std::shared_ptr<ResponseEvaluator> evaluator)
       : AdmissionControlFilterConfig(proto_config, runtime, time_source, random, scope,
-                                     std::move(tls), std::move(evaluator)),
+                                     std::move(tls), evaluator),
         controller_(controller) {}
   ThreadLocalController& getController() const override { return controller_; }
 
@@ -52,9 +59,6 @@ private:
   MockThreadLocalController& controller_;
 };
 
-/**
- * TODO (@tallen): implement mock evaluator and spit out answers all this needs to be changed
- */
 class AdmissionControlTest : public testing::Test {
 public:
   AdmissionControlTest() = default;
@@ -63,9 +67,10 @@ public:
     AdmissionControlProto proto;
     TestUtility::loadFromYamlAndValidate(yaml, proto);
     auto tls = context_.threadLocal().allocateSlot();
+    evaluator_ = std::make_shared<MockResponseEvaluator>();
 
     return std::make_shared<TestConfig>(proto, runtime_, time_system_, random_, scope_,
-                                        std::move(tls), controller_, std::m);
+                                        std::move(tls), controller_, evaluator_);
   }
 
   void setupFilter(std::shared_ptr<AdmissionControlFilterConfig> config) {
@@ -84,34 +89,6 @@ public:
     filter_->encodeHeaders(headers, true);
   }
 
-  void expectHttpSuccess(std::string&& code) {
-    Http::RequestHeaderMapImpl request_headers;
-    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
-    EXPECT_CALL(controller_, recordSuccess());
-    sampleHttpRequest(std::move(code));
-  }
-
-  void expectHttpFail(std::string&& code) {
-    Http::RequestHeaderMapImpl request_headers;
-    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
-    EXPECT_CALL(controller_, recordFailure());
-    sampleHttpRequest(std::move(code));
-  }
-
-  void expectGrpcSuccess(std::string&& code) {
-    Http::RequestHeaderMapImpl request_headers;
-    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
-    EXPECT_CALL(controller_, recordSuccess());
-    sampleGrpcRequest(std::move(code));
-  }
-
-  void expectGrpcFail(std::string&& code) {
-    Http::RequestHeaderMapImpl request_headers;
-    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
-    EXPECT_CALL(controller_, recordFailure());
-    sampleGrpcRequest(std::move(code));
-  }
-
 protected:
   std::string stats_prefix_{""};
   NiceMock<Runtime::MockLoader> runtime_;
@@ -121,7 +98,8 @@ protected:
   NiceMock<Runtime::MockRandomGenerator> random_;
   std::shared_ptr<AdmissionControlFilter> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
-  MockThreadLocalController controller_;
+  NiceMock<MockThreadLocalController> controller_;
+  std::shared_ptr<MockResponseEvaluator> evaluator_;
   const std::string default_yaml_{R"EOF(
 enabled:
   default_value: true
@@ -184,92 +162,86 @@ TEST_F(AdmissionControlTest, DisregardHealthChecks) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
-// Validate simple behavioral cases.
-TEST_F(AdmissionControlTest, FilterBehaviorBasic) {
+// Validate simple HTTP failure case.
+TEST_F(AdmissionControlTest, HttpFailureBehavior) {
   auto config = makeConfig(default_yaml_);
   setupFilter(config);
 
-  // Fail lots of requests so that we can expect a ~100% rejection rate.
-  EXPECT_CALL(controller_, requestTotalCount()).WillRepeatedly(Return(1000));
-  EXPECT_CALL(controller_, requestSuccessCount()).WillRepeatedly(Return(0));
-
-  // We expect rejections due to the failure rate.
+  // We expect rejection counter to increment upon failure.
   TestUtility::waitForCounterEq(scope_, "test_prefix.rq_rejected", 0, time_system_);
+
+  EXPECT_CALL(controller_, requestTotalCount()).WillRepeatedly(Return(100));
+  EXPECT_CALL(controller_, requestSuccessCount()).WillRepeatedly(Return(0));
+  EXPECT_CALL(*evaluator_, isHttpSuccess(500)).WillRepeatedly(Return(false));
+
   Http::TestRequestHeaderMapImpl request_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, true));
+  Http::TestResponseHeaderMapImpl response_headers;
+  sampleHttpRequest("500");
+
   TestUtility::waitForCounterEq(scope_, "test_prefix.rq_rejected", 1, time_system_);
-
-  // Now we pretend as if the historical data has been phased out.
-  EXPECT_CALL(controller_, requestTotalCount()).WillRepeatedly(Return(0));
-  EXPECT_CALL(controller_, requestSuccessCount()).WillRepeatedly(Return(0));
-
-  // Should continue forwarding since SR has become stale and there's no additional data. This also
-  // verifies that HTTP 200s are default successes.
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
-  EXPECT_CALL(controller_, recordSuccess());
-  sampleHttpRequest("200");
-
-  // Fail exactly half of the requests so we get a ~50% rejection rate.
-  EXPECT_CALL(controller_, requestTotalCount()).WillRepeatedly(Return(1000));
-  EXPECT_CALL(controller_, requestSuccessCount()).WillRepeatedly(Return(500));
-
-  // Random numbers in the range [0,1e4) are considered for the rejection calculation. One request
-  // should fail and the other should pass.
-  EXPECT_CALL(random_, random()).WillOnce(Return(5500));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
-  EXPECT_CALL(controller_, recordFailure());
-  sampleHttpRequest("503");
-
-  EXPECT_CALL(random_, random()).WillOnce(Return(4500));
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
-            filter_->decodeHeaders(request_headers, true));
-}
-//
-// Ensure that HTTP status codes are not considered when evaluating a GRPC request.
-TEST_F(DefaultEvalutorTest, HttpCodeInfluence) {
-  const std::string yaml = R"EOF(
-default_eval_criteria:
-  http_status:
-  grpc_status:
-    - 7  # PERMISSION_DENIED
-    - 12 # UNIMPLEMENTED
-)EOF";
-
-  // TODO @tallen
 }
 
-// Ensure that HTTP status codes are not considered when evaluating a GRPC request.
-TEST_F(DefaultEvalutorTest, HttpCodeInfluence2) {
-  const std::string yaml = R"EOF(
-default_eval_criteria:
-  http_status:
-    - start: 300
-      end:   400
-  grpc_status:
-    - 7  # PERMISSION_DENIED
-    - 12 # UNIMPLEMENTED
-)EOF";
-
-  // TODO @tallen
-
-  auto config = makeConfig(yaml);
-
-  Http::TestRequestHeaderMapImpl request_headers;
-  EXPECT_CALL(controller_, requestTotalCount()).WillRepeatedly(Return(0));
-  EXPECT_CALL(controller_, requestSuccessCount()).WillRepeatedly(Return(0));
-
+// Validate simple HTTP success case.
+TEST_F(AdmissionControlTest, HttpSuccessBehavior) {
+  auto config = makeConfig(default_yaml_);
   setupFilter(config);
 
-  // HTTP 2xx is not considered a success, but it's returned for all of the GRPC messages, so let's
-  // make sure GRPC still gets evaluated correctly.
-  expectGrpcSuccess("7");
-  expectGrpcFail("0");
+  // We expect rejection counter to NOT increment upon success.
+  TestUtility::waitForCounterEq(scope_, "test_prefix.rq_rejected", 0, time_system_);
 
-  // Verify that the HTTP behaves correctly as well. A code of 200 counts as a failure in the
-  // config, so let's make sure it actually fails without a GRPC message type.
-  expectHttpFail("200");
-  expectHttpSuccess("301");
+  EXPECT_CALL(controller_, requestTotalCount()).WillRepeatedly(Return(100));
+  EXPECT_CALL(controller_, requestSuccessCount()).WillRepeatedly(Return(100));
+  EXPECT_CALL(*evaluator_, isHttpSuccess(200)).WillRepeatedly(Return(true));
+
+  Http::TestRequestHeaderMapImpl request_headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_->decodeHeaders(request_headers, true));
+  sampleHttpRequest("200");
+
+  TestUtility::waitForCounterEq(scope_, "test_prefix.rq_rejected", 0, time_system_);
+}
+
+// Validate simple gRPC failure case.
+TEST_F(AdmissionControlTest, GrpcFailureBehavior) {
+  auto config = makeConfig(default_yaml_);
+  setupFilter(config);
+
+  // We expect rejection counter to increment upon failure.
+  TestUtility::waitForCounterEq(scope_, "test_prefix.rq_rejected", 0, time_system_);
+
+  EXPECT_CALL(controller_, requestTotalCount()).WillRepeatedly(Return(100));
+  EXPECT_CALL(controller_, requestSuccessCount()).WillRepeatedly(Return(0));
+  EXPECT_CALL(*evaluator_, isGrpcSuccess(7)).WillRepeatedly(Return(false));
+
+  Http::TestRequestHeaderMapImpl request_headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, true));
+  Http::TestResponseHeaderMapImpl response_headers;
+  sampleGrpcRequest("7");
+
+  TestUtility::waitForCounterEq(scope_, "test_prefix.rq_rejected", 1, time_system_);
+}
+
+// Validate simple gRPC success case.
+TEST_F(AdmissionControlTest, GrpcSuccessBehavior) {
+  auto config = makeConfig(default_yaml_);
+  setupFilter(config);
+
+  // We expect rejection counter to NOT increment upon success.
+  TestUtility::waitForCounterEq(scope_, "test_prefix.rq_rejected", 0, time_system_);
+
+  EXPECT_CALL(controller_, requestTotalCount()).WillRepeatedly(Return(100));
+  EXPECT_CALL(controller_, requestSuccessCount()).WillRepeatedly(Return(100));
+  EXPECT_CALL(*evaluator_, isGrpcSuccess(0)).WillRepeatedly(Return(true));
+
+  Http::TestRequestHeaderMapImpl request_headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_->decodeHeaders(request_headers, true));
+  sampleGrpcRequest("0");
+
+  TestUtility::waitForCounterEq(scope_, "test_prefix.rq_rejected", 0, time_system_);
 }
 
 } // namespace
