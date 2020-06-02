@@ -1,12 +1,12 @@
 syntax = "proto3";
 
-package test.common.access_log;
+package test.common.substitution;
 
 import "test/fuzz/common.proto";
 
 import "validate/validate.proto";
 
-// Structured input for access_log_formatter_fuzz_test.
+// Structured input for substitution_formatter_fuzz_test.
 
 message TestCase {
   // Do not allow invalid header characters in %REQ(...)% and %RESP(...)%.

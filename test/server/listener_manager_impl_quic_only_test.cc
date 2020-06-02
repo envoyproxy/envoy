@@ -55,21 +55,18 @@ udp_listener_config:
 #endif
                            /* expected_creation_params */ {true, false});
 
-  expectSetsockopt(os_sys_calls_,
-                   /* expected_sockopt_level */ IPPROTO_IP,
+  expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
                    /* expected_sockopt_name */ ENVOY_IP_PKTINFO,
                    /* expected_value */ 1,
                    /* expected_num_calls */ 1);
 #ifdef SO_RXQ_OVFL
-  expectSetsockopt(os_sys_calls_,
-                   /* expected_sockopt_level */ SOL_SOCKET,
+  expectSetsockopt(/* expected_sockopt_level */ SOL_SOCKET,
                    /* expected_sockopt_name */ SO_RXQ_OVFL,
                    /* expected_value */ 1,
                    /* expected_num_calls */ 1);
 #endif
 
-  expectSetsockopt(os_sys_calls_,
-                   /* expected_sockopt_level */ SOL_SOCKET,
+  expectSetsockopt(/* expected_sockopt_level */ SOL_SOCKET,
                    /* expected_sockopt_name */ SO_REUSEPORT,
                    /* expected_value */ 1,
                    /* expected_num_calls */ 1);

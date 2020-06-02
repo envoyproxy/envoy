@@ -1,6 +1,6 @@
 #include "envoy/config/core/v3/substitution_format_string.pb.validate.h"
 
-#include "common/common/substitution_format_string.h"
+#include "common/formatter/substitution_format_string.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
@@ -12,6 +12,7 @@
 using testing::Return;
 
 namespace Envoy {
+namespace Formatter {
 
 class SubstitutionFormatStringUtilsTest : public ::testing::Test {
 public:
@@ -92,4 +93,5 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestInvalidConfigs) {
   }
 }
 
+} // namespace Formatter
 } // namespace Envoy

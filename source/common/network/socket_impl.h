@@ -86,18 +86,24 @@ public:
   Api::SysCallIntResult bind(Network::Address::InstanceConstSharedPtr address) override;
   Api::SysCallIntResult listen(int backlog) override;
   Api::SysCallIntResult connect(const Address::InstanceConstSharedPtr addr) override;
+  Api::SysCallIntResult setSocketOption(int level, int optname, const void* optval,
+                                        socklen_t optlen) override;
+  Api::SysCallIntResult getSocketOption(int level, int optname, void* optval,
+                                        socklen_t* optlen) override;
+  Api::SysCallIntResult setBlockingForTest(bool blocking) override;
 
   const OptionsSharedPtr& options() const override { return options_; }
   Address::SocketType socketType() const override { return sock_type_; }
+  Address::Type addressType() const override { return addr_type_; }
 
 protected:
-  SocketImpl(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& local_address)
-      : io_handle_(std::move(io_handle)), local_address_(local_address) {}
+  SocketImpl(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& local_address);
 
   const IoHandlePtr io_handle_;
   Address::InstanceConstSharedPtr local_address_;
   OptionsSharedPtr options_;
   Address::SocketType sock_type_;
+  Address::Type addr_type_;
 };
 
 } // namespace Network
