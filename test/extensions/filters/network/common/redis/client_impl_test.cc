@@ -524,7 +524,7 @@ TEST_F(RedisClientImplTest, InitializedWithAuthPassword) {
   client_->close();
 }
 
-TEST_F(RedisClientImplTest, InitializedWithAuthUsernamePassword) {
+TEST_F(RedisClientImplTest, InitializedWithAuthAcl) {
   InSequence s;
 
   setup();
