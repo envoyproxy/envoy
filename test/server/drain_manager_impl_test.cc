@@ -19,8 +19,9 @@ namespace {
 
 constexpr int DrainTimeSeconds(600);
 
-class DrainManagerImplTest : public Event::TestUsingSimulatedTime, public testing::TestWithParam<bool> {
- protected:
+class DrainManagerImplTest : public Event::TestUsingSimulatedTime,
+                             public testing::TestWithParam<bool> {
+protected:
   DrainManagerImplTest() {
     ON_CALL(server_.options_, drainTime())
         .WillByDefault(Return(std::chrono::seconds(DrainTimeSeconds)));
@@ -69,8 +70,7 @@ TEST_F(DrainManagerImplTest, ModifyOnly) {
 
 TEST_P(DrainManagerImplTest, DrainDeadline) {
   const bool drain_incrementally = GetParam();
-  ON_CALL(server_.options_, drainIncrementally())
-      .WillByDefault(Return(drain_incrementally));
+  ON_CALL(server_.options_, drainIncrementally()).WillByDefault(Return(drain_incrementally));
   // TODO(auni53): Add integration tests for this once TestDrainManager is
   // removed.
   DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::DEFAULT);
@@ -112,8 +112,7 @@ TEST_P(DrainManagerImplTest, DrainDeadline) {
 
 TEST_P(DrainManagerImplTest, DrainDeadlineProbability) {
   const bool drain_incrementally = GetParam();
-  ON_CALL(server_.options_, drainIncrementally())
-      .WillByDefault(Return(drain_incrementally));
+  ON_CALL(server_.options_, drainIncrementally()).WillByDefault(Return(drain_incrementally));
   ON_CALL(server_.random_, random()).WillByDefault(Return(4));
   ON_CALL(server_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(3)));
 
@@ -145,8 +144,7 @@ TEST_P(DrainManagerImplTest, DrainDeadlineProbability) {
   }
 }
 
-INSTANTIATE_TEST_SUITE_P(DrainIncrementally, DrainManagerImplTest,
-                                                  testing::Bool());
+INSTANTIATE_TEST_SUITE_P(DrainIncrementally, DrainManagerImplTest, testing::Bool());
 
 } // namespace
 } // namespace Server

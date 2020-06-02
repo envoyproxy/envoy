@@ -66,7 +66,9 @@ public:
   void setParentShutdownTime(std::chrono::seconds parent_shutdown_time) {
     parent_shutdown_time_ = parent_shutdown_time;
   }
-  void setDrainIncrementally(bool drain_incrementally) { drain_incrementally_ = drain_incrementally; }
+  void setDrainIncrementally(bool drain_incrementally) {
+    drain_incrementally_ = drain_incrementally;
+  }
   void setLogLevel(spdlog::level::level_enum log_level) { log_level_ = log_level; }
   void setLogFormat(const std::string& log_format) { log_format_ = log_format; }
   void setLogPath(const std::string& log_path) { log_path_ = log_path; }
