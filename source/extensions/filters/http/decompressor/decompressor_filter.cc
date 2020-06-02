@@ -106,8 +106,8 @@ Http::FilterHeadersStatus DecompressorFilter::maybeInitDecompress(
     headers.removeContentLength();
     modifyContentEncoding(headers);
 
-    ENVOY_STREAM_LOG(debug, "do decompress (without buffering) {}: {}", callbacks,
-                     direction_config.logString(), headers);
+    ENVOY_STREAM_LOG(debug, "do decompress {}: {}", callbacks, direction_config.logString(),
+                     headers);
   } else {
     direction_config.stats().not_decompressed_.inc();
     ENVOY_STREAM_LOG(debug, "do not decompress {}: {}", callbacks, direction_config.logString(),
