@@ -168,9 +168,6 @@ public:
   }
   void add(uint64_t amount) override {
     counter_->add(amount);
-    if (name() == "cluster_manager.cluster_removed") {
-      std::cerr << "Signaling that " << name() << "is " << counter_->value() << "\n";
-    }
     absl::MutexLock l(&mutex_);
     condvar_.Signal();
   }
@@ -206,7 +203,6 @@ public:
       absl::MutexLock l(&mutex_);
       counters_.emplace(counter->name(), counter);
       if (counter->name() == "cluster_manager.cluster_removed") {
-        std::cerr << "Signaling about " << counter->name() << "existing \n";
       }
       condvar_.Signal();
     }
@@ -384,20 +380,8 @@ public:
     ENVOY_LOG_MISC(trace, "waiting for {} to be {}", name, value);
     while (statsAllocator().getCounterLockHeld(name) == nullptr ||
            statsAllocator().getCounterLockHeld(name)->value() != value) {
-      std::cerr << " waiting for " << name << " to be " << value << "\n";
-      if (statsAllocator().getCounterLockHeld(name)) {
-        std::cerr << " Value " << statsAllocator().getCounterLockHeld(name)->value() << std::endl;
-      } else {
-        std::cerr << " Does not exist\n";
-      }
       statsAllocator().condvar().Wait(&statsAllocator().mutex_);
-      if (statsAllocator().getCounterLockHeld(name)) {
-        std::cerr << " Value " << statsAllocator().getCounterLockHeld(name)->value() << std::endl;
-      } else {
-        std::cerr << " Does not exist\n";
-      }
     }
-    std::cerr << " done waiting for " << name << " to be " << value;
     ENVOY_LOG_MISC(trace, "done waiting for {} to be {}", name, value);
   }
 
@@ -406,20 +390,8 @@ public:
     ENVOY_LOG_MISC(trace, "waiting for {} to be at least {}", name, value);
     while (statsAllocator().getCounterLockHeld(name) == nullptr ||
            statsAllocator().getCounterLockHeld(name)->value() < value) {
-      std::cerr << " waiting for " << name << " to be at least " << value << std::endl;
-      if (statsAllocator().getCounterLockHeld(name)) {
-        std::cerr << " Value " << statsAllocator().getCounterLockHeld(name)->value() << std::endl;
-      } else {
-        std::cerr << " Does not exist\n";
-      }
       statsAllocator().condvar().Wait(&statsAllocator().mutex_);
-      if (statsAllocator().getCounterLockHeld(name)) {
-        std::cerr << " Value " << statsAllocator().getCounterLockHeld(name)->value() << std::endl;
-      } else {
-        std::cerr << " Does not exist\n";
-      }
     }
-    std::cerr << " done waiting for " << name << " to be at least " << value;
     ENVOY_LOG_MISC(trace, "done waiting for {} to be at least {}", name, value);
   }
 
