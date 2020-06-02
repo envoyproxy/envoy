@@ -9,24 +9,24 @@ namespace Envoy {
 namespace Extensions {
 namespace Upstreams {
 namespace Http {
-namespace Http {
+namespace Default {
 
 /**
- * Config registration for the Http conn pool.
+ * Config registration for the Default conn pool.
  * @see FIXME.
  */
-class HttpGenericConnPoolFactory : public Router::GenericConnPoolFactory {
+class DefaultGenericConnPoolFactory : public Router::GenericConnPoolFactory {
 public:
-  ~HttpGenericConnPoolFactory() override = default;
-  std::string name() const override { return HttpUpstreamsNames::get().Http; }
+  ~DefaultGenericConnPoolFactory() override = default;
+  std::string name() const override { return HttpUpstreamsNames::get().Default; }
   std::string category() const override { return "envoy.upstreams"; }
   Router::GenericConnPoolPtr createGenericConnPool(Upstream::ClusterManager& cm, bool is_connect, const Router::RouteEntry& route_entry,
-                                                   Envoy::Http::Protocol protocol, Upstream::LoadBalancerContext* ctx) const override;
+                                                                     Envoy::Http::Protocol protocol, Upstream::LoadBalancerContext* ctx) const override;
 };
 
-DECLARE_FACTORY(HttpGenericConnPoolFactory);
+DECLARE_FACTORY(DefaultGenericConnPoolFactory);
 
-} // namespace Http
+} // namespace Default
 } // namespace Http
 } // namespace Upstreams
 } // namespace Extensions

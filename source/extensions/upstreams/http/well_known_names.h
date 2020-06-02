@@ -21,6 +21,9 @@ public:
 
   // The "CONNECT" upstream: sending decapsulated CONNECT requests over a TCP connection.
   const std::string Tcp = "envoy.filters.upstreams.http.tcp";
+
+  // The default upstream, returning TCP upstream for CONNECT requests, HTTP for non-CONNECT requests.
+  const std::string Default = "envoy.filters.upstreams.http.default";
 };
 
 using HttpUpstreamsNames = ConstSingleton<HttpUpstreamsNameValues>;

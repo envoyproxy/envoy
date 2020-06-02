@@ -24,37 +24,36 @@
 #include "common/stream_info/stream_info_impl.h"
 
 namespace Envoy {
-namespace Router {
+namespace Extensions {
+namespace Upstreams {
+namespace Http {
+namespace Tcp {
 
-class GenericUpstream;
-class GenericConnectionPoolCallbacks;
-class RouterFilterInterface;
-class UpstreamRequest;
-
-class TcpConnPool : public GenericConnPool, public Tcp::ConnectionPool::Callbacks {
+class TcpConnPool : public Router::GenericConnPool, public Envoy::Tcp::ConnectionPool::Callbacks {
 public:
-  bool initialize(Upstream::ClusterManager& cm, const Router::RouteEntry& route_entry, Envoy::Http::Protocol,
-                  Upstream::LoadBalancerContext* ctx) override {
+  TcpConnPool(Upstream::ClusterManager& cm, bool is_connect, const Router::RouteEntry& route_entry, Envoy::Http::Protocol,
+                  Upstream::LoadBalancerContext* ctx) {
+    ASSERT(is_connect);
     conn_pool_ = cm.tcpConnPoolForCluster(route_entry.clusterName(),
                                           Upstream::ResourcePriority::Default, ctx);
-    return conn_pool_ != nullptr;
   }
-
-  void newStream(GenericConnectionPoolCallbacks* callbacks) override {
+  void newStream(Router::GenericConnectionPoolCallbacks* callbacks) override {
     callbacks_ = callbacks;
     upstream_handle_ = conn_pool_->newConnection(*this);
   }
 
   bool cancelAnyPendingRequest() override {
     if (upstream_handle_) {
-      upstream_handle_->cancel(Tcp::ConnectionPool::CancelPolicy::Default);
+      upstream_handle_->cancel(Envoy::Tcp::ConnectionPool::CancelPolicy::Default);
       upstream_handle_ = nullptr;
       return true;
     }
     return false;
   }
-  absl::optional<Http::Protocol> protocol() const override { return absl::nullopt; }
+  absl::optional<Envoy::Http::Protocol> protocol() const override { return absl::nullopt; }
   Upstream::HostDescriptionConstSharedPtr host() const override { return conn_pool_->host(); }
+
+  bool valid() { return conn_pool_ != nullptr; }
 
   // Tcp::ConnectionPool::Callbacks
   void onPoolFailure(ConnectionPool::PoolFailureReason reason,
@@ -63,24 +62,24 @@ public:
     callbacks_->onPoolFailure(reason, "", host);
   }
 
-  void onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
+  void onPoolReady(Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
                    Upstream::HostDescriptionConstSharedPtr host) override;
 
 private:
-  Tcp::ConnectionPool::Instance* conn_pool_;
-  Tcp::ConnectionPool::Cancellable* upstream_handle_{};
-  GenericConnectionPoolCallbacks* callbacks_{};
+  Envoy::Tcp::ConnectionPool::Instance* conn_pool_;
+  Envoy::Tcp::ConnectionPool::Cancellable* upstream_handle_{};
+  Router::GenericConnectionPoolCallbacks* callbacks_{};
 };
 
-class TcpUpstream : public GenericUpstream, public Tcp::ConnectionPool::UpstreamCallbacks {
+class TcpUpstream : public Router::GenericUpstream, public Envoy::Tcp::ConnectionPool::UpstreamCallbacks {
 public:
-  TcpUpstream(UpstreamRequest* upstream_request, Tcp::ConnectionPool::ConnectionDataPtr&& upstream);
+  TcpUpstream(Router::UpstreamRequest* upstream_request, Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& upstream);
 
   // GenericUpstream
   void encodeData(Buffer::Instance& data, bool end_stream) override;
-  void encodeMetadata(const Http::MetadataMapVector&) override {}
-  void encodeHeaders(const Http::RequestHeaderMap&, bool end_stream) override;
-  void encodeTrailers(const Http::RequestTrailerMap&) override;
+  void encodeMetadata(const Envoy::Http::MetadataMapVector&) override {}
+  void encodeHeaders(const Envoy::Http::RequestHeaderMap&, bool end_stream) override;
+  void encodeTrailers(const Envoy::Http::RequestTrailerMap&) override;
   void readDisable(bool disable) override;
   void resetStream() override;
 
@@ -91,9 +90,13 @@ public:
   void onBelowWriteBufferLowWatermark() override;
 
 private:
-  UpstreamRequest* upstream_request_;
-  Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
+  Router::UpstreamRequest* upstream_request_;
+  Envoy::Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
 };
 
-} // namespace Router
+} // namespace Tcp
+} // namespace Http
+} // namespace Upstreams
+} // namespace Extensions
 } // namespace Envoy
+

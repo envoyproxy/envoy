@@ -31,7 +31,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Cluster configuration]
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 48]
+// [#next-free-field: 49]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster";
 
@@ -499,6 +499,10 @@ message Cluster {
     google.protobuf.Duration max_interval = 2 [(validate.rules).duration = {gt {nanos: 1000000}}];
   }
 
+  // FIXME commennt
+  message UpstreamType {
+  }
+
   reserved 12, 15, 7, 11, 35;
 
   reserved "hosts", "tls_context", "extension_protocol_options";
@@ -812,6 +816,9 @@ message Cluster {
   // of 0 would indicate that none of the timeout was used or that the timeout was infinite. A value
   // of 100 would indicate that the request took the entirety of the timeout given to it.
   bool track_timeout_budgets = 47;
+
+  // FIXME comment
+  UpstreamType upstream_type = 48;
 }
 
 // [#not-implemented-hide:] Extensible load balancing policy configuration.

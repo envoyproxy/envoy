@@ -39,9 +39,12 @@
 #include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
-namespace Router {
+namespace Extensions {
+namespace Upstreams {
+namespace Http {
+namespace Tcp {
 
-void TcpConnPool::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
+void TcpConnPool::onPoolReady(Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
                               Upstream::HostDescriptionConstSharedPtr host) {
   upstream_handle_ = nullptr;
   Network::Connection& latched_conn = conn_data->connection();
@@ -51,8 +54,8 @@ void TcpConnPool::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data
                           latched_conn.streamInfo());
 }
 
-TcpUpstream::TcpUpstream(UpstreamRequest* upstream_request,
-                         Tcp::ConnectionPool::ConnectionDataPtr&& upstream)
+TcpUpstream::TcpUpstream(Router::UpstreamRequest* upstream_request,
+                         Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& upstream)
     : upstream_request_(upstream_request), upstream_conn_data_(std::move(upstream)) {
   upstream_conn_data_->connection().enableHalfClose(true);
   upstream_conn_data_->addUpstreamCallbacks(*this);
@@ -62,7 +65,7 @@ void TcpUpstream::encodeData(Buffer::Instance& data, bool end_stream) {
   upstream_conn_data_->connection().write(data, end_stream);
 }
 
-void TcpUpstream::encodeHeaders(const Http::RequestHeaderMap&, bool end_stream) {
+void TcpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderMap&, bool end_stream) {
   // Headers should only happen once, so use this opportunity to add the proxy
   // proto header, if configured.
   ASSERT(upstream_request_->parent().routeEntry()->connectConfig().has_value());
@@ -80,12 +83,12 @@ void TcpUpstream::encodeHeaders(const Http::RequestHeaderMap&, bool end_stream) 
 
   // TcpUpstream::encodeHeaders is called after the UpstreamRequest is fully initialized. Also use
   // this time to synthesize the 200 response headers downstream to complete the CONNECT handshake.
-  Http::ResponseHeaderMapPtr headers{
-      Http::createHeaderMap<Http::ResponseHeaderMapImpl>({{Http::Headers::get().Status, "200"}})};
+  Envoy::Http::ResponseHeaderMapPtr headers{
+    Envoy::Http::createHeaderMap<Envoy::Http::ResponseHeaderMapImpl>({{Envoy::Http::Headers::get().Status, "200"}})};
   upstream_request_->decodeHeaders(std::move(headers), false);
 }
 
-void TcpUpstream::encodeTrailers(const Http::RequestTrailerMap&) {
+void TcpUpstream::encodeTrailers(const Envoy::Http::RequestTrailerMap&) {
   Buffer::OwnedImpl data;
   upstream_conn_data_->connection().write(data, true);
 }
@@ -108,7 +111,7 @@ void TcpUpstream::onUpstreamData(Buffer::Instance& data, bool end_stream) {
 
 void TcpUpstream::onEvent(Network::ConnectionEvent event) {
   if (event != Network::ConnectionEvent::Connected && upstream_request_) {
-    upstream_request_->onResetStream(Http::StreamResetReason::ConnectionTermination, "");
+    upstream_request_->onResetStream(Envoy::Http::StreamResetReason::ConnectionTermination, "");
   }
 }
 
@@ -124,5 +127,8 @@ void TcpUpstream::onBelowWriteBufferLowWatermark() {
   }
 }
 
-} // namespace Router
+} // namespace Tcp
+} // namespace Http
+} // namespace Upstreams
+} // namespace Extensions
 } // namespace Envoy

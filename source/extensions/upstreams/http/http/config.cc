@@ -9,8 +9,10 @@ namespace Http {
 namespace Http {
 
 Router::GenericConnPoolPtr
-HttpGenericConnPoolFactory::createGenericConnPool() const {
-  return std::make_unique<HttpConnPool>();
+HttpGenericConnPoolFactory::createGenericConnPool(Upstream::ClusterManager& cm, bool is_connect, const Router::RouteEntry& route_entry,
+                                                  Envoy::Http::Protocol protocol, Upstream::LoadBalancerContext* ctx) const {
+  auto ret = std::make_unique<HttpConnPool>(cm, is_connect, route_entry, protocol, ctx);
+  return (ret->valid() ? std::move(ret) : nullptr);
 }
 
 REGISTER_FACTORY(HttpGenericConnPoolFactory, Router::GenericConnPoolFactory);

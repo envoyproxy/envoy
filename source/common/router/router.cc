@@ -494,9 +494,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
           *callbacks_->streamInfo().filterState());
   std::unique_ptr<GenericConnPool> generic_conn_pool = createConnPool();
-  Http::Protocol protocol = cluster_->upstreamHttpProtocol(callbacks_->streamInfo().protocol());
 
-  if (!generic_conn_pool->initialize(config_.cm_, *route_entry_, protocol, this)) {
+  if (!generic_conn_pool) {
     sendNoHealthyUpstreamResponse();
     return Http::FilterHeadersStatus::StopIteration;
   }
@@ -598,19 +597,15 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   return Http::FilterHeadersStatus::StopIteration;
 }
 
+// TODO(alyssawilk) create from config.
 std::unique_ptr<GenericConnPool> Filter::createConnPool() {
+  auto factory = &Envoy::Config::Utility::getAndCheckFactoryByName<GenericConnPoolFactory>(
+      Extensions::Upstreams::Http::HttpUpstreamsNames::get().Default);
   const bool should_tcp_proxy =
       route_entry_->connectConfig().has_value() &&
       downstream_headers_->getMethodValue() == Http::Headers::get().MethodValues.Connect;
-  GenericConnPoolFactory* factory;
-  if (should_tcp_proxy) {
-    factory = &Envoy::Config::Utility::getAndCheckFactoryByName<GenericConnPoolFactory>(
-        Extensions::Upstreams::Http::HttpUpstreamsNames::get().Tcp);
-  } else {
-    factory = &Envoy::Config::Utility::getAndCheckFactoryByName<GenericConnPoolFactory>(
-        Extensions::Upstreams::Http::HttpUpstreamsNames::get().Http);
-  }
-  return factory->createGenericConnPool();
+  Http::Protocol protocol = cluster_->upstreamHttpProtocol(callbacks_->streamInfo().protocol());
+  return factory->createGenericConnPool(config_.cm_, should_tcp_proxy, *route_entry_, protocol, this);
 }
 
 Http::ConnectionPool::Instance* Filter::getHttpConnPool() {
@@ -1525,8 +1520,7 @@ void Filter::doRetry() {
   pending_retries_--;
 
   std::unique_ptr<GenericConnPool> generic_conn_pool = createConnPool();
-  Http::Protocol protocol = cluster_->upstreamHttpProtocol(callbacks_->streamInfo().protocol());
-  if (!generic_conn_pool->initialize(config_.cm_, *route_entry_, protocol, this)) {
+  if (!generic_conn_pool) {
     sendNoHealthyUpstreamResponse();
     cleanup();
     return;

@@ -1104,10 +1104,6 @@ class GenericConnPool : public Logger::Loggable<Logger::Id::router> {
 public:
   virtual ~GenericConnPool() = default;
 
-  // Initializes the connection pool. This must be called before the connection
-  // pool is valid, and can be used.
-  virtual bool initialize(Upstream::ClusterManager& cm, const RouteEntry& route_entry,
-                          Http::Protocol protocol, Upstream::LoadBalancerContext* ctx) PURE;
   // Called to create a new HTTP stream or TCP connection. The implementation
   // is then responsible for calling either onPoolReady or onPoolFailure on the
   // supplied GenericConnectionPoolCallbacks.
@@ -1164,9 +1160,10 @@ public:
 
   /*
    * @param options for creating the transport socket
-   * @return Network::UpstreamRequestPtr a transport socket to be passed to connection.
+   * @return may be null
    */
-  virtual GenericConnPoolPtr createGenericConnPool() const PURE;
+  virtual GenericConnPoolPtr createGenericConnPool(Upstream::ClusterManager& cm, bool is_connect, const RouteEntry& route_entry,
+                                                   Http::Protocol protocol, Upstream::LoadBalancerContext* ctx) const PURE;
 };
 
 using GenericConnPoolFactoryPtr = std::unique_ptr<GenericConnPoolFactory>;
