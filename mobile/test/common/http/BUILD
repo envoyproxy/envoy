@@ -13,6 +13,7 @@ envoy_cc_test(
         "//library/common/http:header_utility_lib",
         "//library/common/types:c_types_lib",
         "@envoy//source/common/http:context_lib",
+        "@envoy//source/common/stats:isolated_store_lib",
         "@envoy//test/common/http:common_lib",
         "@envoy//test/mocks/buffer:buffer_mocks",
         "@envoy//test/mocks/event:event_mocks",

@@ -9,6 +9,7 @@
 #include "envoy/http/async_client.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
+#include "envoy/stats/stats_macros.h"
 
 #include "common/common/logger.h"
 #include "common/common/thread.h"
@@ -22,6 +23,21 @@ namespace Envoy {
 namespace Http {
 
 /**
+ * All decompressor filter stats. @see stats_macros.h
+ */
+#define ALL_HTTP_DISPATCHER_STATS(COUNTER)                                                         \
+  COUNTER(stream_success)                                                                          \
+  COUNTER(stream_failure)                                                                          \
+  COUNTER(stream_cancel)
+
+/**
+ * Struct definition for decompressor stats. @see stats_macros.h
+ */
+struct DispatcherStats {
+  ALL_HTTP_DISPATCHER_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+/**
  * Manages HTTP streams, and provides an interface to interact with them.
  * The Dispatcher executes all stream operations on the provided Event::Dispatcher's event loop.
  */
@@ -29,7 +45,7 @@ class Dispatcher : public Logger::Loggable<Logger::Id::http> {
 public:
   Dispatcher(std::atomic<envoy_network_t>& preferred_network);
 
-  void ready(Event::Dispatcher& event_dispatcher, ApiListener& api_listener);
+  void ready(Event::Dispatcher& event_dispatcher, Stats::Scope& scope, ApiListener& api_listener);
 
   /**
    * Attempts to open a new stream to the remote. Note that this function is asynchronous and
@@ -85,6 +101,9 @@ public:
    */
   envoy_status_t resetStream(envoy_stream_t stream);
 
+  const DispatcherStats& stats() const;
+
+  // Used for testing.
   Thread::ThreadSynchronizer& synchronizer() { return synchronizer_; }
 
 private:
@@ -121,10 +140,11 @@ private:
   private:
     DirectStream& direct_stream_;
     const envoy_http_callbacks bridge_callbacks_;
+    Dispatcher& http_dispatcher_;
     absl::optional<envoy_error_code_t> error_code_;
     absl::optional<envoy_data> error_message_;
     absl::optional<int32_t> error_attempt_count_;
-    Dispatcher& http_dispatcher_;
+    bool observed_success_{};
   };
 
   using DirectStreamCallbacksPtr = std::unique_ptr<DirectStreamCallbacks>;
@@ -192,6 +212,9 @@ private:
 
   using DirectStreamSharedPtr = std::shared_ptr<DirectStream>;
 
+  static DispatcherStats generateStats(const std::string& prefix, Stats::Scope& scope) {
+    return DispatcherStats{ALL_HTTP_DISPATCHER_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
+  }
   /**
    * Post a functor to the dispatcher. This is safe cross thread.
    * @param callback, the functor to post.
@@ -205,6 +228,15 @@ private:
   std::list<Event::PostCb> init_queue_ GUARDED_BY(ready_lock_);
   Event::Dispatcher* event_dispatcher_ GUARDED_BY(ready_lock_){};
   ApiListener* api_listener_ GUARDED_BY(ready_lock_){};
+  // stats_ is not currently const because the Http::Dispatcher is constructed before there is
+  // access to MainCommon's stats scope.
+  // This can be fixed when queueing logic is moved out of the Http::Dispatcher, as at that point
+  // the Http::Dispatcher could be constructed when access to all objects set in
+  // Http::Dispatcher::ready() is done; obviously this would require "ready()" to not me a member
+  // function of the dispatcher, but rather have a static factory method.
+  // Related issue: https://github.com/lyft/envoy-mobile/issues/720
+  const std::string stats_prefix_;
+  absl::optional<DispatcherStats> stats_ GUARDED_BY(ready_lock_){};
   // std::unordered_map does is not safe for concurrent access. Thus a cross-thread, concurrent find
   // in cancellation (which happens in a platform thread) with an erase (which always happens in the
   // Envoy Main thread) is not safe.

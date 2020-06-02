@@ -114,7 +114,7 @@ TEST_P(DispatcherIntegrationTest, Basic) {
   ConditionalInitializer ready_ran;
   test_server_->server().dispatcher().post([this, &ready_ran]() -> void {
     http_dispatcher_.ready(
-        test_server_->server().dispatcher(),
+        test_server_->server().dispatcher(), test_server_->statStore(),
         test_server_->server().listenerManager().apiListener()->get().http()->get());
     ready_ran.setReady();
   });
@@ -177,13 +177,116 @@ TEST_P(DispatcherIntegrationTest, Basic) {
   ASSERT_EQ(cc.on_headers_calls, 1);
   ASSERT_EQ(cc.on_data_calls, 2);
   ASSERT_EQ(cc.on_complete_calls, 1);
+
+  // stream_success gets charged for 2xx status codes.
+  test_server_->waitForCounterEq("http.dispatcher.stream_success", 1);
+}
+
+TEST_P(DispatcherIntegrationTest, BasicNon2xx) {
+  ConditionalInitializer ready_ran;
+  test_server_->server().dispatcher().post([this, &ready_ran]() -> void {
+    http_dispatcher_.ready(
+        test_server_->server().dispatcher(), test_server_->statStore(),
+        test_server_->server().listenerManager().apiListener()->get().http()->get());
+    ready_ran.setReady();
+  });
+  ready_ran.waitReady();
+
+  // Set response header status to be non-2xx to test that the correct stats get charged.
+  reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())
+      ->setResponseHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(
+          Http::TestHeaderMapImpl({{":status", "503"}, {"content-length", "0"}})));
+
+  envoy_stream_t stream = 1;
+  // Setup bridge_callbacks to handle the response.
+  envoy_http_callbacks bridge_callbacks;
+  ConditionalInitializer terminal_callback;
+  callbacks_called cc = {0, 0, 0, 0, 0, &terminal_callback};
+  bridge_callbacks.context = &cc;
+  bridge_callbacks.on_headers = [](envoy_headers c_headers, bool end_stream,
+                                   void* context) -> void {
+    ASSERT_TRUE(end_stream);
+    Http::ResponseHeaderMapPtr response_headers = toResponseHeaders(c_headers);
+    EXPECT_EQ(response_headers->Status()->value().getStringView(), "503");
+    callbacks_called* cc = static_cast<callbacks_called*>(context);
+    cc->on_headers_calls++;
+  };
+  bridge_callbacks.on_complete = [](void* context) -> void {
+    callbacks_called* cc = static_cast<callbacks_called*>(context);
+    cc->on_complete_calls++;
+    cc->terminal_callback->setReady();
+  };
+  bridge_callbacks.on_error = [](envoy_error error, void* context) -> void {
+    error.message.release(error.message.context);
+    callbacks_called* cc = static_cast<callbacks_called*>(context);
+    cc->on_error_calls++;
+  };
+
+  // Build a set of request headers.
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  envoy_headers c_headers = Http::Utility::toBridgeHeaders(headers);
+
+  // Create a stream.
+  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks), ENVOY_SUCCESS);
+  http_dispatcher_.sendHeaders(stream, c_headers, true);
+
+  terminal_callback.waitReady();
+
+  ASSERT_EQ(cc.on_error_calls, 0);
+  ASSERT_EQ(cc.on_headers_calls, 1);
+  ASSERT_EQ(cc.on_complete_calls, 1);
+
+  // stream_failure gets charged for all non-2xx status codes.
+  test_server_->waitForCounterEq("http.dispatcher.stream_failure", 1);
+}
+
+TEST_P(DispatcherIntegrationTest, BasicReset) {
+  ConditionalInitializer ready_ran;
+  test_server_->server().dispatcher().post([this, &ready_ran]() -> void {
+    http_dispatcher_.ready(
+        test_server_->server().dispatcher(), test_server_->statStore(),
+        test_server_->server().listenerManager().apiListener()->get().http()->get());
+    ready_ran.setReady();
+  });
+  ready_ran.waitReady();
+
+  envoy_stream_t stream = 1;
+  // Setup bridge_callbacks to handle the response.
+  envoy_http_callbacks bridge_callbacks;
+  ConditionalInitializer terminal_callback;
+  callbacks_called cc = {0, 0, 0, 0, 0, &terminal_callback};
+  bridge_callbacks.context = &cc;
+  bridge_callbacks.on_error = [](envoy_error error, void* context) -> void {
+    error.message.release(error.message.context);
+    callbacks_called* cc = static_cast<callbacks_called*>(context);
+    cc->on_error_calls++;
+    cc->terminal_callback->setReady();
+  };
+
+  // Build a set of request headers.
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  // Cause an upstream reset after request is complete.
+  headers.addCopy(AutonomousStream::RESET_AFTER_REQUEST, "yes");
+  envoy_headers c_headers = Http::Utility::toBridgeHeaders(headers);
+
+  // Create a stream.
+  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks), ENVOY_SUCCESS);
+  http_dispatcher_.sendHeaders(stream, c_headers, true);
+
+  terminal_callback.waitReady();
+
+  ASSERT_EQ(cc.on_error_calls, 1);
+  // Reset causes a charge to stream_failure.
+  test_server_->waitForCounterEq("http.dispatcher.stream_failure", 1);
 }
 
 TEST_P(DispatcherIntegrationTest, RaceDoesNotCauseDoubleDeletion) {
   ConditionalInitializer ready_ran;
   test_server_->server().dispatcher().post([this, &ready_ran]() -> void {
     http_dispatcher_.ready(
-        test_server_->server().dispatcher(),
+        test_server_->server().dispatcher(), test_server_->statStore(),
         test_server_->server().listenerManager().apiListener()->get().http()->get());
     ready_ran.setReady();
   });
@@ -241,6 +344,9 @@ TEST_P(DispatcherIntegrationTest, RaceDoesNotCauseDoubleDeletion) {
   ASSERT_EQ(cc.on_cancel_calls, 1);
 
   http_dispatcher_.synchronizer().signal("dispatch_encode_final_data");
+  // stream_cancel gets charged even though the request was a success because the cancellation won
+  // the dispatch race.
+  test_server_->waitForCounterEq("http.dispatcher.stream_cancel", 1);
 }
 
 // TODO(junr03): test with envoy local reply with local stream not closed, which causes a reset

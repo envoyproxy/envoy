@@ -49,11 +49,11 @@ envoy_status_t Engine::run(std::string config, std::string log_level) {
     // as we did previously).
     postinit_callback_handler_ = main_common_->server()->lifecycleNotifier().registerCallback(
         Envoy::Server::ServerLifecycleNotifier::Stage::PostInit, [this]() -> void {
-          Server::Instance* server = TS_UNCHECKED_READ(main_common_)->server();
-          auto api_listener = server->listenerManager().apiListener()->get().http();
+          server_ = TS_UNCHECKED_READ(main_common_)->server();
+          auto api_listener = server_->listenerManager().apiListener()->get().http();
           ASSERT(api_listener.has_value());
-          server_ = server;
-          http_dispatcher_->ready(server->dispatcher(), api_listener.value());
+          http_dispatcher_->ready(server_->dispatcher(), server_->serverFactoryContext().scope(),
+                                  api_listener.value());
         });
   } // mutex_
 
