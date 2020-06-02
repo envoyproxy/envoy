@@ -8,9 +8,9 @@ namespace Upstreams {
 namespace Http {
 namespace Tcp {
 
-Router::GenericConnPoolPtr
-TcpGenericConnPoolFactory::createGenericConnPool(Upstream::ClusterManager& cm, bool is_connect, const Router::RouteEntry& route_entry,
-                  Envoy::Http::Protocol protocol, Upstream::LoadBalancerContext* ctx) const {
+Router::GenericConnPoolPtr TcpGenericConnPoolFactory::createGenericConnPool(
+    Upstream::ClusterManager& cm, bool is_connect, const Router::RouteEntry& route_entry,
+    Envoy::Http::Protocol protocol, Upstream::LoadBalancerContext* ctx) const {
   auto ret = std::make_unique<TcpConnPool>(cm, is_connect, route_entry, protocol, ctx);
   return (ret->valid() ? std::move(ret) : nullptr);
 }

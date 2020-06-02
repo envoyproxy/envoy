@@ -492,7 +492,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
 
   transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
-          *callbacks_->streamInfo().filterState());
+      *callbacks_->streamInfo().filterState());
   std::unique_ptr<GenericConnPool> generic_conn_pool = createConnPool();
 
   if (!generic_conn_pool) {
@@ -587,7 +587,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   modify_headers_ = modify_headers;
 
   UpstreamRequestPtr upstream_request =
-          std::make_unique<UpstreamRequest>(*this, std::move(generic_conn_pool));
+      std::make_unique<UpstreamRequest>(*this, std::move(generic_conn_pool));
   upstream_request->moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->encodeHeaders(end_stream);
   if (end_stream) {
@@ -597,7 +597,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   return Http::FilterHeadersStatus::StopIteration;
 }
 
-// TODO(alyssawilk) create from config.
+// TODO(alyssawilk) create from cluster config.
 std::unique_ptr<GenericConnPool> Filter::createConnPool() {
   auto factory = &Envoy::Config::Utility::getAndCheckFactoryByName<GenericConnPoolFactory>(
       Extensions::Upstreams::Http::HttpUpstreamsNames::get().Default);
@@ -605,7 +605,8 @@ std::unique_ptr<GenericConnPool> Filter::createConnPool() {
       route_entry_->connectConfig().has_value() &&
       downstream_headers_->getMethodValue() == Http::Headers::get().MethodValues.Connect;
   Http::Protocol protocol = cluster_->upstreamHttpProtocol(callbacks_->streamInfo().protocol());
-  return factory->createGenericConnPool(config_.cm_, should_tcp_proxy, *route_entry_, protocol, this);
+  return factory->createGenericConnPool(config_.cm_, should_tcp_proxy, *route_entry_, protocol,
+                                        this);
 }
 
 Http::ConnectionPool::Instance* Filter::getHttpConnPool() {

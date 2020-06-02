@@ -84,7 +84,8 @@ void TcpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderMap&, bool end_s
   // TcpUpstream::encodeHeaders is called after the UpstreamRequest is fully initialized. Also use
   // this time to synthesize the 200 response headers downstream to complete the CONNECT handshake.
   Envoy::Http::ResponseHeaderMapPtr headers{
-    Envoy::Http::createHeaderMap<Envoy::Http::ResponseHeaderMapImpl>({{Envoy::Http::Headers::get().Status, "200"}})};
+      Envoy::Http::createHeaderMap<Envoy::Http::ResponseHeaderMapImpl>(
+          {{Envoy::Http::Headers::get().Status, "200"}})};
   upstream_request_->decodeHeaders(std::move(headers), false);
 }
 

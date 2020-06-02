@@ -20,8 +20,10 @@ public:
   ~DefaultGenericConnPoolFactory() override = default;
   std::string name() const override { return HttpUpstreamsNames::get().Default; }
   std::string category() const override { return "envoy.upstreams"; }
-  Router::GenericConnPoolPtr createGenericConnPool(Upstream::ClusterManager& cm, bool is_connect, const Router::RouteEntry& route_entry,
-                                                                     Envoy::Http::Protocol protocol, Upstream::LoadBalancerContext* ctx) const override;
+  Router::GenericConnPoolPtr
+  createGenericConnPool(Upstream::ClusterManager& cm, bool is_connect,
+                        const Router::RouteEntry& route_entry, Envoy::Http::Protocol protocol,
+                        Upstream::LoadBalancerContext* ctx) const override;
 };
 
 DECLARE_FACTORY(DefaultGenericConnPoolFactory);

@@ -500,10 +500,16 @@ message Cluster {
     google.protobuf.Duration max_interval = 2 [(validate.rules).duration = {gt {nanos: 1000000}}];
   }
 
-  // FIXME commennt
+  // Allows creation and configuration of custom upstream type.
   message UpstreamType {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.cluster.v3.Cluster.UpstreamType";
+
+    // Required. The name of the upstream type
+    string name = 1;
+
+    // The configuration for the upstream type.
+    google.protobuf.Any typed_config = 2;
   }
 
   reserved 12, 15, 7, 11, 35;
@@ -820,7 +826,12 @@ message Cluster {
   // of 100 would indicate that the request took the entirety of the timeout given to it.
   bool track_timeout_budgets = 47;
 
-  // FIXME comment
+  // Optional customization and configuration of upstream type.
+  // By default, Envoy will create an upstream of type envoy.filters.upstreams.http.default
+  // The default upstream will create a envoy.filters.upstreams.http.tcp upstream
+  // if the request is a CONNECT request and connect termination is configured.
+  // Otherwise it will be envoy.filters.upstreams.http.http, with the protocol
+  // based on `http2_protocol_options`.
   UpstreamType upstream_type = 48;
 }
 

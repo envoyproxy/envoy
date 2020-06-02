@@ -37,7 +37,7 @@ namespace Envoy {
 namespace Upstream {
 class ClusterManager;
 class LoadBalancerContext;
-}
+} // namespace Upstream
 
 namespace Router {
 
@@ -1162,8 +1162,10 @@ public:
    * @param options for creating the transport socket
    * @return may be null
    */
-  virtual GenericConnPoolPtr createGenericConnPool(Upstream::ClusterManager& cm, bool is_connect, const RouteEntry& route_entry,
-                                                   Http::Protocol protocol, Upstream::LoadBalancerContext* ctx) const PURE;
+  virtual GenericConnPoolPtr createGenericConnPool(Upstream::ClusterManager& cm, bool is_connect,
+                                                   const RouteEntry& route_entry,
+                                                   Http::Protocol protocol,
+                                                   Upstream::LoadBalancerContext* ctx) const PURE;
 };
 
 using GenericConnPoolFactoryPtr = std::unique_ptr<GenericConnPoolFactory>;

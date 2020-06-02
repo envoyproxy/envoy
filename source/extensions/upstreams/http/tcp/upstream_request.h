@@ -31,8 +31,8 @@ namespace Tcp {
 
 class TcpConnPool : public Router::GenericConnPool, public Envoy::Tcp::ConnectionPool::Callbacks {
 public:
-  TcpConnPool(Upstream::ClusterManager& cm, bool is_connect, const Router::RouteEntry& route_entry, Envoy::Http::Protocol,
-                  Upstream::LoadBalancerContext* ctx) {
+  TcpConnPool(Upstream::ClusterManager& cm, bool is_connect, const Router::RouteEntry& route_entry,
+              Envoy::Http::Protocol, Upstream::LoadBalancerContext* ctx) {
     ASSERT(is_connect);
     conn_pool_ = cm.tcpConnPoolForCluster(route_entry.clusterName(),
                                           Upstream::ResourcePriority::Default, ctx);
@@ -71,9 +71,11 @@ private:
   Router::GenericConnectionPoolCallbacks* callbacks_{};
 };
 
-class TcpUpstream : public Router::GenericUpstream, public Envoy::Tcp::ConnectionPool::UpstreamCallbacks {
+class TcpUpstream : public Router::GenericUpstream,
+                    public Envoy::Tcp::ConnectionPool::UpstreamCallbacks {
 public:
-  TcpUpstream(Router::UpstreamRequest* upstream_request, Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& upstream);
+  TcpUpstream(Router::UpstreamRequest* upstream_request,
+              Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& upstream);
 
   // GenericUpstream
   void encodeData(Buffer::Instance& data, bool end_stream) override;
@@ -99,4 +101,3 @@ private:
 } // namespace Upstreams
 } // namespace Extensions
 } // namespace Envoy
-

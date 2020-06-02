@@ -33,7 +33,7 @@ class HttpConnPool : public Router::GenericConnPool, public Envoy::Http::Connect
 public:
   // GenericConnPool
   HttpConnPool(Upstream::ClusterManager& cm, bool is_connect, const Router::RouteEntry& route_entry,
-              Envoy::Http::Protocol protocol, Upstream::LoadBalancerContext* ctx) {
+               Envoy::Http::Protocol protocol, Upstream::LoadBalancerContext* ctx) {
     ASSERT(!is_connect);
     conn_pool_ =
         cm.httpConnPoolForCluster(route_entry.clusterName(), route_entry.priority(), protocol, ctx);
