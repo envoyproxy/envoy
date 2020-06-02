@@ -203,8 +203,6 @@ private:
 
 class HttpConnPool : public GenericConnPool, public Http::ConnectionPool::Callbacks {
 public:
-  HttpConnPool() = default;
-
   // GenericConnPool
   bool initialize(Upstream::ClusterManager& cm, const RouteEntry& route_entry,
                   Http::Protocol protocol, Upstream::LoadBalancerContext* ctx) override {
@@ -228,15 +226,13 @@ public:
 
 private:
   // Points to the actual connection pool to create streams from.
-  Http::ConnectionPool::Instance* conn_pool_;
+  Http::ConnectionPool::Instance* conn_pool_{};
   Http::ConnectionPool::Cancellable* conn_pool_stream_handle_{};
   GenericConnectionPoolCallbacks* callbacks_{};
 };
 
 class TcpConnPool : public GenericConnPool, public Tcp::ConnectionPool::Callbacks {
 public:
-  TcpConnPool() = default;
-
   bool initialize(Upstream::ClusterManager& cm, const RouteEntry& route_entry, Http::Protocol,
                   Upstream::LoadBalancerContext* ctx) override {
     conn_pool_ = cm.tcpConnPoolForCluster(route_entry.clusterName(),
