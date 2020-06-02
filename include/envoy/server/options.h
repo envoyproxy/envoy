@@ -42,6 +42,16 @@ enum class Mode {
   // to be validated in a non-prod environment.
 };
 
+
+/**
+ * Define the behaviour for Envoy's drain sequence.
+ */
+enum class DrainStrategy {
+  Incremental,
+
+  Abrupt,
+};
+
 using CommandLineOptionsPtr = std::unique_ptr<envoy::admin::v3::CommandLineOptions>;
 
 /**
@@ -63,6 +73,11 @@ public:
    * @return the number of worker threads to run in the server.
    */
   virtual uint32_t concurrency() const PURE;
+
+  /**
+   * @return the duration of the drain period in seconds.
+   */
+  virtual DrainStrategy drainStrategy() const PURE;
 
   /**
    * @return the duration of the drain period in seconds.
