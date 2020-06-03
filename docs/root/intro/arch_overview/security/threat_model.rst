@@ -34,8 +34,8 @@ We will activate the security release process for disclosures that meet the foll
 	the configured header or high watermark limit. I.e. 10 KiB client request leading to 1 MiB bytes of
 	memory consumed by Envoy;
       
-      + CPU exhaustion where 100 or fewer HTTP/1 connections or HTTP/2 streams with requests sent at 5 Mbit/s
-        or less consume an entire CPU core.
+      + Highly asymmetric CPU utilization where Envoy uses 100x or more CPU compared to client.
+
 
 The Envoy availability stance around CPU and memory DoS is still evolving, especially for brute force
 attacks. We acknowledge that brute force (i.e. these with amplification factor less than 100) attacks are
