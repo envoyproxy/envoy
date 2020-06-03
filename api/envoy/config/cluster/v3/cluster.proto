@@ -814,25 +814,26 @@ message Cluster {
   // of 100 would indicate that the request took the entirety of the timeout given to it.
   bool track_timeout_budgets = 47;
 
-  // Optional customization and configuration of upstream type.
+  // Optional customization and configuration of upstream connection pool, and
+  // upstream type.
   //
   // Currently this field only applies for HTTP traffic but is designed for
   // eventual use for custom TCP upstreams.
   //
   // For HTTP traffic, Envoy will generally take downstream HTTP and send it
-  // upstream as upstream HTTP, using the upstream
-  // `envoy.filters.upstreams.http.http` and the codec from `http2_protocol_options`
+  // upstream as upstream HTTP, using the connection pool
+  // `envoy.filters.connection_pools.http.http` and the codec from `http2_protocol_options`
   //
   // For routes where CONNECT termination is configured, Envoy will take
   // downstream CONNECT requests and forward the CONNECT payload upstream over
-  // raw TCP, using the `envoy.filters.upstreams.http.tcp` upstream.
+  // raw TCP, using `envoy.filters.connection_pools.http.tcp`.
   //
-  // The default upstream in Envoy `envoy.filters.upstreams.http.default`, which
+  // The default pool used in Envoy `envoy.filters.connection_pool.http.default`, which
   // creates the HTTP upstream for most HTTP requests, and the TCP upstream if
   // CONNECT termination is configured.
   //
-  // If users desire custom upstream behavior, for example terminating CONNECT
-  // only if a custom filter indicates it is appropriate, the custom upstream
+  // If users desire custom connection pool or upstream behavior, for example terminating
+  // CONNECT only if a custom filter indicates it is appropriate, the custom factories
   // can be registered and configured here.
   core.v3.TypedExtensionConfig upstream_config = 48;
 }

@@ -1,10 +1,7 @@
 #include "extensions/upstreams/http/http/upstream_request.h"
 
-#include <chrono>
 #include <cstdint>
-#include <functional>
 #include <memory>
-#include <string>
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
@@ -14,23 +11,13 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/common/scope_tracker.h"
 #include "common/common/utility.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
-#include "common/network/application_protocol.h"
-#include "common/network/transport_socket_options_impl.h"
-#include "common/network/upstream_server_name.h"
-#include "common/network/upstream_subject_alt_names.h"
-#include "common/router/config_impl.h"
-#include "common/router/debug_config.h"
 #include "common/router/router.h"
-#include "common/stream_info/uint32_accessor_impl.h"
-#include "common/tracing/http_tracer_impl.h"
 
 using Envoy::Router::GenericConnectionPoolCallbacks;
 

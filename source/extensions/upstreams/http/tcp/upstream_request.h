@@ -1,23 +1,13 @@
 #pragma once
 
-#include <chrono>
 #include <cstdint>
-#include <functional>
 #include <memory>
-#include <string>
 
 #include "envoy/http/codec.h"
-#include "envoy/http/codes.h"
-#include "envoy/http/conn_pool.h"
-#include "envoy/http/filter.h"
-#include "envoy/stats/scope.h"
 #include "envoy/tcp/conn_pool.h"
 
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/cleanup.h"
-#include "common/common/hash.h"
-#include "common/common/hex.h"
-#include "common/common/linked_object.h"
 #include "common/common/logger.h"
 #include "common/config/well_known_names.h"
 #include "common/router/upstream_request.h"

@@ -12,13 +12,12 @@ namespace Http {
 namespace Default {
 
 /**
- * Config registration for the Default conn pool.
- * @see FIXME.
+ * Config registration for the DefaultConnPool. * @see Router::GenericConnPoolFactory
  */
 class DefaultGenericConnPoolFactory : public Router::GenericConnPoolFactory {
 public:
   ~DefaultGenericConnPoolFactory() override = default;
-  std::string name() const override { return HttpUpstreamsNames::get().Default; }
+  std::string name() const override { return HttpConnectionPoolNames::get().Default; }
   std::string category() const override { return "envoy.upstreams"; }
   Router::GenericConnPoolPtr
   createGenericConnPool(Upstream::ClusterManager& cm, bool is_connect,
