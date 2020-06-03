@@ -46,8 +46,8 @@ class ValidatingCodeBlock(CodeBlock):
       process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
       stdout, stderr = process.communicate()
       if process.poll():
-        raise ExtensionError("Failed config validation for type: '{0}' in: {1} line: {2}".format(
-            self.options.get('type-name'), source, line))
+        raise ExtensionError("Failed config validation for type: '{0}' in: {1} line: {2}:\n {3}".format(
+            self.options.get('type-name'), source, line, stderr.decode(encoding='utf-8')))
 
     self.options.pop('type-name', None)
     return list(CodeBlock.run(self))
