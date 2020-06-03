@@ -33,20 +33,3 @@ envoy_cc_library(
         "@envoy_api//envoy/extensions/filters/http/admission_control/v3alpha:pkg_cc_proto",
     ],
 )
-
-envoy_cc_extension(
-    name = "config",
-    srcs = ["config.cc"],
-    hdrs = ["config.h"],
-    security_posture = "unknown",
-    status = "alpha",
-    deps = [
-        "//include/envoy/registry",
-        "//source/common/common:enum_to_int",
-        "//source/extensions/filters/http:well_known_names",
-        "//source/extensions/filters/http/admission_control:admission_control_filter_lib",
-        "//source/extensions/filters/http/admission_control/evaluators:response_evaluator_lib",
-        "//source/extensions/filters/http/common:factory_base_lib",
-        "@envoy_api//envoy/extensions/filters/http/admission_control/v3alpha:pkg_cc_proto",
-    ],
-)
