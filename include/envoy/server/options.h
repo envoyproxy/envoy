@@ -42,7 +42,6 @@ enum class Mode {
   // to be validated in a non-prod environment.
 };
 
-
 /**
  * During the drain sequence, different components ask the DrainManager
  * whether to drain via drainClose(). This enum dictates the behaviour of

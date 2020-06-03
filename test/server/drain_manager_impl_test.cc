@@ -70,8 +70,9 @@ TEST_F(DrainManagerImplTest, ModifyOnly) {
 
 TEST_P(DrainManagerImplTest, DrainDeadline) {
   const bool drain_gradually = GetParam();
-  ON_CALL(server_.options_, drainStrategy()).WillByDefault(Return(
-      drain_gradually ? Server::DrainStrategy::Gradual : Server::DrainStrategy::Immediate));
+  ON_CALL(server_.options_, drainStrategy())
+      .WillByDefault(Return(drain_gradually ? Server::DrainStrategy::Gradual
+                                            : Server::DrainStrategy::Immediate));
   // TODO(auni53): Add integration tests for this once TestDrainManager is
   // removed.
   DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::DEFAULT);
@@ -113,8 +114,9 @@ TEST_P(DrainManagerImplTest, DrainDeadline) {
 
 TEST_P(DrainManagerImplTest, DrainDeadlineProbability) {
   const bool drain_gradually = GetParam();
-  ON_CALL(server_.options_, drainStrategy()).WillByDefault(Return(
-      drain_gradually ? Server::DrainStrategy::Gradual : Server::DrainStrategy::Immediate));
+  ON_CALL(server_.options_, drainStrategy())
+      .WillByDefault(Return(drain_gradually ? Server::DrainStrategy::Gradual
+                                            : Server::DrainStrategy::Immediate));
   ON_CALL(server_.random_, random()).WillByDefault(Return(4));
   ON_CALL(server_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(3)));
 

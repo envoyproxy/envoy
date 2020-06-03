@@ -371,9 +371,9 @@ OptionsImpl::OptionsImpl(const std::string& service_cluster, const std::string& 
       log_format_(Logger::Logger::DEFAULT_LOG_FORMAT), log_format_escaped_(false),
       restart_epoch_(0u), service_cluster_(service_cluster), service_node_(service_node),
       service_zone_(service_zone), file_flush_interval_msec_(10000), drain_time_(600),
-      parent_shutdown_time_(900), drain_strategy_(Server::DrainStrategy::Gradual), mode_(Server::Mode::Serve),
-      hot_restart_disabled_(false), signal_handling_enabled_(true), mutex_tracing_enabled_(false),
-      cpuset_threads_(false), fake_symbol_table_enabled_(false) {}
+      parent_shutdown_time_(900), drain_strategy_(Server::DrainStrategy::Gradual),
+      mode_(Server::Mode::Serve), hot_restart_disabled_(false), signal_handling_enabled_(true),
+      mutex_tracing_enabled_(false), cpuset_threads_(false), fake_symbol_table_enabled_(false) {}
 
 void OptionsImpl::disableExtensions(const std::vector<std::string>& names) {
   for (const auto& name : names) {

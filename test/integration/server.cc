@@ -32,7 +32,8 @@ namespace Server {
 OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::string& config_yaml,
                                   Network::Address::IpVersion ip_version,
                                   FieldValidationConfig validation_config, uint32_t concurrency,
-                                  std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy) {
+                                  std::chrono::seconds drain_time,
+                                  Server::DrainStrategy drain_strategy) {
   OptionsImpl test_options("cluster_name", "node_name", "zone_name", spdlog::level::info);
 
   test_options.setConfigPath(config_path);
