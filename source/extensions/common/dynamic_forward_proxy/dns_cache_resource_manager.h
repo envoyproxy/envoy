@@ -32,9 +32,9 @@ class DnsCacheResourceImpl : public BasicResourceLimitImpl {
 public:
   using Base = BasicResourceLimitImpl;
   explicit DnsCacheResourceImpl(uint64_t max, Runtime::Loader& runtime,
-                                const std::string& runtime_key, Stats::Gauge& opening,
+                                const std::string& runtime_key, Stats::Gauge& open,
                                 Stats::Gauge& remaining)
-      : Envoy::BasicResourceLimitImpl(max, runtime, runtime_key), opening_(opening),
+      : Envoy::BasicResourceLimitImpl(max, runtime, runtime_key), open_(open),
         remaining_(remaining) {
     remaining_.set(max);
   }
@@ -42,13 +42,13 @@ public:
   void inc() override {
     Base::inc();
     remaining_.set(Base::canCreate() ? Base::max() - current_ : 0);
-    opening_.set(Base::canCreate() ? 0 : 1);
+    open_.set(Base::canCreate() ? 0 : 1);
   }
 
   void decBy(uint64_t amount) override {
     Base::decBy(amount);
     remaining_.set(Base::canCreate() ? Base::max() - current_ : 0);
-    opening_.set(Base::canCreate() ? 0 : 1);
+    open_.set(Base::canCreate() ? 0 : 1);
   }
 
 private:
