@@ -3,6 +3,8 @@
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.h"
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.validate.h"
 
+#include "common/common/enum_to_int.h"
+
 #include "extensions/filters/http/admission_control/admission_control.h"
 #include "extensions/filters/http/admission_control/evaluators/success_criteria_evaluator.h"
 
@@ -11,9 +13,9 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::HasSubstr;
 using testing::NiceMock;
 using testing::Return;
-using testing::HasSubstr;
 
 namespace Envoy {
 namespace Extensions {
@@ -41,26 +43,14 @@ public:
   void expectGrpcFail(int code) { EXPECT_FALSE(evaluator_->isGrpcSuccess(code)); }
 
   void verifyGrpcDefaultEval() {
-    // Ok.
-    expectGrpcSuccess(0);
+    expectGrpcSuccess(enumToInt(Grpc::Status::WellKnownGrpcStatus::Ok));
 
-    // Aborted.
-    expectGrpcFail(10);
-
-    // Data loss.
-    expectGrpcFail(15);
-
-    // Deadline exceeded.
-    expectGrpcFail(4);
-
-    // Internal
-    expectGrpcFail(13);
-
-    // Resource exhausted.
-    expectGrpcFail(8);
-
-    // Unavailable.
-    expectGrpcFail(14);
+    expectGrpcFail(enumToInt(Grpc::Status::WellKnownGrpcStatus::Aborted));
+    expectGrpcFail(enumToInt(Grpc::Status::WellKnownGrpcStatus::DataLoss));
+    expectGrpcFail(enumToInt(Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded));
+    expectGrpcFail(enumToInt(Grpc::Status::WellKnownGrpcStatus::Internal));
+    expectGrpcFail(enumToInt(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted));
+    expectGrpcFail(enumToInt(Grpc::Status::WellKnownGrpcStatus::Unavailable));
   }
 
   void verifyHttpDefaultEval() {
@@ -145,8 +135,7 @@ grpc_criteria:
 )EOF";
   try {
     makeEvaluator(yaml);
-  }
-  catch (const EnvoyException& e) {
+  } catch (const EnvoyException& e) {
     EXPECT_THAT(e.what(), HasSubstr("invalid gRPC code"));
   }
 }
@@ -156,8 +145,7 @@ TEST_F(SuccessCriteriaTest, HttpRangeValidation) {
   auto check_ranges = [this](std::string&& yaml) {
     try {
       makeEvaluator(yaml);
-    }
-    catch (const EnvoyException& e) {
+    } catch (const EnvoyException& e) {
       EXPECT_THAT(e.what(), HasSubstr("invalid HTTP range"));
     }
   };

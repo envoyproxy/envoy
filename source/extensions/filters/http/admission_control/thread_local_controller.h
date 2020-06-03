@@ -33,7 +33,6 @@ public:
  * Placeholder admission controller implementation.
  */
 class NoopControllerImpl : public ThreadLocalController {
-  NoopControllerImpl() = default;
   void recordSuccess() override {}
   void recordFailure() override {}
   uint32_t requestTotalCount() override { return 0; }

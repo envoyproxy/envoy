@@ -14,8 +14,8 @@ envoy_cc_library(
     name = "response_evaluator_lib",
     srcs = ["success_criteria_evaluator.cc"],
     hdrs = [
-        "success_criteria_evaluator.h",
         "response_evaluator.h",
+        "success_criteria_evaluator.h",
     ],
     visibility = ["//visibility:public"],
     deps = [

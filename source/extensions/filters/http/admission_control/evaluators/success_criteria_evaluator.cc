@@ -2,11 +2,11 @@
 
 #include <algorithm>
 
-#include "envoy/grpc/status.h"
 #include "envoy/common/exception.h"
+#include "envoy/grpc/status.h"
 
-#include "common/common/fmt.h"
 #include "common/common/enum_to_int.h"
+#include "common/common/fmt.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -14,8 +14,8 @@ namespace HttpFilters {
 namespace AdmissionControl {
 
 SuccessCriteriaEvaluator::SuccessCriteriaEvaluator(
-    envoy::extensions::filters::http::admission_control::v3alpha::AdmissionControl::
-        SuccessCriteria success_criteria) {
+    envoy::extensions::filters::http::admission_control::v3alpha::AdmissionControl::SuccessCriteria
+        success_criteria) {
   // HTTP status.
   if (success_criteria.has_http_criteria()) {
     for (const auto& range : success_criteria.http_criteria().http_success_status()) {
