@@ -107,7 +107,7 @@ void MainCommonBase::configureHotRestarter(Runtime::RandomGenerator& random_gene
     uint32_t base_id = options_.baseId();
 
     if (options_.useDynamicBaseId()) {
-      RELEASE_ASSERT(options_.restartEpoch() == 0, "cannot use dynamic base id during hot restart");
+      ASSERT(options_.restartEpoch() == 0, "cannot use dynamic base id during hot restart");
 
       std::unique_ptr<Server::HotRestart> restarter;
 
