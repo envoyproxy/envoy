@@ -727,7 +727,7 @@ def fixBuildPath(file_path):
     if os.system("%s %s %s" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)) != 0:
       error_messages += ["envoy_build_fixer rewrite failed for file: %s" % file_path]
 
-  if os.system("%s -mode=fix %s" % (BUILDIFIER_PATH, file_path)) != 0:
+  if os.system("%s -lint=fix -mode=fix %s" % (BUILDIFIER_PATH, file_path)) != 0:
     error_messages += ["buildifier rewrite failed for file: %s" % file_path]
   return error_messages
 

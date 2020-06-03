@@ -1,7 +1,8 @@
-licenses(["notice"])  # Apache 2
-
+load("@rules_cc//cc:defs.bzl", "cc_library")
 load("//bazel:envoy_build_system.bzl", "envoy_cmake_external", "envoy_package")
 load("@rules_foreign_cc//tools/build_defs:configure.bzl", "configure_make")
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 

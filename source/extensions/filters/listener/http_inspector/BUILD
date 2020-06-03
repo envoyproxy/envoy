@@ -1,13 +1,13 @@
-licenses(["notice"])  # Apache 2
-
-# HTTP inspector filter for sniffing HTTP protocol and setting HTTP version to a FilterChain.
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
+
+# HTTP inspector filter for sniffing HTTP protocol and setting HTTP version to a FilterChain.
 
 envoy_package()
 

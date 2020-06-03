@@ -358,6 +358,14 @@ DEPENDENCY_REPOSITORIES = dict(
         urls = ["https://github.com/bazelbuild/rules_go/releases/download/v0.20.3/rules_go-v0.20.3.tar.gz"],
         use_category = ["build"],
     ),
+    rules_cc = dict(
+        sha256 = "9d48151ea71b3e225adfb6867e6d2c7d0dce46cbdc8710d9a9a628574dfd40a0",
+        strip_prefix = "rules_cc-818289e5613731ae410efb54218a4077fb9dbb03",
+        # 2020-05-13
+        # TODO(lizan): pin to a point releases when there's a released version.
+        urls = ["https://github.com/bazelbuild/rules_cc/archive/818289e5613731ae410efb54218a4077fb9dbb03.tar.gz"],
+        use_category = ["build"],
+    ),
     rules_foreign_cc = dict(
         sha256 = "3184c244b32e65637a74213fc448964b687390eeeca42a36286f874c046bba15",
         strip_prefix = "rules_foreign_cc-7bc4be735b0560289f6b86ab6136ee25d20b65b7",
