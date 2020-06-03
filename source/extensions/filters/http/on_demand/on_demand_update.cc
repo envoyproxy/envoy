@@ -37,6 +37,9 @@ void OnDemandRouteUpdate::setDecoderFilterCallbacks(Http::StreamDecoderFilterCal
   callbacks_ = &callbacks;
 }
 
+// A weak_ptr copy of the route_config_updated_callback_ is kept by RdsRouteConfigProviderImpl
+// in config_update_callbacks_. By resetting the pointer in onDestroy() callback we ensure
+// that this filter/filter-chain will not be resumed if the corresponding has been closed
 void OnDemandRouteUpdate::onDestroy() { route_config_updated_callback_.reset(); }
 
 // This is the callback which is called when an update requested in requestRouteConfigUpdate()
