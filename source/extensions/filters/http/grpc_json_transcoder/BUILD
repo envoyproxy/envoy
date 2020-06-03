@@ -1,14 +1,14 @@
-licenses(["notice"])  # Apache 2
-
-# L7 HTTP filter that implements binary gRPC to JSON transcoding
-# Public docs: docs/root/configuration/http_filters/grpc_json_transcoder_filter.rst
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
+
+# L7 HTTP filter that implements binary gRPC to JSON transcoding
+# Public docs: docs/root/configuration/http_filters/grpc_json_transcoder_filter.rst
 
 envoy_package()
 
