@@ -93,7 +93,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       // "-ALL:[ECDHE-ECDSA-AES128-GCM-SHA256|ECDHE-ECDSA-CHACHA20-POLY1305]:ECDHE-ECDSA-AES128-SHA".
       //
       // "-" is both an operator when in the leading position of a token (-ALL: don't allow this
-      // cipher), and the common separater in names (ECDHE-ECDSA-AES128-GCM-SHA256). Don't split on
+      // cipher), and the common separator in names (ECDHE-ECDSA-AES128-GCM-SHA256). Don't split on
       // it because it will seprate pieces the same cipher. When it is a leading character, it is
       // removed below.
       std::vector<absl::string_view> ciphers =
