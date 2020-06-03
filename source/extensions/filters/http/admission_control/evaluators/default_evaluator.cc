@@ -4,6 +4,7 @@
 
 #include "envoy/grpc/status.h"
 
+#include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
 
 namespace Envoy {
@@ -17,6 +18,9 @@ DefaultResponseEvaluator::DefaultResponseEvaluator(
   // HTTP status.
   if (evaluation_criteria.http_success_status_size() > 0) {
     for (const auto& range : evaluation_criteria.http_success_status()) {
+      RELEASE_ASSERT(range.start() <= range.end() && range.start() < 600 && range.start() >= 100 &&
+                         range.end() <= 600 && range.end() >= 100,
+                     fmt::format("invalid HTTP range: [{}, {})", range.start(), range.end()));
       http_success_fns_.emplace_back([range](uint64_t status) {
         return (static_cast<uint64_t>(range.start()) <= status) &&
                (status < static_cast<uint64_t>(range.end()));
@@ -33,7 +37,7 @@ DefaultResponseEvaluator::DefaultResponseEvaluator(
       grpc_success_codes_.emplace_back(status);
     }
   } else {
-    grpc_success_codes_ = decltype(grpc_success_codes_)({
+    grpc_success_codes_ = {
         enumToInt(Grpc::Status::WellKnownGrpcStatus::Ok),
         enumToInt(Grpc::Status::WellKnownGrpcStatus::Canceled),
         enumToInt(Grpc::Status::WellKnownGrpcStatus::Unknown),
@@ -44,7 +48,7 @@ DefaultResponseEvaluator::DefaultResponseEvaluator(
         enumToInt(Grpc::Status::WellKnownGrpcStatus::FailedPrecondition),
         enumToInt(Grpc::Status::WellKnownGrpcStatus::OutOfRange),
         enumToInt(Grpc::Status::WellKnownGrpcStatus::Unimplemented),
-    });
+    };
   }
 }
 

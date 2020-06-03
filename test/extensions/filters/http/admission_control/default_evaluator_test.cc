@@ -135,6 +135,34 @@ grpc_success_status:
   verifyHttpDefaultEval();
 }
 
+// Verify correct HTTP range validation.
+TEST_F(DefaultEvaluatorTest, HttpRangeOrderValidation) {
+  auto check_ranges = [this](std::string&& yaml) {
+    EXPECT_DEATH({ makeEvaluator(yaml); }, "invalid HTTP range");
+  };
+
+  check_ranges(R"EOF(
+http_success_status:
+  - start: 300
+    end:   200
+grpc_success_status:
+)EOF");
+
+  check_ranges(R"EOF(
+http_success_status:
+  - start: 600
+    end:   600
+grpc_success_status:
+)EOF");
+
+  check_ranges(R"EOF(
+http_success_status:
+  - start: 99
+    end:   99
+grpc_success_status:
+)EOF");
+}
+
 } // namespace
 } // namespace AdmissionControl
 } // namespace HttpFilters

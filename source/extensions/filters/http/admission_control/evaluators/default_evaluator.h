@@ -22,7 +22,7 @@ public:
 
 private:
   std::vector<std::function<bool(uint64_t)>> http_success_fns_;
-  std::vector<uint64_t> grpc_success_codes_;
+  std::vector<uint32_t> grpc_success_codes_;
 };
 
 } // namespace AdmissionControl
