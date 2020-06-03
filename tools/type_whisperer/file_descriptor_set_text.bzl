@@ -1,3 +1,5 @@
+load("@rules_proto//proto:defs.bzl", "ProtoInfo")
+
 def _file_descriptor_set_text(ctx):
     file_descriptor_sets = depset()
     for dep in ctx.attr.deps:

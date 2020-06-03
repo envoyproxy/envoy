@@ -1,13 +1,12 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
+    "envoy_py_test_binary",
 )
 
-envoy_package()
+licenses(["notice"])  # Apache 2
 
-load("//bazel:envoy_build_system.bzl", "envoy_py_test_binary")
+envoy_package()
 
 envoy_py_test_binary(
     name = "configgen",

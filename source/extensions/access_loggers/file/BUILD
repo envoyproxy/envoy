@@ -1,14 +1,14 @@
-licenses(["notice"])  # Apache 2
-
-# Access log implementation that writes to a file.
-# Public docs: docs/root/configuration/access_log.rst
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
+
+# Access log implementation that writes to a file.
+# Public docs: docs/root/configuration/access_log.rst
 
 envoy_package()
 

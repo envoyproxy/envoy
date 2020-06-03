@@ -1,14 +1,14 @@
-licenses(["notice"])  # Apache 2
-
-# ORIGINAL_DST iptables redirection listener filter
-# Public docs: docs/root/configuration/listener_filters/original_dst_filter.rst
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
+
+# ORIGINAL_DST iptables redirection listener filter
+# Public docs: docs/root/configuration/listener_filters/original_dst_filter.rst
 
 envoy_package()
 

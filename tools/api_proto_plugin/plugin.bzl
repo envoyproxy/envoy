@@ -36,7 +36,7 @@ def api_proto_plugin_impl(target, ctx, output_group, mnemonic, output_suffixes):
     # extractions. See https://github.com/bazelbuild/bazel/issues/3971.
     import_paths = []
     for f in target[ProtoInfo].transitive_sources.to_list():
-        import_paths += ["{}={}".format(_path_ignoring_repository(f), f.path)]
+        import_paths.append("{}={}".format(_path_ignoring_repository(f), f.path))
 
     # The outputs live in the ctx.label's package root. We add some additional
     # path information to match with protoc's notion of path relative locations.
@@ -56,9 +56,9 @@ def api_proto_plugin_impl(target, ctx, output_group, mnemonic, output_suffixes):
         inputs = depset(transitive = [inputs] + [ctx.attr._type_db.files])
         if len(ctx.attr._type_db.files.to_list()) != 1:
             fail("{} must have one type database file".format(ctx.attr._type_db))
-        args += ["--api_proto_plugin_opt=type_db_path=" + ctx.attr._type_db.files.to_list()[0].path]
+        args.append("--api_proto_plugin_opt=type_db_path=" + ctx.attr._type_db.files.to_list()[0].path)
     if hasattr(ctx.attr, "_extra_args"):
-        args += ["--api_proto_plugin_opt=extra_args=" + ctx.attr._extra_args[BuildSettingInfo].value]
+        args.append("--api_proto_plugin_opt=extra_args=" + ctx.attr._extra_args[BuildSettingInfo].value)
     args += [src.path for src in target[ProtoInfo].direct_sources]
     env = {}
 

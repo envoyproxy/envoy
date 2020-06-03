@@ -1,5 +1,7 @@
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
+
 def clang_tools_cc_binary(name, copts = [], tags = [], deps = [], **kwargs):
-    native.cc_binary(
+    cc_binary(
         name = name,
         copts = copts + [
             "-fno-exceptions",
@@ -11,13 +13,13 @@ def clang_tools_cc_binary(name, copts = [], tags = [], deps = [], **kwargs):
     )
 
 def clang_tools_cc_library(name, **kwargs):
-    native.cc_library(
+    cc_library(
         name = name,
         **kwargs
     )
 
 def clang_tools_cc_test(name, deps = [], **kwargs):
-    native.cc_test(
+    cc_test(
         name = name,
         deps = deps + ["@com_google_googletest//:gtest_main"],
         **kwargs

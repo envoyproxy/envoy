@@ -1,13 +1,13 @@
-licenses(["notice"])  # Apache 2
-
-# Trace driver for Zipkin (https://zipkin.io/).
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
+
+# Trace driver for Zipkin (https://zipkin.io/).
 
 envoy_package()
 

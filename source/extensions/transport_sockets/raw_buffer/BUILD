@@ -1,12 +1,12 @@
-licenses(["notice"])  # Apache 2
-
-# Built-in plaintext connection transport socket.
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
+
+# Built-in plaintext connection transport socket.
 
 envoy_package()
 

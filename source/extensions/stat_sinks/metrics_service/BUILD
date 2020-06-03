@@ -1,13 +1,13 @@
-licenses(["notice"])  # Apache 2
-
-# Stats sink for the gRPC metrics service: api/envoy/service/metrics/v2/metrics_service.proto
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
+
+# Stats sink for the gRPC metrics service: api/envoy/service/metrics/v2/metrics_service.proto
 
 envoy_package()
 

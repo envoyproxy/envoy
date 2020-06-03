@@ -1,6 +1,6 @@
-licenses(["notice"])  # Apache 2
-
 load("@envoy_api//bazel:api_build_system.bzl", "api_cc_test")
+
+licenses(["notice"])  # Apache 2
 
 api_cc_test(
     name = "pgv_test",
