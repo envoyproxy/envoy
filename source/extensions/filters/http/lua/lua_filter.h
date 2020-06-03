@@ -284,7 +284,7 @@ private:
   std::function<void()> yield_callback_;
   Http::AsyncClient::Request* http_request_{};
   Tracing::SpanPtr span_;
-  bool http_call_failed_;
+  bool http_call_failed_{false};
 };
 
 /**
