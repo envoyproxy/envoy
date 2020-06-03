@@ -683,7 +683,7 @@ public:
 class MockBootstrapExtensionFactory : public BootstrapExtensionFactory {
 public:
   MockBootstrapExtensionFactory();
-  ~MockBootstrapExtensionFactory();
+  ~MockBootstrapExtensionFactory() override;
 
   MOCK_METHOD(BootstrapExtensionPtr, createBootstrapExtension,
               (const Protobuf::Message&, Configuration::ServerFactoryContext&), (override));
