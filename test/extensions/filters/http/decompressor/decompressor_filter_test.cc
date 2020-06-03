@@ -305,6 +305,16 @@ TEST_P(DecompressorFilterTest, NoDecompressionHeadersOnly) {
   TestUtility::headerMapEqualIgnoreOrder(headers_before_filter, *headers_after_filter);
 }
 
+TEST_P(DecompressorFilterTest, NoDecompressionContentEncodingAbsent) {
+  EXPECT_CALL(*decompressor_factory_, createDecompressor()).Times(0);
+  Http::TestHeaderMapImpl headers_before_filter{{"content-length", "256"}};
+  std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
+      doHeaders(headers_before_filter, false /* end_stream */);
+  TestUtility::headerMapEqualIgnoreOrder(headers_before_filter, *headers_after_filter);
+
+  expectNoDecompression();
+}
+
 TEST_P(DecompressorFilterTest, NoDecompressionContentEncodingDoesNotMatch) {
   EXPECT_CALL(*decompressor_factory_, createDecompressor()).Times(0);
   Http::TestHeaderMapImpl headers_before_filter{{"content-encoding", "not-matching"},
