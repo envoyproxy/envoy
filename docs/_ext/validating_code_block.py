@@ -27,7 +27,7 @@ class ValidatingCodeBlock(CodeBlock):
   }
   option_spec.update(CodeBlock.option_spec)
   skip_validation = os.getenv('SPHINX_SKIP_CONFIG_VALIDATION') or 'false'
-  bazel_build_options = os.getenv('BAZEL_BUILD_OPTIONS')
+  bazel_build_options = os.getenv('BAZEL_BUILD_OPTIONS') or ''
 
   def run(self):
     source, line = self.state_machine.get_source_and_line(self.lineno)
@@ -37,8 +37,7 @@ class ValidatingCodeBlock(CodeBlock):
 
     if ValidatingCodeBlock.skip_validation.lower() != 'true':
       args = [
-          arg for arg in [
-              'bazel', 'run', ValidatingCodeBlock.bazel_build_options,
+          arg for arg in ['bazel', 'run'] + ValidatingCodeBlock.bazel_build_options.split() + [
               '//tools/config_validation:validate_fragment', '--',
               self.options.get('type-name'), '-s', '\n'.join(self.content)
           ] if arg != None
@@ -46,8 +45,9 @@ class ValidatingCodeBlock(CodeBlock):
       process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
       stdout, stderr = process.communicate()
       if process.poll():
-        raise ExtensionError("Failed config validation for type: '{0}' in: {1} line: {2}:\n {3}".format(
-            self.options.get('type-name'), source, line, stderr.decode(encoding='utf-8')))
+        raise ExtensionError(
+            "Failed config validation for type: '{0}' in: {1} line: {2}:\n {3}".format(
+                self.options.get('type-name'), source, line, stderr.decode(encoding='utf-8')))
 
     self.options.pop('type-name', None)
     return list(CodeBlock.run(self))
