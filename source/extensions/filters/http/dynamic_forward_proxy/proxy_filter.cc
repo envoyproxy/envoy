@@ -58,14 +58,14 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   // By default, envoy doesn't allow to use dns cache circuit breakers even if configured. But this
   // runtime feature will enable you to use this feature. This runtime feature is prepared to
   // guarantee backward compatibility.
-  const auto dns_cache_resource_manager = config_->cache().dnsCacheResourceManager();
-  const auto should_use_dns_cache_circuit_breakers =
+  const auto& dns_cache_resource_manager = config_->cache().dnsCacheResourceManager();
+  const bool should_use_dns_cache_circuit_breakers =
       Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.enable_dns_cache_circuit_breakers") &&
-      dns_cache_resource_manager.has_value();
+      dns_cache_resource_manager != nullptr;
   ResourceLimit& pending_requests =
       should_use_dns_cache_circuit_breakers
-          ? dns_cache_resource_manager.value()->pendingRequests()
+          ? dns_cache_resource_manager->pendingRequests()
           : cluster_info_->resourceManager(route_entry->priority()).pendingRequests();
 
   if (!pending_requests.canCreate()) {

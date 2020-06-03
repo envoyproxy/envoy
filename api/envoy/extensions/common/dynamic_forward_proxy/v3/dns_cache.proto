@@ -19,7 +19,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Dynamic forward proxy common configuration]
 
 // Configuration of circuit breakers for resolver.
-// It this value is not set, we will use circuit breakers for upstream connections as default.
 message DnsCacheCircuitBreakers {
   // The maximum number of pending requests that Envoy will allow to the
   // resolver. If not specified, the default is 1024.
@@ -93,5 +92,6 @@ message DnsCacheConfig {
   config.cluster.v3.Cluster.RefreshRate dns_failure_refresh_rate = 6;
 
   // The config of circuit breakers for resolver. It provides a configurable threshold.
+  // If this value is not set, we will use cluster circuit breakers as default.
   DnsCacheCircuitBreakers dns_cache_circuit_breaker = 7;
 }

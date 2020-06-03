@@ -57,7 +57,7 @@ public:
   virtual ResourceLimit& pendingRequests() PURE;
 };
 
-using DnsCacheResourceManagerPtr = std::shared_ptr<DnsCacheResourceManager>;
+using DnsCacheResourceManagerPtr = std::unique_ptr<DnsCacheResourceManager>;
 
 /**
  * A cache of DNS hosts. Hosts will re-resolve their addresses or be automatically purged
@@ -168,7 +168,7 @@ public:
   /**
    * @return A pointer to resource manager for dns cache.
    */
-  virtual absl::optional<DnsCacheResourceManagerPtr> dnsCacheResourceManager() PURE;
+  virtual DnsCacheResourceManagerPtr& dnsCacheResourceManager() PURE;
 };
 
 using DnsCacheSharedPtr = std::shared_ptr<DnsCache>;

@@ -23,12 +23,6 @@ DnsCacheImpl::DnsCacheImpl(
       resolver_(main_thread_dispatcher.createDnsResolver({}, false)), tls_slot_(tls.allocateSlot()),
       scope_(root_scope.createScope(fmt::format("dns_cache.{}.", config.name()))),
       stats_{ALL_DNS_CACHE_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_))},
-      resource_manager_(
-          config.has_dns_cache_circuit_breaker()
-              ? absl::make_optional(std::make_shared<DnsCacheResourceManagerImpl>(
-                    DnsCacheImpl::generateDnsCacheCircuitBreakersStats(*scope_), loader,
-                    config.name(), std::move(config.dns_cache_circuit_breaker())))
-              : absl::nullopt),
       refresh_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_refresh_rate, 60000)),
       failure_backoff_strategy_(
           Config::Utility::prepareDnsRefreshStrategy<
@@ -36,6 +30,11 @@ DnsCacheImpl::DnsCacheImpl(
               config, refresh_interval_.count(), random)),
       host_ttl_(PROTOBUF_GET_MS_OR_DEFAULT(config, host_ttl, 300000)),
       max_hosts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_hosts, 1024)) {
+  if (config.has_dns_cache_circuit_breaker()) {
+    resource_manager_ = std::make_unique<DnsCacheResourceManagerImpl>(
+        DnsCacheImpl::generateDnsCacheCircuitBreakersStats(*scope_), loader, config.name(),
+        std::move(config.dns_cache_circuit_breaker()))
+  }
   tls_slot_->set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalHostInfo>(); });
   updateTlsHostsMap();
 }

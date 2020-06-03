@@ -52,7 +52,7 @@ public:
   }
 
 private:
-  Stats::Gauge& opening_;
+  Stats::Gauge& open_;
   Stats::Gauge& remaining_;
 };
 
