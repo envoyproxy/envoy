@@ -371,7 +371,7 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
 
     if (do_boosting) {
       // Attempts to read as the previous version and upgrade, and if it fails
-      // attempts to read as current version.
+      // attempts to read as latest version.
       tryWithApiBoosting(read_proto_binary, message);
     } else {
       read_proto_binary(message, MessageVersion::LATEST_VERSION);
@@ -466,11 +466,14 @@ public:
     if (field.options().deprecated()) {
       if (absl::StartsWith(field.name(), Config::VersionUtil::DeprecatedFieldShadowPrefix)) {
         // The field was marked as hidden_envoy_deprecated and an error must be thrown
-        const std::string fatal_error = absl::StrCat(
-            "Illegal use of deprecated option '", field.full_name(), "' from file ", filename,
-            ". This configuration has been removed from the current Envoy API. "
-            "Please see " ENVOY_DOC_URL_VERSION_HISTORY " for details.");
-        throw ProtoValidationException(fatal_error, message);
+        // unless it is part of an explicit test that needs access to the deprecated field
+        if (!runtime_ || !runtime_->snapshot().deprecatedFeatureEnabled(absl::StrCat("envoy.deprecated_features:", field.full_name()), false)) {
+          const std::string fatal_error = absl::StrCat(
+              "Illegal use of deprecated option '", field.full_name(), "' from file ", filename,
+              ". This configuration has been removed from the current Envoy API. "
+              "Please see " ENVOY_DOC_URL_VERSION_HISTORY " for details.");
+          throw ProtoValidationException(fatal_error, message);
+        }
       }
       const std::string warning =
           absl::StrCat("Using {}deprecated option '", field.full_name(), "' from file ", filename,
@@ -568,6 +571,13 @@ std::string MessageUtil::getJsonStringFromMessage(const Protobuf::Message& messa
   // This should always succeed unless something crash-worthy such as out-of-memory.
   RELEASE_ASSERT(status.ok(), "");
   return json;
+}
+
+std::string MessageUtil::getProtobufBinaryStringFromMessage(const Protobuf::Message& message) {
+  std::string pb_binary_str;
+  pb_binary_str.reserve(message.ByteSizeLong());
+  message.SerializeToString(&pb_binary_str);
+  return pb_binary_str;
 }
 
 void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Message& message) {

@@ -363,6 +363,13 @@ public:
                                               bool always_print_primitive_fields = false);
 
   /**
+   * Extract the Protobuf binary format of a google.protobuf.Message as a string.
+   * @param message message of type type.googleapis.com/google.protobuf.Message.
+   * @return std::string of the Protobuf binary object.
+   */
+  static std::string getProtobufBinaryStringFromMessage(const Protobuf::Message& message);
+
+  /**
    * Utility method to create a Struct containing the passed in key/value strings.
    *
    * @param key the key to use to set the value
