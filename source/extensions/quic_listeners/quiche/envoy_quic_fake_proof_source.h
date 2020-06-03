@@ -24,8 +24,7 @@
 namespace Envoy {
 namespace Quic {
 
-// A fake implementation of quic::ProofSource which uses only RSA_PSS_RSAE_SHA256 to sign in
-// GetProof().
+// A fake implementation of quic::ProofSource which uses RSA cipher suite to sign in GetProof().
 // TODO(danzh) Rename it to EnvoyQuicProofSource once it's fully implemented.
 class EnvoyQuicFakeProofSource : public quic::ProofSource {
 public:
