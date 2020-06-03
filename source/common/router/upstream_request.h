@@ -30,8 +30,6 @@ class GenericConnectionPoolCallbacks;
 class RouterFilterInterface;
 class UpstreamRequest;
 
-// FIXME class GenericConnPool : public Logger::Loggable<Logger::Id::router> {
-
 // The base request for Upstream.
 class UpstreamRequest : public Logger::Loggable<Logger::Id::router>,
                         public Http::ResponseDecoder,

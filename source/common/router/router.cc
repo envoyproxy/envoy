@@ -597,10 +597,15 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   return Http::FilterHeadersStatus::StopIteration;
 }
 
-// TODO(alyssawilk) create from cluster config.
 std::unique_ptr<GenericConnPool> Filter::createConnPool() {
-  auto factory = &Envoy::Config::Utility::getAndCheckFactoryByName<GenericConnPoolFactory>(
-      Extensions::Upstreams::Http::HttpUpstreamsNames::get().Default);
+  GenericConnPoolFactory* factory = nullptr;
+  if (cluster_->upstreamConfig().has_value()) {
+    factory = &Envoy::Config::Utility::getAndCheckFactory<GenericConnPoolFactory>(
+        cluster_->upstreamConfig().value());
+  } else {
+    factory = &Envoy::Config::Utility::getAndCheckFactoryByName<GenericConnPoolFactory>(
+        Extensions::Upstreams::Http::HttpUpstreamsNames::get().Default);
+  }
   const bool should_tcp_proxy =
       route_entry_->connectConfig().has_value() &&
       downstream_headers_->getMethodValue() == Http::Headers::get().MethodValues.Connect;

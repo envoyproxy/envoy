@@ -8,6 +8,7 @@ import "envoy/config/cluster/v4alpha/outlier_detection.proto";
 import "envoy/config/core/v4alpha/address.proto";
 import "envoy/config/core/v4alpha/base.proto";
 import "envoy/config/core/v4alpha/config_source.proto";
+import "envoy/config/core/v4alpha/extension.proto";
 import "envoy/config/core/v4alpha/health_check.proto";
 import "envoy/config/core/v4alpha/protocol.proto";
 import "envoy/config/endpoint/v3/endpoint.proto";
@@ -500,18 +501,6 @@ message Cluster {
     google.protobuf.Duration max_interval = 2 [(validate.rules).duration = {gt {nanos: 1000000}}];
   }
 
-  // Allows creation and configuration of custom upstream type.
-  message UpstreamType {
-    option (udpa.annotations.versioning).previous_message_type =
-        "envoy.config.cluster.v3.Cluster.UpstreamType";
-
-    // Required. The name of the upstream type
-    string name = 1;
-
-    // The configuration for the upstream type.
-    google.protobuf.Any typed_config = 2;
-  }
-
   reserved 12, 15, 7, 11, 35;
 
   reserved "hosts", "tls_context", "extension_protocol_options";
@@ -827,12 +816,26 @@ message Cluster {
   bool track_timeout_budgets = 47;
 
   // Optional customization and configuration of upstream type.
-  // By default, Envoy will create an upstream of type envoy.filters.upstreams.http.default
-  // The default upstream will create a envoy.filters.upstreams.http.tcp upstream
-  // if the request is a CONNECT request and connect termination is configured.
-  // Otherwise it will be envoy.filters.upstreams.http.http, with the protocol
-  // based on `http2_protocol_options`.
-  UpstreamType upstream_type = 48;
+  //
+  // Currently this field only applies for HTTP traffic but is designed for
+  // eventual use for custom TCP upstreams.
+  //
+  // For HTTP traffic, Envoy will generally take downstream HTTP and send it
+  // upstream as upstream HTTP, using the upstream
+  // `envoy.filters.upstreams.http.http` and the codec from `http2_protocol_options`
+  //
+  // For routes where CONNECT termination is configured, Envoy will take
+  // downstream CONNECT requests and forward the CONNECT payload upstream over
+  // raw TCP, using the `envoy.filters.upstreams.http.tcp` upstream.
+  //
+  // The default upstream in Envoy `envoy.filters.upstreams.http.default`, which
+  // creates the HTTP upstream for most HTTP requests, and the TCP upstream if
+  // CONNECT termination is configured.
+  //
+  // If users desire custom upstream behavior, for example terminating CONNECT
+  // only if a custom filter indicates it is appropriate, the custom upstream
+  // can be registered and configured here.
+  core.v4alpha.TypedExtensionConfig upstream_config = 48;
 }
 
 // [#not-implemented-hide:] Extensible load balancing policy configuration.
