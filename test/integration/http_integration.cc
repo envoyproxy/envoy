@@ -153,6 +153,9 @@ IntegrationCodecClient::startRequest(const Http::RequestHeaderMap& headers) {
 }
 
 AssertionResult IntegrationCodecClient::waitForDisconnect(std::chrono::milliseconds time_to_wait) {
+  if (disconnected_) {
+    return AssertionSuccess();
+  }
   Event::TimerPtr wait_timer;
   bool wait_timer_triggered = false;
   if (time_to_wait.count()) {
