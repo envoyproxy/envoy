@@ -1,4 +1,4 @@
-#pragma once
+gpragma once
 
 #include <chrono>
 #include <cstdint>
@@ -1118,7 +1118,7 @@ public:
    * if stream creation fails.
    *
    * The caller is responsible for calling cancelAnyPendingRequest() if stream
-   * createation is no longer desired. newStream may only be called once per
+   * creation is no longer desired. newStream may only be called once per
    * GenericConnPool.
    *
    * @param callbacks callbacks to communicate stream failure or creation on.
