@@ -1,12 +1,12 @@
-licenses(["notice"])  # Apache 2
-
-# File Based Metadata gRPC Credentials
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
+
+# File Based Metadata gRPC Credentials
 
 envoy_package()
 
