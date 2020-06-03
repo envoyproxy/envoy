@@ -72,11 +72,9 @@ private:
 /**
  * All stats for the OAuth filter. @see stats_macros.h
  */
-// clang-format off
-#define ALL_OAUTH_FILTER_STATS(COUNTER)                                                         \
-  COUNTER(oauth_failure)                                                                        \
+#define ALL_OAUTH_FILTER_STATS(COUNTER)                                                            \
+  COUNTER(oauth_failure)                                                                           \
   COUNTER(oauth_success)
-// clang-format on
 
 /**
  * Wrapper struct filter stats. @see stats_macros.h
