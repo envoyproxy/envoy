@@ -152,6 +152,7 @@ cc_library(
         ":clang_basic",
         ":clang_lex",
         ":clang_sema",
+        ":llvm_frontend_omp",
         ":llvm_mc",
         ":llvm_mcparser",
         ":llvm_support",
@@ -304,6 +305,12 @@ cc_library(
     name = "llvm_demangle",
     srcs = ["lib/libLLVMDemangle.a"],
     hdrs = glob(["llvm/Demangle/**"]),
+)
+
+cc_library(
+    name = "llvm_frontend_omp",
+    srcs = ["lib/libLLVMFrontendOpenMP.a"],
+    hdrs = glob(["llvm/Frontend/OpenMP/OMP"]),
 )
 
 cc_library(
