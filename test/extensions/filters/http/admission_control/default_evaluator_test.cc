@@ -135,8 +135,18 @@ grpc_success_status:
   verifyHttpDefaultEval();
 }
 
+// Verify correct gRPC range validation.
+TEST_F(DefaultEvaluatorTest, GrpcRangeValidation) {
+  const std::string yaml = R"EOF(
+http_success_status:
+grpc_success_status:
+  - 17
+)EOF";
+  EXPECT_DEATH({ makeEvaluator(yaml); }, "invalid gRPC code");
+}
+
 // Verify correct HTTP range validation.
-TEST_F(DefaultEvaluatorTest, HttpRangeOrderValidation) {
+TEST_F(DefaultEvaluatorTest, HttpRangeValidation) {
   auto check_ranges = [this](std::string&& yaml) {
     EXPECT_DEATH({ makeEvaluator(yaml); }, "invalid HTTP range");
   };

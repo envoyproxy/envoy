@@ -34,6 +34,7 @@ DefaultResponseEvaluator::DefaultResponseEvaluator(
   // GRPC status.
   if (evaluation_criteria.grpc_success_status_size() > 0) {
     for (const auto& status : evaluation_criteria.grpc_success_status()) {
+      RELEASE_ASSERT(status <= 16, fmt::format("invalid gRPC code {}", status));
       grpc_success_codes_.emplace_back(status);
     }
   } else {

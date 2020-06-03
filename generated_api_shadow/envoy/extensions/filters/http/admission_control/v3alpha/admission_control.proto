@@ -36,7 +36,7 @@ message AdmissionControl {
     // Cancelled, Unknown, InvalidArgument, NotFound, AlreadyExists, Unauthenticated,
     // FailedPrecondition, OutOfRange, and Unimplemented.
     // Mappings can be found at: https://github.com/grpc/grpc/blob/master/doc/statuscodes.md.
-    repeated uint32 grpc_success_status = 2 [(validate.rules).uint32 = {lte: 16}];
+    repeated uint32 grpc_success_status = 2;
   }
 
   // If set to false, the admission control filter will operate as a pass-through filter. If the
