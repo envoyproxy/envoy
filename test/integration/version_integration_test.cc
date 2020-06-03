@@ -32,9 +32,10 @@ TEST_P(VersionIntegrationTest, DEPRECATED_FEATURE_TEST(IpTaggingV2StaticStructCo
   )EOF",
                                         ExampleIpTaggingConfig));
 
-  config_helper_.addRuntimeOverride("envoy.deprecated_features:envoy.extensions.filters.network."
-                                    "http_connection_manager.v3.HttpFilter.hidden_envoy_deprecated_config",
-                                    "true");
+  config_helper_.addRuntimeOverride(
+      "envoy.deprecated_features:envoy.extensions.filters.network."
+      "http_connection_manager.v3.HttpFilter.hidden_envoy_deprecated_config",
+      "true");
   initialize();
 }
 

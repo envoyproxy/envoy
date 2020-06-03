@@ -354,7 +354,7 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
           MessageUtil::checkForUnexpectedFields(message, validation_visitor);
         }
         return;
-      } catch (EnvoyException &ex) {
+      } catch (EnvoyException& ex) {
         if (message_version == MessageVersion::LATEST_VERSION) {
           // Failed reading the latest version - pass the same error upwards
           throw ex;
@@ -467,7 +467,9 @@ public:
       if (absl::StartsWith(field.name(), Config::VersionUtil::DeprecatedFieldShadowPrefix)) {
         // The field was marked as hidden_envoy_deprecated and an error must be thrown
         // unless it is part of an explicit test that needs access to the deprecated field
-        if (!runtime_ || !runtime_->snapshot().deprecatedFeatureEnabled(absl::StrCat("envoy.deprecated_features:", field.full_name()), false)) {
+        if (!runtime_ ||
+            !runtime_->snapshot().deprecatedFeatureEnabled(
+                absl::StrCat("envoy.deprecated_features:", field.full_name()), false)) {
           const std::string fatal_error = absl::StrCat(
               "Illegal use of deprecated option '", field.full_name(), "' from file ", filename,
               ". This configuration has been removed from the current Envoy API. "

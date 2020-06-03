@@ -7108,14 +7108,12 @@ public:
 
   void checkEach(const std::string& yaml, uint32_t expected_entry, uint32_t expected_route,
                  uint32_t expected_vhost, bool latest_api_version) {
-    const TestConfigImpl config=[this, &yaml](bool latest_api_version) {
+    const TestConfigImpl config = [this, &yaml](bool latest_api_version) {
       if (latest_api_version)
         return TestConfigImpl(parseRouteConfigurationFromV3Yaml(yaml), factory_context_, true);
       else
         return TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
     }(latest_api_version);
-
-
 
     const auto route = config.route(genHeaders("www.foo.com", "/", "GET"), 0);
     const auto* route_entry = route->routeEntry();
@@ -7136,7 +7134,7 @@ public:
   }
 
   void checkNoPerFilterConfig(const std::string& yaml, bool latest_api_version) {
-    const TestConfigImpl config=[this, &yaml](bool latest_api_version) {
+    const TestConfigImpl config = [this, &yaml](bool latest_api_version) {
       if (latest_api_version)
         return TestConfigImpl(parseRouteConfigurationFromV3Yaml(yaml), factory_context_, true);
       else
