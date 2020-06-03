@@ -33,7 +33,7 @@ DnsCacheImpl::DnsCacheImpl(
   if (config.has_dns_cache_circuit_breaker()) {
     resource_manager_ = std::make_unique<DnsCacheResourceManagerImpl>(
         DnsCacheImpl::generateDnsCacheCircuitBreakersStats(*scope_), loader, config.name(),
-        std::move(config.dns_cache_circuit_breaker()))
+        std::move(config.dns_cache_circuit_breaker()));
   }
   tls_slot_->set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalHostInfo>(); });
   updateTlsHostsMap();
