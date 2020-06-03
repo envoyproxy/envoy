@@ -1,10 +1,10 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -170,11 +170,22 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "socket_lib",
+    srcs = ["socket_impl.cc"],
+    hdrs = ["socket_impl.h"],
+    deps = [
+        ":address_lib",
+        "//include/envoy/network:socket_interface",
+        "//source/common/common:assert_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "listen_socket_lib",
     srcs = ["listen_socket_impl.cc"],
     hdrs = ["listen_socket_impl.h"],
     deps = [
-        ":address_lib",
+        ":socket_lib",
         ":utility_lib",
         "//include/envoy/network:listen_socket_interface",
         "//source/common/common:assert_lib",
@@ -296,6 +307,7 @@ envoy_cc_library(
     hdrs = ["utility.h"],
     deps = [
         ":address_lib",
+        ":socket_lib",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:listener_interface",
         "//include/envoy/stats:stats_interface",
