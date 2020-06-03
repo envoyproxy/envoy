@@ -6,7 +6,7 @@
 #include "common/stats/isolated_store_impl.h"
 
 #include "extensions/filters/http/admission_control/admission_control.h"
-#include "extensions/filters/http/admission_control/evaluators/default_evaluator.h"
+#include "extensions/filters/http/admission_control/evaluators/success_criteria_evaluator.h"
 
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/mocks.h"
@@ -34,7 +34,7 @@ public:
     AdmissionControlProto proto;
     TestUtility::loadFromYamlAndValidate(yaml, proto);
     auto tls = context_.threadLocal().allocateSlot();
-    auto evaluator = std::make_unique<DefaultResponseEvaluator>(proto.default_eval_criteria());
+    auto evaluator = std::make_unique<SuccessCriteriaEvaluator>(proto.success_criteria());
     return std::make_shared<AdmissionControlFilterConfig>(
         proto, runtime_, time_system_, random_, scope_, std::move(tls), std::move(evaluator));
   }
@@ -57,7 +57,7 @@ sampling_window: 1337s
 aggression_coefficient:
   default_value: 4.2
   runtime_key: "foo.aggression"
-default_eval_criteria:
+success_criteria:
   http_success_status:
   grpc_success_status:
 )EOF";
@@ -74,7 +74,7 @@ TEST_F(AdmissionControlConfigTest, BasicTestMinimumConfigured) {
   AdmissionControlProto proto;
 
   const std::string yaml = R"EOF(
-default_eval_criteria:
+success_criteria:
   http_success_status:
   grpc_success_status:
 )EOF";
@@ -94,7 +94,7 @@ sampling_window: 1337s
 aggression_coefficient:
   default_value: 4.2
   runtime_key: "foo.aggression"
-default_eval_criteria:
+success_criteria:
   http_success_status:
   grpc_success_status:
 )EOF";

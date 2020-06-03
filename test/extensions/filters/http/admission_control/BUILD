@@ -46,8 +46,8 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
-    name = "default_evaluator_test",
-    srcs = ["default_evaluator_test.cc"],
+    name = "success_criteria_evaluator_test",
+    srcs = ["success_criteria_evaluator_test.cc"],
     extension_name = "envoy.filters.http.admission_control",
     deps = [
         "//source/extensions/filters/http/admission_control:admission_control_filter_lib",

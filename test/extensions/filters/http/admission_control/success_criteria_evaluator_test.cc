@@ -4,7 +4,7 @@
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.validate.h"
 
 #include "extensions/filters/http/admission_control/admission_control.h"
-#include "extensions/filters/http/admission_control/evaluators/default_evaluator.h"
+#include "extensions/filters/http/admission_control/evaluators/success_criteria_evaluator.h"
 
 #include "test/test_common/utility.h"
 
@@ -20,15 +20,15 @@ namespace HttpFilters {
 namespace AdmissionControl {
 namespace {
 
-class DefaultEvaluatorTest : public testing::Test {
+class SuccessCriteriaTest : public testing::Test {
 public:
-  DefaultEvaluatorTest() = default;
+  SuccessCriteriaTest() = default;
 
   void makeEvaluator(const std::string& yaml) {
-    AdmissionControlProto::DefaultEvaluationCriteria proto;
+    AdmissionControlProto::SuccessCriteria proto;
     TestUtility::loadFromYamlAndValidate(yaml, proto);
 
-    evaluator_ = std::make_unique<DefaultResponseEvaluator>(proto);
+    evaluator_ = std::make_unique<SuccessCriteriaEvaluator>(proto);
   }
 
   void expectHttpSuccess(int code) { EXPECT_TRUE(evaluator_->isHttpSuccess(code)); }
@@ -73,11 +73,11 @@ public:
   }
 
 protected:
-  std::unique_ptr<DefaultResponseEvaluator> evaluator_;
+  std::unique_ptr<SuccessCriteriaEvaluator> evaluator_;
 };
 
 // Ensure the HTTP code succesful range configurations are honored.
-TEST_F(DefaultEvaluatorTest, HttpErrorCodes) {
+TEST_F(SuccessCriteriaTest, HttpErrorCodes) {
   const std::string yaml = R"EOF(
 http_success_status:
   - start: 200
@@ -102,7 +102,7 @@ grpc_success_status:
 }
 
 // Verify default success values of the evaluator.
-TEST_F(DefaultEvaluatorTest, DefaultBehaviorTest) {
+TEST_F(SuccessCriteriaTest, DefaultBehaviorTest) {
   const std::string yaml = R"EOF(
 http_success_status:
 grpc_success_status:
@@ -114,7 +114,7 @@ grpc_success_status:
 }
 
 // Check that GRPC error code configurations are honored.
-TEST_F(DefaultEvaluatorTest, GrpcErrorCodes) {
+TEST_F(SuccessCriteriaTest, GrpcErrorCodes) {
   const std::string yaml = R"EOF(
 http_success_status:
 grpc_success_status:
@@ -136,7 +136,7 @@ grpc_success_status:
 }
 
 // Verify correct gRPC range validation.
-TEST_F(DefaultEvaluatorTest, GrpcRangeValidation) {
+TEST_F(SuccessCriteriaTest, GrpcRangeValidation) {
   const std::string yaml = R"EOF(
 http_success_status:
 grpc_success_status:
@@ -146,7 +146,7 @@ grpc_success_status:
 }
 
 // Verify correct HTTP range validation.
-TEST_F(DefaultEvaluatorTest, HttpRangeValidation) {
+TEST_F(SuccessCriteriaTest, HttpRangeValidation) {
   auto check_ranges = [this](std::string&& yaml) {
     EXPECT_DEATH({ makeEvaluator(yaml); }, "invalid HTTP range");
   };

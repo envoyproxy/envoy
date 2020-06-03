@@ -1,4 +1,4 @@
-#include "extensions/filters/http/admission_control/evaluators/default_evaluator.h"
+#include "extensions/filters/http/admission_control/evaluators/success_criteria_evaluator.h"
 
 #include <algorithm>
 
@@ -12,12 +12,12 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AdmissionControl {
 
-DefaultResponseEvaluator::DefaultResponseEvaluator(
+SuccessCriteriaEvaluator::SuccessCriteriaEvaluator(
     envoy::extensions::filters::http::admission_control::v3alpha::AdmissionControl::
-        DefaultEvaluationCriteria evaluation_criteria) {
+        SuccessCriteria success_criteria) {
   // HTTP status.
-  if (evaluation_criteria.http_success_status_size() > 0) {
-    for (const auto& range : evaluation_criteria.http_success_status()) {
+  if (success_criteria.http_success_status_size() > 0) {
+    for (const auto& range : success_criteria.http_success_status()) {
       RELEASE_ASSERT(range.start() <= range.end() && range.start() < 600 && range.start() >= 100 &&
                          range.end() <= 600 && range.end() >= 100,
                      fmt::format("invalid HTTP range: [{}, {})", range.start(), range.end()));
@@ -32,8 +32,8 @@ DefaultResponseEvaluator::DefaultResponseEvaluator(
   }
 
   // GRPC status.
-  if (evaluation_criteria.grpc_success_status_size() > 0) {
-    for (const auto& status : evaluation_criteria.grpc_success_status()) {
+  if (success_criteria.grpc_success_status_size() > 0) {
+    for (const auto& status : success_criteria.grpc_success_status()) {
       RELEASE_ASSERT(status <= 16, fmt::format("invalid gRPC code {}", status));
       grpc_success_codes_.emplace_back(status);
     }
@@ -53,11 +53,11 @@ DefaultResponseEvaluator::DefaultResponseEvaluator(
   }
 }
 
-bool DefaultResponseEvaluator::isGrpcSuccess(uint32_t status) const {
+bool SuccessCriteriaEvaluator::isGrpcSuccess(uint32_t status) const {
   return std::count(grpc_success_codes_.begin(), grpc_success_codes_.end(), status) > 0;
 }
 
-bool DefaultResponseEvaluator::isHttpSuccess(uint64_t code) const {
+bool SuccessCriteriaEvaluator::isHttpSuccess(uint64_t code) const {
   return std::any_of(http_success_fns_.begin(), http_success_fns_.end(),
                      [code](auto fn) { return fn(code); });
 }

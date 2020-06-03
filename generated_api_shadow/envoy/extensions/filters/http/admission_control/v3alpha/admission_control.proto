@@ -27,9 +27,9 @@ message AdmissionControl {
   // Default method of specifying what constitutes a successful request. All status codes that
   // indicate a successful request must be explicitly specified if not relying on the default
   // values.
-  message DefaultEvaluationCriteria {
-    // If HTTP statuses are unspecified, defaults to all non-5xx. Valid codes are in the range [100,
-    // 600).
+  message SuccessCriteria {
+    // If HTTP statuses are unspecified, all HTTP status codes below 500 are treated as successful
+    // responses. Configurable codes are in the range [100, 600).
     repeated type.v3.Int32Range http_success_status = 1;
 
     // GRPC status codes to consider as request successes. If unspecified, defaults to: Ok,
@@ -47,7 +47,7 @@ message AdmissionControl {
   oneof evaluation_criteria {
     option (validate.required) = true;
 
-    DefaultEvaluationCriteria default_eval_criteria = 2;
+    SuccessCriteria success_criteria = 2;
   }
 
   // The sliding time window over which the success rate is calculated. The window is rounded to the

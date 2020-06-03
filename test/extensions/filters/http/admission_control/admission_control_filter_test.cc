@@ -108,7 +108,7 @@ sampling_window: 10s
 aggression_coefficient:
   default_value: 1.0
   runtime_key: "foo.aggression"
-default_eval_criteria:
+success_criteria:
   http_success_status:
   grpc_success_status:
 )EOF"};
@@ -124,7 +124,7 @@ sampling_window: 10s
 aggression_coefficient:
   default_value: 1.0
   runtime_key: "foo.aggression"
-default_eval_criteria:
+success_criteria:
   http_success_status:
   grpc_success_status:
 )EOF";

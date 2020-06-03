@@ -12,10 +12,10 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AdmissionControl {
 
-class DefaultResponseEvaluator : public ResponseEvaluator {
+class SuccessCriteriaEvaluator : public ResponseEvaluator {
 public:
-  DefaultResponseEvaluator(envoy::extensions::filters::http::admission_control::v3alpha::
-                               AdmissionControl::DefaultEvaluationCriteria evaluation_criteria);
+  SuccessCriteriaEvaluator(envoy::extensions::filters::http::admission_control::v3alpha::
+                               AdmissionControl::SuccessCriteria evaluation_criteria);
   // ResponseEvaluator
   bool isHttpSuccess(uint64_t code) const override;
   bool isGrpcSuccess(uint32_t status) const override;
