@@ -213,8 +213,8 @@ public:
   }
 
 protected:
-  virtual Stats::Counter* makeCounterInternal(StatName name, StatName tag_extracted_name,
-                                              const StatNameTagVector& stat_name_tags) {
+  Stats::Counter* makeCounterInternal(StatName name, StatName tag_extracted_name,
+                                              const StatNameTagVector& stat_name_tags) override {
     Stats::Counter* counter = new NotifyingCounter(
         Stats::AllocatorImpl::makeCounterInternal(name, tag_extracted_name, stat_name_tags), mutex_,
         condvar_);
