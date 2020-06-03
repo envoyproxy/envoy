@@ -810,17 +810,12 @@ void ClusterManagerImpl::updateClusterCounts() {
   // signal to ADS to proceed with RDS updates.
   // If we're in the middle of shutting down (ads_mux_ already gone) then this is irrelevant.
   if (ads_mux_) {
-    const auto type_url_v2 = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(
-        envoy::config::core::v3::ApiVersion::V2);
-    const auto type_url_v3 = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(
-        envoy::config::core::v3::ApiVersion::V3);
+    const auto type_urls = Config::getAllVersionTypeUrls<envoy::config::cluster::v3::Cluster>();
     const uint64_t previous_warming = cm_stats_.warming_clusters_.value();
     if (previous_warming == 0 && !warming_clusters_.empty()) {
-      ads_mux_->pause(type_url_v2);
-      ads_mux_->pause(type_url_v3);
+      ads_mux_->pause(type_urls);
     } else if (previous_warming > 0 && warming_clusters_.empty()) {
-      ads_mux_->resume(type_url_v2);
-      ads_mux_->resume(type_url_v3);
+      ads_mux_->resume(type_urls);
     }
   }
   cm_stats_.active_clusters_.set(active_clusters_.size());

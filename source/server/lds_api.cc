@@ -43,16 +43,11 @@ void LdsApiImpl::onConfigUpdate(
     const std::string& system_version_info) {
   std::unique_ptr<Cleanup> maybe_eds_resume;
   if (cm_.adsMux()) {
-    const auto type_url_v2 = Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>(
-        envoy::config::core::v3::ApiVersion::V2);
-    const auto type_url_v3 = Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>(
-        envoy::config::core::v3::ApiVersion::V3);
-    cm_.adsMux()->pause(type_url_v2);
-    cm_.adsMux()->pause(type_url_v3);
-    maybe_eds_resume = std::make_unique<Cleanup>([this, type_url_v2, type_url_v3] {
-      cm_.adsMux()->resume(type_url_v2);
-      cm_.adsMux()->resume(type_url_v3);
-    });
+    const auto type_urls =
+        Config::getAllVersionTypeUrls<envoy::config::route::v3::RouteConfiguration>();
+    cm_.adsMux()->pause(type_urls);
+    maybe_eds_resume =
+        std::make_unique<Cleanup>([this, type_urls] { cm_.adsMux()->resume(type_urls); });
   }
 
   bool any_applied = false;
