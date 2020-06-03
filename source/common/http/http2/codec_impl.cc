@@ -1066,6 +1066,13 @@ ConnectionImpl::Http2Options::Http2Options(const Http2Settings& http2_settings) 
   if (http2_settings.allow_metadata_) {
     nghttp2_option_set_user_recv_extension_type(options_, METADATA_FRAME_TYPE);
   }
+
+  // nghttp2 v1.39.2 lowered the internal flood protection limit from 10K to 1K of ACK frames. This
+  // new limit may cause the internal nghttp2 mitigation to trigger more often (as it requires just
+  // 9K of incoming bytes for smallest 9 byte SETTINGS frame), bypassing the same mitigation and its
+  // associated behavior in the envoy HTTP/2 codec. Since envoy does not rely on this mitigation,
+  // set back to the old 10K number to avoid any changes in the HTTP/2 codec behavior.
+  nghttp2_option_set_max_outbound_ack(options_, 10000);
 }
 
 ConnectionImpl::Http2Options::~Http2Options() { nghttp2_option_del(options_); }
