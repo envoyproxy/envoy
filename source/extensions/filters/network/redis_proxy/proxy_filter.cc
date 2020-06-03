@@ -104,7 +104,7 @@ void ProxyFilter::onAuth(PendingRequest& request, const std::string& username,
   Common::Redis::RespValuePtr response{new Common::Redis::RespValue()};
   if (config_->downstream_auth_username_.empty() && config_->downstream_auth_password_.empty()) {
     response->type(Common::Redis::RespType::Error);
-    response->asString() = "ERR Client sent AUTH, but no acl is set";
+    response->asString() = "ERR Client sent AUTH, but no username or password is set";
   } else if (username == config_->downstream_auth_username_ &&
              password == config_->downstream_auth_password_) {
     response->type(Common::Redis::RespType::SimpleString);
@@ -112,7 +112,7 @@ void ProxyFilter::onAuth(PendingRequest& request, const std::string& username,
     connection_allowed_ = true;
   } else {
     response->type(Common::Redis::RespType::Error);
-    response->asString() = "ERR invalid acl auth";
+    response->asString() = "ERR invalid auth";
     connection_allowed_ = false;
   }
   request.onResponse(std::move(response));

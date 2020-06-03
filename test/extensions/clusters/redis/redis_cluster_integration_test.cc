@@ -123,7 +123,7 @@ const std::string& testConfigWithAuth() {
 }
 
 // This is the basic redis_proxy configuration with an upstream
-// authentication acl username and password specified.
+// authentication username and password specified.
 
 const std::string& testConfigWithAuthAcl() {
   CONSTRUCT_ON_FIRST_USE(std::string, testConfig() + R"EOF(
@@ -589,7 +589,7 @@ TEST_P(RedisClusterWithAuthIntegrationTest, SingleSlotMasterReplica) {
 // The request and response should make it through the envoy
 // proxy server code unchanged.
 //
-// In this scenario, the fake server will receive 2 auth acl commands:
+// In this scenario, the fake server will receive 2 auth commands with username and password:
 // one as part of a topology discovery connection (before sending a
 // "cluster slots" command), and one to authenticate the connection
 // that carries the "get foo" request.

@@ -795,14 +795,15 @@ TEST_P(RedisProxyIntegrationTest, DownstreamAuthWhenNoPasswordSet) {
                       "-ERR Client sent AUTH, but no password is set\r\n");
 }
 
-// This test sends an AUTH acl command from the fake downstream client to
-// the Envoy proxy. Envoy will respond with a no-password-set error since
-// no downstream_auth_username and downstream_auth_password has been set for the filter.
+// This test sends an AUTH command from the fake downstream client to
+// the Envoy proxy with username and password. Envoy will respond with a
+// no-acl-set error since no downstream_auth_username and downstream_auth_password
+// has been set for the filter.
 
 TEST_P(RedisProxyIntegrationTest, DownstreamAuthWhenNoAclSet) {
   initialize();
   simpleProxyResponse(makeBulkStringArray({"auth", "someusername", "somepassword"}),
-                      "-ERR Client sent AUTH, but no acl is set\r\n");
+                      "-ERR Client sent AUTH, but no ACL is set\r\n");
 }
 
 // This test sends a simple Redis command to a sequence of fake upstream
@@ -1096,10 +1097,10 @@ TEST_P(RedisProxyWithDownstreamAuthAclIntegrationTest, ErrorsUntilCorrectAclSent
   proxyResponseStep(makeBulkStringArray({"auth"}), error_response.str(), redis_client);
 
   proxyResponseStep(makeBulkStringArray({"auth", "wrongusername", "somepassword"}),
-                    "-ERR invalid acl auth\r\n", redis_client);
+                    "-ERR invalid ACL auth\r\n", redis_client);
 
   proxyResponseStep(makeBulkStringArray({"auth", "someusername", "wrongpassword"}),
-                    "-ERR invalid acl auth\r\n", redis_client);
+                    "-ERR invalid ACL auth\r\n", redis_client);
 
   proxyResponseStep(makeBulkStringArray({"get", "foo"}), "-NOAUTH Authentication required.\r\n",
                     redis_client);

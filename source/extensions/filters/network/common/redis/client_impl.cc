@@ -287,7 +287,7 @@ void ClientImpl::PendingRequest::cancel() {
 
 void ClientImpl::initialize(const std::string& auth_username, const std::string& auth_password) {
   if (!auth_username.empty()) {
-    // Send an AUTH acl command to the upstream server with username.
+    // Send an AUTH command to the upstream server with username and password.
     Utility::AuthRequest auth_request(auth_username, auth_password);
     makeRequest(auth_request, null_pool_callbacks);
   } else if (!auth_password.empty()) {
