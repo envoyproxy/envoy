@@ -816,12 +816,13 @@ ProtobufWkt::Value LocalReplyBodyFormatter::formatValue(const Http::RequestHeade
   return ValueUtil::stringValue(std::string(local_reply_body));
 }
 
-SubstitutionFromHeaderFormatter::SubstitutionFromHeaderFormatter(const std::string& main_header,
-                                 const std::string& alternative_header,
-                                 absl::optional<size_t> max_length)
+SubstitutionFromHeaderFormatter::SubstitutionFromHeaderFormatter(
+    const std::string& main_header, const std::string& alternative_header,
+    absl::optional<size_t> max_length)
     : main_header_(main_header), alternative_header_(alternative_header), max_length_(max_length) {}
 
-const Http::HeaderEntry* SubstitutionFromHeaderFormatter::findHeader(const Http::HeaderMap& headers) const {
+const Http::HeaderEntry*
+SubstitutionFromHeaderFormatter::findHeader(const Http::HeaderMap& headers) const {
   const Http::HeaderEntry* header = headers.get(main_header_);
 
   if (!header && !alternative_header_.get().empty()) {
@@ -842,7 +843,8 @@ std::string SubstitutionFromHeaderFormatter::format(const Http::HeaderMap& heade
   return val;
 }
 
-ProtobufWkt::Value SubstitutionFromHeaderFormatter::formatValue(const Http::HeaderMap& headers) const {
+ProtobufWkt::Value
+SubstitutionFromHeaderFormatter::formatValue(const Http::HeaderMap& headers) const {
   const Http::HeaderEntry* header = findHeader(headers);
   if (!header) {
     return unspecifiedValue();

@@ -162,8 +162,9 @@ public:
 
 class SubstitutionFromHeaderFormatter {
 public:
-  SubstitutionFromHeaderFormatter(const std::string& main_header, const std::string& alternative_header,
-                  absl::optional<size_t> max_length);
+  SubstitutionFromHeaderFormatter(const std::string& main_header,
+                                  const std::string& alternative_header,
+                                  absl::optional<size_t> max_length);
 
 protected:
   std::string format(const Http::HeaderMap& headers) const;
