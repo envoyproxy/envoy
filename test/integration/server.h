@@ -194,6 +194,25 @@ class NotifyingAllocatorImpl : public Stats::AllocatorImpl {
 public:
   using Stats::AllocatorImpl::AllocatorImpl;
 
+  virtual void waitForCounterFromStringEq(const std::string& name, uint64_t value) {
+    absl::MutexLock l(&mutex_);
+    ENVOY_LOG_MISC(trace, "waiting for {} to be {}", name, value);
+    while (getCounterLockHeld(name) == nullptr || getCounterLockHeld(name)->value() != value) {
+      condvar_.Wait(&mutex_);
+    }
+    ENVOY_LOG_MISC(trace, "done waiting for {} to be {}", name, value);
+  }
+
+  virtual void waitForCounterFromStringGe(const std::string& name, uint64_t value) {
+    absl::MutexLock l(&mutex_);
+    ENVOY_LOG_MISC(trace, "waiting for {} to be {}", name, value);
+    while (getCounterLockHeld(name) == nullptr || getCounterLockHeld(name)->value() < value) {
+      condvar_.Wait(&mutex_);
+    }
+    ENVOY_LOG_MISC(trace, "done waiting for {} to be {}", name, value);
+  }
+
+protected:
   virtual Stats::Counter* makeCounterInternal(StatName name, StatName tag_extracted_name,
                                               const StatNameTagVector& stat_name_tags) {
     Stats::Counter* counter = new NotifyingCounter(
@@ -201,6 +220,8 @@ public:
         condvar_);
     {
       absl::MutexLock l(&mutex_);
+      // Allow getting the counter directly from the allocator, since it's harder to
+      // signal when the counter has been added to a given stats store.
       counters_.emplace(counter->name(), counter);
       if (counter->name() == "cluster_manager.cluster_removed") {
       }
@@ -209,9 +230,8 @@ public:
     return counter;
   }
 
-  // Allow getting the counter directly from the allocator, since it's harder to
-  // signal when the counter has been added to a given stats store.
-  virtual Stats::Counter* getCounterLockHeld(std::string name) EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
+  virtual Stats::Counter* getCounterLockHeld(const std::string& name)
+      EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
     auto it = counters_.find(name);
     if (it != counters_.end()) {
       return it->second;
@@ -219,11 +239,9 @@ public:
     return nullptr;
   }
 
-  absl::CondVar& condvar() { return condvar_; }
-  absl::Mutex mutex_;
-
 private:
   absl::flat_hash_map<std::string, Stats::Counter*> counters_;
+  absl::Mutex mutex_;
   absl::CondVar condvar_;
 };
 
@@ -377,23 +395,11 @@ public:
              std::chrono::seconds drain_time);
 
   void waitForCounterEq(const std::string& name, uint64_t value) override {
-    absl::MutexLock l(&statsAllocator().mutex_);
-    ENVOY_LOG_MISC(trace, "waiting for {} to be {}", name, value);
-    while (statsAllocator().getCounterLockHeld(name) == nullptr ||
-           statsAllocator().getCounterLockHeld(name)->value() != value) {
-      statsAllocator().condvar().Wait(&statsAllocator().mutex_);
-    }
-    ENVOY_LOG_MISC(trace, "done waiting for {} to be {}", name, value);
+    notifyingStatsAllocator().waitForCounterFromStringEq(name, value);
   }
 
   void waitForCounterGe(const std::string& name, uint64_t value) override {
-    absl::MutexLock l(&statsAllocator().mutex_);
-    ENVOY_LOG_MISC(trace, "waiting for {} to be at least {}", name, value);
-    while (statsAllocator().getCounterLockHeld(name) == nullptr ||
-           statsAllocator().getCounterLockHeld(name)->value() < value) {
-      statsAllocator().condvar().Wait(&statsAllocator().mutex_);
-    }
-    ENVOY_LOG_MISC(trace, "done waiting for {} to be at least {}", name, value);
+    notifyingStatsAllocator().waitForCounterFromStringGe(name, value);
   }
 
   void waitForGaugeGe(const std::string& name, uint64_t value) override {
@@ -439,7 +445,7 @@ public:
   virtual Server::Instance& server() PURE;
   virtual Stats::Store& statStore() PURE;
   virtual Network::Address::InstanceConstSharedPtr adminAddress() PURE;
-  virtual Stats::NotifyingAllocatorImpl& statsAllocator() PURE;
+  virtual Stats::NotifyingAllocatorImpl& notifyingStatsAllocator() PURE;
   void useAdminInterfaceToQuit(bool use) { use_admin_interface_to_quit_ = use; }
   bool useAdminInterfaceToQuit() { return use_admin_interface_to_quit_; }
 
@@ -493,7 +499,7 @@ private:
 class IntegrationTestServerImpl : public IntegrationTestServer {
 public:
   IntegrationTestServerImpl(Event::TestTimeSystem& time_system, Api::Api& api,
-                            const std::string& config_path, bool use_real_stats = false);
+                            const std::string& config_path, bool real_stats = false);
 
   ~IntegrationTestServerImpl() override;
 
@@ -507,9 +513,10 @@ public:
   }
   Network::Address::InstanceConstSharedPtr adminAddress() override { return admin_address_; }
 
-  Stats::NotifyingAllocatorImpl& statsAllocator() override {
+  Stats::NotifyingAllocatorImpl& notifyingStatsAllocator() override {
     auto* ret = dynamic_cast<Stats::NotifyingAllocatorImpl*>(stats_allocator_.get());
-    RELEASE_ASSERT(ret != nullptr, "This test does not support using real stats");
+    RELEASE_ASSERT(ret != nullptr,
+                   "notifyingStatsAllocator() is not created when real_stats is true");
     return *ret;
   }
 
