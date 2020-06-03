@@ -52,11 +52,7 @@ public:
     cluster_->initialize([this] { initialized_ = true; });
   }
 
-  // Set up an EDS config with multiple priorities, localities, weights and make sure
-  // they are loaded and reloaded as expected.
-  void priorityAndLocalityWeightedHelper(bool ignore_unknown_dynamic_fields, int num_hosts) {
-    envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
-    cluster_load_assignment.set_cluster_name("fare");
+  void resetClusterHelper() {
     resetCluster(R"EOF(
       name: name
       connect_timeout: 0.25s
@@ -70,6 +66,14 @@ public:
             refresh_delay: 1s
     )EOF",
                  Envoy::Upstream::Cluster::InitializePhase::Secondary);
+  }
+
+  // Set up an EDS config with multiple priorities, localities, weights and make sure
+  // they are loaded as expected.
+  void priorityAndLocalityWeightedHelper(bool ignore_unknown_dynamic_fields, int num_hosts,
+                                         bool healthy) {
+    envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+    cluster_load_assignment.set_cluster_name("fare");
 
     // Add a whole bunch of hosts in a single place:
     auto* endpoints = cluster_load_assignment.add_endpoints();
@@ -82,10 +86,14 @@ public:
 
     uint32_t port = 1000;
     for (int i = 0; i < num_hosts; ++i) {
-      auto* socket_address = endpoints->add_lb_endpoints()
-                                 ->mutable_endpoint()
-                                 ->mutable_address()
-                                 ->mutable_socket_address();
+      auto* lb_endpoint = endpoints->add_lb_endpoints();
+      if (healthy) {
+        lb_endpoint->set_health_status(envoy::config::core::v3::HEALTHY);
+      } else {
+        lb_endpoint->set_health_status(envoy::config::core::v3::UNHEALTHY);
+      }
+      auto* endpoint = lb_endpoint->mutable_endpoint();
+      auto* socket_address = endpoint->mutable_address()->mutable_socket_address();
       socket_address->set_address("10.0.1." + std::to_string(i / 60000));
       socket_address->set_port_value((port + i) % 60000);
     }
@@ -127,8 +135,37 @@ static void priorityAndLocalityWeighted(benchmark::State& state) {
                                        Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
   for (auto _ : state) {
     Envoy::Upstream::EdsSpeedTest speed_test;
-    speed_test.priorityAndLocalityWeightedHelper(state.range(0), state.range(1));
+    speed_test.resetClusterHelper();
+    speed_test.priorityAndLocalityWeightedHelper(state.range(0), state.range(1), true);
   }
 }
 
 BENCHMARK(priorityAndLocalityWeighted)->Ranges({{false, true}, {2000, 100000}});
+
+static void duplicateUpdate(benchmark::State& state) {
+  Envoy::Thread::MutexBasicLockable lock;
+  Envoy::Logger::Context logging_state(spdlog::level::warn,
+                                       Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
+  for (auto _ : state) {
+    Envoy::Upstream::EdsSpeedTest speed_test;
+    speed_test.resetClusterHelper();
+    speed_test.priorityAndLocalityWeightedHelper(true, state.range(0), true);
+    speed_test.priorityAndLocalityWeightedHelper(true, state.range(0), true);
+  }
+}
+
+BENCHMARK(duplicateUpdate)->Range(2000, 100000);
+
+static void healthOnlyUpdate(benchmark::State& state) {
+  Envoy::Thread::MutexBasicLockable lock;
+  Envoy::Logger::Context logging_state(spdlog::level::warn,
+                                       Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
+  for (auto _ : state) {
+    Envoy::Upstream::EdsSpeedTest speed_test;
+    speed_test.resetClusterHelper();
+    speed_test.priorityAndLocalityWeightedHelper(true, state.range(0), true);
+    speed_test.priorityAndLocalityWeightedHelper(true, state.range(0), false);
+  }
+}
+
+BENCHMARK(healthOnlyUpdate)->Range(2000, 100000);

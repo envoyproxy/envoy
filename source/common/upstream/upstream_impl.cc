@@ -1337,12 +1337,15 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
   std::unordered_set<std::string> existing_hosts_for_current_priority(
       current_priority_hosts.size());
   HostVector final_hosts;
+  // this entire function: O(n), due to this loop.
   for (const HostSharedPtr& host : new_hosts) {
+    // O(1)
     if (updated_hosts.count(host->address()->asString())) {
       continue;
     }
 
     // To match a new host with an existing host means comparing their addresses.
+    // O(1)
     auto existing_host = all_hosts.find(host->address()->asString());
     const bool existing_host_found = existing_host != all_hosts.end();
 
@@ -1378,6 +1381,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
 
       // Did metadata change?
       bool metadata_changed = true;
+      // O(sizeof(metadata()))
       if (host->metadata() && existing_host->second->metadata()) {
         metadata_changed = !Protobuf::util::MessageDifferencer::Equivalent(
             *host->metadata(), *existing_host->second->metadata());
@@ -1406,7 +1410,9 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
       }
 
       existing_host->second->weight(host->weight());
+      // O(1)
       final_hosts.push_back(existing_host->second);
+      // O(1)
       updated_hosts[existing_host->second->address()->asString()] = existing_host->second;
     } else {
       if (host->weight() > max_host_weight) {
@@ -1424,6 +1430,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
         }
       }
 
+      // O(1)
       updated_hosts[host->address()->asString()] = host;
       final_hosts.push_back(host);
       hosts_added_to_current_priority.push_back(host);
@@ -1432,10 +1439,13 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
 
   // Remove hosts from current_priority_hosts that were matched to an existing host in the previous
   // loop.
+  // this entire block: O(n^3) (worst case I am not going to type a phi or whatever)
   for (auto itr = current_priority_hosts.begin(); itr != current_priority_hosts.end();) {
+    // O(n)!
     auto existing_itr = existing_hosts_for_current_priority.find((*itr)->address()->asString());
 
     if (existing_itr != existing_hosts_for_current_priority.end()) {
+      // O(n)!
       existing_hosts_for_current_priority.erase(existing_itr);
       itr = current_priority_hosts.erase(itr);
     } else {
@@ -1459,6 +1469,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
   const bool dont_remove_healthy_hosts =
       health_checker_ != nullptr && !info()->drainConnectionsOnHostRemoval();
   if (!current_priority_hosts.empty() && dont_remove_healthy_hosts) {
+    // this whole block: O(n^2)
     for (auto i = current_priority_hosts.begin(); i != current_priority_hosts.end();) {
       if (!((*i)->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC) ||
             (*i)->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH))) {
@@ -1469,6 +1480,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
         final_hosts.push_back(*i);
         updated_hosts[(*i)->address()->asString()] = *i;
         (*i)->healthFlagSet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL);
+        // O(n)!
         i = current_priority_hosts.erase(i);
       } else {
         i++;
