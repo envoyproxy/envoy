@@ -58,7 +58,6 @@ envoy_cc_benchmark_binary(
 envoy_benchmark_test(
     name = "address_impl_speed_test_benchmark_test",
     benchmark_binary = "address_impl_speed_test",
-    tags = ["fails_on_windows"],
 )
 
 envoy_cc_test(
