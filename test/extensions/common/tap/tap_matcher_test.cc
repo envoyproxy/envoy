@@ -132,7 +132,7 @@ TapMatcherGenericBodyTest::TapMatcherGenericBodyTest() {
   body_parts_.push_back("roxy");                                        // Index 4
   body_parts_.push_back("roxy layer 7");                                // Index 5
   body_parts_.push_back("blah");                                        // Index 6
-  hex = "xx";                                                           // allocate 2 bytes
+  hex = "xx";
   unsigned char buf[] = {0xde, 0xad};
   memcpy(const_cast<char*>(hex.data()), buf, 2);
   body_parts_.push_back(hex); // Index 7
@@ -150,34 +150,6 @@ http_request_generic_body_match:
 )EOF";
   TestUtility::loadFromYaml(matcher_yaml, config_);
   ASSERT_ANY_THROW(buildMatcher(config_, matchers_));
-}
-
-TEST_P(TapMatcherGenericBodyConfigTest, DISABLED_LongestPatternTest) {
-  Direction dir = std::get<0>(GetParam());
-  std::string matcher_yaml;
-  if (Direction::Request == dir) {
-    matcher_yaml =
-        R"EOF(http_request_generic_body_match:
-  patterns:)EOF";
-  } else {
-    matcher_yaml =
-        R"EOF(http_response_generic_body_match:
-  patterns:)EOF";
-  }
-
-  // auto text_and_result = std::get<1>(GetParam());
-  std::tuple<std::vector<std::string>, size_t> text_and_result = std::get<1>(GetParam());
-  // Append vector of matchers
-  for (const auto& i : std::get<0>(text_and_result)) {
-    matcher_yaml += '\n';
-    matcher_yaml += i;
-    matcher_yaml += '\n';
-  }
-
-  TestUtility::loadFromYaml(matcher_yaml, config_);
-  buildMatcher(config_, matchers_);
-  EXPECT_EQ(static_cast<const HttpGenericBodyMatcher*>(matchers_[0].get())->getLongestPattern(),
-            std::get<1>(text_and_result));
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -220,7 +192,9 @@ TEST_P(TapMatcherGenericBodyTest, GenericBodyTest) {
   statuses_.resize(matchers_.size());
   matchers_[0]->onNewStream(statuses_);
 
-  // Now create data
+  // Now create data. The data is passed to matcher in several
+  // steps to simulate that body was not received in one continuous
+  // chunk. Data for each step is reassembled from body_parts_.
   for (const auto& i : std::get<1>(text_and_result)) {
     data_.drain(data_.length());
     for (const auto& j : i) {

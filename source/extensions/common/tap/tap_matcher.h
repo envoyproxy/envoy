@@ -348,7 +348,6 @@ class HttpGenericBodyMatcher : public HttpBodyMatcherBase {
 public:
   HttpGenericBodyMatcher(const envoy::config::tap::v3::HttpGenericBodyMatch& config,
                          const std::vector<MatcherPtr>& matchers);
-  size_t getLongestPattern() const { return longest_pattern_; }
 
 protected:
   void onBody(const Buffer::Instance&, MatchStatusVector&);
@@ -356,8 +355,14 @@ protected:
 private:
   // Vector of strings which body must contain to get match.
   std::list<std::string> patterns_;
-  size_t longest_pattern_;
-  std::string overlap_;
+  // Stores the length of the longest pattern.
+  size_t overlap_size_;
+  // Buffer to store the last bytes from previous body chunk(s).
+  // It will store only as many bytes as is the length of the longest
+  // pattern to be found minus 1.
+  // It is necessary to locate patterns which are spread across 2 or more
+  // body chunks.
+  std::unique_ptr<char[]> overlap_;
   size_t bytes_in_overlap_{0};
 };
 

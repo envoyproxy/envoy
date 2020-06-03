@@ -163,8 +163,8 @@ HttpGenericBodyMatcher::HttpGenericBodyMatcher(
   auto index = std::max_element(
       patterns_.begin(), patterns_.end(),
       [](const std::string& i, const std::string& j) -> bool { return i.length() < j.length(); });
-  longest_pattern_ = (*index).length();
-  overlap_ = (*index).substr(0, (*index).length() - 1);
+  overlap_size_ = (*index).length() - 1;
+  overlap_ = std::make_unique<char[]>(overlap_size_);
 }
 
 void HttpGenericBodyMatcher::onBody(const Buffer::Instance& data, MatchStatusVector& statuses) {
@@ -181,16 +181,21 @@ void HttpGenericBodyMatcher::onBody(const Buffer::Instance& data, MatchStatusVec
     // overlap_ buffer and the pattern should continue at the beginning of the next buffer. Iterate
     // through all patterns yet to be find.
     auto it = patterns_.begin();
-    while(it != patterns_.end()) {
+    while (it != patterns_.end()) {
       const auto& pattern = *it;
       // Take the first character from the pattern and locate it in overlap_.
       auto index_pattern = 0;
-      auto index_overlap = overlap_.find(pattern[index_pattern]);
-      if (index_overlap == std::string::npos) {
+      auto first_char =
+          static_cast<char*>(memchr(overlap_.get(), pattern[index_pattern], bytes_in_overlap_));
+
+      if (first_char == nullptr) {
         // Pattern not found. Check the next one.
         it++;
         continue;
       }
+      // Calculate the offset of the found character
+      // from the beginning of the overlap_ buffer.
+      size_t index_overlap = first_char - overlap_.get();
       bool match = true;
       // Continue checking characters until end of overlap_ buffer.
       while (index_overlap < bytes_in_overlap_) {
@@ -251,34 +256,31 @@ void HttpGenericBodyMatcher::onBody(const Buffer::Instance& data, MatchStatusVec
     }
   }
 
-  // The matcher buffers the last X bytes where X is equal to the length of the
+  // The matcher buffers the last seen X bytes where X is equal to the length of the
   // longest pattern - 1. With the arrival of the new 'data' the following situations
   // are possible:
-  // 1. The new data's length is larger than X-1. In this case just copy last X-1 bytes
+  // 1. The new data's length is larger or equal to X. In this case just copy last X bytes
   // from the data to overlap_ buffer.
-  // 2. The new data length is smaller than X-1 and there enough room in overlap buffer to just copy
-  // the bytes from data
-  // 3. The new data length is smaller than X-1 and there is not enough room in overlap buffer.
-  if (data.length() >= longest_pattern_) {
+  // 2. The new data length is smaller than X and there enough room in overlap buffer to just copy
+  // the bytes from data.
+  // 3. The new data length is smaller than X and there is not enough room in overlap buffer.
+  if (data.length() >= overlap_size_) {
     // Case 1:
     // Just overwrite the entire overlap_ buffer with new data.
-    data.copyOut(data.length() - longest_pattern_ + 1, longest_pattern_ - 1,
-                 const_cast<char*>(overlap_.data()));
-    bytes_in_overlap_ = longest_pattern_ - 1;
+    data.copyOut(data.length() - overlap_size_, overlap_size_, const_cast<char*>(overlap_.get()));
+    bytes_in_overlap_ = overlap_size_;
   } else {
-    if (data.length() <= (overlap_.length() - bytes_in_overlap_)) {
+    if (data.length() <= (overlap_size_ - bytes_in_overlap_)) {
       // Case 2. Just add the new data on top of already buffered.
-      data.copyOut(0, data.length(), const_cast<char*>(overlap_.data() + bytes_in_overlap_));
+      data.copyOut(0, data.length(), overlap_.get() + bytes_in_overlap_);
       bytes_in_overlap_ += data.length();
     } else {
       // Case 3. First shift data and then copy the last entire buffer.
-      const size_t shift = bytes_in_overlap_ - ((longest_pattern_ - 1) - data.length());
-      memcpy(const_cast<char*>(overlap_.data()), overlap_.data() + shift,
-             (bytes_in_overlap_ - shift));
-      data.copyOut(0, data.length(),
-                   const_cast<char*>(overlap_.data() + (bytes_in_overlap_ - shift)));
+      const size_t shift = bytes_in_overlap_ - (overlap_size_ - data.length());
+      memcpy(overlap_.get(), overlap_.get() + shift, (bytes_in_overlap_ - shift));
+      data.copyOut(0, data.length(), overlap_.get() + (bytes_in_overlap_ - shift));
       bytes_in_overlap_ += data.length() - shift;
-      ASSERT(bytes_in_overlap_ == (longest_pattern_ - 1));
+      ASSERT(bytes_in_overlap_ == overlap_size_);
     }
   }
 }
