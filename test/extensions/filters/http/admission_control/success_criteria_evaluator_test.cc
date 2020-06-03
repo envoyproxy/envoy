@@ -13,6 +13,7 @@
 
 using testing::NiceMock;
 using testing::Return;
+using testing::HasSubstr;
 
 namespace Envoy {
 namespace Extensions {
@@ -79,12 +80,12 @@ protected:
 // Ensure the HTTP code succesful range configurations are honored.
 TEST_F(SuccessCriteriaTest, HttpErrorCodes) {
   const std::string yaml = R"EOF(
-http_success_status:
+http_criteria:
+  http_success_status:
   - start: 200
     end:   300
   - start: 400
     end:   500
-grpc_success_status:
 )EOF";
 
   makeEvaluator(yaml);
@@ -104,8 +105,8 @@ grpc_success_status:
 // Verify default success values of the evaluator.
 TEST_F(SuccessCriteriaTest, DefaultBehaviorTest) {
   const std::string yaml = R"EOF(
-http_success_status:
-grpc_success_status:
+http_criteria:
+grpc_criteria:
 )EOF";
 
   makeEvaluator(yaml);
@@ -116,8 +117,8 @@ grpc_success_status:
 // Check that GRPC error code configurations are honored.
 TEST_F(SuccessCriteriaTest, GrpcErrorCodes) {
   const std::string yaml = R"EOF(
-http_success_status:
-grpc_success_status:
+grpc_criteria:
+  grpc_success_status:
   - 7
   - 13
 )EOF";
@@ -138,38 +139,48 @@ grpc_success_status:
 // Verify correct gRPC range validation.
 TEST_F(SuccessCriteriaTest, GrpcRangeValidation) {
   const std::string yaml = R"EOF(
-http_success_status:
-grpc_success_status:
-  - 17
+grpc_criteria:
+  grpc_success_status:
+    - 17
 )EOF";
-  EXPECT_DEATH({ makeEvaluator(yaml); }, "invalid gRPC code");
+  try {
+    makeEvaluator(yaml);
+  }
+  catch (const EnvoyException& e) {
+    EXPECT_THAT(e.what(), HasSubstr("invalid gRPC code"));
+  }
 }
 
 // Verify correct HTTP range validation.
 TEST_F(SuccessCriteriaTest, HttpRangeValidation) {
   auto check_ranges = [this](std::string&& yaml) {
-    EXPECT_DEATH({ makeEvaluator(yaml); }, "invalid HTTP range");
+    try {
+      makeEvaluator(yaml);
+    }
+    catch (const EnvoyException& e) {
+      EXPECT_THAT(e.what(), HasSubstr("invalid HTTP range"));
+    }
   };
 
   check_ranges(R"EOF(
-http_success_status:
-  - start: 300
-    end:   200
-grpc_success_status:
+http_criteria:
+  http_success_status:
+    - start: 300
+      end:   200
 )EOF");
 
   check_ranges(R"EOF(
-http_success_status:
-  - start: 600
-    end:   600
-grpc_success_status:
+http_criteria:
+  http_success_status:
+    - start: 600
+      end:   600
 )EOF");
 
   check_ranges(R"EOF(
-http_success_status:
-  - start: 99
-    end:   99
-grpc_success_status:
+http_criteria:
+  http_success_status:
+    - start: 99
+      end:   99
 )EOF");
 }
 

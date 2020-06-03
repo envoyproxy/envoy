@@ -21,6 +21,14 @@ public:
   bool isGrpcSuccess(uint32_t status) const override;
 
 private:
+  bool validHttpRange(const int32_t start, const int32_t end) const {
+    return start <= end &&
+           start < 600 &&
+           start >= 100 &&
+           end <= 600 &&
+           end >= 100;
+  }
+
   std::vector<std::function<bool(uint64_t)>> http_success_fns_;
   std::vector<uint32_t> grpc_success_codes_;
 };

@@ -28,15 +28,27 @@ message AdmissionControl {
   // indicate a successful request must be explicitly specified if not relying on the default
   // values.
   message SuccessCriteria {
-    // If HTTP statuses are unspecified, all HTTP status codes below 500 are treated as successful
-    // responses. Configurable codes are in the range [100, 600).
-    repeated type.v3.Int32Range http_success_status = 1;
+    message HttpCriteria {
+      // Status code ranges that constitute a successful request. Configurable codes are in the
+      // range [100, 600). If empty, all HTTP requests will be considered unsuccessful.
+      repeated type.v3.Int32Range http_success_status = 1;
+    }
+
+    message GrpcCriteria {
+      // Status codes that constitute a successful request. If empty, all gRPC requests will be
+      // considered unsucessful.
+      // Mappings can be found at: https://github.com/grpc/grpc/blob/master/doc/statuscodes.md.
+      repeated uint32 grpc_success_status = 1;
+    }
+
+    // If HTTP criteria are unspecified, all HTTP status codes below 500 are treated as successful
+    // responses.
+    HttpCriteria http_criteria = 1;
 
     // GRPC status codes to consider as request successes. If unspecified, defaults to: Ok,
     // Cancelled, Unknown, InvalidArgument, NotFound, AlreadyExists, Unauthenticated,
     // FailedPrecondition, OutOfRange, and Unimplemented.
-    // Mappings can be found at: https://github.com/grpc/grpc/blob/master/doc/statuscodes.md.
-    repeated uint32 grpc_success_status = 2;
+    GrpcCriteria grpc_criteria = 2;
   }
 
   // If set to false, the admission control filter will operate as a pass-through filter. If the

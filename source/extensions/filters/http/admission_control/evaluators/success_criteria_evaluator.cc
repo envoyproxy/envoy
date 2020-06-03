@@ -3,8 +3,9 @@
 #include <algorithm>
 
 #include "envoy/grpc/status.h"
+#include "envoy/common/exception.h"
 
-#include "common/common/assert.h"
+#include "common/common/fmt.h"
 #include "common/common/enum_to_int.h"
 
 namespace Envoy {
@@ -16,25 +17,30 @@ SuccessCriteriaEvaluator::SuccessCriteriaEvaluator(
     envoy::extensions::filters::http::admission_control::v3alpha::AdmissionControl::
         SuccessCriteria success_criteria) {
   // HTTP status.
-  if (success_criteria.http_success_status_size() > 0) {
-    for (const auto& range : success_criteria.http_success_status()) {
-      RELEASE_ASSERT(range.start() <= range.end() && range.start() < 600 && range.start() >= 100 &&
-                         range.end() <= 600 && range.end() >= 100,
-                     fmt::format("invalid HTTP range: [{}, {})", range.start(), range.end()));
+  if (success_criteria.has_http_criteria()) {
+    for (const auto& range : success_criteria.http_criteria().http_success_status()) {
+      if (!validHttpRange(range.start(), range.end())) {
+        throw EnvoyException(
+            fmt::format("invalid HTTP range: [{}, {})", range.start(), range.end()));
+      }
+
       http_success_fns_.emplace_back([range](uint64_t status) {
         return (static_cast<uint64_t>(range.start()) <= status) &&
                (status < static_cast<uint64_t>(range.end()));
       });
     }
   } else {
-    // We default to all 5xx codes as request failures.
+    // We default to all non-5xx codes as successes.
     http_success_fns_.emplace_back([](uint64_t status) { return status < 500; });
   }
 
   // GRPC status.
-  if (success_criteria.grpc_success_status_size() > 0) {
-    for (const auto& status : success_criteria.grpc_success_status()) {
-      RELEASE_ASSERT(status <= 16, fmt::format("invalid gRPC code {}", status));
+  if (success_criteria.has_grpc_criteria()) {
+    for (const auto& status : success_criteria.grpc_criteria().grpc_success_status()) {
+      if (status > 16) {
+        throw EnvoyException(fmt::format("invalid gRPC code {}", status));
+      }
+
       grpc_success_codes_.emplace_back(status);
     }
   } else {

@@ -58,8 +58,8 @@ aggression_coefficient:
   default_value: 4.2
   runtime_key: "foo.aggression"
 success_criteria:
-  http_success_status:
-  grpc_success_status:
+  http_criteria:
+  grpc_criteria:
 )EOF";
 
   auto config = makeConfig(yaml);
@@ -75,8 +75,8 @@ TEST_F(AdmissionControlConfigTest, BasicTestMinimumConfigured) {
 
   const std::string yaml = R"EOF(
 success_criteria:
-  http_success_status:
-  grpc_success_status:
+  http_criteria:
+  grpc_criteria:
 )EOF";
   auto config = makeConfig(yaml);
 
@@ -95,8 +95,8 @@ aggression_coefficient:
   default_value: 4.2
   runtime_key: "foo.aggression"
 success_criteria:
-  http_success_status:
-  grpc_success_status:
+  http_criteria:
+  grpc_criteria:
 )EOF";
 
   auto config = makeConfig(yaml);

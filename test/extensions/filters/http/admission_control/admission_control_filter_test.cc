@@ -109,8 +109,8 @@ aggression_coefficient:
   default_value: 1.0
   runtime_key: "foo.aggression"
 success_criteria:
-  http_success_status:
-  grpc_success_status:
+  http_criteria:
+  grpc_criteria:
 )EOF"};
 };
 
@@ -125,8 +125,8 @@ aggression_coefficient:
   default_value: 1.0
   runtime_key: "foo.aggression"
 success_criteria:
-  http_success_status:
-  grpc_success_status:
+  http_criteria:
+  grpc_criteria:
 )EOF";
 
   auto config = makeConfig(yaml);
