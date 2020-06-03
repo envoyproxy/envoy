@@ -184,7 +184,14 @@ public:
    * @param length limits the search to specified number of bytes starting from start index.
    * @return the index where the match starts or -1 if there is no match.
    */
-  virtual ssize_t search(const void* data, uint64_t size, size_t start, size_t length = 0) const PURE;
+  virtual ssize_t search(const void* data, uint64_t size, size_t start, size_t length) const PURE;
+
+  /**
+   * Wrapper around search method which does not take length parameter.
+   */
+  ssize_t search(const void* data, uint64_t size, size_t start) const {
+    return search(data, size, start, 0);
+  }
 
   /**
    * Search for an occurrence of data at the start of a buffer.

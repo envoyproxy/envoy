@@ -128,7 +128,7 @@ message HttpGenericBodyMatch {
     }
   }
 
-  // Limits search to specified number of bytes - default zero (not limit - match entire captured buffer).
+  // Limits search to specified number of bytes - default zero (no limit - match entire captured buffer).
   uint32 bytes_limit = 1;
 
   // List of patterns to match.
