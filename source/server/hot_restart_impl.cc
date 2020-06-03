@@ -90,15 +90,11 @@ void initializeMutex(pthread_mutex_t& mutex) {
   pthread_mutex_init(&mutex, &attribute);
 }
 
-// N.B. Older versions of Envoy would immediately multiply the base id from the
-// command line by 10 in OptionsImpl. Very old versions of Envoy used this
-// convention to provide space between consecutive ids for the parent & child
-// domain socket names. Currently, Envoy uses the restart epoch to distinguish
-// a sequence of hot-restart parent/child domain socket names and thus the
-// scaling is not necessary. It remains for backwards compatibility with
-// versions that perform the scaling.
-// TODO(zuercher): Figure out if there's a way to undo this scaling mess with having to
-// bump the hot restart version.
+// The base id is automatically scaled by 10 to prevent overlap of domain socket names when
+// multiple Envoys with different base-ids run on a single host. Note that older versions of Envoy
+// performed the multiplication in OptionsImpl which produced incorrect server info output.
+// TODO(zuercher): ideally, the base_id would be separated from the restart_epoch in
+// the socket names to entirely prevent collisions between consecutive base ids.
 HotRestartImpl::HotRestartImpl(uint32_t base_id, uint32_t restart_epoch)
     : base_id_(base_id), scaled_base_id_(base_id * 10),
       as_child_(HotRestartingChild(scaled_base_id_, restart_epoch)),
