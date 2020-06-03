@@ -36,10 +36,14 @@ public:
   // LimitingInputStream before passing to protobuf code to avoid a spin loop.
   bool Next(const void** data, int* size) override;
   void BackUp(int count) override;
-  bool Skip(int count) override; // Not implemented
+  bool Skip(int count) override;
   ProtobufTypes::Int64 ByteCount() const override { return byte_count_; }
 
 protected:
+  // The last slice is kept to support limited BackUp() calls.
+  // This function will drain it.
+  void drainLastSlice();
+
   Buffer::InstancePtr buffer_;
   uint64_t position_{0};
   bool finished_{false};
