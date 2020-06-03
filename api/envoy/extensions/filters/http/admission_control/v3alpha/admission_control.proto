@@ -32,7 +32,9 @@ message AdmissionControl {
     // 600).
     repeated type.v3.Int32Range http_success_status = 1;
 
-    // GRPC status codes to consider as request successes. If unspecified, defaults to 0 ("OK").
+    // GRPC status codes to consider as request successes. If unspecified, defaults to: Ok,
+    // Cancelled, Unknown, InvalidArgument, NotFound, AlreadyExists, Unauthenticated,
+    // FailedPrecondition, OutOfRange, and Unimplemented.
     // Mappings can be found at: https://github.com/grpc/grpc/blob/master/doc/statuscodes.md.
     repeated uint32 grpc_success_status = 2 [(validate.rules).uint32 = {lte: 16}];
   }
