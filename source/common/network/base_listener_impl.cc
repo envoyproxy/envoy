@@ -9,7 +9,6 @@
 #include "common/event/file_event_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/socket_impl.h"
-#include "common/network/socket_interface_singleton.h"
 
 #include "event2/listener.h"
 

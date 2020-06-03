@@ -5,7 +5,7 @@
 #include "common/api/os_sys_calls_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/io_socket_handle_impl.h"
-#include "common/network/socket_interface_singleton.h"
+#include "common/network/socket_interface_impl.h"
 
 namespace Envoy {
 namespace Network {

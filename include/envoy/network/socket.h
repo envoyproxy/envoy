@@ -225,22 +225,24 @@ using SocketOptRef = absl::optional<std::reference_wrapper<Socket>>;
 class SocketInterface {
 public:
   virtual ~SocketInterface() = default;
+
   /**
-   * Low level api to create a socket in the underlying host stack. Does not create an
-   * Envoy socket.
+   * Low level api to create a socket in the underlying host stack. Does not create a
+   * @ref Network::SocketImpl
    * @param type type of socket requested
    * @param addr_type type of address used with the socket
    * @param version IP version if address type is IP
-   * @return Socket file descriptor
+   * @return @ref Network::IoHandlePtr that wraps the underlying socket file descriptor
    */
   virtual IoHandlePtr socket(Address::SocketType type, Address::Type addr_type,
                              Address::IpVersion version) PURE;
 
   /**
    * Low level api to create a socket in the underlying host stack. Does not create an
-   * Envoy socket.
+   * @ref Network::SocketImpl
    * @param socket_type type of socket requested
-   * @param addr address that is gleaned for address type and version if needed (@see createSocket)
+   * @param addr address that is gleaned for address type and version if needed
+   * @return @ref Network::IoHandlePtr that wraps the underlying socket file descriptor
    */
   virtual IoHandlePtr socket(Address::SocketType socket_type,
                              const Address::InstanceConstSharedPtr addr) PURE;

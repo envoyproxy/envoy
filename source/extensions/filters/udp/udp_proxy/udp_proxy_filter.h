@@ -6,7 +6,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/network/socket_impl.h"
+#include "common/network/socket_interface_impl.h"
 #include "common/network/utility.h"
 
 #include "absl/container/flat_hash_set.h"

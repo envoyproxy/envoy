@@ -3,6 +3,7 @@
 #include "envoy/network/address.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/network/socket_interface_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 

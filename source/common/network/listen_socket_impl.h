@@ -11,7 +11,7 @@
 
 #include "common/common/assert.h"
 #include "common/network/socket_impl.h"
-#include "common/network/socket_interface_singleton.h"
+#include "common/network/socket_interface_impl.h"
 
 namespace Envoy {
 namespace Network {

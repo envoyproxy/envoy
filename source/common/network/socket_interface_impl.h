@@ -3,7 +3,7 @@
 #include "envoy/network/address.h"
 #include "envoy/network/socket.h"
 
-#include "common/network/socket_interface_singleton.h"
+#include "common/singleton/threadsafe_singleton.h"
 
 namespace Envoy {
 namespace Network {
@@ -18,6 +18,9 @@ public:
   Address::InstanceConstSharedPtr addressFromFd(os_fd_t fd) override;
   Address::InstanceConstSharedPtr peerAddressFromFd(os_fd_t fd) override;
 };
+
+using SocketInterfaceSingleton = InjectableSingleton<SocketInterface>;
+using SocketInterfaceLoader = ScopedInjectableLoader<SocketInterface>;
 
 } // namespace Network
 } // namespace Envoy
