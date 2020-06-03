@@ -53,6 +53,12 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
       StringUtil::cropRight(string_buffer.substr(0, split_point),
                             string_buffer.substr(split_point));
     }
+    {
+      const std::string string_buffer(reinterpret_cast<const char*>(buf), len);
+      // sample random bit to use as the whitespace flag
+      bool trimWhitespace = split_point & 1;
+      StringUtil::findToken(string_buffer, string_buffer.substr(0, split_point), string_buffer.substr(split_point), trimWhitespace);
+    }
   }
 }
 
