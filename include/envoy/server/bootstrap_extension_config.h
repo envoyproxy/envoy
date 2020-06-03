@@ -10,7 +10,7 @@ namespace Envoy {
 namespace Server {
 
 /**
- * Parent class for boostrap extensions.
+ * Parent class for bootstrap extensions.
  */
 class BootstrapExtension {
 public:
