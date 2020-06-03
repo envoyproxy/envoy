@@ -160,9 +160,9 @@ public:
                                  absl::string_view local_reply_body) const override;
 };
 
-class HeaderFormatter {
+class SubstitutionFromHeaderFormatter {
 public:
-  HeaderFormatter(const std::string& main_header, const std::string& alternative_header,
+  SubstitutionFromHeaderFormatter(const std::string& main_header, const std::string& alternative_header,
                   absl::optional<size_t> max_length);
 
 protected:
@@ -180,7 +180,7 @@ private:
 /**
  * FormatterProvider for request headers.
  */
-class RequestHeaderFormatter : public FormatterProvider, HeaderFormatter {
+class RequestHeaderFormatter : public FormatterProvider, SubstitutionFromHeaderFormatter {
 public:
   RequestHeaderFormatter(const std::string& main_header, const std::string& alternative_header,
                          absl::optional<size_t> max_length);
@@ -197,7 +197,7 @@ public:
 /**
  * FormatterProvider for response headers.
  */
-class ResponseHeaderFormatter : public FormatterProvider, HeaderFormatter {
+class ResponseHeaderFormatter : public FormatterProvider, SubstitutionFromHeaderFormatter {
 public:
   ResponseHeaderFormatter(const std::string& main_header, const std::string& alternative_header,
                           absl::optional<size_t> max_length);
@@ -214,7 +214,7 @@ public:
 /**
  * FormatterProvider for response trailers.
  */
-class ResponseTrailerFormatter : public FormatterProvider, HeaderFormatter {
+class ResponseTrailerFormatter : public FormatterProvider, SubstitutionFromHeaderFormatter {
 public:
   ResponseTrailerFormatter(const std::string& main_header, const std::string& alternative_header,
                            absl::optional<size_t> max_length);
@@ -231,7 +231,7 @@ public:
 /**
  * FormatterProvider for grpc-status
  */
-class GrpcStatusFormatter : public FormatterProvider, HeaderFormatter {
+class GrpcStatusFormatter : public FormatterProvider, SubstitutionFromHeaderFormatter {
 public:
   GrpcStatusFormatter(const std::string& main_header, const std::string& alternative_header,
                       absl::optional<size_t> max_length);

@@ -816,12 +816,12 @@ ProtobufWkt::Value LocalReplyBodyFormatter::formatValue(const Http::RequestHeade
   return ValueUtil::stringValue(std::string(local_reply_body));
 }
 
-HeaderFormatter::HeaderFormatter(const std::string& main_header,
+SubstitutionFromHeaderFormatter::SubstitutionFromHeaderFormatter(const std::string& main_header,
                                  const std::string& alternative_header,
                                  absl::optional<size_t> max_length)
     : main_header_(main_header), alternative_header_(alternative_header), max_length_(max_length) {}
 
-const Http::HeaderEntry* HeaderFormatter::findHeader(const Http::HeaderMap& headers) const {
+const Http::HeaderEntry* SubstitutionFromHeaderFormatter::findHeader(const Http::HeaderMap& headers) const {
   const Http::HeaderEntry* header = headers.get(main_header_);
 
   if (!header && !alternative_header_.get().empty()) {
@@ -831,7 +831,7 @@ const Http::HeaderEntry* HeaderFormatter::findHeader(const Http::HeaderMap& head
   return header;
 }
 
-std::string HeaderFormatter::format(const Http::HeaderMap& headers) const {
+std::string SubstitutionFromHeaderFormatter::format(const Http::HeaderMap& headers) const {
   const Http::HeaderEntry* header = findHeader(headers);
   if (!header) {
     return UnspecifiedValueString;
@@ -842,7 +842,7 @@ std::string HeaderFormatter::format(const Http::HeaderMap& headers) const {
   return val;
 }
 
-ProtobufWkt::Value HeaderFormatter::formatValue(const Http::HeaderMap& headers) const {
+ProtobufWkt::Value SubstitutionFromHeaderFormatter::formatValue(const Http::HeaderMap& headers) const {
   const Http::HeaderEntry* header = findHeader(headers);
   if (!header) {
     return unspecifiedValue();
@@ -856,65 +856,65 @@ ProtobufWkt::Value HeaderFormatter::formatValue(const Http::HeaderMap& headers) 
 ResponseHeaderFormatter::ResponseHeaderFormatter(const std::string& main_header,
                                                  const std::string& alternative_header,
                                                  absl::optional<size_t> max_length)
-    : HeaderFormatter(main_header, alternative_header, max_length) {}
+    : SubstitutionFromHeaderFormatter(main_header, alternative_header, max_length) {}
 
 std::string ResponseHeaderFormatter::format(const Http::RequestHeaderMap&,
                                             const Http::ResponseHeaderMap& response_headers,
                                             const Http::ResponseTrailerMap&,
                                             const StreamInfo::StreamInfo&,
                                             absl::string_view) const {
-  return HeaderFormatter::format(response_headers);
+  return SubstitutionFromHeaderFormatter::format(response_headers);
 }
 
 ProtobufWkt::Value ResponseHeaderFormatter::formatValue(
     const Http::RequestHeaderMap&, const Http::ResponseHeaderMap& response_headers,
     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&, absl::string_view) const {
-  return HeaderFormatter::formatValue(response_headers);
+  return SubstitutionFromHeaderFormatter::formatValue(response_headers);
 }
 
 RequestHeaderFormatter::RequestHeaderFormatter(const std::string& main_header,
                                                const std::string& alternative_header,
                                                absl::optional<size_t> max_length)
-    : HeaderFormatter(main_header, alternative_header, max_length) {}
+    : SubstitutionFromHeaderFormatter(main_header, alternative_header, max_length) {}
 
 std::string RequestHeaderFormatter::format(const Http::RequestHeaderMap& request_headers,
                                            const Http::ResponseHeaderMap&,
                                            const Http::ResponseTrailerMap&,
                                            const StreamInfo::StreamInfo&, absl::string_view) const {
-  return HeaderFormatter::format(request_headers);
+  return SubstitutionFromHeaderFormatter::format(request_headers);
 }
 
 ProtobufWkt::Value
 RequestHeaderFormatter::formatValue(const Http::RequestHeaderMap& request_headers,
                                     const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&,
                                     const StreamInfo::StreamInfo&, absl::string_view) const {
-  return HeaderFormatter::formatValue(request_headers);
+  return SubstitutionFromHeaderFormatter::formatValue(request_headers);
 }
 
 ResponseTrailerFormatter::ResponseTrailerFormatter(const std::string& main_header,
                                                    const std::string& alternative_header,
                                                    absl::optional<size_t> max_length)
-    : HeaderFormatter(main_header, alternative_header, max_length) {}
+    : SubstitutionFromHeaderFormatter(main_header, alternative_header, max_length) {}
 
 std::string ResponseTrailerFormatter::format(const Http::RequestHeaderMap&,
                                              const Http::ResponseHeaderMap&,
                                              const Http::ResponseTrailerMap& response_trailers,
                                              const StreamInfo::StreamInfo&,
                                              absl::string_view) const {
-  return HeaderFormatter::format(response_trailers);
+  return SubstitutionFromHeaderFormatter::format(response_trailers);
 }
 
 ProtobufWkt::Value
 ResponseTrailerFormatter::formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
                                       const Http::ResponseTrailerMap& response_trailers,
                                       const StreamInfo::StreamInfo&, absl::string_view) const {
-  return HeaderFormatter::formatValue(response_trailers);
+  return SubstitutionFromHeaderFormatter::formatValue(response_trailers);
 }
 
 GrpcStatusFormatter::GrpcStatusFormatter(const std::string& main_header,
                                          const std::string& alternative_header,
                                          absl::optional<size_t> max_length)
-    : HeaderFormatter(main_header, alternative_header, max_length) {}
+    : SubstitutionFromHeaderFormatter(main_header, alternative_header, max_length) {}
 
 std::string GrpcStatusFormatter::format(const Http::RequestHeaderMap&,
                                         const Http::ResponseHeaderMap& response_headers,
