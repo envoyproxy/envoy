@@ -56,14 +56,14 @@ public:
   struct ClientCodecError : public std::runtime_error {
     ClientCodecError(Http::Status&& status)
         : std::runtime_error(std::string(status.message())), status_(std::move(status)) {}
-    const char* what() const noexcept { return status_.message().data(); }
+    const char* what() const noexcept override { return status_.message().data(); }
     const Http::Status status_;
   };
 
   struct ServerCodecError : public std::runtime_error {
     ServerCodecError(Http::Status&& status)
         : std::runtime_error(std::string(status.message())), status_(std::move(status)) {}
-    const char* what() const noexcept { return status_.message().data(); }
+    const char* what() const noexcept override { return status_.message().data(); }
     const Http::Status status_;
   };
 
