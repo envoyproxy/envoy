@@ -476,6 +476,49 @@ TEST_P(TcpTunnelingIntegrationTest, TcpProxyUpstreamFlush) {
   tcp_client->waitForHalfClose();
 }
 
+// Test that h2 connection is reused.
+TEST_P(TcpTunnelingIntegrationTest, H2ConnectionReuse) {
+  initialize();
+
+  // Establish a connection.
+  IntegrationTcpClientPtr tcp_client1 = makeTcpConnection(lookupPort("tcp_proxy"));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+
+  // Send data in both directions.
+  tcp_client1->write("hello1", false);
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, "hello1"));
+
+  // Send data from upstream to downstream with an end stream and make sure the data is received
+  // before the connection is half-closed.
+  upstream_request_->encodeData("world1", true);
+  tcp_client1->waitForData("world1");
+  tcp_client1->waitForHalfClose();
+  tcp_client1->close();
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  // Establish a new connection.
+  IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  // The new CONNECT stream is established in the existing h2 connection.
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+
+  tcp_client2->write("hello2", false);
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, "hello2"));
+
+  // Send data from upstream to downstream with an end stream and make sure the data is received
+  // before the connection is half-closed.
+  upstream_request_->encodeData("world2", true);
+  tcp_client2->waitForData("world2");
+  tcp_client2->waitForHalfClose();
+  tcp_client2->close();
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+}
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, TcpTunnelingIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
