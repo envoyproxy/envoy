@@ -195,7 +195,6 @@ private:
   std::string username_;
   std::string new_expires_;
   absl::string_view host_;
-  std::string user_agent_;
   std::string state_{};
   bool found_bearer_token_{false};
   Http::RequestHeaderMap* request_headers_{nullptr};
