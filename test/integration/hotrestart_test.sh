@@ -23,6 +23,7 @@ if [[ -z "${ENVOY_IP_TEST_VERSIONS}" ]] || [[ "${ENVOY_IP_TEST_VERSIONS}" == "al
     sed -e "s#{{ ip_loopback_address }}#127.0.0.1#" | \
     sed -e "s#{{ reuse_port }}#false#" | \
     sed -e "s#{{ dns_lookup_family }}#V4_ONLY#" | \
+    sed -e "s#{{ null_device_path }}#/dev/null#" | \
     cat > "${HOT_RESTART_JSON_V4}"
   JSON_TEST_ARRAY+=("${HOT_RESTART_JSON_V4}")
 fi
@@ -37,6 +38,7 @@ if [[ -z "${ENVOY_IP_TEST_VERSIONS}" ]] || [[ "${ENVOY_IP_TEST_VERSIONS}" == "al
     sed -e "s#{{ ip_loopback_address }}#::1#" | \
     sed -e "s#{{ reuse_port }}#false#" | \
     sed -e "s#{{ dns_lookup_family }}#v6_only#" | \
+    sed -e "s#{{ null_device_path }}#/dev/null#" | \
     cat > "${HOT_RESTART_JSON_V6}"
   JSON_TEST_ARRAY+=("${HOT_RESTART_JSON_V6}")
 fi
@@ -48,6 +50,7 @@ SOCKET_DIR="$(mktemp -d /tmp/envoy_test_hotrestart.XXXXXX)"
 cat "${TEST_SRCDIR}/envoy"/test/config/integration/server_unix_listener.yaml |
   sed -e "s#{{ socket_dir }}#${SOCKET_DIR}#" | \
   sed -e "s#{{ ip_loopback_address }}#127.0.0.1#" | \
+  sed -e "s#{{ null_device_path }}#/dev/null#" | \
   cat > "${HOT_RESTART_JSON_UDS}"
 JSON_TEST_ARRAY+=("${HOT_RESTART_JSON_UDS}")
 
@@ -61,15 +64,14 @@ cat "${TEST_SRCDIR}/envoy"/test/config/integration/server.yaml |
   sed -e "s#{{ ip_loopback_address }}#127.0.0.1#" | \
   sed -e "s#{{ reuse_port }}#true#" | \
   sed -e "s#{{ dns_lookup_family }}#V4_ONLY#" | \
+  sed -e "s#{{ null_device_path }}#/dev/null#" | \
   cat > "${HOT_RESTART_JSON_REUSE_PORT}"
 JSON_TEST_ARRAY+=("${HOT_RESTART_JSON_REUSE_PORT}")
 
-# Enable this test to work with --runs_per_test
-if [[ -z "${TEST_RANDOM_SEED}" ]]; then
-  BASE_ID=1
-else
-  BASE_ID="${TEST_RANDOM_SEED}"
-fi
+# Use TEST_RANDOM_SEED or TEST_SHARD_INDEX to choose a base id. This
+# replicates the logic of TestEnvironment::chooseBaseId(1). See that method
+# for details.
+let BASE_ID=1000000+${TEST_RANDOM_SEED:-${TEST_SHARD_INDEX:-0}}
 
 echo "Hot restart test using --base-id ${BASE_ID}"
 

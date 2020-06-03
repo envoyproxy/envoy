@@ -1522,22 +1522,28 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
 
   stream_info_.setResponseCodeDetails(details);
   Utility::sendLocalReply(
-      is_grpc_request,
-      [this, modify_headers](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
-        if (modify_headers != nullptr) {
-          modify_headers(*headers);
-        }
-        response_headers_ = std::move(headers);
-        // TODO: Start encoding from the last decoder filter that saw the
-        // request instead.
-        encodeHeaders(nullptr, *response_headers_, end_stream);
-      },
-      [this](Buffer::Instance& data, bool end_stream) -> void {
-        // TODO: Start encoding from the last decoder filter that saw the
-        // request instead.
-        encodeData(nullptr, data, end_stream, FilterIterationStartState::CanStartFromCurrent);
-      },
-      state_.destroyed_, code, body, grpc_status, is_head_request);
+      state_.destroyed_,
+      Utility::EncodeFunctions{
+          [this](ResponseHeaderMap& response_headers, Code& code, std::string& body,
+                 absl::string_view& content_type) -> void {
+            connection_manager_.config_.localReply().rewrite(
+                request_headers_.get(), response_headers, stream_info_, code, body, content_type);
+          },
+          [this, modify_headers](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
+            if (modify_headers != nullptr) {
+              modify_headers(*headers);
+            }
+            response_headers_ = std::move(headers);
+            // TODO: Start encoding from the last decoder filter that saw the
+            // request instead.
+            encodeHeaders(nullptr, *response_headers_, end_stream);
+          },
+          [this](Buffer::Instance& data, bool end_stream) -> void {
+            // TODO: Start encoding from the last decoder filter that saw the
+            // request instead.
+            encodeData(nullptr, data, end_stream, FilterIterationStartState::CanStartFromCurrent);
+          }},
+      Utility::LocalReplyData{is_grpc_request, code, body, grpc_status, is_head_request});
 }
 
 void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
@@ -2311,9 +2317,10 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::clearRouteCache() {
 }
 
 Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamDecoderFilter::createBuffer() {
-  auto buffer =
-      std::make_unique<Buffer::WatermarkBuffer>([this]() -> void { this->requestDataDrained(); },
-                                                [this]() -> void { this->requestDataTooLarge(); });
+  auto buffer = std::make_unique<Buffer::WatermarkBuffer>(
+      [this]() -> void { this->requestDataDrained(); },
+      [this]() -> void { this->requestDataTooLarge(); },
+      []() -> void { /* TODO(adisuissa): Handle overflow watermark */ });
   buffer->setWatermarks(parent_.buffer_limit_);
   return buffer;
 }
@@ -2413,7 +2420,11 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::requestDataDrained() {
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::
     onDecoderFilterBelowWriteBufferLowWatermark() {
   ENVOY_STREAM_LOG(debug, "Read-enabling downstream stream due to filter callbacks.", parent_);
-  parent_.response_encoder_->getStream().readDisable(false);
+  // If the state is destroyed, the codec's stream is already torn down. On
+  // teardown the codec will unwind any remaining read disable calls.
+  if (!parent_.state_.destroyed_) {
+    parent_.response_encoder_->getStream().readDisable(false);
+  }
   parent_.connection_manager_.stats_.named_.downstream_flow_control_resumed_reading_total_.inc();
 }
 
@@ -2480,8 +2491,10 @@ ConnectionManagerImpl::ActiveStreamDecoderFilter::routeConfig() {
 }
 
 Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamEncoderFilter::createBuffer() {
-  auto buffer = new Buffer::WatermarkBuffer([this]() -> void { this->responseDataDrained(); },
-                                            [this]() -> void { this->responseDataTooLarge(); });
+  auto buffer = new Buffer::WatermarkBuffer(
+      [this]() -> void { this->responseDataDrained(); },
+      [this]() -> void { this->responseDataTooLarge(); },
+      []() -> void { /* TODO(adisuissa): Handle overflow watermark */ });
   buffer->setWatermarks(parent_.buffer_limit_);
   return Buffer::WatermarkBufferPtr{buffer};
 }
@@ -2544,25 +2557,32 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataTooLarge() {
       // Make sure we won't end up with nested watermark calls from the body buffer.
       parent_.state_.encoder_filters_streaming_ = true;
       allowIteration();
-
       parent_.stream_info_.setResponseCodeDetails(
-          StreamInfo::ResponseCodeDetails::get().RequestHeadersTooLarge);
+          StreamInfo::ResponseCodeDetails::get().ResponsePayloadTooLarge);
       // This does not call the standard sendLocalReply because if there is already response data
       // we do not want to pass a second set of response headers through the filter chain.
       // Instead, call the encodeHeadersInternal / encodeDataInternal helpers
       // directly, which maximizes shared code with the normal response path.
       Http::Utility::sendLocalReply(
-          Grpc::Common::hasGrpcContentType(*parent_.request_headers_),
-          [&](ResponseHeaderMapPtr&& response_headers, bool end_stream) -> void {
-            parent_.response_headers_ = std::move(response_headers);
-            parent_.encodeHeadersInternal(*parent_.response_headers_, end_stream);
-          },
-          [&](Buffer::Instance& data, bool end_stream) -> void {
-            parent_.encodeDataInternal(data, end_stream);
-          },
-          parent_.state_.destroyed_, Http::Code::InternalServerError,
-          CodeUtility::toString(Http::Code::InternalServerError), absl::nullopt,
-          parent_.state_.is_head_request_);
+          parent_.state_.destroyed_,
+          Utility::EncodeFunctions{
+              [&](ResponseHeaderMap& response_headers, Code& code, std::string& body,
+                  absl::string_view& content_type) -> void {
+                parent_.connection_manager_.config_.localReply().rewrite(
+                    parent_.request_headers_.get(), response_headers, parent_.stream_info_, code,
+                    body, content_type);
+              },
+              [&](ResponseHeaderMapPtr&& response_headers, bool end_stream) -> void {
+                parent_.response_headers_ = std::move(response_headers);
+                parent_.encodeHeadersInternal(*parent_.response_headers_, end_stream);
+              },
+              [&](Buffer::Instance& data, bool end_stream) -> void {
+                parent_.encodeDataInternal(data, end_stream);
+              }},
+          Utility::LocalReplyData{Grpc::Common::hasGrpcContentType(*parent_.request_headers_),
+                                  Http::Code::InternalServerError,
+                                  CodeUtility::toString(Http::Code::InternalServerError),
+                                  absl::nullopt, parent_.state_.is_head_request_});
       parent_.maybeEndEncode(parent_.state_.local_complete_);
     } else {
       ENVOY_STREAM_LOG(

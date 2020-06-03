@@ -31,16 +31,16 @@
 namespace Envoy {
 
 std::string ConfigHelper::baseConfig() {
-  return R"EOF(
+  return fmt::format(R"EOF(
 admin:
-  access_log_path: /dev/null
+  access_log_path: {}
   address:
     socket_address:
       address: 127.0.0.1
       port_value: 0
 dynamic_resources:
   lds_config:
-    path: /dev/null
+    path: {}
 static_resources:
   secrets:
   - name: "secret_static_0"
@@ -68,13 +68,14 @@ static_resources:
       socket_address:
         address: 127.0.0.1
         port_value: 0
-)EOF";
+)EOF",
+                     TestEnvironment::nullDevicePath(), TestEnvironment::nullDevicePath());
 }
 
 std::string ConfigHelper::baseUdpListenerConfig() {
-  return R"EOF(
+  return fmt::format(R"EOF(
 admin:
-  access_log_path: /dev/null
+  access_log_path: {}
   address:
     socket_address:
       address: 127.0.0.1
@@ -98,7 +99,8 @@ static_resources:
         address: 0.0.0.0
         port_value: 0
         protocol: udp
-)EOF";
+)EOF",
+                     TestEnvironment::nullDevicePath());
 }
 
 std::string ConfigHelper::tcpProxyConfig() {
@@ -121,7 +123,7 @@ typed_config:
 }
 
 std::string ConfigHelper::httpProxyConfig() {
-  return absl::StrCat(baseConfig(), R"EOF(
+  return absl::StrCat(baseConfig(), fmt::format(R"EOF(
     filter_chains:
       filters:
         name: http
@@ -136,10 +138,10 @@ std::string ConfigHelper::httpProxyConfig() {
           access_log:
             name: accesslog
             filter:
-              not_health_check_filter:  {}
+              not_health_check_filter:  {{}}
             typed_config:
               "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
-              path: /dev/null
+              path: {}
           route_config:
             virtual_hosts:
               name: integration
@@ -150,14 +152,15 @@ std::string ConfigHelper::httpProxyConfig() {
                   prefix: "/"
               domains: "*"
             name: route_config_0
-)EOF");
+)EOF",
+                                                TestEnvironment::nullDevicePath()));
 }
 
 // TODO(danzh): For better compatibility with HTTP integration test framework,
 // it's better to combine with HTTP_PROXY_CONFIG, and use config modifiers to
 // specify quic specific things.
 std::string ConfigHelper::quicHttpProxyConfig() {
-  return absl::StrCat(baseUdpListenerConfig(), R"EOF(
+  return absl::StrCat(baseUdpListenerConfig(), fmt::format(R"EOF(
     filter_chains:
       transport_socket:
         name: envoy.transport_sockets.quic
@@ -172,10 +175,10 @@ std::string ConfigHelper::quicHttpProxyConfig() {
           access_log:
             name: file_access_log
             filter:
-              not_health_check_filter:  {}
+              not_health_check_filter:  {{}}
             typed_config:
               "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
-              path: /dev/null
+              path: {}
           route_config:
             virtual_hosts:
               name: integration
@@ -188,7 +191,8 @@ std::string ConfigHelper::quicHttpProxyConfig() {
             name: route_config_0
     udp_listener_config:
       udp_listener_name: "quiche_quic_listener"
-)EOF");
+)EOF",
+                                                           TestEnvironment::nullDevicePath()));
 }
 
 std::string ConfigHelper::defaultBufferFilter() {
@@ -248,7 +252,7 @@ std::string ConfigHelper::discoveredClustersBootstrap(const std::string& api_typ
   return fmt::format(
       R"EOF(
 admin:
-  access_log_path: /dev/null
+  access_log_path: {}
   address:
     socket_address:
       address: 127.0.0.1
@@ -305,7 +309,7 @@ static_resources:
                   prefix: "/cluster2"
               domains: "*"
 )EOF",
-      api_type);
+      TestEnvironment::nullDevicePath(), api_type);
 }
 
 // TODO(#6327) cleaner approach to testing with static config.
@@ -337,13 +341,13 @@ static_resources:
     lb_policy: ROUND_ROBIN
     http2_protocol_options: {{}}
 admin:
-  access_log_path: /dev/null
+  access_log_path: {}
   address:
     socket_address:
       address: 127.0.0.1
       port_value: 0
 )EOF",
-      api_type);
+      TestEnvironment::nullDevicePath(), api_type);
 }
 
 envoy::config::cluster::v3::Cluster ConfigHelper::buildCluster(const std::string& name, int port,
@@ -762,7 +766,7 @@ bool ConfigHelper::setAccessLog(const std::string& filename, absl::string_view f
   if (getFilterFromListener("http") == nullptr) {
     return false;
   }
-  // Replace /dev/null with a real path for the file access log.
+  // Replace null device with a real path for the file access log.
   envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
       hcm_config;
   loadHttpConnectionManager(hcm_config);
@@ -945,6 +949,16 @@ void ConfigHelper::setOutboundFramesLimits(uint32_t max_all_frames, uint32_t max
       storeHttpConnectionManager(hcm_config);
     }
   }
+}
+
+void ConfigHelper::setLocalReply(
+    const envoy::extensions::filters::network::http_connection_manager::v3::LocalReplyConfig&
+        config) {
+  envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
+      hcm_config;
+  loadHttpConnectionManager(hcm_config);
+  hcm_config.mutable_local_reply_config()->MergeFrom(config);
+  storeHttpConnectionManager(hcm_config);
 }
 
 CdsHelper::CdsHelper() : cds_path_(TestEnvironment::writeStringToFileForTest("cds.pb_text", "")) {}

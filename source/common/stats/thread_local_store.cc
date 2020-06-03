@@ -72,11 +72,7 @@ void ThreadLocalStoreImpl::removeRejectedStats(StatMapClass& map, StatListClass&
 }
 
 bool ThreadLocalStoreImpl::rejects(StatName stat_name) const {
-  // Don't both elaborating the StatName there are no pattern-based
-  // exclusions;/inclusions.
-  if (stats_matcher_->acceptsAll()) {
-    return false;
-  }
+  ASSERT(!stats_matcher_->acceptsAll());
 
   // TODO(ambuc): If stats_matcher_ depends on regexes, this operation (on the
   // hot path) could become prohibitively expensive. Revisit this usage in the
