@@ -32,7 +32,7 @@ message ConfigDump {
   // * *clusters*: :ref:`ClustersConfigDump <envoy_api_msg_admin.v3.ClustersConfigDump>`
   // * *listeners*: :ref:`ListenersConfigDump <envoy_api_msg_admin.v3.ListenersConfigDump>`
   // * *routes*:  :ref:`RoutesConfigDump <envoy_api_msg_admin.v3.RoutesConfigDump>`
-  // * *endpoints*:  :ref:`EndpointsConfigDump <envoy_api_msg_admin.v3.EndpointsConfigDump>`
+  // [#not-implemented-hide:] * *endpoints*:  :ref:`EndpointsConfigDump <envoy_api_msg_admin.v3.EndpointsConfigDump>`
   //
   // You can filter output with the resource and mask query parameters.
   // See :ref:`/config_dump?resource={} <operations_admin_interface_config_dump_by_resource>`,
