@@ -350,7 +350,8 @@ public:
          bool defer_listener_finalization = false,
          ProcessObjectOptRef process_object = absl::nullopt,
          Server::FieldValidationConfig validation_config = Server::FieldValidationConfig(),
-         uint32_t concurrency = 1, std::chrono::seconds drain_time = std::chrono::seconds(1));
+         uint32_t concurrency = 1, std::chrono::seconds drain_time = std::chrono::seconds(1),
+         bool use_real_stats = false);
   // Note that the derived class is responsible for tearing down the server in its
   // destructor.
   ~IntegrationTestServer() override;
@@ -492,7 +493,7 @@ private:
 class IntegrationTestServerImpl : public IntegrationTestServer {
 public:
   IntegrationTestServerImpl(Event::TestTimeSystem& time_system, Api::Api& api,
-                            const std::string& config_path);
+                            const std::string& config_path, bool use_real_stats = false);
 
   ~IntegrationTestServerImpl() override;
 
@@ -505,7 +506,12 @@ public:
     return *stat_store_;
   }
   Network::Address::InstanceConstSharedPtr adminAddress() override { return admin_address_; }
-  Stats::NotifyingAllocatorImpl& statsAllocator() override { return stats_allocator_; }
+
+  Stats::NotifyingAllocatorImpl& statsAllocator() override {
+    auto* ret = dynamic_cast<Stats::NotifyingAllocatorImpl*>(stats_allocator_.get());
+    RELEASE_ASSERT(ret != nullptr, "This test does not support using real stats");
+    return *ret;
+  }
 
 private:
   void createAndRunEnvoyServer(OptionsImpl& options, Event::TimeSystem& time_system,
@@ -522,7 +528,7 @@ private:
   Network::Address::InstanceConstSharedPtr admin_address_;
   absl::Notification server_gone_;
   Stats::SymbolTablePtr symbol_table_;
-  Stats::NotifyingAllocatorImpl stats_allocator_;
+  std::unique_ptr<Stats::AllocatorImpl> stats_allocator_;
 };
 
 } // namespace Envoy
