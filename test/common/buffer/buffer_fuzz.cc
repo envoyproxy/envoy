@@ -401,7 +401,7 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
     const std::string& content = action.search().content();
     const uint32_t offset = action.search().offset();
     const std::string data = target_buffer.toString();
-    FUZZ_ASSERT(target_buffer.search(content.data(), content.size(), offset, 0) ==
+    FUZZ_ASSERT(target_buffer.search(content.data(), content.size(), offset) ==
                 static_cast<ssize_t>(target_buffer.toString().find(content, offset)));
     break;
   }

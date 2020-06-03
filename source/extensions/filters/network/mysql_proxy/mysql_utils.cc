@@ -110,7 +110,7 @@ int BufferHelper::readBytes(Buffer::Instance& buffer, size_t skip_bytes) {
 
 int BufferHelper::readString(Buffer::Instance& buffer, std::string& str) {
   char end = MYSQL_STR_END;
-  ssize_t index = buffer.search(&end, sizeof(end), 0, 0);
+  ssize_t index = buffer.search(&end, sizeof(end), 0);
   if (index == -1) {
     return MYSQL_FAILURE;
   }

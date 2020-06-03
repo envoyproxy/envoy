@@ -526,21 +526,21 @@ TEST_F(OwnedImplTest, Search) {
   }
   EXPECT_STREQ("abaaaabaaaaaba", buffer.toString().c_str());
 
-  EXPECT_EQ(-1, buffer.search("c", 1, 0, 0));
-  EXPECT_EQ(0, buffer.search("", 0, 0, 0));
-  EXPECT_EQ(buffer.length(), buffer.search("", 0, buffer.length(), 0));
-  EXPECT_EQ(-1, buffer.search("", 0, buffer.length() + 1, 0));
-  EXPECT_EQ(0, buffer.search("a", 1, 0, 0));
-  EXPECT_EQ(1, buffer.search("b", 1, 1, 0));
-  EXPECT_EQ(2, buffer.search("a", 1, 1, 0));
-  EXPECT_EQ(0, buffer.search("abaa", 4, 0, 0));
-  EXPECT_EQ(2, buffer.search("aaaa", 4, 0, 0));
-  EXPECT_EQ(2, buffer.search("aaaa", 4, 1, 0));
-  EXPECT_EQ(2, buffer.search("aaaa", 4, 2, 0));
-  EXPECT_EQ(7, buffer.search("aaaaab", 6, 0, 0));
-  EXPECT_EQ(0, buffer.search("abaaaabaaaaaba", 14, 0, 0));
-  EXPECT_EQ(12, buffer.search("ba", 2, 10, 0));
-  EXPECT_EQ(-1, buffer.search("abaaaabaaaaabaa", 15, 0, 0));
+  EXPECT_EQ(-1, buffer.search("c", 1, 0));
+  EXPECT_EQ(0, buffer.search("", 0, 0));
+  EXPECT_EQ(buffer.length(), buffer.search("", 0, buffer.length()));
+  EXPECT_EQ(-1, buffer.search("", 0, buffer.length() + 1));
+  EXPECT_EQ(0, buffer.search("a", 1, 0));
+  EXPECT_EQ(1, buffer.search("b", 1, 1));
+  EXPECT_EQ(2, buffer.search("a", 1, 1));
+  EXPECT_EQ(0, buffer.search("abaa", 4, 0));
+  EXPECT_EQ(2, buffer.search("aaaa", 4, 0));
+  EXPECT_EQ(2, buffer.search("aaaa", 4, 1));
+  EXPECT_EQ(2, buffer.search("aaaa", 4, 2));
+  EXPECT_EQ(7, buffer.search("aaaaab", 6, 0));
+  EXPECT_EQ(0, buffer.search("abaaaabaaaaaba", 14, 0));
+  EXPECT_EQ(12, buffer.search("ba", 2, 10));
+  EXPECT_EQ(-1, buffer.search("abaaaabaaaaabaa", 15, 0));
 }
 
 TEST_F(OwnedImplTest, SearchWithLengthLimit) {
@@ -702,7 +702,7 @@ TEST_F(OwnedImplTest, ReserveZeroCommit) {
   Api::IoCallUint64Result result = buf.read(io_handle, max_length);
   ASSERT_EQ(result.rc_, static_cast<uint64_t>(rc));
   ASSERT_EQ(os_sys_calls.close(pipe_fds[1]).rc_, 0);
-  ASSERT_EQ(previous_length, buf.search(data.data(), rc, previous_length, 0));
+  ASSERT_EQ(previous_length, buf.search(data.data(), rc, previous_length));
   EXPECT_EQ("bbbbb", buf.toString().substr(0, 5));
   expectSlices({{5, 0, 4056}, {1953, 2103, 4056}}, buf);
 }

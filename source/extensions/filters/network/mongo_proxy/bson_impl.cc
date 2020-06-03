@@ -50,7 +50,7 @@ void BufferHelper::removeBytes(Buffer::Instance& data, uint8_t* out, size_t out_
 
 std::string BufferHelper::removeCString(Buffer::Instance& data) {
   char end = '\0';
-  ssize_t index = data.search(&end, sizeof(end), 0, 0);
+  ssize_t index = data.search(&end, sizeof(end), 0);
   if (index == -1) {
     throw EnvoyException("invalid CString");
   }
