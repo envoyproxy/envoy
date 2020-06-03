@@ -66,9 +66,7 @@ public:
   void setParentShutdownTime(std::chrono::seconds parent_shutdown_time) {
     parent_shutdown_time_ = parent_shutdown_time;
   }
-  void setDrainIncrementally(bool drain_incrementally) {
-    drain_incrementally_ = drain_incrementally;
-  }
+  void setDrainStrategy(Server::DrainStrategy drain_strategy) { drain_strategy_ = drain_strategy; }
   void setLogLevel(spdlog::level::level_enum log_level) { log_level_ = log_level; }
   void setLogFormat(const std::string& log_format) { log_format_ = log_format; }
   void setLogPath(const std::string& log_path) { log_path_ = log_path; }
@@ -121,7 +119,7 @@ public:
   }
   std::chrono::seconds drainTime() const override { return drain_time_; }
   std::chrono::seconds parentShutdownTime() const override { return parent_shutdown_time_; }
-  bool drainIncrementally() const override { return drain_incrementally_; }
+  Server::DrainStrategy drainStrategy() const override { return drain_strategy_; }
 
   spdlog::level::level_enum logLevel() const override { return log_level_; }
   const std::vector<std::pair<std::string, spdlog::level::level_enum>>&
@@ -187,7 +185,7 @@ private:
   std::chrono::milliseconds file_flush_interval_msec_;
   std::chrono::seconds drain_time_;
   std::chrono::seconds parent_shutdown_time_;
-  bool drain_incrementally_;
+  Server::DrainStrategy drain_strategy_;
   Server::Mode mode_;
   bool hot_restart_disabled_;
   bool signal_handling_enabled_;

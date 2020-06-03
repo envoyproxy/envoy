@@ -82,7 +82,7 @@ public:
   MOCK_METHOD(Network::Address::IpVersion, localAddressIpVersion, (), (const));
   MOCK_METHOD(std::chrono::seconds, drainTime, (), (const));
   MOCK_METHOD(std::chrono::seconds, parentShutdownTime, (), (const));
-  MOCK_METHOD(bool, drainIncrementally, (), (const));
+  MOCK_METHOD(Server::DrainStrategy, drainStrategy, (), (const));
   MOCK_METHOD(spdlog::level::level_enum, logLevel, (), (const));
   MOCK_METHOD((const std::vector<std::pair<std::string, spdlog::level::level_enum>>&),
               componentLogLevels, (), (const));

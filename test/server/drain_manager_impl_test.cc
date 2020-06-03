@@ -69,8 +69,9 @@ TEST_F(DrainManagerImplTest, ModifyOnly) {
 }
 
 TEST_P(DrainManagerImplTest, DrainDeadline) {
-  const bool drain_incrementally = GetParam();
-  ON_CALL(server_.options_, drainIncrementally()).WillByDefault(Return(drain_incrementally));
+  const bool drain_gradually = GetParam();
+  ON_CALL(server_.options_, drainStrategy()).WillByDefault(Return(
+      drain_gradually ? Server::DrainStrategy::Gradual : Server::DrainStrategy::Immediate));
   // TODO(auni53): Add integration tests for this once TestDrainManager is
   // removed.
   DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::DEFAULT);
@@ -82,7 +83,7 @@ TEST_P(DrainManagerImplTest, DrainDeadline) {
   ON_CALL(server_.options_, drainTime())
       .WillByDefault(Return(std::chrono::seconds(DrainTimeSeconds)));
 
-  if (drain_incrementally) {
+  if (drain_gradually) {
     // random() should be called when elapsed time < drain timeout
     EXPECT_CALL(server_.random_, random()).Times(2);
     EXPECT_FALSE(drain_manager.drainClose());
@@ -111,8 +112,9 @@ TEST_P(DrainManagerImplTest, DrainDeadline) {
 }
 
 TEST_P(DrainManagerImplTest, DrainDeadlineProbability) {
-  const bool drain_incrementally = GetParam();
-  ON_CALL(server_.options_, drainIncrementally()).WillByDefault(Return(drain_incrementally));
+  const bool drain_gradually = GetParam();
+  ON_CALL(server_.options_, drainStrategy()).WillByDefault(Return(
+      drain_gradually ? Server::DrainStrategy::Gradual : Server::DrainStrategy::Immediate));
   ON_CALL(server_.random_, random()).WillByDefault(Return(4));
   ON_CALL(server_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(3)));
 
@@ -124,7 +126,7 @@ TEST_P(DrainManagerImplTest, DrainDeadlineProbability) {
   EXPECT_FALSE(drain_manager.drainClose());
   drain_manager.startDrainSequence([] {});
 
-  if (drain_incrementally) {
+  if (drain_gradually) {
     // random() should be called when elapsed time < drain timeout
     EXPECT_CALL(server_.random_, random()).Times(2);
     // Current elapsed time is 0
@@ -144,7 +146,7 @@ TEST_P(DrainManagerImplTest, DrainDeadlineProbability) {
   }
 }
 
-INSTANTIATE_TEST_SUITE_P(DrainIncrementally, DrainManagerImplTest, testing::Bool());
+INSTANTIATE_TEST_SUITE_P(DrainGradually, DrainManagerImplTest, testing::Bool());
 
 } // namespace
 } // namespace Server

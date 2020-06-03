@@ -44,12 +44,21 @@ enum class Mode {
 
 
 /**
- * Define the behaviour for Envoy's drain sequence.
+ * During the drain sequence, different components ask the DrainManager
+ * whether to drain via drainClose(). This enum dictates the behaviour of
+ * drainClose() calls.
  */
 enum class DrainStrategy {
-  Incremental,
+  /**
+   * The probability of drainClose() returning true increases from 0 to 100%
+   * over the duration of the drain period.
+   */
+  Gradual,
 
-  Abrupt,
+  /**
+   * drainClose() will return true as soon as the drain sequence is initiated.
+   */
+  Immediate,
 };
 
 using CommandLineOptionsPtr = std::unique_ptr<envoy::admin::v3::CommandLineOptions>;
@@ -77,11 +86,6 @@ public:
   /**
    * @return the duration of the drain period in seconds.
    */
-  virtual DrainStrategy drainStrategy() const PURE;
-
-  /**
-   * @return the duration of the drain period in seconds.
-   */
   virtual std::chrono::seconds drainTime() const PURE;
 
   /**
@@ -91,13 +95,9 @@ public:
   virtual std::chrono::seconds parentShutdownTime() const PURE;
 
   /**
-   * @return the behaviour of calls to DrainManager::drainClose() during the
-   *         drain manager. If false, requests and connections will be
-   *         discouraged for the duration of the drain period. If true, the
-   *         probability of discouraging gradually increases to 100% over the
-   *         course of the drain period.
+   * @return the strategy that defines behaviour of DrainManager::drainClose();
    */
-  virtual bool drainIncrementally() const PURE;
+  virtual DrainStrategy drainStrategy() const PURE;
 
   /**
    * @return const std::string& the path to the configuration file.

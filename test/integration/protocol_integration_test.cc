@@ -275,7 +275,7 @@ typed_config:
 }
 
 // Add a health check filter and verify correct behavior when draining.
-TEST_P(ProtocolIntegrationTest, DrainClose) {
+TEST_P(ProtocolIntegrationTest, DrainCloseGradual) {
   // The probability of drain close increases over time. With a high timeout,
   // the probability will be very low, but the rapid retries prevent this from
   // increasing total test time.
@@ -311,8 +311,9 @@ TEST_P(ProtocolIntegrationTest, DrainClose) {
   }
 }
 
-TEST_P(ProtocolIntegrationTest, DrainCloseNoIncremental) {
-  drain_time_ = std::chrono::seconds(10);
+TEST_P(ProtocolIntegrationTest, DrainCloseImmediate) {
+  drain_strategy_ = Server::DrainStrategy::Immediate;
+  drain_time_ = std::chrono::seconds(100);
   config_helper_.addFilter(ConfigHelper::defaultHealthCheckFilter());
   initialize();
 

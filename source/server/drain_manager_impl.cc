@@ -32,9 +32,10 @@ bool DrainManagerImpl::drainClose() const {
     return false;
   }
 
-  if (!server_.options().drainIncrementally()) {
+  if (server_.options().drainStrategy() == Server::DrainStrategy::Immediate) {
     return true;
   }
+  ASSERT(server_.options().drainStrategy() == Server::DrainStrategy::Gradual);
 
   // P(return true) = elapsed time / drain timeout
   // If the drain deadline is exceeded, skip the probability calculation.

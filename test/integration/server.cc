@@ -32,7 +32,7 @@ namespace Server {
 OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::string& config_yaml,
                                   Network::Address::IpVersion ip_version,
                                   FieldValidationConfig validation_config, uint32_t concurrency,
-                                  std::chrono::seconds drain_time) {
+                                  std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy) {
   OptionsImpl test_options("cluster_name", "node_name", "zone_name", spdlog::level::info);
 
   test_options.setConfigPath(config_path);
@@ -41,7 +41,7 @@ OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::str
   test_options.setFileFlushIntervalMsec(std::chrono::milliseconds(50));
   test_options.setDrainTime(drain_time);
   test_options.setParentShutdownTime(std::chrono::seconds(2));
-  test_options.setDrainIncrementally(false);
+  test_options.setDrainStrategy(drain_strategy);
   test_options.setAllowUnkownFields(validation_config.allow_unknown_static_fields);
   test_options.setRejectUnknownFieldsDynamic(validation_config.reject_unknown_dynamic_fields);
   test_options.setIgnoreUnknownFieldsDynamic(validation_config.ignore_unknown_dynamic_fields);
@@ -59,14 +59,14 @@ IntegrationTestServerPtr IntegrationTestServer::create(
     std::function<void()> on_server_init_function, bool deterministic,
     Event::TestTimeSystem& time_system, Api::Api& api, bool defer_listener_finalization,
     ProcessObjectOptRef process_object, Server::FieldValidationConfig validation_config,
-    uint32_t concurrency, std::chrono::seconds drain_time) {
+    uint32_t concurrency, std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy) {
   IntegrationTestServerPtr server{
       std::make_unique<IntegrationTestServerImpl>(time_system, api, config_path)};
   if (server_ready_function != nullptr) {
     server->setOnServerReadyCb(server_ready_function);
   }
   server->start(version, on_server_init_function, deterministic, defer_listener_finalization,
-                process_object, validation_config, concurrency, drain_time);
+                process_object, validation_config, concurrency, drain_time, drain_strategy);
   return server;
 }
 
@@ -85,14 +85,15 @@ void IntegrationTestServer::start(const Network::Address::IpVersion version,
                                   bool defer_listener_finalization,
                                   ProcessObjectOptRef process_object,
                                   Server::FieldValidationConfig validator_config,
-                                  uint32_t concurrency, std::chrono::seconds drain_time) {
+                                  uint32_t concurrency, std::chrono::seconds drain_time,
+                                  Server::DrainStrategy drain_strategy) {
   ENVOY_LOG(info, "starting integration test server");
   ASSERT(!thread_);
   thread_ =
       api_.threadFactory().createThread([version, deterministic, process_object, validator_config,
-                                         concurrency, drain_time, this]() -> void {
+                                         concurrency, drain_time, drain_strategy, this]() -> void {
         threadRoutine(version, deterministic, process_object, validator_config, concurrency,
-                      drain_time);
+                      drain_time, drain_strategy);
       });
 
   // If any steps need to be done prior to workers starting, do them now. E.g., xDS pre-init.
@@ -168,9 +169,10 @@ void IntegrationTestServer::serverReady() {
 void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion version,
                                           bool deterministic, ProcessObjectOptRef process_object,
                                           Server::FieldValidationConfig validation_config,
-                                          uint32_t concurrency, std::chrono::seconds drain_time) {
+                                          uint32_t concurrency, std::chrono::seconds drain_time,
+                                          Server::DrainStrategy drain_strategy) {
   OptionsImpl options(Server::createTestOptionsImpl(config_path_, "", version, validation_config,
-                                                    concurrency, drain_time));
+                                                    concurrency, drain_time, drain_strategy));
   Thread::MutexBasicLockable lock;
 
   Runtime::RandomGeneratorPtr random_generator;
