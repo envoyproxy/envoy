@@ -19,7 +19,9 @@
 #include "absl/types/optional.h"
 
 namespace Envoy {
-namespace Router {
+namespace Formatter {
+
+using ::Envoy::Router::StringAccessor;
 
 namespace {
 
@@ -319,7 +321,7 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
     const std::string pattern = fmt::format("%{}%", field_name);
     if (start_time_formatters_.find(pattern) == start_time_formatters_.end()) {
       start_time_formatters_.emplace(
-          std::make_pair(pattern, Formatter::SubstitutionFormatParser::parse(pattern)));
+          std::make_pair(pattern, SubstitutionFormatParser::parse(pattern)));
     }
     field_extractor_ = [this, pattern](const Envoy::StreamInfo::StreamInfo& stream_info) {
       const auto& formatters = start_time_formatters_.at(pattern);
@@ -366,5 +368,5 @@ StreamInfoHeaderFormatter::format(const Envoy::StreamInfo::StreamInfo& stream_in
   return field_extractor_(stream_info);
 }
 
-} // namespace Router
+} // namespace Formatter
 } // namespace Envoy

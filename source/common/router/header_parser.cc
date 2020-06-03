@@ -16,6 +16,13 @@
 namespace Envoy {
 namespace Router {
 
+using ::Envoy::Formatter::HeaderFormatter;
+using ::Envoy::Formatter::HeaderFormatterPtr;
+
+using ::Envoy::Formatter::CompoundHeaderFormatter;
+using ::Envoy::Formatter::PlainHeaderFormatter;
+using ::Envoy::Formatter::StreamInfoHeaderFormatter;
+
 namespace {
 
 enum class ParserState {

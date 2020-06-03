@@ -9,7 +9,7 @@
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
-namespace Router {
+namespace Formatter {
 
 /**
  * Interface for all types of header formatters used for custom request headers.
@@ -91,5 +91,5 @@ private:
   const bool append_;
 };
 
-} // namespace Router
+} // namespace Formatter
 } // namespace Envoy
