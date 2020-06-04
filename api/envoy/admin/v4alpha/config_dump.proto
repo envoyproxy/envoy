@@ -32,6 +32,7 @@ message ConfigDump {
   // * *clusters*: :ref:`ClustersConfigDump <envoy_api_msg_admin.v4alpha.ClustersConfigDump>`
   // * *listeners*: :ref:`ListenersConfigDump <envoy_api_msg_admin.v4alpha.ListenersConfigDump>`
   // * *routes*:  :ref:`RoutesConfigDump <envoy_api_msg_admin.v4alpha.RoutesConfigDump>`
+  // [#not-implemented-hide:] * *endpoints*:  :ref:`EndpointsConfigDump <envoy_api_msg_admin.v4alpha.EndpointsConfigDump>`
   //
   // You can filter output with the resource and mask query parameters.
   // See :ref:`/config_dump?resource={} <operations_admin_interface_config_dump_by_resource>`,
@@ -339,4 +340,45 @@ message SecretsConfigDump {
   // The dynamically loaded warming secrets. These are secrets that are currently undergoing
   // warming in preparation to service clusters or listeners.
   repeated DynamicSecret dynamic_warming_secrets = 3;
+}
+
+// [#not-implemented-hide:]
+// Envoy's EDS implementation *will* fill this message with all currently known endpoints. Endpoint
+// configuration information can be used to recreate an Envoy configuration by populating all
+// endpoints as static endpoints or by returning them in an EDS response.
+message EndpointsConfigDump {
+  option (udpa.annotations.versioning).previous_message_type = "envoy.admin.v3.EndpointsConfigDump";
+
+  message StaticEndpointConfig {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.admin.v3.EndpointsConfigDump.StaticEndpointConfig";
+
+    // The endpoint config.
+    google.protobuf.Any endpoint_config = 1;
+
+    // The timestamp when the Endpoint was last updated.
+    google.protobuf.Timestamp last_updated = 2;
+  }
+
+  message DynamicEndpointConfig {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.admin.v3.EndpointsConfigDump.DynamicEndpointConfig";
+
+    // This is the per-resource version information. This version is currently taken from the
+    // :ref:`version_info <envoy_api_field_service.discovery.v3.DiscoveryResponse.version_info>` field at the time that
+    // the endpoint configuration was loaded.
+    string version_info = 1;
+
+    // The endpoint config.
+    google.protobuf.Any endpoint_config = 2;
+
+    // The timestamp when the Endpoint was last updated.
+    google.protobuf.Timestamp last_updated = 3;
+  }
+
+  // The statically loaded endpoint configs.
+  repeated StaticEndpointConfig static_endpoint_configs = 2;
+
+  // The dynamically loaded endpoint configs.
+  repeated DynamicEndpointConfig dynamic_endpoint_configs = 3;
 }
