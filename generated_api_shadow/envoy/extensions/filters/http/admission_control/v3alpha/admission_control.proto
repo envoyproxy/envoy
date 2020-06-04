@@ -36,7 +36,7 @@ message AdmissionControl {
 
     message GrpcCriteria {
       // Status codes that constitute a successful request. If empty, all gRPC requests will be
-      // considered unsucessful.
+      // considered unsuccessful.
       // Mappings can be found at: https://github.com/grpc/grpc/blob/master/doc/statuscodes.md.
       repeated uint32 grpc_success_status = 1;
     }

@@ -67,7 +67,7 @@ protected:
   std::unique_ptr<SuccessCriteriaEvaluator> evaluator_;
 };
 
-// Ensure the HTTP code succesful range configurations are honored.
+// Ensure the HTTP code successful range configurations are honored.
 TEST_F(SuccessCriteriaTest, HttpErrorCodes) {
   const std::string yaml = R"EOF(
 http_criteria:
