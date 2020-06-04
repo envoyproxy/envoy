@@ -133,7 +133,7 @@ struct msghdr {
 #include <netdb.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
-#include <netinet/udp.h> // for udp_gro
+#include <netinet/udp.h> // for UDP_GRO
 #include <sys/ioctl.h>
 #include <sys/mman.h> // for mode_t
 #include <sys/socket.h>

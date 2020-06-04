@@ -598,7 +598,7 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
       ASSERT(num_slices == 1u);
 
       memcpy(&sub_slice.mem_, (&slice.mem_) + bytes_to_skip,
-             output.msg_[0].gso_size_); // copy contents of slice[i:i+gso_size] to newSlice;
+             output.msg_[0].gso_size_); // copy contents of slice[i:i+gso_size] to new_slice;
       passPayloadToProcessor(
           result.rc_, sub_slice, std::move(sub_buffer), std::move(output.msg_[0].peer_address_),
           std::move(output.msg_[0].local_address_), udp_packet_processor, receive_time);
