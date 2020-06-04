@@ -53,10 +53,12 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["build"],
     ),
     bazel_toolchains = dict(
-        sha256 = "5d48b13686081f5d07dbba1271595d1bb2b5fa1d2f8c049ef15011bd4e6bdd19",
-        strip_prefix = "bazel-toolchains-834b89b3f608a9aa4c212e7ee4a05b323b980a85",
-        # 2020-05-21
-        urls = ["https://github.com/bazelbuild/bazel-toolchains/archive/834b89b3f608a9aa4c212e7ee4a05b323b980a85.tar.gz"],
+        sha256 = "db48eed61552e25d36fe051a65d2a329cc0fb08442627e8f13960c5ab087a44e",
+        strip_prefix = "bazel-toolchains-3.2.0",
+        urls = [
+            "https://github.com/bazelbuild/bazel-toolchains/releases/download/3.2.0/bazel-toolchains-3.2.0.tar.gz",
+            "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/3.2.0.tar.gz",
+        ],
         use_category = ["build"],
     ),
     build_bazel_rules_apple = dict(
@@ -65,10 +67,10 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["build"],
     ),
     envoy_build_tools = dict(
-        sha256 = "6839c15e0c9dd306a977685334c91544050ca7a68705cd5c4aa318df0f1893b3",
-        strip_prefix = "envoy-build-tools-7f64276cf203e391d2519f799bb3e141a6cd8187",
-        # 2020-05-27
-        urls = ["https://github.com/greenhouse-org/envoy-build-tools/archive/7f64276cf203e391d2519f799bb3e141a6cd8187.tar.gz"],
+        sha256 = "b10206bcd938eb266d479a6b8fceec6f30aec8df84193f6d8e18106aa8d2926d",
+        strip_prefix = "envoy-build-tools-bb7f604e1eb67c2d0dfa9f243a6ed5dc1d161413",
+        # 2020-06-04
+        urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/bb7f604e1eb67c2d0dfa9f243a6ed5dc1d161413.tar.gz"],
         use_category = ["build"],
     ),
     boringssl = dict(
@@ -199,9 +201,9 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "N/A",
     ),
     com_github_nghttp2_nghttp2 = dict(
-        sha256 = "eb9d9046495a49dd40c7ef5d6c9907b51e5a6b320ea6e2add11eb8b52c982c47",
-        strip_prefix = "nghttp2-1.40.0",
-        urls = ["https://github.com/nghttp2/nghttp2/releases/download/v1.40.0/nghttp2-1.40.0.tar.gz"],
+        sha256 = "eacc6f0f8543583ecd659faf0a3f906ed03826f1d4157b536b4b385fe47c5bb8",
+        strip_prefix = "nghttp2-1.41.0",
+        urls = ["https://github.com/nghttp2/nghttp2/releases/download/v1.41.0/nghttp2-1.41.0.tar.gz"],
         use_category = ["dataplane"],
         cpe = "cpe:2.3:a:nghttp2:nghttp2:*",
     ),
@@ -261,9 +263,10 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "cpe:2.3:a:gnu:zlib:*",
     ),
     com_github_jbeder_yaml_cpp = dict(
-        sha256 = "77ea1b90b3718aa0c324207cb29418f5bced2354c2e483a9523d98c3460af1ed",
-        strip_prefix = "yaml-cpp-yaml-cpp-0.6.3",
-        urls = ["https://github.com/jbeder/yaml-cpp/archive/yaml-cpp-0.6.3.tar.gz"],
+        sha256 = "17ffa6320c33de65beec33921c9334dee65751c8a4b797ba5517e844062b98f1",
+        strip_prefix = "yaml-cpp-6701275f1910bf63631528dfd9df9c3ac787365b",
+        # 2020-05-25
+        urls = ["https://github.com/jbeder/yaml-cpp/archive/6701275f1910bf63631528dfd9df9c3ac787365b.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),
@@ -354,6 +357,14 @@ DEPENDENCY_REPOSITORIES = dict(
     io_bazel_rules_go = dict(
         sha256 = "e88471aea3a3a4f19ec1310a55ba94772d087e9ce46e41ae38ecebe17935de7b",
         urls = ["https://github.com/bazelbuild/rules_go/releases/download/v0.20.3/rules_go-v0.20.3.tar.gz"],
+        use_category = ["build"],
+    ),
+    rules_cc = dict(
+        sha256 = "9d48151ea71b3e225adfb6867e6d2c7d0dce46cbdc8710d9a9a628574dfd40a0",
+        strip_prefix = "rules_cc-818289e5613731ae410efb54218a4077fb9dbb03",
+        # 2020-05-13
+        # TODO(lizan): pin to a point releases when there's a released version.
+        urls = ["https://github.com/bazelbuild/rules_cc/archive/818289e5613731ae410efb54218a4077fb9dbb03.tar.gz"],
         use_category = ["build"],
     ),
     rules_foreign_cc = dict(
