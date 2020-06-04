@@ -10,7 +10,6 @@ from sphinx.errors import ExtensionError
 import os
 import subprocess
 
-
 class ValidatingCodeBlock(CodeBlock):
   """A directive that provides protobuf yaml formatting and validation.
 
@@ -26,7 +25,7 @@ class ValidatingCodeBlock(CodeBlock):
       'type-name': directives.unchanged,
   }
   option_spec.update(CodeBlock.option_spec)
-  skip_validation = os.getenv('SPHINX_SKIP_CONFIG_VALIDATION') or 'false'
+  skip_validation = (os.getenv('SPHINX_SKIP_CONFIG_VALIDATION') or 'false').lower() == 'true'
   bazel_build_options = os.getenv('BAZEL_BUILD_OPTIONS') or ''
 
   def run(self):
@@ -35,7 +34,7 @@ class ValidatingCodeBlock(CodeBlock):
     if self.options.get('type-name') == None:
       raise ExtensionError("Expected type name in: {0} line: {1}".format(source, line))
 
-    if ValidatingCodeBlock.skip_validation.lower() != 'true':
+    if not ValidatingCodeBlock.skip_validation:
       args = [
           arg for arg in ['bazel', 'run'] + ValidatingCodeBlock.bazel_build_options.split() + [
               '//tools/config_validation:validate_fragment', '--',
@@ -51,7 +50,6 @@ class ValidatingCodeBlock(CodeBlock):
 
     self.options.pop('type-name', None)
     return list(CodeBlock.run(self))
-
 
 def setup(app):
   app.add_directive("validated-code-block", ValidatingCodeBlock)
