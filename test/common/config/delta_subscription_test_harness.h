@@ -156,7 +156,7 @@ public:
       expectSendMessage({}, {}, Grpc::Status::WellKnownGrpcStatus::Internal, "bad config", {});
     }
     static_cast<NewGrpcMuxImpl*>(subscription_->grpcMux().get())
-        ->onDiscoveryResponse(std::move(response));
+        ->onDiscoveryResponse(std::move(response), control_plane_stats_);
     Mock::VerifyAndClearExpectations(&async_stream_);
   }
 

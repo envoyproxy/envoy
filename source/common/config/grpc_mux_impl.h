@@ -53,8 +53,9 @@ public:
   // Config::GrpcStreamCallbacks
   void onStreamEstablished() override;
   void onEstablishmentFailure() override;
-  void onDiscoveryResponse(
-      std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message) override;
+  void
+  onDiscoveryResponse(std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message,
+                      ControlPlaneStats& control_plane_stats) override;
   void onWriteable() override;
 
   GrpcStream<envoy::service::discovery::v3::DiscoveryRequest,
@@ -152,8 +153,8 @@ public:
   void onWriteable() override {}
   void onStreamEstablished() override {}
   void onEstablishmentFailure() override {}
-  void onDiscoveryResponse(
-      std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&&) override {}
+  void onDiscoveryResponse(std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&&,
+                           ControlPlaneStats&) override {}
 };
 
 } // namespace Config

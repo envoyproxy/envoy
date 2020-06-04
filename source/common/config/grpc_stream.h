@@ -25,8 +25,9 @@ public:
              Event::Dispatcher& dispatcher, Stats::Scope& scope,
              const RateLimitSettings& rate_limit_settings)
       : callbacks_(callbacks), async_client_(std::move(async_client)),
-        service_method_(service_method), control_plane_stats_(generateControlPlaneStats(scope)),
-        random_(random), time_source_(dispatcher.timeSource()),
+        service_method_(service_method),
+        control_plane_stats_(Utility::generateControlPlaneStats(scope)), random_(random),
+        time_source_(dispatcher.timeSource()),
         rate_limiting_enabled_(rate_limit_settings.enabled_) {
     retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
     if (rate_limiting_enabled_) {
@@ -80,7 +81,7 @@ public:
     // have 0 until it is reconnected. Setting here ensures that it is consistent with the state of
     // management server connection.
     control_plane_stats_.connected_state_.set(1);
-    callbacks_->onDiscoveryResponse(std::move(message));
+    callbacks_->onDiscoveryResponse(std::move(message), control_plane_stats_);
   }
 
   void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&& metadata) override {
@@ -123,12 +124,6 @@ public:
 private:
   void setRetryTimer() {
     retry_timer_->enableTimer(std::chrono::milliseconds(backoff_strategy_->nextBackOffMs()));
-  }
-
-  ControlPlaneStats generateControlPlaneStats(Stats::Scope& scope) {
-    const std::string control_plane_prefix = "control_plane.";
-    return {ALL_CONTROL_PLANE_STATS(POOL_COUNTER_PREFIX(scope, control_plane_prefix),
-                                    POOL_GAUGE_PREFIX(scope, control_plane_prefix))};
   }
 
   GrpcStreamCallbacks<ResponseProto>* const callbacks_;
