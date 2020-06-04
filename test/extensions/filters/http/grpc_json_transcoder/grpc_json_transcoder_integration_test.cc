@@ -434,6 +434,62 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, StreamGetHttpBodyFragmented) {
   EXPECT_EQ("text/plain", content_type->value().getStringView());
 }
 
+TEST_P(GrpcJsonTranscoderIntegrationTest, StreamTrailersOnlyResponse) {
+  HttpIntegrationTest::initialize();
+
+  // Make request to gRPC upstream
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/shelves/1/books"},
+      {":authority", "host"},
+  });
+  waitForNextUpstreamRequest();
+
+  // Make headers only response
+  Http::TestResponseHeaderMapImpl response_headers;
+  response_headers.setStatus(200);
+  response_headers.setContentType("application/grpc");
+  response_headers.setGrpcStatus(Code::NOT_FOUND);
+  response_headers.setGrpcMessage("JustError");
+  upstream_request_->encodeHeaders(response_headers, true);
+
+  // Wait for complete
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+
+  // Ensure that grpc-status converted to http status for headers/trailers only response
+  EXPECT_EQ("404", response->headers().Status()->value().getStringView());
+}
+
+TEST_P(GrpcJsonTranscoderIntegrationTest, StreamTrailersOnlyResponseHttpBody) {
+  HttpIntegrationTest::initialize();
+
+  // Make request to gRPC upstream
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/indexStream"},
+      {":authority", "host"},
+  });
+  waitForNextUpstreamRequest();
+
+  // Make headers only response
+  Http::TestResponseHeaderMapImpl response_headers;
+  response_headers.setStatus(200);
+  response_headers.setContentType("application/grpc");
+  response_headers.setGrpcStatus(Code::NOT_FOUND);
+  response_headers.setGrpcMessage("JustError");
+  upstream_request_->encodeHeaders(response_headers, true);
+
+  // Wait for complete
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+
+  // Ensure that grpc-status converted to http status for headers/trailers only response
+  EXPECT_EQ("404", response->headers().Status()->value().getStringView());
+}
+
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryEchoHttpBody) {
   HttpIntegrationTest::initialize();
   testTranscoding<bookstore::EchoBodyRequest, google::api::HttpBody>(
