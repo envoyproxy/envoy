@@ -309,6 +309,8 @@ void InstanceImpl::initialize(const Options& options,
     // setPrefix has a release assert verifying that setPrefix() is not called after prefix()
     ThreadSafeSingleton<Http::PrefixValue>::get().setPrefix(bootstrap_.header_prefix().c_str());
   }
+  // TODO(mattklein123): Custom O(1) headers can be registered at this point for creating/finalizing
+  // any header maps.
 
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
   // stats.
