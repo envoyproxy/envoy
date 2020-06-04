@@ -44,7 +44,7 @@ private:
 
 ThreadPtr ThreadFactoryImplWin32::createThread(std::function<void()> thread_routine,
                                                OptionsOptConstRef options) {
-  return std::make_unique<ThreadImplWin32>(thread_routine, name);
+  return std::make_unique<ThreadImplWin32>(thread_routine, options);
 }
 
 ThreadId ThreadFactoryImplWin32::currentThreadId() {
