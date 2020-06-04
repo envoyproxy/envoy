@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
@@ -7,6 +5,8 @@ load(
     "envoy_proto_library",
     "envoy_select_hot_restart",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -108,6 +108,7 @@ envoy_cc_library(
     deps = [
         ":watchdog_lib",
         "//include/envoy/api:api_interface",
+        "//include/envoy/common:time_interface",
         "//include/envoy/event:timer_interface",
         "//include/envoy/server:configuration_interface",
         "//include/envoy/server:guarddog_interface",
@@ -396,6 +397,7 @@ envoy_cc_library(
         "//include/envoy/event:signal_interface",
         "//include/envoy/event:timer_interface",
         "//include/envoy/network:dns_interface",
+        "//include/envoy/server:bootstrap_extension_config_interface",
         "//include/envoy/server:drain_manager_interface",
         "//include/envoy/server:instance_interface",
         "//include/envoy/server:listener_manager_interface",
