@@ -122,19 +122,6 @@ const std::string& testConfigWithAuth() {
 )EOF");
 }
 
-// This is the basic redis_proxy configuration with an upstream
-// authentication username and password specified.
-
-const std::string& testConfigWithAuthAcl() {
-  CONSTRUCT_ON_FIRST_USE(std::string, testConfig() + R"EOF(
-      typed_extension_protocol_options:
-        envoy.filters.network.redis_proxy:
-          "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProtocolOptions
-          auth_username: { inline_string: someusername }
-          auth_password: { inline_string: somepassword }
-)EOF");
-}
-
 // This function encodes commands as an array of bulkstrings as transmitted by Redis clients to
 // Redis servers, according to the Redis protocol.
 std::string makeBulkStringArray(std::vector<std::string>&& command_strings) {
@@ -379,13 +366,6 @@ public:
       : RedisClusterIntegrationTest(config, num_upstreams) {}
 };
 
-class RedisClusterWithAuthAclIntegrationTest : public RedisClusterIntegrationTest {
-public:
-  RedisClusterWithAuthAclIntegrationTest(const std::string& config = testConfigWithAuthAcl(),
-                                         int num_upstreams = 2)
-      : RedisClusterIntegrationTest(config, num_upstreams) {}
-};
-
 class RedisClusterWithReadPolicyIntegrationTest : public RedisClusterIntegrationTest {
 public:
   RedisClusterWithReadPolicyIntegrationTest(const std::string& config = testConfigWithReadPolicy(),
@@ -405,10 +385,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, RedisClusterIntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, RedisClusterWithAuthIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
-
-INSTANTIATE_TEST_SUITE_P(IpVersions, RedisClusterWithAuthAclIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
@@ -576,40 +552,6 @@ TEST_P(RedisClusterWithAuthIntegrationTest, SingleSlotMasterReplica) {
 
   roundtripToUpstreamStep(fake_upstreams_[random_index_], makeBulkStringArray({"get", "foo"}),
                           "$3\r\nbar\r\n", redis_client, fake_upstream_connection, "",
-                          "somepassword");
-
-  redis_client->close();
-  EXPECT_TRUE(fake_upstream_connection->close());
-}
-
-// This test sends a simple "get foo" command from a fake
-// downstream client through the proxy to a fake upstream
-// Redis cluster with a single slot with master and replica.
-// The fake server sends a valid response back to the client.
-// The request and response should make it through the envoy
-// proxy server code unchanged.
-//
-// In this scenario, the fake server will receive 2 auth commands with username and password:
-// one as part of a topology discovery connection (before sending a
-// "cluster slots" command), and one to authenticate the connection
-// that carries the "get foo" request.
-
-TEST_P(RedisClusterWithAuthAclIntegrationTest, SingleSlotMasterReplica) {
-  random_index_ = 0;
-
-  on_server_init_function_ = [this]() {
-    std::string cluster_slot_response = singleSlotMasterReplica(
-        fake_upstreams_[0]->localAddress()->ip(), fake_upstreams_[1]->localAddress()->ip());
-    expectCallClusterSlot(0, cluster_slot_response, "someusername", "somepassword");
-  };
-
-  initialize();
-
-  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
-  FakeRawConnectionPtr fake_upstream_connection;
-
-  roundtripToUpstreamStep(fake_upstreams_[random_index_], makeBulkStringArray({"get", "foo"}),
-                          "$3\r\nbar\r\n", redis_client, fake_upstream_connection, "someusername",
                           "somepassword");
 
   redis_client->close();
