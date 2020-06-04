@@ -17,6 +17,7 @@
 #include "absl/synchronization/mutex.h"
 #include "fmt/ostream.h"
 #include "spdlog/spdlog.h"
+#include "absl/container/flat_hash_map.h"       // addition by Jinhui Song
 
 namespace Envoy {
 namespace Logger {
@@ -357,5 +358,40 @@ protected:
   ENVOY_STREAM_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, FORMAT, STREAM, ##__VA_ARGS__)
 
 // TODO(danielhochman): macros(s)/function(s) for logging structures that support iteration.
+
+
+/**
+ * ---------------------------------------------------------------
+ * Fancy logging macros by Jinhui Song
+ */
+
+
+/**
+ * Constant for uninitialized flag of local epoch.
+ */
+const int kUnInitialized = -1;
+
+// add mutex? or linked list
+// global epoch? benchmark? tsan? asan (address sanitizer)
+
+/**
+ * Macro for fancy logger. 
+ * Use atomic global_epoch here to avoid the lock overhead and update all logger
+ * if one logger's log level is updated.
+ */
+#define FANCY_LOGGER() ({   \
+  static int* local_epoch__ = &kUnInitialized;                  \
+  static spdlog::logger flogger__(__FILE__);                    \
+  if (!global_epoch__ || *local_epoch < global_epoch->load())   \
+    updateFancyLogger(__FILE__, &flogger, &local_epoch);        \
+  flogger__;                                                    \
+})
+
+#define FANCY_LOG(LEVEL, ...) ENVOY_LOG_TO_LOGGER(FANCY_LOGGER(), LEVEL, ##__VA_ARGS__)
+
+/**
+ * End 
+ * ----------------------------------------------------------------
+ */
 
 } // namespace Envoy
