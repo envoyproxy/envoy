@@ -143,7 +143,21 @@ class AcceptedSocketImpl : public ConnectionSocketImpl {
 public:
   AcceptedSocketImpl(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& local_address,
                      const Address::InstanceConstSharedPtr& remote_address)
-      : ConnectionSocketImpl(std::move(io_handle), local_address, remote_address) {}
+      : ConnectionSocketImpl(std::move(io_handle), local_address, remote_address) {
+    ++global_accepted_socket_count_;
+  }
+
+  ~AcceptedSocketImpl() override {
+    ASSERT(global_accepted_socket_count_.load() > 0);
+    --global_accepted_socket_count_;
+  }
+
+  // TODO (tonya11en): Global connection count tracking is temporarily performed via a static
+  // variable until the logic is moved into the overload manager.
+  static uint64_t acceptedSocketCount() { return global_accepted_socket_count_.load(); }
+
+private:
+  static std::atomic<uint64_t> global_accepted_socket_count_;
 };
 
 // ConnectionSocket used with client connections.

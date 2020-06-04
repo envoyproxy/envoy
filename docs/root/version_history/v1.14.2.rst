@@ -7,3 +7,5 @@ Changes
 * http: fixed CVE-2020-11080 by rejecting HTTP/2 SETTINGS frames with too many parameters.
 * listener: Add runtime support for `per-listener limits <config_listeners_runtime>` on
   active/accepted connections.
+* overload management: Add runtime support for :ref:`global limits <config_overload_manager>`
+  on active/accepted connections.

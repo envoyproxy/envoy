@@ -1306,6 +1306,21 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "cx_limit_integration_test",
+    srcs = ["cx_limit_integration_test.cc"],
+    deps = [
+        ":http_integration_lib",
+        "//include/envoy/network:filter_interface",
+        "//include/envoy/registry",
+        "//source/extensions/filters/network/tcp_proxy:config",
+        "//test/config:utility_lib",
+        "//test/test_common:logging_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "local_reply_integration_test",
     srcs = [
         "local_reply_integration_test.cc",

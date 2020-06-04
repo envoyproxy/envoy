@@ -168,6 +168,11 @@ public:
    * @param socket supplies the socket that is moved into the callee.
    */
   virtual void onAccept(ConnectionSocketPtr&& socket) PURE;
+
+  /**
+   * Called when a new connection is rejected.
+   */
+  virtual void onReject() PURE;
 };
 
 /**

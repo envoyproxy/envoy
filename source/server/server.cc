@@ -34,6 +34,7 @@
 #include "common/local_info/local_info_impl.h"
 #include "common/memory/stats.h"
 #include "common/network/address_impl.h"
+#include "common/network/listener_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/router/rds_impl.h"
 #include "common/runtime/runtime_impl.h"
@@ -525,6 +526,15 @@ void InstanceImpl::onRuntimeReady() {
         stats_store_, *ssl_context_manager_, *random_generator_, info_factory_, access_log_manager_,
         *config_.clusterManager(), *local_info_, *admin_, *singleton_manager_, thread_local_,
         messageValidationContext().dynamicValidationVisitor(), *api_);
+  }
+
+  // If there is no global limit to the number of active connections, warn on startup.
+  // TODO (tonya11en): Move this functionality into the overload manager.
+  if (!runtime().snapshot().get(Network::ListenerImpl::GlobalMaxCxRuntimeKey)) {
+    ENVOY_LOG(warn,
+              "there is no configured limit to the number of allowed active connections. Set a "
+              "limit via the runtime key {}",
+              Network::ListenerImpl::GlobalMaxCxRuntimeKey);
   }
 }
 
