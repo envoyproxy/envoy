@@ -115,6 +115,11 @@ message H2FramePostRequest {
   bytes path = 3;
 }
 
+// A generic frame to emit a malformed frame
+message H2FrameGeneric {
+  bytes frame_bytes = 1;
+}
+
 message H2TestFrame {
   // These values map to the frame creation methods in:
   // test/common/http/http2/http2_frame.h
@@ -133,6 +138,7 @@ message H2TestFrame {
     H2FrameMalformedRequestWithZerolenHeader malformed_request_with_zerolen_header = 12;
     H2FrameRequest request = 13;
     H2FramePostRequest post_request = 14;
+    H2FrameGeneric generic = 15;
   }
 }
 

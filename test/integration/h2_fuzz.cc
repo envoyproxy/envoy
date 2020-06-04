@@ -133,6 +133,12 @@ void H2FuzzIntegrationTest::sendFrame(const test::integration::H2TestFrame& prot
     h2_frame = Http2Frame::makePostRequest(stream_idx, host, path);
     break;
   }
+  case test::integration::H2TestFrame::kGeneric: {
+    const absl::string_view frame_bytes = proto_frame.generic().frame_bytes();
+    ENVOY_LOG_MISC(trace, "Sending generic frame");
+    h2_frame = Http2Frame::makeMalformedFrame(frame_bytes);
+    break;
+  }
   default:
     ENVOY_LOG_MISC(debug, "Proto-frame not supported!");
     break;

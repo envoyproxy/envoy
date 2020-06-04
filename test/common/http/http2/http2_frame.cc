@@ -257,6 +257,12 @@ Http2Frame Http2Frame::makePostRequest(uint32_t stream_index, absl::string_view 
   return frame;
 }
 
+Http2Frame Http2Frame::makeMalformedFrame(absl::string_view contents) {
+  Http2Frame frame;
+  frame.appendData(contents);
+  return frame;
+}
+
 } // namespace Http2
 } // namespace Http
 } // namespace Envoy

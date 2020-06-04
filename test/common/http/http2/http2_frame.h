@@ -109,6 +109,7 @@ public:
                                 absl::string_view path);
   static Http2Frame makePostRequest(uint32_t stream_index, absl::string_view host,
                                     absl::string_view path);
+  static Http2Frame makeMalformedFrame(absl::string_view contents);
 
   Type type() const { return static_cast<Type>(data_[3]); }
   ResponseStatus responseStatus() const;
