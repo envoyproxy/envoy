@@ -62,7 +62,7 @@ body_format:
   response->waitForEndStream();
 
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
-    codec_client_->waitForDisconnect();
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
     codec_client_->close();
   }
@@ -134,7 +134,7 @@ body_format:
   response->waitForEndStream();
 
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
-    codec_client_->waitForDisconnect();
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
     codec_client_->close();
   }
@@ -206,7 +206,7 @@ body_format:
   response->waitForEndStream();
 
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
-    codec_client_->waitForDisconnect();
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
     codec_client_->close();
   }
@@ -267,7 +267,7 @@ mappers:
   response->waitForEndStream();
 
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
-    codec_client_->waitForDisconnect();
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
     codec_client_->close();
   }
@@ -324,7 +324,7 @@ body_format:
   response->waitForEndStream();
 
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
-    codec_client_->waitForDisconnect();
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
     codec_client_->close();
   }

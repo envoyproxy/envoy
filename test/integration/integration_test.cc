@@ -151,7 +151,7 @@ TEST_P(IntegrationTest, ConnectionClose) {
                                                                           {":authority", "host"},
                                                                           {"connection", "close"}});
   response->waitForEndStream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   EXPECT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), HttpStatusIs("200"));
@@ -809,7 +809,7 @@ TEST_P(IntegrationTest, UpstreamProtocolError) {
   ASSERT_TRUE(fake_upstream_connection->waitForData(187, &data));
   ASSERT_TRUE(fake_upstream_connection->write("bad protocol data!"));
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
@@ -953,7 +953,7 @@ TEST_P(IntegrationTest, ViaAppendHeaderOnly) {
   EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Headers::get().Via, "foo, bar"));
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   response->waitForEndStream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
   EXPECT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), HttpStatusIs("200"));
   EXPECT_THAT(response->headers(), HeaderValueOf(Headers::get().Via, "bar"));
@@ -1134,7 +1134,7 @@ TEST_P(IntegrationTest, ProcessObjectHealthy) {
                                                                           {":authority", "host"},
                                                                           {"connection", "close"}});
   response->waitForEndStream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   EXPECT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), HttpStatusIs("200"));
@@ -1155,7 +1155,7 @@ TEST_P(IntegrationTest, ProcessObjectUnealthy) {
                                                                           {":authority", "host"},
                                                                           {"connection", "close"}});
   response->waitForEndStream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   EXPECT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), HttpStatusIs("500"));
