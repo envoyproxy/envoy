@@ -59,7 +59,7 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
   // any), and we need to find out the port number that the OS picked so we can return it.
   // TODO(fcoras) maybe move to SocketImpl
   if (addr_port->ip()->port() == 0) {
-    return SocketInterface::addressFromFd(sock.ioHandle().fd());
+    return SocketInterfaceSingleton::get().addressFromFd(sock.ioHandle().fd());
   }
   return addr_port;
 }
@@ -185,7 +185,8 @@ bindFreeLoopbackPort(Address::IpVersion version, Address::SocketType type) {
     throw EnvoyException(msg);
   }
 
-  return std::make_pair(SocketInterface::addressFromFd(sock->ioHandle().fd()), std::move(sock));
+  return std::make_pair(SocketInterfaceSingleton::get().addressFromFd(sock->ioHandle().fd()),
+                        std::move(sock));
 }
 
 TransportSocketPtr createRawBufferSocket() { return std::make_unique<RawBufferSocket>(); }

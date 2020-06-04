@@ -171,12 +171,19 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "socket_lib",
-    srcs = ["socket_impl.cc"],
-    hdrs = ["socket_impl.h"],
+    srcs = [
+        "socket_impl.cc",
+        "socket_interface_impl.cc",
+    ],
+    hdrs = [
+        "socket_impl.h",
+        "socket_interface_impl.h",
+    ],
     deps = [
         ":address_lib",
         "//include/envoy/network:socket_interface",
         "//source/common/common:assert_lib",
+        "//source/common/singleton:threadsafe_singleton",
     ],
 )
 
@@ -277,6 +284,7 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         ":address_lib",
+        ":socket_lib",
         ":socket_option_lib",
         "//include/envoy/network:listen_socket_interface",
         "//source/common/api:os_sys_calls_lib",

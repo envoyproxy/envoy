@@ -6,6 +6,7 @@
 #include "envoy/api/api.h"
 #include "envoy/event/timer.h"
 #include "envoy/filesystem/filesystem.h"
+#include "envoy/network/socket.h"
 #include "envoy/thread/thread.h"
 
 namespace Envoy {

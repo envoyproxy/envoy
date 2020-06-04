@@ -9,8 +9,6 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/listener.h"
 
-#include "common/network/socket_impl.h"
-
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
