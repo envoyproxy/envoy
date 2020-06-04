@@ -110,10 +110,6 @@ struct msghdr {
 // Following Cygwin's porting example (may not be comprehensive)
 #define SO_REUSEPORT SO_REUSEADDR
 
-/** TODO(yugant)
-#define UDP_GRO This should be imported from the linux udpgso_bench_rx.c
-**/
-
 // Solve for rfc2292 (need to address rfc3542?)
 #ifndef IPV6_RECVPKTINFO
 #define IPV6_RECVPKTINFO IPV6_PKTINFO
@@ -137,6 +133,7 @@ struct msghdr {
 #include <netdb.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+#include <netinet/udp.h>  // for udp_gro
 #include <sys/ioctl.h>
 #include <sys/mman.h> // for mode_t
 #include <sys/socket.h>
@@ -145,6 +142,7 @@ struct msghdr {
 #include <sys/un.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <linux/version.h> // to check linux version
 
 #ifdef __APPLE__
 #include <libkern/OSByteOrder.h>
@@ -167,6 +165,14 @@ struct msghdr {
 #if defined(__linux__)
 #include <linux/netfilter_ipv4.h>
 #endif
+
+// TODO(yugant), maybe define it better here.
+#ifdef UDP_GRO
+#define GRO_UDP UDP_GRO
+#else
+#define GRO_UDP 104
+#endif
+
 
 #define PACKED_STRUCT(definition, ...) definition, ##__VA_ARGS__ __attribute__((packed))
 
@@ -210,11 +216,13 @@ struct mmsghdr {
 };
 #endif
 
-
-// TODO(yugant)
-// UDP_GRO should only be enabled for linux
+// TODO(yugant) Check for a better way to check linux version
 #if defined(__linux__)
-#define ENVOY_UDP_GRO_MORE 1
+  #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0)
+    #define ENVOY_UDP_GRO_MORE 1
+  #else
+    #define ENVOY_UDP_GRO_MORE 0
+  #endif
 #else
-#define ENVOY_UDP_GRO_MORE 0
+  #define ENVOY_UDP_GRO_MORE 0
 #endif
