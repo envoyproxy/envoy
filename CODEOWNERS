@@ -120,3 +120,4 @@ extensions/filters/common/original_src @snowp @klarose
 # Compression
 /*/extensions/compression/common @junr03 @rojkov
 /*/extensions/compression/gzip @junr03 @rojkov
+/*/extensions/filters/http/decompressor @rojkov @dio

@@ -23,6 +23,7 @@ if [[ -z "${ENVOY_IP_TEST_VERSIONS}" ]] || [[ "${ENVOY_IP_TEST_VERSIONS}" == "al
     sed -e "s#{{ ip_loopback_address }}#127.0.0.1#" | \
     sed -e "s#{{ reuse_port }}#false#" | \
     sed -e "s#{{ dns_lookup_family }}#V4_ONLY#" | \
+    sed -e "s#{{ null_device_path }}#/dev/null#" | \
     cat > "${HOT_RESTART_JSON_V4}"
   JSON_TEST_ARRAY+=("${HOT_RESTART_JSON_V4}")
 fi
@@ -37,6 +38,7 @@ if [[ -z "${ENVOY_IP_TEST_VERSIONS}" ]] || [[ "${ENVOY_IP_TEST_VERSIONS}" == "al
     sed -e "s#{{ ip_loopback_address }}#::1#" | \
     sed -e "s#{{ reuse_port }}#false#" | \
     sed -e "s#{{ dns_lookup_family }}#v6_only#" | \
+    sed -e "s#{{ null_device_path }}#/dev/null#" | \
     cat > "${HOT_RESTART_JSON_V6}"
   JSON_TEST_ARRAY+=("${HOT_RESTART_JSON_V6}")
 fi
@@ -48,6 +50,7 @@ SOCKET_DIR="$(mktemp -d /tmp/envoy_test_hotrestart.XXXXXX)"
 cat "${TEST_SRCDIR}/envoy"/test/config/integration/server_unix_listener.yaml |
   sed -e "s#{{ socket_dir }}#${SOCKET_DIR}#" | \
   sed -e "s#{{ ip_loopback_address }}#127.0.0.1#" | \
+  sed -e "s#{{ null_device_path }}#/dev/null#" | \
   cat > "${HOT_RESTART_JSON_UDS}"
 JSON_TEST_ARRAY+=("${HOT_RESTART_JSON_UDS}")
 
@@ -61,35 +64,41 @@ cat "${TEST_SRCDIR}/envoy"/test/config/integration/server.yaml |
   sed -e "s#{{ ip_loopback_address }}#127.0.0.1#" | \
   sed -e "s#{{ reuse_port }}#true#" | \
   sed -e "s#{{ dns_lookup_family }}#V4_ONLY#" | \
+  sed -e "s#{{ null_device_path }}#/dev/null#" | \
   cat > "${HOT_RESTART_JSON_REUSE_PORT}"
 JSON_TEST_ARRAY+=("${HOT_RESTART_JSON_REUSE_PORT}")
 
-# Enable this test to work with --runs_per_test
-if [[ -z "${TEST_RANDOM_SEED}" ]]; then
-  BASE_ID=1
-else
-  BASE_ID="${TEST_RANDOM_SEED}"
-fi
-
-echo "Hot restart test using --base-id ${BASE_ID}"
+echo "Hot restart test using dynamic base id"
 
 TEST_INDEX=0
 function run_testsuite() {
   local HOT_RESTART_JSON="$1"
   local FAKE_SYMBOL_TABLE="$2"
 
-  # TODO(jun03): instead of setting the base-id, the validate server should use the nop hot restart
   start_test validation
   check "${ENVOY_BIN}" -c "${HOT_RESTART_JSON}" --mode validate --service-cluster cluster \
-      --use-fake-symbol-table "$FAKE_SYMBOL_TABLE" --service-node node --base-id "${BASE_ID}"
+      --use-fake-symbol-table "$FAKE_SYMBOL_TABLE" --service-node node --disable-hot-restart
+
+  local BASE_ID_PATH=$(mktemp 'envoy_test_base_id.XXXXXX')
+  echo "Selected dynamic base id path ${BASE_ID_PATH}"
 
   # Now start the real server, hot restart it twice, and shut it all down as a basic hot restart
   # sanity test.
   start_test Starting epoch 0
   ADMIN_ADDRESS_PATH_0="${TEST_TMPDIR}"/admin.0."${TEST_INDEX}".address
   run_in_background_saving_pid "${ENVOY_BIN}" -c "${HOT_RESTART_JSON}" \
-      --restart-epoch 0 --base-id "${BASE_ID}" --service-cluster cluster --service-node node \
-      --use-fake-symbol-table "$FAKE_SYMBOL_TABLE" --admin-address-path "${ADMIN_ADDRESS_PATH_0}"
+      --restart-epoch 0  --use-dynamic-base-id --base-id-path "${BASE_ID_PATH}" \
+      --service-cluster cluster --service-node node --use-fake-symbol-table "$FAKE_SYMBOL_TABLE" \
+      --admin-address-path "${ADMIN_ADDRESS_PATH_0}"
+
+  local BASE_ID=$(cat "${BASE_ID_PATH}")
+  while [ -z "${BASE_ID}" ]; do
+      echo "Waiting for base id"
+      sleep 0.5
+      BASE_ID=$(cat "${BASE_ID_PATH}")
+  done
+
+  echo "Selected dynamic base id ${BASE_ID}"
 
   FIRST_SERVER_PID=$BACKGROUND_PID
 

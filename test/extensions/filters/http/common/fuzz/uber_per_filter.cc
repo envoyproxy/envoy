@@ -83,10 +83,18 @@ void UberFilterFuzzer::perFilterSetup() {
   addr_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
   ON_CALL(connection_, remoteAddress()).WillByDefault(testing::ReturnRef(addr_));
   ON_CALL(connection_, localAddress()).WillByDefault(testing::ReturnRef(addr_));
-  ON_CALL(callbacks_, connection()).WillByDefault(testing::Return(&connection_));
-  ON_CALL(callbacks_, activeSpan())
+  ON_CALL(factory_context_, clusterManager()).WillByDefault(testing::ReturnRef(cluster_manager_));
+  ON_CALL(cluster_manager_.async_client_, send_(_, _, _)).WillByDefault(Return(&async_request_));
+
+  ON_CALL(decoder_callbacks_, connection()).WillByDefault(testing::Return(&connection_));
+  ON_CALL(decoder_callbacks_, activeSpan())
       .WillByDefault(testing::ReturnRef(Tracing::NullSpan::instance()));
-  callbacks_.stream_info_.protocol_ = Envoy::Http::Protocol::Http2;
+  decoder_callbacks_.stream_info_.protocol_ = Envoy::Http::Protocol::Http2;
+
+  ON_CALL(encoder_callbacks_, connection()).WillByDefault(testing::Return(&connection_));
+  ON_CALL(encoder_callbacks_, activeSpan())
+      .WillByDefault(testing::ReturnRef(Tracing::NullSpan::instance()));
+  encoder_callbacks_.stream_info_.protocol_ = Envoy::Http::Protocol::Http2;
 
   // Prepare expectations for dynamic forward proxy.
   ON_CALL(factory_context_.dispatcher_, createDnsResolver(_, _))
