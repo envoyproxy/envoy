@@ -118,7 +118,7 @@ TEST_P(OverloadIntegrationTest, DisableKeepaliveWhenOverloaded) {
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
   auto response = sendRequestAndWaitForResponse(request_headers, 1, default_response_headers_, 1);
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());

@@ -300,7 +300,7 @@ TEST_P(ProtocolIntegrationTest, DrainClose) {
   }
   EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_drain_close")->value(), 1L);
 
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
   EXPECT_TRUE(response->complete());
 
   EXPECT_EQ("200", response->headers().getStatusValue());
@@ -992,7 +992,7 @@ TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresCauseRequestRejectedByDefa
                                      {"foo_bar", "baz"}});
 
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
-    codec_client_->waitForDisconnect();
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("400", response->headers().getStatusValue());
   } else {
@@ -1127,7 +1127,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLength) {
                                                                  {"content-length", "-1"}});
   auto response = std::move(encoder_decoder.second);
 
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     ASSERT_TRUE(response->complete());
@@ -1158,7 +1158,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLengthAllowed) {
   auto response = std::move(encoder_decoder.second);
 
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
-    codec_client_->waitForDisconnect();
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
     response->waitForReset();
     codec_client_->close();
@@ -1183,7 +1183,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengths) {
                                                                  {"content-length", "3,2"}});
   auto response = std::move(encoder_decoder.second);
 
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     ASSERT_TRUE(response->complete());
@@ -1212,7 +1212,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengthsAllowed) {
   auto response = std::move(encoder_decoder.second);
 
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
-    codec_client_->waitForDisconnect();
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
     response->waitForReset();
     codec_client_->close();
@@ -1420,7 +1420,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersRejected) {
   codec_client_->sendTrailers(*request_encoder_, request_trailers);
 
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
-    codec_client_->waitForDisconnect();
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("431", response->headers().getStatusValue());
   } else {
@@ -1543,7 +1543,7 @@ TEST_P(ProtocolIntegrationTest, LargeRequestMethod) {
     auto encoder_decoder = codec_client_->startRequest(request_headers);
     request_encoder_ = &encoder_decoder.first;
     auto response = std::move(encoder_decoder.second);
-    codec_client_->waitForDisconnect();
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("400", response->headers().getStatusValue());
   } else {
@@ -1845,7 +1845,7 @@ TEST_P(ProtocolIntegrationTest, TestDownstreamResetIdleTimeout) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   }
 
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
 
 // Test connection is closed after single request processed.
@@ -1954,7 +1954,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidAuthority) {
   } else {
     // For HTTP/2 this is handled by nghttp2 which resets the connection without
     // sending an HTTP response.
-    codec_client_->waitForDisconnect();
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
     ASSERT_FALSE(response->complete());
   }
 }
@@ -1973,7 +1973,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectIsBlocked) {
     EXPECT_TRUE(response->complete());
   } else {
     response->waitForReset();
-    codec_client_->waitForDisconnect();
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
   }
 }
 
