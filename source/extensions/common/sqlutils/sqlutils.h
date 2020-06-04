@@ -7,7 +7,7 @@ namespace Extensions {
 namespace Common {
 namespace SQLUtils {
 
-class SQLutils {
+class SQLUtils {
 public:
   static bool setMetadata(const std::string& query, ProtobufWkt::Struct& metadata);
 };

@@ -28,53 +28,83 @@ class MetadataFromSQLTest
 TEST_P(MetadataFromSQLTest, ParsingAndMetadataTest) {
   // Get the SQL query
   const std::string& query = std::get<0>(GetParam());
-  ProtobufWkt::Struct metadata;
+  // vector of queries to check.
+  std::vector<std::string> test_queries;
+  test_queries.push_back(std::string(query));
 
-  // Check if the parsing result is what expected.
-  ASSERT_EQ(std::get<1>(GetParam()), SQLutils::setMetadata(query, metadata));
+  // Create uppercase and lowercase versions of the queries and put
+  // them into vector of queries to check
+  std::string lowercase_query = query;
+  std::transform(query.begin(), query.end(), lowercase_query.begin(),
+                 [](unsigned char c) { return std::tolower(c); });
+  test_queries.push_back(lowercase_query);
 
-  // If parsing was expected to fail do not check parsing values.
-  if (!std::get<1>(GetParam())) {
-    return;
-  }
+  std::string uppercase_query = query;
+  std::transform(query.begin(), query.end(), uppercase_query.begin(),
+                 [](unsigned char c) { return std::toupper(c); });
+  test_queries.push_back(uppercase_query);
 
-  // Access metadata fields, where parsing results are stored.
-  auto& fields = *metadata.mutable_fields();
+  while (!test_queries.empty()) {
+    std::string test_query = test_queries.back();
+    ProtobufWkt::Struct metadata;
 
-  // Get the names of resources which SQL query operates on.
-  std::map<std::string, std::list<std::string>> expected_tables = std::get<2>(GetParam());
-  // Check if query results return the same number of resources as expected.
-  ASSERT_EQ(expected_tables.size(), fields.size());
-  for (const auto& i : fields) {
-    // Get from created metadata the list of operations on the resource
-    const auto& operations = i;
-    // Get the list of expected operations on the same resource from test param.
-    const auto& table_name_it = expected_tables.find(operations.first);
-    // Make sure that a resource (table) found in metadata is expected.
-    ASSERT_NE(expected_tables.end(), table_name_it);
-    auto& operations_list = table_name_it->second;
-    // The number of expected operations and created in metadata must be the same.
-    ASSERT_EQ(operations_list.size(), operations.second.list_value().values().size());
-    // Now iterate over the operations list found in metadata and check if the same operation
-    // is listed as expected in test param.
-    for (const auto& j : operations.second.list_value().values()) {
-      // Find that operation in test params.
-      const auto operation_it =
-          std::find(operations_list.begin(), operations_list.end(), j.string_value());
-      ASSERT_NE(operations_list.end(), operation_it);
-      // Erase the operation. At the end of the test this list should be empty what means
-      // that we found all expected operations.
-      operations_list.erase(operation_it);
+    // Check if the parsing result is what expected.
+    ASSERT_EQ(std::get<1>(GetParam()), SQLUtils::setMetadata(test_query, metadata));
+
+    // If parsing was expected to fail do not check parsing values.
+    if (!std::get<1>(GetParam())) {
+      return;
     }
-    // Make sure that we went through all expected operations.
-    ASSERT_TRUE(operations_list.empty());
-    // Remove the table from the list. At the end of the test this list must be empty.
-    expected_tables.erase(table_name_it);
-  }
 
-  ASSERT_TRUE(expected_tables.empty());
+    // Access metadata fields, where parsing results are stored.
+    auto& fields = *metadata.mutable_fields();
+
+    // Get the names of resources which SQL query operates on.
+    std::map<std::string, std::list<std::string>> expected_tables = std::get<2>(GetParam());
+    // Check if query results return the same number of resources as expected.
+    ASSERT_EQ(expected_tables.size(), fields.size());
+    for (const auto& i : fields) {
+      // Get from created metadata the list of operations on the resource
+      const auto& operations = i;
+      std::string table_name = operations.first;
+
+      std::transform(table_name.begin(), table_name.end(), table_name.begin(),
+                     [](unsigned char c) { return std::tolower(c); });
+      // Get the list of expected operations on the same resource from test param.
+      const auto& table_name_it = expected_tables.find(table_name);
+      // Make sure that a resource (table) found in metadata is expected.
+      ASSERT_NE(expected_tables.end(), table_name_it);
+      auto& operations_list = table_name_it->second;
+      // The number of expected operations and created in metadata must be the same.
+      ASSERT_EQ(operations_list.size(), operations.second.list_value().values().size());
+      // Now iterate over the operations list found in metadata and check if the same operation
+      // is listed as expected in test param.
+      for (const auto& j : operations.second.list_value().values()) {
+        // Find that operation in test params.
+        const auto operation_it =
+            std::find(operations_list.begin(), operations_list.end(), j.string_value());
+        ASSERT_NE(operations_list.end(), operation_it);
+        // Erase the operation. At the end of the test this list should be empty what means
+        // that we found all expected operations.
+        operations_list.erase(operation_it);
+      }
+      // Make sure that we went through all expected operations.
+      ASSERT_TRUE(operations_list.empty());
+      // Remove the table from the list. At the end of the test this list must be empty.
+      expected_tables.erase(table_name_it);
+    }
+
+    ASSERT_TRUE(expected_tables.empty());
+    test_queries.pop_back();
+  }
 }
 
+// Note: This parameterized test's queries are converted to all lowercase and all uppercase
+// to validate that parser is case-insensitive. The test routine converts to uppercase and
+// lowercase entire query string, not only SQL keywords. This introduces a problem when comparing
+// tables' names when verifying parsing result. Therefore the test converts table names to lowercase
+// before comparing. It however requires that all table names in the queries below use lowercase
+// only.
 #define TEST_VALUE(...)                                                                            \
   std::tuple<std::string, bool, std::map<std::string, std::list<std::string>>> { __VA_ARGS__ }
 INSTANTIATE_TEST_SUITE_P(
@@ -116,8 +146,8 @@ INSTANTIATE_TEST_SUITE_P(
 
         TEST_VALUE("SELECT * FROM table1 WHERE Count = 1;", true, {{"table1", {"select"}}}),
         TEST_VALUE("SELECT * FROM table1 WHERE Count = 1;", true, {{"table1", {"select"}}}),
-        TEST_VALUE("SELECT Product.category FROM table1 WHERE Count = 1;", true,
-                   {{"table1", {"select"}}, {"Product", {"unknown"}}}),
+        TEST_VALUE("SELECT product.category FROM table1 WHERE Count = 1;", true,
+                   {{"table1", {"select"}}, {"product", {"unknown"}}}),
         TEST_VALUE("SELECT DISTINCT Usr FROM table1;", true, {{"table1", {"select"}}}),
         TEST_VALUE("SELECT Usr, Count FROM table1 ORDER BY Count DESC;", true,
                    {{"table1", {"select"}}}),

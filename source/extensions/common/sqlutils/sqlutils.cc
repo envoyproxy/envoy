@@ -5,7 +5,7 @@ namespace Extensions {
 namespace Common {
 namespace SQLUtils {
 
-bool SQLutils::setMetadata(const std::string& query, ProtobufWkt::Struct& metadata) {
+bool SQLUtils::setMetadata(const std::string& query, ProtobufWkt::Struct& metadata) {
   hsql::SQLParserResult result;
   hsql::SQLParser::parse(query, &result);
 
