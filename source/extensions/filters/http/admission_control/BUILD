@@ -1,6 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
+    "envoy_cc_extension",
     "envoy_package",
 )
 
@@ -20,6 +21,7 @@ envoy_cc_library(
         "admission_control.h",
         "thread_local_controller.h",
     ],
+    security_posture = "unknown",
     deps = [
         "//include/envoy/http:filter_interface",
         "//include/envoy/runtime:runtime_interface",
