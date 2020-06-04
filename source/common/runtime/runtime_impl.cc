@@ -515,7 +515,13 @@ LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator
   loadNewSnapshot();
 }
 
-void LoaderImpl::initialize(Upstream::ClusterManager& cm) { cm_ = &cm; }
+void LoaderImpl::initialize(Upstream::ClusterManager& cm) {
+  cm_ = &cm;
+
+  for (const auto& s : subscriptions_) {
+    s->createSubscription();
+  }
+}
 
 void LoaderImpl::startRtdsSubscriptions(ReadyCallback on_done) {
   on_rtds_initialized_ = on_done;
@@ -536,6 +542,12 @@ RtdsSubscription::RtdsSubscription(
       resource_name_(rtds_layer.name()),
       init_target_("RTDS " + resource_name_, [this]() { start(); }),
       validation_visitor_(validation_visitor) {}
+
+void RtdsSubscription::createSubscription() {
+  const auto resource_name = getResourceName();
+  subscription_ = parent.cm_->subscriptionFactory().subscriptionFromConfigSource(
+      config_source_, Grpc::Common::typeUrl(resource_name), store_, *this);
+}
 
 void RtdsSubscription::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                                       const std::string&) {
@@ -569,15 +581,7 @@ void RtdsSubscription::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureRe
   init_target_.ready();
 }
 
-void RtdsSubscription::start() {
-  // We have to delay the subscription creation until init-time, since the
-  // cluster manager resources are not available in the constructor when
-  // instantiated in the server instance.
-  const auto resource_name = getResourceName();
-  subscription_ = parent_.cm_->subscriptionFactory().subscriptionFromConfigSource(
-      config_source_, Grpc::Common::typeUrl(resource_name), store_, *this);
-  subscription_->start({resource_name_});
-}
+void RtdsSubscription::start() { subscription_->start({resource_name_}); }
 
 void RtdsSubscription::validateUpdateSize(uint32_t num_resources) {
   if (num_resources != 1) {
