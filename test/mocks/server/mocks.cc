@@ -303,6 +303,9 @@ MockTracerFactoryContext::MockTracerFactoryContext() {
 }
 
 MockTracerFactoryContext::~MockTracerFactoryContext() = default;
+
+MockBootstrapExtensionFactory::MockBootstrapExtensionFactory() = default;
+MockBootstrapExtensionFactory::~MockBootstrapExtensionFactory() = default;
 } // namespace Configuration
 } // namespace Server
 } // namespace Envoy
