@@ -11,6 +11,20 @@
 namespace Envoy {
 namespace ProtobufMessage {
 
+namespace {
+const char deprecation_error[] = " If continued use of this field is absolutely necessary, "
+                                 "see " ENVOY_DOC_URL_RUNTIME_OVERRIDE_DEPRECATED " for "
+                                 "how to apply a temporary and highly discouraged override.";
+
+void onDeprecatedFieldDefault(absl::string_view description, bool soft_deprecation) {
+  if (soft_deprecation) {
+    ENVOY_LOG_MISC(warn, "Deprecated field: {}", absl::StrCat(description, deprecation_error));
+  } else {
+    throw DeprecatedProtoFieldException(absl::StrCat(description, deprecation_error));
+  }
+}
+} // namespace
+
 void WarningValidationVisitorImpl::setUnknownCounter(Stats::Counter& counter) {
   ASSERT(unknown_counter_ == nullptr);
   unknown_counter_ = &counter;
@@ -36,11 +50,7 @@ void WarningValidationVisitorImpl::onUnknownField(absl::string_view description)
 
 void WarningValidationVisitorImpl::onDeprecatedField(absl::string_view description,
                                                      bool soft_deprecation) {
-  if (soft_deprecation) {
-    ENVOY_LOG_MISC(warn, "Deprecated field: {}", absl::StrCat(description, deprecation_error));
-  } else {
-    throw DeprecatedProtoFieldException(absl::StrCat(description, deprecation_error));
-  }
+  onDeprecatedFieldDefault(description, soft_deprecation);
 }
 
 void StrictValidationVisitorImpl::onUnknownField(absl::string_view description) {
@@ -50,11 +60,7 @@ void StrictValidationVisitorImpl::onUnknownField(absl::string_view description) 
 
 void StrictValidationVisitorImpl::onDeprecatedField(absl::string_view description,
                                                     bool soft_deprecation) {
-  if (soft_deprecation) {
-    ENVOY_LOG_MISC(warn, "Unexpected field: {}", absl::StrCat(description, deprecation_error));
-  } else {
-    throw DeprecatedProtoFieldException(absl::StrCat(description, deprecation_error));
-  }
+  onDeprecatedFieldDefault(description, soft_deprecation);
 }
 
 ValidationVisitor& getNullValidationVisitor() {

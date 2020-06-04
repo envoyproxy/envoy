@@ -28,20 +28,20 @@ TEST(WarningValidationVisitorImpl, UnknownField) {
   // we want to be executed.
   EXPECT_FALSE(warning_validation_visitor.skipValidation());
   // First time around we should log.
-  EXPECT_LOG_CONTAINS("warn", "Unexpected field: foo",
+  EXPECT_LOG_CONTAINS("warn", "Unknown field: foo",
                       warning_validation_visitor.onUnknownField("foo"));
   // Duplicate descriptions don't generate a log the second time around.
-  EXPECT_LOG_NOT_CONTAINS("warn", "Unexpected field: foo",
+  EXPECT_LOG_NOT_CONTAINS("warn", "Unknown field: foo",
                           warning_validation_visitor.onUnknownField("foo"));
   // Unrelated variable increments.
-  EXPECT_LOG_CONTAINS("warn", "Unexpected field: bar",
+  EXPECT_LOG_CONTAINS("warn", "Unknown field: bar",
                       warning_validation_visitor.onUnknownField("bar"));
   // When we set the stats counter, the above increments are transferred.
   EXPECT_EQ(0, unknown_counter.value());
   warning_validation_visitor.setUnknownCounter(unknown_counter);
   EXPECT_EQ(2, unknown_counter.value());
   // A third unknown field is tracked in stats post-initialization.
-  EXPECT_LOG_CONTAINS("warn", "Unexpected field: baz",
+  EXPECT_LOG_CONTAINS("warn", "Unknown field: baz",
                       warning_validation_visitor.onUnknownField("baz"));
   EXPECT_EQ(3, unknown_counter.value());
 }
