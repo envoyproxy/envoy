@@ -23,6 +23,7 @@
 
 #include "extensions/transport_sockets/tls/utility.h"
 
+#include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
 #include "openssl/evp.h"
 #include "openssl/hmac.h"
@@ -102,7 +103,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       for (const auto& cipher : ciphers) {
         std::string cipher_str(cipher);
 
-        if (cipher_str.find("-") == 0) {
+        if (absl::StartsWith(cipher_str, "-")) {
           cipher_str.erase(cipher_str.begin());
         }
 
