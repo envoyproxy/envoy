@@ -12,7 +12,7 @@ load(
 envoy_package()
 
 envoy_extension_cc_test(
-    name = "oauth_test",
+    name = "filter_test",
     srcs = ["filter_test.cc"],
     extension_name = "envoy.filters.http.oauth",
     deps = [
