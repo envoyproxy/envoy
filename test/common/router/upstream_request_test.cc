@@ -30,7 +30,8 @@ class MockGenericConnPool : public GenericConnPool {
   MOCK_METHOD(bool, cancelAnyPendingRequest, ());
   MOCK_METHOD(absl::optional<Http::Protocol>, protocol, (), (const));
   MOCK_METHOD(bool, initialize,
-              (Upstream::ClusterManager&, const RouteEntry&, Http::Protocol,
+              (Upstream::ClusterManager&, const RouteEntry&,
+               std::function<Http::Protocol(const Upstream::ClusterInfo&)>,
                Upstream::LoadBalancerContext*));
   MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, host, (), (const));
 };
@@ -115,7 +116,8 @@ public:
     NiceMock<MockRouteEntry> route_entry;
     NiceMock<Upstream::MockClusterManager> cm;
     EXPECT_CALL(cm, tcpConnPoolForCluster(_, _, _)).WillOnce(Return(&mock_pool_));
-    EXPECT_TRUE(conn_pool_.initialize(cm, route_entry, Http::Protocol::Http11, nullptr));
+    EXPECT_TRUE(conn_pool_.initialize(
+        cm, route_entry, [](const auto&) { return Http::Protocol::Http11; }, nullptr));
   }
 
   TcpConnPool conn_pool_;
