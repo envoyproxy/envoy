@@ -14,7 +14,12 @@ class ThreadImplWin32 : public Thread {
 public:
   ThreadImplWin32(std::function<void()> thread_routine, OptionsOptConstRef options)
       : thread_routine_(thread_routine) {
-    UNREFERENCED_PARAMETER(options); // TODO(jmarantz): set the thread name for task manager, etc.
+    if (options) {
+      name_ = options->name_;
+      // TODO(jmarantz): set the thread name for task manager, etc, or pull the
+      // auto-generated name from the OS if options is not present.
+    }
+
     RELEASE_ASSERT(Logger::Registry::initialized(), "");
     thread_handle_ = reinterpret_cast<HANDLE>(::_beginthreadex(
         nullptr, 0,
@@ -37,9 +42,12 @@ public:
   // Needed for WatcherImpl for the QueueUserAPC callback context
   HANDLE handle() const { return thread_handle_; }
 
+  sted::string name() const override { return name_; }
+
 private:
   std::function<void()> thread_routine_;
   HANDLE thread_handle_;
+  std::string name_;
 };
 
 ThreadPtr ThreadFactoryImplWin32::createThread(std::function<void()> thread_routine,

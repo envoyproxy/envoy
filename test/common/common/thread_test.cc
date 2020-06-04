@@ -7,6 +7,7 @@
 
 #include "absl/strings/str_cat.h"
 #include "absl/synchronization/notification.h"
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -205,7 +206,19 @@ TEST_F(ThreadAsyncPtrTest, ManagedAlloc) {
 TEST_F(ThreadAsyncPtrTest, Truncate) {
   auto thread =
       thread_factory_.createThread([]() {}, Options{"this name is way too long for posix"});
-  EXPECT_EQ("this name is wa", thread->name());
+
+  // To make this test work on multiple platforms, just assume the first 10 characters
+  // are retained.
+  EXPECT_THAT(thread->name(), testing::StartsWith("this name "));
+}
+
+TEST_F(ThreadAsyncPtrTest, NameNotSpecified) {
+  auto thread = thread_factory_.createThread([]() {});
+
+  // For posix builds, the thread name defaults to the name of the binary.
+  // Not sure about Windows. Note that for coverage, the tests are all linked
+  // together, and for Windows tests I'm not sure what the behavior is.
+  EXPECT_FALSE(thread->name().empty());
 }
 
 } // namespace

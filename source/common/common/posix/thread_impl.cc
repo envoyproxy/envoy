@@ -58,18 +58,20 @@ public:
         },
         this);
     RELEASE_ASSERT(rc == 0, "");
-    if (!name_.empty()) {
+
+    // If the name was not specified, get it from the OS. If the name was
+    // specified, write it into the thread, and assert that the OS sees it the
+    // same way.
+    if (name_.empty()) {
+      name_ = getNameFromOS();
+    } else {
       const int set_name_rc = pthread_setname_np(thread_handle_, name_.c_str());
       RELEASE_ASSERT(set_name_rc == 0, absl::StrCat("Error ", set_name_rc, " setting name '", name_,
                                                     "': ", strerror(set_name_rc)));
-#ifndef NDEBUG
-      // Verify that the name got written into the thread as expected.
-      char buf[PTHREAD_MAX_LEN_INCLUDING_NULL_BYTE];
-      const int get_name_rc = pthread_getname_np(thread_handle_, buf, sizeof(buf));
-      RELEASE_ASSERT(get_name_rc == 0, absl::StrCat("Error ", get_name_rc, " setting name '", name_,
-                                                    "': ", strerror(get_name_rc)));
-#endif
+      ASSERT(name_ == getNameFromOS(),
+             absl::StrCat("configured name=", name_, " os name=", getNameFromOS()));
     }
+
     start_.Notify();
   }
 
@@ -79,6 +81,15 @@ public:
   void join() override;
 
 private:
+  std::string getNameFromOS() {
+    // Verify that the name got written into the thread as expected.
+    char buf[PTHREAD_MAX_LEN_INCLUDING_NULL_BYTE];
+    const int get_name_rc = pthread_getname_np(thread_handle_, buf, sizeof(buf));
+    RELEASE_ASSERT(get_name_rc == 0, absl::StrCat("Error ", get_name_rc, " setting name '", name_,
+                                                  "': ", strerror(get_name_rc)));
+    return buf;
+  }
+
   std::function<void()> thread_routine_;
   pthread_t thread_handle_;
   std::string name_;
