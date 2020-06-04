@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_fuzz_test",
@@ -10,6 +8,8 @@ load(
     "envoy_package",
     "envoy_proto_library",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -69,7 +69,7 @@ envoy_cc_test(
         "//source/common/config:utility_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/router:rds_lib",
-        "//source/server/http:admin_lib",
+        "//source/server/admin:admin_lib",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/server:server_mocks",
@@ -113,7 +113,7 @@ envoy_cc_test(
         "//source/common/http:message_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/router:scoped_rds_lib",
-        "//source/server/http:admin_lib",
+        "//source/server/admin:admin_lib",
         "//test/mocks/config:config_mocks",
         "//test/mocks/init:init_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
@@ -138,7 +138,7 @@ envoy_cc_test(
         "//source/common/protobuf",
         "//source/common/router:rds_lib",
         "//source/common/router:vhds_lib",
-        "//source/server/http:admin_lib",
+        "//source/server/admin:admin_lib",
         "//test/mocks/config:config_mocks",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/server:server_mocks",

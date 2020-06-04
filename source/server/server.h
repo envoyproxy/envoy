@@ -10,6 +10,7 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/event/timer.h"
+#include "envoy/server/bootstrap_extension_config.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/guarddog.h"
 #include "envoy/server/instance.h"
@@ -35,8 +36,8 @@
 #include "common/secret/secret_manager_impl.h"
 #include "common/upstream/health_discovery_service.h"
 
+#include "server/admin/admin.h"
 #include "server/configuration_impl.h"
-#include "server/http/admin.h"
 #include "server/listener_hooks.h"
 #include "server/listener_manager_impl.h"
 #include "server/overload_manager_impl.h"
@@ -346,6 +347,7 @@ private:
   Upstream::ProdClusterInfoFactory info_factory_;
   Upstream::HdsDelegatePtr hds_delegate_;
   std::unique_ptr<OverloadManagerImpl> overload_manager_;
+  std::vector<BootstrapExtensionPtr> bootstrap_extensions_;
   Envoy::MutexTracer* mutex_tracer_;
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;

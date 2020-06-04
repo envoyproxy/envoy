@@ -1,17 +1,20 @@
 #include <memory>
 
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/server/bootstrap_extension_config.h"
 
 #include "common/common/assert.h"
 #include "common/common/version.h"
 #include "common/network/address_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/socket_option_impl.h"
+#include "common/protobuf/protobuf.h"
 #include "common/thread_local/thread_local_impl.h"
 
 #include "server/process_context_impl.h"
 #include "server/server.h"
 
+#include "test/common/config/dummy_config.pb.h"
 #include "test/common/stats/stat_test_utility.h"
 #include "test/integration/server.h"
 #include "test/mocks/server/mocks.h"
@@ -186,7 +189,7 @@ protected:
         std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
         Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
         std::move(process_context_));
-    EXPECT_TRUE(server_->api().fileSystem().fileExists("/dev/null"));
+    EXPECT_TRUE(server_->api().fileSystem().fileExists(TestEnvironment::nullDevicePath()));
   }
 
   void initializeWithHealthCheckParams(const std::string& bootstrap_path, const double timeout,
@@ -205,7 +208,7 @@ protected:
         std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
         Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr);
 
-    EXPECT_TRUE(server_->api().fileSystem().fileExists("/dev/null"));
+    EXPECT_TRUE(server_->api().fileSystem().fileExists(TestEnvironment::nullDevicePath()));
   }
 
   Thread::ThreadPtr startTestServer(const std::string& bootstrap_path,
@@ -805,6 +808,14 @@ TEST_P(ServerInstanceImplTest, BootstrapClusterManagerInitializationFail) {
                             EnvoyException, "cluster manager: duplicate cluster 'service_google'");
 }
 
+// Regression tests for SdsApi throwing exceptions in initialize().
+TEST_P(ServerInstanceImplTest, BadSdsConfigSource) {
+  EXPECT_THROW_WITH_MESSAGE(
+      initialize("test/server/test_data/server/bad_sds_config_source.yaml"), EnvoyException,
+      "envoy.config.core.v3.ApiConfigSource must have a statically defined non-EDS cluster: "
+      "'sds-grpc' does not exist, was added via api, or is an EDS cluster");
+}
+
 // Test for protoc-gen-validate constraint on invalid timeout entry of a health check config entry.
 TEST_P(ServerInstanceImplTest, BootstrapClusterHealthCheckInvalidTimeout) {
   EXPECT_THROW_WITH_REGEX(
@@ -860,9 +871,10 @@ namespace {
 void bindAndListenTcpSocket(const Network::Address::InstanceConstSharedPtr& address,
                             const Network::Socket::OptionsSharedPtr& options) {
   auto socket = std::make_unique<Network::TcpListenSocket>(address, options, true);
+  auto& os_sys_calls = Api::OsSysCallsSingleton::get();
   // Some kernels erroneously allow `bind` without SO_REUSEPORT for addresses
   // with some other socket already listening on it, see #7636.
-  if (::listen(socket->ioHandle().fd(), 1) != 0) {
+  if (SOCKET_FAILURE(os_sys_calls.listen(socket->ioHandle().fd(), 1).rc_)) {
     // Mimic bind exception for the test simplicity.
     throw Network::SocketBindException(fmt::format("cannot listen: {}", strerror(errno)), errno);
   }
@@ -1040,6 +1052,53 @@ TEST_P(ServerInstanceImplTest, WithProcessContext) {
 
   object.boolean_flag_ = false;
   EXPECT_FALSE(object_from_context.boolean_flag_);
+}
+
+class FooBootstrapExtension : public BootstrapExtension {};
+
+TEST_P(ServerInstanceImplTest, WithBootstrapExtensions) {
+  NiceMock<Configuration::MockBootstrapExtensionFactory> mock_factory;
+  EXPECT_CALL(mock_factory, createEmptyConfigProto()).WillRepeatedly(Invoke([]() {
+    return std::make_unique<test::common::config::DummyConfig>();
+  }));
+  EXPECT_CALL(mock_factory, name()).WillRepeatedly(Return("envoy_test.bootstrap.foo"));
+  EXPECT_CALL(mock_factory, createBootstrapExtension(_, _))
+      .WillOnce(Invoke([](const Protobuf::Message& config, Configuration::ServerFactoryContext&) {
+        const auto* proto = dynamic_cast<const test::common::config::DummyConfig*>(&config);
+        EXPECT_NE(nullptr, proto);
+        EXPECT_EQ(proto->a(), "foo");
+        return std::make_unique<FooBootstrapExtension>();
+      }));
+
+  Registry::InjectFactory<Configuration::BootstrapExtensionFactory> registered_factory(
+      mock_factory);
+
+  EXPECT_NO_THROW(initialize("test/server/test_data/server/bootstrap_extensions.yaml"));
+}
+
+TEST_P(ServerInstanceImplTest, WithBootstrapExtensionsThrowingError) {
+  NiceMock<Configuration::MockBootstrapExtensionFactory> mock_factory;
+  EXPECT_CALL(mock_factory, createEmptyConfigProto()).WillRepeatedly(Invoke([]() {
+    return std::make_unique<test::common::config::DummyConfig>();
+  }));
+  EXPECT_CALL(mock_factory, name()).WillRepeatedly(Return("envoy_test.bootstrap.foo"));
+  EXPECT_CALL(mock_factory, createBootstrapExtension(_, _))
+      .WillOnce(Invoke([](const Protobuf::Message&,
+                          Configuration::ServerFactoryContext&) -> BootstrapExtensionPtr {
+        throw EnvoyException("Unable to initiate mock_bootstrap_extension.");
+      }));
+
+  Registry::InjectFactory<Configuration::BootstrapExtensionFactory> registered_factory(
+      mock_factory);
+
+  EXPECT_THROW_WITH_REGEX(initialize("test/server/test_data/server/bootstrap_extensions.yaml"),
+                          EnvoyException, "Unable to initiate mock_bootstrap_extension.");
+}
+
+TEST_P(ServerInstanceImplTest, WithUnknownBootstrapExtensions) {
+  EXPECT_THROW_WITH_REGEX(
+      initialize("test/server/test_data/server/bootstrap_extensions.yaml"), EnvoyException,
+      "Didn't find a registered implementation for name: 'envoy_test.bootstrap.foo'");
 }
 
 // Static configuration validation. We test with both allow/reject settings various aspects of

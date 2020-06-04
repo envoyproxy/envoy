@@ -53,9 +53,8 @@ Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::RequestHeaderMap& head
 
   is_cors_request_ = true;
 
-  const auto method = headers.Method();
-  if (method == nullptr ||
-      method->value().getStringView() != Http::Headers::get().MethodValues.Options) {
+  const absl::string_view method = headers.getMethodValue();
+  if (method != Http::Headers::get().MethodValues.Options) {
     return Http::FilterHeadersStatus::Continue;
   }
 

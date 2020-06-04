@@ -259,6 +259,7 @@ size_t MessageUtil::hash(const Protobuf::Message& message) {
     printer.SetExpandAny(true);
     printer.SetUseFieldNumber(true);
     printer.SetSingleLineMode(true);
+    printer.SetHideUnknownFields(true);
     printer.PrintToString(message, &text_format);
   }
 

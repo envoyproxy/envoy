@@ -17,6 +17,7 @@ ASCII
 ASSERTs
 AST
 AWS
+Allowlisted
 BACKTRACE
 BSON
 BPF
@@ -147,6 +148,7 @@ IPV
 IPs
 IPv
 ITOA
+Injectable
 Isode
 Iters
 JSON
@@ -170,6 +172,7 @@ LHS
 LLVM
 LPT
 LRS
+Loggable
 MB
 MD
 MERCHANTABILITY
@@ -362,6 +365,7 @@ alloc
 alloca
 allocator
 allowlist
+allowlisted
 alls
 alphanumerics
 amongst
@@ -798,6 +802,7 @@ openssl
 opentracing
 optimizations
 optname
+optval
 ostream
 outlier
 outliers
@@ -943,6 +948,7 @@ retriable
 retriggers
 rmdir
 rocketmq
+rewriter
 rollout
 roundtrip
 rpcs
@@ -983,6 +989,7 @@ snapshotted
 sockaddr
 socketpair
 sockfd
+socklen
 sockopt
 sockopts
 somestring

@@ -216,18 +216,18 @@ protected:
   }
 
   /**
-   * Validate that setsockopt() is called the expected number of times with the expected options.
+   * Validate that setSocketOption() is called the expected number of times with the expected
+   * options.
    */
-  void expectSetsockopt(NiceMock<Api::MockOsSysCalls>& os_sys_calls, int expected_sockopt_level,
-                        int expected_sockopt_name, int expected_value,
+  void expectSetsockopt(int expected_sockopt_level, int expected_sockopt_name, int expected_value,
                         uint32_t expected_num_calls = 1) {
-    EXPECT_CALL(os_sys_calls,
-                setsockopt_(_, expected_sockopt_level, expected_sockopt_name, _, sizeof(int)))
+    EXPECT_CALL(*listener_factory_.socket_,
+                setSocketOption(expected_sockopt_level, expected_sockopt_name, _, sizeof(int)))
         .Times(expected_num_calls)
-        .WillRepeatedly(
-            Invoke([expected_value](os_fd_t, int, int, const void* optval, socklen_t) -> int {
+        .WillRepeatedly(Invoke(
+            [expected_value](int, int, const void* optval, socklen_t) -> Api::SysCallIntResult {
               EXPECT_EQ(expected_value, *static_cast<const int*>(optval));
-              return 0;
+              return {0, 0};
             }));
   }
 

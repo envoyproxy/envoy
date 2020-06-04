@@ -2739,8 +2739,7 @@ virtual_hosts:
     route->routeEntry()->maxGrpcTimeout();
     route->routeEntry()->grpcTimeoutOffset();
     route->routeEntry()->upgradeMap();
-    route->routeEntry()->internalRedirectAction();
-    route->routeEntry()->maxInternalRedirects();
+    route->routeEntry()->internalRedirectPolicy();
   }
 }
 
@@ -2812,6 +2811,50 @@ virtual_hosts:
   EXPECT_EQ(absl::nullopt, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
                                ->routeEntry()
                                ->grpcTimeoutOffset());
+}
+
+TEST_F(RouteMatcherTest, GrpcTimeoutOffsetOfDynamicRoute) {
+  // A DynamicRouteEntry will be created when 'cluster_header' is set.
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains:
+  - "*"
+  routes:
+  - match:
+      prefix: "/foo"
+    route:
+      cluster: local_service_grpc
+      max_grpc_timeout: 0.1s
+      grpc_timeout_offset: 0.01s
+  - match:
+      prefix: "/"
+    route:
+      max_grpc_timeout: 0.2s
+      grpc_timeout_offset: 0.02s
+      cluster_header: request_to
+      )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
+
+  {
+    Http::TestRequestHeaderMapImpl reqeust_headers = genHeaders("www.lyft.com", "/", "GET");
+    reqeust_headers.addCopy(Http::LowerCaseString("reqeust_to"), "dynamic_grpc_service");
+    EXPECT_EQ(absl::make_optional(std::chrono::milliseconds(20)),
+              config.route(reqeust_headers, 0)->routeEntry()->grpcTimeoutOffset());
+    EXPECT_EQ(absl::make_optional(std::chrono::milliseconds(200)),
+              config.route(reqeust_headers, 0)->routeEntry()->maxGrpcTimeout());
+  }
+  {
+
+    EXPECT_EQ(absl::make_optional(std::chrono::milliseconds(10)),
+              config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                  ->routeEntry()
+                  ->grpcTimeoutOffset());
+    EXPECT_EQ(
+        absl::make_optional(std::chrono::milliseconds(100)),
+        config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)->routeEntry()->maxGrpcTimeout());
+  }
 }
 
 TEST_F(RouteMatcherTest, FractionalRuntime) {
@@ -6884,6 +6927,130 @@ virtual_hosts:
   const auto predicates1 = retry_policy.retryHostPredicates();
   const auto predicates2 = retry_policy.retryHostPredicates();
   EXPECT_NE(predicates1, predicates2);
+}
+
+TEST_F(RouteConfigurationV2, InternalRedirctIsDisabledWhenNotSpecifiedInRouteAction) {
+  const std::string InternalRedirectEnabled = R"EOF(
+name: InternalRedirectEnabled
+virtual_hosts:
+  - name: regex
+    domains: [idle.lyft.com]
+    routes:
+      - match:
+          safe_regex:
+            google_re2: {}
+            regex: "/regex"
+        route:
+          cluster: some-cluster
+  )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(InternalRedirectEnabled),
+                        factory_context_, true);
+  Http::TestRequestHeaderMapImpl headers =
+      genRedirectHeaders("idle.lyft.com", "/regex", true, false);
+  const auto& internal_redirect_policy =
+      config.route(headers, 0)->routeEntry()->internalRedirectPolicy();
+  EXPECT_FALSE(internal_redirect_policy.enabled());
+}
+
+TEST_F(RouteConfigurationV2, DefaultInternalRedirctPolicyIsSensible) {
+  const std::string InternalRedirectEnabled = R"EOF(
+name: InternalRedirectEnabled
+virtual_hosts:
+  - name: regex
+    domains: [idle.lyft.com]
+    routes:
+      - match:
+          safe_regex:
+            google_re2: {}
+            regex: "/regex"
+        route:
+          cluster: some-cluster
+          internal_redirect_policy: {}
+  )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(InternalRedirectEnabled),
+                        factory_context_, true);
+  Http::TestRequestHeaderMapImpl headers =
+      genRedirectHeaders("idle.lyft.com", "/regex", true, false);
+  const auto& internal_redirect_policy =
+      config.route(headers, 0)->routeEntry()->internalRedirectPolicy();
+  EXPECT_TRUE(internal_redirect_policy.enabled());
+  EXPECT_TRUE(internal_redirect_policy.shouldRedirectForResponseCode(static_cast<Http::Code>(302)));
+  EXPECT_FALSE(
+      internal_redirect_policy.shouldRedirectForResponseCode(static_cast<Http::Code>(200)));
+  EXPECT_EQ(1, internal_redirect_policy.maxInternalRedirects());
+  EXPECT_TRUE(internal_redirect_policy.predicates().empty());
+  EXPECT_FALSE(internal_redirect_policy.isCrossSchemeRedirectAllowed());
+}
+
+TEST_F(RouteConfigurationV2, InternalRedirctPolicyDropsInvalidRedirectCode) {
+  const std::string InternalRedirectEnabled = R"EOF(
+name: InternalRedirectEnabled
+virtual_hosts:
+  - name: regex
+    domains: [idle.lyft.com]
+    routes:
+      - match:
+          safe_regex:
+            google_re2: {}
+            regex: "/regex"
+        route:
+          cluster: some-cluster
+          internal_redirect_policy:
+            redirect_response_codes: [301, 302, 303, 304]
+  )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(InternalRedirectEnabled),
+                        factory_context_, true);
+  Http::TestRequestHeaderMapImpl headers =
+      genRedirectHeaders("idle.lyft.com", "/regex", true, false);
+  const auto& internal_redirect_policy =
+      config.route(headers, 0)->routeEntry()->internalRedirectPolicy();
+  EXPECT_TRUE(internal_redirect_policy.enabled());
+  EXPECT_TRUE(internal_redirect_policy.shouldRedirectForResponseCode(static_cast<Http::Code>(301)));
+  EXPECT_TRUE(internal_redirect_policy.shouldRedirectForResponseCode(static_cast<Http::Code>(302)));
+  EXPECT_TRUE(internal_redirect_policy.shouldRedirectForResponseCode(static_cast<Http::Code>(303)));
+  EXPECT_FALSE(
+      internal_redirect_policy.shouldRedirectForResponseCode(static_cast<Http::Code>(304)));
+  EXPECT_FALSE(
+      internal_redirect_policy.shouldRedirectForResponseCode(static_cast<Http::Code>(305)));
+  EXPECT_FALSE(
+      internal_redirect_policy.shouldRedirectForResponseCode(static_cast<Http::Code>(306)));
+  EXPECT_FALSE(
+      internal_redirect_policy.shouldRedirectForResponseCode(static_cast<Http::Code>(307)));
+}
+
+TEST_F(RouteConfigurationV2, InternalRedirctPolicyDropsInvalidRedirectCodeCauseEmptySet) {
+  const std::string InternalRedirectEnabled = R"EOF(
+name: InternalRedirectEnabled
+virtual_hosts:
+  - name: regex
+    domains: [idle.lyft.com]
+    routes:
+      - match:
+          safe_regex:
+            google_re2: {}
+            regex: "/regex"
+        route:
+          cluster: some-cluster
+          internal_redirect_policy:
+            redirect_response_codes: [200, 304]
+  )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(InternalRedirectEnabled),
+                        factory_context_, true);
+  Http::TestRequestHeaderMapImpl headers =
+      genRedirectHeaders("idle.lyft.com", "/regex", true, false);
+  const auto& internal_redirect_policy =
+      config.route(headers, 0)->routeEntry()->internalRedirectPolicy();
+  EXPECT_TRUE(internal_redirect_policy.enabled());
+  EXPECT_FALSE(
+      internal_redirect_policy.shouldRedirectForResponseCode(static_cast<Http::Code>(302)));
+  EXPECT_FALSE(
+      internal_redirect_policy.shouldRedirectForResponseCode(static_cast<Http::Code>(304)));
+  EXPECT_FALSE(
+      internal_redirect_policy.shouldRedirectForResponseCode(static_cast<Http::Code>(200)));
 }
 
 class PerFilterConfigsTest : public testing::Test, public ConfigImplTestBase {

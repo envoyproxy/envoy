@@ -353,7 +353,7 @@ typed_config:
   cleanup();
 
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("403", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("403", response->headers().getStatusValue());
   EXPECT_EQ("nope", response->body());
 }
 
@@ -404,7 +404,7 @@ typed_config:
   cleanup();
 
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 // Filter alters headers and changes route.
@@ -437,7 +437,7 @@ typed_config:
   cleanup();
 
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 // Should survive from 30 calls when calling streamInfo():dynamicMetadata(). This is a regression
@@ -471,7 +471,7 @@ typed_config:
     response->waitForEndStream();
 
     EXPECT_TRUE(response->complete());
-    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+    EXPECT_EQ("200", response->headers().getStatusValue());
   }
 
   cleanup();
@@ -571,7 +571,7 @@ typed_config:
   response->waitForEndStream();
 
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 
   cleanup();
 }

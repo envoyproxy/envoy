@@ -1,7 +1,8 @@
-licenses(["notice"])  # Apache 2
-
+load("@rules_cc//cc:defs.bzl", "cc_library")
 load("//bazel:envoy_build_system.bzl", "envoy_cmake_external", "envoy_package")
 load("@rules_foreign_cc//tools/build_defs:configure.bzl", "configure_make")
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -82,9 +83,18 @@ envoy_cmake_external(
         "CARES_SHARED": "no",
         "CARES_STATIC": "on",
         "CMAKE_CXX_COMPILER_FORCED": "on",
+        "CMAKE_INSTALL_LIBDIR": "lib",
     },
     defines = ["CARES_STATICLIB"],
     lib_source = "@com_github_c_ares_c_ares//:all",
+    linkopts = select({
+        "//bazel:apple": ["-lresolv"],
+        "//conditions:default": [],
+    }),
+    postfix_script = select({
+        "//bazel:windows_x86_64": "cp -L $EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/nameser.h $INSTALLDIR/include/nameser.h",
+        "//conditions:default": "",
+    }),
     static_libraries = select({
         "//bazel:windows_x86_64": ["cares.lib"],
         "//conditions:default": ["libcares.a"],
@@ -193,8 +203,8 @@ envoy_cmake_external(
     defines = ["NGHTTP2_STATICLIB"],
     lib_source = "@com_github_nghttp2_nghttp2//:all",
     static_libraries = select({
-        "//bazel:windows_x86_64": ["nghttp2_static.lib"],
-        "//conditions:default": ["libnghttp2_static.a"],
+        "//bazel:windows_x86_64": ["nghttp2.lib"],
+        "//conditions:default": ["libnghttp2.a"],
     }),
 )
 
@@ -207,7 +217,7 @@ envoy_cmake_external(
     },
     lib_source = "@com_github_jbeder_yaml_cpp//:all",
     static_libraries = select({
-        "//bazel:windows_x86_64": ["libyaml-cpp.lib"],
+        "//bazel:windows_x86_64": ["yaml-cpp.lib"],
         "//conditions:default": ["libyaml-cpp.a"],
     }),
 )
