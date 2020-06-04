@@ -5,6 +5,8 @@ Version history
 ================
 * listener: Add runtime support for `per-listener limits <config_listeners_runtime>` on
   active/accepted connections.
+* overload management: Add runtime support for :ref:`global limits <config_overload_manager>`
+  on active/accepted connections.
 
 1.14.2 (June 8, 2020)
 =====================

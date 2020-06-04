@@ -332,7 +332,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // 2020/04/02  10624    35564       36000   Use 100 clusters rather than 1000 to avoid timeouts
   // 2020/04/07  10661    35557       36000   fix clang tidy on master
   // 2020/05/13  10531    36537       44600   Refactor resource manager
-  // 2020/04/23  10661    36537       37000   per-listener connection limits
+  // 2020/04/23  10661    36537       36800   per-listener connection limits
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you

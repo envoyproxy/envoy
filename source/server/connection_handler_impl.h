@@ -28,8 +28,9 @@ namespace Server {
 
 #define ALL_LISTENER_STATS(COUNTER, GAUGE, HISTOGRAM)                                              \
   COUNTER(downstream_cx_destroy)                                                                   \
-  COUNTER(downstream_cx_total)                                                                     \
   COUNTER(downstream_cx_overflow)                                                                  \
+  COUNTER(downstream_cx_total)                                                                     \
+  COUNTER(downstream_global_cx_overflow)                                                           \
   COUNTER(downstream_pre_cx_timeout)                                                               \
   COUNTER(no_filter_chain_match)                                                                   \
   GAUGE(downstream_cx_active, Accumulate)                                                          \
@@ -125,6 +126,7 @@ private:
 
     // Network::ListenerCallbacks
     void onAccept(Network::ConnectionSocketPtr&& socket) override;
+    void onReject() override { stats_.downstream_global_cx_overflow_.inc(); }
 
     // ActiveListenerImplBase
     Network::Listener* listener() override { return listener_.get(); }

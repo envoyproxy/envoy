@@ -17,12 +17,43 @@
 namespace Envoy {
 namespace Network {
 
+const absl::string_view ListenerImpl::GlobalMaxCxRuntimeKey =
+    "overload.global_downstream_max_connections";
+
+bool ListenerImpl::rejectCxOverGlobalLimit() {
+  // Enforce the global connection limit if necessary, immediately closing the accepted connection.
+  Runtime::Loader* runtime = Runtime::LoaderSingleton::getExisting();
+
+  if (runtime == nullptr) {
+    // The runtime singleton won't exist in most unit tests that do not need global downstream limit
+    // enforcement. Therefore, there is no need to enforce limits if the singleton doesn't exist.
+    // TODO(tonya11en): Revisit this once runtime is made globally available.
+    return false;
+  }
+
+  // If the connection limit is not set, don't limit the connections, but still track them.
+  // TODO(tonya11en): In integration tests, threadsafeSnapshot is necessary since the FakeUpstreams
+  // use a listener and do not run in a worker thread. In practice, this code path will always be
+  // run on a worker thread, but to prevent failed assertions in test environments, threadsafe
+  // snapshots must be used. This must be revisited.
+  const uint64_t global_cx_limit = runtime->threadsafeSnapshot()->getInteger(
+      GlobalMaxCxRuntimeKey, std::numeric_limits<uint64_t>::max());
+  return AcceptedSocketImpl::acceptedSocketCount() >= global_cx_limit;
+}
+
 void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr* remote_addr,
                                   int remote_addr_len, void* arg) {
   ListenerImpl* listener = static_cast<ListenerImpl*>(arg);
 
   // Create the IoSocketHandleImpl for the fd here.
   IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(fd);
+
+  if (rejectCxOverGlobalLimit()) {
+    // The global connection limit has been reached.
+    io_handle->close();
+    listener->cb_.onReject();
+    return;
+  }
 
   // Get the local address from the new socket if the listener is listening on IP ANY
   // (e.g., 0.0.0.0 for IPv4) (local_address_ is nullptr in this case).
