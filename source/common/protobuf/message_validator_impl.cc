@@ -16,7 +16,7 @@ const char deprecation_error[] = " If continued use of this field is absolutely 
                                  "see " ENVOY_DOC_URL_RUNTIME_OVERRIDE_DEPRECATED " for "
                                  "how to apply a temporary and highly discouraged override.";
 
-void onDeprecatedFieldDefault(absl::string_view description, bool soft_deprecation) {
+void onDeprecatedFieldCommon(absl::string_view description, bool soft_deprecation) {
   if (soft_deprecation) {
     ENVOY_LOG_MISC(warn, "Deprecated field: {}", absl::StrCat(description, deprecation_error));
   } else {
@@ -50,7 +50,7 @@ void WarningValidationVisitorImpl::onUnknownField(absl::string_view description)
 
 void WarningValidationVisitorImpl::onDeprecatedField(absl::string_view description,
                                                      bool soft_deprecation) {
-  onDeprecatedFieldDefault(description, soft_deprecation);
+  onDeprecatedFieldCommon(description, soft_deprecation);
 }
 
 void StrictValidationVisitorImpl::onUnknownField(absl::string_view description) {
@@ -60,7 +60,7 @@ void StrictValidationVisitorImpl::onUnknownField(absl::string_view description) 
 
 void StrictValidationVisitorImpl::onDeprecatedField(absl::string_view description,
                                                     bool soft_deprecation) {
-  onDeprecatedFieldDefault(description, soft_deprecation);
+  onDeprecatedFieldCommon(description, soft_deprecation);
 }
 
 ValidationVisitor& getNullValidationVisitor() {
