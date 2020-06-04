@@ -4,7 +4,6 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
-#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/http/header_map.h"
 
 #include "common/formatter/header_formatter.h"
