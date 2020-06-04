@@ -275,7 +275,8 @@ void HttpGenericBodyMatcher::onBody(const Buffer::Instance& data, MatchStatusVec
       data.copyOut(0, data.length(), overlap_.get() + bytes_in_overlap_);
       bytes_in_overlap_ += data.length();
     } else {
-      // Case 3. First shift data and then copy the last entire buffer.
+      // Case 3. First shift data to make room for new data and then copy
+      // entire new buffer.
       const size_t shift = bytes_in_overlap_ - (overlap_size_ - data.length());
       memcpy(overlap_.get(), overlap_.get() + shift, (bytes_in_overlap_ - shift));
       data.copyOut(0, data.length(), overlap_.get() + (bytes_in_overlap_ - shift));
