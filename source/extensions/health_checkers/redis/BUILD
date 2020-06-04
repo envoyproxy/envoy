@@ -1,13 +1,13 @@
-licenses(["notice"])  # Apache 2
-
-# Redis custom health checker.
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
+
+# Redis custom health checker.
 
 envoy_package()
 
