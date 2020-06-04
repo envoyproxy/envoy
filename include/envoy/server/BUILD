@@ -1,10 +1,10 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -291,5 +291,14 @@ envoy_cc_library(
     deps = [
         "//include/envoy/config:typed_config_interface",
         "//include/envoy/network:connection_handler_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "bootstrap_extension_config_interface",
+    hdrs = ["bootstrap_extension_config.h"],
+    deps = [
+        ":filter_config_interface",
+        "//include/envoy/config:typed_config_interface",
     ],
 )

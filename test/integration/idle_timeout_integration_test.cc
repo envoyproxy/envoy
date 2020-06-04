@@ -66,7 +66,7 @@ public:
   void waitForTimeout(IntegrationStreamDecoder& response, absl::string_view stat_name = "",
                       absl::string_view stat_prefix = "http.config_test") {
     if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
-      codec_client_->waitForDisconnect();
+      ASSERT_TRUE(codec_client_->waitForDisconnect());
     } else {
       response.waitForReset();
       codec_client_->close();
@@ -182,6 +182,27 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterDownstreamHeaders) {
   EXPECT_EQ("stream timeout", response->body());
 
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("stream_idle_timeout"));
+}
+
+// Per-stream idle timeout with reads disabled.
+TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutWithLargeBuffer) {
+  config_helper_.addFilter(R"EOF(
+  name: backpressure-filter
+  )EOF");
+  enable_per_stream_idle_timeout_ = true;
+  initialize();
+
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+
+  // Make sure that for HTTP/1.1 reads are enabled even though the first request
+  // ended in the "backed up" state.
+  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  response2->waitForEndStream();
+  EXPECT_TRUE(response2->complete());
 }
 
 // Per-stream idle timeout after having sent downstream head request.

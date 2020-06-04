@@ -79,6 +79,11 @@ public:
   virtual Address::SocketType socketType() const PURE;
 
   /**
+   * @return the type (IP or pipe) of addresses used by the socket (subset of socket domain)
+   */
+  virtual Address::Type addressType() const PURE;
+
+  /**
    * Close the underlying socket.
    */
   virtual void close() PURE;
@@ -87,6 +92,48 @@ public:
    * Return true if close() hasn't been called.
    */
   virtual bool isOpen() const PURE;
+
+  /**
+   * Bind a socket to this address. The socket should have been created with a call to socket()
+   * @param address address to bind the socket to.
+   * @return a Api::SysCallIntResult with rc_ = 0 for success and rc_ = -1 for failure. If the call
+   *   is successful, errno_ shouldn't be used.
+   */
+  virtual Api::SysCallIntResult bind(const Address::InstanceConstSharedPtr address) PURE;
+
+  /**
+   * Listen on bound socket.
+   * @param backlog maximum number of pending connections for listener
+   * @return a Api::SysCallIntResult with rc_ = 0 for success and rc_ = -1 for failure. If the call
+   *   is successful, errno_ shouldn't be used.
+   */
+  virtual Api::SysCallIntResult listen(int backlog) PURE;
+
+  /**
+   * Connect a socket to this address. The socket should have been created with a call to socket()
+   * on this object.
+   * @param address remote address to connect to.
+   * @return a Api::SysCallIntResult with rc_ = 0 for success and rc_ = -1 for failure. If the call
+   *   is successful, errno_ shouldn't be used.
+   */
+  virtual Api::SysCallIntResult connect(const Address::InstanceConstSharedPtr address) PURE;
+
+  /**
+   * Propagates option to underlying socket (@see man 2 setsockopt)
+   */
+  virtual Api::SysCallIntResult setSocketOption(int level, int optname, const void* optval,
+                                                socklen_t optlen) PURE;
+
+  /**
+   * Retrieves option from underlying socket (@see man 2 getsockopt)
+   */
+  virtual Api::SysCallIntResult getSocketOption(int level, int optname, void* optval,
+                                                socklen_t* optlen) PURE;
+
+  /**
+   * Toggle socket blocking state
+   */
+  virtual Api::SysCallIntResult setBlockingForTest(bool blocking) PURE;
 
   /**
    * Visitor class for setting socket options.
@@ -174,6 +221,53 @@ public:
 using SocketPtr = std::unique_ptr<Socket>;
 using SocketSharedPtr = std::shared_ptr<Socket>;
 using SocketOptRef = absl::optional<std::reference_wrapper<Socket>>;
+
+class SocketInterface {
+public:
+  virtual ~SocketInterface() = default;
+
+  /**
+   * Low level api to create a socket in the underlying host stack. Does not create a
+   * @ref Network::SocketImpl
+   * @param type type of socket requested
+   * @param addr_type type of address used with the socket
+   * @param version IP version if address type is IP
+   * @return @ref Network::IoHandlePtr that wraps the underlying socket file descriptor
+   */
+  virtual IoHandlePtr socket(Address::SocketType type, Address::Type addr_type,
+                             Address::IpVersion version) PURE;
+
+  /**
+   * Low level api to create a socket in the underlying host stack. Does not create an
+   * @ref Network::SocketImpl
+   * @param socket_type type of socket requested
+   * @param addr address that is gleaned for address type and version if needed
+   * @return @ref Network::IoHandlePtr that wraps the underlying socket file descriptor
+   */
+  virtual IoHandlePtr socket(Address::SocketType socket_type,
+                             const Address::InstanceConstSharedPtr addr) PURE;
+
+  /**
+   * Returns true if the given family is supported on this machine.
+   * @param domain the IP family.
+   */
+  virtual bool ipFamilySupported(int domain) PURE;
+
+  /**
+   * Obtain an address from a bound file descriptor. Raises an EnvoyException on failure.
+   * @param fd socket file descriptor
+   * @return InstanceConstSharedPtr for bound address.
+   */
+  virtual Address::InstanceConstSharedPtr addressFromFd(os_fd_t fd) PURE;
+
+  /**
+   * Obtain the address of the peer of the socket with the specified file descriptor.
+   * Raises an EnvoyException on failure.
+   * @param fd socket file descriptor
+   * @return InstanceConstSharedPtr for peer address.
+   */
+  virtual Address::InstanceConstSharedPtr peerAddressFromFd(os_fd_t fd) PURE;
+};
 
 } // namespace Network
 } // namespace Envoy

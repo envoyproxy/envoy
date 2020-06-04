@@ -10,7 +10,6 @@
 #include "envoy/event/timer.h"
 #include "envoy/network/filter.h"
 
-#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
@@ -49,10 +48,12 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
       transport_socket_(std::move(transport_socket)), socket_(std::move(socket)),
       stream_info_(stream_info), filter_manager_(*this),
       read_buffer_([this]() -> void { this->onReadBufferLowWatermark(); },
-                   [this]() -> void { this->onReadBufferHighWatermark(); }),
+                   [this]() -> void { this->onReadBufferHighWatermark(); },
+                   []() -> void { /* TODO(adisuissa): Handle overflow watermark */ }),
       write_buffer_(dispatcher.getWatermarkFactory().create(
           [this]() -> void { this->onWriteBufferLowWatermark(); },
-          [this]() -> void { this->onWriteBufferHighWatermark(); })),
+          [this]() -> void { this->onWriteBufferHighWatermark(); },
+          []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
       write_buffer_above_high_watermark_(false), detect_early_close_(true),
       enable_half_close_(false), read_end_stream_raised_(false), read_end_stream_(false),
       write_end_stream_(false), current_write_end_stream_(false), dispatch_buffered_data_(false) {
@@ -240,23 +241,14 @@ void ConnectionImpl::noDelay(bool enable) {
   }
 
   // Don't set NODELAY for unix domain sockets
-  sockaddr_storage addr;
-  socklen_t len = sizeof(addr);
-
-  auto os_sys_calls = Api::OsSysCallsSingleton::get();
-  Api::SysCallIntResult result =
-      os_sys_calls.getsockname(ioHandle().fd(), reinterpret_cast<struct sockaddr*>(&addr), &len);
-
-  RELEASE_ASSERT(result.rc_ == 0, "");
-
-  if (addr.ss_family == AF_UNIX) {
+  if (socket_->addressType() == Address::Type::Pipe) {
     return;
   }
 
   // Set NODELAY
   int new_value = enable;
-  result = os_sys_calls.setsockopt(ioHandle().fd(), IPPROTO_TCP, TCP_NODELAY, &new_value,
-                                   sizeof(new_value));
+  Api::SysCallIntResult result =
+      socket_->setSocketOption(IPPROTO_TCP, TCP_NODELAY, &new_value, sizeof(new_value));
 #if defined(__APPLE__)
   if (SOCKET_FAILURE(result.rc_) && result.errno_ == EINVAL) {
     // Sometimes occurs when the connection is not yet fully formed. Empirically, TCP_NODELAY is
@@ -602,7 +594,7 @@ ConnectionImpl::unixSocketPeerCredentials() const {
 #else
   struct ucred ucred;
   socklen_t ucred_size = sizeof(ucred);
-  int rc = getsockopt(ioHandle().fd(), SOL_SOCKET, SO_PEERCRED, &ucred, &ucred_size);
+  int rc = socket_->getSocketOption(SOL_SOCKET, SO_PEERCRED, &ucred, &ucred_size).rc_;
   if (rc == -1) {
     return absl::nullopt;
   }
@@ -617,9 +609,7 @@ void ConnectionImpl::onWriteReady() {
   if (connecting_) {
     int error;
     socklen_t error_size = sizeof(error);
-    RELEASE_ASSERT(Api::OsSysCallsSingleton::get()
-                           .getsockopt(ioHandle().fd(), SOL_SOCKET, SO_ERROR, &error, &error_size)
-                           .rc_ == 0,
+    RELEASE_ASSERT(socket_->getSocketOption(SOL_SOCKET, SO_ERROR, &error, &error_size).rc_ == 0,
                    "");
 
     if (error == 0) {
@@ -734,16 +724,18 @@ ClientConnectionImpl::ClientConnectionImpl(
       file_event_->activate(Event::FileReadyType::Write);
       return;
     }
-    const Network::Address::Instance* source_to_use = source_address.get();
+
+    const Network::Address::InstanceConstSharedPtr* source = &source_address;
+
     if (socket_->localAddress()) {
-      source_to_use = socket_->localAddress().get();
+      source = &socket_->localAddress();
     }
 
-    if (source_to_use != nullptr) {
-      const Api::SysCallIntResult result = source_to_use->bind(ioHandle().fd());
+    if (*source != nullptr) {
+      Api::SysCallIntResult result = socket_->bind(*source);
       if (result.rc_ < 0) {
         // TODO(lizan): consider add this error into transportFailureReason.
-        ENVOY_LOG_MISC(debug, "Bind failure. Failed to bind to {}: {}", source_to_use->asString(),
+        ENVOY_LOG_MISC(debug, "Bind failure. Failed to bind to {}: {}", source->get()->asString(),
                        strerror(result.errno_));
         bind_error_ = true;
         // Set a special error state to ensure asynchronous close to give the owner of the
@@ -759,7 +751,7 @@ ClientConnectionImpl::ClientConnectionImpl(
 
 void ClientConnectionImpl::connect() {
   ENVOY_CONN_LOG(debug, "connecting to {}", *this, socket_->remoteAddress()->asString());
-  const Api::SysCallIntResult result = socket_->remoteAddress()->connect(ioHandle().fd());
+  const Api::SysCallIntResult result = socket_->connect(socket_->remoteAddress());
   if (result.rc_ == 0) {
     // write will become ready.
     ASSERT(connecting_);
@@ -780,8 +772,9 @@ void ClientConnectionImpl::connect() {
 
   // The local address can only be retrieved for IP connections. Other
   // types, such as UDS, don't have a notion of a local address.
+  // TODO(fcoras) move to SocketImpl?
   if (socket_->remoteAddress()->type() == Address::Type::Ip) {
-    socket_->setLocalAddress(SocketInterface::addressFromFd(ioHandle().fd()));
+    socket_->setLocalAddress(SocketInterfaceSingleton::get().addressFromFd(ioHandle().fd()));
   }
 }
 } // namespace Network

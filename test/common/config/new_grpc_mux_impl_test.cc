@@ -41,6 +41,7 @@ class NewGrpcMuxImplTestBase : public testing::Test {
 public:
   NewGrpcMuxImplTestBase()
       : async_client_(new Grpc::MockAsyncClient()),
+        control_plane_stats_(Utility::generateControlPlaneStats(stats_)),
         control_plane_connected_state_(
             stats_.gauge("control_plane.connected_state", Stats::Gauge::ImportMode::NeverImport)) {}
 
@@ -62,6 +63,7 @@ public:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Stats::TestUtil::TestStore stats_;
   Envoy::Config::RateLimitSettings rate_limit_settings_;
+  ControlPlaneStats control_plane_stats_;
   Stats::Gauge& control_plane_connected_state_;
 };
 
@@ -86,7 +88,7 @@ TEST_F(NewGrpcMuxImplTest, DiscoveryResponseNonexistentSub) {
     unexpected_response->set_type_url(type_url);
     unexpected_response->set_system_version_info("0");
     EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "0")).Times(0);
-    grpc_mux_->onDiscoveryResponse(std::move(unexpected_response));
+    grpc_mux_->onDiscoveryResponse(std::move(unexpected_response), control_plane_stats_);
   }
   {
     auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
@@ -107,7 +109,7 @@ TEST_F(NewGrpcMuxImplTest, DiscoveryResponseNonexistentSub) {
                       added_resources[0].resource());
               EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment));
             }));
-    grpc_mux_->onDiscoveryResponse(std::move(response));
+    grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
   }
 }
 
@@ -136,7 +138,7 @@ TEST_F(NewGrpcMuxImplTest, ConfigUpdateWithAliases) {
   response->mutable_resources()->at(0).add_aliases("domain1.test");
   response->mutable_resources()->at(0).add_aliases("domain2.test");
 
-  grpc_mux_->onDiscoveryResponse(std::move(response));
+  grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
 
   const auto& subscriptions = grpc_mux_->subscriptions();
   auto sub = subscriptions.find(type_url);
@@ -165,7 +167,7 @@ TEST_F(NewGrpcMuxImplTest, ConfigUpdateWithNotFoundResponse) {
   response->mutable_resources()->at(0).set_name("not-found");
   response->mutable_resources()->at(0).add_aliases("domain1.test");
 
-  grpc_mux_->onDiscoveryResponse(std::move(response));
+  grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
 
   const auto& subscriptions = grpc_mux_->subscriptions();
   auto sub = subscriptions.find(type_url);

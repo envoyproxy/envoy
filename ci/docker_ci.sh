@@ -41,7 +41,7 @@ fi
 
 docker login -u "$DOCKERHUB_USERNAME" -p "$DOCKERHUB_PASSWORD"
 
-for BUILD_TYPE in ${BUILD_TYPES}; do
+for BUILD_TYPE in "${BUILD_TYPES[@]}"; do
     docker tag "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}:local" "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:${IMAGE_NAME}"
     docker push "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:${IMAGE_NAME}"
 
@@ -49,6 +49,13 @@ for BUILD_TYPE in ${BUILD_TYPES}; do
     if [[ "${AZP_BRANCH}" == "${MASTER_BRANCH}" ]]; then
         docker tag "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}:local" "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:latest"
         docker push "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:latest"
+    fi
+
+    # Push vX.Y-latest to tag the latest image in a release line
+    if [[ "${AZP_BRANCH}" =~ ${RELEASE_TAG_REGEX} ]]; then
+      RELEASE_LINE=$(echo "$IMAGE_NAME" | sed -E 's/(v[0-9]+\.[0-9]+)\.[0-9]+/\1-latest/')
+      docker tag "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}:local" "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:${RELEASE_LINE}"
+      docker push "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:${RELEASE_LINE}"
     fi
 done
 
