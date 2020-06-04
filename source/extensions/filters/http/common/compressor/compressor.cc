@@ -371,10 +371,8 @@ bool CompressorFilter::isMinimumContentLength(Http::ResponseHeaderMap& headers) 
     return is_minimum_content_length;
   }
 
-  const Http::HeaderEntry* transfer_encoding = headers.TransferEncoding();
-  return (transfer_encoding &&
-          StringUtil::caseFindToken(transfer_encoding->value().getStringView(), ",",
-                                    Http::Headers::get().TransferEncodingValues.Chunked));
+  return StringUtil::caseFindToken(headers.getTransferEncodingValue(), ",",
+                                   Http::Headers::get().TransferEncodingValues.Chunked);
 }
 
 bool CompressorFilter::isTransferEncodingAllowed(Http::ResponseHeaderMap& headers) const {

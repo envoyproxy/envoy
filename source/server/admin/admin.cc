@@ -21,7 +21,6 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/access_log/access_log_formatter.h"
 #include "common/access_log/access_log_impl.h"
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
@@ -29,6 +28,7 @@
 #include "common/common/fmt.h"
 #include "common/common/mutex_tracer_impl.h"
 #include "common/common/utility.h"
+#include "common/formatter/substitution_formatter.h"
 #include "common/html/utility.h"
 #include "common/http/codes.h"
 #include "common/http/conn_manager_utility.h"
@@ -544,7 +544,7 @@ void AdminImpl::startHttpListener(const std::string& access_log_path,
   // TODO(mattklein123): Allow admin to use normal access logger extension loading and avoid the
   // hard dependency here.
   access_logs_.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
-      access_log_path, {}, AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter(),
+      access_log_path, {}, Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
       server_.accessLogManager()));
   socket_ = std::make_shared<Network::TcpListenSocket>(address, socket_options, true);
   socket_factory_ = std::make_shared<AdminListenSocketFactory>(socket_);
@@ -630,7 +630,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
            MAKE_ADMIN_HANDLER(logs_handler_.handlerReopenLogs), false, true},
       },
       date_provider_(server.dispatcher().timeSource()),
-      admin_filter_chain_(std::make_shared<AdminFilterChain>()) {}
+      admin_filter_chain_(std::make_shared<AdminFilterChain>()),
+      local_reply_(LocalReply::Factory::createDefault()) {}
 
 Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection,
                                                  const Buffer::Instance& data,
@@ -673,8 +674,7 @@ Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
     if (path_and_query.compare(0, query_index, handler.prefix_) == 0) {
       found_handler = true;
       if (handler.mutates_server_state_) {
-        const absl::string_view method =
-            admin_stream.getRequestHeaders().Method()->value().getStringView();
+        const absl::string_view method = admin_stream.getRequestHeaders().getMethodValue();
         if (method != Http::Headers::get().MethodValues.Post) {
           ENVOY_LOG(error, "admin path \"{}\" mutates state, method={} rather than POST",
                     handler.prefix_, method);
