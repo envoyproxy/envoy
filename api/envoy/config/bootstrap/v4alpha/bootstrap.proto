@@ -7,6 +7,7 @@ import "envoy/config/core/v4alpha/address.proto";
 import "envoy/config/core/v4alpha/base.proto";
 import "envoy/config/core/v4alpha/config_source.proto";
 import "envoy/config/core/v4alpha/event_service_config.proto";
+import "envoy/config/core/v4alpha/extension.proto";
 import "envoy/config/core/v4alpha/socket_option.proto";
 import "envoy/config/listener/v4alpha/listener.proto";
 import "envoy/config/metrics/v4alpha/stats.proto";
@@ -34,7 +35,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // <config_overview_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
-// [#next-free-field: 21]
+// [#next-free-field: 22]
 message Bootstrap {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v3.Bootstrap";
@@ -173,6 +174,10 @@ message Bootstrap {
   // :ref:`use_tcp_for_dns_lookups <envoy_api_field_config.cluster.v4alpha.Cluster.use_tcp_for_dns_lookups>` are
   // specified.
   bool use_tcp_for_dns_lookups = 20;
+
+  // Specifies optional bootstrap extensions to be instantiated at startup time.
+  // Each item contains extension specific configuration.
+  repeated core.v4alpha.TypedExtensionConfig bootstrap_extensions = 21;
 }
 
 // Administration interface :ref:`operations documentation

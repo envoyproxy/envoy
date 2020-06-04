@@ -293,3 +293,12 @@ envoy_cc_library(
         "//include/envoy/network:connection_handler_interface",
     ],
 )
+
+envoy_cc_library(
+    name = "bootstrap_extension_config_interface",
+    hdrs = ["bootstrap_extension_config.h"],
+    deps = [
+        ":filter_config_interface",
+        "//include/envoy/config:typed_config_interface",
+    ],
+)
