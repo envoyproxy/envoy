@@ -661,9 +661,6 @@ TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateHttpConnectionCloses) {
   testRouterHeaderOnlyRequestAndResponse(nullptr, 1);
   cleanupUpstreamAndDownstream();
   codec_client_->waitForDisconnect();
-//  Stats::Store& stats = test_server_->server().stats();
-//  const auto initial_config_reloads =
-//      TestUtility::findCounter(stats, "http.config_test.vhds.my_route.config_reload")->value();
 
   // Attempt to make a request to an unknown host
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -672,7 +669,9 @@ TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateHttpConnectionCloses) {
                                                  {":scheme", "http"},
                                                  {":authority", "vhost_1"},
                                                  {"x-lyft-user-id", "123"}};
-  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  auto encoder_decoder = codec_client_->startRequest(request_headers);
+  Http::RequestEncoder& encoder = encoder_decoder.first;
+  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost,
                                            {vhdsRequestResourceName("vhost_1")}, {}, vhds_stream_));
 
@@ -681,11 +680,10 @@ TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateHttpConnectionCloses) {
   vhds_stream_->sendGrpcMessage(vhds_update);
 
   fake_upstreams_[1]->set_allow_unexpected_disconnects(true);
-  fake_upstream_connection_.reset();
+  codec_client_->sendReset(encoder);
+  response->waitForReset();
+  EXPECT_TRUE(codec_client_->connected());
 
-//  EXPECT_EQ(
-//      initial_config_reloads + 1UL,
-//      TestUtility::findCounter(stats, "http.config_test.vhds.my_route.config_reload")->value());
   cleanupUpstreamAndDownstream();
 }
 
