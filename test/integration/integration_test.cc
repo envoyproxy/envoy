@@ -500,7 +500,7 @@ TEST_P(IntegrationTest, Http09WithKeepalive) {
   initialize();
   reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())
       ->setResponseHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(
-          Http::TestHeaderMapImpl({{":status", "200"}, {"content-length", "0"}})));
+          Http::TestResponseHeaderMapImpl({{":status", "200"}, {"content-length", "0"}})));
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GET /\r\nConnection: keep-alive\r\n\r\n",
                                 &response, true);
@@ -588,7 +588,7 @@ TEST_P(IntegrationTest, Http10WithHostandKeepAliveAndContentLengthAndLws) {
   initialize();
   reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())
       ->setResponseHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(
-          Http::TestHeaderMapImpl({{":status", "200"}, {"content-length", "10"}})));
+          Http::TestResponseHeaderMapImpl({{":status", "200"}, {"content-length", "10"}})));
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"),
                                 "GET / HTTP/1.0\r\nHost: foo.com \r\nConnection:Keep-alive\r\n\r\n",
@@ -820,10 +820,10 @@ TEST_P(IntegrationTest, TestHead) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  Http::TestHeaderMapImpl head_request{{":method", "HEAD"},
-                                       {":path", "/test/long/url"},
-                                       {":scheme", "http"},
-                                       {":authority", "host"}};
+  Http::TestRequestHeaderMapImpl head_request{{":method", "HEAD"},
+                                              {":path", "/test/long/url"},
+                                              {":scheme", "http"},
+                                              {":authority", "host"}};
 
   // Without an explicit content length, assume we chunk for HTTP/1.1
   auto response = sendRequestAndWaitForResponse(head_request, 0, default_response_headers_, 0);
@@ -836,7 +836,8 @@ TEST_P(IntegrationTest, TestHead) {
   EXPECT_EQ(0, response->body().size());
 
   // Preserve explicit content length.
-  Http::TestHeaderMapImpl content_length_response{{":status", "200"}, {"content-length", "12"}};
+  Http::TestResponseHeaderMapImpl content_length_response{{":status", "200"},
+                                                          {"content-length", "12"}};
   response = sendRequestAndWaitForResponse(head_request, 0, content_length_response, 0);
   ASSERT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), HttpStatusIs("200"));
@@ -1224,7 +1225,7 @@ TEST_P(IntegrationTest, TestFloodUpstreamErrors) {
 
   // Set an Upstream reply with an invalid content-length, which will be rejected by the Envoy.
   auto response_headers = std::make_unique<Http::TestResponseHeaderMapImpl>(
-      Http::TestHeaderMapImpl({{":status", "200"}, {"content-length", "invalid"}}));
+      Http::TestResponseHeaderMapImpl({{":status", "200"}, {"content-length", "invalid"}}));
   reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())
       ->setResponseHeaders(std::move(response_headers));
 
