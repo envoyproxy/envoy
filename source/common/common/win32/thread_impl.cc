@@ -39,10 +39,10 @@ public:
     RELEASE_ASSERT(rc == WAIT_OBJECT_0, "");
   }
 
+  std::string name() const override { return name_; }
+
   // Needed for WatcherImpl for the QueueUserAPC callback context
   HANDLE handle() const { return thread_handle_; }
-
-  sted::string name() const override { return name_; }
 
 private:
   std::function<void()> thread_routine_;
