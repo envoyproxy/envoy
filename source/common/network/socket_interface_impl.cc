@@ -135,8 +135,6 @@ Address::InstanceConstSharedPtr SocketInterfaceImpl::peerAddressFromFd(os_fd_t f
   return Address::addressFromSockAddr(ss, ss_len);
 }
 
-SocketInterface* createDefaultSocketInterface() { return new SocketInterfaceImpl(); }
-
 static SocketInterfaceLoader* socket_interface_ =
     new SocketInterfaceLoader(std::make_unique<SocketInterfaceImpl>());
 
