@@ -9,6 +9,9 @@
 
 #include "common/common/thread_annotations.h"
 
+#include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
+
 namespace Envoy {
 namespace Thread {
 
@@ -37,12 +40,24 @@ public:
   virtual ~Thread() = default;
 
   /**
+   * Returns the name of the thread.
+   */
+  virtual std::string name() const PURE;
+
+  /**
    * Join on thread exit.
    */
   virtual void join() PURE;
 };
 
 using ThreadPtr = std::unique_ptr<Thread>;
+
+// Options specified during thread creation.
+struct Options {
+  std::string name_;
+};
+
+using OptionsOptConstRef = const absl::optional<Options>&;
 
 /**
  * Interface providing a mechanism for creating threads.
@@ -54,8 +69,10 @@ public:
   /**
    * Create a thread.
    * @param thread_routine supplies the function to invoke in the thread.
+   * @param name supplies a name for the thread. May be truncated per platform limits.
    */
-  virtual ThreadPtr createThread(std::function<void()> thread_routine) PURE;
+  virtual ThreadPtr createThread(std::function<void()> thread_routine,
+                                 OptionsOptConstRef options = absl::nullopt) PURE;
 
   /**
    * Return the current system thread ID

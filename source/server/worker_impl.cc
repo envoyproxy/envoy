@@ -81,8 +81,9 @@ void WorkerImpl::removeFilterChains(uint64_t listener_tag,
 
 void WorkerImpl::start(GuardDog& guard_dog) {
   ASSERT(!thread_);
-  thread_ =
-      api_.threadFactory().createThread([this, &guard_dog]() -> void { threadRoutine(guard_dog); });
+  Thread::Options options{absl::StrCat("worker:", dispatcher_->name())};
+  thread_ = api_.threadFactory().createThread(
+      [this, &guard_dog]() -> void { threadRoutine(guard_dog); }, options);
 }
 
 void WorkerImpl::initializeStats(Stats::Scope& scope) { dispatcher_->initializeStats(scope); }
