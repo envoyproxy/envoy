@@ -679,7 +679,6 @@ TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateHttpConnectionCloses) {
       createDeltaDiscoveryResponseWithResourceNameUsedAsAlias();
   vhds_stream_->sendGrpcMessage(vhds_update);
 
-  fake_upstreams_[1]->set_allow_unexpected_disconnects(true);
   codec_client_->sendReset(encoder);
   response->waitForReset();
   EXPECT_TRUE(codec_client_->connected());
