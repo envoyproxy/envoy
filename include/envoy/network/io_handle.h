@@ -147,8 +147,8 @@ public:
   virtual bool supportsMmsg() const PURE;
 
   /** TODO(yugant)
-  * return true if the platform supports udp_gro
-  */
+   * return true if the platform supports udp_gro
+   */
   virtual bool supportsUdpGro() const PURE;
 };
 

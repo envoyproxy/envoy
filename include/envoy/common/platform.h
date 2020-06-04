@@ -133,7 +133,7 @@ struct msghdr {
 #include <netdb.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
-#include <netinet/udp.h>  // for udp_gro
+#include <netinet/udp.h> // for udp_gro
 #include <sys/ioctl.h>
 #include <sys/mman.h> // for mode_t
 #include <sys/socket.h>
@@ -172,7 +172,6 @@ struct msghdr {
 #else
 #define GRO_UDP 104
 #endif
-
 
 #define PACKED_STRUCT(definition, ...) definition, ##__VA_ARGS__ __attribute__((packed))
 
@@ -218,11 +217,11 @@ struct mmsghdr {
 
 // TODO(yugant) Check for a better way to check linux version
 #if defined(__linux__)
-  #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0)
-    #define ENVOY_UDP_GRO_MORE 1
-  #else
-    #define ENVOY_UDP_GRO_MORE 0
-  #endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0)
+#define ENVOY_UDP_GRO_MORE 1
 #else
-  #define ENVOY_UDP_GRO_MORE 0
+#define ENVOY_UDP_GRO_MORE 0
+#endif
+#else
+#define ENVOY_UDP_GRO_MORE 0
 #endif

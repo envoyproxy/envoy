@@ -1,6 +1,7 @@
 #include "common/network/utility.h"
 
 #include <bits/stdint-uintn.h>
+
 #include <cstdint>
 #include <list>
 #include <memory>
@@ -566,7 +567,7 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
     ASSERT(num_slices == 1u);
 
     IoHandle::RecvMsgOutput output(1, packets_dropped);
-    
+
     Api::IoCallUint64Result result =
         handle.recvmsg(&slice, num_slices, local_address.ip()->port(), output);
 
@@ -577,33 +578,35 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
     ENVOY_LOG_MISC(trace, "recvmsg bytes {}", result.rc_);
 
     // Get gso_size
-    if(output.msg_[0].gso_size_ == 0u) {
+    if (output.msg_[0].gso_size_ == 0u) {
       // skip gso segmentation and proceed
       // PRINT_WARNING
       passPayloadToProcessor(
-              result.rc_, slice, std::move(buffer), std::move(output.msg_[0].peer_address_),
-              std::move(output.msg_[0].local_address_), udp_packet_processor, receive_time);
+          result.rc_, slice, std::move(buffer), std::move(output.msg_[0].peer_address_),
+          std::move(output.msg_[0].local_address_), udp_packet_processor, receive_time);
       return result;
     }
 
     // Segment the buffer into gso_sized buffers
     // Not Worrying about not being a multiple of gso_size | TODO(yugant): maybe worry
-    for (uint64_t bytes_to_skip=0; bytes_to_skip<(slice.len_-output.msg_[0].gso_size_); 
-         bytes_to_skip+=output.msg_[0].gso_size_) {
+    for (uint64_t bytes_to_skip = 0; bytes_to_skip < (slice.len_ - output.msg_[0].gso_size_);
+         bytes_to_skip += output.msg_[0].gso_size_) {
       Buffer::InstancePtr sub_buffer = std::make_unique<Buffer::OwnedImpl>();
       Buffer::RawSlice sub_slice;
-      const uint64_t num_slices = sub_buffer->reserve(udp_packet_processor.maxPacketSize(), &sub_slice, 1);
+      const uint64_t num_slices =
+          sub_buffer->reserve(udp_packet_processor.maxPacketSize(), &sub_slice, 1);
       ASSERT(num_slices == 1u);
-      
-      memcpy(&sub_slice.mem_, (&slice.mem_)+bytes_to_skip, output.msg_[0].gso_size_); // copy contents of slice[i:i+gso_size] to newSlice;
-      passPayloadToProcessor( 
-              result.rc_, sub_slice, std::move(sub_buffer), std::move(output.msg_[0].peer_address_),
-              std::move(output.msg_[0].local_address_), udp_packet_processor, receive_time);
+
+      memcpy(&sub_slice.mem_, (&slice.mem_) + bytes_to_skip,
+             output.msg_[0].gso_size_); // copy contents of slice[i:i+gso_size] to newSlice;
+      passPayloadToProcessor(
+          result.rc_, sub_slice, std::move(sub_buffer), std::move(output.msg_[0].peer_address_),
+          std::move(output.msg_[0].local_address_), udp_packet_processor, receive_time);
     }
-    
+
     return result;
   }
-  
+
   if (handle.supportsMmsg()) {
     const uint32_t num_packets_per_mmsg_call = 16u;
     const uint32_t num_slices_per_packet = 1u;
