@@ -5932,6 +5932,12 @@ TEST_F(RouterTest, ConnectPauseAndResume) {
 
 // Verify that CONNECT payload is not sent upstream if non-200 response headers are received.
 TEST_F(RouterTest, ConnectPauseNoResume) {
+  // Explicitly configure an HTTP upstream, to test factory creation.
+  cm_.thread_local_cluster_.cluster_.info_->upstream_config_ =
+      absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>();
+  cm_.thread_local_cluster_.cluster_.info_->upstream_config_.value().set_name(
+      "envoy.filters.connection_pools.http.http");
+
   NiceMock<Http::MockRequestEncoder> encoder;
   Http::ResponseDecoder* response_decoder = nullptr;
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
@@ -5960,6 +5966,25 @@ TEST_F(RouterTest, ConnectPauseNoResume) {
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "400"}});
   response_decoder->decodeHeaders(std::move(response_headers), true);
+}
+
+TEST_F(RouterTest, ConnectExplicitTcpUpstream) {
+  // Explicitly configure an TCP upstream, to test factory creation.
+  cm_.thread_local_cluster_.cluster_.info_->upstream_config_ =
+      absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>();
+  cm_.thread_local_cluster_.cluster_.info_->upstream_config_.value().set_name(
+      "envoy.filters.connection_pools.http.tcp");
+  callbacks_.route_->route_entry_.connect_config_ =
+      absl::make_optional<RouteEntry::ConnectConfig>();
+
+  // Make sure newConnection is called on the TCP pool, not newStream on the HTTP pool.
+  EXPECT_CALL(cm_.tcp_conn_pool_, newConnection(_));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  headers.setMethod("CONNECT");
+  router_.decodeHeaders(headers, false);
+
+  router_.onDestroy();
 }
 
 class WatermarkTest : public RouterTest {

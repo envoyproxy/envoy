@@ -16,7 +16,6 @@ namespace Default {
  */
 class DefaultGenericConnPoolFactory : public Router::GenericConnPoolFactory {
 public:
-  ~DefaultGenericConnPoolFactory() override = default;
   std::string name() const override { return HttpConnectionPoolNames::get().Default; }
   std::string category() const override { return "envoy.upstreams"; }
   Router::GenericConnPoolPtr

@@ -16,7 +16,6 @@ namespace Tcp {
  */
 class TcpGenericConnPoolFactory : public Router::GenericConnPoolFactory {
 public:
-  ~TcpGenericConnPoolFactory() override = default;
   std::string name() const override { return HttpConnectionPoolNames::get().Tcp; }
   std::string category() const override { return "envoy.upstreams"; }
   Router::GenericConnPoolPtr

@@ -264,6 +264,8 @@ envoy_cc_test(
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
         "//source/extensions/upstreams/http/default:config",
+        "//source/extensions/upstreams/http/http:config",
+        "//source/extensions/upstreams/http/tcp:config",
         "//test/common/http:common_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/local_info:local_info_mocks",
