@@ -2,7 +2,6 @@
 #include "common/common/thread_impl.h"
 
 #include "absl/strings/str_cat.h"
-#include "absl/synchronization/notification.h"
 
 #if defined(__linux__)
 #include <sys/syscall.h>
@@ -47,13 +46,7 @@ public:
     const int rc = pthread_create(
         &thread_handle_, nullptr,
         [](void* arg) -> void* {
-          auto* thread = static_cast<ThreadImplPosix*>(arg);
-
-          // Block at thread start waiting for setup to be complete in the initiating thread.
-          // For example, we want to set the debug name of the thread.
-          thread->start_.WaitForNotification();
-
-          thread->thread_routine_();
+          static_cast<ThreadImplPosix*>(arg)->thread_routine_();
           return nullptr;
         },
         this);
@@ -63,16 +56,22 @@ public:
     // specified, write it into the thread, and assert that the OS sees it the
     // same way.
     if (name_.empty()) {
-      name_ = getNameFromOS();
+      getNameFromOS(name_);
     } else {
       const int set_name_rc = pthread_setname_np(thread_handle_, name_.c_str());
-      RELEASE_ASSERT(set_name_rc == 0, absl::StrCat("Error ", set_name_rc, " setting name '", name_,
-                                                    "': ", strerror(set_name_rc)));
-      ASSERT(name_ == getNameFromOS(),
-             absl::StrCat("configured name=", name_, " os name=", getNameFromOS()));
+      if (set_name_rc != 0) {
+        ENVOY_LOG_MISC(trace, "Error {} setting name `{}': {}", set_name_rc, name_,
+                       strerror(set_name_rc));
+      } else {
+#ifndef NDEBUG
+        std::string check_name;
+        if (getNameFromOS(check_name)) {
+          ASSERT(check_name == name_,
+                 absl::StrCat("configured name=", name_, " os name=", check_name));
+        }
+#endif
+      }
     }
-
-    start_.Notify();
   }
 
   std::string name() const override { return name_; }
@@ -81,19 +80,21 @@ public:
   void join() override;
 
 private:
-  std::string getNameFromOS() {
+  bool getNameFromOS(std::string& name) {
     // Verify that the name got written into the thread as expected.
     char buf[PTHREAD_MAX_LEN_INCLUDING_NULL_BYTE];
     const int get_name_rc = pthread_getname_np(thread_handle_, buf, sizeof(buf));
-    RELEASE_ASSERT(get_name_rc == 0, absl::StrCat("Error ", get_name_rc, " setting name '", name_,
-                                                  "': ", strerror(get_name_rc)));
-    return buf;
+    if (get_name_rc != 0) {
+      ENVOY_LOG_MISC(trace, "Error {} getting name: {}", get_name_rc, strerror(get_name_rc));
+      return false;
+    }
+    name = buf;
+    return true;
   }
 
   std::function<void()> thread_routine_;
   pthread_t thread_handle_;
   std::string name_;
-  absl::Notification start_;
 };
 
 void ThreadImplPosix::join() {

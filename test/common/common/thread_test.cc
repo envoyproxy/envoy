@@ -203,7 +203,19 @@ TEST_F(ThreadAsyncPtrTest, ManagedAlloc) {
   }
 }
 
-TEST_F(ThreadAsyncPtrTest, Truncate) {
+TEST_F(ThreadAsyncPtrTest, TruncateWait) {
+  absl::Notification notify;
+  auto thread = thread_factory_.createThread([&notify]() { notify.WaitForNotification(); },
+                                             Options{"this name is way too long for posix"});
+  notify.Notify();
+
+  // To make this test work on multiple platforms, just assume the first 10 characters
+  // are retained.
+  EXPECT_THAT(thread->name(), testing::StartsWith("this name "));
+  thread->join();
+}
+
+TEST_F(ThreadAsyncPtrTest, TruncateNoWait) {
   auto thread =
       thread_factory_.createThread([]() {}, Options{"this name is way too long for posix"});
 
@@ -212,13 +224,16 @@ TEST_F(ThreadAsyncPtrTest, Truncate) {
   EXPECT_THAT(thread->name(), testing::StartsWith("this name "));
 }
 
-TEST_F(ThreadAsyncPtrTest, NameNotSpecified) {
-  auto thread = thread_factory_.createThread([]() {});
+TEST_F(ThreadAsyncPtrTest, NameNotSpecifiedWait) {
+  absl::Notification notify;
+  auto thread = thread_factory_.createThread([&notify]() { notify.WaitForNotification(); });
+  notify.Notify();
 
   // For posix builds, the thread name defaults to the name of the binary.
   // Not sure about Windows. Note that for coverage, the tests are all linked
   // together, and for Windows tests I'm not sure what the behavior is.
   EXPECT_FALSE(thread->name().empty());
+  thread->join();
 }
 
 } // namespace
