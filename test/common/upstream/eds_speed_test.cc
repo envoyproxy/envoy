@@ -48,11 +48,6 @@ public:
   }
 
   void initialize() {
-    EXPECT_CALL(*cm_.subscription_factory_.subscription_, start(_));
-    cluster_->initialize([this] { initialized_ = true; });
-  }
-
-  void resetClusterHelper() {
     resetCluster(R"EOF(
       name: name
       connect_timeout: 0.25s
@@ -66,6 +61,9 @@ public:
             refresh_delay: 1s
     )EOF",
                  Envoy::Upstream::Cluster::InitializePhase::Secondary);
+
+    EXPECT_CALL(*cm_.subscription_factory_.subscription_, start(_));
+    cluster_->initialize([this] { initialized_ = true; });
   }
 
   // Set up an EDS config with multiple priorities, localities, weights and make sure
@@ -101,7 +99,6 @@ public:
     // this is what we're actually testing:
     validation_visitor_.setSkipValidation(ignore_unknown_dynamic_fields);
 
-    initialize();
     Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
     resources.Add()->PackFrom(cluster_load_assignment);
     eds_callbacks_->onConfigUpdate(resources, "");
@@ -135,7 +132,7 @@ static void priorityAndLocalityWeighted(benchmark::State& state) {
                                        Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
   for (auto _ : state) {
     Envoy::Upstream::EdsSpeedTest speed_test;
-    speed_test.resetClusterHelper();
+    speed_test.initialize();
     speed_test.priorityAndLocalityWeightedHelper(state.range(0), state.range(1), true);
   }
 }
@@ -148,7 +145,7 @@ static void duplicateUpdate(benchmark::State& state) {
                                        Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
   for (auto _ : state) {
     Envoy::Upstream::EdsSpeedTest speed_test;
-    speed_test.resetClusterHelper();
+    speed_test.initialize();
     speed_test.priorityAndLocalityWeightedHelper(true, state.range(0), true);
     speed_test.priorityAndLocalityWeightedHelper(true, state.range(0), true);
   }
@@ -162,7 +159,7 @@ static void healthOnlyUpdate(benchmark::State& state) {
                                        Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
   for (auto _ : state) {
     Envoy::Upstream::EdsSpeedTest speed_test;
-    speed_test.resetClusterHelper();
+    speed_test.initialize();
     speed_test.priorityAndLocalityWeightedHelper(true, state.range(0), true);
     speed_test.priorityAndLocalityWeightedHelper(true, state.range(0), false);
   }

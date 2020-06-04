@@ -1327,9 +1327,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
   bool hosts_changed = false;
 
   // Go through and see if the list we have is different from what we just got. If it is, we make a
-  // new host list and raise a change notification. This uses an N^2 search given that this does not
-  // happen very often and the list sizes should be small (see
-  // https://github.com/envoyproxy/envoy/issues/2874). We also check for duplicates here. It's
+  // new host list and raise a change notification. We also check for duplicates here. It's
   // possible for DNS to return the same address multiple times, and a bad EDS implementation could
   // do the same thing.
 
@@ -1337,15 +1335,12 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
   std::unordered_set<std::string> existing_hosts_for_current_priority(
       current_priority_hosts.size());
   HostVector final_hosts;
-  // this entire function: O(n), due to this loop.
   for (const HostSharedPtr& host : new_hosts) {
-    // O(1)
     if (updated_hosts.count(host->address()->asString())) {
       continue;
     }
 
     // To match a new host with an existing host means comparing their addresses.
-    // O(1)
     auto existing_host = all_hosts.find(host->address()->asString());
     const bool existing_host_found = existing_host != all_hosts.end();
 
@@ -1410,9 +1405,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
       }
 
       existing_host->second->weight(host->weight());
-      // O(1)
       final_hosts.push_back(existing_host->second);
-      // O(1)
       updated_hosts[existing_host->second->address()->asString()] = existing_host->second;
     } else {
       if (host->weight() > max_host_weight) {
@@ -1430,7 +1423,6 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
         }
       }
 
-      // O(1)
       updated_hosts[host->address()->asString()] = host;
       final_hosts.push_back(host);
       hosts_added_to_current_priority.push_back(host);
@@ -1439,19 +1431,18 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
 
   // Remove hosts from current_priority_hosts that were matched to an existing host in the previous
   // loop.
-  // this entire block: O(n^3) (worst case I am not going to type a phi or whatever)
-  for (auto itr = current_priority_hosts.begin(); itr != current_priority_hosts.end();) {
-    // O(n)!
-    auto existing_itr = existing_hosts_for_current_priority.find((*itr)->address()->asString());
+  auto current_erase_from = current_priority_hosts.end();
+  for (auto i = current_priority_hosts.begin(); i != current_erase_from;) {
+    auto existing_itr = existing_hosts_for_current_priority.find((*i)->address()->asString());
 
     if (existing_itr != existing_hosts_for_current_priority.end()) {
-      // O(n)!
       existing_hosts_for_current_priority.erase(existing_itr);
-      itr = current_priority_hosts.erase(itr);
+      *i = *(--current_erase_from);
     } else {
-      itr++;
+      i++;
     }
   }
+  current_priority_hosts.erase(current_erase_from, current_priority_hosts.end());
 
   // If we saw existing hosts during this iteration from a different priority, then we've moved
   // a host from another priority into this one, so we should mark the priority as having changed.
@@ -1469,8 +1460,8 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
   const bool dont_remove_healthy_hosts =
       health_checker_ != nullptr && !info()->drainConnectionsOnHostRemoval();
   if (!current_priority_hosts.empty() && dont_remove_healthy_hosts) {
-    // this whole block: O(n^2)
-    for (auto i = current_priority_hosts.begin(); i != current_priority_hosts.end();) {
+    auto erase_from_itr = current_priority_hosts.end();
+    for (auto i = current_priority_hosts.begin(); i != erase_from_itr;) {
       if (!((*i)->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC) ||
             (*i)->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH))) {
         if ((*i)->weight() > max_host_weight) {
@@ -1480,12 +1471,12 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
         final_hosts.push_back(*i);
         updated_hosts[(*i)->address()->asString()] = *i;
         (*i)->healthFlagSet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL);
-        // O(n)!
-        i = current_priority_hosts.erase(i);
+        *i = *(--erase_from_itr);
       } else {
         i++;
       }
     }
+    current_priority_hosts.erase(erase_from_itr, current_priority_hosts.end());
   }
 
   // At this point we've accounted for all the new hosts as well the hosts that previously
