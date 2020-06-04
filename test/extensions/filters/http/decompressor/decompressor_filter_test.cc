@@ -305,6 +305,16 @@ TEST_P(DecompressorFilterTest, NoDecompressionHeadersOnly) {
   TestUtility::headerMapEqualIgnoreOrder(headers_before_filter, *headers_after_filter);
 }
 
+TEST_P(DecompressorFilterTest, NoDecompressionContentEncodingAbsent) {
+  EXPECT_CALL(*decompressor_factory_, createDecompressor()).Times(0);
+  Http::TestHeaderMapImpl headers_before_filter{{"content-length", "256"}};
+  std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
+      doHeaders(headers_before_filter, false /* end_stream */);
+  TestUtility::headerMapEqualIgnoreOrder(headers_before_filter, *headers_after_filter);
+
+  expectNoDecompression();
+}
+
 TEST_P(DecompressorFilterTest, NoDecompressionContentEncodingDoesNotMatch) {
   EXPECT_CALL(*decompressor_factory_, createDecompressor()).Times(0);
   Http::TestHeaderMapImpl headers_before_filter{{"content-encoding", "not-matching"},
@@ -354,6 +364,21 @@ TEST_P(DecompressorFilterTest, NoResponseDecompressionNoTransformPresentInList) 
   TestUtility::headerMapEqualIgnoreOrder(headers_before_filter, *headers_after_filter);
 
   expectNoDecompression();
+}
+
+TEST_P(DecompressorFilterTest, DecompressionLibraryNotRegistered) {
+  EXPECT_THROW_WITH_MESSAGE(
+      setUpFilter(R"EOF(
+decompressor_library:
+  typed_config:
+    "@type": "type.googleapis.com/envoy.extensions.compression.does_not_exist"
+)EOF"),
+      EnvoyException,
+      "Unable to parse JSON as proto (INVALID_ARGUMENT:(decompressor_library.typed_config): "
+      "invalid value Invalid type URL, unknown type: envoy.extensions.compression.does_not_exist "
+      "for type Any): "
+      "{\"decompressor_library\":{\"typed_config\":{\"@type\":\"type.googleapis.com/"
+      "envoy.extensions.compression.does_not_exist\"}}}");
 }
 
 } // namespace
