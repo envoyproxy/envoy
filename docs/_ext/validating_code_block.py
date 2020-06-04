@@ -10,6 +10,7 @@ from sphinx.errors import ExtensionError
 import os
 import subprocess
 
+
 class ValidatingCodeBlock(CodeBlock):
   """A directive that provides protobuf yaml formatting and validation.
 
@@ -50,6 +51,7 @@ class ValidatingCodeBlock(CodeBlock):
 
     self.options.pop('type-name', None)
     return list(CodeBlock.run(self))
+
 
 def setup(app):
   app.add_directive("validated-code-block", ValidatingCodeBlock)
