@@ -427,64 +427,69 @@ Utility::parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions&
   return ret;
 }
 
-void Utility::sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbacks,
-                             const bool& is_reset, Code response_code, absl::string_view body_text,
-                             const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
-                             bool is_head_request) {
+void Utility::sendLocalReply(const bool& is_reset, StreamDecoderFilterCallbacks& callbacks,
+                             const LocalReplyData& local_reply_data) {
   sendLocalReply(
-      is_grpc,
-      [&](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
-        callbacks.encodeHeaders(std::move(headers), end_stream);
-      },
-      [&](Buffer::Instance& data, bool end_stream) -> void {
-        callbacks.encodeData(data, end_stream);
-      },
-      is_reset, response_code, body_text, grpc_status, is_head_request);
+      is_reset,
+      Utility::EncodeFunctions{nullptr,
+                               [&](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
+                                 callbacks.encodeHeaders(std::move(headers), end_stream);
+                               },
+                               [&](Buffer::Instance& data, bool end_stream) -> void {
+                                 callbacks.encodeData(data, end_stream);
+                               }},
+      local_reply_data);
 }
 
-void Utility::sendLocalReply(
-    bool is_grpc,
-    std::function<void(ResponseHeaderMapPtr&& headers, bool end_stream)> encode_headers,
-    std::function<void(Buffer::Instance& data, bool end_stream)> encode_data, const bool& is_reset,
-    Code response_code, absl::string_view body_text,
-    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, bool is_head_request) {
+void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode_functions,
+                             const LocalReplyData& local_reply_data) {
   // encode_headers() may reset the stream, so the stream must not be reset before calling it.
   ASSERT(!is_reset);
+
+  // rewrite_response will rewrite response code and body text.
+  Code response_code = local_reply_data.response_code_;
+  std::string body_text(local_reply_data.body_text_);
+  absl::string_view content_type(Headers::get().ContentTypeValues.Text);
+
+  ResponseHeaderMapPtr response_headers{createHeaderMap<ResponseHeaderMapImpl>(
+      {{Headers::get().Status, std::to_string(enumToInt(response_code))}})};
+
+  if (encode_functions.rewrite_) {
+    encode_functions.rewrite_(*response_headers, response_code, body_text, content_type);
+  }
+
   // Respond with a gRPC trailers-only response if the request is gRPC
-  if (is_grpc) {
-    ResponseHeaderMapPtr response_headers{createHeaderMap<ResponseHeaderMapImpl>(
-        {{Headers::get().Status, std::to_string(enumToInt(Code::OK))},
-         {Headers::get().ContentType, Headers::get().ContentTypeValues.Grpc},
-         {Headers::get().GrpcStatus,
-          std::to_string(enumToInt(
-              grpc_status ? grpc_status.value()
-                          : Grpc::Utility::httpToGrpcStatus(enumToInt(response_code))))}})};
-    if (!body_text.empty() && !is_head_request) {
+  if (local_reply_data.is_grpc_) {
+    response_headers->setStatus(std::to_string(enumToInt(Code::OK)));
+    response_headers->setReferenceContentType(Headers::get().ContentTypeValues.Grpc);
+    response_headers->setGrpcStatus(
+        std::to_string(enumToInt(local_reply_data.grpc_status_
+                                     ? local_reply_data.grpc_status_.value()
+                                     : Grpc::Utility::httpToGrpcStatus(enumToInt(response_code)))));
+    if (!body_text.empty() && !local_reply_data.is_head_request_) {
       // TODO(dio): Probably it is worth to consider caching the encoded message based on gRPC
       // status.
       response_headers->setGrpcMessage(PercentEncoding::encode(body_text));
     }
-    encode_headers(std::move(response_headers), true); // Trailers only response
+    encode_functions.encode_headers_(std::move(response_headers), true); // Trailers only response
     return;
   }
 
-  ResponseHeaderMapPtr response_headers{createHeaderMap<ResponseHeaderMapImpl>(
-      {{Headers::get().Status, std::to_string(enumToInt(response_code))}})};
   if (!body_text.empty()) {
     response_headers->setContentLength(body_text.size());
-    response_headers->setReferenceContentType(Headers::get().ContentTypeValues.Text);
+    response_headers->setReferenceContentType(content_type);
   }
 
-  if (is_head_request) {
-    encode_headers(std::move(response_headers), true);
+  if (local_reply_data.is_head_request_) {
+    encode_functions.encode_headers_(std::move(response_headers), true);
     return;
   }
 
-  encode_headers(std::move(response_headers), body_text.empty());
+  encode_functions.encode_headers_(std::move(response_headers), body_text.empty());
   // encode_headers()) may have changed the referenced is_reset so we need to test it
   if (!body_text.empty() && !is_reset) {
     Buffer::OwnedImpl buffer(body_text);
-    encode_data(buffer, true);
+    encode_functions.encode_data_(buffer, true);
   }
 }
 

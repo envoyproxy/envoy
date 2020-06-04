@@ -72,11 +72,9 @@ private:
 /**
  * All stats for the OAuth filter. @see stats_macros.h
  */
-// clang-format off
-#define ALL_OAUTH_FILTER_STATS(COUNTER)                                                         \
-  COUNTER(oauth_failure)                                                                        \
+#define ALL_OAUTH_FILTER_STATS(COUNTER)                                                            \
+  COUNTER(oauth_failure)                                                                           \
   COUNTER(oauth_success)
-// clang-format on
 
 /**
  * Wrapper struct filter stats. @see stats_macros.h
@@ -114,10 +112,10 @@ private:
   const std::string oauth_server_hostname_;
   const std::string callback_path_;
   const std::string signout_path_;
-  const bool forward_bearer_token_ : 1;
-  const bool pass_through_options_method_ : 1;
   std::shared_ptr<SecretReader> secret_reader_;
   FilterStats stats_;
+  const bool forward_bearer_token_ : 1;
+  const bool pass_through_options_method_ : 1;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -193,7 +191,6 @@ private:
   std::string access_token_{}; // TODO - see if we can avoid this being a member variable
   std::string new_expires_;
   absl::string_view host_;
-  std::string user_agent_;
   std::string state_{};
   bool found_bearer_token_{false};
   Http::RequestHeaderMap* request_headers_{nullptr};

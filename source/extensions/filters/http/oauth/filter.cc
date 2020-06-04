@@ -80,9 +80,10 @@ FilterConfig::FilterConfig(
       callback_path_(
           PROTOBUF_GET_STRING_OR_DEFAULT(proto_config, callback_path, defaultOauthCallback())),
       signout_path_(
-          PROTOBUF_GET_STRING_OR_DEFAULT(proto_config, signout_path, defaultOauthSignout())), forward_bearer_token_(proto_config.forward_bearer_token()),
-      pass_through_options_method_(proto_config.pass_through_options_method()),
-      secret_reader_(secret_reader), stats_(FilterConfig::generateStats(stats_prefix, scope)) {
+          PROTOBUF_GET_STRING_OR_DEFAULT(proto_config, signout_path, defaultOauthSignout())),
+      secret_reader_(secret_reader), stats_(FilterConfig::generateStats(stats_prefix, scope)),
+      forward_bearer_token_(proto_config.forward_bearer_token()),
+      pass_through_options_method_(proto_config.pass_through_options_method()) {
   if (!cluster_manager.get(cluster_name_)) {
     throw EnvoyException(fmt::format("OAuth2 filter: unknown cluster '{}' in config. Please "
                                      "specify which cluster to direct OAuth requests to.",
@@ -186,15 +187,6 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   const Http::HeaderEntry* path_header = headers.Path();
   ASSERT(path_header != nullptr);
   const absl::string_view path_str = path_header->value().getStringView();
-
-  // Keep track of how many initial 302s (to the auth server) we initially distribute.
-  // The goal is to keep this number in line with the number of successful logins at the conclusion
-  // of this filter.
-  const auto* user_agent_header = headers.UserAgent();
-  const absl::string_view user_agent_value =
-      user_agent_header != nullptr ? user_agent_header->value().getStringView() : EMPTY_STRING;
-  const std::vector<std::string> v = absl::StrSplit(user_agent_value, '.');
-  user_agent_ = v[0];
 
   // We should check if this is a sign out request.
   if (path_str == config_->signoutPath()) {
@@ -430,7 +422,6 @@ void OAuth2Filter::finishFlow() {
   }
 
   response_headers->setReferenceKey(Http::Headers::get().Location, state_);
-  response_headers->setReferenceKey(Http::Headers::get().UserAgent, "Auth/Redirect");
 
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true);
   config_->stats().oauth_success_.inc();

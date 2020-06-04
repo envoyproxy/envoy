@@ -22,6 +22,8 @@ public:
   const std::string Cors = "envoy.filters.http.cors";
   // CSRF filter
   const std::string Csrf = "envoy.filters.http.csrf";
+  // Decompressor filter
+  const std::string Decompressor = "envoy.filters.http.decompressor";
   // Dynamo filter
   const std::string Dynamo = "envoy.filters.http.dynamo";
   // Fault filter
