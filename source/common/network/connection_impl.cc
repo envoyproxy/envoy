@@ -774,7 +774,7 @@ void ClientConnectionImpl::connect() {
   // types, such as UDS, don't have a notion of a local address.
   // TODO(fcoras) move to SocketImpl?
   if (socket_->remoteAddress()->type() == Address::Type::Ip) {
-    socket_->setLocalAddress(SocketInterface::addressFromFd(ioHandle().fd()));
+    socket_->setLocalAddress(SocketInterfaceSingleton::get().addressFromFd(ioHandle().fd()));
   }
 }
 } // namespace Network

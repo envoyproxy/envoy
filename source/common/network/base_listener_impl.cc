@@ -16,7 +16,7 @@ namespace Envoy {
 namespace Network {
 
 Address::InstanceConstSharedPtr BaseListenerImpl::getLocalAddress(os_fd_t fd) {
-  return SocketInterface::addressFromFd(fd);
+  return SocketInterfaceSingleton::get().addressFromFd(fd);
 }
 
 BaseListenerImpl::BaseListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket)

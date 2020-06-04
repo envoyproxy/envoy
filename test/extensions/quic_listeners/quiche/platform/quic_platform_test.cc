@@ -10,6 +10,7 @@
 #include <unordered_set>
 
 #include "common/memory/stats.h"
+#include "common/network/socket_impl.h"
 #include "common/network/utility.h"
 
 #include "extensions/quic_listeners/quiche/platform/flags_impl.h"

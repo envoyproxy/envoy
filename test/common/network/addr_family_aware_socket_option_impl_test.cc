@@ -3,6 +3,7 @@
 
 #include "common/network/addr_family_aware_socket_option_impl.h"
 #include "common/network/io_socket_handle_impl.h"
+#include "common/network/socket_interface_impl.h"
 #include "common/network/utility.h"
 
 #include "test/common/network/socket_option_test.h"
@@ -46,7 +47,7 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, SetOptionFailure) {
 // If a platform supports IPv4 socket option variant for an IPv4 address, it works
 TEST_F(AddrFamilyAwareSocketOptionImplTest, SetOptionSuccess) {
   Address::Ipv4Instance address("1.2.3.4", 5678);
-  IoHandlePtr io_handle = Network::SocketInterface::socket(
+  IoHandlePtr io_handle = Network::SocketInterfaceSingleton::get().socket(
       Address::SocketType::Stream, std::make_shared<Address::Ipv4Instance>(address));
   EXPECT_CALL(testing::Const(socket_), ioHandle()).WillRepeatedly(testing::ReturnRef(*io_handle));
 
@@ -62,7 +63,7 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, SetOptionSuccess) {
 // If a platform doesn't support IPv4 socket option variant for an IPv4 address we fail
 TEST_F(AddrFamilyAwareSocketOptionImplTest, V4EmptyOptionNames) {
   Address::Ipv4Instance address("1.2.3.4", 5678);
-  IoHandlePtr io_handle = Network::SocketInterface::socket(
+  IoHandlePtr io_handle = Network::SocketInterfaceSingleton::get().socket(
       Address::SocketType::Stream, std::make_shared<Address::Ipv4Instance>(address));
   EXPECT_CALL(testing::Const(socket_), ioHandle()).WillRepeatedly(testing::ReturnRef(*io_handle));
   AddrFamilyAwareSocketOptionImpl socket_option{
@@ -76,7 +77,7 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, V4EmptyOptionNames) {
 // If a platform doesn't support IPv4 and IPv6 socket option variants for an IPv4 address, we fail
 TEST_F(AddrFamilyAwareSocketOptionImplTest, V6EmptyOptionNames) {
   Address::Ipv6Instance address("::1:2:3:4", 5678);
-  IoHandlePtr io_handle = Network::SocketInterface::socket(
+  IoHandlePtr io_handle = Network::SocketInterfaceSingleton::get().socket(
       Address::SocketType::Stream, std::make_shared<Address::Ipv6Instance>(address));
   EXPECT_CALL(testing::Const(socket_), ioHandle()).WillRepeatedly(testing::ReturnRef(*io_handle));
   AddrFamilyAwareSocketOptionImpl socket_option{
@@ -91,7 +92,7 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, V6EmptyOptionNames) {
 // IPv4 variant
 TEST_F(AddrFamilyAwareSocketOptionImplTest, V4IgnoreV6) {
   Address::Ipv4Instance address("1.2.3.4", 5678);
-  IoHandlePtr io_handle = Network::SocketInterface::socket(
+  IoHandlePtr io_handle = Network::SocketInterfaceSingleton::get().socket(
       Address::SocketType::Stream, std::make_shared<Address::Ipv4Instance>(address));
   EXPECT_CALL(testing::Const(socket_), ioHandle()).WillRepeatedly(testing::ReturnRef(*io_handle));
 
@@ -105,7 +106,7 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, V4IgnoreV6) {
 // If a platform supports IPv6 socket option variant for an IPv6 address it works
 TEST_F(AddrFamilyAwareSocketOptionImplTest, V6Only) {
   Address::Ipv6Instance address("::1:2:3:4", 5678);
-  IoHandlePtr io_handle = Network::SocketInterface::socket(
+  IoHandlePtr io_handle = Network::SocketInterfaceSingleton::get().socket(
       Address::SocketType::Stream, std::make_shared<Address::Ipv6Instance>(address));
   EXPECT_CALL(testing::Const(socket_), ioHandle()).WillRepeatedly(testing::ReturnRef(*io_handle));
 
@@ -122,7 +123,7 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, V6Only) {
 // we apply the IPv4 variant.
 TEST_F(AddrFamilyAwareSocketOptionImplTest, V6OnlyV4Fallback) {
   Address::Ipv6Instance address("::1:2:3:4", 5678);
-  IoHandlePtr io_handle = Network::SocketInterface::socket(
+  IoHandlePtr io_handle = Network::SocketInterfaceSingleton::get().socket(
       Address::SocketType::Stream, std::make_shared<Address::Ipv6Instance>(address));
   EXPECT_CALL(testing::Const(socket_), ioHandle()).WillRepeatedly(testing::ReturnRef(*io_handle));
 
@@ -139,7 +140,7 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, V6OnlyV4Fallback) {
 // AddrFamilyAwareSocketOptionImpl::setIpSocketOption() works with the IPv6 variant.
 TEST_F(AddrFamilyAwareSocketOptionImplTest, V6Precedence) {
   Address::Ipv6Instance address("::1:2:3:4", 5678);
-  IoHandlePtr io_handle = Network::SocketInterface::socket(
+  IoHandlePtr io_handle = Network::SocketInterfaceSingleton::get().socket(
       Address::SocketType::Stream, std::make_shared<Address::Ipv6Instance>(address));
   EXPECT_CALL(testing::Const(socket_), ioHandle()).WillRepeatedly(testing::ReturnRef(*io_handle));
 
@@ -153,7 +154,7 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, V6Precedence) {
 // GetSocketOptionName returns the v4 information for a v4 address
 TEST_F(AddrFamilyAwareSocketOptionImplTest, V4GetSocketOptionName) {
   Address::Ipv4Instance address("1.2.3.4", 5678);
-  IoHandlePtr io_handle = Network::SocketInterface::socket(
+  IoHandlePtr io_handle = Network::SocketInterfaceSingleton::get().socket(
       Address::SocketType::Stream, std::make_shared<Address::Ipv4Instance>(address));
   EXPECT_CALL(testing::Const(socket_), ioHandle()).WillRepeatedly(testing::ReturnRef(*io_handle));
 
@@ -169,7 +170,7 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, V4GetSocketOptionName) {
 // GetSocketOptionName returns the v4 information for a v6 address
 TEST_F(AddrFamilyAwareSocketOptionImplTest, V6GetSocketOptionName) {
   Address::Ipv6Instance address("2::1", 5678);
-  IoHandlePtr io_handle = Network::SocketInterface::socket(
+  IoHandlePtr io_handle = Network::SocketInterfaceSingleton::get().socket(
       Address::SocketType::Stream, std::make_shared<Address::Ipv6Instance>(address));
   EXPECT_CALL(testing::Const(socket_), ioHandle()).WillRepeatedly(testing::ReturnRef(*io_handle));
 

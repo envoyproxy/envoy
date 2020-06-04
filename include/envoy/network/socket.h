@@ -222,5 +222,52 @@ using SocketPtr = std::unique_ptr<Socket>;
 using SocketSharedPtr = std::shared_ptr<Socket>;
 using SocketOptRef = absl::optional<std::reference_wrapper<Socket>>;
 
+class SocketInterface {
+public:
+  virtual ~SocketInterface() = default;
+
+  /**
+   * Low level api to create a socket in the underlying host stack. Does not create a
+   * @ref Network::SocketImpl
+   * @param type type of socket requested
+   * @param addr_type type of address used with the socket
+   * @param version IP version if address type is IP
+   * @return @ref Network::IoHandlePtr that wraps the underlying socket file descriptor
+   */
+  virtual IoHandlePtr socket(Address::SocketType type, Address::Type addr_type,
+                             Address::IpVersion version) PURE;
+
+  /**
+   * Low level api to create a socket in the underlying host stack. Does not create an
+   * @ref Network::SocketImpl
+   * @param socket_type type of socket requested
+   * @param addr address that is gleaned for address type and version if needed
+   * @return @ref Network::IoHandlePtr that wraps the underlying socket file descriptor
+   */
+  virtual IoHandlePtr socket(Address::SocketType socket_type,
+                             const Address::InstanceConstSharedPtr addr) PURE;
+
+  /**
+   * Returns true if the given family is supported on this machine.
+   * @param domain the IP family.
+   */
+  virtual bool ipFamilySupported(int domain) PURE;
+
+  /**
+   * Obtain an address from a bound file descriptor. Raises an EnvoyException on failure.
+   * @param fd socket file descriptor
+   * @return InstanceConstSharedPtr for bound address.
+   */
+  virtual Address::InstanceConstSharedPtr addressFromFd(os_fd_t fd) PURE;
+
+  /**
+   * Obtain the address of the peer of the socket with the specified file descriptor.
+   * Raises an EnvoyException on failure.
+   * @param fd socket file descriptor
+   * @return InstanceConstSharedPtr for peer address.
+   */
+  virtual Address::InstanceConstSharedPtr peerAddressFromFd(os_fd_t fd) PURE;
+};
+
 } // namespace Network
 } // namespace Envoy
