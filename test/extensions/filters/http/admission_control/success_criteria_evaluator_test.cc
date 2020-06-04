@@ -14,8 +14,6 @@
 #include "gtest/gtest.h"
 
 using testing::HasSubstr;
-using testing::NiceMock;
-using testing::Return;
 
 namespace Envoy {
 namespace Extensions {
