@@ -219,6 +219,7 @@ struct RtdsSubscription : Envoy::Config::SubscriptionBase<envoy::service::runtim
 
   void start();
   void validateUpdateSize(uint32_t num_resources);
+  void createSubscription();
 
   LoaderImpl& parent_;
   const envoy::config::core::v3::ConfigSource config_source_;
