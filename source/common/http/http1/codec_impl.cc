@@ -68,7 +68,7 @@ StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection,
                                      HeaderKeyFormatter* header_key_formatter)
     : connection_(connection), disable_chunk_encoding_(false), chunk_encoding_(true),
       processing_100_continue_(false), is_response_to_head_request_(false),
-      is_response_to_connect_request_(false), is_content_length_allowed_(true),
+      is_response_to_connect_request_(false), is_1xx_or_204_(false),
       header_key_formatter_(header_key_formatter) {
   if (connection_.connection().aboveHighWatermark()) {
     runHighWatermarkCallbacks();
@@ -158,7 +158,7 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
       // response to a HEAD request.
       // For 204s and 1xx where content length is disallowed, don't append the content length but
       // also don't chunk encode.
-      if (is_content_length_allowed_) {
+      if (!is_1xx_or_204_) {
         encodeFormattedHeader(Headers::get().ContentLength.get(), "0");
       }
       chunk_encoding_ = false;
@@ -166,8 +166,9 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
       chunk_encoding_ = false;
     } else {
       // For responses to connect requests, do not send the chunked encoding header:
-      // https://tools.ietf.org/html/rfc7231#section-4.3.6
-      if (!is_response_to_connect_request_) {
+      // https://tools.ietf.org/html/rfc7231#section-4.3.6. The same is true for 1xx and 204
+      // responses: https://tools.ietf.org/html/rfc7230#section-3.3.1
+      if (!is_response_to_connect_request_ && !is_1xx_or_204_) {
         encodeFormattedHeader(Headers::get().TransferEncoding.get(),
                               Headers::get().TransferEncodingValues.Chunked);
       }
@@ -352,12 +353,13 @@ void ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers, bool e
   connection_.addCharToBuffer('\n');
 
   if (numeric_status == 204 || numeric_status < 200) {
-    // Per https://tools.ietf.org/html/rfc7230#section-3.3.2
-    setIsContentLengthAllowed(false);
+    // Enabling handling or https://tools.ietf.org/html/rfc7230#section-3.3.1 and
+    // https://tools.ietf.org/html/rfc7230#section-3.3.1
+    setIs1xxOr204(true);
   } else {
-    // Make sure that if we encodeHeaders(100) then encodeHeaders(200) that we
-    // set is_content_length_allowed_ back to true.
-    setIsContentLengthAllowed(true);
+    // Make sure that if we encodeHeaders(100) then encodeHeaders(200) that
+    // reset handling of 1xx/204.
+    setIs1xxOr204(false);
   }
   if (numeric_status >= 300) {
     // Don't do special CONNECT logic if the CONNECT was rejected.

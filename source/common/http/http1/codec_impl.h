@@ -95,7 +95,7 @@ public:
 
 protected:
   StreamEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter);
-  void setIsContentLengthAllowed(bool value) { is_content_length_allowed_ = value; }
+  void setIs1xxOr204(bool value) { is_1xx_or_204_ = value; }
   void encodeHeadersBase(const RequestOrResponseHeaderMap& headers, bool end_stream);
   void encodeTrailersBase(const HeaderMap& headers);
 
@@ -109,7 +109,7 @@ protected:
   bool processing_100_continue_ : 1;
   bool is_response_to_head_request_ : 1;
   bool is_response_to_connect_request_ : 1;
-  bool is_content_length_allowed_ : 1;
+  bool is_1xx_or_204_ : 1;
 
 private:
   /**
