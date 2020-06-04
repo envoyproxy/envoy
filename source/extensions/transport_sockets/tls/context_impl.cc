@@ -95,8 +95,8 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       //
       // "-" is both an operator when in the leading position of a token (-ALL: don't allow this
       // cipher), and the common separator in names (ECDHE-ECDSA-AES128-GCM-SHA256). Don't split on
-      // it because it will separate pieces of the same cipher. When it is a leading character, it is
-      // removed below.
+      // it because it will separate pieces of the same cipher. When it is a leading character, it
+      // is removed below.
       std::vector<absl::string_view> ciphers =
           StringUtil::splitToken(config.cipherSuites(), ":+![|]", false);
       std::vector<std::string> bad_ciphers;
