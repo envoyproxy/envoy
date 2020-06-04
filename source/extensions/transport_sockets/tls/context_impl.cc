@@ -23,6 +23,7 @@
 
 #include "extensions/transport_sockets/tls/utility.h"
 
+#include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
 #include "openssl/evp.h"
 #include "openssl/hmac.h"
@@ -88,11 +89,24 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
     RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
 
     if (!SSL_CTX_set_strict_cipher_list(ctx.ssl_ctx_.get(), config.cipherSuites().c_str())) {
+      // Break up a set of ciphers into each individual cipher and try them each individually in
+      // order to attempt to log which specific one failed. Example of config.cipherSuites():
+      // "-ALL:[ECDHE-ECDSA-AES128-GCM-SHA256|ECDHE-ECDSA-CHACHA20-POLY1305]:ECDHE-ECDSA-AES128-SHA".
+      //
+      // "-" is both an operator when in the leading position of a token (-ALL: don't allow this
+      // cipher), and the common separator in names (ECDHE-ECDSA-AES128-GCM-SHA256). Don't split on
+      // it because it will separate pieces of the same cipher. When it is a leading character, it
+      // is removed below.
       std::vector<absl::string_view> ciphers =
-          StringUtil::splitToken(config.cipherSuites(), ":+-![|]", false);
+          StringUtil::splitToken(config.cipherSuites(), ":+![|]", false);
       std::vector<std::string> bad_ciphers;
       for (const auto& cipher : ciphers) {
         std::string cipher_str(cipher);
+
+        if (absl::StartsWith(cipher_str, "-")) {
+          cipher_str.erase(cipher_str.begin());
+        }
+
         if (!SSL_CTX_set_strict_cipher_list(ctx.ssl_ctx_.get(), cipher_str.c_str())) {
           bad_ciphers.push_back(cipher_str);
         }
