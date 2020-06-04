@@ -50,7 +50,7 @@ public:
                                             LoadDnsCacheEntryCallbacks& callbacks) override;
   AddUpdateCallbacksHandlePtr addUpdateCallbacks(UpdateCallbacks& callbacks) override;
   absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> hosts() override;
-  DnsCacheResourceManagerPtr& dnsCacheResourceManager() override { return resource_manager_; }
+  DnsCacheResourceManager* dnsCacheResourceManager() override { return resource_manager_.get(); }
 
 private:
   using TlsHostMap = absl::flat_hash_map<std::string, DnsHostInfoSharedPtr>;

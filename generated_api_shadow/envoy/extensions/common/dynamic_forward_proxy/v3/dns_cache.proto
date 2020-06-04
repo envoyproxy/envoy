@@ -92,6 +92,6 @@ message DnsCacheConfig {
   config.cluster.v3.Cluster.RefreshRate dns_failure_refresh_rate = 6;
 
   // The config of circuit breakers for resolver. It provides a configurable threshold.
-  // If this value is not set, we will use cluster circuit breakers as default.
+  // If this value is not set, the cluster circuit breakers will be used.
   DnsCacheCircuitBreakers dns_cache_circuit_breaker = 7;
 }

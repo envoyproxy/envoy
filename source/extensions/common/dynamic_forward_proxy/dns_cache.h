@@ -168,7 +168,7 @@ public:
   /**
    * @return A pointer to resource manager for dns cache.
    */
-  virtual DnsCacheResourceManagerPtr& dnsCacheResourceManager() PURE;
+  virtual DnsCacheResourceManager* dnsCacheResourceManager() PURE;
 };
 
 using DnsCacheSharedPtr = std::shared_ptr<DnsCache>;
