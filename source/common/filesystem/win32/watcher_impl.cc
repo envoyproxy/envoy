@@ -33,7 +33,7 @@ WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher, Api::Api& api)
   keep_watching_ = true;
 
   // See comments in WorkerImpl::start for the naming convention.
-  Thread::Options options{absl::StrCat("wat:", dispatcher_->name())};
+  Thread::Options options{absl::StrCat("wat:", dispatcher.name())};
   watch_thread_ = thread_factory_.createThread([this]() -> void { watchLoop(); }, options);
 }
 
