@@ -53,6 +53,10 @@ public:
   // that exception goes only through the mock network connection and sending codec, i.e. it is
   // thrown only through the test harness code. Specific exception types are to distinguish error
   // codes returned when processing requests or responses.
+  // TODO(yanavlasov): modify the code to verify test expectations at the point of calling codec
+  //                   under test through the ON_CALL expectations in the
+  //                   setupDefaultConnectionMocks() method. This will make the exceptions below
+  //                   unnecessary.
   struct ClientCodecError : public std::runtime_error {
     ClientCodecError(Http::Status&& status)
         : std::runtime_error(std::string(status.message())), status_(std::move(status)) {}
