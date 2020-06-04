@@ -56,8 +56,9 @@ message DnsFilterConfig {
 
     // Sets the maximum time we will wait for the upstream query to complete
     // We allow 5s for the upstream resolution to complete, so the minimum
-    // value here is 5
-    google.protobuf.Duration resolver_timeout = 1 [(validate.rules).duration = {gte {seconds: 5}}];
+    // value here is 1. Note that the total latency for a failed query is the
+    // number of retries multiplied by the resolver_timeout.
+    google.protobuf.Duration resolver_timeout = 1 [(validate.rules).duration = {gte {seconds: 1}}];
 
     // A list of DNS servers to which we can forward queries
     repeated string upstream_resolvers = 2 [(validate.rules).repeated = {
