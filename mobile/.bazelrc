@@ -1,5 +1,5 @@
 # Envoy Mobile Bazel build/test options.
-import ./envoy/.bazelrc
+try-import ./envoy/.bazelrc
 
 # Common flags for all builds
 build --define=google_grpc=disabled
