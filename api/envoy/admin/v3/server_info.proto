@@ -54,7 +54,7 @@ message ServerInfo {
   CommandLineOptions command_line_options = 6;
 }
 
-// [#next-free-field: 31]
+// [#next-free-field: 33]
 message CommandLineOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.admin.v2alpha.CommandLineOptions";
@@ -81,6 +81,12 @@ message CommandLineOptions {
 
   // See :option:`--base-id` for details.
   uint64 base_id = 1;
+
+  // See :option:`--use-dynamic-base-id` for details.
+  bool use_dynamic_base_id = 31;
+
+  // See :option:`--base-id-path` for details.
+  string base_id_path = 32;
 
   // See :option:`--concurrency` for details.
   uint32 concurrency = 2;

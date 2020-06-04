@@ -87,6 +87,7 @@ protected:
 
 private:
   void configureComponentLogLevels();
+  void configureHotRestarter(Runtime::RandomGenerator& random_generator);
 };
 
 // TODO(jmarantz): consider removing this class; I think it'd be more useful to

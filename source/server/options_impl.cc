@@ -59,6 +59,13 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   TCLAP::ValueArg<uint32_t> base_id(
       "", "base-id", "base ID so that multiple envoys can run on the same host if needed", false, 0,
       "uint32_t", cmd);
+  TCLAP::SwitchArg use_dynamic_base_id(
+      "", "use-dynamic-base-id",
+      "the server chooses a base ID dynamically. Supersedes a static base ID. May not be used "
+      "when the restart epoch is non-zero.",
+      cmd, false);
+  TCLAP::ValueArg<std::string> base_id_path(
+      "", "base-id-path", "path to which the base ID is written", false, "", "string", cmd);
   TCLAP::ValueArg<uint32_t> concurrency("", "concurrency", "# of worker threads to run", false,
                                         std::thread::hardware_concurrency(), "uint32_t", cmd);
   TCLAP::ValueArg<std::string> config_path("c", "config-path", "Path to configuration file", false,
@@ -209,9 +216,16 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
         fmt::format("error: unknown IP address version '{}'", local_address_ip_version.getValue());
     throw MalformedArgvException(message);
   }
+  base_id_ = base_id.getValue();
+  use_dynamic_base_id_ = use_dynamic_base_id.getValue();
+  base_id_path_ = base_id_path.getValue();
+  restart_epoch_ = restart_epoch.getValue();
 
-  // For base ID, scale what the user inputs by 10 so that we have spread for domain sockets.
-  base_id_ = base_id.getValue() * 10;
+  if (use_dynamic_base_id_ && restart_epoch_ > 0) {
+    const std::string message = fmt::format(
+        "error: cannot use --restart-epoch={} with --use-dynamic-base-id", restart_epoch_);
+    throw MalformedArgvException(message);
+  }
 
   if (!concurrency.isSet() && cpuset_threads_) {
     // The 'concurrency' command line option wasn't set but the 'cpuset-threads'
@@ -241,7 +255,6 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   ignore_unknown_dynamic_fields_ = ignore_unknown_dynamic_fields.getValue();
   admin_address_path_ = admin_address_path.getValue();
   log_path_ = log_path.getValue();
-  restart_epoch_ = restart_epoch.getValue();
   service_cluster_ = service_cluster.getValue();
   service_node_ = service_node.getValue();
   service_zone_ = service_zone.getValue();
@@ -320,6 +333,8 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
   Server::CommandLineOptionsPtr command_line_options =
       std::make_unique<envoy::admin::v3::CommandLineOptions>();
   command_line_options->set_base_id(baseId());
+  command_line_options->set_use_dynamic_base_id(useDynamicBaseId());
+  command_line_options->set_base_id_path(baseIdPath());
   command_line_options->set_concurrency(concurrency());
   command_line_options->set_config_path(configPath());
   command_line_options->set_config_yaml(configYaml());
@@ -366,7 +381,8 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
 
 OptionsImpl::OptionsImpl(const std::string& service_cluster, const std::string& service_node,
                          const std::string& service_zone, spdlog::level::level_enum log_level)
-    : base_id_(0u), concurrency_(1u), config_path_(""), config_yaml_(""),
+    : base_id_(0u), use_dynamic_base_id_(false), base_id_path_(""), concurrency_(1u),
+      config_path_(""), config_yaml_(""),
       local_address_ip_version_(Network::Address::IpVersion::v4), log_level_(log_level),
       log_format_(Logger::Logger::DEFAULT_LOG_FORMAT), log_format_escaped_(false),
       restart_epoch_(0u), service_cluster_(service_cluster), service_node_(service_node),
