@@ -37,12 +37,9 @@ if [ -n "$CIRCLECI" ]; then
     mv ~/.gitconfig ~/.gitconfig_save
 fi
 
-# Required as bazel and a foreign bazelisk are installed in the latest macos vm image, we have
-# to unlink/overwrite them to install bazelisk
+# Bazel and bazelisk fight for the /usr/local/bin/bazel symlink, depending on the
+# state of the VM we need to make sure bazel doesn't install itself there
 echo "Installing bazelbuild/tap/bazelisk"
+brew tap bazelbuild/tap
+brew uninstall --force bazel bazelbuild/tap/bazelisk
 brew install --force bazelbuild/tap/bazelisk
-brew unlink bazelbuild/tap/bazelisk || true
-if ! brew link --overwrite bazelbuild/tap/bazelisk; then
-    echo "Failed to install and link bazelbuild/tap/bazelisk"
-    exit 1
-fi
