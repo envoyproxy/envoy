@@ -660,7 +660,7 @@ TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateHttpConnectionCloses) {
 
   testRouterHeaderOnlyRequestAndResponse(nullptr, 1);
   cleanupUpstreamAndDownstream();
-  codec_client_->waitForDisconnect();
+  EXPECT_TRUE(codec_client_->waitForDisconnect());
 
   // Attempt to make a request to an unknown host
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
