@@ -158,11 +158,23 @@ public:
    *
    * Can return nullptr if there is no host available in the cluster or if the cluster does not
    * exist.
+   *
+   * Since the desired protocol might depend on the cluster of the selected host (which could be
+   * different than the top level cluster), we accept a callback that allows protocol selection to
+   * depend on the selected cluster.
    */
-  virtual Http::ConnectionPool::Instance* httpConnPoolForCluster(const std::string& cluster,
-                                                                 ResourcePriority priority,
-                                                                 Http::Protocol protocol,
-                                                                 LoadBalancerContext* context) PURE;
+  virtual Http::ConnectionPool::Instance*
+  httpConnPoolForCluster(const std::string& cluster, ResourcePriority priority,
+                         std::function<Http::Protocol(const ClusterInfo&)> protocol,
+                         LoadBalancerContext* context) PURE;
+
+  Http::ConnectionPool::Instance* httpConnPoolForCluster(const std::string& cluster,
+                                                         ResourcePriority priority,
+                                                         Http::Protocol protocol,
+                                                         LoadBalancerContext* context) {
+    return httpConnPoolForCluster(
+        cluster, priority, [protocol](auto&) { return protocol; }, context);
+  }
 
   /**
    * Allocate a load balanced TCP connection pool for a cluster. This is *per-thread* so that

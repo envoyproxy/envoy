@@ -492,9 +492,13 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
       *callbacks_->streamInfo().filterState());
   std::unique_ptr<GenericConnPool> generic_conn_pool = createConnPool();
-  Http::Protocol protocol = cluster_->upstreamHttpProtocol(callbacks_->streamInfo().protocol());
 
-  if (!generic_conn_pool->initialize(config_.cm_, *route_entry_, protocol, this)) {
+  if (!generic_conn_pool->initialize(
+          config_.cm_, *route_entry_,
+          [protocol = callbacks_->streamInfo().protocol()](const auto& cluster) {
+            return cluster.upstreamHttpProtocol(protocol);
+          },
+          this)) {
     sendNoHealthyUpstreamResponse();
     return Http::FilterHeadersStatus::StopIteration;
   }
@@ -1511,8 +1515,12 @@ void Filter::doRetry() {
 
   std::unique_ptr<GenericConnPool> generic_conn_pool = createConnPool();
 
-  Http::Protocol protocol = cluster_->upstreamHttpProtocol(callbacks_->streamInfo().protocol());
-  if (!generic_conn_pool->initialize(config_.cm_, *route_entry_, protocol, this)) {
+  if (!generic_conn_pool->initialize(
+          config_.cm_, *route_entry_,
+          [protocol = callbacks_->streamInfo().protocol()](const auto& cluster) {
+            return cluster.upstreamHttpProtocol(protocol);
+          },
+          this)) {
     sendNoHealthyUpstreamResponse();
     cleanup();
     return;
