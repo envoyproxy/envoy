@@ -10,9 +10,12 @@
 #include "extensions/access_loggers/well_known_names.h"
 
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::Return;
 
 namespace Envoy {
 namespace Extensions {
@@ -20,7 +23,7 @@ namespace AccessLoggers {
 namespace File {
 namespace {
 
-TEST(FileAccessLogConfigTest, ValidateFail) {
+TEST(FileAccessLogNegativeTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   EXPECT_THROW(FileAccessLogFactory().createAccessLogInstance(
@@ -28,7 +31,7 @@ TEST(FileAccessLogConfigTest, ValidateFail) {
                ProtoValidationException);
 }
 
-TEST(FileAccessLogConfigTest, ConfigureFromProto) {
+TEST(FileAccessLogNegativeTest, InvalidNameFail) {
   envoy::config::accesslog::v3::AccessLog config;
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
@@ -39,149 +42,137 @@ TEST(FileAccessLogConfigTest, ConfigureFromProto) {
 
   EXPECT_THROW_WITH_MESSAGE(AccessLog::AccessLogFactory::fromProto(config, context), EnvoyException,
                             "Didn't find a registered implementation for name: 'INVALID'");
-
-  envoy::extensions::access_loggers::file::v3::FileAccessLog fal_config;
-  fal_config.set_path("/dev/null");
-
-  config.mutable_typed_config()->PackFrom(fal_config);
-
-  config.set_name(AccessLogNames::get().File);
-
-  AccessLog::InstanceSharedPtr log = AccessLog::AccessLogFactory::fromProto(config, context);
-
-  EXPECT_NE(nullptr, log);
-  EXPECT_NE(nullptr, dynamic_cast<FileAccessLog*>(log.get()));
 }
 
-TEST(FileAccessLogConfigTest, FileAccessLogTest) {
-  auto factory =
-      Registry::FactoryRegistry<Server::Configuration::AccessLogInstanceFactory>::getFactory(
-          AccessLogNames::get().File);
-  ASSERT_NE(nullptr, factory);
+class FileAccessLogTest : public testing::Test {
+public:
+  FileAccessLogTest() = default;
 
-  ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
-  ASSERT_NE(nullptr, message);
-
-  envoy::extensions::access_loggers::file::v3::FileAccessLog file_access_log;
-  file_access_log.set_path("/dev/null");
-  file_access_log.set_format("%START_TIME%");
-  TestUtility::jsonConvert(file_access_log, *message);
-
-  AccessLog::FilterPtr filter;
-  NiceMock<Server::Configuration::MockFactoryContext> context;
-
-  AccessLog::InstanceSharedPtr instance =
-      factory->createAccessLogInstance(*message, std::move(filter), context);
-  EXPECT_NE(nullptr, instance);
-  EXPECT_NE(nullptr, dynamic_cast<FileAccessLog*>(instance.get()));
-}
-
-TEST(FileAccessLogConfigTest, FileAccessLogJsonTest) {
-  envoy::config::accesslog::v3::AccessLog config;
-
-  NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW_WITH_MESSAGE(AccessLog::AccessLogFactory::fromProto(config, context), EnvoyException,
-                            "Provided name for static registration lookup was empty.");
-
-  config.set_name("INVALID");
-
-  EXPECT_THROW_WITH_MESSAGE(AccessLog::AccessLogFactory::fromProto(config, context), EnvoyException,
-                            "Didn't find a registered implementation for name: 'INVALID'");
-
-  envoy::extensions::access_loggers::file::v3::FileAccessLog fal_config;
-  fal_config.set_path("/dev/null");
-
-  ProtobufWkt::Value string_value;
-  string_value.set_string_value("%PROTOCOL%");
-
-  auto json_format = fal_config.mutable_json_format();
-  (*json_format->mutable_fields())["protocol"] = string_value;
-
-  EXPECT_EQ(
-      fal_config.access_log_format_case(),
-      envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::kJsonFormat);
-  config.mutable_typed_config()->PackFrom(fal_config);
-
-  config.set_name(AccessLogNames::get().File);
-
-  AccessLog::InstanceSharedPtr log = AccessLog::AccessLogFactory::fromProto(config, context);
-
-  EXPECT_NE(nullptr, log);
-  EXPECT_NE(nullptr, dynamic_cast<FileAccessLog*>(log.get()));
-}
-
-TEST(FileAccessLogConfigTest, FileAccessLogTypedJsonTest) {
-  envoy::config::accesslog::v3::AccessLog config;
-
-  envoy::extensions::access_loggers::file::v3::FileAccessLog fal_config;
-  fal_config.set_path("/dev/null");
-
-  ProtobufWkt::Value string_value;
-  string_value.set_string_value("%PROTOCOL%");
-
-  auto json_format = fal_config.mutable_typed_json_format();
-  (*json_format->mutable_fields())["protocol"] = string_value;
-
-  EXPECT_EQ(fal_config.access_log_format_case(),
-            envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::
-                kTypedJsonFormat);
-  config.mutable_typed_config()->PackFrom(fal_config);
-
-  config.set_name(AccessLogNames::get().File);
-
-  NiceMock<Server::Configuration::MockFactoryContext> context;
-  AccessLog::InstanceSharedPtr log = AccessLog::AccessLogFactory::fromProto(config, context);
-
-  EXPECT_NE(nullptr, log);
-  EXPECT_NE(nullptr, dynamic_cast<FileAccessLog*>(log.get()));
-}
-
-TEST(FileAccessLogConfigTest, FileAccessLogJsonWithBoolValueTest) {
-  {
-    // Make sure we fail if you set a bool value in the format dictionary
-    envoy::config::accesslog::v3::AccessLog config;
-    config.set_name(AccessLogNames::get().File);
+  void runTest(const std::string& yaml, absl::string_view expected, bool is_json) {
     envoy::extensions::access_loggers::file::v3::FileAccessLog fal_config;
-    fal_config.set_path("/dev/null");
+    TestUtility::loadFromYaml(yaml, fal_config);
 
-    ProtobufWkt::Value bool_value;
-    bool_value.set_bool_value(false);
-    auto json_format = fal_config.mutable_json_format();
-    (*json_format->mutable_fields())["protocol"] = bool_value;
-
+    envoy::config::accesslog::v3::AccessLog config;
     config.mutable_typed_config()->PackFrom(fal_config);
-    NiceMock<Server::Configuration::MockFactoryContext> context;
 
-    EXPECT_THROW_WITH_MESSAGE(AccessLog::AccessLogFactory::fromProto(config, context),
-                              EnvoyException,
-                              "Only string values are supported in the JSON access log format.");
+    auto file = std::make_shared<AccessLog::MockAccessLogFile>();
+    EXPECT_CALL(context_.access_log_manager_, createAccessLog(fal_config.path()))
+        .WillOnce(Return(file));
+
+    AccessLog::InstanceSharedPtr logger = AccessLog::AccessLogFactory::fromProto(config, context_);
+
+    absl::Time abslStartTime =
+        TestUtility::parseTime("Dec 18 01:50:34 2018 GMT", "%b %e %H:%M:%S %Y GMT");
+    stream_info_.start_time_ = absl::ToChronoTime(abslStartTime);
+    EXPECT_CALL(stream_info_, upstreamHost()).WillRepeatedly(Return(nullptr));
+    stream_info_.response_code_ = 200;
+
+    EXPECT_CALL(*file, write(_)).WillOnce(Invoke([expected, is_json](absl::string_view got) {
+      if (is_json) {
+        EXPECT_TRUE(TestUtility::jsonStringEqual(std::string(got), std::string(expected)));
+      } else {
+        EXPECT_EQ(got, expected);
+      }
+    }));
+    logger->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
   }
+
+  Http::TestRequestHeaderMapImpl request_headers_{{":method", "GET"}, {":path", "/bar/foo"}};
+  Http::TestResponseHeaderMapImpl response_headers_;
+  Http::TestResponseTrailerMapImpl response_trailers_;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
+
+  NiceMock<Server::Configuration::MockFactoryContext> context_;
+};
+
+TEST_F(FileAccessLogTest, DEPRECATED_FEATURE_TEST(LegacyFormatEmpty)) {
+  runTest(
+      R"(
+  path: "/foo"
+  format: ""
+)",
+      "[2018-12-18T01:50:34.000Z] \"GET /bar/foo -\" 200 - 0 0 - - \"-\" \"-\" \"-\" \"-\" \"-\"\n",
+      false);
 }
 
-TEST(FileAccessLogConfigTest, FileAccessLogJsonWithNestedKeyTest) {
-  {
-    // Make sure we fail if you set a nested Struct value in the format dictionary
-    envoy::config::accesslog::v3::AccessLog config;
-    config.set_name(AccessLogNames::get().File);
-    envoy::extensions::access_loggers::file::v3::FileAccessLog fal_config;
-    fal_config.set_path("/dev/null");
+TEST_F(FileAccessLogTest, DEPRECATED_FEATURE_TEST(LegacyFormatPlainText)) {
+  runTest(
+      R"(
+  path: "/foo"
+  format: "plain_text"
+)",
+      "plain_text", false);
+}
 
-    ProtobufWkt::Value string_value;
-    string_value.set_string_value("some_nested_value");
+TEST_F(FileAccessLogTest, DEPRECATED_FEATURE_TEST(LegacyJsonFormat)) {
+  runTest(
+      R"(
+  path: "/foo"
+  json_format:
+    text: "plain text"
+    path: "%REQ(:path)%"
+    code: "%RESPONSE_CODE%"
+)",
+      R"({
+    "text": "plain text",
+    "path": "/bar/foo",
+    "code": "200"
+})",
+      true);
+}
 
-    ProtobufWkt::Value struct_value;
-    (*struct_value.mutable_struct_value()->mutable_fields())["some_nested_key"] = string_value;
+TEST_F(FileAccessLogTest, DEPRECATED_FEATURE_TEST(LegacyTypedJsonFormat)) {
+  runTest(
+      R"(
+  path: "/foo"
+  typed_json_format:
+    text: "plain text"
+    path: "%REQ(:path)%"
+    code: "%RESPONSE_CODE%"
+)",
+      R"({
+    "text": "plain text",
+    "path": "/bar/foo",
+    "code": 200
+})",
+      true);
+}
 
-    auto json_format = fal_config.mutable_json_format();
-    (*json_format->mutable_fields())["top_level_key"] = struct_value;
+TEST_F(FileAccessLogTest, EmptyFormat) {
+  runTest(
+      R"(
+  path: "/foo"
+)",
+      "[2018-12-18T01:50:34.000Z] \"GET /bar/foo -\" 200 - 0 0 - - \"-\" \"-\" \"-\" \"-\" \"-\"\n",
+      false);
+}
 
-    config.mutable_typed_config()->PackFrom(fal_config);
-    NiceMock<Server::Configuration::MockFactoryContext> context;
+TEST_F(FileAccessLogTest, LogFormatText) {
+  runTest(
+      R"(
+  path: "/foo"
+  log_format:
+    text_format: "plain_text - %REQ(:path)% - %RESPONSE_CODE%"
+)",
+      "plain_text - /bar/foo - 200", false);
+}
 
-    EXPECT_THROW_WITH_MESSAGE(AccessLog::AccessLogFactory::fromProto(config, context),
-                              EnvoyException,
-                              "Only string values are supported in the JSON access log format.");
-  }
+TEST_F(FileAccessLogTest, LogFormatJson) {
+  runTest(
+      R"(
+  path: "/foo"
+  log_format:
+    json_format:
+      text: "plain text"
+      path: "%REQ(:path)%"
+      code: "%RESPONSE_CODE%"
+)",
+      R"({
+    "text": "plain text",
+    "path": "/bar/foo",
+    "code": 200
+})",
+      true);
 }
 
 } // namespace

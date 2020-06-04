@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_fuzz_test",
@@ -11,6 +9,8 @@ load(
     "//source/extensions:all_extensions.bzl",
     "envoy_all_extensions",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -33,6 +33,7 @@ envoy_cc_test_library(
     deps = [
         ":filter_fuzz_proto_cc_proto",
         "//source/common/config:utility_lib",
+        "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http:well_known_names",
         "//test/fuzz:utility_lib",

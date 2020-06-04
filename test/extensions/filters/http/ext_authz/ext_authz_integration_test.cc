@@ -29,7 +29,7 @@ public:
         new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
   }
 
-  void initializeWithDownstreamProtocol(Http::CodecClient::Type downstream_protocol) {
+  void initializeConfig() {
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
       ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
@@ -40,14 +40,25 @@ public:
       setGrpcService(*proto_config_.mutable_grpc_service(), "ext_authz",
                      fake_upstreams_.back()->localAddress());
 
+      proto_config_.mutable_filter_enabled()->set_runtime_key("envoy.ext_authz.enable");
+      proto_config_.mutable_filter_enabled()->mutable_default_value()->set_numerator(100);
+      proto_config_.mutable_deny_at_disable()->set_runtime_key("envoy.ext_authz.deny_at_disable");
+      proto_config_.mutable_deny_at_disable()->mutable_default_value()->set_value(false);
+
       envoy::config::listener::v3::Filter ext_authz_filter;
       ext_authz_filter.set_name(Extensions::HttpFilters::HttpFilterNames::get().ExtAuthorization);
       ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
       config_helper_.addFilter(MessageUtil::getJsonStringFromMessage(ext_authz_filter));
     });
+  }
 
-    setDownstreamProtocol(downstream_protocol);
-    HttpIntegrationTest::initialize();
+  void setDenyAtDisableRuntimeConfig(bool deny_at_disable) {
+    config_helper_.addRuntimeOverride("envoy.ext_authz.enable", "numerator: 0");
+    if (deny_at_disable) {
+      config_helper_.addRuntimeOverride("envoy.ext_authz.deny_at_disable", "true");
+    } else {
+      config_helper_.addRuntimeOverride("envoy.ext_authz.deny_at_disable", "false");
+    }
   }
 
   void initiateClientConnection(uint64_t request_body_length) {
@@ -71,11 +82,10 @@ public:
     result = ext_authz_request_->waitForGrpcMessage(*dispatcher_, check_request);
     RELEASE_ASSERT(result, result.message());
 
-    EXPECT_EQ("POST", ext_authz_request_->headers().Method()->value().getStringView());
+    EXPECT_EQ("POST", ext_authz_request_->headers().getMethodValue());
     EXPECT_EQ("/envoy.service.auth.v2.Authorization/Check",
-              ext_authz_request_->headers().Path()->value().getStringView());
-    EXPECT_EQ("application/grpc",
-              ext_authz_request_->headers().ContentType()->value().getStringView());
+              ext_authz_request_->headers().getPathValue());
+    EXPECT_EQ("application/grpc", ext_authz_request_->headers().getContentTypeValue());
 
     envoy::service::auth::v3::CheckRequest expected_check_request;
     TestUtility::loadFromYaml(expected_check_request_yaml, expected_check_request);
@@ -100,7 +110,7 @@ public:
     RELEASE_ASSERT(result, result.message());
   }
 
-  void waitForSuccessfulUpstreamResponse() {
+  void waitForSuccessfulUpstreamResponse(const std::string& expected_response_code) {
     AssertionResult result =
         fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
     RELEASE_ASSERT(result, result.message());
@@ -117,7 +127,7 @@ public:
     EXPECT_EQ(request_body_.length(), upstream_request_->bodyLength());
 
     EXPECT_TRUE(response_->complete());
-    EXPECT_EQ("200", response_->headers().Status()->value().getStringView());
+    EXPECT_EQ(expected_response_code, response_->headers().getStatusValue());
     EXPECT_EQ(response_size_, response_->body().size());
   }
 
@@ -170,11 +180,25 @@ attributes:
 
   void expectCheckRequestWithBody(Http::CodecClient::Type downstream_protocol,
                                   uint64_t request_size) {
-    initializeWithDownstreamProtocol(downstream_protocol);
+    initializeConfig();
+    setDownstreamProtocol(downstream_protocol);
+    HttpIntegrationTest::initialize();
     initiateClientConnection(request_size);
     waitForExtAuthzRequest(expectedCheckRequest(downstream_protocol));
     sendExtAuthzResponse();
-    waitForSuccessfulUpstreamResponse();
+    waitForSuccessfulUpstreamResponse("200");
+    cleanup();
+  }
+
+  void expectFilterDisableCheck(bool deny_at_disable, const std::string& expected_status) {
+    initializeConfig();
+    setDenyAtDisableRuntimeConfig(deny_at_disable);
+    setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
+    HttpIntegrationTest::initialize();
+    initiateClientConnection(4);
+    if (!deny_at_disable) {
+      waitForSuccessfulUpstreamResponse(expected_status);
+    }
     cleanup();
   }
 
@@ -319,6 +343,10 @@ TEST_P(ExtAuthzGrpcIntegrationTest, HTTP2DownstreamRequestWithBody) {
 TEST_P(ExtAuthzGrpcIntegrationTest, HTTP2DownstreamRequestWithLargeBody) {
   expectCheckRequestWithBody(Http::CodecClient::Type::HTTP2, 2048);
 }
+
+TEST_P(ExtAuthzGrpcIntegrationTest, AllowAtDisable) { expectFilterDisableCheck(false, "200"); }
+
+TEST_P(ExtAuthzGrpcIntegrationTest, DenyAtDisable) { expectFilterDisableCheck(true, "403"); }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ExtAuthzHttpIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),

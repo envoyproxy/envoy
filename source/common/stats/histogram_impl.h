@@ -33,7 +33,7 @@ public:
   // HistogramStatistics
   std::string quantileSummary() const override;
   std::string bucketSummary() const override;
-  const std::vector<double>& supportedQuantiles() const override;
+  const std::vector<double>& supportedQuantiles() const final;
   const std::vector<double>& computedQuantiles() const override { return computed_quantiles_; }
   const std::vector<double>& supportedBuckets() const override;
   const std::vector<uint64_t>& computedBuckets() const override { return computed_buckets_; }

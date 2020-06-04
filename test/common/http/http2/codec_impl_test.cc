@@ -46,12 +46,38 @@ namespace CommonUtility = ::Envoy::Http2::Utility;
 class Http2CodecImplTestFixture {
 public:
   struct ConnectionWrapper {
-    void dispatch(const Buffer::Instance& data, ConnectionImpl& connection) {
+    Http::Status dispatch(const Buffer::Instance& data, ConnectionImpl& connection) {
+      Http::Status status = Http::okStatus();
       buffer_.add(data);
       if (!dispatching_) {
         while (buffer_.length() > 0) {
           dispatching_ = true;
-          connection.dispatch(buffer_);
+          status = connection.dispatch(buffer_);
+          if (!status.ok()) {
+            // Exit early if we hit an error status.
+            return status;
+          }
+          dispatching_ = false;
+        }
+      }
+      return status;
+    }
+
+    // TODO(#10878): This test uses the innerDispatch which may throw exceptions while
+    // exception removal is in progress. Tests override MockConnection's write with this
+    // method. Connection::write can be called while dispatching data in a codec callback, or
+    // outside a dispatching context (for example, in RequestEncoder::encodeHeaders) where they are
+    // not caught like in Connection::dispatch. In practice, these would never be triggered since
+    // these inputs would fail parsing on ingress.
+    // This should be removed, and the throws that are expected outside of dispatching context
+    // should be replaced with error handling.
+    void innerDispatch(const Buffer::Instance& data, ConnectionImpl& connection) {
+      Http::Status status;
+      buffer_.add(data);
+      if (!dispatching_) {
+        while (buffer_.length() > 0) {
+          dispatching_ = true;
+          status = connection.innerDispatch(buffer_);
           dispatching_ = false;
         }
       }
@@ -100,11 +126,11 @@ public:
           if (corrupt_metadata_frame_) {
             corruptMetadataFramePayload(data);
           }
-          server_wrapper_.dispatch(data, *server_);
+          server_wrapper_.innerDispatch(data, *server_);
         }));
     ON_CALL(server_connection_, write(_, _))
         .WillByDefault(Invoke([&](Buffer::Instance& data, bool) -> void {
-          client_wrapper_.dispatch(data, *client_);
+          client_wrapper_.innerDispatch(data, *client_);
         }));
   }
 
@@ -341,7 +367,8 @@ TEST_P(Http2CodecImplTest, InvalidContinueWithFinAllowed) {
   // Flush pending data.
   EXPECT_CALL(request_callbacks, onResetStream(StreamResetReason::LocalReset, _));
   setupDefaultConnectionMocks();
-  client_wrapper_.dispatch(Buffer::OwnedImpl(), *client_);
+  auto status = client_wrapper_.dispatch(Buffer::OwnedImpl(), *client_);
+  EXPECT_TRUE(status.ok());
 
   EXPECT_EQ(1, stats_store_.counter("http2.rx_messaging_error").value());
   expectDetailsRequest("http2.violation.of.messaging.rule");
@@ -389,7 +416,8 @@ TEST_P(Http2CodecImplTest, InvalidRepeatContinueAllowed) {
   // Flush pending data.
   EXPECT_CALL(request_callbacks, onResetStream(StreamResetReason::LocalReset, _));
   setupDefaultConnectionMocks();
-  client_wrapper_.dispatch(Buffer::OwnedImpl(), *client_);
+  auto status = client_wrapper_.dispatch(Buffer::OwnedImpl(), *client_);
+  EXPECT_TRUE(status.ok());
 
   EXPECT_EQ(1, stats_store_.counter("http2.rx_messaging_error").value());
   expectDetailsRequest("http2.violation.of.messaging.rule");
@@ -469,7 +497,8 @@ TEST_P(Http2CodecImplTest, Invalid204WithContentLengthAllowed) {
   EXPECT_CALL(request_callbacks, onResetStream(StreamResetReason::LocalReset, _));
   EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::RemoteReset, _));
   setupDefaultConnectionMocks();
-  client_wrapper_.dispatch(Buffer::OwnedImpl(), *client_);
+  auto status = client_wrapper_.dispatch(Buffer::OwnedImpl(), *client_);
+  EXPECT_TRUE(status.ok());
 
   EXPECT_EQ(1, stats_store_.counter("http2.rx_messaging_error").value());
   expectDetailsRequest("http2.invalid.header.field");
@@ -513,7 +542,8 @@ TEST_P(Http2CodecImplTest, InvalidHeadersFrameAllowed) {
   request_encoder_->encodeHeaders(TestRequestHeaderMapImpl{}, true);
   EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalReset, _));
   EXPECT_CALL(request_callbacks, onResetStream(StreamResetReason::RemoteReset, _));
-  server_wrapper_.dispatch(Buffer::OwnedImpl(), *server_);
+  auto status = server_wrapper_.dispatch(Buffer::OwnedImpl(), *server_);
+  EXPECT_TRUE(status.ok());
   expectDetailsResponse("http2.violation.of.messaging.rule");
 }
 
@@ -560,7 +590,8 @@ TEST_P(Http2CodecImplTest, TrailingHeadersLargeBody) {
 
   // Flush pending data.
   setupDefaultConnectionMocks();
-  server_wrapper_.dispatch(Buffer::OwnedImpl(), *server_);
+  auto status = server_wrapper_.dispatch(Buffer::OwnedImpl(), *server_);
+  EXPECT_TRUE(status.ok());
 
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
@@ -720,7 +751,8 @@ TEST_P(Http2CodecImplDeferredResetTest, DeferredResetClient) {
   EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::RemoteReset, _));
 
   setupDefaultConnectionMocks();
-  server_wrapper_.dispatch(Buffer::OwnedImpl(), *server_);
+  auto status = server_wrapper_.dispatch(Buffer::OwnedImpl(), *server_);
+  EXPECT_TRUE(status.ok());
 }
 
 TEST_P(Http2CodecImplDeferredResetTest, DeferredResetServer) {
@@ -751,7 +783,8 @@ TEST_P(Http2CodecImplDeferredResetTest, DeferredResetServer) {
   EXPECT_CALL(response_decoder_, decodeData(_, false)).Times(AtLeast(1));
   EXPECT_CALL(client_stream_callbacks, onResetStream(StreamResetReason::RemoteReset, _));
   setupDefaultConnectionMocks();
-  client_wrapper_.dispatch(Buffer::OwnedImpl(), *client_);
+  auto status = client_wrapper_.dispatch(Buffer::OwnedImpl(), *client_);
+  EXPECT_TRUE(status.ok());
 }
 
 class Http2CodecImplFlowControlTest : public Http2CodecImplTest {};
@@ -1769,7 +1802,7 @@ TEST_P(Http2CodecImplTest, EmptyDataFlood) {
   Buffer::OwnedImpl data;
   emptyDataFlood(data);
   EXPECT_CALL(request_decoder_, decodeData(_, false));
-  EXPECT_THROW(server_wrapper_.dispatch(data, *server_), FrameFloodException);
+  EXPECT_THROW(server_wrapper_.innerDispatch(data, *server_), FrameFloodException);
 }
 
 TEST_P(Http2CodecImplTest, EmptyDataFloodOverride) {
@@ -1780,7 +1813,8 @@ TEST_P(Http2CodecImplTest, EmptyDataFloodOverride) {
       .Times(
           CommonUtility::OptionsLimits::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD +
           1);
-  EXPECT_NO_THROW(server_wrapper_.dispatch(data, *server_));
+  auto status = server_wrapper_.dispatch(data, *server_);
+  EXPECT_TRUE(status.ok());
 }
 
 // CONNECT without upgrade type gets tagged with "bytestream"
@@ -1899,11 +1933,11 @@ protected:
         max_request_headers_kb_, max_request_headers_count_, headers_with_underscores_action_);
     ON_CALL(client_connection_, write(_, _))
         .WillByDefault(Invoke([&](Buffer::Instance& data, bool) -> void {
-          server_wrapper_.dispatch(data, *server_);
+          server_wrapper_.innerDispatch(data, *server_);
         }));
     ON_CALL(server_connection_, write(_, _))
         .WillByDefault(Invoke([&](Buffer::Instance& data, bool) -> void {
-          client_wrapper_.dispatch(data, *client_);
+          client_wrapper_.innerDispatch(data, *client_);
         }));
   }
 

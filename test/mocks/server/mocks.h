@@ -13,6 +13,7 @@
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/server/admin.h"
+#include "envoy/server/bootstrap_extension_config.h"
 #include "envoy/server/configuration.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/filter_config.h"
@@ -70,6 +71,8 @@ public:
   ~MockOptions() override;
 
   MOCK_METHOD(uint64_t, baseId, (), (const));
+  MOCK_METHOD(bool, useDynamicBaseId, (), (const));
+  MOCK_METHOD(const std::string&, baseIdPath, (), (const));
   MOCK_METHOD(uint32_t, concurrency, (), (const));
   MOCK_METHOD(const std::string&, configPath, (), (const));
   MOCK_METHOD(const envoy::config::bootstrap::v3::Bootstrap&, configProto, (), (const));
@@ -77,6 +80,7 @@ public:
   MOCK_METHOD(const absl::optional<uint32_t>&, bootstrapVersion, (), (const));
   MOCK_METHOD(bool, allowUnknownStaticFields, (), (const));
   MOCK_METHOD(bool, rejectUnknownDynamicFields, (), (const));
+  MOCK_METHOD(bool, ignoreUnknownDynamicFields, (), (const));
   MOCK_METHOD(const std::string&, adminAddressPath, (), (const));
   MOCK_METHOD(Network::Address::IpVersion, localAddressIpVersion, (), (const));
   MOCK_METHOD(std::chrono::seconds, drainTime, (), (const));
@@ -107,6 +111,7 @@ public:
   absl::optional<uint32_t> bootstrap_version_;
   bool allow_unknown_static_fields_{};
   bool reject_unknown_dynamic_fields_{};
+  bool ignore_unknown_dynamic_fields_{};
   std::string admin_address_path_;
   std::string service_cluster_name_;
   std::string service_node_name_;
@@ -231,6 +236,7 @@ public:
   MOCK_METHOD(void, sendParentTerminateRequest, ());
   MOCK_METHOD(ServerStatsFromParent, mergeParentStatsIfAny, (Stats::StoreRoot & stats_store));
   MOCK_METHOD(void, shutdown, ());
+  MOCK_METHOD(uint32_t, baseId, ());
   MOCK_METHOD(std::string, version, ());
   MOCK_METHOD(Thread::BasicLockable&, logLock, ());
   MOCK_METHOD(Thread::BasicLockable&, accessLogLock, ());
@@ -675,6 +681,17 @@ public:
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
 
   testing::NiceMock<Configuration::MockServerFactoryContext> server_factory_context_;
+};
+
+class MockBootstrapExtensionFactory : public BootstrapExtensionFactory {
+public:
+  MockBootstrapExtensionFactory();
+  ~MockBootstrapExtensionFactory() override;
+
+  MOCK_METHOD(BootstrapExtensionPtr, createBootstrapExtension,
+              (const Protobuf::Message&, Configuration::ServerFactoryContext&), (override));
+  MOCK_METHOD(ProtobufTypes::MessagePtr, createEmptyConfigProto, (), (override));
+  MOCK_METHOD(std::string, name, (), (const override));
 };
 
 } // namespace Configuration

@@ -91,11 +91,6 @@ public:
    */
   ProtocolState currentState() const { return state_; }
 
-  /**
-   * Set the current state. Used for testing only.
-   */
-  void setCurrentState(ProtocolState state) { state_ = state; }
-
 private:
   struct DecoderStatus {
     DecoderStatus() = default;

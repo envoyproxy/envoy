@@ -17,19 +17,24 @@
 namespace Envoy {
 namespace Network {
 
-void ListenSocketImpl::doBind() {
-  const Api::SysCallIntResult result = local_address_->bind(io_handle_->fd());
+Api::SysCallIntResult ListenSocketImpl::bind(Network::Address::InstanceConstSharedPtr address) {
+  local_address_ = address;
+
+  const Api::SysCallIntResult result = SocketImpl::bind(local_address_);
   if (SOCKET_FAILURE(result.rc_)) {
     close();
     throw SocketBindException(
         fmt::format("cannot bind '{}': {}", local_address_->asString(), strerror(result.errno_)),
         result.errno_);
   }
+  // TODO(fcoras): should this be moved to SocketImpl::bind()?
   if (local_address_->type() == Address::Type::Ip && local_address_->ip()->port() == 0) {
     // If the port we bind is zero, then the OS will pick a free port for us (assuming there are
     // any), and we need to find out the port number that the OS picked.
-    local_address_ = Address::addressFromFd(io_handle_->fd());
+    local_address_ = SocketInterface::addressFromFd(io_handle_->fd());
   }
+
+  return {0, 0};
 }
 
 void ListenSocketImpl::setListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) {
@@ -44,7 +49,7 @@ void ListenSocketImpl::setupSocket(const Network::Socket::OptionsSharedPtr& opti
   setListenSocketOptions(options);
 
   if (bind_to_port) {
-    doBind();
+    bind(local_address_);
   }
 }
 
@@ -64,9 +69,9 @@ void NetworkListenSocket<
     NetworkSocketTrait<Address::SocketType::Datagram>>::setPrebindSocketOptions() {}
 
 UdsListenSocket::UdsListenSocket(const Address::InstanceConstSharedPtr& address)
-    : ListenSocketImpl(address->socket(Address::SocketType::Stream), address) {
+    : ListenSocketImpl(SocketInterface::socket(Address::SocketType::Stream, address), address) {
   RELEASE_ASSERT(io_handle_->fd() != -1, "");
-  doBind();
+  bind(local_address_);
 }
 
 UdsListenSocket::UdsListenSocket(IoHandlePtr&& io_handle,

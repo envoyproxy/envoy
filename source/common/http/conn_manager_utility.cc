@@ -6,9 +6,9 @@
 
 #include "envoy/type/v3/percent.pb.h"
 
-#include "common/access_log/access_log_formatter.h"
 #include "common/common/empty_string.h"
 #include "common/common/utility.h"
+#include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
@@ -42,18 +42,22 @@ std::string ConnectionManagerUtility::determineNextProtocol(Network::Connection&
 
 ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(
     Network::Connection& connection, const Buffer::Instance& data,
-    ServerConnectionCallbacks& callbacks, Stats::Scope& scope, const Http1Settings& http1_settings,
+    ServerConnectionCallbacks& callbacks, Stats::Scope& scope,
+    Http1::CodecStats::AtomicPtr& http1_codec_stats,
+    Http2::CodecStats::AtomicPtr& http2_codec_stats, const Http1Settings& http1_settings,
     const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
     uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
         headers_with_underscores_action) {
   if (determineNextProtocol(connection, data) == Http2::ALPN_STRING) {
+    Http2::CodecStats& stats = Http2::CodecStats::atomicGet(http2_codec_stats, scope);
     return std::make_unique<Http2::ServerConnectionImpl>(
-        connection, callbacks, scope, http2_options, max_request_headers_kb,
+        connection, callbacks, stats, http2_options, max_request_headers_kb,
         max_request_headers_count, headers_with_underscores_action);
   } else {
+    Http1::CodecStats& stats = Http1::CodecStats::atomicGet(http1_codec_stats, scope);
     return std::make_unique<Http1::ServerConnectionImpl>(
-        connection, scope, callbacks, http1_settings, max_request_headers_kb,
+        connection, stats, callbacks, http1_settings, max_request_headers_kb,
         max_request_headers_count, headers_with_underscores_action);
   }
 }
@@ -418,6 +422,14 @@ bool ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_head
     PathUtil::mergeSlashes(request_headers);
   }
   return is_valid_path;
+}
+
+void ConnectionManagerUtility::maybeNormalizeHost(RequestHeaderMap& request_headers,
+                                                  const ConnectionManagerConfig& config,
+                                                  uint32_t port) {
+  if (config.shouldStripMatchingPort()) {
+    HeaderUtility::stripPortFromHost(request_headers, port);
+  }
 }
 
 } // namespace Http
