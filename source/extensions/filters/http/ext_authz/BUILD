@@ -1,14 +1,14 @@
-licenses(["notice"])  # Apache 2
-
-# External authorization L7 HTTP filter
-# Public docs: TODO(saumoh): Docs needed in docs/root/configuration/http_filters
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
+
+# External authorization L7 HTTP filter
+# Public docs: TODO(saumoh): Docs needed in docs/root/configuration/http_filters
 
 envoy_package()
 

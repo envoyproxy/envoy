@@ -13,7 +13,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 
-UberFilterFuzzer::UberFilterFuzzer() {
+UberFilterFuzzer::UberFilterFuzzer() : async_request_{&cluster_manager_.async_client_} {
   // This is a decoder filter.
   ON_CALL(filter_callback_, addStreamDecoderFilter(_))
       .WillByDefault(Invoke([&](Http::StreamDecoderFilterSharedPtr filter) -> void {
@@ -34,6 +34,10 @@ UberFilterFuzzer::UberFilterFuzzer() {
         encoder_filter_ = filter;
         encoder_filter_->setEncoderFilterCallbacks(encoder_callbacks_);
       }));
+  // This filter supports access logging.
+  ON_CALL(filter_callback_, addAccessLogHandler(_))
+      .WillByDefault(
+          Invoke([&](AccessLog::InstanceSharedPtr handler) -> void { access_logger_ = handler; }));
   // Set expectations for particular filters that may get fuzzed.
   perFilterSetup();
 }
@@ -153,6 +157,12 @@ void UberFilterFuzzer::sendTrailers(Http::StreamEncoderFilter* filter,
   filter->encodeTrailers(response_trailers_);
 }
 
+void UberFilterFuzzer::accessLog(AccessLog::Instance* access_logger,
+                                 const StreamInfo::StreamInfo& stream_info) {
+  ENVOY_LOG_MISC(debug, "Access logging");
+  access_logger->log(&request_headers_, &response_headers_, &response_trailers_, stream_info);
+}
+
 void UberFilterFuzzer::fuzz(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter&
         proto_config,
@@ -180,6 +190,9 @@ void UberFilterFuzzer::fuzz(
   if (encoder_filter_ != nullptr) {
     runData(encoder_filter_.get(), upstream_data);
   }
+  if (access_logger_ != nullptr) {
+    accessLog(access_logger_.get(), stream_info_);
+  }
 
   reset();
 }
@@ -195,6 +208,7 @@ void UberFilterFuzzer::reset() {
   }
   encoder_filter_.reset();
 
+  access_logger_.reset();
   request_headers_.clear();
   response_headers_.clear();
   request_trailers_.clear();
