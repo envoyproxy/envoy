@@ -50,6 +50,8 @@ public:
 
   // Setters for option fields. These are not part of the Options interface.
   void setBaseId(uint64_t base_id) { base_id_ = base_id; };
+  void setUseDynamicBaseId(bool use_dynamic_base_id) { use_dynamic_base_id_ = use_dynamic_base_id; }
+  void setBaseIdPath(const std::string& base_id_path) { base_id_path_ = base_id_path; }
   void setConcurrency(uint32_t concurrency) { concurrency_ = concurrency; }
   void setConfigPath(const std::string& config_path) { config_path_ = config_path; }
   void setConfigProto(const envoy::config::bootstrap::v3::Bootstrap& config_proto) {
@@ -102,6 +104,8 @@ public:
 
   // Server::Options
   uint64_t baseId() const override { return base_id_; }
+  bool useDynamicBaseId() const override { return use_dynamic_base_id_; }
+  const std::string& baseIdPath() const override { return base_id_path_; }
   uint32_t concurrency() const override { return concurrency_; }
   const std::string& configPath() const override { return config_path_; }
   const envoy::config::bootstrap::v3::Bootstrap& configProto() const override {
@@ -159,6 +163,8 @@ private:
   spdlog::level::level_enum parseAndValidateLogLevel(absl::string_view log_level);
 
   uint64_t base_id_;
+  bool use_dynamic_base_id_;
+  std::string base_id_path_;
   uint32_t concurrency_;
   std::string config_path_;
   envoy::config::bootstrap::v3::Bootstrap config_proto_;

@@ -1,5 +1,6 @@
 #include "exe/main_common.h"
 
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <new>
@@ -7,6 +8,7 @@
 #include "envoy/config/listener/v3/listener.pb.h"
 
 #include "common/common/compiler_requirements.h"
+#include "common/common/logger.h"
 #include "common/common/perf_annotation.h"
 #include "common/network/utility.h"
 #include "common/stats/symbol_table_creator.h"
@@ -58,14 +60,7 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
   switch (options_.mode()) {
   case Server::Mode::InitOnly:
   case Server::Mode::Serve: {
-#ifdef ENVOY_HOT_RESTART
-    if (!options.hotRestartDisabled()) {
-      restarter_ = std::make_unique<Server::HotRestartImpl>(options_);
-    }
-#endif
-    if (restarter_ == nullptr) {
-      restarter_ = std::make_unique<Server::HotRestartNopImpl>();
-    }
+    configureHotRestarter(*random_generator);
 
     tls_ = std::make_unique<ThreadLocal::InstanceImpl>();
     Thread::BasicLockable& log_lock = restarter_->logLock();
@@ -103,6 +98,60 @@ void MainCommonBase::configureComponentLogLevels() {
     Logger::Logger* logger_to_change = Logger::Registry::logger(component_log_level.first);
     ASSERT(logger_to_change);
     logger_to_change->setLevel(component_log_level.second);
+  }
+}
+
+void MainCommonBase::configureHotRestarter(Runtime::RandomGenerator& random_generator) {
+#ifdef ENVOY_HOT_RESTART
+  if (!options_.hotRestartDisabled()) {
+    uint32_t base_id = options_.baseId();
+
+    if (options_.useDynamicBaseId()) {
+      ASSERT(options_.restartEpoch() == 0, "cannot use dynamic base id during hot restart");
+
+      std::unique_ptr<Server::HotRestart> restarter;
+
+      // Try 100 times to get an unused base ID and then give up under the assumption
+      // that some other problem has occurred to prevent binding the domain socket.
+      for (int i = 0; i < 100 && restarter == nullptr; i++) {
+        // HotRestartImpl is going to multiply this value by 10, so leave head room.
+        base_id = static_cast<uint32_t>(random_generator.random()) & 0x0FFFFFFF;
+
+        try {
+          restarter = std::make_unique<Server::HotRestartImpl>(base_id, 0);
+        } catch (Server::HotRestartDomainSocketInUseException& ex) {
+          // No luck, try again.
+          ENVOY_LOG_MISC(debug, "dynamic base id: {}", ex.what());
+        }
+      }
+
+      if (restarter == nullptr) {
+        throw EnvoyException("unable to select a dynamic base id");
+      }
+
+      restarter_.swap(restarter);
+    } else {
+      restarter_ = std::make_unique<Server::HotRestartImpl>(base_id, options_.restartEpoch());
+    }
+
+    // Write the base-id to the requested path whether we selected it
+    // dynamically or not.
+    if (!options_.baseIdPath().empty()) {
+      std::ofstream base_id_out_file(options_.baseIdPath());
+      if (!base_id_out_file) {
+        ENVOY_LOG_MISC(critical, "cannot open base id output file {} for writing.",
+                       options_.baseIdPath());
+      } else {
+        base_id_out_file << base_id;
+      }
+    }
+  }
+#else
+  UNREFERENCED_PARAMETER(random_generator);
+#endif
+
+  if (restarter_ == nullptr) {
+    restarter_ = std::make_unique<Server::HotRestartNopImpl>();
   }
 }
 
