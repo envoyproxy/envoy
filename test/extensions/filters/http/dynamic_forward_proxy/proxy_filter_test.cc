@@ -8,9 +8,6 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/mocks/upstream/transport_socket_match.h"
-#include "test/test_common/test_runtime.h"
-
-#include "absl/memory/memory.h"
 
 using testing::AtLeast;
 using testing::Eq;
