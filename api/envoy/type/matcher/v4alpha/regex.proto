@@ -57,7 +57,7 @@ message RegexMatchAndSubstitute {
   // so as to replace just one occurrence of a pattern. Capture groups can be
   // used in the pattern to extract portions of the subject string, and then
   // referenced in the substitution string.
-  RegexMatcher pattern = 1;
+  RegexMatcher pattern = 1 [(validate.rules).message = {required: true}];
 
   // The string that should be substituted into matching portions of the
   // subject string during a substitution operation to produce a new string.
