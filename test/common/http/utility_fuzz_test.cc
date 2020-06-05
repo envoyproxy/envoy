@@ -66,6 +66,11 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
                                       max_age, cookie_value.httponly());
     break;
   }
+  case test::common::http::UtilityTestCase::kParseAuthorityString: {
+    const auto& authority_string = input.parse_authority_string();
+    Http::Utility::parseAuthority(authority_string);
+    break;
+  }
 
   default:
     // Nothing to do.

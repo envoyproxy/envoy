@@ -43,5 +43,6 @@ message UtilityTestCase {
     string find_query_string = 9
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE, strict: false}];
     CookieValue make_set_cookie_value = 10;
+    string parse_authority_string = 11;
   }
 }
