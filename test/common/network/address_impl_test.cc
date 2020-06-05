@@ -319,6 +319,7 @@ TEST(PipeInstanceTest, Basic) {
   EXPECT_EQ(nullptr, address.ip());
 }
 
+#ifndef WIN32
 TEST(PipeInstanceTest, BasicPermission) {
   std::string path = TestEnvironment::unixDomainSocketPath("foo.sock");
 
@@ -342,6 +343,7 @@ TEST(PipeInstanceTest, BasicPermission) {
       << path << std::oct << "\t" << (stat_buf.st_mode & 07777) << std::dec << "\t"
       << (stat_buf.st_mode) << strerror(result.errno_);
 }
+#endif
 
 TEST(PipeInstanceTest, PermissionFail) {
   NiceMock<Api::MockOsSysCalls> os_sys_calls;

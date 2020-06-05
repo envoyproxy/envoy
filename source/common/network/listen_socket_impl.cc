@@ -56,12 +56,15 @@ void ListenSocketImpl::setupSocket(const Network::Socket::OptionsSharedPtr& opti
 template <>
 void NetworkListenSocket<
     NetworkSocketTrait<Address::SocketType::Stream>>::setPrebindSocketOptions() {
-
+// On Windows, SO_REUSEADDR does not restrict subsequent bind calls when there is a listener as on
+// Linux and later BSD socket stacks
+#ifndef WIN32
   int on = 1;
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
   Api::SysCallIntResult status =
       os_syscalls.setsockopt(io_handle_->fd(), SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
   RELEASE_ASSERT(status.rc_ != -1, "failed to set SO_REUSEADDR socket option");
+#endif
 }
 
 template <>

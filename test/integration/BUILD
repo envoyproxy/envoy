@@ -1194,6 +1194,7 @@ envoy_cc_test(
     srcs = [
         "local_reply_integration_test.cc",
     ],
+    tags = ["fails_on_windows"],
     deps = [
         ":http_integration_lib",
         ":http_protocol_integration_lib",
