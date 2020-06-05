@@ -36,8 +36,7 @@ Http::Status exceptionToStatus(std::function<Http::Status(Buffer::Instance&)> di
 namespace Http2 {
 namespace Utility {
 
-void validateCustomSettingsParameters(
-    const envoy::config::core::v3::Http2ProtocolOptions& options);
+void validateCustomSettingsParameters(const envoy::config::core::v3::Http2ProtocolOptions& options);
 
 struct SettingsEntryHash {
   size_t operator()(const nghttp2_settings_entry& entry) const {
