@@ -278,10 +278,10 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "N/A",
     ),
     com_github_google_jwt_verify = dict(
-        sha256 = "118f955620509f1634cbd918c63234d2048dce56b1815caf348d78e3c3dc899c",
-        strip_prefix = "jwt_verify_lib-44291b2ee4c19631e5a0a0bf4f965436a9364ca7",
-        # 2020-05-21
-        urls = ["https://github.com/google/jwt_verify_lib/archive/44291b2ee4c19631e5a0a0bf4f965436a9364ca7.tar.gz"],
+        sha256 = "c6249f6caeab616d2c232258fc9423f1c4a537418dd575a4b7d3616b8e2a0cb6",
+        strip_prefix = "jwt_verify_lib-78b4ae005db2e287e321515a8385baac7c3b4207",
+        # 2020-06-03
+        urls = ["https://github.com/google/jwt_verify_lib/archive/78b4ae005db2e287e321515a8385baac7c3b4207.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),
