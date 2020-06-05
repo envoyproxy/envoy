@@ -230,8 +230,10 @@ TEST_F(ThreadAsyncPtrTest, NameNotSpecifiedWait) {
   auto thread = thread_factory_.createThread([&notify]() { notify.WaitForNotification(); });
   notify.Notify();
 
-  // For linux builds, the thread name defaults to the name of the binary.
-  // Currently, this population does not occur for Mac or Windows.
+  // For linux builds, the thread name defaults to the name of the
+  // binary. However the name of the binary is different depending on whether
+  // this is a coverage test or not. Currently, this population does not occur
+  // for Mac or Windows.
 #ifdef __linux__
   EXPECT_FALSE(thread->name().empty());
 #endif

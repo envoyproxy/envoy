@@ -62,16 +62,20 @@ public:
     } else {
       const int set_name_rc = pthread_setname_np(thread_handle_, name_.c_str());
       if (set_name_rc != 0) {
-        ENVOY_LOG_MISC(trace, "Error {} setting name `{}': {}", set_name_rc, name_,
-                       strerror(set_name_rc));
+        ENVOY_LOG_MISC(trace, "Error {} setting name `{}'", set_name_rc, name_);
       } else {
-#ifndef NDEBUG
+        // When compiling in debug mode, read back the thread-name from the OS,
+        // and verify it's what we asked for. This ensures the truncation is as
+        // expected, and that the OS will actually retain all the bytes of the
+        // name we expect.
+        //
+        // Note that the system-call to read the thread name may fail in case
+        // the thread exits after the call to set the name above, and before the
+        // call to get the name, so we can only do the assert if that call
+        // succeeded.
         std::string check_name;
-        if (getNameFromOS(check_name)) {
-          ASSERT(check_name == name_,
-                 absl::StrCat("configured name=", name_, " os name=", check_name));
-        }
-#endif
+        ASSERT(!getNameFromOS(check_name) || check_name == name_,
+               absl::StrCat("configured name=", name_, " os name=", check_name));
       }
     }
 #endif
@@ -93,10 +97,10 @@ private:
 #ifdef __linux__
   bool getNameFromOS(std::string& name) {
     // Verify that the name got written into the thread as expected.
-    char buf[PTHREAD_MAX_LEN_INCLUDING_NULL_BYTE];
+    char buf[PTHREAD_MAX_THREADNAME_LEN_INCLUDING_NULL_BYTE];
     const int get_name_rc = pthread_getname_np(thread_handle_, buf, sizeof(buf));
     if (get_name_rc != 0) {
-      ENVOY_LOG_MISC(trace, "Error {} getting name: {}", get_name_rc, strerror(get_name_rc));
+      ENVOY_LOG_MISC(trace, "Error {} getting name", get_name_rc);
       return false;
     }
     name = buf;
