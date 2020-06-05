@@ -78,8 +78,8 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
     break;
   }
   case test::common::http::UtilityTestCase::kValidateSettingsParameters: {
-    const auto& settings_parameters = input.validate_settings_paramters();
-    Http::Utility::validateCustomSettingsParameters(settings_parameters);
+    const auto& settings_parameters = input.validate_settings_parameters();
+    Http2::Utility::validateCustomSettingsParameters(settings_parameters);
     break;
   }
 

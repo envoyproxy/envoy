@@ -343,7 +343,9 @@ envoy_proto_library(
     name = "utility_fuzz_proto",
     srcs = [
         "utility_fuzz.proto",
-        "@envoy_api//enovy/config/core/v3:pkg",
+    ],
+    deps = [
+        "@envoy_api//envoy/config/core/v3:pkg",
     ],
 )
 

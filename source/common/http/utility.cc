@@ -57,7 +57,7 @@ Http::Status exceptionToStatus(std::function<Http::Status(Buffer::Instance&)> di
 namespace Http2 {
 namespace Utility {
 
-namespace {
+/* namespace { */
 
 void validateCustomSettingsParameters(
     const envoy::config::core::v3::Http2ProtocolOptions& options) {
@@ -123,7 +123,7 @@ void validateCustomSettingsParameters(
   }
 }
 
-} // namespace
+/* } // namespace */
 
 const uint32_t OptionsLimits::MIN_HPACK_TABLE_SIZE;
 const uint32_t OptionsLimits::DEFAULT_HPACK_TABLE_SIZE;
