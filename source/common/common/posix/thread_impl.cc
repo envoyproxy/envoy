@@ -29,7 +29,7 @@ int64_t getCurrentThreadId() {
 // See https://www.man7.org/linux/man-pages/man3/pthread_setname_np.3.html.
 // The maximum thread name is 16 bytes including the terminating nul byte,
 // so we need to truncate the string_view to 15 bytes.
-#define PTHREAD_MAX_LEN_INCLUDING_NULL_BYTE 16
+#define PTHREAD_MAX_THREADNAME_LEN_INCLUDING_NULL_BYTE 16
 
 /**
  * Wrapper for a pthread thread. We don't use std::thread because it eats exceptions and leads to
@@ -40,7 +40,8 @@ public:
   ThreadImplPosix(std::function<void()> thread_routine, OptionsOptConstRef options)
       : thread_routine_(std::move(thread_routine)) {
     if (options) {
-      name_ = (std::string(options->name_.substr(0, PTHREAD_MAX_LEN_INCLUDING_NULL_BYTE - 1)));
+      name_ = (std::string(
+          options->name_.substr(0, PTHREAD_MAX_THREADNAME_LEN_INCLUDING_NULL_BYTE - 1)));
     }
     RELEASE_ASSERT(Logger::Registry::initialized(), "");
     const int rc = pthread_create(
@@ -76,10 +77,17 @@ public:
 #endif
   }
 
+  ~ThreadImplPosix() { ASSERT(joined_); }
+
   std::string name() const override { return name_; }
 
   // Thread::Thread
-  void join() override;
+  void join() override {
+    ASSERT(!joined_);
+    joined_ = true;
+    const int rc = pthread_join(thread_handle_, nullptr);
+    RELEASE_ASSERT(rc == 0, "");
+  }
 
 private:
 #ifdef __linux__
@@ -99,12 +107,8 @@ private:
   std::function<void()> thread_routine_;
   pthread_t thread_handle_;
   std::string name_;
+  bool joined_{false};
 };
-
-void ThreadImplPosix::join() {
-  const int rc = pthread_join(thread_handle_, nullptr);
-  RELEASE_ASSERT(rc == 0, "");
-}
 
 ThreadPtr ThreadFactoryImplPosix::createThread(std::function<void()> thread_routine,
                                                OptionsOptConstRef options) {

@@ -22,7 +22,7 @@ static constexpr int DefaultBufferLimitBytes = 1024 * 1024;
 
 GoogleAsyncClientThreadLocal::GoogleAsyncClientThreadLocal(Api::Api& api)
     : completion_thread_(api.threadFactory().createThread([this] { completionThread(); },
-                                                          Thread::Options{"GoogleAsyncClient"})) {}
+                                                          Thread::Options{"GrpcGoogClient"})) {}
 
 GoogleAsyncClientThreadLocal::~GoogleAsyncClientThreadLocal() {
   // Force streams to shutdown and invoke TryCancel() to start the drain of

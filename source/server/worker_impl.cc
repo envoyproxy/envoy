@@ -92,7 +92,7 @@ void WorkerImpl::start(GuardDog& guard_dog) {
   //
   // TODO(jmarantz): consider refactoring how this naming works so this naming
   // architecture is centralized, resulting in clearer names.
-  Thread::Options options{absl::StrCat("dsp:", dispatcher_->name())};
+  Thread::Options options{absl::StrCat("wrk:", dispatcher_->name())};
   thread_ = api_.threadFactory().createThread(
       [this, &guard_dog]() -> void { threadRoutine(guard_dog); }, options);
 }
