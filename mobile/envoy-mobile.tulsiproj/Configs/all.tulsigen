@@ -4,6 +4,10 @@
     "library/swift/test/BUILD"
   ],
   "buildTargets" : [
+    "//examples/objective-c/hello_world:app",
+    "//examples/objective-c/hello_world:appmain",
+    "//examples/swift/hello_world:app",
+    "//examples/swift/hello_world:appmain",
     "//library/swift/src:ios_framework_archive",
     "//library/swift/test:envoy_client_builder_tests",
     "//library/swift/test:envoy_client_builder_tests_lib",
@@ -72,9 +76,13 @@
   },
   "projectName" : "envoy-mobile",
   "sourceFilters" : [
+    "examples/objective-c/...",
+    "examples/objective-c/hello_world",
+    "examples/swift/...",
+    "examples/swift/hello_world",
     "library",
-    "library/objective-c",
-    "library/swift",
+    "library/objective-c/...",
+    "library/swift/...",
     "library/swift/src",
     "library/swift/src/filters",
     "library/swift/src/grpc",
