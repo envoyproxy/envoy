@@ -1438,7 +1438,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
       existing_hosts_for_current_priority.erase(existing_itr);
       *i = *(--current_erase_from);
     } else {
-      i++;
+      ++i;
     }
   }
   current_priority_hosts.erase(current_erase_from, current_priority_hosts.end());
@@ -1472,7 +1472,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
         (*i)->healthFlagSet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL);
         *i = *(--erase_from_itr);
       } else {
-        i++;
+        ++i;
       }
     }
     current_priority_hosts.erase(erase_from_itr, current_priority_hosts.end());
