@@ -331,7 +331,7 @@ TEST_P(ProtocolIntegrationTest, DrainCloseImmediate) {
   response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   response->waitForEndStream();
 
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
   EXPECT_TRUE(response->complete());
 
   EXPECT_EQ("200", response->headers().getStatusValue());
