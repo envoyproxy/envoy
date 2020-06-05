@@ -60,6 +60,17 @@ public:
   virtual uint64_t baseId() const PURE;
 
   /**
+   * @return bool choose an unused base ID dynamically. The chosen base id can be written to a
+   *         a file using the baseIdPath option.
+   */
+  virtual bool useDynamicBaseId() const PURE;
+
+  /**
+   * @return const std::string& the dynamic base id output file.
+   */
+  virtual const std::string& baseIdPath() const PURE;
+
+  /**
    * @return the number of worker threads to run in the server.
    */
   virtual uint32_t concurrency() const PURE;
@@ -100,6 +111,11 @@ public:
    * @return bool allow unknown fields in the dynamic configuration?
    */
   virtual bool rejectUnknownDynamicFields() const PURE;
+
+  /**
+   * @return bool ignore unknown fields in the dynamic configuration?
+   **/
+  virtual bool ignoreUnknownDynamicFields() const PURE;
 
   /**
    * @return const std::string& the admin address output file.

@@ -1,12 +1,10 @@
 load("@rules_cc//cc:defs.bzl", "cc_library", "cc_proto_library")
+load("//bazel:envoy_build_system.bzl", "envoy_package")
+load("//bazel:envoy_internal.bzl", "envoy_select_force_libcpp")
 
 licenses(["notice"])  # Apache 2
 
-load("//bazel:envoy_build_system.bzl", "envoy_package")
-
 envoy_package()
-
-load("//bazel:envoy_internal.bzl", "envoy_select_force_libcpp")
 
 exports_files([
     "gen_sh_test_runner.sh",
@@ -41,12 +39,6 @@ genrule(
     # Undocumented attr to depend on workspace status files.
     # https://github.com/bazelbuild/bazel/issues/4942
     stamp = 1,
-)
-
-sh_binary(
-    name = "fuzzit_wrapper",
-    srcs = ["fuzzit_wrapper.sh"],
-    data = ["@fuzzit_linux//:fuzzit"],
 )
 
 # A target to optionally link C++ standard library dynamically in sanitizer runs.
@@ -105,6 +97,11 @@ config_setting(
 config_setting(
     name = "dbg_build",
     values = {"compilation_mode": "dbg"},
+)
+
+config_setting(
+    name = "no_debug_info",
+    values = {"define": "no_debug_info=1"},
 )
 
 config_setting(

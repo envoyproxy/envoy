@@ -12,6 +12,7 @@
 #include "common/http/http2/codec_impl.h"
 #include "common/http/http3/quic_codec_factory.h"
 #include "common/http/http3/well_known_names.h"
+#include "common/http/status.h"
 #include "common/http/utility.h"
 
 namespace Envoy {
@@ -121,18 +122,18 @@ void CodecClient::onReset(ActiveRequest& request, StreamResetReason reason) {
 
 void CodecClient::onData(Buffer::Instance& data) {
   bool protocol_error = false;
-  try {
-    codec_->dispatch(data);
-  } catch (CodecProtocolException& e) {
-    ENVOY_CONN_LOG(debug, "protocol error: {}", *connection_, e.what());
+  const Status status = codec_->dispatch(data);
+
+  if (isCodecProtocolError(status)) {
+    ENVOY_CONN_LOG(debug, "protocol error: {}", *connection_, status.message());
     close();
     protocol_error = true;
-  } catch (PrematureResponseException& e) {
+  } else if (isPrematureResponseError(status)) {
     ENVOY_CONN_LOG(debug, "premature response", *connection_);
     close();
 
     // Don't count 408 responses where we have no active requests as protocol errors
-    if (!active_requests_.empty() || e.responseCode() != Code::RequestTimeout) {
+    if (!active_requests_.empty() || getPrematureResponseHttpCode(status) != Code::RequestTimeout) {
       protocol_error = true;
     }
   }
@@ -146,16 +147,17 @@ CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& conne
                                  Upstream::HostDescriptionConstSharedPtr host,
                                  Event::Dispatcher& dispatcher)
     : CodecClient(type, std::move(connection), host, dispatcher) {
+
   switch (type) {
   case Type::HTTP1: {
     codec_ = std::make_unique<Http1::ClientConnectionImpl>(
-        *connection_, host->cluster().statsScope(), *this, host->cluster().http1Settings(),
+        *connection_, host->cluster().http1CodecStats(), *this, host->cluster().http1Settings(),
         host->cluster().maxResponseHeadersCount());
     break;
   }
   case Type::HTTP2: {
     codec_ = std::make_unique<Http2::ClientConnectionImpl>(
-        *connection_, *this, host->cluster().statsScope(), host->cluster().http2Options(),
+        *connection_, *this, host->cluster().http2CodecStats(), host->cluster().http2Options(),
         Http::DEFAULT_MAX_REQUEST_HEADERS_KB, host->cluster().maxResponseHeadersCount(),
         Http2::ProdNghttp2SessionFactory::get());
     break;

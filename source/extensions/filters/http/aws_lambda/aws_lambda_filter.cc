@@ -93,8 +93,7 @@ bool isContentTypeTextual(const Http::RequestOrResponseHeaderMap& headers) {
     return false;
   }
 
-  const Http::LowerCaseString content_type_value{
-      std::string(headers.ContentType()->value().getStringView())};
+  const Http::LowerCaseString content_type_value{std::string(headers.getContentTypeValue())};
   if (content_type_value.get() == Http::Headers::get().ContentTypeValues.Json) {
     return true;
   }
@@ -251,9 +250,7 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_strea
   }
 
   ENVOY_LOG(trace, "Tranforming JSON payload to HTTP response.");
-  if (!encoder_callbacks_->encodingBuffer()) {
-    encoder_callbacks_->addEncodedData(data, false);
-  }
+  encoder_callbacks_->addEncodedData(data, false);
   const Buffer::Instance& encoding_buffer = *encoder_callbacks_->encodingBuffer();
   encoder_callbacks_->modifyEncodingBuffer([this](Buffer::Instance& enc_buf) {
     Buffer::OwnedImpl body;
@@ -270,11 +267,11 @@ void Filter::jsonizeRequest(Http::RequestHeaderMap const& headers, const Buffer:
   using source::extensions::filters::http::aws_lambda::Request;
   Request json_req;
   if (headers.Path()) {
-    json_req.set_raw_path(std::string(headers.Path()->value().getStringView()));
+    json_req.set_raw_path(std::string(headers.getPathValue()));
   }
 
   if (headers.Method()) {
-    json_req.set_method(std::string(headers.Method()->value().getStringView()));
+    json_req.set_method(std::string(headers.getMethodValue()));
   }
 
   // Wrap the headers
@@ -299,8 +296,7 @@ void Filter::jsonizeRequest(Http::RequestHeaderMap const& headers, const Buffer:
 
   // Wrap the Query String
   if (headers.Path()) {
-    for (auto&& kv_pair :
-         Http::Utility::parseQueryString(headers.Path()->value().getStringView())) {
+    for (auto&& kv_pair : Http::Utility::parseQueryString(headers.getPathValue())) {
       json_req.mutable_query_string_parameters()->insert({kv_pair.first, kv_pair.second});
     }
   }

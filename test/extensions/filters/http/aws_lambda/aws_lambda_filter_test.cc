@@ -235,11 +235,11 @@ TEST_F(AwsLambdaFilterTest, DecodeHeadersOnlyRequestWithJsonOn) {
   ASSERT_GT(json_buf.length(), 0);
 
   ASSERT_NE(headers.ContentType(), nullptr);
-  EXPECT_EQ("application/json", headers.ContentType()->value().getStringView());
+  EXPECT_EQ("application/json", headers.getContentTypeValue());
 
   // Assert the true (post-transformation) content-length sent to the Lambda endpoint.
   ASSERT_NE(headers.ContentLength(), nullptr);
-  EXPECT_EQ(fmt::format("{}", json_buf.length()), headers.ContentLength()->value().getStringView());
+  EXPECT_EQ(fmt::format("{}", json_buf.length()), headers.getContentLengthValue());
 
   // The best way to verify the generated JSON is to deserialize it and inspect it.
   Request req;
@@ -298,12 +298,11 @@ TEST_F(AwsLambdaFilterTest, DecodeDataWithTextualBodyWithJsonOn) {
     ASSERT_GT(decoded_buf.length(), 0);
 
     ASSERT_NE(headers.ContentType(), nullptr);
-    EXPECT_EQ("application/json", headers.ContentType()->value().getStringView());
+    EXPECT_EQ("application/json", headers.getContentTypeValue());
 
     // Assert the true (post-transformation) content-length sent to the Lambda endpoint.
     ASSERT_NE(headers.ContentLength(), nullptr);
-    EXPECT_EQ(fmt::format("{}", decoded_buf.length()),
-              headers.ContentLength()->value().getStringView());
+    EXPECT_EQ(fmt::format("{}", decoded_buf.length()), headers.getContentLengthValue());
 
     // The best way to verify the generated JSON is to deserialize it and inspect it.
     Request req;
@@ -471,6 +470,19 @@ TEST_F(AwsLambdaFilterTest, EncodeDataJsonModeStopIterationAndBuffer) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, result);
 }
 
+TEST_F(AwsLambdaFilterTest, EncodeDataAddsLastChunk) {
+  setupFilter({arn_, InvocationMode::Synchronous, false /*passthrough*/});
+  filter_->resolveSettings();
+  Http::TestResponseHeaderMapImpl headers;
+  headers.setStatus(200);
+  filter_->encodeHeaders(headers, false /*end_stream*/);
+
+  Buffer::OwnedImpl buf(std::string("foobar"));
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false));
+  EXPECT_CALL(encoder_callbacks_, encodingBuffer).WillRepeatedly(Return(&buf));
+  filter_->encodeData(buf, true /*end_stream*/);
+}
+
 /**
  * encodeData() data in JSON mode without a 'body' key should translate the 'headers' key to HTTP
  * headers while ignoring any HTTP/2 pseudo-headers.
@@ -506,7 +518,7 @@ TEST_F(AwsLambdaFilterTest, EncodeDataJsonModeTransformToHttp) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, result);
 
   ASSERT_NE(nullptr, headers.Status());
-  EXPECT_EQ("201", headers.Status()->value().getStringView());
+  EXPECT_EQ("201", headers.getStatusValue());
 
   EXPECT_EQ(nullptr, headers.get(Http::LowerCaseString(":other")));
 
@@ -608,7 +620,7 @@ TEST_F(AwsLambdaFilterTest, EncodeDataJsonModeInvalidJson) {
   EXPECT_EQ(0, encoded_buf.length());
 
   ASSERT_NE(nullptr, headers.Status());
-  EXPECT_EQ("500", headers.Status()->value().getStringView());
+  EXPECT_EQ("500", headers.getStatusValue());
 
   EXPECT_EQ(1ul, filter_->stats().server_error_.value());
 }

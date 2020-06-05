@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_mock",
@@ -10,6 +8,8 @@ load(
     "//test/extensions:extensions_build_system.bzl",
     "envoy_extension_cc_test",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -49,6 +49,7 @@ envoy_extension_cc_test(
     name = "router_test",
     srcs = ["router_test.cc"],
     extension_name = "envoy.filters.network.rocketmq_proxy",
+    tags = ["fails_on_windows"],
     deps = [
         ":mocks_lib",
         ":utility_lib",

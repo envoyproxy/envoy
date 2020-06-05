@@ -199,7 +199,6 @@ private:
                                public Network::ConnectionCallbacks {
     ActiveTcpConnection(ActiveConnections& active_connections,
                         Network::ConnectionPtr&& new_connection, TimeSource& time_system,
-                        Network::ListenerConfig& config,
                         std::unique_ptr<StreamInfo::StreamInfo>&& stream_info);
     ~ActiveTcpConnection() override;
 
@@ -218,7 +217,6 @@ private:
     ActiveConnections& active_connections_;
     Network::ConnectionPtr connection_;
     Stats::TimespanPtr conn_length_;
-    Network::ListenerConfig& config_;
   };
 
   /**
@@ -325,17 +323,16 @@ private:
 
 /**
  * Wrapper for an active udp listener owned by this handler.
- * TODO(danzh): rename to ActiveRawUdpListener.
  */
-class ActiveUdpListener : public Network::UdpListenerCallbacks,
-                          public ConnectionHandlerImpl::ActiveListenerImplBase,
-                          public Network::UdpListenerFilterManager,
-                          public Network::UdpReadFilterCallbacks {
+class ActiveRawUdpListener : public Network::UdpListenerCallbacks,
+                             public ConnectionHandlerImpl::ActiveListenerImplBase,
+                             public Network::UdpListenerFilterManager,
+                             public Network::UdpReadFilterCallbacks {
 public:
-  ActiveUdpListener(Network::ConnectionHandler& parent, Event::Dispatcher& dispatcher,
-                    Network::ListenerConfig& config);
-  ActiveUdpListener(Network::ConnectionHandler& parent, Network::UdpListenerPtr&& listener,
-                    Network::ListenerConfig& config);
+  ActiveRawUdpListener(Network::ConnectionHandler& parent, Event::Dispatcher& dispatcher,
+                       Network::ListenerConfig& config);
+  ActiveRawUdpListener(Network::ConnectionHandler& parent, Network::UdpListenerPtr&& listener,
+                       Network::ListenerConfig& config);
 
   // Network::UdpListenerCallbacks
   void onData(Network::UdpRecvData& data) override;

@@ -6,6 +6,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/server/options.h"
 #include "envoy/server/process_context.h"
 #include "envoy/stats/stats.h"
@@ -15,6 +16,7 @@
 #include "common/common/logger.h"
 #include "common/common/thread.h"
 
+#include "server/drain_manager_impl.h"
 #include "server/listener_hooks.h"
 #include "server/options_impl.h"
 #include "server/server.h"
@@ -30,27 +32,24 @@
 namespace Envoy {
 namespace Server {
 
-// Create OptionsImpl structures suitable for tests.
+struct FieldValidationConfig {
+  bool allow_unknown_static_fields = false;
+  bool reject_unknown_dynamic_fields = false;
+  bool ignore_unknown_dynamic_fields = false;
+};
+
+// Create OptionsImpl structures suitable for tests. Disables hot restart.
 OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::string& config_yaml,
                                   Network::Address::IpVersion ip_version,
-                                  bool allow_unknown_static_fields = false,
-                                  bool reject_unknown_dynamic_fields = false,
-                                  uint32_t concurrency = 1);
-
-class TestDrainManager : public DrainManager {
-public:
-  // Server::DrainManager
-  bool drainClose() const override { return draining_; }
-  void startDrainSequence(std::function<void()>) override {}
-  void startParentShutdownSequence() override {}
-
-  bool draining_{};
-};
+                                  FieldValidationConfig validation_config = FieldValidationConfig(),
+                                  uint32_t concurrency = 1,
+                                  std::chrono::seconds drain_time = std::chrono::seconds(1));
 
 class TestComponentFactory : public ComponentFactory {
 public:
-  Server::DrainManagerPtr createDrainManager(Server::Instance&) override {
-    return Server::DrainManagerPtr{new Server::TestDrainManager()};
+  Server::DrainManagerPtr createDrainManager(Server::Instance& server) override {
+    return Server::DrainManagerPtr{
+        new Server::DrainManagerImpl(server, envoy::config::listener::v3::Listener::MODIFY_ONLY)};
   }
   Runtime::LoaderPtr createRuntime(Server::Instance& server,
                                    Server::Configuration::Initial& config) override {
@@ -268,20 +267,22 @@ class IntegrationTestServer : public Logger::Loggable<Logger::Id::testing>,
                               public IntegrationTestServerStats,
                               public Server::ComponentFactory {
 public:
-  static IntegrationTestServerPtr create(
-      const std::string& config_path, const Network::Address::IpVersion version,
-      std::function<void(IntegrationTestServer&)> on_server_ready_function,
-      std::function<void()> on_server_init_function, bool deterministic,
-      Event::TestTimeSystem& time_system, Api::Api& api, bool defer_listener_finalization = false,
-      ProcessObjectOptRef process_object = absl::nullopt, bool allow_unknown_static_fields = false,
-      bool reject_unknown_dynamic_fields = false, uint32_t concurrency = 1);
+  static IntegrationTestServerPtr
+  create(const std::string& config_path, const Network::Address::IpVersion version,
+         std::function<void(IntegrationTestServer&)> on_server_ready_function,
+         std::function<void()> on_server_init_function, bool deterministic,
+         Event::TestTimeSystem& time_system, Api::Api& api,
+         bool defer_listener_finalization = false,
+         ProcessObjectOptRef process_object = absl::nullopt,
+         Server::FieldValidationConfig validation_config = Server::FieldValidationConfig(),
+         uint32_t concurrency = 1, std::chrono::seconds drain_time = std::chrono::seconds(1));
   // Note that the derived class is responsible for tearing down the server in its
   // destructor.
   ~IntegrationTestServer() override;
 
   void waitUntilListenersReady();
 
-  Server::TestDrainManager& drainManager() { return *drain_manager_; }
+  Server::DrainManagerImpl& drainManager() { return *drain_manager_; }
   void setOnWorkerListenerAddedCb(std::function<void()> on_worker_listener_added) {
     on_worker_listener_added_cb_ = std::move(on_worker_listener_added);
   }
@@ -296,48 +297,49 @@ public:
   void start(const Network::Address::IpVersion version,
              std::function<void()> on_server_init_function, bool deterministic,
              bool defer_listener_finalization, ProcessObjectOptRef process_object,
-             bool allow_unknown_static_fields, bool reject_unknown_dynamic_fields,
-             uint32_t concurrency);
+             Server::FieldValidationConfig validation_config, uint32_t concurrency,
+             std::chrono::seconds drain_time);
 
   void waitForCounterEq(const std::string& name, uint64_t value) override {
-    TestUtility::waitForCounterEq(stat_store(), name, value, time_system_);
+    TestUtility::waitForCounterEq(statStore(), name, value, time_system_);
   }
 
   void waitForCounterGe(const std::string& name, uint64_t value) override {
-    TestUtility::waitForCounterGe(stat_store(), name, value, time_system_);
+    TestUtility::waitForCounterGe(statStore(), name, value, time_system_);
   }
 
   void waitForGaugeGe(const std::string& name, uint64_t value) override {
-    TestUtility::waitForGaugeGe(stat_store(), name, value, time_system_);
+    TestUtility::waitForGaugeGe(statStore(), name, value, time_system_);
   }
 
   void waitForGaugeEq(const std::string& name, uint64_t value) override {
-    TestUtility::waitForGaugeEq(stat_store(), name, value, time_system_);
+    TestUtility::waitForGaugeEq(statStore(), name, value, time_system_);
   }
 
   Stats::CounterSharedPtr counter(const std::string& name) override {
     // When using the thread local store, only counters() is thread safe. This also allows us
     // to test if a counter exists at all versus just defaulting to zero.
-    return TestUtility::findCounter(stat_store(), name);
+    return TestUtility::findCounter(statStore(), name);
   }
 
   Stats::GaugeSharedPtr gauge(const std::string& name) override {
     // When using the thread local store, only gauges() is thread safe. This also allows us
     // to test if a counter exists at all versus just defaulting to zero.
-    return TestUtility::findGauge(stat_store(), name);
+    return TestUtility::findGauge(statStore(), name);
   }
 
-  std::vector<Stats::CounterSharedPtr> counters() override { return stat_store().counters(); }
+  std::vector<Stats::CounterSharedPtr> counters() override { return statStore().counters(); }
 
-  std::vector<Stats::GaugeSharedPtr> gauges() override { return stat_store().gauges(); }
+  std::vector<Stats::GaugeSharedPtr> gauges() override { return statStore().gauges(); }
 
   // ListenerHooks
   void onWorkerListenerAdded() override;
   void onWorkerListenerRemoved() override;
 
   // Server::ComponentFactory
-  Server::DrainManagerPtr createDrainManager(Server::Instance&) override {
-    drain_manager_ = new Server::TestDrainManager();
+  Server::DrainManagerPtr createDrainManager(Server::Instance& server) override {
+    drain_manager_ =
+        new Server::DrainManagerImpl(server, envoy::config::listener::v3::Listener::MODIFY_ONLY);
     return Server::DrainManagerPtr{drain_manager_};
   }
   Runtime::LoaderPtr createRuntime(Server::Instance& server,
@@ -347,8 +349,10 @@ public:
 
   // Should not be called until createAndRunEnvoyServer() is called.
   virtual Server::Instance& server() PURE;
-  virtual Stats::Store& stat_store() PURE;
-  virtual Network::Address::InstanceConstSharedPtr admin_address() PURE;
+  virtual Stats::Store& statStore() PURE;
+  virtual Network::Address::InstanceConstSharedPtr adminAddress() PURE;
+  void useAdminInterfaceToQuit(bool use) { use_admin_interface_to_quit_ = use; }
+  bool useAdminInterfaceToQuit() { return use_admin_interface_to_quit_; }
 
 protected:
   IntegrationTestServer(Event::TestTimeSystem& time_system, Api::Api& api,
@@ -356,7 +360,7 @@ protected:
       : time_system_(time_system), api_(api), config_path_(config_path) {}
 
   // Create the running envoy server. This function will call serverReady() when the virtual
-  // functions server(), stat_store(), and admin_address() may be called, but before the server
+  // functions server(), statStore(), and adminAddress() may be called, but before the server
   // has been started.
   // The subclass is also responsible for tearing down this server in its destructor.
   virtual void createAndRunEnvoyServer(OptionsImpl& options, Event::TimeSystem& time_system,
@@ -367,7 +371,7 @@ protected:
                                        ProcessObjectOptRef process_object) PURE;
 
   // Will be called by subclass on server thread when the server is ready to be accessed. The
-  // server may not have been run yet, but all server access methods (server(), stat_store(),
+  // server may not have been run yet, but all server access methods (server(), statStore(),
   // adminAddress()) will be available.
   void serverReady();
 
@@ -376,8 +380,9 @@ private:
    * Runs the real server on a thread.
    */
   void threadRoutine(const Network::Address::IpVersion version, bool deterministic,
-                     ProcessObjectOptRef process_object, bool allow_unknown_static_fields,
-                     bool reject_unknown_dynamic_fields, uint32_t concurrency);
+                     ProcessObjectOptRef process_object,
+                     Server::FieldValidationConfig validation_config, uint32_t concurrency,
+                     std::chrono::seconds drain_time);
 
   Event::TestTimeSystem& time_system_;
   Api::Api& api_;
@@ -387,11 +392,12 @@ private:
   Thread::MutexBasicLockable listeners_mutex_;
   uint64_t pending_listeners_;
   ConditionalInitializer server_set_;
-  Server::TestDrainManager* drain_manager_{};
+  Server::DrainManagerImpl* drain_manager_{};
   std::function<void()> on_worker_listener_added_cb_;
   std::function<void()> on_worker_listener_removed_cb_;
   TcpDumpPtr tcp_dump_;
   std::function<void(IntegrationTestServer&)> on_server_ready_cb_;
+  bool use_admin_interface_to_quit_{};
 };
 
 // Default implementation of IntegrationTestServer
@@ -407,11 +413,11 @@ public:
     RELEASE_ASSERT(server_ != nullptr, "");
     return *server_;
   }
-  Stats::Store& stat_store() override {
+  Stats::Store& statStore() override {
     RELEASE_ASSERT(stat_store_ != nullptr, "");
     return *stat_store_;
   }
-  Network::Address::InstanceConstSharedPtr admin_address() override { return admin_address_; }
+  Network::Address::InstanceConstSharedPtr adminAddress() override { return admin_address_; }
 
 private:
   void createAndRunEnvoyServer(OptionsImpl& options, Event::TimeSystem& time_system,

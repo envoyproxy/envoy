@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
@@ -8,6 +6,8 @@ load(
     "//test/extensions:extensions_build_system.bzl",
     "envoy_extension_cc_test",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -30,6 +30,7 @@ envoy_extension_cc_test(
     name = "cors_filter_integration_test",
     srcs = ["cors_filter_integration_test.cc"],
     extension_name = "envoy.filters.http.cors",
+    tags = ["fails_on_windows"],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",

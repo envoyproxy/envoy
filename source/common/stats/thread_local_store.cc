@@ -57,7 +57,7 @@ void ThreadLocalStoreImpl::setStatsMatcher(StatsMatcherPtr&& stats_matcher) {
 
 template <class StatMapClass, class StatListClass>
 void ThreadLocalStoreImpl::removeRejectedStats(StatMapClass& map, StatListClass& list) {
-  std::vector<StatName> remove_list;
+  StatNameVec remove_list;
   for (auto& stat : map) {
     if (rejects(stat.first)) {
       remove_list.push_back(stat.first);
@@ -72,11 +72,7 @@ void ThreadLocalStoreImpl::removeRejectedStats(StatMapClass& map, StatListClass&
 }
 
 bool ThreadLocalStoreImpl::rejects(StatName stat_name) const {
-  // Don't both elaborating the StatName there are no pattern-based
-  // exclusions;/inclusions.
-  if (stats_matcher_->acceptsAll()) {
-    return false;
-  }
+  ASSERT(!stats_matcher_->acceptsAll());
 
   // TODO(ambuc): If stats_matcher_ depends on regexes, this operation (on the
   // hot path) could become prohibitively expensive. Revisit this usage in the

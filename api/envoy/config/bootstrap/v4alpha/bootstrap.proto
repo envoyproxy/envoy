@@ -7,17 +7,19 @@ import "envoy/config/core/v4alpha/address.proto";
 import "envoy/config/core/v4alpha/base.proto";
 import "envoy/config/core/v4alpha/config_source.proto";
 import "envoy/config/core/v4alpha/event_service_config.proto";
+import "envoy/config/core/v4alpha/extension.proto";
 import "envoy/config/core/v4alpha/socket_option.proto";
-import "envoy/config/listener/v3/listener.proto";
-import "envoy/config/metrics/v3/stats.proto";
+import "envoy/config/listener/v4alpha/listener.proto";
+import "envoy/config/metrics/v4alpha/stats.proto";
 import "envoy/config/overload/v3/overload.proto";
-import "envoy/extensions/transport_sockets/tls/v4alpha/cert.proto";
+import "envoy/extensions/transport_sockets/tls/v4alpha/secret.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
 import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -33,7 +35,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // <config_overview_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
-// [#next-free-field: 21]
+// [#next-free-field: 22]
 message Bootstrap {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v3.Bootstrap";
@@ -42,9 +44,9 @@ message Bootstrap {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.bootstrap.v3.Bootstrap.StaticResources";
 
-    // Static :ref:`Listeners <envoy_api_msg_config.listener.v3.Listener>`. These listeners are
+    // Static :ref:`Listeners <envoy_api_msg_config.listener.v4alpha.Listener>`. These listeners are
     // available regardless of LDS configuration.
-    repeated listener.v3.Listener listeners = 1;
+    repeated listener.v4alpha.Listener listeners = 1;
 
     // If a network based configuration source is specified for :ref:`cds_config
     // <envoy_api_field_config.bootstrap.v4alpha.Bootstrap.DynamicResources.cds_config>`, it's necessary
@@ -65,7 +67,7 @@ message Bootstrap {
 
     reserved 4;
 
-    // All :ref:`Listeners <envoy_api_msg_config.listener.v3.Listener>` are provided by a single
+    // All :ref:`Listeners <envoy_api_msg_config.listener.v4alpha.Listener>` are provided by a single
     // :ref:`LDS <arch_overview_dynamic_config_lds>` configuration source.
     core.v4alpha.ConfigSource lds_config = 1;
 
@@ -110,10 +112,10 @@ message Bootstrap {
   string flags_path = 5;
 
   // Optional set of stats sinks.
-  repeated metrics.v3.StatsSink stats_sinks = 6;
+  repeated metrics.v4alpha.StatsSink stats_sinks = 6;
 
   // Configuration for internal processing of stats.
-  metrics.v3.StatsConfig stats_config = 13;
+  metrics.v4alpha.StatsConfig stats_config = 13;
 
   // Optional duration between flushes to configured stats sinks. For
   // performance reasons Envoy latches counters and only flushes counters and
@@ -137,12 +139,15 @@ message Bootstrap {
   Admin admin = 12;
 
   // Optional overload manager configuration.
-  overload.v3.OverloadManager overload_manager = 15;
+  overload.v3.OverloadManager overload_manager = 15 [
+    (udpa.annotations.security).configure_for_untrusted_downstream = true,
+    (udpa.annotations.security).configure_for_untrusted_upstream = true
+  ];
 
   // Enable :ref:`stats for event dispatcher <operations_performance>`, defaults to false.
   // Note that this records a value for each iteration of the event loop on every thread. This
   // should normally be minimal overhead, but when using
-  // :ref:`statsd <envoy_api_msg_config.metrics.v3.StatsdSink>`, it will send each observed value
+  // :ref:`statsd <envoy_api_msg_config.metrics.v4alpha.StatsdSink>`, it will send each observed value
   // over the wire individually because the statsd protocol doesn't have any way to represent a
   // histogram summary. Be aware that this can be a very large volume of data.
   bool enable_dispatcher_stats = 16;
@@ -160,7 +165,7 @@ message Bootstrap {
 
   // Optional proxy version which will be used to set the value of :ref:`server.version statistic
   // <server_statistics>` if specified. Envoy will not process this value, it will be sent as is to
-  // :ref:`stats sinks <envoy_api_msg_config.metrics.v3.StatsSink>`.
+  // :ref:`stats sinks <envoy_api_msg_config.metrics.v4alpha.StatsSink>`.
   google.protobuf.UInt64Value stats_server_version_override = 19;
 
   // Always use TCP queries instead of UDP queries for DNS lookups.
@@ -169,6 +174,10 @@ message Bootstrap {
   // :ref:`use_tcp_for_dns_lookups <envoy_api_field_config.cluster.v4alpha.Cluster.use_tcp_for_dns_lookups>` are
   // specified.
   bool use_tcp_for_dns_lookups = 20;
+
+  // Specifies optional bootstrap extensions to be instantiated at startup time.
+  // Each item contains extension specific configuration.
+  repeated core.v4alpha.TypedExtensionConfig bootstrap_extensions = 21;
 }
 
 // Administration interface :ref:`operations documentation

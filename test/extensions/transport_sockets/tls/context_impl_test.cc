@@ -3,7 +3,7 @@
 
 #include "envoy/admin/v3/certs.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
-#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.validate.h"
+#include "envoy/extensions/transport_sockets/tls/v3/tls.pb.validate.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 
 #include "common/json/json_loader.h"
@@ -126,16 +126,17 @@ TEST_F(SslContextImplTest, TestCipherSuites) {
   const std::string yaml = R"EOF(
   common_tls_context:
     tls_params:
-      cipher_suites: "-ALL:+[AES128-SHA|BOGUS1]:BOGUS2:AES256-SHA"
+      cipher_suites: "-ALL:+[AES128-SHA|BOGUS1-SHA256]:BOGUS2-SHA:AES256-SHA"
   )EOF";
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
   ClientContextConfigImpl cfg(tls_context, factory_context_);
-  EXPECT_THROW_WITH_MESSAGE(manager_.createSslClientContext(store_, cfg), EnvoyException,
-                            "Failed to initialize cipher suites "
-                            "-ALL:+[AES128-SHA|BOGUS1]:BOGUS2:AES256-SHA. The following "
-                            "ciphers were rejected when tried individually: BOGUS1, BOGUS2");
+  EXPECT_THROW_WITH_MESSAGE(
+      manager_.createSslClientContext(store_, cfg), EnvoyException,
+      "Failed to initialize cipher suites "
+      "-ALL:+[AES128-SHA|BOGUS1-SHA256]:BOGUS2-SHA:AES256-SHA. The following "
+      "ciphers were rejected when tried individually: BOGUS1-SHA256, BOGUS2-SHA");
 }
 
 TEST_F(SslContextImplTest, TestExpiringCert) {

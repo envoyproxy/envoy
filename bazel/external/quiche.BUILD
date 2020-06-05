@@ -1,3 +1,13 @@
+load("@rules_cc//cc:defs.bzl", "cc_proto_library")
+load("@rules_proto//proto:defs.bzl", "proto_library")
+load(":genrule_cmd.bzl", "genrule_cmd")
+load(
+    "@envoy//bazel:envoy_build_system.bzl",
+    "envoy_cc_library",
+    "envoy_cc_test",
+    "envoy_cc_test_library",
+)
+
 licenses(["notice"])  # Apache 2
 
 # QUICHE is Google's implementation of QUIC and related protocols. It is the
@@ -25,16 +35,6 @@ licenses(["notice"])  # Apache 2
 # QUICHE platform APIs in //source/extensions/quic_listeners/quiche/platform/,
 # should remain largely the same.
 
-load("@rules_proto//proto:defs.bzl", "proto_library")
-load(":genrule_cmd.bzl", "genrule_cmd")
-load(
-    "@envoy//bazel:envoy_build_system.bzl",
-    "envoy_cc_library",
-    "envoy_cc_test",
-    "envoy_cc_test_library",
-    "envoy_proto_library",
-)
-
 src_files = glob([
     "**/*.h",
     "**/*.c",
@@ -59,14 +59,22 @@ quiche_copts = select({
         # Remove these after upstream fix.
         "-Wno-unused-parameter",
         "-Wno-unused-function",
-        "-Wno-unused-const-variable",
-        "-Wno-type-limits",
+        "-Wno-unknown-warning-option",
+        "-Wno-deprecated-copy",
         # quic_inlined_frame.h uses offsetof() to optimize memory usage in frames.
         "-Wno-invalid-offsetof",
-        "-Wno-type-limits",
-        "-Wno-return-type",
     ],
 })
+
+test_suite(
+    name = "ci_tests",
+    tests = [
+        "http2_platform_api_test",
+        "quic_platform_api_test",
+        "quiche_common_test",
+        "spdy_platform_api_test",
+    ],
+)
 
 envoy_cc_test_library(
     name = "http2_test_tools_random",
@@ -3553,6 +3561,7 @@ envoy_cc_test(
     name = "spdy_core_header_block_test",
     srcs = ["quiche/spdy/core/spdy_header_block_test.cc"],
     copts = quiche_copts,
+    coverage = False,
     repository = "@envoy",
     tags = ["nofips"],
     deps = [

@@ -207,8 +207,32 @@ void FakeStream::finishGrpcStream(Grpc::Status::GrpcStatus status) {
       Http::TestHeaderMapImpl{{"grpc-status", std::to_string(static_cast<uint32_t>(status))}});
 }
 
+// The TestHttp1ServerConnectionImpl outlives its underlying Network::Connection
+// so must not access the Connection on teardown. To achieve this, clear the
+// read disable calls to avoid checking / editing the Connection blocked state.
+class TestHttp1ServerConnectionImpl : public Http::Http1::ServerConnectionImpl {
+public:
+  using Http::Http1::ServerConnectionImpl::ServerConnectionImpl;
+
+  void onMessageComplete() override {
+    ServerConnectionImpl::onMessageComplete();
+
+    if (activeRequest().has_value() && activeRequest().value().request_decoder_) {
+      // Undo the read disable from the base class - we have many tests which
+      // waitForDisconnect after a full request has been read which will not
+      // receive the disconnect if reading is disabled.
+      activeRequest().value().response_encoder_.readDisable(false);
+    }
+  }
+  ~TestHttp1ServerConnectionImpl() override {
+    if (activeRequest().has_value()) {
+      activeRequest().value().response_encoder_.clearReadDisableCallsForTests();
+    }
+  }
+};
+
 FakeHttpConnection::FakeHttpConnection(
-    SharedConnectionWrapper& shared_connection, Stats::Store& store, Type type,
+    FakeUpstream& fake_upstream, SharedConnectionWrapper& shared_connection, Type type,
     Event::TestTimeSystem& time_system, uint32_t max_request_headers_kb,
     uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
@@ -218,8 +242,9 @@ FakeHttpConnection::FakeHttpConnection(
     Http::Http1Settings http1_settings;
     // For the purpose of testing, we always have the upstream encode the trailers if any
     http1_settings.enable_trailers_ = true;
-    codec_ = std::make_unique<Http::Http1::ServerConnectionImpl>(
-        shared_connection_.connection(), store, *this, http1_settings, max_request_headers_kb,
+    Http::Http1::CodecStats& stats = fake_upstream.http1CodecStats();
+    codec_ = std::make_unique<TestHttp1ServerConnectionImpl>(
+        shared_connection_.connection(), stats, *this, http1_settings, max_request_headers_kb,
         max_request_headers_count, headers_with_underscores_action);
   } else {
     envoy::config::core::v3::Http2ProtocolOptions http2_options =
@@ -227,8 +252,9 @@ FakeHttpConnection::FakeHttpConnection(
             envoy::config::core::v3::Http2ProtocolOptions());
     http2_options.set_allow_connect(true);
     http2_options.set_allow_metadata(true);
+    Http::Http2::CodecStats& stats = fake_upstream.http2CodecStats();
     codec_ = std::make_unique<Http::Http2::ServerConnectionImpl>(
-        shared_connection_.connection(), *this, store, http2_options, max_request_headers_kb,
+        shared_connection_.connection(), *this, stats, http2_options, max_request_headers_kb,
         max_request_headers_count, headers_with_underscores_action);
     ASSERT(type == Type::HTTP2);
   }
@@ -463,7 +489,7 @@ AssertionResult FakeUpstream::waitForHttpConnection(
       return AssertionFailure() << "Got a new connection event, but didn't create a connection.";
     }
     connection = std::make_unique<FakeHttpConnection>(
-        consumeConnection(), stats_store_, http_type_, time_system, max_request_headers_kb,
+        *this, consumeConnection(), http_type_, time_system, max_request_headers_kb,
         max_request_headers_count, headers_with_underscores_action);
   }
   VERIFY_ASSERTION(connection->initialize());
@@ -495,9 +521,9 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
         client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
       } else {
         connection = std::make_unique<FakeHttpConnection>(
-            upstream.consumeConnection(), upstream.stats_store_, upstream.http_type_,
-            upstream.timeSystem(), Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
-            Http::DEFAULT_MAX_HEADERS_COUNT, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+            upstream, upstream.consumeConnection(), upstream.http_type_, upstream.timeSystem(),
+            Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
+            envoy::config::core::v3::HttpProtocolOptions::ALLOW);
         lock.release();
         VERIFY_ASSERTION(connection->initialize());
         VERIFY_ASSERTION(connection->readDisable(false));

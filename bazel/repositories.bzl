@@ -2,12 +2,13 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load(":dev_binding.bzl", "envoy_dev_binding")
 load(":genrule_repository.bzl", "genrule_repository")
 load("@envoy_api//bazel:envoy_http_archive.bzl", "envoy_http_archive")
-load(":repository_locations.bzl", "REPOSITORY_LOCATIONS")
+load(":repository_locations.bzl", "DEPENDENCY_ANNOTATIONS", "DEPENDENCY_REPOSITORIES", "USE_CATEGORIES", "USE_CATEGORIES_WITH_CPE_OPTIONAL")
 load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_language")
 
 PPC_SKIP_TARGETS = ["envoy.filters.http.lua"]
 
 WINDOWS_SKIP_TARGETS = [
+    "envoy.filters.http.lua",
     "envoy.tracers.dynamic_ot",
     "envoy.tracers.lightstep",
     "envoy.tracers.datadog",
@@ -17,6 +18,37 @@ WINDOWS_SKIP_TARGETS = [
 # Make all contents of an external repository accessible under a filegroup.  Used for external HTTP
 # archives, e.g. cares.
 BUILD_ALL_CONTENT = """filegroup(name = "all", srcs = glob(["**"]), visibility = ["//visibility:public"])"""
+
+# Method for verifying content of the DEPENDENCY_REPOSITORIES defined in bazel/repository_locations.bzl
+# Verification is here so that bazel/repository_locations.bzl can be loaded into other tools written in Python,
+# and as such needs to be free of bazel specific constructs.
+def _repository_locations():
+    locations = dict(DEPENDENCY_REPOSITORIES)
+    for key, location in locations.items():
+        if "sha256" not in location or len(location["sha256"]) == 0:
+            fail("SHA256 missing for external dependency " + str(location["urls"]))
+
+        if "use_category" not in location:
+            fail("The 'use_category' attribute must be defined for external dependecy " + str(location["urls"]))
+
+        if "cpe" not in location and not [category for category in USE_CATEGORIES_WITH_CPE_OPTIONAL if category in location["use_category"]]:
+            fail("The 'cpe' attribute must be defined for external dependecy " + str(location["urls"]))
+
+        for category in location["use_category"]:
+            if category not in USE_CATEGORIES:
+                fail("Unknown use_category value '" + category + "' for dependecy " + str(location["urls"]))
+
+    return locations
+
+REPOSITORY_LOCATIONS = _repository_locations()
+
+# To initialize http_archive REPOSITORY_LOCATIONS dictionaries must be stripped of annotations.
+# See repository_locations.bzl for the list of annotation attributes.
+def _get_location(dependency):
+    stripped = dict(REPOSITORY_LOCATIONS[dependency])
+    for attribute in DEPENDENCY_ANNOTATIONS:
+        stripped.pop(attribute, None)
+    return stripped
 
 def _repository_impl(name, **kwargs):
     envoy_http_archive(
@@ -37,9 +69,9 @@ _default_envoy_build_config = repository_rule(
     },
 )
 
-# Python dependencies. If these become non-trivial, we might be better off using a virtualenv to
-# wrap them, but for now we can treat them as first-class Bazel.
+# Python dependencies.
 def _python_deps():
+    # TODO(htuch): convert these to pip3_import.
     _repository_impl(
         name = "com_github_pallets_markupsafe",
         build_file = "@envoy//bazel/external:markupsafe.BUILD",
@@ -159,10 +191,10 @@ def envoy_dependencies(skip_targets = []):
     _repository_impl("bazel_toolchains")
     _repository_impl("bazel_compdb")
     _repository_impl("envoy_build_tools")
+    _repository_impl("rules_cc")
 
     # Unconditional, since we use this only for compiler-agnostic fuzzing utils.
     _org_llvm_releases_compiler_rt()
-    _fuzzit_linux()
 
     _python_deps()
     _cc_deps()
@@ -211,10 +243,9 @@ def _com_github_circonus_labs_libcircllhist():
     )
 
 def _com_github_c_ares_c_ares():
-    location = REPOSITORY_LOCATIONS["com_github_c_ares_c_ares"]
+    location = _get_location("com_github_c_ares_c_ares")
     http_archive(
         name = "com_github_c_ares_c_ares",
-        patches = ["@envoy//bazel/foreign_cc:cares-win32-nameser.patch"],
         build_file_content = BUILD_ALL_CONTENT,
         **location
     )
@@ -280,7 +311,7 @@ def _com_github_gabime_spdlog():
     )
 
 def _com_github_google_benchmark():
-    location = REPOSITORY_LOCATIONS["com_github_google_benchmark"]
+    location = _get_location("com_github_google_benchmark")
     http_archive(
         name = "com_github_google_benchmark",
         **location
@@ -297,7 +328,7 @@ def _com_github_google_libprotobuf_mutator():
     )
 
 def _com_github_jbeder_yaml_cpp():
-    location = REPOSITORY_LOCATIONS["com_github_jbeder_yaml_cpp"]
+    location = _get_location("com_github_jbeder_yaml_cpp")
     http_archive(
         name = "com_github_jbeder_yaml_cpp",
         build_file_content = BUILD_ALL_CONTENT,
@@ -309,12 +340,10 @@ def _com_github_jbeder_yaml_cpp():
     )
 
 def _com_github_libevent_libevent():
-    location = REPOSITORY_LOCATIONS["com_github_libevent_libevent"]
+    location = _get_location("com_github_libevent_libevent")
     http_archive(
         name = "com_github_libevent_libevent",
         build_file_content = BUILD_ALL_CONTENT,
-        patch_args = ["-p0"],
-        patches = ["@envoy//bazel/foreign_cc:libevent_msvc.patch"],
         **location
     )
     native.bind(
@@ -323,12 +352,11 @@ def _com_github_libevent_libevent():
     )
 
 def _net_zlib():
-    location = REPOSITORY_LOCATIONS["net_zlib"]
-
-    http_archive(
+    _repository_impl(
         name = "net_zlib",
         build_file_content = BUILD_ALL_CONTENT,
-        **location
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel/foreign_cc:zlib.patch"],
     )
 
     native.bind(
@@ -346,7 +374,7 @@ def _com_google_cel_cpp():
     _repository_impl("com_google_cel_cpp")
 
 def _com_github_nghttp2_nghttp2():
-    location = REPOSITORY_LOCATIONS["com_github_nghttp2_nghttp2"]
+    location = _get_location("com_github_nghttp2_nghttp2")
     http_archive(
         name = "com_github_nghttp2_nghttp2",
         build_file_content = BUILD_ALL_CONTENT,
@@ -560,7 +588,7 @@ def _com_google_protobuf():
     )
 
 def _io_opencensus_cpp():
-    location = REPOSITORY_LOCATIONS["io_opencensus_cpp"]
+    location = _get_location("io_opencensus_cpp")
     http_archive(
         name = "io_opencensus_cpp",
         **location
@@ -604,7 +632,7 @@ def _io_opencensus_cpp():
 
 def _com_github_curl():
     # Used by OpenCensus Zipkin exporter.
-    location = REPOSITORY_LOCATIONS["com_github_curl"]
+    location = _get_location("com_github_curl")
     http_archive(
         name = "com_github_curl",
         build_file_content = BUILD_ALL_CONTENT + """
@@ -620,7 +648,7 @@ cc_library(name = "curl", visibility = ["//visibility:public"], deps = ["@envoy/
     )
 
 def _com_googlesource_chromium_v8():
-    location = REPOSITORY_LOCATIONS["com_googlesource_chromium_v8"]
+    location = _get_location("com_googlesource_chromium_v8")
     genrule_repository(
         name = "com_googlesource_chromium_v8",
         genrule_cmd_file = "@envoy//bazel/external:wee8.genrule_cmd",
@@ -678,12 +706,6 @@ def _org_llvm_releases_compiler_rt():
         build_file = "@envoy//bazel/external:compiler_rt.BUILD",
     )
 
-def _fuzzit_linux():
-    _repository_impl(
-        name = "fuzzit_linux",
-        build_file_content = "exports_files([\"fuzzit\"])",
-    )
-
 def _com_github_grpc_grpc():
     _repository_impl("com_github_grpc_grpc")
     _repository_impl("build_bazel_rules_apple")
@@ -738,7 +760,7 @@ def _com_github_google_jwt_verify():
     )
 
 def _com_github_luajit_luajit():
-    location = REPOSITORY_LOCATIONS["com_github_luajit_luajit"]
+    location = _get_location("com_github_luajit_luajit")
     http_archive(
         name = "com_github_luajit_luajit",
         build_file_content = BUILD_ALL_CONTENT,
@@ -754,7 +776,7 @@ def _com_github_luajit_luajit():
     )
 
 def _com_github_moonjit_moonjit():
-    location = REPOSITORY_LOCATIONS["com_github_moonjit_moonjit"]
+    location = _get_location("com_github_moonjit_moonjit")
     http_archive(
         name = "com_github_moonjit_moonjit",
         build_file_content = BUILD_ALL_CONTENT,
@@ -770,7 +792,7 @@ def _com_github_moonjit_moonjit():
     )
 
 def _com_github_gperftools_gperftools():
-    location = REPOSITORY_LOCATIONS["com_github_gperftools_gperftools"]
+    location = _get_location("com_github_gperftools_gperftools")
     http_archive(
         name = "com_github_gperftools_gperftools",
         build_file_content = BUILD_ALL_CONTENT,
@@ -802,7 +824,7 @@ filegroup(
         name = "kafka_source",
         build_file_content = KAFKASOURCE_BUILD_CONTENT,
         patches = ["@envoy//bazel/external:kafka_int32.patch"],
-        **REPOSITORY_LOCATIONS["kafka_source"]
+        **_get_location("kafka_source")
     )
 
     # This archive provides Kafka (and Zookeeper) binaries, that are used during Kafka integration
@@ -810,7 +832,7 @@ filegroup(
     http_archive(
         name = "kafka_server_binary",
         build_file_content = BUILD_ALL_CONTENT,
-        **REPOSITORY_LOCATIONS["kafka_server_binary"]
+        **_get_location("kafka_server_binary")
     )
 
     # This archive provides Kafka client in Python, so we can use it to interact with Kafka server
@@ -818,7 +840,7 @@ filegroup(
     http_archive(
         name = "kafka_python_client",
         build_file_content = BUILD_ALL_CONTENT,
-        **REPOSITORY_LOCATIONS["kafka_python_client"]
+        **_get_location("kafka_python_client")
     )
 
 def _foreign_cc_dependencies():

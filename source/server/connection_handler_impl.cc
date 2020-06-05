@@ -67,9 +67,7 @@ void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
 void ConnectionHandlerImpl::removeFilterChains(
     uint64_t listener_tag, const std::list<const Network::FilterChain*>& filter_chains,
     std::function<void()> completion) {
-  // TODO(lambdai): Merge the optimistic path and the pessimistic path.
   for (auto& listener : listeners_) {
-    // Optimistic path: The listener tag provided by arg is not stale.
     if (listener.second.listener_->listenerTag() == listener_tag) {
       listener.second.tcp_listener_->get().deferredRemoveFilterChains(filter_chains);
       // Completion is deferred because the above removeFilterChains() may defer delete connection.
@@ -77,17 +75,7 @@ void ConnectionHandlerImpl::removeFilterChains(
       return;
     }
   }
-  // Fallback to iterate over all listeners. The reason is that the target listener might have began
-  // another update and the previous tag is lost.
-  // TODO(lambdai): Remove this once we decide to use the same listener tag during intelligent
-  // update.
-  for (auto& listener : listeners_) {
-    if (listener.second.tcp_listener_.has_value()) {
-      listener.second.tcp_listener_->get().deferredRemoveFilterChains(filter_chains);
-    }
-  }
-  // Completion is deferred because the above removeFilterChains() may defer delete connection.
-  Event::DeferredTaskUtil::deferredRun(dispatcher_, std::move(completion));
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 void ConnectionHandlerImpl::stopListeners(uint64_t listener_tag) {
@@ -399,7 +387,7 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
       std::move(socket), std::move(transport_socket), *stream_info);
   ActiveTcpConnectionPtr active_connection(
       new ActiveTcpConnection(active_connections, std::move(server_conn_ptr),
-                              parent_.dispatcher_.timeSource(), *config_, std::move(stream_info)));
+                              parent_.dispatcher_.timeSource(), std::move(stream_info)));
   active_connection->connection_->setBufferLimits(config_->perConnectionBufferLimitBytes());
 
   const bool empty_filter_chain = !config_->filterChainFactory().createNetworkFilterChain(
@@ -498,13 +486,11 @@ ConnectionHandlerImpl::ActiveConnections::~ActiveConnections() {
 
 ConnectionHandlerImpl::ActiveTcpConnection::ActiveTcpConnection(
     ActiveConnections& active_connections, Network::ConnectionPtr&& new_connection,
-    TimeSource& time_source, Network::ListenerConfig& config,
-    std::unique_ptr<StreamInfo::StreamInfo>&& stream_info)
+    TimeSource& time_source, std::unique_ptr<StreamInfo::StreamInfo>&& stream_info)
     : stream_info_(std::move(stream_info)), active_connections_(active_connections),
       connection_(std::move(new_connection)),
       conn_length_(new Stats::HistogramCompletableTimespanImpl(
-          active_connections_.listener_.stats_.downstream_cx_length_ms_, time_source)),
-      config_(config) {
+          active_connections_.listener_.stats_.downstream_cx_length_ms_, time_source)) {
   // We just universally set no delay on connections. Theoretically we might at some point want
   // to make this configurable.
   connection_->noDelay(true);
@@ -521,7 +507,7 @@ ConnectionHandlerImpl::ActiveTcpConnection::ActiveTcpConnection(
 }
 
 ConnectionHandlerImpl::ActiveTcpConnection::~ActiveTcpConnection() {
-  emitLogs(config_, *stream_info_);
+  emitLogs(*active_connections_.listener_.config_, *stream_info_);
 
   active_connections_.listener_.stats_.downstream_cx_active_.dec();
   active_connections_.listener_.stats_.downstream_cx_destroy_.inc();
@@ -535,16 +521,17 @@ ConnectionHandlerImpl::ActiveTcpConnection::~ActiveTcpConnection() {
   active_connections_.listener_.parent_.decNumConnections();
 }
 
-ActiveUdpListener::ActiveUdpListener(Network::ConnectionHandler& parent,
-                                     Event::Dispatcher& dispatcher, Network::ListenerConfig& config)
-    : ActiveUdpListener(
+ActiveRawUdpListener::ActiveRawUdpListener(Network::ConnectionHandler& parent,
+                                           Event::Dispatcher& dispatcher,
+                                           Network::ListenerConfig& config)
+    : ActiveRawUdpListener(
           parent,
           dispatcher.createUdpListener(config.listenSocketFactory().getListenSocket(), *this),
           config) {}
 
-ActiveUdpListener::ActiveUdpListener(Network::ConnectionHandler& parent,
-                                     Network::UdpListenerPtr&& listener,
-                                     Network::ListenerConfig& config)
+ActiveRawUdpListener::ActiveRawUdpListener(Network::ConnectionHandler& parent,
+                                           Network::UdpListenerPtr&& listener,
+                                           Network::ListenerConfig& config)
     : ConnectionHandlerImpl::ActiveListenerImplBase(parent, &config),
       udp_listener_(std::move(listener)), read_filter_(nullptr) {
   // Create the filter chain on creating a new udp listener
@@ -558,26 +545,26 @@ ActiveUdpListener::ActiveUdpListener(Network::ConnectionHandler& parent,
   }
 }
 
-void ActiveUdpListener::onData(Network::UdpRecvData& data) { read_filter_->onData(data); }
+void ActiveRawUdpListener::onData(Network::UdpRecvData& data) { read_filter_->onData(data); }
 
-void ActiveUdpListener::onReadReady() {}
+void ActiveRawUdpListener::onReadReady() {}
 
-void ActiveUdpListener::onWriteReady(const Network::Socket&) {
+void ActiveRawUdpListener::onWriteReady(const Network::Socket&) {
   // TODO(sumukhs): This is not used now. When write filters are implemented, this is a
   // trigger to invoke the on write ready API on the filters which is when they can write
   // data
 }
 
-void ActiveUdpListener::onReceiveError(Api::IoError::IoErrorCode error_code) {
+void ActiveRawUdpListener::onReceiveError(Api::IoError::IoErrorCode error_code) {
   read_filter_->onReceiveError(error_code);
 }
 
-void ActiveUdpListener::addReadFilter(Network::UdpListenerReadFilterPtr&& filter) {
+void ActiveRawUdpListener::addReadFilter(Network::UdpListenerReadFilterPtr&& filter) {
   ASSERT(read_filter_ == nullptr, "Cannot add a 2nd UDP read filter");
   read_filter_ = std::move(filter);
 }
 
-Network::UdpListener& ActiveUdpListener::udpListener() { return *udp_listener_; }
+Network::UdpListener& ActiveRawUdpListener::udpListener() { return *udp_listener_; }
 
 } // namespace Server
 } // namespace Envoy

@@ -1,14 +1,14 @@
-licenses(["notice"])  # Apache 2
-
-# Mongo proxy L4 network filter (observability and fault injection).
-# Public docs: docs/root/configuration/network_filters/mongo_proxy_filter.rst
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
+
+# Mongo proxy L4 network filter (observability and fault injection).
+# Public docs: docs/root/configuration/network_filters/mongo_proxy_filter.rst
 
 envoy_package()
 
@@ -89,6 +89,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/stats:stats_interface",
         "//source/common/stats:symbol_table_lib",
+        "//source/common/stats:utility_lib",
     ],
 )
 

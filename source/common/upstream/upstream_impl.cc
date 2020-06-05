@@ -19,6 +19,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/dns.h"
+#include "envoy/network/transport_socket.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/transport_socket_config.h"
@@ -30,6 +31,8 @@
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/config/utility.h"
+#include "common/http/http1/codec_impl.h"
+#include "common/http/http2/codec_impl.h"
 #include "common/http/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/resolver_impl.h"
@@ -268,7 +271,7 @@ HostDescriptionImpl::HostDescriptionImpl(
 
 Network::TransportSocketFactory& HostDescriptionImpl::resolveTransportSocketFactory(
     const Network::Address::InstanceConstSharedPtr& dest_address,
-    const envoy::config::core::v3::Metadata* metadata) {
+    const envoy::config::core::v3::Metadata* metadata) const {
   auto match = cluster_->transportSocketMatcher().resolve(metadata);
   match.stats_.total_match_count_.inc();
   ENVOY_LOG(debug, "transport socket match, socket {} selected for host with address {}",
@@ -305,8 +308,13 @@ void HostImpl::setEdsHealthFlag(envoy::config::core::v3::HealthStatus health_sta
 
 Host::CreateConnectionData HostImpl::createHealthCheckConnection(
     Event::Dispatcher& dispatcher,
-    Network::TransportSocketOptionsSharedPtr transport_socket_options) const {
-  return {createConnection(dispatcher, *cluster_, healthCheckAddress(), socket_factory_, nullptr,
+    Network::TransportSocketOptionsSharedPtr transport_socket_options,
+    const envoy::config::core::v3::Metadata* metadata) const {
+
+  Network::TransportSocketFactory& factory =
+      (metadata != nullptr) ? resolveTransportSocketFactory(healthCheckAddress(), metadata)
+                            : socket_factory_;
+  return {createConnection(dispatcher, *cluster_, healthCheckAddress(), factory, nullptr,
                            transport_socket_options),
           shared_from_this()};
 }
@@ -679,6 +687,7 @@ ClusterInfoImpl::ClusterInfoImpl(
       features_(parseFeatures(config)),
       http1_settings_(Http::Utility::parseHttp1Settings(config.http_protocol_options())),
       http2_options_(Http2::Utility::initializeAndValidateOptions(config.http2_protocol_options())),
+      common_http_protocol_options_(config.common_http_protocol_options()),
       extension_protocol_options_(parseExtensionProtocolOptions(config, validation_visitor)),
       resource_managers_(config, runtime, name_, *stats_scope_),
       maintenance_mode_runtime_key_(absl::StrCat("upstream.maintenance_mode.", name_)),
@@ -1094,6 +1103,14 @@ ClusterInfoImpl::generateCircuitBreakersStats(Stats::Scope& scope, const std::st
     return {ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(POOL_GAUGE_PREFIX(scope, prefix),
                                                NULL_POOL_GAUGE(scope))};
   }
+}
+
+Http::Http1::CodecStats& ClusterInfoImpl::http1CodecStats() const {
+  return Http::Http1::CodecStats::atomicGet(http1_codec_stats_, *stats_scope_);
+}
+
+Http::Http2::CodecStats& ClusterInfoImpl::http2CodecStats() const {
+  return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, *stats_scope_);
 }
 
 ResourceManagerImplPtr

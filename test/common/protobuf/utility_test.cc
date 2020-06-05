@@ -1,6 +1,7 @@
 #include <unordered_set>
 
 #include "envoy/api/v2/cluster.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.validate.h"
@@ -8,6 +9,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.validate.h"
 #include "envoy/config/cluster/v3/filter.pb.h"
 #include "envoy/config/cluster/v3/filter.pb.validate.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/common/base64.h"
@@ -152,6 +154,34 @@ TEST_F(ProtobufUtilityTest, MessageUtilHash) {
   EXPECT_EQ(MessageUtil::hash(a2), MessageUtil::hash(a3));
   EXPECT_NE(0, MessageUtil::hash(a1));
   EXPECT_NE(MessageUtil::hash(s), MessageUtil::hash(a1));
+}
+
+TEST_F(ProtobufUtilityTest, MessageUtilHashAndEqualToIgnoreOriginalTypeField) {
+  ProtobufWkt::Struct s;
+  (*s.mutable_fields())["ab"].set_string_value("fgh");
+  EXPECT_EQ(1, s.fields_size());
+  envoy::api::v2::core::Metadata mv2;
+  mv2.mutable_filter_metadata()->insert({"xyz", s});
+  EXPECT_EQ(1, mv2.filter_metadata_size());
+
+  // Add the OriginalTypeFieldNumber as unknown field.
+  envoy::config::core::v3::Metadata mv3;
+  Config::VersionConverter::upgrade(mv2, mv3);
+
+  // Add another unknown field.
+  {
+    const Protobuf::Reflection* reflection = mv3.GetReflection();
+    auto* unknown_field_set = reflection->MutableUnknownFields(&mv3);
+    auto set_size = unknown_field_set->field_count();
+    // 183412668 is the magic number OriginalTypeFieldNumber. The successor number should not be
+    // occupied.
+    unknown_field_set->AddFixed32(183412668 + 1, 1);
+    EXPECT_EQ(set_size + 1, unknown_field_set->field_count()) << "Fail to add an unknown field";
+  }
+
+  envoy::config::core::v3::Metadata mv3dup = mv3;
+  ASSERT_EQ(MessageUtil::hash(mv3), MessageUtil::hash(mv3dup));
+  ASSERT(MessageUtil()(mv3, mv3dup));
 }
 
 TEST_F(ProtobufUtilityTest, RepeatedPtrUtilDebugString) {
@@ -1396,12 +1426,15 @@ class DeprecatedFieldsTest : public testing::TestWithParam<bool> {
 protected:
   DeprecatedFieldsTest()
       : with_upgrade_(GetParam()), api_(Api::createApiForTest(store_)),
-        runtime_deprecated_feature_use_(store_.counter("runtime.deprecated_feature_use")) {
+        runtime_deprecated_feature_use_(store_.counter("runtime.deprecated_feature_use")),
+        deprecated_feature_seen_since_process_start_(
+            store_.gauge("runtime.deprecated_feature_seen_since_process_start",
+                         Stats::Gauge::ImportMode::NeverImport)) {
     envoy::config::bootstrap::v3::LayeredRuntime config;
     config.add_layers()->mutable_admin_layer();
-    loader_ = std::make_unique<Runtime::ScopedLoaderSingleton>(Runtime::LoaderPtr{
-        new Runtime::LoaderImpl(dispatcher_, tls_, config, local_info_, init_manager_, store_,
-                                generator_, validation_visitor_, *api_)});
+    loader_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
+        Runtime::LoaderPtr{new Runtime::LoaderImpl(dispatcher_, tls_, config, local_info_, store_,
+                                                   generator_, validation_visitor_, *api_)});
   }
 
   void checkForDeprecation(const Protobuf::Message& message) {
@@ -1424,8 +1457,8 @@ protected:
   Runtime::MockRandomGenerator rand_;
   std::unique_ptr<Runtime::ScopedLoaderSingleton> loader_;
   Stats::Counter& runtime_deprecated_feature_use_;
+  Stats::Gauge& deprecated_feature_seen_since_process_start_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  Init::MockManager init_manager_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
 };
 
@@ -1446,6 +1479,7 @@ TEST_P(DeprecatedFieldsTest, NoErrorWhenDeprecatedFieldsUnused) {
   // Fatal checks for a non-deprecated field should cause no problem.
   checkForDeprecation(base);
   EXPECT_EQ(0, runtime_deprecated_feature_use_.value());
+  EXPECT_EQ(0, deprecated_feature_seen_since_process_start_.value());
 }
 
 TEST_P(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(IndividualFieldDeprecated)) {
@@ -1456,6 +1490,7 @@ TEST_P(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(IndividualFieldDeprecated))
                       "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'",
                       checkForDeprecation(base));
   EXPECT_EQ(1, runtime_deprecated_feature_use_.value());
+  EXPECT_EQ(1, deprecated_feature_seen_since_process_start_.value());
 }
 
 // Use of a deprecated and disallowed field should result in an exception.

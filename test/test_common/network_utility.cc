@@ -27,17 +27,17 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
                   << (addr_port == nullptr ? "nullptr" : addr_port->asString());
     return nullptr;
   }
-  IoHandlePtr io_handle = addr_port->socket(type);
+  SocketImpl sock(type, addr_port);
   // Not setting REUSEADDR, therefore if the address has been recently used we won't reuse it here.
   // However, because we're going to use the address while checking if it is available, we'll need
   // to set REUSEADDR on listener sockets created by tests using an address validated by this means.
-  Api::SysCallIntResult result = addr_port->bind(io_handle->fd());
+  Api::SysCallIntResult result = sock.bind(addr_port);
   const char* failing_fn = nullptr;
   if (result.rc_ != 0) {
     failing_fn = "bind";
   } else if (type == Address::SocketType::Stream) {
     // Try listening on the port also, if the type is TCP.
-    result = Api::OsSysCallsSingleton::get().listen(io_handle->fd(), 1);
+    result = sock.listen(1);
     if (result.rc_ != 0) {
       failing_fn = "listen";
     }
@@ -57,8 +57,9 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
   }
   // If the port we bind is zero, then the OS will pick a free port for us (assuming there are
   // any), and we need to find out the port number that the OS picked so we can return it.
+  // TODO(fcoras) maybe move to SocketImpl
   if (addr_port->ip()->port() == 0) {
-    return Address::addressFromFd(io_handle->fd());
+    return SocketInterfaceSingleton::get().addressFromFd(sock.ioHandle().fd());
   }
   return addr_port;
 }
@@ -149,13 +150,13 @@ Address::InstanceConstSharedPtr getAnyAddress(const Address::IpVersion version, 
 
 bool supportsIpVersion(const Address::IpVersion version) {
   Address::InstanceConstSharedPtr addr = getCanonicalLoopbackAddress(version);
-  IoHandlePtr io_handle = addr->socket(Address::SocketType::Stream);
-  if (0 != addr->bind(io_handle->fd()).rc_) {
+  SocketImpl sock(Address::SocketType::Stream, addr);
+  if (0 != sock.bind(addr).rc_) {
     // Socket bind failed.
-    RELEASE_ASSERT(io_handle->close().err_ == nullptr, "");
+    RELEASE_ASSERT(sock.ioHandle().close().err_ == nullptr, "");
     return false;
   }
-  RELEASE_ASSERT(io_handle->close().err_ == nullptr, "");
+  RELEASE_ASSERT(sock.ioHandle().close().err_ == nullptr, "");
   return true;
 }
 
@@ -171,19 +172,21 @@ std::string ipVersionToDnsFamily(Network::Address::IpVersion version) {
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-std::pair<Address::InstanceConstSharedPtr, Network::IoHandlePtr>
+std::pair<Address::InstanceConstSharedPtr, Network::SocketPtr>
 bindFreeLoopbackPort(Address::IpVersion version, Address::SocketType type) {
   Address::InstanceConstSharedPtr addr = getCanonicalLoopbackAddress(version);
-  IoHandlePtr io_handle = addr->socket(type);
-  Api::SysCallIntResult result = addr->bind(io_handle->fd());
+  SocketPtr sock = std::make_unique<SocketImpl>(type, addr);
+  Api::SysCallIntResult result = sock->bind(addr);
   if (0 != result.rc_) {
-    io_handle->close();
+    sock->close();
     std::string msg = fmt::format("bind failed for address {} with error: {} ({})",
                                   addr->asString(), strerror(result.errno_), result.errno_);
     ADD_FAILURE() << msg;
     throw EnvoyException(msg);
   }
-  return std::make_pair(Address::addressFromFd(io_handle->fd()), std::move(io_handle));
+
+  return std::make_pair(SocketInterfaceSingleton::get().addressFromFd(sock->ioHandle().fd()),
+                        std::move(sock));
 }
 
 TransportSocketPtr createRawBufferSocket() { return std::make_unique<RawBufferSocket>(); }
@@ -228,9 +231,7 @@ Api::IoCallUint64Result readFromSocket(IoHandle& handle, const Address::Instance
 UdpSyncPeer::UdpSyncPeer(Network::Address::IpVersion version)
     : socket_(
           std::make_unique<UdpListenSocket>(getCanonicalLoopbackAddress(version), nullptr, true)) {
-  RELEASE_ASSERT(
-      Api::OsSysCallsSingleton::get().setsocketblocking(socket_->ioHandle().fd(), true).rc_ != -1,
-      "");
+  RELEASE_ASSERT(socket_->setBlockingForTest(true).rc_ != -1, "");
 }
 
 void UdpSyncPeer::write(const std::string& buffer, const Network::Address::Instance& peer) {

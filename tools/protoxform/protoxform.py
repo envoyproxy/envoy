@@ -16,9 +16,10 @@ from tools.protoxform import utils
 # during FileDescriptorProto printing.
 from google.api import annotations_pb2 as _
 from validate import validate_pb2 as _
-from envoy.annotations import deprecation_pb2 as _
-from envoy.annotations import resource_pb2
+from envoy_api_canonical.envoy.annotations import deprecation_pb2 as _
+from envoy_api_canonical.envoy.annotations import resource_pb2
 from udpa.annotations import migrate_pb2
+from udpa.annotations import security_pb2 as _
 from udpa.annotations import sensitive_pb2 as _
 from udpa.annotations import status_pb2
 

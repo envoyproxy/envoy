@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
@@ -10,6 +8,8 @@ load(
     "envoy_extension_cc_test",
     "envoy_extension_cc_test_library",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -333,6 +333,7 @@ envoy_extension_cc_test(
         "//test/extensions/filters/network/thrift_proxy/driver:generate_fixture",
     ],
     extension_name = "envoy.filters.network.thrift_proxy",
+    tags = ["fails_on_windows"],
     deps = [
         ":integration_lib",
         ":utility_lib",
@@ -349,6 +350,7 @@ envoy_extension_cc_test(
         "//test/extensions/filters/network/thrift_proxy/driver:generate_fixture",
     ],
     extension_name = "envoy.filters.network.thrift_proxy",
+    tags = ["fails_on_windows"],
     deps = [
         ":integration_lib",
         ":utility_lib",

@@ -1,14 +1,14 @@
-licenses(["notice"])  # Apache 2
-
-# HTTP L7 filter that transforms request data into dynamic metadata
-# Public docs: docs/root/configuration/http_filters/header_to_metadata_filter.rst
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
+
+# HTTP L7 filter that transforms request data into dynamic metadata
+# Public docs: docs/root/configuration/http_filters/header_to_metadata_filter.rst
 
 envoy_package()
 
@@ -19,6 +19,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/server:filter_config_interface",
         "//source/common/common:base64_lib",
+        "//source/common/http:utility_lib",
         "//source/extensions/filters/http:well_known_names",
         "@envoy_api//envoy/extensions/filters/http/header_to_metadata/v3:pkg_cc_proto",
     ],

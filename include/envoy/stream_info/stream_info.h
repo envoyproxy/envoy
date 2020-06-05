@@ -72,8 +72,12 @@ enum ResponseFlag {
   InvalidEnvoyRequestHeaders = 0x20000,
   // Downstream request had an HTTP protocol error
   DownstreamProtocolError = 0x40000,
+  // Upstream request reached to user defined max stream duration.
+  UpstreamMaxStreamDurationReached = 0x80000,
+  // True if the response was served from an Envoy cache filter.
+  ResponseFromCacheFilter = 0x100000,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = DownstreamProtocolError
+  LastFlag = ResponseFromCacheFilter
 };
 
 /**
@@ -91,6 +95,9 @@ struct ResponseCodeDetailValues {
   // Envoy is doing non-streaming proxying, and the request payload exceeded
   // configured limits.
   const std::string RequestPayloadTooLarge = "request_payload_too_large";
+  // Envoy is doing non-streaming proxying, and the response payload exceeded
+  // configured limits.
+  const std::string ResponsePayloadTooLarge = "response_payload_too_large";
   // Envoy is doing streaming proxying, but too much data arrived while waiting
   // to attempt a retry.
   const std::string RequestPayloadExceededRetryBufferLimit =
@@ -108,8 +115,6 @@ struct ResponseCodeDetailValues {
   const std::string LowVersion = "low_version";
   // The request was rejected due to the Host: or :authority field missing
   const std::string MissingHost = "missing_host_header";
-  // The request was rejected due to the request headers being larger than the configured limit.
-  const std::string RequestHeadersTooLarge = "request_headers_too_large";
   // The request was rejected due to x-envoy-* headers failing strict header validation.
   const std::string InvalidEnvoyRequestHeaders = "request_headers_failed_strict_check";
   // The request was rejected due to the Path or :path header field missing.
@@ -139,6 +144,8 @@ struct ResponseCodeDetailValues {
   const std::string UpstreamTimeout = "upstream_response_timeout";
   // The final upstream try timed out
   const std::string UpstreamPerTryTimeout = "upstream_per_try_timeout";
+  // The request was destroyed because of user defined max stream duration.
+  const std::string UpstreamMaxStreamDurationReached = "upstream_max_stream_duration_reached";
   // The upstream connection was reset before a response was started. This
   // will generally be accompanied by details about why the reset occurred.
   const std::string EarlyUpstreamReset = "upstream_reset_before_response_started";

@@ -206,11 +206,11 @@ public:
   void createTestServer(const std::string& json_path, const std::vector<std::string>& port_names);
   void createGeneratedApiTestServer(const std::string& bootstrap_path,
                                     const std::vector<std::string>& port_names,
-                                    bool allow_unknown_static_fields,
-                                    bool reject_unknown_dynamic_fields, bool allow_lds_rejection);
+                                    Server::FieldValidationConfig validator_config,
+                                    bool allow_lds_rejection);
   void createApiTestServer(const ApiFilesystemConfig& api_filesystem_config,
                            const std::vector<std::string>& port_names,
-                           bool allow_unknown_static_fields, bool reject_unknown_dynamic_fields,
+                           Server::FieldValidationConfig validator_config,
                            bool allow_lds_rejection);
 
   Event::TestTimeSystem& timeSystem() { return time_system_; }
@@ -222,8 +222,8 @@ public:
 
   // Enable the listener access log
   void useListenerAccessLog(absl::string_view format = "");
-  // Waits for the first access log entry.
-  std::string waitForAccessLog(const std::string& filename);
+  // Waits for the nth access log entry, defaulting to log entry 0.
+  std::string waitForAccessLog(const std::string& filename, uint32_t entry = 0);
 
   std::string listener_access_log_name_;
 
@@ -358,6 +358,21 @@ public:
   void sendRawHttpAndWaitForResponse(int port, const char* raw_http, std::string* response,
                                      bool disconnect_after_headers_complete = false);
 
+  /**
+   * Helper to create ConnectionDriver.
+   *
+   * @param port the port to connect to.
+   * @param initial_data the data to send.
+   * @param data_callback the callback on the received data.
+   **/
+  std::unique_ptr<RawConnectionDriver> createConnectionDriver(
+      uint32_t port, const std::string& initial_data,
+      std::function<void(Network::ClientConnection&, const Buffer::Instance&)>&& data_callback) {
+    Buffer::OwnedImpl buffer(initial_data);
+    return std::make_unique<RawConnectionDriver>(port, buffer, data_callback, version_,
+                                                 *dispatcher_);
+  }
+
 protected:
   // Create the envoy server in another thread and start it.
   // Will not return until that server is listening.
@@ -417,6 +432,9 @@ protected:
 
   // The number of worker threads that the test server uses.
   uint32_t concurrency_{1};
+
+  // The duration of the drain manager graceful drain period.
+  std::chrono::seconds drain_time_{1};
 
   // Member variables for xDS testing.
   FakeUpstream* xds_upstream_{};

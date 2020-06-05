@@ -116,7 +116,7 @@ TEST_P(EnvoyQuicClientStreamTest, PostRequestAndResponse) {
 
   EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
       .WillOnce(Invoke([](const Http::ResponseHeaderMapPtr& headers, bool) {
-        EXPECT_EQ("200", headers->Status()->value().getStringView());
+        EXPECT_EQ("200", headers->getStatusValue());
       }));
   quic_stream_->OnStreamHeaderList(/*fin=*/false, response_headers_.uncompressed_header_bytes(),
                                    response_headers_);
@@ -163,7 +163,7 @@ TEST_P(EnvoyQuicClientStreamTest, OutOfOrderTrailers) {
   quic_stream_->encodeHeaders(request_headers_, true);
   EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
       .WillOnce(Invoke([](const Http::ResponseHeaderMapPtr& headers, bool) {
-        EXPECT_EQ("200", headers->Status()->value().getStringView());
+        EXPECT_EQ("200", headers->getStatusValue());
       }));
   quic_stream_->OnStreamHeaderList(/*fin=*/false, response_headers_.uncompressed_header_bytes(),
                                    response_headers_);

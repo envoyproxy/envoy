@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
@@ -8,6 +6,8 @@ load(
     "//test/extensions:extensions_build_system.bzl",
     "envoy_extension_cc_test",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -25,6 +25,7 @@ envoy_extension_cc_test(
     name = "original_src_config_factory_test",
     srcs = ["original_src_config_factory_test.cc"],
     extension_name = "envoy.filters.listener.original_src",
+    tags = ["fails_on_windows"],
     deps = [
         "//source/extensions/filters/listener/original_src:config",
         "//source/extensions/filters/listener/original_src:config_lib",

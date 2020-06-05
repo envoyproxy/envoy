@@ -198,7 +198,7 @@ void SquashFilter::onCreateAttachmentSuccess(Http::ResponseMessagePtr&& m) {
   // Get the config object that was created
   if (Http::Utility::getResponseStatus(m->headers()) != enumToInt(Http::Code::Created)) {
     ENVOY_LOG(debug, "Squash: can't create attachment object. status {} - not squashing",
-              m->headers().Status()->value().getStringView());
+              m->headers().getStatusValue());
     doneSquashing();
   } else {
     std::string debug_attachment_id;
