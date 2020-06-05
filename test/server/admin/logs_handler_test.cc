@@ -8,7 +8,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(AdminInstanceTest, ReopenLogs) {
-  Http::ResponseHeaderMapImpl header_map;
+  Http::TestResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl response;
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
 

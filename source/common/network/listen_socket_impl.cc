@@ -31,7 +31,7 @@ Api::SysCallIntResult ListenSocketImpl::bind(Network::Address::InstanceConstShar
   if (local_address_->type() == Address::Type::Ip && local_address_->ip()->port() == 0) {
     // If the port we bind is zero, then the OS will pick a free port for us (assuming there are
     // any), and we need to find out the port number that the OS picked.
-    local_address_ = SocketInterface::addressFromFd(io_handle_->fd());
+    local_address_ = SocketInterfaceSingleton::get().addressFromFd(io_handle_->fd());
   }
 
   return {0, 0};
@@ -56,12 +56,15 @@ void ListenSocketImpl::setupSocket(const Network::Socket::OptionsSharedPtr& opti
 template <>
 void NetworkListenSocket<
     NetworkSocketTrait<Address::SocketType::Stream>>::setPrebindSocketOptions() {
-
+// On Windows, SO_REUSEADDR does not restrict subsequent bind calls when there is a listener as on
+// Linux and later BSD socket stacks
+#ifndef WIN32
   int on = 1;
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
   Api::SysCallIntResult status =
       os_syscalls.setsockopt(io_handle_->fd(), SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
   RELEASE_ASSERT(status.rc_ != -1, "failed to set SO_REUSEADDR socket option");
+#endif
 }
 
 template <>
@@ -69,7 +72,8 @@ void NetworkListenSocket<
     NetworkSocketTrait<Address::SocketType::Datagram>>::setPrebindSocketOptions() {}
 
 UdsListenSocket::UdsListenSocket(const Address::InstanceConstSharedPtr& address)
-    : ListenSocketImpl(SocketInterface::socket(Address::SocketType::Stream, address), address) {
+    : ListenSocketImpl(SocketInterfaceSingleton::get().socket(Address::SocketType::Stream, address),
+                       address) {
   RELEASE_ASSERT(io_handle_->fd() != -1, "");
   bind(local_address_);
 }

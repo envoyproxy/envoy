@@ -80,7 +80,7 @@ message ClusterLoadAssignment {
 
     // Priority levels and localities are considered overprovisioned with this
     // factor (in percentage). This means that we don't consider a priority
-    // level or locality unhealthy until the percentage of healthy hosts
+    // level or locality unhealthy until the fraction of healthy hosts
     // multiplied by the overprovisioning factor drops below 100.
     // With the default value 140(1.4), Envoy doesn't consider a priority level
     // or a locality unhealthy until their percentage of healthy hosts drops
