@@ -1,3 +1,5 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@build_bazel_rules_android//android:rules.bzl", "android_binary")
 load("@google_bazel_common//tools/maven:pom_file.bzl", "pom_file")
 
 # This file is based on https://github.com/aj-michael/aar_with_jni which is
@@ -63,13 +65,13 @@ EOF
     # We wrap our native so dependencies in a cc_library because android_binaries
     # require a library target as dependencies in order to generate the appropriate
     # architectures in the directory `lib/`
-    native.cc_library(
+    cc_library(
         name = cc_lib_name,
         srcs = native_deps,
     )
 
     # This outputs {jni_archive_name}_unsigned.apk which will contain the base files for our aar
-    native.android_binary(
+    android_binary(
         name = jni_archive_name,
         manifest = archive_name + "_generated_AndroidManifest.xml",
         custom_package = "does.not.matter",
@@ -79,7 +81,7 @@ EOF
 
     # This creates bazel-bin/library/kotlin/src/io/envoyproxy/envoymobile/name_bin_deploy.jar
     # This jar has all the classes needed for our aar and will be our `classes.jar`
-    native.android_binary(
+    android_binary(
         name = android_binary_name,
         manifest = manifest,
         srcs = [],

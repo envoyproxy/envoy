@@ -1,6 +1,6 @@
-licenses(["notice"])  # Apache 2
-
 load("//bazel:kotlin_test.bzl", "envoy_mobile_kt_test")
+
+licenses(["notice"])  # Apache 2
 
 envoy_mobile_kt_test(
     name = "request_builder_test",

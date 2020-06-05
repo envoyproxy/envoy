@@ -1,6 +1,6 @@
-licenses(["notice"])  # Apache 2
-
 load("@io_bazel_rules_kotlin//kotlin:kotlin.bzl", "kt_android_library")
+
+licenses(["notice"])  # Apache 2
 
 kt_android_library(
     name = "hello_envoy_shared_lib",

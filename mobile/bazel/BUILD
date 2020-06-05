@@ -1,7 +1,7 @@
-licenses(["notice"])  # Apache 2
-
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_package")
 load("@io_bazel_rules_kotlin//kotlin:kotlin.bzl", "kt_jvm_library")
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 

@@ -1,6 +1,6 @@
-licenses(["notice"])  # Apache 2
-
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_package")
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -12,6 +12,7 @@ envoy_cc_library(
     hdrs = ["registry.h"],
     repository = "@envoy",
     deps = [
+        "@envoy//source/common/network:socket_lib",
         "@envoy//source/common/upstream:logical_dns_cluster_lib",
         "@envoy//source/extensions/clusters/dynamic_forward_proxy:cluster",
         "@envoy//source/extensions/compression/gzip/decompressor:config",

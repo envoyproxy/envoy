@@ -18,23 +18,12 @@ TEST(SyntheticAddressImplTest, Names) {
   ASSERT_EQ(address.logicalName(), "synthetic");
 }
 
-TEST(SyntheticAddressImplTest, Syscalls) {
-  SyntheticAddressImpl address;
-
-  const Api::SysCallIntResult bind_rc = address.bind(0);
-  ASSERT_EQ(bind_rc.rc_, -1);
-  ASSERT_EQ(bind_rc.errno_, EADDRNOTAVAIL);
-
-  const Api::SysCallIntResult connect_rc = address.connect(0);
-  ASSERT_EQ(connect_rc.rc_, -1);
-  ASSERT_EQ(connect_rc.errno_, EPROTOTYPE);
-}
-
 TEST(SyntheticAddressImplTest, Accessors) {
   SyntheticAddressImpl address;
   ASSERT_EQ(address.ip(), nullptr);
-  ASSERT_EQ(address.socket(SocketType::Datagram), nullptr);
-  ASSERT_EQ(address.socket(SocketType::Stream), nullptr);
+  ASSERT_EQ(address.pipe(), nullptr);
+  ASSERT_EQ(address.sockAddr(), nullptr);
+  ASSERT_EQ(address.sockAddrLen(), 0);
 }
 
 TEST(SyntheticAddressImplTest, Type) {

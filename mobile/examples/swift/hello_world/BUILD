@@ -1,7 +1,7 @@
-licenses(["notice"])  # Apache 2
-
 load("@build_bazel_rules_apple//apple:ios.bzl", "ios_application")
 load("@build_bazel_rules_swift//swift:swift.bzl", "swift_library")
+
+licenses(["notice"])  # Apache 2
 
 swift_library(
     name = "appmain",

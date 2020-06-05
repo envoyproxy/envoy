@@ -1,3 +1,5 @@
+load("@rules_cc//cc:defs.bzl", "objc_library")
+
 licenses(["notice"])  # Apache 2
 
 exports_files([

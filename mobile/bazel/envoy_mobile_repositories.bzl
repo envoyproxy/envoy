@@ -11,6 +11,7 @@ def envoy_mobile_repositories():
     upstream_envoy_overrides()
     swift_repos()
     kotlin_repos()
+    android_repos()
 
 def upstream_envoy_overrides():
     # Patch protobuf to prevent duplicate symbols: https://github.com/lyft/envoy-mobile/issues/617
@@ -121,4 +122,12 @@ def kotlin_repos():
         name = "kotlin_dokka",
         sha256 = "4c73eee92dd652ea8e2afd7b20732cf863d4938a30f634d12c88fe64def89fd8",
         url = "https://github.com/Kotlin/dokka/releases/download/0.9.18/dokka-fatjar-0.9.18.jar",
+    )
+
+def android_repos():
+    http_archive(
+        name = "build_bazel_rules_android",
+        urls = ["https://github.com/bazelbuild/rules_android/archive/v0.1.1.zip"],
+        sha256 = "cd06d15dd8bb59926e4d65f9003bfc20f9da4b2519985c27e190cddc8b7a7806",
+        strip_prefix = "rules_android-0.1.1",
     )
