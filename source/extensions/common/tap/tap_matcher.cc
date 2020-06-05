@@ -140,20 +140,20 @@ HttpGenericBodyMatcher::HttpGenericBodyMatcher(
     : HttpBodyMatcherBase(matchers) {
   for (const auto& i : config.patterns()) {
     switch (i.rule_case()) {
-    case envoy::config::tap::v3::HttpGenericBodyMatch::GenericTextMatch::kContainsHex: {
+    case envoy::config::tap::v3::HttpGenericBodyMatch::GenericTextMatch::kBinaryMatch: {
       // Convert the hex string to real hex values.
       // String containing "01" will be converted to 1 byte: 0x01
-      const std::vector<unsigned char> hex = Hex::decode(i.contains_hex());
+      const std::vector<unsigned char> hex = Hex::decode(i.binary_match());
       if (hex.empty()) {
-        throw EnvoyException(fmt::format("invalid hex string '{}'", i.contains_hex()));
+        throw EnvoyException(fmt::format("invalid hex string '{}'", i.binary_match()));
       }
       std::string hex_string;
       hex_string.assign(reinterpret_cast<const char*>(hex.data()), hex.size());
       patterns_.push_back(hex_string);
     } break;
     // For text pattern just add the string to vector of patterns the matcher will look for.
-    case envoy::config::tap::v3::HttpGenericBodyMatch::GenericTextMatch::kContainsText:
-      patterns_.push_back(i.contains_text());
+    case envoy::config::tap::v3::HttpGenericBodyMatch::GenericTextMatch::kStringMatch:
+      patterns_.push_back(i.string_match());
       break;
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
@@ -278,7 +278,7 @@ void HttpGenericBodyMatcher::onBody(const Buffer::Instance& data, MatchStatusVec
       // Case 3. First shift data to make room for new data and then copy
       // entire new buffer.
       const size_t shift = bytes_in_overlap_ - (overlap_size_ - data.length());
-      memcpy(overlap_.get(), overlap_.get() + shift, (bytes_in_overlap_ - shift));
+      memmove(overlap_.get(), overlap_.get() + shift, (bytes_in_overlap_ - shift));
       data.copyOut(0, data.length(), overlap_.get() + (bytes_in_overlap_ - shift));
       bytes_in_overlap_ += data.length() - shift;
       ASSERT(bytes_in_overlap_ == overlap_size_);

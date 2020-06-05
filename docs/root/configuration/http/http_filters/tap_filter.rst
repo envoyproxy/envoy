@@ -137,12 +137,12 @@ Another example POST body:
                   exact_match: bar
           - http_request_generic_body_match:
               patterns:
-                - contains_text: test
-                - contains_hex: deadbeef
+                - string_match: test
+                - binary_match: deadbeef
               bytes_limit: 128
           - http_response_generic_body_match:
               patterns:
-                - contains_hex: beef
+                - binary_match: beef
               bytes_limit: 64
     output_config:
       sinks:

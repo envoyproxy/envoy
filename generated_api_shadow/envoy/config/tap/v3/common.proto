@@ -117,10 +117,10 @@ message HttpGenericBodyMatch {
       option (validate.required) = true;
 
       // Text string to be located in HTTP body.
-      string contains_text = 1;
+      string string_match = 1;
 
       // Text with hex digits to be located in HTTP body.
-      string contains_hex = 2;
+      string binary_match = 2;
     }
   }
 

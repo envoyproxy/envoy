@@ -146,7 +146,7 @@ TEST_F(TapMatcherGenericBodyTest, WrongConfigTest) {
   std::string matcher_yaml = R"EOF(
 http_request_generic_body_match:
   patterns:
-    - contains_hex: beefa
+    - binary_match: beefa
 )EOF";
   TestUtility::loadFromYaml(matcher_yaml, config_);
   ASSERT_ANY_THROW(buildMatcher(config_, matchers_));
@@ -159,8 +159,8 @@ INSTANTIATE_TEST_SUITE_P(
                           TapMatcherTestBase::Direction::Response),
         ::testing::Values(
             // Should match - envoy is in the body
-            std::make_tuple(std::vector<std::string>{"    - contains_text: \"envoy\""}, 5),
-            std::make_tuple(std::vector<std::string>{"    - contains_text: \"envoy\""}, 5))));
+            std::make_tuple(std::vector<std::string>{"    - string_match: \"envoy\""}, 5),
+            std::make_tuple(std::vector<std::string>{"    - string_match: \"envoy\""}, 5))));
 
 // Test different configurations against the body.
 // Parameterized test passes various configurations
@@ -220,187 +220,187 @@ INSTANTIATE_TEST_SUITE_P(
         ::testing::Values(
             // SEARCHING FOR SINGLE PATTERN - no limit
             // Should match - there is a single body chunk and envoy is in the body
-            std::make_tuple(std::vector<std::string>{"    - contains_text: \"envoy\""},
+            std::make_tuple(std::vector<std::string>{"    - string_match: \"envoy\""},
                             std::list<std::list<uint32_t>>{{0}}, std::make_pair(true, false)),
             // Should match - single body and `envoyproxy` is there
-            std::make_tuple(std::vector<std::string>{"    - contains_text: \"envoyproxy\""},
+            std::make_tuple(std::vector<std::string>{"    - string_match: \"envoyproxy\""},
                             std::list<std::list<uint32_t>>{{0, 1}}, std::make_pair(true, false)),
             // Should match - 2 body chunks. First contains 'envoy' at the end and the second
             // chunk contains 'proxy' at the beginning.
-            std::make_tuple(std::vector<std::string>{"    - contains_text: \"envoyproxy\""},
+            std::make_tuple(std::vector<std::string>{"    - string_match: \"envoyproxy\""},
                             std::list<std::list<uint32_t>>{{0}, {1}}, std::make_pair(true, false)),
             // Should match - 3 body chunks containing string `envoyproxy` when reassembled.
-            std::make_tuple(std::vector<std::string>{"    - contains_text: \"envoyproxy\""},
+            std::make_tuple(std::vector<std::string>{"    - string_match: \"envoyproxy\""},
                             std::list<std::list<uint32_t>>{{2}, {3}, {4}},
                             std::make_pair(true, false)),
             // Should match - 3 body chunks containing string ``envoyproxy layer`` when reassembled.
-            std::make_tuple(std::vector<std::string>{"    - contains_text: \"envoyproxy\""},
+            std::make_tuple(std::vector<std::string>{"    - string_match: \"envoyproxy\""},
                             std::list<std::list<uint32_t>>{{2}, {3}, {5}},
                             std::make_pair(true, false)),
             // Should match - 4 body chunks The last 3 contain string ``envoyproxy layer`` when
             // reassembled.
-            std::make_tuple(std::vector<std::string>{"    - contains_text: \"envoyproxy\""},
+            std::make_tuple(std::vector<std::string>{"    - string_match: \"envoyproxy\""},
                             std::list<std::list<uint32_t>>{{6}, {2}, {3}, {5}},
                             std::make_pair(true, false)),
             // Should match - First few chunks does not match, then 3 reassembled match
             // `envoyproxy`.
-            std::make_tuple(std::vector<std::string>{"    - contains_text: \"envoyproxy\""},
+            std::make_tuple(std::vector<std::string>{"    - string_match: \"envoyproxy\""},
                             std::list<std::list<uint32_t>>{{6}, {6}, {6}, {2}, {3}, {5}, {6}},
                             std::make_pair(true, false)),
             // Should match - chunk #7 contains hex 0xdead
-            std::make_tuple(std::vector<std::string>{"    - contains_hex: \"dead\""},
+            std::make_tuple(std::vector<std::string>{"    - binary_match: \"dead\""},
                             std::list<std::list<uint32_t>>{{6}, {6}, {7}, {6}},
                             std::make_pair(true, false)),
             // Should match - chunk #7 contains 0xdead and chunk 8 contains 0xbeef
-            std::make_tuple(std::vector<std::string>{"    - contains_hex: \"deadbeef\""},
+            std::make_tuple(std::vector<std::string>{"    - binary_match: \"deadbeef\""},
                             std::list<std::list<uint32_t>>{{6}, {6}, {7}, {8}, {6}},
                             std::make_pair(true, false)),
             // Should NOT match - hex 0xdeed is not there
-            std::make_tuple(std::vector<std::string>{"    - contains_hex: \"deed\""},
+            std::make_tuple(std::vector<std::string>{"    - binary_match: \"deed\""},
                             std::list<std::list<uint32_t>>{{6}, {6}, {7}, {8}, {6}},
                             std::make_pair(false, true)),
 
             // SEARCHING FOR SINGLE PATTERN - with limit
             // Should match - there is a single body chunk and 'This' is within
             // search limit.
-            std::make_tuple(std::vector<std::string>{"    - contains_text: \"This\"",
+            std::make_tuple(std::vector<std::string>{"    - string_match: \"This\"",
                                                      "  bytes_limit: 10"},
                             std::list<std::list<uint32_t>>{{0}}, std::make_pair(true, false)),
             // Should NOT match - there is a single body chunk and envoy is in the body
             // but outside of the limit
-            std::make_tuple(std::vector<std::string>{"    - contains_text: \"envoy\"",
+            std::make_tuple(std::vector<std::string>{"    - string_match: \"envoy\"",
                                                      "  bytes_limit: 10"},
                             std::list<std::list<uint32_t>>{{0}}, std::make_pair(false, false)),
             // Should NOT match - 2 body chunks. First contains 'envoy' at the end and the second
             // chunk contains 'proxy' at the beginning. Search is limited to the first 10 bytes
             //  - 'proxy' in the second chunk should not be found as it is outside of the search
             //  limit.
-            std::make_tuple(std::vector<std::string>{"    - contains_text: \"proxy\"",
+            std::make_tuple(std::vector<std::string>{"    - string_match: \"proxy\"",
                                                      "  bytes_limit: 10"},
                             std::list<std::list<uint32_t>>{{0}, {1}}, std::make_pair(false, false)),
             // Should match - 2 body chunks. First contains 'envoy' at the end and the second
             // chunk contains 'proxy' at the beginning. 'proxy' is located at bytes 44-48
             // so should be found when search limit is 48.
-            std::make_tuple(std::vector<std::string>{"    - contains_text: \"proxy\"",
+            std::make_tuple(std::vector<std::string>{"    - string_match: \"proxy\"",
                                                      "  bytes_limit: 48"},
                             std::list<std::list<uint32_t>>{{0}, {1}}, std::make_pair(true, false)),
             // Should NOT match - 2 body chunks. First contains 'envoy' at the end and the second
             // chunk contains 'proxy' at the beginning. 'proxy' is located at bytes 44-48.
             // Search limit is 47 bytes, so the last character of 'proxy' is outside of the search
             // limit.
-            std::make_tuple(std::vector<std::string>{"    - contains_text: \"proxy\"",
+            std::make_tuple(std::vector<std::string>{"    - string_match: \"proxy\"",
                                                      "  bytes_limit: 47"},
                             std::list<std::list<uint32_t>>{{0}, {1}}, std::make_pair(false, false)),
             // Should match - 2 body chunks. First contains 'envoy' at the end and the second
             // chunk contains 'proxy' at the beginning. 'proxy' is located at bytes 44-48.
             // Search limit is 46 bytes, which is enough to include 'envoypro' in search.
-            std::make_tuple(std::vector<std::string>{"    - contains_text: \"envoypro\"",
+            std::make_tuple(std::vector<std::string>{"    - string_match: \"envoypro\"",
                                                      "  bytes_limit: 46"},
                             std::list<std::list<uint32_t>>{{0}, {1}}, std::make_pair(true, false)),
             // Should NOT match - 2 body chunks. First contains 'envoy' at the end and the second
             // chunk contains 'proxy' at the beginning. 'proxy' is located at bytes 44-48.
             // Search limit is 45 bytes, so the last character of `envoyproxy` is outside of the
             // search limit.
-            std::make_tuple(std::vector<std::string>{"    - contains_text: \"envoypro\"",
+            std::make_tuple(std::vector<std::string>{"    - string_match: \"envoypro\"",
                                                      "  bytes_limit: 45"},
                             std::list<std::list<uint32_t>>{{0}, {1}}, std::make_pair(false, false)),
 
             // SEARCHING FOR MULTIPLE PATTERNS - no limit
             // Should NOT match. None of the patterns is in the body.
-            std::make_tuple(std::vector<std::string>{"    - contains_text: \"balancer\"",
-                                                     "    - contains_text: \"error\""},
+            std::make_tuple(std::vector<std::string>{"    - string_match: \"balancer\"",
+                                                     "    - string_match: \"error\""},
                             std::list<std::list<uint32_t>>{{0}}, std::make_pair(false, true)),
             // Should NOT match. One pattern is in the body but the second is not.
-            std::make_tuple(std::vector<std::string>{"    - contains_text: \"envoy\"",
-                                                     "    - contains_text: \"error\""},
+            std::make_tuple(std::vector<std::string>{"    - string_match: \"envoy\"",
+                                                     "    - string_match: \"error\""},
                             std::list<std::list<uint32_t>>{{0}}, std::make_pair(false, true)),
             // Should match. Both patterns are in the body (concatenated frags 0 and 1).
-            std::make_tuple(std::vector<std::string>{"    - contains_text: \"envoy\"",
-                                                     "    - contains_text: \"proxy\""},
+            std::make_tuple(std::vector<std::string>{"    - string_match: \"envoy\"",
+                                                     "    - string_match: \"proxy\""},
                             std::list<std::list<uint32_t>>{{0, 1}}, std::make_pair(true, false)),
             // Should match. Both patterns should be found. 'envoy' is in the first
             // chunk and '0xbeef' is in the chunk 8
-            std::make_tuple(std::vector<std::string>{"    - contains_text: \"envoy\"",
-                                                     "    - contains_hex: \"beef\""},
+            std::make_tuple(std::vector<std::string>{"    - string_match: \"envoy\"",
+                                                     "    - binary_match: \"beef\""},
                             std::list<std::list<uint32_t>>{{0, 1}, {8}, {6}},
                             std::make_pair(true, false)),
             // Should match. Both patterns should be found. '0xdeadbeef' is spread
             // across two chunks - 7 and 8. The second pattern 'envoy' is in chunk 0.
-            std::make_tuple(std::vector<std::string>{"    - contains_text: \"envoy\"",
-                                                     "    - contains_hex: \"deadbeef\""},
+            std::make_tuple(std::vector<std::string>{"    - string_match: \"envoy\"",
+                                                     "    - binary_match: \"deadbeef\""},
                             std::list<std::list<uint32_t>>{{7}, {8}, {6, 0}},
                             std::make_pair(true, false)),
             // Should match. One pattern is substring of the other and they both
             // are located part in chunk 0 and part in chunk 1.
-            std::make_tuple(std::vector<std::string>{"    - contains_text: \"envoyproxy\"",
-                                                     "    - contains_text: \"voypro\""},
+            std::make_tuple(std::vector<std::string>{"    - string_match: \"envoyproxy\"",
+                                                     "    - string_match: \"voypro\""},
                             std::list<std::list<uint32_t>>{{6}, {0}, {1}, {8}, {6}},
                             std::make_pair(true, false)),
             // Should match. Duplicated pattern which is found in the body.
-            std::make_tuple(std::vector<std::string>{"    - contains_text: \"envoyproxy\"",
-                                                     "    - contains_text: \"envoyproxy\""},
+            std::make_tuple(std::vector<std::string>{"    - string_match: \"envoyproxy\"",
+                                                     "    - string_match: \"envoyproxy\""},
                             std::list<std::list<uint32_t>>{{6}, {0}, {1}, {8}, {6}},
                             std::make_pair(true, false)),
 
             // SEARCHING FOR MULTIPLE PATTERNS - with limit
             // Should NOT match. None of the patterns is in the body.
-            std::make_tuple(std::vector<std::string>{"    - contains_text: \"balancer\"",
-                                                     "    - contains_text: \"error\"",
+            std::make_tuple(std::vector<std::string>{"    - string_match: \"balancer\"",
+                                                     "    - string_match: \"error\"",
                                                      "  bytes_limit: 15"},
                             std::list<std::list<uint32_t>>{{0}}, std::make_pair(false, false)),
             // Should NOT match. One pattern is in the body but the second is not.
             // Search limit is large enough to find the first pattern.
-            std::make_tuple(std::vector<std::string>{"    - contains_text: \"envoy\"",
-                                                     "    - contains_text: \"error\"",
+            std::make_tuple(std::vector<std::string>{"    - string_match: \"envoy\"",
+                                                     "    - string_match: \"error\"",
                                                      "  bytes_limit: 35"},
                             std::list<std::list<uint32_t>>{{0}}, std::make_pair(false, false)),
             // Should NOT match. One pattern is in the body but the second is not.
             // Search limit is small so none of the patterns should be found.
-            std::make_tuple(std::vector<std::string>{"    - contains_text: \"envoy\"",
-                                                     "    - contains_text: \"error\"",
+            std::make_tuple(std::vector<std::string>{"    - string_match: \"envoy\"",
+                                                     "    - string_match: \"error\"",
                                                      "  bytes_limit: 5"},
                             std::list<std::list<uint32_t>>{{0}}, std::make_pair(false, false)),
             // Should NOT match. Both patterns are in the body (concatenated frags 0 and 1).
             // Limit includes only the first pattern.
-            std::make_tuple(std::vector<std::string>{"    - contains_text: \"envoy\"",
-                                                     "    - contains_text: \"proxy\"",
+            std::make_tuple(std::vector<std::string>{"    - string_match: \"envoy\"",
+                                                     "    - string_match: \"proxy\"",
                                                      "  bytes_limit: 30"},
                             std::list<std::list<uint32_t>>{{0, 1}}, std::make_pair(false, false)),
             // Should match. Both patterns should be found. 'envoy' is in the first
             // chunk and '0xbeef' is in the chunk 8 and search limit is large enough
             // to include 2 patterns
             std::make_tuple(
-                std::vector<std::string>{"    - contains_text: \"envoy\"",
-                                         "    - contains_hex: \"beef\"", "  bytes_limit: 90"},
+                std::vector<std::string>{"    - string_match: \"envoy\"",
+                                         "    - binary_match: \"beef\"", "  bytes_limit: 90"},
                 std::list<std::list<uint32_t>>{{0, 1}, {8}, {6}}, std::make_pair(true, false)),
             // Should match. Both patterns should be found. '0xdeadbeef' is spread
             // across two chunks - 7 and 8. The second pattern 'envoy' is in chunk 0.
             std::make_tuple(
-                std::vector<std::string>{"    - contains_text: \"envoy\"",
-                                         "    - contains_hex: \"deadbeef\"", "  bytes_limit: 85"},
+                std::vector<std::string>{"    - string_match: \"envoy\"",
+                                         "    - binary_match: \"deadbeef\"", "  bytes_limit: 85"},
                 std::list<std::list<uint32_t>>{{7}, {8}, {6, 0}}, std::make_pair(true, false)),
             // Should match. Search limit ends exactly where 0xdeadbeef ends.
             std::make_tuple(
-                std::vector<std::string>{"    - contains_text: \"envoy\"",
-                                         "    - contains_hex: \"deadbeef\"", "  bytes_limit: 47"},
+                std::vector<std::string>{"    - string_match: \"envoy\"",
+                                         "    - binary_match: \"deadbeef\"", "  bytes_limit: 47"},
                 std::list<std::list<uint32_t>>{{0}, {7}, {8}, {6, 0}}, std::make_pair(true, false)),
             // Should NOT match. Search limit ends exactly one byte before end of 0xdeadbeef.
-            std::make_tuple(std::vector<std::string>{"    - contains_text: \"envoy\"",
-                                                     "    - contains_hex: \"deadbeef\"",
+            std::make_tuple(std::vector<std::string>{"    - string_match: \"envoy\"",
+                                                     "    - binary_match: \"deadbeef\"",
                                                      "  bytes_limit: 46"},
                             std::list<std::list<uint32_t>>{{0}, {7}, {8}, {6, 0}},
                             std::make_pair(false, false)),
             // Test the situation when end of the search limit overlaps with end of first chunk.
             // Should NOT match. The second pattern should not be found.
-            std::make_tuple(std::vector<std::string>{"    - contains_text: \"envoy\"",
-                                                     "    - contains_hex: \"deadbeef\"",
+            std::make_tuple(std::vector<std::string>{"    - string_match: \"envoy\"",
+                                                     "    - binary_match: \"deadbeef\"",
                                                      "  bytes_limit: 43"},
                             std::list<std::list<uint32_t>>{{0}, {7}, {8}, {6, 0}},
                             std::make_pair(false, false)),
 
             // Now pass enormously large value. It should work just fine
-            std::make_tuple(std::vector<std::string>{"    - contains_text: \"envoy\"",
-                                                     "    - contains_hex: \"deadbeef\"",
+            std::make_tuple(std::vector<std::string>{"    - string_match: \"envoy\"",
+                                                     "    - binary_match: \"deadbeef\"",
                                                      "  bytes_limit: 50000000"},
                             std::list<std::list<uint32_t>>{{0}, {7}, {8}, {6, 0}},
                             std::make_pair(true, false)))));
