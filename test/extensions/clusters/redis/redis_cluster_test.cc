@@ -160,6 +160,7 @@ protected:
 
   void expectRedisSessionCreated() {
     resolve_timer_ = new Event::MockTimer(&dispatcher_);
+    EXPECT_CALL(*resolve_timer_, disableTimer());
     ON_CALL(random_, random()).WillByDefault(Return(0));
   }
 
