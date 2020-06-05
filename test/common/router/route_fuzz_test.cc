@@ -29,10 +29,9 @@ cleanRouteConfig(envoy::config::route::v3::RouteConfiguration route_config) {
                         envoy::config::route::v3::RouteMatch::PathSpecifierCase::
                             kHiddenEnvoyDeprecatedRegex) {
                       routes->erase(routes->begin() + i);
-                    } else if (routes-> Get(i).has_filter_action()) {
+                    } else if (routes->Get(i).has_filter_action()) {
                       routes->erase(routes->begin() + i);
-                    }
-                    else {
+                    } else {
                       ++i;
                     }
                   }
