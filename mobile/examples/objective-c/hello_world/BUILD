@@ -1,6 +1,7 @@
-licenses(["notice"])  # Apache 2
-
+load("@rules_cc//cc:defs.bzl", "objc_library")
 load("@build_bazel_rules_apple//apple:ios.bzl", "ios_application")
+
+licenses(["notice"])  # Apache 2
 
 objc_library(
     name = "appmain",

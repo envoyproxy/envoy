@@ -31,19 +31,13 @@ public:
 
   const std::string& logicalName() const { return address_; }
 
-  Api::SysCallIntResult bind(int) const {
-    // a socket should never be bound to a synthetic address.
-    return {-1, EADDRNOTAVAIL};
-  }
-
-  Api::SysCallIntResult connect(int) const {
-    // a socket should never connect to a synthetic address.
-    return {-1, EPROTOTYPE};
-  }
-
   const Ip* ip() const { return nullptr; }
 
-  IoHandlePtr socket(SocketType) const { return nullptr; }
+  const Pipe* pipe() const { return nullptr; }
+
+  const sockaddr* sockAddr() const { return nullptr; }
+
+  socklen_t sockAddrLen() const { return 0; }
 
   Type type() const {
     // TODO(junr03): consider adding another type of address.
