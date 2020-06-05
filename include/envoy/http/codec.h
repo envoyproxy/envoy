@@ -36,6 +36,24 @@ const char MaxResponseHeadersCountOverrideKey[] =
 
 class Stream;
 
+enum class ErrorCode {
+  NoError,
+  ProtocolError,
+  InternalError,
+  FlowControlError,
+  SettingsTimeout,
+  StreamClosed,
+  FrameSizeError,
+  RefusedStream,
+  Cancel,
+  CompressionError,
+  ConnectError,
+  EnhanceYourCalm,
+  InadequateSecurity,
+  Http11Required,
+  Unknown, 
+};
+
 /**
  * Stream encoder options specific to HTTP/1.
  */
@@ -324,7 +342,7 @@ public:
   /**
    * Fires when the remote indicates "go away." No new streams should be created.
    */
-  virtual void onGoAway() PURE;
+  virtual void onGoAway(ErrorCode error_code) PURE;
 };
 
 /**
