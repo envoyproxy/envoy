@@ -171,7 +171,8 @@ Http2Frame Http2Frame::makeEmptyPushPromiseFrame(uint32_t stream_index,
                     makeRequestStreamId(stream_index));
   const uint32_t promised_stream_id = makeRequestStreamId(promised_stream_index);
   ASSERT(frame.data_.capacity() >= HeaderSize + sizeof(uint32_t));
-  memcpy(&frame.data_[HeaderSize], reinterpret_cast<const void*>(&promised_stream_id), sizeof(uint32_t));
+  memcpy(&frame.data_[HeaderSize], reinterpret_cast<const void*>(&promised_stream_id),
+         sizeof(uint32_t));
   return frame;
 }
 
@@ -191,7 +192,8 @@ Http2Frame Http2Frame::makeEmptyGoAwayFrame(uint32_t last_stream_index, ErrorCod
   frame.buildHeader(Type::GoAway, kEmptyGoAwayPayloadSize, 0, makeRequestStreamId(0));
   const uint32_t last_stream_id = makeRequestStreamId(last_stream_index);
   ASSERT(frame.data_.capacity() >= HeaderSize + 4 + sizeof(uint32_t));
-  memcpy(&frame.data_[HeaderSize], reinterpret_cast<const void*>(&last_stream_id), sizeof(uint32_t));
+  memcpy(&frame.data_[HeaderSize], reinterpret_cast<const void*>(&last_stream_id),
+         sizeof(uint32_t));
   const uint32_t error = static_cast<uint32_t>(error_code);
   memcpy(&frame.data_[HeaderSize + 4], reinterpret_cast<const void*>(&error), sizeof(uint32_t));
   return frame;
