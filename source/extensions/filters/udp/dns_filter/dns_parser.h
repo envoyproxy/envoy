@@ -105,7 +105,7 @@ public:
   uint16_t response_code_;
   uint64_t retry_;
   uint16_t id_;
-  Network::DnsResolver::ResolutionStatus resolver_status_;
+  Network::DnsResolver::ResolutionStatus resolution_status_;
   DnsQueryPtrVec queries_;
   DnsAnswerMap answers_;
 };

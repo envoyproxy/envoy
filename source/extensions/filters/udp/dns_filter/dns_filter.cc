@@ -127,7 +127,7 @@ DnsFilter::DnsFilter(Network::UdpReadFilterCallbacks& callbacks,
   // resolver, we build an answer record from each IP returned then send a response to the client
   resolver_callback_ = [this](DnsQueryContextPtr context, const DnsQueryRecord* query,
                               AddressConstPtrVec& iplist) -> void {
-    if (context->resolver_status_ != Network::DnsResolver::ResolutionStatus::Success &&
+    if (context->resolution_status_ != Network::DnsResolver::ResolutionStatus::Success &&
         context->retry_) {
       --context->retry_;
       ENVOY_LOG(debug, "resolving name [{}] via external resolvers [retry {}]", query->name_,
