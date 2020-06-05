@@ -313,6 +313,7 @@ def envoy_sh_test(
             data = srcs + data + cc_binary,
             tags = tags,
             deps = ["//test/test_common:environment_lib"] + cc_binary,
+            **kargs
         )
 
     else:

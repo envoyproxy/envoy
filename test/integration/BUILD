@@ -230,6 +230,7 @@ exports_files(["test_utility.sh"])
 
 envoy_sh_test(
     name = "hotrestart_test",
+    size = "enormous",
     srcs = envoy_select_hot_restart([
         "hotrestart_test.sh",
     ]),
