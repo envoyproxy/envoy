@@ -81,7 +81,7 @@ public:
 #endif
   }
 
-  ~ThreadImplPosix() { ASSERT(joined_); }
+  ~ThreadImplPosix() override { ASSERT(joined_); }
 
   std::string name() const override { return name_; }
 
