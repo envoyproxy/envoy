@@ -106,10 +106,10 @@ private:
 JsonTranscoderConfig::JsonTranscoderConfig(
     const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder&
         proto_config,
-    Api::Api& api, bool disabled)
-    : disabled_(disabled) {
+    Api::Api& api) {
 
-  if (disabled) {
+  disabled_ = (proto_config.services().size() == 0);
+  if (disabled_) {
     return;
   }
 
@@ -197,18 +197,6 @@ JsonTranscoderConfig::JsonTranscoderConfig(
   match_incoming_request_route_ = proto_config.match_incoming_request_route();
   ignore_unknown_query_parameters_ = proto_config.ignore_unknown_query_parameters();
 }
-
-JsonTranscoderConfig::JsonTranscoderConfig(
-    const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoderPerRoute&
-        per_route_config,
-    Api::Api& api)
-    : JsonTranscoderConfig(per_route_config.transcoder(), api, per_route_config.disabled()) {}
-
-JsonTranscoderConfig::JsonTranscoderConfig(
-    const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder&
-        proto_config,
-    Api::Api& api)
-    : JsonTranscoderConfig(proto_config, api, false) {}
 
 void JsonTranscoderConfig::addFileDescriptor(const Protobuf::FileDescriptorProto& file) {
   if (descriptor_pool_.BuildFile(file) == nullptr) {

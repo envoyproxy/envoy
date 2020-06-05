@@ -64,7 +64,8 @@ message GrpcJsonTranscoder {
   // the transcoder will translate. If the service name doesn't exist in ``proto_descriptor``,
   // Envoy will fail at startup. The ``proto_descriptor`` may contain more services than
   // the service names specified here, but they won't be translated.
-  repeated string services = 2 [(validate.rules).repeated = {min_items: 1}];
+  // If the list of services is empty, filter is considered disabled.
+  repeated string services = 2 [(validate.rules).repeated = {min_items: 0}];
 
   // Control options for response JSON. These options are passed directly to
   // `JsonPrintOptions <https://developers.google.com/protocol-buffers/docs/reference/cpp/
@@ -160,16 +161,4 @@ message GrpcJsonTranscoder {
   //  the ``google/rpc/error_details.proto`` should be included in the configured
   //  :ref:`proto descriptor set <config_grpc_json_generate_proto_descriptor_set>`.
   bool convert_grpc_status = 9;
-}
-
-message GrpcJsonTranscoderPerRoute {
-  oneof override {
-    option (validate.required) = true;
-
-    // Disable the grpc json transcoder filter for this particular vhost or route.
-    bool disabled = 1 [(validate.rules).bool = {const: true}];
-
-    // Override the global configuration of the filter with this new config.
-    GrpcJsonTranscoder transcoder = 2 [(validate.rules).message = {required: true}];
-  }
 }

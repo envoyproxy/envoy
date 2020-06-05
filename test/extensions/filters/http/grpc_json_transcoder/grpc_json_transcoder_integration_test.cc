@@ -173,8 +173,7 @@ protected:
   // override configuration on per-route basis
   void overrideConfig(const std::string& json_config) {
 
-    envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoderPerRoute
-        per_route_config;
+    envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder per_route_config;
     TestUtility::loadFromJson(json_config, per_route_config);
     ConfigHelper::HttpModifierFunction modifier =
         [per_route_config](
@@ -874,7 +873,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UTF8) {
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, RouteDisabled) {
-  overrideConfig(R"EOF({"disabled": true})EOF");
+  overrideConfig(R"EOF({"services": [], "proto_descriptor_bin": ""})EOF");
   HttpIntegrationTest::initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -900,11 +899,9 @@ public:
             name: grpc_json_transcoder
             typed_config:
               "@type": type.googleapis.com/envoy.config.filter.http.transcoder.v2.GrpcJsonTranscoder
-              proto_descriptor : "{}"
-              services : "helloworld.Greeter"
+              "proto_descriptor": ""
             )EOF";
-    config_helper_.addFilter(
-        fmt::format(filter, TestEnvironment::runfilesPath("test/proto/helloworld.descriptor")));
+    config_helper_.addFilter(filter);
   }
 };
 INSTANTIATE_TEST_SUITE_P(IpVersions, OverrideConfigGrpcJsonTranscoderIntegrationTest,
@@ -915,10 +912,8 @@ TEST_P(OverrideConfigGrpcJsonTranscoderIntegrationTest, RouteOverride) {
   // add bookstore per-route override
   const std::string filter =
       R"EOF({{
-          "transcoder": {{
               "services": ["bookstore.Bookstore"],
               "proto_descriptor": "{}"
-            }}
           }})EOF";
   overrideConfig(
       fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));

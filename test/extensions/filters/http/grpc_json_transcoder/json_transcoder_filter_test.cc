@@ -350,8 +350,9 @@ protected:
 };
 
 TEST_F(GrpcJsonTranscoderFilterTest, PerRouteDisabledConfigOverride) {
-  envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoderPerRoute route_cfg;
-  route_cfg.set_disabled(true);
+  // not setting up services list (which disables filter)
+  envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder route_cfg;
+  route_cfg.set_proto_descriptor_bin("");
   JsonTranscoderConfig route_config(route_cfg, *api_);
   routeLocalConfig(&route_config, nullptr);
 
@@ -360,8 +361,8 @@ TEST_F(GrpcJsonTranscoderFilterTest, PerRouteDisabledConfigOverride) {
 }
 
 TEST_F(GrpcJsonTranscoderFilterTest, PerVHostDisabledConfigOverride) {
-  envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoderPerRoute vhost_cfg;
-  vhost_cfg.set_disabled(true);
+  envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder vhost_cfg;
+  vhost_cfg.set_proto_descriptor_bin("");
   JsonTranscoderConfig vhost_config(vhost_cfg, *api_);
   routeLocalConfig(nullptr, &vhost_config);
 

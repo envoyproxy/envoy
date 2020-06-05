@@ -69,11 +69,6 @@ public:
           proto_config,
       Api::Api& api);
 
-  JsonTranscoderConfig(
-      const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoderPerRoute&
-          per_route_config,
-      Api::Api& api);
-
   /**
    * Create an instance of Transcoder interface based on incoming request
    * @param headers headers received from decoder
@@ -132,7 +127,7 @@ private:
 
   Protobuf::DescriptorPool descriptor_pool_;
   google::grpc::transcoding::PathMatcherPtr<MethodInfoSharedPtr> path_matcher_;
-  std::shared_ptr<google::grpc::transcoding::TypeHelper> type_helper_;
+  std::unique_ptr<google::grpc::transcoding::TypeHelper> type_helper_;
   Protobuf::util::JsonPrintOptions print_options_;
 
   bool match_incoming_request_route_{false};
@@ -191,14 +186,14 @@ private:
   void initPerRouteConfig();
 
   JsonTranscoderConfig& config_;
-  const JsonTranscoderConfig* per_route_config_{nullptr};
+  const JsonTranscoderConfig* per_route_config_{};
   std::unique_ptr<google::grpc::transcoding::Transcoder> transcoder_;
   TranscoderInputStreamImpl request_in_;
   TranscoderInputStreamImpl response_in_;
-  Http::StreamDecoderFilterCallbacks* decoder_callbacks_{nullptr};
-  Http::StreamEncoderFilterCallbacks* encoder_callbacks_{nullptr};
+  Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
+  Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   MethodInfoSharedPtr method_;
-  Http::ResponseHeaderMap* response_headers_{nullptr};
+  Http::ResponseHeaderMap* response_headers_{};
   Grpc::Decoder decoder_;
 
   // Data of the initial request message, initialized from query arguments, path, etc.

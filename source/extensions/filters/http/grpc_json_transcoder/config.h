@@ -16,8 +16,7 @@ namespace GrpcJsonTranscoder {
  */
 class GrpcJsonTranscoderFilterConfig
     : public Common::FactoryBase<
-          envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder,
-          envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoderPerRoute> {
+          envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder> {
 public:
   GrpcJsonTranscoderFilterConfig() : FactoryBase(HttpFilterNames::get().GrpcJsonTranscoder) {}
 
@@ -28,7 +27,7 @@ private:
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 
   Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
-      const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoderPerRoute&,
+      const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder&,
       Server::Configuration::ServerFactoryContext& context,
       ProtobufMessage::ValidationVisitor& validator) override;
 };
