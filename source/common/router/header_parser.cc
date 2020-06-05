@@ -4,8 +4,6 @@
 #include <memory>
 #include <string>
 
-#include "envoy/config/core/v3/base.pb.h"
-
 #include "common/common/assert.h"
 #include "common/http/headers.h"
 #include "common/protobuf/utility.h"
