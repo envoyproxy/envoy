@@ -81,6 +81,8 @@ void removeConnectMatcher(Protobuf::Message* message) {
     if (rules.match().has_connect_matcher()) {
       rules.mutable_match()->set_path("/");
     }
+  }
+}
 
 void cleanAttachmentTemplate(Protobuf::Message* message) {
   envoy::extensions::filters::http::squash::v3::Squash& config =
