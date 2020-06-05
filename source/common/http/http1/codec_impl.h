@@ -220,6 +220,20 @@ protected:
   bool resetStreamCalled() { return reset_stream_called_; }
   void onMessageBeginBase();
 
+  /**
+   * Get memory used to represent HTTP headers or trailers currently being parsed.
+   * Computed by adding the partial header field and value that is currently being parsed and the
+   * estimated header size for previous header lines provided by HeaderMap::byteSize().
+   */
+  virtual uint32_t getHeadersSize();
+
+  /**
+   * Called from onUrl, onHeaderField and onHeaderValue to verify that the headers do not exceed the
+   * configured max header size limit. Throws a  CodecProtocolException if headers exceed the size
+   * limit.
+   */
+  void checkMaxHeadersSize();
+
   Network::Connection& connection_;
   CodecStats& stats_;
   http_parser parser_;
@@ -246,7 +260,7 @@ private:
   virtual HeaderMap& headersOrTrailers() PURE;
   virtual RequestOrResponseHeaderMap& requestOrResponseHeaders() PURE;
   virtual void allocHeaders() PURE;
-  virtual void maybeAllocTrailers() PURE;
+  virtual void allocTrailers() PURE;
 
   /**
    * Called in order to complete an in progress header decode.
@@ -426,6 +440,8 @@ protected:
   absl::optional<ActiveRequest>& activeRequest() { return active_request_; }
   // ConnectionImpl
   void onMessageComplete() override;
+  // Add the size of the request_url to the reported header size when processing request headers.
+  uint32_t getHeadersSize() override;
 
 private:
   /**
@@ -462,9 +478,10 @@ private:
   }
   void allocHeaders() override {
     ASSERT(nullptr == absl::get<RequestHeaderMapPtr>(headers_or_trailers_));
+    ASSERT(!processing_trailers_);
     headers_or_trailers_.emplace<RequestHeaderMapPtr>(RequestHeaderMapImpl::create());
   }
-  void maybeAllocTrailers() override {
+  void allocTrailers() override {
     ASSERT(processing_trailers_);
     if (!absl::holds_alternative<RequestTrailerMapPtr>(headers_or_trailers_)) {
       headers_or_trailers_.emplace<RequestTrailerMapPtr>(RequestTrailerMapImpl::create());
@@ -547,9 +564,10 @@ private:
   }
   void allocHeaders() override {
     ASSERT(nullptr == absl::get<ResponseHeaderMapPtr>(headers_or_trailers_));
+    ASSERT(!processing_trailers_);
     headers_or_trailers_.emplace<ResponseHeaderMapPtr>(ResponseHeaderMapImpl::create());
   }
-  void maybeAllocTrailers() override {
+  void allocTrailers() override {
     ASSERT(processing_trailers_);
     if (!absl::holds_alternative<ResponseTrailerMapPtr>(headers_or_trailers_)) {
       headers_or_trailers_.emplace<ResponseTrailerMapPtr>(ResponseTrailerMapImpl::create());
@@ -567,9 +585,9 @@ private:
   bool ignore_message_complete_for_100_continue_{};
   // TODO(mattklein123): This should be a member of PendingResponse but this change needs dedicated
   // thought as some of the reset and no header code paths make this difficult. Headers are
-  // populated on message begin. Trailers are populated on the first parsed trailer field (if
-  // trailers are enabled). The variant is reset to null headers on message complete for assertion
-  // purposes.
+  // populated on message begin. Trailers are populated when the switch to trailer processing is
+  // detected while parsing the first trailer field (if trailers are enabled). The variant is reset
+  // to null headers on message complete for assertion purposes.
   absl::variant<ResponseHeaderMapPtr, ResponseTrailerMapPtr> headers_or_trailers_;
 
   // The default limit of 80 KiB is the vanilla http_parser behaviour.
