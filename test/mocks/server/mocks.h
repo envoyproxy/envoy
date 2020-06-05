@@ -691,7 +691,7 @@ public:
   MOCK_METHOD(BootstrapExtensionPtr, createBootstrapExtension,
               (const Protobuf::Message&, Configuration::ServerFactoryContext&), (override));
   MOCK_METHOD(ProtobufTypes::MessagePtr, createEmptyConfigProto, (), (override));
-  MOCK_METHOD(std::string, name, (), (const override));
+  MOCK_METHOD(std::string, name, (), (const, override));
 };
 
 } // namespace Configuration

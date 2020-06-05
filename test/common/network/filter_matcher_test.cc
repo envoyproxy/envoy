@@ -19,13 +19,13 @@ struct CallbackHandle {
 } // namespace
 class ListenerFilterMatcherTest : public testing::Test {
 public:
-  CallbackHandle createCallbackOnPort(int port) {
-    CallbackHandle handle;
-    handle.address_ = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", port);
-    handle.socket_ = std::make_unique<MockConnectionSocket>();
-    handle.callback_ = std::make_unique<MockListenerFilterCallbacks>();
-    EXPECT_CALL(*handle.socket_, localAddress()).WillRepeatedly(ReturnRef(handle.address_));
-    EXPECT_CALL(*handle.callback_, socket()).WillRepeatedly(ReturnRef(*handle.socket_));
+  std::unique_ptr<CallbackHandle> createCallbackOnPort(int port) {
+    auto handle = std::make_unique<CallbackHandle>();
+    handle->address_ = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", port);
+    handle->socket_ = std::make_unique<MockConnectionSocket>();
+    handle->callback_ = std::make_unique<MockListenerFilterCallbacks>();
+    EXPECT_CALL(*(handle->socket_), localAddress()).WillRepeatedly(ReturnRef(handle->address_));
+    EXPECT_CALL(*(handle->callback_), socket()).WillRepeatedly(ReturnRef(*(handle->socket_)));
     return handle;
   }
   envoy::config::listener::v3::ListenerFilterChainMatchPredicate createPortPredicate(int port_start,
@@ -44,9 +44,9 @@ TEST_F(ListenerFilterMatcherTest, DstPortMatcher) {
   auto handle79 = createCallbackOnPort(79);
   auto handle80 = createCallbackOnPort(80);
   auto handle81 = createCallbackOnPort(81);
-  EXPECT_FALSE(matcher->matches(*handle79.callback_));
-  EXPECT_TRUE(matcher->matches(*handle80.callback_));
-  EXPECT_FALSE(matcher->matches(*handle81.callback_));
+  EXPECT_FALSE(matcher->matches(*(handle79->callback_)));
+  EXPECT_TRUE(matcher->matches(*(handle80->callback_)));
+  EXPECT_FALSE(matcher->matches(*(handle81->callback_)));
 }
 
 TEST_F(ListenerFilterMatcherTest, AnyMatdcher) {
@@ -56,9 +56,9 @@ TEST_F(ListenerFilterMatcherTest, AnyMatdcher) {
   auto handle79 = createCallbackOnPort(79);
   auto handle80 = createCallbackOnPort(80);
   auto handle81 = createCallbackOnPort(81);
-  EXPECT_TRUE(matcher->matches(*handle79.callback_));
-  EXPECT_TRUE(matcher->matches(*handle80.callback_));
-  EXPECT_TRUE(matcher->matches(*handle81.callback_));
+  EXPECT_TRUE(matcher->matches(*(handle79->callback_)));
+  EXPECT_TRUE(matcher->matches(*(handle80->callback_)));
+  EXPECT_TRUE(matcher->matches(*(handle81->callback_)));
 }
 
 TEST_F(ListenerFilterMatcherTest, NotMatcher) {
@@ -69,9 +69,9 @@ TEST_F(ListenerFilterMatcherTest, NotMatcher) {
   auto handle79 = createCallbackOnPort(79);
   auto handle80 = createCallbackOnPort(80);
   auto handle81 = createCallbackOnPort(81);
-  EXPECT_TRUE(matcher->matches(*handle79.callback_));
-  EXPECT_FALSE(matcher->matches(*handle80.callback_));
-  EXPECT_TRUE(matcher->matches(*handle81.callback_));
+  EXPECT_TRUE(matcher->matches(*(handle79->callback_)));
+  EXPECT_FALSE(matcher->matches(*(handle80->callback_)));
+  EXPECT_TRUE(matcher->matches(*(handle81->callback_)));
 }
 
 TEST_F(ListenerFilterMatcherTest, OrMatcher) {
@@ -87,9 +87,9 @@ TEST_F(ListenerFilterMatcherTest, OrMatcher) {
   auto handle443 = createCallbackOnPort(443);
   auto handle3306 = createCallbackOnPort(3306);
 
-  EXPECT_FALSE(matcher->matches(*handle3306.callback_));
-  EXPECT_TRUE(matcher->matches(*handle80.callback_));
-  EXPECT_TRUE(matcher->matches(*handle443.callback_));
+  EXPECT_FALSE(matcher->matches(*(handle3306->callback_)));
+  EXPECT_TRUE(matcher->matches(*(handle80->callback_)));
+  EXPECT_TRUE(matcher->matches(*(handle443->callback_)));
 }
 
 TEST_F(ListenerFilterMatcherTest, AndMatcher) {
@@ -105,9 +105,9 @@ TEST_F(ListenerFilterMatcherTest, AndMatcher) {
   auto handle443 = createCallbackOnPort(443);
   auto handle3306 = createCallbackOnPort(3306);
 
-  EXPECT_FALSE(matcher->matches(*handle3306.callback_));
-  EXPECT_FALSE(matcher->matches(*handle80.callback_));
-  EXPECT_TRUE(matcher->matches(*handle443.callback_));
+  EXPECT_FALSE(matcher->matches(*(handle3306->callback_)));
+  EXPECT_FALSE(matcher->matches(*(handle80->callback_)));
+  EXPECT_TRUE(matcher->matches(*(handle443->callback_)));
 }
 } // namespace Network
 } // namespace Envoy
