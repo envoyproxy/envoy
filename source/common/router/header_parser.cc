@@ -14,7 +14,6 @@
 namespace Envoy {
 namespace Router {
 
-using ::Envoy::Formatter::HeaderFormatter;
 using ::Envoy::Formatter::HeaderFormatterPtr;
 
 using ::Envoy::Formatter::CompoundHeaderFormatter;
