@@ -20,7 +20,7 @@ namespace Network {
 namespace Test {
 
 Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstSharedPtr addr_port,
-                                                    Address::SocketType type) {
+                                                    Socket::Type type) {
   if (addr_port == nullptr || addr_port->type() != Address::Type::Ip) {
     ADD_FAILURE() << "Not an internet address: "
                   << (addr_port == nullptr ? "nullptr" : addr_port->asString());
@@ -34,7 +34,7 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
   const char* failing_fn = nullptr;
   if (result.rc_ != 0) {
     failing_fn = "bind";
-  } else if (type == Address::SocketType::Stream) {
+  } else if (type == Socket::Type::Stream) {
     // Try listening on the port also, if the type is TCP.
     result = sock.listen(1);
     if (result.rc_ != 0) {
@@ -58,7 +58,7 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
 }
 
 Address::InstanceConstSharedPtr findOrCheckFreePort(const std::string& addr_port,
-                                                    Address::SocketType type) {
+                                                    Socket::Type type) {
   auto instance = Utility::parseInternetAddressAndPort(addr_port);
   if (instance != nullptr) {
     instance = findOrCheckFreePort(instance, type);
@@ -159,7 +159,7 @@ std::string ipVersionToDnsFamily(Network::Address::IpVersion version) {
 }
 
 std::pair<Address::InstanceConstSharedPtr, Network::SocketPtr>
-bindFreeLoopbackPort(Address::IpVersion version, Address::SocketType type) {
+bindFreeLoopbackPort(Address::IpVersion version, Socket::Type type) {
   Address::InstanceConstSharedPtr addr = getCanonicalLoopbackAddress(version);
   SocketPtr sock = std::make_unique<SocketImpl>(type, addr);
   Api::SysCallIntResult result = sock->bind(addr);
