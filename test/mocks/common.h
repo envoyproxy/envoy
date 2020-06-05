@@ -61,6 +61,16 @@ public:
           const Duration& duration) noexcept ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
     real_time_.waitFor(mutex, condvar, duration); // NO_CHECK_FORMAT(real_time)
   }
+  // Returns true if the condition was unsatisfied prior to the timeout.
+  bool await(const bool& cond, Thread::MutexBasicLockable& mutex,
+             const Duration& duration) override {
+    return real_time_.await(cond, mutex, duration);
+  }
+  bool await(BoolFn cond, Thread::MutexBasicLockable& mutex,
+             const Duration& duration) override {
+    return real_time_.await(cond, mutex, duration);
+  }
+
   MOCK_METHOD(SystemTime, systemTime, ());
   MOCK_METHOD(MonotonicTime, monotonicTime, ());
 
