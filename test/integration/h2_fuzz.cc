@@ -136,7 +136,7 @@ void H2FuzzIntegrationTest::sendFrame(const test::integration::H2TestFrame& prot
   case test::integration::H2TestFrame::kGeneric: {
     const absl::string_view frame_bytes = proto_frame.generic().frame_bytes();
     ENVOY_LOG_MISC(trace, "Sending generic frame");
-    h2_frame = Http2Frame::makeMalformedFrame(frame_bytes);
+    h2_frame = Http2Frame::makeGenericFrame(frame_bytes);
     break;
   }
   default:
@@ -158,6 +158,7 @@ void H2FuzzIntegrationTest::replay(const test::integration::H2CaptureFuzzTestCas
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("http"));
   FakeRawConnectionPtr fake_upstream_connection;
   bool stop_further_inputs = false;
+  bool preamble_sent = false;
   for (int i = 0; i < input.events().size(); ++i) {
     if (stop_further_inputs) {
       break;
@@ -174,8 +175,11 @@ void H2FuzzIntegrationTest::replay(const test::integration::H2CaptureFuzzTestCas
       auto downstream_write_func = [&](const Http2Frame& h2_frame) -> void {
         tcp_client->write(std::string(h2_frame), false, false);
       };
-      // Start H2 session - send hello string
-      tcp_client->write(Http2Frame::Preamble, false, false);
+      if (!preamble_sent) {
+        // Start H2 session - send hello string
+        tcp_client->write(Http2Frame::Preamble, false, false);
+        preamble_sent = true;
+      }
       for (auto& frame : event.downstream_send_event().h2_frames()) {
         if (!tcp_client->connected()) {
           ENVOY_LOG_MISC(debug,
@@ -226,8 +230,8 @@ void H2FuzzIntegrationTest::replay(const test::integration::H2CaptureFuzzTestCas
           ENVOY_LOG_MISC(trace, "sending upstream frame");
           sendFrame(frame, upstream_write_func);
         }
+        break;
       }
-      break;
     default:
       // Maybe nothing is set?
       break;

@@ -109,7 +109,13 @@ public:
                                 absl::string_view path);
   static Http2Frame makePostRequest(uint32_t stream_index, absl::string_view host,
                                     absl::string_view path);
-  static Http2Frame makeMalformedFrame(absl::string_view contents);
+  /**
+   * Creates a frame with the given contents. This frame can be
+   * malformed/invalid depending on the given contents.
+   * @param contents the contents of the newly created frame.
+   * @return an Http2Frame that is comprised of the given contents.
+   */
+  static Http2Frame makeGenericFrame(absl::string_view contents);
 
   Type type() const { return static_cast<Type>(data_[3]); }
   ResponseStatus responseStatus() const;

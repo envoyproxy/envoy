@@ -33,6 +33,8 @@ const char Http2Frame::Preamble[25] = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
 void Http2Frame::setHeader(absl::string_view header) {
   ASSERT(header.size() >= HeaderSize);
   data_.assign(HeaderSize, 0);
+  // TODO(adisuissa): memcpy is discouraged as it may be unsafe. This should be
+  // use a safer memcpy alternative (example: https://abseil.io/tips/93)
   memcpy(data_.data(), header.data(), HeaderSize);
   data_.resize(HeaderSize + payloadSize());
 }
@@ -154,9 +156,9 @@ Http2Frame Http2Frame::makePriorityFrame(uint32_t stream_index, uint32_t depende
   static constexpr size_t kPriorityPayloadSize = 5;
   Http2Frame frame;
   frame.buildHeader(Type::Priority, kPriorityPayloadSize, 0, makeRequestStreamId(stream_index));
-  uint32_t dependent_net = makeRequestStreamId(dependent_index);
+  const uint32_t dependent_net = makeRequestStreamId(dependent_index);
   ASSERT(frame.data_.capacity() >= HeaderSize + sizeof(uint32_t));
-  memcpy(&frame.data_[HeaderSize], reinterpret_cast<void*>(&dependent_net), sizeof(uint32_t));
+  memcpy(&frame.data_[HeaderSize], reinterpret_cast<const void*>(&dependent_net), sizeof(uint32_t));
   return frame;
 }
 
@@ -167,9 +169,9 @@ Http2Frame Http2Frame::makeEmptyPushPromiseFrame(uint32_t stream_index,
   Http2Frame frame;
   frame.buildHeader(Type::PushPromise, kEmptyPushPromisePayloadSize, static_cast<uint8_t>(flags),
                     makeRequestStreamId(stream_index));
-  uint32_t promised_stream_id = makeRequestStreamId(promised_stream_index);
+  const uint32_t promised_stream_id = makeRequestStreamId(promised_stream_index);
   ASSERT(frame.data_.capacity() >= HeaderSize + sizeof(uint32_t));
-  memcpy(&frame.data_[HeaderSize], reinterpret_cast<void*>(&promised_stream_id), sizeof(uint32_t));
+  memcpy(&frame.data_[HeaderSize], reinterpret_cast<const void*>(&promised_stream_id), sizeof(uint32_t));
   return frame;
 }
 
@@ -177,9 +179,9 @@ Http2Frame Http2Frame::makeResetStreamFrame(uint32_t stream_index, ErrorCode err
   static constexpr size_t kResetStreamPayloadSize = 4;
   Http2Frame frame;
   frame.buildHeader(Type::RstStream, kResetStreamPayloadSize, 0, makeRequestStreamId(stream_index));
-  uint32_t error = static_cast<uint32_t>(error_code);
+  const uint32_t error = static_cast<uint32_t>(error_code);
   ASSERT(frame.data_.capacity() >= HeaderSize + sizeof(uint32_t));
-  memcpy(&frame.data_[HeaderSize], reinterpret_cast<void*>(&error), sizeof(uint32_t));
+  memcpy(&frame.data_[HeaderSize], reinterpret_cast<const void*>(&error), sizeof(uint32_t));
   return frame;
 }
 
@@ -187,11 +189,11 @@ Http2Frame Http2Frame::makeEmptyGoAwayFrame(uint32_t last_stream_index, ErrorCod
   static constexpr size_t kEmptyGoAwayPayloadSize = 8;
   Http2Frame frame;
   frame.buildHeader(Type::GoAway, kEmptyGoAwayPayloadSize, 0, makeRequestStreamId(0));
-  uint32_t last_stream_id = makeRequestStreamId(last_stream_index);
+  const uint32_t last_stream_id = makeRequestStreamId(last_stream_index);
   ASSERT(frame.data_.capacity() >= HeaderSize + 4 + sizeof(uint32_t));
-  memcpy(&frame.data_[HeaderSize], reinterpret_cast<void*>(&last_stream_id), sizeof(uint32_t));
-  uint32_t error = static_cast<uint32_t>(error_code);
-  memcpy(&frame.data_[HeaderSize + 4], reinterpret_cast<void*>(&error), sizeof(uint32_t));
+  memcpy(&frame.data_[HeaderSize], reinterpret_cast<const void*>(&last_stream_id), sizeof(uint32_t));
+  const uint32_t error = static_cast<uint32_t>(error_code);
+  memcpy(&frame.data_[HeaderSize + 4], reinterpret_cast<const void*>(&error), sizeof(uint32_t));
   return frame;
 }
 
@@ -200,9 +202,9 @@ Http2Frame Http2Frame::makeWindowUpdateFrame(uint32_t stream_index, uint32_t inc
   Http2Frame frame;
   frame.buildHeader(Type::WindowUpdate, kWindowUpdatePayloadSize, 0,
                     makeRequestStreamId(stream_index));
-  uint32_t increment_net = htonl(increment);
+  const uint32_t increment_net = htonl(increment);
   ASSERT(frame.data_.capacity() >= HeaderSize + sizeof(uint32_t));
-  memcpy(&frame.data_[HeaderSize], reinterpret_cast<void*>(&increment_net), sizeof(uint32_t));
+  memcpy(&frame.data_[HeaderSize], reinterpret_cast<const void*>(&increment_net), sizeof(uint32_t));
   return frame;
 }
 
@@ -257,7 +259,7 @@ Http2Frame Http2Frame::makePostRequest(uint32_t stream_index, absl::string_view 
   return frame;
 }
 
-Http2Frame Http2Frame::makeMalformedFrame(absl::string_view contents) {
+Http2Frame Http2Frame::makeGenericFrame(absl::string_view contents) {
   Http2Frame frame;
   frame.appendData(contents);
   return frame;

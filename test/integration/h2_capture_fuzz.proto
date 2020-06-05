@@ -117,7 +117,7 @@ message H2FramePostRequest {
 
 // A generic frame to emit a malformed frame
 message H2FrameGeneric {
-  bytes frame_bytes = 1;
+  string frame_bytes = 1;
 }
 
 message H2TestFrame {
