@@ -454,6 +454,22 @@ void ConnectionImpl::completeLastHeader() {
   ASSERT(current_header_value_.empty());
 }
 
+uint32_t ConnectionImpl::getHeadersSize() {
+  return current_header_field_.size() + current_header_value_.size() +
+         headersOrTrailers().byteSize();
+}
+
+void ConnectionImpl::checkMaxHeadersSize() {
+  const uint32_t total = getHeadersSize();
+  if (total > (max_headers_kb_ * 1024)) {
+    const absl::string_view header_type =
+        processing_trailers_ ? Http1HeaderTypes::get().Trailers : Http1HeaderTypes::get().Headers;
+    error_code_ = Http::Code::RequestHeaderFieldsTooLarge;
+    sendProtocolError(Http1ResponseCodeDetails::get().HeadersTooLarge);
+    throw CodecProtocolException(absl::StrCat(header_type, " size exceeds limit"));
+  }
+}
+
 bool ConnectionImpl::maybeDirectDispatch(Buffer::Instance& data) {
   if (!handling_upgrade_) {
     // Only direct dispatch for Upgrade requests.
@@ -523,22 +539,21 @@ void ConnectionImpl::onHeaderField(const char* data, size_t length) {
     }
     processing_trailers_ = true;
     header_parsing_state_ = HeaderParsingState::Field;
+    allocTrailers();
   }
   if (header_parsing_state_ == HeaderParsingState::Value) {
     completeLastHeader();
   }
 
   current_header_field_.append(data, length);
+
+  checkMaxHeadersSize();
 }
 
 void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
   if (header_parsing_state_ == HeaderParsingState::Done && !enable_trailers_) {
     // Ignore trailers.
     return;
-  }
-
-  if (processing_trailers_) {
-    maybeAllocTrailers();
   }
 
   // Work around a bug in http_parser where trailing whitespace is not trimmed
@@ -557,15 +572,7 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
   header_parsing_state_ = HeaderParsingState::Value;
   current_header_value_.append(header_value.data(), header_value.length());
 
-  const uint32_t total =
-      current_header_field_.size() + current_header_value_.size() + headersOrTrailers().byteSize();
-  if (total > (max_headers_kb_ * 1024)) {
-    const absl::string_view header_type =
-        processing_trailers_ ? Http1HeaderTypes::get().Trailers : Http1HeaderTypes::get().Headers;
-    error_code_ = Http::Code::RequestHeaderFieldsTooLarge;
-    sendProtocolError(Http1ResponseCodeDetails::get().HeadersTooLarge);
-    throw CodecProtocolException(absl::StrCat(header_type, " size exceeds limit"));
-  }
+  checkMaxHeadersSize();
 }
 
 int ConnectionImpl::onHeadersCompleteBase() {
@@ -708,6 +715,14 @@ ServerConnectionImpl::ServerConnectionImpl(
           Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_flood_protection")),
       headers_with_underscores_action_(headers_with_underscores_action) {}
 
+uint32_t ServerConnectionImpl::getHeadersSize() {
+  // Add in the the size of the request URL if processing request headers.
+  const uint32_t url_size = (!processing_trailers_ && active_request_.has_value())
+                                ? active_request_.value().request_url_.size()
+                                : 0;
+  return url_size + ConnectionImpl::getHeadersSize();
+}
+
 void ServerConnectionImpl::onEncodeComplete() {
   if (active_request_.value().remote_complete_) {
     // Only do this if remote is complete. If we are replying before the request is complete the
@@ -842,6 +857,8 @@ void ServerConnectionImpl::onMessageBegin() {
 void ServerConnectionImpl::onUrl(const char* data, size_t length) {
   if (active_request_.has_value()) {
     active_request_.value().request_url_.append(data, length);
+
+    checkMaxHeadersSize();
   }
 }
 
