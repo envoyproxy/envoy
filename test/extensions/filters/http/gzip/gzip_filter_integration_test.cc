@@ -25,8 +25,8 @@ public:
     codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   }
 
-  void doRequestAndCompression(Http::TestHeaderMapImpl&& request_headers,
-                               Http::TestHeaderMapImpl&& response_headers) {
+  void doRequestAndCompression(Http::TestRequestHeaderMapImpl&& request_headers,
+                               Http::TestResponseHeaderMapImpl&& response_headers) {
     uint64_t content_length;
     ASSERT_TRUE(absl::SimpleAtoi(response_headers.get_("content-length"), &content_length));
     const Buffer::OwnedImpl expected_response{std::string(content_length, 'a')};
@@ -50,8 +50,8 @@ public:
     EXPECT_TRUE(TestUtility::buffersEqual(expected_response, decompressed_response));
   }
 
-  void doRequestAndNoCompression(Http::TestHeaderMapImpl&& request_headers,
-                                 Http::TestHeaderMapImpl&& response_headers) {
+  void doRequestAndNoCompression(Http::TestRequestHeaderMapImpl&& request_headers,
+                                 Http::TestResponseHeaderMapImpl&& response_headers) {
     uint64_t content_length;
     ASSERT_TRUE(absl::SimpleAtoi(response_headers.get_("content-length"), &content_length));
     auto response =
