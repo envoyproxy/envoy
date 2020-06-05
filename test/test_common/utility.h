@@ -19,6 +19,8 @@
 #include "common/common/c_smart_ptr.h"
 #include "common/common/empty_string.h"
 #include "common/common/thread.h"
+#include "common/config/decoded_resource_impl.h"
+#include "common/config/opaque_resource_decoder_impl.h"
 #include "common/config/version_converter.h"
 #include "common/http/header_map_impl.h"
 #include "common/protobuf/message_validator_impl.h"
@@ -297,6 +299,20 @@ public:
     ASSERT(ignored_field != nullptr, "Field name to ignore not found.");
     differencer.IgnoreField(ignored_field);
     return differencer.Compare(lhs, rhs);
+  }
+
+  /**
+   * Compare two decoded resources for equality.
+   *
+   * @param lhs decoded resource on LHS.
+   * @param rhs decoded resource on RHS.
+   * @return bool indicating whether the decoded resources are equal.
+   */
+  static bool decodedResourceEq(const Config::DecodedResource& lhs,
+                                const Config::DecodedResource& rhs) {
+    return lhs.name() == rhs.name() && lhs.aliases() == rhs.aliases() &&
+           lhs.version() == rhs.version() && lhs.hasResource() == rhs.hasResource() &&
+           (!lhs.hasResource() || protoEqual(lhs.resource(), rhs.resource()));
   }
 
   /**
@@ -599,6 +615,68 @@ public:
     message.SerializeToString(&pb_binary_str);
     return pb_binary_str;
   }
+
+  struct DecodedResources {
+    std::vector<Config::DecodedResourcePtr> owned_resources_;
+    std::vector<Config::DecodedResourceRef> refvec_;
+  };
+
+  template <class MessageType>
+  static DecodedResources decodeResources(std::initializer_list<MessageType> resources,
+                                          const std::string& name_field = "name") {
+    DecodedResources decoded_resources;
+    for (const auto& resource : resources) {
+      auto owned_resource = std::make_unique<MessageType>(resource);
+      decoded_resources.owned_resources_.emplace_back(new Config::DecodedResourceImpl(
+          std::move(owned_resource), MessageUtil::getStringField(resource, name_field), {}, ""));
+      decoded_resources.refvec_.emplace_back(*decoded_resources.owned_resources_.back());
+    }
+    return decoded_resources;
+  }
+
+  template <class MessageType>
+  static DecodedResources
+  decodeResources(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                  const std::string& version, const std::string& name_field = "name") {
+    DecodedResources decoded_resources;
+    TestOpaqueResourceDecoderImpl<MessageType> resource_decoder(name_field);
+    for (const auto& resource : resources) {
+      decoded_resources.owned_resources_.emplace_back(
+          new Config::DecodedResourceImpl(resource_decoder, resource, version));
+      decoded_resources.refvec_.emplace_back(*decoded_resources.owned_resources_.back());
+    }
+    return decoded_resources;
+  }
+
+  template <class MessageType>
+  static DecodedResources
+  decodeResources(const envoy::service::discovery::v3::DiscoveryResponse& resources,
+                  const std::string& name_field = "name") {
+    return decodeResources<MessageType>(resources.resources(), resources.version_info(),
+                                        name_field);
+  }
+
+  template <class MessageType>
+  static DecodedResources decodeResources(
+      const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& resources,
+      const std::string& name_field = "name") {
+    DecodedResources decoded_resources;
+    TestOpaqueResourceDecoderImpl<MessageType> resource_decoder(name_field);
+    for (const auto& resource : resources) {
+      decoded_resources.owned_resources_.emplace_back(
+          new Config::DecodedResourceImpl(resource_decoder, resource));
+      decoded_resources.refvec_.emplace_back(*decoded_resources.owned_resources_.back());
+    }
+    return decoded_resources;
+  }
+
+  template <typename Current>
+  class TestOpaqueResourceDecoderImpl : public Config::OpaqueResourceDecoderImpl<Current> {
+  public:
+    TestOpaqueResourceDecoderImpl(absl::string_view name_field)
+        : Config::OpaqueResourceDecoderImpl<Current>(ProtobufMessage::getStrictValidationVisitor(),
+                                                     name_field) {}
+  };
 };
 
 /**
@@ -950,6 +1028,35 @@ MATCHER_P(RepeatedProtoEq, expected, "") {
                      << TestUtility::addLeftAndRightPadding("is not equal to actual repeated:")
                      << "\n"
                      << RepeatedPtrUtil::debugString(arg) << "\n"
+                     << TestUtility::addLeftAndRightPadding("") // line full of padding
+                     << "\n";
+  }
+  return equal;
+}
+
+MATCHER_P(DecodedResourcesEq, expected, "") {
+  const bool equal = std::equal(arg.begin(), arg.end(), expected.begin(), expected.end(),
+                                TestUtility::decodedResourceEq);
+  if (!equal) {
+    const auto format_resources =
+        [](const std::vector<Config::DecodedResourceRef>& resources) -> std::string {
+      std::vector<std::string> resource_strs;
+      std::transform(
+          resources.begin(), resources.end(), std::back_inserter(resource_strs),
+          [](const Config::DecodedResourceRef& resource) -> std::string {
+            return fmt::format(
+                "<name: {}, aliases: {}, version: {}, resource: {}>", resource.get().name(),
+                absl::StrJoin(resource.get().aliases(), ","), resource.get().version(),
+                resource.get().hasResource() ? resource.get().resource().DebugString() : "(none)");
+          });
+      return absl::StrJoin(resource_strs, ", ");
+    };
+    *result_listener << "\n"
+                     << TestUtility::addLeftAndRightPadding("Expected resources:") << "\n"
+                     << format_resources(expected) << "\n"
+                     << TestUtility::addLeftAndRightPadding("are not equal to actual resources:")
+                     << "\n"
+                     << format_resources(arg) << "\n"
                      << TestUtility::addLeftAndRightPadding("") // line full of padding
                      << "\n";
   }

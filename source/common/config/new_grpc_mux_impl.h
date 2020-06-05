@@ -35,7 +35,8 @@ public:
                  const LocalInfo::LocalInfo& local_info);
 
   GrpcMuxWatchPtr addWatch(const std::string& type_url, const std::set<std::string>& resources,
-                           SubscriptionCallbacks& callbacks) override;
+                           SubscriptionCallbacks& callbacks,
+                           OpaqueResourceDecoder& resource_decoder) override;
 
   void pause(const std::string& type_url) override;
   void pause(const std::vector<std::string> type_urls) override;

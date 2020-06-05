@@ -4,6 +4,7 @@
 
 #include "common/common/macros.h"
 #include "common/common/utility.h"
+#include "common/config/decoded_resource_impl.h"
 #include "common/config/utility.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
@@ -13,9 +14,11 @@ namespace Config {
 
 FilesystemSubscriptionImpl::FilesystemSubscriptionImpl(
     Event::Dispatcher& dispatcher, absl::string_view path, SubscriptionCallbacks& callbacks,
-    SubscriptionStats stats, ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
+    OpaqueResourceDecoder& resource_decoder, SubscriptionStats stats,
+    ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
     : path_(path), watcher_(dispatcher.createFilesystemWatcher()), callbacks_(callbacks),
-      stats_(stats), api_(api), validation_visitor_(validation_visitor) {
+      resource_decoder_(resource_decoder), stats_(stats), api_(api),
+      validation_visitor_(validation_visitor) {
   watcher_->addWatch(path_, Filesystem::Watcher::Events::MovedTo, [this](uint32_t) {
     if (started_) {
       refresh();
@@ -51,7 +54,14 @@ void FilesystemSubscriptionImpl::refresh() {
   try {
     MessageUtil::loadFromFile(path_, message, validation_visitor_, api_);
     config_update_available = true;
-    callbacks_.onConfigUpdate(message.resources(), message.version_info());
+    std::vector<DecodedResourceImplPtr> decoded_resources;
+    std::vector<DecodedResourceRef> resource_refs;
+    for (const auto& resource : message.resources()) {
+      decoded_resources.emplace_back(
+          new DecodedResourceImpl(resource_decoder_, resource, message.version_info()));
+      resource_refs.emplace_back(*decoded_resources.back());
+    }
+    callbacks_.onConfigUpdate(resource_refs, message.version_info());
     stats_.update_time_.set(DateUtil::nowToMilliseconds(api_.timeSource()));
     stats_.version_.set(HashUtil::xxHash64(message.version_info()));
     stats_.version_text_.set(message.version_info());

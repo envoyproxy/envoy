@@ -61,6 +61,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "decoded_resource_lib",
+    hdrs = ["decoded_resource_impl.h"],
+    deps = [
+        "//include/envoy/config:subscription_interface",
+        "//source/common/protobuf:utility_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "delta_subscription_state_lib",
     srcs = ["delta_subscription_state.cc"],
     hdrs = ["delta_subscription_state.h"],
@@ -68,6 +77,7 @@ envoy_cc_library(
         ":api_version_lib",
         ":pausable_ack_queue_lib",
         ":utility_lib",
+        ":watch_map_lib",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/event:dispatcher_interface",
         "//source/common/common:assert_lib",
@@ -86,6 +96,7 @@ envoy_cc_library(
     srcs = ["filesystem_subscription_impl.cc"],
     hdrs = ["filesystem_subscription_impl.h"],
     deps = [
+        ":decoded_resource_lib",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/filesystem:filesystem_interface",
@@ -122,6 +133,7 @@ envoy_cc_library(
     hdrs = ["grpc_mux_impl.h"],
     deps = [
         ":api_version_lib",
+        ":decoded_resource_lib",
         ":grpc_stream_lib",
         ":utility_lib",
         "//include/envoy/config:grpc_mux_interface",
@@ -175,6 +187,7 @@ envoy_cc_library(
     ],
     deps = [
         ":api_version_lib",
+        ":decoded_resource_lib",
         ":version_converter_lib",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/event:dispatcher_interface",
@@ -206,6 +219,15 @@ envoy_cc_library(
         "//source/common/shared_pool:shared_pool_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/metadata/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "opaque_resource_decoder_lib",
+    hdrs = ["opaque_resource_decoder_impl.h"],
+    deps = [
+        "//include/envoy/config:subscription_interface",
+        "//source/common/protobuf:utility_lib",
     ],
 )
 
@@ -357,6 +379,7 @@ envoy_cc_library(
     srcs = ["watch_map.cc"],
     hdrs = ["watch_map.h"],
     deps = [
+        ":decoded_resource_lib",
         "//include/envoy/config:subscription_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
@@ -369,6 +392,7 @@ envoy_cc_library(
     name = "subscription_base_interface",
     hdrs = ["subscription_base.h"],
     deps = [
+        ":opaque_resource_decoder_lib",
         ":resource_name_lib",
         "//include/envoy/config:subscription_interface",
     ],
