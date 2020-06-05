@@ -490,6 +490,9 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
   } catch (const ProtoValidationException& e) {
     ENVOY_LOG_MISC(debug, "ProtoValidationException: {}", e.what());
     return;
+  } catch (const Envoy::ProtobufMessage::DeprecatedProtoFieldException& e) {
+    ENVOY_LOG_MISC(debug, "DeprecatedProtoFieldException: {}", e.what());
+    return;
   }
 
   FuzzConfig config;
