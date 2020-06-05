@@ -452,6 +452,9 @@ public:
    * @return A pointer to the first byte of data (skipping over size bytes).
    */
   const uint8_t* data() const {
+    if (size_and_data_ == nullptr) {
+      return nullptr;
+    }
     return size_and_data_ + SymbolTableImpl::Encoding::encodingSizeBytes(dataSize());
   }
 
