@@ -89,7 +89,7 @@ public:
    * @param type_url type URLs corresponding to xDS API e.g.
    * type.googleapis.com/envoy.api.v2.Cluster
    */
-  virtual void resume(const std::vector<std::string> type_urls) {
+  void resume(const std::vector<std::string> type_urls) {
     for (const auto& type_url : type_urls) {
       resume(type_url);
     }
