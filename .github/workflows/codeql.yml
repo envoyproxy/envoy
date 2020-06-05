@@ -1,0 +1,35 @@
+on:
+  push:
+  schedule:
+    - cron: '0 9 * * 4'
+
+jobs:
+  CodeQL-Build:
+    strategy:
+      fail-fast: false
+
+    # CodeQL runs on ubuntu-latest and windows-latest
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Install deps
+      shell: bash
+      run: |
+       sudo apt-get update && sudo apt-get install libtool cmake automake autoconf make ninja-build curl unzip virtualenv openjdk-11-jdk build-essential libc++1
+       mkdir -p bin/clang9
+       cd bin/clang9
+       wget https://releases.llvm.org/9.0.0/clang+llvm-9.0.0-x86_64-linux-gnu-ubuntu-18.04.tar.xz
+       tar -xf clang+llvm-9.0.0-x86_64-linux-gnu-ubuntu-18.04.tar.xz --strip-components 1
+       
+    - name: Build
+      run: |
+       export PATH=bin/clang9/bin:$PATH
+       alias bazel=/usr/local/bin/bazelisk
+       bazel/setup_clang.sh bin/clang9
+       bazel --version
+       clang --version
+       bazel shutdown
+       bazel build -c fastbuild --spawn_strategy=local --discard_analysis_cache --nouse_action_cache --config clang --config libc++ //source/exe:envoy-static --verbose_failures
