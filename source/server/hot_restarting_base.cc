@@ -48,9 +48,13 @@ void HotRestartingBase::bindDomainSocket(uint64_t id, const std::string& role) {
   Api::SysCallIntResult result =
       os_sys_calls.bind(my_domain_socket_, reinterpret_cast<sockaddr*>(&address), sizeof(address));
   if (result.rc_ != 0) {
-    throw EnvoyException(fmt::format(
+    const auto msg = fmt::format(
         "unable to bind domain socket with base_id={}, id={}, errno={} (see --base-id option)",
-        base_id_, id, result.errno_));
+        base_id_, id, result.errno_);
+    if (result.errno_ == EADDRINUSE) {
+      throw HotRestartDomainSocketInUseException(msg);
+    }
+    throw EnvoyException(msg);
   }
 }
 
