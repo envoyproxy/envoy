@@ -282,7 +282,9 @@ TEST_P(AggregateIntegrationTest, PreviousPrioritiesRetryPredicate) {
 
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
   ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   fake_upstream_connection_.reset();
+
   waitForNextUpstreamRequest(SecondUpstreamIndex);
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
