@@ -222,6 +222,7 @@ TEST_F(ThreadAsyncPtrTest, TruncateNoWait) {
   // To make this test work on multiple platforms, just assume the first 10 characters
   // are retained.
   EXPECT_THAT(thread->name(), testing::StartsWith("this name "));
+  thread->join();
 }
 
 TEST_F(ThreadAsyncPtrTest, NameNotSpecifiedWait) {

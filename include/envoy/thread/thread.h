@@ -40,12 +40,12 @@ public:
   virtual ~Thread() = default;
 
   /**
-   * Returns the name of the thread.
+   * @return the name of the thread.
    */
   virtual std::string name() const PURE;
 
   /**
-   * Join on thread exit.
+   * Blocks until the thread exits.
    */
   virtual void join() PURE;
 };
@@ -54,7 +54,7 @@ using ThreadPtr = std::unique_ptr<Thread>;
 
 // Options specified during thread creation.
 struct Options {
-  std::string name_;
+  std::string name_; // A name supplied for the thread. On Linux this is limited to 15 chars.
 };
 
 using OptionsOptConstRef = const absl::optional<Options>&;
@@ -67,9 +67,10 @@ public:
   virtual ~ThreadFactory() = default;
 
   /**
-   * Create a thread.
+   * Creates a thread, immediately starting the thread_routine.
+   *
    * @param thread_routine supplies the function to invoke in the thread.
-   * @param name supplies a name for the thread. May be truncated per platform limits.
+   * @param options supplies options specified on thread creation.
    */
   virtual ThreadPtr createThread(std::function<void()> thread_routine,
                                  OptionsOptConstRef options = absl::nullopt) PURE;
