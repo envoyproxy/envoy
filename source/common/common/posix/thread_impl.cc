@@ -52,6 +52,7 @@ public:
         this);
     RELEASE_ASSERT(rc == 0, "");
 
+#ifdef __linux__
     // If the name was not specified, get it from the OS. If the name was
     // specified, write it into the thread, and assert that the OS sees it the
     // same way.
@@ -72,6 +73,7 @@ public:
 #endif
       }
     }
+#endif
   }
 
   std::string name() const override { return name_; }
@@ -80,6 +82,7 @@ public:
   void join() override;
 
 private:
+#ifdef __linux__
   bool getNameFromOS(std::string& name) {
     // Verify that the name got written into the thread as expected.
     char buf[PTHREAD_MAX_LEN_INCLUDING_NULL_BYTE];
@@ -91,6 +94,7 @@ private:
     name = buf;
     return true;
   }
+#endif
 
   std::function<void()> thread_routine_;
   pthread_t thread_handle_;

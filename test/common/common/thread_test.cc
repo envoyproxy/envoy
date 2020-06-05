@@ -229,10 +229,11 @@ TEST_F(ThreadAsyncPtrTest, NameNotSpecifiedWait) {
   auto thread = thread_factory_.createThread([&notify]() { notify.WaitForNotification(); });
   notify.Notify();
 
-  // For posix builds, the thread name defaults to the name of the binary.
-  // Not sure about Windows. Note that for coverage, the tests are all linked
-  // together, and for Windows tests I'm not sure what the behavior is.
+  // For linux builds, the thread name defaults to the name of the binary.
+  // Currently, this population does not occur for Mac or Windows.
+#ifdef __linux__
   EXPECT_FALSE(thread->name().empty());
+#endif
   thread->join();
 }
 
