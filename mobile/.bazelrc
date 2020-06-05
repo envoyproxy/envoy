@@ -46,3 +46,6 @@ build:release-ios --compilation_mode=opt
 build:release-android --config=android
 build:release-android --config=release-common
 build:release-android --compilation_mode=opt
+
+# Instrument Envoy Mobile's c++ code for coverage
+build:coverage --instrumentation_filter="//library/common[/:]"
