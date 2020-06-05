@@ -25,14 +25,17 @@
 namespace quic {
 namespace test {
 namespace crypto_test_utils {
+// NOLINTNEXTLINE(readability-identifier-naming)
 std::unique_ptr<ProofSource> ProofSourceForTesting() {
   return std::make_unique<Envoy::Quic::TestProofSource>();
 }
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 std::unique_ptr<ProofVerifier> ProofVerifierForTesting() {
   return std::make_unique<Envoy::Quic::EnvoyQuicFakeProofVerifier>();
 }
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 std::unique_ptr<ProofVerifyContext> ProofVerifyContextForTesting() {
   // No context needed for fake verifier.
   return nullptr;

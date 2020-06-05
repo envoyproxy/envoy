@@ -204,7 +204,7 @@ protected:
     ASSERT_EQ(slice[0].len_, send_rc.rc_);
   }
 
-  void ReadFromClientSockets() {
+  void readFromClientSockets() {
     for (auto& client_socket : client_sockets_) {
       Buffer::InstancePtr result_buffer(new Buffer::OwnedImpl());
       const uint64_t bytes_to_read = 11;
@@ -310,7 +310,7 @@ TEST_P(ActiveQuicListenerTest, ReceiveCHLO) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_FALSE(buffered_packets->HasChlosBuffered());
   EXPECT_FALSE(quic_dispatcher_->session_map().empty());
-  ReadFromClientSockets();
+  readFromClientSockets();
 }
 
 TEST_P(ActiveQuicListenerTest, ProcessBufferedChlos) {
@@ -344,7 +344,7 @@ TEST_P(ActiveQuicListenerTest, ProcessBufferedChlos) {
   }
   EXPECT_FALSE(buffered_packets->HasChlosBuffered());
 
-  ReadFromClientSockets();
+  readFromClientSockets();
 }
 
 TEST_P(ActiveQuicListenerTest, QuicProcessingDisabledAndEnabled) {
@@ -386,7 +386,7 @@ TEST_P(ActiveQuicListenerEmptyFlagConfigTest, ReceiveFullQuicCHLO) {
   EXPECT_FALSE(buffered_packets->HasChlosBuffered());
   EXPECT_FALSE(quic_dispatcher_->session_map().empty());
   EXPECT_TRUE(ActiveQuicListenerPeer::enabled(*quic_listener_));
-  ReadFromClientSockets();
+  readFromClientSockets();
 }
 
 } // namespace Quic

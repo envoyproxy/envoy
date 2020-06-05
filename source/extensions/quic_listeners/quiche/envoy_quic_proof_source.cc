@@ -93,8 +93,7 @@ EnvoyQuicProofSource::getTlsCertConfig(const quic::QuicSocketAddress& server_add
   // Only return the first TLS cert config.
   // TODO(danzh) Choose based on supported cipher suites in TLS1.3 CHLO and prefer EC
   // certs if supported.
-  return absl::optional<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>>(
-      tls_cert_configs[0].get());
+  return {tls_cert_configs[0].get()};
 }
 
 } // namespace Quic
