@@ -69,7 +69,7 @@ TEST_P(AutoSniIntegrationTest, BasicAutoSniTest) {
   setup();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   const auto response_ = sendRequestAndWaitForResponse(
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "localhost"}},
       0, default_response_headers_, 0);
 
@@ -87,7 +87,7 @@ TEST_P(AutoSniIntegrationTest, PassingNotDNS) {
   setup();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   const auto response_ = sendRequestAndWaitForResponse(
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "127.0.0.1"}},
       0, default_response_headers_, 0);
 

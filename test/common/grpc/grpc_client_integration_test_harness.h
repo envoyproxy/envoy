@@ -112,7 +112,7 @@ public:
   void expectInitialMetadata(const TestMetadata& metadata) {
     EXPECT_CALL(*this, onReceiveInitialMetadata_(_))
         .WillOnce(Invoke([this, &metadata](const Http::HeaderMap& received_headers) {
-          Http::TestHeaderMapImpl stream_headers(received_headers);
+          Http::TestResponseHeaderMapImpl stream_headers(received_headers);
           for (const auto& value : metadata) {
             EXPECT_EQ(value.second, stream_headers.get_(value.first));
           }
@@ -124,7 +124,7 @@ public:
   void expectTrailingMetadata(const TestMetadata& metadata) {
     EXPECT_CALL(*this, onReceiveTrailingMetadata_(_))
         .WillOnce(Invoke([this, &metadata](const Http::HeaderMap& received_headers) {
-          Http::TestHeaderMapImpl stream_headers(received_headers);
+          Http::TestResponseTrailerMapImpl stream_headers(received_headers);
           for (auto& value : metadata) {
             EXPECT_EQ(value.second, stream_headers.get_(value.first));
           }
@@ -139,7 +139,7 @@ public:
       reply_headers->addReference(value.first, value.second);
     }
     expectInitialMetadata(metadata);
-    fake_stream_->encodeHeaders(Http::TestHeaderMapImpl(*reply_headers), false);
+    fake_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl(*reply_headers), false);
   }
 
   void sendReply() {
@@ -164,7 +164,8 @@ public:
 
   void sendServerTrailers(Status::GrpcStatus grpc_status, const std::string& grpc_message,
                           const TestMetadata& metadata, bool trailers_only = false) {
-    Http::TestHeaderMapImpl reply_trailers{{"grpc-status", std::to_string(enumToInt(grpc_status))}};
+    Http::TestResponseTrailerMapImpl reply_trailers{
+        {"grpc-status", std::to_string(enumToInt(grpc_status))}};
     if (!grpc_message.empty()) {
       reply_trailers.addCopy("grpc-message", grpc_message);
     }
@@ -330,7 +331,7 @@ public:
   void expectInitialHeaders(FakeStream& fake_stream, const TestMetadata& initial_metadata) {
     AssertionResult result = fake_stream.waitForHeadersComplete();
     RELEASE_ASSERT(result, result.message());
-    stream_headers_ = std::make_unique<Http::TestHeaderMapImpl>(fake_stream.headers());
+    stream_headers_ = std::make_unique<Http::TestRequestHeaderMapImpl>(fake_stream.headers());
     EXPECT_EQ("POST", stream_headers_->get_(":method"));
     EXPECT_EQ("/helloworld.Greeter/SayHello", stream_headers_->get_(":path"));
     EXPECT_EQ("application/grpc", stream_headers_->get_("content-type"));
@@ -434,7 +435,7 @@ public:
   Stats::ScopeSharedPtr stats_scope_{stats_store_};
   Grpc::StatNames google_grpc_stat_names_{stats_store_->symbolTable()};
   TestMetadata service_wide_initial_metadata_;
-  std::unique_ptr<Http::TestHeaderMapImpl> stream_headers_;
+  std::unique_ptr<Http::TestRequestHeaderMapImpl> stream_headers_;
   std::vector<std::pair<std::string, std::string>> channel_args_;
 #ifdef ENVOY_GOOGLE_GRPC
   std::unique_ptr<GoogleAsyncClientThreadLocal> google_tls_;
