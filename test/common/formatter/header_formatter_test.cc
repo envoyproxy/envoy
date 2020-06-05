@@ -27,12 +27,12 @@ namespace Envoy {
 namespace Formatter {
 namespace {
 
+using Envoy::Router::StringAccessor;
+using Envoy::Router::StringAccessorImpl;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
-using Envoy::Router::StringAccessor;
-using Envoy::Router::StringAccessorImpl;
 
 class StreamInfoHeaderFormatterTest : public testing::Test {
 public:
