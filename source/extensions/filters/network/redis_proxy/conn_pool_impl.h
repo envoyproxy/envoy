@@ -52,7 +52,7 @@ public:
   void onFailure() override{};
 };
 
-class InstanceImpl : public Instance {
+class InstanceImpl : public Instance, public std::enable_shared_from_this<InstanceImpl> {
 public:
   InstanceImpl(
       const std::string& cluster_name, Upstream::ClusterManager& cm,
@@ -82,6 +82,8 @@ public:
   bool onRedirection() override { return refresh_manager_->onRedirection(cluster_name_); }
   bool onFailure() { return refresh_manager_->onFailure(cluster_name_); }
   bool onHostDegraded() { return refresh_manager_->onHostDegraded(cluster_name_); }
+
+  void init();
 
   // Allow the unit test to have access to private members.
   friend class RedisConnPoolImplTest;
@@ -127,7 +129,8 @@ private:
 
   struct ThreadLocalPool : public ThreadLocal::ThreadLocalObject,
                            public Upstream::ClusterUpdateCallbacks {
-    ThreadLocalPool(InstanceImpl& parent, Event::Dispatcher& dispatcher, std::string cluster_name);
+    ThreadLocalPool(std::weak_ptr<InstanceImpl> parent, Event::Dispatcher& dispatcher,
+                    std::string cluster_name);
     ~ThreadLocalPool() override;
     ThreadLocalActiveClientPtr& threadLocalActiveClient(Upstream::HostConstSharedPtr host);
     Common::Redis::Client::PoolRequest* makeRequest(const std::string& key, RespVariant&& request,
@@ -149,7 +152,7 @@ private:
 
     void onRequestCompleted();
 
-    InstanceImpl& parent_;
+    std::weak_ptr<InstanceImpl> parent_;
     Event::Dispatcher& dispatcher_;
     const std::string cluster_name_;
     Upstream::ClusterUpdateCallbacksHandlePtr cluster_update_handle_;

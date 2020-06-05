@@ -149,6 +149,9 @@ RedisCluster::DnsDiscoveryResolveTarget::~DnsDiscoveryResolveTarget() {
   if (active_query_) {
     active_query_->cancel();
   }
+  if (resolve_timer_) {
+    resolve_timer_->disableTimer();
+  }
 }
 
 void RedisCluster::DnsDiscoveryResolveTarget::startResolveDns() {
@@ -225,6 +228,9 @@ RedisCluster::RedisDiscoverySession::~RedisDiscoverySession() {
   if (current_request_) {
     current_request_->cancel();
     current_request_ = nullptr;
+  }
+  if (resolve_timer_) {
+    resolve_timer_->disableTimer();
   }
 
   while (!client_map_.empty()) {

@@ -78,11 +78,12 @@ public:
         std::make_shared<NiceMock<Extensions::Common::Redis::MockClusterRefreshManager>>();
     auto redis_command_stats =
         Common::Redis::RedisCommandStats::createRedisCommandStats(store->symbolTable());
-    std::unique_ptr<InstanceImpl> conn_pool_impl = std::make_unique<InstanceImpl>(
+    std::shared_ptr<InstanceImpl> conn_pool_impl = std::make_shared<InstanceImpl>(
         cluster_name_, cm_, *this, tls_,
         Common::Redis::Client::createConnPoolSettings(20, hashtagging, true, max_unknown_conns,
                                                       read_policy_),
         api_, std::move(store), redis_command_stats, cluster_refresh_manager_);
+    conn_pool_impl->init();
     // Set the authentication password for this connection pool.
     conn_pool_impl->tls_->getTyped<InstanceImpl::ThreadLocalPool>().auth_password_ = auth_password_;
     conn_pool_ = std::move(conn_pool_impl);

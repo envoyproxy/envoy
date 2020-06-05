@@ -47,10 +47,18 @@ InstanceImpl::InstanceImpl(
       tls_(tls.allocateSlot()), config_(config), api_(api), stats_scope_(std::move(stats_scope)),
       redis_command_stats_(redis_command_stats), redis_cluster_stats_{REDIS_CLUSTER_STATS(
                                                      POOL_COUNTER(*stats_scope_))},
-      refresh_manager_(std::move(refresh_manager)) {
-  tls_->set([this, cluster_name](
+      refresh_manager_(std::move(refresh_manager)) {}
+
+void InstanceImpl::init() {
+  // Note: `this` and `cluster_name` have a a lifetime of the filter.
+  // That may be shorter of the tls callback if the listener is torn shortly after it is created.
+  // We use a weak pointer to make sure this object outlives the tls callbacks.
+  auto this_shared_ptr = this->shared_from_this();
+  std::weak_ptr<InstanceImpl> this_weak_ptr = this_shared_ptr;
+  auto cluster_name = this_shared_ptr->cluster_name_;
+  tls_->set([this_weak_ptr, cluster_name](
                 Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    return std::make_shared<ThreadLocalPool>(*this, dispatcher, cluster_name);
+    return std::make_shared<ThreadLocalPool>(this_weak_ptr, dispatcher, cluster_name);
   });
 }
 
@@ -66,22 +74,29 @@ InstanceImpl::makeRequestToHost(const std::string& host_address,
   return tls_->getTyped<ThreadLocalPool>().makeRequestToHost(host_address, request, callbacks);
 }
 
-InstanceImpl::ThreadLocalPool::ThreadLocalPool(InstanceImpl& parent, Event::Dispatcher& dispatcher,
+InstanceImpl::ThreadLocalPool::ThreadLocalPool(std::weak_ptr<InstanceImpl> parent,
+                                               Event::Dispatcher& dispatcher,
                                                std::string cluster_name)
     : parent_(parent), dispatcher_(dispatcher), cluster_name_(std::move(cluster_name)),
       drain_timer_(dispatcher.createTimer([this]() -> void { drainClients(); })),
       is_redis_cluster_(false) {
-  cluster_update_handle_ = parent_.cm_.addThreadLocalClusterUpdateCallbacks(*this);
-  Upstream::ThreadLocalCluster* cluster = parent_.cm_.get(cluster_name_);
-  if (cluster != nullptr) {
-    auth_password_ = ProtocolOptionsConfigImpl::authPassword(cluster->info(), parent_.api_);
-    onClusterAddOrUpdateNonVirtual(*cluster);
+  if (auto shared_parent = parent_.lock()) {
+    cluster_update_handle_ = shared_parent->cm_.addThreadLocalClusterUpdateCallbacks(*this);
+    Upstream::ThreadLocalCluster* cluster = shared_parent->cm_.get(cluster_name_);
+    if (cluster != nullptr) {
+      auth_password_ =
+          ProtocolOptionsConfigImpl::authPassword(cluster->info(), shared_parent->api_);
+      onClusterAddOrUpdateNonVirtual(*cluster);
+    }
   }
 }
 
 InstanceImpl::ThreadLocalPool::~ThreadLocalPool() {
   if (host_set_member_update_cb_handle_ != nullptr) {
     host_set_member_update_cb_handle_->remove();
+  }
+  if (drain_timer_) {
+    drain_timer_->disableTimer();
   }
   while (!pending_requests_.empty()) {
     pending_requests_.pop_front();
@@ -97,6 +112,11 @@ InstanceImpl::ThreadLocalPool::~ThreadLocalPool() {
 void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
     Upstream::ThreadLocalCluster& cluster) {
   if (cluster.info()->name() != cluster_name_) {
+    return;
+  }
+  // ensure the filter is still exists
+  auto shared_parent = parent_.lock();
+  if (!shared_parent) {
     return;
   }
 
@@ -212,12 +232,14 @@ InstanceImpl::ThreadLocalActiveClientPtr&
 InstanceImpl::ThreadLocalPool::threadLocalActiveClient(Upstream::HostConstSharedPtr host) {
   ThreadLocalActiveClientPtr& client = client_map_[host];
   if (!client) {
-    client = std::make_unique<ThreadLocalActiveClient>(*this);
-    client->host_ = host;
-    client->redis_client_ = parent_.client_factory_.create(host, dispatcher_, parent_.config_,
-                                                           parent_.redis_command_stats_,
-                                                           *parent_.stats_scope_, auth_password_);
-    client->redis_client_->addConnectionCallbacks(*client);
+    if (auto shared_parent = parent_.lock()) {
+      client = std::make_unique<ThreadLocalActiveClient>(*this);
+      client->host_ = host;
+      client->redis_client_ = shared_parent->client_factory_.create(
+          host, dispatcher_, shared_parent->config_, shared_parent->redis_command_stats_,
+          *(shared_parent->stats_scope_), auth_password_);
+      client->redis_client_->addConnectionCallbacks(*client);
+    }
   }
   return client;
 }
@@ -230,10 +252,15 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key, RespVariant&&
     ASSERT(host_set_member_update_cb_handle_ == nullptr);
     return nullptr;
   }
+  // ensure the filter is not removed
+  auto shared_parent = parent_.lock();
+  if (!shared_parent) {
+    return nullptr;
+  }
 
-  Clusters::Redis::RedisLoadBalancerContextImpl lb_context(key, parent_.config_.enableHashtagging(),
-                                                           is_redis_cluster_, getRequest(request),
-                                                           parent_.config_.readPolicy());
+  Clusters::Redis::RedisLoadBalancerContextImpl lb_context(
+      key, shared_parent->config_.enableHashtagging(), is_redis_cluster_, getRequest(request),
+      shared_parent->config_.readPolicy());
   Upstream::HostConstSharedPtr host = cluster_->loadBalancer().chooseHost(&lb_context);
   if (!host) {
     return nullptr;
@@ -265,6 +292,12 @@ Common::Redis::Client::PoolRequest* InstanceImpl::ThreadLocalPool::makeRequestTo
     return nullptr;
   }
 
+  // ensure filter is not removed
+  auto shared_parent = parent_.lock();
+  if (!shared_parent) {
+    return nullptr;
+  }
+
   const std::string ip_address = host_address.substr(0, colon_pos);
   const bool ipv6 = (ip_address.find(':') != std::string::npos);
   std::string host_address_map_key;
@@ -289,9 +322,10 @@ Common::Redis::Client::PoolRequest* InstanceImpl::ThreadLocalPool::makeRequestTo
   auto it = host_address_map_.find(host_address_map_key);
   if (it == host_address_map_.end()) {
     // This host is not known to the cluster manager. Create a new host and insert it into the map.
-    if (created_via_redirect_hosts_.size() == parent_.config_.maxUpstreamUnknownConnections()) {
+    if (created_via_redirect_hosts_.size() ==
+        shared_parent->config_.maxUpstreamUnknownConnections()) {
       // Too many upstream connections to unknown hosts have been created.
-      parent_.redis_cluster_stats_.max_upstream_unknown_connections_reached_.inc();
+      shared_parent->redis_cluster_stats_.max_upstream_unknown_connections_reached_.inc();
       return nullptr;
     }
     if (!ipv6) {
@@ -343,7 +377,9 @@ void InstanceImpl::ThreadLocalActiveClient::onEvent(Network::ConnectionEvent eve
            it++) {
         if ((*it).get() == this) {
           if (!redis_client_->active()) {
-            parent_.parent_.redis_cluster_stats_.upstream_cx_drained_.inc();
+            if (auto shared_conn_pool = parent_.parent_.lock()) {
+              shared_conn_pool->redis_cluster_stats_.upstream_cx_drained_.inc();
+            }
           }
           parent_.dispatcher_.deferredDelete(std::move(redis_client_));
           parent_.clients_to_drain_.erase(it);
@@ -379,7 +415,9 @@ void InstanceImpl::PendingRequest::onResponse(Common::Redis::RespValuePtr&& resp
 void InstanceImpl::PendingRequest::onFailure() {
   request_handler_ = nullptr;
   pool_callbacks_.onFailure();
-  parent_.parent_.onFailure();
+  if (auto shared_conn_pool = parent_.parent_.lock()) {
+    shared_conn_pool->onFailure();
+  }
   parent_.onRequestCompleted();
 }
 
@@ -402,7 +440,9 @@ bool InstanceImpl::PendingRequest::onRedirection(Common::Redis::RespValuePtr&& v
     onResponse(std::move(value));
     return false;
   } else {
-    parent_.parent_.onRedirection();
+    if (auto shared_conn_pool = parent_.parent_.lock()) {
+      shared_conn_pool->onRedirection();
+    }
     return true;
   }
 }
