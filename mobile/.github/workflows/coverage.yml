@@ -14,16 +14,15 @@ jobs:
     name: coverage
     runs-on: ubuntu-18.04
     timeout-minutes: 60
-    # TODO: Re-enable coverage https://github.com/lyft/envoy-mobile/issues/863
-    # steps:
-    #   - uses: actions/checkout@v1
-    #     with:
-    #       submodules: true
-    #   - name: 'Install dependencies'
-    #     run: ./ci/linux_ci_setup.sh
-    #   - name: 'Run coverage'
-    #     run: |
-    #       export PATH=/usr/lib/llvm-8/bin:$PATH
-    #       export CC=clang
-    #       export CXX=clang++
-    #       ./test/coverage/run_coverage.sh
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          submodules: true
+      - name: 'Install dependencies'
+        run: ./ci/linux_ci_setup.sh
+      - name: 'Run coverage'
+        run: |
+          export PATH=/usr/lib/llvm-8/bin:$PATH
+          export CC=clang
+          export CXX=clang++
+          ./envoy/test/run_envoy_bazel_coverage.sh //test/...
