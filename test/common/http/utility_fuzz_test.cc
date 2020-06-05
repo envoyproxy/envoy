@@ -10,6 +10,12 @@ namespace Fuzz {
 namespace {
 
 DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
+  try {
+    TestUtility::validate(input);
+  } catch (ProtoValidationException& e) {
+    ENVOY_LOG_MISC(debug, "ProtoValidationException: {}", e.what());
+    return;
+  }
   switch (input.utility_selector_case()) {
   case test::common::http::UtilityTestCase::kParseQueryString: {
     Http::Utility::parseQueryString(input.parse_query_string());
@@ -69,6 +75,11 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
   case test::common::http::UtilityTestCase::kParseAuthorityString: {
     const auto& authority_string = input.parse_authority_string();
     Http::Utility::parseAuthority(authority_string);
+    break;
+  }
+  case test::common::http::UtilityTestCase::kValidateSettingsParameters: {
+    const auto& settings_parameters = input.validate_settings_paramters();
+    Http::Utility::validateCustomSettingsParameters(settings_parameters);
     break;
   }
 

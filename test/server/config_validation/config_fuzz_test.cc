@@ -1,6 +1,6 @@
 #include <fstream>
 
-#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.validate.h"
 
 #include "common/common/thread.h"
 #include "common/network/address_impl.h"
@@ -12,6 +12,7 @@
 #include "test/integration/server.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Server {
@@ -20,6 +21,13 @@ namespace {
 // Derived from //test/server:server_fuzz_test.cc, but starts the server in configuration validation
 // mode (quits upon validation of the given config)
 DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v3::Bootstrap& input) {
+  try {
+    TestUtility::validate(input);
+  } catch (const ProtoValidationException& e) {
+    ENVOY_LOG_MISC(debug, "ProtoValidationException: {}", e.what());
+    return;
+  }
+
   testing::NiceMock<MockOptions> options;
   TestComponentFactory component_factory;
   Fuzz::PerTestEnvironment test_env;
