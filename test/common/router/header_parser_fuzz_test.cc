@@ -14,7 +14,7 @@ DEFINE_PROTO_FUZZER(const test::common::router::TestCase& input) {
     TestUtility::validate(input);
     Router::HeaderParserPtr parser =
         Router::HeaderParser::configure(input.headers_to_add(), input.headers_to_remove());
-    Http::HeaderMapImpl header_map;
+    Http::TestRequestHeaderMapImpl header_map;
     TestStreamInfo test_stream_info = fromStreamInfo(input.stream_info());
     parser->evaluateHeaders(header_map, test_stream_info);
     ENVOY_LOG_MISC(trace, "Success");

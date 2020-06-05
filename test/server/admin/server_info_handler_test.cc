@@ -18,7 +18,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(AdminInstanceTest, ContextThatReturnsNullCertDetails) {
-  Http::ResponseHeaderMapImpl header_map;
+  Http::TestResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl response;
 
   // Setup a context that returns null cert details.
@@ -47,7 +47,7 @@ TEST_P(AdminInstanceTest, ContextThatReturnsNullCertDetails) {
 }
 
 TEST_P(AdminInstanceTest, Memory) {
-  Http::ResponseHeaderMapImpl header_map;
+  Http::TestResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl response;
   EXPECT_EQ(Http::Code::OK, getCallback("/memory", header_map, response));
   const std::string output_json = response.toString();
@@ -65,7 +65,7 @@ TEST_P(AdminInstanceTest, GetReadyRequest) {
   ON_CALL(server_, initManager()).WillByDefault(ReturnRef(initManager));
 
   {
-    Http::ResponseHeaderMapImpl response_headers;
+    Http::TestResponseHeaderMapImpl response_headers;
     std::string body;
 
     ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Initialized));
@@ -75,7 +75,7 @@ TEST_P(AdminInstanceTest, GetReadyRequest) {
   }
 
   {
-    Http::ResponseHeaderMapImpl response_headers;
+    Http::TestResponseHeaderMapImpl response_headers;
     std::string body;
 
     ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Uninitialized));
@@ -85,7 +85,7 @@ TEST_P(AdminInstanceTest, GetReadyRequest) {
     EXPECT_THAT(std::string(response_headers.getContentTypeValue()), HasSubstr("text/plain"));
   }
 
-  Http::ResponseHeaderMapImpl response_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
   std::string body;
 
   ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Initializing));
@@ -108,7 +108,7 @@ TEST_P(AdminInstanceTest, GetRequest) {
   ON_CALL(server_.hot_restart_, version()).WillByDefault(Return("foo_version"));
 
   {
-    Http::ResponseHeaderMapImpl response_headers;
+    Http::TestResponseHeaderMapImpl response_headers;
     std::string body;
 
     ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Initialized));
@@ -126,7 +126,7 @@ TEST_P(AdminInstanceTest, GetRequest) {
   }
 
   {
-    Http::ResponseHeaderMapImpl response_headers;
+    Http::TestResponseHeaderMapImpl response_headers;
     std::string body;
 
     ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Uninitialized));
@@ -142,7 +142,7 @@ TEST_P(AdminInstanceTest, GetRequest) {
     EXPECT_EQ(server_info_proto.command_line_options().service_cluster(), "cluster");
   }
 
-  Http::ResponseHeaderMapImpl response_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
   std::string body;
 
   ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Initializing));
@@ -159,7 +159,7 @@ TEST_P(AdminInstanceTest, GetRequest) {
 }
 
 TEST_P(AdminInstanceTest, PostRequest) {
-  Http::ResponseHeaderMapImpl response_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
   std::string body;
   EXPECT_NO_LOGS(EXPECT_EQ(Http::Code::OK,
                            admin_.request("/healthcheck/fail", "POST", response_headers, body)));

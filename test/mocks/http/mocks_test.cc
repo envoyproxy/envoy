@@ -9,7 +9,7 @@ using ::testing::Not;
 
 namespace Http {
 TEST(HeaderValueOfTest, ConstHeaderMap) {
-  const TestHeaderMapImpl header_map{{"key", "expected value"}};
+  const TestRequestHeaderMapImpl header_map{{"key", "expected value"}};
 
   // Positive checks.
   EXPECT_THAT(header_map, HeaderValueOf("key", "expected value"));
@@ -21,7 +21,7 @@ TEST(HeaderValueOfTest, ConstHeaderMap) {
 }
 
 TEST(HeaderValueOfTest, MutableHeaderMap) {
-  TestHeaderMapImpl header_map;
+  TestRequestHeaderMapImpl header_map;
 
   // Negative checks.
   EXPECT_THAT(header_map, Not(HeaderValueOf("key", "other value")));
@@ -35,7 +35,7 @@ TEST(HeaderValueOfTest, MutableHeaderMap) {
 }
 
 TEST(HeaderValueOfTest, LowerCaseString) {
-  TestHeaderMapImpl header_map;
+  TestRequestHeaderMapImpl header_map;
   LowerCaseString key("key");
   LowerCaseString other_key("other_key");
 
@@ -63,51 +63,51 @@ TEST(HttpStatusIsTest, CheckStatus) {
 }
 
 TEST(IsSubsetOfHeadersTest, ConstHeaderMap) {
-  const TestHeaderMapImpl header_map{{"first key", "1"}};
+  const TestRequestHeaderMapImpl header_map{{"first key", "1"}};
 
-  EXPECT_THAT(header_map, IsSubsetOfHeaders(TestHeaderMapImpl{{"first key", "1"}}));
+  EXPECT_THAT(header_map, IsSubsetOfHeaders(TestRequestHeaderMapImpl{{"first key", "1"}}));
   EXPECT_THAT(header_map,
-              IsSubsetOfHeaders(TestHeaderMapImpl{{"first key", "1"}, {"second key", "2"}}));
+              IsSubsetOfHeaders(TestRequestHeaderMapImpl{{"first key", "1"}, {"second key", "2"}}));
 
-  EXPECT_THAT(header_map, Not(IsSubsetOfHeaders(TestHeaderMapImpl{{"third key", "1"}})));
+  EXPECT_THAT(header_map, Not(IsSubsetOfHeaders(TestRequestHeaderMapImpl{{"third key", "1"}})));
 }
 
 TEST(IsSubsetOfHeadersTest, MutableHeaderMap) {
-  TestHeaderMapImpl header_map;
+  TestRequestHeaderMapImpl header_map;
   header_map.addCopy("first key", "1");
 
-  EXPECT_THAT(header_map, IsSubsetOfHeaders(TestHeaderMapImpl{{"first key", "1"}}));
+  EXPECT_THAT(header_map, IsSubsetOfHeaders(TestRequestHeaderMapImpl{{"first key", "1"}}));
   EXPECT_THAT(header_map,
-              IsSubsetOfHeaders(TestHeaderMapImpl{{"first key", "1"}, {"second key", "2"}}));
+              IsSubsetOfHeaders(TestRequestHeaderMapImpl{{"first key", "1"}, {"second key", "2"}}));
 
-  EXPECT_THAT(header_map, Not(IsSubsetOfHeaders(TestHeaderMapImpl{{"third key", "1"}})));
+  EXPECT_THAT(header_map, Not(IsSubsetOfHeaders(TestRequestHeaderMapImpl{{"third key", "1"}})));
 }
 
 TEST(IsSupersetOfHeadersTest, ConstHeaderMap) {
-  const TestHeaderMapImpl header_map{{"first key", "1"}, {"second key", "2"}};
+  const TestRequestHeaderMapImpl header_map{{"first key", "1"}, {"second key", "2"}};
 
-  EXPECT_THAT(header_map,
-              IsSupersetOfHeaders(TestHeaderMapImpl{{"first key", "1"}, {"second key", "2"}}));
-  EXPECT_THAT(header_map, IsSupersetOfHeaders(TestHeaderMapImpl{{"first key", "1"}}));
+  EXPECT_THAT(header_map, IsSupersetOfHeaders(
+                              TestRequestHeaderMapImpl{{"first key", "1"}, {"second key", "2"}}));
+  EXPECT_THAT(header_map, IsSupersetOfHeaders(TestRequestHeaderMapImpl{{"first key", "1"}}));
 
-  EXPECT_THAT(header_map, Not(IsSupersetOfHeaders(TestHeaderMapImpl{{"third key", "1"}})));
+  EXPECT_THAT(header_map, Not(IsSupersetOfHeaders(TestRequestHeaderMapImpl{{"third key", "1"}})));
 }
 
 TEST(IsSupersetOfHeadersTest, MutableHeaderMap) {
-  TestHeaderMapImpl header_map;
+  TestRequestHeaderMapImpl header_map;
   header_map.addCopy("first key", "1");
   header_map.addCopy("second key", "2");
 
-  EXPECT_THAT(header_map,
-              IsSupersetOfHeaders(TestHeaderMapImpl{{"first key", "1"}, {"second key", "2"}}));
-  EXPECT_THAT(header_map, IsSupersetOfHeaders(TestHeaderMapImpl{{"first key", "1"}}));
+  EXPECT_THAT(header_map, IsSupersetOfHeaders(
+                              TestRequestHeaderMapImpl{{"first key", "1"}, {"second key", "2"}}));
+  EXPECT_THAT(header_map, IsSupersetOfHeaders(TestRequestHeaderMapImpl{{"first key", "1"}}));
 
-  EXPECT_THAT(header_map, Not(IsSupersetOfHeaders(TestHeaderMapImpl{{"third key", "1"}})));
+  EXPECT_THAT(header_map, Not(IsSupersetOfHeaders(TestRequestHeaderMapImpl{{"third key", "1"}})));
 }
 } // namespace Http
 
 TEST(HeaderHasValueRefTest, MutableValueRef) {
-  Http::TestHeaderMapImpl header_map;
+  Http::TestRequestHeaderMapImpl header_map;
 
   EXPECT_THAT(header_map, Not(HeaderHasValueRef("key", "value")));
   EXPECT_THAT(header_map, Not(HeaderHasValueRef("other key", "value")));
@@ -119,7 +119,7 @@ TEST(HeaderHasValueRefTest, MutableValueRef) {
 }
 
 TEST(HeaderHasValueRefTest, ConstValueRef) {
-  const Http::TestHeaderMapImpl header_map{{"key", "expected value"}};
+  const Http::TestRequestHeaderMapImpl header_map{{"key", "expected value"}};
 
   EXPECT_THAT(header_map, Not(HeaderHasValueRef("key", "other value")));
   EXPECT_THAT(header_map, HeaderHasValueRef("key", "expected value"));
@@ -127,7 +127,7 @@ TEST(HeaderHasValueRefTest, ConstValueRef) {
 
 TEST(HeaderHasValueRefTest, LowerCaseStringArguments) {
   Http::LowerCaseString key("key"), other_key("other key");
-  Http::TestHeaderMapImpl header_map;
+  Http::TestRequestHeaderMapImpl header_map;
 
   EXPECT_THAT(header_map, Not(HeaderHasValueRef(key, "value")));
   EXPECT_THAT(header_map, Not(HeaderHasValueRef(other_key, "value")));

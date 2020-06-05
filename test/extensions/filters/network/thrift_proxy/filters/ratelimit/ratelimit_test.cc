@@ -389,7 +389,7 @@ TEST_F(ThriftRateLimitFilterTest, LimitResponseWithHeaders) {
 
   EXPECT_EQ(ThriftProxy::FilterStatus::StopIteration, filter_->messageBegin(request_metadata_));
 
-  Http::HeaderMapPtr rl_headers{new Http::TestHeaderMapImpl{
+  Http::HeaderMapPtr rl_headers{new Http::TestRequestHeaderMapImpl{
       {"x-ratelimit-limit", "1000"}, {"x-ratelimit-remaining", "0"}, {"retry-after", "33"}}};
 
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);

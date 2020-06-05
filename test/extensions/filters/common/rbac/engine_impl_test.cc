@@ -24,10 +24,11 @@ namespace Common {
 namespace RBAC {
 namespace {
 
-void checkEngine(const RBAC::RoleBasedAccessControlEngineImpl& engine, bool expected,
-                 const Envoy::Network::Connection& connection = Envoy::Network::MockConnection(),
-                 const Envoy::Http::RequestHeaderMap& headers = Envoy::Http::RequestHeaderMapImpl(),
-                 const StreamInfo::StreamInfo& info = NiceMock<StreamInfo::MockStreamInfo>()) {
+void checkEngine(
+    const RBAC::RoleBasedAccessControlEngineImpl& engine, bool expected,
+    const Envoy::Network::Connection& connection = Envoy::Network::MockConnection(),
+    const Envoy::Http::RequestHeaderMap& headers = Envoy::Http::TestRequestHeaderMapImpl(),
+    const StreamInfo::StreamInfo& info = NiceMock<StreamInfo::MockStreamInfo>()) {
   EXPECT_EQ(expected, engine.allowed(connection, headers, info, nullptr));
 }
 
@@ -137,7 +138,7 @@ TEST(RoleBasedAccessControlEngineImpl, AllowedWhitelist) {
   RBAC::RoleBasedAccessControlEngineImpl engine(rbac);
 
   Envoy::Network::MockConnection conn;
-  Envoy::Http::RequestHeaderMapImpl headers;
+  Envoy::Http::TestRequestHeaderMapImpl headers;
   NiceMock<StreamInfo::MockStreamInfo> info;
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
@@ -160,7 +161,7 @@ TEST(RoleBasedAccessControlEngineImpl, DeniedBlacklist) {
   RBAC::RoleBasedAccessControlEngineImpl engine(rbac);
 
   Envoy::Network::MockConnection conn;
-  Envoy::Http::RequestHeaderMapImpl headers;
+  Envoy::Http::TestRequestHeaderMapImpl headers;
   NiceMock<StreamInfo::MockStreamInfo> info;
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
@@ -280,7 +281,7 @@ TEST(RoleBasedAccessControlEngineImpl, HeaderCondition) {
   (*rbac.mutable_policies())["foo"] = policy;
   RBAC::RoleBasedAccessControlEngineImpl engine(rbac);
 
-  Envoy::Http::RequestHeaderMapImpl headers;
+  Envoy::Http::TestRequestHeaderMapImpl headers;
   Envoy::Http::LowerCaseString key("foo");
   std::string value = "bar";
   headers.setReference(key, value);
@@ -321,7 +322,7 @@ TEST(RoleBasedAccessControlEngineImpl, MetadataCondition) {
   (*rbac.mutable_policies())["foo"] = policy;
   RBAC::RoleBasedAccessControlEngineImpl engine(rbac);
 
-  Envoy::Http::RequestHeaderMapImpl headers;
+  Envoy::Http::TestRequestHeaderMapImpl headers;
   NiceMock<StreamInfo::MockStreamInfo> info;
 
   auto label = MessageUtil::keyValueStruct("label", "prod");
@@ -349,7 +350,7 @@ TEST(RoleBasedAccessControlEngineImpl, ConjunctiveCondition) {
   RBAC::RoleBasedAccessControlEngineImpl engine(rbac);
 
   Envoy::Network::MockConnection conn;
-  Envoy::Http::RequestHeaderMapImpl headers;
+  Envoy::Http::TestRequestHeaderMapImpl headers;
   NiceMock<StreamInfo::MockStreamInfo> info;
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);

@@ -173,7 +173,7 @@ public:
     initiateClientConnection();
     waitForRatelimitRequest();
     sendRateLimitResponse(envoy::service::ratelimit::v3::RateLimitResponse::OK,
-                          Http::ResponseHeaderMapImpl{}, Http::RequestHeaderMapImpl{});
+                          Http::TestResponseHeaderMapImpl{}, Http::TestRequestHeaderMapImpl{});
     waitForSuccessfulUpstreamResponse();
     cleanup();
 
@@ -249,7 +249,7 @@ TEST_P(RatelimitIntegrationTest, OverLimit) {
   initiateClientConnection();
   waitForRatelimitRequest();
   sendRateLimitResponse(envoy::service::ratelimit::v3::RateLimitResponse::OVER_LIMIT,
-                        Http::ResponseHeaderMapImpl{}, Http::RequestHeaderMapImpl{});
+                        Http::TestResponseHeaderMapImpl{}, Http::TestRequestHeaderMapImpl{});
   waitForFailedUpstreamResponse(429);
   cleanup();
 
@@ -264,7 +264,7 @@ TEST_P(RatelimitIntegrationTest, OverLimitWithHeaders) {
   Http::TestResponseHeaderMapImpl ratelimit_response_headers{
       {"x-ratelimit-limit", "1000"}, {"x-ratelimit-remaining", "0"}, {"retry-after", "33"}};
   sendRateLimitResponse(envoy::service::ratelimit::v3::RateLimitResponse::OVER_LIMIT,
-                        ratelimit_response_headers, Http::RequestHeaderMapImpl{});
+                        ratelimit_response_headers, Http::TestRequestHeaderMapImpl{});
   waitForFailedUpstreamResponse(429);
 
   ratelimit_response_headers.iterate(

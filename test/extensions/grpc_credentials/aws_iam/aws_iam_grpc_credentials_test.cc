@@ -36,7 +36,7 @@ public:
   void expectExtraHeaders(FakeStream& fake_stream) override {
     AssertionResult result = fake_stream.waitForHeadersComplete();
     RELEASE_ASSERT(result, result.message());
-    Http::TestHeaderMapImpl stream_headers(fake_stream.headers());
+    Http::TestRequestHeaderMapImpl stream_headers(fake_stream.headers());
     const auto auth_header = stream_headers.get_("Authorization");
     const auto auth_parts = StringUtil::splitToken(auth_header, ", ", false);
     ASSERT_EQ(4, auth_parts.size());

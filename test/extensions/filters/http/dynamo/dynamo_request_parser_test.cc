@@ -20,25 +20,26 @@ namespace {
 TEST(DynamoRequestParser, parseOperation) {
   // Well formed x-amz-target header, in a format, Version.Operation
   {
-    Http::TestHeaderMapImpl headers{{"X", "X"}, {"x-amz-target", "X.Operation"}};
+    Http::TestRequestHeaderMapImpl headers{{"X", "X"}, {"x-amz-target", "X.Operation"}};
     EXPECT_EQ("Operation", RequestParser::parseOperation(headers));
   }
 
   // Not well formed x-amz-target header.
   {
-    Http::TestHeaderMapImpl headers{{"X", "X"}, {"x-amz-target", "X,Operation"}};
+    Http::TestRequestHeaderMapImpl headers{{"X", "X"}, {"x-amz-target", "X,Operation"}};
     EXPECT_EQ("", RequestParser::parseOperation(headers));
   }
 
   // Too many entries in the Version.Operation.
   {
-    Http::TestHeaderMapImpl headers{{"X", "X"}, {"x-amz-target", "NOT_VALID.NOT_VALID.NOT_VALID"}};
+    Http::TestRequestHeaderMapImpl headers{{"X", "X"},
+                                           {"x-amz-target", "NOT_VALID.NOT_VALID.NOT_VALID"}};
     EXPECT_EQ("", RequestParser::parseOperation(headers));
   }
 
   // Required header is not present in the headers
   {
-    Http::TestHeaderMapImpl headers{{"Z", "Z"}};
+    Http::TestRequestHeaderMapImpl headers{{"Z", "Z"}};
     EXPECT_EQ("", RequestParser::parseOperation(headers));
   }
 }

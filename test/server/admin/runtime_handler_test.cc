@@ -8,7 +8,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(AdminInstanceTest, Runtime) {
-  Http::ResponseHeaderMapImpl header_map;
+  Http::TestResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl response;
 
   Runtime::MockSnapshot snapshot;
@@ -75,7 +75,7 @@ TEST_P(AdminInstanceTest, Runtime) {
 }
 
 TEST_P(AdminInstanceTest, RuntimeModify) {
-  Http::ResponseHeaderMapImpl header_map;
+  Http::TestResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl response;
 
   Runtime::MockLoader loader;
@@ -101,14 +101,14 @@ TEST_P(AdminInstanceTest, RuntimeModifyParamsInBody) {
   EXPECT_CALL(loader, mergeValues(overrides)).Times(1);
 
   const std::string body = fmt::format("{}={}", key, value);
-  Http::ResponseHeaderMapImpl header_map;
+  Http::TestResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl response;
   EXPECT_EQ(Http::Code::OK, runCallback("/runtime_modify", header_map, response, "POST", body));
   EXPECT_EQ("OK\n", response.toString());
 }
 
 TEST_P(AdminInstanceTest, RuntimeModifyNoArguments) {
-  Http::ResponseHeaderMapImpl header_map;
+  Http::TestResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl response;
 
   EXPECT_EQ(Http::Code::BadRequest, postCallback("/runtime_modify", header_map, response));

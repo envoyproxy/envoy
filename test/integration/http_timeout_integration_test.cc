@@ -299,7 +299,7 @@ TEST_P(HttpTimeoutIntegrationTest, PerTryTimeoutWithoutGlobalTimeout) {
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
   // Encode 200 response headers for the first (timed out) request.
-  Http::TestHeaderMapImpl response_headers{{":status", "200"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   upstream_request_->encodeHeaders(response_headers, true);
 
   response->waitForHeaders();

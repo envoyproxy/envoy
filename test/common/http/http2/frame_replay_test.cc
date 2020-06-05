@@ -97,7 +97,7 @@ TEST_F(ResponseFrameCommentTest, SimpleExampleHuffman) {
 
   EXPECT_TRUE(codec.write(WellKnownFrames::defaultSettingsFrame(), connection).ok());
   EXPECT_TRUE(codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection).ok());
-  TestHeaderMapImpl expected_headers;
+  TestResponseHeaderMapImpl expected_headers;
   expected_headers.addCopy(":status", "200");
   expected_headers.addCopy("compression", "test");
   EXPECT_CALL(codec.response_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
@@ -177,7 +177,7 @@ TEST_F(ResponseFrameCommentTest, SimpleExamplePlain) {
 
   EXPECT_TRUE(codec.write(WellKnownFrames::defaultSettingsFrame(), connection).ok());
   EXPECT_TRUE(codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection).ok());
-  TestHeaderMapImpl expected_headers;
+  TestResponseHeaderMapImpl expected_headers;
   expected_headers.addCopy(":status", "200");
   expected_headers.addCopy("compression", "test");
   EXPECT_CALL(codec.response_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), true));

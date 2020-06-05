@@ -1355,7 +1355,7 @@ TEST_P(HttpFilterTestParam, DestroyResponseBeforeSendLocalReply) {
   EXPECT_CALL(filter_callbacks_, encodeData(_, true))
       .WillOnce(Invoke([&](Buffer::Instance& data, bool) {
         response_ptr.reset();
-        Http::TestHeaderMapImpl test_headers{*saved_headers};
+        Http::TestRequestHeaderMapImpl test_headers{*saved_headers};
         EXPECT_EQ(test_headers.get_("foo"), "bar");
         EXPECT_EQ(test_headers.get_("bar"), "foo");
         EXPECT_EQ(data.toString(), "foo");
@@ -1420,7 +1420,7 @@ TEST_P(HttpFilterTestParam, OverrideEncodingHeaders) {
   EXPECT_CALL(filter_callbacks_, encodeData(_, true))
       .WillOnce(Invoke([&](Buffer::Instance& data, bool) {
         response_ptr.reset();
-        Http::TestHeaderMapImpl test_headers{*saved_headers};
+        Http::TestRequestHeaderMapImpl test_headers{*saved_headers};
         EXPECT_EQ(test_headers.get_("foo"), "bar");
         EXPECT_EQ(test_headers.get_("bar"), "foo");
         EXPECT_EQ(test_headers.get_("foobar"), "DO_NOT_OVERRIDE");

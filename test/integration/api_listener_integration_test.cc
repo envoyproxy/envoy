@@ -97,7 +97,7 @@ TEST_P(ApiListenerIntegrationTest, Basic) {
 
     // The AutonomousUpstream responds with 200 OK and a body of 10 bytes.
     // In the http1 codec the end stream is encoded with encodeData and 0 bytes.
-    Http::TestHeaderMapImpl expected_response_headers{{":status", "200"}};
+    Http::TestResponseHeaderMapImpl expected_response_headers{{":status", "200"}};
     EXPECT_CALL(stream_encoder_, encodeHeaders(_, false));
     EXPECT_CALL(stream_encoder_, encodeData(_, false));
     EXPECT_CALL(stream_encoder_, encodeData(BufferStringEqual(""), true)).WillOnce(Notify(&done));

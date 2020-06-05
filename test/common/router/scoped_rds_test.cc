@@ -42,7 +42,7 @@ namespace Envoy {
 namespace Router {
 namespace {
 
-using ::Envoy::Http::TestHeaderMapImpl;
+using ::Envoy::Http::TestRequestHeaderMapImpl;
 
 envoy::config::route::v3::ScopedRouteConfiguration
 parseScopedRouteConfigurationFromYaml(const std::string& yaml) {
@@ -306,24 +306,24 @@ key:
   EXPECT_NE(getScopedRdsProvider()->config<ScopedConfigImpl>(), nullptr);
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
                 ->name(),
             "");
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})
+                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})
                 ->name(),
             "");
   // RDS updates foo_routes.
   pushRdsConfig({"foo_routes"}, "111");
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
                 ->name(),
             "foo_routes");
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})
+                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})
                 ->name(),
             "foo_routes");
 
@@ -337,11 +337,11 @@ key:
                 .value());
   // now scope key "x-bar-key" points to nowhere.
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
-                  TestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}),
+                  TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}),
               IsNull());
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
                 ->name(),
             "foo_routes");
 }
@@ -382,24 +382,24 @@ key:
   EXPECT_NE(getScopedRdsProvider()->config<ScopedConfigImpl>(), nullptr);
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
                 ->name(),
             "");
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})
+                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})
                 ->name(),
             "");
   // RDS updates foo_routes.
   pushRdsConfig({"foo_routes"}, "111");
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
                 ->name(),
             "foo_routes");
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})
+                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})
                 ->name(),
             "foo_routes");
 
@@ -415,11 +415,11 @@ key:
                 .value());
   // now scope key "x-bar-key" points to nowhere.
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
-                  TestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}),
+                  TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}),
               IsNull());
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
                 ->name(),
             "foo_routes");
 }
@@ -458,7 +458,7 @@ key:
   EXPECT_NE(getScopedRdsProvider(), nullptr);
   EXPECT_NE(getScopedRdsProvider()->config<ScopedConfigImpl>(), nullptr);
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
-                  TestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}),
+                  TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}),
               IsNull());
   EXPECT_EQ(server_factory_context_.scope_.counter("foo.rds.foo_routes.config_reload").value(),
             0UL);
@@ -504,7 +504,7 @@ key:
             server_factory_context_.scope_.counter("foo.rds.foo_routes.config_reload").value());
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
                 ->name(),
             "foo_routes");
 }
@@ -540,7 +540,7 @@ key:
   // No RDS "foo_routes" config push happened yet, Router::NullConfig is returned.
   EXPECT_THAT(getScopedRdsProvider()
                   ->config<ScopedConfigImpl>()
-                  ->getRouteConfig(TestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                  ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
                   ->name(),
               "");
   init_watcher_.expectReady().Times(1);
@@ -552,7 +552,7 @@ key:
             1UL);
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
                 ->name(),
             "foo_routes");
 
@@ -580,7 +580,7 @@ key:
   // The same scope-key now points to the same route table.
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
                 ->name(),
             "foo_routes");
 
@@ -606,7 +606,7 @@ key:
   EXPECT_EQ(getScopedRouteMap().count("foo_scope3"), 1);
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})
+                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})
                 ->name(),
             "bar_routes");
 
@@ -623,12 +623,12 @@ key:
   EXPECT_EQ(getScopedRouteMap().count("foo_scope4"), 1);
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})
+                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})
                 ->name(),
             "foo_routes");
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
                 ->name(),
             "foo_routes");
 }

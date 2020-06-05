@@ -12,7 +12,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,
 
 TEST_P(AdminInstanceTest, AdminCpuProfiler) {
   Buffer::OwnedImpl data;
-  Http::ResponseHeaderMapImpl header_map;
+  Http::TestResponseHeaderMapImpl header_map;
 
   // Can only get code coverage of AdminImpl::handlerCpuProfiler stopProfiler with
   // a real profiler linked in (successful call to startProfiler).
@@ -31,7 +31,7 @@ TEST_P(AdminInstanceTest, AdminCpuProfiler) {
 
 TEST_P(AdminInstanceTest, AdminHeapProfilerOnRepeatedRequest) {
   Buffer::OwnedImpl data;
-  Http::ResponseHeaderMapImpl header_map;
+  Http::TestResponseHeaderMapImpl header_map;
   auto repeatResultCode = Http::Code::BadRequest;
 #ifndef PROFILER_AVAILABLE
   repeatResultCode = Http::Code::NotImplemented;
@@ -46,7 +46,7 @@ TEST_P(AdminInstanceTest, AdminHeapProfilerOnRepeatedRequest) {
 
 TEST_P(AdminInstanceTest, AdminHeapProfiler) {
   Buffer::OwnedImpl data;
-  Http::ResponseHeaderMapImpl header_map;
+  Http::TestResponseHeaderMapImpl header_map;
 
   // The below flow need to begin with the profiler not running
   Profiler::Heap::stopProfiler();
@@ -68,7 +68,7 @@ TEST_P(AdminInstanceTest, AdminBadProfiler) {
   Buffer::OwnedImpl data;
   AdminImpl admin_bad_profile_path(TestEnvironment::temporaryPath("some/unlikely/bad/path.prof"),
                                    server_);
-  Http::ResponseHeaderMapImpl header_map;
+  Http::TestResponseHeaderMapImpl header_map;
   const absl::string_view post = Http::Headers::get().MethodValues.Post;
   request_headers_.setMethod(post);
   admin_filter_.decodeHeaders(request_headers_, false);
