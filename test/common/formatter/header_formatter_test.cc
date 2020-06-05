@@ -1,6 +1,5 @@
 #include <string>
 
-#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/route.pb.validate.h"
 #include "envoy/config/route/v3/route_components.pb.h"
@@ -25,13 +24,15 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace Router {
+namespace Formatter {
 namespace {
 
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
+using Envoy::Router::StringAccessor;
+using Envoy::Router::StringAccessorImpl;
 
 class StreamInfoHeaderFormatterTest : public testing::Test {
 public:
@@ -710,5 +711,5 @@ TEST_F(StreamInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
 }
 
 } // namespace
-} // namespace Router
+} // namespace Formatter
 } // namespace Envoy
