@@ -398,7 +398,7 @@ TEST(HttpUtility, getLastAddressFromXFF) {
 }
 
 TEST(HttpUtility, TestParseCookie) {
-  TestHeaderMapImpl headers{
+  TestRequestHeaderMapImpl headers{
       {"someheader", "10.0.0.1"},
       {"cookie", "somekey=somevalue; someotherkey=someothervalue"},
       {"cookie", "abc=def; token=abc123; Expires=Wed, 09 Jun 2021 10:18:14 GMT"},
@@ -410,10 +410,10 @@ TEST(HttpUtility, TestParseCookie) {
 }
 
 TEST(HttpUtility, TestParseCookieBadValues) {
-  TestHeaderMapImpl headers{{"cookie", "token1=abc123; = "},
-                            {"cookie", "token2=abc123;   "},
-                            {"cookie", "; token3=abc123;"},
-                            {"cookie", "=; token4=\"abc123\""}};
+  TestRequestHeaderMapImpl headers{{"cookie", "token1=abc123; = "},
+                                   {"cookie", "token2=abc123;   "},
+                                   {"cookie", "; token3=abc123;"},
+                                   {"cookie", "=; token4=\"abc123\""}};
 
   EXPECT_EQ(Utility::parseCookieValue(headers, "token1"), "abc123");
   EXPECT_EQ(Utility::parseCookieValue(headers, "token2"), "abc123");
@@ -422,7 +422,7 @@ TEST(HttpUtility, TestParseCookieBadValues) {
 }
 
 TEST(HttpUtility, TestParseCookieWithQuotes) {
-  TestHeaderMapImpl headers{
+  TestRequestHeaderMapImpl headers{
       {"someheader", "10.0.0.1"},
       {"cookie", "dquote=\"; quoteddquote=\"\"\""},
       {"cookie", "leadingdquote=\"foobar;"},
@@ -827,7 +827,7 @@ TEST(HttpUtility, TestTeHeaderGzipTrailersSanitized) {
   // Expect that the set of headers is valid and can be sanitized
   EXPECT_TRUE(Utility::sanitizeConnectionHeader(request_headers));
 
-  Http::TestHeaderMapImpl sanitized_headers = {
+  Http::TestRequestHeaderMapImpl sanitized_headers = {
       {":method", "GET"},
       {":path", "/"},
       {":scheme", "http"},
@@ -855,7 +855,7 @@ TEST(HttpUtility, TestNominatedConnectionHeader) {
   };
   EXPECT_TRUE(Utility::sanitizeConnectionHeader(request_headers));
 
-  TestHeaderMapImpl sanitized_headers = {
+  TestRequestHeaderMapImpl sanitized_headers = {
       {":method", "GET"},
       {":path", "/"},
       {":scheme", "http"},
@@ -883,7 +883,7 @@ TEST(HttpUtility, TestNominatedConnectionHeader2) {
   };
   EXPECT_TRUE(Utility::sanitizeConnectionHeader(request_headers));
 
-  Http::TestHeaderMapImpl sanitized_headers = {
+  Http::TestRequestHeaderMapImpl sanitized_headers = {
       {":method", "GET"},
       {":path", "/"},
       {":scheme", "http"},
@@ -910,7 +910,7 @@ TEST(HttpUtility, TestNominatedPseudoHeader) {
   };
 
   // Headers remain unchanged since there are nominated pseudo headers
-  Http::TestHeaderMapImpl sanitized_headers(request_headers);
+  Http::TestRequestHeaderMapImpl sanitized_headers(request_headers);
 
   EXPECT_FALSE(Utility::sanitizeConnectionHeader(request_headers));
   EXPECT_EQ(sanitized_headers, request_headers);
@@ -932,7 +932,7 @@ TEST(HttpUtility, TestSanitizeEmptyTokensFromHeaders) {
   };
   EXPECT_TRUE(Utility::sanitizeConnectionHeader(request_headers));
 
-  Http::TestHeaderMapImpl sanitized_headers = {
+  Http::TestRequestHeaderMapImpl sanitized_headers = {
       {":method", "GET"},
       {":path", "/"},
       {":scheme", "http"},
@@ -959,7 +959,7 @@ TEST(HttpUtility, TestTooManyNominatedHeaders) {
   };
 
   // Headers remain unchanged because there are too many nominated headers
-  Http::TestHeaderMapImpl sanitized_headers(request_headers);
+  Http::TestRequestHeaderMapImpl sanitized_headers(request_headers);
 
   EXPECT_FALSE(Utility::sanitizeConnectionHeader(request_headers));
   EXPECT_EQ(sanitized_headers, request_headers);
@@ -977,7 +977,7 @@ TEST(HttpUtility, TestRejectNominatedXForwardedFor) {
   };
 
   // Headers remain unchanged due to nominated X-Forwarded* header
-  Http::TestHeaderMapImpl sanitized_headers(request_headers);
+  Http::TestRequestHeaderMapImpl sanitized_headers(request_headers);
 
   EXPECT_FALSE(Utility::sanitizeConnectionHeader(request_headers));
   EXPECT_EQ(sanitized_headers, request_headers);
@@ -995,7 +995,7 @@ TEST(HttpUtility, TestRejectNominatedXForwardedHost) {
   };
 
   // Headers remain unchanged due to nominated X-Forwarded* header
-  Http::TestHeaderMapImpl sanitized_headers(request_headers);
+  Http::TestRequestHeaderMapImpl sanitized_headers(request_headers);
 
   EXPECT_FALSE(Utility::sanitizeConnectionHeader(request_headers));
   EXPECT_EQ(sanitized_headers, request_headers);
@@ -1015,7 +1015,7 @@ TEST(HttpUtility, TestRejectNominatedXForwardedProto) {
   // Headers are not sanitized due to nominated X-Forwarded* header
   EXPECT_FALSE(Utility::sanitizeConnectionHeader(request_headers));
 
-  Http::TestHeaderMapImpl sanitized_headers = {
+  Http::TestRequestHeaderMapImpl sanitized_headers = {
       {":method", "GET"},
       {":path", "/"},
       {":scheme", "http"},
@@ -1039,7 +1039,7 @@ TEST(HttpUtility, TestRejectTrailersSubString) {
   };
   EXPECT_TRUE(Utility::sanitizeConnectionHeader(request_headers));
 
-  Http::TestHeaderMapImpl sanitized_headers = {
+  Http::TestRequestHeaderMapImpl sanitized_headers = {
       {":method", "GET"},
       {":path", "/"},
       {":scheme", "http"},
@@ -1077,7 +1077,7 @@ TEST(HttpUtility, TestRejectTeHeaderTooLong) {
   };
 
   // Headers remain unchanged because the TE value is too long
-  Http::TestHeaderMapImpl sanitized_headers(request_headers);
+  Http::TestRequestHeaderMapImpl sanitized_headers(request_headers);
 
   EXPECT_FALSE(Utility::sanitizeConnectionHeader(request_headers));
   EXPECT_EQ(sanitized_headers, request_headers);

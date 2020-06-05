@@ -357,7 +357,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeadersFromStreamInf
   const HeaderValuePair expected_header{"x-authz-header1", "123"};
   EXPECT_CALL(async_client_, send_(ContainsPairAsHeader(expected_header), _, _));
 
-  Http::RequestHeaderMapImpl request_headers;
+  Http::TestRequestHeaderMapImpl request_headers;
   request_headers.addCopy(Http::LowerCaseString(std::string("x-request-id")),
                           expected_header.second);
 
