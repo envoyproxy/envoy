@@ -530,7 +530,7 @@ public:
     *os << "is a subset of headers:\n" << expected_headers_;
   }
 
-  const TestHeaderMapImpl expected_headers_;
+  const TestRequestHeaderMapImpl expected_headers_;
 };
 
 class IsSubsetOfHeadersMatcher {
@@ -549,7 +549,7 @@ public:
   }
 
 private:
-  TestHeaderMapImpl expected_headers_;
+  TestRequestHeaderMapImpl expected_headers_;
 };
 
 IsSubsetOfHeadersMatcher IsSubsetOfHeaders(const HeaderMap& expected_headers);
@@ -586,7 +586,7 @@ public:
     *os << "is a superset of headers:\n" << expected_headers_;
   }
 
-  const TestHeaderMapImpl expected_headers_;
+  const TestRequestHeaderMapImpl expected_headers_;
 };
 
 class IsSupersetOfHeadersMatcher {
@@ -605,7 +605,7 @@ public:
   }
 
 private:
-  TestHeaderMapImpl expected_headers_;
+  TestRequestHeaderMapImpl expected_headers_;
 };
 
 IsSupersetOfHeadersMatcher IsSupersetOfHeaders(const HeaderMap& expected_headers);

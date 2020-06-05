@@ -214,7 +214,7 @@ def readFile(path):
 # environment variable. If it cannot be found, empty string is returned.
 def lookPath(executable):
   for path_dir in os.environ["PATH"].split(os.pathsep):
-    executable_path = os.path.join(path_dir, executable)
+    executable_path = os.path.expanduser(os.path.join(path_dir, executable))
     if os.path.exists(executable_path):
       return executable_path
   return ""
