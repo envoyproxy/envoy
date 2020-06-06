@@ -485,7 +485,7 @@ public:
 
     EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
 
-    std::vector<Common::Redis::Client::PoolRequest> dummy_requests(num_gets);
+    std::vector<Common::Redis::Client::MockPoolRequest> dummy_requests(num_gets);
     for (uint32_t i = 0; i < num_gets; i++) {
       Common::Redis::Client::PoolRequest* request_to_use = nullptr;
       if (std::find(null_handle_indexes.begin(), null_handle_indexes.end(), i) ==
