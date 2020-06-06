@@ -27,21 +27,26 @@ public:
     return response;
   }
 
-  static HazelcastHttpCacheConfig getTestConfig(bool unified) {
-    HazelcastHttpCacheConfig hc;
-    hc.set_group_name("dev");
-    hc.set_group_password("dev-pass");
-    HazelcastHttpCacheConfig::MemberAddress* memberAddress = hc.add_addresses();
+  static envoy::extensions::filters::http::cache::v3alpha::CacheConfig getTestCacheConfig() {
+    envoy::extensions::filters::http::cache::v3alpha::CacheConfig cache_config;
+    cache_config.set_max_body_bytes(TEST_MAX_BODY_SIZE);
+    return cache_config;
+  }
+
+  static HazelcastHttpCacheConfig getTestTypedConfig(bool unified) {
+    HazelcastHttpCacheConfig typed_config;
+    typed_config.set_group_name("dev");
+    typed_config.set_group_password("dev-pass");
+    HazelcastHttpCacheConfig::MemberAddress* memberAddress = typed_config.add_addresses();
     memberAddress->set_ip("127.0.0.1");
     memberAddress->set_port(5701);
-    hc.set_invocation_timeout(1);
-    hc.set_body_partition_size(TEST_PARTITION_SIZE);
+    typed_config.set_invocation_timeout(1);
+    typed_config.set_body_partition_size(TEST_PARTITION_SIZE);
     // During parallel tests, if caches do not have different prefixes, the entries
     // and hence the results will be different than the expected.
-    hc.set_app_prefix(randomGenerator().uuid());
-    hc.set_unified(unified);
-    hc.set_max_body_size(TEST_MAX_BODY_SIZE);
-    return hc;
+    typed_config.set_app_prefix(randomGenerator().uuid());
+    typed_config.set_unified(unified);
+    return typed_config;
   }
 
   static void setRequestHeaders(Http::TestRequestHeaderMapImpl& headers) {

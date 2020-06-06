@@ -19,7 +19,7 @@ public:
                                                              : config_value;
   }
 
-  static uint64_t validMaxBodySize(const uint64_t config_value, const bool unified) {
+  static uint32_t validMaxBodySize(const uint32_t config_value, const bool unified) {
     if (unified) {
       // Apply size limitation for single entry (unified response) on the map.
       return config_value == 0 || (config_value > MAX_ALLOWED_UNIFIED_BODY_SIZE)

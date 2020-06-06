@@ -87,7 +87,7 @@ void HazelcastLookupContextBase::arrangeVariantHeaders(
 
 HazelcastInsertContextBase::HazelcastInsertContextBase(LookupContext& lookup_context,
                                                        HazelcastHttpCache& cache)
-    : hz_cache_(cache), max_body_size_(cache.maxBodySize()),
+    : hz_cache_(cache), max_body_size_(cache.maxBodyBytes()),
       variant_key_hash_(static_cast<HazelcastLookupContextBase&>(lookup_context).variantKeyHash()),
       variant_key_(static_cast<HazelcastLookupContextBase&>(lookup_context).variantKey()),
       abort_insertion_(static_cast<HazelcastLookupContextBase&>(lookup_context).isAborted()) {}

@@ -17,10 +17,11 @@ class HazelcastHttpCacheTest : public HazelcastHttpCacheTestBase,
                                public testing::WithParamInterface<bool> {
 protected:
   void SetUp() override {
-    HazelcastHttpCacheConfig config = HazelcastTestUtil::getTestConfig(GetParam());
+    HazelcastHttpCacheConfig typed_config = HazelcastTestUtil::getTestTypedConfig(GetParam());
+    envoy::extensions::filters::http::cache::v3alpha::CacheConfig cache_config = HazelcastTestUtil::getTestCacheConfig();
     // To test the cache with a real Hazelcast instance, use remote test cache.
-    // cache_ = std::make_unique<HazelcastRemoteTestCache>(config);
-    cache_ = std::make_unique<HazelcastLocalTestCache>(config);
+    // cache_ = std::make_unique<HazelcastRemoteTestCache>(std::move(typed_config), cache_config);
+    cache_ = std::make_unique<HazelcastLocalTestCache>(std::move(typed_config), cache_config);
     cache_->start();
     cache_->getTestAccessor().clearMaps();
   }
@@ -217,11 +218,11 @@ TEST(Registration, GetFactory) {
       "envoy.source.extensions.filters.http.cache.HazelcastHttpCacheConfig");
   ASSERT_NE(factory, nullptr);
   envoy::extensions::filters::http::cache::v3alpha::CacheConfig config;
-  HazelcastHttpCacheConfig hz_cache_config = HazelcastTestUtil::getTestConfig(true);
-  hz_cache_config.set_group_name("do-not-connect-any-cluster");
-  hz_cache_config.set_connection_attempt_limit(1);
-  hz_cache_config.set_connection_attempt_period(1); // give up immediately.
-  config.mutable_typed_config()->PackFrom(hz_cache_config);
+  HazelcastHttpCacheConfig typed_config = HazelcastTestUtil::getTestTypedConfig(true);
+  typed_config.set_group_name("do-not-connect-any-cluster");
+  typed_config.set_connection_attempt_limit(1);
+  typed_config.set_connection_attempt_period(1); // give up immediately.
+  config.mutable_typed_config()->PackFrom(typed_config);
 
   {
     // getOfflineCache() call is for testing. It creates a HazelcastHttpCache but does

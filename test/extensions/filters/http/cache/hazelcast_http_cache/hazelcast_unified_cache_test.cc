@@ -15,10 +15,11 @@ namespace HazelcastHttpCache {
  */
 class HazelcastUnifiedCacheTest : public HazelcastHttpCacheTestBase {
   void SetUp() override {
-    HazelcastHttpCacheConfig config = HazelcastTestUtil::getTestConfig(true);
+    HazelcastHttpCacheConfig typed_config = HazelcastTestUtil::getTestTypedConfig(true);
+    envoy::extensions::filters::http::cache::v3alpha::CacheConfig cache_config = HazelcastTestUtil::getTestCacheConfig();
     // To test the cache with a real Hazelcast instance, use remote test cache.
-    // cache_ = std::make_unique<HazelcastRemoteTestCache>(config);
-    cache_ = std::make_unique<HazelcastLocalTestCache>(config);
+    // cache_ = std::make_unique<HazelcastRemoteTestCache>(std::move(typed_config), cache_config);
+    cache_ = std::make_unique<HazelcastLocalTestCache>(std::move(typed_config), cache_config);
     cache_->start();
     cache_->getTestAccessor().clearMaps();
   }

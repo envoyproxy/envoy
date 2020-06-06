@@ -31,6 +31,13 @@ then three different entries will be created to store the body of this response:
     size. Also, to keep these partitioned cache entries even, extra operations - not necessarily asynchronous, might
     be needed (i.e. cleaning up a malformed body sequence, recovery from a mismatch between body and header, etc.).
 
+Maximum body size limit must be configured in CacheConfig. In UNIFIED mode, the maximum allowed body size is 32 KB.
+Any value above this will be ignored and 32 KB will be used as the limit. If an insertion for a larger value than
+maximum is attempted by the cache filter, only the first 32 KB of the response body will be cached.
+
+In DIVIDED mode, there is no such an upper limit but keeping (max_body_size / body_partition_size) below 20 is
+recommended since each partition causes an extra network call made to the distributed map.
+
 ## Connecting to a Hazelcast cluster
 **NOTE:** The plugin uses the client with version 3.12.1 and hence it is not yet compatible with Hazelcast 4.x.
 Hazelcast version 3.12.x is recommended for the server-side.

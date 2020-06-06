@@ -18,7 +18,8 @@ namespace HazelcastHttpCache {
  */
 class HazelcastHttpTestCache : public HazelcastHttpCache {
 public:
-  HazelcastHttpTestCache(HazelcastHttpCacheConfig config) : HazelcastHttpCache(std::move(config)) {}
+  HazelcastHttpTestCache(HazelcastHttpCacheConfig&& typed_config, const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& cache_config) :
+    HazelcastHttpCache(std::move(typed_config), cache_config) {}
 
   TestAccessor& getTestAccessor() { return dynamic_cast<TestAccessor&>(*accessor_); }
 };
@@ -30,7 +31,8 @@ public:
  */
 class HazelcastRemoteTestCache : public HazelcastHttpTestCache {
 public:
-  HazelcastRemoteTestCache(HazelcastHttpCacheConfig config) : HazelcastHttpTestCache(std::move(config)) {}
+  HazelcastRemoteTestCache(HazelcastHttpCacheConfig&& typed_config, const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& cache_config) :
+    HazelcastHttpTestCache(std::move(typed_config), cache_config) {}
 
   void start() override {
     if (accessor_ && accessor_->isRunning()) {
@@ -63,7 +65,8 @@ public:
  */
 class HazelcastLocalTestCache : public HazelcastHttpTestCache {
 public:
-  HazelcastLocalTestCache(HazelcastHttpCacheConfig config) : HazelcastHttpTestCache(std::move(config)) {}
+  HazelcastLocalTestCache(HazelcastHttpCacheConfig&& typed_config, const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& cache_config) :
+    HazelcastHttpTestCache(std::move(typed_config), cache_config) {}
 
   void start() override {
     if (!accessor_) {

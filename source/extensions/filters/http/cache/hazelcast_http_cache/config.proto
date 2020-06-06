@@ -69,13 +69,4 @@ message HazelcastHttpCacheConfig {
   // Body partition size for divided cache. Ignored in unified mode.
   // At most 32 KB is allowed. 16 KB by default.
   uint64 body_partition_size = 10;
-
-  // Maximum allowed body size per response. If insertion for a larger
-  // value than the limit is attempted, the first max_body_size bytes
-  // of the response will be cached and the remaining will be ignored.
-  // At most 32 KB is allowed for UNIFIED mode. In DIVIDED mode, there
-  // is no such an upper limit but keeping (max_body_size / body_partition_size)
-  // below 20 is recommended since each partition causes an extra
-  // network call made to the distributed map.
-  uint64 max_body_size = 11;
 }

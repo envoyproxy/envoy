@@ -42,7 +42,8 @@ using envoy::source::extensions::filters::http::cache::HazelcastHttpCacheConfig;
 class HazelcastHttpCache : public HttpCache,
                            public Logger::Loggable<Logger::Id::hazelcast_http_cache> {
 public:
-  HazelcastHttpCache(HazelcastHttpCacheConfig config);
+  HazelcastHttpCache(HazelcastHttpCacheConfig&& typed_config,
+      const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& cache_config);
 
   /// Divided mode
 
@@ -167,7 +168,7 @@ public:
    *            than this limit, the first max_body_size_ bytes of the response
    *            will be cached only.
    */
-  uint64_t maxBodySize() const { return max_body_size_; }
+  uint32_t maxBodyBytes() const { return max_body_bytes_; }
 
   /**
    * Makes the cache ready to serve. Storage accessor connection must be established
@@ -236,8 +237,8 @@ private:
   /** Partition size in bytes for a single body entry */
   const uint64_t body_partition_size_;
 
-  /** Allowed max body size in bytes for a response */
-  const uint64_t max_body_size_;
+  /** Allowed max body size for a response */
+  const uint32_t max_body_bytes_;
 
   /** typed config from CacheConfig */
   HazelcastHttpCacheConfig cache_config_;
