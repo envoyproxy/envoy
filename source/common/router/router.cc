@@ -495,8 +495,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   if (!generic_conn_pool->initialize(
           config_.cm_, *route_entry_,
-          [protocol = callbacks_->streamInfo().protocol()](const auto& cluster) {
-            return cluster.upstreamHttpProtocol(protocol);
+          [protocol = callbacks_->streamInfo().protocol()](const auto& host) {
+            return host.cluster().upstreamHttpProtocol(protocol);
           },
           this)) {
     sendNoHealthyUpstreamResponse();
@@ -1517,8 +1517,8 @@ void Filter::doRetry() {
 
   if (!generic_conn_pool->initialize(
           config_.cm_, *route_entry_,
-          [protocol = callbacks_->streamInfo().protocol()](const auto& cluster) {
-            return cluster.upstreamHttpProtocol(protocol);
+          [protocol = callbacks_->streamInfo().protocol()](const auto& host) {
+            return host.cluster().upstreamHttpProtocol(protocol);
           },
           this)) {
     sendNoHealthyUpstreamResponse();

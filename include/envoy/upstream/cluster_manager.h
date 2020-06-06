@@ -151,6 +151,8 @@ public:
    */
   virtual ThreadLocalCluster* get(absl::string_view cluster) PURE;
 
+  using ProtocolResolutionFunc = std::function<Http::Protocol(const Host&)>;
+
   /**
    * Allocate a load balanced HTTP connection pool for a cluster. This is *per-thread* so that
    * callers do not need to worry about per thread synchronization. The load balancing policy that
@@ -165,7 +167,7 @@ public:
    */
   virtual Http::ConnectionPool::Instance*
   httpConnPoolForCluster(const std::string& cluster, ResourcePriority priority,
-                         std::function<Http::Protocol(const ClusterInfo&)> protocol,
+                         ProtocolResolutionFunc protocol,
                          LoadBalancerContext* context) PURE;
 
   Http::ConnectionPool::Instance* httpConnPoolForCluster(const std::string& cluster,

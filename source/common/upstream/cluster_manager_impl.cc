@@ -824,7 +824,7 @@ ThreadLocalCluster* ClusterManagerImpl::get(absl::string_view cluster) {
 
 Http::ConnectionPool::Instance* ClusterManagerImpl::httpConnPoolForCluster(
     const std::string& cluster, ResourcePriority priority,
-    std::function<Http::Protocol(const ClusterInfo&)> protocol, LoadBalancerContext* context) {
+    Upstream::ClusterManager::ProtocolResolutionFunc protocol, LoadBalancerContext* context) {
   ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
 
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);
@@ -1277,7 +1277,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::~ClusterEntry()
 
 Http::ConnectionPool::Instance*
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
-    ResourcePriority priority, std::function<Http::Protocol(const ClusterInfo&)> protocol,
+    ResourcePriority priority, Upstream::ClusterManager::ProtocolResolutionFunc protocol,
     LoadBalancerContext* context) {
   HostConstSharedPtr host = lb_->chooseHost(context);
   if (!host) {
@@ -1286,7 +1286,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
     return nullptr;
   }
 
-  auto final_protocol = protocol(host->cluster());
+  auto final_protocol = protocol(*host);
   std::vector<uint8_t> hash_key = {uint8_t(final_protocol)};
 
   Network::Socket::OptionsSharedPtr upstream_options(std::make_shared<Network::Socket::Options>());
