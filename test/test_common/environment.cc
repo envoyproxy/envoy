@@ -244,10 +244,11 @@ std::vector<Network::Address::IpVersion> TestEnvironment::getIpVersionsForTest()
       parameters.push_back(version);
       if (!Network::Test::supportsIpVersion(version)) {
         const auto version_string = Network::Test::addressVersionAsString(version);
-        ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::testing), warn,
-                            "Testing with IP{} addresses may not be supported on this machine. If "
-                            "testing fails, set the environment variable ENVOY_IP_TEST_VERSIONS to 'v{}only'.",
-                            version_string, version_string);
+        ENVOY_LOG_TO_LOGGER(
+            Logger::Registry::getLog(Logger::Id::testing), warn,
+            "Testing with IP{} addresses may not be supported on this machine. If "
+            "testing fails, set the environment variable ENVOY_IP_TEST_VERSIONS to 'v{}only'.",
+            version_string, version_string);
       }
     }
   }
