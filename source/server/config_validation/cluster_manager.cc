@@ -39,7 +39,7 @@ ValidationClusterManager::ValidationClusterManager(
 
 Http::ConnectionPool::Instance*
 ValidationClusterManager::httpConnPoolForCluster(const std::string&, ResourcePriority,
-                                                 std::function<Http::Protocol(const ClusterInfo&)>,
+                                                 Upstream::ClusterManager::ProtocolResolutionFunc,
                                                  LoadBalancerContext*) {
   return nullptr;
 }

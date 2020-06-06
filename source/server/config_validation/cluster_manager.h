@@ -66,7 +66,7 @@ public:
 
   Http::ConnectionPool::Instance*
   httpConnPoolForCluster(const std::string&, ResourcePriority,
-                         std::function<Http::Protocol(const ClusterInfo&)>,
+                         Upstream::ClusterManager::ProtocolResolutionFunc,
                          LoadBalancerContext*) override;
   Host::CreateConnectionData tcpConnForCluster(const std::string&, LoadBalancerContext*) override;
   Http::AsyncClient& httpAsyncClientForCluster(const std::string&) override;
