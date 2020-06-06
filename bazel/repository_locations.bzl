@@ -126,9 +126,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/moonjit/moonjit/archive/2.2.0.tar.gz"],
     ),
     com_github_nghttp2_nghttp2 = dict(
-        sha256 = "eb9d9046495a49dd40c7ef5d6c9907b51e5a6b320ea6e2add11eb8b52c982c47",
-        strip_prefix = "nghttp2-1.40.0",
-        urls = ["https://github.com/nghttp2/nghttp2/releases/download/v1.40.0/nghttp2-1.40.0.tar.gz"],
+        sha256 = "eacc6f0f8543583ecd659faf0a3f906ed03826f1d4157b536b4b385fe47c5bb8",
+        strip_prefix = "nghttp2-1.41.0",
+        urls = ["https://github.com/nghttp2/nghttp2/releases/download/v1.41.0/nghttp2-1.41.0.tar.gz"],
     ),
     io_opentracing_cpp = dict(
         sha256 = "015c4187f7a6426a2b5196f0ccd982aa87f010cf61f507ae3ce5c90523f92301",
