@@ -8,6 +8,7 @@
 #include "common/event/dispatcher_impl.h"
 #include "common/http/codec_client.h"
 #include "common/http/http1/conn_pool.h"
+#include "common/http/utility.h"
 #include "common/network/raw_buffer_socket.h"
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
@@ -280,7 +281,8 @@ TEST_F(Http1ConnPoolImplTest, VerifyAlpnFallback) {
       .WillOnce(Invoke(
           [](Network::TransportSocketOptionsSharedPtr options) -> Network::TransportSocketPtr {
             EXPECT_TRUE(options != nullptr);
-            EXPECT_EQ(options->applicationProtocolFallback(), "http/1.1");
+            EXPECT_EQ(options->applicationProtocolFallback(),
+                      Http::Utility::AlpnNames::get().Http11);
             return std::make_unique<Network::RawBufferSocket>();
           }));
   cluster_->transport_socket_matcher_ =

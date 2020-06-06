@@ -246,7 +246,6 @@ TEST_F(Http2ConnPoolImplTest, DrainConnectionIdle) {
 TEST_F(Http2ConnPoolImplTest, VerifyAlpnFallback) {
   InSequence s;
 
-  // EXPECT_CALL(dispatcher_, createTimer_(_));
   // Override the TransportSocketFactory with a mock version we can add expectations to.
   auto factory = std::make_unique<Network::MockTransportSocketFactory>();
   auto factory_ptr = factory.get();
@@ -259,15 +258,16 @@ TEST_F(Http2ConnPoolImplTest, VerifyAlpnFallback) {
   pool_ = std::make_unique<TestConnPoolImpl>(dispatcher_, host_,
                                              Upstream::ResourcePriority::Default, nullptr, nullptr);
 
-  // This requires some careful setup of expectations ordering: the call to createTransportSocket
-  // happens before all the connection setup but after the test client is created (due to some)
+  // This requires some careful set up of expectations ordering: the call to createTransportSocket
+  // happens before all the connection set up but after the test client is created (due to some)
   // of the mocks that are constructed as part of the test client.
   auto& client = createTestClient();
   EXPECT_CALL(*factory_ptr, createTransportSocket(_))
       .WillOnce(Invoke(
           [](Network::TransportSocketOptionsSharedPtr options) -> Network::TransportSocketPtr {
             EXPECT_TRUE(options != nullptr);
-            EXPECT_EQ(options->applicationProtocolFallback(), "h2");
+            EXPECT_EQ(options->applicationProtocolFallback(),
+                      Http::Utility::AlpnNames::get().Http2);
             return std::make_unique<Network::RawBufferSocket>();
           }));
   expectConnectionSetupForClient(client);

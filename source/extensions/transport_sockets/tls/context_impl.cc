@@ -858,6 +858,7 @@ bool ContextImpl::parseAndSetAlpn(const std::vector<std::string>& alpn, SSL& ssl
   std::vector<uint8_t> parsed_alpn = parseAlpnProtocols(absl::StrJoin(alpn, ","));
   if (!parsed_alpn.empty()) {
     const int rc = SSL_set_alpn_protos(&ssl, parsed_alpn.data(), parsed_alpn.size());
+    // This should only if memory allocation fails, e.g. OOM.
     RELEASE_ASSERT(rc == 0, Utility::getLastCryptoError().value_or(""));
     return true;
   }
@@ -885,7 +886,7 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl(const Network::TransportSocketOpt
   // We determine what ALPN using the following precedence:
   // 1. Option-provided ALPN override.
   // 2. ALPN statically configured in the upstream TLS context.
-  // 3. option-provided ALPN fallback.
+  // 3. Option-provided ALPN fallback.
 
   // At this point in the code the ALPN has already been set (if present) to the value specified in
   // the TLS context. We've stored this value in parsed_alpn_protocols_ so we can check that to see

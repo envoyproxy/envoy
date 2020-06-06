@@ -1,6 +1,7 @@
 #include "common/http/conn_pool_base.h"
 
 #include "common/common/assert.h"
+#include "common/http/utility.h"
 #include "common/network/transport_socket_options_impl.h"
 #include "common/runtime/runtime_features.h"
 #include "common/stats/timespan_impl.h"
@@ -22,12 +23,13 @@ wrapTransportSocketOptions(Network::TransportSocketOptionsSharedPtr transport_so
   case Http::Protocol::Http10:
     NOT_REACHED_GCOVR_EXCL_LINE;
   case Http::Protocol::Http11:
-    alpn = "http/1.1";
+    alpn = Http::Utility::AlpnNames::get().Http11;
     break;
   case Http::Protocol::Http2:
-    alpn = "h2";
+    alpn = Http::Utility::AlpnNames::get().Http2;
     break;
   case Http::Protocol::Http3:
+    // TODO(snowp): Add once HTTP/3 upstream support is added.
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     break;
   }
