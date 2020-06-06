@@ -165,10 +165,10 @@ public:
    * different than the top level cluster), we accept a callback that allows protocol selection to
    * depend on the selected cluster.
    */
-  virtual Http::ConnectionPool::Instance*
-  httpConnPoolForCluster(const std::string& cluster, ResourcePriority priority,
-                         ProtocolResolutionFunc protocol,
-                         LoadBalancerContext* context) PURE;
+  virtual Http::ConnectionPool::Instance* httpConnPoolForCluster(const std::string& cluster,
+                                                                 ResourcePriority priority,
+                                                                 ProtocolResolutionFunc protocol,
+                                                                 LoadBalancerContext* context) PURE;
 
   Http::ConnectionPool::Instance* httpConnPoolForCluster(const std::string& cluster,
                                                          ResourcePriority priority,

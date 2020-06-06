@@ -331,8 +331,7 @@ private:
       ~ClusterEntry() override;
 
       Http::ConnectionPool::Instance*
-      connPool(ResourcePriority priority,
-               Upstream::ClusterManager::ProtocolResolutionFunc protocol,
+      connPool(ResourcePriority priority, Upstream::ClusterManager::ProtocolResolutionFunc protocol,
                LoadBalancerContext* context);
 
       Tcp::ConnectionPool::Instance* tcpConnPool(ResourcePriority priority,
