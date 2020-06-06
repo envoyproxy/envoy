@@ -98,7 +98,9 @@ public:
           filter_manager.addAcceptFilter(
               nullptr,
               std::make_unique<ListenerFilters::ProxyProtocol::Filter>(
-                  std::make_shared<ListenerFilters::ProxyProtocol::Config>(listenerScope())));
+                  std::make_shared<ListenerFilters::ProxyProtocol::Config>(
+                      listenerScope(),
+                      envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol())));
           maybeExitDispatcher();
           return true;
         }));

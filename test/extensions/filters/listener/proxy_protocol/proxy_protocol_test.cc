@@ -18,6 +18,7 @@
 #include "server/connection_handler_impl.h"
 
 #include "extensions/filters/listener/proxy_protocol/proxy_protocol.h"
+#include "extensions/filters/listener/well_known_names.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/buffer/mocks.h"
@@ -35,6 +36,7 @@
 using testing::_;
 using testing::AnyNumber;
 using testing::AtLeast;
+using testing::ElementsAre;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
@@ -97,7 +99,9 @@ public:
     return filter_chain_.get();
   }
 
-  void connect(bool read = true) {
+  void connect(bool read = true,
+               const envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol*
+                   proto_config = nullptr) {
     int expected_callbacks = 2;
     auto maybeExitDispatcher = [&]() -> void {
       expected_callbacks--;
@@ -109,7 +113,11 @@ public:
     EXPECT_CALL(factory_, createListenerFilterChain(_))
         .WillOnce(Invoke([&](Network::ListenerFilterManager& filter_manager) -> bool {
           filter_manager.addAcceptFilter(
-              nullptr, std::make_unique<Filter>(std::make_shared<Config>(listenerScope())));
+              nullptr,
+              std::make_unique<Filter>(std::make_shared<Config>(
+                  listenerScope(), proto_config ? *proto_config
+                                                : envoy::extensions::filters::listener::
+                                                      proxy_protocol::v3::ProxyProtocol())));
           maybeExitDispatcher();
           return true;
         }));
@@ -876,6 +884,188 @@ TEST_P(ProxyProtocolTest, V2PartialRead) {
   disconnect();
 }
 
+TEST_P(ProxyProtocolTest, V2ExtractTlvOfInterest) {
+  // A well-formed ipv4/tcp with a pair of TLV extensions is accepted
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x1a, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
+  constexpr uint8_t tlv1[] = {0x0, 0x0, 0x1, 0xff};
+  constexpr uint8_t tlv_type_authority[] = {0x02, 0x00, 0x07, 0x66, 0x6f,
+                                            0x6f, 0x2e, 0x63, 0x6f, 0x6d};
+  constexpr uint8_t data[] = {'D', 'A', 'T', 'A'};
+
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  proto_config.add_tlv_types(0x02);
+
+  connect(true, &proto_config);
+  write(buffer, sizeof(buffer));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  write(tlv1, sizeof(tlv1));
+  write(tlv_type_authority, sizeof(tlv_type_authority));
+  write(data, sizeof(data));
+  expectData("DATA");
+
+  EXPECT_EQ(1, server_connection_->streamInfo().dynamicMetadata().filter_metadata_size());
+
+  auto metadata = server_connection_->streamInfo().dynamicMetadata().filter_metadata();
+  EXPECT_EQ(1, metadata.size());
+  EXPECT_EQ(1, metadata.count(ListenerFilters::ListenerFilterNames::get().ProxyProtocol));
+
+  auto fields = metadata.at(ListenerFilters::ListenerFilterNames::get().ProxyProtocol).fields();
+  EXPECT_EQ(1, fields.size());
+  EXPECT_EQ(1, fields.count(std::to_string(static_cast<uint8_t>(0x02))));
+
+  auto value_s = fields.at(std::to_string(static_cast<uint8_t>(0x02))).string_value();
+  ASSERT_THAT(value_s, ElementsAre(0x66, 0x6f, 0x6f, 0x2e, 0x63, 0x6f, 0x6d));
+  disconnect();
+}
+
+TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterest) {
+  // A well-formed ipv4/tcp with a pair of TLV extensions is accepted
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x39, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
+  // a TLV of type 0x00 with size of 4 (1 byte is value)
+  constexpr uint8_t tlv1[] = {0x00, 0x00, 0x01, 0xff};
+  // a TLV of type 0x02 with size of 10 bytes (7 bytes are value)
+  constexpr uint8_t tlv_type_authority[] = {0x02, 0x00, 0x07, 0x66, 0x6f,
+                                            0x6f, 0x2e, 0x63, 0x6f, 0x6d};
+  // a TLV of type 0x0f with size of 6 bytes (3 bytes are value)
+  constexpr uint8_t tlv3[] = {0x0f, 0x00, 0x03, 0xf0, 0x00, 0x0f};
+  // a TLV of type 0xea with size of 25 bytes (22 bytes are value)
+  constexpr uint8_t tlv_vpc_id[] = {0xea, 0x00, 0x16, 0x01, 0x76, 0x70, 0x63, 0x2d, 0x30,
+                                    0x32, 0x35, 0x74, 0x65, 0x73, 0x74, 0x32, 0x66, 0x61,
+                                    0x36, 0x63, 0x36, 0x33, 0x68, 0x61, 0x37};
+  constexpr uint8_t data[] = {'D', 'A', 'T', 'A'};
+
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  proto_config.add_tlv_types(0xea);
+  proto_config.add_tlv_types(0x02);
+
+  connect(true, &proto_config);
+  write(buffer, sizeof(buffer));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  write(tlv1, sizeof(tlv1));
+  write(tlv_type_authority, sizeof(tlv_type_authority));
+  write(tlv3, sizeof(tlv3));
+  write(tlv_vpc_id, sizeof(tlv_vpc_id));
+  write(data, sizeof(data));
+  expectData("DATA");
+
+  EXPECT_EQ(1, server_connection_->streamInfo().dynamicMetadata().filter_metadata_size());
+
+  auto metadata = server_connection_->streamInfo().dynamicMetadata().filter_metadata();
+  EXPECT_EQ(1, metadata.size());
+  EXPECT_EQ(1, metadata.count(ListenerFilters::ListenerFilterNames::get().ProxyProtocol));
+
+  auto fields = metadata.at(ListenerFilters::ListenerFilterNames::get().ProxyProtocol).fields();
+  EXPECT_EQ(2, fields.size());
+  EXPECT_EQ(1, fields.count(std::to_string(static_cast<uint8_t>(0x02))));
+  EXPECT_EQ(1, fields.count(std::to_string(static_cast<uint8_t>(0xea))));
+
+  auto value_type_authority = fields.at(std::to_string(static_cast<uint8_t>(0x02))).string_value();
+  ASSERT_THAT(value_type_authority, ElementsAre(0x66, 0x6f, 0x6f, 0x2e, 0x63, 0x6f, 0x6d));
+
+  auto value_vpc_id = fields.at(std::to_string(static_cast<uint8_t>(0xea))).string_value();
+  ASSERT_THAT(value_vpc_id,
+              ElementsAre(0x01, 0x76, 0x70, 0x63, 0x2d, 0x30, 0x32, 0x35, 0x74, 0x65, 0x73, 0x74,
+                          0x32, 0x66, 0x61, 0x36, 0x63, 0x36, 0x33, 0x68, 0x61, 0x37));
+  disconnect();
+}
+
+TEST_P(ProxyProtocolTest, V2WillNotOverwriteTLV) {
+  // A well-formed ipv4/tcp with a pair of TLV extensions is accepted
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x2a, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
+  // a TLV of type 0x00 with size of 4 (1 byte is value)
+  constexpr uint8_t tlv1[] = {0x00, 0x00, 0x01, 0xff};
+  // a TLV of type 0x02 with size of 10 bytes (7 bytes are value)
+  constexpr uint8_t tlv_type_authority1[] = {0x02, 0x00, 0x07, 0x66, 0x6f,
+                                             0x6f, 0x2e, 0x63, 0x6f, 0x6d};
+  // a TLV of type 0x0f with size of 6 bytes (3 bytes are value)
+  constexpr uint8_t tlv3[] = {0x0f, 0x00, 0x03, 0xf0, 0x00, 0x0f};
+  // a TLV of type 0x02 (again) with size of 10 bytes (7 bytes are value) and different values
+  constexpr uint8_t tlv_type_authority2[] = {0x02, 0x00, 0x07, 0x62, 0x61,
+                                             0x72, 0x2e, 0x6e, 0x65, 0x74};
+  constexpr uint8_t data[] = {'D', 'A', 'T', 'A'};
+
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  proto_config.add_tlv_types(0x02);
+
+  connect(true, &proto_config);
+  write(buffer, sizeof(buffer));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  write(tlv1, sizeof(tlv1));
+  write(tlv_type_authority1, sizeof(tlv_type_authority1));
+  write(tlv3, sizeof(tlv3));
+  write(tlv_type_authority2, sizeof(tlv_type_authority2));
+  write(data, sizeof(data));
+  expectData("DATA");
+
+  EXPECT_EQ(1, server_connection_->streamInfo().dynamicMetadata().filter_metadata_size());
+
+  auto metadata = server_connection_->streamInfo().dynamicMetadata().filter_metadata();
+  EXPECT_EQ(1, metadata.size());
+  EXPECT_EQ(1, metadata.count(ListenerFilters::ListenerFilterNames::get().ProxyProtocol));
+
+  auto fields = metadata.at(ListenerFilters::ListenerFilterNames::get().ProxyProtocol).fields();
+  EXPECT_EQ(1, fields.size());
+  EXPECT_EQ(1, fields.count(std::to_string(static_cast<uint8_t>(0x02))));
+
+  auto value_type_authority = fields.at(std::to_string(static_cast<uint8_t>(0x02))).string_value();
+  ASSERT_THAT(value_type_authority, ElementsAre(0x66, 0x6f, 0x6f, 0x2e, 0x63, 0x6f, 0x6d));
+
+  disconnect();
+}
+
+TEST_P(ProxyProtocolTest, V2WrongTLVLength) {
+  // A well-formed ipv4/tcp with buffer[14]15] being 0x00 and 0x10. It says we should have 16 bytes
+  // following.
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x10, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
+
+  // tlv[2] should be 0x1 since there's only one byte for tlv value.
+  constexpr uint8_t tlv[] = {0x0, 0x0, 0x2, 0xff};
+
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  proto_config.add_tlv_types(0x00);
+
+  connect(false, &proto_config);
+  write(buffer, sizeof(buffer));
+  write(tlv, sizeof(tlv));
+
+  expectProxyProtoError();
+}
+
+TEST_P(ProxyProtocolTest, V2IncompleteTLV) {
+  // A ipv4/tcp with buffer[14]15] being 0x00 and 0x11. It says we should have 17 bytes following,
+  // however we have 20.
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x11, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
+
+  // a TLV of type 0x00 with size of 4 (1 byte is value)
+  constexpr uint8_t tlv1[] = {0x0, 0x0, 0x1, 0xff};
+  // a TLV of type 0x01 with size of 4 (1 byte is value)
+  constexpr uint8_t tlv2[] = {0x1, 0x0, 0x1, 0xff};
+
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  proto_config.add_tlv_types(0x00);
+  proto_config.add_tlv_types(0x01);
+
+  connect(false, &proto_config);
+  write(buffer, sizeof(buffer));
+  write(tlv1, sizeof(tlv1));
+  write(tlv2, sizeof(tlv2));
+
+  expectProxyProtoError();
+}
+
 TEST_P(ProxyProtocolTest, MalformedProxyLine) {
   connect(false);
 
@@ -1014,7 +1204,10 @@ public:
     EXPECT_CALL(factory_, createListenerFilterChain(_))
         .WillOnce(Invoke([&](Network::ListenerFilterManager& filter_manager) -> bool {
           filter_manager.addAcceptFilter(
-              nullptr, std::make_unique<Filter>(std::make_shared<Config>(listenerScope())));
+              nullptr,
+              std::make_unique<Filter>(std::make_shared<Config>(
+                  listenerScope(),
+                  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol())));
           return true;
         }));
   }
@@ -1136,6 +1329,52 @@ TEST_P(WildcardProxyProtocolTest, BasicV6) {
   EXPECT_TRUE(server_connection_->localAddressRestored());
 
   disconnect();
+}
+
+TEST(ProxyProtocolTest, InvalidPPVTypePassedToConfig) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  // valid TLV types
+  proto_config.add_tlv_types(0x01);
+  proto_config.add_tlv_types(0x02);
+  // invalid TLV types
+  proto_config.add_tlv_types(300);
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  ProxyProtocol::Config config(factory_context.scope_, proto_config);
+  EXPECT_EQ(2, config.numberOfNeededTlvTypes());
+}
+
+TEST(ProxyProtocolConfigFactoryTest, TestCreateFactory) {
+  Server::Configuration::NamedListenerFilterConfigFactory* factory =
+      Registry::FactoryRegistry<Server::Configuration::NamedListenerFilterConfigFactory>::
+          getFactory(ListenerFilters::ListenerFilterNames::get().ProxyProtocol);
+
+  EXPECT_EQ(factory->name(), ListenerFilters::ListenerFilterNames::get().ProxyProtocol);
+
+  const std::string yaml = R"EOF(
+      tlv_types: [0x01, 0x1a]
+)EOF";
+
+  ProtobufTypes::MessagePtr proto_config = factory->createEmptyConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+
+  Server::Configuration::MockListenerFactoryContext context;
+  EXPECT_CALL(context, scope()).Times(1);
+  EXPECT_CALL(context, messageValidationVisitor()).Times(1);
+  Network::ListenerFilterFactoryCb cb =
+      factory->createListenerFilterFactoryFromProto(*proto_config, nullptr, context);
+
+  Network::MockListenerFilterManager manager;
+  Network::ListenerFilterPtr added_filter;
+  EXPECT_CALL(manager, addAcceptFilter_(_, _))
+      .WillOnce(Invoke([&added_filter](const Network::ListenerFilterMatcherSharedPtr&,
+                                       Network::ListenerFilterPtr& filter) {
+        added_filter = std::move(filter);
+      }));
+  cb(manager);
+
+  // Make sure we actually create the correct type!
+  EXPECT_NE(dynamic_cast<ProxyProtocol::Filter*>(added_filter.get()), nullptr);
 }
 
 // Test that the deprecated extension name still functions.

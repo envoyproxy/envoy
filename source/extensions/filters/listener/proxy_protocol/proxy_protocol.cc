@@ -1,6 +1,7 @@
 #include "extensions/filters/listener/proxy_protocol/proxy_protocol.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <memory>
@@ -15,16 +16,41 @@
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
+#include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
+
+#include "extensions/filters/listener/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace ListenerFilters {
 namespace ProxyProtocol {
 
-Config::Config(Stats::Scope& scope) : stats_{ALL_PROXY_PROTOCOL_STATS(POOL_COUNTER(scope))} {}
+Config::Config(
+    Stats::Scope& scope,
+    const envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol& proto_config)
+    : stats_{ALL_PROXY_PROTOCOL_STATS(POOL_COUNTER(scope))} {
+  uint32_t tlv_type{0};
+  for (int i = 0; i < proto_config.tlv_types_size(); i++) {
+    tlv_type = proto_config.tlv_types(i);
+    if (tlv_type > 0xFF) {
+      // the TLV type in Proxy Protocol V2 is defined as uint8_t, it should not be bigger than 0xFF.
+      ENVOY_LOG(
+          warn,
+          "proxy_protocol: TLV type should be between 0~255. is out of the range and discarded.");
+      continue;
+    }
+    tlv_types_.insert(0xFF & tlv_type);
+  }
+}
+
+bool Config::isTlvTypeNeeded(uint8_t type) const {
+  return tlv_types_.end() != tlv_types_.find(type);
+}
+
+size_t Config::numberOfNeededTlvTypes() const { return tlv_types_.size(); }
 
 Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   ENVOY_LOG(debug, "proxy_protocol: New connection accepted");
@@ -54,7 +80,7 @@ void Filter::onReadWorker() {
   Network::ConnectionSocket& socket = cb_->socket();
 
   if ((!proxy_protocol_header_.has_value() && !readProxyHeader(socket.ioHandle().fd())) ||
-      (proxy_protocol_header_.has_value() && !parseExtensions(socket.ioHandle().fd()))) {
+      (proxy_protocol_header_.has_value() && !readExtensions(socket.ioHandle().fd()))) {
     // We return if a) we do not yet have the header, or b) we have the header but not yet all
     // the extension data. In both cases we'll be called again when the socket is ready to read
     // and pick up where we left off.
@@ -231,11 +257,10 @@ void Filter::parseV1Header(char* buf, size_t len) {
   }
 }
 
-bool Filter::parseExtensions(os_fd_t fd) {
+bool Filter::parseExtensions(os_fd_t fd, uint8_t* buf, size_t buf_size, size_t* buf_off) {
   // If we ever implement extensions elsewhere, be sure to
   // continue to skip and ignore those for LOCAL.
   while (proxy_protocol_header_.value().extensions_length_) {
-    // buf_ is no longer in use so we re-use it to read/discard
     int bytes_avail;
     auto& os_syscalls = Api::OsSysCallsSingleton::get();
     if (os_syscalls.ioctl(fd, FIONREAD, &bytes_avail).rc_ < 0) {
@@ -244,14 +269,103 @@ bool Filter::parseExtensions(os_fd_t fd) {
     if (bytes_avail == 0) {
       return false;
     }
-    bytes_avail = std::min(size_t(bytes_avail), sizeof(buf_));
+    bytes_avail = std::min(size_t(bytes_avail), buf_size);
     bytes_avail = std::min(size_t(bytes_avail), proxy_protocol_header_.value().extensions_length_);
-    const Api::SysCallSizeResult recv_result = os_syscalls.recv(fd, buf_, bytes_avail, 0);
+    buf += buf_off ? *buf_off : 0;
+    const Api::SysCallSizeResult recv_result = os_syscalls.recv(fd, buf, bytes_avail, 0);
     if (recv_result.rc_ != bytes_avail) {
       throw EnvoyException("failed to read proxy protocol extension");
     }
     proxy_protocol_header_.value().extensions_length_ -= recv_result.rc_;
+
+    if (buf_off) {
+      *buf_off += recv_result.rc_;
+    }
   }
+
+  return true;
+}
+
+/**
+ * @note  A TLV is arranged in the following format: @n
+ *        1st byte is type, @n
+ *        2nd and 3rd bytes are length of value with 2nd being the high byte, @n
+ *        Starting from the 4th bytes are the value.
+ */
+void Filter::parseTlvs(const std::vector<uint8_t>& tlvs) {
+  std::string filter_name = ListenerFilterNames::get().ProxyProtocol;
+  size_t size = tlvs.size();
+  uint8_t tlv_type;
+  uint8_t tlv_length_upper;
+  uint8_t tlv_length_lower;
+  size_t tlv_value_length;
+  size_t idx{0};
+  while (idx < size) {
+    // get type
+    tlv_type = tlvs[idx];
+    idx++;
+
+    // get length
+    if ((idx + 1) >= size) {
+      throw EnvoyException(
+          fmt::format("failed to read proxy protocol extension. No bytes for TLV length. "
+                      "Extension length is {}, current index is {}, current type is {}.",
+                      size, idx, tlv_type));
+    }
+
+    tlv_length_upper = tlvs[idx];
+    tlv_length_lower = tlvs[idx + 1];
+    tlv_value_length = (tlv_length_upper << 8) + tlv_length_lower;
+    idx += 2;
+
+    // get the value
+    if ((idx + tlv_value_length - 1) >= size) {
+      throw EnvoyException(
+          fmt::format("failed to read proxy protocol extension. No bytes for TLV value. "
+                      "Extension length is {}, current index is {}, current type is {}, current "
+                      "value length is {}.",
+                      size, idx, tlv_type, tlv_length_upper));
+    }
+
+    // only save to dynamic metadata if this type of TLV is needed
+    if (config_->isTlvTypeNeeded(tlv_type)) {
+      std::string tlv_value(reinterpret_cast<char const*>(tlvs.data() + idx), tlv_value_length);
+      auto metadata_value = ProtobufWkt::Value();
+      metadata_value.set_string_value(std::move(tlv_value));
+
+      ProtobufWkt::Struct metadata(
+          (*cb_->dynamicMetadata().mutable_filter_metadata())[filter_name]);
+      metadata.mutable_fields()->insert({std::to_string(tlv_type), metadata_value});
+      cb_->setDynamicMetadata(filter_name, metadata);
+    } else {
+      ENVOY_LOG(debug, "proxy_protocol: Skip TLV of type {} since it's not needed", tlv_type);
+    }
+
+    idx += tlv_value_length;
+  }
+}
+
+bool Filter::readExtensions(os_fd_t fd) {
+  // parse and discard the extensions if this is a local command or there's no TLV needs to be saved
+  // to metadata
+  if (proxy_protocol_header_.value().local_command_ || 0 == config_->numberOfNeededTlvTypes()) {
+    // buf_ is no longer in use so we re-use it to read/discard
+    return parseExtensions(fd, reinterpret_cast<uint8_t*>(buf_), sizeof(buf_), nullptr);
+  }
+
+  // Initialize the buf_tlv_ only when we need to read the TLVs.
+  if (!buf_tlv_init_) {
+    buf_tlv_.resize(proxy_protocol_header_.value().extensions_length_);
+    buf_tlv_init_ = true;
+  }
+
+  // parse until we have all the TLVs in buf_tlv
+  if (!parseExtensions(fd, buf_tlv_.data(), buf_tlv_.size(), &buf_tlv_off_)) {
+    return false;
+  }
+
+  parseTlvs(buf_tlv_);
+
   return true;
 }
 

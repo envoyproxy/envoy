@@ -17,4 +17,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message ProxyProtocol {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.listener.proxy_protocol.v2.ProxyProtocol";
+
+  // Types of TLV extensions that will be extracted from Proxy Protocol (V2) Header and
+  // saved to dynamic metadata.
+  repeated uint32 tlv_types = 1;
 }
