@@ -45,6 +45,8 @@ SocketImpl::SocketImpl(IoHandlePtr&& io_handle,
 }
 
 Api::SysCallIntResult SocketImpl::bind(Network::Address::InstanceConstSharedPtr address) {
+  Api::SysCallIntResult bind_result;
+
   if (address->type() == Address::Type::Pipe) {
     const Address::Pipe* pipe = address->pipe();
     const auto* pipe_sa = reinterpret_cast<const sockaddr_un*>(address->sockAddr());
@@ -56,8 +58,8 @@ Api::SysCallIntResult SocketImpl::bind(Network::Address::InstanceConstSharedPtr 
       unlink(pipe_sa->sun_path);
     }
     // Not storing a reference to syscalls singleton because of unit test mocks
-    auto bind_result = Api::OsSysCallsSingleton::get().bind(io_handle_->fd(), address->sockAddr(),
-                                                            address->sockAddrLen());
+    bind_result = Api::OsSysCallsSingleton::get().bind(io_handle_->fd(), address->sockAddr(),
+                                                       address->sockAddrLen());
     if (pipe->mode() != 0 && !abstract_namespace && bind_result.rc_ == 0) {
       auto set_permissions = Api::OsSysCallsSingleton::get().chmod(pipe_sa->sun_path, pipe->mode());
       if (set_permissions.rc_ != 0) {
@@ -69,8 +71,12 @@ Api::SysCallIntResult SocketImpl::bind(Network::Address::InstanceConstSharedPtr 
     return bind_result;
   }
 
-  return Api::OsSysCallsSingleton::get().bind(io_handle_->fd(), address->sockAddr(),
-                                              address->sockAddrLen());
+  bind_result = Api::OsSysCallsSingleton::get().bind(io_handle_->fd(), address->sockAddr(),
+                                                     address->sockAddrLen());
+  if (bind_result.rc_ == 0 && address->ip()->port() == 0) {
+    local_address_ = SocketInterfaceSingleton::get().addressFromFd(io_handle_->fd());
+  }
+  return bind_result;
 }
 
 Api::SysCallIntResult SocketImpl::listen(int backlog) {
@@ -78,8 +84,12 @@ Api::SysCallIntResult SocketImpl::listen(int backlog) {
 }
 
 Api::SysCallIntResult SocketImpl::connect(const Network::Address::InstanceConstSharedPtr address) {
-  return Api::OsSysCallsSingleton::get().connect(io_handle_->fd(), address->sockAddr(),
-                                                 address->sockAddrLen());
+  auto result = Api::OsSysCallsSingleton::get().connect(io_handle_->fd(), address->sockAddr(),
+                                                        address->sockAddrLen());
+  if (address->type() == Address::Type::Ip) {
+    local_address_ = SocketInterfaceSingleton::get().addressFromFd(io_handle_->fd());
+  }
+  return result;
 }
 
 Api::SysCallIntResult SocketImpl::setSocketOption(int level, int optname, const void* optval,
