@@ -31,8 +31,7 @@ class MockGenericConnPool : public GenericConnPool {
   MOCK_METHOD(absl::optional<Http::Protocol>, protocol, (), (const));
   MOCK_METHOD(bool, initialize,
               (Upstream::ClusterManager&, const RouteEntry&,
-               std::function<Http::Protocol(const Upstream::ClusterInfo&)>,
-               Upstream::LoadBalancerContext*));
+               Upstream::ClusterManager::ProtocolResolutionFunc, Upstream::LoadBalancerContext*));
   MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, host, (), (const));
 };
 
