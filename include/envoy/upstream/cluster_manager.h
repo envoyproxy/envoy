@@ -151,7 +151,7 @@ public:
    */
   virtual ThreadLocalCluster* get(absl::string_view cluster) PURE;
 
-  using ProtocolResolutionFunc = std::function<Http::Protocol(const Host&)>;
+  using ProtocolResolutionFunc = std::function<Http::Protocol(const HostDescription&)>;
 
   /**
    * Allocate a load balanced HTTP connection pool for a cluster. This is *per-thread* so that

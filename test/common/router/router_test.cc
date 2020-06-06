@@ -508,13 +508,13 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
 
 TEST_F(RouterTest, Http1Upstream) {
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
-      .WillOnce(Invoke([this](const auto&, auto, auto protocol_cb,
-                              auto) -> Http::ConnectionPool::Instance* {
-        EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, upstreamHttpProtocol(_))
-            .WillOnce(Return(Http::Protocol::Http11));
-        EXPECT_EQ(Http::Protocol::Http11, protocol_cb(*cm_.thread_local_cluster_.cluster_.info_));
-        return &cm_.conn_pool_;
-      }));
+      .WillOnce(Invoke(
+          [this](const auto&, auto, auto protocol_cb, auto) -> Http::ConnectionPool::Instance* {
+            EXPECT_CALL(cm_.conn_pool_.host_->cluster_, upstreamHttpProtocol(_))
+                .WillOnce(Return(Http::Protocol::Http11));
+            EXPECT_EQ(Http::Protocol::Http11, protocol_cb(*cm_.conn_pool_.host_));
+            return &cm_.conn_pool_;
+          }));
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();
 
@@ -538,13 +538,13 @@ TEST_F(RouterTest, Http1Upstream) {
 // suppression is configured.
 TEST_F(RouterTestSuppressEnvoyHeaders, Http1Upstream) {
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
-      .WillOnce(Invoke([this](const auto&, auto, auto protocol_cb,
-                              auto) -> Http::ConnectionPool::Instance* {
-        EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, upstreamHttpProtocol(_))
-            .WillOnce(Return(Http::Protocol::Http11));
-        EXPECT_EQ(Http::Protocol::Http11, protocol_cb(*cm_.thread_local_cluster_.cluster_.info_));
-        return &cm_.conn_pool_;
-      }));
+      .WillOnce(Invoke(
+          [this](const auto&, auto, auto protocol_cb, auto) -> Http::ConnectionPool::Instance* {
+            EXPECT_CALL(cm_.conn_pool_.host_->cluster_, upstreamHttpProtocol(_))
+                .WillOnce(Return(Http::Protocol::Http11));
+            EXPECT_EQ(Http::Protocol::Http11, protocol_cb(*cm_.conn_pool_.host_));
+            return &cm_.conn_pool_;
+          }));
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();
 
@@ -564,13 +564,13 @@ TEST_F(RouterTestSuppressEnvoyHeaders, Http1Upstream) {
 
 TEST_F(RouterTest, Http2Upstream) {
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
-      .WillOnce(Invoke([this](const auto&, auto, auto protocol_cb,
-                              auto) -> Http::ConnectionPool::Instance* {
-        EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, upstreamHttpProtocol(_))
-            .WillOnce(Return(Http::Protocol::Http2));
-        EXPECT_EQ(Http::Protocol::Http2, protocol_cb(*cm_.thread_local_cluster_.cluster_.info_));
-        return &cm_.conn_pool_;
-      }));
+      .WillOnce(Invoke(
+          [this](const auto&, auto, auto protocol_cb, auto) -> Http::ConnectionPool::Instance* {
+            EXPECT_CALL(cm_.conn_pool_.host_->cluster_, upstreamHttpProtocol(_))
+                .WillOnce(Return(Http::Protocol::Http2));
+            EXPECT_EQ(Http::Protocol::Http2, protocol_cb(*cm_.conn_pool_.host_));
+            return &cm_.conn_pool_;
+          }));
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();
 
