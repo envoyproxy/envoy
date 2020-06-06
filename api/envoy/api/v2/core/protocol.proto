@@ -17,7 +17,28 @@ import "validate/validate.proto";
 message TcpProtocolOptions {
 }
 
+// [#next-free-field: 6]
 message HttpProtocolOptions {
+  // Action to take when Envoy receives client request with header names containing underscore
+  // characters.
+  // Underscore character is allowed in header names by the RFC-7230 and this behavior is
+  // implemented as a security measure due to systems that treat '_' and '-' as interchangeable.
+  // Envoy by default allows client request headers with underscore characters.
+  enum HeadersWithUnderscoresAction {
+    // Allow headers with underscores. This is the default behavior.
+    ALLOW = 0;
+
+    // Reject client request. HTTP/1 requests are rejected with the 400 status. HTTP/2 requests
+    // end with the stream reset. The "httpN.requests_rejected_with_underscores_in_headers" counter
+    // is incremented for each rejected request.
+    REJECT_REQUEST = 1;
+
+    // Drop the header with name containing underscores. The header is dropped before the filter
+    // chain is invoked and as such filters will not see dropped headers. The
+    // "httpN.dropped_headers_with_underscores" is incremented for each dropped header.
+    DROP_HEADER = 2;
+  }
+
   // The idle timeout for connections. The idle timeout is defined as the
   // period in which there are no active requests. If not set, there is no idle timeout. When the
   // idle timeout is reached the connection will be closed. If the connection is an HTTP/2
@@ -44,6 +65,11 @@ message HttpProtocolOptions {
   // maximum number of request headers allowed is 100. Requests that exceed this limit will receive
   // a 431 response for HTTP/1.x and cause a stream reset for HTTP/2.
   google.protobuf.UInt32Value max_headers_count = 2 [(validate.rules).uint32 = {gte: 1}];
+
+  // Action to take when a client request with a header name containing underscore characters is
+  // received. If this setting is not specified, the value defaults to ALLOW. Note: upstream
+  // responses are not affected by this setting.
+  HeadersWithUnderscoresAction headers_with_underscores_action = 5;
 }
 
 message Http1ProtocolOptions {

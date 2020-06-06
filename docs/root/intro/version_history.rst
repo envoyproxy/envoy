@@ -1,6 +1,10 @@
 Version history
 ---------------
 
+1.12.4 (Pending)
+================
+* http: added :ref:`headers_with_underscores_action setting <envoy_api_field_core.HttpProtocolOptions.headers_with_underscores_action>` to control how client requests with header names containing underscore characters are handled. The options are to allow such headers, reject request or drop headers. The default is to allow headers, preserving existing behavior.
+
 1.12.3 (March 3, 2020)
 ======================
 * buffer: force copy when appending small slices to OwnedImpl buffer to avoid fragmentation.

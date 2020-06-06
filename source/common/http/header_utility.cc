@@ -130,9 +130,13 @@ bool HeaderUtility::matchHeaders(const HeaderMap& request_headers, const HeaderD
   return match != header_data.invert_match_;
 }
 
-bool HeaderUtility::headerIsValid(const absl::string_view header_value) {
+bool HeaderUtility::headerValueIsValid(const absl::string_view header_value) {
   return (nghttp2_check_header_value(reinterpret_cast<const uint8_t*>(header_value.data()),
                                      header_value.size()) != 0);
+}
+
+bool HeaderUtility::headerNameContainsUnderscore(const absl::string_view header_name) {
+  return header_name.find('_') != absl::string_view::npos;
 }
 
 bool HeaderUtility::authorityIsValid(const absl::string_view header_value) {

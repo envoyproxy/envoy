@@ -389,6 +389,13 @@ public:
    * one.
    */
   virtual bool shouldMergeSlashes() const PURE;
+
+  /**
+   * @return the action HttpConnectionManager should take when receiving client request
+   * headers containing underscore characters.
+   */
+  virtual envoy::api::v2::core::HttpProtocolOptions::HeadersWithUnderscoresAction
+  headersWithUnderscoresAction() const PURE;
 };
 } // namespace Http
 } // namespace Envoy

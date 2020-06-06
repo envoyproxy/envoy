@@ -414,7 +414,9 @@ public:
 
   FakeHttpConnection(SharedConnectionWrapper& shared_connection, Stats::Store& store, Type type,
                      Event::TestTimeSystem& time_system, uint32_t max_request_headers_kb,
-                     uint32_t max_request_headers_count);
+                     uint32_t max_request_headers_count,
+                     envoy::api::v2::core::HttpProtocolOptions::HeadersWithUnderscoresAction
+                         headers_with_underscores_action);
 
   // By default waitForNewStream assumes the next event is a new stream and
   // returns AssertionFailure if an unexpected event occurs. If a caller truly
@@ -555,11 +557,13 @@ public:
 
   // Returns the new connection via the connection argument.
   ABSL_MUST_USE_RESULT
-  testing::AssertionResult
-  waitForHttpConnection(Event::Dispatcher& client_dispatcher, FakeHttpConnectionPtr& connection,
-                        std::chrono::milliseconds timeout = TestUtility::DefaultTimeout,
-                        uint32_t max_request_headers_kb = Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
-                        uint32_t max_request_headers_count = Http::DEFAULT_MAX_HEADERS_COUNT);
+  testing::AssertionResult waitForHttpConnection(
+      Event::Dispatcher& client_dispatcher, FakeHttpConnectionPtr& connection,
+      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout,
+      uint32_t max_request_headers_kb = Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
+      uint32_t max_request_headers_count = Http::DEFAULT_MAX_HEADERS_COUNT,
+      envoy::api::v2::core::HttpProtocolOptions::HeadersWithUnderscoresAction
+          headers_with_underscores_action = envoy::api::v2::core::HttpProtocolOptions::ALLOW);
 
   ABSL_MUST_USE_RESULT
   testing::AssertionResult

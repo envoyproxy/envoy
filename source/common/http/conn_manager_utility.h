@@ -37,7 +37,9 @@ public:
   autoCreateCodec(Network::Connection& connection, const Buffer::Instance& data,
                   ServerConnectionCallbacks& callbacks, Stats::Scope& scope,
                   const Http1Settings& http1_settings, const Http2Settings& http2_settings,
-                  uint32_t max_request_headers_kb, uint32_t max_request_headers_count);
+                  uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
+                  envoy::api::v2::core::HttpProtocolOptions::HeadersWithUnderscoresAction
+                      headers_with_underscores_action);
 
   /**
    * Mutates request headers in various ways. This functionality is broken out because of its
