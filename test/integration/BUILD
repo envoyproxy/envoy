@@ -230,6 +230,7 @@ exports_files(["test_utility.sh"])
 
 envoy_sh_test(
     name = "hotrestart_test",
+    size = "enormous",
     srcs = envoy_select_hot_restart([
         "hotrestart_test.sh",
     ]),
@@ -1194,6 +1195,7 @@ envoy_cc_test(
     srcs = [
         "local_reply_integration_test.cc",
     ],
+    tags = ["fails_on_windows"],
     deps = [
         ":http_integration_lib",
         ":http_protocol_integration_lib",

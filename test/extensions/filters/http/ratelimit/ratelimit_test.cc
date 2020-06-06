@@ -269,15 +269,15 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithHeaders) {
       .Times(0);
 
   Http::HeaderMapPtr request_headers_to_add{
-      new Http::TestHeaderMapImpl{{"x-rls-rate-limited", "true"}}};
-  Http::HeaderMapPtr rl_headers{
-      new Http::TestHeaderMapImpl{{"x-ratelimit-limit", "1000"}, {"x-ratelimit-remaining", "500"}}};
+      new Http::TestRequestHeaderMapImpl{{"x-rls-rate-limited", "true"}}};
+  Http::HeaderMapPtr rl_headers{new Http::TestResponseHeaderMapImpl{
+      {"x-ratelimit-limit", "1000"}, {"x-ratelimit-remaining", "500"}}};
 
   request_callbacks_->complete(
       Filters::Common::RateLimit::LimitStatus::OK,
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl(*rl_headers)},
       Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl(*request_headers_to_add)});
-  Http::TestHeaderMapImpl expected_headers(*rl_headers);
+  Http::TestResponseHeaderMapImpl expected_headers(*rl_headers);
   Http::TestResponseHeaderMapImpl response_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
   EXPECT_EQ(true, (expected_headers == response_headers));
@@ -476,9 +476,9 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseWithHeaders) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
 
-  Http::HeaderMapPtr rl_headers{new Http::TestHeaderMapImpl{
+  Http::HeaderMapPtr rl_headers{new Http::TestResponseHeaderMapImpl{
       {"x-ratelimit-limit", "1000"}, {"x-ratelimit-remaining", "0"}, {"retry-after", "33"}}};
-  Http::TestHeaderMapImpl expected_headers(*rl_headers);
+  Http::TestResponseHeaderMapImpl expected_headers(*rl_headers);
   expected_headers.addCopy(":status", "429");
   expected_headers.addCopy("x-envoy-ratelimited", Http::Headers::get().EnvoyRateLimitedValues.True);
 
@@ -488,7 +488,7 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseWithHeaders) {
               setResponseFlag(StreamInfo::ResponseFlag::RateLimited));
 
   Http::HeaderMapPtr request_headers_to_add{
-      new Http::TestHeaderMapImpl{{"x-rls-rate-limited", "true"}}};
+      new Http::TestRequestHeaderMapImpl{{"x-rls-rate-limited", "true"}}};
 
   Http::ResponseHeaderMapPtr h{new Http::TestResponseHeaderMapImpl(*rl_headers)};
   Http::RequestHeaderMapPtr uh{new Http::TestRequestHeaderMapImpl(*request_headers_to_add)};
