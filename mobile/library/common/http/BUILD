@@ -20,7 +20,6 @@ envoy_cc_library(
         "@envoy//include/envoy/buffer:buffer_interface",
         "@envoy//include/envoy/event:dispatcher_interface",
         "@envoy//include/envoy/http:api_listener_interface",
-        "@envoy//include/envoy/http:async_client_interface",
         "@envoy//include/envoy/http:header_map_interface",
         "@envoy//include/envoy/stats:stats_interface",
         "@envoy//include/envoy/stats:stats_macros",

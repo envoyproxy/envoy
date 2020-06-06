@@ -3,10 +3,8 @@
 #include <unordered_map>
 
 #include "envoy/buffer/buffer.h"
-#include "envoy/event/deferred_deletable.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/api_listener.h"
-#include "envoy/http/async_client.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
 #include "envoy/stats/stats_macros.h"
