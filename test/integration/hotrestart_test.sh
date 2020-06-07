@@ -163,15 +163,22 @@ function run_testsuite() {
   CONFIG_DIFF=$(diff "${UPDATED_HOT_RESTART_JSON}" "${HOT_RESTART_JSON_1}")
   [[ -z "${CONFIG_DIFF}" ]]
 
-  start_test Checking server.hot_restart_generation 2
-  GENERATION_1=$(curl -sg http://${ADMIN_ADDRESS_1}/stats | grep server.hot_restart_generation)
-  check [ "$GENERATION_1" = "server.hot_restart_generation: 2" ];
-
   ADMIN_ADDRESS_PATH_2="${TEST_TMPDIR}"/admin.2."${TEST_INDEX}".address
   start_test Starting epoch 2
   run_in_background_saving_pid "${ENVOY_BIN}" -c "${UPDATED_HOT_RESTART_JSON}" \
       --restart-epoch 2  --base-id "${BASE_ID}" --service-cluster cluster --service-node node \
       --use-fake-symbol-table "$FAKE_SYMBOL_TABLE" --admin-address-path "${ADMIN_ADDRESS_PATH_2}"
+
+  # Now wait for the first server to exit.
+  start_test Waiting for epoch 0 to finish.
+  echo wait ${FIRST_SERVER_PID}
+  wait ${FIRST_SERVER_PID}
+  [[ $? == 0 ]]
+
+  sleep 3
+  start_test Checking server.hot_restart_generation 2
+  GENERATION_1=$(curl -sg http://${ADMIN_ADDRESS_1}/stats | grep server.hot_restart_generation)
+  check [ "$GENERATION_1" = "server.hot_restart_generation: 2" ];
 
   THIRD_SERVER_PID=$BACKGROUND_PID
   sleep 3
@@ -182,11 +189,6 @@ function run_testsuite() {
     "-u" "${HOT_RESTART_JSON_2}"
   CONFIG_DIFF=$(diff "${UPDATED_HOT_RESTART_JSON}" "${HOT_RESTART_JSON_2}")
   [[ -z "${CONFIG_DIFF}" ]]
-
-  # First server should already be gone.
-  start_test Waiting for epoch 0
-  wait ${FIRST_SERVER_PID}
-  [[ $? == 0 ]]
 
   #Send SIGUSR1 signal to the second server, this should not kill it
   start_test Sending SIGUSR1 to the second server
