@@ -66,6 +66,23 @@ public:
     Host = 38,
   };
 
+  enum class ErrorCode : uint8_t {
+    NoError = 0,
+    ProtocolError,
+    InternalError,
+    FlowControlError,
+    SettingsTimeout,
+    StreamClosed,
+    FrameSizeError,
+    RefusedStream,
+    Cancel,
+    CompressionError,
+    ConnectError,
+    EnhanceYourCalm,
+    InadequateSecurity,
+    Http11Required
+  };
+
   enum class ResponseStatus { Unknown, Ok, NotFound };
 
   // Methods for creating HTTP2 frames
@@ -77,6 +94,12 @@ public:
                                                HeadersFlags flags = HeadersFlags::None);
   static Http2Frame makeEmptyDataFrame(uint32_t stream_index, DataFlags flags = DataFlags::None);
   static Http2Frame makePriorityFrame(uint32_t stream_index, uint32_t dependent_index);
+
+  static Http2Frame makeEmptyPushPromiseFrame(uint32_t stream_index, uint32_t promised_stream_index,
+                                              HeadersFlags flags = HeadersFlags::None);
+  static Http2Frame makeResetStreamFrame(uint32_t stream_index, ErrorCode error_code);
+  static Http2Frame makeEmptyGoAwayFrame(uint32_t last_stream_index, ErrorCode error_code);
+
   static Http2Frame makeWindowUpdateFrame(uint32_t stream_index, uint32_t increment);
   static Http2Frame makeMalformedRequest(uint32_t stream_index);
   static Http2Frame makeMalformedRequestWithZerolenHeader(uint32_t stream_index,
@@ -86,6 +109,13 @@ public:
                                 absl::string_view path);
   static Http2Frame makePostRequest(uint32_t stream_index, absl::string_view host,
                                     absl::string_view path);
+  /**
+   * Creates a frame with the given contents. This frame can be
+   * malformed/invalid depending on the given contents.
+   * @param contents the contents of the newly created frame.
+   * @return an Http2Frame that is comprised of the given contents.
+   */
+  static Http2Frame makeGenericFrame(absl::string_view contents);
 
   Type type() const { return static_cast<Type>(data_[3]); }
   ResponseStatus responseStatus() const;
