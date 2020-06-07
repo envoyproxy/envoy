@@ -769,13 +769,6 @@ void ClientConnectionImpl::connect() {
       file_event_->activate(Event::FileReadyType::Write);
     }
   }
-
-  // The local address can only be retrieved for IP connections. Other
-  // types, such as UDS, don't have a notion of a local address.
-  // TODO(fcoras) move to SocketImpl?
-  if (socket_->remoteAddress()->type() == Address::Type::Ip) {
-    socket_->setLocalAddress(SocketInterfaceSingleton::get().addressFromFd(ioHandle().fd()));
-  }
 }
 } // namespace Network
 } // namespace Envoy

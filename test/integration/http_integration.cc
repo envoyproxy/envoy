@@ -1292,7 +1292,7 @@ void HttpIntegrationTest::testMaxStreamDurationWithRetry(bool invoke_retry_upstr
 
     EXPECT_EQ("408", response->headers().getStatusValue());
   } else {
-    Http::TestHeaderMapImpl response_headers{{":status", "200"}};
+    Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
     upstream_request_->encodeHeaders(response_headers, true);
 
     response->waitForHeaders();
