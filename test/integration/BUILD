@@ -255,6 +255,19 @@ envoy_sh_test(
 )
 
 envoy_cc_test(
+    name = "alpn_selection_integration_test",
+    srcs = [
+        "alpn_selection_integration_test.cc",
+    ],
+    data = [
+        "//test/config/integration/certs",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+envoy_cc_test(
     name = "header_integration_test",
     srcs = [
         "header_integration_test.cc",
