@@ -5,7 +5,6 @@
 
 #include "envoy/common/platform.h"
 
-#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/network/address_impl.h"
@@ -55,13 +54,7 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
                   << "' with error: " << strerror(result.errno_) << " (" << result.errno_ << ")";
     return nullptr;
   }
-  // If the port we bind is zero, then the OS will pick a free port for us (assuming there are
-  // any), and we need to find out the port number that the OS picked so we can return it.
-  // TODO(fcoras) maybe move to SocketImpl
-  if (addr_port->ip()->port() == 0) {
-    return SocketInterface::addressFromFd(sock.ioHandle().fd());
-  }
-  return addr_port;
+  return sock.localAddress();
 }
 
 Address::InstanceConstSharedPtr findOrCheckFreePort(const std::string& addr_port,
@@ -149,15 +142,8 @@ Address::InstanceConstSharedPtr getAnyAddress(const Address::IpVersion version, 
 }
 
 bool supportsIpVersion(const Address::IpVersion version) {
-  Address::InstanceConstSharedPtr addr = getCanonicalLoopbackAddress(version);
-  SocketImpl sock(Address::SocketType::Stream, addr);
-  if (0 != sock.bind(addr).rc_) {
-    // Socket bind failed.
-    RELEASE_ASSERT(sock.ioHandle().close().err_ == nullptr, "");
-    return false;
-  }
-  RELEASE_ASSERT(sock.ioHandle().close().err_ == nullptr, "");
-  return true;
+  return Network::SocketInterfaceSingleton::get().ipFamilySupported(
+      version == Address::IpVersion::v4 ? AF_INET : AF_INET6);
 }
 
 std::string ipVersionToDnsFamily(Network::Address::IpVersion version) {
@@ -185,7 +171,7 @@ bindFreeLoopbackPort(Address::IpVersion version, Address::SocketType type) {
     throw EnvoyException(msg);
   }
 
-  return std::make_pair(SocketInterface::addressFromFd(sock->ioHandle().fd()), std::move(sock));
+  return std::make_pair(sock->localAddress(), std::move(sock));
 }
 
 TransportSocketPtr createRawBufferSocket() { return std::make_unique<RawBufferSocket>(); }
@@ -230,9 +216,7 @@ Api::IoCallUint64Result readFromSocket(IoHandle& handle, const Address::Instance
 UdpSyncPeer::UdpSyncPeer(Network::Address::IpVersion version)
     : socket_(
           std::make_unique<UdpListenSocket>(getCanonicalLoopbackAddress(version), nullptr, true)) {
-  RELEASE_ASSERT(
-      Api::OsSysCallsSingleton::get().setsocketblocking(socket_->ioHandle().fd(), true).rc_ != -1,
-      "");
+  RELEASE_ASSERT(socket_->setBlockingForTest(true).rc_ != -1, "");
 }
 
 void UdpSyncPeer::write(const std::string& buffer, const Network::Address::Instance& peer) {

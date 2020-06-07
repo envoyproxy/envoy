@@ -10,18 +10,16 @@ namespace Extensions {
 namespace ListenerFilters {
 namespace OriginalDst {
 
-Network::Address::InstanceConstSharedPtr OriginalDstFilter::getOriginalDst(os_fd_t fd) {
-  return Network::Utility::getOriginalDst(fd);
+Network::Address::InstanceConstSharedPtr OriginalDstFilter::getOriginalDst(Network::Socket& sock) {
+  return Network::Utility::getOriginalDst(sock);
 }
 
 Network::FilterStatus OriginalDstFilter::onAccept(Network::ListenerFilterCallbacks& cb) {
   ENVOY_LOG(debug, "original_dst: New connection accepted");
   Network::ConnectionSocket& socket = cb.socket();
-  const Network::Address::Instance& local_address = *socket.localAddress();
 
-  if (local_address.type() == Network::Address::Type::Ip) {
-    Network::Address::InstanceConstSharedPtr original_local_address =
-        getOriginalDst(socket.ioHandle().fd());
+  if (socket.addressType() == Network::Address::Type::Ip) {
+    Network::Address::InstanceConstSharedPtr original_local_address = getOriginalDst(socket);
 
     // A listener that has the use_original_dst flag set to true can still receive
     // connections that are NOT redirected using iptables. If a connection was not redirected,

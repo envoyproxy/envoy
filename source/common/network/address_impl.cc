@@ -7,11 +7,10 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 
-#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
-#include "common/network/io_socket_handle_impl.h"
+#include "common/network/socket_interface_impl.h"
 
 namespace Envoy {
 namespace Network {
@@ -19,21 +18,10 @@ namespace Address {
 
 namespace {
 
-// Check if an IP family is supported on this machine.
-bool ipFamilySupported(int domain) {
-  Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
-  const Api::SysCallSocketResult result = os_sys_calls.socket(domain, SOCK_STREAM, 0);
-  if (SOCKET_VALID(result.rc_)) {
-    RELEASE_ASSERT(os_sys_calls.close(result.rc_).rc_ == 0,
-                   absl::StrCat("Fail to close fd: response code ", result.rc_));
-  }
-  return SOCKET_VALID(result.rc_);
-}
-
 // Validate that IPv4 is supported on this platform, raise an exception for the
 // given address if not.
 void validateIpv4Supported(const std::string& address) {
-  static const bool supported = Network::Address::ipFamilySupported(AF_INET);
+  static const bool supported = SocketInterfaceSingleton::get().ipFamilySupported(AF_INET);
   if (!supported) {
     throw EnvoyException(
         fmt::format("IPv4 addresses are not supported on this machine: {}", address));
@@ -43,7 +31,7 @@ void validateIpv4Supported(const std::string& address) {
 // Validate that IPv6 is supported on this platform, raise an exception for the
 // given address if not.
 void validateIpv6Supported(const std::string& address) {
-  static const bool supported = Network::Address::ipFamilySupported(AF_INET6);
+  static const bool supported = SocketInterfaceSingleton::get().ipFamilySupported(AF_INET6);
   if (!supported) {
     throw EnvoyException(
         fmt::format("IPv6 addresses are not supported on this machine: {}", address));
