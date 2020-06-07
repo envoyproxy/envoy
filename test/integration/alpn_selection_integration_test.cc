@@ -95,7 +95,7 @@ require_client_certificate: true
   std::vector<std::string> configured_alpn_;
 };
 
-// No upstream ALPN is specified in the protocol, but we succesfully negotiate h2 ALPN
+// No upstream ALPN is specified in the protocol, but we successfully negotiate h2 ALPN
 // due to the default ALPN set through the HTTP/2 conn pool.
 TEST_F(AlpnSelectionIntegrationTest, Http2UpstreamMatchingAlpn) {
   use_h2_ = true;
@@ -135,7 +135,7 @@ TEST_F(AlpnSelectionIntegrationTest, Http2UpstreamMismatchingAlpn) {
 }
 
 // The upstream supports h2,custom-alpn, and we configure the upstream TLS context to negotiate
-// custom-alpn. No attempt to negoitate h2 should happen, so we should select custom-alpn.
+// custom-alpn. No attempt to negotiate h2 should happen, so we should select custom-alpn.
 TEST_F(AlpnSelectionIntegrationTest, Http2UpstreamConfiguredALPN) {
   use_h2_ = true;
   upstream_alpn_.emplace_back(Http::Utility::AlpnNames::get().Http2);
@@ -193,7 +193,7 @@ TEST_F(AlpnSelectionIntegrationTest, Http11UpstreaMismatchingAlpn) {
 }
 
 // The upstream supports http/1.1,custom-alpn, and we configure the upstream TLS context to
-// negotiate custom-alpn. No attempt to negoitate http/1.1 should happen, so we should select
+// negotiate custom-alpn. No attempt to negotiate http/1.1 should happen, so we should select
 // custom-alpn.
 TEST_F(AlpnSelectionIntegrationTest, Http11UpstreamConfiguredALPN) {
   upstream_alpn_.emplace_back(Http::Utility::AlpnNames::get().Http11);
