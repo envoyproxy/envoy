@@ -1,20 +1,21 @@
-#include "common/http/utility.h"
+#include <initializer_list>
+
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
+#include "common/http/utility.h"
+
 #include "extensions/transport_sockets/tls/context_config_impl.h"
 #include "extensions/transport_sockets/tls/context_impl.h"
 #include "extensions/transport_sockets/tls/ssl_socket.h"
 
-#include "fake_upstream.h"
 #include "test/integration/autonomous_upstream.h"
 #include "test/integration/http_integration.h"
 
 #include "absl/strings/str_replace.h"
 #include "gtest/gtest.h"
-#include <initializer_list>
 
 namespace Envoy {
 
@@ -23,8 +24,7 @@ public:
   AlpnSelectionIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1,
                             TestEnvironment::getIpVersionsForTest().front(),
-                            ConfigHelper::httpProxyConfig()) {
-  }
+                            ConfigHelper::httpProxyConfig()) {}
 
   void initialize() override {
     setDownstreamProtocol(Http::CodecClient::Type::HTTP1);
@@ -35,7 +35,7 @@ public:
       auto* cluster = static_resources->mutable_clusters(0);
 
       if (use_h2_) {
-          cluster->mutable_http2_protocol_options();
+        cluster->mutable_http2_protocol_options();
       }
       const std::string transport_socket_yaml = absl::StrFormat(
           R"EOF(
@@ -106,7 +106,8 @@ TEST_F(AlpnSelectionIntegrationTest, Http2UpstreamMatchingAlpn) {
       codec_client_->makeHeaderOnlyRequest(default_request_headers_);
 
   waitForNextUpstreamRequest();
-  EXPECT_EQ(Http::Utility::AlpnNames::get().Http2, fake_upstream_connection_->connection().nextProtocol());
+  EXPECT_EQ(Http::Utility::AlpnNames::get().Http2,
+            fake_upstream_connection_->connection().nextProtocol());
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
   response->waitForEndStream();
@@ -133,8 +134,8 @@ TEST_F(AlpnSelectionIntegrationTest, Http2UpstreamMismatchingAlpn) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-// The upstream supports h2,custom-alpn, and we configure the upstream TLS context to negotiate custom-alpn.
-// No attempt to negoitate h2 should happen, so we should select custom-alpn.
+// The upstream supports h2,custom-alpn, and we configure the upstream TLS context to negotiate
+// custom-alpn. No attempt to negoitate h2 should happen, so we should select custom-alpn.
 TEST_F(AlpnSelectionIntegrationTest, Http2UpstreamConfiguredALPN) {
   use_h2_ = true;
   upstream_alpn_.emplace_back(Http::Utility::AlpnNames::get().Http2);
@@ -164,7 +165,8 @@ TEST_F(AlpnSelectionIntegrationTest, Http11UpstreaMatchingAlpn) {
       codec_client_->makeHeaderOnlyRequest(default_request_headers_);
 
   waitForNextUpstreamRequest();
-  EXPECT_EQ(Http::Utility::AlpnNames::get().Http11, fake_upstream_connection_->connection().nextProtocol());
+  EXPECT_EQ(Http::Utility::AlpnNames::get().Http11,
+            fake_upstream_connection_->connection().nextProtocol());
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
   response->waitForEndStream();
@@ -190,8 +192,9 @@ TEST_F(AlpnSelectionIntegrationTest, Http11UpstreaMismatchingAlpn) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-// The upstream supports http/1.1,custom-alpn, and we configure the upstream TLS context to negotiate custom-alpn.
-// No attempt to negoitate http/1.1 should happen, so we should select custom-alpn.
+// The upstream supports http/1.1,custom-alpn, and we configure the upstream TLS context to
+// negotiate custom-alpn. No attempt to negoitate http/1.1 should happen, so we should select
+// custom-alpn.
 TEST_F(AlpnSelectionIntegrationTest, Http11UpstreamConfiguredALPN) {
   upstream_alpn_.emplace_back(Http::Utility::AlpnNames::get().Http11);
   upstream_alpn_.emplace_back("custom-alpn");
