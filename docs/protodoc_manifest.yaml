@@ -45,9 +45,7 @@ fields:
   envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.request_timeout:
     edge_config:
       note: >
-        This timeout is not compatible with streaming requests. However, if using the
-        :ref:`buffer filter <config_http_filters_buffer>`, it is recommended to configure this timeout
-        for streaming requests.
+        This timeout is not compatible with streaming requests.
       example: 300s # 5 mins
   envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.use_remote_address:
     edge_config: { example: true }
