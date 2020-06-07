@@ -55,8 +55,8 @@ createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
   auto* common_context = tls_context.mutable_common_tls_context();
 
   if (options.alpn_) {
-    common_context->add_alpn_protocols(Http::Utility::AlpnNames::get().Htt2);
-    common_context->add_alpn_protocols(Http::Utility::AlpnNames::get().Htt11);
+    common_context->add_alpn_protocols(Http::Utility::AlpnNames::get().Http2);
+    common_context->add_alpn_protocols(Http::Utility::AlpnNames::get().Http11);
   }
   if (options.san_) {
     common_context->mutable_validation_context()
