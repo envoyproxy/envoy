@@ -1,8 +1,5 @@
-#include <initializer_list>
-
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
-#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
 #include "common/http/utility.h"
@@ -11,7 +8,6 @@
 #include "extensions/transport_sockets/tls/context_impl.h"
 #include "extensions/transport_sockets/tls/ssl_socket.h"
 
-#include "test/integration/autonomous_upstream.h"
 #include "test/integration/http_integration.h"
 
 #include "absl/strings/str_replace.h"
