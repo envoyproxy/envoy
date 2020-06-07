@@ -60,6 +60,8 @@ if [[ "$VALIDATE_COVERAGE" == "true" ]]; then
   fi
 fi
 
+# We want to allow per_file_coverage to fail without exiting this script.
+set +e
 if [[ "$VALIDATE_COVERAGE" == "true" ]]; then
   echo "Checking per-extension coverage"
   output=$(./test/per_file_coverage.sh)

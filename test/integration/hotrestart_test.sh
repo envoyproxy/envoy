@@ -68,30 +68,37 @@ cat "${TEST_SRCDIR}/envoy"/test/config/integration/server.yaml |
   cat > "${HOT_RESTART_JSON_REUSE_PORT}"
 JSON_TEST_ARRAY+=("${HOT_RESTART_JSON_REUSE_PORT}")
 
-# Use TEST_RANDOM_SEED or TEST_SHARD_INDEX to choose a base id. This
-# replicates the logic of TestEnvironment::chooseBaseId(1). See that method
-# for details.
-let BASE_ID=1000000+${TEST_RANDOM_SEED:-${TEST_SHARD_INDEX:-0}}
-
-echo "Hot restart test using --base-id ${BASE_ID}"
+echo "Hot restart test using dynamic base id"
 
 TEST_INDEX=0
 function run_testsuite() {
   local HOT_RESTART_JSON="$1"
   local FAKE_SYMBOL_TABLE="$2"
 
-  # TODO(jun03): instead of setting the base-id, the validate server should use the nop hot restart
   start_test validation
   check "${ENVOY_BIN}" -c "${HOT_RESTART_JSON}" --mode validate --service-cluster cluster \
-      --use-fake-symbol-table "$FAKE_SYMBOL_TABLE" --service-node node --base-id "${BASE_ID}"
+      --use-fake-symbol-table "$FAKE_SYMBOL_TABLE" --service-node node --disable-hot-restart
+
+  local BASE_ID_PATH=$(mktemp 'envoy_test_base_id.XXXXXX')
+  echo "Selected dynamic base id path ${BASE_ID_PATH}"
 
   # Now start the real server, hot restart it twice, and shut it all down as a basic hot restart
   # sanity test.
   start_test Starting epoch 0
   ADMIN_ADDRESS_PATH_0="${TEST_TMPDIR}"/admin.0."${TEST_INDEX}".address
   run_in_background_saving_pid "${ENVOY_BIN}" -c "${HOT_RESTART_JSON}" \
-      --restart-epoch 0 --base-id "${BASE_ID}" --service-cluster cluster --service-node node \
-      --use-fake-symbol-table "$FAKE_SYMBOL_TABLE" --admin-address-path "${ADMIN_ADDRESS_PATH_0}"
+      --restart-epoch 0  --use-dynamic-base-id --base-id-path "${BASE_ID_PATH}" \
+      --service-cluster cluster --service-node node --use-fake-symbol-table "$FAKE_SYMBOL_TABLE" \
+      --admin-address-path "${ADMIN_ADDRESS_PATH_0}"
+
+  local BASE_ID=$(cat "${BASE_ID_PATH}")
+  while [ -z "${BASE_ID}" ]; do
+      echo "Waiting for base id"
+      sleep 0.5
+      BASE_ID=$(cat "${BASE_ID_PATH}")
+  done
+
+  echo "Selected dynamic base id ${BASE_ID}"
 
   FIRST_SERVER_PID=$BACKGROUND_PID
 
