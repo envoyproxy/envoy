@@ -97,27 +97,27 @@ message H2FrameMalformedRequest {
 // an additional zero length header (making this a malformed request)
 message H2FrameMalformedRequestWithZerolenHeader {
   uint32 stream_index = 1;
-  bytes host = 2;
-  bytes path = 3;
+  string host = 2;
+  string path = 3;
 }
 
 // A request that is comprised of a header that has HTTP GET request with a given host and path
 message H2FrameRequest {
   uint32 stream_index = 1;
-  bytes host = 2;
-  bytes path = 3;
+  string host = 2;
+  string path = 3;
 }
 
 // A request that is comprised of a header that has HTTP POST request with a given host and path
 message H2FramePostRequest {
   uint32 stream_index = 1;
-  bytes host = 2;
-  bytes path = 3;
+  string host = 2;
+  string path = 3;
 }
 
 // A generic frame to emit a malformed frame
 message H2FrameGeneric {
-  string frame_bytes = 1;
+  bytes frame_bytes = 1;
 }
 
 message H2TestFrame {

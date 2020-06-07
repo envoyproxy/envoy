@@ -190,8 +190,9 @@ void H2FuzzIntegrationTest::replay(const test::integration::H2CaptureFuzzTestCas
         ENVOY_LOG_MISC(trace, "sending downstream frame");
         sendFrame(frame, downstream_write_func);
       }
-    } break;
-    case test::integration::Event::kUpstreamSendEvent:
+      break;
+    }
+    case test::integration::Event::kUpstreamSendEvent: {
       if (ignore_response) {
         break;
       }
@@ -230,8 +231,9 @@ void H2FuzzIntegrationTest::replay(const test::integration::H2CaptureFuzzTestCas
           ENVOY_LOG_MISC(trace, "sending upstream frame");
           sendFrame(frame, upstream_write_func);
         }
-        break;
       }
+      break;
+    }
     default:
       // Maybe nothing is set?
       break;
