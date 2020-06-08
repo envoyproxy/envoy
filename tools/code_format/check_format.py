@@ -76,7 +76,7 @@ STD_REGEX_WHITELIST = (
     "./source/common/common/utility.cc", "./source/common/common/regex.h",
     "./source/common/common/regex.cc", "./source/common/stats/tag_extractor_impl.h",
     "./source/common/stats/tag_extractor_impl.cc",
-    "./source/common/access_log/access_log_formatter.cc",
+    "./source/common/formatter/substitution_formatter.cc",
     "./source/extensions/filters/http/squash/squash_filter.h",
     "./source/extensions/filters/http/squash/squash_filter.cc", "./source/server/admin/utils.h",
     "./source/server/admin/utils.cc", "./source/server/admin/stats_handler.h",
@@ -214,7 +214,7 @@ def readFile(path):
 # environment variable. If it cannot be found, empty string is returned.
 def lookPath(executable):
   for path_dir in os.environ["PATH"].split(os.pathsep):
-    executable_path = os.path.join(path_dir, executable)
+    executable_path = os.path.expanduser(os.path.join(path_dir, executable))
     if os.path.exists(executable_path):
       return executable_path
   return ""
@@ -727,7 +727,7 @@ def fixBuildPath(file_path):
     if os.system("%s %s %s" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)) != 0:
       error_messages += ["envoy_build_fixer rewrite failed for file: %s" % file_path]
 
-  if os.system("%s -mode=fix %s" % (BUILDIFIER_PATH, file_path)) != 0:
+  if os.system("%s -lint=fix -mode=fix %s" % (BUILDIFIER_PATH, file_path)) != 0:
     error_messages += ["buildifier rewrite failed for file: %s" % file_path]
   return error_messages
 

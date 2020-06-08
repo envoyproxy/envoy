@@ -7,8 +7,8 @@ function expect_fail_with_error() {
   rm -f "$log"
   expected_error="$1"
   shift
-  echo ${ENVOY_BIN} "$@" ">&" "$log"
-  ${ENVOY_BIN} "$@" >& "$log"
+  echo ${ENVOY_BIN} --use-dynamic-base-id "$@" ">&" "$log"
+  ${ENVOY_BIN} --use-dynamic-base-id "$@" >& "$log"
   EXIT_CODE=$?
   cat "$log"
   check [ $EXIT_CODE -eq 1 ]

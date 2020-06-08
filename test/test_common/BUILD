@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_basic_cc_library",
@@ -8,6 +6,8 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -55,9 +55,19 @@ envoy_cc_test_library(
         "//include/envoy/network:filter_interface",
         "//source/common/common:assert_lib",
         "//source/common/network:address_lib",
+        "//source/common/network:listen_socket_lib",
         "//source/common/network:raw_buffer_socket_lib",
         "//source/common/network:utility_lib",
         "//source/common/runtime:runtime_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "network_utility_test",
+    srcs = ["network_utility_test.cc"],
+    deps = [
+        ":environment_lib",
+        ":network_utility_lib",
     ],
 )
 
