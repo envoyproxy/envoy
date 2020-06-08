@@ -286,7 +286,7 @@ public:
    * @param proto_address the address protobuf
    * @return socket type
    */
-  static Address::SocketType
+  static Socket::Type
   protobufAddressSocketType(const envoy::config::core::v3::Address& proto_address);
 
   /**

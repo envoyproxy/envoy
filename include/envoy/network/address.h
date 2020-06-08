@@ -116,7 +116,6 @@ public:
 };
 
 enum class Type { Ip, Pipe };
-enum class SocketType { Stream, Datagram };
 
 /**
  * Interface for all network addresses.

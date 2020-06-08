@@ -472,22 +472,22 @@ void Utility::addressToProtobufAddress(const Address::Instance& address,
   }
 }
 
-Address::SocketType
+Socket::Type
 Utility::protobufAddressSocketType(const envoy::config::core::v3::Address& proto_address) {
   switch (proto_address.address_case()) {
   case envoy::config::core::v3::Address::AddressCase::kSocketAddress: {
     const auto protocol = proto_address.socket_address().protocol();
     switch (protocol) {
     case envoy::config::core::v3::SocketAddress::TCP:
-      return Address::SocketType::Stream;
+      return Socket::Type::Stream;
     case envoy::config::core::v3::SocketAddress::UDP:
-      return Address::SocketType::Datagram;
+      return Socket::Type::Datagram;
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }
   case envoy::config::core::v3::Address::AddressCase::kPipe:
-    return Address::SocketType::Stream;
+    return Socket::Type::Stream;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }

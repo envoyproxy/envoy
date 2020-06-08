@@ -203,8 +203,7 @@ protected:
                            ListenSocketCreationParams expected_creation_params = {true, true}) {
     EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, expected_creation_params))
         .WillOnce(Invoke([this, expected_num_options, &expected_state](
-                             const Network::Address::InstanceConstSharedPtr&,
-                             Network::Address::SocketType,
+                             const Network::Address::InstanceConstSharedPtr&, Network::Socket::Type,
                              const Network::Socket::OptionsSharedPtr& options,
                              const ListenSocketCreationParams&) -> Network::SocketSharedPtr {
           EXPECT_NE(options.get(), nullptr);

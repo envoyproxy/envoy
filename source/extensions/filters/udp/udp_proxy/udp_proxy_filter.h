@@ -222,7 +222,7 @@ private:
 
   virtual Network::IoHandlePtr createIoHandle(const Upstream::HostConstSharedPtr& host) {
     // Virtual so this can be overridden in unit tests.
-    return Network::SocketInterfaceSingleton::get().socket(Network::Address::SocketType::Datagram,
+    return Network::SocketInterfaceSingleton::get().socket(Network::Socket::Type::Datagram,
                                                            host->address());
   }
 

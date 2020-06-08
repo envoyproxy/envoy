@@ -37,7 +37,7 @@ public:
   /**
    * @return the type of the socket getListenSocket() returns.
    */
-  virtual Address::SocketType socketType() const PURE;
+  virtual Socket::Type socketType() const PURE;
 
   /**
    * @return the listening address of the socket getListenSocket() returns. Before getListenSocket()
