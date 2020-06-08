@@ -64,6 +64,13 @@ void invokeDebugAssertionFailureRecordAction_ForAssertMacroUseOnly();
  */
 void invokeEnvoyBugFailureRecordAction_ForEnvoyBugMacroUseOnly();
 
+/**
+ * Increments power of two counter for EnvoyBugRegistrationImpl.
+ *
+ * This should only be called by ENVOY_BUG macros in this file.
+ */
+bool shouldLogAndInvokeEnvoyBug_ForEnvoyBugMacroUseOnly();
+
 // CONDITION_STR is needed to prevent macros in condition from being expected, which obfuscates
 // the logged failure, e.g., "EAGAIN" vs "11".
 #define _ASSERT_IMPL(CONDITION, CONDITION_STR, ACTION, DETAILS)                                    \
@@ -162,9 +169,10 @@ void invokeEnvoyBugFailureRecordAction_ForEnvoyBugMacroUseOnly();
 
 // CONDITION_STR is needed to prevent macros in condition from being expected, which obfuscates
 // the logged failure, e.g., "EAGAIN" vs "11".
+// ENVOY_BUG logging and actions are invoked only on power-of-two instances.
 #define _ENVOY_BUG_IMPL(CONDITION, CONDITION_STR, ACTION, DETAILS)                                 \
   do {                                                                                             \
-    if (!(CONDITION)) {                                                                            \
+    if (!(CONDITION) && Envoy::Assert::shouldLogAndInvokeEnvoyBug_ForEnvoyBugMacroUseOnly()) {     \
       const std::string& details = (DETAILS);                                                      \
       ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::envoy_bug), error,    \
                           "envoy bug failure: {}.{}{}", CONDITION_STR,                             \

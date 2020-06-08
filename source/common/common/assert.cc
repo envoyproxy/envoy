@@ -40,13 +40,17 @@ public:
     envoy_bug_failure_record_action_ = nullptr;
   }
 
+  static bool shouldLogAndInvoke() {
+    ++count_;
+    if ((count_ & (count_ - 1)) == 0) {
+      return true;
+    }
+    return false;
+  }
+
   static void invokeAction() {
     if (envoy_bug_failure_record_action_ != nullptr) {
-      ++count_;
-      // ENVOY_BUG actions are only invoked on power of two increments.
-      if ((count_ & (count_ - 1)) == 0) {
-        envoy_bug_failure_record_action_();
-      }
+      envoy_bug_failure_record_action_();
     }
   }
 
@@ -76,6 +80,10 @@ void invokeDebugAssertionFailureRecordAction_ForAssertMacroUseOnly() {
 
 void invokeEnvoyBugFailureRecordAction_ForEnvoyBugMacroUseOnly() {
   EnvoyBugRegistrationImpl::invokeAction();
+}
+
+bool shouldLogAndInvokeEnvoyBug_ForEnvoyBugMacroUseOnly() {
+  return EnvoyBugRegistrationImpl::shouldLogAndInvoke();
 }
 
 } // namespace Assert
