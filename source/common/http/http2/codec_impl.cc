@@ -434,13 +434,9 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& st
       stream_error_on_invalid_http_messaging_(
           http2_options.stream_error_on_invalid_http_messaging()),
       flood_detected_(false), max_outbound_frames_(http2_options.max_outbound_frames().value()),
-      frame_buffer_releasor_([this](const Buffer::OwnedBufferFragmentImpl* fragment) {
-        releaseOutboundFrame(fragment);
-      }),
+      frame_buffer_releasor_([this]() { releaseOutboundFrame(); }),
       max_outbound_control_frames_(http2_options.max_outbound_control_frames().value()),
-      control_frame_buffer_releasor_([this](const Buffer::OwnedBufferFragmentImpl* fragment) {
-        releaseOutboundControlFrame(fragment);
-      }),
+      control_frame_buffer_releasor_([this]() { releaseOutboundControlFrame(); }),
       max_consecutive_inbound_frames_with_empty_payload_(
           http2_options.max_consecutive_inbound_frames_with_empty_payload().value()),
       max_inbound_priority_frames_per_stream_(
@@ -725,27 +721,21 @@ bool ConnectionImpl::addOutboundFrameFragment(Buffer::OwnedImpl& output, const u
     return false;
   }
 
-  auto fragment = Buffer::OwnedBufferFragmentImpl::create(
-      absl::string_view(reinterpret_cast<const char*>(data), length),
-      is_outbound_flood_monitored_control_frame ? control_frame_buffer_releasor_
-                                                : frame_buffer_releasor_);
-
-  // The Buffer::OwnedBufferFragmentImpl object will be deleted in the *frame_buffer_releasor_
-  // callback.
-  output.addBufferFragment(*fragment.release());
+  output.add(data, length);
+  output.addDrainTracker(is_outbound_flood_monitored_control_frame ? control_frame_buffer_releasor_
+                                                                   : frame_buffer_releasor_);
   return true;
 }
 
-void ConnectionImpl::releaseOutboundFrame(const Buffer::OwnedBufferFragmentImpl* fragment) {
+void ConnectionImpl::releaseOutboundFrame() {
   ASSERT(outbound_frames_ >= 1);
   --outbound_frames_;
-  delete fragment;
 }
 
-void ConnectionImpl::releaseOutboundControlFrame(const Buffer::OwnedBufferFragmentImpl* fragment) {
+void ConnectionImpl::releaseOutboundControlFrame() {
   ASSERT(outbound_control_frames_ >= 1);
   --outbound_control_frames_;
-  releaseOutboundFrame(fragment);
+  releaseOutboundFrame();
 }
 
 ssize_t ConnectionImpl::onSend(const uint8_t* data, size_t length) {

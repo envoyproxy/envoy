@@ -37,11 +37,20 @@ protected:
 
   static void expectSlices(std::vector<std::vector<int>> buffer_list, OwnedImpl& buffer) {
     const auto& buffer_slices = buffer.describeSlicesForTest();
+    ASSERT_EQ(buffer_list.size(), buffer_slices.size());
     for (uint64_t i = 0; i < buffer_slices.size(); i++) {
       EXPECT_EQ(buffer_slices[i].data, buffer_list[i][0]);
       EXPECT_EQ(buffer_slices[i].reservable, buffer_list[i][1]);
       EXPECT_EQ(buffer_slices[i].capacity, buffer_list[i][2]);
     }
+  }
+
+  static void expectFirstSlice(std::vector<int> slice_description, OwnedImpl& buffer) {
+    const auto& buffer_slices = buffer.describeSlicesForTest();
+    ASSERT_LE(1, buffer_slices.size());
+    EXPECT_EQ(buffer_slices[0].data, slice_description[0]);
+    EXPECT_EQ(buffer_slices[0].reservable, slice_description[1]);
+    EXPECT_EQ(buffer_slices[0].capacity, slice_description[2]);
   }
 };
 
@@ -80,6 +89,7 @@ TEST_F(OwnedImplTest, AddEmptyFragment) {
   BufferFragmentImpl frag2("", 0, [this](const void*, size_t, const BufferFragmentImpl*) {
     release_callback_called_ = true;
   });
+  BufferFragmentImpl frag3(input, 11, [](const void*, size_t, const BufferFragmentImpl*) {});
   Buffer::OwnedImpl buffer;
   buffer.addBufferFragment(frag1);
   EXPECT_EQ(11, buffer.length());
@@ -87,7 +97,18 @@ TEST_F(OwnedImplTest, AddEmptyFragment) {
   buffer.addBufferFragment(frag2);
   EXPECT_EQ(11, buffer.length());
 
-  buffer.drain(11);
+  buffer.addBufferFragment(frag3);
+  EXPECT_EQ(22, buffer.length());
+
+  // Cover case of copying a buffer with an empty fragment.
+  Buffer::OwnedImpl buffer2;
+  buffer2.add(buffer);
+
+  // Cover copyOut
+  std::unique_ptr<char[]> outbuf(new char[buffer.length()]);
+  buffer.copyOut(0, buffer.length(), outbuf.get());
+
+  buffer.drain(22);
   EXPECT_EQ(0, buffer.length());
   EXPECT_TRUE(release_callback_called_);
 }
@@ -324,6 +345,282 @@ TEST_F(OwnedImplTest, Read) {
   EXPECT_THAT(buffer.describeSlicesForTest(), testing::IsEmpty());
 }
 
+TEST_F(OwnedImplTest, DrainTracking) {
+  testing::InSequence s;
+
+  Buffer::OwnedImpl buffer;
+  buffer.add("a");
+
+  testing::MockFunction<void()> tracker1;
+  testing::MockFunction<void()> tracker2;
+  buffer.addDrainTracker(tracker1.AsStdFunction());
+  buffer.addDrainTracker(tracker2.AsStdFunction());
+
+  testing::MockFunction<void()> done;
+  EXPECT_CALL(tracker1, Call());
+  EXPECT_CALL(tracker2, Call());
+  EXPECT_CALL(done, Call());
+  buffer.drain(buffer.length());
+  done.Call();
+}
+
+TEST_F(OwnedImplTest, MoveDrainTrackersWhenTransferingSlices) {
+  testing::InSequence s;
+
+  Buffer::OwnedImpl buffer1;
+  buffer1.add("a");
+
+  testing::MockFunction<void()> tracker1;
+  buffer1.addDrainTracker(tracker1.AsStdFunction());
+
+  Buffer::OwnedImpl buffer2;
+  buffer2.add("b");
+
+  testing::MockFunction<void()> tracker2;
+  buffer2.addDrainTracker(tracker2.AsStdFunction());
+
+  buffer2.add(std::string(10000, 'c'));
+  testing::MockFunction<void()> tracker3;
+  buffer2.addDrainTracker(tracker3.AsStdFunction());
+  EXPECT_EQ(2, buffer2.getRawSlices().size());
+
+  buffer1.move(buffer2);
+  EXPECT_EQ(10002, buffer1.length());
+  EXPECT_EQ(0, buffer2.length());
+  EXPECT_EQ(3, buffer1.getRawSlices().size());
+  EXPECT_EQ(0, buffer2.getRawSlices().size());
+
+  testing::MockFunction<void()> done;
+  EXPECT_CALL(tracker1, Call());
+  EXPECT_CALL(tracker2, Call());
+  EXPECT_CALL(tracker3, Call());
+  EXPECT_CALL(done, Call());
+  buffer1.drain(buffer1.length());
+  done.Call();
+}
+
+TEST_F(OwnedImplTest, MoveDrainTrackersWhenCopying) {
+  testing::InSequence s;
+
+  Buffer::OwnedImpl buffer1;
+  buffer1.add("a");
+
+  testing::MockFunction<void()> tracker1;
+  buffer1.addDrainTracker(tracker1.AsStdFunction());
+
+  Buffer::OwnedImpl buffer2;
+  buffer2.add("b");
+
+  testing::MockFunction<void()> tracker2;
+  buffer2.addDrainTracker(tracker2.AsStdFunction());
+
+  buffer1.move(buffer2);
+  EXPECT_EQ(2, buffer1.length());
+  EXPECT_EQ(0, buffer2.length());
+  EXPECT_EQ(1, buffer1.getRawSlices().size());
+  EXPECT_EQ(0, buffer2.getRawSlices().size());
+
+  buffer1.drain(1);
+  testing::MockFunction<void()> done;
+  EXPECT_CALL(tracker1, Call());
+  EXPECT_CALL(tracker2, Call());
+  EXPECT_CALL(done, Call());
+  buffer1.drain(1);
+  done.Call();
+}
+
+TEST_F(OwnedImplTest, PartialMoveDrainTrackers) {
+  testing::InSequence s;
+
+  Buffer::OwnedImpl buffer1;
+  buffer1.add("a");
+
+  testing::MockFunction<void()> tracker1;
+  buffer1.addDrainTracker(tracker1.AsStdFunction());
+
+  Buffer::OwnedImpl buffer2;
+  buffer2.add("b");
+
+  testing::MockFunction<void()> tracker2;
+  buffer2.addDrainTracker(tracker2.AsStdFunction());
+
+  buffer2.add(std::string(10000, 'c'));
+  testing::MockFunction<void()> tracker3;
+  buffer2.addDrainTracker(tracker3.AsStdFunction());
+  EXPECT_EQ(2, buffer2.getRawSlices().size());
+
+  // Move the first slice and associated trackers and part of the second slice to buffer1.
+  buffer1.move(buffer2, 4999);
+  EXPECT_EQ(5000, buffer1.length());
+  EXPECT_EQ(5002, buffer2.length());
+  EXPECT_EQ(3, buffer1.getRawSlices().size());
+  EXPECT_EQ(1, buffer2.getRawSlices().size());
+
+  testing::MockFunction<void()> done;
+  EXPECT_CALL(tracker1, Call());
+  buffer1.drain(1);
+
+  EXPECT_CALL(tracker2, Call());
+  EXPECT_CALL(done, Call());
+  buffer1.drain(buffer1.length());
+  done.Call();
+
+  // tracker3 remained in buffer2.
+  EXPECT_CALL(tracker3, Call());
+  buffer2.drain(buffer2.length());
+}
+
+TEST_F(OwnedImplTest, DrainTrackingOnDestruction) {
+  testing::InSequence s;
+
+  auto buffer = std::make_unique<Buffer::OwnedImpl>();
+  buffer->add("a");
+
+  testing::MockFunction<void()> tracker;
+  buffer->addDrainTracker(tracker.AsStdFunction());
+
+  testing::MockFunction<void()> done;
+  EXPECT_CALL(tracker, Call());
+  EXPECT_CALL(done, Call());
+  buffer.reset();
+  done.Call();
+}
+
+TEST_F(OwnedImplTest, Linearize) {
+  Buffer::OwnedImpl buffer;
+
+  // Unowned slice to track when linearize kicks in.
+  std::string input(1000, 'a');
+  BufferFragmentImpl frag(
+      input.c_str(), input.size(),
+      [this](const void*, size_t, const BufferFragmentImpl*) { release_callback_called_ = true; });
+  buffer.addBufferFragment(frag);
+
+  // Second slice with more data.
+  buffer.add(std::string(1000, 'b'));
+
+  // Linearize does not change the pointer associated with the first slice if requested size is less
+  // than or equal to size of the first slice.
+  EXPECT_EQ(input.c_str(), buffer.linearize(input.size()));
+  EXPECT_FALSE(release_callback_called_);
+
+  constexpr uint64_t LinearizeSize = 2000;
+  void* out_ptr = buffer.linearize(LinearizeSize);
+  EXPECT_TRUE(release_callback_called_);
+  EXPECT_EQ(input + std::string(1000, 'b'),
+            absl::string_view(reinterpret_cast<const char*>(out_ptr), LinearizeSize));
+}
+
+TEST_F(OwnedImplTest, LinearizeEmptyBuffer) {
+  Buffer::OwnedImpl buffer;
+  EXPECT_EQ(nullptr, buffer.linearize(0));
+}
+
+TEST_F(OwnedImplTest, LinearizeSingleSlice) {
+  auto buffer = std::make_unique<Buffer::OwnedImpl>();
+
+  // Unowned slice to track when linearize kicks in.
+  std::string input(1000, 'a');
+  BufferFragmentImpl frag(
+      input.c_str(), input.size(),
+      [this](const void*, size_t, const BufferFragmentImpl*) { release_callback_called_ = true; });
+  buffer->addBufferFragment(frag);
+
+  EXPECT_EQ(input.c_str(), buffer->linearize(buffer->length()));
+  EXPECT_FALSE(release_callback_called_);
+
+  buffer.reset();
+  EXPECT_TRUE(release_callback_called_);
+}
+
+TEST_F(OwnedImplTest, LinearizeDrainTracking) {
+  constexpr uint32_t SmallChunk = 200;
+  constexpr uint32_t LargeChunk = 16384 - SmallChunk;
+  constexpr uint32_t LinearizeSize = SmallChunk + LargeChunk;
+
+  // Create a buffer with a eclectic combination of buffer OwnedSlice and UnownedSlices that will
+  // help us explore the properties of linearize.
+  Buffer::OwnedImpl buffer;
+
+  // Large add below the target linearize size.
+  testing::MockFunction<void()> tracker1;
+  buffer.add(std::string(LargeChunk, 'a'));
+  buffer.addDrainTracker(tracker1.AsStdFunction());
+
+  // Unowned slice which causes some fragmentation.
+  testing::MockFunction<void()> tracker2;
+  testing::MockFunction<void(const void*, size_t, const BufferFragmentImpl*)>
+      release_callback_tracker;
+  std::string frag_input(2 * SmallChunk, 'b');
+  BufferFragmentImpl frag(frag_input.c_str(), frag_input.size(),
+                          release_callback_tracker.AsStdFunction());
+  buffer.addBufferFragment(frag);
+  buffer.addDrainTracker(tracker2.AsStdFunction());
+
+  // And an unowned slice with 0 size, because.
+  testing::MockFunction<void()> tracker3;
+  testing::MockFunction<void(const void*, size_t, const BufferFragmentImpl*)>
+      release_callback_tracker2;
+  BufferFragmentImpl frag2(nullptr, 0, release_callback_tracker2.AsStdFunction());
+  buffer.addBufferFragment(frag2);
+  buffer.addDrainTracker(tracker3.AsStdFunction());
+
+  // Add a very large chunk
+  testing::MockFunction<void()> tracker4;
+  buffer.add(std::string(LargeChunk + LinearizeSize, 'c'));
+  buffer.addDrainTracker(tracker4.AsStdFunction());
+
+  // Small adds that create no gaps.
+  testing::MockFunction<void()> tracker5;
+  for (int i = 0; i < 105; ++i) {
+    buffer.add(std::string(SmallChunk, 'd'));
+  }
+  buffer.addDrainTracker(tracker5.AsStdFunction());
+
+  expectSlices({{16184, 136, 16320},
+                {400, 0, 400},
+                {0, 0, 0},
+                {32704, 0, 32704},
+                {4032, 0, 4032},
+                {4032, 0, 4032},
+                {4032, 0, 4032},
+                {4032, 0, 4032},
+                {4032, 0, 4032},
+                {704, 3328, 4032}},
+               buffer);
+
+  testing::InSequence s;
+  testing::MockFunction<void(int, int)> drain_tracker;
+  testing::MockFunction<void()> done_tracker;
+  EXPECT_CALL(tracker1, Call());
+  EXPECT_CALL(release_callback_tracker, Call(_, _, _));
+  EXPECT_CALL(tracker2, Call());
+  EXPECT_CALL(drain_tracker, Call(3 * LargeChunk + 108 * SmallChunk, 16384));
+  EXPECT_CALL(release_callback_tracker2, Call(_, _, _));
+  EXPECT_CALL(tracker3, Call());
+  EXPECT_CALL(tracker4, Call());
+  EXPECT_CALL(drain_tracker, Call(2 * LargeChunk + 107 * SmallChunk, 16384));
+  EXPECT_CALL(drain_tracker, Call(LargeChunk + 106 * SmallChunk, 16384));
+  EXPECT_CALL(drain_tracker, Call(105 * SmallChunk, 16384));
+  EXPECT_CALL(tracker5, Call());
+  EXPECT_CALL(drain_tracker, Call(4616, 4616));
+  EXPECT_CALL(done_tracker, Call());
+  for (auto& expected_first_slice : std::vector<std::vector<int>>{{16584, 3832, 20416},
+                                                                  {32904, 3896, 36800},
+                                                                  {16520, 3896, 36800},
+                                                                  {20296, 120, 20416},
+                                                                  {4616, 3512, 8128}}) {
+    const uint32_t write_size = std::min<uint32_t>(LinearizeSize, buffer.length());
+    buffer.linearize(write_size);
+    expectFirstSlice(expected_first_slice, buffer);
+    drain_tracker.Call(buffer.length(), write_size);
+    buffer.drain(write_size);
+  }
+  done_tracker.Call();
+
+  expectSlices({}, buffer);
+}
+
 TEST_F(OwnedImplTest, ReserveCommit) {
   // This fragment will later be added to the buffer. It is declared in an enclosing scope to
   // ensure it is not destructed until after the buffer is.
@@ -375,12 +672,12 @@ TEST_F(OwnedImplTest, ReserveCommit) {
 
     // Request a reservation that too big to fit in the existing slices. This should result
     // in the creation of a third slice.
-    expectSlices({{1, 4055, 4056}}, buffer);
+    expectSlices({{1, 4031, 4032}}, buffer);
     buffer.reserve(4096 - sizeof(OwnedSlice), iovecs, NumIovecs);
-    expectSlices({{1, 4055, 4056}, {0, 4056, 4056}}, buffer);
+    expectSlices({{1, 4031, 4032}, {0, 4032, 4032}}, buffer);
     const void* slice2 = iovecs[1].mem_;
     num_reserved = buffer.reserve(8192, iovecs, NumIovecs);
-    expectSlices({{1, 4055, 4056}, {0, 4056, 4056}, {0, 4056, 4056}}, buffer);
+    expectSlices({{1, 4031, 4032}, {0, 4032, 4032}, {0, 4032, 4032}}, buffer);
     EXPECT_EQ(3, num_reserved);
     EXPECT_EQ(slice1, iovecs[0].mem_);
     EXPECT_EQ(slice2, iovecs[1].mem_);
@@ -389,11 +686,11 @@ TEST_F(OwnedImplTest, ReserveCommit) {
     // Append a fragment to the buffer, and then request a small reservation. The buffer
     // should make a new slice to satisfy the reservation; it cannot safely use any of
     // the previously seen slices, because they are no longer at the end of the buffer.
-    expectSlices({{1, 4055, 4056}}, buffer);
+    expectSlices({{1, 4031, 4032}}, buffer);
     buffer.addBufferFragment(fragment);
     EXPECT_EQ(13, buffer.length());
     num_reserved = buffer.reserve(1, iovecs, NumIovecs);
-    expectSlices({{1, 4055, 4056}, {12, 0, 12}, {0, 4056, 4056}}, buffer);
+    expectSlices({{1, 4031, 4032}, {12, 0, 12}, {0, 4032, 4032}}, buffer);
     EXPECT_EQ(1, num_reserved);
     EXPECT_NE(slice1, iovecs[0].mem_);
     commitReservation(iovecs, num_reserved, buffer);
@@ -424,16 +721,16 @@ TEST_F(OwnedImplTest, ReserveCommitReuse) {
   EXPECT_EQ(2, num_reserved);
   const void* first_slice = iovecs[0].mem_;
   iovecs[0].len_ = 1;
-  expectSlices({{8000, 4248, 12248}, {0, 12248, 12248}}, buffer);
+  expectSlices({{8000, 4224, 12224}, {0, 12224, 12224}}, buffer);
   buffer.commit(iovecs, 1);
   EXPECT_EQ(8001, buffer.length());
   EXPECT_EQ(first_slice, iovecs[0].mem_);
   // The second slice is now released because there's nothing in the second slice.
-  expectSlices({{8001, 4247, 12248}}, buffer);
+  expectSlices({{8001, 4223, 12224}}, buffer);
 
   // Reserve 16KB again.
   num_reserved = buffer.reserve(16384, iovecs, NumIovecs);
-  expectSlices({{8001, 4247, 12248}, {0, 12248, 12248}}, buffer);
+  expectSlices({{8001, 4223, 12224}, {0, 12224, 12224}}, buffer);
   EXPECT_EQ(2, num_reserved);
   EXPECT_EQ(static_cast<const uint8_t*>(first_slice) + 1,
             static_cast<const uint8_t*>(iovecs[0].mem_));
@@ -460,7 +757,7 @@ TEST_F(OwnedImplTest, ReserveReuse) {
   EXPECT_EQ(2, num_reserved);
   EXPECT_EQ(first_slice, iovecs[0].mem_);
   EXPECT_EQ(second_slice, iovecs[1].mem_);
-  expectSlices({{0, 12248, 12248}, {0, 8152, 8152}}, buffer);
+  expectSlices({{0, 12224, 12224}, {0, 8128, 8128}}, buffer);
 
   // Request a larger reservation, verify that the second entry is replaced with a block with a
   // larger size.
@@ -468,51 +765,51 @@ TEST_F(OwnedImplTest, ReserveReuse) {
   const void* third_slice = iovecs[1].mem_;
   EXPECT_EQ(2, num_reserved);
   EXPECT_EQ(first_slice, iovecs[0].mem_);
-  EXPECT_EQ(12248, iovecs[0].len_);
+  EXPECT_EQ(12224, iovecs[0].len_);
   EXPECT_NE(second_slice, iovecs[1].mem_);
   EXPECT_EQ(30000 - iovecs[0].len_, iovecs[1].len_);
-  expectSlices({{0, 12248, 12248}, {0, 8152, 8152}, {0, 20440, 20440}}, buffer);
+  expectSlices({{0, 12224, 12224}, {0, 8128, 8128}, {0, 20416, 20416}}, buffer);
 
   // Repeating a the reservation request for a smaller block returns the previous entry.
   num_reserved = buffer.reserve(16384, iovecs, NumIovecs);
   EXPECT_EQ(2, num_reserved);
   EXPECT_EQ(first_slice, iovecs[0].mem_);
   EXPECT_EQ(second_slice, iovecs[1].mem_);
-  expectSlices({{0, 12248, 12248}, {0, 8152, 8152}, {0, 20440, 20440}}, buffer);
+  expectSlices({{0, 12224, 12224}, {0, 8128, 8128}, {0, 20416, 20416}}, buffer);
 
   // Repeat the larger reservation notice that it doesn't match the prior reservation for 30000
   // bytes.
   num_reserved = buffer.reserve(30000, iovecs, NumIovecs);
   EXPECT_EQ(2, num_reserved);
   EXPECT_EQ(first_slice, iovecs[0].mem_);
-  EXPECT_EQ(12248, iovecs[0].len_);
+  EXPECT_EQ(12224, iovecs[0].len_);
   EXPECT_NE(second_slice, iovecs[1].mem_);
   EXPECT_NE(third_slice, iovecs[1].mem_);
   EXPECT_EQ(30000 - iovecs[0].len_, iovecs[1].len_);
-  expectSlices({{0, 12248, 12248}, {0, 8152, 8152}, {0, 20440, 20440}, {0, 20440, 20440}}, buffer);
+  expectSlices({{0, 12224, 12224}, {0, 8128, 8128}, {0, 20416, 20416}, {0, 20416, 20416}}, buffer);
 
   // Commit the most recent reservation and verify the representation.
   buffer.commit(iovecs, num_reserved);
-  expectSlices({{12248, 0, 12248}, {0, 8152, 8152}, {0, 20440, 20440}, {17752, 2688, 20440}},
+  expectSlices({{12224, 0, 12224}, {0, 8128, 8128}, {0, 20416, 20416}, {17776, 2640, 20416}},
                buffer);
 
   // Do another reservation.
   num_reserved = buffer.reserve(16384, iovecs, NumIovecs);
   EXPECT_EQ(2, num_reserved);
-  expectSlices({{12248, 0, 12248},
-                {0, 8152, 8152},
-                {0, 20440, 20440},
-                {17752, 2688, 20440},
-                {0, 16344, 16344}},
+  expectSlices({{12224, 0, 12224},
+                {0, 8128, 8128},
+                {0, 20416, 20416},
+                {17776, 2640, 20416},
+                {0, 16320, 16320}},
                buffer);
 
   // And commit.
   buffer.commit(iovecs, num_reserved);
-  expectSlices({{12248, 0, 12248},
-                {0, 8152, 8152},
-                {0, 20440, 20440},
-                {20440, 0, 20440},
-                {13696, 2648, 16344}},
+  expectSlices({{12224, 0, 12224},
+                {0, 8128, 8128},
+                {0, 20416, 20416},
+                {20416, 0, 20416},
+                {13744, 2576, 16320}},
                buffer);
 }
 
@@ -664,7 +961,7 @@ TEST_F(OwnedImplTest, ReserveZeroCommit) {
   ASSERT_EQ(::close(pipe_fds[1]), 0);
   ASSERT_EQ(previous_length, buf.search(data.data(), rc, previous_length));
   EXPECT_EQ("bbbbb", buf.toString().substr(0, 5));
-  expectSlices({{5, 0, 4056}, {1953, 2103, 4056}}, buf);
+  expectSlices({{5, 0, 4032}, {1953, 2079, 4032}}, buf);
 }
 
 TEST_F(OwnedImplTest, ReadReserveAndCommit) {
@@ -686,7 +983,7 @@ TEST_F(OwnedImplTest, ReadReserveAndCommit) {
   ASSERT_EQ(result.rc_, static_cast<uint64_t>(rc));
   ASSERT_EQ(::close(pipe_fds[1]), 0);
   EXPECT_EQ("bbbbbe", buf.toString());
-  expectSlices({{6, 4050, 4056}}, buf);
+  expectSlices({{6, 4026, 4032}}, buf);
 }
 
 TEST(OverflowDetectingUInt64, Arithmetic) {

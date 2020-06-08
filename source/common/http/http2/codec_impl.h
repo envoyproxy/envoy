@@ -379,7 +379,7 @@ protected:
   // Maximum number of outbound frames. Initialized from corresponding http2_protocol_options.
   // Default value is 10000.
   const uint32_t max_outbound_frames_;
-  const Buffer::OwnedBufferFragmentImpl::Releasor frame_buffer_releasor_;
+  const std::function<void()> frame_buffer_releasor_;
   // This counter keeps track of the number of outbound frames of types PING, SETTINGS and
   // RST_STREAM (these that were buffered in the underlying connection but not yet written into the
   // socket). If this counter exceeds the `max_outbound_control_frames_' value the connection is
@@ -388,7 +388,7 @@ protected:
   // Maximum number of outbound frames of types PING, SETTINGS and RST_STREAM. Initialized from
   // corresponding http2_protocol_options. Default value is 1000.
   const uint32_t max_outbound_control_frames_;
-  const Buffer::OwnedBufferFragmentImpl::Releasor control_frame_buffer_releasor_;
+  const std::function<void()> control_frame_buffer_releasor_;
   // This counter keeps track of the number of consecutive inbound frames of types HEADERS,
   // CONTINUATION and DATA with an empty payload and no end stream flag. If this counter exceeds
   // the `max_consecutive_inbound_frames_with_empty_payload_` value the connection is terminated.
@@ -454,8 +454,8 @@ private:
   virtual bool trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) PURE;
   virtual bool checkInboundFrameLimits() PURE;
 
-  void releaseOutboundFrame(const Buffer::OwnedBufferFragmentImpl* fragment);
-  void releaseOutboundControlFrame(const Buffer::OwnedBufferFragmentImpl* fragment);
+  void releaseOutboundFrame();
+  void releaseOutboundControlFrame();
 
   bool dispatching_ : 1;
   bool raised_goaway_ : 1;

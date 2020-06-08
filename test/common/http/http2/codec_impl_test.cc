@@ -1531,7 +1531,10 @@ TEST_P(Http2CodecImplTest, PingFloodMitigationDisabled) {
 
 // Verify that outbound control frame counter decreases when send buffer is drained
 TEST_P(Http2CodecImplTest, PingFloodCounterReset) {
-  static const int kMaxOutboundControlFrames = 100;
+  // Ping frames are 17 bytes each so 237 full frames and a partial frame fit in the current min
+  // size for buffer slices. Setting the limit to 2x+1 the number that fits in a single slice allows
+  // the logic below that verifies drain and overflow thresholds.
+  static const int kMaxOutboundControlFrames = 475;
   max_outbound_control_frames_ = kMaxOutboundControlFrames;
   initialize();
 
@@ -1556,16 +1559,17 @@ TEST_P(Http2CodecImplTest, PingFloodCounterReset) {
   EXPECT_NO_THROW(client_->sendPendingFrames());
   EXPECT_EQ(ack_count, kMaxOutboundControlFrames);
 
-  // Drain kMaxOutboundFrames / 2 slices from the send buffer
+  // Drain floor(kMaxOutboundFrames / 2) slices from the send buffer
   buffer.drain(buffer.length() / 2);
 
-  // Send kMaxOutboundFrames / 2 more pings.
+  // Send floor(kMaxOutboundFrames / 2) more pings.
   for (int i = 0; i < kMaxOutboundControlFrames / 2; ++i) {
     EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
   }
   // The number of outbound frames should be half of max so the connection should not be
   // terminated.
   EXPECT_NO_THROW(client_->sendPendingFrames());
+  EXPECT_EQ(ack_count, kMaxOutboundControlFrames + kMaxOutboundControlFrames / 2);
 
   // 1 more ping frame should overflow the outbound frame limit.
   EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
