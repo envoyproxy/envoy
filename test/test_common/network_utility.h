@@ -42,7 +42,7 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(const std::string& addr_port
  * @param version IP address version of loopback address.
  * @return std::string URL ready loopback address as a string.
  */
-const std::string getLoopbackAddressUrlString(const Address::IpVersion version);
+std::string getLoopbackAddressUrlString(const Address::IpVersion version);
 
 /**
  * Get a IP loopback address as a string. There are no square brackets around IPv6 addresses, this
@@ -50,28 +50,28 @@ const std::string getLoopbackAddressUrlString(const Address::IpVersion version);
  * @param version IP address version of loopback address.
  * @return std::string loopback address as a string.
  */
-const std::string getLoopbackAddressString(const Address::IpVersion version);
+std::string getLoopbackAddressString(const Address::IpVersion version);
 
 /**
  * Get a URL ready IP any address as a string.
  * @param version IP address version of any address.
  * @return std::string URL ready any address as a string.
  */
-const std::string getAnyAddressUrlString(const Address::IpVersion version);
+std::string getAnyAddressUrlString(const Address::IpVersion version);
 
 /**
  * Get an IP any address as a string.
  * @param version IP address version of any address.
  * @return std::string any address as a string.
  */
-const std::string getAnyAddressString(const Address::IpVersion version);
+std::string getAnyAddressString(const Address::IpVersion version);
 
 /**
  * Return a string version of enum IpVersion version.
  * @param version IP address version.
  * @return std::string string version of IpVersion.
  */
-const std::string addressVersionAsString(const Address::IpVersion version);
+std::string addressVersionAsString(const Address::IpVersion version);
 
 /**
  * Returns a loopback address for the specified IP version (127.0.0.1 for IPv4 and ::1 for IPv6).
