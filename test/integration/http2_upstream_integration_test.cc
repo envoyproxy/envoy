@@ -242,6 +242,9 @@ void Http2UpstreamIntegrationTest::manySimultaneousRequests(uint32_t request_byt
       EXPECT_EQ("503", responses[i]->headers().getStatusValue());
     }
   }
+
+  EXPECT_EQ(0, test_server_->gauge("http2.streams_active")->value());
+  EXPECT_EQ(0, test_server_->gauge("http2.pending_send_bytes")->value());
 }
 
 TEST_P(Http2UpstreamIntegrationTest, ManySimultaneousRequest) {

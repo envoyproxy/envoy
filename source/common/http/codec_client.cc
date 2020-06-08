@@ -21,7 +21,7 @@ namespace Http {
 CodecClient::CodecClient(Type type, Network::ClientConnectionPtr&& connection,
                          Upstream::HostDescriptionConstSharedPtr host,
                          Event::Dispatcher& dispatcher)
-    : type_(type), connection_(std::move(connection)), host_(host),
+    : type_(type), host_(host), connection_(std::move(connection)),
       idle_timeout_(host_->cluster().idleTimeout()) {
   if (type_ != Type::HTTP3) {
     // Make sure upstream connections process data and then the FIN, rather than processing

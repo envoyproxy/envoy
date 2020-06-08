@@ -99,6 +99,28 @@ TEST_P(Http2IntegrationTest, RetryAttemptCount) { testRetryAttemptCountHeader();
 
 TEST_P(Http2IntegrationTest, LargeRequestTrailersRejected) { testLargeRequestTrailers(66, 60); }
 
+// Verify downstream codec stream flush timeout.
+TEST_P(Http2IntegrationTest, CodecStreamIdleTimeout) {
+  config_helper_.setBufferLimits(1024, 1024);
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.mutable_stream_idle_timeout()->set_seconds(0);
+        constexpr uint64_t IdleTimeoutMs = 400;
+        hcm.mutable_stream_idle_timeout()->set_nanos(IdleTimeoutMs * 1000 * 1000);
+      });
+  initialize();
+  envoy::config::core::v3::Http2ProtocolOptions http2_options;
+  http2_options.mutable_initial_stream_window_size()->set_value(65535);
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), http2_options);
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(70000, true);
+  test_server_->waitForCounterEq("http2.tx_flush_timeout", 1);
+  response->waitForReset();
+}
+
 static std::string response_metadata_filter = R"EOF(
 name: response-metadata-filter
 typed_config:
