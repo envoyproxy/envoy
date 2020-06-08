@@ -30,19 +30,12 @@ TEST_P(MetadataFromSQLTest, ParsingAndMetadataTest) {
   const std::string& query = std::get<0>(GetParam());
   // vector of queries to check.
   std::vector<std::string> test_queries;
-  test_queries.push_back(std::string(query));
+  test_queries.push_back(query);
 
   // Create uppercase and lowercase versions of the queries and put
   // them into vector of queries to check
-  std::string lowercase_query = query;
-  std::transform(query.begin(), query.end(), lowercase_query.begin(),
-                 [](unsigned char c) { return std::tolower(c); });
-  test_queries.push_back(lowercase_query);
-
-  std::string uppercase_query = query;
-  std::transform(query.begin(), query.end(), uppercase_query.begin(),
-                 [](unsigned char c) { return std::toupper(c); });
-  test_queries.push_back(uppercase_query);
+  test_queries.push_back(absl::AsciiStrToLower(query));
+  test_queries.push_back(absl::AsciiStrToUpper(query));
 
   while (!test_queries.empty()) {
     std::string test_query = test_queries.back();
