@@ -354,7 +354,6 @@ envoy_cc_fuzz_test(
         "//source/common/http:utility_lib",
         "//test/fuzz:utility_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
