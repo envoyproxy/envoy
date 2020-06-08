@@ -147,6 +147,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, CdsIntegrationTest,
 TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
   // Calls our initialize(), which includes establishing a listener, route, and cluster.
   testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex1, "/cluster1");
+  test_server_->waitForCounterGe("cluster_manager.cluster_added", 1);
 
   // Tell Envoy that cluster_1 is gone.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "55", {}, {}, {}));

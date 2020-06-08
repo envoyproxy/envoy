@@ -264,7 +264,7 @@ CounterSharedPtr AllocatorImpl::makeCounter(StatName name, StatName tag_extracte
   if (iter != counters_.end()) {
     return CounterSharedPtr(*iter);
   }
-  auto counter = CounterSharedPtr(new CounterImpl(name, *this, tag_extracted_name, stat_name_tags));
+  auto counter = CounterSharedPtr(makeCounterInternal(name, tag_extracted_name, stat_name_tags));
   counters_.insert(counter.get());
   return counter;
 }
@@ -306,6 +306,11 @@ bool AllocatorImpl::isMutexLockedForTest() {
     mutex_.unlock();
   }
   return !locked;
+}
+
+Counter* AllocatorImpl::makeCounterInternal(StatName name, StatName tag_extracted_name,
+                                            const StatNameTagVector& stat_name_tags) {
+  return new CounterImpl(name, *this, tag_extracted_name, stat_name_tags);
 }
 
 } // namespace Stats
