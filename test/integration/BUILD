@@ -242,7 +242,6 @@ envoy_cc_test(
         ":http_protocol_integration_lib",
         "//source/extensions/filters/http/health_check:config",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
 

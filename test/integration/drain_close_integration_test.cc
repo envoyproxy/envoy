@@ -85,5 +85,5 @@ INSTANTIATE_TEST_SUITE_P(Protocols, DrainCloseIntegrationTest,
                              {FakeHttpConnection::Type::HTTP1})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
-}  // namespace
-}  // namespace Envoy
+} // namespace
+} // namespace Envoy
