@@ -219,9 +219,15 @@ TEST_F(ThreadAsyncPtrTest, TruncateNoWait) {
   auto thread =
       thread_factory_.createThread([]() {}, Options{"this name is way too long for posix"});
 
-  // To make this test work on multiple platforms, just assume the first 10 characters
-  // are retained.
+  // In general, across platforms, just assume the first 10 characters are
+  // retained.
   EXPECT_THAT(thread->name(), testing::StartsWith("this name "));
+
+  // On Linux we can check for 15 exactly.
+#ifdef __linux__
+  EXPECT_EQ("this name is wa", thread->name()) << "truncated to 15 chars";
+#endif
+
   thread->join();
 }
 

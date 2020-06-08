@@ -40,8 +40,7 @@ public:
   ThreadImplPosix(std::function<void()> thread_routine, OptionsOptConstRef options)
       : thread_routine_(std::move(thread_routine)) {
     if (options) {
-      name_ = (std::string(
-          options->name_.substr(0, PTHREAD_MAX_THREADNAME_LEN_INCLUDING_NULL_BYTE - 1)));
+      name_ = options->name_.substr(0, PTHREAD_MAX_THREADNAME_LEN_INCLUDING_NULL_BYTE - 1);
     }
     RELEASE_ASSERT(Logger::Registry::initialized(), "");
     const int rc = pthread_create(
@@ -95,6 +94,9 @@ public:
 
 private:
 #ifdef __linux__
+  // Attempts to get the name from the operating system, returning true and
+  // updating 'name' if successful. Note that during normal operation this
+  // may fail, if the thread exits prior to the system call.
   bool getNameFromOS(std::string& name) {
     // Verify that the name got written into the thread as expected.
     char buf[PTHREAD_MAX_THREADNAME_LEN_INCLUDING_NULL_BYTE];
