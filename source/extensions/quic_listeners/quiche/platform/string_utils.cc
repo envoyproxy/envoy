@@ -17,6 +17,7 @@
 
 namespace quiche {
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 std::string HexDump(absl::string_view data) {
   const int kBytesPerLine = 16;
   const char* buf = data.data();
@@ -50,6 +51,7 @@ std::string HexDump(absl::string_view data) {
   return out;
 }
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 char HexDigitToInt(char c) {
   ASSERT(std::isxdigit(c));
 
@@ -65,6 +67,7 @@ char HexDigitToInt(char c) {
   return 0;
 }
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 bool HexDecodeToUInt32(absl::string_view data, uint32_t* out) {
   if (data.empty() || data.size() > 8u) {
     return false;
