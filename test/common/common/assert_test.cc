@@ -45,6 +45,7 @@ TEST(AssertDeathTest, VariousLogs) {
 TEST(EnvoyBugDeathTest, VariousLogs) {
   int expected_counted_failures;
   int envoy_bug_fail_count = 0;
+  // ENVOY_BUG actions only occur on power of two counts.
   auto envoy_bug_action_registration =
       Assert::setEnvoyBugFailureRecordAction([&]() { envoy_bug_fail_count++; });
 
@@ -55,6 +56,8 @@ TEST(EnvoyBugDeathTest, VariousLogs) {
                ".*envoy bug failure: 0. Details: With some logs.*");
   expected_counted_failures = 0;
 #else
+  EXPECT_LOG_CONTAINS("error", "envoy bug failure: 0", ENVOY_BUG(0));
+  EXPECT_LOG_CONTAINS("error", "envoy bug failure: 0", ENVOY_BUG(0));
   EXPECT_LOG_CONTAINS("error", "envoy bug failure: 0", ENVOY_BUG(0));
   EXPECT_LOG_CONTAINS("error", "envoy bug failure: 0", ENVOY_BUG(0, ""));
   EXPECT_LOG_CONTAINS("error", "envoy bug failure: 0. Details: With some logs",

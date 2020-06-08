@@ -477,6 +477,12 @@ TEST_P(ServerInstanceImplTest, Stats) {
 #if defined(NDEBUG)
   ENVOY_BUG(false, "Testing envoy bug assertion failure detection in release build.");
   EXPECT_EQ(1L, TestUtility::findCounter(stats_store_, "server.envoy_bug_failures")->value());
+  // Test power of two increments.
+  for (int i = 0; i < 16; i++) {
+    ENVOY_BUG(false);
+  }
+  EXPECT_EQ(5L, TestUtility::findCounter(stats_store_, "server.envoy_bug_failures")->value());
+
 // The ASSERT stat only works in this configuration.
 #if defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
   ASSERT(false, "Testing debug assertion failure detection in release build.");

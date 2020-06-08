@@ -66,19 +66,6 @@ void invokeEnvoyBugFailureRecordAction_ForEnvoyBugMacroUseOnly();
 
 // CONDITION_STR is needed to prevent macros in condition from being expected, which obfuscates
 // the logged failure, e.g., "EAGAIN" vs "11".
-#define _ENVOY_BUG_IMPL(CONDITION, CONDITION_STR, ACTION, DETAILS)                                 \
-  do {                                                                                             \
-    if (!(CONDITION)) {                                                                            \
-      const std::string& details = (DETAILS);                                                      \
-      ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::envoy_bug), error,    \
-                          "envoy bug failure: {}.{}{}", CONDITION_STR,                             \
-                          details.empty() ? "" : " Details: ", details);                           \
-      ACTION;                                                                                      \
-    }                                                                                              \
-  } while (false)
-
-// CONDITION_STR is needed to prevent macros in condition from being expected, which obfuscates
-// the logged failure, e.g., "EAGAIN" vs "11".
 #define _ASSERT_IMPL(CONDITION, CONDITION_STR, ACTION, DETAILS)                                    \
   do {                                                                                             \
     if (!(CONDITION)) {                                                                            \
@@ -119,6 +106,11 @@ void invokeEnvoyBugFailureRecordAction_ForEnvoyBugMacroUseOnly();
  */
 #define SECURITY_ASSERT(X, DETAILS) _ASSERT_IMPL(X, #X, abort(), DETAILS)
 
+// This is a workaround for fact that MSVC expands __VA_ARGS__ after passing them into a macro,
+// rather than before passing them into a macro. Without this, _ASSERT_SELECTOR does not work
+// correctly when compiled with MSVC
+#define EXPAND(X) X
+
 #if !defined(NDEBUG) || defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
 
 #if !defined(NDEBUG) // If this is a debug build.
@@ -131,11 +123,6 @@ void invokeEnvoyBugFailureRecordAction_ForEnvoyBugMacroUseOnly();
 #define _ASSERT_ORIGINAL(X) _ASSERT_IMPL(X, #X, ASSERT_ACTION, "")
 #define _ASSERT_VERBOSE(X, Y) _ASSERT_IMPL(X, #X, ASSERT_ACTION, Y)
 #define _ASSERT_SELECTOR(_1, _2, ASSERT_MACRO, ...) ASSERT_MACRO
-
-// This is a workaround for fact that MSVC expands __VA_ARGS__ after passing them into a macro,
-// rather than before passing them into a macro. Without this, _ASSERT_SELECTOR does not work
-// correctly when compiled with MSVC
-#define EXPAND(X) X
 
 #if !defined(ENVOY_DISABLE_KNOWN_ISSUE_ASSERTS)
 /**
@@ -173,9 +160,23 @@ void invokeEnvoyBugFailureRecordAction_ForEnvoyBugMacroUseOnly();
     abort();                                                                                       \
   } while (false)
 
+// CONDITION_STR is needed to prevent macros in condition from being expected, which obfuscates
+// the logged failure, e.g., "EAGAIN" vs "11".
+#define _ENVOY_BUG_IMPL(CONDITION, CONDITION_STR, ACTION, DETAILS)                                 \
+  do {                                                                                             \
+    if (!(CONDITION)) {                                                                            \
+      const std::string& details = (DETAILS);                                                      \
+      ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::envoy_bug), error,    \
+                          "envoy bug failure: {}.{}{}", CONDITION_STR,                             \
+                          details.empty() ? "" : " Details: ", details);                           \
+      ACTION;                                                                                      \
+    }                                                                                              \
+  } while (false)
+
 #define _ENVOY_BUG_ORIGINAL(X) _ENVOY_BUG_IMPL(X, #X, ENVOY_BUG_ACTION, "")
 #define _ENVOY_BUG_VERBOSE(X, Y) _ENVOY_BUG_IMPL(X, #X, ENVOY_BUG_ACTION, Y)
 #define _ENVOY_BUG_SELECTOR(_1, _2, ENVOY_BUG_MACRO, ...) ENVOY_BUG_MACRO
+
 /**
  * If ENVOY_BUG is called with one argument, the ENVOY_BUG_SELECTOR will return _ENVOY_BUG_ORIGINAL
  * and this will call _ENVOY_BUG_ORIGINAL(__VA_ARGS__). If ENVOY_BUG is called with two arguments,
