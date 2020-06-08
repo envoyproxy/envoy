@@ -4211,7 +4211,7 @@ TEST_P(SslSocketTest, DownstreamNotReadySslSocket) {
   EXPECT_CALL(factory_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
   EXPECT_CALL(factory_context, localInfo()).WillOnce(ReturnRef(local_info));
   EXPECT_CALL(factory_context, stats()).WillOnce(ReturnRef(stats_store));
-  EXPECT_CALL(factory_context, initManager()).WillRepeatedly(Return(&init_manager));
+  EXPECT_CALL(factory_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   auto sds_secret_configs =
@@ -4246,7 +4246,7 @@ TEST_P(SslSocketTest, UpstreamNotReadySslSocket) {
   NiceMock<Event::MockDispatcher> dispatcher;
   EXPECT_CALL(factory_context, localInfo()).WillOnce(ReturnRef(local_info));
   EXPECT_CALL(factory_context, stats()).WillOnce(ReturnRef(stats_store));
-  EXPECT_CALL(factory_context, initManager()).WillRepeatedly(Return(&init_manager));
+  EXPECT_CALL(factory_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
   EXPECT_CALL(factory_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;

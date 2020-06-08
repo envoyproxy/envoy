@@ -88,7 +88,6 @@ private:
         std::function<void()> unregister_secret_provider = [map_key, this]() {
           removeDynamicSecretProvider(map_key);
         };
-        ASSERT(secret_provider_context.initManager() != nullptr);
         secret_provider = SecretType::create(secret_provider_context, sds_config_source,
                                              config_name, unregister_secret_provider);
         dynamic_secret_providers_[map_key] = secret_provider;

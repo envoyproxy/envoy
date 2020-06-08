@@ -41,7 +41,10 @@ public:
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
   Envoy::Runtime::RandomGenerator& random() override { return random_; }
   Stats::Store& stats() override { return stats_; }
-  Init::Manager* initManager() override { return init_manager_; }
+  Init::Manager& initManager() override {
+    ASSERT(init_manager_ != nullptr);
+    return *init_manager_;
+  }
   Singleton::Manager& singletonManager() override { return singleton_manager_; }
   ThreadLocal::SlotAllocator& threadLocal() override { return tls_; }
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {

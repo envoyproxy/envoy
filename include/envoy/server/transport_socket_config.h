@@ -9,6 +9,7 @@
 #include "envoy/network/transport_socket.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/secret/secret_manager.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/scope.h"
@@ -74,10 +75,9 @@ public:
   virtual Stats::Store& stats() PURE;
 
   /**
-   * @return a pointer pointing to the instance of an init manager, or nullptr
-   * if not set.
+   * @return a reference to the instance of an init manager.
    */
-  virtual Init::Manager* initManager() PURE;
+  virtual Init::Manager& initManager() PURE;
 
   /**
    * @return the server's singleton manager.
