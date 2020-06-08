@@ -1003,6 +1003,8 @@ void EdsHelper::setEds(const std::vector<envoy::config::endpoint::v3::ClusterLoa
 void EdsHelper::setEdsAndWait(
     const std::vector<envoy::config::endpoint::v3::ClusterLoadAssignment>& cluster_load_assignments,
     IntegrationTestServerStats& server_stats) {
+  // Make sure the last version has been accepted before setting a new one.
+  server_stats.waitForCounterGe("cluster.cluster_0.update_success", update_successes_);
   setEds(cluster_load_assignments);
   // Make sure Envoy has consumed the update now that it is running.
   ++update_successes_;

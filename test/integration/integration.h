@@ -447,6 +447,10 @@ protected:
   bool use_lds_{true}; // Use the integration framework's LDS set up.
   Grpc::SotwOrDelta sotw_or_delta_{Grpc::SotwOrDelta::Sotw};
 
+  // By default the test server will use custom stats to notify on increment.
+  // This override exists for tests measuring stats memory.
+  bool use_real_stats_{};
+
 private:
   // The type for the Envoy-to-backend connection
   FakeHttpConnection::Type upstream_protocol_{FakeHttpConnection::Type::HTTP1};
