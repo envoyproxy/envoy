@@ -181,7 +181,7 @@ void invokeEnvoyBugFailureRecordAction_ForEnvoyBugMacroUseOnly();
  * If ENVOY_BUG is called with one argument, the ENVOY_BUG_SELECTOR will return _ENVOY_BUG_ORIGINAL
  * and this will call _ENVOY_BUG_ORIGINAL(__VA_ARGS__). If ENVOY_BUG is called with two arguments,
  * ENVOY_BUG_SELECTOR will return _ENVOY_BUG_VERBOSE, and this will call
- * _ENVOY_BUG_VERVOSE(__VA_ARGS__).
+ * _ENVOY_BUG_VERBOSE(__VA_ARGS__).
  */
 #define ENVOY_BUG(...)                                                                             \
   EXPAND(_ENVOY_BUG_SELECTOR(__VA_ARGS__, _ENVOY_BUG_VERBOSE, _ENVOY_BUG_ORIGINAL)(__VA_ARGS__))
