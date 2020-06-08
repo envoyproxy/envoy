@@ -436,6 +436,8 @@ protected:
   // The duration of the drain manager graceful drain period.
   std::chrono::seconds drain_time_{1};
 
+  // The DrainStrategy that dictates the behaviour of
+  // DrainManagerImpl::drainClose().
   Server::DrainStrategy drain_strategy_{Server::DrainStrategy::Gradual};
 
   // Member variables for xDS testing.

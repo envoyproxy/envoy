@@ -148,7 +148,7 @@ TEST_P(DrainManagerImplTest, DrainDeadlineProbability) {
   }
 }
 
-INSTANTIATE_TEST_SUITE_P(DrainGradually, DrainManagerImplTest, testing::Bool());
+INSTANTIATE_TEST_SUITE_P(DrainStrategies, DrainManagerImplTest, testing::Bool());
 
 } // namespace
 } // namespace Server
