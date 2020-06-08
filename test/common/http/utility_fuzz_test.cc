@@ -77,9 +77,9 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
     Http::Utility::parseAuthority(authority_string);
     break;
   }
-  case test::common::http::UtilityTestCase::kValidateSettingsParameters: {
-    const auto& settings_parameters = input.validate_settings_parameters();
-    Http2::Utility::validateCustomSettingsParameters(settings_parameters);
+  case test::common::http::UtilityTestCase::kInitializeAndValidate: {
+    const auto& options = input.initialize_and_validate();
+    Http2::Utility::initializeAndValidateOptions(options);
     break;
   }
 
