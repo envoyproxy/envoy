@@ -42,4 +42,26 @@ TEST(AssertDeathTest, VariousLogs) {
   EXPECT_EQ(expected_counted_failures, assert_fail_count);
 }
 
+TEST(EnvoyBugDeathTest, VariousLogs) {
+  int expected_counted_failures;
+  int envoy_bug_fail_count = 0;
+  auto envoy_bug_action_registration =
+      Assert::setEnvoyBugFailureRecordAction([&]() { envoy_bug_fail_count++; });
+
+#ifndef NDEBUG
+  EXPECT_DEATH({ ENVOY_BUG(0); }, ".*envoy bug failure: 0.*");
+  EXPECT_DEATH({ ENVOY_BUG(0, ""); }, ".*envoy bug failure: 0.*");
+  EXPECT_DEATH({ ENVOY_BUG(0, "With some logs"); },
+               ".*envoy bug failure: 0. Details: With some logs.*");
+  expected_counted_failures = 0;
+#else
+  EXPECT_LOG_CONTAINS("error", "envoy bug failure: 0", ENVOY_BUG(0));
+  EXPECT_LOG_CONTAINS("error", "envoy bug failure: 0", ENVOY_BUG(0, ""));
+  EXPECT_LOG_CONTAINS("error", "envoy bug failure: 0. Details: With some logs",
+                      ENVOY_BUG(0, "With some logs"));
+  expected_counted_failures = 3;
+#endif
+  EXPECT_EQ(expected_counted_failures, envoy_bug_fail_count);
+}
+
 } // namespace Envoy

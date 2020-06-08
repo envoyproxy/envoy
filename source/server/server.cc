@@ -332,6 +332,8 @@ void InstanceImpl::initialize(const Options& options,
 
   assert_action_registration_ = Assert::setDebugAssertionFailureRecordAction(
       [this]() { server_stats_->debug_assertion_failures_.inc(); });
+  envoy_bug_action_registration_ = Assert::setEnvoyBugFailureRecordAction(
+      [this]() { server_stats_->envoy_bug_failures_.inc(); });
 
   InstanceImpl::failHealthcheck(false);
 

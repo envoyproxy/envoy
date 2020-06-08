@@ -33,12 +33,49 @@ using ActionRegistrationPtr = std::unique_ptr<ActionRegistration>;
 ActionRegistrationPtr setDebugAssertionFailureRecordAction(const std::function<void()>& action);
 
 /**
+ * Sets an action to be invoked when an ENVOY_BUG failure is detected in a release build. This
+ * action will be invoked each time an ENVOY_BUG failure is detected.
+ *
+ * This function is not thread-safe; concurrent calls to set the action are not allowed.
+ *
+ * The action may be invoked concurrently if two ENVOY_BUGs in different threads fail at the
+ * same time, so the action must be thread-safe.
+ *
+ * This has no effect in debug builds (envoy bug failure aborts the process).
+ *
+ * @param action The action to take when an envoy bug fails.
+ * @return A registration object. The registration is removed when the object is destructed.
+ */
+ActionRegistrationPtr setEnvoyBugFailureRecordAction(const std::function<void()>& action);
+
+/**
  * Invokes the action set by setDebugAssertionFailureRecordAction, or does nothing if
  * no action has been set.
  *
  * This should only be called by ASSERT macros in this file.
  */
 void invokeDebugAssertionFailureRecordAction_ForAssertMacroUseOnly();
+
+/**
+ * Invokes the action set by setEnvoyBugFailureRecordAction, or does nothing if
+ * no action has been set.
+ *
+ * This should only be called by ENVOY_BUG macros in this file.
+ */
+void invokeEnvoyBugFailureRecordAction_ForEnvoyBugMacroUseOnly();
+
+// CONDITION_STR is needed to prevent macros in condition from being expected, which obfuscates
+// the logged failure, e.g., "EAGAIN" vs "11".
+#define _ENVOY_BUG_IMPL(CONDITION, CONDITION_STR, ACTION, DETAILS)                                 \
+  do {                                                                                             \
+    if (!(CONDITION)) {                                                                            \
+      const std::string& details = (DETAILS);                                                      \
+      ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::envoy_bug), error,    \
+                          "envoy bug failure: {}.{}{}", CONDITION_STR,                             \
+                          details.empty() ? "" : " Details: ", details);                           \
+      ACTION;                                                                                      \
+    }                                                                                              \
+  } while (false)
 
 // CONDITION_STR is needed to prevent macros in condition from being expected, which obfuscates
 // the logged failure, e.g., "EAGAIN" vs "11".
@@ -86,6 +123,7 @@ void invokeDebugAssertionFailureRecordAction_ForAssertMacroUseOnly();
 
 #if !defined(NDEBUG) // If this is a debug build.
 #define ASSERT_ACTION abort()
+#define ENVOY_BUG_ACTION abort()
 #else // If this is not a debug build, but ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE is defined.
 #define ASSERT_ACTION Envoy::Assert::invokeDebugAssertionFailureRecordAction_ForAssertMacroUseOnly()
 #endif // !defined(NDEBUG)
@@ -111,7 +149,7 @@ void invokeDebugAssertionFailureRecordAction_ForAssertMacroUseOnly();
 // This non-implementation ensures that its argument is a valid expression that can be statically
 // casted to a bool, but the expression is never evaluated and will be compiled away.
 #define KNOWN_ISSUE_ASSERT _NULL_ASSERT_IMPL
-#endif // defined(ENVOY_DEBUG_KNOWN_ISSUES)
+#endif // defined(ENVOY_DISABLE_KNOWN_ISSUE_ASSERTS)
 
 // If ASSERT is called with one argument, the ASSERT_SELECTOR will return
 // _ASSERT_ORIGINAL and this will call _ASSERT_ORIGINAL(__VA_ARGS__).
@@ -122,6 +160,7 @@ void invokeDebugAssertionFailureRecordAction_ForAssertMacroUseOnly();
 #else
 #define ASSERT _NULL_ASSERT_IMPL
 #define KNOWN_ISSUE_ASSERT _NULL_ASSERT_IMPL
+#define ENVOY_BUG_ACTION Envoy::Assert::invokeEnvoyBugFailureRecordAction_ForEnvoyBugMacroUseOnly()
 #endif // !defined(NDEBUG) || defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
 
 /**
@@ -133,6 +172,18 @@ void invokeDebugAssertionFailureRecordAction_ForAssertMacroUseOnly();
                         "panic: {}", X);                                                           \
     abort();                                                                                       \
   } while (false)
+
+#define _ENVOY_BUG_ORIGINAL(X) _ENVOY_BUG_IMPL(X, #X, ENVOY_BUG_ACTION, "")
+#define _ENVOY_BUG_VERBOSE(X, Y) _ENVOY_BUG_IMPL(X, #X, ENVOY_BUG_ACTION, Y)
+#define _ENVOY_BUG_SELECTOR(_1, _2, ENVOY_BUG_MACRO, ...) ENVOY_BUG_MACRO
+/**
+ * If ENVOY_BUG is called with one argument, the ENVOY_BUG_SELECTOR will return _ENVOY_BUG_ORIGINAL
+ * and this will call _ENVOY_BUG_ORIGINAL(__VA_ARGS__). If ENVOY_BUG is called with two arguments,
+ * ENVOY_BUG_SELECTOR will return _ENVOY_BUG_VERBOSE, and this will call
+ * _ENVOY_BUG_VERVOSE(__VA_ARGS__).
+ */
+#define ENVOY_BUG(...)                                                                             \
+  EXPAND(_ENVOY_BUG_SELECTOR(__VA_ARGS__, _ENVOY_BUG_VERBOSE, _ENVOY_BUG_ORIGINAL)(__VA_ARGS__))
 
 // NOT_IMPLEMENTED_GCOVR_EXCL_LINE is for overridden functions that are expressly not implemented.
 // The macro name includes "GCOVR_EXCL_LINE" to exclude the macro's usage from code coverage
