@@ -1,6 +1,10 @@
 Version history
 ---------------
 
+1.14.2 (June 8, 2020)
+=====================
+* http: fixed CVE-2020-11080 by rejecting HTTP/2 SETTINGS frames with too many parameters.
+
 1.14.1 (April 8, 2020)
 ======================
 * request_id_extension: fixed static initialization for noop request id extension.
