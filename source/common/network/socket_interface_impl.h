@@ -10,10 +10,9 @@ namespace Network {
 
 class SocketInterfaceImpl : public SocketInterface {
 public:
-  IoHandlePtr socket(Address::SocketType socket_type, Address::Type addr_type,
+  IoHandlePtr socket(Socket::Type socket_type, Address::Type addr_type,
                      Address::IpVersion version) override;
-  IoHandlePtr socket(Address::SocketType socket_type,
-                     const Address::InstanceConstSharedPtr addr) override;
+  IoHandlePtr socket(Socket::Type socket_type, const Address::InstanceConstSharedPtr addr) override;
   bool ipFamilySupported(int domain) override;
   Address::InstanceConstSharedPtr addressFromFd(os_fd_t fd) override;
   Address::InstanceConstSharedPtr peerAddressFromFd(os_fd_t fd) override;

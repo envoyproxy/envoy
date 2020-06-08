@@ -39,11 +39,11 @@ namespace Envoy {
 namespace Server {
 namespace {
 
-std::string toString(Network::Address::SocketType socket_type) {
+std::string toString(Network::Socket::Type socket_type) {
   switch (socket_type) {
-  case Network::Address::SocketType::Stream:
+  case Network::Socket::Type::Stream:
     return "SocketType::Stream";
-  case Network::Address::SocketType::Datagram:
+  case Network::Socket::Type::Datagram:
     return "SocketType::Datagram";
   }
   NOT_REACHED_GCOVR_EXCL_LINE;
@@ -188,17 +188,17 @@ Network::ListenerFilterMatcherSharedPtr ProdListenerComponentFactory::createList
 }
 
 Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
-    Network::Address::InstanceConstSharedPtr address, Network::Address::SocketType socket_type,
+    Network::Address::InstanceConstSharedPtr address, Network::Socket::Type socket_type,
     const Network::Socket::OptionsSharedPtr& options, const ListenSocketCreationParams& params) {
   ASSERT(address->type() == Network::Address::Type::Ip ||
          address->type() == Network::Address::Type::Pipe);
-  ASSERT(socket_type == Network::Address::SocketType::Stream ||
-         socket_type == Network::Address::SocketType::Datagram);
+  ASSERT(socket_type == Network::Socket::Type::Stream ||
+         socket_type == Network::Socket::Type::Datagram);
 
   // For each listener config we share a single socket among all threaded listeners.
   // First we try to get the socket from our parent if applicable.
   if (address->type() == Network::Address::Type::Pipe) {
-    if (socket_type != Network::Address::SocketType::Stream) {
+    if (socket_type != Network::Socket::Type::Stream) {
       // This could be implemented in the future, since Unix domain sockets
       // support SOCK_DGRAM, but there would need to be a way to specify it in
       // envoy.api.v2.core.Pipe.
@@ -215,7 +215,7 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
     return std::make_shared<Network::UdsListenSocket>(address);
   }
 
-  const std::string scheme = (socket_type == Network::Address::SocketType::Stream)
+  const std::string scheme = (socket_type == Network::Socket::Type::Stream)
                                  ? std::string(Network::Utility::TCP_SCHEME)
                                  : std::string(Network::Utility::UDP_SCHEME);
   const std::string addr = absl::StrCat(scheme, address->asString());
@@ -225,7 +225,7 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
     if (fd != -1) {
       ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
       Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandleImpl>(fd);
-      if (socket_type == Network::Address::SocketType::Stream) {
+      if (socket_type == Network::Socket::Type::Stream) {
         return std::make_shared<Network::TcpListenSocket>(std::move(io_handle), address, options);
       } else {
         return std::make_shared<Network::UdpListenSocket>(std::move(io_handle), address, options);
@@ -233,7 +233,7 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
     }
   }
 
-  if (socket_type == Network::Address::SocketType::Stream) {
+  if (socket_type == Network::Socket::Type::Stream) {
     return std::make_shared<Network::TcpListenSocket>(address, options, params.bind_to_port);
   } else {
     return std::make_shared<Network::UdpListenSocket>(address, options, params.bind_to_port);
@@ -491,13 +491,13 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
       draining_listen_socket_factory = existing_draining_listener->listener_->getSocketFactory();
     }
 
-    Network::Address::SocketType socket_type =
+    Network::Socket::Type socket_type =
         Network::Utility::protobufAddressSocketType(config.address());
     new_listener->setSocketFactory(
         draining_listen_socket_factory
             ? draining_listen_socket_factory
             : createListenSocketFactory(config.address(), *new_listener,
-                                        (socket_type == Network::Address::SocketType::Datagram) ||
+                                        (socket_type == Network::Socket::Type::Datagram) ||
                                             config.reuse_port()));
     if (workers_started_) {
       new_listener->debugLog("add warming listener");
@@ -983,8 +983,7 @@ ListenerFilterChainFactoryBuilder::buildFilterChainInternal(
 Network::ListenSocketFactorySharedPtr ListenerManagerImpl::createListenSocketFactory(
     const envoy::config::core::v3::Address& proto_address, ListenerImpl& listener,
     bool reuse_port) {
-  Network::Address::SocketType socket_type =
-      Network::Utility::protobufAddressSocketType(proto_address);
+  Network::Socket::Type socket_type = Network::Utility::protobufAddressSocketType(proto_address);
   return std::make_shared<ListenSocketFactoryImpl>(
       factory_, listener.address(), socket_type, listener.listenSocketOptions(),
       listener.bindToPort(), listener.name(), reuse_port);

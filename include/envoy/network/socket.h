@@ -50,6 +50,11 @@ public:
   virtual ~Socket() = default;
 
   /**
+   * Type of sockets supported. See man 2 socket for more details
+   */
+  enum class Type { Stream, Datagram };
+
+  /**
    * @return the local address of the socket.
    */
   virtual const Address::InstanceConstSharedPtr& localAddress() const PURE;
@@ -76,7 +81,7 @@ public:
   /**
    * @return the type (stream or datagram) of the socket.
    */
-  virtual Address::SocketType socketType() const PURE;
+  virtual Socket::Type socketType() const PURE;
 
   /**
    * @return the type (IP or pipe) of addresses used by the socket (subset of socket domain)
@@ -234,7 +239,7 @@ public:
    * @param version IP version if address type is IP
    * @return @ref Network::IoHandlePtr that wraps the underlying socket file descriptor
    */
-  virtual IoHandlePtr socket(Address::SocketType type, Address::Type addr_type,
+  virtual IoHandlePtr socket(Socket::Type type, Address::Type addr_type,
                              Address::IpVersion version) PURE;
 
   /**
@@ -244,7 +249,7 @@ public:
    * @param addr address that is gleaned for address type and version if needed
    * @return @ref Network::IoHandlePtr that wraps the underlying socket file descriptor
    */
-  virtual IoHandlePtr socket(Address::SocketType socket_type,
+  virtual IoHandlePtr socket(Socket::Type socket_type,
                              const Address::InstanceConstSharedPtr addr) PURE;
 
   /**

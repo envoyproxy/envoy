@@ -29,14 +29,14 @@ protected:
 /**
  * Wraps a unix socket.
  */
-template <Address::SocketType T> struct NetworkSocketTrait {};
+template <Socket::Type T> struct NetworkSocketTrait {};
 
-template <> struct NetworkSocketTrait<Address::SocketType::Stream> {
-  static constexpr Address::SocketType type = Address::SocketType::Stream;
+template <> struct NetworkSocketTrait<Socket::Type::Stream> {
+  static constexpr Socket::Type type = Socket::Type::Stream;
 };
 
-template <> struct NetworkSocketTrait<Address::SocketType::Datagram> {
-  static constexpr Address::SocketType type = Address::SocketType::Datagram;
+template <> struct NetworkSocketTrait<Socket::Type::Datagram> {
+  static constexpr Socket::Type type = Socket::Type::Datagram;
 };
 
 template <typename T> class NetworkListenSocket : public ListenSocketImpl {
@@ -58,23 +58,23 @@ public:
     setListenSocketOptions(options);
   }
 
-  Address::SocketType socketType() const override { return T::type; }
+  Socket::Type socketType() const override { return T::type; }
 
 protected:
   void setPrebindSocketOptions();
 };
 
-using TcpListenSocket = NetworkListenSocket<NetworkSocketTrait<Address::SocketType::Stream>>;
+using TcpListenSocket = NetworkListenSocket<NetworkSocketTrait<Socket::Type::Stream>>;
 using TcpListenSocketPtr = std::unique_ptr<TcpListenSocket>;
 
-using UdpListenSocket = NetworkListenSocket<NetworkSocketTrait<Address::SocketType::Datagram>>;
+using UdpListenSocket = NetworkListenSocket<NetworkSocketTrait<Socket::Type::Datagram>>;
 using UdpListenSocketPtr = std::unique_ptr<UdpListenSocket>;
 
 class UdsListenSocket : public ListenSocketImpl {
 public:
   UdsListenSocket(const Address::InstanceConstSharedPtr& address);
   UdsListenSocket(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& address);
-  Address::SocketType socketType() const override { return Address::SocketType::Stream; }
+  Socket::Type socketType() const override { return Socket::Type::Stream; }
 };
 
 class ConnectionSocketImpl : public SocketImpl, public ConnectionSocket {
@@ -85,8 +85,7 @@ public:
       : SocketImpl(std::move(io_handle), local_address), remote_address_(remote_address),
         direct_remote_address_(remote_address) {}
 
-  ConnectionSocketImpl(Address::SocketType type,
-                       const Address::InstanceConstSharedPtr& local_address,
+  ConnectionSocketImpl(Socket::Type type, const Address::InstanceConstSharedPtr& local_address,
                        const Address::InstanceConstSharedPtr& remote_address)
       : SocketImpl(type, local_address), remote_address_(remote_address),
         direct_remote_address_(remote_address) {
@@ -94,7 +93,7 @@ public:
   }
 
   // Network::Socket
-  Address::SocketType socketType() const override { return Address::SocketType::Stream; }
+  Socket::Type socketType() const override { return Socket::Type::Stream; }
 
   // Network::ConnectionSocket
   const Address::InstanceConstSharedPtr& remoteAddress() const override { return remote_address_; }
@@ -152,9 +151,9 @@ class ClientSocketImpl : public ConnectionSocketImpl {
 public:
   ClientSocketImpl(const Address::InstanceConstSharedPtr& remote_address,
                    const OptionsSharedPtr& options)
-      : ConnectionSocketImpl(Network::SocketInterfaceSingleton::get().socket(
-                                 Address::SocketType::Stream, remote_address),
-                             nullptr, remote_address) {
+      : ConnectionSocketImpl(
+            Network::SocketInterfaceSingleton::get().socket(Socket::Type::Stream, remote_address),
+            nullptr, remote_address) {
     if (options) {
       addOptions(options);
     }

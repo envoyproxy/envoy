@@ -89,9 +89,7 @@ public:
   // Dummy method
   void close() override {}
   bool isOpen() const override { return false; }
-  Network::Address::SocketType socketType() const override {
-    return Network::Address::SocketType::Stream;
-  }
+  Network::Socket::Type socketType() const override { return Network::Socket::Type::Stream; }
   Network::Address::Type addressType() const override { return local_address_->type(); }
   void setLocalAddress(const Network::Address::InstanceConstSharedPtr&) override {}
   void restoreLocalAddress(const Network::Address::InstanceConstSharedPtr&) override {}
