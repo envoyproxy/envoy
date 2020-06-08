@@ -515,6 +515,8 @@ public:
   MOCK_METHOD(Api::Api&, api, ());
   Grpc::Context& grpcContext() override { return grpc_context_; }
   MOCK_METHOD(Server::DrainManager&, drainManager, ());
+  MOCK_METHOD(Init::Manager&, initManager, ());
+  MOCK_METHOD(ServerLifecycleNotifier&, lifecycleNotifier, ());
 
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
@@ -604,7 +606,7 @@ public:
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(Envoy::Runtime::RandomGenerator&, random, ());
   MOCK_METHOD(Stats::Store&, stats, ());
-  MOCK_METHOD(Init::Manager*, initManager, ());
+  MOCK_METHOD(Init::Manager&, initManager, ());
   MOCK_METHOD(Singleton::Manager&, singletonManager, ());
   MOCK_METHOD(ThreadLocal::SlotAllocator&, threadLocal, ());
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
