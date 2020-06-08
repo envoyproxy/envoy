@@ -1,9 +1,10 @@
 Version history
 ---------------
 
-1.13.2 (Pending)
-================
+1.13.2 (June 8, 2020)
+=====================
 * http: added :ref:`headers_with_underscores_action setting <envoy_api_field_core.HttpProtocolOptions.headers_with_underscores_action>` to control how client requests with header names containing underscore characters are handled. The options are to allow such headers, reject request or drop headers. The default is to allow headers, preserving existing behavior.
+* http: fixed CVE-2020-11080 by rejecting HTTP/2 SETTINGS frames with too many parameters.
 
 1.13.1 (March 3, 2020)
 ======================
