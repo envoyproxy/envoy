@@ -6,8 +6,14 @@
 namespace Envoy {
 namespace Thread {
 
-ThreadImplWin32::ThreadImplWin32(std::function<void()> thread_routine)
+ThreadImplWin32::ThreadImplWin32(std::function<void()> thread_routine, OptionsOptConstRef options)
     : thread_routine_(thread_routine) {
+  if (options) {
+    name_ = options->name_;
+    // TODO(jmarantz): set the thread name for task manager, etc, or pull the
+    // auto-generated name from the OS if options is not present.
+  }
+
   RELEASE_ASSERT(Logger::Registry::initialized(), "");
   thread_handle_ = reinterpret_cast<HANDLE>(::_beginthreadex(
       nullptr, 0,
@@ -26,8 +32,9 @@ void ThreadImplWin32::join() {
   RELEASE_ASSERT(rc == WAIT_OBJECT_0, "");
 }
 
-ThreadPtr ThreadFactoryImplWin32::createThread(std::function<void()> thread_routine) {
-  return std::make_unique<ThreadImplWin32>(thread_routine);
+ThreadPtr ThreadFactoryImplWin32::createThread(std::function<void()> thread_routine,
+                                               OptionsOptConstRef options) {
+  return std::make_unique<ThreadImplWin32>(thread_routine, options);
 }
 
 ThreadId ThreadFactoryImplWin32::currentThreadId() {
