@@ -490,7 +490,7 @@ public:
       Common::Redis::Client::PoolRequest* request_to_use = nullptr;
       if (std::find(null_handle_indexes.begin(), null_handle_indexes.end(), i) ==
           null_handle_indexes.end()) {
-        request_to_use = &dummy_requests[i];
+        request_to_use = &pool_requests_[i];
       }
       Common::Redis::Client::PoolRequest* mirror_request_to_use = nullptr;
       if (std::find(null_handle_indexes.begin(), null_handle_indexes.end(), i) ==
