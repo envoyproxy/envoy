@@ -267,7 +267,7 @@ TEST_F(SecretManagerImplTest, DeduplicateDynamicTlsCertificateSecretProvider) {
         init_target_handle = target.createHandle("test");
       }));
   EXPECT_CALL(secret_context, stats()).WillRepeatedly(ReturnRef(stats));
-  EXPECT_CALL(secret_context, initManager()).WillRepeatedly(Return(&init_manager));
+  EXPECT_CALL(secret_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
   EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
   EXPECT_CALL(secret_context, localInfo()).WillRepeatedly(ReturnRef(local_info));
 
@@ -350,7 +350,7 @@ TEST_F(SecretManagerImplTest, SdsDynamicSecretUpdateSuccess) {
         init_target_handle = target.createHandle("test");
       }));
   EXPECT_CALL(secret_context, stats()).WillOnce(ReturnRef(stats));
-  EXPECT_CALL(secret_context, initManager()).WillRepeatedly(Return(&init_manager));
+  EXPECT_CALL(secret_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
   EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(*dispatcher_));
   EXPECT_CALL(secret_context, localInfo()).WillOnce(ReturnRef(local_info));
   EXPECT_CALL(secret_context, api()).WillRepeatedly(ReturnRef(*api_));
@@ -400,7 +400,7 @@ TEST_F(SecretManagerImplTest, SdsDynamicGenericSecret) {
   EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(*dispatcher_));
   EXPECT_CALL(secret_context, messageValidationVisitor()).WillOnce(ReturnRef(validation_visitor));
   EXPECT_CALL(secret_context, stats()).WillOnce(ReturnRef(stats));
-  EXPECT_CALL(secret_context, initManager()).WillRepeatedly(Return(&init_manager));
+  EXPECT_CALL(secret_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
   EXPECT_CALL(secret_context, localInfo()).WillOnce(ReturnRef(local_info));
   EXPECT_CALL(secret_context, api()).WillRepeatedly(ReturnRef(*api_));
   EXPECT_CALL(init_manager, add(_))
@@ -450,7 +450,7 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandler) {
         init_target_handle = target.createHandle("test");
       }));
   EXPECT_CALL(secret_context, stats()).WillRepeatedly(ReturnRef(stats));
-  EXPECT_CALL(secret_context, initManager()).WillRepeatedly(Return(&init_manager));
+  EXPECT_CALL(secret_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
   EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
   EXPECT_CALL(secret_context, localInfo()).WillRepeatedly(ReturnRef(local_info));
 
@@ -708,7 +708,7 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandlerWarmingSecrets) {
         init_target_handle = target.createHandle("test");
       }));
   EXPECT_CALL(secret_context, stats()).WillRepeatedly(ReturnRef(stats));
-  EXPECT_CALL(secret_context, initManager()).WillRepeatedly(Return(&init_manager));
+  EXPECT_CALL(secret_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
   EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
   EXPECT_CALL(secret_context, localInfo()).WillRepeatedly(ReturnRef(local_info));
 
@@ -841,7 +841,7 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandlerStaticSecrets) {
         init_target_handle = target.createHandle("test");
       }));
   EXPECT_CALL(secret_context, stats()).WillRepeatedly(ReturnRef(stats));
-  EXPECT_CALL(secret_context, initManager()).WillRepeatedly(Return(&init_manager));
+  EXPECT_CALL(secret_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
   EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
   EXPECT_CALL(secret_context, localInfo()).WillRepeatedly(ReturnRef(local_info));
 
@@ -913,7 +913,7 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandlerStaticValidationContext) {
         init_target_handle = target.createHandle("test");
       }));
   EXPECT_CALL(secret_context, stats()).WillRepeatedly(ReturnRef(stats));
-  EXPECT_CALL(secret_context, initManager()).WillRepeatedly(Return(&init_manager));
+  EXPECT_CALL(secret_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
   EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
   EXPECT_CALL(secret_context, localInfo()).WillRepeatedly(ReturnRef(local_info));
 
@@ -958,7 +958,7 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandlerStaticSessionTicketsContext) {
         init_target_handle = target.createHandle("test");
       }));
   EXPECT_CALL(secret_context, stats()).WillRepeatedly(ReturnRef(stats));
-  EXPECT_CALL(secret_context, initManager()).WillRepeatedly(Return(&init_manager));
+  EXPECT_CALL(secret_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
   EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
   EXPECT_CALL(secret_context, localInfo()).WillRepeatedly(ReturnRef(local_info));
 
