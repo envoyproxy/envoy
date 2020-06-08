@@ -1,4 +1,4 @@
-#include "extensions/upstreams/http/default/config.h"
+#include "extensions/upstreams/http/generic/config.h"
 
 #include "extensions/upstreams/http/http/upstream_request.h"
 #include "extensions/upstreams/http/tcp/upstream_request.h"
@@ -7,9 +7,9 @@ namespace Envoy {
 namespace Extensions {
 namespace Upstreams {
 namespace Http {
-namespace Default {
+namespace Generic {
 
-Router::GenericConnPoolPtr DefaultGenericConnPoolFactory::createGenericConnPool(
+Router::GenericConnPoolPtr GenericGenericConnPoolFactory::createGenericConnPool(
     Upstream::ClusterManager& cm, bool is_connect, const Router::RouteEntry& route_entry,
     Envoy::Http::Protocol protocol, Upstream::LoadBalancerContext* ctx) const {
   if (is_connect) {
@@ -22,9 +22,9 @@ Router::GenericConnPoolPtr DefaultGenericConnPoolFactory::createGenericConnPool(
   return (ret->valid() ? std::move(ret) : nullptr);
 }
 
-REGISTER_FACTORY(DefaultGenericConnPoolFactory, Router::GenericConnPoolFactory);
+REGISTER_FACTORY(GenericGenericConnPoolFactory, Router::GenericConnPoolFactory);
 
-} // namespace Default
+} // namespace Generic
 } // namespace Http
 } // namespace Upstreams
 } // namespace Extensions

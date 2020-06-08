@@ -5,6 +5,8 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+#include "envoy/extensions/upstreams/http/http/v3/http_connection_pool.pb.h"
+#include "envoy/extensions/upstreams/http/tcp/v3/tcp_connection_pool.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -5935,8 +5937,10 @@ TEST_F(RouterTest, ConnectPauseNoResume) {
   // Explicitly configure an HTTP upstream, to test factory creation.
   cm_.thread_local_cluster_.cluster_.info_->upstream_config_ =
       absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>();
-  cm_.thread_local_cluster_.cluster_.info_->upstream_config_.value().set_name(
-      "envoy.filters.connection_pools.http.http");
+  envoy::extensions::upstreams::http::http::v3::HttpConnectionPoolProto http_config;
+  cm_.thread_local_cluster_.cluster_.info_->upstream_config_.value()
+      .mutable_typed_config()
+      ->PackFrom(http_config);
 
   NiceMock<Http::MockRequestEncoder> encoder;
   Http::ResponseDecoder* response_decoder = nullptr;
@@ -5972,8 +5976,10 @@ TEST_F(RouterTest, ConnectExplicitTcpUpstream) {
   // Explicitly configure an TCP upstream, to test factory creation.
   cm_.thread_local_cluster_.cluster_.info_->upstream_config_ =
       absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>();
-  cm_.thread_local_cluster_.cluster_.info_->upstream_config_.value().set_name(
-      "envoy.filters.connection_pools.http.tcp");
+  envoy::extensions::upstreams::http::tcp::v3::TcpConnectionPoolProto tcp_config;
+  cm_.thread_local_cluster_.cluster_.info_->upstream_config_.value()
+      .mutable_typed_config()
+      ->PackFrom(tcp_config);
   callbacks_.route_->route_entry_.connect_config_ =
       absl::make_optional<RouteEntry::ConnectConfig>();
 

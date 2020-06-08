@@ -24,7 +24,7 @@ public:
 
   // The default upstream, returning TCP upstream for CONNECT requests, HTTP for non-CONNECT
   // requests.
-  const std::string Default = "envoy.filters.connection_pools.http.default";
+  const std::string Generic = "envoy.filters.connection_pools.http.generic";
 };
 
 using HttpConnectionPoolNames = ConstSingleton<HttpConnectionPoolNameValues>;

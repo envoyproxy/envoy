@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/extensions/upstreams/http/http/v3/http_connection_pool.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/router/router.h"
 
@@ -22,6 +23,11 @@ public:
   createGenericConnPool(Upstream::ClusterManager& cm, bool is_connect,
                         const Router::RouteEntry& route_entry, Envoy::Http::Protocol protocol,
                         Upstream::LoadBalancerContext* ctx) const override;
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<
+        envoy::extensions::upstreams::http::http::v3::HttpConnectionPoolProto>();
+  }
 };
 
 DECLARE_FACTORY(HttpGenericConnPoolFactory);

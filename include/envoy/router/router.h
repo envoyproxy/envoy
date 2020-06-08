@@ -1225,7 +1225,7 @@ using GenericConnPoolPtr = std::unique_ptr<GenericConnPool>;
 /*
  * A factory for creating generic connection pools.
  */
-class GenericConnPoolFactory : public Envoy::Config::UntypedFactory {
+class GenericConnPoolFactory : public Envoy::Config::TypedFactory {
 public:
   virtual ~GenericConnPoolFactory() = default;
 

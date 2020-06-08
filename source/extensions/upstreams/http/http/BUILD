@@ -19,6 +19,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":upstream_request_lib",
+        "@envoy_api//envoy/extensions/upstreams/http/http/v3:pkg_cc_proto",
     ],
 )
 
