@@ -60,9 +60,10 @@ IntegrationTestServerPtr IntegrationTestServer::create(
     std::function<void()> on_server_init_function, bool deterministic,
     Event::TestTimeSystem& time_system, Api::Api& api, bool defer_listener_finalization,
     ProcessObjectOptRef process_object, Server::FieldValidationConfig validation_config,
-    uint32_t concurrency, std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy) {
+    uint32_t concurrency, std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
+    bool use_real_stats) {
   IntegrationTestServerPtr server{
-      std::make_unique<IntegrationTestServerImpl>(time_system, api, config_path)};
+      std::make_unique<IntegrationTestServerImpl>(time_system, api, config_path, use_real_stats)};
   if (server_ready_function != nullptr) {
     server->setOnServerReadyCb(server_ready_function);
   }
@@ -186,6 +187,16 @@ void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion vers
                           lock, *this, std::move(random_generator), process_object);
 }
 
+IntegrationTestServerImpl::IntegrationTestServerImpl(Event::TestTimeSystem& time_system,
+                                                     Api::Api& api, const std::string& config_path,
+                                                     bool use_real_stats)
+    : IntegrationTestServer(time_system, api, config_path),
+      symbol_table_(Stats::SymbolTableCreator::makeSymbolTable()) {
+  stats_allocator_ =
+      (use_real_stats ? std::make_unique<Stats::AllocatorImpl>(*symbol_table_)
+                      : std::make_unique<Stats::NotifyingAllocatorImpl>(*symbol_table_));
+}
+
 void IntegrationTestServerImpl::createAndRunEnvoyServer(
     OptionsImpl& options, Event::TimeSystem& time_system,
     Network::Address::InstanceConstSharedPtr local_address, ListenerHooks& hooks,
@@ -193,11 +204,9 @@ void IntegrationTestServerImpl::createAndRunEnvoyServer(
     Runtime::RandomGeneratorPtr&& random_generator, ProcessObjectOptRef process_object) {
   {
     Init::ManagerImpl init_manager{"Server"};
-    Stats::SymbolTablePtr symbol_table = Stats::SymbolTableCreator::makeSymbolTable();
     Server::HotRestartNopImpl restarter;
     ThreadLocal::InstanceImpl tls;
-    Stats::AllocatorImpl stats_allocator(*symbol_table);
-    Stats::ThreadLocalStoreImpl stat_store(stats_allocator);
+    Stats::ThreadLocalStoreImpl stat_store(*stats_allocator_);
     std::unique_ptr<ProcessContext> process_context;
     if (process_object.has_value()) {
       process_context = std::make_unique<ProcessContextImpl>(process_object->get());
