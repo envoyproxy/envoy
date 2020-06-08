@@ -342,9 +342,10 @@ TEST_F(GrpcJsonTranscoderFilterTest, NoTranscoding) {
                                                  {":method", "POST"},
                                                  {":path", "/grpc.service/UnknownGrpcMethod"}};
 
-  Http::TestHeaderMapImpl expected_request_headers{{"content-type", "application/grpc"},
-                                                   {":method", "POST"},
-                                                   {":path", "/grpc.service/UnknownGrpcMethod"}};
+  Http::TestRequestHeaderMapImpl expected_request_headers{
+      {"content-type", "application/grpc"},
+      {":method", "POST"},
+      {":path", "/grpc.service/UnknownGrpcMethod"}};
 
   EXPECT_CALL(decoder_callbacks_, clearRouteCache()).Times(0);
 
@@ -363,8 +364,8 @@ TEST_F(GrpcJsonTranscoderFilterTest, NoTranscoding) {
   Http::TestResponseHeaderMapImpl response_headers{{"content-type", "application/grpc"},
                                                    {":status", "200"}};
 
-  Http::TestHeaderMapImpl expected_response_headers{{"content-type", "application/grpc"},
-                                                    {":status", "200"}};
+  Http::TestResponseHeaderMapImpl expected_response_headers{{"content-type", "application/grpc"},
+                                                            {":status", "200"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
   EXPECT_EQ(expected_response_headers, response_headers);
@@ -374,7 +375,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, NoTranscoding) {
   EXPECT_EQ(2, response_data.length());
 
   Http::TestResponseTrailerMapImpl response_trailers{{"grpc-status", "0"}};
-  Http::TestHeaderMapImpl expected_response_trailers{{"grpc-status", "0"}};
+  Http::TestResponseTrailerMapImpl expected_response_trailers{{"grpc-status", "0"}};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
   EXPECT_EQ(expected_response_trailers, response_trailers);
 }
