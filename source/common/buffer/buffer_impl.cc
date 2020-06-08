@@ -33,6 +33,11 @@ void OwnedImpl::addImpl(const void* data, uint64_t size) {
   }
 }
 
+void OwnedImpl::addDrainTracker(std::function<void()> drain_tracker) {
+  ASSERT(!slices_.empty());
+  slices_.back()->addDrainTracker(std::move(drain_tracker));
+}
+
 void OwnedImpl::add(const void* data, uint64_t size) { addImpl(data, size); }
 
 void OwnedImpl::addBufferFragment(BufferFragment& fragment) {
@@ -231,9 +236,11 @@ void* OwnedImpl::linearize(uint32_t size) {
     auto dest = static_cast<uint8_t*>(reservation.mem_);
     do {
       uint64_t data_size = slices_.front()->dataSize();
-      memcpy(dest, slices_.front()->data(), data_size);
-      bytes_copied += data_size;
-      dest += data_size;
+      if (data_size > 0) {
+        memcpy(dest, slices_.front()->data(), data_size);
+        bytes_copied += data_size;
+        dest += data_size;
+      }
       slices_.pop_front();
     } while (bytes_copied < linearized_size);
     ASSERT(dest == static_cast<const uint8_t*>(reservation.mem_) + linearized_size);
@@ -256,6 +263,7 @@ void OwnedImpl::coalesceOrAddSlice(SlicePtr&& other_slice) {
     // Copy content of the `other_slice`. The `move` methods which call this method effectively
     // drain the source buffer.
     addImpl(other_slice->data(), slice_size);
+    other_slice->transferDrainTrackersTo(*slices_.back());
   } else {
     // Take ownership of the slice.
     slices_.emplace_back(std::move(other_slice));

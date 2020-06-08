@@ -63,6 +63,15 @@ public:
   virtual ~Instance() = default;
 
   /**
+   * Register function to call when the last byte in the last slice of this
+   * buffer has fully drained. Note that slices may be transferred to
+   * downstream buffers, drain trackers are transferred along with the bytes
+   * they track so the function is called only after the last byte is drained
+   * from all buffers.
+   */
+  virtual void addDrainTracker(std::function<void()> drain_tracker) PURE;
+
+  /**
    * Copy data into the buffer (deprecated, use absl::string_view variant
    * instead).
    * TODO(htuch): Cleanup deprecated call sites.
