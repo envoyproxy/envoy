@@ -13,9 +13,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AdmissionControl {
 
-SuccessCriteriaEvaluator::SuccessCriteriaEvaluator(
-    envoy::extensions::filters::http::admission_control::v3alpha::AdmissionControl::SuccessCriteria
-        success_criteria) {
+SuccessCriteriaEvaluator::SuccessCriteriaEvaluator(const SuccessCriteria& success_criteria) {
   // HTTP status.
   if (success_criteria.has_http_criteria()) {
     for (const auto& range : success_criteria.http_criteria().http_success_status()) {
@@ -24,10 +22,10 @@ SuccessCriteriaEvaluator::SuccessCriteriaEvaluator(
             fmt::format("invalid HTTP range: [{}, {})", range.start(), range.end()));
       }
 
-      http_success_fns_.emplace_back([range](uint64_t status) {
-        return (static_cast<uint64_t>(range.start()) <= status) &&
-               (status < static_cast<uint64_t>(range.end()));
-      });
+      const auto start = static_cast<uint64_t>(range.start());
+      const auto end = static_cast<uint64_t>(range.end());
+      http_success_fns_.emplace_back(
+          [start, end](uint64_t status) { return (start <= status) && (status < end); });
     }
   } else {
     // We default to all non-5xx codes as successes.

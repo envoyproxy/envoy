@@ -113,7 +113,8 @@ grpc_criteria:
 
   makeEvaluator(yaml);
 
-  for (int code = 0; code < 15; ++code) {
+  using GrpcStatus = Grpc::Status::WellKnownGrpcStatus;
+  for (int code = GrpcStatus::Ok; code <= GrpcStatus::MaximumKnown; ++code) {
     if (code == 7 || code == 13) {
       expectGrpcSuccess(code);
     } else {
@@ -131,21 +132,13 @@ grpc_criteria:
   grpc_success_status:
     - 17
 )EOF";
-  try {
-    makeEvaluator(yaml);
-  } catch (const EnvoyException& e) {
-    EXPECT_THAT(e.what(), HasSubstr("invalid gRPC code"));
-  }
+  EXPECT_THROW_WITH_REGEX(makeEvaluator(yaml), EnvoyException, "invalid gRPC code*");
 }
 
 // Verify correct HTTP range validation.
 TEST_F(SuccessCriteriaTest, HttpRangeValidation) {
   auto check_ranges = [this](std::string&& yaml) {
-    try {
-      makeEvaluator(yaml);
-    } catch (const EnvoyException& e) {
-      EXPECT_THAT(e.what(), HasSubstr("invalid HTTP range"));
-    }
+    EXPECT_THROW_WITH_REGEX(makeEvaluator(yaml), EnvoyException, "invalid HTTP range*");
   };
 
   check_ranges(R"EOF(

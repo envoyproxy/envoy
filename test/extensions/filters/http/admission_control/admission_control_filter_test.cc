@@ -2,7 +2,9 @@
 
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.h"
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.validate.h"
+#include "envoy/grpc/status.h"
 
+#include "common/common/enum_to_int.h"
 #include "common/stats/isolated_store_impl.h"
 
 #include "extensions/filters/http/admission_control/admission_control.h"
@@ -30,18 +32,16 @@ namespace {
 class MockThreadLocalController : public ThreadLocal::ThreadLocalObject,
                                   public ThreadLocalController {
 public:
-  MockThreadLocalController() = default;
-  MOCK_METHOD(uint32_t, requestTotalCount, (), (override));
-  MOCK_METHOD(uint32_t, requestSuccessCount, (), (override));
-  MOCK_METHOD(void, recordSuccess, (), (override));
-  MOCK_METHOD(void, recordFailure, (), (override));
+  MOCK_METHOD(uint32_t, requestTotalCount, ());
+  MOCK_METHOD(uint32_t, requestSuccessCount, ());
+  MOCK_METHOD(void, recordSuccess, ());
+  MOCK_METHOD(void, recordFailure, ());
 };
 
 class MockResponseEvaluator : public ResponseEvaluator {
 public:
-  MockResponseEvaluator() = default;
-  MOCK_METHOD(bool, isHttpSuccess, (uint64_t code), (const, override));
-  MOCK_METHOD(bool, isGrpcSuccess, (uint32_t status), (const, override));
+  MOCK_METHOD(bool, isHttpSuccess, (uint64_t code), (const));
+  MOCK_METHOD(bool, isGrpcSuccess, (uint32_t status), (const));
 };
 
 class TestConfig : public AdmissionControlFilterConfig {
@@ -51,7 +51,7 @@ public:
              ThreadLocal::SlotPtr&& tls, MockThreadLocalController& controller,
              std::shared_ptr<ResponseEvaluator> evaluator)
       : AdmissionControlFilterConfig(proto_config, runtime, time_source, random, scope,
-                                     std::move(tls), evaluator),
+                                     std::move(tls), std::move(evaluator)),
         controller_(controller) {}
   ThreadLocalController& getController() const override { return controller_; }
 
@@ -78,19 +78,19 @@ public:
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
 
-  void sampleGrpcRequest(std::string&& grpc_status) {
+  void sampleGrpcRequest(const Grpc::Status::WellKnownGrpcStatus status) {
     Http::TestResponseHeaderMapImpl headers{{"content-type", "application/grpc"},
-                                            {"grpc-status", grpc_status}};
+                                            {"grpc-status", std::to_string(enumToInt(status))}};
     filter_->encodeHeaders(headers, true);
   }
 
-  void sampleHttpRequest(std::string&& http_error_code) {
+  void sampleHttpRequest(const std::string& http_error_code) {
     Http::TestResponseHeaderMapImpl headers{{":status", http_error_code}};
     filter_->encodeHeaders(headers, true);
   }
 
 protected:
-  std::string stats_prefix_{""};
+  std::string stats_prefix_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   Stats::IsolatedStoreImpl scope_;
@@ -153,8 +153,7 @@ TEST_F(AdmissionControlTest, DisregardHealthChecks) {
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(testing::ReturnRef(stream_info));
   EXPECT_CALL(stream_info, healthCheck()).WillOnce(Return(true));
 
-  // Fail lots of requests so that we would normally expect a ~100% rejection rate. It should pass
-  // below since the request is a healthcheck.
+  // Health checks shouldn't need to know the number of requests for any kind of admission decision.
   EXPECT_CALL(controller_, requestTotalCount()).Times(0);
   EXPECT_CALL(controller_, requestSuccessCount()).Times(0);
 
@@ -218,7 +217,7 @@ TEST_F(AdmissionControlTest, GrpcFailureBehavior) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, true));
   Http::TestResponseHeaderMapImpl response_headers;
-  sampleGrpcRequest("7");
+  sampleGrpcRequest(Grpc::Status::WellKnownGrpcStatus::PermissionDenied);
 
   TestUtility::waitForCounterEq(scope_, "test_prefix.rq_rejected", 1, time_system_);
 }
@@ -237,7 +236,7 @@ TEST_F(AdmissionControlTest, GrpcSuccessBehavior) {
 
   Http::TestRequestHeaderMapImpl request_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
-  sampleGrpcRequest("0");
+  sampleGrpcRequest(Grpc::Status::WellKnownGrpcStatus::Ok);
 
   TestUtility::waitForCounterEq(scope_, "test_prefix.rq_rejected", 0, time_system_);
 }

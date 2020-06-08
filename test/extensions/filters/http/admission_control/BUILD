@@ -16,6 +16,7 @@ envoy_extension_cc_test(
     srcs = ["admission_control_filter_test.cc"],
     extension_name = "envoy.filters.http.admission_control",
     deps = [
+        "//source/common/common:enum_to_int",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/extensions/filters/http/admission_control:admission_control_filter_lib",

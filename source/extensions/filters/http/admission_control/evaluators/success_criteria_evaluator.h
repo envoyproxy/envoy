@@ -14,8 +14,9 @@ namespace AdmissionControl {
 
 class SuccessCriteriaEvaluator : public ResponseEvaluator {
 public:
-  SuccessCriteriaEvaluator(envoy::extensions::filters::http::admission_control::v3alpha::
-                               AdmissionControl::SuccessCriteria evaluation_criteria);
+  using SuccessCriteria = envoy::extensions::filters::http::admission_control::v3alpha::
+      AdmissionControl::SuccessCriteria;
+  SuccessCriteriaEvaluator(const SuccessCriteria& evaluation_criteria);
   // ResponseEvaluator
   bool isHttpSuccess(uint64_t code) const override;
   bool isGrpcSuccess(uint32_t status) const override;
