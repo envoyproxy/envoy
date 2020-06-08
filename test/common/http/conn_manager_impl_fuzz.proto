@@ -101,5 +101,6 @@ message Action {
 
 message ConnManagerImplTestCase {
   repeated Action actions = 1;
-  envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.ForwardClientCertDetails forward_client_cert = 2;
+  envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+      .ForwardClientCertDetails forward_client_cert = 2;
 }
