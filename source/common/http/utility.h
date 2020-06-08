@@ -96,6 +96,11 @@ struct OptionsLimits {
 };
 
 /**
+ * used by initializeAndValidateOptions to validate settings set in |options|
+ */
+void validateCustomSettingsParameters(const envoy::config::core::v3::Http2ProtocolOptions& options);
+
+/**
  * Validates settings/options already set in |options| and initializes any remaining fields with
  * defaults.
  */
