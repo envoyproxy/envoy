@@ -428,6 +428,14 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     regex_rewrite_ = Regex::Utility::parseRegex(rewrite_spec.pattern());
     regex_rewrite_substitution_ = rewrite_spec.substitution();
   }
+
+  if (!path_redirect_.empty() && path_redirect_.find('?') != absl::string_view::npos &&
+      strip_query_) {
+    ENVOY_LOG(warn,
+              "`strip_query` is set to true, but `path_redirect` contains query string and it will "
+              "not be stripped: {}",
+              path_redirect_);
+  }
 }
 
 bool RouteEntryImplBase::evaluateRuntimeMatch(const uint64_t random_value) const {
@@ -661,15 +669,40 @@ std::string RouteEntryImplBase::newPath(const Http::RequestHeaderMap& headers) c
     final_host = processRequestHost(headers, final_scheme, final_port);
   }
 
+  std::string final_path_value;
+  bool path_redirect_has_query = false;
+  /*
+    if `path_redirect` is not empty:
+      if `path_redirect` contains query string:
+        set `final_path` to `path_redirect` and keep query string anyway
+      else if `strip_query`:
+        set `final_path` to `path_redirect` and strip query string
+      else:
+        set `final_path` to `path_redirect` and keep query string if exists
+    else if `strip_query`:
+      set `final_path` to `current_path` and strip query
+    else:
+      set `final_path` to `current_path`
+  */
   if (!path_redirect_.empty()) {
-    final_path = path_redirect_.c_str();
+    absl::string_view current_path = headers.getPathValue();
+    path_redirect_has_query = path_redirect_.find('?') != absl::string_view::npos;
+    size_t path_end = current_path.find('?');
+    bool current_path_has_query = path_end != absl::string_view::npos;
+    if (!path_redirect_has_query && current_path_has_query) {
+      final_path_value = path_redirect_;
+      final_path_value.append(current_path.data() + path_end, current_path.length() - path_end);
+      final_path = final_path_value;
+    } else {
+      final_path = path_redirect_.c_str();
+    }
   } else {
     final_path = headers.getPathValue();
-    if (strip_query_) {
-      size_t path_end = final_path.find("?");
-      if (path_end != absl::string_view::npos) {
-        final_path = final_path.substr(0, path_end);
-      }
+  }
+  if (!path_redirect_has_query && strip_query_) {
+    size_t path_end = final_path.find('?');
+    if (path_end != absl::string_view::npos) {
+      final_path = final_path.substr(0, path_end);
     }
   }
 

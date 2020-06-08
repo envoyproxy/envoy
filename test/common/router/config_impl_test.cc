@@ -6250,6 +6250,12 @@ virtual_hosts:
         redirect: { host_redirect: new.lyft.com }
       - match: { path: "/path/redirect/"}
         redirect: { path_redirect: "/new/path-redirect/" }
+      - match: { path: "/path/redirect/strip-query/true"}
+        redirect: { path_redirect: "/new/path-redirect/", strip_query: "true" }
+      - match: { path: "/path/redirect/query"}
+        redirect: { path_redirect: "/new/path-redirect?foo=1" }
+      - match: { path: "/path/redirect/query-with-strip"}
+        redirect: { path_redirect: "/new/path-redirect?foo=2", strip_query: "true" }
       - match: { prefix: "/all/combinations"}
         redirect: { host_redirect: "new.lyft.com", prefix_rewrite: "/new/prefix" , https_redirect: "true", strip_query: "true" }
   )EOF";
@@ -6282,8 +6288,38 @@ virtual_hosts:
   }
   {
     Http::TestRequestHeaderMapImpl headers =
-        genRedirectHeaders("redirect.lyft.com", "/path/redirect/", true, false);
+        genRedirectHeaders("redirect.lyft.com", "/path/redirect/?lang=eng&con=US", true, false);
+    EXPECT_EQ("https://redirect.lyft.com/new/path-redirect/?lang=eng&con=US",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestRequestHeaderMapImpl headers = genRedirectHeaders(
+        "redirect.lyft.com", "/path/redirect/strip-query/true?lang=eng&con=US", true, false);
     EXPECT_EQ("https://redirect.lyft.com/new/path-redirect/",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestRequestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/path/redirect/query", true, false);
+    EXPECT_EQ("https://redirect.lyft.com/new/path-redirect?foo=1",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestRequestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/path/redirect/query?bar=1", true, false);
+    EXPECT_EQ("https://redirect.lyft.com/new/path-redirect?foo=1",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestRequestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/path/redirect/query-with-strip", true, false);
+    EXPECT_EQ("https://redirect.lyft.com/new/path-redirect?foo=2",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestRequestHeaderMapImpl headers = genRedirectHeaders(
+        "redirect.lyft.com", "/path/redirect/query-with-strip?bar=1", true, false);
+    EXPECT_EQ("https://redirect.lyft.com/new/path-redirect?foo=2",
               config.route(headers, 0)->directResponseEntry()->newPath(headers));
   }
   {
