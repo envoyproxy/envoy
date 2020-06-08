@@ -95,7 +95,8 @@ public:
 
 protected:
   StreamEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter);
-  void setIs1xxOr204(bool value) { is_1xx_or_204_ = value; }
+  void setIs1xx(bool value) { is_1xx_ = value; }
+  void setIs204(bool value) { is_204_ = value; }
   void encodeHeadersBase(const RequestOrResponseHeaderMap& headers, bool end_stream);
   void encodeTrailersBase(const HeaderMap& headers);
 
@@ -109,7 +110,8 @@ protected:
   bool processing_100_continue_ : 1;
   bool is_response_to_head_request_ : 1;
   bool is_response_to_connect_request_ : 1;
-  bool is_1xx_or_204_ : 1;
+  bool is_1xx_ : 1;
+  bool is_204_ : 1;
 
 private:
   /**

@@ -421,9 +421,6 @@ TEST_P(WebsocketIntegrationTest, BidirectionalChunkedData) {
   if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
     ASSERT_TRUE(upstream_request_->headers().TransferEncoding() != nullptr);
   }
-  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
-    ASSERT_TRUE(response_->headers().TransferEncoding() == nullptr);
-  }
 
   // Send both a chunked request body and "websocket" payload.
   std::string request_payload = "3\r\n123\r\n0\r\n\r\nSomeWebsocketRequestPayload";
