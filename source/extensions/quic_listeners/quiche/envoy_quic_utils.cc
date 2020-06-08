@@ -109,11 +109,7 @@ createConnectionSocket(Network::Address::InstanceConstSharedPtr& peer_addr,
   }
   connection_socket->bind(local_addr);
   ASSERT(local_addr->ip());
-  // TODO(fcoras) maybe move to SocketImpl?
-  if (local_addr->ip()->port() == 0) {
-    // Get ephemeral port number.
-    local_addr = Network::SocketInterface::addressFromFd(connection_socket->ioHandle().fd());
-  }
+  local_addr = connection_socket->localAddress();
   if (!Network::Socket::applyOptions(connection_socket->options(), *connection_socket,
                                      envoy::config::core::v3::SocketOption::STATE_BOUND)) {
     ENVOY_LOG_MISC(error, "Fail to apply post-bind options");
