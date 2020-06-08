@@ -852,9 +852,6 @@ ClientContextImpl::ClientContextImpl(Stats::Scope& scope,
 }
 
 bool ContextImpl::parseAndSetAlpn(const std::vector<std::string>& alpn, SSL& ssl) {
-  if (alpn.empty()) {
-    return false;
-  }
   std::vector<uint8_t> parsed_alpn = parseAlpnProtocols(absl::StrJoin(alpn, ","));
   if (!parsed_alpn.empty()) {
     const int rc = SSL_set_alpn_protos(&ssl, parsed_alpn.data(), parsed_alpn.size());

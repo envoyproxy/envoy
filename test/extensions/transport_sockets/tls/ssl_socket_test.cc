@@ -3847,6 +3847,10 @@ TEST_P(SslSocketTest, ALPN) {
   testUtilV2(test_options);
   client_ctx->clear_alpn_protocols();
   server_ctx->clear_alpn_protocols();
+
+  // Client attempts to configure ALPN that is too large.
+  client_ctx->add_alpn_protocols(std::string(100000, 'a'));
+  EXPECT_THROW_WITH_MESSAGE(testUtilV2(test_options), EnvoyException, "Invalid ALPN protocol string");
 }
 
 TEST_P(SslSocketTest, CipherSuites) {
