@@ -1,0 +1,7 @@
+1.14.2 (June 8, 2020)
+=====================
+
+Changes
+-------
+
+* http: fixed CVE-2020-11080 by rejecting HTTP/2 SETTINGS frames with too many parameters.
