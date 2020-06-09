@@ -1104,7 +1104,7 @@ class GenericUpstream;
  * The GenericConnPool exists to create a GenericUpstream handle via a call to
  * newStream resulting in an eventual call to onPoolReady
  */
-class GenericConnPool : public Logger::Loggable<Logger::Id::router> {
+class GenericConnPool {
 public:
   virtual ~GenericConnPool() = default;
 

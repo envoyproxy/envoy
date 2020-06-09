@@ -2,7 +2,6 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
-    "envoy_cc_test",
     "envoy_package",
 )
 
@@ -50,26 +49,5 @@ envoy_cc_library(
         "//source/common/router:router_lib",
         "//source/common/upstream:load_balancer_lib",
         "//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",
-    ],
-)
-
-envoy_cc_test(
-    name = "upstream_request_test",
-    srcs = ["upstream_request_test.cc"],
-    deps = [
-        ":upstream_request_lib",
-        "//source/common/buffer:buffer_lib",
-        "//source/common/router:router_lib",
-        "//source/common/upstream:upstream_includes",
-        "//source/common/upstream:upstream_lib",
-        "//test/common/http:common_lib",
-        "//test/mocks/http:http_mocks",
-        "//test/mocks/network:network_mocks",
-        "//test/mocks/router:router_mocks",
-        "//test/mocks/server:server_mocks",
-        "//test/mocks/upstream:upstream_mocks",
-        "//test/test_common:environment_lib",
-        "//test/test_common:simulated_time_system_lib",
-        "//test/test_common:utility_lib",
     ],
 )
