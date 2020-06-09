@@ -28,6 +28,7 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_alarm_factory.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_packet_writer.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
+#include "test/extensions/quic_listeners/quiche/test_utils.h"
 
 namespace Envoy {
 namespace Quic {
@@ -43,26 +44,7 @@ public:
   Http::StreamResetReason last_stream_reset_reason_{Http::StreamResetReason::LocalReset};
 };
 
-std::vector<std::pair<Network::Address::IpVersion, bool>> generateTestParam() {
-  std::vector<std::pair<Network::Address::IpVersion, bool>> param;
-  for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
-    for (bool use_http3 : {true, false}) {
-      param.emplace_back(ip_version, use_http3);
-    }
-  }
-
-  return param;
-}
-
-static std::string testParamsToString(
-    const ::testing::TestParamInfo<std::pair<Network::Address::IpVersion, bool>>& params) {
-  std::string ip_version = params.param.first == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6";
-  return absl::StrCat(ip_version, params.param.second ? "_UseHttp3" : "_UseGQuic");
-}
-
-class QuicHttpIntegrationTest
-    : public HttpIntegrationTest,
-      public testing::TestWithParam<std::pair<Network::Address::IpVersion, bool>> {
+class QuicHttpIntegrationTest : public HttpIntegrationTest, public QuicMultiVersionTest {
 public:
   QuicHttpIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP3, GetParam().first,
@@ -74,9 +56,7 @@ public:
         crypto_config_(std::make_unique<EnvoyQuicFakeProofVerifier>()), conn_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *conn_helper_.GetClock()),
         injected_resource_filename_(TestEnvironment::temporaryPath("injected_resource")),
-        file_updater_(injected_resource_filename_) {
-    // quic::SetVerbosityLogThreshold(1);
-  }
+        file_updater_(injected_resource_filename_) {}
 
   Network::ClientConnectionPtr makeClientConnectionWithOptions(
       uint32_t port, const Network::ConnectionSocket::OptionsSharedPtr& options) override {

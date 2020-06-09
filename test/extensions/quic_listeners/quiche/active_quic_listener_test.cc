@@ -41,29 +41,13 @@
 #include "extensions/quic_listeners/quiche/active_quic_listener_config.h"
 #include "extensions/quic_listeners/quiche/platform/envoy_quic_clock.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
+#include "quiche/quic/test_tools/quic_test_utils.h"
 
 using testing::Return;
 using testing::ReturnRef;
 
 namespace Envoy {
 namespace Quic {
-
-std::vector<std::pair<Network::Address::IpVersion, bool>> generateTestParam() {
-  std::vector<std::pair<Network::Address::IpVersion, bool>> param;
-  for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
-    for (bool use_http3 : {true, false}) {
-      param.emplace_back(ip_version, use_http3);
-    }
-  }
-
-  return param;
-}
-
-static std::string testParamsToString(
-    const ::testing::TestParamInfo<std::pair<Network::Address::IpVersion, bool>>& params) {
-  std::string ip_version = params.param.first == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6";
-  return absl::StrCat(ip_version, params.param.second ? "_UseHttp3" : "_UseGQuic");
-}
 
 class ActiveQuicListenerPeer {
 public:
@@ -86,8 +70,7 @@ public:
   }
 };
 
-class ActiveQuicListenerTest
-    : public testing::TestWithParam<std::pair<Network::Address::IpVersion, bool>> {
+class ActiveQuicListenerTest : public QuicMultiVersionTest {
 protected:
   using Socket = Network::NetworkListenSocket<
       Network::NetworkSocketTrait<Network::Address::SocketType::Datagram>>;

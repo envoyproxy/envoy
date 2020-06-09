@@ -154,7 +154,6 @@ INSTANTIATE_TEST_SUITE_P(EnvoyQuicServerStreamTests, EnvoyQuicServerStreamTest,
                          testing::ValuesIn({true, false}));
 
 TEST_P(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
-  quic::SetVerbosityLogThreshold(1);
   quic::QuicHeaderList request_headers;
   request_headers.OnHeaderBlockStart();
   request_headers.OnHeader(":authority", host_);

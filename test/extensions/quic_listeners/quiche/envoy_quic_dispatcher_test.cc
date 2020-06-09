@@ -34,6 +34,7 @@
 #include "server/configuration_impl.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "quiche/quic/test_tools/quic_test_utils.h"
 
 using testing::Invoke;
 using testing::Return;
@@ -46,26 +47,8 @@ namespace {
 const size_t kNumSessionsToCreatePerLoopForTests = 16;
 }
 
-std::vector<std::pair<Network::Address::IpVersion, bool>> generateTestParam() {
-  std::vector<std::pair<Network::Address::IpVersion, bool>> param;
-  for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
-    for (bool use_http3 : {true, false}) {
-      param.emplace_back(ip_version, use_http3);
-    }
-  }
-
-  return param;
-}
-
-static std::string testParamsToString(
-    const ::testing::TestParamInfo<std::pair<Network::Address::IpVersion, bool>>& params) {
-  std::string ip_version = params.param.first == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6";
-  return absl::StrCat(ip_version, params.param.second ? "_UseHttp3" : "_UseGQuic");
-}
-
-class EnvoyQuicDispatcherTest
-    : public testing::TestWithParam<std::pair<Network::Address::IpVersion, bool>>,
-      protected Logger::Loggable<Logger::Id::main> {
+class EnvoyQuicDispatcherTest : public QuicMultiVersionTest,
+                                protected Logger::Loggable<Logger::Id::main> {
 public:
   EnvoyQuicDispatcherTest()
       : version_(GetParam().first), api_(Api::createApiForTest(time_system_)),
@@ -95,8 +78,6 @@ public:
             quic::kQuicDefaultConnectionIdLength, connection_handler_, listener_config_,
             listener_stats_, per_worker_stats_, *dispatcher_, *listen_socket_),
         connection_id_(quic::test::TestConnectionId(1)) {
-    quic::SetVerbosityLogThreshold(1);
-
     auto writer = new testing::NiceMock<quic::test::MockPacketWriter>();
     envoy_quic_dispatcher_.InitializeWithWriter(writer);
     EXPECT_CALL(*writer, WritePacket(_, _, _, _, _))
