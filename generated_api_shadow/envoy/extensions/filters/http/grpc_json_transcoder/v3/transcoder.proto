@@ -16,6 +16,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.http.grpc_json_transcoder]
 
 // [#next-free-field: 10]
+// GrpcJsonTranscoder filter configuration.
+// The filter itself can be used per route / per virtual host or on the general level. The most
+// specific one is being used for a given route. If the list of services is empty - filter
+// is considered to be disabled.
 message GrpcJsonTranscoder {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.transcoder.v2.GrpcJsonTranscoder";
@@ -65,7 +69,7 @@ message GrpcJsonTranscoder {
   // Envoy will fail at startup. The ``proto_descriptor`` may contain more services than
   // the service names specified here, but they won't be translated.
   // If the list of services is empty, filter is considered disabled.
-  repeated string services = 2 [(validate.rules).repeated = {min_items: 0}];
+  repeated string services = 2;
 
   // Control options for response JSON. These options are passed directly to
   // `JsonPrintOptions <https://developers.google.com/protocol-buffers/docs/reference/cpp/

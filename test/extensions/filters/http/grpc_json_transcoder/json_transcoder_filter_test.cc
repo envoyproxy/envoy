@@ -323,6 +323,10 @@ protected:
   bookstoreProtoConfig() {
     const std::string json_string = "{\"proto_descriptor\": \"" + bookstoreDescriptorPath() +
                                     "\",\"services\": [\"bookstore.Bookstore\"]}";
+    return makeProtoConfig(json_string);
+  }
+  static const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder
+  makeProtoConfig(const std::string json_string) {
     envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder proto_config;
     TestUtility::loadFromJson(json_string, proto_config);
     return proto_config;
@@ -1188,6 +1192,54 @@ TEST_P(GrpcJsonTranscoderFilterPrintTest, PrintOptions) {
 
   std::string response_json = response_data->toString();
   EXPECT_EQ(GetParam().expected_response_, response_json);
+}
+
+class GrpcJsonTranscoderDisabledFilterTest : public GrpcJsonTranscoderFilterTest {
+protected:
+  GrpcJsonTranscoderDisabledFilterTest()
+      : GrpcJsonTranscoderFilterTest(
+            makeProtoConfig("{\"proto_descriptor_bin\": \"\", \"services\": []}")) {}
+};
+
+TEST_F(GrpcJsonTranscoderDisabledFilterTest, FilterDisabled) {
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers, false));
+}
+
+TEST_F(GrpcJsonTranscoderDisabledFilterTest, PerRouteEnabledOverride) {
+  envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder route_cfg =
+      bookstoreProtoConfig();
+  JsonTranscoderConfig route_config(route_cfg, *api_);
+  routeLocalConfig(&route_config, nullptr);
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", "application/json"}, {":method", "POST"}, {":path", "/shelf"}};
+
+  EXPECT_CALL(decoder_callbacks_, clearRouteCache());
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ("application/grpc", request_headers.get_("content-type"));
+  EXPECT_EQ("/shelf", request_headers.get_("x-envoy-original-path"));
+  EXPECT_EQ("/bookstore.Bookstore/CreateShelf", request_headers.get_(":path"));
+  EXPECT_EQ("trailers", request_headers.get_("te"));
+}
+
+TEST_F(GrpcJsonTranscoderDisabledFilterTest, PerVhostEnabledOverride) {
+  envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder vhost_cfg =
+      bookstoreProtoConfig();
+  JsonTranscoderConfig vhost_config(vhost_cfg, *api_);
+  routeLocalConfig(nullptr, &vhost_config);
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", "application/json"}, {":method", "POST"}, {":path", "/shelf"}};
+
+  EXPECT_CALL(decoder_callbacks_, clearRouteCache());
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ("application/grpc", request_headers.get_("content-type"));
+  EXPECT_EQ("/shelf", request_headers.get_("x-envoy-original-path"));
+  EXPECT_EQ("/bookstore.Bookstore/CreateShelf", request_headers.get_(":path"));
+  EXPECT_EQ("trailers", request_headers.get_("te"));
 }
 
 INSTANTIATE_TEST_SUITE_P(
