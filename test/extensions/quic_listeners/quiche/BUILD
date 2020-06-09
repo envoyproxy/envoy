@@ -180,7 +180,6 @@ envoy_cc_test(
         "//source/server:configuration_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
-        "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:simulated_time_system_lib",
         "@com_googlesource_quiche//:quic_test_tools_crypto_server_config_peer_lib",
@@ -211,7 +210,6 @@ envoy_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/stats:stats_mocks",
-        "//test/test_common:environment_lib",
         "//test/test_common:global_lib",
         "//test/test_common:simulated_time_system_lib",
     ],
@@ -298,6 +296,7 @@ envoy_cc_test_library(
     tags = ["nofips"],
     deps = [
         "//source/extensions/quic_listeners/quiche:quic_filter_manager_connection_lib",
+        "//test/test_common:environment_lib",
         "@com_googlesource_quiche//:quic_core_http_spdy_session_lib",
         "@com_googlesource_quiche//:quic_test_tools_first_flight_lib",
     ],
