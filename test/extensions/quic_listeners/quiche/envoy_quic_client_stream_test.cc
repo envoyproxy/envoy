@@ -26,6 +26,7 @@ public:
         connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
           SetQuicReloadableFlag(quic_enable_version_draft_27, GetParam());
+          std::cerr << "============= version " << quic::CurrentSupportedVersions() << "\n";
           return quic::CurrentSupportedVersions()[0];
         }()),
         peer_addr_(Network::Utility::getAddressWithPort(*Network::Utility::getIpv6LoopbackAddress(),
@@ -255,6 +256,37 @@ TEST_P(EnvoyQuicClientStreamTest, WatermarkSendBuffer) {
 
   EXPECT_TRUE(quic_stream_->local_end_stream_);
   EXPECT_TRUE(quic_stream_->write_side_closed());
+  EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
+}
+
+TEST_P(EnvoyQuicClientStreamTest, ClearWatermarkBufferUponClose) {
+    // Bump connection flow control window large enough not to cause connection
+  // level flow control blocked.
+  quic::QuicWindowUpdateFrame window_update(
+      quic::kInvalidControlFrameId,
+      quic::QuicUtils::GetInvalidStreamId(quic_version_.transport_version), 1024 * 1024);
+  quic_session_.OnWindowUpdateFrame(window_update);
+
+   quic_stream_->encodeHeaders(request_headers_, /*end_stream=*/false);
+  // Encode 32kB request body. first 16KB should be written out right away. The
+  // rest should be buffered. The high watermark is 16KB, so this call should
+  // make the send buffer reach its high watermark.
+  std::string request(32 * 1024 + 1, 'a');
+  Buffer::OwnedImpl buffer(request);
+  EXPECT_CALL(stream_callbacks_, onAboveWriteBufferHighWatermark());
+  quic_stream_->encodeData(buffer, false);
+
+  EXPECT_EQ(0u, buffer.length());
+  EXPECT_TRUE(quic_stream_->flow_controller()->IsBlocked());
+
+  Http::TestRequestTrailerMapImpl trailers{{"some", "request_trailer"}};
+  quic_stream_->encodeTrailers(trailers);
+
+  quic::QuicWindowUpdateFrame window_update1(quic::kInvalidControlFrameId, quic_stream_->id(),
+                                             32 * 1024 + 1024);
+  quic_stream_->OnWindowUpdateFrame(window_update1);
+  EXPECT_CALL(stream_callbacks_, onBelowWriteBufferLowWatermark());
+  quic_session_.OnCanWrite();
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
 
