@@ -99,15 +99,15 @@ public:
   virtual std::chrono::seconds drainTime() const PURE;
 
   /**
+   * @return the strategy that defines behaviour of DrainManager::drainClose();
+   */
+  virtual DrainStrategy drainStrategy() const PURE;
+
+  /**
    * @return the delay before shutting down the parent envoy in a hot restart,
    *         generally longer than drainTime().
    */
   virtual std::chrono::seconds parentShutdownTime() const PURE;
-
-  /**
-   * @return the strategy that defines behaviour of DrainManager::drainClose();
-   */
-  virtual DrainStrategy drainStrategy() const PURE;
 
   /**
    * @return const std::string& the path to the configuration file.
