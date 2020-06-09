@@ -152,7 +152,10 @@ IntegrationCodecClient::startRequest(const Http::RequestHeaderMap& headers) {
   return {encoder, std::move(response)};
 }
 
-bool IntegrationCodecClient::waitForDisconnect(std::chrono::milliseconds time_to_wait) {
+AssertionResult IntegrationCodecClient::waitForDisconnect(std::chrono::milliseconds time_to_wait) {
+  if (disconnected_) {
+    return AssertionSuccess();
+  }
   Event::TimerPtr wait_timer;
   bool wait_timer_triggered = false;
   if (time_to_wait.count()) {
@@ -171,11 +174,11 @@ bool IntegrationCodecClient::waitForDisconnect(std::chrono::milliseconds time_to
   }
 
   if (wait_timer_triggered && !disconnected_) {
-    return false;
+    return AssertionFailure() << "Timed out waiting for disconnect";
   }
   EXPECT_TRUE(disconnected_);
 
-  return true;
+  return AssertionSuccess();
 }
 
 void IntegrationCodecClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent event) {
@@ -537,7 +540,7 @@ void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete() {
   response->waitForEndStream();
 
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
-    codec_client_->waitForDisconnect();
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
     codec_client_->close();
   }
@@ -564,7 +567,7 @@ void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeResponseComplete(
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
-    codec_client_->waitForDisconnect();
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
     response->waitForReset();
     codec_client_->close();
@@ -661,7 +664,7 @@ void HttpIntegrationTest::testRouterUpstreamResponseBeforeRequestComplete() {
   }
 
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
-    codec_client_->waitForDisconnect();
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
     codec_client_->close();
   }
@@ -992,7 +995,7 @@ void HttpIntegrationTest::testLargeRequestHeaders(uint32_t size, uint32_t count,
     auto response = std::move(encoder_decoder.second);
 
     if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
-      codec_client_->waitForDisconnect();
+      ASSERT_TRUE(codec_client_->waitForDisconnect());
       EXPECT_TRUE(response->complete());
       EXPECT_EQ("431", response->headers().getStatusValue());
     } else {
@@ -1031,7 +1034,7 @@ void HttpIntegrationTest::testLargeRequestTrailers(uint32_t size, uint32_t max_s
 
   if (size >= max_size) {
     if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
-      codec_client_->waitForDisconnect();
+      ASSERT_TRUE(codec_client_->waitForDisconnect());
       EXPECT_TRUE(response->complete());
       EXPECT_EQ("431", response->headers().getStatusValue());
     } else {
@@ -1236,7 +1239,7 @@ void HttpIntegrationTest::testMaxStreamDuration() {
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_max_duration_reached", 1);
 
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
-    codec_client_->waitForDisconnect();
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
     response->waitForReset();
     codec_client_->close();
@@ -1281,7 +1284,7 @@ void HttpIntegrationTest::testMaxStreamDurationWithRetry(bool invoke_retry_upstr
   if (invoke_retry_upstream_disconnect) {
     test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_max_duration_reached", 2);
     if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
-      codec_client_->waitForDisconnect();
+      ASSERT_TRUE(codec_client_->waitForDisconnect());
     } else {
       response->waitForReset();
       codec_client_->close();
@@ -1289,7 +1292,7 @@ void HttpIntegrationTest::testMaxStreamDurationWithRetry(bool invoke_retry_upstr
 
     EXPECT_EQ("408", response->headers().getStatusValue());
   } else {
-    Http::TestHeaderMapImpl response_headers{{":status", "200"}};
+    Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
     upstream_request_->encodeHeaders(response_headers, true);
 
     response->waitForHeaders();
