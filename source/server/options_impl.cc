@@ -374,10 +374,15 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
   }
   command_line_options->mutable_file_flush_interval()->MergeFrom(
       Protobuf::util::TimeUtil::MillisecondsToDuration(fileFlushIntervalMsec().count()));
-  command_line_options->mutable_parent_shutdown_time()->MergeFrom(
-      Protobuf::util::TimeUtil::SecondsToDuration(parentShutdownTime().count()));
+
   command_line_options->mutable_drain_time()->MergeFrom(
       Protobuf::util::TimeUtil::SecondsToDuration(drainTime().count()));
+  command_line_options->set_drain_strategy(drainStrategy() == Server::DrainStrategy::Immediate
+      ?  envoy::admin::v3::CommandLineOptions::Immediate
+      :  envoy::admin::v3::CommandLineOptions::Gradual);
+  command_line_options->mutable_parent_shutdown_time()->MergeFrom(
+      Protobuf::util::TimeUtil::SecondsToDuration(parentShutdownTime().count()));
+
   command_line_options->set_disable_hot_restart(hotRestartDisabled());
   command_line_options->set_enable_mutex_tracing(mutexTracingEnabled());
   command_line_options->set_cpuset_threads(cpusetThreadsEnabled());

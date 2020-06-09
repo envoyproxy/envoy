@@ -81,7 +81,6 @@ message CommandLineOptions {
 
     // Discourage all connections for the duration of the drain sequence.
     Immediate = 1;
-
   }
 
   reserved 12, 20, 21;

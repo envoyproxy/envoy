@@ -211,7 +211,7 @@ TEST_F(OptionsImplTest, SetAll) {
   EXPECT_EQ(envoy::admin::v3::CommandLineOptions::v6,
             command_line_options->local_address_ip_version());
   EXPECT_EQ(options->drainTime().count(), command_line_options->drain_time().seconds());
-  EXPECT_EQ(options->drainStrategy(), command_line_options->drain_strategy());
+  EXPECT_EQ(envoy::admin::v3::CommandLineOptions::Immediate, command_line_options->drain_strategy());
   EXPECT_EQ(options->parentShutdownTime().count(),
             command_line_options->parent_shutdown_time().seconds());
   EXPECT_EQ(spdlog::level::to_string_view(options->logLevel()), command_line_options->log_level());
