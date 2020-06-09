@@ -1,6 +1,9 @@
 Version history
 ---------------
 
+1.14.3 (Pending)
+================
+
 1.14.2 (June 8, 2020)
 =====================
 * http: fixed CVE-2020-11080 by rejecting HTTP/2 SETTINGS frames with too many parameters.
