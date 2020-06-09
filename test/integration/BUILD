@@ -236,8 +236,6 @@ envoy_cc_test(
     srcs = [
         "drain_close_integration_test.cc",
     ],
-    # REVIEWER: Do I need this tag?
-    # tags = ["fails_on_windows"],
     deps = [
         ":http_protocol_integration_lib",
         "//source/extensions/filters/http/health_check:config",
