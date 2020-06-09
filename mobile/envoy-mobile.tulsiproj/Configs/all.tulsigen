@@ -9,12 +9,10 @@
     "//examples/swift/hello_world:app",
     "//examples/swift/hello_world:appmain",
     "//library/swift/src:ios_framework_archive",
-    "//library/swift/test:envoy_client_builder_tests",
-    "//library/swift/test:envoy_client_builder_tests_lib",
-    "//library/swift/test:grpc_active_stream_tests",
-    "//library/swift/test:grpc_active_stream_tests_lib",
     "//library/swift/test:grpc_request_headers_builder_tests",
     "//library/swift/test:grpc_request_headers_builder_tests_lib",
+    "//library/swift/test:grpc_stream_tests",
+    "//library/swift/test:grpc_stream_tests_lib",
     "//library/swift/test:headers_builder_tests",
     "//library/swift/test:headers_builder_tests_lib",
     "//library/swift/test:request_headers_builder_tests",
@@ -24,7 +22,9 @@
     "//library/swift/test:retry_policy_mapper_tests",
     "//library/swift/test:retry_policy_mapper_tests_lib",
     "//library/swift/test:retry_policy_tests",
-    "//library/swift/test:retry_policy_tests_lib"
+    "//library/swift/test:retry_policy_tests_lib",
+    "//library/swift/test:stream_client_builder_tests",
+    "//library/swift/test:stream_client_builder_tests_lib"
   ],
   "optionSet" : {
     "BazelBuildOptionsDebug" : {
