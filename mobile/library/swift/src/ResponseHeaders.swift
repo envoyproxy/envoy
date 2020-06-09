@@ -7,4 +7,11 @@ public final class ResponseHeaders: Headers {
   public var httpStatus: Int? {
     return self.value(forName: ":status")?.first.flatMap(Int.init)
   }
+
+  /// Convert the headers back to a builder for mutation.
+  ///
+  /// - returns: The new builder.
+  public func toResponseHeadersBuilder() -> ResponseHeadersBuilder {
+    return ResponseHeadersBuilder(headers: self.headers)
+  }
 }

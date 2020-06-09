@@ -10,13 +10,13 @@ final class ViewController: UITableViewController {
   private var requestCount = 0
   private var results = [Result<Response, RequestError>]()
   private var timer: Timer?
-  private var envoy: EnvoyClient?
+  private var client: StreamClient?
 
   override func viewDidLoad() {
     super.viewDidLoad()
     do {
       NSLog("Starting Envoy...")
-      self.envoy = try EnvoyClientBuilder().build()
+      self.client = try StreamClientBuilder().build()
     } catch let error {
       NSLog("Starting Envoy failed: \(error)")
     }
@@ -38,7 +38,7 @@ final class ViewController: UITableViewController {
   }
 
   private func performRequest() {
-    guard let envoy = self.envoy else {
+    guard let client = self.client else {
       NSLog("Failed to start request - Envoy is not running")
       return
     }
@@ -46,25 +46,28 @@ final class ViewController: UITableViewController {
     self.requestCount += 1
     NSLog("Starting request to '\(kRequestPath)'")
 
-    let requestID = self.requestCount
     // Note: this request will use an h2 stream for the upstream request.
     // The Objective-C example uses http/1.1. This is done on purpose to test both paths in
     // end-to-end tests in CI.
-    let request = RequestBuilder(method: .get, scheme: kRequestScheme,
-                                 authority: kRequestAuthority,
-                                 path: kRequestPath)
-        .addUpstreamHttpProtocol(.http2)
-        .build()
-    let handler = ResponseHandler()
-      .onHeaders { [weak self] headers, statusCode, _ in
+    let requestID = self.requestCount
+    let headers = RequestHeadersBuilder(method: .get, scheme: kRequestScheme,
+                                        authority: kRequestAuthority, path: kRequestPath)
+      .addUpstreamHttpProtocol(.http2)
+      .build()
+
+    client
+      .newStreamPrototype()
+      .setOnResponseHeaders { [weak self] headers, _ in
+        let statusCode = headers.httpStatus ?? -1
+        let response = Response(id: requestID, body: "Status: \(statusCode)",
+                                serverHeader: headers.value(forName: "server")?.first ?? "")
         NSLog("Response status (\(requestID)): \(statusCode)\n\(headers)")
-        self?.add(result: .success(Response(id: requestID, body: "Status: \(statusCode)",
-                                            serverHeader: headers["server"]?.first ?? "")))
+        self?.add(result: .success(response))
       }
-      .onData { data, _ in
+      .setOnResponseData { data, _ in
         NSLog("Response data (\(requestID)): \(data.count) bytes")
       }
-      .onError { [weak self] error in
+      .setOnError { [weak self] error in
         let message: String
         if let attemptCount = error.attemptCount {
           message = "failed within Envoy library after \(attemptCount) attempts: \(error.message)"
@@ -73,11 +76,10 @@ final class ViewController: UITableViewController {
         }
 
         NSLog("Error (\(requestID)): \(message)")
-        self?.add(result: .failure(RequestError(id: requestID,
-                                                message: message)))
+        self?.add(result: .failure(RequestError(id: requestID, message: message)))
       }
-
-    envoy.send(request, body: nil, trailers: nil, handler: handler)
+      .start()
+      .sendHeaders(headers, endStream: true)
   }
 
   private func add(result: Result<Response, RequestError>) {

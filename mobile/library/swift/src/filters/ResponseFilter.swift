@@ -50,5 +50,5 @@ public protocol ResponseFilter: Filter {
   ///
   /// This should be considered a terminal state, and invalidates any previous attempts to
   /// `stopIteration{...}`.
-  func onCanceled()
+  func onCancel()
 }

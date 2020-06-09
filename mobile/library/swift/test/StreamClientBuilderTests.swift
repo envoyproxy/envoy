@@ -19,7 +19,7 @@ mock_template:
   virtual_clusters: {{ virtual_clusters }}
 """
 
-final class EnvoyClientBuilderTests: XCTestCase {
+final class StreamClientBuilderTests: XCTestCase {
   override func tearDown() {
     super.tearDown()
     MockEnvoyEngine.onRunWithConfig = nil
@@ -33,7 +33,7 @@ final class EnvoyClientBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = try EnvoyClientBuilder(yaml: "foobar")
+    _ = try StreamClientBuilder(yaml: "foobar")
       .addEngineType(MockEnvoyEngine.self)
       .build()
     self.waitForExpectations(timeout: 0.01)
@@ -46,7 +46,7 @@ final class EnvoyClientBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = try EnvoyClientBuilder()
+    _ = try StreamClientBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addLogLevel(.trace)
       .build()
@@ -60,7 +60,7 @@ final class EnvoyClientBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = try EnvoyClientBuilder()
+    _ = try StreamClientBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addStatsDomain("stats.foo.com")
       .build()
@@ -74,7 +74,7 @@ final class EnvoyClientBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = try EnvoyClientBuilder()
+    _ = try StreamClientBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addConnectTimeoutSeconds(12345)
       .build()
@@ -88,7 +88,7 @@ final class EnvoyClientBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = try EnvoyClientBuilder()
+    _ = try StreamClientBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addDNSRefreshSeconds(23)
       .build()
@@ -103,7 +103,7 @@ final class EnvoyClientBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = try EnvoyClientBuilder()
+    _ = try StreamClientBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addDNSFailureRefreshSeconds(base: 1234, max: 5678)
       .build()
@@ -117,7 +117,7 @@ final class EnvoyClientBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = try EnvoyClientBuilder()
+    _ = try StreamClientBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addStatsFlushSeconds(42)
       .build()
@@ -131,7 +131,7 @@ final class EnvoyClientBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = try EnvoyClientBuilder()
+    _ = try StreamClientBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addAppVersion("v1.2.3")
       .build()
@@ -145,7 +145,7 @@ final class EnvoyClientBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = try EnvoyClientBuilder()
+    _ = try StreamClientBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addAppId("com.mydomain.myapp")
       .build()
@@ -159,7 +159,7 @@ final class EnvoyClientBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = try EnvoyClientBuilder()
+    _ = try StreamClientBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addVirtualClusters("[test]")
       .build()
@@ -176,11 +176,7 @@ final class EnvoyClientBuilderTests: XCTestCase {
                                     appVersion: "v1.2.3",
                                     appId: "com.mydomain.myapp",
                                     virtualClusters: "[test]")
-    guard let resolvedYAML = config.resolveTemplate(kMockTemplate) else {
-      XCTFail("Resolved template YAML is nil")
-      return
-    }
-
+    let resolvedYAML = try XCTUnwrap(config.resolveTemplate(kMockTemplate))
     XCTAssertTrue(resolvedYAML.contains("stats_domain: stats.foo.com"))
     XCTAssertTrue(resolvedYAML.contains("connect_timeout: 200s"))
     XCTAssertTrue(resolvedYAML.contains("dns_refresh_rate: 300s"))
