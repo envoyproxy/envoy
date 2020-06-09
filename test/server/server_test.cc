@@ -479,7 +479,7 @@ TEST_P(ServerInstanceImplTest, Stats) {
   EXPECT_EQ(1L, TestUtility::findCounter(stats_store_, "server.envoy_bug_failures")->value());
   // Test power of two increments.
   for (int i = 0; i < 16; i++) {
-    ENVOY_BUG(false);
+    ENVOY_BUG(false, "");
   }
   EXPECT_EQ(5L, TestUtility::findCounter(stats_store_, "server.envoy_bug_failures")->value());
 
@@ -490,7 +490,7 @@ TEST_P(ServerInstanceImplTest, Stats) {
 #endif // defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
 #else
   // The ENVOY_BUG macro aborts in debug mode.
-  EXPECT_DEATH(ENVOY_BUG(false), "");
+  EXPECT_DEATH(ENVOY_BUG(false, ""), "");
   EXPECT_EQ(0L, TestUtility::findCounter(stats_store_, "server.debug_assertion_failures")->value());
 #endif
 }

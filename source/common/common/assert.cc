@@ -31,6 +31,7 @@ private:
 class EnvoyBugRegistrationImpl : public ActionRegistration {
 public:
   EnvoyBugRegistrationImpl(std::function<void()> action) {
+    count_ = 0;
     ASSERT(envoy_bug_failure_record_action_ == nullptr);
     envoy_bug_failure_record_action_ = action;
   }

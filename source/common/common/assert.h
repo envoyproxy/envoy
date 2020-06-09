@@ -113,11 +113,6 @@ bool shouldLogAndInvokeEnvoyBug_ForEnvoyBugMacroUseOnly();
  */
 #define SECURITY_ASSERT(X, DETAILS) _ASSERT_IMPL(X, #X, abort(), DETAILS)
 
-// This is a workaround for fact that MSVC expands __VA_ARGS__ after passing them into a macro,
-// rather than before passing them into a macro. Without this, _ASSERT_SELECTOR does not work
-// correctly when compiled with MSVC
-#define EXPAND(X) X
-
 #if !defined(NDEBUG) || defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
 
 #if !defined(NDEBUG) // If this is a debug build.
@@ -130,6 +125,11 @@ bool shouldLogAndInvokeEnvoyBug_ForEnvoyBugMacroUseOnly();
 #define _ASSERT_ORIGINAL(X) _ASSERT_IMPL(X, #X, ASSERT_ACTION, "")
 #define _ASSERT_VERBOSE(X, Y) _ASSERT_IMPL(X, #X, ASSERT_ACTION, Y)
 #define _ASSERT_SELECTOR(_1, _2, ASSERT_MACRO, ...) ASSERT_MACRO
+
+// This is a workaround for fact that MSVC expands __VA_ARGS__ after passing them into a macro,
+// rather than before passing them into a macro. Without this, _ASSERT_SELECTOR does not work
+// correctly when compiled with MSVC
+#define EXPAND(X) X
 
 #if !defined(ENVOY_DISABLE_KNOWN_ISSUE_ASSERTS)
 /**
@@ -181,18 +181,12 @@ bool shouldLogAndInvokeEnvoyBug_ForEnvoyBugMacroUseOnly();
     }                                                                                              \
   } while (false)
 
-#define _ENVOY_BUG_ORIGINAL(X) _ENVOY_BUG_IMPL(X, #X, ENVOY_BUG_ACTION, "")
 #define _ENVOY_BUG_VERBOSE(X, Y) _ENVOY_BUG_IMPL(X, #X, ENVOY_BUG_ACTION, Y)
-#define _ENVOY_BUG_SELECTOR(_1, _2, ENVOY_BUG_MACRO, ...) ENVOY_BUG_MACRO
 
 /**
- * If ENVOY_BUG is called with one argument, the ENVOY_BUG_SELECTOR will return _ENVOY_BUG_ORIGINAL
- * and this will call _ENVOY_BUG_ORIGINAL(__VA_ARGS__). If ENVOY_BUG is called with two arguments,
- * ENVOY_BUG_SELECTOR will return _ENVOY_BUG_VERBOSE, and this will call
- * _ENVOY_BUG_VERBOSE(__VA_ARGS__).
+ * ENVOY_BUG must be called with two arguments for verbose logging.
  */
-#define ENVOY_BUG(...)                                                                             \
-  EXPAND(_ENVOY_BUG_SELECTOR(__VA_ARGS__, _ENVOY_BUG_VERBOSE, _ENVOY_BUG_ORIGINAL)(__VA_ARGS__))
+#define ENVOY_BUG(...) _ENVOY_BUG_VERBOSE(__VA_ARGS__)
 
 // NOT_IMPLEMENTED_GCOVR_EXCL_LINE is for overridden functions that are expressly not implemented.
 // The macro name includes "GCOVR_EXCL_LINE" to exclude the macro's usage from code coverage

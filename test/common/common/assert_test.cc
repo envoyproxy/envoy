@@ -50,17 +50,17 @@ TEST(EnvoyBugDeathTest, VariousLogs) {
       Assert::setEnvoyBugFailureRecordAction([&]() { envoy_bug_fail_count++; });
 
 #ifndef NDEBUG
-  EXPECT_DEATH({ ENVOY_BUG(false); }, ".*envoy bug failure: 0.*");
-  EXPECT_DEATH({ ENVOY_BUG(false, ""); }, ".*envoy bug failure: 0.*");
+  EXPECT_DEATH({ ENVOY_BUG(false, ""); }, ".*envoy bug failure: false.*");
+  EXPECT_DEATH({ ENVOY_BUG(false, ""); }, ".*envoy bug failure: false.*");
   EXPECT_DEATH({ ENVOY_BUG(false, "With some logs"); },
-               ".*envoy bug failure: 0. Details: With some logs.*");
+               ".*envoy bug failure: false. Details: With some logs.*");
   expected_counted_failures = 0;
 #else
-  EXPECT_LOG_CONTAINS("error", "envoy bug failure: 0", ENVOY_BUG(false));
-  EXPECT_LOG_CONTAINS("error", "envoy bug failure: 0", ENVOY_BUG(false));
+  EXPECT_LOG_CONTAINS("error", "envoy bug failure: false", ENVOY_BUG(false, ""));
+  EXPECT_LOG_CONTAINS("error", "envoy bug failure: false", ENVOY_BUG(false, ""));
   // Logging only occurs on power of two instances.
   EXPECT_NO_LOGS(ENVOY_BUG(false, ""));
-  EXPECT_LOG_CONTAINS("error", "envoy bug failure: 0. Details: With some logs",
+  EXPECT_LOG_CONTAINS("error", "envoy bug failure: false. Details: With some logs",
                       ENVOY_BUG(false, "With some logs"));
   expected_counted_failures = 3;
 #endif
