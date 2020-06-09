@@ -146,7 +146,7 @@ envoy_cc_library(
 # Contains minimal code for logging to stderr.
 envoy_cc_library(
     name = "minimal_logger_lib",
-    srcs = ["logger.cc"],
+    srcs = ["logger.cc", "fancy_logger.cc"],
     hdrs = ["logger.h"],
     external_deps = ["abseil_synchronization"],
     deps = [

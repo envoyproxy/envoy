@@ -1,4 +1,5 @@
 #include "common/common/logger.h"
+#include <memory>
 
 using spdlog::level::level_enum;
 
@@ -9,19 +10,12 @@ namespace Envoy{
  * FancyLogger implementation by Jinhui Song.
  */
 
-/**
- * Log info struct for the linked list.
- */
-struct FancyLogInfo {
-  std::string file;
-  mutable spdlog::level::level_enum level;
-  const FancyLogInfo* next;
-};
+spdlog::level::level_enum kDefaultFancyLevel = spdlog::level::info;
 
 /**
  * Global epoch of the latest update of <file, log_level> map.
  */
-static std::atomic<int>* global_epoch__ = nullptr;
+std::atomic<int>* global_epoch__ = nullptr;
 
 /** 
  * Lock for the following linked list.
@@ -29,10 +23,9 @@ static std::atomic<int>* global_epoch__ = nullptr;
 static absl::Mutex fancy_log_lock__;
 
 /**
- * Global linked list for file and log_level.
+ * Global linked list for file and log_level, static if not tests.
  */
-static FancyLogInfo* fancy_log_list__ = nullptr;
-
+FancyLogInfo* fancy_log_list__ = nullptr;
 
 
 /**
@@ -60,28 +53,54 @@ const FancyLogInfo* findFancyInfo(FancyLogInfo* list, std::string file) {
     return cur;
 }
 
+
+static spdlog::sink_ptr getFancySink() {
+    static spdlog::sink_ptr sink = Logger::DelegatingLogSink::init();
+    return sink;
+  }
+
+const char* LOG_PATTERN = "[%Y-%m-%d %T.%e][%t][%l][%n] %v";
+
 /**
- * Initialize the global epoch and linked list, update the local fancy logger.
+ * Get Fancy Logger.
+ * 1. If up to date, return a logger with local level;
+ * 2. else, update the local logger with global linked list.
  */
-void updateFancyLogger(const char* file, spdlog::logger* logger, int** local_epoch) {
+spdlog::logger getFancyLogger(const char* file, int* local_epoch, level_enum** local_level) {
+    // printf("%s: epoch = %d, level = %d\n", file, *local_epoch, static_cast<int>(**local_level));
+
+    spdlog::logger flogger("Anonymous", getFancySink());
     if (!global_epoch__) {
         initFancyGlobalEpoch();
     }
-    
     const FancyLogInfo* entry = findFancyInfo(fancy_log_list__, file);
-    if (!entry)             // initialization if no entry exists (empty list case included)
-    {
+    if (!entry) {
+        // printf(" - Creating a new entry ...\n");
         FancyLogInfo* new_entry = new FancyLogInfo;
         new_entry->file = std::string(file);
-        new_entry->level = level_enum::info;        // default level, so no global epoch update needed
-        new_entry->next = fancy_log_list__;         // add the entry in the front
+        new_entry->level = level_enum::info;
+
+        fancy_log_lock__.Lock();
+        new_entry->next = fancy_log_list__;
         fancy_log_list__ = new_entry;
+        fancy_log_lock__.Unlock();
+
+        // initialize local epoch & local level of the first site of file
+        *local_epoch = 0;
+        *local_level = &new_entry->level;
     }
-    else {                  // update local epoch and log level
-        **local_epoch = *global_epoch__;
-        logger->set_level(entry->level);
+    else if (*local_epoch < global_epoch__->load()) {
+        // printf(" - Updating existing entry ...\n");
+        *local_epoch = global_epoch__->load();
+        *local_level = &entry->level;
     }
 
+    flogger.set_level(**local_level);
+    flogger.set_pattern(LOG_PATTERN);
+    flogger.flush_on(level_enum::critical);
+    printf(" Return: global epoch = %d, local epoch = %d, logger level = %d\n", \
+        global_epoch__->load(), *local_epoch, flogger.level());
+    return static_cast<spdlog::logger>(flogger);
 }
 
 /**
@@ -97,21 +116,27 @@ int setFancyLogLevel(const char* file, level_enum log_level) {
         global_epoch__->store(new_epoch);
     }
 
+    printf("Setting Fancy Log Level: \n");
     const FancyLogInfo* entry = findFancyInfo(fancy_log_list__, file);
     if (!entry) {
+        // printf(" - Creating a new entry here...\n");
         FancyLogInfo* new_entry = new FancyLogInfo;
         new_entry->file = std::string(file);
         new_entry->level = log_level;
+        fancy_log_lock__.Lock();
         new_entry->next = fancy_log_list__;
         fancy_log_list__ = new_entry;
     }
     else {
+        // printf(" - Modify existing entry ...\n");
         fancy_log_lock__.Lock();
         entry->level = log_level;
-        fancy_log_lock__.Unlock();
     }
+    fancy_log_lock__.Unlock();
 
     return new_epoch;
 }
+
+
 
 } // namespace Envoy

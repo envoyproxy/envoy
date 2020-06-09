@@ -367,12 +367,28 @@ protected:
 
 
 /**
- * Constant for uninitialized flag of local epoch.
+ * Constant value for uninitialized flag of local epoch.
  */
-const int kUnInitialized = -1;
+// int kUnInitialized = -1;
 
-// add mutex? or linked list
-// global epoch? benchmark? tsan? asan (address sanitizer)
+extern spdlog::level::level_enum kDefaultFancyLevel;
+
+extern std::atomic<int>* global_epoch__;
+
+/**
+ * Log info struct for the linked list.
+ */
+struct FancyLogInfo {
+  std::string file;
+  mutable spdlog::level::level_enum level;
+  const FancyLogInfo* next;
+};
+
+extern FancyLogInfo* fancy_log_list__;
+
+extern spdlog::logger getFancyLogger(const char* file, int* local_epoch, spdlog::level::level_enum** local_level);
+
+extern int setFancyLogLevel(const char* file, spdlog::level::level_enum log_level);
 
 /**
  * Macro for fancy logger. 
@@ -380,11 +396,10 @@ const int kUnInitialized = -1;
  * if one logger's log level is updated.
  */
 #define FANCY_LOGGER() ({   \
-  static int* local_epoch__ = &kUnInitialized;                  \
-  static spdlog::logger flogger__(__FILE__);                    \
-  if (!global_epoch__ || *local_epoch < global_epoch->load())   \
-    updateFancyLogger(__FILE__, &flogger, &local_epoch);        \
-  flogger__;                                                    \
+  static int local_epoch__ = -1;                                  \
+  static spdlog::level::level_enum* local_level__ = &kDefaultFancyLevel;           \
+  spdlog::logger flogger(Envoy::getFancyLogger(__FILE__, &local_epoch__, &local_level__));  \
+  flogger;                                                                    \
 })
 
 #define FANCY_LOG(LEVEL, ...) ENVOY_LOG_TO_LOGGER(FANCY_LOGGER(), LEVEL, ##__VA_ARGS__)
