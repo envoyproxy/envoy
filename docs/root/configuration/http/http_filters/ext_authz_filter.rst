@@ -3,7 +3,7 @@
 External Authorization
 ======================
 * External authorization :ref:`architecture overview <arch_overview_ext_authz>`
-* :ref:`HTTP filter v3 API reference <envoy_v3_api_msg_extensions.filters.network.ext_authz.v3.ExtAuthz>`
+* :ref:`HTTP filter v3 API reference <envoy_v3_api_msg_extensions.filters.http.ext_authz.v3.ExtAuthz>`
 * This filter should be configured with the name *envoy.filters.http.ext_authz*.
 
 The external authorization filter calls an external gRPC or HTTP service to check whether an incoming

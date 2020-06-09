@@ -1,13 +1,13 @@
-licenses(["notice"])  # Apache 2
-
-## WIP: Simple in-memory cache storage plugin. Not ready for deployment.
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_package",
     "envoy_proto_library",
 )
+
+licenses(["notice"])  # Apache 2
+
+## WIP: Simple in-memory cache storage plugin. Not ready for deployment.
 
 envoy_package()
 
