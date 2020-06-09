@@ -9,7 +9,7 @@ load("@io_bazel_rules_kotlin//kotlin:kotlin.bzl", "kt_jvm_test")
 # 4. Ability to test internal envoy mobile entities
 #
 # Usage example:
-# load("//bazel:kotlin_test.bzl", "envoy_mobile_kt_test)
+# load("@envoy_mobile//bazel:kotlin_test.bzl", "envoy_mobile_kt_test)
 #
 # envoy_mobile_kt_test(
 #     name = "example_kotlin_test",

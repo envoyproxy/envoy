@@ -29,7 +29,7 @@ jobs:
               --config=release-android \
               --fat_apk_cpu=x86,armeabi-v7a,arm64-v8a \
               --define=pom_version=master-$current_short_commit \
-              //:android_deploy
+              //:android_dist
       - uses: actions/upload-artifact@v1
         with:
           name: envoy_android_aar_sources

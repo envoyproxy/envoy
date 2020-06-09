@@ -8,7 +8,7 @@ load("@build_bazel_rules_swift//swift:swift.bzl", "swift_library")
 # - Sets default visibility and OS requirements
 #
 # Usage example:
-# load("//bazel:swift_test.bzl", "envoy_mobile_swift_test")
+# load("@envoy_mobile//bazel:swift_test.bzl", "envoy_mobile_swift_test")
 #
 # envoy_mobile_swift_test(
 #     name = "sample_test",

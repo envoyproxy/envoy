@@ -1,5 +1,5 @@
-load("//bazel:aar_with_jni.bzl", "aar_with_jni")
-load("//bazel:kotlin_lib.bzl", "envoy_mobile_kt_library")
+load("@envoy_mobile//bazel:aar_with_jni.bzl", "aar_with_jni")
+load("@envoy_mobile//bazel:kotlin_lib.bzl", "envoy_mobile_kt_library")
 load("@io_bazel_rules_kotlin//kotlin:kotlin.bzl", "kt_android_library")
 load("@rules_detekt//detekt:defs.bzl", "detekt")
 
