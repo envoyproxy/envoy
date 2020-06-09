@@ -100,6 +100,8 @@ public:
    */
   void merge() override;
 
+  void intervalHistogram(std::vector<std::uint8_t>& bb) const override;
+  void cumulativeHistogram(std::vector<std::uint8_t>& bb) const override;
   const HistogramStatistics& intervalStatistics() const override { return interval_statistics_; }
   const HistogramStatistics& cumulativeStatistics() const override {
     return cumulative_statistics_;

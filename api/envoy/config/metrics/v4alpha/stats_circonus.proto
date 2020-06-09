@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package envoy.config.metrics.v4alpha;
+
+import "google/protobuf/any.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.config.metrics.v4alpha";
+option java_outer_classname = "StatsCirconusProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+
+// Stats configuration proto schema for built-in *envoy.stat_sinks.circonus* sink.
+// The sink is actually a no-op other than registering a new admin handler
+//
+// Note that only a single sink should be configured.
+// [#extension: envoy.stat_sinks.circonus]
+message CirconusSink {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.metrics.v3.CirconusSink";
+}

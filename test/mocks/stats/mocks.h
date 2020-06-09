@@ -243,6 +243,8 @@ public:
   MOCK_METHOD(void, recordValue, (uint64_t value));
   MOCK_METHOD(const HistogramStatistics&, cumulativeStatistics, (), (const));
   MOCK_METHOD(const HistogramStatistics&, intervalStatistics, (), (const));
+  MOCK_METHOD(void, intervalHistogram, (std::vector<std::uint8_t>& bb), (const));
+  MOCK_METHOD(void, cumulativeHistogram, (std::vector<std::uint8_t>& bb), (const));
 
   // RefcountInterface
   void incRefCount() override { refcount_helper_.incRefCount(); }

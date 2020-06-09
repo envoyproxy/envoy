@@ -135,6 +135,20 @@ public:
   virtual void merge() PURE;
 
   /**
+   * Retrieves the interval histogram for the flush interval encoded in {@code base64}.
+   *
+   * @param bb The byte buffer that receives the encoded data
+   */
+  virtual void intervalHistogram(std::vector<std::uint8_t>& bb) const PURE;
+
+  /**
+   * Retrieves the cumulative histogram for the flush interval encoded in {@code base64}.
+   *
+   * @param bb The byte buffer that receives the encoded data
+   */
+  virtual void cumulativeHistogram(std::vector<std::uint8_t>& bb) const PURE;
+
+  /**
    * Returns the interval histogram summary statistics for the flush interval.
    */
   virtual const HistogramStatistics& intervalStatistics() const PURE;

@@ -131,6 +131,7 @@ EXTENSIONS = {
     # Stat sinks
     #
 
+    "envoy.stat_sinks.circonus":                        "//source/extensions/stat_sinks/circonus:config",
     "envoy.stat_sinks.dog_statsd":                      "//source/extensions/stat_sinks/dog_statsd:config",
     "envoy.stat_sinks.hystrix":                         "//source/extensions/stat_sinks/hystrix:config",
     "envoy.stat_sinks.metrics_service":                 "//source/extensions/stat_sinks/metrics_service:config",

@@ -22,6 +22,20 @@
 namespace Envoy {
 namespace Stats {
 
+namespace {
+void encodeHistogram(const histogram_t *histogram, std::vector<std::uint8_t>& bb) {
+  ssize_t n = hist_serialize_b64_estimate(histogram);
+
+  bb.reserve(n + 1);
+
+  while ((n = hist_serialize_b64(histogram, reinterpret_cast<char*>(&bb[0]), bb.capacity())) < 0) {
+    bb.reserve(bb.capacity() * 2 + 1);
+  }
+
+  bb[n] = 0;
+}
+} // namespace
+
 const char ThreadLocalStoreImpl::MainDispatcherCleanupSync[] = "main-dispatcher-cleanup";
 
 ThreadLocalStoreImpl::ThreadLocalStoreImpl(Allocator& alloc)
@@ -746,6 +760,14 @@ void ParentHistogramImpl::merge() {
     interval_statistics_.refresh(interval_histogram_);
     merged_ = true;
   }
+}
+
+void ParentHistogramImpl::intervalHistogram(std::vector<std::uint8_t>& bb) const {
+  encodeHistogram(interval_histogram_, bb);
+}
+
+void ParentHistogramImpl::cumulativeHistogram(std::vector<std::uint8_t>& bb) const {
+  encodeHistogram(cumulative_histogram_, bb);
 }
 
 const std::string ParentHistogramImpl::quantileSummary() const {

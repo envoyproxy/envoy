@@ -22,6 +22,8 @@ public:
   const std::string MetricsService = "envoy.stat_sinks.metrics_service";
   // Hystrix sink
   const std::string Hystrix = "envoy.stat_sinks.hystrix";
+  // Circonus sink
+  const std::string Circonus = "envoy.stat_sinks.circonus";
 };
 
 using StatsSinkNames = ConstSingleton<StatsSinkNameValues>;
