@@ -35,7 +35,9 @@ class RedisCommandSplitterImplTest : public testing::Test {
 public:
   RedisCommandSplitterImplTest() : RedisCommandSplitterImplTest(false) {}
   RedisCommandSplitterImplTest(bool latency_in_macro)
-      : RedisCommandSplitterImplTest(latency_in_macro, nullptr) {}
+      : RedisCommandSplitterImplTest(latency_in_macro, nullptr) {
+    splitter_.setDispatcher(dispatcher_);
+  }
   RedisCommandSplitterImplTest(bool latency_in_macro, Common::Redis::FaultSharedPtr fault_ptr)
       : latency_in_micros_(latency_in_macro) {
     ON_CALL(fault_manager_, getFaultForCommand(_)).WillByDefault(Return(fault_ptr.get()));
@@ -74,7 +76,6 @@ public:
       "redis.foo.",
       time_system_,
       latency_in_micros_,
-      dispatcher_,
       std::make_unique<NiceMock<MockFaultManager>>(fault_manager_),
   };
   MockSplitCallbacks callbacks_;

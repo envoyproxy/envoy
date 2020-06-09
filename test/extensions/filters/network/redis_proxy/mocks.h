@@ -126,6 +126,8 @@ public:
 
   MOCK_METHOD(SplitRequest*, makeRequest_,
               (const Common::Redis::RespValue& request, SplitCallbacks& callbacks));
+
+  MOCK_METHOD(void, setDispatcher_, (Event::Dispatcher & dispatcher));
 };
 
 } // namespace CommandSplitter

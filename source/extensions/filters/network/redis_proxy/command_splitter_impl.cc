@@ -126,10 +126,8 @@ std::unique_ptr<DelayFaultRequest> DelayFaultRequest::create(SplitCallbacks& cal
 
 void DelayFaultRequest::onResponse(Common::Redis::RespValuePtr&& response) {
   response_ = std::move(response);
-  dispatcher_.post([this]() {
-    delay_timer_ = dispatcher_.createTimer([this]() -> void { onDelayResponse(); });
-    delay_timer_->enableTimer(delay_);
-  });
+  delay_timer_ = dispatcher_.createTimer([this]() -> void { onDelayResponse(); });
+  delay_timer_->enableTimer(delay_);
 }
 
 void DelayFaultRequest::onDelayResponse() {
@@ -150,7 +148,6 @@ SplitRequestPtr SimpleRequest::create(Router& router,
                                       TimeSource& time_source, bool delay_command_latency) {
   std::unique_ptr<SimpleRequest> request_ptr{
       new SimpleRequest(callbacks, command_stats, time_source, delay_command_latency)};
-
   const auto route = router.upstreamPool(incoming_request->asArray()[1].asString());
   if (route) {
     Common::Redis::RespValueSharedPtr base_request = std::move(incoming_request);
@@ -438,13 +435,12 @@ void SplitKeysSumResultRequest::onChildResponse(Common::Redis::RespValuePtr&& va
 
 InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::string& stat_prefix,
                            TimeSource& time_source, bool latency_in_micros,
-                           Event::Dispatcher& dispatcher,
                            Common::Redis::FaultManagerPtr&& fault_manager)
     : router_(std::move(router)), simple_command_handler_(*router_),
       eval_command_handler_(*router_), mget_handler_(*router_), mset_handler_(*router_),
       split_keys_sum_result_handler_(*router_),
       stats_{ALL_COMMAND_SPLITTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix + "splitter."))},
-      time_source_(time_source), dispatcher_(dispatcher), fault_manager_(std::move(fault_manager)) {
+      time_source_(time_source), fault_manager_(std::move(fault_manager)) {
   for (const std::string& command : Common::Redis::SupportedCommands::simpleCommands()) {
     addHandler(scope, stat_prefix, command, latency_in_micros, simple_command_handler_);
   }
@@ -531,7 +527,7 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
   std::unique_ptr<DelayFaultRequest> delay_fault_ptr;
   if (has_delay_fault) {
     delay_fault_ptr = DelayFaultRequest::create(callbacks, handler->command_stats_, time_source_,
-                                                dispatcher_, fault_ptr->delayMs());
+                                                *dispatcher_, fault_ptr->delayMs());
   }
 
   // Note that the command_stats_ object of the original request is used for faults, so that our

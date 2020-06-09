@@ -71,6 +71,12 @@ public:
    */
   virtual SplitRequestPtr makeRequest(Common::Redis::RespValuePtr&& request,
                                       SplitCallbacks& callbacks) PURE;
+
+  /**
+   * Set the dispatcher on the command splitter.
+   * @param dispatcher supplies the dispatcher.
+   */
+  virtual void setDispatcher(Event::Dispatcher& dispatcher) PURE;
 };
 
 } // namespace CommandSplitter

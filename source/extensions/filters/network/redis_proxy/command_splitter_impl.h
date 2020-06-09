@@ -333,12 +333,14 @@ struct InstanceStats {
 class InstanceImpl : public Instance, Logger::Loggable<Logger::Id::redis> {
 public:
   InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::string& stat_prefix,
-               TimeSource& time_source, bool latency_in_micros, Event::Dispatcher& dispatcher,
+               TimeSource& time_source, bool latency_in_micros,
                Common::Redis::FaultManagerPtr&& fault_manager);
 
   // RedisProxy::CommandSplitter::Instance
   SplitRequestPtr makeRequest(Common::Redis::RespValuePtr&& request,
                               SplitCallbacks& callbacks) override;
+
+  void setDispatcher(Event::Dispatcher& dispatcher) override { dispatcher_ = &dispatcher; };
 
 private:
   struct HandlerData {
@@ -361,7 +363,7 @@ private:
   TrieLookupTable<HandlerDataPtr> handler_lookup_table_;
   InstanceStats stats_;
   TimeSource& time_source_;
-  Event::Dispatcher& dispatcher_;
+  Event::Dispatcher* dispatcher_;
 
   Common::Redis::FaultManagerPtr fault_manager_;
 
