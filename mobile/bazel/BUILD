@@ -19,3 +19,8 @@ kt_jvm_library(
 exports_files([
     "pom_template.xml",
 ])
+
+alias(
+    name = "zipper",
+    actual = "@bazel_tools//tools/zip:zipper",
+)

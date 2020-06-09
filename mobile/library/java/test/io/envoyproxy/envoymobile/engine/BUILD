@@ -1,4 +1,4 @@
-load("//bazel:kotlin_test.bzl", "envoy_mobile_kt_test")
+load("@envoy_mobile//bazel:kotlin_test.bzl", "envoy_mobile_kt_test")
 
 licenses(["notice"])  # Apache 2
 

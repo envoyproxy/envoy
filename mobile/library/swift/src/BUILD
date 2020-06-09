@@ -1,4 +1,4 @@
-load("//bazel:swift_static_framework.bzl", "swift_static_framework")
+load("@envoy_mobile//bazel:swift_static_framework.bzl", "swift_static_framework")
 
 licenses(["notice"])  # Apache 2
 
