@@ -107,6 +107,11 @@ envoy_proto_library(
     srcs = [":capture_fuzz.proto"],
 )
 
+envoy_proto_library(
+    name = "h2_capture_fuzz_proto",
+    srcs = [":h2_capture_fuzz.proto"],
+)
+
 envoy_cc_test(
     name = "cds_integration_test",
     srcs = ["cds_integration_test.cc"],
@@ -230,6 +235,7 @@ exports_files(["test_utility.sh"])
 
 envoy_sh_test(
     name = "hotrestart_test",
+    size = "enormous",
     srcs = envoy_select_hot_restart([
         "hotrestart_test.sh",
     ]),
@@ -1109,6 +1115,69 @@ envoy_cc_fuzz_test(
     ],
 )
 
+H2_FUZZ_LIB_DEPS = [
+    ":h2_capture_fuzz_proto_cc_proto",
+    ":http_integration_lib",
+    "//source/common/common:assert_lib",
+    "//source/common/common:logger_lib",
+    "//test/common/http/http2:http2_frame",
+    "//test/fuzz:fuzz_runner_lib",
+    "//test/fuzz:utility_lib",
+    "//test/integration:integration_lib",
+    "//test/test_common:environment_lib",
+]
+
+envoy_cc_test_library(
+    name = "h2_fuzz_lib",
+    srcs = ["h2_fuzz.cc"],
+    hdrs = ["h2_fuzz.h"],
+    deps = H2_FUZZ_LIB_DEPS,
+)
+
+envoy_cc_test_library(
+    name = "h2_fuzz_persistent_lib",
+    srcs = ["h2_fuzz.cc"],
+    hdrs = ["h2_fuzz.h"],
+    copts = ["-DPERSISTENT_FUZZER"],
+    deps = H2_FUZZ_LIB_DEPS,
+)
+
+envoy_cc_fuzz_test(
+    name = "h2_capture_fuzz_test",
+    srcs = ["h2_capture_fuzz_test.cc"],
+    corpus = "h2_corpus",
+    deps = [":h2_fuzz_lib"],
+)
+
+envoy_cc_fuzz_test(
+    name = "h2_capture_persistent_fuzz_test",
+    srcs = ["h2_capture_fuzz_test.cc"],
+    copts = ["-DPERSISTENT_FUZZER"],
+    corpus = "h2_corpus",
+    deps = [":h2_fuzz_persistent_lib"],
+)
+
+envoy_cc_fuzz_test(
+    name = "h2_capture_direct_response_fuzz_test",
+    srcs = ["h2_capture_direct_response_fuzz_test.cc"],
+    corpus = "h2_corpus",
+    deps = [
+        ":h2_fuzz_lib",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "h2_capture_direct_response_persistent_fuzz_test",
+    srcs = ["h2_capture_direct_response_fuzz_test.cc"],
+    copts = ["-DPERSISTENT_FUZZER"],
+    corpus = "h2_corpus",
+    deps = [
+        ":h2_fuzz_persistent_lib",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
 envoy_cc_test(
     name = "scoped_rds_integration_test",
     srcs = [
@@ -1194,6 +1263,7 @@ envoy_cc_test(
     srcs = [
         "local_reply_integration_test.cc",
     ],
+    tags = ["fails_on_windows"],
     deps = [
         ":http_integration_lib",
         ":http_protocol_integration_lib",
