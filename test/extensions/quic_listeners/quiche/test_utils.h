@@ -156,7 +156,7 @@ void setQuicConfigWithDefaultValues(quic::QuicConfig* config) {
       config, quic::kMinimumFlowControlSendWindow);
 }
 
-// A test suite with variation of ip version and a knob to turn on and off IETF QUIC implementatin.
+// A test suite with variation of ip version and a knob to turn on/off IETF QUIC implementation.
 class QuicMultiVersionTest
     : public testing::TestWithParam<std::pair<Network::Address::IpVersion, bool>> {};
 
