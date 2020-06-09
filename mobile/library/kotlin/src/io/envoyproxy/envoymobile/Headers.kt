@@ -27,4 +27,13 @@ open class Headers {
   fun value(name: String): List<String>? {
     return headers[name]
   }
+
+  /**
+   * Accessor for all underlying headers as a map.
+   *
+   * @return Map<String, List<String>>, The underlying headers.
+   */
+  fun allHeaders(): Map<String, List<String>> {
+    return headers
+  }
 }

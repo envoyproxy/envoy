@@ -15,6 +15,13 @@ public class Headers: NSObject {
     return self.headers[name]
   }
 
+  /// Accessor for all underlying headers as a map.
+  ///
+  /// - returns: The underlying headers.
+  public func allHeaders() -> [String: [String]] {
+    return self.headers
+  }
+
   /// Internal initializer used by builders.
   ///
   /// - parameter headers: Headers to set.
