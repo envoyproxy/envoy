@@ -293,6 +293,7 @@ envoy_cc_test(
 envoy_cc_test_library(
     name = "test_utils_lib",
     hdrs = ["test_utils.h"],
+    external_deps = ["bazel_runfiles"],
     tags = ["nofips"],
     deps = [
         "//source/extensions/quic_listeners/quiche:quic_filter_manager_connection_lib",

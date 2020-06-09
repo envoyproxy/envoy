@@ -41,7 +41,6 @@
 #include "extensions/quic_listeners/quiche/active_quic_listener_config.h"
 #include "extensions/quic_listeners/quiche/platform/envoy_quic_clock.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
-#include "quiche/quic/test_tools/quic_test_utils.h"
 
 using testing::Return;
 using testing::ReturnRef;

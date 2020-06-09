@@ -34,7 +34,6 @@
 #include "server/configuration_impl.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "quiche/quic/test_tools/quic_test_utils.h"
 
 using testing::Invoke;
 using testing::Return;
