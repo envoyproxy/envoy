@@ -40,12 +40,12 @@ class ListenSocketFactoryImpl : public Network::ListenSocketFactory,
 public:
   ListenSocketFactoryImpl(ListenerComponentFactory& factory,
                           Network::Address::InstanceConstSharedPtr address,
-                          Network::Address::SocketType socket_type,
+                          Network::Socket::Type socket_type,
                           const Network::Socket::OptionsSharedPtr& options, bool bind_to_port,
                           const std::string& listener_name, bool reuse_port);
 
   // Network::ListenSocketFactory
-  Network::Address::SocketType socketType() const override { return socket_type_; }
+  Network::Socket::Type socketType() const override { return socket_type_; }
   const Network::Address::InstanceConstSharedPtr& localAddress() const override {
     return local_address_;
   }
@@ -73,7 +73,7 @@ private:
   // Initially, its port number might be 0. Once a socket is created, its port
   // will be set to the binding port.
   Network::Address::InstanceConstSharedPtr local_address_;
-  Network::Address::SocketType socket_type_;
+  Network::Socket::Type socket_type_;
   const Network::Socket::OptionsSharedPtr options_;
   bool bind_to_port_;
   const std::string& listener_name_;
@@ -337,10 +337,10 @@ private:
                uint32_t concurrency);
   // Helpers for constructor.
   void buildAccessLog();
-  void buildUdpListenerFactory(Network::Address::SocketType socket_type, uint32_t concurrency);
-  void buildListenSocketOptions(Network::Address::SocketType socket_type);
-  void createListenerFilterFactories(Network::Address::SocketType socket_type);
-  void validateFilterChains(Network::Address::SocketType socket_type);
+  void buildUdpListenerFactory(Network::Socket::Type socket_type, uint32_t concurrency);
+  void buildListenSocketOptions(Network::Socket::Type socket_type);
+  void createListenerFilterFactories(Network::Socket::Type socket_type);
+  void validateFilterChains(Network::Socket::Type socket_type);
   void buildFilterChains();
   void buildSocketOptions();
   void buildOriginalDstListenerFilter();
