@@ -266,11 +266,11 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   drain_time_ = std::chrono::seconds(drain_time_s.getValue());
   parent_shutdown_time_ = std::chrono::seconds(parent_shutdown_time_s.getValue());
 
-  if (drain_strategy.getValue() == "immediate")
+  if (drain_strategy.getValue() == "immediate") {
     drain_strategy_ = Server::DrainStrategy::Immediate;
-  else if (drain_strategy.getValue() == "gradual")
+  } else if (drain_strategy.getValue() == "gradual") {
     drain_strategy_ = Server::DrainStrategy::Gradual;
-  else {
+  } else {
     throw MalformedArgvException(
         fmt::format("error: unknown drain-strategy '{}'", mode.getValue()));
   }
