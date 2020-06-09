@@ -19,6 +19,7 @@ import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
 import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -585,7 +586,8 @@ message Cluster {
 
   // Soft limit on size of the cluster’s connections read and write buffers. If
   // unspecified, an implementation defined default is applied (1MiB).
-  google.protobuf.UInt32Value per_connection_buffer_limit_bytes = 5;
+  google.protobuf.UInt32Value per_connection_buffer_limit_bytes = 5
+      [(udpa.annotations.security).configure_for_untrusted_upstream = true];
 
   // The :ref:`load balancer type <arch_overview_load_balancing_types>` to use
   // when picking a host in the cluster.
@@ -636,7 +638,8 @@ message Cluster {
   // supports prior knowledge for upstream connections. Even if TLS is used
   // with ALPN, `http2_protocol_options` must be specified. As an aside this allows HTTP/2
   // connections to happen over plain text.
-  core.v4alpha.Http2ProtocolOptions http2_protocol_options = 14;
+  core.v4alpha.Http2ProtocolOptions http2_protocol_options = 14
+      [(udpa.annotations.security).configure_for_untrusted_upstream = true];
 
   // The extension_protocol_options field is used to provide extension-specific protocol options
   // for upstream connections. The key should match the extension filter name, such as
