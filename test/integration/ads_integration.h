@@ -15,7 +15,7 @@
 // TODO(fredlas) set_node_on_first_message_only was true; the delta+SotW unification
 //               work restores it here.
 namespace Envoy {
-static std::string AdsIntegrationConfig(const std::string& api_type,
+static std::string adsIntegrationConfig(const std::string& api_type,
                                         const std::string& api_version = "V2") {
   // Note: do not use CONSTRUCT_ON_FIRST_USE here!
   return fmt::format(R"EOF(

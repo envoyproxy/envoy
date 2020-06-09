@@ -23,7 +23,7 @@ namespace Envoy {
 AdsIntegrationTest::AdsIntegrationTest(const envoy::config::core::v3::ApiVersion api_version)
     : HttpIntegrationTest(
           Http::CodecClient::Type::HTTP2, ipVersion(),
-          AdsIntegrationConfig(sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC",
+          adsIntegrationConfig(sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC",
                                api_version == envoy::config::core::v3::ApiVersion::V2 ? "V2"
                                                                                       : "V3")) {
   use_lds_ = false;

@@ -594,7 +594,7 @@ class AdsFailIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest,
 public:
   AdsFailIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(),
-                            AdsIntegrationConfig(
+                            adsIntegrationConfig(
                                 sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
     create_xds_upstream_ = true;
     use_lds_ = false;
@@ -638,7 +638,7 @@ class AdsConfigIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest,
 public:
   AdsConfigIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(),
-                            AdsIntegrationConfig(
+                            adsIntegrationConfig(
                                 sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
     create_xds_upstream_ = true;
     use_lds_ = false;
@@ -803,7 +803,7 @@ class AdsClusterFromFileIntegrationTest : public Grpc::DeltaSotwIntegrationParam
 public:
   AdsClusterFromFileIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(),
-                            AdsIntegrationConfig(
+                            adsIntegrationConfig(
                                 sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
     create_xds_upstream_ = true;
     use_lds_ = false;
