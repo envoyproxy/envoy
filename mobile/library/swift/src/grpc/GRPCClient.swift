@@ -3,23 +3,20 @@ import Foundation
 /// Client that supports sending and receiving gRPC traffic.
 @objcMembers
 public final class GRPCClient: NSObject {
-  private let httpClient: HTTPClient
+  private let streamClient: StreamClient
 
   /// Create a new gRPC client instance.
   ///
-  /// - parameter httpClient: The HTTP client to use for gRPC streams.
-  public init(httpClient: HTTPClient) {
-    self.httpClient = httpClient
+  /// - parameter streamClient: The stream client to use for gRPC streams.
+  public init(streamClient: StreamClient) {
+    self.streamClient = streamClient
   }
 
-  /// Start a gRPC request with the provided handler.
+  /// Create a new gRPC stream prototype which can be used to start streams.
   ///
-  /// - parameter request: The outbound gRPC request. See `GRPCRequestBuilder` for creation.
-  /// - parameter handler: Handler for receiving responses.
-  ///
-  /// - returns: An emitter that can be used for sending more traffic over the stream.
-  public func start(_ request: Request, handler: GRPCResponseHandler) -> GRPCStreamEmitter {
-    let emitter = self.httpClient.start(request, handler: handler.underlyingHandler)
-    return GRPCStreamEmitter(emitter: emitter)
+  /// - returns: The new gRPC stream prototype.
+  public func newGRPCStreamPrototype() -> GRPCStreamPrototype {
+    let prototype = self.streamClient.newStreamPrototype()
+    return GRPCStreamPrototype(underlyingStream: prototype)
   }
 }

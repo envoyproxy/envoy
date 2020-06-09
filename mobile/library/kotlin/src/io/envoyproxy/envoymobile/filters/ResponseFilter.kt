@@ -66,5 +66,5 @@ interface ResponseFilter: Filter {
    * This should be considered a terminal state, and invalidates any previous attempts to
    * `stopIteration{...}`.
    */
-  fun onCanceled()
+  fun onCancel()
 }

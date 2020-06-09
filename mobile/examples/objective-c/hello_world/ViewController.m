@@ -13,7 +13,7 @@ NSString *_REQUEST_SCHEME = @"https";
 #pragma mark - ViewController
 
 @interface ViewController ()
-@property (nonatomic, strong) EnvoyClient *envoy;
+@property (nonatomic, strong) id<StreamClient> client;
 @property (nonatomic, assign) int requestCount;
 @property (nonatomic, strong) NSMutableArray<Result *> *results;
 @property (nonatomic, weak) NSTimer *requestTimer;
@@ -36,8 +36,8 @@ NSString *_REQUEST_SCHEME = @"https";
 - (void)startEnvoy {
   NSLog(@"Starting Envoy...");
   NSError *error;
-  EnvoyClientBuilder *builder = [[EnvoyClientBuilder alloc] init];
-  self.envoy = [builder buildAndReturnError:&error];
+  StreamClientBuilder *builder = [[StreamClientBuilder alloc] init];
+  self.client = [builder buildAndReturnError:&error];
   if (error) {
     NSLog(@"Starting Envoy failed: %@", error);
   } else {
@@ -65,38 +65,38 @@ NSString *_REQUEST_SCHEME = @"https";
   self.requestCount++;
   NSLog(@"Starting request to '%@'", _REQUEST_PATH);
 
-  int requestID = self.requestCount;
   // Note: this request will use an http/1.1 stream for the upstream request.
   // The Swift example uses h2. This is done on purpose to test both paths in end-to-end tests
   // in CI.
-  RequestBuilder *builder = [[RequestBuilder alloc] initWithMethod:RequestMethodGet
-                                                            scheme:_REQUEST_SCHEME
-                                                         authority:_REQUEST_AUTHORITY
-                                                              path:_REQUEST_PATH];
-  Request *request = [builder build];
-  ResponseHandler *handler = [[ResponseHandler alloc] initWithQueue:dispatch_get_main_queue()];
+  int requestID = self.requestCount;
+  RequestHeadersBuilder *builder = [[RequestHeadersBuilder alloc] initWithMethod:RequestMethodGet
+                                                                          scheme:_REQUEST_SCHEME
+                                                                       authority:_REQUEST_AUTHORITY
+                                                                            path:_REQUEST_PATH];
+  [builder addUpstreamHttpProtocol:UpstreamHttpProtocolHttp1];
+  RequestHeaders *headers = [builder build];
 
   __weak ViewController *weakSelf = self;
-  [handler onHeaders:^(NSDictionary<NSString *, NSArray<NSString *> *> *headers,
-                       NSInteger statusCode, BOOL endStream) {
-    NSLog(@"Response status (%i): %ld\n%@", requestID, statusCode, headers);
-    NSString *body = [NSString stringWithFormat:@"Status: %ld", statusCode];
+  StreamPrototype *prototype = [self.client newStreamPrototype];
+  [prototype setOnResponseHeadersWithClosure:^(ResponseHeaders *headers, BOOL endStream) {
+    int statusCode = [[[headers valueForName:@":status"] firstObject] intValue];
+    NSLog(@"Response status (%i): %i\n%@", requestID, statusCode, headers);
+    NSString *body = [NSString stringWithFormat:@"Status: %i", statusCode];
     [weakSelf addResponseBody:body
-                 serverHeader:[headers[@"server"] firstObject]
+                 serverHeader:[[headers valueForName:@"server"] firstObject]
                    identifier:requestID
                         error:nil];
   }];
-
-  [handler onData:^(NSData *data, BOOL endStream) {
+  [prototype setOnResponseDataWithClosure:^(NSData *data, BOOL endStream) {
     NSLog(@"Response data (%i): %ld bytes", requestID, data.length);
   }];
-
-  [handler onError:^(EnvoyError *error) {
+  [prototype setOnErrorWithClosure:^(EnvoyError *error) {
     // TODO: expose attemptCount. https://github.com/lyft/envoy-mobile/issues/823
     NSLog(@"Error (%i): Request failed: %@", requestID, error.message);
   }];
 
-  [self.envoy send:request body:nil trailers:nil handler:handler];
+  Stream *stream = [prototype startWithQueue:dispatch_get_main_queue()];
+  [stream sendHeaders:headers endStream:YES];
 }
 
 - (void)addResponseBody:(NSString *)body

@@ -2,7 +2,7 @@ import Foundation
 
 /// Headers representing an outbound request.
 @objcMembers
-public final class RequestHeaders: Headers {
+public class RequestHeaders: Headers {
   /// Method for the request.
   public var method: RequestMethod! {
     return self.value(forName: ":method")?.first.flatMap(RequestMethod.init)
@@ -37,7 +37,7 @@ public final class RequestHeaders: Headers {
   /// Convert the headers back to a builder for mutation.
   ///
   /// - returns: The new builder.
-  public func toBuilder() -> RequestHeadersBuilder {
+  public func toRequestHeadersBuilder() -> RequestHeadersBuilder {
     return RequestHeadersBuilder(headers: self.headers)
   }
 }

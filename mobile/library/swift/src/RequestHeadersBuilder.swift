@@ -28,7 +28,7 @@ public final class RequestHeadersBuilder: HeadersBuilder {
   @discardableResult
   public func addRetryPolicy(_ retryPolicy: RetryPolicy) -> RequestHeadersBuilder {
     for (name, value) in retryPolicy.outboundHeaders() {
-      self.set(name: name, value: value)
+      self.internalSet(name: name, value: value)
     }
 
     return self
@@ -43,7 +43,8 @@ public final class RequestHeadersBuilder: HeadersBuilder {
   public func addUpstreamHttpProtocol(_ upstreamHttpProtocol: UpstreamHttpProtocol)
     -> RequestHeadersBuilder
   {
-    self.set(name: "x-envoy-mobile-upstream-protocol", value: [upstreamHttpProtocol.stringValue])
+    self.internalSet(name: "x-envoy-mobile-upstream-protocol",
+                     value: [upstreamHttpProtocol.stringValue])
     return self
   }
 
