@@ -1,3 +1,13 @@
+load("@rules_cc//cc:defs.bzl", "cc_proto_library")
+load("@rules_proto//proto:defs.bzl", "proto_library")
+load(":genrule_cmd.bzl", "genrule_cmd")
+load(
+    "@envoy//bazel:envoy_build_system.bzl",
+    "envoy_cc_library",
+    "envoy_cc_test",
+    "envoy_cc_test_library",
+)
+
 licenses(["notice"])  # Apache 2
 
 # QUICHE is Google's implementation of QUIC and related protocols. It is the
@@ -24,16 +34,6 @@ licenses(["notice"])  # Apache 2
 # quiche/{http2,quic,spdy}/, with the Envoy-specific implementation of the
 # QUICHE platform APIs in //source/extensions/quic_listeners/quiche/platform/,
 # should remain largely the same.
-
-load("@rules_proto//proto:defs.bzl", "proto_library")
-load(":genrule_cmd.bzl", "genrule_cmd")
-load(
-    "@envoy//bazel:envoy_build_system.bzl",
-    "envoy_cc_library",
-    "envoy_cc_test",
-    "envoy_cc_test_library",
-    "envoy_proto_library",
-)
 
 src_files = glob([
     "**/*.h",

@@ -10,6 +10,7 @@
 #include <unordered_set>
 
 #include "common/memory/stats.h"
+#include "common/network/socket_impl.h"
 #include "common/network/utility.h"
 
 #include "extensions/quic_listeners/quiche/platform/flags_impl.h"
@@ -670,7 +671,7 @@ TEST_F(QuicPlatformTest, PickUnsedPort) {
         Envoy::Network::Test::getCanonicalLoopbackAddress(ip_version);
     Envoy::Network::Address::InstanceConstSharedPtr addr_with_port =
         Envoy::Network::Utility::getAddressWithPort(*addr, port);
-    Envoy::Network::SocketImpl sock(Envoy::Network::Address::SocketType::Datagram, addr_with_port);
+    Envoy::Network::SocketImpl sock(Envoy::Network::Socket::Type::Datagram, addr_with_port);
     // binding of given port should success.
     EXPECT_EQ(0, sock.bind(addr_with_port).rc_);
   }

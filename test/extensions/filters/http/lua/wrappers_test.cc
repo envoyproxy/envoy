@@ -50,7 +50,7 @@ TEST_F(LuaHeaderMapWrapperTest, Methods) {
   InSequence s;
   setup(SCRIPT);
 
-  Http::TestHeaderMapImpl headers;
+  Http::TestRequestHeaderMapImpl headers;
   HeaderMapWrapper::create(coroutine_->luaState(), headers, []() { return true; });
   EXPECT_CALL(*this, testPrint("WORLD"));
   EXPECT_CALL(*this, testPrint("'hello' 'WORLD'"));
@@ -86,7 +86,7 @@ TEST_F(LuaHeaderMapWrapperTest, ModifiableMethods) {
   InSequence s;
   setup(SCRIPT);
 
-  Http::TestHeaderMapImpl headers;
+  Http::TestRequestHeaderMapImpl headers;
   HeaderMapWrapper::create(coroutine_->luaState(), headers, []() { return false; });
   start("shouldBeOk");
 
@@ -119,13 +119,13 @@ TEST_F(LuaHeaderMapWrapperTest, Replace) {
   InSequence s;
   setup(SCRIPT);
 
-  Http::TestHeaderMapImpl headers{{":path", "/"}, {"other_header", "hello"}};
+  Http::TestRequestHeaderMapImpl headers{{":path", "/"}, {"other_header", "hello"}};
   HeaderMapWrapper::create(coroutine_->luaState(), headers, []() { return true; });
   start("callMe");
 
-  EXPECT_EQ((Http::TestHeaderMapImpl{{":path", "/new_path"},
-                                     {"other_header", "other_header_value"},
-                                     {"new_header", "new_header_value"}}),
+  EXPECT_EQ((Http::TestRequestHeaderMapImpl{{":path", "/new_path"},
+                                            {"other_header", "other_header_value"},
+                                            {"new_header", "new_header_value"}}),
             headers);
 }
 
@@ -142,7 +142,7 @@ TEST_F(LuaHeaderMapWrapperTest, ModifyDuringIteration) {
   InSequence s;
   setup(SCRIPT);
 
-  Http::TestHeaderMapImpl headers{{"foo", "bar"}};
+  Http::TestRequestHeaderMapImpl headers{{"foo", "bar"}};
   HeaderMapWrapper::create(coroutine_->luaState(), headers, []() { return true; });
   EXPECT_THROW_WITH_MESSAGE(start("callMe"), Filters::Common::Lua::LuaException,
                             "[string \"...\"]:4: header map cannot be modified while iterating");
@@ -167,7 +167,7 @@ TEST_F(LuaHeaderMapWrapperTest, ModifyAfterIteration) {
   InSequence s;
   setup(SCRIPT);
 
-  Http::TestHeaderMapImpl headers{{"foo", "bar"}};
+  Http::TestRequestHeaderMapImpl headers{{"foo", "bar"}};
   HeaderMapWrapper::create(coroutine_->luaState(), headers, []() { return true; });
   EXPECT_CALL(*this, testPrint("'foo' 'bar'"));
   EXPECT_CALL(*this, testPrint("'foo' 'bar'"));
@@ -188,7 +188,7 @@ TEST_F(LuaHeaderMapWrapperTest, DontFinishIteration) {
   InSequence s;
   setup(SCRIPT);
 
-  Http::TestHeaderMapImpl headers{{"foo", "bar"}, {"hello", "world"}};
+  Http::TestRequestHeaderMapImpl headers{{"foo", "bar"}, {"hello", "world"}};
   HeaderMapWrapper::create(coroutine_->luaState(), headers, []() { return true; });
   EXPECT_THROW_WITH_MESSAGE(
       start("callMe"), Filters::Common::Lua::LuaException,
@@ -208,7 +208,7 @@ TEST_F(LuaHeaderMapWrapperTest, IteratorAcrossYield) {
   InSequence s;
   setup(SCRIPT);
 
-  Http::TestHeaderMapImpl headers{{"foo", "bar"}, {"hello", "world"}};
+  Http::TestRequestHeaderMapImpl headers{{"foo", "bar"}, {"hello", "world"}};
   Filters::Common::Lua::LuaDeathRef<HeaderMapWrapper> wrapper(
       HeaderMapWrapper::create(coroutine_->luaState(), headers, []() { return true; }), true);
   yield_callback_ = [] {};
