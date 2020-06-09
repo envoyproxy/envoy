@@ -12,6 +12,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::AnyNumber;
 using testing::AtLeast;
 using testing::InSequence;
 using testing::Mock;
@@ -31,7 +32,7 @@ Api::IoCallUint64Result makeNoError(uint64_t rc) {
   return no_error;
 }
 
-class DnsFilterTest : public testing::Test {
+class DnsFilterTest : public testing::Test, public Event::TestUsingSimulatedTime {
 public:
   DnsFilterTest()
       : listener_address_(Network::Utility::parseInternetAddressAndPort("127.0.2.1:5353")),
@@ -56,7 +57,7 @@ public:
   void setupResponseParser() {
     histogram_.unit_ = Stats::Histogram::Unit::Milliseconds;
     response_parser_ = std::make_unique<DnsMessageParser>(
-        true /* recursive queries */, api_->timeSource(), 3 /* retries */, random_, histogram_);
+        true /* recursive queries */, api_->timeSource(), 0 /* retries */, random_, histogram_);
   }
 
   void setup(const std::string& yaml) {
@@ -72,7 +73,11 @@ public:
 
     resolver_ = std::make_shared<Network::MockDnsResolver>();
     EXPECT_CALL(dispatcher_, createDnsResolver(_, _)).WillOnce(Return(resolver_));
-    EXPECT_CALL(dispatcher_, createTimer_(_)).Times(AtLeast(0));
+
+    timeout_timer_ = new Event::MockTimer(&dispatcher_);
+    EXPECT_CALL(*timeout_timer_, disableTimer()).Times(AtLeast(0));
+    EXPECT_CALL(*timeout_timer_, enableTimer(_, _)).Times(AtLeast(0));
+    EXPECT_CALL(dispatcher_, createTimer_(_)).WillRepeatedly(Return(timeout_timer_));
 
     config_ = std::make_shared<DnsFilterEnvoyConfig>(listener_factory_, config);
     filter_ = std::make_unique<DnsFilter>(callbacks_, config_);
@@ -92,6 +97,7 @@ public:
   DnsFilterEnvoyConfigSharedPtr config_;
   DnsParserCounters counters_;
   DnsQueryContextPtr query_ctx_;
+  Event::MockTimer* timeout_timer_{};
   Event::MockDispatcher dispatcher_;
   Network::MockUdpReadFilterCallbacks callbacks_;
   Network::UdpRecvData udp_response_;
@@ -171,14 +177,14 @@ server_config:
   const std::string forward_query_on_config = R"EOF(
 stat_prefix: "my_prefix"
 client_config:
-  resolver_timeout: 5s
+  resolver_timeout: 1s
   upstream_resolvers:
   - "1.1.1.1"
   - "8.8.8.8"
   - "8.8.4.4"
 server_config:
   inline_dns_table:
-    external_retry_count: 3
+    external_retry_count: 0
     known_suffixes:
     - suffix: foo1.com
     - suffix: foo2.com
@@ -499,6 +505,9 @@ TEST_F(DnsFilterTest, ExternalResolutionReturnSingleAddress) {
   // Send a query to for a name not in our configuration
   sendQueryFromClient("10.0.0.1:1000", query);
 
+  // Expect another disableTimer call from within the callback
+  EXPECT_CALL(*timeout_timer_, disableTimer()).Times(AnyNumber());
+
   // Execute resolve callback
   resolve_cb(Network::DnsResolver::ResolutionStatus::Success,
              TestUtility::makeDnsResponse({expected_address}));
@@ -547,6 +556,9 @@ TEST_F(DnsFilterTest, ExternalResolutionReturnMultipleAddresses) {
   // Send a query to for a name not in our configuration
   sendQueryFromClient("10.0.0.1:1000", query);
 
+  // Expect another disableTimer call from within the callback
+  EXPECT_CALL(*timeout_timer_, disableTimer()).Times(AnyNumber());
+
   // Execute resolve callback
   resolve_cb(Network::DnsResolver::ResolutionStatus::Success,
              TestUtility::makeDnsResponse({expected_address}));
@@ -594,8 +606,47 @@ TEST_F(DnsFilterTest, ExternalResolutionReturnNoAddresses) {
   // Send a query to for a name not in our configuration
   sendQueryFromClient("10.0.0.1:1000", query);
 
+  // Expect another disableTimer call from within the callback
+  EXPECT_CALL(*timeout_timer_, disableTimer()).Times(AnyNumber());
+
   // Execute resolve callback
   resolve_cb(Network::DnsResolver::ResolutionStatus::Success, TestUtility::makeDnsResponse({}));
+
+  // parse the result
+  query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
+  EXPECT_TRUE(query_ctx_->parse_status_);
+  EXPECT_EQ(DNS_RESPONSE_CODE_NAME_ERROR, response_parser_->getQueryResponseCode());
+  EXPECT_EQ(0, query_ctx_->answers_.size());
+
+  // Validate stats
+  EXPECT_EQ(1, config_->stats().downstream_rx_queries_.value());
+  EXPECT_EQ(1, config_->stats().external_a_record_queries_.value());
+  EXPECT_EQ(0, config_->stats().external_a_record_answers_.value());
+  EXPECT_EQ(1, config_->stats().a_record_queries_.value());
+  EXPECT_EQ(0, config_->stats().aaaa_record_queries_.value());
+  EXPECT_EQ(0, config_->stats().unanswered_queries_.value());
+
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(resolver_.get()));
+}
+
+TEST_F(DnsFilterTest, ExternalResolutionTimeout) {
+  InSequence s;
+
+  const std::string domain("www.foobaz.com");
+  setup(forward_query_on_config);
+
+  const std::string query =
+      Utils::buildQueryForDomain(domain, DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN);
+  ASSERT_FALSE(query.empty());
+
+  EXPECT_CALL(*resolver_, resolve(domain, _, _)).WillOnce(Return(&resolver_->active_query_));
+
+  // Send a query to for a name not in our configuration
+  sendQueryFromClient("10.0.0.1:1000", query);
+  simTime().advanceTimeWait(std::chrono::milliseconds(1500));
+
+  // Execute resolve callback
+  timeout_timer_->invokeCallback();
 
   // parse the result
   query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
