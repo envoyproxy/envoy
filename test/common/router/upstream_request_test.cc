@@ -122,7 +122,7 @@ public:
   Tcp::ConnectionPool::MockInstance mock_pool_;
   MockGenericConnectionPoolCallbacks mock_generic_callbacks_;
   std::shared_ptr<NiceMock<Upstream::MockHost>> host_;
-  NiceMock<Tcp::ConnectionPool::MockCancellable> cancellable_;
+  NiceMock<Envoy::ConnectionPool::MockCancellable> cancellable_;
 };
 
 TEST_F(TcpConnPoolTest, Basic) {
