@@ -102,7 +102,7 @@ TEST_P(BufferIntegrationTest, RouterRequestBufferLimitExceeded) {
   // the response is read.
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(1000 * 1000); });
+             hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(2000 * 1000); });
   config_helper_.addFilter(ConfigHelper::smallBufferFilter());
   initialize();
 
