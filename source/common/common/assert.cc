@@ -31,8 +31,9 @@ private:
 class EnvoyBugRegistrationImpl : public ActionRegistration {
 public:
   EnvoyBugRegistrationImpl(std::function<void()> action) {
+    ASSERT(envoy_bug_failure_record_action_ == nullptr,
+           "An ENVOY_BUG action was already set. Currently only a single action is supported.");
     count_ = 0;
-    ASSERT(envoy_bug_failure_record_action_ == nullptr);
     envoy_bug_failure_record_action_ = action;
   }
 
@@ -43,6 +44,7 @@ public:
 
   static bool shouldLogAndInvoke() {
     ++count_;
+    // Check if count_ is power of two by its bitwise representation.
     if ((count_ & (count_ - 1)) == 0) {
       return true;
     }
