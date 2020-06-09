@@ -238,6 +238,8 @@ public:
   void onUnderlyingConnectionAboveWriteBufferHighWatermark() override { onAboveHighWatermark(); }
   void onUnderlyingConnectionBelowWriteBufferLowWatermark() override { onBelowLowWatermark(); }
 
+  bool strict1xxAnd204Headers() { return strict_1xx_and_204_headers_; }
+
 protected:
   ConnectionImpl(Network::Connection& connection, CodecStats& stats, http_parser_type type,
                  uint32_t max_headers_kb, const uint32_t max_headers_count,
@@ -263,6 +265,7 @@ protected:
   const bool connection_header_sanitization_ : 1;
   const bool enable_trailers_ : 1;
   const bool reject_unsupported_transfer_encodings_ : 1;
+  const bool strict_1xx_and_204_headers_ : 1;
 
 private:
   enum class HeaderParsingState { Field, Value, Done };

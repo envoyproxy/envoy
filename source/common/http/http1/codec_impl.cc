@@ -166,15 +166,13 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
       chunk_encoding_ = false;
     } else if (connection_.protocol() == Protocol::Http10) {
       chunk_encoding_ = false;
-    } else if (is_1xx_ || is_204_) {
+    } else if (connection_.strict1xxAnd204Headers() && (is_1xx_ || is_204_)) {
       // For 1xx and 204 responses, do not send the chunked encoding header or enable chunked
       // encoding: https://tools.ietf.org/html/rfc7230#section-3.3.1
       chunk_encoding_ = false;
 
-      if (is_204_) {
-        // Assert no content.
-        ASSERT(end_stream);
-      }
+      // Assert 1xx (may have content) OR 204 and end stream.
+      ASSERT(is_1xx_ || end_stream);
     } else {
       // For responses to connect requests, do not send the chunked encoding header:
       // https://tools.ietf.org/html/rfc7231#section-4.3.6.
@@ -467,6 +465,8 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       enable_trailers_(enable_trailers),
       reject_unsupported_transfer_encodings_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.reject_unsupported_transfer_encodings")),
+      strict_1xx_and_204_headers_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.strict_1xx_and_204_response_headers")),
       output_buffer_([&]() -> void { this->onBelowLowWatermark(); },
                      [&]() -> void { this->onAboveHighWatermark(); },
                      []() -> void { /* TODO(adisuissa): Handle overflow watermark */ }),
@@ -1072,7 +1072,7 @@ int ClientConnectionImpl::onHeadersComplete() {
       }
     }
 
-    if ((parser_.status_code < 200 || parser_.status_code == 204)) {
+    if (strict_1xx_and_204_headers_ && (parser_.status_code < 200 || parser_.status_code == 204)) {
       if (headers->TransferEncoding()) {
         sendProtocolError(Http1ResponseCodeDetails::get().TransferEncodingNotAllowed);
         throw CodecProtocolException(
