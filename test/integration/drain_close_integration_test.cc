@@ -43,6 +43,37 @@ TEST_P(DrainCloseIntegrationTest, DrainClose) {
   }
 }
 
+TEST_P(DrainCloseIntegrationTest, DrainImmediately) {
+  drain_strategy_ = Server::DrainStrategy::Immediate;
+  drain_time_ = std::chrono::seconds(100);
+  config_helper_.addFilter(ConfigHelper::defaultHealthCheckFilter());
+  initialize();
+
+  absl::Notification drain_sequence_started;
+  test_server_->server().dispatcher().post([this, &drain_sequence_started]() {
+    test_server_->drainManager().startDrainSequence([] {});
+    drain_sequence_started.Notify();
+  });
+  drain_sequence_started.WaitForNotification();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  EXPECT_FALSE(codec_client_->disconnected());
+
+  IntegrationStreamDecoderPtr response;
+  response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  response->waitForEndStream();
+
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  EXPECT_TRUE(response->complete());
+
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP2) {
+    EXPECT_TRUE(codec_client_->sawGoAway());
+  } else {
+    EXPECT_EQ("close", response->headers().getConnectionValue());
+  }
+}
+
 TEST_P(DrainCloseIntegrationTest, AdminDrain) {
   initialize();
 
@@ -79,7 +110,57 @@ TEST_P(DrainCloseIntegrationTest, AdminDrain) {
   test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
 }
 
+
 INSTANTIATE_TEST_SUITE_P(Protocols, DrainCloseIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             {Http::CodecClient::Type::HTTP1, Http::CodecClient::Type::HTTP2},
+                             {FakeHttpConnection::Type::HTTP1})),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+class DrainManagerSimulatedTimeTest : public Event::TestUsingSimulatedTime, public HttpProtocolIntegrationTest {};
+
+TEST_P(DrainManagerSimulatedTimeTest, DrainCloseImmediate) {
+  std::cerr << "[AUNI] " << "starting"
+            << "\n";
+  drain_strategy_ = Server::DrainStrategy::Immediate;
+  drain_time_ = std::chrono::seconds(100);
+  config_helper_.addFilter(ConfigHelper::defaultHealthCheckFilter());
+  initialize();
+
+  absl::Notification drain_sequence_started;
+  test_server_->server().dispatcher().post([this, &drain_sequence_started]() {
+    test_server_->drainManager().startDrainSequence([] {});
+    drain_sequence_started.Notify();
+  });
+  drain_sequence_started.WaitForNotification();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  EXPECT_FALSE(codec_client_->disconnected());
+
+  IntegrationStreamDecoderPtr response;
+  response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  response->waitForEndStream();
+
+  std::cerr << "[AUNI] " << "wait for disconnect" << "\n";
+  std::cerr << "[AUNI] " << "advanceTime 1" << "\n";
+  simTime().advanceTimeWait(std::chrono::seconds(1));
+  // std::cerr << "[AUNI] " << "advanceTime 2" << "\n";
+  // simTime().advanceTimeWait(std::chrono::seconds(50));
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  std::cerr << "[AUNI] " << "wait for complete" << "\n";
+  EXPECT_TRUE(response->complete());
+
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP2) {
+    EXPECT_TRUE(codec_client_->sawGoAway());
+  } else {
+    EXPECT_EQ("close", response->headers().getConnectionValue());
+  }
+  std::cerr << "[AUNI] " << "done"
+            << "\n";
+}
+
+INSTANTIATE_TEST_SUITE_P(Protocols, DrainManagerSimulatedTimeTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
                              {Http::CodecClient::Type::HTTP1, Http::CodecClient::Type::HTTP2},
                              {FakeHttpConnection::Type::HTTP1})),
