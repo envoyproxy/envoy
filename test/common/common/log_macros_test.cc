@@ -22,6 +22,9 @@ public:
     ENVOY_LOG(critical, "fake message");
     ENVOY_CONN_LOG(info, "fake message", connection_);
     ENVOY_STREAM_LOG(info, "fake message", stream_);
+
+    ENVOY_LOG(critical, "Logger's level: {}",
+              ENVOY_LOGGER().level()); // Jinhui Song: check log level
   }
 
   void logMessageEscapeSequences() { ENVOY_LOG_MISC(info, "line 1 \n line 2 \t tab \\r test"); }
@@ -48,6 +51,9 @@ TEST(Logger, evaluateParams) {
   // Log message with higher severity and make sure that params were evaluated.
   GET_MISC_LOGGER().set_level(spdlog::level::info);
   ENVOY_LOG_MISC(warn, "test message '{}'", i++);
+
+  ENVOY_LOG_MISC(info, "Test test!"); // Jinhui Song: for test only
+
   EXPECT_THAT(i, testing::Eq(2));
 }
 
@@ -136,5 +142,54 @@ TEST_F(FormatTest, OutputEscaped) {
   const Envoy::ExpectedLogMessages message{{"info", R"(line 1 \n line 2 \t tab \\r test)"}};
   EXPECT_LOG_CONTAINS_ALL_OF_ESCAPED(message, logMessageEscapeSequences());
 }
+
+/**
+ * Test for Fancy Logger macros.
+ */
+TEST(Fancy, Global) {
+  // First log
+  printf("Global test, first log: \n");
+  EXPECT_THAT(global_epoch__, testing::Eq(nullptr));
+  EXPECT_EQ(fancy_log_list__, nullptr);
+  FANCY_LOG(info, "Hello world! Here's a line of fancy log!\n");
+  EXPECT_THAT(global_epoch__->load(), testing::Eq(0));
+  
+  EXPECT_NE(fancy_log_list__, nullptr);
+  EXPECT_EQ(fancy_log_list__->file, __FILE__);
+  EXPECT_EQ(fancy_log_list__->level, 2);       // info
+  
+  // Second log
+  printf("Global test, second log: \n");
+  FANCY_LOG(error, "Fancy Error! Here's the second message!\n");
+  printf("After error print...\n");
+  EXPECT_EQ(global_epoch__->load(), 0);
+  EXPECT_EQ(fancy_log_list__->file, __FILE__);
+  printf("After two of assertion...\n");
+  EXPECT_EQ(fancy_log_list__->level, 2);       // file level is default
+}
+
+TEST(Fancy, SetLevel) {
+  printf("SetLevel test: \n");
+  int gepoch = global_epoch__->load();
+  const char* file = "P=NP_file";
+  setFancyLogLevel(file, spdlog::level::trace);
+  printf("After first setting level ...\n");
+  EXPECT_EQ(global_epoch__->load(), gepoch + 1);
+  EXPECT_EQ(fancy_log_list__->file, file);
+  EXPECT_EQ(fancy_log_list__->level, 0);      // trace level
+
+  printf("Before second setting level ...\n");
+  setFancyLogLevel(__FILE__, spdlog::level::err);
+  EXPECT_EQ(fancy_log_list__->file, "P=NP_file");
+  EXPECT_EQ(fancy_log_list__->level, 0);
+  EXPECT_EQ(fancy_log_list__->next->file, __FILE__);
+  EXPECT_EQ(fancy_log_list__->next->level, 4);
+  FANCY_LOG(error, "Fancy Error! Here's a test for level.\n");
+  
+  printf("Last: warn message here.\n");
+  FANCY_LOG(warn, "Warning: you shouldn't see this message!\n");
+
+}
+
 
 } // namespace Envoy
