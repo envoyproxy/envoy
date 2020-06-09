@@ -12,11 +12,11 @@ envoy_cc_test(
     name = "upstream_request_test",
     srcs = ["upstream_request_test.cc"],
     deps = [
-        "//source/extensions/upstreams/http/tcp:upstream_request_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/router:router_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
+        "//source/extensions/upstreams/http/tcp:upstream_request_lib",
         "//test/common/http:common_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
