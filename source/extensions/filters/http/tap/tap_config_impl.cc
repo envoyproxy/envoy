@@ -182,7 +182,7 @@ void HttpPerRequestTapperImpl::onBody(
   request ? config_->rootMatcher().onRequestBody(data, statuses_)
           : config_->rootMatcher().onResponseBody(data, statuses_);
   if (config_->streaming()) {
-    const auto match_status = config_->rootMatcher().matchStatus(statuses_);
+    const auto& match_status = config_->rootMatcher().matchStatus(statuses_);
     // Without body matching, we must have already started tracing or have not yet matched.
     ASSERT(started_streaming_trace_ || !match_status.matches_);
 

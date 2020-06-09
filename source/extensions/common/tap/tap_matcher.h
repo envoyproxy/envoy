@@ -15,6 +15,18 @@ class Matcher;
 using MatcherPtr = std::unique_ptr<Matcher>;
 
 /**
+ * Base class for context used by individual matchers.
+ * The context may be required by matchers which are called multiple times
+ * and need to carry state between the calls. For example body matchers may
+ * store information how any bytes of the body have been already processed
+ * or what what has been already found in the body and what has yet to be found.
+ */
+class MatcherCtx {
+public:
+  virtual ~MatcherCtx() = default;
+};
+
+/**
  * Base class for all tap matchers.
  *
  * A high level note on the design of tap matching which is different from other matching in Envoy
@@ -42,6 +54,7 @@ public:
 
     bool matches_{false};            // Does the matcher currently match?
     bool might_change_status_{true}; // Is it possible for matches_ to change in subsequent updates?
+    std::unique_ptr<MatcherCtx> ctx_{}; // Context used by matchers to save interim context.
   };
 
   using MatchStatusVector = std::vector<MatchStatus>;
@@ -126,7 +139,9 @@ public:
    * @param statuses supplies the per-stream-request match status vector which must be the same
    *                 size as the match tree vector (see above).
    */
-  MatchStatus matchStatus(const MatchStatusVector& statuses) const { return statuses[my_index_]; }
+  const MatchStatus& matchStatus(const MatchStatusVector& statuses) const {
+    return statuses[my_index_];
+  }
 
 protected:
   const size_t my_index_;
@@ -339,6 +354,36 @@ protected:
   // Limit search to specified number of bytes.
   // Value equal to zero means no limit.
   uint32_t limit_{};
+};
+
+/**
+ * Context is used by HttpGenericBodyMatcher to:
+ * - track how many bytes has been processed
+ * - track patterns which have been found
+ * - store last several seen bytes of the HTTP body (when pattern starts at the end of previous body
+ *   chunk and continues at the beginning of the next body chunk)
+ */
+class HttpGenericBodyMatcherCtx : public MatcherCtx {
+public:
+  HttpGenericBodyMatcherCtx(std::list<std::string> patterns, size_t overlap_size)
+      : patterns_(patterns), overlap_size_(overlap_size) {
+    overlap_ = std::make_unique<char[]>(overlap_size_);
+  }
+  virtual ~HttpGenericBodyMatcherCtx() = default;
+
+  // List is initialized based on the Matcher's configuration.
+  // When data is passing through the matcher, found patterns are removed
+  // from the list. When all patterns have been found, the list is empty.
+  std::list<std::string> patterns_;
+  // Stores the length of the longest pattern.
+  size_t overlap_size_;
+  // Buffer to store the last bytes from previous body chunk(s).
+  // It will store only as many bytes as is the length of the longest
+  // pattern to be found minus 1.
+  // It is necessary to locate patterns which are spread across 2 or more
+  // body chunks.
+  std::unique_ptr<char[]> overlap_;
+  size_t bytes_in_overlap_{0};
   // Tracks how many bytes has been already processed.
   // Used only when limit_ is not zero.
   uint32_t processed_bytes_{};
@@ -351,19 +396,21 @@ public:
 
 protected:
   void onBody(const Buffer::Instance&, MatchStatusVector&);
+  void onNewStream(MatchStatusVector& statuses) const override {
+    // Allocate a new context used for the new stream.
+    statuses[my_index_].ctx_ =
+        std::make_unique<HttpGenericBodyMatcherCtx>(patterns_, overlap_size_);
+  }
+  bool locatePatternAcrossChunks(const std::string& pattern, const Buffer::Instance& data,
+                                 const HttpGenericBodyMatcherCtx* ctx);
 
 private:
-  // Vector of strings which body must contain to get match.
+  // The following fields are initialized based on matcher config and are used
+  // by all HTTP tappers.
+  // List of strings which body must contain to get match.
   std::list<std::string> patterns_;
   // Stores the length of the longest pattern.
   size_t overlap_size_;
-  // Buffer to store the last bytes from previous body chunk(s).
-  // It will store only as many bytes as is the length of the longest
-  // pattern to be found minus 1.
-  // It is necessary to locate patterns which are spread across 2 or more
-  // body chunks.
-  std::unique_ptr<char[]> overlap_;
-  size_t bytes_in_overlap_{0};
 };
 
 class HttpRequestGenericBodyMatcher : public HttpGenericBodyMatcher {
