@@ -568,34 +568,8 @@ enum ErrorCode ngHttp2ErrorCodeToErrorCode(uint32_t code) noexcept {
   switch (code) {
   case NGHTTP2_NO_ERROR:
     return ErrorCode::NoError;
-  case NGHTTP2_PROTOCOL_ERROR:
-    return ErrorCode::ProtocolError;
-  case NGHTTP2_INTERNAL_ERROR:
-    return ErrorCode::InternalError;
-  case NGHTTP2_FLOW_CONTROL_ERROR:
-    return ErrorCode::FlowControlError;
-  case NGHTTP2_SETTINGS_TIMEOUT:
-    return ErrorCode::SettingsTimeout;
-  case NGHTTP2_STREAM_CLOSED:
-    return ErrorCode::StreamClosed;
-  case NGHTTP2_FRAME_SIZE_ERROR:
-    return ErrorCode::FrameSizeError;
-  case NGHTTP2_REFUSED_STREAM:
-    return ErrorCode::RefusedStream;
-  case NGHTTP2_CANCEL:
-    return ErrorCode::Cancel;
-  case NGHTTP2_COMPRESSION_ERROR:
-    return ErrorCode::CompressionError;
-  case NGHTTP2_CONNECT_ERROR:
-    return ErrorCode::ConnectError;
-  case NGHTTP2_ENHANCE_YOUR_CALM:
-    return ErrorCode::EnhanceYourCalm;
-  case NGHTTP2_INADEQUATE_SECURITY:
-    return ErrorCode::InadequateSecurity;
-  case NGHTTP2_HTTP_1_1_REQUIRED:
-    return ErrorCode::Http11Required;
   default:
-    return ErrorCode::Unknown;
+    return ErrorCode::Other;
   }
 }
 

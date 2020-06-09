@@ -729,7 +729,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onResetStream(Http::St
   handleFailure(envoy::data::core::v3::NETWORK);
 }
 
-void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onGoAway() {
+void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onGoAway(Http::ErrorCode) {
   ENVOY_CONN_LOG(debug, "connection going away health_flags={}", *client_,
                  HostUtility::healthFlagsToString(*host_));
   // If we have an active health check probe, allow it to complete before closing the connection.

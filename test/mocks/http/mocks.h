@@ -44,7 +44,7 @@ public:
   ~MockConnectionCallbacks() override;
 
   // Http::ConnectionCallbacks
-  MOCK_METHOD(void, onGoAway, ());
+  MOCK_METHOD(void, onGoAway, (ErrorCode error_code));
 };
 
 class MockServerConnectionCallbacks : public ServerConnectionCallbacks,

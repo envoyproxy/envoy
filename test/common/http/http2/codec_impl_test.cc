@@ -305,7 +305,7 @@ TEST_P(Http2CodecImplTest, ShutdownNotice) {
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
   request_encoder_->encodeHeaders(request_headers, true);
 
-  EXPECT_CALL(client_callbacks_, onGoAway());
+  EXPECT_CALL(client_callbacks_, onGoAway(_));
   server_->shutdownNotice();
   server_->goAway();
 
@@ -1445,7 +1445,7 @@ TEST_P(Http2CodecImplTest, LargeRequestHeadersExceedPerHeaderLimit) {
   request_headers.addCopy("big", long_string);
 
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, _)).Times(0);
-  EXPECT_CALL(client_callbacks_, onGoAway());
+  EXPECT_CALL(client_callbacks_, onGoAway(_));
   server_->shutdownNotice();
   server_->goAway();
   request_encoder_->encodeHeaders(request_headers, true);

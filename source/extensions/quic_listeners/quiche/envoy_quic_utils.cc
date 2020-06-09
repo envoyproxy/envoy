@@ -90,6 +90,15 @@ Http::StreamResetReason quicErrorCodeToEnvoyResetReason(quic::QuicErrorCode erro
   }
 }
 
+Http::ErrorCode quicErrorCodeToEnvoyErrorCode(quic::QuicErrorCode error) {
+  switch (error) {
+  case quic::QUIC_NO_ERROR:
+    return Http::ErrorCode::NoError;
+  default:
+    return Http::ErrorCode::Other;
+  }
+}
+
 Network::ConnectionSocketPtr
 createConnectionSocket(Network::Address::InstanceConstSharedPtr& peer_addr,
                        Network::Address::InstanceConstSharedPtr& local_addr,

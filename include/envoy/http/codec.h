@@ -38,20 +38,7 @@ class Stream;
 
 enum class ErrorCode {
   NoError,
-  ProtocolError,
-  InternalError,
-  FlowControlError,
-  SettingsTimeout,
-  StreamClosed,
-  FrameSizeError,
-  RefusedStream,
-  Cancel,
-  CompressionError,
-  ConnectError,
-  EnhanceYourCalm,
-  InadequateSecurity,
-  Http11Required,
-  Unknown, 
+  Other,
 };
 
 /**
