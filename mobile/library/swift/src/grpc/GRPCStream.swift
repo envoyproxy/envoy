@@ -17,6 +17,7 @@ public final class GRPCStream: NSObject {
   /// - parameter underlyingStream: The underlying stream to use for sending data.
   required init(underlyingStream: Stream) {
     self.underlyingStream = underlyingStream
+    super.init()
   }
 
   // MARK: - Public

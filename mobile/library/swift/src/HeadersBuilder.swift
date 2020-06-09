@@ -73,11 +73,12 @@ public class HeadersBuilder: NSObject {
     return self
   }
 
-  /// Instantiate a new builder.
+  /// Initialize a new builder. Subclasses should provide their own public convenience initializers.
   ///
-  /// - parameter headers: The headers to start with.
-  init(headers: [String: [String]]) {
+  /// - parameter headers: The headers with which to start.
+  required init(headers: [String: [String]]) {
     self.headers = headers
+    super.init()
   }
 }
 

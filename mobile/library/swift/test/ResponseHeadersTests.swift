@@ -15,4 +15,11 @@ final class ResponseHeadersTests: XCTestCase {
   func testParsingMissingStatusCodeReturnsNil() {
     XCTAssertNil(ResponseHeaders(headers: [:]).httpStatus)
   }
+
+  func testAddingHttpStatusCode() {
+    let headers = ResponseHeadersBuilder()
+      .addHttpStatus(200)
+      .build()
+    XCTAssertEqual(200, headers.httpStatus)
+  }
 }

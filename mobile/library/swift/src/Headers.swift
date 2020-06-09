@@ -20,6 +20,7 @@ public class Headers: NSObject {
   /// - parameter headers: Headers to set.
   required init(headers: [String: [String]]) {
     self.headers = headers
+    super.init()
   }
 }
 
