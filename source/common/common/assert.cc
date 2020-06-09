@@ -77,15 +77,15 @@ ActionRegistrationPtr setEnvoyBugFailureRecordAction(const std::function<void()>
   return std::make_unique<EnvoyBugRegistrationImpl>(action);
 }
 
-void invokeDebugAssertionFailureRecordAction_ForAssertMacroUseOnly() {
+void invokeDebugAssertionFailureRecordActionForAssertMacroUseOnly() {
   ActionRegistrationImpl::invokeAction();
 }
 
-void invokeEnvoyBugFailureRecordAction_ForEnvoyBugMacroUseOnly() {
+void invokeEnvoyBugFailureRecordActionForEnvoyBugMacroUseOnly() {
   EnvoyBugRegistrationImpl::invokeAction();
 }
 
-bool shouldLogAndInvokeEnvoyBug_ForEnvoyBugMacroUseOnly() {
+bool shouldLogAndInvokeEnvoyBugForEnvoyBugMacroUseOnly() {
   return EnvoyBugRegistrationImpl::shouldLogAndInvoke();
 }
 

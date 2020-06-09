@@ -54,7 +54,7 @@ ActionRegistrationPtr setEnvoyBugFailureRecordAction(const std::function<void()>
  *
  * This should only be called by ASSERT macros in this file.
  */
-void invokeDebugAssertionFailureRecordAction_ForAssertMacroUseOnly();
+void invokeDebugAssertionFailureRecordActionForAssertMacroUseOnly();
 
 /**
  * Invokes the action set by setEnvoyBugFailureRecordAction, or does nothing if
@@ -62,14 +62,14 @@ void invokeDebugAssertionFailureRecordAction_ForAssertMacroUseOnly();
  *
  * This should only be called by ENVOY_BUG macros in this file.
  */
-void invokeEnvoyBugFailureRecordAction_ForEnvoyBugMacroUseOnly();
+void invokeEnvoyBugFailureRecordActionForEnvoyBugMacroUseOnly();
 
 /**
  * Increments power of two counter for EnvoyBugRegistrationImpl.
  *
  * This should only be called by ENVOY_BUG macros in this file.
  */
-bool shouldLogAndInvokeEnvoyBug_ForEnvoyBugMacroUseOnly();
+bool shouldLogAndInvokeEnvoyBugForEnvoyBugMacroUseOnly();
 
 // CONDITION_STR is needed to prevent macros in condition from being expected, which obfuscates
 // the logged failure, e.g., "EAGAIN" vs "11".
@@ -117,9 +117,8 @@ bool shouldLogAndInvokeEnvoyBug_ForEnvoyBugMacroUseOnly();
 
 #if !defined(NDEBUG) // If this is a debug build.
 #define ASSERT_ACTION abort()
-#define ENVOY_BUG_ACTION abort()
 #else // If this is not a debug build, but ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE is defined.
-#define ASSERT_ACTION Envoy::Assert::invokeDebugAssertionFailureRecordAction_ForAssertMacroUseOnly()
+#define ASSERT_ACTION Envoy::Assert::invokeDebugAssertionFailureRecordActionForAssertMacroUseOnly()
 #endif // !defined(NDEBUG)
 
 #define _ASSERT_ORIGINAL(X) _ASSERT_IMPL(X, #X, ASSERT_ACTION, "")
@@ -154,7 +153,6 @@ bool shouldLogAndInvokeEnvoyBug_ForEnvoyBugMacroUseOnly();
 #else
 #define ASSERT _NULL_ASSERT_IMPL
 #define KNOWN_ISSUE_ASSERT _NULL_ASSERT_IMPL
-#define ENVOY_BUG_ACTION Envoy::Assert::invokeEnvoyBugFailureRecordAction_ForEnvoyBugMacroUseOnly()
 #endif // !defined(NDEBUG) || defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
 
 /**
@@ -167,12 +165,18 @@ bool shouldLogAndInvokeEnvoyBug_ForEnvoyBugMacroUseOnly();
     abort();                                                                                       \
   } while (false)
 
+#if !defined(NDEBUG)
+#define ENVOY_BUG_ACTION abort()
+#else
+#define ENVOY_BUG_ACTION Envoy::Assert::invokeEnvoyBugFailureRecordActionForEnvoyBugMacroUseOnly()
+#endif
+
 // CONDITION_STR is needed to prevent macros in condition from being expected, which obfuscates
 // the logged failure, e.g., "EAGAIN" vs "11".
 // ENVOY_BUG logging and actions are invoked only on power-of-two instances.
 #define _ENVOY_BUG_IMPL(CONDITION, CONDITION_STR, ACTION, DETAILS)                                 \
   do {                                                                                             \
-    if (!(CONDITION) && Envoy::Assert::shouldLogAndInvokeEnvoyBug_ForEnvoyBugMacroUseOnly()) {     \
+    if (!(CONDITION) && Envoy::Assert::shouldLogAndInvokeEnvoyBugForEnvoyBugMacroUseOnly()) {      \
       const std::string& details = (DETAILS);                                                      \
       ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::envoy_bug), error,    \
                           "envoy bug failure: {}.{}{}", CONDITION_STR,                             \
