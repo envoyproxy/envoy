@@ -19,6 +19,7 @@ import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
 import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -281,13 +282,15 @@ message HttpConnectionManager {
 
   // Additional settings for HTTP requests handled by the connection manager. These will be
   // applicable to both HTTP1 and HTTP2 requests.
-  config.core.v3.HttpProtocolOptions common_http_protocol_options = 35;
+  config.core.v3.HttpProtocolOptions common_http_protocol_options = 35
+      [(udpa.annotations.security).configure_for_untrusted_downstream = true];
 
   // Additional HTTP/1 settings that are passed to the HTTP/1 codec.
   config.core.v3.Http1ProtocolOptions http_protocol_options = 8;
 
   // Additional HTTP/2 settings that are passed directly to the HTTP/2 codec.
-  config.core.v3.Http2ProtocolOptions http2_protocol_options = 9;
+  config.core.v3.Http2ProtocolOptions http2_protocol_options = 9
+      [(udpa.annotations.security).configure_for_untrusted_downstream = true];
 
   // An optional override that the connection manager will write to the server
   // header in responses. If not set, the default is *envoy*.
@@ -332,13 +335,15 @@ message HttpConnectionManager {
   //
   // A value of 0 will completely disable the connection manager stream idle
   // timeout, although per-route idle timeout overrides will continue to apply.
-  google.protobuf.Duration stream_idle_timeout = 24;
+  google.protobuf.Duration stream_idle_timeout = 24
+      [(udpa.annotations.security).configure_for_untrusted_downstream = true];
 
   // The amount of time that Envoy will wait for the entire request to be received.
   // The timer is activated when the request is initiated, and is disarmed when the last byte of the
   // request is sent upstream (i.e. all decoding filters have processed the request), OR when the
   // response is initiated. If not specified or set to 0, this timeout is disabled.
-  google.protobuf.Duration request_timeout = 28;
+  google.protobuf.Duration request_timeout = 28
+      [(udpa.annotations.security).configure_for_untrusted_downstream = true];
 
   // The time that Envoy will wait between sending an HTTP/2 “shutdown
   // notification” (GOAWAY frame with max stream ID) and a final GOAWAY frame.
@@ -394,7 +399,8 @@ message HttpConnectionManager {
   // :ref:`config_http_conn_man_headers_x-forwarded-for`,
   // :ref:`config_http_conn_man_headers_x-envoy-internal`, and
   // :ref:`config_http_conn_man_headers_x-envoy-external-address` for more information.
-  google.protobuf.BoolValue use_remote_address = 14;
+  google.protobuf.BoolValue use_remote_address = 14
+      [(udpa.annotations.security).configure_for_untrusted_downstream = true];
 
   // The number of additional ingress proxy hops from the right side of the
   // :ref:`config_http_conn_man_headers_x-forwarded-for` HTTP header to trust when
