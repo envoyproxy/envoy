@@ -131,9 +131,10 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   TCLAP::ValueArg<uint32_t> drain_time_s("", "drain-time-s",
                                          "Hot restart and LDS removal drain time in seconds", false,
                                          600, "uint32_t", cmd);
-  TCLAP::ValueArg<std::string> drain_strategy("", "drain-strategy",
-                                           "Hot restart drain sequence behaviour, one of 'gradual' (default) or 'immediate'.",
-                                           false, "gradual", "string", cmd);
+  TCLAP::ValueArg<std::string> drain_strategy(
+      "", "drain-strategy",
+      "Hot restart drain sequence behaviour, one of 'gradual' (default) or 'immediate'.", false,
+      "gradual", "string", cmd);
   TCLAP::ValueArg<uint32_t> parent_shutdown_time_s("", "parent-shutdown-time-s",
                                                    "Hot restart parent shutdown time in seconds",
                                                    false, 900, "uint32_t", cmd);
@@ -265,10 +266,13 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   drain_time_ = std::chrono::seconds(drain_time_s.getValue());
   parent_shutdown_time_ = std::chrono::seconds(parent_shutdown_time_s.getValue());
 
-  if (drain_strategy.getValue() == "immediate") drain_strategy_ = Server::DrainStrategy::Immediate;
-  else if (drain_strategy.getValue() == "gradual") drain_strategy_ = Server::DrainStrategy::Gradual;
+  if (drain_strategy.getValue() == "immediate")
+    drain_strategy_ = Server::DrainStrategy::Immediate;
+  else if (drain_strategy.getValue() == "gradual")
+    drain_strategy_ = Server::DrainStrategy::Gradual;
   else {
-    throw MalformedArgvException(fmt::format("error: unknown drain-strategy '{}'", mode.getValue()));
+    throw MalformedArgvException(
+        fmt::format("error: unknown drain-strategy '{}'", mode.getValue()));
   }
 
   if (hot_restart_version_option.getValue()) {
@@ -378,8 +382,8 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
   command_line_options->mutable_drain_time()->MergeFrom(
       Protobuf::util::TimeUtil::SecondsToDuration(drainTime().count()));
   command_line_options->set_drain_strategy(drainStrategy() == Server::DrainStrategy::Immediate
-      ?  envoy::admin::v3::CommandLineOptions::Immediate
-      :  envoy::admin::v3::CommandLineOptions::Gradual);
+                                               ? envoy::admin::v3::CommandLineOptions::Immediate
+                                               : envoy::admin::v3::CommandLineOptions::Gradual);
   command_line_options->mutable_parent_shutdown_time()->MergeFrom(
       Protobuf::util::TimeUtil::SecondsToDuration(parentShutdownTime().count()));
 
