@@ -9,7 +9,7 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_alarm_factory.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_connection_helper.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_dispatcher.h"
-#include "extensions/quic_listeners/quiche/envoy_quic_fake_proof_source.h"
+#include "extensions/quic_listeners/quiche/envoy_quic_proof_source.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_packet_writer.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
 
@@ -33,6 +33,20 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
                                        const quic::QuicConfig& quic_config,
                                        Network::Socket::OptionsSharedPtr options,
                                        const envoy::config::core::v3::RuntimeFeatureFlag& enabled)
+    : ActiveQuicListener(dispatcher, parent, listen_socket, listener_config, quic_config,
+                         std::move(options),
+                         std::make_unique<EnvoyQuicProofSource>(
+                             listen_socket, listener_config.filterChainManager()),
+                         enabled) {}
+
+ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
+                                       Network::ConnectionHandler& parent,
+                                       Network::SocketSharedPtr listen_socket,
+                                       Network::ListenerConfig& listener_config,
+                                       const quic::QuicConfig& quic_config,
+                                       Network::Socket::OptionsSharedPtr options,
+                                       std::unique_ptr<quic::ProofSource> proof_source,
+                                       const envoy::config::core::v3::RuntimeFeatureFlag& enabled)
     : Server::ConnectionHandlerImpl::ActiveListenerImplBase(parent, &listener_config),
       dispatcher_(dispatcher), version_manager_(quic::CurrentSupportedVersions()),
       listen_socket_(*listen_socket), enabled_(enabled, Runtime::LoaderSingleton::get()) {
@@ -51,8 +65,7 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
   random->RandBytes(random_seed_, sizeof(random_seed_));
   crypto_config_ = std::make_unique<quic::QuicCryptoServerConfig>(
       quiche::QuicheStringPiece(reinterpret_cast<char*>(random_seed_), sizeof(random_seed_)),
-      quic::QuicRandom::GetInstance(), std::make_unique<EnvoyQuicFakeProofSource>(),
-      quic::KeyExchangeSource::Default());
+      quic::QuicRandom::GetInstance(), std::move(proof_source), quic::KeyExchangeSource::Default());
   auto connection_helper = std::make_unique<EnvoyQuicConnectionHelper>(dispatcher_);
   crypto_config_->AddDefaultConfig(random, connection_helper->GetClock(),
                                    quic::QuicCryptoServerConfig::ConfigOptions());
@@ -122,7 +135,6 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
       config.has_idle_timeout() ? DurationUtil::durationToMilliseconds(config.idle_timeout())
                                 : 300000;
   quic_config_.SetIdleNetworkTimeout(
-      quic::QuicTime::Delta::FromMilliseconds(idle_network_timeout_ms),
       quic::QuicTime::Delta::FromMilliseconds(idle_network_timeout_ms));
   int32_t max_time_before_crypto_handshake_ms =
       config.has_crypto_handshake_timeout()
