@@ -993,9 +993,9 @@ TEST_P(AdsIntegrationTestWithRtdsAndSecondaryClusters, Basic) {
 }
 
 // Check if EDS cluster defined in file is loaded before ADS request and used as xDS server
-class AdsClusterV3 : public AdsIntegrationTest {
+class AdsClusterV3Test : public AdsIntegrationTest {
 public:
-  AdsClusterV3() : AdsIntegrationTest(envoy::config::core::v3::ApiVersion::V3) {}
+  AdsClusterV3Test() : AdsIntegrationTest(envoy::config::core::v3::ApiVersion::V3) {}
 
   std::string xdsResourceName(const ProtobufWkt::Any& resource) {
     if (resource.type_url() == Config::getTypeUrl<envoy::config::listener::v3::Listener>(
@@ -1097,11 +1097,11 @@ public:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, AdsClusterV3,
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, AdsClusterV3Test,
                          DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Verify CDS is paused during cluster warming.
-TEST_P(AdsClusterV3, CdsPausedDuringWarming) {
+TEST_P(AdsClusterV3Test, CdsPausedDuringWarming) {
   initialize();
 
   const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(
