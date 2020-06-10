@@ -48,14 +48,11 @@ public:
   }
 
   static bool shouldLogAndInvoke(const char* filename, int line) {
-    absl::Mutex lock;
+    absl::MutexLock lock(&mutex_);
     const auto name = absl::StrCat(filename, ",", line);
 
-    // Get counter and increment.
-    lock.Lock();
     // Increment counter, inserting first if counter does not exist.
     auto counter_value = ++counters_[name];
-    lock.Unlock();
 
     // Check if counter is power of two by its bitwise representation.
     if ((counter_value & (counter_value - 1)) == 0) {
@@ -76,12 +73,14 @@ private:
   // additional actions are registered.
   static std::function<void()> envoy_bug_failure_record_action_;
 
-  static EnvoyBugMap counters_;
+  static absl::Mutex mutex_;
+  static EnvoyBugMap counters_ GUARDED_BY(mutex_);
 };
 
 std::function<void()> ActionRegistrationImpl::debug_assertion_failure_record_action_;
 std::function<void()> EnvoyBugRegistrationImpl::envoy_bug_failure_record_action_;
 EnvoyBugMap EnvoyBugRegistrationImpl::counters_;
+absl::Mutex EnvoyBugRegistrationImpl::mutex_;
 
 ActionRegistrationPtr setDebugAssertionFailureRecordAction(const std::function<void()>& action) {
   return std::make_unique<ActionRegistrationImpl>(action);
