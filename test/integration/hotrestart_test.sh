@@ -89,7 +89,7 @@ function run_testsuite() {
   run_in_background_saving_pid "${ENVOY_BIN}" -c "${HOT_RESTART_JSON}" \
       --restart-epoch 0  --use-dynamic-base-id --base-id-path "${BASE_ID_PATH}" \
       --service-cluster cluster --service-node node --use-fake-symbol-table "$FAKE_SYMBOL_TABLE" \
-      --admin-address-path "${ADMIN_ADDRESS_PATH_0}"
+      --admin-address-path "${ADMIN_ADDRESS_PATH_0}" --drain-time-s 2
 
   local BASE_ID=$(cat "${BASE_ID_PATH}")
   while [ -z "${BASE_ID}" ]; do
@@ -100,7 +100,7 @@ function run_testsuite() {
 
   echo "Selected dynamic base id ${BASE_ID}"
 
-  FIRST_SERVER_PID=$BACKGROUND_PID
+  SERVER_0_PID=$BACKGROUND_PID
 
   start_test Updating original config listener addresses
   sleep 3
@@ -112,8 +112,8 @@ function run_testsuite() {
   # Send SIGUSR1 signal to the first server, this should not kill it. Also send SIGHUP which should
   # get eaten.
   echo "Sending SIGUSR1/SIGHUP to first server"
-  kill -SIGUSR1 ${FIRST_SERVER_PID}
-  kill -SIGHUP ${FIRST_SERVER_PID}
+  kill -SIGUSR1 ${SERVER_0_PID}
+  kill -SIGHUP ${SERVER_0_PID}
   sleep 3
 
   disableHeapCheck
@@ -158,7 +158,7 @@ function run_testsuite() {
       --restart-epoch 1 --base-id "${BASE_ID}" --service-cluster cluster --service-node node \
       --use-fake-symbol-table "$FAKE_SYMBOL_TABLE" --admin-address-path "${ADMIN_ADDRESS_PATH_1}"
 
-  SECOND_SERVER_PID=$BACKGROUND_PID
+  SERVER_1_PID=$BACKGROUND_PID
 
   # Wait for stat flushing
   sleep 7
@@ -174,24 +174,35 @@ function run_testsuite() {
   CONFIG_DIFF=$(diff "${UPDATED_HOT_RESTART_JSON}" "${HOT_RESTART_JSON_1}")
   [[ -z "${CONFIG_DIFF}" ]]
 
+  start_test Checking server.hot_restart_generation 2
+  GENERATION_1=$(curl -sg http://${ADMIN_ADDRESS_1}/stats | grep server.hot_restart_generation)
+  check [ "$GENERATION_1" = "server.hot_restart_generation: 2" ];  
+
   ADMIN_ADDRESS_PATH_2="${TEST_TMPDIR}"/admin.2."${TEST_INDEX}".address
   start_test Starting epoch 2
   run_in_background_saving_pid "${ENVOY_BIN}" -c "${UPDATED_HOT_RESTART_JSON}" \
       --restart-epoch 2  --base-id "${BASE_ID}" --service-cluster cluster --service-node node \
       --use-fake-symbol-table "$FAKE_SYMBOL_TABLE" --admin-address-path "${ADMIN_ADDRESS_PATH_2}"
 
+  sleep 3
+
   # Now wait for the first server to exit.
   start_test Waiting for epoch 0 to finish.
-  echo wait ${FIRST_SERVER_PID}
-  wait ${FIRST_SERVER_PID}
+  echo time wait ${SERVER_0_PID}
+  time wait ${SERVER_0_PID}
   [[ $? == 0 ]]
 
-  sleep 3
-  start_test Checking server.hot_restart_generation 2
-  GENERATION_1=$(curl -sg http://${ADMIN_ADDRESS_1}/stats | grep server.hot_restart_generation)
-  check [ "$GENERATION_1" = "server.hot_restart_generation: 2" ];
+  # This tests that we are retaining the generation count. For most Gauges,
+  # we erase the parent contribution when the parent exits, but 
+  # server.hot_restart_generation is excluded. Commenting out the call to
+  # stat_merger_->retainParentGaugeValue(hot_restart_generation_stat_name_)
+  # in source/server/hot_restarting_child.cc results in this test failing.
+  start_test Checking server.hot_restart_generation 3
+  ADMIN_ADDRESS_2=$(cat "${ADMIN_ADDRESS_PATH_2}")
+  GENERATION_2=$(curl -sg http://${ADMIN_ADDRESS_2}/stats | grep server.hot_restart_generation)
+  check [ "$GENERATION_2" = "server.hot_restart_generation: 3" ];
 
-  THIRD_SERVER_PID=$BACKGROUND_PID
+  SERVER_2_PID=$BACKGROUND_PID
   sleep 3
 
   start_test Checking that listener addresses have not changed
@@ -203,17 +214,17 @@ function run_testsuite() {
 
   #Send SIGUSR1 signal to the second server, this should not kill it
   start_test Sending SIGUSR1 to the second server
-  kill -SIGUSR1 ${SECOND_SERVER_PID}
+  kill -SIGUSR1 ${SERVER_1_PID}
   sleep 3
 
   # Now term the last server, and the other one should exit also.
   start_test Killing and waiting for epoch 2
-  kill ${THIRD_SERVER_PID}
-  wait ${THIRD_SERVER_PID}
+  kill ${SERVER_2_PID}
+  wait ${SERVER_2_PID}
   [[ $? == 0 ]]
 
   start_test Waiting for epoch 1
-  wait ${SECOND_SERVER_PID}
+  wait ${SERVER_1_PID}
   [[ $? == 0 ]]
 }
 
