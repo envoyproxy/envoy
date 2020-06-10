@@ -68,8 +68,8 @@ public:
 
 class ActiveQuicListenerTest : public testing::TestWithParam<Network::Address::IpVersion> {
 protected:
-  using Socket = Network::NetworkListenSocket<
-      Network::NetworkSocketTrait<Network::Address::SocketType::Datagram>>;
+  using Socket =
+      Network::NetworkListenSocket<Network::NetworkSocketTrait<Network::Socket::Type::Datagram>>;
 
   ActiveQuicListenerTest()
       : version_(GetParam()), api_(Api::createApiForTest(simulated_time_system_)),

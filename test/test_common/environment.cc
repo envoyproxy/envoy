@@ -194,30 +194,6 @@ std::string TestEnvironment::getCheckedEnvVar(const std::string& var) {
   return optional.value();
 }
 
-std::string TestEnvironment::chooseBaseId(uint64_t test_base_id) {
-  ASSERT(test_base_id >= 1);
-  ASSERT(test_base_id <= 1L << 44); // Leave room to multiple by 1000000.
-
-  test_base_id *= 1000000;
-
-  auto test_random_seed = TestEnvironment::getOptionalEnvVar("TEST_RANDOM_SEED");
-  auto test_shard_index = TestEnvironment::getOptionalEnvVar("TEST_SHARD_INDEX");
-
-  if (test_random_seed) {
-    int mutator = 0;
-    if (absl::SimpleAtoi(test_random_seed.value(), &mutator)) {
-      test_base_id += mutator;
-    }
-  } else if (test_shard_index) {
-    int mutator = 0;
-    if (absl::SimpleAtoi(test_shard_index.value(), &mutator)) {
-      test_base_id += mutator;
-    }
-  }
-
-  return absl::StrFormat("%d", test_base_id);
-}
-
 void TestEnvironment::initializeTestMain(char* program_name) {
 #ifdef WIN32
   _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
@@ -267,10 +243,12 @@ std::vector<Network::Address::IpVersion> TestEnvironment::getIpVersionsForTest()
     if (TestEnvironment::shouldRunTestForIpVersion(version)) {
       parameters.push_back(version);
       if (!Network::Test::supportsIpVersion(version)) {
-        ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::testing), warn,
-                            "Testing with IP{} addresses may not be supported on this machine. If "
-                            "testing fails, set the environment variable ENVOY_IP_TEST_VERSIONS.",
-                            Network::Test::addressVersionAsString(version));
+        const auto version_string = Network::Test::addressVersionAsString(version);
+        ENVOY_LOG_TO_LOGGER(
+            Logger::Registry::getLog(Logger::Id::testing), warn,
+            "Testing with IP{} addresses may not be supported on this machine. If "
+            "testing fails, set the environment variable ENVOY_IP_TEST_VERSIONS to 'v{}only'.",
+            version_string, version_string);
       }
     }
   }
@@ -285,6 +263,14 @@ Server::Options& TestEnvironment::getOptions() {
 
 const std::string& TestEnvironment::temporaryDirectory() {
   CONSTRUCT_ON_FIRST_USE(std::string, getTemporaryDirectory());
+}
+
+const std::string& TestEnvironment::nullDevicePath() {
+#ifdef WIN32
+  CONSTRUCT_ON_FIRST_USE(std::string, "NUL");
+#else
+  CONSTRUCT_ON_FIRST_USE(std::string, "/dev/null");
+#endif
 }
 
 std::string TestEnvironment::runfilesDirectory(const std::string& workspace) {
@@ -314,6 +300,10 @@ std::string TestEnvironment::substitute(const std::string& str,
     const std::regex port_regex("\\{\\{ " + it.first + " \\}\\}");
     out_json_string = std::regex_replace(out_json_string, port_regex, it.second);
   }
+
+  // Substitute platform specific null device.
+  const std::regex null_device_regex(R"(\{\{ null_device_path \}\})");
+  out_json_string = std::regex_replace(out_json_string, null_device_regex, nullDevicePath());
 
   // Substitute IP loopback addresses.
   const std::regex loopback_address_regex(R"(\{\{ ip_loopback_address \}\})");

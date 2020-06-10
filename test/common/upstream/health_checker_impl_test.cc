@@ -4487,6 +4487,66 @@ TEST_F(GrpcHealthCheckerImplTest, DontReuseConnectionBetweenChecks) {
   expectHostHealthy(true);
 }
 
+// Test that we close connections when a timeout occurs and reuse_connection is false.
+TEST_F(GrpcHealthCheckerImplTest, DontReuseConnectionTimeout) {
+  setupNoReuseConnectionHC();
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+
+  expectSessionCreate();
+  expectHealthcheckStart(0);
+  EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
+  health_checker_->start();
+
+  expectHealthcheckStop(0);
+  // Timeouts are considered network failures and make host unhealthy also after 2nd event.
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::ChangePending));
+  test_sessions_[0]->timeout_timer_->invokeCallback();
+  expectHostHealthy(true);
+
+  // A new client is created because we close the connection
+  // when a timeout occurs and connection reuse is disabled.
+  expectClientCreate(0);
+  expectHealthcheckStart(0);
+  test_sessions_[0]->interval_timer_->invokeCallback();
+
+  expectHealthcheckStop(0);
+  // Test host state haven't changed.
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+  respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
+  expectHostHealthy(true);
+}
+
+// Test that we close connections when a stream reset occurs and reuse_connection is false.
+TEST_F(GrpcHealthCheckerImplTest, DontReuseConnectionStreamReset) {
+  setupNoReuseConnectionHC();
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+
+  expectSessionCreate();
+  expectHealthcheckStart(0);
+  EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
+  health_checker_->start();
+
+  expectHealthcheckStop(0);
+  // Resets are considered network failures and make host unhealthy also after 2nd event.
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::ChangePending));
+  test_sessions_[0]->request_encoder_.stream_.resetStream(Http::StreamResetReason::RemoteReset);
+  expectHostHealthy(true);
+
+  // A new client is created because we close the connection
+  // when a stream reset occurs and connection reuse is disabled.
+  expectClientCreate(0);
+  expectHealthcheckStart(0);
+  test_sessions_[0]->interval_timer_->invokeCallback();
+
+  expectHealthcheckStop(0);
+  // Test host state haven't changed.
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+  respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
+  expectHostHealthy(true);
+}
+
 // Test UNKNOWN health status is considered unhealthy.
 TEST_F(GrpcHealthCheckerImplTest, GrpcFailUnknown) {
   setupHC();
