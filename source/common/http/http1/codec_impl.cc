@@ -34,6 +34,7 @@ struct Http1ResponseCodeDetailValues {
   const absl::string_view ConnectionHeaderSanitization = "http1.connection_header_rejected";
   const absl::string_view InvalidUrl = "http1.invalid_url";
   const absl::string_view InvalidTransferEncoding = "http1.invalid_transfer_encoding";
+  const absl::string_view BodyDisallowed = "http1.body_disallowed";
   const absl::string_view TransferEncodingNotAllowed = "http1.transfer_encoding_not_allowed";
   const absl::string_view ContentLengthNotAllowed = "http1.content_length_not_allowed";
 };
@@ -669,16 +670,30 @@ int ConnectionImpl::onHeadersCompleteBase() {
     }
   }
   if (parser_.method == HTTP_CONNECT) {
+    if (request_or_response_headers.ContentLength()) {
+      if (request_or_response_headers.getContentLengthValue() == "0") {
+        request_or_response_headers.removeContentLength();
+      } else {
+        // Per https://tools.ietf.org/html/rfc7231#section-4.3.6 a payload with a
+        // CONNECT request has no defined semantics, and may be rejected.
+        error_code_ = Http::Code::BadRequest;
+        sendProtocolError(Http1ResponseCodeDetails::get().BodyDisallowed);
+        throw CodecProtocolException("http/1.1 protocol error: unsupported content length");
+      }
+    }
     ENVOY_CONN_LOG(trace, "codec entering upgrade mode for CONNECT request.", connection_);
     handling_upgrade_ = true;
   }
 
   // Per https://tools.ietf.org/html/rfc7230#section-3.3.1 Envoy should reject
   // transfer-codings it does not understand.
+  // Per https://tools.ietf.org/html/rfc7231#section-4.3.6 a payload with a
+  // CONNECT request has no defined semantics, and may be rejected.
   if (request_or_response_headers.TransferEncoding()) {
     const absl::string_view encoding = request_or_response_headers.getTransferEncodingValue();
-    if (reject_unsupported_transfer_encodings_ &&
-        !absl::EqualsIgnoreCase(encoding, Headers::get().TransferEncodingValues.Chunked)) {
+    if ((reject_unsupported_transfer_encodings_ &&
+         !absl::EqualsIgnoreCase(encoding, Headers::get().TransferEncodingValues.Chunked)) ||
+        parser_.method == HTTP_CONNECT) {
       error_code_ = Http::Code::NotImplemented;
       sendProtocolError(Http1ResponseCodeDetails::get().InvalidTransferEncoding);
       throw CodecProtocolException("http/1.1 protocol error: unsupported transfer encoding");

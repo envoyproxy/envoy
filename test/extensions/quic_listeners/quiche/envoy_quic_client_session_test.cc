@@ -16,6 +16,7 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_connection_helper.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_alarm_factory.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
+#include "test/extensions/quic_listeners/quiche/test_utils.h"
 
 #include "envoy/stats/stats_macros.h"
 #include "test/mocks/event/mocks.h"
@@ -62,9 +63,9 @@ public:
   TestQuicCryptoClientStream(const quic::QuicServerId& server_id, quic::QuicSession* session,
                              std::unique_ptr<quic::ProofVerifyContext> verify_context,
                              quic::QuicCryptoClientConfig* crypto_config,
-                             ProofHandler* proof_handler)
+                             ProofHandler* proof_handler, bool has_application_state)
       : quic::QuicCryptoClientStream(server_id, session, std::move(verify_context), crypto_config,
-                                     proof_handler) {}
+                                     proof_handler, has_application_state) {}
 
   bool encryption_established() const override { return true; }
 };
@@ -84,7 +85,7 @@ public:
   std::unique_ptr<quic::QuicCryptoClientStreamBase> CreateQuicCryptoStream() override {
     return std::make_unique<TestQuicCryptoClientStream>(
         server_id(), this, crypto_config()->proof_verifier()->CreateDefaultContext(),
-        crypto_config(), this);
+        crypto_config(), this, true);
   }
 };
 
@@ -122,6 +123,8 @@ public:
 
   void SetUp() override {
     envoy_quic_session_.Initialize();
+    setQuicConfigWithDefaultValues(envoy_quic_session_.config());
+    envoy_quic_session_.OnConfigNegotiated();
     envoy_quic_session_.addConnectionCallbacks(network_connection_callbacks_);
     envoy_quic_session_.setConnectionStats(
         {read_total_, read_current_, write_total_, write_current_, nullptr, nullptr});
