@@ -26,6 +26,13 @@ using GrpcAltsCredentialsOptionsPtr =
 
 namespace {
 
+void grpc_alts_set_rpc_protocol_versions(grpc_gcp_rpc_protocol_versions* rpc_versions) {
+  grpc_gcp_rpc_protocol_versions_set_max(rpc_versions, GRPC_PROTOCOL_VERSION_MAX_MAJOR,
+                                         GRPC_PROTOCOL_VERSION_MAX_MINOR);
+  grpc_gcp_rpc_protocol_versions_set_min(rpc_versions, GRPC_PROTOCOL_VERSION_MIN_MAJOR,
+                                         GRPC_PROTOCOL_VERSION_MIN_MINOR);
+}
+
 // Returns true if the peer's service account is found in peers, otherwise
 // returns false and fills out err with an error message.
 bool doValidate(const tsi_peer& peer, const std::unordered_set<std::string>& peers,
@@ -108,6 +115,7 @@ Network::TransportSocketFactoryPtr createTransportSocketFactoryHelper(
     } else {
       options = GrpcAltsCredentialsOptionsPtr(grpc_alts_credentials_server_options_create());
     }
+    grpc_alts_set_rpc_protocol_versions(&options->rpc_versions);
     const char* target_name = is_upstream ? "" : nullptr;
     tsi_handshaker* handshaker = nullptr;
     // Specifying target name as empty since TSI won't take care of validating peer identity
