@@ -41,10 +41,11 @@ void initFancyGlobalEpoch() {
 
 /**
  * Find the file info in the linked list, return null if not found.
+ * Should run in a locked session.
  */
 const FancyLogInfo* findFancyInfo(FancyLogInfo* list, std::string file) {
     const FancyLogInfo* cur = list;
-    absl::MutexLock l(&fancy_log_lock__);
+    // absl::MutexLock l(&fancy_log_lock__);
     for( ; cur != nullptr; cur = cur->next) {
         if (cur->file == file) {
             break;
@@ -67,39 +68,37 @@ const char* LOG_PATTERN = "[%Y-%m-%d %T.%e][%t][%l][%n] %v";
  * 2. else, update the local logger with global linked list.
  */
 spdlog::logger getFancyLogger(const char* file, int* local_epoch, level_enum** local_level) {
-    // printf("%s: epoch = %d, level = %d\n", file, *local_epoch, static_cast<int>(**local_level));
-
     spdlog::logger flogger("Anonymous", getFancySink());
     if (!global_epoch__) {
         initFancyGlobalEpoch();
     }
-    const FancyLogInfo* entry = findFancyInfo(fancy_log_list__, file);
-    if (!entry) {
-        // printf(" - Creating a new entry ...\n");
-        FancyLogInfo* new_entry = new FancyLogInfo;
-        new_entry->file = std::string(file);
-        new_entry->level = level_enum::info;
-
+    if (*local_epoch < global_epoch__->load()) {
+        printf(" - Slow path!\n");
         fancy_log_lock__.Lock();
-        new_entry->next = fancy_log_list__;
-        fancy_log_list__ = new_entry;
-        fancy_log_lock__.Unlock();
+        const FancyLogInfo* entry = findFancyInfo(fancy_log_list__, file);
+        if (!entry) {
+            FancyLogInfo* new_entry = new FancyLogInfo;
+            new_entry->file = std::string(file);
+            new_entry->level = level_enum::info;
+            new_entry->next = fancy_log_list__;
+            fancy_log_list__ = new_entry;
 
-        // initialize local epoch & local level of the first site of file
-        *local_epoch = 0;
-        *local_level = &new_entry->level;
-    }
-    else if (*local_epoch < global_epoch__->load()) {
-        // printf(" - Updating existing entry ...\n");
-        *local_epoch = global_epoch__->load();
-        *local_level = &entry->level;
+            // initialize local epoch & local level of the first site of file
+            *local_epoch = 0;
+            *local_level = &new_entry->level;
+        }
+        else if (*local_epoch < global_epoch__->load()) {
+            *local_epoch = global_epoch__->load();
+            *local_level = &entry->level;
+        }
+        fancy_log_lock__.Unlock();
     }
 
     flogger.set_level(**local_level);
     flogger.set_pattern(LOG_PATTERN);
     flogger.flush_on(level_enum::critical);
-    printf(" Return: global epoch = %d, local epoch = %d, logger level = %d\n", \
-        global_epoch__->load(), *local_epoch, flogger.level());
+    // printf(" Return: global epoch = %d, local epoch = %d, logger level = %d\n", \
+        // global_epoch__->load(), *local_epoch, flogger.level());
     return static_cast<spdlog::logger>(flogger);
 }
 
@@ -107,6 +106,7 @@ spdlog::logger getFancyLogger(const char* file, int* local_epoch, level_enum** l
  * Hook for setting log level.
  */
 int setFancyLogLevel(const char* file, level_enum log_level) {
+    absl::MutexLock l(&fancy_log_lock__);
     int new_epoch = 0;
     if (!global_epoch__) {
         initFancyGlobalEpoch();
@@ -116,23 +116,18 @@ int setFancyLogLevel(const char* file, level_enum log_level) {
         global_epoch__->store(new_epoch);
     }
 
-    printf("Setting Fancy Log Level: \n");
+    // printf("Setting Fancy Log Level... \n");
     const FancyLogInfo* entry = findFancyInfo(fancy_log_list__, file);
     if (!entry) {
-        // printf(" - Creating a new entry here...\n");
         FancyLogInfo* new_entry = new FancyLogInfo;
         new_entry->file = std::string(file);
         new_entry->level = log_level;
-        fancy_log_lock__.Lock();
         new_entry->next = fancy_log_list__;
         fancy_log_list__ = new_entry;
     }
     else {
-        // printf(" - Modify existing entry ...\n");
-        fancy_log_lock__.Lock();
         entry->level = log_level;
     }
-    fancy_log_lock__.Unlock();
 
     return new_epoch;
 }
