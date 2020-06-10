@@ -683,7 +683,7 @@ int ConnectionImpl::onHeadersCompleteBase() {
   if (request_or_response_headers.TransferEncoding()) {
     const absl::string_view encoding = request_or_response_headers.getTransferEncodingValue();
     if ((reject_unsupported_transfer_encodings_ &&
-        !absl::EqualsIgnoreCase(encoding, Headers::get().TransferEncodingValues.Chunked)) ||
+         !absl::EqualsIgnoreCase(encoding, Headers::get().TransferEncodingValues.Chunked)) ||
         parser_.method == HTTP_CONNECT) {
       error_code_ = Http::Code::NotImplemented;
       sendProtocolError(Http1ResponseCodeDetails::get().InvalidTransferEncoding);
