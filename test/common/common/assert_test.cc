@@ -43,7 +43,6 @@ TEST(AssertDeathTest, VariousLogs) {
 }
 
 TEST(EnvoyBugDeathTest, VariousLogs) {
-  int expected_counted_failures;
   int envoy_bug_fail_count = 0;
   // ENVOY_BUG actions only occur on power of two counts.
   auto envoy_bug_action_registration =
@@ -54,17 +53,20 @@ TEST(EnvoyBugDeathTest, VariousLogs) {
   EXPECT_DEATH({ ENVOY_BUG(false, ""); }, ".*envoy bug failure: false.*");
   EXPECT_DEATH({ ENVOY_BUG(false, "With some logs"); },
                ".*envoy bug failure: false. Details: With some logs.*");
-  expected_counted_failures = 0;
+  EXPECT_EQ(0, envoy_bug_fail_count);
 #else
+  // Same log lines trigger exponential back-off.
+  for (int i = 0; i < 4; i++) {
+    ENVOY_BUG(false, "");
+  }
+  EXPECT_EQ(3, envoy_bug_fail_count);
+
+  // Different log lines have separate counters for exponential back-off.
   EXPECT_LOG_CONTAINS("error", "envoy bug failure: false", ENVOY_BUG(false, ""));
-  EXPECT_LOG_CONTAINS("error", "envoy bug failure: false", ENVOY_BUG(false, ""));
-  // Logging only occurs on power of two instances.
-  EXPECT_NO_LOGS(ENVOY_BUG(false, ""));
   EXPECT_LOG_CONTAINS("error", "envoy bug failure: false. Details: With some logs",
                       ENVOY_BUG(false, "With some logs"));
-  expected_counted_failures = 3;
+  EXPECT_EQ(5, envoy_bug_fail_count);
 #endif
-  EXPECT_EQ(expected_counted_failures, envoy_bug_fail_count);
 }
 
 } // namespace Envoy

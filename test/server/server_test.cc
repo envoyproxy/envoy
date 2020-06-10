@@ -475,13 +475,14 @@ TEST_P(ServerInstanceImplTest, Stats) {
 
 // The ENVOY_BUG stat works in release mode.
 #if defined(NDEBUG)
-  ENVOY_BUG(false, "Testing envoy bug assertion failure detection in release build.");
-  EXPECT_EQ(1L, TestUtility::findCounter(stats_store_, "server.envoy_bug_failures")->value());
-  // Test power of two increments.
+  // Test exponential back-off on a fixed line ENVOY_BUG.
   for (int i = 0; i < 16; i++) {
     ENVOY_BUG(false, "");
   }
   EXPECT_EQ(5L, TestUtility::findCounter(stats_store_, "server.envoy_bug_failures")->value());
+  // Another ENVOY_BUG increments the counter.
+  ENVOY_BUG(false, "Testing envoy bug assertion failure detection in release build.");
+  EXPECT_EQ(6L, TestUtility::findCounter(stats_store_, "server.envoy_bug_failures")->value());
 #else
   // The ENVOY_BUG macro aborts in debug mode.
   EXPECT_DEATH(ENVOY_BUG(false, ""), "");

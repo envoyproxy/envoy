@@ -18,6 +18,7 @@ envoy_cc_library(
     name = "assert_lib",
     srcs = ["assert.cc"],
     hdrs = ["assert.h"],
+    external_deps = ["abseil_base"],
     deps = [":minimal_logger_lib"],
 )
 
