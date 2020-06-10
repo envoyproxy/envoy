@@ -13,8 +13,6 @@
 #include "extensions/transport_sockets/alts/grpc_tsi.h"
 #include "extensions/transport_sockets/alts/tsi_socket.h"
 
-#include "grpc/grpc_security.h"
-
 #include "absl/strings/str_join.h"
 
 namespace Envoy {
