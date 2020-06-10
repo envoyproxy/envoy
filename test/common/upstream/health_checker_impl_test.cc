@@ -4589,7 +4589,26 @@ TEST_F(GrpcHealthCheckerImplTest, GrpcFailUnknownHealthStatus) {
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 }
 
-// Test receiving GOAWAY is handled gracefully while a check is in progress.
+// Test receiving GOAWAY (error) is interpreted as connection close event.
+TEST_F(GrpcHealthCheckerImplTest, GoAwayErrorProbeInProgress) {
+  // FailureType::Network will be issued, it will render host unhealthy only if unhealthy_threshold
+  // is reached.
+  setupHCWithUnhealthyThreshold(1);
+  expectSingleHealthcheck(HealthTransition::Changed);
+  EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _));
+  EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
+
+  // GOAWAY with non-NO_ERROR code will result in a healthcheck failure
+  // and the connection closing.
+  test_sessions_[0]->codec_client_->raiseGoAway(Http::ErrorCode::Other);
+
+  EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
+      Host::HealthFlag::FAILED_ACTIVE_HC));
+  EXPECT_EQ(Host::Health::Unhealthy,
+            cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+}
+
+// Test receiving GOAWAY (no error) is handled gracefully while a check is in progress.
 TEST_F(GrpcHealthCheckerImplTest, GoAwayProbeInProgress) {
   setupHCWithUnhealthyThreshold(/*threshold=*/1);
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
@@ -4602,7 +4621,7 @@ TEST_F(GrpcHealthCheckerImplTest, GoAwayProbeInProgress) {
   expectHealthcheckStop(0);
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
 
-  // GOAWAY during check should be handle gracefully.
+  // GOAWAY with NO_ERROR code during check should be handle gracefully.
   test_sessions_[0]->codec_client_->raiseGoAway(Http::ErrorCode::NoError);
   respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
   expectHostHealthy(true);
@@ -4619,7 +4638,7 @@ TEST_F(GrpcHealthCheckerImplTest, GoAwayProbeInProgress) {
   expectHostHealthy(true);
 }
 
-// Test receiving GOAWAY closes connection after an in progress probe times outs.
+// Test receiving GOAWAY (no error) closes connection after an in progress probe times outs.
 TEST_F(GrpcHealthCheckerImplTest, GoAwayProbeInProgressTimeout) {
   setupHCWithUnhealthyThreshold(/*threshold=*/1);
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
@@ -4654,7 +4673,7 @@ TEST_F(GrpcHealthCheckerImplTest, GoAwayProbeInProgressTimeout) {
   expectHostHealthy(false);
 }
 
-// Test receiving GOAWAY closes connection after an unexpected stream reset.
+// Test receiving GOAWAY (no error) closes connection after an unexpected stream reset.
 TEST_F(GrpcHealthCheckerImplTest, GoAwayProbeInProgressStreamReset) {
   setupHCWithUnhealthyThreshold(/*threshold=*/1);
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
@@ -4689,7 +4708,7 @@ TEST_F(GrpcHealthCheckerImplTest, GoAwayProbeInProgressStreamReset) {
   expectHostHealthy(false);
 }
 
-// Test receiving GOAWAY closes connection after a bad response.
+// Test receiving GOAWAY (no error) closes connection after a bad response.
 TEST_F(GrpcHealthCheckerImplTest, GoAwayProbeInProgressBadResponse) {
   setupHCWithUnhealthyThreshold(/*threshold=*/1);
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
@@ -4726,7 +4745,7 @@ TEST_F(GrpcHealthCheckerImplTest, GoAwayProbeInProgressBadResponse) {
   expectHostHealthy(false);
 }
 
-// Test receiving GOAWAY and a connection close.
+// Test receiving GOAWAY (no error) and a connection close.
 TEST_F(GrpcHealthCheckerImplTest, GoAwayProbeInProgressConnectionClose) {
   setupHCWithUnhealthyThreshold(/*threshold=*/1);
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {

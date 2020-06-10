@@ -730,15 +730,23 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onResetStream(Http::St
   handleFailure(envoy::data::core::v3::NETWORK);
 }
 
-void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onGoAway(Http::ErrorCode) {
+void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onGoAway(Http::ErrorCode error_code) {
   ENVOY_CONN_LOG(debug, "connection going away health_flags={}", *client_,
                  HostUtility::healthFlagsToString(*host_));
-  // If we have an active health check probe, allow it to complete before closing the connection.
-  if (request_encoder_) {
+  // If we have an active health check probe and receive a GOAWAY indicating
+  // graceful shutdown, allow the probe to complete before closing the connection.
+  if (request_encoder_ && error_code == Http::ErrorCode::NoError) {
     received_goaway_ = true;
-  } else {
-    client_->close();
+    return;
   }
+
+  // Even if we have active health check probe, fail it on GOAWAY and schedule new one.
+  if (request_encoder_) {
+    handleFailure(envoy::data::core::v3::NETWORK);
+    expect_reset_ = true;
+    request_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
+  }
+  client_->close();
 }
 
 bool GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::isHealthCheckSucceeded(
