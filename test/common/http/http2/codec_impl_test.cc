@@ -854,7 +854,7 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   EXPECT_EQ(initial_stream_window + 1, client_->getStream(1)->pending_send_data_.length());
 
   // Now create a second stream on the connection.
-  MockStreamDecoder response_decoder2;
+  MockResponseDecoder response_decoder2;
   RequestEncoder* request_encoder2 = &client_->newStream(response_decoder_);
   StreamEncoder* response_encoder2;
   MockStreamCallbacks server_stream_callbacks2;
