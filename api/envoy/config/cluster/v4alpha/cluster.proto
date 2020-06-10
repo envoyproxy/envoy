@@ -591,7 +591,8 @@ message Cluster {
 
   // The :ref:`load balancer type <arch_overview_load_balancing_types>` to use
   // when picking a host in the cluster.
-  LbPolicy lb_policy = 6 [(validate.rules).enum = {defined_only: true}];
+  // [#comment:TODO: Remove enum constraint :ref:`LOAD_BALANCING_POLICY_CONFIG<envoy_api_enum_value_config.cluster.v4alpha.Cluster.LbPolicy.LOAD_BALANCING_POLICY_CONFIG>` when implemented.]
+  LbPolicy lb_policy = 6 [(validate.rules).enum = {defined_only: true not_in: 7}];
 
   // Setting this is required for specifying members of
   // :ref:`STATIC<envoy_api_enum_value_config.cluster.v4alpha.Cluster.DiscoveryType.STATIC>`,
