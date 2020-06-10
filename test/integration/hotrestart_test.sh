@@ -83,8 +83,8 @@ function run_testsuite() {
   echo "Selected dynamic base id path ${BASE_ID_PATH}"
 
   # Now start the real server, hot restart it twice, and shut it all down as a
-  # basic hot restart sanity test. We expect server0 to exit quickly when
-  # server2 starts, and are not relying on timeouts.
+  # basic hot restart sanity test. We expect SERVER_0 to exit quickly when
+  # SERVER_2 starts, and are not relying on timeouts.
   start_test Starting epoch 0
   ADMIN_ADDRESS_PATH_0="${TEST_TMPDIR}"/admin.0."${TEST_INDEX}".address
   run_in_background_saving_pid "${ENVOY_BIN}" -c "${HOT_RESTART_JSON}" \
@@ -153,7 +153,7 @@ function run_testsuite() {
 
   enableHeapCheck
 
-  # For server 1, we set a drain timer, so it exits a few seconds after server 2 starts.
+  # For SERVER_1, we set a drain timer, so it exits a few seconds after SERVER_2 starts.
   start_test Starting epoch 1
   ADMIN_ADDRESS_PATH_1="${TEST_TMPDIR}"/admin.1."${TEST_INDEX}".address
   run_in_background_saving_pid "${ENVOY_BIN}" -c "${UPDATED_HOT_RESTART_JSON}" \
@@ -177,6 +177,12 @@ function run_testsuite() {
   CONFIG_DIFF=$(diff "${UPDATED_HOT_RESTART_JSON}" "${HOT_RESTART_JSON_1}")
   [[ -z "${CONFIG_DIFF}" ]]
 
+  # Send SIGUSR1 signal to the second server, this should not kill it, and
+  # we prove that by checking its stats after having sent it a signal.
+  start_test Sending SIGUSR1 to SERVER_1.
+  kill -SIGUSR1 ${SERVER_1_PID}
+  sleep 3
+
   start_test Checking server.hot_restart_generation 2
   GENERATION_1=$(curl -sg http://${ADMIN_ADDRESS_1}/stats | grep server.hot_restart_generation)
   check [ "$GENERATION_1" = "server.hot_restart_generation: 2" ];
@@ -188,16 +194,18 @@ function run_testsuite() {
       --use-fake-symbol-table "$FAKE_SYMBOL_TABLE" --admin-address-path "${ADMIN_ADDRESS_PATH_2}" \
       --parent-shutdown-time-s 3
 
-  # Now wait for the server0 to exit. It should occur immediately when server2 starts, as
-  # server1 will terminate server0 when it becomes the parent.
+  SERVER_2_PID=$BACKGROUND_PID
+
+  # Now wait for the SERVER_0 to exit. It should occur immediately when SERVER_2 starts, as
+  # SERVER_1 will terminate SERVER_0 when it becomes the parent.
   start_test Waiting for epoch 0 to finish.
   echo time wait ${SERVER_0_PID}
   time wait ${SERVER_0_PID}
   [[ $? == 0 ]]
 
-  # Then wait for the server2 to exit, which should happen within a few seconds
-  # due to '--parent-shutdown-time-s 3' on server2, and '--drain-time-s 2' on
-  # server1.
+  # Then wait for the SERVER_1 to exit, which should happen within a few seconds
+  # due to '--parent-shutdown-time-s 3' on SERVER_2, and '--drain-time-s 2' on
+  # SERVER_1.
   start_test Waiting for epoch 1 to finish.
   echo time wait ${SERVER_1_PID}
   time wait ${SERVER_1_PID}
@@ -214,11 +222,6 @@ function run_testsuite() {
   GENERATION_2=$(curl -sg http://${ADMIN_ADDRESS_2}/stats | grep server.hot_restart_generation)
   check [ "$GENERATION_2" = "server.hot_restart_generation: 3" ];
 
-  sleep 3
-
-  SERVER_2_PID=$BACKGROUND_PID
-  sleep 3
-
   start_test Checking that listener addresses have not changed
   HOT_RESTART_JSON_2="${TEST_TMPDIR}"/hot_restart.2."${TEST_INDEX}".yaml
   "${TEST_SRCDIR}/envoy"/tools/socket_passing "-o" "${UPDATED_HOT_RESTART_JSON}" "-a" "${ADMIN_ADDRESS_PATH_2}" \
@@ -226,19 +229,10 @@ function run_testsuite() {
   CONFIG_DIFF=$(diff "${UPDATED_HOT_RESTART_JSON}" "${HOT_RESTART_JSON_2}")
   [[ -z "${CONFIG_DIFF}" ]]
 
-  #Send SIGUSR1 signal to the second server, this should not kill it
-  start_test Sending SIGUSR1 to the second server
-  kill -SIGUSR1 ${SERVER_1_PID}
-  sleep 3
-
   # Now term the last server, and the other one should exit also.
   start_test Killing and waiting for epoch 2
   kill ${SERVER_2_PID}
   wait ${SERVER_2_PID}
-  [[ $? == 0 ]]
-
-  start_test Waiting for epoch 1
-  wait ${SERVER_1_PID}
   [[ $? == 0 ]]
 }
 
