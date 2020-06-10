@@ -23,7 +23,7 @@ namespace Envoy {
 AdsIntegrationTest::AdsIntegrationTest()
     : HttpIntegrationTest(
           Http::CodecClient::Type::HTTP2, ipVersion(),
-          AdsIntegrationConfig(sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
+          ConfigHelper::adsBootstrap(sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
   use_lds_ = false;
   create_xds_upstream_ = true;
   tls_xds_upstream_ = true;
@@ -115,11 +115,11 @@ AdsIntegrationTest::buildRedisListener(const std::string& name, const std::strin
         - name: redis
           typed_config:
             "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProxy
-            settings: 
+            settings:
               op_timeout: 1s
             stat_prefix: {}
             prefix_routes:
-              catch_all_route: 
+              catch_all_route:
                 cluster: {}
     )EOF",
       name, Network::Test::getLoopbackAddressString(ipVersion()), name, cluster));

@@ -313,7 +313,10 @@ static_resources:
 }
 
 // TODO(#6327) cleaner approach to testing with static config.
+// TODO(fredlas) set_node_on_first_message_only was true; the delta+SotW unification
+//               work restores it here. (moved from ads_integration.h)
 std::string ConfigHelper::adsBootstrap(const std::string& api_type) {
+  // Note: do not use CONSTRUCT_ON_FIRST_USE here!
   return fmt::format(
       R"EOF(
 dynamic_resources:
@@ -323,6 +326,7 @@ dynamic_resources:
     ads: {{}}
   ads_config:
     api_type: {}
+    set_node_on_first_message_only: false
 static_resources:
   clusters:
     name: dummy_cluster
@@ -347,7 +351,7 @@ admin:
       address: 127.0.0.1
       port_value: 0
 )EOF",
-      TestEnvironment::nullDevicePath(), api_type);
+      api_type, TestEnvironment::nullDevicePath());
 }
 
 envoy::config::cluster::v3::Cluster ConfigHelper::buildCluster(const std::string& name, int port,
