@@ -162,7 +162,8 @@ TEST_F(AdmissionControlTest, DisregardHealthChecks) {
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(testing::ReturnRef(stream_info));
   EXPECT_CALL(stream_info, healthCheck()).WillOnce(Return(true));
 
-  // Health checks shouldn't need to know the number of requests for any kind of admission decision.
+  // We do not make admission decisions for health checks, so we expect no lookup of request success
+  // counts.
   EXPECT_CALL(controller_, requestTotalCount()).Times(0);
   EXPECT_CALL(controller_, requestSuccessCount()).Times(0);
 
