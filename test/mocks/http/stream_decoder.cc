@@ -6,9 +6,6 @@ using testing::Invoke;
 namespace Envoy {
 namespace Http {
 
-MockStreamDecoder::MockStreamDecoder() = default;
-MockStreamDecoder::~MockStreamDecoder() = default;
-
 MockRequestDecoder::MockRequestDecoder() {
   ON_CALL(*this, decodeHeaders_(_, _)).WillByDefault(Invoke([](RequestHeaderMapPtr& headers, bool) {
     // Check to see that method is not-null. Path can be null for CONNECT and authority can be null
