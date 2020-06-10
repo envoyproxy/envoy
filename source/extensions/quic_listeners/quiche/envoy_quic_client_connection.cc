@@ -95,6 +95,7 @@ void EnvoyQuicClientConnection::setUpConnectionSocket() {
 void EnvoyQuicClientConnection::switchConnectionSocket(
     Network::ConnectionSocketPtr&& connection_socket) {
   auto writer = std::make_unique<EnvoyQuicPacketWriter>(*connection_socket);
+  file_event_.reset();
   setConnectionSocket(std::move(connection_socket));
   setUpConnectionSocket();
   SetQuicPacketWriter(writer.release(), true);
