@@ -244,8 +244,6 @@ TEST_P(ProxyingConnectIntegrationTest, ProxyConnect) {
   // Also test upstream to downstream data.
   upstream_request_->encodeData(12, false);
   response_->waitForBodyData(12);
-
-  cleanupUpstreamAndDownstream();
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ConnectTerminationIntegrationTest,

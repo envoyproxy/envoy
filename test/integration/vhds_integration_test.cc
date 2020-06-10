@@ -142,8 +142,6 @@ public:
 
   void TearDown() override {
     cleanUpXdsConnection();
-    test_server_.reset();
-    fake_upstreams_.clear();
   }
 
   // Overridden to insert this stuff into the initialize() at the very beginning of
@@ -244,8 +242,6 @@ public:
 
   void TearDown() override {
     cleanUpXdsConnection();
-    test_server_.reset();
-    fake_upstreams_.clear();
   }
 
   std::string virtualHostYaml(const std::string& name, const std::string& domain) {

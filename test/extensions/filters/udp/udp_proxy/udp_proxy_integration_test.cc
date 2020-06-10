@@ -46,14 +46,6 @@ public:
     BaseIntegrationTest::initialize();
   }
 
-  /**
-   *  Destructor for an individual test.
-   */
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
-
   void requestResponseWithListenerAddress(const Network::Address::Instance& listener_address) {
     // Send datagram to be proxied.
     Network::Test::UdpSyncPeer client(version_);

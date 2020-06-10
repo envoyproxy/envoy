@@ -32,8 +32,6 @@ AdsIntegrationTest::AdsIntegrationTest()
 
 void AdsIntegrationTest::TearDown() {
   cleanUpXdsConnection();
-  test_server_.reset();
-  fake_upstreams_.clear();
 }
 
 envoy::config::cluster::v3::Cluster AdsIntegrationTest::buildCluster(const std::string& name) {

@@ -106,8 +106,6 @@ public:
 
   void TearDown() override {
     cleanUpXdsConnection();
-    cleanupUpstreamAndDownstream();
-    codec_client_.reset();
   }
 
   void createSdsStream() {

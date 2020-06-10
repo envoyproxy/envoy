@@ -255,8 +255,6 @@ void HttpIntegrationTest::useAccessLog(absl::string_view format) {
 
 HttpIntegrationTest::~HttpIntegrationTest() {
   cleanupUpstreamAndDownstream();
-  test_server_.reset();
-  fake_upstreams_.clear();
 }
 
 void HttpIntegrationTest::setDownstreamProtocol(Http::CodecClient::Type downstream_protocol) {

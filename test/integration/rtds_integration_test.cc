@@ -77,8 +77,6 @@ public:
 
   void TearDown() override {
     cleanUpXdsConnection();
-    test_server_.reset();
-    fake_upstreams_.clear();
   }
 
   void initialize() override {
@@ -228,7 +226,6 @@ TEST_P(RtdsIntegrationTest, RtdsAfterAsyncPrimaryClusterInitialization) {
   EXPECT_EQ(initial_load_success_ + 1, test_server_->counter("runtime.load_success")->value());
   EXPECT_EQ(initial_keys_ + 1, test_server_->gauge("runtime.num_keys")->value());
   EXPECT_EQ(3, test_server_->gauge("runtime.num_layers")->value());
-  cleanupUpstreamAndDownstream();
 }
 
 } // namespace

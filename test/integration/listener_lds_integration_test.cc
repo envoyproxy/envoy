@@ -34,7 +34,6 @@ protected:
 
   ~ListenerIntegrationTest() override {
     resetConnections();
-    cleanupUpstreamAndDownstream();
   }
 
   void initialize() override {
@@ -258,7 +257,6 @@ TEST_P(ListenerIntegrationTest, BasicSuccess) {
   verifyResponse(std::move(response), "200", response_headers, std::string(response_size, 'a'));
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(request_size, upstream_request_->bodyLength());
-  cleanupUpstreamAndDownstream();
 }
 
 } // namespace

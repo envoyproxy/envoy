@@ -603,8 +603,6 @@ public:
 
   void TearDown() override {
     cleanUpXdsConnection();
-    test_server_.reset();
-    fake_upstreams_.clear();
   }
 
   void initialize() override {
@@ -647,8 +645,6 @@ public:
 
   void TearDown() override {
     cleanUpXdsConnection();
-    test_server_.reset();
-    fake_upstreams_.clear();
   }
 
   void initialize() override {
@@ -812,8 +808,6 @@ public:
 
   void TearDown() override {
     cleanUpXdsConnection();
-    test_server_.reset();
-    fake_upstreams_.clear();
   }
 
   void initialize() override {

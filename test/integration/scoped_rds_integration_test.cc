@@ -34,7 +34,6 @@ protected:
 
   ~ScopedRdsIntegrationTest() override {
     resetConnections();
-    cleanupUpstreamAndDownstream();
   }
 
   void initialize() override {

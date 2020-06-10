@@ -53,9 +53,7 @@ typed_config:
   }
 
   void TearDown() override {
-    test_server_.reset();
     fake_upstream_connection_.reset();
-    fake_upstreams_.clear();
   }
 
 protected:
