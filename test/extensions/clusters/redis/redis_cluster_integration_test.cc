@@ -376,6 +376,14 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, RedisClusterWithAuthIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+INSTANTIATE_TEST_SUITE_P(IpVersions, RedisClusterWithReadPolicyIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, RedisClusterWithRefreshIntegrationTest,
+    testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+    TestUtility::ipTestParamsToString);
+
 // This test sends a simple "get foo" command from a fake
 // downstream client through the proxy to a fake upstream
 // Redis cluster with a single slot with master and replica.
