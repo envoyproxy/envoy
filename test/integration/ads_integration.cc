@@ -39,6 +39,10 @@ void AdsIntegrationTest::TearDown() {
   fake_upstreams_.clear();
 }
 
+bool AdsIntegrationTest::shouldBoost() {
+  return api_version_ == envoy::config::core::v3::ApiVersion::V2 ? true : false;
+}
+
 envoy::config::cluster::v3::Cluster AdsIntegrationTest::buildCluster(const std::string& name) {
   API_NO_BOOST(envoy::config::cluster::v3::Cluster) cluster;
   TestUtility::loadFromYaml(
@@ -54,7 +58,7 @@ envoy::config::cluster::v3::Cluster AdsIntegrationTest::buildCluster(const std::
       http2_protocol_options: {{}}
     )EOF",
                   name, api_version_ == envoy::config::core::v3::ApiVersion::V2 ? "V2" : "V3"),
-      cluster, api_version_ == envoy::config::core::v3::ApiVersion::V2 ? true : false);
+      cluster, shouldBoost());
   return cluster;
 }
 
@@ -72,7 +76,7 @@ envoy::config::cluster::v3::Cluster AdsIntegrationTest::buildRedisCluster(const 
       lb_policy: MAGLEV
     )EOF",
                   name, api_version_ == envoy::config::core::v3::ApiVersion::V2 ? "V2" : "V3"),
-      cluster, api_version_ == envoy::config::core::v3::ApiVersion::V2 ? true : false);
+      cluster, shouldBoost());
   return cluster;
 }
 
@@ -91,8 +95,7 @@ AdsIntegrationTest::buildClusterLoadAssignment(const std::string& name) {
     )EOF",
                                         name, Network::Test::getLoopbackAddressString(ipVersion()),
                                         fake_upstreams_[0]->localAddress()->ip()->port()),
-                            cluster_load_assignment,
-                            api_version_ == envoy::config::core::v3::ApiVersion::V2 ? true : false);
+                            cluster_load_assignment, shouldBoost());
   return cluster_load_assignment;
 }
 
@@ -124,16 +127,15 @@ AdsIntegrationTest::buildListener(const std::string& name, const std::string& ro
     )EOF",
           name, Network::Test::getLoopbackAddressString(ipVersion()), stat_prefix, route_config,
           api_version_ == envoy::config::core::v3::ApiVersion::V2 ? "V2" : "V3"),
-      listener, api_version_ == envoy::config::core::v3::ApiVersion::V2 ? true : false);
+      listener, shouldBoost());
   return listener;
 }
 
 envoy::config::listener::v3::Listener
 AdsIntegrationTest::buildRedisListener(const std::string& name, const std::string& cluster) {
   API_NO_BOOST(envoy::config::listener::v3::Listener) listener;
-  TestUtility::loadFromYaml(
-      fmt::format(
-          R"EOF(
+  TestUtility::loadFromYaml(fmt::format(
+                                R"EOF(
       name: {}
       address:
         socket_address:
@@ -151,8 +153,9 @@ AdsIntegrationTest::buildRedisListener(const std::string& name, const std::strin
               catch_all_route: 
                 cluster: {}
     )EOF",
-          name, Network::Test::getLoopbackAddressString(ipVersion()), name, cluster),
-      listener, api_version_ == envoy::config::core::v3::ApiVersion::V2 ? true : false);
+                                name, Network::Test::getLoopbackAddressString(ipVersion()), name,
+                                cluster),
+                            listener, shouldBoost());
   return listener;
 }
 
@@ -169,8 +172,7 @@ AdsIntegrationTest::buildRouteConfig(const std::string& name, const std::string&
           route: {{ cluster: {} }}
     )EOF",
                                         name, cluster),
-                            route,
-                            api_version_ == envoy::config::core::v3::ApiVersion::V2 ? true : false);
+                            route, shouldBoost());
   return route;
 }
 
