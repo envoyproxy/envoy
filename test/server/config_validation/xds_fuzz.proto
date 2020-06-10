@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package test.server.config_validation;
+
+// Structured input for xds_fuzz_test.
+message AddListener {
+  string name = 1;
+  string route_config = 2;
+  string version = 3;
+}
+
+message AddRoute {
+  string name = 1;
+  string cluster = 2;
+  string version = 3;
+}
+
+message RemoveListener {
+  string name = 1;
+  string version = 2;
+}
+
+message RemoveRoute {
+  string name = 1;
+  string version = 2;
+}
+
+message Action {
+  oneof action_selector {
+    AddListener add_listener = 1;
+    AddRoute add_route = 2;
+    RemoveListener remove_listener = 3;
+    RemoveRoute remove_route = 4;
+  }
+}
+
+message XdsTestCase {
+  repeated Action actions = 1;
+}
