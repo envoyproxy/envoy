@@ -19,8 +19,8 @@ protected:
   void SetUp() override {
     HazelcastHttpCacheConfig config = HazelcastTestUtil::getTestConfig(GetParam());
     // To test the cache with a real Hazelcast instance, use remote test cache.
-    // cache_ = std::make_unique<RemoteTestCache>(config);
-    cache_ = std::make_unique<LocalTestCache>(config);
+    // cache_ = std::make_unique<HazelcastRemoteTestCache>(config);
+    cache_ = std::make_unique<HazelcastLocalTestCache>(config);
     cache_->start();
     cache_->getTestAccessor().clearMaps();
   }
@@ -145,13 +145,13 @@ TEST_P(HazelcastHttpCacheTest, PrivateResponse) {
 
 TEST_P(HazelcastHttpCacheTest, Miss) {
   LookupContextPtr name_lookup_context = lookup("/no/such/entry");
-  uint64_t variant_hash_key =
-      static_cast<HazelcastLookupContextBase&>(*name_lookup_context).variantHashKey();
+  uint64_t variant_key_hash =
+      static_cast<HazelcastLookupContextBase&>(*name_lookup_context).variantKeyHash();
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 
   // Do not left over a missed lookup without inserting or releasing its lock.
-  // This is required for RemoteTestCache.
-  cache_->unlock(variant_hash_key);
+  // This is required for HazelcastRemoteTestCache.
+  cache_->unlock(variant_key_hash);
 }
 
 TEST_P(HazelcastHttpCacheTest, Fresh) {
@@ -226,13 +226,13 @@ TEST(Registration, GetFactory) {
   {
     // getOfflineCache() call is for testing. It creates a HazelcastHttpCache but does
     // not make it operational until a start() call. This is required to make cacheInfo()
-    // behavior testable when using LocalTestCache.
-    HazelcastHttpCache* cache =
+    // behavior testable when using HazelcastLocalTestCache.
+    HazelcastHttpCachePtr cache =
         static_cast<HazelcastHttpCacheFactory*>(factory)->getOfflineCache(config);
     EXPECT_EQ(cache->cacheInfo().name_, "envoy.extensions.http.cache.hazelcast");
     EXPECT_THROW_WITH_MESSAGE(cache->start(), EnvoyException,
                               "Hazelcast Client could not connect to any cluster.");
-    delete cache;
+    cache.reset();
   }
   EXPECT_THROW_WITH_MESSAGE(factory->getCache(config), EnvoyException,
                             "Hazelcast Client could not connect to any cluster.");

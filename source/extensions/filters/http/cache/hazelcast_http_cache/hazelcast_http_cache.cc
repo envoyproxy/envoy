@@ -19,27 +19,28 @@ HazelcastHttpCache::HazelcastHttpCache(HazelcastHttpCacheConfig config)
       max_body_size_(ConfigUtil::validMaxBodySize(config.max_body_size(), config.unified())),
       cache_config_(config) {}
 
-void HazelcastHttpCache::onMissingBody(uint64_t key, int32_t version, uint64_t body_size) {
+void HazelcastHttpCache::onMissingBody(uint64_t key_hash, int32_t version, uint64_t body_size) {
   try {
-    if (!tryLock(key)) {
-      // Let lock owner context to recover it.
+    if (!tryLock(key_hash)) {
+      // If multiple onMissingBody calls are made for the same key hash simultaneously,
+      // the locking here will allow only one of them to perform clean up.
       return;
     }
-    auto header = getHeader(key);
+    auto header = getHeader(key_hash);
     if (header && header->version() != version) {
       // The missed body does not belong to the looked up header. Probably eviction and then
       // insertion for the header has happened in the meantime. Since new insertion will
       // override the existing bodies, ignore the cleanup and let orphan bodies (belong to
       // evicted header, not overridden) be evicted by TTL as well.
-      unlock(key);
+      unlock(key_hash);
       return;
     }
     int body_count = body_size / body_partition_size_;
     while (body_count >= 0) {
-      accessor_->removeBodyAsync(orderedMapKey(key, body_count--));
+      accessor_->removeBodyAsync(orderedMapKey(key_hash, body_count--));
     }
-    accessor_->removeHeader(mapKey(key));
-    unlock(key);
+    accessor_->removeHeader(mapKey(key_hash));
+    unlock(key_hash);
   } catch (HazelcastClientOfflineException& e) {
     // see DividedInsertContext::insertHeader for left over locks on a connection failure.
     ENVOY_LOG(warn, "Hazelcast Connection is offline!");
@@ -48,8 +49,8 @@ void HazelcastHttpCache::onMissingBody(uint64_t key, int32_t version, uint64_t b
   }
 }
 
-void HazelcastHttpCache::onVersionMismatch(uint64_t key, int32_t version, uint64_t body_size) {
-  onMissingBody(key, version, body_size);
+void HazelcastHttpCache::onVersionMismatch(uint64_t key_hash, int32_t version, uint64_t body_size) {
+  onMissingBody(key_hash, version, body_size);
 }
 
 void HazelcastHttpCache::start() {
@@ -125,7 +126,7 @@ InsertContextPtr HazelcastHttpCache::makeInsertContext(LookupContextPtr&& lookup
 // TODO(enozcan): Implement when it's ready on the filter side.
 //  Depending on the filter's implementation, the cached entry's
 //  variant_key_ must be updated as well. Also, if vary headers
-//  change then the hash key of the response will change and
+//  change then the key hash of the response will change and
 //  updating only header map will not be enough in this case.
 void HazelcastHttpCache::updateHeaders(LookupContextPtr&&, Http::ResponseHeaderMapPtr&&) {
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
@@ -159,14 +160,14 @@ HttpCache& HazelcastHttpCacheFactory::getCache(
   return *cache_;
 }
 
-HazelcastHttpCache* HazelcastHttpCacheFactory::getOfflineCache(
+HazelcastHttpCachePtr HazelcastHttpCacheFactory::getOfflineCache(
     const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& config) {
   if (!cache_) {
     HazelcastHttpCacheConfig hz_cache_config;
     MessageUtil::unpackTo(config.typed_config(), hz_cache_config);
     cache_ = std::make_unique<HazelcastHttpCache>(hz_cache_config);
   }
-  return cache_.release();
+  return std::move(cache_);
 }
 
 static Registry::RegisterFactory<HazelcastHttpCacheFactory, HttpCacheFactory> register_;

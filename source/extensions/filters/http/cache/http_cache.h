@@ -172,7 +172,6 @@ public:
   // storage implementation forwards lookup requests to a remote cache server that supports *vary*
   // headers, that server may need to see these headers. For local implementations, it may be
   // simpler to instead call makeLookupResult with each potential response.
-  HeaderVector& varyHeaders() { return vary_headers_; }
   const HeaderVector& varyHeaders() const { return vary_headers_; }
 
   // Time when this LookupRequest was created (in response to an HTTP request).

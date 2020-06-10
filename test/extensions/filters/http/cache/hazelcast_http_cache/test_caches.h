@@ -28,9 +28,9 @@ public:
  *
  * Requires a running Hazelcast instance to be tested.
  */
-class RemoteTestCache : public HazelcastHttpTestCache {
+class HazelcastRemoteTestCache : public HazelcastHttpTestCache {
 public:
-  RemoteTestCache(HazelcastHttpCacheConfig config) : HazelcastHttpTestCache(std::move(config)) {}
+  HazelcastRemoteTestCache(HazelcastHttpCacheConfig config) : HazelcastHttpTestCache(std::move(config)) {}
 
   void start() override {
     if (accessor_ && accessor_->isRunning()) {
@@ -61,9 +61,9 @@ public:
  * Does not require a running Hazelcast instance. Instead, tests the cache
  * with local storage. This is the way the cache is tested in CI environment.
  */
-class LocalTestCache : public HazelcastHttpTestCache {
+class HazelcastLocalTestCache : public HazelcastHttpTestCache {
 public:
-  LocalTestCache(HazelcastHttpCacheConfig config) : HazelcastHttpTestCache(std::move(config)) {}
+  HazelcastLocalTestCache(HazelcastHttpCacheConfig config) : HazelcastHttpTestCache(std::move(config)) {}
 
   void start() override {
     if (!accessor_) {

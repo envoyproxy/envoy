@@ -17,8 +17,8 @@ class HazelcastUnifiedCacheTest : public HazelcastHttpCacheTestBase {
   void SetUp() override {
     HazelcastHttpCacheConfig config = HazelcastTestUtil::getTestConfig(true);
     // To test the cache with a real Hazelcast instance, use remote test cache.
-    // cache_ = std::make_unique<RemoteTestCache>(config);
-    cache_ = std::make_unique<LocalTestCache>(config);
+    // cache_ = std::make_unique<HazelcastRemoteTestCache>(config);
+    cache_ = std::make_unique<HazelcastLocalTestCache>(config);
     cache_->start();
     cache_->getTestAccessor().clearMaps();
   }
@@ -74,8 +74,8 @@ TEST_F(HazelcastUnifiedCacheTest, MissUnifiedLookupOnDifferentKey) {
   LookupContextPtr lookup_context = lookup(RequestPath);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 
-  uint64_t variant_hash_key =
-      static_cast<HazelcastLookupContextBase&>(*lookup_context).variantHashKey();
+  uint64_t variant_key_hash =
+      static_cast<HazelcastLookupContextBase&>(*lookup_context).variantKeyHash();
 
   const std::string Body("hazelcast");
   insert(move(lookup_context), getResponseHeaders(), Body);
@@ -84,12 +84,12 @@ TEST_F(HazelcastUnifiedCacheTest, MissUnifiedLookupOnDifferentKey) {
 
   // Manipulate the cache entry directly. Cache is not aware of that.
   // The cached key will not be the same with the created one by filter.
-  auto response = cache_->getResponse(variant_hash_key);
+  auto response = cache_->getResponse(variant_key_hash);
   Key modified = response->header().variantKey();
   modified.add_custom_fields("custom1");
   modified.add_custom_fields("custom2");
   response->header().variantKey(std::move(modified));
-  cache_->getTestAccessor().insertResponse(cache_->mapKey(variant_hash_key), *response);
+  cache_->getTestAccessor().insertResponse(mapKey(variant_key_hash), *response);
 
   lookup_context = lookup(RequestPath);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);

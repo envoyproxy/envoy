@@ -20,7 +20,7 @@ public:
   void getTrailers(LookupTrailersCallback&&) override;
 
   const Key& variantKey() const { return lookup_request_.key(); }
-  uint64_t variantHashKey() const { return variant_hash_key_; }
+  uint64_t variantKeyHash() const { return variant_key_hash_; }
   bool isAborted() const { return abort_insertion_; }
 
 protected:
@@ -32,7 +32,7 @@ protected:
 
   /** Hash key aware of vary headers. Lookup to header and response entry is performed using this
    * key. */
-  uint64_t variant_hash_key_;
+  uint64_t variant_key_hash_;
 
   /** Flag to notice insert context created for this lookup */
   bool abort_insertion_ = false;
@@ -47,7 +47,7 @@ private:
    * headers. Rather than storing multiple responses with the same key and
    * then querying them according to vary headers, a different key for each
    * response including vary headers in custom fields is created here. Hence
-   * responses can be found by their <variant_hash> directly without querying.
+   * responses can be found by their <variant_key_hash> directly without querying.
    *
    * @param raw_key     Key to be modified created by the filter.
    */
@@ -84,7 +84,7 @@ protected:
   bool committed_end_stream_ = false;
 
   // Derived from lookup context
-  const uint64_t variant_hash_key_;
+  const uint64_t variant_key_hash_;
   Key variant_key_;
   const bool abort_insertion_;
 

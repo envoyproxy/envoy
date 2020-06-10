@@ -26,8 +26,8 @@ public:
   virtual int bodyMapSize() PURE;
   virtual int responseMapSize() PURE;
 
-  virtual void insertResponse(int64_t key, const HazelcastResponseEntry& entry) PURE;
-  virtual void removeBody(const std::string& key) PURE;
+  virtual void insertResponse(int64_t map_key, const HazelcastResponseEntry& entry) PURE;
+  virtual void removeBody(const std::string& map_key) PURE;
 
   virtual void failOnLock() PURE;
 
@@ -61,10 +61,10 @@ public:
 
   int responseMapSize() override { return getResponseMap().size(); }
 
-  void removeBody(const std::string& key) override { getBodyMap().remove(key); }
+  void removeBody(const std::string& map_key) override { getBodyMap().remove(map_key); }
 
-  void insertResponse(int64_t key, const HazelcastResponseEntry& entry) override {
-    getResponseMap().put(key, entry);
+  void insertResponse(int64_t map_key, const HazelcastResponseEntry& entry) override {
+    getResponseMap().put(map_key, entry);
   }
 
   void failOnLock() override {} // Required for local accessor only.
@@ -97,34 +97,34 @@ public:
 
   int responseMapSize() override { return response_map_.size(); }
 
-  void insertResponse(int64_t key, const HazelcastResponseEntry& entry) override {
+  void insertResponse(int64_t map_key, const HazelcastResponseEntry& entry) override {
     checkConnection();
-    response_map_[key] = HazelcastResponsePtr(new HazelcastResponseEntry(entry));
+    response_map_[map_key] = HazelcastResponsePtr(new HazelcastResponseEntry(entry));
   }
 
-  void removeBody(const std::string& key) override {
+  void removeBody(const std::string& map_key) override {
     checkConnection();
-    removeBodyAsync(key);
+    removeBodyAsync(map_key);
   }
 
   // StorageAccessor
-  void putHeader(const int64_t key, const HazelcastHeaderEntry& value) override {
+  void putHeader(const int64_t map_key, const HazelcastHeaderEntry& value) override {
     checkConnection();
-    header_map_[key] = HazelcastHeaderPtr(new HazelcastHeaderEntry(value));
+    header_map_[map_key] = HazelcastHeaderPtr(new HazelcastHeaderEntry(value));
   }
 
-  void putBody(const std::string& key, const HazelcastBodyEntry& value) override {
+  void putBody(const std::string& map_key, const HazelcastBodyEntry& value) override {
     checkConnection();
-    body_map_[key] = HazelcastBodyPtr(new HazelcastBodyEntry(value));
+    body_map_[map_key] = HazelcastBodyPtr(new HazelcastBodyEntry(value));
   }
 
-  void putResponse(const int64_t key, const HazelcastResponseEntry& value) override {
-    insertResponse(key, value);
+  void putResponse(const int64_t map_key, const HazelcastResponseEntry& value) override {
+    insertResponse(map_key, value);
   }
 
-  HazelcastHeaderPtr getHeader(const int64_t key) override {
+  HazelcastHeaderPtr getHeader(const int64_t map_key) override {
     checkConnection();
-    auto result = header_map_.find(key);
+    auto result = header_map_.find(map_key);
     if (result != header_map_.end()) {
       // New objects are created during deserialization. Hence not returning
       // the original one here.
@@ -134,9 +134,9 @@ public:
     }
   }
 
-  HazelcastBodyPtr getBody(const std::string& key) override {
+  HazelcastBodyPtr getBody(const std::string& map_key) override {
     checkConnection();
-    auto result = body_map_.find(key);
+    auto result = body_map_.find(map_key);
     if (result != body_map_.end()) {
       return HazelcastBodyPtr(new HazelcastBodyEntry(*result->second));
     } else {
@@ -144,9 +144,9 @@ public:
     }
   }
 
-  HazelcastResponsePtr getResponse(const int64_t key) override {
+  HazelcastResponsePtr getResponse(const int64_t map_key) override {
     checkConnection();
-    auto result = response_map_.find(key);
+    auto result = response_map_.find(map_key);
     if (result != response_map_.end()) {
       return HazelcastResponsePtr(new HazelcastResponseEntry(*result->second));
     } else {
@@ -154,46 +154,46 @@ public:
     }
   }
 
-  void removeBodyAsync(const std::string& key) override {
+  void removeBodyAsync(const std::string& map_key) override {
     checkConnection();
-    body_map_.erase(key);
+    body_map_.erase(map_key);
   }
 
-  void removeHeader(const int64_t key) override {
+  void removeHeader(const int64_t map_key) override {
     checkConnection();
-    header_map_.erase(key);
+    header_map_.erase(map_key);
   }
 
-  bool tryLock(const int64_t key, bool unified) override {
+  bool tryLock(const int64_t map_key, bool unified) override {
     checkConnection(fail_on_lock_);
     if (unified) {
       bool locked =
-          std::find(response_locks_.begin(), response_locks_.end(), key) != response_locks_.end();
+          std::find(response_locks_.begin(), response_locks_.end(), map_key) != response_locks_.end();
       if (locked) {
         return false;
       } else {
-        response_locks_.push_back(key);
+        response_locks_.push_back(map_key);
         return true;
       }
     } else {
       bool locked =
-          std::find(header_locks_.begin(), header_locks_.end(), key) != header_locks_.end();
+          std::find(header_locks_.begin(), header_locks_.end(), map_key) != header_locks_.end();
       if (locked) {
         return false;
       } else {
-        header_locks_.push_back(key);
+        header_locks_.push_back(map_key);
         return true;
       }
     }
   }
 
-  void unlock(const int64_t key, bool unified) override {
+  void unlock(const int64_t map_key, bool unified) override {
     checkConnection();
     if (unified) {
-      response_locks_.erase(std::remove(response_locks_.begin(), response_locks_.end(), key),
+      response_locks_.erase(std::remove(response_locks_.begin(), response_locks_.end(), map_key),
                             response_locks_.end());
     } else {
-      header_locks_.erase(std::remove(header_locks_.begin(), header_locks_.end(), key),
+      header_locks_.erase(std::remove(header_locks_.begin(), header_locks_.end(), map_key),
                           header_locks_.end());
     }
   }

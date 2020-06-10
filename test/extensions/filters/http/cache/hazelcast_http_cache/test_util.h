@@ -63,6 +63,14 @@ class HazelcastHttpCacheTestBase : public testing::Test {
 protected:
   HazelcastHttpCacheTestBase() { HazelcastTestUtil::setRequestHeaders(request_headers_); }
 
+  int64_t mapKey(const uint64_t key_hash) {
+    return cache_->mapKey(key_hash);
+  }
+
+  std::string orderedMapKey(const uint64_t key_hash, const uint64_t order) {
+    return cache_->orderedMapKey(key_hash, order);
+  }
+
   // Makes getBody requests until requested range is satisfied.
   // Returns the body on success; HazelcastTestUtil::abortedBodyResponse() on
   // abortion by cache.

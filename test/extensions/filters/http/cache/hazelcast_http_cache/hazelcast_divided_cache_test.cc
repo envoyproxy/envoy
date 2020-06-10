@@ -18,8 +18,8 @@ protected:
   void SetUp() override {
     HazelcastHttpCacheConfig config = HazelcastTestUtil::getTestConfig(false);
     // To test the cache with a real Hazelcast instance, use remote test cache.
-    // cache_ = std::make_unique<RemoteTestCache>(config);
-    cache_ = std::make_unique<LocalTestCache>(config);
+    // cache_ = std::make_unique<HazelcastRemoteTestCache>(config);
+    cache_ = std::make_unique<HazelcastLocalTestCache>(config);
     cache_->start();
     cache_->getTestAccessor().clearMaps();
   }
@@ -68,16 +68,16 @@ TEST_F(HazelcastDividedCacheTest, AllowOverridingCacheEntries) {
 
 TEST_F(HazelcastDividedCacheTest, CleanBodyOnHeaderEviction) {
   LookupContextPtr lookup_context = lookup("/header/eviction/");
-  uint64_t variant_hash_key =
-      static_cast<HazelcastLookupContextBase&>(*lookup_context).variantHashKey();
+  uint64_t variant_key_hash =
+      static_cast<HazelcastLookupContextBase&>(*lookup_context).variantKeyHash();
   const int BodyCount = 3;
   insert(move(lookup_context), getResponseHeaders(),
          std::string(HazelcastTestUtil::TEST_PARTITION_SIZE * BodyCount, 'h'));
   EXPECT_EQ(1, cache_->getTestAccessor().headerMapSize());
   EXPECT_EQ(BodyCount, cache_->getTestAccessor().bodyMapSize());
 
-  auto keyObject = std::make_unique<int64_t>(cache_->mapKey(variant_hash_key));
-  auto valueObject = cache_->getHeader(variant_hash_key);
+  auto keyObject = std::make_unique<int64_t>(mapKey(variant_key_hash));
+  auto valueObject = cache_->getHeader(variant_key_hash);
   EXPECT_NE(nullptr, valueObject);
 
   Member m;
@@ -143,18 +143,18 @@ TEST_F(HazelcastDividedCacheTest, MissLookupOnVersionMismatch) {
   LookupContextPtr lookup_context = lookup(RequestPath1);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 
-  uint64_t variant_hash_key =
-      static_cast<HazelcastLookupContextBase&>(*lookup_context).variantHashKey();
+  uint64_t variant_key_hash =
+      static_cast<HazelcastLookupContextBase&>(*lookup_context).variantKeyHash();
 
   const std::string Body(HazelcastTestUtil::TEST_PARTITION_SIZE * 2, 'h');
   insert(move(lookup_context), getResponseHeaders(), Body);
   EXPECT_TRUE(expectLookupSuccessWithFullBody(lookup(RequestPath1).get(), Body));
 
   // Change version of the second partition.
-  auto body2 = cache_->getBody(variant_hash_key, 1);
+  auto body2 = cache_->getBody(variant_key_hash, 1);
   EXPECT_NE(body2, nullptr);
   body2->version(body2->version() + 1);
-  cache_->putBody(variant_hash_key, 1, *body2);
+  cache_->putBody(variant_key_hash, 1, *body2);
 
   // Change happened in the second partition. Lookup to the first one should be successful.
   lookup_context = lookup(RequestPath1);
@@ -176,8 +176,8 @@ TEST_F(HazelcastDividedCacheTest, MissDividedLookupOnDifferentKey) {
   LookupContextPtr lookup_context = lookup(RequestPath);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 
-  uint64_t variant_hash_key =
-      static_cast<HazelcastLookupContextBase&>(*lookup_context).variantHashKey();
+  uint64_t variant_key_hash =
+      static_cast<HazelcastLookupContextBase&>(*lookup_context).variantKeyHash();
 
   const std::string Body("hazelcast");
   insert(move(lookup_context), getResponseHeaders(), Body);
@@ -185,12 +185,12 @@ TEST_F(HazelcastDividedCacheTest, MissDividedLookupOnDifferentKey) {
 
   // Manipulate the cache entry directly. Cache is not aware of that.
   // The cached key will not be the same with the created one by filter.
-  auto header = cache_->getHeader(variant_hash_key);
+  auto header = cache_->getHeader(variant_key_hash);
   Key modified = header->variantKey();
   modified.add_custom_fields("custom1");
   modified.add_custom_fields("custom2");
   header->variantKey(std::move(modified));
-  cache_->putHeader(variant_hash_key, *header);
+  cache_->putHeader(variant_key_hash, *header);
 
   lookup_context = lookup(RequestPath);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
@@ -203,7 +203,7 @@ TEST_F(HazelcastDividedCacheTest, MissDividedLookupOnDifferentKey) {
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
   EXPECT_EQ(1, cache_->getTestAccessor().headerMapSize());
 
-  auto modified_header = cache_->getHeader(variant_hash_key);
+  auto modified_header = cache_->getHeader(variant_key_hash);
   EXPECT_EQ(*header, *modified_header);
 }
 
@@ -211,8 +211,8 @@ TEST_F(HazelcastDividedCacheTest, CleanUpCachedResponseOnMissingBody) {
   const std::string RequestPath1("/clean/up/on/missing/body");
   LookupContextPtr lookup_context1 = lookup(RequestPath1);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
-  uint64_t variant_hash_key =
-      static_cast<HazelcastLookupContextBase&>(*lookup_context1).variantHashKey();
+  uint64_t variant_key_hash =
+      static_cast<HazelcastLookupContextBase&>(*lookup_context1).variantKeyHash();
 
   const std::string Body = std::string(HazelcastTestUtil::TEST_PARTITION_SIZE, 'h') +
                            std::string(HazelcastTestUtil::TEST_PARTITION_SIZE, 'z') +
@@ -222,13 +222,13 @@ TEST_F(HazelcastDividedCacheTest, CleanUpCachedResponseOnMissingBody) {
   lookup_context1 = lookup(RequestPath1);
 
   // Response is cached with the following pattern:
-  // variant_hash_key -> HeaderEntry (in header map)
-  // variant_hash_key "0" -> Body1 (in body map)
-  // variant_hash_key "1" -> Body2 (in body map)
-  // variant_hash_key "2" -> Body3 (in body map)
+  // variant_key_hash -> HeaderEntry (in header map)
+  // variant_key_hash "0" -> Body1 (in body map)
+  // variant_key_hash "1" -> Body2 (in body map)
+  // variant_key_hash "2" -> Body3 (in body map)
   EXPECT_TRUE(expectLookupSuccessWithFullBody(lookup_context1.get(), Body));
 
-  cache_->getTestAccessor().removeBody(cache_->orderedMapKey(variant_hash_key, 1)); // evict Body2.
+  cache_->getTestAccessor().removeBody(orderedMapKey(variant_key_hash, 1)); // evict Body2.
 
   lookup_context1 = lookup(RequestPath1);
   EXPECT_EQ(CacheEntryStatus::Ok, lookup_result_.cache_entry_status_);
@@ -241,7 +241,7 @@ TEST_F(HazelcastDividedCacheTest, CleanUpCachedResponseOnMissingBody) {
     std::thread t1([&] {
       // If another thread locks the key, then the current one should not perform
       // clean up. The lock here will serve the purpose.
-      EXPECT_TRUE(cache_->tryLock(variant_hash_key));
+      EXPECT_TRUE(cache_->tryLock(variant_key_hash));
     });
     t1.join();
 
@@ -253,16 +253,16 @@ TEST_F(HazelcastDividedCacheTest, CleanUpCachedResponseOnMissingBody) {
 
     EXPECT_NE(0, cache_->getTestAccessor().bodyMapSize()); // clean up is not performed.
 
-    cache_->unlock(variant_hash_key);
+    cache_->unlock(variant_key_hash);
   }
 
   {
     // Clean up must be aborted when header versions are mismatched.
     // This prevents clean up operation for wrong entries.
-    auto header = cache_->getHeader(variant_hash_key);
+    auto header = cache_->getHeader(variant_key_hash);
     int32_t original_version = header->version();
     header->version(original_version - 1);
-    cache_->putHeader(variant_hash_key, *header);
+    cache_->putHeader(variant_key_hash, *header);
 
     lookup_context1->getBody(
         {HazelcastTestUtil::TEST_PARTITION_SIZE, HazelcastTestUtil::TEST_PARTITION_SIZE * 3},
@@ -271,7 +271,7 @@ TEST_F(HazelcastDividedCacheTest, CleanUpCachedResponseOnMissingBody) {
     EXPECT_NE(0, cache_->getTestAccessor().bodyMapSize());
 
     header->version(original_version);
-    cache_->putHeader(variant_hash_key, *header);
+    cache_->putHeader(variant_key_hash, *header);
   }
 
   {
@@ -387,18 +387,18 @@ TEST_F(HazelcastDividedCacheTest, FailDuringLock) {
   // using Local Test Accessor. Changing the order might not cause test to fail but
   // to uncover some exceptions.
   const std::string RequestPath("/failed/during/try/lock");
-  uint64_t variant_hash_key =
-      static_cast<HazelcastLookupContextBase&>(*lookup(RequestPath)).variantHashKey();
+  uint64_t variant_key_hash =
+      static_cast<HazelcastLookupContextBase&>(*lookup(RequestPath)).variantKeyHash();
 
   std::thread t1([&] {
-    // To make this test compatible with RemoteTestCache, the key is locked here
+    // To make this test compatible with HazelcastRemoteTestCache, the key is locked here
     // explicitly. This behavior will cause tryLock to return false for further
     // trials. Hence the lookups below will throw exception for local cache and
     // return false for remote cache. This has no effect on local test but lack of
     // this locking causes remote test to fail. Notice that if this locking would not
     // be performed by a different thread, following insertions in this thread would
-    // be able to lock the key again and again for RemoteTestCache.
-    EXPECT_TRUE(cache_->tryLock(variant_hash_key));
+    // be able to lock the key again and again for HazelcastRemoteTestCache.
+    EXPECT_TRUE(cache_->tryLock(variant_key_hash));
   });
   t1.join();
 
@@ -409,7 +409,7 @@ TEST_F(HazelcastDividedCacheTest, FailDuringLock) {
   insert(lookup(RequestPath), getResponseHeaders(), "aborted"); // HazelcastClientOfflineException
   insert(lookup(RequestPath), getResponseHeaders(), "aborted"); // OperationTimeoutException
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
-  cache_->unlock(variant_hash_key);
+  cache_->unlock(variant_key_hash);
 }
 
 TEST_F(HazelcastDividedCacheTest, FailDuringBodyLookupWhenHeaderSucceeds) {

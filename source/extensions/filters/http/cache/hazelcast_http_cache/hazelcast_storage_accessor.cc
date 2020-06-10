@@ -8,34 +8,34 @@ namespace HttpFilters {
 namespace Cache {
 namespace HazelcastHttpCache {
 
-void HazelcastClusterAccessor::putHeader(const int64_t key, const HazelcastHeaderEntry& value) {
-  getHeaderMap().set(key, value);
+void HazelcastClusterAccessor::putHeader(const int64_t map_key, const HazelcastHeaderEntry& value) {
+  getHeaderMap().set(map_key, value);
 }
 
-void HazelcastClusterAccessor::putBody(const std::string& key, const HazelcastBodyEntry& value) {
-  getBodyMap().set(key, value);
+void HazelcastClusterAccessor::putBody(const std::string& map_key, const HazelcastBodyEntry& value) {
+  getBodyMap().set(map_key, value);
 }
 
-HazelcastHeaderPtr HazelcastClusterAccessor::getHeader(const int64_t key) {
-  return getHeaderMap().get(key);
+HazelcastHeaderPtr HazelcastClusterAccessor::getHeader(const int64_t map_key) {
+  return getHeaderMap().get(map_key);
 }
 
-HazelcastBodyPtr HazelcastClusterAccessor::getBody(const std::string& key) {
-  return getBodyMap().get(key);
+HazelcastBodyPtr HazelcastClusterAccessor::getBody(const std::string& map_key) {
+  return getBodyMap().get(map_key);
 }
 
-void HazelcastClusterAccessor::removeBodyAsync(const std::string& key) {
-  getBodyMap().removeAsync(key);
+void HazelcastClusterAccessor::removeBodyAsync(const std::string& map_key) {
+  getBodyMap().removeAsync(map_key);
 }
 
-void HazelcastClusterAccessor::removeHeader(const int64_t key) { getHeaderMap().deleteEntry(key); }
+void HazelcastClusterAccessor::removeHeader(const int64_t map_key) { getHeaderMap().deleteEntry(map_key); }
 
-void HazelcastClusterAccessor::putResponse(const int64_t key, const HazelcastResponseEntry& value) {
-  getResponseMap().set(key, value);
+void HazelcastClusterAccessor::putResponse(const int64_t map_key, const HazelcastResponseEntry& value) {
+  getResponseMap().set(map_key, value);
 }
 
-HazelcastResponsePtr HazelcastClusterAccessor::getResponse(const int64_t key) {
-  return getResponseMap().get(key);
+HazelcastResponsePtr HazelcastClusterAccessor::getResponse(const int64_t map_key) {
+  return getResponseMap().get(map_key);
 }
 
 // Internal lock mechanism of Hazelcast specific to map and key pair is
@@ -45,18 +45,18 @@ HazelcastResponsePtr HazelcastClusterAccessor::getResponse(const int64_t key) {
 // proxies when they connect to the same Hazelcast cluster. The locks used
 // here are re-entrant. A locked key can be acquired by the same thread
 // again and again based on its pid.
-bool HazelcastClusterAccessor::tryLock(const int64_t key, bool unified) {
-  return unified ? getResponseMap().tryLock(key) : getHeaderMap().tryLock(key);
+bool HazelcastClusterAccessor::tryLock(const int64_t map_key, bool unified) {
+  return unified ? getResponseMap().tryLock(map_key) : getHeaderMap().tryLock(map_key);
 }
 
 // Hazelcast does not allow a thread to unlock a key unless it's the key
 // owner. To handle this, IMap::forceUnlock is called here to make sure
 // the lock is released certainly.
-void HazelcastClusterAccessor::unlock(const int64_t key, bool unified) {
+void HazelcastClusterAccessor::unlock(const int64_t map_key, bool unified) {
   if (unified) {
-    getResponseMap().forceUnlock(key);
+    getResponseMap().forceUnlock(map_key);
   } else {
-    getHeaderMap().forceUnlock(key);
+    getHeaderMap().forceUnlock(map_key);
   }
 }
 

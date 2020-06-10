@@ -23,19 +23,19 @@ class StorageAccessor {
 public:
   StorageAccessor() = default;
 
-  virtual void putHeader(const int64_t key, const HazelcastHeaderEntry& value) PURE;
-  virtual void putBody(const std::string& key, const HazelcastBodyEntry& value) PURE;
-  virtual void putResponse(const int64_t key, const HazelcastResponseEntry& value) PURE;
+  virtual void putHeader(const int64_t map_key, const HazelcastHeaderEntry& value) PURE;
+  virtual void putBody(const std::string& map_key, const HazelcastBodyEntry& value) PURE;
+  virtual void putResponse(const int64_t map_key, const HazelcastResponseEntry& value) PURE;
 
-  virtual HazelcastHeaderPtr getHeader(const int64_t key) PURE;
-  virtual HazelcastBodyPtr getBody(const std::string& key) PURE;
-  virtual HazelcastResponsePtr getResponse(const int64_t key) PURE;
+  virtual HazelcastHeaderPtr getHeader(const int64_t map_key) PURE;
+  virtual HazelcastBodyPtr getBody(const std::string& map_key) PURE;
+  virtual HazelcastResponsePtr getResponse(const int64_t map_key) PURE;
 
-  virtual void removeBodyAsync(const std::string& key) PURE;
-  virtual void removeHeader(const int64_t key) PURE;
+  virtual void removeBodyAsync(const std::string& map_key) PURE;
+  virtual void removeHeader(const int64_t map_key) PURE;
 
-  virtual bool tryLock(const int64_t key, bool unified) PURE;
-  virtual void unlock(const int64_t key, bool unified) PURE;
+  virtual bool tryLock(const int64_t map_key, bool unified) PURE;
+  virtual void unlock(const int64_t map_key, bool unified) PURE;
 
   virtual bool isRunning() PURE;
   virtual std::string clusterName() PURE;
@@ -59,19 +59,19 @@ public:
   HazelcastClusterAccessor(HazelcastHttpCache& cache, ClientConfig&& client_config,
                            const std::string& app_prefix, const uint64_t partition_size);
 
-  void putHeader(const int64_t key, const HazelcastHeaderEntry& value) override;
-  void putBody(const std::string& key, const HazelcastBodyEntry& value) override;
-  void putResponse(const int64_t key, const HazelcastResponseEntry& value) override;
+  void putHeader(const int64_t map_key, const HazelcastHeaderEntry& value) override;
+  void putBody(const std::string& map_key, const HazelcastBodyEntry& value) override;
+  void putResponse(const int64_t map_key, const HazelcastResponseEntry& value) override;
 
-  HazelcastHeaderPtr getHeader(const int64_t key) override;
-  HazelcastBodyPtr getBody(const std::string& key) override;
-  HazelcastResponsePtr getResponse(const int64_t key) override;
+  HazelcastHeaderPtr getHeader(const int64_t map_key) override;
+  HazelcastBodyPtr getBody(const std::string& map_key) override;
+  HazelcastResponsePtr getResponse(const int64_t map_key) override;
 
-  void removeBodyAsync(const std::string& key) override;
-  void removeHeader(const int64_t key) override;
+  void removeBodyAsync(const std::string& map_key) override;
+  void removeHeader(const int64_t map_key) override;
 
-  bool tryLock(const int64_t key, bool unified) override;
-  void unlock(const int64_t key, bool unified) override;
+  bool tryLock(const int64_t map_key, bool unified) override;
+  void unlock(const int64_t map_key, bool unified) override;
 
   bool isRunning() override;
   std::string clusterName() override;
@@ -99,7 +99,7 @@ private:
   std::string constructMapName(const std::string& postfix, bool unified);
 
   /** Returns remote header cache proxy */
-  inline IMap<int64_t, HazelcastHeaderEntry> getHeaderMap() {
+  IMap<int64_t, HazelcastHeaderEntry> getHeaderMap() {
     if (!hazelcast_client_) {
       throw EnvoyException("Hazelcast Client is not connected to a cluster.");
     }
@@ -107,7 +107,7 @@ private:
   }
 
   /** Returns remote body cache proxy */
-  inline IMap<std::string, HazelcastBodyEntry> getBodyMap() {
+  IMap<std::string, HazelcastBodyEntry> getBodyMap() {
     if (!hazelcast_client_) {
       throw EnvoyException("Hazelcast Client is not connected to a cluster.");
     }
@@ -115,7 +115,7 @@ private:
   }
 
   /** Returns remote response cache proxy */
-  inline IMap<int64_t, HazelcastResponseEntry> getResponseMap() {
+  IMap<int64_t, HazelcastResponseEntry> getResponseMap() {
     if (!hazelcast_client_) {
       throw EnvoyException("Hazelcast Client is not connected to a cluster.");
     }

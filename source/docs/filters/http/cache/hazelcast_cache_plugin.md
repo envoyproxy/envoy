@@ -3,8 +3,8 @@ Work in Progress--Cache filter has not implemented features. The corresponding o
 
 Hazelcast Http Cache provides a pluggable storage implementation backed by Hazelcast In Memory Data Grid for the Http
 cache filter. Using Hazelcast C++ client, the plugin does not store any Http response locally but in a distributed map
-provided by Hazelcast cluster. To enable the cache plugin, the network configuration belongs to a cluster to be
-connected must be set on the cache plugin configuration.
+provided by Hazelcast cluster. After having a Hazelcast cluster up and running, passing the network address of a
+cluster member to the cache plugin will be enough for client to connect to the cluster.
 
 ## Offered cache modes
 The plugin comes with two modes:
@@ -12,7 +12,7 @@ The plugin comes with two modes:
  - **Unified**
 A cached Http response is stored as a single entry in the cache. On a range Http request, regardless of the requested
 range, the whole response body is fetched from the cache and then only the desired bytes are served along with the
-headers and trailers (if any). This mode is handy where response body sizes are reasonably large (up to 10 KB), or
+headers and trailers (if any). This mode is handy where response body sizes are relatively small (up to 32 KB), or
 range requests are not frequent, or they are not allowed at all.
 
  - **Divided**
