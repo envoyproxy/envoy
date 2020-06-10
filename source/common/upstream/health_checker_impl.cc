@@ -735,6 +735,8 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onGoAway(Http::ErrorCo
                  HostUtility::healthFlagsToString(*host_));
   // If we have an active health check probe and receive a GOAWAY indicating
   // graceful shutdown, allow the probe to complete before closing the connection.
+  // The connection will be closed when the active check completes or another
+  // terminal condition occurs, such as a timeout or stream reset.
   if (request_encoder_ && error_code == Http::ErrorCode::NoError) {
     received_goaway_ = true;
     return;
@@ -772,6 +774,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onRpcComplete(
     handleFailure(envoy::data::core::v3::ACTIVE);
   }
 
+  // Read the value as we may call resetState() and clear it.
   const bool goaway = received_goaway_;
 
   // |end_stream| will be false if we decided to stop healthcheck before HTTP stream has ended -
