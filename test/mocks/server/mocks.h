@@ -84,13 +84,14 @@ public:
   MOCK_METHOD(const std::string&, adminAddressPath, (), (const));
   MOCK_METHOD(Network::Address::IpVersion, localAddressIpVersion, (), (const));
   MOCK_METHOD(std::chrono::seconds, drainTime, (), (const));
+  MOCK_METHOD(std::chrono::seconds, parentShutdownTime, (), (const));
+  MOCK_METHOD(Server::DrainStrategy, drainStrategy, (), (const));
   MOCK_METHOD(spdlog::level::level_enum, logLevel, (), (const));
   MOCK_METHOD((const std::vector<std::pair<std::string, spdlog::level::level_enum>>&),
               componentLogLevels, (), (const));
   MOCK_METHOD(const std::string&, logFormat, (), (const));
   MOCK_METHOD(bool, logFormatEscaped, (), (const));
   MOCK_METHOD(const std::string&, logPath, (), (const));
-  MOCK_METHOD(std::chrono::seconds, parentShutdownTime, (), (const));
   MOCK_METHOD(uint64_t, restartEpoch, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, fileFlushIntervalMsec, (), (const));
   MOCK_METHOD(Mode, mode, (), (const));

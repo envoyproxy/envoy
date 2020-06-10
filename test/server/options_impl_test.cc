@@ -154,10 +154,11 @@ TEST_F(OptionsImplTest, SetAll) {
   options->setAdminAddressPath("path");
   options->setLocalAddressIpVersion(Network::Address::IpVersion::v6);
   options->setDrainTime(std::chrono::seconds(42));
+  options->setDrainStrategy(Server::DrainStrategy::Immediate);
+  options->setParentShutdownTime(std::chrono::seconds(43));
   options->setLogLevel(spdlog::level::trace);
   options->setLogFormat("%L %n %v");
   options->setLogPath("/foo/bar");
-  options->setParentShutdownTime(std::chrono::seconds(43));
   options->setRestartEpoch(44);
   options->setFileFlushIntervalMsec(std::chrono::milliseconds(45));
   options->setMode(Server::Mode::Validate);
@@ -181,6 +182,7 @@ TEST_F(OptionsImplTest, SetAll) {
   EXPECT_EQ("path", options->adminAddressPath());
   EXPECT_EQ(Network::Address::IpVersion::v6, options->localAddressIpVersion());
   EXPECT_EQ(std::chrono::seconds(42), options->drainTime());
+  EXPECT_EQ(Server::DrainStrategy::Immediate, options->drainStrategy());
   EXPECT_EQ(spdlog::level::trace, options->logLevel());
   EXPECT_EQ("%L %n %v", options->logFormat());
   EXPECT_EQ("/foo/bar", options->logPath());
@@ -209,11 +211,13 @@ TEST_F(OptionsImplTest, SetAll) {
   EXPECT_EQ(envoy::admin::v3::CommandLineOptions::v6,
             command_line_options->local_address_ip_version());
   EXPECT_EQ(options->drainTime().count(), command_line_options->drain_time().seconds());
+  EXPECT_EQ(envoy::admin::v3::CommandLineOptions::Immediate,
+            command_line_options->drain_strategy());
+  EXPECT_EQ(options->parentShutdownTime().count(),
+            command_line_options->parent_shutdown_time().seconds());
   EXPECT_EQ(spdlog::level::to_string_view(options->logLevel()), command_line_options->log_level());
   EXPECT_EQ(options->logFormat(), command_line_options->log_format());
   EXPECT_EQ(options->logPath(), command_line_options->log_path());
-  EXPECT_EQ(options->parentShutdownTime().count(),
-            command_line_options->parent_shutdown_time().seconds());
   EXPECT_EQ(options->restartEpoch(), command_line_options->restart_epoch());
   EXPECT_EQ(options->fileFlushIntervalMsec().count() / 1000,
             command_line_options->file_flush_interval().seconds());
@@ -229,6 +233,7 @@ TEST_F(OptionsImplTest, SetAll) {
 TEST_F(OptionsImplTest, DefaultParams) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy -c hello");
   EXPECT_EQ(std::chrono::seconds(600), options->drainTime());
+  EXPECT_EQ(Server::DrainStrategy::Gradual, options->drainStrategy());
   EXPECT_EQ(std::chrono::seconds(900), options->parentShutdownTime());
   EXPECT_EQ("", options->adminAddressPath());
   EXPECT_EQ(Network::Address::IpVersion::v4, options->localAddressIpVersion());
