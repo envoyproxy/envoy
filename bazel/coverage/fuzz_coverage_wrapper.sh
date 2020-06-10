@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -ex
+set -x
 
 TEST_BINARY=$1
 shift
