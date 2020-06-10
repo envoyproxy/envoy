@@ -73,6 +73,8 @@ message RBAC {
     // The policies deny access to principals. The rest is allowed. This is block-list style
     // access control.
     DENY = 1;
+
+    LOG = 2;
   }
 
   // The action to take if a policy matches. The request is allowed if and only if:

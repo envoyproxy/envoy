@@ -26,7 +26,7 @@ namespace {
 
 class RoleBasedAccessControlFilterTest : public testing::Test {
 public:
-  RoleBasedAccessControlFilterConfigSharedPtr setupConfig() {
+  RoleBasedAccessControlFilterConfigSharedPtr setupConfig(envoy::config::rbac::v3::RBAC::Action action) {
     envoy::extensions::filters::http::rbac::v3::RBAC config;
 
     envoy::config::rbac::v3::Policy policy;
@@ -36,7 +36,7 @@ public:
     policy_rules->add_rules()->set_destination_port(123);
     policy_rules->add_rules()->mutable_url_path()->mutable_path()->set_suffix("suffix");
     policy.add_principals()->set_any(true);
-    config.mutable_rules()->set_action(envoy::config::rbac::v3::RBAC::ALLOW);
+    config.mutable_rules()->set_action(action);
     (*config.mutable_rules()->mutable_policies())["foo"] = policy;
 
     envoy::config::rbac::v3::Policy shadow_policy;
@@ -44,18 +44,20 @@ public:
     shadow_policy_rules->add_rules()->mutable_requested_server_name()->set_exact("xyz.cncf.io");
     shadow_policy_rules->add_rules()->set_destination_port(456);
     shadow_policy.add_principals()->set_any(true);
-    config.mutable_shadow_rules()->set_action(envoy::config::rbac::v3::RBAC::ALLOW);
+    config.mutable_shadow_rules()->set_action(action);
     (*config.mutable_shadow_rules()->mutable_policies())["bar"] = shadow_policy;
 
     return std::make_shared<RoleBasedAccessControlFilterConfig>(config, "test", store_);
   }
 
-  RoleBasedAccessControlFilterTest() : config_(setupConfig()), filter_(config_) {}
+  RoleBasedAccessControlFilterTest() : config_(setupConfig(envoy::config::rbac::v3::RBAC::ALLOW)), filter_(config_),
+                                       log_config_(setupConfig(envoy::config::rbac::v3::RBAC::LOG)), log_filter_(log_config_) {}
 
   void SetUp() override {
     EXPECT_CALL(callbacks_, connection()).WillRepeatedly(Return(&connection_));
     EXPECT_CALL(callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
     filter_.setDecoderFilterCallbacks(callbacks_);
+    log_filter_.setDecoderFilterCallbacks(callbacks_);
   }
 
   void setDestinationPort(uint16_t port) {
@@ -82,8 +84,10 @@ public:
   NiceMock<Envoy::StreamInfo::MockStreamInfo> req_info_;
   Stats::IsolatedStoreImpl store_;
   RoleBasedAccessControlFilterConfigSharedPtr config_;
-
   RoleBasedAccessControlFilter filter_;
+  RoleBasedAccessControlFilterConfigSharedPtr log_config_;
+  RoleBasedAccessControlFilter log_filter_;
+
   Network::Address::InstanceConstSharedPtr address_;
   std::string requested_server_name_;
   Http::TestRequestHeaderMapImpl headers_;
@@ -168,6 +172,39 @@ TEST_F(RoleBasedAccessControlFilterTest, RouteLocalOverride) {
       .WillRepeatedly(Return(&per_route_config_));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers_, true));
+}
+
+//Log Tests
+TEST_F(RoleBasedAccessControlFilterTest, ShouldLog) {
+  setDestinationPort(123);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, log_filter_.decodeHeaders(headers_, false));
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, log_filter_.decodeMetadata(metadata_map));
+  EXPECT_EQ(1U, log_config_->stats().allowed_.value());
+  EXPECT_EQ(0U, log_config_->stats().shadow_denied_.value());
+
+  Buffer::OwnedImpl data("");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, log_filter_.decodeData(data, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, log_filter_.decodeTrailers(trailers_));
+
+  EXPECT_EQ("yes", req_info_.filterState()->getDataMutable<RBACShouldLogState>("kRbacShouldLog").value());
+}
+
+TEST_F(RoleBasedAccessControlFilterTest, ShouldNotLog) {
+  setDestinationPort(456);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, log_filter_.decodeHeaders(headers_, false));
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, log_filter_.decodeMetadata(metadata_map));
+  EXPECT_EQ(1U, log_config_->stats().allowed_.value());
+  EXPECT_EQ(0U, log_config_->stats().shadow_denied_.value());
+
+  Buffer::OwnedImpl data("");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, log_filter_.decodeData(data, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, log_filter_.decodeTrailers(trailers_));
+
+  EXPECT_EQ("no", req_info_.filterState()->getDataMutable<RBACShouldLogState>("kRbacShouldLog").value());
 }
 
 } // namespace

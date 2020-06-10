@@ -7,6 +7,11 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
+//Temporary for key-value setting
+#include <string>
+#include "envoy/stream_info/filter_state.h"
+//
+
 #include "common/common/logger.h"
 
 #include "extensions/filters/common/rbac/engine_impl.h"
@@ -16,6 +21,20 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace RBACFilter {
+
+class RBACShouldLogState : public StreamInfo::FilterState::Object {
+public:
+  RBACShouldLogState(std::string value) {
+    value_ = value;
+  }
+
+  const std::string& value() const { return value_; }
+  void setValue(std::string value) {
+    value_.assign(value);
+  }
+private:
+  std::string value_{};
+};
 
 class RoleBasedAccessControlRouteSpecificFilterConfig : public Router::RouteSpecificFilterConfig {
 public:
