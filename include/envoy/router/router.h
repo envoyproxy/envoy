@@ -1227,7 +1227,7 @@ using GenericConnPoolPtr = std::unique_ptr<GenericConnPool>;
  */
 class GenericConnPoolFactory : public Envoy::Config::TypedFactory {
 public:
-  virtual ~GenericConnPoolFactory() = default;
+  ~GenericConnPoolFactory() override = default;
 
   /*
    * @param options for creating the transport socket
