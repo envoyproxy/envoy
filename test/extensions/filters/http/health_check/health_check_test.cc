@@ -249,9 +249,9 @@ TEST_F(HealthCheckFilterPassThroughTest, Ok) {
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 
-  Http::TestResponseHeaderMapImpl service_hc_respnose{{":status", "200"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(service_hc_respnose, true));
-  EXPECT_EQ("cluster_name", service_hc_respnose.getEnvoyUpstreamHealthCheckedClusterValue());
+  Http::TestResponseHeaderMapImpl service_hc_response{{":status", "200"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(service_hc_response, true));
+  EXPECT_EQ("cluster_name", service_hc_response.getEnvoyUpstreamHealthCheckedClusterValue());
 }
 
 TEST_F(HealthCheckFilterPassThroughTest, OkWithContinue) {
@@ -268,9 +268,9 @@ TEST_F(HealthCheckFilterPassThroughTest, OkWithContinue) {
             filter_->encode100ContinueHeaders(continue_response));
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata_map));
-  Http::TestResponseHeaderMapImpl service_hc_respnose{{":status", "200"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(service_hc_respnose, true));
-  EXPECT_EQ("cluster_name", service_hc_respnose.getEnvoyUpstreamHealthCheckedClusterValue());
+  Http::TestResponseHeaderMapImpl service_hc_response{{":status", "200"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(service_hc_response, true));
+  EXPECT_EQ("cluster_name", service_hc_response.getEnvoyUpstreamHealthCheckedClusterValue());
 }
 
 TEST_F(HealthCheckFilterPassThroughTest, Failed) {
