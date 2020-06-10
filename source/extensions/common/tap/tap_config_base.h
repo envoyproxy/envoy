@@ -55,8 +55,6 @@ public:
       start_offset -= start_offset_trim;
       if (slice.mem_ != nullptr) {
         slice.mem_ = static_cast<char*>(slice.mem_) + start_offset_trim;
-      } else {
-        slice.mem_ = reinterpret_cast<void*>(start_offset_trim);
       }
 
       const uint32_t final_length = std::min<uint32_t>(length, slice.len_);
