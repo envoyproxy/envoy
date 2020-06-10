@@ -70,11 +70,7 @@ public:
    * @param type_urls type URLs corresponding to xDS API, e.g.
    * type.googleapis.com/envoy.api.v2.Cluster.
    */
-  void pause(const std::vector<std::string> type_urls) {
-    for (const auto& type_url : type_urls) {
-      pause(type_url);
-    }
-  }
+  virtual void pause(const std::vector<std::string> type_urls) PURE;
 
   /**
    * Resume discovery requests for a given API type. This will send a discovery request if one would
@@ -86,14 +82,10 @@ public:
   /**
    * Resume discovery requests for given API types. This will send a discovery request if one would
    * have been sent during the pause.
-   * @param type_url type URLs corresponding to xDS API e.g.
+   * @param type_urls type URLs corresponding to xDS API e.g.
    * type.googleapis.com/envoy.api.v2.Cluster
    */
-  void resume(const std::vector<std::string> type_urls) {
-    for (const auto& type_url : type_urls) {
-      resume(type_url);
-    }
-  }
+  virtual void resume(const std::vector<std::string> type_urls) PURE;
 
   /**
    * Retrieves the current pause state as set by pause()/resume().

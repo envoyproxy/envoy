@@ -27,9 +27,21 @@ NewGrpcMuxImpl::NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client,
 
 void NewGrpcMuxImpl::pause(const std::string& type_url) { pausable_ack_queue_.pause(type_url); }
 
+void NewGrpcMuxImpl::pause(const std::vector<std::string> type_urls) {
+  for (const auto& type_url : type_urls) {
+    pause(type_url);
+  }
+}
+
 void NewGrpcMuxImpl::resume(const std::string& type_url) {
   pausable_ack_queue_.resume(type_url);
   trySendDiscoveryRequests();
+}
+
+void NewGrpcMuxImpl::resume(const std::vector<std::string> type_urls) {
+  for (const auto& type_url : type_urls) {
+    resume(type_url);
+  }
 }
 
 bool NewGrpcMuxImpl::paused(const std::string& type_url) const {
