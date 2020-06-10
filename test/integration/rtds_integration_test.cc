@@ -75,9 +75,7 @@ public:
     sotw_or_delta_ = sotwOrDelta();
   }
 
-  void TearDown() override {
-    cleanUpXdsConnection();
-  }
+  void TearDown() override { cleanUpXdsConnection(); }
 
   void initialize() override {
     // The tests infra expects the xDS server to be the second fake upstream, so

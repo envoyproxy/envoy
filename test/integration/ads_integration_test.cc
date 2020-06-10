@@ -601,9 +601,7 @@ public:
     sotw_or_delta_ = sotwOrDelta();
   }
 
-  void TearDown() override {
-    cleanUpXdsConnection();
-  }
+  void TearDown() override { cleanUpXdsConnection(); }
 
   void initialize() override {
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -643,9 +641,7 @@ public:
     sotw_or_delta_ = sotwOrDelta();
   }
 
-  void TearDown() override {
-    cleanUpXdsConnection();
-  }
+  void TearDown() override { cleanUpXdsConnection(); }
 
   void initialize() override {
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -806,9 +802,7 @@ public:
     sotw_or_delta_ = sotwOrDelta();
   }
 
-  void TearDown() override {
-    cleanUpXdsConnection();
-  }
+  void TearDown() override { cleanUpXdsConnection(); }
 
   void initialize() override {
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {

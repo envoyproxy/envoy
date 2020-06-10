@@ -27,9 +27,7 @@ public:
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
   }
 
-  void TearDown() override {
-    fake_upstream_connection_.reset();
-  }
+  void TearDown() override { fake_upstream_connection_.reset(); }
 
   void setupLambdaFilter(bool passthrough) {
     const std::string filter =

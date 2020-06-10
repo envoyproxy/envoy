@@ -32,9 +32,7 @@ protected:
   ScopedRdsIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion(), realTime()) {}
 
-  ~ScopedRdsIntegrationTest() override {
-    resetConnections();
-  }
+  ~ScopedRdsIntegrationTest() override { resetConnections(); }
 
   void initialize() override {
     // Setup two upstream hosts, one for each cluster.

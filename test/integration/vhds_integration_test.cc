@@ -140,9 +140,7 @@ public:
     use_lds_ = false;
   }
 
-  void TearDown() override {
-    cleanUpXdsConnection();
-  }
+  void TearDown() override { cleanUpXdsConnection(); }
 
   // Overridden to insert this stuff into the initialize() at the very beginning of
   // HttpIntegrationTest::testRouterRequestAndResponseWithBody().
@@ -240,9 +238,7 @@ public:
     use_lds_ = false;
   }
 
-  void TearDown() override {
-    cleanUpXdsConnection();
-  }
+  void TearDown() override { cleanUpXdsConnection(); }
 
   std::string virtualHostYaml(const std::string& name, const std::string& domain) {
     return fmt::format(VhostTemplate, name, domain);

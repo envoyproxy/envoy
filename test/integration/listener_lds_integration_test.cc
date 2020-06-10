@@ -32,9 +32,7 @@ protected:
   ListenerIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion(), realTime()) {}
 
-  ~ListenerIntegrationTest() override {
-    resetConnections();
-  }
+  ~ListenerIntegrationTest() override { resetConnections(); }
 
   void initialize() override {
     // We want to use the GRPC based LDS.

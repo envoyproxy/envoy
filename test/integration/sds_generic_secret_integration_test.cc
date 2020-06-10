@@ -104,9 +104,7 @@ public:
     HttpIntegrationTest::initialize();
   }
 
-  void TearDown() override {
-    cleanUpXdsConnection();
-  }
+  void TearDown() override { cleanUpXdsConnection(); }
 
   void createSdsStream() {
     createXdsConnection();
