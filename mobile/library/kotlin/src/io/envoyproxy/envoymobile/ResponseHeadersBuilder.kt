@@ -19,6 +19,18 @@ class ResponseHeadersBuilder: HeadersBuilder {
   internal constructor(headers: MutableMap<String, MutableList<String>>) : super(headers)
 
   /**
+   * Add an HTTP status to the response headers.
+   *
+   * @param status: The HTTP status to add.
+   *
+   * @return ResponseHeadersBuilder, This builder.
+   */
+  fun addHttpStatus(status: Int) : ResponseHeadersBuilder {
+    set(":status", mutableListOf("$status"))
+    return this
+  }
+
+  /**
    * Build the response headers using the current builder.
    *
    * @return ResponseHeaders, New instance of response headers.

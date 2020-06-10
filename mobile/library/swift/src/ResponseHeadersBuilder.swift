@@ -11,6 +11,8 @@ public final class ResponseHeadersBuilder: HeadersBuilder {
   /// Add an HTTP status to the response headers.
   ///
   /// - parameter status: The HTTP status to add.
+  ///
+  /// - returns: This builder.
   public func addHttpStatus(_ status: Int) -> ResponseHeadersBuilder {
     self.internalSet(name: ":status", value: ["\(status)"])
     return self
