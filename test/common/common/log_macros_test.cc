@@ -1,4 +1,5 @@
 #include <iostream>
+#include <pthread.h>
 #include <string>
 
 #include "common/common/logger.h"
@@ -148,10 +149,9 @@ TEST_F(FormatTest, OutputEscaped) {
  */
 TEST(Fancy, Global) {
   // First log
-  printf("Global test, first log: \n");
   EXPECT_THAT(global_epoch__, testing::Eq(nullptr));
   EXPECT_EQ(fancy_log_list__, nullptr);
-  FANCY_LOG(info, "Hello world! Here's a line of fancy log!\n");
+  FANCY_LOG(info, "Hello world! Here's a line of fancy log!");
   EXPECT_THAT(global_epoch__->load(), testing::Eq(0));
   
   EXPECT_NE(fancy_log_list__, nullptr);
@@ -159,37 +159,84 @@ TEST(Fancy, Global) {
   EXPECT_EQ(fancy_log_list__->level, 2);       // info
   
   // Second log
-  printf("Global test, second log: \n");
-  FANCY_LOG(error, "Fancy Error! Here's the second message!\n");
-  printf("After error print...\n");
+  FANCY_LOG(error, "Fancy Error! Here's the second message!");
   EXPECT_EQ(global_epoch__->load(), 0);
   EXPECT_EQ(fancy_log_list__->file, __FILE__);
-  printf("After two of assertion...\n");
   EXPECT_EQ(fancy_log_list__->level, 2);       // file level is default
 }
 
 TEST(Fancy, SetLevel) {
-  printf("SetLevel test: \n");
   int gepoch = global_epoch__->load();
   const char* file = "P=NP_file";
   setFancyLogLevel(file, spdlog::level::trace);
-  printf("After first setting level ...\n");
   EXPECT_EQ(global_epoch__->load(), gepoch + 1);
   EXPECT_EQ(fancy_log_list__->file, file);
   EXPECT_EQ(fancy_log_list__->level, 0);      // trace level
 
-  printf("Before second setting level ...\n");
   setFancyLogLevel(__FILE__, spdlog::level::err);
   EXPECT_EQ(fancy_log_list__->file, "P=NP_file");
   EXPECT_EQ(fancy_log_list__->level, 0);
   EXPECT_EQ(fancy_log_list__->next->file, __FILE__);
   EXPECT_EQ(fancy_log_list__->next->level, 4);
-  FANCY_LOG(error, "Fancy Error! Here's a test for level.\n");
-  
-  printf("Last: warn message here.\n");
-  FANCY_LOG(warn, "Warning: you shouldn't see this message!\n");
+  FANCY_LOG(error, "Fancy Error! Here's a test for level.");
+  FANCY_LOG(warn, "Warning: you shouldn't see this message!");
 
 }
+
+TEST(Fancy, FastPath) {
+  // for loop should expands with the same site?
+  printf("You should only see two 'Slow path' in the output..\n");
+  setFancyLogLevel(__FILE__, spdlog::level::info);
+  for(int i = 0; i < 10; i ++) {
+    FANCY_LOG(warn, "Fake warning No. {}", i);
+  }
+}
+
+void *logThread(void* id) {
+  int tid = *static_cast<int*>(id);
+  if (tid) {
+    for (int i = 0; i < 5; i ++) {
+      FANCY_LOG(critical, "Thread {} round {}: fake critical log;", tid, i);
+      FANCY_LOG(trace, "    fake trace log;");
+      FANCY_LOG(debug, "    fake debug log;");
+      FANCY_LOG(info, "   fake info;");
+      FANCY_LOG(warn, "   fake warn;");
+      FANCY_LOG(error, "    fake error;");
+      FANCY_LOG(critical, "   fake critical."); 
+    }
+  }
+  else {
+    FANCY_LOG(info, "Thread {}: thread to set levels", tid);
+    setFancyLogLevel(__FILE__, spdlog::level::trace);
+    printf(" - level = trace\n");
+    setFancyLogLevel(__FILE__, spdlog::level::debug);
+    printf(" - level = debug\n");
+    setFancyLogLevel(__FILE__, spdlog::level::info);
+    printf(" - level = info\n");
+    setFancyLogLevel(__FILE__, spdlog::level::warn);
+    printf(" - level = warn\n");
+    setFancyLogLevel(__FILE__, spdlog::level::err);
+    printf(" - level = error\n");
+    setFancyLogLevel(__FILE__, spdlog::level::critical);
+    printf(" - level = critical\n");
+  }
+  pthread_exit(nullptr);
+  return nullptr;
+}
+
+// TEST(FANCY, Threads) {
+//   // test with multiple threads
+//   pthread_t threads[2];
+//   int num[] = {0, 1};
+//   for (int id : {0, 1}) {
+//     int rc = pthread_create(&threads[id], nullptr, logThread, static_cast<void*>(&num[id]));
+//     EXPECT_EQ(rc, 0);
+//   }
+//   for (int id : {0, 1}) {
+//     pthread_join(threads[id], nullptr);
+//   }
+//   pthread_exit(nullptr);
+// }
 
 
 } // namespace Envoy

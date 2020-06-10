@@ -17,7 +17,7 @@
 #include "absl/synchronization/mutex.h"
 #include "fmt/ostream.h"
 #include "spdlog/spdlog.h"
-#include "absl/container/flat_hash_map.h"       // addition by Jinhui Song
+#include "absl/container/flat_hash_map.h" // addition by Jinhui Song
 
 namespace Envoy {
 namespace Logger {
@@ -359,17 +359,10 @@ protected:
 
 // TODO(danielhochman): macros(s)/function(s) for logging structures that support iteration.
 
-
 /**
  * ---------------------------------------------------------------
  * Fancy logging macros by Jinhui Song
  */
-
-
-/**
- * Constant value for uninitialized flag of local epoch.
- */
-// int kUnInitialized = -1;
 
 extern spdlog::level::level_enum kDefaultFancyLevel;
 
@@ -386,26 +379,33 @@ struct FancyLogInfo {
 
 extern FancyLogInfo* fancy_log_list__;
 
-extern spdlog::logger getFancyLogger(const char* file, int* local_epoch, spdlog::level::level_enum** local_level);
-
 extern int setFancyLogLevel(const char* file, spdlog::level::level_enum log_level);
 
+extern void updateFancyLogger(const char* file, spdlog::logger* logger, std::atomic<int>* local_epoch);
+
+extern spdlog::sink_ptr getSink();
+
 /**
- * Macro for fancy logger. 
+ * Macro for fancy logger.
  * Use atomic global_epoch here to avoid the lock overhead and update all logger
  * if one logger's log level is updated.
  */
-#define FANCY_LOGGER() ({   \
-  static int local_epoch__ = -1;                                  \
-  static spdlog::level::level_enum* local_level__ = &kDefaultFancyLevel;           \
-  spdlog::logger flogger(Envoy::getFancyLogger(__FILE__, &local_epoch__, &local_level__));  \
-  flogger;                                                                    \
-})
+#define FANCY_LOG(LEVEL, ...)                                                                \
+  do {                                                                                       \
+    static std::atomic<int> local_epoch(-1);                                                             \
+    static spdlog::logger flogger(__FILE__, getSink());                  \
+    if (!global_epoch__ || local_epoch.load() < global_epoch__->load()) {                           \
+      updateFancyLogger(__FILE__, &flogger, &local_epoch);                                       \
+    }                                                                                        \
+    flogger.log(spdlog::source_loc{__FILE__, __LINE__, __func__}, ENVOY_SPDLOG_LEVEL(LEVEL), \
+                __VA_ARGS__);                                                                \
+  } while (0)
 
-#define FANCY_LOG(LEVEL, ...) ENVOY_LOG_TO_LOGGER(FANCY_LOGGER(), LEVEL, ##__VA_ARGS__)
+// #define FANCY_LOG(LEVEL, ...) ENVOY_LOG_TO_LOGGER(FANCY_LOGGER(), LEVEL, ##__VA_ARGS__)
+
 
 /**
- * End 
+ * End
  * ----------------------------------------------------------------
  */
 
