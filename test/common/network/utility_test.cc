@@ -350,24 +350,24 @@ TEST(NetworkUtility, ProtobufAddressSocketType) {
   {
     envoy::config::core::v3::Address proto_address;
     proto_address.mutable_socket_address();
-    EXPECT_EQ(Address::SocketType::Stream, Utility::protobufAddressSocketType(proto_address));
+    EXPECT_EQ(Socket::Type::Stream, Utility::protobufAddressSocketType(proto_address));
   }
   {
     envoy::config::core::v3::Address proto_address;
     proto_address.mutable_socket_address()->set_protocol(
         envoy::config::core::v3::SocketAddress::TCP);
-    EXPECT_EQ(Address::SocketType::Stream, Utility::protobufAddressSocketType(proto_address));
+    EXPECT_EQ(Socket::Type::Stream, Utility::protobufAddressSocketType(proto_address));
   }
   {
     envoy::config::core::v3::Address proto_address;
     proto_address.mutable_socket_address()->set_protocol(
         envoy::config::core::v3::SocketAddress::UDP);
-    EXPECT_EQ(Address::SocketType::Datagram, Utility::protobufAddressSocketType(proto_address));
+    EXPECT_EQ(Socket::Type::Datagram, Utility::protobufAddressSocketType(proto_address));
   }
   {
     envoy::config::core::v3::Address proto_address;
     proto_address.mutable_pipe();
-    EXPECT_EQ(Address::SocketType::Stream, Utility::protobufAddressSocketType(proto_address));
+    EXPECT_EQ(Socket::Type::Stream, Utility::protobufAddressSocketType(proto_address));
   }
 }
 

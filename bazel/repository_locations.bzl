@@ -201,9 +201,9 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "N/A",
     ),
     com_github_nghttp2_nghttp2 = dict(
-        sha256 = "eb9d9046495a49dd40c7ef5d6c9907b51e5a6b320ea6e2add11eb8b52c982c47",
-        strip_prefix = "nghttp2-1.40.0",
-        urls = ["https://github.com/nghttp2/nghttp2/releases/download/v1.40.0/nghttp2-1.40.0.tar.gz"],
+        sha256 = "eacc6f0f8543583ecd659faf0a3f906ed03826f1d4157b536b4b385fe47c5bb8",
+        strip_prefix = "nghttp2-1.41.0",
+        urls = ["https://github.com/nghttp2/nghttp2/releases/download/v1.41.0/nghttp2-1.41.0.tar.gz"],
         use_category = ["dataplane"],
         cpe = "cpe:2.3:a:nghttp2:nghttp2:*",
     ),
@@ -263,9 +263,10 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "cpe:2.3:a:gnu:zlib:*",
     ),
     com_github_jbeder_yaml_cpp = dict(
-        sha256 = "77ea1b90b3718aa0c324207cb29418f5bced2354c2e483a9523d98c3460af1ed",
-        strip_prefix = "yaml-cpp-yaml-cpp-0.6.3",
-        urls = ["https://github.com/jbeder/yaml-cpp/archive/yaml-cpp-0.6.3.tar.gz"],
+        sha256 = "17ffa6320c33de65beec33921c9334dee65751c8a4b797ba5517e844062b98f1",
+        strip_prefix = "yaml-cpp-6701275f1910bf63631528dfd9df9c3ac787365b",
+        # 2020-05-25
+        urls = ["https://github.com/jbeder/yaml-cpp/archive/6701275f1910bf63631528dfd9df9c3ac787365b.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),
@@ -358,6 +359,14 @@ DEPENDENCY_REPOSITORIES = dict(
         urls = ["https://github.com/bazelbuild/rules_go/releases/download/v0.20.3/rules_go-v0.20.3.tar.gz"],
         use_category = ["build"],
     ),
+    rules_cc = dict(
+        sha256 = "9d48151ea71b3e225adfb6867e6d2c7d0dce46cbdc8710d9a9a628574dfd40a0",
+        strip_prefix = "rules_cc-818289e5613731ae410efb54218a4077fb9dbb03",
+        # 2020-05-13
+        # TODO(lizan): pin to a point releases when there's a released version.
+        urls = ["https://github.com/bazelbuild/rules_cc/archive/818289e5613731ae410efb54218a4077fb9dbb03.tar.gz"],
+        use_category = ["build"],
+    ),
     rules_foreign_cc = dict(
         sha256 = "3184c244b32e65637a74213fc448964b687390eeeca42a36286f874c046bba15",
         strip_prefix = "rules_foreign_cc-7bc4be735b0560289f6b86ab6136ee25d20b65b7",
@@ -402,9 +411,9 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "N/A",
     ),
     com_googlesource_quiche = dict(
-        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/41c9fdead26b31deefae3c325a2cf1a873688ba3.tar.gz
-        sha256 = "75af53154402e1654cfd32d8aaeed5fab4dbb79d3cab8c9866019d5369c1889e",
-        urls = ["https://storage.googleapis.com/quiche-envoy-integration/41c9fdead26b31deefae3c325a2cf1a873688ba3.tar.gz"],
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/25da9198727ef05edeb99d9f4ce5b6acb3cb87b5.tar.gz
+        sha256 = "52bac2f91a0900730fe3bfb14ffb668f205fe0de48e42ecfee677e3743ec33ee",
+        urls = ["https://storage.googleapis.com/quiche-envoy-integration/25da9198727ef05edeb99d9f4ce5b6acb3cb87b5.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),

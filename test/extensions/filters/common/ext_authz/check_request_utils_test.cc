@@ -167,7 +167,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttp) {
 // Verify that check request object has only a portion of the request data.
 TEST_F(CheckRequestUtilsTest, BasicHttpWithPartialBody) {
   const uint64_t size = 4049;
-  Http::RequestHeaderMapImpl headers_;
+  Http::TestRequestHeaderMapImpl headers_;
   envoy::service::auth::v3::CheckRequest request_;
 
   EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
@@ -185,7 +185,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithPartialBody) {
 
 // Verify that check request object has all the request data.
 TEST_F(CheckRequestUtilsTest, BasicHttpWithFullBody) {
-  Http::RequestHeaderMapImpl headers_;
+  Http::TestRequestHeaderMapImpl headers_;
   envoy::service::auth::v3::CheckRequest request_;
 
   EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));

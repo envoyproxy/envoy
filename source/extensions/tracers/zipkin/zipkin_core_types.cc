@@ -69,7 +69,7 @@ void Annotation::changeEndpointServiceName(const std::string& service_name) {
 const ProtobufWkt::Struct Annotation::toStruct(Util::Replacements& replacements) const {
   ProtobufWkt::Struct annotation;
   auto* fields = annotation.mutable_fields();
-  (*fields)[ANNOTATION_TIMESTAMP] = Util::uint64Value(timestamp_, replacements);
+  (*fields)[ANNOTATION_TIMESTAMP] = Util::uint64Value(timestamp_, SPAN_TIMESTAMP, replacements);
   (*fields)[ANNOTATION_VALUE] = ValueUtil::stringValue(value_);
   if (endpoint_.has_value()) {
     (*fields)[ANNOTATION_ENDPOINT] =
@@ -159,13 +159,13 @@ const ProtobufWkt::Struct Span::toStruct(Util::Replacements& replacements) const
     // Usually we store number to a ProtobufWkt::Struct object via ValueUtil::numberValue.
     // However, due to the possibility of rendering that to a number with scientific notation, we
     // chose to store it as a string and keeping track the corresponding replacement.
-    (*fields)[SPAN_TIMESTAMP] = Util::uint64Value(timestamp_.value(), replacements);
+    (*fields)[SPAN_TIMESTAMP] = Util::uint64Value(timestamp_.value(), SPAN_TIMESTAMP, replacements);
   }
 
   if (duration_.has_value()) {
     // Since SPAN_DURATION has the same data type with SPAN_TIMESTAMP, we use Util::uint64Value to
     // store it.
-    (*fields)[SPAN_DURATION] = Util::uint64Value(duration_.value(), replacements);
+    (*fields)[SPAN_DURATION] = Util::uint64Value(duration_.value(), SPAN_DURATION, replacements);
   }
 
   if (!annotations_.empty()) {
