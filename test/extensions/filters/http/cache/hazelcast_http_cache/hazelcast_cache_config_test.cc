@@ -62,15 +62,15 @@ TEST_F(ConfigUtilsTest, ValidMaxBodySizeTest) {
 TEST_F(ConfigUtilsTest, ClientConfigTest) {
   const std::string group_name = "group_foo";
   const std::string group_pass = "foo_pass";
-  const std::string random_ip = "192.168.10.3";
-  constexpr int random_port = 5703;
+  const std::string member_address = "192.168.10.3"; // arbitrary address
+  constexpr int member_port = 5703; // arbitrary port
 
   HazelcastHttpCacheConfig default_cache_config;
   default_cache_config.set_group_name(group_name);
   default_cache_config.set_group_password(group_pass);
-  HazelcastHttpCacheConfig::MemberAddress* memberAddress = default_cache_config.add_addresses();
-  memberAddress->set_ip(random_ip);
-  memberAddress->set_port(random_port);
+  ::envoy::config::core::v3::SocketAddress* address = default_cache_config.add_addresses();
+  address->set_address(member_address);
+  address->set_port_value(member_port);
 
   hazelcast::client::ClientConfig config = ConfigUtil::getClientConfig(default_cache_config);
 
@@ -86,8 +86,8 @@ TEST_F(ConfigUtilsTest, ClientConfigTest) {
   EXPECT_STREQ(group_pass.c_str(), config.getGroupConfig().getPassword().c_str());
   std::vector<hazelcast::client::Address> addresses = config.getNetworkConfig().getAddresses();
   EXPECT_EQ(1, addresses.size());
-  EXPECT_STREQ(random_ip.c_str(), addresses.at(0).getHost().c_str());
-  EXPECT_EQ(random_port, addresses.at(0).getPort());
+  EXPECT_STREQ(member_address.c_str(), addresses.at(0).getHost().c_str());
+  EXPECT_EQ(member_port, addresses.at(0).getPort());
 }
 
 TEST_F(ConfigUtilsTest, WarnLimitTest) {

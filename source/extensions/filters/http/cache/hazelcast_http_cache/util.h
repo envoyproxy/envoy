@@ -41,7 +41,7 @@ public:
     config.getGroupConfig().setPassword(cache_config.group_password());
     for (auto& address : cache_config.addresses()) {
       config.getNetworkConfig().addAddress(
-          hazelcast::client::Address(address.ip(), address.port()));
+          hazelcast::client::Address(address.address(), address.port_value()));
     }
     config.getNetworkConfig().setConnectionTimeout(cache_config.connection_timeout() == 0
                                                        ? DEFAULT_CONNECTION_TIMEOUT_MS

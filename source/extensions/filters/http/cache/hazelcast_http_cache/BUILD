@@ -41,4 +41,5 @@ envoy_cc_extension(
 envoy_proto_library(
     name = "config",
     srcs = ["config.proto"],
+    deps = ["@envoy_api//envoy/config/core/v3:pkg"],
 )

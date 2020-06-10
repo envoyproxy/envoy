@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.source.extensions.filters.http.cache;
 
+import "envoy/config/core/v3/address.proto";
+
 // [#protodoc-title: HazelcastHttpCache CacheFilter storage plugin]
 // CacheFilter plugin backed by Hazelcast In Memory Data Grid.
 // [#extension: envoy.extensions.http.cache]
@@ -9,16 +11,9 @@ package envoy.source.extensions.filters.http.cache;
 // Hazelcast Http Cache configuration
 message HazelcastHttpCacheConfig {
 
-  // Address for Hazelcast cluster member to be connected.
-  message MemberAddress {
-    string ip = 1;
-    int32 port = 2;
-  }
-
-  // Group name of Hazelcast cluster to be connected. Not only the address of a member
-  // but its group name and password must match.
+  // Group name of the Hazelcast cluster to be connected.
   string group_name = 1;
-  // Group password of Hazelcast cluster to be connected.
+  // Group password of the Hazelcast cluster to be connected.
   string group_password = 2;
 
   // The timeout value in milliseconds for Hazelcast members to accept this client's
@@ -43,10 +38,11 @@ message HazelcastHttpCacheConfig {
   // 8 by default and 0 is not allowed.
   uint32 invocation_timeout = 6;
 
-  // Only one member address is enough to connect to the cluster but
-  // providing more than one is recommended. By default, 127.0.0.1:5701 will
-  // be tried.
-  repeated MemberAddress addresses = 7;
+  // Address and port value of the cluster members. Other fields such as protocol, resolver_name, etc.
+  // are not required. Only one Hazelcast member address is enough to connect to the cluster but
+  // providing more than one is recommended. If no address is provided, 127.0.0.1:5701 will be tried
+  // by default.
+  repeated envoy.config.core.v3.SocketAddress addresses = 7;
 
   // Application specific name for the cache. Different deployments should
   // use the same prefix and connect to the same Hazelcast cluster if they want

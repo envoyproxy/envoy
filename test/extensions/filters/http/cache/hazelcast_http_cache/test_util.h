@@ -37,9 +37,9 @@ public:
     HazelcastHttpCacheConfig typed_config;
     typed_config.set_group_name("dev");
     typed_config.set_group_password("dev-pass");
-    HazelcastHttpCacheConfig::MemberAddress* memberAddress = typed_config.add_addresses();
-    memberAddress->set_ip("127.0.0.1");
-    memberAddress->set_port(5701);
+    envoy::config::core::v3::SocketAddress* member_address = typed_config.add_addresses();
+    member_address->set_address("127.0.0.1");
+    member_address->set_port_value(5701);
     typed_config.set_invocation_timeout(1);
     typed_config.set_body_partition_size(TEST_PARTITION_SIZE);
     // During parallel tests, if caches do not have different prefixes, the entries
