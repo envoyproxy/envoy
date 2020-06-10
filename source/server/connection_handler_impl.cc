@@ -30,7 +30,7 @@ void ConnectionHandlerImpl::decNumConnections() {
 void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_listener,
                                         Network::ListenerConfig& config) {
   ActiveListenerDetails details;
-  if (config.listenSocketFactory().socketType() == Network::Address::SocketType::Stream) {
+  if (config.listenSocketFactory().socketType() == Network::Socket::Type::Stream) {
     if (overridden_listener.has_value()) {
       for (auto& listener : listeners_) {
         if (listener.second.listener_->listenerTag() == overridden_listener) {

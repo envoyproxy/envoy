@@ -39,12 +39,13 @@ public:
             createConnectionSocket(peer_addr_, self_addr_, nullptr))),
         quic_session_(quic_config_, {quic_version_}, quic_connection_, *dispatcher_,
                       quic_config_.GetInitialStreamFlowControlWindowToSend() * 2),
-        stream_id_(quic_version_.transport_version == quic::QUIC_VERSION_IETF_DRAFT_27 ? 4u : 5u),
+        stream_id_(quic::VersionUsesHttp3(quic_version_.transport_version) ? 4u : 5u),
         quic_stream_(new EnvoyQuicClientStream(stream_id_, &quic_session_, quic::BIDIRECTIONAL)),
         request_headers_{{":authority", host_}, {":method", "POST"}, {":path", "/"}} {
     quic_stream_->setResponseDecoder(stream_decoder_);
     quic_stream_->addCallbacks(stream_callbacks_);
     quic_session_.ActivateStream(std::unique_ptr<EnvoyQuicClientStream>(quic_stream_));
+    EXPECT_CALL(quic_session_, ShouldYield(_)).WillRepeatedly(testing::Return(false));
     EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _))
         .WillRepeatedly(Invoke([](quic::QuicStreamId, size_t write_length, quic::QuicStreamOffset,
                                   quic::StreamSendingState state, bool,
@@ -60,6 +61,8 @@ public:
 
   void SetUp() override {
     quic_session_.Initialize();
+    setQuicConfigWithDefaultValues(quic_session_.config());
+    quic_session_.OnConfigNegotiated();
     quic_connection_->setUpConnectionSocket();
     response_headers_.OnHeaderBlockStart();
     response_headers_.OnHeader(":status", "200");
@@ -68,7 +71,7 @@ public:
 
     trailers_.OnHeaderBlockStart();
     trailers_.OnHeader("key1", "value1");
-    if (quic_version_.transport_version != quic::QUIC_VERSION_IETF_DRAFT_27) {
+    if (!quic::VersionUsesHttp3(quic_version_.transport_version)) {
       // ":final-offset" is required and stripped off by quic.
       trailers_.OnHeader(":final-offset", absl::StrCat("", response_body_.length()));
     }
@@ -136,7 +139,7 @@ TEST_P(EnvoyQuicClientStreamTest, PostRequestAndResponse) {
         EXPECT_EQ(0, buffer.length());
       }));
   std::string data = response_body_;
-  if (quic_version_.transport_version == quic::QUIC_VERSION_IETF_DRAFT_27) {
+  if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
     std::unique_ptr<char[]> data_buffer;
     quic::QuicByteCount data_frame_header_length =
         quic::HttpEncoder::SerializeDataFrameHeader(response_body_.length(), &data_buffer);
@@ -174,7 +177,7 @@ TEST_P(EnvoyQuicClientStreamTest, OutOfOrderTrailers) {
   quic_stream_->OnStreamHeaderList(/*fin=*/true, trailers_.uncompressed_header_bytes(), trailers_);
 
   std::string data = response_body_;
-  if (quic_version_.transport_version == quic::QUIC_VERSION_IETF_DRAFT_27) {
+  if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
     std::unique_ptr<char[]> data_buffer;
     quic::QuicByteCount data_frame_header_length =
         quic::HttpEncoder::SerializeDataFrameHeader(response_body_.length(), &data_buffer);
