@@ -5,7 +5,6 @@
 
 #include "envoy/common/platform.h"
 
-#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/network/address_impl.h"
@@ -21,7 +20,7 @@ namespace Network {
 namespace Test {
 
 Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstSharedPtr addr_port,
-                                                    Address::SocketType type) {
+                                                    Socket::Type type) {
   if (addr_port == nullptr || addr_port->type() != Address::Type::Ip) {
     ADD_FAILURE() << "Not an internet address: "
                   << (addr_port == nullptr ? "nullptr" : addr_port->asString());
@@ -35,7 +34,7 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
   const char* failing_fn = nullptr;
   if (result.rc_ != 0) {
     failing_fn = "bind";
-  } else if (type == Address::SocketType::Stream) {
+  } else if (type == Socket::Type::Stream) {
     // Try listening on the port also, if the type is TCP.
     result = sock.listen(1);
     if (result.rc_ != 0) {
@@ -55,17 +54,11 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
                   << "' with error: " << strerror(result.errno_) << " (" << result.errno_ << ")";
     return nullptr;
   }
-  // If the port we bind is zero, then the OS will pick a free port for us (assuming there are
-  // any), and we need to find out the port number that the OS picked so we can return it.
-  // TODO(fcoras) maybe move to SocketImpl
-  if (addr_port->ip()->port() == 0) {
-    return SocketInterfaceSingleton::get().addressFromFd(sock.ioHandle().fd());
-  }
-  return addr_port;
+  return sock.localAddress();
 }
 
 Address::InstanceConstSharedPtr findOrCheckFreePort(const std::string& addr_port,
-                                                    Address::SocketType type) {
+                                                    Socket::Type type) {
   auto instance = Utility::parseInternetAddressAndPort(addr_port);
   if (instance != nullptr) {
     instance = findOrCheckFreePort(instance, type);
@@ -75,35 +68,35 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(const std::string& addr_port
   return instance;
 }
 
-const std::string getLoopbackAddressUrlString(const Address::IpVersion version) {
+std::string getLoopbackAddressUrlString(const Address::IpVersion version) {
   if (version == Address::IpVersion::v6) {
     return std::string("[::1]");
   }
   return std::string("127.0.0.1");
 }
 
-const std::string getLoopbackAddressString(const Address::IpVersion version) {
+std::string getLoopbackAddressString(const Address::IpVersion version) {
   if (version == Address::IpVersion::v6) {
     return std::string("::1");
   }
   return std::string("127.0.0.1");
 }
 
-const std::string getAnyAddressUrlString(const Address::IpVersion version) {
+std::string getAnyAddressUrlString(const Address::IpVersion version) {
   if (version == Address::IpVersion::v6) {
     return std::string("[::]");
   }
   return std::string("0.0.0.0");
 }
 
-const std::string getAnyAddressString(const Address::IpVersion version) {
+std::string getAnyAddressString(const Address::IpVersion version) {
   if (version == Address::IpVersion::v6) {
     return std::string("::");
   }
   return std::string("0.0.0.0");
 }
 
-const std::string addressVersionAsString(const Address::IpVersion version) {
+std::string addressVersionAsString(const Address::IpVersion version) {
   if (version == Address::IpVersion::v4) {
     return std::string("v4");
   }
@@ -149,15 +142,8 @@ Address::InstanceConstSharedPtr getAnyAddress(const Address::IpVersion version, 
 }
 
 bool supportsIpVersion(const Address::IpVersion version) {
-  Address::InstanceConstSharedPtr addr = getCanonicalLoopbackAddress(version);
-  SocketImpl sock(Address::SocketType::Stream, addr);
-  if (0 != sock.bind(addr).rc_) {
-    // Socket bind failed.
-    RELEASE_ASSERT(sock.ioHandle().close().err_ == nullptr, "");
-    return false;
-  }
-  RELEASE_ASSERT(sock.ioHandle().close().err_ == nullptr, "");
-  return true;
+  return Network::SocketInterfaceSingleton::get().ipFamilySupported(
+      version == Address::IpVersion::v4 ? AF_INET : AF_INET6);
 }
 
 std::string ipVersionToDnsFamily(Network::Address::IpVersion version) {
@@ -173,7 +159,7 @@ std::string ipVersionToDnsFamily(Network::Address::IpVersion version) {
 }
 
 std::pair<Address::InstanceConstSharedPtr, Network::SocketPtr>
-bindFreeLoopbackPort(Address::IpVersion version, Address::SocketType type) {
+bindFreeLoopbackPort(Address::IpVersion version, Socket::Type type) {
   Address::InstanceConstSharedPtr addr = getCanonicalLoopbackAddress(version);
   SocketPtr sock = std::make_unique<SocketImpl>(type, addr);
   Api::SysCallIntResult result = sock->bind(addr);
@@ -185,8 +171,7 @@ bindFreeLoopbackPort(Address::IpVersion version, Address::SocketType type) {
     throw EnvoyException(msg);
   }
 
-  return std::make_pair(SocketInterfaceSingleton::get().addressFromFd(sock->ioHandle().fd()),
-                        std::move(sock));
+  return std::make_pair(sock->localAddress(), std::move(sock));
 }
 
 TransportSocketPtr createRawBufferSocket() { return std::make_unique<RawBufferSocket>(); }
