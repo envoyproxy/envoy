@@ -520,8 +520,9 @@ TEST_F(Http1ConnPoolImplTest, CancelExcessBeforeBound) {
   EXPECT_NE(nullptr, handle);
 
   handle->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
-  // Unlike CancelBeforeBound there is no need to clean up the connection as the
-  // cancel closes it.
+  // Unlike CancelBeforeBound there is no need to raise a close event to destroy the connection.
+  EXPECT_CALL(conn_pool_, onClientDestroy());
+  dispatcher_.clearDeferredDeleteList();
 }
 
 /**

@@ -371,8 +371,7 @@ void ConnPoolImplBase::onPendingRequestCancel(PendingRequest& request,
   } else {
     request.removeFromList(pending_requests_);
   }
-  if (policy == Envoy::ConnectionPool::CancelPolicy::CloseExcess &&
-      connecting_clients_.size() != 0 &&
+  if (policy == Envoy::ConnectionPool::CancelPolicy::CloseExcess && !connecting_clients_.empty() &&
       pending_requests_.size() + connecting_clients_.front()->effectiveConcurrentRequestLimit() <=
           connecting_request_capacity_) {
     connecting_clients_.front()->close();
