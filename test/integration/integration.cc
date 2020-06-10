@@ -284,8 +284,8 @@ BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
 
 BaseIntegrationTest::~BaseIntegrationTest() {
   // Tear down the fake upstream before the test server.
-  // When the HTTP cocecs do runtime checks, it is important to finish all
-  // runtime access before the server, and the runtime singlton, go away.
+  // When the HTTP codecs do runtime checks, it is important to finish all
+  // runtime access before the server, and the runtime singleton, go away.
   fake_upstreams_.clear();
   test_server_.reset();
 }
