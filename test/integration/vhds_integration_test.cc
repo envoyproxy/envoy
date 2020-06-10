@@ -653,5 +653,38 @@ TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateFailToResolveOneAliasOutOfSeveral)
   cleanupUpstreamAndDownstream();
 }
 
+// Verify that an vhds update succeeds even when the client closes its connection
+TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateHttpConnectionCloses) {
+  // RDS exchange with a non-empty virtual_hosts field
+  useRdsWithVhosts();
+
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1);
+  cleanupUpstreamAndDownstream();
+  EXPECT_TRUE(codec_client_->waitForDisconnect());
+
+  // Attempt to make a request to an unknown host
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "vhost_1"},
+                                                 {"x-lyft-user-id", "123"}};
+  auto encoder_decoder = codec_client_->startRequest(request_headers);
+  Http::RequestEncoder& encoder = encoder_decoder.first;
+  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost,
+                                           {vhdsRequestResourceName("vhost_1")}, {}, vhds_stream_));
+
+  envoy::api::v2::DeltaDiscoveryResponse vhds_update =
+      createDeltaDiscoveryResponseWithResourceNameUsedAsAlias();
+  vhds_stream_->sendGrpcMessage(vhds_update);
+
+  codec_client_->sendReset(encoder);
+  response->waitForReset();
+  EXPECT_TRUE(codec_client_->connected());
+
+  cleanupUpstreamAndDownstream();
+}
+
 } // namespace
 } // namespace Envoy
