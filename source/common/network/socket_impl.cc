@@ -10,11 +10,10 @@
 namespace Envoy {
 namespace Network {
 
-SocketImpl::SocketImpl(Address::SocketType type, Address::Type addr_type,
-                       Address::IpVersion version)
+SocketImpl::SocketImpl(Socket::Type type, Address::Type addr_type, Address::IpVersion version)
     : io_handle_(SocketInterfaceSingleton::get().socket(type, addr_type, version)) {}
 
-SocketImpl::SocketImpl(Address::SocketType sock_type, const Address::InstanceConstSharedPtr addr)
+SocketImpl::SocketImpl(Socket::Type sock_type, const Address::InstanceConstSharedPtr addr)
     : io_handle_(SocketInterfaceSingleton::get().socket(sock_type, addr)), sock_type_(sock_type),
       addr_type_(addr->type()) {}
 
