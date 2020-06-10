@@ -49,6 +49,7 @@ public:
     quic_stream_->setRequestDecoder(stream_decoder_);
     quic_stream_->addCallbacks(stream_callbacks_);
     quic_session_.ActivateStream(std::unique_ptr<EnvoyQuicServerStream>(quic_stream_));
+    EXPECT_CALL(quic_session_, ShouldYield(_)).WillRepeatedly(testing::Return(false));
     EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _))
         .WillRepeatedly(Invoke([](quic::QuicStreamId, size_t write_length, quic::QuicStreamOffset,
                                   quic::StreamSendingState state, bool,
@@ -64,6 +65,8 @@ public:
 
   void SetUp() override {
     quic_session_.Initialize();
+    setQuicConfigWithDefaultValues(quic_session_.config());
+    quic_session_.OnConfigNegotiated();
     request_headers_.OnHeaderBlockStart();
     request_headers_.OnHeader(":authority", host_);
     request_headers_.OnHeader(":method", "POST");
