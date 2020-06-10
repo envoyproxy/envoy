@@ -7,6 +7,7 @@
 
 using testing::_;
 using testing::Assign;
+using testing::ByMove;
 using testing::InSequence;
 using testing::Return;
 using testing::ReturnRef;
@@ -24,7 +25,7 @@ public:
   HttpPerRequestTapperImplTest() {
     EXPECT_CALL(*config_, createPerTapSinkHandleManager_(1)).WillOnce(Return(sink_manager_));
     EXPECT_CALL(*config_, createMatchStatusVector())
-        .WillOnce(Return(TapCommon::Matcher::MatchStatusVector(1)));
+        .WillOnce(Return(ByMove(TapCommon::Matcher::MatchStatusVector(1))));
     EXPECT_CALL(*config_, rootMatcher()).WillRepeatedly(ReturnRef(matcher_));
     EXPECT_CALL(matcher_, onNewStream(_)).WillOnce(SaveArgAddress(&statuses_));
     tapper_ = std::make_unique<HttpPerRequestTapperImpl>(config_, 1);
