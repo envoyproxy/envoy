@@ -9,11 +9,6 @@ namespace DnsFilter {
 
 void DnsFilterResolver::resolveExternalQuery(DnsQueryContextPtr context,
                                              const DnsQueryRecord* domain_query) {
-  if (active_query_ != nullptr) {
-    active_query_->cancel();
-    active_query_ = nullptr;
-  }
-
   // Create an external resolution context for the query.
   LookupContext ctx{};
   ctx.query_rec = domain_query;
@@ -44,9 +39,8 @@ void DnsFilterResolver::resolveExternalQuery(DnsQueryContextPtr context,
   }
 
   const uint16_t id = ctx.query_context->id_;
-  if (!lookups_.contains(id)) {
-    lookups_.emplace(id, std::move(ctx));
-  }
+  lookups_.emplace(id, std::move(ctx));
+
   ENVOY_LOG(trace, "Pending queries: {}", lookups_.size());
 
   // Re-arm the timeout timer
@@ -55,7 +49,6 @@ void DnsFilterResolver::resolveExternalQuery(DnsQueryContextPtr context,
   // Define the callback that is executed when resolution completes
   auto resolve_cb = [this, id](Network::DnsResolver::ResolutionStatus status,
                                std::list<Network::DnsResponse>&& response) -> void {
-    active_query_ = nullptr;
     auto ctx_iter = lookups_.find(id);
     if (ctx_iter == lookups_.end()) {
       ENVOY_LOG(debug, "Unable to find context for DNS query for ID [{}]", id);
@@ -92,7 +85,7 @@ void DnsFilterResolver::resolveExternalQuery(DnsQueryContextPtr context,
   };
 
   // Resolve the address in the query and add to the resolved_hosts vector
-  active_query_ = resolver_->resolve(domain_query->name_, lookup_family, resolve_cb);
+  resolver_->resolve(domain_query->name_, lookup_family, resolve_cb);
 }
 
 void DnsFilterResolver::onResolveTimeout() {

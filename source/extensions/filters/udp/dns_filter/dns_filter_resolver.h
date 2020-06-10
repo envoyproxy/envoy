@@ -23,9 +23,7 @@ public:
       : dispatcher_(dispatcher),
         resolver_(dispatcher.createDnsResolver(resolvers, false /* use_tcp_for_dns_lookups */)),
         callback_(callback), timeout_(timeout),
-        timeout_timer_(dispatcher.createTimer([this]() -> void { onResolveTimeout(); })),
-        active_query_(nullptr) {}
-
+        timeout_timer_(dispatcher.createTimer([this]() -> void { onResolveTimeout(); })) {}
   /**
    * @brief entry point to resolve the name in a DnsQueryRecord
    *
@@ -50,13 +48,11 @@ private:
    * waiting for a response from the external resolver
    */
   void invokeCallback(LookupContext& context) {
-    // We've timed out. Guard against sending a response
-    if (context.resolver_status == DnsFilterResolverStatus::TimedOut) {
-      return;
+    // If we've timed out. Guard against sending a response
+    if (context.resolver_status == DnsFilterResolverStatus::Complete) {
+      timeout_timer_->disableTimer();
+      callback_(std::move(context.query_context), context.query_rec, context.resolved_hosts);
     }
-
-    timeout_timer_->disableTimer();
-    callback_(std::move(context.query_context), context.query_rec, context.resolved_hosts);
   }
 
   /**
@@ -70,7 +66,6 @@ private:
   DnsFilterResolverCallback& callback_;
   std::chrono::milliseconds timeout_;
   Event::TimerPtr timeout_timer_;
-  Network::ActiveDnsQuery* active_query_;
   absl::flat_hash_map<uint16_t, LookupContext> lookups_;
 };
 
