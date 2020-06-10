@@ -21,7 +21,6 @@ constexpr uint16_t DNS_RECORD_TYPE_AAAA = 28;
 
 constexpr uint16_t DNS_RESPONSE_CODE_NO_ERROR = 0;
 constexpr uint16_t DNS_RESPONSE_CODE_FORMAT_ERROR = 1;
-constexpr uint16_t DNS_RESPONSE_CODE_SERVER_FAILURE = 2;
 constexpr uint16_t DNS_RESPONSE_CODE_NAME_ERROR = 3;
 constexpr uint16_t DNS_RESPONSE_CODE_NOT_IMPLEMENTED = 4;
 
@@ -213,16 +212,6 @@ public:
    * @return uint16_t the response code flag value from a parsed dns object
    */
   uint16_t getQueryResponseCode() { return static_cast<uint16_t>(header_.flags.rcode); }
-
-  /**
-   * @return uint16_t the number of answer records in the parsed dns object
-   */
-  uint16_t getAnswers() { return header_.answers; }
-
-  /**
-   * @return uint16_t the response code flag value from a generated dns object
-   */
-  uint16_t getAnswerResponseCode() { return static_cast<uint16_t>(response_header_.flags.rcode); }
 
   /**
    * @brief Parse the incoming query and create a context object for the filter

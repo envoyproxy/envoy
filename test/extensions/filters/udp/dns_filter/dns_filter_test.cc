@@ -536,6 +536,56 @@ TEST_F(DnsFilterTest, ExternalResolutionReturnSingleAddress) {
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(resolver_.get()));
 }
 
+TEST_F(DnsFilterTest, ExternalResolutionIpv6SingleAddress) {
+  InSequence s;
+
+  const std::string expected_address("2a04:4e42:d::323");
+  const std::string domain("www.foobaz.com");
+  setup(forward_query_on_config);
+
+  // Verify that we are calling the resolver with the expected name
+  Network::DnsResolver::ResolveCb resolve_cb;
+  EXPECT_CALL(*resolver_, resolve(domain, _, _))
+      .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
+
+  const std::string query =
+      Utils::buildQueryForDomain(domain, DNS_RECORD_TYPE_AAAA, DNS_RECORD_CLASS_IN);
+  ASSERT_FALSE(query.empty());
+
+  // Send a query to for a name not in our configuration
+  sendQueryFromClient("10.0.0.1:1000", query);
+
+  // Expect another disableTimer call from within the callback
+  EXPECT_CALL(*timeout_timer_, disableTimer()).Times(AnyNumber());
+
+  // Execute resolve callback
+  resolve_cb(Network::DnsResolver::ResolutionStatus::Success,
+             TestUtility::makeDnsResponse({expected_address}));
+
+  // parse the result
+  query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
+  EXPECT_TRUE(query_ctx_->parse_status_);
+
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_parser_->getQueryResponseCode());
+  EXPECT_EQ(1, query_ctx_->answers_.size());
+
+  std::list<std::string> expected{expected_address};
+  for (const auto& answer : query_ctx_->answers_) {
+    EXPECT_EQ(answer.first, domain);
+    Utils::verifyAddress(expected, answer.second);
+  }
+
+  // Validate stats
+  EXPECT_EQ(1, config_->stats().downstream_rx_queries_.value());
+  EXPECT_EQ(1, config_->stats().external_aaaa_record_queries_.value());
+  EXPECT_EQ(1, config_->stats().external_aaaa_record_answers_.value());
+  EXPECT_EQ(1, config_->stats().aaaa_record_queries_.value());
+  EXPECT_EQ(0, config_->stats().a_record_queries_.value());
+  EXPECT_EQ(0, config_->stats().unanswered_queries_.value());
+
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(resolver_.get()));
+}
+
 TEST_F(DnsFilterTest, ExternalResolutionReturnMultipleAddresses) {
   InSequence s;
 
@@ -645,8 +695,56 @@ TEST_F(DnsFilterTest, ExternalResolutionTimeout) {
   sendQueryFromClient("10.0.0.1:1000", query);
   simTime().advanceTimeWait(std::chrono::milliseconds(1500));
 
-  // Execute resolve callback
+  // Execute timeout timer callback
   timeout_timer_->invokeCallback();
+
+  // parse the result
+  query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
+  EXPECT_TRUE(query_ctx_->parse_status_);
+  EXPECT_EQ(DNS_RESPONSE_CODE_NAME_ERROR, response_parser_->getQueryResponseCode());
+  EXPECT_EQ(0, query_ctx_->answers_.size());
+
+  // Validate stats
+  EXPECT_EQ(1, config_->stats().downstream_rx_queries_.value());
+  EXPECT_EQ(1, config_->stats().external_a_record_queries_.value());
+  EXPECT_EQ(0, config_->stats().external_a_record_answers_.value());
+  EXPECT_EQ(1, config_->stats().a_record_queries_.value());
+  EXPECT_EQ(0, config_->stats().aaaa_record_queries_.value());
+  EXPECT_EQ(0, config_->stats().unanswered_queries_.value());
+
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(resolver_.get()));
+}
+
+TEST_F(DnsFilterTest, ExternalResolutionTimeout2) {
+  InSequence s;
+
+  const std::string domain("www.foobaz.com");
+  setup(forward_query_on_config);
+
+  const std::string query =
+      Utils::buildQueryForDomain(domain, DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN);
+  ASSERT_FALSE(query.empty());
+
+  // Verify that we are calling the resolver with the expected name
+  Network::DnsResolver::ResolveCb resolve_cb;
+  EXPECT_CALL(*resolver_, resolve(domain, _, _))
+      .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
+
+  // Send a query to for a name not in our configuration
+  sendQueryFromClient("10.0.0.1:1000", query);
+  simTime().advanceTimeWait(std::chrono::milliseconds(1500));
+
+  // Execute timeout timer callback
+  timeout_timer_->invokeCallback();
+
+  // Expect another disableTimer call from within the callback
+  EXPECT_CALL(*timeout_timer_, disableTimer()).Times(AnyNumber());
+
+  // Execute resolve callback. This should harmlessly return and not alter
+  // the response received by the client. Even though we are returning a successful
+  // response, the client does not get an answer
+  resolve_cb(Network::DnsResolver::ResolutionStatus::Success,
+             TestUtility::makeDnsResponse({"130.207.244.251"}));
 
   // parse the result
   query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
