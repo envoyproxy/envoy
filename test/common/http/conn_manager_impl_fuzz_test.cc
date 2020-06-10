@@ -123,6 +123,30 @@ public:
     }
   }
 
+  Http::ForwardClientCertType
+  fromClientCert(envoy::extensions::filters::network::http_connection_manager::v3::
+                     HttpConnectionManager::ForwardClientCertDetails forward_client_cert) {
+    switch (forward_client_cert) {
+    case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+        SANITIZE:
+      return Http::ForwardClientCertType::Sanitize;
+    case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+        FORWARD_ONLY:
+      return Http::ForwardClientCertType::ForwardOnly;
+    case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+        APPEND_FORWARD:
+      return Http::ForwardClientCertType::AppendForward;
+    case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+        SANITIZE_SET:
+      return Http::ForwardClientCertType::SanitizeSet;
+    case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+        ALWAYS_FORWARD_ONLY:
+      return Http::ForwardClientCertType::AlwaysForwardOnly;
+    default:
+      return Http::ForwardClientCertType::Sanitize;
+    }
+  }
+
   // Http::ConnectionManagerConfig
 
   RequestIDExtensionSharedPtr requestIDExtension() override { return request_id_extension_; }
