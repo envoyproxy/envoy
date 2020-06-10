@@ -7,9 +7,8 @@ namespace Envoy {
 namespace Fuzz {
 
 DEFINE_FUZZER(const uint8_t* buf, size_t len) {
-  std::vector<uint8_t> key(buf, buf+len);
+  std::vector<uint8_t> key(buf, buf + len);
   auto digest = Common::Crypto::UtilitySingleton::get().importPublicKey(key);
-  
 }
 
 } // namespace Fuzz
