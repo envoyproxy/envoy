@@ -406,15 +406,19 @@ TEST_P(TcpProxyIntegrationTest, TestNoCloseOnHealthFailure) {
       cluster->mutable_health_checks(0)->mutable_unhealthy_threshold()->set_value(1);
       cluster->mutable_health_checks(0)->mutable_healthy_threshold()->set_value(1);
       cluster->mutable_health_checks(0)->mutable_tcp_health_check();
-      cluster->mutable_health_checks(0)->mutable_tcp_health_check()->mutable_send()->set_text("50696E67");;
-      cluster->mutable_health_checks(0)->mutable_tcp_health_check()->add_receive()->set_text("506F6E67");
+      cluster->mutable_health_checks(0)->mutable_tcp_health_check()->mutable_send()->set_text(
+          "50696E67");
+      ;
+      cluster->mutable_health_checks(0)->mutable_tcp_health_check()->add_receive()->set_text(
+          "506F6E67");
     }
   });
 
   FakeRawConnectionPtr fake_upstream_health_connection;
   on_server_init_function_ = [&](void) -> void {
     ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_health_connection));
-    ASSERT_TRUE(fake_upstream_health_connection->waitForData(FakeRawConnection::waitForInexactMatch("Ping")));
+    ASSERT_TRUE(fake_upstream_health_connection->waitForData(
+        FakeRawConnection::waitForInexactMatch("Ping")));
     ASSERT_TRUE(fake_upstream_health_connection->write("Pong"));
   };
 
@@ -433,10 +437,12 @@ TEST_P(TcpProxyIntegrationTest, TestNoCloseOnHealthFailure) {
   ASSERT_TRUE(fake_upstream_health_connection->close());
   ASSERT_TRUE(fake_upstream_health_connection->waitForDisconnect(true));
 
-  // By waiting we know the previous health check attempt completed (with a failure since we closed the connection on it)
+  // By waiting we know the previous health check attempt completed (with a failure since we closed
+  // the connection on it)
   FakeRawConnectionPtr fake_upstream_health_connection_reconnect;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_health_connection_reconnect));
-  ASSERT_TRUE(fake_upstream_health_connection_reconnect->waitForData(FakeRawConnection::waitForInexactMatch("Ping")));
+  ASSERT_TRUE(fake_upstream_health_connection_reconnect->waitForData(
+      FakeRawConnection::waitForInexactMatch("Ping")));
 
   tcp_client->write("still");
   ASSERT_TRUE(fake_upstream_connection->waitForData(15));
@@ -470,8 +476,11 @@ TEST_P(TcpProxyIntegrationTest, TestCloseOnHealthFailure) {
       cluster->mutable_health_checks(0)->mutable_unhealthy_threshold()->set_value(1);
       cluster->mutable_health_checks(0)->mutable_healthy_threshold()->set_value(1);
       cluster->mutable_health_checks(0)->mutable_tcp_health_check();
-      cluster->mutable_health_checks(0)->mutable_tcp_health_check()->mutable_send()->set_text("50696E67");;
-      cluster->mutable_health_checks(0)->mutable_tcp_health_check()->add_receive()->set_text("506F6E67");
+      cluster->mutable_health_checks(0)->mutable_tcp_health_check()->mutable_send()->set_text(
+          "50696E67");
+      ;
+      cluster->mutable_health_checks(0)->mutable_tcp_health_check()->add_receive()->set_text(
+          "506F6E67");
     }
   });
 
