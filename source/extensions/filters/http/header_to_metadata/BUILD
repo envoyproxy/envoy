@@ -1,11 +1,11 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 # HTTP L7 filter that transforms request data into dynamic metadata
 # Public docs: docs/root/configuration/http_filters/header_to_metadata_filter.rst
