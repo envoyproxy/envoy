@@ -26,19 +26,21 @@ filter_chains:
   filters: []
   transport_socket:
     name: envoy.transport_sockets.quic
-    config:
-      common_tls_context:
-        tls_certificates:
-        - certificate_chain:
-            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
-          private_key:
-            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
-        validation_context:
-          trusted_ca:
-            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-          match_subject_alt_names:
-          - exact: localhost
-          - exact: 127.0.0.1
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.transport_sockets.quic.v3.QuicDownstreamTransport
+      downstream_tls_context:
+        common_tls_context:
+          tls_certificates:
+          - certificate_chain:
+              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+            private_key:
+              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+          validation_context:
+            trusted_ca:
+              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+            match_subject_alt_names:
+            - exact: localhost
+            - exact: 127.0.0.1
 reuse_port: true
 udp_listener_config:
   udp_listener_name: "quiche_quic_listener"
