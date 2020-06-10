@@ -90,7 +90,8 @@ Http::StreamResetReason quicErrorCodeToEnvoyResetReason(quic::QuicErrorCode erro
   }
 }
 
-Http::ErrorCode quicErrorCodeToEnvoyErrorCode(quic::QuicErrorCode error) {
+ABSL_MUST_USE_RESULT
+Http::ErrorCode quicErrorCodeToEnvoyErrorCode(quic::QuicErrorCode error) noexcept {
   switch (error) {
   case quic::QUIC_NO_ERROR:
     return Http::ErrorCode::NoError;
