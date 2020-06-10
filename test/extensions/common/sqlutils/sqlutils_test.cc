@@ -165,14 +165,9 @@ INSTANTIATE_TEST_SUITE_P(
         TEST_VALUE("ALTER DATABASE testdb default CHARACTER SET = charset_name;", true, {}),
         TEST_VALUE("ALTER SCHEMA testdb default CHARACTER SET = charset_name;", true, {}),
 
-        // The following DROP DATABASE tests should not produce metadata,
-        // but the SQL parser returns info that table 'testdb' was accessed.
-        // This if a bug. Once SQL parser if fixed the following tests should
-        // be enabled.
-        // SPELLCHECKER(off)
-        // TEST_VALUE("DROP DATABASE testdb;", true, {}),
-        // TEST_VALUE("DROP DATABASE IF EXISTS testdb;", true, {}),
-        // SPELLCHECKER(on)
+        // The following DROP DATABASE tests should not produce metadata.
+        TEST_VALUE("DROP DATABASE testdb;", true, {}),
+        TEST_VALUE("DROP DATABASE IF EXISTS testdb;", true, {}),
 
         // Schema. Should be parsed fine, but should not produce any metadata
         TEST_VALUE("SHOW databases;", true, {}), TEST_VALUE("SHOW tables;", true, {}),

@@ -464,7 +464,7 @@ TEST_F(MySQLCommandTest, MySQLTest20) {
  * The library should return that none of database tables has been accessed,
  * but it returns that operation drop has been performed on TABLE 'mysqldb'.
  */
-TEST_F(MySQLCommandTest, DISABLED_MySQLTest21) {
+TEST_F(MySQLCommandTest, MySQLTest21) {
   std::string db = "mysqldb";
   std::string command = buildDrop(TestResource::DB, false, db);
   hsql::SQLParserResult result;
@@ -479,7 +479,7 @@ TEST_F(MySQLCommandTest, DISABLED_MySQLTest21) {
  * The library should return that none of database tables has been accessed,
  * but it returns that operation drop has been performed on TABLE 'mysqldb'.
  */
-TEST_F(MySQLCommandTest, DISABLED_MySQLTest22) {
+TEST_F(MySQLCommandTest, MySQLTest22) {
   std::string db = "mysqldb";
   std::string command = buildDrop(TestResource::DB, true, db);
   hsql::SQLParserResult result;
