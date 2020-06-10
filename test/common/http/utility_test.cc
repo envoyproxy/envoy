@@ -701,16 +701,16 @@ TEST(HttpUtility, TraversePerFilterConfigIteratesInOrder) {
 
   // Create configs to test; to ease of testing instead of using real objects
   // we will use pointers that are actually indexes.
-  const Router::RouteSpecificFilterConfig* nullconfig = nullptr;
+  const std::vector<Router::RouteSpecificFilterConfig> nullconfigs(5);
   size_t num_configs = 1;
   ON_CALL(filter_callbacks.route_->route_entry_.virtual_host_, perFilterConfig(filter_name))
-      .WillByDefault(Return(nullconfig + num_configs));
+      .WillByDefault(Return(&nullconfigs[num_configs]));
   num_configs++;
   ON_CALL(*filter_callbacks.route_, perFilterConfig(filter_name))
-      .WillByDefault(Return(nullconfig + num_configs));
+      .WillByDefault(Return(&nullconfigs[num_configs]));
   num_configs++;
   ON_CALL(filter_callbacks.route_->route_entry_, perFilterConfig(filter_name))
-      .WillByDefault(Return(nullconfig + num_configs));
+      .WillByDefault(Return(&nullconfigs[num_configs]));
 
   // a vector to save which configs are visited by the traversePerFilterConfigGeneric
   std::vector<size_t> visited_configs(num_configs, 0);
@@ -719,7 +719,7 @@ TEST(HttpUtility, TraversePerFilterConfigIteratesInOrder) {
   size_t index = 0;
   Utility::traversePerFilterConfigGeneric(filter_name, filter_callbacks.route(),
                                           [&](const Router::RouteSpecificFilterConfig& cfg) {
-                                            int cfg_index = &cfg - nullconfig;
+                                            int cfg_index = &cfg - nullconfigs.data();
                                             visited_configs[index] = cfg_index - 1;
                                             index++;
                                           });
