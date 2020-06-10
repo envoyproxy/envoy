@@ -62,7 +62,8 @@ public:
     std::shared_ptr<Router::MockConfig> route_config_{new NiceMock<Router::MockConfig>()};
   };
 
-  FuzzConfig()
+  FuzzConfig(envoy::extensions::filters::network::http_connection_manager::v3::
+                 HttpConnectionManager::ForwardClientCertDetails forward_client_cert)
       : stats_({ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(fake_stats_), POOL_GAUGE(fake_stats_),
                                         POOL_HISTOGRAM(fake_stats_))},
                "", fake_stats_),
@@ -74,6 +75,7 @@ public:
         .WillByDefault(Return(time_system_.systemTime()));
     access_logs_.emplace_back(std::make_shared<NiceMock<AccessLog::MockInstance>>());
     request_id_extension_ = RequestIDExtensionFactory::defaultInstance(random_);
+    forward_client_cert_ = fromClientCert(forward_client_cert);
   }
 
   void newStream() {
@@ -89,6 +91,30 @@ public:
         }));
     EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_));
     EXPECT_CALL(*encoder_filter_, setEncoderFilterCallbacks(_));
+  }
+
+  Http::ForwardClientCertType
+  fromClientCert(envoy::extensions::filters::network::http_connection_manager::v3::
+                     HttpConnectionManager::ForwardClientCertDetails forward_client_cert) {
+    switch (forward_client_cert) {
+    case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+        SANITIZE:
+      return Http::ForwardClientCertType::Sanitize;
+    case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+        FORWARD_ONLY:
+      return Http::ForwardClientCertType::ForwardOnly;
+    case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+        APPEND_FORWARD:
+      return Http::ForwardClientCertType::AppendForward;
+    case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+        SANITIZE_SET:
+      return Http::ForwardClientCertType::SanitizeSet;
+    case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+        ALWAYS_FORWARD_ONLY:
+      return Http::ForwardClientCertType::AlwaysForwardOnly;
+    default:
+      return Http::ForwardClientCertType::Sanitize;
+    }
   }
 
   // Http::ConnectionManagerConfig
@@ -194,7 +220,7 @@ public:
   std::chrono::milliseconds request_timeout_{};
   std::chrono::milliseconds delayed_close_timeout_{};
   bool use_remote_address_{true};
-  Http::ForwardClientCertType forward_client_cert_{Http::ForwardClientCertType::Sanitize};
+  Http::ForwardClientCertType forward_client_cert_;
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
   Network::Address::Ipv4Instance local_address_{"127.0.0.1"};
   absl::optional<std::string> user_agent_;
@@ -495,7 +521,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
     return;
   }
 
-  FuzzConfig config;
+  FuzzConfig config(input.forward_client_cert());
   NiceMock<Network::MockDrainDecision> drain_close;
   NiceMock<Runtime::MockRandomGenerator> random;
   Stats::SymbolTablePtr symbol_table(Stats::SymbolTableCreator::makeSymbolTable());
