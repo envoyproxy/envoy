@@ -32,9 +32,7 @@ Config::Config(
     Stats::Scope& scope,
     const envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol& proto_config)
     : stats_{ALL_PROXY_PROTOCOL_STATS(POOL_COUNTER(scope))} {
-  uint32_t tlv_type{0};
-  for (int i = 0; i < proto_config.tlv_types_size(); i++) {
-    tlv_type = proto_config.tlv_types(i);
+  for (const auto& tlv_type : proto_config.tlv_types()) {
     if (tlv_type > 0xFF) {
       // the TLV type in Proxy Protocol V2 is defined as uint8_t, it should not be bigger than 0xFF.
       ENVOY_LOG(
@@ -288,9 +286,13 @@ bool Filter::parseExtensions(os_fd_t fd, uint8_t* buf, size_t buf_size, size_t* 
 
 /**
  * @note  A TLV is arranged in the following format: @n
- *        1st byte is type, @n
- *        2nd and 3rd bytes are length of value with 2nd being the high byte, @n
- *        Starting from the 4th bytes are the value.
+ *        struct pp2_tlv {      @n
+            uint8_t type;       @n
+            uint8_t length_hi;  @n
+            uint8_t length_lo;  @n
+            uint8_t value[0];   @n
+          };                    @n
+ *        See https://www.haproxy.org/download/2.1/doc/proxy-protocol.txt for details
  */
 void Filter::parseTlvs(const std::vector<uint8_t>& tlvs) {
   std::string filter_name = ListenerFilterNames::get().ProxyProtocol;
