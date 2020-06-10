@@ -1717,20 +1717,31 @@ TEST_F(Http1ServerConnectionImplTest, ConnectRequestWithTEChunked) {
   NiceMock<MockRequestDecoder> decoder;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
-  // Connect with body is technically illegal, but Envoy does not inspect the
-  // body to see if there is a non-zero byte chunk. It will instead pass it
-  // through.
-  // TODO(alyssawilk) track connect payload and block if this happens.
-  Buffer::OwnedImpl expected_data("12345abcd");
-  EXPECT_CALL(decoder, decodeHeaders_(_, false));
-  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false));
+  // Per https://tools.ietf.org/html/rfc7231#section-4.3.6 CONNECT with body has no defined
+  // semantics: Envoy will reject chunked CONNECT requests.
   Buffer::OwnedImpl buffer(
       "CONNECT host:80 HTTP/1.1\r\ntransfer-encoding: chunked\r\n\r\n12345abcd");
   auto status = codec_->dispatch(buffer);
-  EXPECT_TRUE(status.ok());
+  EXPECT_TRUE(isCodecProtocolError(status));
+  EXPECT_EQ(status.message(), "http/1.1 protocol error: unsupported transfer encoding");
 }
 
-TEST_F(Http1ServerConnectionImplTest, ConnectRequestWithContentLength) {
+TEST_F(Http1ServerConnectionImplTest, ConnectRequestWithNonZeroContentLength) {
+  initialize();
+
+  InSequence sequence;
+  NiceMock<MockRequestDecoder> decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  // Make sure we avoid the deferred_end_stream_headers_ optimization for
+  // requests-with-no-body.
+  Buffer::OwnedImpl buffer("CONNECT host:80 HTTP/1.1\r\ncontent-length: 1\r\n\r\nabcd");
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(isCodecProtocolError(status));
+  EXPECT_EQ(status.message(), "http/1.1 protocol error: unsupported content length");
+}
+
+TEST_F(Http1ServerConnectionImplTest, ConnectRequestWithZeroContentLength) {
   initialize();
 
   InSequence sequence;
