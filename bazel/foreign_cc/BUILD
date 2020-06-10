@@ -16,6 +16,7 @@ configure_make(
         "--disable-libunwind",
     ] + select({
         "//bazel:apple": ["AR=/usr/bin/ar"],
+        "//bazel/toolchains:gcc_aarch64_cross_cfg": ["--host aarch64-linux-gnu"],
         "//conditions:default": [],
     }),
     lib_source = "@com_github_gperftools_gperftools//:all",
