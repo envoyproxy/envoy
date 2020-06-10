@@ -113,6 +113,8 @@ TEST_F(AlpnSelectionIntegrationTest, Http2UpstreamMatchingAlpn) {
 // No upstream ALPN is specified in the protocol and we fail to negotiate h2 ALPN
 // since the upstream doesn't list h2 in its ALPN list. Note that the call still goes
 // through because ALPN negotiation failure doesn't necessarily fail the call.
+// TODO(snowp): We should actually fail the handshake in case of negotiation failure,
+// fix that and update these tests.
 TEST_F(AlpnSelectionIntegrationTest, Http2UpstreamMismatchingAlpn) {
   use_h2_ = true;
   upstream_alpn_.emplace_back(Http::Utility::AlpnNames::get().Http11);
@@ -150,9 +152,8 @@ TEST_F(AlpnSelectionIntegrationTest, Http2UpstreamConfiguredALPN) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-// No upstream ALPN is specified in the protocol and we fail to negotiate h2 ALPN
-// since the upstream doesn't list h2 in its ALPN list. Note that the call still goes
-// through because ALPN negotiation failure doesn't necessarily fail the call.
+// No upstream ALPN is specified in the protocol, but we successfully negotiate http/1.1 ALPN
+// due to the default ALPN set through the HTTP/1.1 conn pool.
 TEST_F(AlpnSelectionIntegrationTest, Http11UpstreaMatchingAlpn) {
   upstream_alpn_.emplace_back(Http::Utility::AlpnNames::get().Http11);
   initialize();
@@ -191,6 +192,8 @@ TEST_F(AlpnSelectionIntegrationTest, Http11UpstreaMismatchingAlpn) {
 // The upstream supports http/1.1,custom-alpn, and we configure the upstream TLS context to
 // negotiate custom-alpn. No attempt to negotiate http/1.1 should happen, so we should select
 // custom-alpn.
+// TODO(snowp): We should actually fail the handshake in case of negotiation failure,
+// fix that and update these tests.
 TEST_F(AlpnSelectionIntegrationTest, Http11UpstreamConfiguredALPN) {
   upstream_alpn_.emplace_back(Http::Utility::AlpnNames::get().Http11);
   upstream_alpn_.emplace_back("custom-alpn");
