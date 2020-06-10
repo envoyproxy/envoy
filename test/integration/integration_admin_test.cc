@@ -285,14 +285,17 @@ TEST_P(IntegrationAdminTest, Admin) {
               "       1 http2.inbound_window_update_frames_flood\n"
               "       1 http2.outbound_control_flood\n"
               "       1 http2.outbound_flood\n"
+              "       1 http2.pending_send_bytes\n"
               "       1 http2.requests_rejected_with_underscores_in_headers\n"
               "       1 http2.rx_messaging_error\n"
               "       1 http2.rx_reset\n"
+              "       1 http2.streams_active\n"
               "       1 http2.too_many_header_frames\n"
               "       1 http2.trailers\n"
+              "       1 http2.tx_flush_timeout\n"
               "       1 http2.tx_reset\n"
               "\n"
-              "total: 14\n",
+              "total: 17\n",
               response->body());
     break;
   case Http::CodecClient::Type::HTTP3:

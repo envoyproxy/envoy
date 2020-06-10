@@ -70,6 +70,11 @@ public:
   uint32_t bufferLimit() override;
   absl::string_view responseDetails() override { return details_; }
   const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override;
+  void setFlushTimeout(std::chrono::milliseconds) override {
+    // HTTP/1 has one stream per connection, thus any data encoded is immediately written to the
+    // connection, invoking any watermarks as necessary. There is no internal buffering that would
+    // require a flush timeout not already covered by other timeouts.
+  }
 
   void isResponseToHeadRequest(bool value) { is_response_to_head_request_ = value; }
   void setDetails(absl::string_view details) { details_ = details; }

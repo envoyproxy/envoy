@@ -202,12 +202,18 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeHttpConnection(uint32_t port)
   return makeHttpConnection(makeClientConnection(port));
 }
 
-IntegrationCodecClientPtr
-HttpIntegrationTest::makeRawHttpConnection(Network::ClientConnectionPtr&& conn) {
+IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
+    Network::ClientConnectionPtr&& conn,
+    absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options) {
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   cluster->max_response_headers_count_ = 200;
-  cluster->http2_options_.set_allow_connect(true);
-  cluster->http2_options_.set_allow_metadata(true);
+  if (!http2_options.has_value()) {
+    http2_options = Http2::Utility::initializeAndValidateOptions(
+        envoy::config::core::v3::Http2ProtocolOptions());
+    http2_options.value().set_allow_connect(true);
+    http2_options.value().set_allow_metadata(true);
+  }
+  cluster->http2_options_ = http2_options.value();
   cluster->http1_settings_.enable_trailers_ = true;
   Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
       cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)))};
@@ -217,7 +223,7 @@ HttpIntegrationTest::makeRawHttpConnection(Network::ClientConnectionPtr&& conn) 
 
 IntegrationCodecClientPtr
 HttpIntegrationTest::makeHttpConnection(Network::ClientConnectionPtr&& conn) {
-  auto codec = makeRawHttpConnection(std::move(conn));
+  auto codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
   EXPECT_TRUE(codec->connected()) << codec->connection()->transportFailureReason();
   return codec;
 }

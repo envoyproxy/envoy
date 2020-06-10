@@ -138,7 +138,16 @@ All http2 statistics are rooted at *http2.*
    rx_reset, Counter, Total number of reset stream frames received by Envoy
    too_many_header_frames, Counter, Total number of times an HTTP2 connection is reset due to receiving too many headers frames. Envoy currently supports proxying at most one header frame for 100-Continue one non-100 response code header frame and one frame with trailers
    trailers, Counter, Total number of trailers seen on requests coming from downstream
+   tx_flush_timeout, Counter, Total number of :ref:`stream idle timeouts <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.stream_idle_timeout>` waiting for open stream window to flush the remainder of a stream
    tx_reset, Counter, Total number of reset stream frames transmitted by Envoy
+   streams_active, Gauge, Active streams as observed by the codec
+   pending_send_bytes, Gauge, Currently buffered body data in bytes waiting to be written when stream/connection window is opened.
+
+.. attention::
+
+  The HTTP/2 `streams_active` gauge may be greater than the HTTP connection manager
+  `downstream_rq_active` gauge due to differences in stream accounting between the codec and the
+  HTTP connection manager.
 
 Tracing statistics
 ------------------

@@ -273,6 +273,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // 2020/04/07  10661    43349       44000   fix clang tidy on master
   // 2020/05/13  10531    44425       44600   Refactor resource manager
   // 2020/04/23  10661    44425       44600   per-listener connection limits
+  // 2020/06/09  tbd      43541       44600   add stats and stream flush timeout
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -286,8 +287,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_cluster, 44425);
-  EXPECT_MEMORY_LE(m_per_cluster, 44425);
+  EXPECT_MEMORY_EQ(m_per_cluster, 43541);
+  EXPECT_MEMORY_LE(m_per_cluster, 44600);
 }
 
 TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
@@ -333,6 +334,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // 2020/04/07  10661    35557       36000   fix clang tidy on master
   // 2020/05/13  10531    36537       44600   Refactor resource manager
   // 2020/04/23  10661    36537       36800   per-listener connection limits
+  // 2020/06/09  tbd      35749       36800   add stats and stream flush timeout
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -346,8 +348,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_cluster, 36537);
-  EXPECT_MEMORY_LE(m_per_cluster, 36537);
+  EXPECT_MEMORY_EQ(m_per_cluster, 35749);
+  EXPECT_MEMORY_LE(m_per_cluster, 36800);
 }
 
 TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {

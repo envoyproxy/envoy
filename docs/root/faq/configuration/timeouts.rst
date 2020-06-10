@@ -52,8 +52,10 @@ context request/stream is interchangeable.
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.stream_idle_timeout>`
   is the amount of time that the connection manager will allow a stream to exist with no upstream
   or downstream activity. The default stream idle timeout is *5 minutes*. This timeout is strongly
-  recommended for streaming APIs (requests or responses that never end).
-* The HTTP protocol :ref:`max_stream_duration <envoy_api_field_core.HttpProtocolOptions.max_stream_duration>` 
+  recommended for all requests (not just streaming requests/responses) as it additionally defends
+  against an HTTP/2 peer that does not open stream window once an entire response has been buffered
+  to be sent to a downstream client.r end).
+* The HTTP protocol :ref:`max_stream_duration <envoy_api_field_core.HttpProtocolOptions.max_stream_duration>`
   is defined in a generic message used by the HTTP connection manager. The max stream duration is the 
   maximum time that a stream's lifetime will span. You can use this functionality when you want to reset 
   HTTP request/response streams periodically. You can't use :ref:`request_timeout 
