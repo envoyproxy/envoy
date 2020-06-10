@@ -29,16 +29,6 @@ public:
   virtual uint32_t requestSuccessCount() PURE;
 };
 
-/**
- * Placeholder admission controller implementation.
- */
-class NoopControllerImpl : public ThreadLocalController {
-  void recordSuccess() override {}
-  void recordFailure() override {}
-  uint32_t requestTotalCount() override { return 0; }
-  uint32_t requestSuccessCount() override { return 0; }
-};
-
 } // namespace AdmissionControl
 } // namespace HttpFilters
 } // namespace Extensions

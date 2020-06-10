@@ -84,6 +84,15 @@ public:
     filter_->encodeHeaders(headers, true);
   }
 
+  void sampleGrpcRequestTrailer(const Grpc::Status::WellKnownGrpcStatus status) {
+    Http::TestResponseHeaderMapImpl headers{{"content-type", "application/grpc"},
+                                            {":status", "200"}};
+    filter_->encodeHeaders(headers, false);
+    Http::TestResponseTrailerMapImpl trailers{{"grpc-message", "foo"},
+                                              {"grpc-status", std::to_string(enumToInt(status))}};
+    filter_->encodeTrailers(trailers);
+  }
+
   void sampleHttpRequest(const std::string& http_error_code) {
     Http::TestResponseHeaderMapImpl headers{{":status", http_error_code}};
     filter_->encodeHeaders(headers, true);
@@ -206,7 +215,6 @@ TEST_F(AdmissionControlTest, GrpcFailureBehavior) {
   auto config = makeConfig(default_yaml_);
   setupFilter(config);
 
-  // We expect rejection counter to increment upon failure.
   TestUtility::waitForCounterEq(scope_, "test_prefix.rq_rejected", 0, time_system_);
 
   EXPECT_CALL(controller_, requestTotalCount()).WillRepeatedly(Return(100));
@@ -219,6 +227,47 @@ TEST_F(AdmissionControlTest, GrpcFailureBehavior) {
   Http::TestResponseHeaderMapImpl response_headers;
   sampleGrpcRequest(Grpc::Status::WellKnownGrpcStatus::PermissionDenied);
 
+  // We expect rejection counter to increment upon failure.
+  TestUtility::waitForCounterEq(scope_, "test_prefix.rq_rejected", 1, time_system_);
+}
+
+// Validate simple gRPC success case with status in the trailer.
+TEST_F(AdmissionControlTest, GrpcSuccessBehaviorTrailer) {
+  auto config = makeConfig(default_yaml_);
+  setupFilter(config);
+
+  TestUtility::waitForCounterEq(scope_, "test_prefix.rq_rejected", 0, time_system_);
+
+  EXPECT_CALL(controller_, requestTotalCount()).WillRepeatedly(Return(100));
+  EXPECT_CALL(controller_, requestSuccessCount()).WillRepeatedly(Return(100));
+  EXPECT_CALL(*evaluator_, isGrpcSuccess(0)).WillRepeatedly(Return(true));
+
+  Http::TestRequestHeaderMapImpl request_headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  sampleGrpcRequestTrailer(Grpc::Status::WellKnownGrpcStatus::Ok);
+
+  // We expect rejection counter to NOT increment upon success.
+  TestUtility::waitForCounterEq(scope_, "test_prefix.rq_rejected", 0, time_system_);
+}
+
+// Validate simple gRPC failure case with status in the trailer.
+TEST_F(AdmissionControlTest, GrpcFailureBehaviorTrailer) {
+  auto config = makeConfig(default_yaml_);
+  setupFilter(config);
+
+  TestUtility::waitForCounterEq(scope_, "test_prefix.rq_rejected", 0, time_system_);
+
+  EXPECT_CALL(controller_, requestTotalCount()).WillRepeatedly(Return(100));
+  EXPECT_CALL(controller_, requestSuccessCount()).WillRepeatedly(Return(0));
+  EXPECT_CALL(*evaluator_, isGrpcSuccess(7)).WillRepeatedly(Return(false));
+
+  Http::TestRequestHeaderMapImpl request_headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, true));
+  Http::TestResponseHeaderMapImpl response_headers;
+  sampleGrpcRequestTrailer(Grpc::Status::WellKnownGrpcStatus::PermissionDenied);
+
+  // We expect rejection counter to increment upon failure.
   TestUtility::waitForCounterEq(scope_, "test_prefix.rq_rejected", 1, time_system_);
 }
 
@@ -227,7 +276,6 @@ TEST_F(AdmissionControlTest, GrpcSuccessBehavior) {
   auto config = makeConfig(default_yaml_);
   setupFilter(config);
 
-  // We expect rejection counter to NOT increment upon success.
   TestUtility::waitForCounterEq(scope_, "test_prefix.rq_rejected", 0, time_system_);
 
   EXPECT_CALL(controller_, requestTotalCount()).WillRepeatedly(Return(100));
@@ -238,6 +286,7 @@ TEST_F(AdmissionControlTest, GrpcSuccessBehavior) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
   sampleGrpcRequest(Grpc::Status::WellKnownGrpcStatus::Ok);
 
+  // We expect rejection counter to NOT increment upon success.
   TestUtility::waitForCounterEq(scope_, "test_prefix.rq_rejected", 0, time_system_);
 }
 

@@ -31,14 +31,14 @@ using GrpcStatus = Grpc::Status::GrpcStatus;
 static constexpr double defaultAggression = 2.0;
 
 AdmissionControlFilterConfig::AdmissionControlFilterConfig(
-    const AdmissionControlProto& proto_config, Runtime::Loader& runtime, TimeSource& time_source,
+    const AdmissionControlProto& proto_config, Runtime::Loader& runtime, TimeSource&,
     Runtime::RandomGenerator& random, Stats::Scope& scope, ThreadLocal::SlotPtr&& tls,
     std::shared_ptr<ResponseEvaluator> response_evaluator)
-    : runtime_(runtime), time_source_(time_source), random_(random), scope_(scope),
-      tls_(std::move(tls)), admission_control_feature_(proto_config.enabled(), runtime_),
+    : random_(random), scope_(scope), tls_(std::move(tls)),
+      admission_control_feature_(proto_config.enabled(), runtime),
       aggression_(
           proto_config.has_aggression_coefficient()
-              ? std::make_unique<Runtime::Double>(proto_config.aggression_coefficient(), runtime_)
+              ? std::make_unique<Runtime::Double>(proto_config.aggression_coefficient(), runtime)
               : nullptr),
       response_evaluator_(std::move(response_evaluator)) {}
 
