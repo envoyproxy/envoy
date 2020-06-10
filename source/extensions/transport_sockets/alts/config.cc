@@ -26,7 +26,9 @@ using GrpcAltsCredentialsOptionsPtr =
 
 namespace {
 
-void grpc_alts_set_rpc_protocol_versions(grpc_gcp_rpc_protocol_versions* rpc_versions) {
+// There is an equivalent function grpc_alts_set_rpc_protocol_versions in newer
+// release of gRPC that should be called directly when available.
+void grpcAltsSetRpcProtocolVersions(grpc_gcp_rpc_protocol_versions* rpc_versions) {
   grpc_gcp_rpc_protocol_versions_set_max(rpc_versions, GRPC_PROTOCOL_VERSION_MAX_MAJOR,
                                          GRPC_PROTOCOL_VERSION_MAX_MINOR);
   grpc_gcp_rpc_protocol_versions_set_min(rpc_versions, GRPC_PROTOCOL_VERSION_MIN_MAJOR,
@@ -115,7 +117,7 @@ Network::TransportSocketFactoryPtr createTransportSocketFactoryHelper(
     } else {
       options = GrpcAltsCredentialsOptionsPtr(grpc_alts_credentials_server_options_create());
     }
-    grpc_alts_set_rpc_protocol_versions(&options->rpc_versions);
+    grpcAltsSetRpcProtocolVersions(&options->rpc_versions);
     const char* target_name = is_upstream ? "" : nullptr;
     tsi_handshaker* handshaker = nullptr;
     // Specifying target name as empty since TSI won't take care of validating peer identity
