@@ -1159,6 +1159,7 @@ TEST_F(RedisConnPoolImplTest, AskRedirectionFailure) {
 }
 
 TEST_F(RedisConnPoolImplTest, MakeRequestFollowedByDelete) {
+  tls_.defer_delete = true;
   std::unique_ptr<NiceMock<Stats::MockStore>> store =
       std::make_unique<NiceMock<Stats::MockStore>>();
   cluster_refresh_manager_ =
