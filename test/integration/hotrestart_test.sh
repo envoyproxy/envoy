@@ -82,14 +82,15 @@ function run_testsuite() {
   local BASE_ID_PATH=$(mktemp 'envoy_test_base_id.XXXXXX')
   echo "Selected dynamic base id path ${BASE_ID_PATH}"
 
-  # Now start the real server, hot restart it twice, and shut it all down as a basic hot restart
-  # sanity test.
+  # Now start the real server, hot restart it twice, and shut it all down as a
+  # basic hot restart sanity test. We expect server0 to exit quickly when
+  # server2 starts, and are not relying on timeouts.
   start_test Starting epoch 0
   ADMIN_ADDRESS_PATH_0="${TEST_TMPDIR}"/admin.0."${TEST_INDEX}".address
   run_in_background_saving_pid "${ENVOY_BIN}" -c "${HOT_RESTART_JSON}" \
       --restart-epoch 0  --use-dynamic-base-id --base-id-path "${BASE_ID_PATH}" \
       --service-cluster cluster --service-node node --use-fake-symbol-table "$FAKE_SYMBOL_TABLE" \
-      --admin-address-path "${ADMIN_ADDRESS_PATH_0}" --drain-time-s 2
+      --admin-address-path "${ADMIN_ADDRESS_PATH_0}"
 
   local BASE_ID=$(cat "${BASE_ID_PATH}")
   while [ -z "${BASE_ID}" ]; do
@@ -152,11 +153,13 @@ function run_testsuite() {
 
   enableHeapCheck
 
+  # For server 1, we set a drain timer, so it exits a few seconds after server 2 starts.
   start_test Starting epoch 1
   ADMIN_ADDRESS_PATH_1="${TEST_TMPDIR}"/admin.1."${TEST_INDEX}".address
   run_in_background_saving_pid "${ENVOY_BIN}" -c "${UPDATED_HOT_RESTART_JSON}" \
       --restart-epoch 1 --base-id "${BASE_ID}" --service-cluster cluster --service-node node \
-      --use-fake-symbol-table "$FAKE_SYMBOL_TABLE" --admin-address-path "${ADMIN_ADDRESS_PATH_1}"
+      --use-fake-symbol-table "$FAKE_SYMBOL_TABLE" --admin-address-path "${ADMIN_ADDRESS_PATH_1}" \
+      --drain-time-s 2
 
   SERVER_1_PID=$BACKGROUND_PID
 
@@ -176,31 +179,42 @@ function run_testsuite() {
 
   start_test Checking server.hot_restart_generation 2
   GENERATION_1=$(curl -sg http://${ADMIN_ADDRESS_1}/stats | grep server.hot_restart_generation)
-  check [ "$GENERATION_1" = "server.hot_restart_generation: 2" ];  
+  check [ "$GENERATION_1" = "server.hot_restart_generation: 2" ];
 
   ADMIN_ADDRESS_PATH_2="${TEST_TMPDIR}"/admin.2."${TEST_INDEX}".address
   start_test Starting epoch 2
   run_in_background_saving_pid "${ENVOY_BIN}" -c "${UPDATED_HOT_RESTART_JSON}" \
       --restart-epoch 2  --base-id "${BASE_ID}" --service-cluster cluster --service-node node \
-      --use-fake-symbol-table "$FAKE_SYMBOL_TABLE" --admin-address-path "${ADMIN_ADDRESS_PATH_2}"
+      --use-fake-symbol-table "$FAKE_SYMBOL_TABLE" --admin-address-path "${ADMIN_ADDRESS_PATH_2}" \
+      --parent-shutdown-time-s 3
 
-  sleep 3
-
-  # Now wait for the first server to exit.
+  # Now wait for the server0 to exit. It should occur immediately when server2 starts, as
+  # server1 will terminate server0 when it becomes the parent.
   start_test Waiting for epoch 0 to finish.
   echo time wait ${SERVER_0_PID}
   time wait ${SERVER_0_PID}
   [[ $? == 0 ]]
 
+  # Then wait for the server2 to exit, which should happen within a few seconds
+  # due to '--parent-shutdown-time-s 3' on server2, and '--drain-time-s 2' on
+  # server1.
+  start_test Waiting for epoch 1 to finish.
+  echo time wait ${SERVER_1_PID}
+  time wait ${SERVER_1_PID}
+  [[ $? == 0 ]]
+
   # This tests that we are retaining the generation count. For most Gauges,
-  # we erase the parent contribution when the parent exits, but 
+  # we erase the parent contribution when the parent exits, but
   # server.hot_restart_generation is excluded. Commenting out the call to
   # stat_merger_->retainParentGaugeValue(hot_restart_generation_stat_name_)
-  # in source/server/hot_restarting_child.cc results in this test failing.
-  start_test Checking server.hot_restart_generation 3
+  # in source/server/hot_restarting_child.cc results in this test failing,
+  # with the generation being decremented back to 1.
+  start_test Checking server.hot_restart_generation 2
   ADMIN_ADDRESS_2=$(cat "${ADMIN_ADDRESS_PATH_2}")
   GENERATION_2=$(curl -sg http://${ADMIN_ADDRESS_2}/stats | grep server.hot_restart_generation)
   check [ "$GENERATION_2" = "server.hot_restart_generation: 3" ];
+
+  sleep 3
 
   SERVER_2_PID=$BACKGROUND_PID
   sleep 3
