@@ -23,6 +23,16 @@ envoy_mobile_kt_test(
 )
 
 envoy_mobile_kt_test(
+    name = "response_headers_test",
+    srcs = [
+        "ResponseHeadersTest.kt",
+    ],
+    deps = [
+        "//library/kotlin/src/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+    ],
+)
+
+envoy_mobile_kt_test(
     name = "retry_policy_mapper_test",
     srcs = [
         "RetryPolicyMapperTest.kt",

@@ -16,7 +16,7 @@ final class ResponseHeadersTests: XCTestCase {
     XCTAssertNil(ResponseHeaders(headers: [:]).httpStatus)
   }
 
-  func testAddingHttpStatusCode() {
+  func testAddingHttpStatusCodeSetsTheAppropriateHeader() {
     let headers = ResponseHeadersBuilder()
       .addHttpStatus(200)
       .build()
