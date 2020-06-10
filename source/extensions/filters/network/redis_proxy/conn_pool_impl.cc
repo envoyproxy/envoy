@@ -62,11 +62,15 @@ void InstanceImpl::init() {
   });
 }
 
+// this method is always called from a InstanceSharedPtr we don't have to worry about tls_->getTyped
+// failing.
 Common::Redis::Client::PoolRequest*
 InstanceImpl::makeRequest(const std::string& key, RespVariant&& request, PoolCallbacks& callbacks) {
   return tls_->getTyped<ThreadLocalPool>().makeRequest(key, std::move(request), callbacks);
 }
 
+// this method is always called from a InstanceSharedPtr we don't have to worry about tls_->getTyped
+// failing.
 Common::Redis::Client::PoolRequest*
 InstanceImpl::makeRequestToHost(const std::string& host_address,
                                 const Common::Redis::RespValue& request,
