@@ -1,10 +1,10 @@
+licenses(["notice"])  # Apache 2
+
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_package",
 )
-
-licenses(["notice"])  # Apache 2
 
 # Stats sink for the basic version of the statsd protocol (https://github.com/b/statsd_spec).
 

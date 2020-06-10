@@ -1,3 +1,5 @@
+licenses(["notice"])  # Apache 2
+
 load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 load(
     "//bazel:envoy_build_system.bzl",
@@ -5,8 +7,6 @@ load(
     "envoy_cc_library",
     "envoy_package",
 )
-
-licenses(["notice"])  # Apache 2
 
 # Kafka network filter.
 # Broker filter public docs: docs/root/configuration/network_filters/kafka_broker_filter.rst
