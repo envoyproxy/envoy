@@ -26,8 +26,15 @@ envoy_cc_test(
 )
 
 envoy_cc_fuzz_test(
-    name = "utility_fuzz_test",
-    srcs = ["utility_fuzz_test.cc"],
-    corpus = "utility_corpus",
+    name = "import_public_key_fuzz_test",
+    srcs = ["import_public_key_fuzz_test.cc"],
+    corpus = "import_public_key_corpus",
+    deps = ["//source/extensions/common/crypto:utility_lib"],
+)
+
+envoy_cc_fuzz_test(
+    name = "get_sha_256_digest_fuzz_test",
+    srcs = ["get_sha_256_digest_fuzz_test.cc"],
+    corpus = "get_sha_256_digest_corpus",
     deps = ["//source/extensions/common/crypto:utility_lib"],
 )
