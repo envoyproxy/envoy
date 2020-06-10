@@ -8,6 +8,7 @@
 #include "common/event/dispatcher_impl.h"
 #include "common/event/file_event_impl.h"
 #include "common/network/address_impl.h"
+#include "common/network/socket_impl.h"
 
 #include "event2/listener.h"
 
@@ -15,7 +16,7 @@ namespace Envoy {
 namespace Network {
 
 Address::InstanceConstSharedPtr BaseListenerImpl::getLocalAddress(os_fd_t fd) {
-  return Address::addressFromFd(fd);
+  return SocketInterfaceSingleton::get().addressFromFd(fd);
 }
 
 BaseListenerImpl::BaseListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket)

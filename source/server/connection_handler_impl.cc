@@ -30,7 +30,7 @@ void ConnectionHandlerImpl::decNumConnections() {
 void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_listener,
                                         Network::ListenerConfig& config) {
   ActiveListenerDetails details;
-  if (config.listenSocketFactory().socketType() == Network::Address::SocketType::Stream) {
+  if (config.listenSocketFactory().socketType() == Network::Socket::Type::Stream) {
     if (overridden_listener.has_value()) {
       for (auto& listener : listeners_) {
         if (listener.second.listener_->listenerTag() == overridden_listener) {
@@ -521,16 +521,17 @@ ConnectionHandlerImpl::ActiveTcpConnection::~ActiveTcpConnection() {
   active_connections_.listener_.parent_.decNumConnections();
 }
 
-ActiveUdpListener::ActiveUdpListener(Network::ConnectionHandler& parent,
-                                     Event::Dispatcher& dispatcher, Network::ListenerConfig& config)
-    : ActiveUdpListener(
+ActiveRawUdpListener::ActiveRawUdpListener(Network::ConnectionHandler& parent,
+                                           Event::Dispatcher& dispatcher,
+                                           Network::ListenerConfig& config)
+    : ActiveRawUdpListener(
           parent,
           dispatcher.createUdpListener(config.listenSocketFactory().getListenSocket(), *this),
           config) {}
 
-ActiveUdpListener::ActiveUdpListener(Network::ConnectionHandler& parent,
-                                     Network::UdpListenerPtr&& listener,
-                                     Network::ListenerConfig& config)
+ActiveRawUdpListener::ActiveRawUdpListener(Network::ConnectionHandler& parent,
+                                           Network::UdpListenerPtr&& listener,
+                                           Network::ListenerConfig& config)
     : ConnectionHandlerImpl::ActiveListenerImplBase(parent, &config),
       udp_listener_(std::move(listener)), read_filter_(nullptr) {
   // Create the filter chain on creating a new udp listener
@@ -544,26 +545,26 @@ ActiveUdpListener::ActiveUdpListener(Network::ConnectionHandler& parent,
   }
 }
 
-void ActiveUdpListener::onData(Network::UdpRecvData& data) { read_filter_->onData(data); }
+void ActiveRawUdpListener::onData(Network::UdpRecvData& data) { read_filter_->onData(data); }
 
-void ActiveUdpListener::onReadReady() {}
+void ActiveRawUdpListener::onReadReady() {}
 
-void ActiveUdpListener::onWriteReady(const Network::Socket&) {
+void ActiveRawUdpListener::onWriteReady(const Network::Socket&) {
   // TODO(sumukhs): This is not used now. When write filters are implemented, this is a
   // trigger to invoke the on write ready API on the filters which is when they can write
   // data
 }
 
-void ActiveUdpListener::onReceiveError(Api::IoError::IoErrorCode error_code) {
+void ActiveRawUdpListener::onReceiveError(Api::IoError::IoErrorCode error_code) {
   read_filter_->onReceiveError(error_code);
 }
 
-void ActiveUdpListener::addReadFilter(Network::UdpListenerReadFilterPtr&& filter) {
+void ActiveRawUdpListener::addReadFilter(Network::UdpListenerReadFilterPtr&& filter) {
   ASSERT(read_filter_ == nullptr, "Cannot add a 2nd UDP read filter");
   read_filter_ = std::move(filter);
 }
 
-Network::UdpListener& ActiveUdpListener::udpListener() { return *udp_listener_; }
+Network::UdpListener& ActiveRawUdpListener::udpListener() { return *udp_listener_; }
 
 } // namespace Server
 } // namespace Envoy

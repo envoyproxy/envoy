@@ -1,10 +1,11 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -61,13 +62,30 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "envoy_quic_proof_source_lib",
+    name = "envoy_quic_fake_proof_source_lib",
     hdrs = ["envoy_quic_fake_proof_source.h"],
     external_deps = ["quiche_quic_platform"],
     tags = ["nofips"],
     deps = [
         "@com_googlesource_quiche//:quic_core_crypto_proof_source_interface_lib",
         "@com_googlesource_quiche//:quic_core_versions_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "envoy_quic_proof_source_lib",
+    srcs = ["envoy_quic_proof_source.cc"],
+    hdrs = ["envoy_quic_proof_source.h"],
+    external_deps = ["ssl"],
+    tags = ["nofips"],
+    deps = [
+        ":envoy_quic_fake_proof_source_lib",
+        ":envoy_quic_utils_lib",
+        ":quic_io_handle_wrapper_lib",
+        ":quic_transport_socket_factory_lib",
+        "//include/envoy/ssl:tls_certificate_config_interface",
+        "//source/extensions/transport_sockets:well_known_names",
+        "@com_googlesource_quiche//:quic_core_crypto_certificate_view_lib",
     ],
 )
 
@@ -274,6 +292,7 @@ envoy_cc_library(
         "//include/envoy/network:listener_interface",
         "//source/common/network:listener_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/runtime:runtime_lib",
         "//source/server:connection_handler_lib",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
@@ -308,10 +327,11 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "quic_transport_socket_factory_lib",
     srcs = ["quic_transport_socket_factory.cc"],
     hdrs = ["quic_transport_socket_factory.h"],
+    security_posture = "unknown",
     tags = ["nofips"],
     deps = [
         "//include/envoy/network:transport_socket_interface",
@@ -320,6 +340,6 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/extensions/transport_sockets:well_known_names",
         "//source/extensions/transport_sockets/tls:context_config_lib",
-        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
     ],
 )

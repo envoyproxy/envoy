@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_basic_cc_library",
@@ -11,6 +9,8 @@ load(
     "envoy_package",
     "envoy_select_boringssl",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -201,6 +201,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "basic_resource_lib",
+    hdrs = ["basic_resource_impl.h"],
+    deps = [
+        "//include/envoy/common:resource_interface",
+        "//include/envoy/runtime:runtime_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "macros",
     hdrs = ["macros.h"],
 )
@@ -340,7 +349,11 @@ genrule(
 genrule(
     name = "generate_version_linkstamp",
     outs = ["lib/version_linkstamp.h"],
-    cmd = "$(location :generate_version_linkstamp.sh) >> $@",
+    cmd = select({
+        # Only iOS builds typically follow this logic, OS/X is built as a normal binary
+        "//bazel:apple": "$(location :generate_version_linkstamp.sh) Library >> $@",
+        "//conditions:default": "$(location :generate_version_linkstamp.sh) >> $@",
+    }),
     # Undocumented attr to depend on workspace status files.
     # https://github.com/bazelbuild/bazel/issues/4942
     # Used here because generate_version_linkstamp.sh depends on the workspace status files.
@@ -425,16 +438,6 @@ envoy_cc_library(
         "//include/envoy/common:time_interface",
         "//include/envoy/common:token_bucket_interface",
         "//source/common/common:utility_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "zlib_base_lib",
-    srcs = ["zlib/base.cc"],
-    hdrs = ["zlib/base.h"],
-    external_deps = ["zlib"],
-    deps = [
-        "//source/common/buffer:buffer_lib",
     ],
 )
 

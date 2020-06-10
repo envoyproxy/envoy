@@ -39,7 +39,7 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
   // IPv4 local_address was created from an IPv6 mapped IPv4 address.
   const Address::InstanceConstSharedPtr& remote_address =
       (remote_addr->sa_family == AF_UNIX)
-          ? Address::peerAddressFromFd(io_handle->fd())
+          ? SocketInterfaceSingleton::get().peerAddressFromFd(io_handle->fd())
           : Address::addressFromSockAddr(*reinterpret_cast<const sockaddr_storage*>(remote_addr),
                                          remote_addr_len,
                                          local_address->ip()->version() == Address::IpVersion::v6);

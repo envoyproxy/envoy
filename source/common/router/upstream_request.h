@@ -35,6 +35,11 @@ class GenericConnPool : public Logger::Loggable<Logger::Id::router> {
 public:
   virtual ~GenericConnPool() = default;
 
+  // Initializes the connection pool. This must be called before the connection
+  // pool is valid, and can be used.
+  virtual bool initialize(Upstream::ClusterManager& cm, const RouteEntry& route_entry,
+                          Http::Protocol protocol, Upstream::LoadBalancerContext* ctx) PURE;
+
   // Called to create a new HTTP stream or TCP connection. The implementation
   // is then responsible for calling either onPoolReady or onPoolFailure on the
   // supplied GenericConnectionPoolCallbacks.
@@ -44,6 +49,8 @@ public:
   virtual bool cancelAnyPendingRequest() PURE;
   // Optionally returns the protocol for the connection pool.
   virtual absl::optional<Http::Protocol> protocol() const PURE;
+  // Returns the host for this conn pool.
+  virtual Upstream::HostDescriptionConstSharedPtr host() const PURE;
 };
 
 // An API for the UpstreamRequest to get callbacks from either an HTTP or TCP
@@ -196,12 +203,18 @@ private:
 
 class HttpConnPool : public GenericConnPool, public Http::ConnectionPool::Callbacks {
 public:
-  HttpConnPool(Http::ConnectionPool::Instance& conn_pool) : conn_pool_(conn_pool) {}
-
   // GenericConnPool
+  bool initialize(Upstream::ClusterManager& cm, const RouteEntry& route_entry,
+                  Http::Protocol protocol, Upstream::LoadBalancerContext* ctx) override {
+    conn_pool_ =
+        cm.httpConnPoolForCluster(route_entry.clusterName(), route_entry.priority(), protocol, ctx);
+    return conn_pool_ != nullptr;
+  }
+
   void newStream(GenericConnectionPoolCallbacks* callbacks) override;
   bool cancelAnyPendingRequest() override;
   absl::optional<Http::Protocol> protocol() const override;
+  Upstream::HostDescriptionConstSharedPtr host() const override { return conn_pool_->host(); }
 
   // Http::ConnectionPool::Callbacks
   void onPoolFailure(ConnectionPool::PoolFailureReason reason,
@@ -213,14 +226,19 @@ public:
 
 private:
   // Points to the actual connection pool to create streams from.
-  Http::ConnectionPool::Instance& conn_pool_;
+  Http::ConnectionPool::Instance* conn_pool_{};
   Http::ConnectionPool::Cancellable* conn_pool_stream_handle_{};
   GenericConnectionPoolCallbacks* callbacks_{};
 };
 
 class TcpConnPool : public GenericConnPool, public Tcp::ConnectionPool::Callbacks {
 public:
-  TcpConnPool(Tcp::ConnectionPool::Instance* conn_pool) : conn_pool_(conn_pool) {}
+  bool initialize(Upstream::ClusterManager& cm, const RouteEntry& route_entry, Http::Protocol,
+                  Upstream::LoadBalancerContext* ctx) override {
+    conn_pool_ = cm.tcpConnPoolForCluster(route_entry.clusterName(),
+                                          Upstream::ResourcePriority::Default, ctx);
+    return conn_pool_ != nullptr;
+  }
 
   void newStream(GenericConnectionPoolCallbacks* callbacks) override {
     callbacks_ = callbacks;
@@ -236,7 +254,7 @@ public:
     return false;
   }
   absl::optional<Http::Protocol> protocol() const override { return absl::nullopt; }
-
+  Upstream::HostDescriptionConstSharedPtr host() const override { return conn_pool_->host(); }
   // Tcp::ConnectionPool::Callbacks
   void onPoolFailure(ConnectionPool::PoolFailureReason reason,
                      Upstream::HostDescriptionConstSharedPtr host) override {
@@ -333,7 +351,6 @@ public:
 private:
   UpstreamRequest* upstream_request_;
   Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
-  bool sent_headers_{};
 };
 
 } // namespace Router

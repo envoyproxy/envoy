@@ -76,12 +76,12 @@ STD_REGEX_WHITELIST = (
     "./source/common/common/utility.cc", "./source/common/common/regex.h",
     "./source/common/common/regex.cc", "./source/common/stats/tag_extractor_impl.h",
     "./source/common/stats/tag_extractor_impl.cc",
-    "./source/common/access_log/access_log_formatter.cc",
+    "./source/common/formatter/substitution_formatter.cc",
     "./source/extensions/filters/http/squash/squash_filter.h",
-    "./source/extensions/filters/http/squash/squash_filter.cc", "./source/server/http/utils.h",
-    "./source/server/http/utils.cc", "./source/server/http/stats_handler.h",
-    "./source/server/http/stats_handler.cc", "./source/server/http/prometheus_stats.h",
-    "./source/server/http/prometheus_stats.cc", "./tools/clang_tools/api_booster/main.cc",
+    "./source/extensions/filters/http/squash/squash_filter.cc", "./source/server/admin/utils.h",
+    "./source/server/admin/utils.cc", "./source/server/admin/stats_handler.h",
+    "./source/server/admin/stats_handler.cc", "./source/server/admin/prometheus_stats.h",
+    "./source/server/admin/prometheus_stats.cc", "./tools/clang_tools/api_booster/main.cc",
     "./tools/clang_tools/api_booster/proto_cxx_utils.cc", "./source/common/common/version.cc")
 
 # Only one C++ file should instantiate grpc_init
@@ -214,7 +214,7 @@ def readFile(path):
 # environment variable. If it cannot be found, empty string is returned.
 def lookPath(executable):
   for path_dir in os.environ["PATH"].split(os.pathsep):
-    executable_path = os.path.join(path_dir, executable)
+    executable_path = os.path.expanduser(os.path.join(path_dir, executable))
     if os.path.exists(executable_path):
       return executable_path
   return ""
@@ -411,7 +411,7 @@ def hasInvalidAngleBracketDirectory(line):
 
 
 VERSION_HISTORY_NEW_LINE_REGEX = re.compile("\* ([a-z \-_]+): ([a-z:`]+)")
-VERSION_HISTORY_NEW_SECTION_REGEX = re.compile("^-----[-]+$")
+VERSION_HISTORY_SECTION_NAME = re.compile("^[A-Z][A-Za-z ]*$")
 RELOADABLE_FLAG_REGEX = re.compile(".*(.)(envoy.reloadable_features.[^ ]*)\s.*")
 # Check for punctuation in a terminal ref clause, e.g.
 # :ref:`panic mode. <arch_overview_load_balancing_panic_threshold>`
@@ -419,8 +419,6 @@ REF_WITH_PUNCTUATION_REGEX = re.compile(".*\. <[^<]*>`\s*")
 
 
 def checkCurrentReleaseNotes(file_path, error_messages):
-  in_changes_section = False
-
   first_word_of_prior_line = ''
   next_word_to_check = ''  # first word after :
   prior_line = ''
@@ -439,12 +437,15 @@ def checkCurrentReleaseNotes(file_path, error_messages):
     def reportError(message):
       error_messages.append("%s:%d: %s" % (file_path, line_number + 1, message))
 
-    if VERSION_HISTORY_NEW_SECTION_REGEX.match(line):
-      # The second section is deprecations, which are not sorted.
-      if in_changes_section:
+    if VERSION_HISTORY_SECTION_NAME.match(line):
+      if line == "Deprecated":
+        # The deprecations section is last, and does not have enforced formatting.
         break
-      # If we see a section marker we are now in the changes section.
-      in_changes_section = True
+
+      # Reset all parsing at the start of a section.
+      first_word_of_prior_line = ''
+      next_word_to_check = ''  # first word after :
+      prior_line = ''
 
     # make sure flags are surrounded by ``s
     flag_match = RELOADABLE_FLAG_REGEX.match(line)
@@ -452,7 +453,7 @@ def checkCurrentReleaseNotes(file_path, error_messages):
       if not flag_match.groups()[0].startswith('`'):
         reportError("Flag `%s` should be enclosed in back ticks" % flag_match.groups()[1])
 
-    if line.startswith("*"):
+    if line.startswith("* "):
       if not endsWithPeriod(prior_line):
         reportError("The following release note does not end with a '.'\n %s" % prior_line)
 
@@ -697,7 +698,8 @@ def checkSourceLine(line, file_path, reportError):
 
 
 def checkBuildLine(line, file_path, reportError):
-  if "@bazel_tools" in line and not (isSkylarkFile(file_path) or file_path.startswith("./bazel/")):
+  if "@bazel_tools" in line and not (isSkylarkFile(file_path) or file_path.startswith("./bazel/") or
+                                     "python/runfiles" in line):
     reportError("unexpected @bazel_tools reference, please indirect via a definition in //bazel")
   if not whitelistedForProtobufDeps(file_path) and '"protobuf"' in line:
     reportError("unexpected direct external dependency on protobuf, use "
@@ -725,7 +727,7 @@ def fixBuildPath(file_path):
     if os.system("%s %s %s" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)) != 0:
       error_messages += ["envoy_build_fixer rewrite failed for file: %s" % file_path]
 
-  if os.system("%s -mode=fix %s" % (BUILDIFIER_PATH, file_path)) != 0:
+  if os.system("%s -lint=fix -mode=fix %s" % (BUILDIFIER_PATH, file_path)) != 0:
     error_messages += ["buildifier rewrite failed for file: %s" % file_path]
   return error_messages
 
