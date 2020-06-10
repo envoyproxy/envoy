@@ -35,6 +35,8 @@ struct Http1ResponseCodeDetailValues {
   const absl::string_view InvalidUrl = "http1.invalid_url";
   const absl::string_view InvalidTransferEncoding = "http1.invalid_transfer_encoding";
   const absl::string_view BodyDisallowed = "http1.body_disallowed";
+  const absl::string_view TransferEncodingNotAllowed = "http1.transfer_encoding_not_allowed";
+  const absl::string_view ContentLengthNotAllowed = "http1.content_length_not_allowed";
 };
 
 struct Http1HeaderTypesValues {
@@ -69,7 +71,7 @@ StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection,
                                      HeaderKeyFormatter* header_key_formatter)
     : connection_(connection), disable_chunk_encoding_(false), chunk_encoding_(true),
       processing_100_continue_(false), is_response_to_head_request_(false),
-      is_response_to_connect_request_(false), is_content_length_allowed_(true),
+      is_response_to_connect_request_(false), is_1xx_(false), is_204_(false),
       header_key_formatter_(header_key_formatter) {
   if (connection_.connection().aboveHighWatermark()) {
     runHighWatermarkCallbacks();
@@ -159,15 +161,22 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
       // response to a HEAD request.
       // For 204s and 1xx where content length is disallowed, don't append the content length but
       // also don't chunk encode.
-      if (is_content_length_allowed_) {
+      if (!is_1xx_ && !is_204_) {
         encodeFormattedHeader(Headers::get().ContentLength.get(), "0");
       }
       chunk_encoding_ = false;
     } else if (connection_.protocol() == Protocol::Http10) {
       chunk_encoding_ = false;
+    } else if (connection_.strict1xxAnd204Headers() && (is_1xx_ || is_204_)) {
+      // For 1xx and 204 responses, do not send the chunked encoding header or enable chunked
+      // encoding: https://tools.ietf.org/html/rfc7230#section-3.3.1
+      chunk_encoding_ = false;
+
+      // Assert 1xx (may have content) OR 204 and end stream.
+      ASSERT(is_1xx_ || end_stream);
     } else {
       // For responses to connect requests, do not send the chunked encoding header:
-      // https://tools.ietf.org/html/rfc7231#section-4.3.6
+      // https://tools.ietf.org/html/rfc7231#section-4.3.6.
       if (!is_response_to_connect_request_) {
         encodeFormattedHeader(Headers::get().TransferEncoding.get(),
                               Headers::get().TransferEncodingValues.Chunked);
@@ -352,14 +361,12 @@ void ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers, bool e
   connection_.addCharToBuffer('\r');
   connection_.addCharToBuffer('\n');
 
-  if (numeric_status == 204 || numeric_status < 200) {
-    // Per https://tools.ietf.org/html/rfc7230#section-3.3.2
-    setIsContentLengthAllowed(false);
-  } else {
-    // Make sure that if we encodeHeaders(100) then encodeHeaders(200) that we
-    // set is_content_length_allowed_ back to true.
-    setIsContentLengthAllowed(true);
-  }
+  // Enabling handling of https://tools.ietf.org/html/rfc7230#section-3.3.1 and
+  // https://tools.ietf.org/html/rfc7230#section-3.3.2. Also resets these flags
+  // if a 100 Continue is followed by another status.
+  setIs1xx(numeric_status < 200);
+  setIs204(numeric_status == 204);
+
   if (numeric_status >= 300) {
     // Don't do special CONNECT logic if the CONNECT was rejected.
     is_response_to_connect_request_ = false;
@@ -459,6 +466,8 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       enable_trailers_(enable_trailers),
       reject_unsupported_transfer_encodings_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.reject_unsupported_transfer_encodings")),
+      strict_1xx_and_204_headers_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.strict_1xx_and_204_response_headers")),
       output_buffer_([&]() -> void { this->onBelowLowWatermark(); },
                      [&]() -> void { this->onAboveHighWatermark(); },
                      []() -> void { /* TODO(adisuissa): Handle overflow watermark */ }),
@@ -1075,6 +1084,25 @@ int ClientConnectionImpl::onHeadersComplete() {
                                  Headers::get().TransferEncodingValues.Chunked)) {
         sendProtocolError(Http1ResponseCodeDetails::get().InvalidTransferEncoding);
         throw CodecProtocolException("http/1.1 protocol error: unsupported transfer encoding");
+      }
+    }
+
+    if (strict_1xx_and_204_headers_ && (parser_.status_code < 200 || parser_.status_code == 204)) {
+      if (headers->TransferEncoding()) {
+        sendProtocolError(Http1ResponseCodeDetails::get().TransferEncodingNotAllowed);
+        throw CodecProtocolException(
+            "http/1.1 protocol error: transfer encoding not allowed in 1xx or 204");
+      }
+
+      if (headers->ContentLength()) {
+        // Report a protocol error for non-zero Content-Length, but paper over zero Content-Length.
+        if (headers->ContentLength()->value().getStringView() != "0") {
+          sendProtocolError(Http1ResponseCodeDetails::get().ContentLengthNotAllowed);
+          throw CodecProtocolException(
+              "http/1.1 protocol error: content length not allowed in 1xx or 204");
+        }
+
+        headers->removeContentLength();
       }
     }
 
