@@ -236,7 +236,7 @@ message RedisProxy {
   // before enabling any other command. If an AUTH command's username and password matches this username
   // and the downstream_auth_password , an "OK" response will be returned to the client. If the AUTH
   // command username or password does not match this username or the downstream_auth_password, then an
-  // "ERR invalid ACL auth" error will be returned. If any other command is received before AUTH when this
+  // "WRONGPASS invalid username-password pair" error will be returned. If any other command is received before AUTH when this
   // password is set, then a "NOAUTH Authentication required." error response will be sent to the
   // client. If an AUTH command is received when the password is not set, then an "ERR Client sent
   // AUTH, but no ACL is set" error will be returned.

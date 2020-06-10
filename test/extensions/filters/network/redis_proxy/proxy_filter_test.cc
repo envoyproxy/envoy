@@ -347,7 +347,7 @@ TEST_F(RedisProxyFilterTest, AuthAclWhenNotRequired) {
             EXPECT_TRUE(callbacks.connectionAllowed());
             Common::Redis::RespValuePtr error(new Common::Redis::RespValue());
             error->type(Common::Redis::RespType::Error);
-            error->asString() = "ERR Client sent AUTH, but no ACL is set";
+            error->asString() = "ERR Client sent AUTH, but no username-password pair is set";
             EXPECT_CALL(*encoder_, encode(Eq(ByRef(*error)), _));
             EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
             callbacks.onAuth("foo", "bar");
@@ -489,7 +489,7 @@ TEST_F(RedisProxyFilterWithAuthAclTest, AuthAclUsernameIncorrect) {
             EXPECT_FALSE(callbacks.connectionAllowed());
             Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
             reply->type(Common::Redis::RespType::Error);
-            reply->asString() = "ERR invalid ACL auth";
+            reply->asString() = "WRONGPASS invalid username-password pair";
             EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
             EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
             callbacks.onAuth("wrongusername", "somepassword");
@@ -516,7 +516,7 @@ TEST_F(RedisProxyFilterWithAuthAclTest, AuthAclPasswordIncorrect) {
             EXPECT_FALSE(callbacks.connectionAllowed());
             Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
             reply->type(Common::Redis::RespType::Error);
-            reply->asString() = "ERR invalid ACL auth";
+            reply->asString() = "WRONGPASS invalid username-password pair";
             EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
             EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
             callbacks.onAuth("someusername", "wrongpassword");
