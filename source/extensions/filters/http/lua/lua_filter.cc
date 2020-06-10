@@ -20,21 +20,14 @@ namespace {
 
 const std::string DEPRECATED_LUA_NAME = "envoy.lua";
 
+constexpr absl::string_view HTTP_CALL_STATUS = "lua_http_call_status";
+constexpr absl::string_view HTTP_CALL_HTTP_STATUS = "lua_http_call_http_status";
+constexpr absl::string_view HTTP_CALL_SUCCESS = "Success";
+constexpr absl::string_view HTTP_CALL_FAILURE = "Failure";
+
 std::atomic<bool>& deprecatedNameLogged() {
   MUTABLE_CONSTRUCT_ON_FIRST_USE(std::atomic<bool>, false);
 }
-
-/**
- * Constant values used for tracing metadata.
- */
-struct TracingConstantValues {
-  const std::string Status = "lua_http_call_status";
-  const std::string HttpStatus = "lua_http_call_http_status";
-  const std::string Success = "Success";
-  const std::string Failure = "Failure";
-};
-
-using TracingConstants = ConstSingleton<TracingConstantValues>;
 
 // Checks if deprecated metadata names are allowed. On the first check only it will log either
 // a warning (indicating the name should be updated) or an error (the feature is off and the
@@ -274,7 +267,7 @@ int StreamHandleWrapper::luaHttpCall(lua_State* state) {
 
   auto headers = std::make_unique<Http::RequestHeaderMapImpl>();
   buildHeadersFromTable(*headers, state, 3);
-  Http::RequestMessagePtr message(new Http::RequestMessageImpl(std::move(headers)));
+  Http::RequestMessagePtr message = std::make_unique<Http::RequestMessageImpl>(std::move(headers));
 
   // Check that we were provided certain headers.
   if (message->headers().Path() == nullptr || message->headers().Method() == nullptr ||
@@ -334,14 +327,14 @@ void StreamHandleWrapper::onSuccess(const Http::AsyncClient::Request&,
 
   if (!http_call_failed_) {
     ASSERT(span_ != nullptr);
-    span_->setTag(TracingConstants::get().Status, TracingConstants::get().Success);
+    span_->setTag(HTTP_CALL_STATUS, HTTP_CALL_SUCCESS);
 
     uint64_t status_code{};
     if (!absl::SimpleAtoi(response->headers().getStatusValue(), &status_code)) {
       // When parsing status_code is failed, we tag it as an error.
       span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
     } else {
-      span_->setTag(TracingConstants::get().HttpStatus,
+      span_->setTag(HTTP_CALL_HTTP_STATUS,
                     Http::CodeUtility::toString(static_cast<Http::Code>(status_code)));
     }
   }
@@ -399,12 +392,12 @@ void StreamHandleWrapper::onFailure(const Http::AsyncClient::Request& request,
   ENVOY_LOG(debug, "async HTTP failure");
 
   ASSERT(span_ != nullptr);
-  span_->setTag(TracingConstants::get().Status, TracingConstants::get().Failure);
+  span_->setTag(HTTP_CALL_STATUS, HTTP_CALL_FAILURE);
   span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
 
   // Just fake a basic 503 response.
-  Http::ResponseMessagePtr response_message(
-      new Http::ResponseMessageImpl(Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
+  Http::ResponseMessagePtr response_message(std::make_unique<Http::ResponseMessageImpl>(
+      Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
           {{Http::Headers::get().Status,
             std::to_string(enumToInt(Http::Code::ServiceUnavailable))}})));
   response_message->body() = std::make_unique<Buffer::OwnedImpl>("upstream failure");
