@@ -54,7 +54,7 @@ void EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& headers,
   ASSERT(bytes_to_send_old <= bytes_to_send_new);
   // IETF QUIC sends HEADER frame on current stream. After writing headers, the
   // buffer may increase.
-  // maybeCheckWatermark(bytes_to_send_old, bytes_to_send_new, *filterManagerConnection());
+  maybeCheckWatermark(bytes_to_send_old, bytes_to_send_new, *filterManagerConnection());
 }
 
 void EnvoyQuicClientStream::encodeData(Buffer::Instance& data, bool end_stream) {
@@ -88,7 +88,7 @@ void EnvoyQuicClientStream::encodeTrailers(const Http::RequestTrailerMap& traile
   ASSERT(bytes_to_send_old <= bytes_to_send_new);
   // IETF QUIC sends HEADER frame on current stream. After writing trailers, the
   // buffer may increase.
- // maybeCheckWatermark(bytes_to_send_old, bytes_to_send_new, *filterManagerConnection());
+  maybeCheckWatermark(bytes_to_send_old, bytes_to_send_new, *filterManagerConnection());
 }
 
 void EnvoyQuicClientStream::encodeMetadata(const Http::MetadataMapVector& /*metadata_map_vector*/) {
