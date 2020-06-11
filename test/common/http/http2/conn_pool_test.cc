@@ -417,7 +417,7 @@ TEST_F(Http2ConnPoolImplTest, CloseExcessMixedMultiplexing) {
     EXPECT_CALL(*this, onClientDestroy()).Times(0);
     r2.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
   }
-  // 4 requests, capacity [3, 2] - canceling one detroys the client with [2]
+  // 4 requests, capacity [3, 2] - canceling one destroys the client with [2]
   {
     EXPECT_CALL(*this, onClientDestroy());
     r3.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
