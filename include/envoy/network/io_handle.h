@@ -5,6 +5,7 @@
 #include "envoy/api/io_error.h"
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
+#include "envoy/network/address.h"
 
 #include "absl/container/fixed_array.h"
 
@@ -16,12 +17,6 @@ struct RawSlice;
 using RawSliceArrays = absl::FixedArray<absl::FixedArray<Buffer::RawSlice>>;
 
 namespace Network {
-namespace Address {
-class Instance;
-class Ip;
-
-using InstanceConstSharedPtr = std::shared_ptr<const Instance>;
-} // namespace Address
 
 /**
  * IoHandle: an abstract interface for all I/O operations
