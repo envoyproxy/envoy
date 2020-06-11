@@ -91,6 +91,12 @@ public:
         }));
     EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_));
     EXPECT_CALL(*encoder_filter_, setEncoderFilterCallbacks(_));
+    EXPECT_CALL(filter_factory_, createUpgradeFilterChain("WebSocket", _, _))
+        .WillRepeatedly(Invoke([&](absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
+                                   FilterChainFactoryCallbacks& callbacks) -> bool {
+          filter_factory_.createFilterChain(callbacks);
+          return true;
+        }));
   }
 
   Http::ForwardClientCertType
