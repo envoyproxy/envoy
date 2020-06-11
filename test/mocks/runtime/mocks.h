@@ -8,6 +8,8 @@
 #include "envoy/type/v3/percent.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "test/mocks/stats/mocks.h"
+
 #include "gmock/gmock.h"
 
 namespace Envoy {
@@ -79,6 +81,7 @@ public:
   MOCK_METHOD(Stats::Store&, getStore, ());
 
   testing::NiceMock<MockSnapshot> snapshot_;
+  testing::NiceMock<Stats::MockStore> store_;
 };
 
 class MockOverrideLayer : public Snapshot::OverrideLayer {
