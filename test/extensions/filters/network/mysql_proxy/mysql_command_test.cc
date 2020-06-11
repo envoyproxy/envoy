@@ -460,9 +460,6 @@ TEST_F(MySQLCommandTest, MySQLTest20) {
 
 /*
  * Test query: "DROP DATABASE <DB>"
- * Test is disabled because of a bug in SQL parsing library.
- * The library should return that none of database tables has been accessed,
- * but it returns that operation drop has been performed on TABLE 'mysqldb'.
  */
 TEST_F(MySQLCommandTest, MySQLTest21) {
   std::string db = "mysqldb";
@@ -475,9 +472,6 @@ TEST_F(MySQLCommandTest, MySQLTest21) {
 /*
  * Test query with optional cmd:
  * "DROP DATABASE IF EXISTS <DB>"
- * Test is disabled because of a bug in SQL parsing library.
- * The library should return that none of database tables has been accessed,
- * but it returns that operation drop has been performed on TABLE 'mysqldb'.
  */
 TEST_F(MySQLCommandTest, MySQLTest22) {
   std::string db = "mysqldb";
