@@ -1,6 +1,7 @@
 #include "common/common/assert.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/synchronization/mutex.h"
 #include "absl/strings/str_join.h"
 
 namespace Envoy {
@@ -49,7 +50,7 @@ public:
     const auto name = absl::StrCat(filename, ",", line);
 
     // Increment counter, inserting first if counter does not exist.
-    absl::ReleaseableMutexLock lock(&mutex_);
+    absl::ReleasableMutexLock lock(&mutex_);
     auto counter_value = ++counters_[name];
     lock.Release();
 
