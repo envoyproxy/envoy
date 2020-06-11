@@ -29,6 +29,7 @@ swift_static_framework(
         "UpstreamHttpProtocol.swift",
         "filters/*.swift",
         "grpc/*.swift",
+        "mocks/*.swift",
     ]),
     module_name = "Envoy",
     private_deps = ["//library/objective-c:envoy_engine_objc_lib"],

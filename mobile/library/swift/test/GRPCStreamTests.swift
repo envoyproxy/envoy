@@ -1,5 +1,4 @@
 @testable import Envoy
-import EnvoyEngine
 import Foundation
 import XCTest
 
@@ -11,13 +10,12 @@ final class GRPCStreamTests: XCTestCase {
 
   func testDataSizeIsFiveBytesGreaterThanMessageSize() {
     var sentData = Data()
-    let engine = MockEnvoyEngine { callbacks -> EnvoyHTTPStream in
-      let stream = MockEnvoyHTTPStream(handle: 0, callbacks: callbacks)
-      stream.onData = { data, _ in sentData.append(data) }
-      return stream
+    let streamClient = MockStreamClient { stream in
+      stream.onRequestData = { data, _ in sentData.append(data) }
     }
 
-    _ = GRPCStreamPrototype(underlyingStream: StreamPrototype(engine: engine))
+    _ = GRPCClient(streamClient: streamClient)
+      .newGRPCStreamPrototype()
       .start()
       .sendMessage(kMessage1)
 
@@ -26,13 +24,12 @@ final class GRPCStreamTests: XCTestCase {
 
   func testPrefixesSentDataWithZeroCompressionFlag() {
     var sentData = Data()
-    let engine = MockEnvoyEngine { callbacks -> EnvoyHTTPStream in
-      let stream = MockEnvoyHTTPStream(handle: 0, callbacks: callbacks)
-      stream.onData = { data, _ in sentData.append(data) }
-      return stream
+    let streamClient = MockStreamClient { stream in
+      stream.onRequestData = { data, _ in sentData.append(data) }
     }
 
-    _ = GRPCStreamPrototype(underlyingStream: StreamPrototype(engine: engine))
+    _ = GRPCClient(streamClient: streamClient)
+      .newGRPCStreamPrototype()
       .start()
       .sendMessage(kMessage1)
 
@@ -41,13 +38,12 @@ final class GRPCStreamTests: XCTestCase {
 
   func testPrefixesSentDataWithBigEndianLengthOfMessage() {
     var sentData = Data()
-    let engine = MockEnvoyEngine { callbacks -> EnvoyHTTPStream in
-      let stream = MockEnvoyHTTPStream(handle: 0, callbacks: callbacks)
-      stream.onData = { data, _ in sentData.append(data) }
-      return stream
+    let streamClient = MockStreamClient { stream in
+      stream.onRequestData = { data, _ in sentData.append(data) }
     }
 
-    _ = GRPCStreamPrototype(underlyingStream: StreamPrototype(engine: engine))
+    _ = GRPCClient(streamClient: streamClient)
+      .newGRPCStreamPrototype()
       .start()
       .sendMessage(kMessage1)
 
@@ -58,13 +54,12 @@ final class GRPCStreamTests: XCTestCase {
 
   func testAppendsMessageDataAtTheEndOfSentData() {
     var sentData = Data()
-    let engine = MockEnvoyEngine { callbacks -> EnvoyHTTPStream in
-      let stream = MockEnvoyHTTPStream(handle: 0, callbacks: callbacks)
-      stream.onData = { data, _ in sentData.append(data) }
-      return stream
+    let streamClient = MockStreamClient { stream in
+      stream.onRequestData = { data, _ in sentData.append(data) }
     }
 
-    _ = GRPCStreamPrototype(underlyingStream: StreamPrototype(engine: engine))
+    _ = GRPCClient(streamClient: streamClient)
+      .newGRPCStreamPrototype()
       .start()
       .sendMessage(kMessage1)
 
@@ -73,16 +68,15 @@ final class GRPCStreamTests: XCTestCase {
 
   func testCloseIsCalledWithEmptyDataFrame() {
     var closedData: Data?
-    let engine = MockEnvoyEngine { callbacks -> EnvoyHTTPStream in
-      let stream = MockEnvoyHTTPStream(handle: 0, callbacks: callbacks)
-      stream.onData = { data, endStream in
+    let streamClient = MockStreamClient { stream in
+      stream.onRequestData = { data, endStream in
         XCTAssertTrue(endStream)
         closedData = data
       }
-      return stream
     }
 
-    GRPCStreamPrototype(underlyingStream: StreamPrototype(engine: engine))
+    GRPCClient(streamClient: streamClient)
+      .newGRPCStreamPrototype()
       .start()
       .close()
 
@@ -95,13 +89,11 @@ final class GRPCStreamTests: XCTestCase {
     let expectation = self.expectation(description: "Closure is called")
     let expectedHeaders = ResponseHeaders(headers: ["grpc-status": ["1"], "other": ["foo", "bar"]])
 
-    var streamCallbacks: EnvoyHTTPCallbacks!
-    let engine = MockEnvoyEngine { callbacks -> EnvoyHTTPStream in
-      streamCallbacks = callbacks
-      return MockEnvoyHTTPStream(handle: 0, callbacks: callbacks)
-    }
+    var stream: MockStream!
+    let streamClient = MockStreamClient { stream = $0 }
 
-    _ = GRPCStreamPrototype(underlyingStream: StreamPrototype(engine: engine))
+    _ = GRPCClient(streamClient: streamClient)
+      .newGRPCStreamPrototype()
       .setOnResponseHeaders { headers, endStream in
         XCTAssertEqual(expectedHeaders, headers)
         XCTAssertTrue(endStream)
@@ -109,7 +101,7 @@ final class GRPCStreamTests: XCTestCase {
       }
       .start()
 
-    streamCallbacks.onHeaders(expectedHeaders.headers, true)
+    stream.receiveHeaders(expectedHeaders, endStream: true)
     self.waitForExpectations(timeout: 0.1)
   }
 
@@ -117,20 +109,18 @@ final class GRPCStreamTests: XCTestCase {
     let expectation = self.expectation(description: "Closure is called")
     let expectedTrailers = ResponseTrailers(headers: ["foo": ["bar"], "baz": ["1", "2"]])
 
-    var streamCallbacks: EnvoyHTTPCallbacks!
-    let engine = MockEnvoyEngine { callbacks -> EnvoyHTTPStream in
-      streamCallbacks = callbacks
-      return MockEnvoyHTTPStream(handle: 0, callbacks: callbacks)
-    }
+    var stream: MockStream!
+    let streamClient = MockStreamClient { stream = $0 }
 
-    _ = GRPCStreamPrototype(underlyingStream: StreamPrototype(engine: engine))
+    _ = GRPCClient(streamClient: streamClient)
+      .newGRPCStreamPrototype()
       .setOnResponseTrailers { trailers in
         XCTAssertEqual(expectedTrailers, trailers)
         expectation.fulfill()
       }
       .start()
 
-    streamCallbacks.onTrailers(expectedTrailers.headers)
+    stream.receiveTrailers(expectedTrailers)
     self.waitForExpectations(timeout: 0.1)
   }
 
@@ -141,20 +131,18 @@ final class GRPCStreamTests: XCTestCase {
       0x0, 0x0, 0x0, 0x5, // Length bytes
     ] + kMessage1)
 
-    var streamCallbacks: EnvoyHTTPCallbacks!
-    let engine = MockEnvoyEngine { callbacks -> EnvoyHTTPStream in
-      streamCallbacks = callbacks
-      return MockEnvoyHTTPStream(handle: 0, callbacks: callbacks)
-    }
+    var stream: MockStream!
+    let streamClient = MockStreamClient { stream = $0 }
 
-    _ = GRPCStreamPrototype(underlyingStream: StreamPrototype(engine: engine))
+    _ = GRPCClient(streamClient: streamClient)
+      .newGRPCStreamPrototype()
       .setOnResponseMessage { message in
         XCTAssertEqual(kMessage1, message)
         expectation.fulfill()
       }
       .start()
 
-    streamCallbacks.onData(firstMessage, false)
+    stream.receiveData(firstMessage, endStream: false)
     self.waitForExpectations(timeout: 0.1)
   }
 
@@ -179,23 +167,21 @@ final class GRPCStreamTests: XCTestCase {
     let secondMessagePart3 = Data(kMessage2[2..<6])
 
     var expectedMessages = [kMessage1, kMessage2]
-    var streamCallbacks: EnvoyHTTPCallbacks!
-    let engine = MockEnvoyEngine { callbacks -> EnvoyHTTPStream in
-      streamCallbacks = callbacks
-      return MockEnvoyHTTPStream(handle: 0, callbacks: callbacks)
-    }
+    var stream: MockStream!
+    let streamClient = MockStreamClient { stream = $0 }
 
-    _ = GRPCStreamPrototype(underlyingStream: StreamPrototype(engine: engine))
+    _ = GRPCClient(streamClient: streamClient)
+      .newGRPCStreamPrototype()
       .setOnResponseMessage { message in
         XCTAssertEqual(expectedMessages.removeFirst(), message)
         expectation.fulfill()
       }
       .start()
 
-    streamCallbacks.onData(firstMessage, false)
-    streamCallbacks.onData(secondMessagePart1, false)
-    streamCallbacks.onData(secondMessagePart2, false)
-    streamCallbacks.onData(secondMessagePart3, false)
+    stream.receiveData(firstMessage, endStream: false)
+    stream.receiveData(secondMessagePart1, endStream: false)
+    stream.receiveData(secondMessagePart2, endStream: false)
+    stream.receiveData(secondMessagePart3, endStream: false)
     self.waitForExpectations(timeout: 0.1)
     XCTAssertTrue(expectedMessages.isEmpty)
   }
@@ -207,20 +193,18 @@ final class GRPCStreamTests: XCTestCase {
       0x0, 0x0, 0x0, 0x0, // Length bytes
     ])
 
-    var streamCallbacks: EnvoyHTTPCallbacks!
-    let engine = MockEnvoyEngine { callbacks -> EnvoyHTTPStream in
-      streamCallbacks = callbacks
-      return MockEnvoyHTTPStream(handle: 0, callbacks: callbacks)
-    }
+    var stream: MockStream!
+    let streamClient = MockStreamClient { stream = $0 }
 
-    _ = GRPCStreamPrototype(underlyingStream: StreamPrototype(engine: engine))
+    _ = GRPCClient(streamClient: streamClient)
+      .newGRPCStreamPrototype()
       .setOnResponseMessage { message in
         XCTAssertTrue(message.isEmpty)
         expectation.fulfill()
       }
       .start()
 
-    streamCallbacks.onData(firstMessage, false)
+    stream.receiveData(firstMessage, endStream: false)
     self.waitForExpectations(timeout: 0.1)
   }
 
@@ -238,21 +222,19 @@ final class GRPCStreamTests: XCTestCase {
     ] + kMessage2)
 
     var expectedMessages = [Data(), kMessage2]
-    var streamCallbacks: EnvoyHTTPCallbacks!
-    let engine = MockEnvoyEngine { callbacks -> EnvoyHTTPStream in
-      streamCallbacks = callbacks
-      return MockEnvoyHTTPStream(handle: 0, callbacks: callbacks)
-    }
+    var stream: MockStream!
+    let streamClient = MockStreamClient { stream = $0 }
 
-    _ = GRPCStreamPrototype(underlyingStream: StreamPrototype(engine: engine))
+    _ = GRPCClient(streamClient: streamClient)
+      .newGRPCStreamPrototype()
       .setOnResponseMessage { message in
         XCTAssertEqual(expectedMessages.removeFirst(), message)
         expectation.fulfill()
       }
       .start()
 
-    streamCallbacks.onData(firstMessage, false)
-    streamCallbacks.onData(secondMessage, false)
+    stream.receiveData(firstMessage, endStream: false)
+    stream.receiveData(secondMessage, endStream: false)
     self.waitForExpectations(timeout: 0.1)
     XCTAssertTrue(expectedMessages.isEmpty)
   }

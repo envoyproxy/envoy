@@ -5,13 +5,13 @@ import Foundation
 ///
 /// Constructed using `StreamPrototype`, and used to write to the network.
 @objcMembers
-public final class Stream: NSObject {
+public class Stream: NSObject {
   private let underlyingStream: EnvoyHTTPStream
 
   /// Initialize a new instance of the stream.
   ///
   /// - parameter underlyingStream: Underlying stream that can be used to send request data.
-  required init(underlyingStream: EnvoyHTTPStream) {
+  init(underlyingStream: EnvoyHTTPStream) {
     self.underlyingStream = underlyingStream
     super.init()
   }

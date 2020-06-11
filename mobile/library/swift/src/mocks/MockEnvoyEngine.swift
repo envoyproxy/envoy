@@ -1,24 +1,12 @@
-@testable import Envoy
-import EnvoyEngine
+@_implementationOnly import EnvoyEngine
 import Foundation
 
+/// Mock implementation of `EnvoyEngine`. Used internally for testing the bridging layer & mocking.
 final class MockEnvoyEngine: NSObject {
-  private let streamFactory: ((EnvoyHTTPCallbacks) -> EnvoyHTTPStream)?
-
   /// Closure called when `run(withConfig:)` is called.
   static var onRunWithConfig: ((_ config: EnvoyConfiguration, _ logLevel: String?) -> Void)?
   /// Closure called when `run(withConfigYAML:)` is called.
   static var onRunWithYAML: ((_ configYAML: String, _ logLevel: String?) -> Void)?
-
-  init(streamFactory: ((EnvoyHTTPCallbacks) -> EnvoyHTTPStream)?) {
-    self.streamFactory = streamFactory
-    super.init()
-  }
-
-  override init() {
-    self.streamFactory = nil
-    super.init()
-  }
 }
 
 extension MockEnvoyEngine: EnvoyEngine {
@@ -33,10 +21,6 @@ extension MockEnvoyEngine: EnvoyEngine {
   }
 
   func startStream(with callbacks: EnvoyHTTPCallbacks) -> EnvoyHTTPStream {
-    if let factory = self.streamFactory {
-      return factory(callbacks)
-    } else {
-      return MockEnvoyHTTPStream(handle: 0, callbacks: callbacks)
-    }
+    return MockEnvoyHTTPStream(handle: 0, callbacks: callbacks)
   }
 }

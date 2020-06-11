@@ -72,16 +72,10 @@
   },
   "projectName" : "envoy-mobile",
   "sourceFilters" : [
-    "examples/objective-c/...",
-    "examples/objective-c/hello_world",
-    "examples/swift/...",
-    "examples/swift/hello_world",
+    "examples/...",
     "library",
     "library/objective-c/...",
     "library/swift/...",
-    "library/swift/src",
-    "library/swift/src/filters",
-    "library/swift/src/grpc",
-    "library/swift/test"
+    "library/swift/src"
   ]
 }

@@ -7,16 +7,25 @@ import Foundation
 /// Constructed via `StreamClient`, and used to assign response callbacks
 /// prior to starting an `Stream` by calling `start()`.
 @objcMembers
-public final class StreamPrototype: NSObject {
+public class StreamPrototype: NSObject {
   private let engine: EnvoyEngine
   private let callbacks = StreamCallbacks()
 
   /// Initialize a new instance of the stream prototype.
   ///
   /// - parameter engine: Engine to use for starting streams.
-  required init(engine: EnvoyEngine) {
+  init(engine: EnvoyEngine) {
     self.engine = engine
     super.init()
+  }
+
+  /// Create engine callbacks using the provided queue.
+  ///
+  /// - parameter queue: Queue on which to receive callback events.
+  ///
+  /// - returns: A new set of engine callbacks.
+  func createCallbacks(queue: DispatchQueue) -> EnvoyHTTPCallbacks {
+    return EnvoyHTTPCallbacks(callbacks: self.callbacks, queue: queue)
   }
 
   // MARK: - Public
@@ -27,8 +36,7 @@ public final class StreamPrototype: NSObject {
   ///
   /// - returns: The new stream.
   public func start(queue: DispatchQueue = .main) -> Stream {
-    let engineCallbacks = EnvoyHTTPCallbacks(callbacks: self.callbacks, queue: queue)
-    let engineStream = self.engine.startStream(with: engineCallbacks)
+    let engineStream = self.engine.startStream(with: self.createCallbacks(queue: queue))
     return Stream(underlyingStream: engineStream)
   }
 
