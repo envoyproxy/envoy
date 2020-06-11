@@ -1,5 +1,4 @@
-licenses(["notice"])  # Apache 2
-
+load("@rules_python//python:defs.bzl", "py_binary")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_fuzz_test",
@@ -10,6 +9,8 @@ load(
     "envoy_select_hot_restart",
     "envoy_sh_test",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -104,6 +105,11 @@ py_binary(
 envoy_proto_library(
     name = "capture_fuzz_proto",
     srcs = [":capture_fuzz.proto"],
+)
+
+envoy_proto_library(
+    name = "h2_capture_fuzz_proto",
+    srcs = [":h2_capture_fuzz.proto"],
 )
 
 envoy_cc_test(
@@ -229,12 +235,13 @@ exports_files(["test_utility.sh"])
 
 envoy_sh_test(
     name = "hotrestart_test",
+    size = "enormous",
     srcs = envoy_select_hot_restart([
         "hotrestart_test.sh",
     ]),
+    cc_binary = ["//source/exe:envoy-static"],
     data = [
         "test_utility.sh",
-        "//source/exe:envoy-static",
         "//test/config/integration:server_config_files",
         "//tools:socket_passing",
     ],
@@ -245,13 +252,11 @@ envoy_sh_test(
 envoy_sh_test(
     name = "run_envoy_test",
     srcs = ["run_envoy_test.sh"],
+    cc_binary = ["//source/exe:envoy-static"],
     data = [
         "test_utility.sh",
-        "//source/exe:envoy-static",
         "//test/config/integration:server_config_files",
     ],
-    # TODO: This script invocation does not work on Windows, see: https://github.com/bazelbuild/bazel/issues/10959
-    tags = ["fails_on_windows"],
 )
 
 envoy_cc_test(
@@ -458,6 +463,7 @@ envoy_cc_test_library(
         "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//test/common/upstream:utility_lib",
+        "//test/integration/filters:add_body_filter_config_lib",
         "//test/integration/filters:add_trailers_filter_config_lib",
         "//test/integration/filters:call_decodedata_once_filter_config_lib",
         "//test/integration/filters:decode_headers_return_stop_all_filter_config_lib",
@@ -466,6 +472,7 @@ envoy_cc_test_library(
         "//test/integration/filters:modify_buffer_filter_config_lib",
         "//test/integration/filters:passthrough_filter_config_lib",
         "//test/integration/filters:pause_filter_lib",
+        "//test/integration/filters:wait_for_whole_request_and_response_config_lib",
         "//test/test_common:registry_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
@@ -495,6 +502,7 @@ envoy_cc_test(
     tags = ["fails_on_windows"],
     deps = [
         ":http_protocol_integration_lib",
+        "//test/integration/filters:backpressure_filter_config_lib",
         "//test/test_common:test_time_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
@@ -567,6 +575,7 @@ envoy_cc_test_library(
         "//source/extensions/transport_sockets/tap:config",
         "//source/extensions/transport_sockets/tls:config",
         "//source/server:connection_handler_lib",
+        "//source/server:drain_manager_lib",
         "//source/server:hot_restart_nop_lib",
         "//source/server:listener_hooks_lib",
         "//source/server:process_context_lib",
@@ -591,6 +600,7 @@ envoy_cc_test_library(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
@@ -632,9 +642,15 @@ envoy_cc_test(
     deps = [
         ":http_protocol_integration_lib",
         "//source/common/http:header_map_lib",
+        "//source/extensions/internal_redirect/allow_listed_routes:config",
+        "//source/extensions/internal_redirect/previous_routes:config",
+        "//source/extensions/internal_redirect/safe_cross_scheme:config",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/internal_redirect/allow_listed_routes/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/internal_redirect/previous_routes/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/internal_redirect/safe_cross_scheme/v3:pkg_cc_proto",
     ],
 )
 
@@ -973,7 +989,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "version_integration_test",
     srcs = ["version_integration_test.cc"],
-    tags = ["fails_on_windows"],
     deps = [
         ":http_integration_lib",
         "//source/extensions/filters/http/ip_tagging:config",
@@ -1100,6 +1115,69 @@ envoy_cc_fuzz_test(
     ],
 )
 
+H2_FUZZ_LIB_DEPS = [
+    ":h2_capture_fuzz_proto_cc_proto",
+    ":http_integration_lib",
+    "//source/common/common:assert_lib",
+    "//source/common/common:logger_lib",
+    "//test/common/http/http2:http2_frame",
+    "//test/fuzz:fuzz_runner_lib",
+    "//test/fuzz:utility_lib",
+    "//test/integration:integration_lib",
+    "//test/test_common:environment_lib",
+]
+
+envoy_cc_test_library(
+    name = "h2_fuzz_lib",
+    srcs = ["h2_fuzz.cc"],
+    hdrs = ["h2_fuzz.h"],
+    deps = H2_FUZZ_LIB_DEPS,
+)
+
+envoy_cc_test_library(
+    name = "h2_fuzz_persistent_lib",
+    srcs = ["h2_fuzz.cc"],
+    hdrs = ["h2_fuzz.h"],
+    copts = ["-DPERSISTENT_FUZZER"],
+    deps = H2_FUZZ_LIB_DEPS,
+)
+
+envoy_cc_fuzz_test(
+    name = "h2_capture_fuzz_test",
+    srcs = ["h2_capture_fuzz_test.cc"],
+    corpus = "h2_corpus",
+    deps = [":h2_fuzz_lib"],
+)
+
+envoy_cc_fuzz_test(
+    name = "h2_capture_persistent_fuzz_test",
+    srcs = ["h2_capture_fuzz_test.cc"],
+    copts = ["-DPERSISTENT_FUZZER"],
+    corpus = "h2_corpus",
+    deps = [":h2_fuzz_persistent_lib"],
+)
+
+envoy_cc_fuzz_test(
+    name = "h2_capture_direct_response_fuzz_test",
+    srcs = ["h2_capture_direct_response_fuzz_test.cc"],
+    corpus = "h2_corpus",
+    deps = [
+        ":h2_fuzz_lib",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "h2_capture_direct_response_persistent_fuzz_test",
+    srcs = ["h2_capture_direct_response_fuzz_test.cc"],
+    copts = ["-DPERSISTENT_FUZZER"],
+    corpus = "h2_corpus",
+    deps = [
+        ":h2_fuzz_persistent_lib",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
 envoy_cc_test(
     name = "scoped_rds_integration_test",
     srcs = [
@@ -1177,5 +1255,18 @@ envoy_cc_test(
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "local_reply_integration_test",
+    srcs = [
+        "local_reply_integration_test.cc",
+    ],
+    tags = ["fails_on_windows"],
+    deps = [
+        ":http_integration_lib",
+        ":http_protocol_integration_lib",
+        "//test/test_common:utility_lib",
     ],
 )

@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_benchmark_test",
@@ -11,12 +9,13 @@ load(
     "envoy_proto_library",
 )
 
+licenses(["notice"])  # Apache 2
+
 envoy_package()
 
 envoy_cc_test(
     name = "async_client_impl_test",
     srcs = ["async_client_impl_test.cc"],
-    tags = ["fails_on_windows"],
     deps = [
         ":common_lib",
         "//source/common/buffer:buffer_lib",
@@ -155,6 +154,7 @@ envoy_proto_library(
     srcs = ["conn_manager_impl_fuzz.proto"],
     deps = [
         "//test/fuzz:common_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg",
     ],
 )
 
@@ -192,18 +192,17 @@ envoy_cc_fuzz_test(
 envoy_cc_test(
     name = "conn_manager_impl_test",
     srcs = ["conn_manager_impl_test.cc"],
-    tags = ["fails_on_windows"],
     deps = [
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/http:request_id_extension_interface",
         "//include/envoy/tracing:http_tracer_interface",
-        "//source/common/access_log:access_log_formatter_lib",
         "//source/common/access_log:access_log_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:macros",
         "//source/common/event:dispatcher_lib",
+        "//source/common/formatter:substitution_formatter_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:context_lib",
         "//source/common/http:date_provider_lib",
@@ -278,6 +277,7 @@ envoy_cc_test(
     name = "header_map_impl_test",
     srcs = ["header_map_impl_test.cc"],
     deps = [
+        "//source/common/http:header_list_view_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:header_utility_lib",
         "//test/test_common:utility_lib",
@@ -341,6 +341,7 @@ envoy_cc_test(
 envoy_proto_library(
     name = "utility_fuzz_proto",
     srcs = ["utility_fuzz.proto"],
+    deps = ["@envoy_api//envoy/config/core/v3:pkg"],
 )
 
 envoy_cc_fuzz_test(

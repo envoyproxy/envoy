@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package envoy.config.core.v3;
+
+import "google/protobuf/struct.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.config.core.v3";
+option java_outer_classname = "SubstitutionFormatStringProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Substitution format string]
+
+// Configuration to use multiple :ref:`command operators <config_access_log_command_operators>`
+// to generate a new string in either plain text or JSON format.
+message SubstitutionFormatString {
+  oneof format {
+    option (validate.required) = true;
+
+    // Specify a format with command operators to form a text string.
+    // Its details is described in :ref:`format string<config_access_log_format_strings>`.
+    //
+    // .. code-block::
+    //
+    //   text_format: %LOCAL_REPLY_BODY%:%RESPONSE_CODE%:path=$REQ(:path)%
+    //
+    // The following plain text will be created:
+    //
+    // .. code-block::
+    //
+    //   upstream connect error:204:path=/foo
+    //
+    string text_format = 1 [(validate.rules).string = {min_bytes: 1}];
+
+    // Specify a format with command operators to form a JSON string.
+    // Its details is described in :ref:`format dictionary<config_access_log_format_dictionaries>`.
+    // Values are rendered as strings, numbers, or boolean values as appropriate.
+    // Nested JSON objects may be produced by some command operators (e.g. FILTER_STATE or DYNAMIC_METADATA).
+    // See the documentation for a specific command operator for details.
+    //
+    // .. code-block::
+    //
+    //  json_format:
+    //    status: %RESPONSE_CODE%
+    //    message: %LOCAL_REPLY_BODY%
+    //
+    // The following JSON object would be created:
+    //
+    // .. code-block:: json
+    //
+    //  {
+    //    "status": 500,
+    //    "message": "My error message"
+    //  }
+    //
+    google.protobuf.Struct json_format = 2 [(validate.rules).message = {required: true}];
+  }
+}

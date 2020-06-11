@@ -3,6 +3,7 @@
 #include "envoy/network/address.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/network/socket_interface_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 
@@ -29,7 +30,8 @@ std::string createHeader(const std::string& format, uint32_t version) {
 
 DaemonBrokerImpl::DaemonBrokerImpl(const std::string& daemon_endpoint)
     : address_(Network::Utility::parseInternetAddressAndPort(daemon_endpoint, false /*v6only*/)),
-      io_handle_(address_->socket(Network::Address::SocketType::Datagram)) {}
+      io_handle_(Network::SocketInterfaceSingleton::get().socket(Network::Socket::Type::Datagram,
+                                                                 address_)) {}
 
 void DaemonBrokerImpl::send(const std::string& data) const {
   auto& logger = Logger::Registry::getLog(Logger::Id::tracing);

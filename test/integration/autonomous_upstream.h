@@ -35,8 +35,9 @@ private:
 // An upstream which creates AutonomousStreams for new incoming streams.
 class AutonomousHttpConnection : public FakeHttpConnection {
 public:
-  AutonomousHttpConnection(SharedConnectionWrapper& shared_connection, Stats::Store& store,
-                           Type type, AutonomousUpstream& upstream);
+  AutonomousHttpConnection(AutonomousUpstream& autonomous_upstream,
+                           SharedConnectionWrapper& shared_connection, Type type,
+                           AutonomousUpstream& upstream);
 
   Http::RequestDecoder& newStream(Http::ResponseEncoder& response_encoder, bool) override;
 
@@ -56,7 +57,7 @@ public:
       : FakeUpstream(address, type, time_system),
         allow_incomplete_streams_(allow_incomplete_streams),
         response_headers_(std::make_unique<Http::TestResponseHeaderMapImpl>(
-            Http::TestHeaderMapImpl({{":status", "200"}}))) {}
+            Http::TestResponseHeaderMapImpl({{":status", "200"}}))) {}
 
   AutonomousUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory, uint32_t port,
                      FakeHttpConnection::Type type, Network::Address::IpVersion version,
@@ -64,7 +65,7 @@ public:
       : FakeUpstream(std::move(transport_socket_factory), port, type, version, time_system),
         allow_incomplete_streams_(allow_incomplete_streams),
         response_headers_(std::make_unique<Http::TestResponseHeaderMapImpl>(
-            Http::TestHeaderMapImpl({{":status", "200"}}))) {}
+            Http::TestResponseHeaderMapImpl({{":status", "200"}}))) {}
 
   ~AutonomousUpstream() override;
   bool
@@ -77,7 +78,7 @@ public:
   void setLastRequestHeaders(const Http::HeaderMap& headers);
   std::unique_ptr<Http::TestRequestHeaderMapImpl> lastRequestHeaders();
   void setResponseHeaders(std::unique_ptr<Http::TestResponseHeaderMapImpl>&& response_headers);
-  Http::TestHeaderMapImpl responseHeaders();
+  Http::TestResponseHeaderMapImpl responseHeaders();
   const bool allow_incomplete_streams_{false};
 
 private:

@@ -1,8 +1,8 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
-#include "common/decompressor/zlib_decompressor_impl.h"
 
 #include "extensions/compression/gzip/compressor/zlib_compressor_impl.h"
+#include "extensions/compression/gzip/decompressor/zlib_decompressor_impl.h"
 
 #include "test/fuzz/fuzz_runner.h"
 

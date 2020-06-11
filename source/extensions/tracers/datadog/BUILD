@@ -1,13 +1,13 @@
-licenses(["notice"])  # Apache 2
-
-# Trace driver for Datadog (https://datadoghq.com/)
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
+
+# Trace driver for Datadog (https://datadoghq.com/)
 
 envoy_package()
 
@@ -21,6 +21,7 @@ envoy_cc_library(
     ],
     external_deps = ["dd_opentracing_cpp"],
     deps = [
+        "//source/common/common:version_lib",
         "//source/common/config:utility_lib",
         "//source/common/http:async_client_utility_lib",
         "//source/common/tracing:http_tracer_lib",

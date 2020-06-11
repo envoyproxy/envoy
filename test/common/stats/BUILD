@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_fuzz_test",
@@ -8,6 +6,8 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -157,7 +157,6 @@ envoy_cc_fuzz_test(
         ":stat_test_utility_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
-        "//source/common/decompressor:decompressor_lib",
         "//source/common/stats:symbol_table_lib",
         "//test/fuzz:utility_lib",
     ],

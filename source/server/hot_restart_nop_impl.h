@@ -23,6 +23,7 @@ public:
   void sendParentTerminateRequest() override {}
   ServerStatsFromParent mergeParentStatsIfAny(Stats::StoreRoot&) override { return {}; }
   void shutdown() override {}
+  uint32_t baseId() override { return 0; }
   std::string version() override { return "disabled"; }
   Thread::BasicLockable& logLock() override { return log_lock_; }
   Thread::BasicLockable& accessLogLock() override { return access_log_lock_; }

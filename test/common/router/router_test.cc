@@ -225,8 +225,7 @@ public:
     }
     router_.decodeHeaders(headers, true);
 
-    EXPECT_EQ(expected_count,
-              atoi(std::string(headers.EnvoyAttemptCount()->value().getStringView()).c_str()));
+    EXPECT_EQ(expected_count, atoi(std::string(headers.getEnvoyAttemptCountValue()).c_str()));
 
     // When the router filter gets reset we should cancel the pool request.
     EXPECT_CALL(cancellable_, cancel());
@@ -267,9 +266,7 @@ public:
     EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
     EXPECT_CALL(callbacks_, encodeHeaders_(_, true))
         .WillOnce(Invoke([expected_count](Http::ResponseHeaderMap& headers, bool) {
-          EXPECT_EQ(
-              expected_count,
-              atoi(std::string(headers.EnvoyAttemptCount()->value().getStringView()).c_str()));
+          EXPECT_EQ(expected_count, atoi(std::string(headers.getEnvoyAttemptCountValue()).c_str()));
         }));
     response_decoder->decodeHeaders(std::move(response_headers), true);
     EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
@@ -294,16 +291,18 @@ public:
     router_.decodeHeaders(default_request_headers_, end_stream);
   }
 
-  void enableRedirects() {
-    ON_CALL(callbacks_.route_->route_entry_, internalRedirectAction())
-        .WillByDefault(Return(InternalRedirectAction::Handle));
-    ON_CALL(callbacks_, connection()).WillByDefault(Return(&connection_));
-    setMaxInternalRedirects(1);
-  }
-
-  void setMaxInternalRedirects(uint32_t max_internal_redirects) {
-    ON_CALL(callbacks_.route_->route_entry_, maxInternalRedirects())
+  void enableRedirects(uint32_t max_internal_redirects = 1) {
+    ON_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, enabled())
+        .WillByDefault(Return(true));
+    ON_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_,
+            shouldRedirectForResponseCode(_))
+        .WillByDefault(Return(true));
+    ON_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, maxInternalRedirects())
         .WillByDefault(Return(max_internal_redirects));
+    ON_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_,
+            isCrossSchemeRedirectAllowed())
+        .WillByDefault(Return(false));
+    ON_CALL(callbacks_, connection()).WillByDefault(Return(&connection_));
   }
 
   void setNumPreviousRedirect(uint32_t num_previous_redirects) {
@@ -721,7 +720,8 @@ TEST_F(RouterTest, AddCookieNoDuplicate) {
 
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
       .WillOnce(Invoke([&](const Http::HeaderMap& headers, const bool) -> void {
-        EXPECT_EQ(headers.get(Http::Headers::get().SetCookie)->value().getStringView(), "foo=baz");
+        EXPECT_EQ(std::string{headers.get(Http::Headers::get().SetCookie)->value().getStringView()},
+                  "foo=baz");
       }));
   expectResponseTimerCreate();
 
@@ -1035,7 +1035,7 @@ TEST_F(RouterTest, EnvoyAttemptCountInRequestUpdatedInRetries) {
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
 
   // Initial request has 1 attempt.
-  EXPECT_EQ(1, atoi(std::string(headers.EnvoyAttemptCount()->value().getStringView()).c_str()));
+  EXPECT_EQ(1, atoi(std::string(headers.getEnvoyAttemptCountValue()).c_str()));
 
   // 5xx response.
   router_.retry_state_->expectHeadersRetry();
@@ -1061,7 +1061,7 @@ TEST_F(RouterTest, EnvoyAttemptCountInRequestUpdatedInRetries) {
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
 
   // The retry should cause the header to increase to 2.
-  EXPECT_EQ(2, atoi(std::string(headers.EnvoyAttemptCount()->value().getStringView()).c_str()));
+  EXPECT_EQ(2, atoi(std::string(headers.getEnvoyAttemptCountValue()).c_str()));
 
   // Normal response.
   EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _)).WillOnce(Return(RetryStatus::No));
@@ -1207,8 +1207,7 @@ TEST_F(RouterTest, EnvoyAttemptCountInResponseWithRetries) {
   EXPECT_CALL(callbacks_, encodeHeaders_(_, true))
       .WillOnce(Invoke([](Http::ResponseHeaderMap& headers, bool) {
         // Because a retry happened the number of attempts in the response headers should be 2.
-        EXPECT_EQ(2,
-                  atoi(std::string(headers.EnvoyAttemptCount()->value().getStringView()).c_str()));
+        EXPECT_EQ(2, atoi(std::string(headers.getEnvoyAttemptCountValue()).c_str()));
       }));
   response_decoder->decodeHeaders(std::move(response_headers2), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
@@ -1438,8 +1437,8 @@ TEST_F(RouterTestSuppressEnvoyHeaders, EnvoyUpstreamServiceTime) {
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
-  Http::TestHeaderMapImpl downstream_response_headers{{":status", "200"},
-                                                      {"x-envoy-upstream-service-time", "0"}};
+  Http::TestResponseHeaderMapImpl downstream_response_headers{
+      {":status", "200"}, {"x-envoy-upstream-service-time", "0"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(_, true))
       .WillOnce(Invoke([](Http::HeaderMap& headers, bool) {
         EXPECT_EQ(nullptr, headers.get(Http::Headers::get().EnvoyUpstreamServiceTime));
@@ -4433,10 +4432,11 @@ TEST_F(RouterTest, RetryRespectsRetryHostPredicate) {
 }
 
 TEST_F(RouterTest, InternalRedirectRejectedWhenReachingMaxInternalRedirect) {
-  enableRedirects();
-  setMaxInternalRedirects(3);
+  enableRedirects(3);
   setNumPreviousRedirect(3);
   sendRequest();
+
+  EXPECT_CALL(callbacks_, recreateStream()).Times(0);
 
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
 
@@ -4445,6 +4445,8 @@ TEST_F(RouterTest, InternalRedirectRejectedWhenReachingMaxInternalRedirect) {
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_internal_redirect_failed_total")
                     .value());
+  EXPECT_EQ(1UL,
+            stats_store_.counter("test.passthrough_internal_redirect_too_many_redirects").value());
 }
 
 TEST_F(RouterTest, InternalRedirectRejectedWithEmptyLocation) {
@@ -4452,6 +4454,9 @@ TEST_F(RouterTest, InternalRedirectRejectedWithEmptyLocation) {
   sendRequest();
 
   redirect_headers_->setLocation("");
+
+  EXPECT_CALL(callbacks_, recreateStream()).Times(0);
+
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
 
   Buffer::OwnedImpl data("1234567890");
@@ -4459,6 +4464,7 @@ TEST_F(RouterTest, InternalRedirectRejectedWithEmptyLocation) {
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_internal_redirect_failed_total")
                     .value());
+  EXPECT_EQ(1UL, stats_store_.counter("test.passthrough_internal_redirect_bad_location").value());
 }
 
 TEST_F(RouterTest, InternalRedirectRejectedWithInvalidLocation) {
@@ -4466,6 +4472,9 @@ TEST_F(RouterTest, InternalRedirectRejectedWithInvalidLocation) {
   sendRequest();
 
   redirect_headers_->setLocation("h");
+
+  EXPECT_CALL(callbacks_, recreateStream()).Times(0);
+
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
 
   Buffer::OwnedImpl data("1234567890");
@@ -4473,12 +4482,15 @@ TEST_F(RouterTest, InternalRedirectRejectedWithInvalidLocation) {
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_internal_redirect_failed_total")
                     .value());
+  EXPECT_EQ(1UL, stats_store_.counter("test.passthrough_internal_redirect_bad_location").value());
 }
 
 TEST_F(RouterTest, InternalRedirectRejectedWithoutCompleteRequest) {
   enableRedirects();
 
   sendRequest(false);
+
+  EXPECT_CALL(callbacks_, recreateStream()).Times(0);
 
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
 
@@ -4495,6 +4507,9 @@ TEST_F(RouterTest, InternalRedirectRejectedWithoutLocation) {
   sendRequest();
 
   redirect_headers_->removeLocation();
+
+  EXPECT_CALL(callbacks_, recreateStream()).Times(0);
+
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
   Buffer::OwnedImpl data("1234567890");
   response_decoder_->decodeData(data, true);
@@ -4508,7 +4523,10 @@ TEST_F(RouterTest, InternalRedirectRejectedWithBody) {
 
   sendRequest();
 
-  EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
+  Buffer::InstancePtr body_data(new Buffer::OwnedImpl("random_fake_data"));
+  EXPECT_CALL(callbacks_, decodingBuffer()).WillOnce(Return(body_data.get()));
+  EXPECT_CALL(callbacks_, recreateStream()).Times(0);
+
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
   Buffer::OwnedImpl data("1234567890");
   response_decoder_->decodeData(data, true);
@@ -4517,26 +4535,61 @@ TEST_F(RouterTest, InternalRedirectRejectedWithBody) {
                     .value());
 }
 
-TEST_F(RouterTest, InternalRedirectRejectedWithCrossSchemeRedirect) {
+TEST_F(RouterTest, CrossSchemeRedirectRejectedByPolicy) {
   enableRedirects();
 
   sendRequest();
 
   redirect_headers_->setLocation("https://www.foo.com");
+
+  EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
+  EXPECT_CALL(callbacks_, recreateStream()).Times(0);
+
   response_decoder_->decodeHeaders(std::move(redirect_headers_), true);
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_internal_redirect_failed_total")
                     .value());
+  EXPECT_EQ(1UL, stats_store_.counter("test.passthrough_internal_redirect_unsafe_scheme").value());
+}
+
+TEST_F(RouterTest, InternalRedirectRejectedByPredicate) {
+  enableRedirects();
+
+  sendRequest();
+
+  redirect_headers_->setLocation("http://www.foo.com/some/path");
+
+  auto mock_predicate = std::make_shared<NiceMock<MockInternalRedirectPredicate>>();
+
+  EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
+  EXPECT_CALL(callbacks_, clearRouteCache()).Times(1);
+  EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, predicates())
+      .WillOnce(Return(std::vector<InternalRedirectPredicateSharedPtr>({mock_predicate})));
+  EXPECT_CALL(*mock_predicate, acceptTargetRoute(_, _, _, _)).WillOnce(Return(false));
+  ON_CALL(*mock_predicate, name()).WillByDefault(Return("mock_predicate"));
+  EXPECT_CALL(callbacks_, recreateStream()).Times(0);
+
+  response_decoder_->decodeHeaders(std::move(redirect_headers_), true);
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_failed_total")
+                    .value());
+  EXPECT_EQ(1UL, stats_store_.counter("test.passthrough_internal_redirect_predicate").value());
+
+  // Make sure the original host/path is preserved.
+  EXPECT_EQ("host", default_request_headers_.getHostValue());
+  EXPECT_EQ("/", default_request_headers_.getPathValue());
+  // Make sure x-envoy-original-url is not set for unsuccessful redirect.
+  EXPECT_EQ(nullptr, default_request_headers_.EnvoyOriginalUrl());
 }
 
 TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
-  enableRedirects();
-  setMaxInternalRedirects(3);
+  enableRedirects(3);
   setNumPreviousRedirect(2);
   default_request_headers_.setForwardedProto("http");
   sendRequest();
 
   EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
+  EXPECT_CALL(callbacks_, clearRouteCache()).Times(1);
   EXPECT_CALL(callbacks_, recreateStream()).Times(1).WillOnce(Return(true));
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
@@ -4553,8 +4606,7 @@ TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
 
 TEST_F(RouterTest, HttpsInternalRedirectSucceeded) {
   auto ssl_connection = std::make_shared<Ssl::MockConnectionInfo>();
-  enableRedirects();
-  setMaxInternalRedirects(3);
+  enableRedirects(3);
   setNumPreviousRedirect(1);
 
   sendRequest();
@@ -4562,6 +4614,30 @@ TEST_F(RouterTest, HttpsInternalRedirectSucceeded) {
   redirect_headers_->setLocation("https://www.foo.com");
   EXPECT_CALL(connection_, ssl()).Times(1).WillOnce(Return(ssl_connection));
   EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
+  EXPECT_CALL(callbacks_, clearRouteCache()).Times(1);
+  EXPECT_CALL(callbacks_, recreateStream()).Times(1).WillOnce(Return(true));
+  response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_succeeded_total")
+                    .value());
+
+  // In production, the HCM recreateStream would have called this.
+  router_.onDestroy();
+}
+
+TEST_F(RouterTest, CrossSchemeRedirectAllowedByPolicy) {
+  auto ssl_connection = std::make_shared<Ssl::MockConnectionInfo>();
+  enableRedirects();
+
+  sendRequest();
+
+  redirect_headers_->setLocation("http://www.foo.com");
+  EXPECT_CALL(connection_, ssl()).Times(1).WillOnce(Return(ssl_connection));
+  EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
+  EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_,
+              isCrossSchemeRedirectAllowed())
+      .WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, clearRouteCache()).Times(1);
   EXPECT_CALL(callbacks_, recreateStream()).Times(1).WillOnce(Return(true));
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
