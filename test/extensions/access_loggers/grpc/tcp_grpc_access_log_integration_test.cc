@@ -32,11 +32,6 @@ public:
     enable_half_close_ = true;
   }
 
-  ~TcpGrpcAccessLogIntegrationTest() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
-
   void createUpstreams() override {
     BaseIntegrationTest::createUpstreams();
     fake_upstreams_.emplace_back(

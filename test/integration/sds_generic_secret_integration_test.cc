@@ -104,11 +104,7 @@ public:
     HttpIntegrationTest::initialize();
   }
 
-  void TearDown() override {
-    cleanUpXdsConnection();
-    cleanupUpstreamAndDownstream();
-    codec_client_.reset();
-  }
+  void TearDown() override { cleanUpXdsConnection(); }
 
   void createSdsStream() {
     createXdsConnection();

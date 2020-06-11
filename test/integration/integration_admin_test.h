@@ -36,14 +36,6 @@ public:
   }
 
   /**
-   *  Destructor for an individual test.
-   */
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
-
-  /**
    * Validates that the passed in string conforms to output of stats in JSON format.
    */
   void validateStatsJson(const std::string& stats_json, const uint64_t expected_hist_count) {

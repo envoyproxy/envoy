@@ -32,10 +32,7 @@ protected:
   ListenerIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion(), realTime()) {}
 
-  ~ListenerIntegrationTest() override {
-    resetConnections();
-    cleanupUpstreamAndDownstream();
-  }
+  ~ListenerIntegrationTest() override { resetConnections(); }
 
   void initialize() override {
     // We want to use the GRPC based LDS.
@@ -258,7 +255,6 @@ TEST_P(ListenerIntegrationTest, BasicSuccess) {
   verifyResponse(std::move(response), "200", response_headers, std::string(response_size, 'a'));
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(request_size, upstream_request_->bodyLength());
-  cleanupUpstreamAndDownstream();
 }
 
 } // namespace

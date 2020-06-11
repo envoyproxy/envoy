@@ -841,8 +841,6 @@ TEST_P(IntegrationTest, TestHead) {
   EXPECT_THAT(response->headers(), HeaderValueOf(Headers::get().ContentLength, "12"));
   EXPECT_EQ(response->headers().TransferEncoding(), nullptr);
   EXPECT_EQ(0, response->body().size());
-
-  cleanupUpstreamAndDownstream();
 }
 
 // The Envoy HTTP/1.1 codec ASSERTs that T-E headers are cleared in
@@ -1299,7 +1297,6 @@ TEST_P(IntegrationTest, TestUpgradeHeaderInResponse) {
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("Hello World", response->body());
-  cleanupUpstreamAndDownstream();
 }
 
 TEST_P(IntegrationTest, ConnectWithNoBody) {

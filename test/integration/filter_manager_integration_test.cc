@@ -410,11 +410,6 @@ public:
 
   void SetUp() override { addAuxiliaryFilter(config_helper_); }
 
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
-
 protected:
   // Returns configuration for a given auxiliary filter
   std::string filterConfig(const std::string& auxiliary_filter_name) override {

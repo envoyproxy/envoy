@@ -71,11 +71,6 @@ public:
   }
 
   void SetUp() override { BaseIntegrationTest::initialize(); }
-
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
 };
 
 class AwsMetadataIntegrationTestSuccess : public AwsMetadataIntegrationTestBase {

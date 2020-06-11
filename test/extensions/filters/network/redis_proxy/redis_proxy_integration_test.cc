@@ -294,11 +294,6 @@ public:
       : BaseIntegrationTest(GetParam(), config), num_upstreams_(num_upstreams),
         version_(GetParam()) {}
 
-  ~RedisProxyIntegrationTest() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
-
   // This method encodes a fake upstream's IP address and TCP port in the
   // same format as one would expect from a Redis server in
   // an ask/moved redirection error.
