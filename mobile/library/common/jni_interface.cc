@@ -236,8 +236,16 @@ static void jvm_on_complete(void* context) {
 }
 
 static void jvm_on_cancel(void* context) {
+  __android_log_write(ANDROID_LOG_VERBOSE, "[Envoy]", "jvm_on_cancel");
+
   JNIEnv* env = get_env();
   jobject j_context = static_cast<jobject>(context);
+
+  jclass jcls_JvmObserverContext = env->GetObjectClass(j_context);
+  jmethodID jmid_onCancel = env->GetMethodID(jcls_JvmObserverContext, "onCancel", "()V");
+  env->CallVoidMethod(j_context, jmid_onCancel);
+
+  // No further callbacks happen on this context. Delete the reference held by native code.
   env->DeleteGlobalRef(j_context);
 }
 
