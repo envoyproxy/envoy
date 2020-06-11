@@ -26,22 +26,18 @@ jobs:
     - name: Install deps
       shell: bash
       run: |
-       wget -O /usr/local/bin/bazel https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64
-       chmod +x /usr/local/bin/bazel
-       apt-get install libtool cmake automake autoconf make ninja-build curl unzip virtualenv
-       mkdir clang9
-       cd clang9
+       sudo apt-get update && sudo apt-get install libtool cmake automake autoconf make ninja-build curl unzip virtualenv openjdk-11-jdk build-essential libc++1
+       mkdir -p bin/clang9
+       cd bin/clang9
        wget https://releases.llvm.org/9.0.0/clang+llvm-9.0.0-x86_64-linux-gnu-ubuntu-18.04.tar.xz
        tar -xf clang+llvm-9.0.0-x86_64-linux-gnu-ubuntu-18.04.tar.xz --strip-components 1
-       cd ..
-       export CLANG_TOOLCHAIN=clang9
-       export CC=$CLANG_TOOLCHAIN/bin/clang
-       export CXX=$CLANG_TOOLCHAIN/bin/clang++
+       export PATH=bin/clang9/bin:$PATH
 
     - name: Build
-      shell: bash
       run: |
-       /usr/local/bin/bazel build //source/exe:envoy-static
+       bazel/setup_clang.sh bin/clang9
+       bazelisk shutdown
+       bazelisk build -c fastbuild --spawn_strategy=local --discard_analysis_cache --nouse_action_cache --config clang --config libc++ //source/exe:envoy-static --verbose_failures
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v1
