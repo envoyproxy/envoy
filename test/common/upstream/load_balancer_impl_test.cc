@@ -1534,9 +1534,14 @@ TEST_P(LeastRequestLoadBalancerTest, WeightImbalance) {
 }
 
 TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceWithCustomExponent) {
-  EXPECT_CALL(runtime_.snapshot_,
-              getDouble("upstream.least_requests.active_requests_exponent", 1.0))
-      .WillRepeatedly(Return(0.0));
+  // Create a load balancer with a custom active requests exponent.
+  envoy::config::cluster::v3::Cluster::LeastRequestLbConfig lr_lb_config;
+  lr_lb_config.mutable_active_requests_exponent()->set_runtime_key("exponent");
+  lr_lb_config.mutable_active_requests_exponent()->set_default_value(1.0);
+  LeastRequestLoadBalancer lb_2{priority_set_, nullptr,        stats_,      runtime_,
+                                random_,       common_config_, lr_lb_config};
+
+  EXPECT_CALL(runtime_.snapshot_, getDouble("exponent", 1.0)).WillRepeatedly(Return(0.0));
 
   hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", 1),
                               makeTestHost(info_, "tcp://127.0.0.1:81", 2)};
@@ -1549,12 +1554,12 @@ TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceWithCustomExponent) {
 
   // We should see 2:1 ratio for hosts[1] to hosts[0], regardless of the active request count.
   hostSet().healthy_hosts_[1]->stats().rq_active_.set(1);
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
 }
 
 TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceCallbacks) {

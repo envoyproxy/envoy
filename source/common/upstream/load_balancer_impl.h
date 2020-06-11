@@ -12,15 +12,11 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/protobuf/utility.h"
+#include "common/runtime/runtime_protos.h"
 #include "common/upstream/edf_scheduler.h"
-
-#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Upstream {
-
-constexpr absl::string_view RuntimeLeastRequestsActiveRequestsExponent =
-    "upstream.least_requests.active_requests_exponent";
 
 // Priority levels and localities are considered overprovisioned with this factor.
 static constexpr uint32_t kDefaultOverProvisioningFactor = 140;
@@ -371,7 +367,7 @@ protected:
     std::unique_ptr<EdfScheduler<const Host>> edf_;
   };
 
-  virtual void initialize();
+  void initialize();
 
   virtual void refresh(uint32_t priority);
 
@@ -444,8 +440,7 @@ private:
  *    The benefit of the Maglev table is at the expense of resolution, memory usage is capped.
  *    Additionally, the Maglev table can be shared amongst all threads.
  */
-class LeastRequestLoadBalancer : public EdfLoadBalancerBase,
-                                 Logger::Loggable<Logger::Id::upstream> {
+class LeastRequestLoadBalancer : public EdfLoadBalancerBase {
 public:
   LeastRequestLoadBalancer(
       const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
@@ -458,59 +453,66 @@ public:
         choice_count_(
             least_request_config.has_value()
                 ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(least_request_config.value(), choice_count, 2)
-                : 2) {
+                : 2),
+        active_requests_exponent_runtime_(
+            least_request_config.has_value() && least_request_config->has_active_requests_exponent()
+                ? absl::optional<Runtime::Double>(
+                      Runtime::Double(least_request_config->active_requests_exponent(), runtime))
+                : absl::nullopt) {
     initialize();
   }
 
 protected:
   void refresh(uint32_t priority) override {
-    active_requests_exponent_ =
-        runtime_.snapshot().getDouble(RuntimeLeastRequestsActiveRequestsExponent, 1.0);
+    active_requests_exponent_ = active_requests_exponent_runtime_.has_value()
+                                    ? active_requests_exponent_runtime_->value()
+                                    : 1.0;
+
     EdfLoadBalancerBase::refresh(priority);
   }
 
 private:
   void refreshHostSource(const HostsSource&) override {}
   double hostWeight(const Host& host) override {
-    // Here we scale host weight by the number of active requests at the time we do the pick. We
-    // always add 1 to avoid division by 0. It might be possible to do better by picking two hosts
-    // off of the schedule, and selecting the one with fewer active requests at the time of
-    // selection.
-    // TODO(mattklein123): @htuch brings up the point that how we are scaling weight here might not
-    // be the only/best way of doing this. Essentially, it makes weight and active requests equally
-    // important. Are they equally important in practice? There is no right answer here and we might
-    // want to iterate on this as we gain more experience.
-
-    // TODO(gkleiman): the final PR will not log anything and will return directly instead of using
-    // a temporary variable.
-    double weight;
-
+    // This method is called to calculate the dynamic weight as following when all load balancing
+    // weights are not equal:
+    //
+    // `weight = load_balancing_weight / (active_requests + 1)^active_requests_exponent`
+    //
+    // `active_requests_exponent` can be configured via runtime and its value is cached in
+    // `active_requests_exponent_` to avoid having to do a runtime lookup each time a host weight is
+    // calculated.
+    //
+    // When `active_requests_exponent == 0.0` we behave like `RoundRobinLoadBalancer` and return the
+    // host weight without considering the number of active requests at the time we do the pick.
+    //
+    // When `active_requests_exponent > 0.0` we scale the host weight by the number of active
+    // requests at the time we do the pick. We always add 1 to avoid division by 0.
+    //
+    // It might be possible to do better by picking two hosts off of the schedule, and selecting the
+    // one with fewer active requests at the time of selection.
     if (active_requests_exponent_ == 0.0) {
-      weight = host.weight();
-    } else if (active_requests_exponent_ == 1.0) {
-      weight = static_cast<double>(host.weight()) / (host.stats().rq_active_.value() + 1);
-    } else {
-      weight = static_cast<double>(host.weight()) /
-               std::pow(host.stats().rq_active_.value() + 1, active_requests_exponent_);
+      return host.weight();
     }
 
-    ENVOY_LOG(trace, "cluster={} address={} active_requests_exponent={} weight={}",
-              host.cluster().name(), host.address()->asString(), active_requests_exponent_, weight);
+    if (active_requests_exponent_ == 1.0) {
+      return static_cast<double>(host.weight()) / (host.stats().rq_active_.value() + 1);
+    }
 
-    return weight;
+    return static_cast<double>(host.weight()) /
+           std::pow(host.stats().rq_active_.value() + 1, active_requests_exponent_);
   }
   HostConstSharedPtr unweightedHostPick(const HostVector& hosts_to_use,
                                         const HostsSource& source) override;
 
   const uint32_t choice_count_;
 
-  // When hosts have different weights, the host weight is calculated as:
-  //
-  // host_weight = (configured_weight / active_requests^k). k is configured via runtime and its
-  // value is cached to avoid having to do a runtime lookup each time a host weight is generated.
-  //
-  // The cached value is refreshed in `LeastRequestLoadBalancer::refresh(uint32_t priority)`.
+  // The exponent used to calculate host weights can be configured via runtime. We cache it for
+  // performance reasons and refresh it in `LeastRequestLoadBalancer::refresh(uint32_t priority)`
+  // whenever a `HostSet` is updated.
   double active_requests_exponent_;
+
+  const absl::optional<Runtime::Double> active_requests_exponent_runtime_;
 };
 
 /**
