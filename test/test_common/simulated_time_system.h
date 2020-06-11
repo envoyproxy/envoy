@@ -97,8 +97,9 @@ private:
   void incPendingLockHeld() EXCLUSIVE_LOCKS_REQUIRED(mutex_) { ++pending_alarms_; }
   void decPending() {
     absl::MutexLock lock(&mutex_);
-    --pending_alarms_;
+    decPendingLockHeld();
   }
+  void decPendingLockHeld() EXCLUSIVE_LOCKS_REQUIRED(mutex_) { --pending_alarms_; }
   void waitForNoPendingLockHeld() const EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   RealTimeSource real_time_source_; // Used to initialize monotonic_time_ and system_time_;

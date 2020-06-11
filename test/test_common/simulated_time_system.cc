@@ -170,6 +170,7 @@ SimulatedTimeSystemHelper::Alarm::Alarm::~Alarm() {
 }
 
 void SimulatedTimeSystemHelper::Alarm::Alarm::disableTimer() {
+  base_timer_->disableTimer();
   absl::MutexLock lock(&time_system_.mutex_);
   disableTimerLockHeld();
 }
@@ -179,10 +180,15 @@ void SimulatedTimeSystemHelper::Alarm::Alarm::disableTimerLockHeld() {
     time_system_.removeAlarmLockHeld(this);
     armed_ = false;
   }
+  if (pending_) {
+    pending_ = false;
+    time_system_.decPendingLockHeld();
+  }
 }
 
 void SimulatedTimeSystemHelper::Alarm::Alarm::enableHRTimer(
     const std::chrono::microseconds& duration, const ScopeTrackedObject* scope) {
+  base_timer_->disableTimer();
   absl::MutexLock lock(&time_system_.mutex_);
   disableTimerLockHeld();
   armed_ = true;

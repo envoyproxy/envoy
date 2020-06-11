@@ -3,6 +3,7 @@
 #include "common/event/libevent_scheduler.h"
 #include "common/event/timer_impl.h"
 
+#include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
@@ -60,6 +61,105 @@ TEST_F(SimulatedTimeSystemTest, AdvanceTimeAsync) {
   advanceMsAndLoop(5);
   EXPECT_EQ(start_monotonic_time_ + std::chrono::milliseconds(5), time_system_.monotonicTime());
   EXPECT_EQ(start_system_time_ + std::chrono::milliseconds(5), time_system_.systemTime());
+}
+
+TEST_F(SimulatedTimeSystemTest, TimerOrdering) {
+  EXPECT_EQ(start_monotonic_time_, time_system_.monotonicTime());
+  EXPECT_EQ(start_system_time_, time_system_.systemTime());
+
+  ReadyWatcher watcher1;
+  Event::TimerPtr timer1 = scheduler_->createTimer([&] { watcher1.ready(); }, dispatcher_);
+
+  ReadyWatcher watcher2;
+  Event::TimerPtr timer2 = scheduler_->createTimer([&] { watcher2.ready(); }, dispatcher_);
+
+  ReadyWatcher watcher3;
+  Event::TimerPtr timer3 = scheduler_->createTimer([&] { watcher3.ready(); }, dispatcher_);
+
+  timer1->enableTimer(std::chrono::milliseconds(0));
+  timer2->enableTimer(std::chrono::milliseconds(1));
+  timer3->enableTimer(std::chrono::milliseconds(2));
+
+  // Expect watcher calls to happen in order since timers have different times.
+  testing::InSequence s;
+  EXPECT_CALL(watcher1, ready());
+  EXPECT_CALL(watcher2, ready());
+  EXPECT_CALL(watcher3, ready());
+  advanceMsAndLoop(5);
+}
+
+// Alarms that are scheduled to execute and are cancelled do not trigger.
+TEST_F(SimulatedTimeSystemTest, TimerOrderAndDisableAlarm) {
+  EXPECT_EQ(start_monotonic_time_, time_system_.monotonicTime());
+  EXPECT_EQ(start_system_time_, time_system_.systemTime());
+
+  ReadyWatcher watcher3;
+  Event::TimerPtr timer3 = scheduler_->createTimer([&] { watcher3.ready(); }, dispatcher_);
+
+  ReadyWatcher watcher2;
+  Event::TimerPtr timer2 = scheduler_->createTimer([&] { watcher2.ready(); }, dispatcher_);
+
+  ReadyWatcher watcher1;
+  Event::TimerPtr timer1 = scheduler_->createTimer(
+      [&] {
+        timer2->disableTimer();
+        watcher1.ready();
+      },
+      dispatcher_);
+
+  timer1->enableTimer(std::chrono::milliseconds(0));
+  timer2->enableTimer(std::chrono::milliseconds(1));
+  timer3->enableTimer(std::chrono::milliseconds(2));
+
+  // Expect watcher calls to happen in order since timers have different times. watcher2 ready() is
+  // not called because timer2 was disabled as part of timer1's execution.
+  testing::InSequence s;
+  EXPECT_CALL(watcher1, ready());
+  EXPECT_CALL(watcher3, ready());
+  advanceMsAndLoop(5);
+}
+
+// Change the registration time for an alarm that is already activated and verify that execution is
+// delayed.
+TEST_F(SimulatedTimeSystemTest, TimerOrderAndRescheduleAlarm) {
+  EXPECT_EQ(start_monotonic_time_, time_system_.monotonicTime());
+  EXPECT_EQ(start_system_time_, time_system_.systemTime());
+
+  ReadyWatcher watcher4;
+  Event::TimerPtr timer4 = scheduler_->createTimer([&] { watcher4.ready(); }, dispatcher_);
+
+  ReadyWatcher watcher3;
+  Event::TimerPtr timer3 = scheduler_->createTimer([&] { watcher3.ready(); }, dispatcher_);
+
+  ReadyWatcher watcher2;
+  Event::TimerPtr timer2 = scheduler_->createTimer([&] { watcher2.ready(); }, dispatcher_);
+
+  ReadyWatcher watcher1;
+  Event::TimerPtr timer1 = scheduler_->createTimer(
+      [&] {
+        timer2->enableTimer(std::chrono::milliseconds(0));
+        timer3->enableTimer(std::chrono::milliseconds(1));
+        watcher1.ready();
+      },
+      dispatcher_);
+
+  timer1->enableTimer(std::chrono::milliseconds(0));
+  timer2->enableTimer(std::chrono::milliseconds(1));
+  timer3->enableTimer(std::chrono::milliseconds(2));
+  timer4->enableTimer(std::chrono::milliseconds(3));
+
+  // timer1 is expected to run first and reschedule timers 2 and 3. watcher4 should fire before
+  // watcher2 since watcher4's registration is unaffected. watcher2 runs in the same iteration
+  // because it is scheduled with zero delay. timer3 executes in a later iteration because it is
+  // enabled with a non-zero timeout.
+  testing::InSequence s;
+  EXPECT_CALL(watcher1, ready());
+  EXPECT_CALL(watcher4, ready());
+  EXPECT_CALL(watcher2, ready());
+  advanceMsAndLoop(5);
+
+  EXPECT_CALL(watcher3, ready());
+  advanceMsAndLoop(5);
 }
 
 TEST_F(SimulatedTimeSystemTest, AdvanceTimeWait) {
