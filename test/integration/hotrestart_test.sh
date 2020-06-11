@@ -70,10 +70,19 @@ JSON_TEST_ARRAY+=("${HOT_RESTART_JSON_REUSE_PORT}")
 
 echo "Hot restart test using dynamic base id"
 
+function scrape_stat() {
+  local ADMIN_ADDRESS="$1"
+  local STAT_NAME="$2"
+  curl -sg "$ADMIN_ADDRESS"/stats | grep "^${STAT_NAME}: " | cut -f2 -d" "
+}
+
 TEST_INDEX=0
 function run_testsuite() {
   local HOT_RESTART_JSON="$1"
   local FAKE_SYMBOL_TABLE="$2"
+
+  echo cat "${HOT_RESTART_JSON}"
+  cat "${HOT_RESTART_JSON}"
 
   start_test validation
   check "${ENVOY_BIN}" -c "${HOT_RESTART_JSON}" --mode validate --service-cluster cluster \
@@ -151,15 +160,20 @@ function run_testsuite() {
   SERVER_LIVE_0=$(curl -sg http://${ADMIN_ADDRESS_0}/stats | grep server.live)
   check [ "$SERVER_LIVE_0" = "server.live: 1" ];
 
+  # Capture the amount of memory allocated with one server, which we'll use to
+  # make sure parent gauge accumulation and erasure works via approximate 
+  # comparisons. Note that on some platforms or build options, memory is not
+  # captured and comes out as 0, in which case we'll ignore the tests.
+  start_test Capturing memory use per-server
+  SERVER_MEMORY_0=$(scrape_stat "${ADMIN_ADDRESS_0}" "server.memory_allocated")
+  echo SERVER_MEMORY_0 = ${SERVER_MEMORY_0}
+
   enableHeapCheck
 
-  # For SERVER_1, we set a drain timer, so it exits a few seconds after SERVER_2 starts.
-  start_test Starting epoch 1
   ADMIN_ADDRESS_PATH_1="${TEST_TMPDIR}"/admin.1."${TEST_INDEX}".address
   run_in_background_saving_pid "${ENVOY_BIN}" -c "${UPDATED_HOT_RESTART_JSON}" \
       --restart-epoch 1 --base-id "${BASE_ID}" --service-cluster cluster --service-node node \
-      --use-fake-symbol-table "$FAKE_SYMBOL_TABLE" --admin-address-path "${ADMIN_ADDRESS_PATH_1}" \
-      --drain-time-s 2
+      --use-fake-symbol-table "$FAKE_SYMBOL_TABLE" --admin-address-path "${ADMIN_ADDRESS_PATH_1}"
 
   SERVER_1_PID=$BACKGROUND_PID
 
@@ -169,6 +183,16 @@ function run_testsuite() {
   ADMIN_ADDRESS_1=$(cat "${ADMIN_ADDRESS_PATH_1}")
   SERVER_LIVE_1=$(curl -sg http://${ADMIN_ADDRESS_1}/stats | grep server.live)
   check [ "$SERVER_LIVE_1" = "server.live: 1" ];
+
+  # Check to see that the SERVER_1 reports roughly twice the memory of SERVER_0,
+  # since it is accumulating server.memory_allocated from the parent. This will
+  # be erased once SERVER_0 terminates.
+  if [ "$SERVER_MEMORY_0" != 0 ]; then
+    start_test Checking that the memory allocation reported in SERVER_2 excludes that from parents.
+    SERVER_MEMORY_1=$(scrape_stat "${ADMIN_ADDRESS_1}" "server.memory_allocated")
+    echo SERVER_MEMORY_1 = ${SERVER_MEMORY_1}
+    check [ $SERVER_MEMORY_1 -ge $((2*SERVER_MEMORY_0)) ]
+  fi
 
   start_test Checking that listener addresses have not changed
   HOT_RESTART_JSON_1="${TEST_TMPDIR}"/hot_restart.1."${TEST_INDEX}".yaml
@@ -219,8 +243,22 @@ function run_testsuite() {
   # with the generation being decremented back to 1.
   start_test Checking server.hot_restart_generation 2
   ADMIN_ADDRESS_2=$(cat "${ADMIN_ADDRESS_PATH_2}")
+  echo curl -sg http://${ADMIN_ADDRESS_2}/stats
+  curl -sg http://${ADMIN_ADDRESS_2}/stats
+  echo curl -sg http://${ADMIN_ADDRESS_2}/stats
+  curl -sg http://${ADMIN_ADDRESS_2}/stats
   GENERATION_2=$(curl -sg http://${ADMIN_ADDRESS_2}/stats | grep server.hot_restart_generation)
   check [ "$GENERATION_2" = "server.hot_restart_generation: 3" ];
+
+  # Check to see that the SERVER_2 has approximately the same amount of memory 
+  # as SERVER_0, since its parents have now exited and we have erased their
+  # gauge contributions.
+  if [ "$SERVER_MEMORY_0" != 0 ]; then
+    start_test Checking that the memory allocation reported in SERVER_2 includes that from SERVER_1
+    SERVER_MEMORY_2=$(scrape_stat "${ADMIN_ADDRESS_2}" "server.memory_allocated")
+    echo SERVER_MEMORY_2 = ${SERVER_MEMORY_2}
+    check [ $SERVER_MEMORY_2 -lt $((2*SERVER_MEMORY_0)) ]
+  fi
 
   start_test Checking that listener addresses have not changed
   HOT_RESTART_JSON_2="${TEST_TMPDIR}"/hot_restart.2."${TEST_INDEX}".yaml
