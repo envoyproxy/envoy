@@ -9,8 +9,8 @@
 namespace quiche {
 
 namespace {
-QuicheOptionalImpl<int64_t> QuicheUtcDateTimeToUnixSecondsInner(int year, int month, int day,
-                                                                int hour, int minute, int second) {
+QuicheOptional<int64_t> QuicheUtcDateTimeToUnixSecondsInner(int year, int month, int day, int hour,
+                                                            int minute, int second) {
   const absl::CivilSecond civil_time(year, month, day, hour, minute, second);
   if (second != 60 && (civil_time.year() != year || civil_time.month() != month ||
                        civil_time.day() != day || civil_time.hour() != hour ||
@@ -23,8 +23,8 @@ QuicheOptionalImpl<int64_t> QuicheUtcDateTimeToUnixSecondsInner(int year, int mo
 }
 } // namespace
 
-QuicheOptionalImpl<int64_t> QuicheUtcDateTimeToUnixSecondsImpl(int year, int month, int day,
-                                                               int hour, int minute, int second) {
+QuicheOptional<int64_t> QuicheUtcDateTimeToUnixSecondsImpl(int year, int month, int day, int hour,
+                                                           int minute, int second) {
   // Handle leap seconds without letting any other irregularities happen.
   if (second == 60) {
     auto previous_second =

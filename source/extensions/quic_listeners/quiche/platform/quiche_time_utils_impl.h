@@ -8,14 +8,13 @@
 
 #include <cstdint>
 
-#include "extensions/quic_listeners/quiche/platform/quiche_optional_impl.h"
-
 #include "absl/time/civil_time.h"
 #include "absl/time/time.h"
+#include "quiche/common/platform/api/quiche_optional.h"
 
 namespace quiche {
 
-QuicheOptionalImpl<int64_t> QuicheUtcDateTimeToUnixSecondsImpl(int year, int month, int day,
-                                                               int hour, int minute, int second);
+QuicheOptional<int64_t> QuicheUtcDateTimeToUnixSecondsImpl(int year, int month, int day, int hour,
+                                                           int minute, int second);
 
 } // namespace quiche
