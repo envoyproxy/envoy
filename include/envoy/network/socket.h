@@ -89,6 +89,11 @@ public:
   virtual Address::Type addressType() const PURE;
 
   /**
+   * @return the IP version used by the socket if address type is IP, absl::nullopt otherwise
+   */
+  virtual absl::optional<Address::IpVersion> ipVersion() const PURE;
+
+  /**
    * Close the underlying socket.
    */
   virtual void close() PURE;
@@ -133,7 +138,7 @@ public:
    * Retrieves option from underlying socket (@see man 2 getsockopt)
    */
   virtual Api::SysCallIntResult getSocketOption(int level, int optname, void* optval,
-                                                socklen_t* optlen) PURE;
+                                                socklen_t* optlen) const PURE;
 
   /**
    * Toggle socket blocking state

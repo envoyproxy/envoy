@@ -3465,6 +3465,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
   Network::FilterChainFactory& filterChainFactory = listener.filterChainFactory();
   Network::MockListenerFilterManager manager;
 
+  // Return error when trying to retrieve the original dst on the invalid handle
+  EXPECT_CALL(os_sys_calls_, getsockopt_(_, _, _, _, _)).WillOnce(Return(-1));
+
   NiceMock<Network::MockListenerFilterCallbacks> callbacks;
   Network::AcceptedSocketImpl socket(std::make_unique<Network::IoSocketHandleImpl>(),
                                      Network::Address::InstanceConstSharedPtr{

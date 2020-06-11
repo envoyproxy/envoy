@@ -11,7 +11,8 @@ namespace Envoy {
 namespace Network {
 
 SocketImpl::SocketImpl(Socket::Type type, Address::Type addr_type, Address::IpVersion version)
-    : io_handle_(SocketInterfaceSingleton::get().socket(type, addr_type, version)) {}
+    : io_handle_(SocketInterfaceSingleton::get().socket(type, addr_type, version)),
+      sock_type_(type), addr_type_(addr_type) {}
 
 SocketImpl::SocketImpl(Socket::Type sock_type, const Address::InstanceConstSharedPtr addr)
     : io_handle_(SocketInterfaceSingleton::get().socket(sock_type, addr)), sock_type_(sock_type),
@@ -98,13 +99,39 @@ Api::SysCallIntResult SocketImpl::setSocketOption(int level, int optname, const 
 }
 
 Api::SysCallIntResult SocketImpl::getSocketOption(int level, int optname, void* optval,
-                                                  socklen_t* optlen) {
+                                                  socklen_t* optlen) const {
   return Api::OsSysCallsSingleton::get().getsockopt(io_handle_->fd(), level, optname, optval,
                                                     optlen);
 }
 
 Api::SysCallIntResult SocketImpl::setBlockingForTest(bool blocking) {
   return Api::OsSysCallsSingleton::get().setsocketblocking(io_handle_->fd(), blocking);
+}
+
+absl::optional<Address::IpVersion> SocketImpl::ipVersion() const {
+  if (addr_type_ == Address::Type::Ip) {
+    // Always hit after socket is initialized, i.e., accepted or connected
+    if (local_address_ != nullptr) {
+      return local_address_->ip()->version();
+    } else {
+#ifdef SOL_IP
+      int socket_domain;
+      socklen_t domain_len = sizeof(socket_domain);
+      auto result = getSocketOption(SOL_SOCKET, SO_DOMAIN, &socket_domain, &domain_len);
+      if (result.rc_ != 0) {
+        return absl::nullopt;
+      }
+      if (socket_domain == AF_INET) {
+        return Address::IpVersion::v4;
+      } else if (socket_domain == AF_INET6) {
+        return Address::IpVersion::v6;
+      } else {
+        return absl::nullopt;
+      }
+#endif
+    }
+  }
+  return absl::nullopt;
 }
 
 } // namespace Network
