@@ -30,7 +30,7 @@ namespace Upstream {
 
 class EdsSpeedTest {
 public:
-  EdsSpeedTest() : api_(Api::createApiForTest(stats_)) {}
+  EdsSpeedTest(benchmark::State& state) : state_(state), api_(Api::createApiForTest(stats_)) {}
 
   void resetCluster(const std::string& yaml_config, Cluster::InitializePhase initialize_phase) {
     local_info_.node_.mutable_locality()->set_zone("us-east-1a");
@@ -54,7 +54,9 @@ public:
 
   // Set up an EDS config with multiple priorities, localities, weights and make sure
   // they are loaded and reloaded as expected.
-  void priorityAndLocalityWeightedHelper(bool ignore_unknown_dynamic_fields, int num_hosts) {
+  void priorityAndLocalityWeightedHelper(bool v2_config, bool ignore_unknown_dynamic_fields,
+                                         int num_hosts) {
+    state_.PauseTiming();
     envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
     cluster_load_assignment.set_cluster_name("fare");
     resetCluster(R"EOF(
@@ -95,11 +97,20 @@ public:
 
     initialize();
     Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
-    resources.Add()->PackFrom(cluster_load_assignment);
+    auto* resource = resources.Add();
+    resource->PackFrom(cluster_load_assignment);
+    if (v2_config) {
+      RELEASE_ASSERT(resource->type_url() ==
+                         "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment",
+                     "");
+      resource->set_type_url("type.googleapis.com/envoy.api.v2.ClusterLoadAssignment");
+    }
+    state_.ResumeTiming();
     eds_callbacks_->onConfigUpdate(resources, "");
     ASSERT(initialized_);
   }
 
+  benchmark::State& state_;
   bool initialized_{};
   Stats::IsolatedStoreImpl stats_;
   Ssl::MockContextManager ssl_context_manager_;
@@ -126,9 +137,9 @@ static void priorityAndLocalityWeighted(benchmark::State& state) {
   Envoy::Logger::Context logging_state(spdlog::level::warn,
                                        Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
   for (auto _ : state) {
-    Envoy::Upstream::EdsSpeedTest speed_test;
-    speed_test.priorityAndLocalityWeightedHelper(state.range(0), state.range(1));
+    Envoy::Upstream::EdsSpeedTest speed_test(state);
+    speed_test.priorityAndLocalityWeightedHelper(state.range(0), state.range(1), state.range(2));
   }
 }
 
-BENCHMARK(priorityAndLocalityWeighted)->Ranges({{false, true}, {2000, 100000}});
+BENCHMARK(priorityAndLocalityWeighted)->Ranges({{false, true}, {false, true}, {2000, 100000}});
