@@ -86,7 +86,7 @@ public:
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   ProtobufMessage::NullValidationVisitorImpl any_validation_visitor_;
   std::unique_ptr<ConfigImpl> config_;
-  Http::TestHeaderMapImpl header_;
+  Http::TestRequestHeaderMapImpl header_;
   const RouteEntry* route_;
   Network::Address::Ipv4Instance default_remote_address_{"10.0.0.1"};
 };
@@ -271,7 +271,7 @@ public:
   }
 
   std::unique_ptr<RateLimitPolicyEntryImpl> rate_limit_entry_;
-  Http::TestHeaderMapImpl header_;
+  Http::TestRequestHeaderMapImpl header_;
   NiceMock<MockRouteEntry> route_;
   std::vector<Envoy::RateLimit::Descriptor> descriptors_;
   Network::Address::Ipv4Instance default_remote_address_{"10.0.0.1"};
@@ -358,7 +358,7 @@ actions:
   )EOF";
 
   setupTest(yaml);
-  Http::TestHeaderMapImpl header{{"x-header-name", "test_value"}};
+  Http::TestRequestHeaderMapImpl header{{"x-header-name", "test_value"}};
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header,
                                          default_remote_address_);
@@ -382,7 +382,7 @@ actions:
   )EOF";
 
   setupTest(yaml);
-  Http::TestHeaderMapImpl header{{"x-header-name", "test_value"}};
+  Http::TestRequestHeaderMapImpl header{{"x-header-name", "test_value"}};
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header,
                                          default_remote_address_);
@@ -406,7 +406,7 @@ actions:
   )EOF";
 
   setupTest(yaml);
-  Http::TestHeaderMapImpl header{{"x-header-test", "test_value"}};
+  Http::TestRequestHeaderMapImpl header{{"x-header-test", "test_value"}};
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header,
                                          default_remote_address_);
@@ -422,7 +422,7 @@ actions:
   )EOF";
 
   setupTest(yaml);
-  Http::TestHeaderMapImpl header{{"x-header-name", "test_value"}};
+  Http::TestRequestHeaderMapImpl header{{"x-header-name", "test_value"}};
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header,
                                          default_remote_address_);
@@ -455,7 +455,7 @@ actions:
   )EOF";
 
   setupTest(yaml);
-  Http::TestHeaderMapImpl header{{"x-header-name", "test_value"}};
+  Http::TestRequestHeaderMapImpl header{{"x-header-name", "test_value"}};
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header, default_remote_address_);
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"header_match", "fake_value"}}}}),
@@ -473,7 +473,7 @@ actions:
   )EOF";
 
   setupTest(yaml);
-  Http::TestHeaderMapImpl header{{"x-header-name", "not_same_value"}};
+  Http::TestRequestHeaderMapImpl header{{"x-header-name", "not_same_value"}};
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header, default_remote_address_);
   EXPECT_TRUE(descriptors_.empty());
@@ -491,7 +491,7 @@ actions:
   )EOF";
 
   setupTest(yaml);
-  Http::TestHeaderMapImpl header{{"x-header-name", "not_same_value"}};
+  Http::TestRequestHeaderMapImpl header{{"x-header-name", "not_same_value"}};
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header, default_remote_address_);
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"header_match", "fake_value"}}}}),
@@ -510,7 +510,7 @@ actions:
   )EOF";
 
   setupTest(yaml);
-  Http::TestHeaderMapImpl header{{"x-header-name", "test_value"}};
+  Http::TestRequestHeaderMapImpl header{{"x-header-name", "test_value"}};
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header, default_remote_address_);
   EXPECT_TRUE(descriptors_.empty());

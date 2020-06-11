@@ -112,7 +112,7 @@ public:
   void expectInitialMetadata(const TestMetadata& metadata) {
     EXPECT_CALL(*this, onReceiveInitialMetadata_(_))
         .WillOnce(Invoke([this, &metadata](const Http::HeaderMap& received_headers) {
-          Http::TestHeaderMapImpl stream_headers(received_headers);
+          Http::TestResponseHeaderMapImpl stream_headers(received_headers);
           for (const auto& value : metadata) {
             EXPECT_EQ(value.second, stream_headers.get_(value.first));
           }
@@ -124,7 +124,7 @@ public:
   void expectTrailingMetadata(const TestMetadata& metadata) {
     EXPECT_CALL(*this, onReceiveTrailingMetadata_(_))
         .WillOnce(Invoke([this, &metadata](const Http::HeaderMap& received_headers) {
-          Http::TestHeaderMapImpl stream_headers(received_headers);
+          Http::TestResponseTrailerMapImpl stream_headers(received_headers);
           for (auto& value : metadata) {
             EXPECT_EQ(value.second, stream_headers.get_(value.first));
           }
@@ -139,7 +139,7 @@ public:
       reply_headers->addReference(value.first, value.second);
     }
     expectInitialMetadata(metadata);
-    fake_stream_->encodeHeaders(Http::TestHeaderMapImpl(*reply_headers), false);
+    fake_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl(*reply_headers), false);
   }
 
   void sendReply() {
@@ -164,7 +164,8 @@ public:
 
   void sendServerTrailers(Status::GrpcStatus grpc_status, const std::string& grpc_message,
                           const TestMetadata& metadata, bool trailers_only = false) {
-    Http::TestHeaderMapImpl reply_trailers{{"grpc-status", std::to_string(enumToInt(grpc_status))}};
+    Http::TestResponseTrailerMapImpl reply_trailers{
+        {"grpc-status", std::to_string(enumToInt(grpc_status))}};
     if (!grpc_message.empty()) {
       reply_trailers.addCopy("grpc-message", grpc_message);
     }
@@ -307,6 +308,10 @@ public:
     auto* google_grpc = config.mutable_google_grpc();
     google_grpc->set_target_uri(fake_upstream_->localAddress()->asString());
     google_grpc->set_stat_prefix("fake_cluster");
+    for (const auto& config_arg : channel_args_) {
+      (*google_grpc->mutable_channel_args()->mutable_args())[config_arg.first].set_string_value(
+          config_arg.second);
+    }
     fillServiceWideInitialMetadata(config);
     return config;
   }
@@ -326,16 +331,16 @@ public:
   void expectInitialHeaders(FakeStream& fake_stream, const TestMetadata& initial_metadata) {
     AssertionResult result = fake_stream.waitForHeadersComplete();
     RELEASE_ASSERT(result, result.message());
-    Http::TestHeaderMapImpl stream_headers(fake_stream.headers());
-    EXPECT_EQ("POST", stream_headers.get_(":method"));
-    EXPECT_EQ("/helloworld.Greeter/SayHello", stream_headers.get_(":path"));
-    EXPECT_EQ("application/grpc", stream_headers.get_("content-type"));
-    EXPECT_EQ("trailers", stream_headers.get_("te"));
+    stream_headers_ = std::make_unique<Http::TestRequestHeaderMapImpl>(fake_stream.headers());
+    EXPECT_EQ("POST", stream_headers_->get_(":method"));
+    EXPECT_EQ("/helloworld.Greeter/SayHello", stream_headers_->get_(":path"));
+    EXPECT_EQ("application/grpc", stream_headers_->get_("content-type"));
+    EXPECT_EQ("trailers", stream_headers_->get_("te"));
     for (const auto& value : initial_metadata) {
-      EXPECT_EQ(value.second, stream_headers.get_(value.first));
+      EXPECT_EQ(value.second, stream_headers_->get_(value.first));
     }
     for (const auto& value : service_wide_initial_metadata_) {
-      EXPECT_EQ(value.second, stream_headers.get_(value.first));
+      EXPECT_EQ(value.second, stream_headers_->get_(value.first));
     }
   }
 
@@ -430,6 +435,8 @@ public:
   Stats::ScopeSharedPtr stats_scope_{stats_store_};
   Grpc::StatNames google_grpc_stat_names_{stats_store_->symbolTable()};
   TestMetadata service_wide_initial_metadata_;
+  std::unique_ptr<Http::TestRequestHeaderMapImpl> stream_headers_;
+  std::vector<std::pair<std::string, std::string>> channel_args_;
 #ifdef ENVOY_GOOGLE_GRPC
   std::unique_ptr<GoogleAsyncClientThreadLocal> google_tls_;
 #endif

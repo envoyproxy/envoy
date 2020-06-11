@@ -47,10 +47,6 @@ namespace {
 
 const std::string DEPRECATED_ROUTER_NAME = "envoy.router";
 
-const absl::string_view getPath(const Http::RequestHeaderMap& headers) {
-  return headers.Path() ? headers.Path()->value().getStringView() : "";
-}
-
 } // namespace
 
 std::string SslRedirector::newPath(const Http::RequestHeaderMap& headers) const {
@@ -485,7 +481,8 @@ bool RouteEntryImplBase::matchRoute(const Http::RequestHeaderMap& headers,
 
   matches &= Http::HeaderUtility::matchHeaders(headers, config_headers_);
   if (!config_query_parameters_.empty()) {
-    Http::Utility::QueryParams query_parameters = Http::Utility::parseQueryString(getPath(headers));
+    Http::Utility::QueryParams query_parameters =
+        Http::Utility::parseQueryString(headers.getPathValue());
     matches &= ConfigUtility::matchQueryParams(query_parameters, config_query_parameters_);
   }
 
@@ -576,7 +573,8 @@ void RouteEntryImplBase::finalizePathHeader(Http::RequestHeaderMap& headers,
     return;
   }
 
-  std::string path(getPath(headers));
+  // TODO(perf): can we avoid the string copy for the common case?
+  std::string path(headers.getPathValue());
   if (insert_envoy_original_path) {
     headers.setEnvoyOriginalPath(path);
   }
@@ -601,7 +599,7 @@ absl::string_view RouteEntryImplBase::processRequestHost(const Http::RequestHead
                                                          absl::string_view new_scheme,
                                                          absl::string_view new_port) const {
 
-  absl::string_view request_host = headers.Host()->value().getStringView();
+  absl::string_view request_host = headers.getHostValue();
   size_t host_end;
   if (request_host.empty()) {
     return request_host;
@@ -618,7 +616,7 @@ absl::string_view RouteEntryImplBase::processRequestHost(const Http::RequestHead
 
   if (host_end != absl::string_view::npos) {
     absl::string_view request_port = request_host.substr(host_end);
-    absl::string_view request_protocol = headers.ForwardedProto()->value().getStringView();
+    absl::string_view request_protocol = headers.getForwardedProtoValue();
     bool remove_port = !new_port.empty();
 
     if (new_scheme != request_protocol) {
@@ -650,7 +648,7 @@ std::string RouteEntryImplBase::newPath(const Http::RequestHeaderMap& headers) c
     final_scheme = Http::Headers::get().SchemeValues.Https;
   } else {
     ASSERT(headers.ForwardedProto());
-    final_scheme = headers.ForwardedProto()->value().getStringView();
+    final_scheme = headers.getForwardedProtoValue();
   }
 
   if (!port_redirect_.empty()) {
@@ -669,7 +667,7 @@ std::string RouteEntryImplBase::newPath(const Http::RequestHeaderMap& headers) c
   if (!path_redirect_.empty()) {
     final_path = path_redirect_.c_str();
   } else {
-    final_path = getPath(headers);
+    final_path = headers.getPathValue();
     if (strip_query_) {
       size_t path_end = final_path.find("?");
       if (path_end != absl::string_view::npos) {
@@ -909,7 +907,7 @@ RouteConstSharedPtr PrefixRouteEntryImpl::matches(const Http::RequestHeaderMap& 
                                                   const StreamInfo::StreamInfo& stream_info,
                                                   uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value) &&
-      path_matcher_->match(getPath(headers))) {
+      path_matcher_->match(headers.getPathValue())) {
     return clusterEntry(headers, random_value);
   }
   return nullptr;
@@ -931,7 +929,7 @@ RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::RequestHeaderMap& he
                                                 const StreamInfo::StreamInfo& stream_info,
                                                 uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value) &&
-      path_matcher_->match(getPath(headers))) {
+      path_matcher_->match(headers.getPathValue())) {
     return clusterEntry(headers, random_value);
   }
 
@@ -959,7 +957,7 @@ RegexRouteEntryImpl::RegexRouteEntryImpl(
 
 void RegexRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                             bool insert_envoy_original_path) const {
-  const absl::string_view path = Http::PathUtil::removeQueryAndFragment(getPath(headers));
+  const absl::string_view path = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
   // TODO(yuval-k): This ASSERT can happen if the path was changed by a filter without clearing the
   // route cache. We should consider if ASSERT-ing is the desired behavior in this case.
   ASSERT(regex_->match(path));
@@ -970,7 +968,7 @@ RouteConstSharedPtr RegexRouteEntryImpl::matches(const Http::RequestHeaderMap& h
                                                  const StreamInfo::StreamInfo& stream_info,
                                                  uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
-    const absl::string_view path = Http::PathUtil::removeQueryAndFragment(getPath(headers));
+    const absl::string_view path = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
     if (regex_->match(path)) {
       return clusterEntry(headers, random_value);
     }
@@ -986,7 +984,7 @@ ConnectRouteEntryImpl::ConnectRouteEntryImpl(
 
 void ConnectRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                               bool insert_envoy_original_path) const {
-  const absl::string_view path = Http::PathUtil::removeQueryAndFragment(getPath(headers));
+  const absl::string_view path = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
   finalizePathHeader(headers, path, insert_envoy_original_path);
 }
 
@@ -1249,8 +1247,8 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMa
 
   // TODO (@rshriram) Match Origin header in WebSocket
   // request with VHost, using wildcard match
-  const std::string host =
-      Http::LowerCaseString(std::string(headers.Host()->value().getStringView())).get();
+  // Lower-case the value of the host header, as hostnames are case insensitive.
+  const std::string host = absl::AsciiStrToLower(headers.getHostValue());
   const auto& iter = virtual_hosts_.find(host);
   if (iter != virtual_hosts_.end()) {
     return iter->second.get();

@@ -15,6 +15,7 @@
 #include "common/common/lock_guard.h"
 #include "common/common/logger.h"
 #include "common/common/thread.h"
+#include "common/stats/allocator_impl.h"
 
 #include "server/drain_manager_impl.h"
 #include "server/listener_hooks.h"
@@ -38,11 +39,14 @@ struct FieldValidationConfig {
   bool ignore_unknown_dynamic_fields = false;
 };
 
-// Create OptionsImpl structures suitable for tests.
-OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::string& config_yaml,
-                                  Network::Address::IpVersion ip_version,
-                                  FieldValidationConfig validation_config = FieldValidationConfig(),
-                                  uint32_t concurrency = 1);
+// Create OptionsImpl structures suitable for tests. Disables hot restart.
+OptionsImpl
+createTestOptionsImpl(const std::string& config_path, const std::string& config_yaml,
+                      Network::Address::IpVersion ip_version,
+                      FieldValidationConfig validation_config = FieldValidationConfig(),
+                      uint32_t concurrency = 1,
+                      std::chrono::seconds drain_time = std::chrono::seconds(1),
+                      Server::DrainStrategy drain_strategy = Server::DrainStrategy::Gradual);
 
 class TestComponentFactory : public ComponentFactory {
 public:
@@ -149,6 +153,98 @@ public:
 private:
   Thread::MutexBasicLockable& lock_;
   ScopePtr wrapped_scope_;
+};
+
+// A counter which signals on a condition variable when it is incremented.
+class NotifyingCounter : public Stats::Counter {
+public:
+  NotifyingCounter(Stats::Counter* counter, absl::Mutex& mutex, absl::CondVar& condvar)
+      : counter_(counter), mutex_(mutex), condvar_(condvar) {}
+
+  std::string name() const override { return counter_->name(); }
+  StatName statName() const override { return counter_->statName(); }
+  TagVector tags() const override { return counter_->tags(); }
+  std::string tagExtractedName() const override { return counter_->tagExtractedName(); }
+  void iterateTagStatNames(const TagStatNameIterFn& fn) const override {
+    counter_->iterateTagStatNames(fn);
+  }
+  void add(uint64_t amount) override {
+    counter_->add(amount);
+    absl::MutexLock l(&mutex_);
+    condvar_.Signal();
+  }
+  void inc() override { add(1); }
+  uint64_t latch() override { return counter_->latch(); }
+  void reset() override { return counter_->reset(); }
+  uint64_t value() const override { return counter_->value(); }
+  void incRefCount() override { counter_->incRefCount(); }
+  bool decRefCount() override { return counter_->decRefCount(); }
+  uint32_t use_count() const override { return counter_->use_count(); }
+  StatName tagExtractedStatName() const override { return counter_->tagExtractedStatName(); }
+  bool used() const override { return counter_->used(); }
+  SymbolTable& symbolTable() override { return counter_->symbolTable(); }
+  const SymbolTable& constSymbolTable() const override { return counter_->constSymbolTable(); }
+
+private:
+  std::unique_ptr<Stats::Counter> counter_;
+  absl::Mutex& mutex_;
+  absl::CondVar& condvar_;
+};
+
+// A stats allocator which creates NotifyingCounters rather than regular CounterImpls.
+class NotifyingAllocatorImpl : public Stats::AllocatorImpl {
+public:
+  using Stats::AllocatorImpl::AllocatorImpl;
+
+  virtual void waitForCounterFromStringEq(const std::string& name, uint64_t value) {
+    absl::MutexLock l(&mutex_);
+    ENVOY_LOG_MISC(trace, "waiting for {} to be {}", name, value);
+    while (getCounterLockHeld(name) == nullptr || getCounterLockHeld(name)->value() != value) {
+      condvar_.Wait(&mutex_);
+    }
+    ENVOY_LOG_MISC(trace, "done waiting for {} to be {}", name, value);
+  }
+
+  virtual void waitForCounterFromStringGe(const std::string& name, uint64_t value) {
+    absl::MutexLock l(&mutex_);
+    ENVOY_LOG_MISC(trace, "waiting for {} to be {}", name, value);
+    while (getCounterLockHeld(name) == nullptr || getCounterLockHeld(name)->value() < value) {
+      condvar_.Wait(&mutex_);
+    }
+    ENVOY_LOG_MISC(trace, "done waiting for {} to be {}", name, value);
+  }
+
+protected:
+  Stats::Counter* makeCounterInternal(StatName name, StatName tag_extracted_name,
+                                      const StatNameTagVector& stat_name_tags) override {
+    Stats::Counter* counter = new NotifyingCounter(
+        Stats::AllocatorImpl::makeCounterInternal(name, tag_extracted_name, stat_name_tags), mutex_,
+        condvar_);
+    {
+      absl::MutexLock l(&mutex_);
+      // Allow getting the counter directly from the allocator, since it's harder to
+      // signal when the counter has been added to a given stats store.
+      counters_.emplace(counter->name(), counter);
+      if (counter->name() == "cluster_manager.cluster_removed") {
+      }
+      condvar_.Signal();
+    }
+    return counter;
+  }
+
+  virtual Stats::Counter* getCounterLockHeld(const std::string& name)
+      EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
+    auto it = counters_.find(name);
+    if (it != counters_.end()) {
+      return it->second;
+    }
+    return nullptr;
+  }
+
+private:
+  absl::flat_hash_map<std::string, Stats::Counter*> counters_;
+  absl::Mutex mutex_;
+  absl::CondVar condvar_;
 };
 
 /**
@@ -274,7 +370,9 @@ public:
          bool defer_listener_finalization = false,
          ProcessObjectOptRef process_object = absl::nullopt,
          Server::FieldValidationConfig validation_config = Server::FieldValidationConfig(),
-         uint32_t concurrency = 1);
+         uint32_t concurrency = 1, std::chrono::seconds drain_time = std::chrono::seconds(1),
+         Server::DrainStrategy drain_strategy = Server::DrainStrategy::Gradual,
+         bool use_real_stats = false);
   // Note that the derived class is responsible for tearing down the server in its
   // destructor.
   ~IntegrationTestServer() override;
@@ -296,14 +394,15 @@ public:
   void start(const Network::Address::IpVersion version,
              std::function<void()> on_server_init_function, bool deterministic,
              bool defer_listener_finalization, ProcessObjectOptRef process_object,
-             Server::FieldValidationConfig validation_config, uint32_t concurrency);
+             Server::FieldValidationConfig validation_config, uint32_t concurrency,
+             std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy);
 
   void waitForCounterEq(const std::string& name, uint64_t value) override {
-    TestUtility::waitForCounterEq(statStore(), name, value, time_system_);
+    notifyingStatsAllocator().waitForCounterFromStringEq(name, value);
   }
 
   void waitForCounterGe(const std::string& name, uint64_t value) override {
-    TestUtility::waitForCounterGe(statStore(), name, value, time_system_);
+    notifyingStatsAllocator().waitForCounterFromStringGe(name, value);
   }
 
   void waitForGaugeGe(const std::string& name, uint64_t value) override {
@@ -349,6 +448,7 @@ public:
   virtual Server::Instance& server() PURE;
   virtual Stats::Store& statStore() PURE;
   virtual Network::Address::InstanceConstSharedPtr adminAddress() PURE;
+  virtual Stats::NotifyingAllocatorImpl& notifyingStatsAllocator() PURE;
   void useAdminInterfaceToQuit(bool use) { use_admin_interface_to_quit_ = use; }
   bool useAdminInterfaceToQuit() { return use_admin_interface_to_quit_; }
 
@@ -379,7 +479,8 @@ private:
    */
   void threadRoutine(const Network::Address::IpVersion version, bool deterministic,
                      ProcessObjectOptRef process_object,
-                     Server::FieldValidationConfig validation_config, uint32_t concurrency);
+                     Server::FieldValidationConfig validation_config, uint32_t concurrency,
+                     std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy);
 
   Event::TestTimeSystem& time_system_;
   Api::Api& api_;
@@ -401,8 +502,7 @@ private:
 class IntegrationTestServerImpl : public IntegrationTestServer {
 public:
   IntegrationTestServerImpl(Event::TestTimeSystem& time_system, Api::Api& api,
-                            const std::string& config_path)
-      : IntegrationTestServer(time_system, api, config_path) {}
+                            const std::string& config_path, bool real_stats = false);
 
   ~IntegrationTestServerImpl() override;
 
@@ -415,6 +515,13 @@ public:
     return *stat_store_;
   }
   Network::Address::InstanceConstSharedPtr adminAddress() override { return admin_address_; }
+
+  Stats::NotifyingAllocatorImpl& notifyingStatsAllocator() override {
+    auto* ret = dynamic_cast<Stats::NotifyingAllocatorImpl*>(stats_allocator_.get());
+    RELEASE_ASSERT(ret != nullptr,
+                   "notifyingStatsAllocator() is not created when real_stats is true");
+    return *ret;
+  }
 
 private:
   void createAndRunEnvoyServer(OptionsImpl& options, Event::TimeSystem& time_system,
@@ -430,6 +537,8 @@ private:
   Stats::Store* stat_store_{};
   Network::Address::InstanceConstSharedPtr admin_address_;
   absl::Notification server_gone_;
+  Stats::SymbolTablePtr symbol_table_;
+  std::unique_ptr<Stats::AllocatorImpl> stats_allocator_;
 };
 
 } // namespace Envoy

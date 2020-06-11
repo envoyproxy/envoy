@@ -1,3 +1,5 @@
+load("@rules_python//python:defs.bzl", "py_library")
+
 licenses(["notice"])  # Apache 2
 
 # The apache-thrift distribution does not keep the thrift files in a directory with the

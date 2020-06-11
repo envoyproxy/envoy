@@ -68,8 +68,9 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.fixed_connection_close",
     "envoy.reloadable_features.http_default_alpn",
     "envoy.reloadable_features.listener_in_place_filterchain_update",
-    "envoy.reloadable_features.stop_faking_paths",
     "envoy.reloadable_features.preserve_upstream_date",
+    "envoy.reloadable_features.stop_faking_paths",
+    "envoy.reloadable_features.strict_1xx_and_204_response_headers",
 };
 
 // This is a section for officially sanctioned runtime features which are too
