@@ -398,7 +398,7 @@ TEST(HttpUtility, getLastAddressFromXFF) {
 }
 
 TEST(HttpUtility, TestParseCookie) {
-  TestHeaderMapImpl headers{
+  TestRequestHeaderMapImpl headers{
       {"someheader", "10.0.0.1"},
       {"cookie", "somekey=somevalue; someotherkey=someothervalue"},
       {"cookie", "abc=def; token=abc123; Expires=Wed, 09 Jun 2021 10:18:14 GMT"},
@@ -410,10 +410,10 @@ TEST(HttpUtility, TestParseCookie) {
 }
 
 TEST(HttpUtility, TestParseCookieBadValues) {
-  TestHeaderMapImpl headers{{"cookie", "token1=abc123; = "},
-                            {"cookie", "token2=abc123;   "},
-                            {"cookie", "; token3=abc123;"},
-                            {"cookie", "=; token4=\"abc123\""}};
+  TestRequestHeaderMapImpl headers{{"cookie", "token1=abc123; = "},
+                                   {"cookie", "token2=abc123;   "},
+                                   {"cookie", "; token3=abc123;"},
+                                   {"cookie", "=; token4=\"abc123\""}};
 
   EXPECT_EQ(Utility::parseCookieValue(headers, "token1"), "abc123");
   EXPECT_EQ(Utility::parseCookieValue(headers, "token2"), "abc123");
@@ -422,7 +422,7 @@ TEST(HttpUtility, TestParseCookieBadValues) {
 }
 
 TEST(HttpUtility, TestParseCookieWithQuotes) {
-  TestHeaderMapImpl headers{
+  TestRequestHeaderMapImpl headers{
       {"someheader", "10.0.0.1"},
       {"cookie", "dquote=\"; quoteddquote=\"\"\""},
       {"cookie", "leadingdquote=\"foobar;"},
@@ -471,12 +471,12 @@ TEST(HttpUtility, SendLocalGrpcReply) {
 
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
-        EXPECT_EQ(headers.Status()->value().getStringView(), "200");
+        EXPECT_EQ(headers.getStatusValue(), "200");
         EXPECT_NE(headers.GrpcStatus(), nullptr);
-        EXPECT_EQ(headers.GrpcStatus()->value().getStringView(),
+        EXPECT_EQ(headers.getGrpcStatusValue(),
                   std::to_string(enumToInt(Grpc::Status::WellKnownGrpcStatus::Unknown)));
         EXPECT_NE(headers.GrpcMessage(), nullptr);
-        EXPECT_EQ(headers.GrpcMessage()->value().getStringView(), "large");
+        EXPECT_EQ(headers.getGrpcMessageValue(), "large");
       }));
   Utility::sendLocalReply(
       is_reset, callbacks,
@@ -498,13 +498,13 @@ TEST(HttpUtility, SendLocalGrpcReplyWithUpstreamJsonPayload) {
 
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
-        EXPECT_EQ(headers.Status()->value().getStringView(), "200");
+        EXPECT_EQ(headers.getStatusValue(), "200");
         EXPECT_NE(headers.GrpcStatus(), nullptr);
-        EXPECT_EQ(headers.GrpcStatus()->value().getStringView(),
+        EXPECT_EQ(headers.getGrpcStatusValue(),
                   std::to_string(enumToInt(Grpc::Status::WellKnownGrpcStatus::Unauthenticated)));
         EXPECT_NE(headers.GrpcMessage(), nullptr);
         const auto& encoded = Utility::PercentEncoding::encode(json);
-        EXPECT_EQ(headers.GrpcMessage()->value().getStringView(), encoded);
+        EXPECT_EQ(headers.getGrpcMessageValue(), encoded);
       }));
   Utility::sendLocalReply(
       is_reset, callbacks,
@@ -517,7 +517,7 @@ TEST(HttpUtility, RateLimitedGrpcStatus) {
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_NE(headers.GrpcStatus(), nullptr);
-        EXPECT_EQ(headers.GrpcStatus()->value().getStringView(),
+        EXPECT_EQ(headers.getGrpcStatusValue(),
                   std::to_string(enumToInt(Grpc::Status::WellKnownGrpcStatus::Unavailable)));
       }));
   Utility::sendLocalReply(
@@ -527,7 +527,7 @@ TEST(HttpUtility, RateLimitedGrpcStatus) {
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_NE(headers.GrpcStatus(), nullptr);
-        EXPECT_EQ(headers.GrpcStatus()->value().getStringView(),
+        EXPECT_EQ(headers.getGrpcStatusValue(),
                   std::to_string(enumToInt(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted)));
       }));
   Utility::sendLocalReply(
@@ -556,8 +556,7 @@ TEST(HttpUtility, SendLocalReplyHeadRequest) {
   bool is_reset = false;
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
-        EXPECT_EQ(headers.ContentLength()->value().getStringView(),
-                  fmt::format("{}", strlen("large")));
+        EXPECT_EQ(headers.getContentLengthValue(), fmt::format("{}", strlen("large")));
       }));
   Utility::sendLocalReply(
       is_reset, callbacks,
@@ -607,8 +606,8 @@ TEST(HttpUtility, TestPrepareHeaders) {
 
   Http::RequestMessagePtr message = Utility::prepareHeaders(http_uri);
 
-  EXPECT_EQ("/x/y/z", message->headers().Path()->value().getStringView());
-  EXPECT_EQ("dns.name", message->headers().Host()->value().getStringView());
+  EXPECT_EQ("/x/y/z", message->headers().getPathValue());
+  EXPECT_EQ("dns.name", message->headers().getHostValue());
 }
 
 TEST(HttpUtility, QueryParamsToString) {
@@ -828,7 +827,7 @@ TEST(HttpUtility, TestTeHeaderGzipTrailersSanitized) {
   // Expect that the set of headers is valid and can be sanitized
   EXPECT_TRUE(Utility::sanitizeConnectionHeader(request_headers));
 
-  Http::TestHeaderMapImpl sanitized_headers = {
+  Http::TestRequestHeaderMapImpl sanitized_headers = {
       {":method", "GET"},
       {":path", "/"},
       {":scheme", "http"},
@@ -856,7 +855,7 @@ TEST(HttpUtility, TestNominatedConnectionHeader) {
   };
   EXPECT_TRUE(Utility::sanitizeConnectionHeader(request_headers));
 
-  TestHeaderMapImpl sanitized_headers = {
+  TestRequestHeaderMapImpl sanitized_headers = {
       {":method", "GET"},
       {":path", "/"},
       {":scheme", "http"},
@@ -884,7 +883,7 @@ TEST(HttpUtility, TestNominatedConnectionHeader2) {
   };
   EXPECT_TRUE(Utility::sanitizeConnectionHeader(request_headers));
 
-  Http::TestHeaderMapImpl sanitized_headers = {
+  Http::TestRequestHeaderMapImpl sanitized_headers = {
       {":method", "GET"},
       {":path", "/"},
       {":scheme", "http"},
@@ -911,7 +910,7 @@ TEST(HttpUtility, TestNominatedPseudoHeader) {
   };
 
   // Headers remain unchanged since there are nominated pseudo headers
-  Http::TestHeaderMapImpl sanitized_headers(request_headers);
+  Http::TestRequestHeaderMapImpl sanitized_headers(request_headers);
 
   EXPECT_FALSE(Utility::sanitizeConnectionHeader(request_headers));
   EXPECT_EQ(sanitized_headers, request_headers);
@@ -933,7 +932,7 @@ TEST(HttpUtility, TestSanitizeEmptyTokensFromHeaders) {
   };
   EXPECT_TRUE(Utility::sanitizeConnectionHeader(request_headers));
 
-  Http::TestHeaderMapImpl sanitized_headers = {
+  Http::TestRequestHeaderMapImpl sanitized_headers = {
       {":method", "GET"},
       {":path", "/"},
       {":scheme", "http"},
@@ -960,7 +959,7 @@ TEST(HttpUtility, TestTooManyNominatedHeaders) {
   };
 
   // Headers remain unchanged because there are too many nominated headers
-  Http::TestHeaderMapImpl sanitized_headers(request_headers);
+  Http::TestRequestHeaderMapImpl sanitized_headers(request_headers);
 
   EXPECT_FALSE(Utility::sanitizeConnectionHeader(request_headers));
   EXPECT_EQ(sanitized_headers, request_headers);
@@ -978,7 +977,7 @@ TEST(HttpUtility, TestRejectNominatedXForwardedFor) {
   };
 
   // Headers remain unchanged due to nominated X-Forwarded* header
-  Http::TestHeaderMapImpl sanitized_headers(request_headers);
+  Http::TestRequestHeaderMapImpl sanitized_headers(request_headers);
 
   EXPECT_FALSE(Utility::sanitizeConnectionHeader(request_headers));
   EXPECT_EQ(sanitized_headers, request_headers);
@@ -996,7 +995,7 @@ TEST(HttpUtility, TestRejectNominatedXForwardedHost) {
   };
 
   // Headers remain unchanged due to nominated X-Forwarded* header
-  Http::TestHeaderMapImpl sanitized_headers(request_headers);
+  Http::TestRequestHeaderMapImpl sanitized_headers(request_headers);
 
   EXPECT_FALSE(Utility::sanitizeConnectionHeader(request_headers));
   EXPECT_EQ(sanitized_headers, request_headers);
@@ -1016,7 +1015,7 @@ TEST(HttpUtility, TestRejectNominatedXForwardedProto) {
   // Headers are not sanitized due to nominated X-Forwarded* header
   EXPECT_FALSE(Utility::sanitizeConnectionHeader(request_headers));
 
-  Http::TestHeaderMapImpl sanitized_headers = {
+  Http::TestRequestHeaderMapImpl sanitized_headers = {
       {":method", "GET"},
       {":path", "/"},
       {":scheme", "http"},
@@ -1040,7 +1039,7 @@ TEST(HttpUtility, TestRejectTrailersSubString) {
   };
   EXPECT_TRUE(Utility::sanitizeConnectionHeader(request_headers));
 
-  Http::TestHeaderMapImpl sanitized_headers = {
+  Http::TestRequestHeaderMapImpl sanitized_headers = {
       {":method", "GET"},
       {":path", "/"},
       {":scheme", "http"},
@@ -1078,7 +1077,7 @@ TEST(HttpUtility, TestRejectTeHeaderTooLong) {
   };
 
   // Headers remain unchanged because the TE value is too long
-  Http::TestHeaderMapImpl sanitized_headers(request_headers);
+  Http::TestRequestHeaderMapImpl sanitized_headers(request_headers);
 
   EXPECT_FALSE(Utility::sanitizeConnectionHeader(request_headers));
   EXPECT_EQ(sanitized_headers, request_headers);

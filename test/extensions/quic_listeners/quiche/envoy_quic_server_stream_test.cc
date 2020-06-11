@@ -104,10 +104,9 @@ public:
   size_t sendRequest(const std::string& payload, bool fin, size_t decoder_buffer_high_watermark) {
     EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
         .WillOnce(Invoke([this](const Http::RequestHeaderMapPtr& headers, bool) {
-          EXPECT_EQ(host_, headers->Host()->value().getStringView());
-          EXPECT_EQ("/", headers->Path()->value().getStringView());
-          EXPECT_EQ(Http::Headers::get().MethodValues.Post,
-                    headers->Method()->value().getStringView());
+          EXPECT_EQ(host_, headers->getHostValue());
+          EXPECT_EQ("/", headers->getPathValue());
+          EXPECT_EQ(Http::Headers::get().MethodValues.Post, headers->getMethodValue());
         }));
     quic_stream_->OnStreamHeaderList(/*fin=*/false, request_headers_.uncompressed_header_bytes(),
                                      request_headers_);
@@ -164,10 +163,9 @@ TEST_P(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
 
   EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/true))
       .WillOnce(Invoke([this](const Http::RequestHeaderMapPtr& headers, bool) {
-        EXPECT_EQ(host_, headers->Host()->value().getStringView());
-        EXPECT_EQ("/", headers->Path()->value().getStringView());
-        EXPECT_EQ(Http::Headers::get().MethodValues.Get,
-                  headers->Method()->value().getStringView());
+        EXPECT_EQ(host_, headers->getHostValue());
+        EXPECT_EQ("/", headers->getPathValue());
+        EXPECT_EQ(Http::Headers::get().MethodValues.Get, headers->getMethodValue());
       }));
   quic_stream_->OnStreamHeaderList(/*fin=*/true, request_headers.uncompressed_header_bytes(),
                                    request_headers);
@@ -201,10 +199,9 @@ TEST_P(EnvoyQuicServerStreamTest, OutOfOrderTrailers) {
   }
   EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
       .WillOnce(Invoke([this](const Http::RequestHeaderMapPtr& headers, bool) {
-        EXPECT_EQ(host_, headers->Host()->value().getStringView());
-        EXPECT_EQ("/", headers->Path()->value().getStringView());
-        EXPECT_EQ(Http::Headers::get().MethodValues.Post,
-                  headers->Method()->value().getStringView());
+        EXPECT_EQ(host_, headers->getHostValue());
+        EXPECT_EQ("/", headers->getPathValue());
+        EXPECT_EQ(Http::Headers::get().MethodValues.Post, headers->getMethodValue());
       }));
   quic_stream_->OnStreamHeaderList(/*fin=*/false, request_headers_.uncompressed_header_bytes(),
                                    request_headers_);
@@ -274,10 +271,9 @@ TEST_P(EnvoyQuicServerStreamTest, ReadDisableUponLargePost) {
 TEST_P(EnvoyQuicServerStreamTest, ReadDisableAndReEnableImmediately) {
   EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
       .WillOnce(Invoke([this](const Http::RequestHeaderMapPtr& headers, bool) {
-        EXPECT_EQ(host_, headers->Host()->value().getStringView());
-        EXPECT_EQ("/", headers->Path()->value().getStringView());
-        EXPECT_EQ(Http::Headers::get().MethodValues.Post,
-                  headers->Method()->value().getStringView());
+        EXPECT_EQ(host_, headers->getHostValue());
+        EXPECT_EQ("/", headers->getPathValue());
+        EXPECT_EQ(Http::Headers::get().MethodValues.Post, headers->getMethodValue());
       }));
   quic_stream_->OnStreamHeaderList(/*fin=*/false, request_headers_.uncompressed_header_bytes(),
                                    request_headers_);

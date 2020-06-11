@@ -131,12 +131,12 @@ TEST_P(IntegrationTest, RouterDirectResponse) {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "GET", "/", "", downstream_protocol_, version_, "direct.example.com");
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ("example-value", response->headers()
                                  .get(Envoy::Http::LowerCaseString("x-additional-header"))
                                  ->value()
                                  .getStringView());
-  EXPECT_EQ("text/html", response->headers().ContentType()->value().getStringView());
+  EXPECT_EQ("text/html", response->headers().getContentTypeValue());
   EXPECT_EQ(body, response->body());
 }
 
@@ -151,7 +151,7 @@ TEST_P(IntegrationTest, ConnectionClose) {
                                                                           {":authority", "host"},
                                                                           {"connection", "close"}});
   response->waitForEndStream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   EXPECT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), HttpStatusIs("200"));
@@ -302,7 +302,7 @@ TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 1);
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 1);
 
@@ -317,7 +317,7 @@ TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response2->complete());
-  EXPECT_EQ("200", response2->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response2->headers().getStatusValue());
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 2);
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 2);
 }
@@ -500,7 +500,7 @@ TEST_P(IntegrationTest, Http09WithKeepalive) {
   initialize();
   reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())
       ->setResponseHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(
-          Http::TestHeaderMapImpl({{":status", "200"}, {"content-length", "0"}})));
+          Http::TestResponseHeaderMapImpl({{":status", "200"}, {"content-length", "0"}})));
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GET /\r\nConnection: keep-alive\r\n\r\n",
                                 &response, true);
@@ -588,7 +588,7 @@ TEST_P(IntegrationTest, Http10WithHostandKeepAliveAndContentLengthAndLws) {
   initialize();
   reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())
       ->setResponseHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(
-          Http::TestHeaderMapImpl({{":status", "200"}, {"content-length", "10"}})));
+          Http::TestResponseHeaderMapImpl({{":status", "200"}, {"content-length", "10"}})));
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"),
                                 "GET / HTTP/1.0\r\nHost: foo.com \r\nConnection:Keep-alive\r\n\r\n",
@@ -711,7 +711,7 @@ TEST_P(IntegrationTest, NoHost) {
   response->waitForEndStream();
 
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("400", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("400", response->headers().getStatusValue());
 }
 
 TEST_P(IntegrationTest, BadPath) {
@@ -809,10 +809,10 @@ TEST_P(IntegrationTest, UpstreamProtocolError) {
   ASSERT_TRUE(fake_upstream_connection->waitForData(187, &data));
   ASSERT_TRUE(fake_upstream_connection->write("bad protocol data!"));
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("503", response->headers().getStatusValue());
 }
 
 TEST_P(IntegrationTest, TestHead) {
@@ -820,10 +820,10 @@ TEST_P(IntegrationTest, TestHead) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  Http::TestHeaderMapImpl head_request{{":method", "HEAD"},
-                                       {":path", "/test/long/url"},
-                                       {":scheme", "http"},
-                                       {":authority", "host"}};
+  Http::TestRequestHeaderMapImpl head_request{{":method", "HEAD"},
+                                              {":path", "/test/long/url"},
+                                              {":scheme", "http"},
+                                              {":authority", "host"}};
 
   // Without an explicit content length, assume we chunk for HTTP/1.1
   auto response = sendRequestAndWaitForResponse(head_request, 0, default_response_headers_, 0);
@@ -836,7 +836,8 @@ TEST_P(IntegrationTest, TestHead) {
   EXPECT_EQ(0, response->body().size());
 
   // Preserve explicit content length.
-  Http::TestHeaderMapImpl content_length_response{{":status", "200"}, {"content-length", "12"}};
+  Http::TestResponseHeaderMapImpl content_length_response{{":status", "200"},
+                                                          {"content-length", "12"}};
   response = sendRequestAndWaitForResponse(head_request, 0, content_length_response, 0);
   ASSERT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), HttpStatusIs("200"));
@@ -953,7 +954,7 @@ TEST_P(IntegrationTest, ViaAppendHeaderOnly) {
   EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Headers::get().Via, "foo, bar"));
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   response->waitForEndStream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
   EXPECT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), HttpStatusIs("200"));
   EXPECT_THAT(response->headers(), HeaderValueOf(Headers::get().Via, "bar"));
@@ -996,7 +997,7 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownOnGracefulClose) {
 
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("413", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("413", response->headers().getStatusValue());
   // With no delayed close processing, Envoy will close the connection immediately after flushing
   // and this should instead return true.
   EXPECT_FALSE(codec_client_->waitForDisconnect(std::chrono::milliseconds(500)));
@@ -1113,7 +1114,7 @@ TEST_P(IntegrationTest, NoConnectionPoolsFree) {
 
   response->waitForEndStream();
 
-  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("503", response->headers().getStatusValue());
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_503", 1);
 
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_pool_overflow")->value(), 1);
@@ -1134,7 +1135,7 @@ TEST_P(IntegrationTest, ProcessObjectHealthy) {
                                                                           {":authority", "host"},
                                                                           {"connection", "close"}});
   response->waitForEndStream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   EXPECT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), HttpStatusIs("200"));
@@ -1155,7 +1156,7 @@ TEST_P(IntegrationTest, ProcessObjectUnealthy) {
                                                                           {":authority", "host"},
                                                                           {"connection", "close"}});
   response->waitForEndStream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   EXPECT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), HttpStatusIs("500"));
@@ -1224,7 +1225,7 @@ TEST_P(IntegrationTest, TestFloodUpstreamErrors) {
 
   // Set an Upstream reply with an invalid content-length, which will be rejected by the Envoy.
   auto response_headers = std::make_unique<Http::TestResponseHeaderMapImpl>(
-      Http::TestHeaderMapImpl({{":status", "200"}, {"content-length", "invalid"}}));
+      Http::TestResponseHeaderMapImpl({{":status", "200"}, {"content-length", "invalid"}}));
   reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())
       ->setResponseHeaders(std::move(response_headers));
 

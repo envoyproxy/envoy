@@ -189,8 +189,7 @@ TEST_F(HttpFilterTest, ErrorFailClose) {
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(_, true))
       .WillOnce(Invoke([&](const Http::ResponseHeaderMap& headers, bool) -> void {
-        EXPECT_EQ(headers.Status()->value().getStringView(),
-                  std::to_string(enumToInt(Http::Code::Forbidden)));
+        EXPECT_EQ(headers.getStatusValue(), std::to_string(enumToInt(Http::Code::Forbidden)));
       }));
 
   Filters::Common::ExtAuthz::Response response{};
@@ -228,7 +227,7 @@ TEST_F(HttpFilterTest, ErrorCustomStatusCode) {
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(_, true))
       .WillOnce(Invoke([&](const Http::ResponseHeaderMap& headers, bool) -> void {
-        EXPECT_EQ(headers.Status()->value().getStringView(),
+        EXPECT_EQ(headers.getStatusValue(),
                   std::to_string(enumToInt(Http::Code::ServiceUnavailable)));
       }));
 
@@ -910,6 +909,69 @@ TEST_F(HttpFilterTest, FilterEnabled) {
             filter_->decodeHeaders(request_headers_, false));
 }
 
+// Test that filter can deny for protected path when filter is disabled via filter_enabled field.
+TEST_F(HttpFilterTest, FilterDenyAtDisable) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  filter_enabled:
+    runtime_key: "http.ext_authz.enabled"
+    default_value:
+      numerator: 0
+      denominator: HUNDRED
+  deny_at_disable:
+    runtime_key: "http.ext_authz.deny_at_disable"
+    default_value:
+      value: true
+  )EOF");
+
+  ON_CALL(runtime_.snapshot_,
+          featureEnabled("http.ext_authz.enabled",
+                         testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0))))
+      .WillByDefault(Return(false));
+
+  ON_CALL(runtime_.snapshot_, featureEnabled("http.ext_authz.enabled", false))
+      .WillByDefault(Return(true));
+
+  // Make sure check is not called.
+  EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
+  // Engage the filter.
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+}
+
+// Test that filter allows for protected path when filter is disabled via filter_enabled field.
+TEST_F(HttpFilterTest, FilterAllowAtDisable) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  filter_enabled:
+    runtime_key: "http.ext_authz.enabled"
+    default_value:
+      numerator: 0
+      denominator: HUNDRED
+  deny_at_disable:
+    runtime_key: "http.ext_authz.deny_at_disable"
+    default_value:
+      value: false
+  )EOF");
+
+  ON_CALL(runtime_.snapshot_,
+          featureEnabled("http.ext_authz.enabled",
+                         testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0))))
+      .WillByDefault(Return(false));
+
+  ON_CALL(runtime_.snapshot_, featureEnabled("http.ext_authz.enabled", false))
+      .WillByDefault(Return(false));
+
+  // Make sure check is not called.
+  EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
+  // Engage the filter.
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+}
+
 // -------------------
 // Parameterized Tests
 // -------------------
@@ -1293,7 +1355,7 @@ TEST_P(HttpFilterTestParam, DestroyResponseBeforeSendLocalReply) {
   EXPECT_CALL(filter_callbacks_, encodeData(_, true))
       .WillOnce(Invoke([&](Buffer::Instance& data, bool) {
         response_ptr.reset();
-        Http::TestHeaderMapImpl test_headers{*saved_headers};
+        Http::TestRequestHeaderMapImpl test_headers{*saved_headers};
         EXPECT_EQ(test_headers.get_("foo"), "bar");
         EXPECT_EQ(test_headers.get_("bar"), "foo");
         EXPECT_EQ(data.toString(), "foo");
@@ -1358,7 +1420,7 @@ TEST_P(HttpFilterTestParam, OverrideEncodingHeaders) {
   EXPECT_CALL(filter_callbacks_, encodeData(_, true))
       .WillOnce(Invoke([&](Buffer::Instance& data, bool) {
         response_ptr.reset();
-        Http::TestHeaderMapImpl test_headers{*saved_headers};
+        Http::TestRequestHeaderMapImpl test_headers{*saved_headers};
         EXPECT_EQ(test_headers.get_("foo"), "bar");
         EXPECT_EQ(test_headers.get_("bar"), "foo");
         EXPECT_EQ(test_headers.get_("foobar"), "DO_NOT_OVERRIDE");

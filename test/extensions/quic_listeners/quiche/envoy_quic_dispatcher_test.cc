@@ -53,7 +53,7 @@ public:
       : version_(GetParam().first), api_(Api::createApiForTest(time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")),
         listen_socket_(std::make_unique<Network::NetworkListenSocket<
-                           Network::NetworkSocketTrait<Network::Address::SocketType::Datagram>>>(
+                           Network::NetworkSocketTrait<Network::Socket::Type::Datagram>>>(
             Network::Test::getCanonicalLoopbackAddress(version_), nullptr, /*bind*/ true)),
         connection_helper_(*dispatcher_),
         crypto_config_(quic::QuicCryptoServerConfig::TESTING, quic::QuicRandom::GetInstance(),

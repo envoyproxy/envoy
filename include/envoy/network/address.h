@@ -98,8 +98,24 @@ public:
   virtual IpVersion version() const PURE;
 };
 
+/**
+ * Interface for a generic Pipe address
+ */
+class Pipe {
+public:
+  virtual ~Pipe() = default;
+  /**
+   * @return abstract namespace flag
+   */
+  virtual bool abstractNamespace() const PURE;
+
+  /**
+   * @return pipe mode
+   */
+  virtual mode_t mode() const PURE;
+};
+
 enum class Type { Ip, Pipe };
-enum class SocketType { Stream, Datagram };
 
 /**
  * Interface for all network addresses.
@@ -138,27 +154,24 @@ public:
   virtual const std::string& logicalName() const PURE;
 
   /**
-   * Bind a socket to this address. The socket should have been created with a call to socket() on
-   * an Instance of the same address family.
-   * @param fd supplies the platform socket handle.
-   * @return a Api::SysCallIntResult with rc_ = 0 for success and rc_ = -1 for failure. If the call
-   *   is successful, errno_ shouldn't be used.
-   */
-  virtual Api::SysCallIntResult bind(os_fd_t fd) const PURE;
-
-  /**
-   * Connect a socket to this address. The socket should have been created with a call to socket()
-   * on this object.
-   * @param fd supplies the platform socket handle.
-   * @return a Api::SysCallIntResult with rc_ = 0 for success and rc_ = -1 for failure. If the call
-   *   is successful, errno_ shouldn't be used.
-   */
-  virtual Api::SysCallIntResult connect(os_fd_t fd) const PURE;
-
-  /**
    * @return the IP address information IFF type() == Type::Ip, otherwise nullptr.
    */
   virtual const Ip* ip() const PURE;
+
+  /**
+   * @return the pipe address information IFF type() == Type::Pipe, otherwise nullptr.
+   */
+  virtual const Pipe* pipe() const PURE;
+
+  /**
+   * @return the underlying structure wherein the address is stored
+   */
+  virtual const sockaddr* sockAddr() const PURE;
+
+  /**
+   * @return length of the address container
+   */
+  virtual socklen_t sockAddrLen() const PURE;
 
   /**
    * @return the type of address.

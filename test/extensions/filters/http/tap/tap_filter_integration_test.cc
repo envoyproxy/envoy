@@ -87,7 +87,7 @@ public:
         {":method", "POST"}, {":path", "/tap"}, {":scheme", "http"}, {":authority", "host"}};
     admin_response_ = admin_client_->makeRequestWithBody(admin_request_headers, admin_request_yaml);
     admin_response_->waitForHeaders();
-    EXPECT_EQ("200", admin_response_->headers().Status()->value().getStringView());
+    EXPECT_EQ("200", admin_response_->headers().getStatusValue());
     EXPECT_FALSE(admin_response_->complete());
   }
 
