@@ -1,10 +1,11 @@
-licenses(["notice"])  # Apache 2
-
+load("@rules_python//python:defs.bzl", "py_binary")
 load("//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_package", "envoy_proto_library")
 load("//tools/type_whisperer:api_build_file.bzl", "api_build_file")
 load("//tools/type_whisperer:file_descriptor_set_text.bzl", "file_descriptor_set_text")
 load("//tools/type_whisperer:type_database.bzl", "type_database")
 load("//tools/type_whisperer:proto_cc_source.bzl", "proto_cc_source")
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -67,6 +68,12 @@ type_database(
 
 file_descriptor_set_text(
     name = "all_protos_pb_text",
+    deps = ["@envoy_api_canonical//:all_protos"],
+)
+
+file_descriptor_set_text(
+    name = "all_protos_with_ext_pb_text",
+    with_external_deps = True,
     deps = ["@envoy_api_canonical//:all_protos"],
 )
 

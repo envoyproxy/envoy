@@ -89,7 +89,10 @@ versioning guidelines:
   open it.
 * Any PR that changes user-facing behavior **must** have associated documentation in [docs](docs) as
   well as [release notes](docs/root/version_history/current.rst). API changes should be documented
-  inline with protos as per the [API contribution guidelines](api/CONTRIBUTING.md).
+  inline with protos as per the [API contribution guidelines](api/CONTRIBUTING.md). If a change applies
+  to multiple sections of the release notes, it should be noted in the first (most important) section
+  that applies. For instance, a bug fix that introduces incompatible behavior should be noted in
+  `Incompatible Behavior Changes` but not in `Bug Fixes`.
 * All code comments and documentation are expected to have proper English grammar and punctuation.
   If you are not a fluent English speaker (or a bad writer ;-)) please let us know and we will try
   to find some help but there are no guarantees.
@@ -97,10 +100,15 @@ versioning guidelines:
   colon. Examples:
   * "docs: fix grammar error"
   * "http conn man: add new feature"
-* Your PR commit message will be used as the commit message when your PR is merged. You should 
+* Your PR commit message will be used as the commit message when your PR is merged. You should
   update this field if your PR diverges during review.
 * Your PR description should have details on what the PR does. If it fixes an existing issue it
   should end with "Fixes #XXX".
+* If your PR is co-authored or based on an earlier PR from another contributor,
+  please attribute them with `Co-authored-by: name <name@example.com>`. See
+  GitHub's [multiple author
+  guidance](https://help.github.com/en/github/committing-changes-to-your-project/creating-a-commit-with-multiple-authors)
+  for further details.
 * When all of the tests are passing and all other conditions described herein are satisfied, a
   maintainer will be assigned to review and merge the PR.
 * Once you submit a PR, *please do not rebase it*. It's much easier to review if subsequent commits

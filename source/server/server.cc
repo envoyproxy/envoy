@@ -18,6 +18,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/network/dns.h"
 #include "envoy/registry/registry.h"
+#include "envoy/server/bootstrap_extension_config.h"
 #include "envoy/server/options.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -41,10 +42,10 @@
 #include "common/stats/timespan_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
 
+#include "server/admin/utils.h"
 #include "server/configuration_impl.h"
 #include "server/connection_handler_impl.h"
 #include "server/guarddog_impl.h"
-#include "server/http/utils.h"
 #include "server/listener_hooks.h"
 #include "server/ssl_context_manager.h"
 
@@ -60,7 +61,8 @@ InstanceImpl::InstanceImpl(
     Filesystem::Instance& file_system, std::unique_ptr<ProcessContext> process_context)
     : init_manager_(init_manager), workers_started_(false), live_(false), shutdown_(false),
       options_(options), validation_context_(options_.allowUnknownStaticFields(),
-                                             !options.rejectUnknownDynamicFields()),
+                                             !options.rejectUnknownDynamicFields(),
+                                             options.ignoreUnknownDynamicFields()),
       time_source_(time_system), restarter_(restarter), start_time_(time(nullptr)),
       original_start_time_(start_time_), stats_store_(store), thread_local_(tls),
       api_(new Api::Impl(thread_factory, store, time_system, file_system,
@@ -135,7 +137,7 @@ Upstream::ClusterManager& InstanceImpl::clusterManager() { return *config_.clust
 void InstanceImpl::drainListeners() {
   ENVOY_LOG(info, "closing and draining listeners");
   listener_manager_->stopListeners(ListenerManager::StopListenersType::All);
-  drain_manager_->startDrainSequence(nullptr);
+  drain_manager_->startDrainSequence([] {});
 }
 
 void InstanceImpl::failHealthcheck(bool fail) {
@@ -288,8 +290,8 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
 void InstanceImpl::initialize(const Options& options,
                               Network::Address::InstanceConstSharedPtr local_address,
                               ComponentFactory& component_factory, ListenerHooks& hooks) {
-  ENVOY_LOG(info, "initializing epoch {} (hot restart version={})", options.restartEpoch(),
-            restarter_.version());
+  ENVOY_LOG(info, "initializing epoch {} (base id={}, hot restart version={})",
+            options.restartEpoch(), restarter_.baseId(), restarter_.version());
 
   ENVOY_LOG(info, "statically linked extensions:");
   for (const auto& ext : Envoy::Registry::FactoryCategoryRegistry::registeredFactories()) {
@@ -318,9 +320,9 @@ void InstanceImpl::initialize(const Options& options,
       ServerStats{ALL_SERVER_STATS(POOL_COUNTER_PREFIX(stats_store_, server_stats_prefix),
                                    POOL_GAUGE_PREFIX(stats_store_, server_stats_prefix),
                                    POOL_HISTOGRAM_PREFIX(stats_store_, server_stats_prefix))});
-  validation_context_.static_warning_validation_visitor().setCounter(
+  validation_context_.static_warning_validation_visitor().setUnknownCounter(
       server_stats_->static_unknown_fields_);
-  validation_context_.dynamic_warning_validation_visitor().setCounter(
+  validation_context_.dynamic_warning_validation_visitor().setUnknownCounter(
       server_stats_->dynamic_unknown_fields_);
 
   initialization_timer_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
@@ -480,6 +482,16 @@ void InstanceImpl::initialize(const Options& options,
   // GuardDog (deadlock detection) object and thread setup before workers are
   // started and before our own run() loop runs.
   guard_dog_ = std::make_unique<Server::GuardDogImpl>(stats_store_, config_, *api_);
+
+  for (const auto& bootstrap_extension : bootstrap_.bootstrap_extensions()) {
+    auto& factory = Config::Utility::getAndCheckFactory<Configuration::BootstrapExtensionFactory>(
+        bootstrap_extension);
+    auto config = Config::Utility::translateAnyToFactoryConfig(
+        bootstrap_extension.typed_config(), messageValidationContext().staticValidationVisitor(),
+        factory);
+    bootstrap_extensions_.push_back(
+        factory.createBootstrapExtension(*config, serverFactoryContext()));
+  }
 }
 
 void InstanceImpl::onClusterManagerPrimaryInitializationComplete() {

@@ -32,6 +32,9 @@ MockOptions::MockOptions(const std::string& config_path) : config_path_(config_p
   ON_CALL(*this, rejectUnknownDynamicFields()).WillByDefault(Invoke([this] {
     return reject_unknown_dynamic_fields_;
   }));
+  ON_CALL(*this, ignoreUnknownDynamicFields()).WillByDefault(Invoke([this] {
+    return ignore_unknown_dynamic_fields_;
+  }));
   ON_CALL(*this, adminAddressPath()).WillByDefault(ReturnRef(admin_address_path_));
   ON_CALL(*this, serviceClusterName()).WillByDefault(ReturnRef(service_cluster_name_));
   ON_CALL(*this, serviceNodeName()).WillByDefault(ReturnRef(service_node_name_));
@@ -96,8 +99,7 @@ MockOverloadManager::~MockOverloadManager() = default;
 MockListenerComponentFactory::MockListenerComponentFactory()
     : socket_(std::make_shared<NiceMock<Network::MockListenSocket>>()) {
   ON_CALL(*this, createListenSocket(_, _, _, _))
-      .WillByDefault(Invoke([&](Network::Address::InstanceConstSharedPtr,
-                                Network::Address::SocketType,
+      .WillByDefault(Invoke([&](Network::Address::InstanceConstSharedPtr, Network::Socket::Type,
                                 const Network::Socket::OptionsSharedPtr& options,
                                 const ListenSocketCreationParams&) -> Network::SocketSharedPtr {
         if (!Network::Socket::applyOptions(options, *socket_,
@@ -300,6 +302,9 @@ MockTracerFactoryContext::MockTracerFactoryContext() {
 }
 
 MockTracerFactoryContext::~MockTracerFactoryContext() = default;
+
+MockBootstrapExtensionFactory::MockBootstrapExtensionFactory() = default;
+MockBootstrapExtensionFactory::~MockBootstrapExtensionFactory() = default;
 } // namespace Configuration
 } // namespace Server
 } // namespace Envoy

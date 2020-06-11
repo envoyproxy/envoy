@@ -5,6 +5,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/runtime/runtime.h"
 
+#include "common/common/documentation_url.h"
 #include "common/common/logger.h"
 
 namespace Envoy {
@@ -103,9 +104,8 @@ private:
 
     return fmt::format(
         "Using deprecated {}{}extension name '{}' for '{}'. This name will be removed from Envoy "
-        "soon. Please see "
-        "https://www.envoyproxy.io/docs/envoy/latest/intro/deprecated for details.",
-        extension_type, spacing, deprecated_name, canonical_name);
+        "soon. Please see {} for details.",
+        extension_type, spacing, deprecated_name, canonical_name, ENVOY_DOC_URL_VERSION_HISTORY);
   }
 
   static std::string fatalMessage(absl::string_view extension_type,
@@ -113,11 +113,9 @@ private:
                                   absl::string_view canonical_name) {
     std::string err = message(extension_type, deprecated_name, canonical_name);
 
-    const char fatal_error[] =
-        " If continued use of this filter name is absolutely necessary, see "
-        "https://www.envoyproxy.io/docs/envoy/latest/configuration/operations/runtime"
-        "#using-runtime-overrides-for-deprecated-features for how to apply a temporary and "
-        "highly discouraged override.";
+    const char fatal_error[] = " If continued use of this filter name is absolutely necessary, "
+                               "see " ENVOY_DOC_URL_RUNTIME_OVERRIDE_DEPRECATED " for "
+                               "how to apply a temporary and highly discouraged override.";
 
     return err + fatal_error;
   }

@@ -1,11 +1,12 @@
-licenses(["notice"])  # Apache 2
-
+load("@rules_cc//cc:defs.bzl", "cc_proto_library")
 load("@rules_proto//proto:defs.bzl", "proto_library")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -33,6 +34,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/protobuf:message_validator_interface",
         "//include/envoy/stats:stats_interface",
+        "//source/common/common:documentation_url_lib",
         "//source/common/common:hash_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:macros",
@@ -64,6 +66,7 @@ envoy_cc_library(
         "//include/envoy/protobuf:message_validator_interface",
         "//include/envoy/runtime:runtime_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:documentation_url_lib",
         "//source/common/common:hash_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:api_type_oracle_lib",

@@ -27,6 +27,15 @@ API
   api/why_versioning
   api/incremental
 
+Debugging
+---------
+.. toctree::
+  :maxdepth: 2
+
+  debugging/why_is_envoy_sending_internal_responses
+  debugging/why_is_envoy_sending_413s
+  debugging/why_is_my_route_not_found
+
 Performance
 -----------
 
@@ -34,6 +43,7 @@ Performance
   :maxdepth: 2
 
   performance/how_fast_is_envoy
+  performance/how_to_benchmark_envoy
 
 Configuration
 -------------
