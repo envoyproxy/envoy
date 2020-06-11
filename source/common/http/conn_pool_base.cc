@@ -372,9 +372,9 @@ void ConnPoolImplBase::onPendingRequestCancel(PendingRequest& request,
     request.removeFromList(pending_requests_);
   }
   // There's excess capacity if
-  // pending_requests < connecting_request_capacity_ - capacity of most recent client
-  // It's calculated below with addition instead to avoid underflow issues (overflow being
-  // assumed to not be a problem across the connection pool)
+  // pending_requests < connecting_request_capacity_ - capacity of most recent client.
+  // It's calculated below with addition instead to avoid underflow issues, overflow being
+  // assumed to not be a problem across the connection pool.
   if (policy == Envoy::ConnectionPool::CancelPolicy::CloseExcess && !connecting_clients_.empty() &&
       (pending_requests_.size() + connecting_clients_.front()->effectiveConcurrentRequestLimit() <=
        connecting_request_capacity_)) {
