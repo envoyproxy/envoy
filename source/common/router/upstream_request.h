@@ -247,7 +247,7 @@ public:
 
   bool cancelAnyPendingRequest() override {
     if (upstream_handle_) {
-      upstream_handle_->cancel(Tcp::ConnectionPool::CancelPolicy::Default);
+      upstream_handle_->cancel(ConnectionPool::CancelPolicy::Default);
       upstream_handle_ = nullptr;
       return true;
     }
