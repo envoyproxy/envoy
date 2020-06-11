@@ -88,8 +88,8 @@ TEST_F(SimulatedTimeSystemTest, TimerOrdering) {
   advanceMsAndLoop(5);
 }
 
-// Alarms that are scheduled to execute and are cancelled do not trigger.
-TEST_F(SimulatedTimeSystemTest, TimerOrderAndDisableAlarm) {
+// Timers that are scheduled to execute and are cancelled do not trigger.
+TEST_F(SimulatedTimeSystemTest, TimerOrderAndDisableTimer) {
   EXPECT_EQ(start_monotonic_time_, time_system_.monotonicTime());
   EXPECT_EQ(start_system_time_, time_system_.systemTime());
 
@@ -119,9 +119,9 @@ TEST_F(SimulatedTimeSystemTest, TimerOrderAndDisableAlarm) {
   advanceMsAndLoop(5);
 }
 
-// Change the registration time for an alarm that is already activated and verify that execution is
+// Change the registration time for an timer that is already activated and verify that execution is
 // delayed.
-TEST_F(SimulatedTimeSystemTest, TimerOrderAndRescheduleAlarm) {
+TEST_F(SimulatedTimeSystemTest, TimerOrderAndRescheduleTimer) {
   EXPECT_EQ(start_monotonic_time_, time_system_.monotonicTime());
   EXPECT_EQ(start_system_time_, time_system_.systemTime());
 
