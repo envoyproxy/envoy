@@ -82,7 +82,7 @@ DEPENDENCY_REPOSITORIES = dict(
         # 3. Find a commit in BoringSSL's "master-with-bazel" branch that merges <boringssl_revision>.
         #
         # chromium-84.0.4147.45(beta)
-        # 2020-06-11
+        # 2020-05-14
         urls = ["https://github.com/google/boringssl/archive/a0899df79b3a63e606448c72d63a090d86bdb75b.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
