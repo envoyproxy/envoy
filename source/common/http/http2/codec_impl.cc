@@ -944,7 +944,7 @@ Status ConnectionImpl::sendPendingFrames() {
     ASSERT(outbound_frames_ <= max_outbound_frames_ &&
            outbound_control_frames_ <= max_outbound_control_frames_);
 
-    throw CodecProtocolException(std::string(nghttp2_strerror(rc)));
+    return codecProtocolError(nghttp2_strerror(rc));
   }
 
   // See ConnectionImpl::StreamImpl::resetStream() for why we do this. This is an uncommon event,
