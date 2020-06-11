@@ -50,6 +50,7 @@ public:
                           quic::ConnectionCloseSource source) override;
   void Initialize() override;
   void OnCanWrite() override;
+  void OnOneRttKeysAvailable() override;
   // quic::QuicSpdySession
   void SetDefaultEncryptionLevel(quic::EncryptionLevel level) override;
 

@@ -62,7 +62,7 @@ ExpressionPtr createExpression(Builder& builder, const google::api::expr::v1alph
     throw CelException(
         absl::StrCat("failed to create an expression: ", cel_expression_status.status().message()));
   }
-  return std::move(cel_expression_status.ValueOrDie());
+  return std::move(cel_expression_status.value());
 }
 
 absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena* arena,
@@ -76,7 +76,7 @@ absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena* arena
     return {};
   }
 
-  return eval_status.ValueOrDie();
+  return eval_status.value();
 }
 
 bool matches(const Expression& expr, const StreamInfo::StreamInfo& info,

@@ -253,7 +253,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "router_test",
     srcs = ["router_test.cc"],
-    tags = ["fails_on_windows"],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:context_lib",
