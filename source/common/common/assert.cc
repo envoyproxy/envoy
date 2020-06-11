@@ -6,8 +6,6 @@
 namespace Envoy {
 namespace Assert {
 
-using EnvoyBugMap = absl::flat_hash_map<std::string, uint64_t>;
-
 class ActionRegistrationImpl : public ActionRegistration {
 public:
   ActionRegistrationImpl(std::function<void()> action) {
@@ -48,11 +46,12 @@ public:
   }
 
   static bool shouldLogAndInvoke(const char* filename, int line) {
-    absl::MutexLock lock(&mutex_);
     const auto name = absl::StrCat(filename, ",", line);
 
     // Increment counter, inserting first if counter does not exist.
+    absl::ReleaseableMutexLock lock(&mutex_);
     auto counter_value = ++counters_[name];
+    lock.Release();
 
     // Check if counter is power of two by its bitwise representation.
     if ((counter_value & (counter_value - 1)) == 0) {
@@ -73,13 +72,14 @@ private:
   // additional actions are registered.
   static std::function<void()> envoy_bug_failure_record_action_;
 
+  using EnvoyBugMap = absl::flat_hash_map<std::string, uint64_t>;
   static absl::Mutex mutex_;
   static EnvoyBugMap counters_ GUARDED_BY(mutex_);
 };
 
 std::function<void()> ActionRegistrationImpl::debug_assertion_failure_record_action_;
 std::function<void()> EnvoyBugRegistrationImpl::envoy_bug_failure_record_action_;
-EnvoyBugMap EnvoyBugRegistrationImpl::counters_;
+EnvoyBugRegistrationImpl::EnvoyBugMap EnvoyBugRegistrationImpl::counters_;
 absl::Mutex EnvoyBugRegistrationImpl::mutex_;
 
 ActionRegistrationPtr setDebugAssertionFailureRecordAction(const std::function<void()>& action) {
