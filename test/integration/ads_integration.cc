@@ -30,11 +30,7 @@ AdsIntegrationTest::AdsIntegrationTest()
   sotw_or_delta_ = sotwOrDelta();
 }
 
-void AdsIntegrationTest::TearDown() {
-  cleanUpXdsConnection();
-  test_server_.reset();
-  fake_upstreams_.clear();
-}
+void AdsIntegrationTest::TearDown() { cleanUpXdsConnection(); }
 
 envoy::config::cluster::v3::Cluster AdsIntegrationTest::buildCluster(const std::string& name) {
   return TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(fmt::format(R"EOF(
