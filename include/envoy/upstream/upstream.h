@@ -597,7 +597,8 @@ public:
   GAUGE(upstream_rq_pending_active, Accumulate)                                                    \
   GAUGE(version, NeverImport)                                                                      \
   HISTOGRAM(upstream_cx_connect_ms, Milliseconds)                                                  \
-  HISTOGRAM(upstream_cx_length_ms, Milliseconds)
+  HISTOGRAM(upstream_cx_length_ms, Milliseconds)                                                   \
+  HISTOGRAM(upstream_rq_headers_size, Bytes)
 
 /**
  * All cluster load report stats. These are only use for EDS load reporting and not sent to the

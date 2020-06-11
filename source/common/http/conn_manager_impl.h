@@ -558,6 +558,8 @@ private:
     }
     void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override;
 
+    Upstream::ClusterInfoConstSharedPtr clusterInfo();
+
     // Tracing::TracingConfig
     Tracing::OperationName operationName() const override;
     const Tracing::CustomTagMap* customTags() const override;

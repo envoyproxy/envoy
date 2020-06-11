@@ -772,6 +772,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
                                connection_manager_.read_callbacks_->connection().dispatcher());
   request_headers_ = std::move(headers);
 
+  clusterInfo()->stats().upstream_rq_headers_size_.recordValue(request_headers_->byteSize());
+
   // Both saw_connection_close_ and is_head_request_ affect local replies: set
   // them as early as possible.
   const Protocol protocol = connection_manager_.codec_->protocol();
@@ -2065,6 +2067,15 @@ void ConnectionManagerImpl::ActiveStream::setBufferLimit(uint32_t new_limit) {
   }
 }
 
+Upstream::ClusterInfoConstSharedPtr ConnectionManagerImpl::ActiveStream::clusterInfo() {
+  // NOTE: Refreshing route caches clusterInfo as well.
+  if (!cached_route_.has_value()) {
+    refreshCachedRoute();
+  }
+
+  return cached_cluster_info_.value();
+}
+
 bool ConnectionManagerImpl::ActiveStream::createFilterChain() {
   if (state_.created_filter_chain_) {
     return false;
@@ -2287,12 +2298,7 @@ Tracing::Span& ConnectionManagerImpl::ActiveStreamFilterBase::activeSpan() {
 Tracing::Config& ConnectionManagerImpl::ActiveStreamFilterBase::tracingConfig() { return parent_; }
 
 Upstream::ClusterInfoConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::clusterInfo() {
-  // NOTE: Refreshing route caches clusterInfo as well.
-  if (!parent_.cached_route_.has_value()) {
-    parent_.refreshCachedRoute();
-  }
-
-  return parent_.cached_cluster_info_.value();
+  return parent_.clusterInfo();
 }
 
 Router::RouteConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::route() {
