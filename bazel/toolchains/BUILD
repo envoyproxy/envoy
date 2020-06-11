@@ -26,6 +26,13 @@ platform(
     ],
 )
 
+config_setting(
+    name = "gcc_aarch64_cross_cfg",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+    ],
+)
+
 gcc_aarch64_cross_toolchain_config_rule(name = "gcc_aarch64_cross_toolchain_config")
 
 filegroup(
