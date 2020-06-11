@@ -13,11 +13,6 @@ envoy_mobile_swift_test(
     name = "grpc_stream_tests",
     srcs = [
         "GRPCStreamTests.swift",
-        "MockEnvoyEngine.swift",
-        "MockEnvoyHTTPStream.swift",
-    ],
-    deps = [
-        "//library/objective-c:envoy_engine_objc_lib",
     ],
 )
 
@@ -59,8 +54,6 @@ envoy_mobile_swift_test(
 envoy_mobile_swift_test(
     name = "stream_client_builder_tests",
     srcs = [
-        "MockEnvoyEngine.swift",
-        "MockEnvoyHTTPStream.swift",
         "StreamClientBuilderTests.swift",
     ],
     deps = [
