@@ -67,7 +67,7 @@ public:
                              bool end_stream) {
     EXPECT_CALL(callbacks, onHeaders_(_, end_stream))
         .WillOnce(Invoke([code](ResponseHeaderMap& headers, bool) -> void {
-          EXPECT_EQ(std::to_string(code), headers.Status()->value().getStringView());
+          EXPECT_EQ(std::to_string(code), headers.getStatusValue());
         }));
   }
 
@@ -149,7 +149,7 @@ TEST_F(AsyncClientImplTest, Basic) {
         return nullptr;
       }));
 
-  TestHeaderMapImpl copy(message_->headers());
+  TestRequestHeaderMapImpl copy(message_->headers());
   copy.addCopy("x-envoy-internal", "true");
   copy.addCopy("x-forwarded-for", "127.0.0.1");
   copy.addCopy(":scheme", "http");
@@ -187,7 +187,7 @@ TEST_F(AsyncClientImplTracingTest, Basic) {
         return nullptr;
       }));
 
-  TestHeaderMapImpl copy(message_->headers());
+  TestRequestHeaderMapImpl copy(message_->headers());
   copy.addCopy("x-envoy-internal", "true");
   copy.addCopy("x-forwarded-for", "127.0.0.1");
   copy.addCopy(":scheme", "http");
@@ -231,7 +231,7 @@ TEST_F(AsyncClientImplTracingTest, BasicNamedChildSpan) {
         return nullptr;
       }));
 
-  TestHeaderMapImpl copy(message_->headers());
+  TestRequestHeaderMapImpl copy(message_->headers());
   copy.addCopy("x-envoy-internal", "true");
   copy.addCopy("x-forwarded-for", "127.0.0.1");
   copy.addCopy(":scheme", "http");
@@ -284,7 +284,7 @@ TEST_F(AsyncClientImplTest, BasicHashPolicy) {
             return &cm_.conn_pool_;
           }));
 
-  TestHeaderMapImpl copy(message_->headers());
+  TestRequestHeaderMapImpl copy(message_->headers());
   copy.addCopy("x-envoy-internal", "true");
   copy.addCopy("x-forwarded-for", "127.0.0.1");
   copy.addCopy(":scheme", "http");
@@ -1103,7 +1103,7 @@ TEST_F(AsyncClientImplTest, StreamTimeout) {
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(40), _));
   EXPECT_CALL(stream_encoder_.stream_, resetStream(_));
 
-  TestHeaderMapImpl expected_timeout{
+  TestRequestHeaderMapImpl expected_timeout{
       {":status", "504"}, {"content-length", "24"}, {"content-type", "text/plain"}};
   EXPECT_CALL(stream_callbacks_, onHeaders_(HeaderMapEqualRef(&expected_timeout), false));
   EXPECT_CALL(stream_callbacks_, onData(_, true));
@@ -1138,7 +1138,7 @@ TEST_F(AsyncClientImplTest, StreamTimeoutHeadReply) {
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(40), _));
   EXPECT_CALL(stream_encoder_.stream_, resetStream(_));
 
-  TestHeaderMapImpl expected_timeout{
+  TestRequestHeaderMapImpl expected_timeout{
       {":status", "504"}, {"content-length", "24"}, {"content-type", "text/plain"}};
   EXPECT_CALL(stream_callbacks_, onHeaders_(HeaderMapEqualRef(&expected_timeout), true));
   EXPECT_CALL(stream_callbacks_, onComplete());

@@ -33,10 +33,11 @@ fi
 bazel coverage ${BAZEL_BUILD_OPTIONS} --test_output=all ${COVERAGE_TARGETS}
 
 COVERAGE_DIR="${SRCDIR}"/generated/coverage
+
+rm -rf "${COVERAGE_DIR}"
 mkdir -p "${COVERAGE_DIR}"
 
 COVERAGE_DATA="${COVERAGE_DIR}/coverage.dat"
-
 cp bazel-out/_coverage/_coverage_report.dat "${COVERAGE_DATA}"
 
 COVERAGE_VALUE=$(genhtml --prefix ${PWD} --output "${COVERAGE_DIR}" "${COVERAGE_DATA}" | tee /dev/stderr | grep lines... | cut -d ' ' -f 4)
@@ -58,4 +59,19 @@ if [[ "$VALIDATE_COVERAGE" == "true" ]]; then
       echo Code coverage ${COVERAGE_VALUE} is good and higher than limit of ${COVERAGE_THRESHOLD}
   fi
 fi
+
+# We want to allow per_file_coverage to fail without exiting this script.
+set +e
+if [[ "$VALIDATE_COVERAGE" == "true" ]]; then
+  echo "Checking per-extension coverage"
+  output=$(./test/per_file_coverage.sh)
+
+  if [ $? -eq 1 ]; then
+    echo Per-extension coverage failed:
+    echo $output
+    exit 1
+  fi
+  echo Per-extension coverage passed.
+fi
+
 echo "HTML coverage report is in ${COVERAGE_DIR}/index.html"

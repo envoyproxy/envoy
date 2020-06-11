@@ -2813,6 +2813,50 @@ virtual_hosts:
                                ->grpcTimeoutOffset());
 }
 
+TEST_F(RouteMatcherTest, GrpcTimeoutOffsetOfDynamicRoute) {
+  // A DynamicRouteEntry will be created when 'cluster_header' is set.
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains:
+  - "*"
+  routes:
+  - match:
+      prefix: "/foo"
+    route:
+      cluster: local_service_grpc
+      max_grpc_timeout: 0.1s
+      grpc_timeout_offset: 0.01s
+  - match:
+      prefix: "/"
+    route:
+      max_grpc_timeout: 0.2s
+      grpc_timeout_offset: 0.02s
+      cluster_header: request_to
+      )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
+
+  {
+    Http::TestRequestHeaderMapImpl reqeust_headers = genHeaders("www.lyft.com", "/", "GET");
+    reqeust_headers.addCopy(Http::LowerCaseString("reqeust_to"), "dynamic_grpc_service");
+    EXPECT_EQ(absl::make_optional(std::chrono::milliseconds(20)),
+              config.route(reqeust_headers, 0)->routeEntry()->grpcTimeoutOffset());
+    EXPECT_EQ(absl::make_optional(std::chrono::milliseconds(200)),
+              config.route(reqeust_headers, 0)->routeEntry()->maxGrpcTimeout());
+  }
+  {
+
+    EXPECT_EQ(absl::make_optional(std::chrono::milliseconds(10)),
+              config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                  ->routeEntry()
+                  ->grpcTimeoutOffset());
+    EXPECT_EQ(
+        absl::make_optional(std::chrono::milliseconds(100)),
+        config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)->routeEntry()->maxGrpcTimeout());
+  }
+}
+
 TEST_F(RouteMatcherTest, FractionalRuntime) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -3972,7 +4016,7 @@ virtual_hosts:
  * @brief  Generate headers for testing
  * @param ssl set true to insert "x-forwarded-proto: https", else "x-forwarded-proto: http"
  * @param internal nullopt for no such "x-envoy-internal" header, or explicit "true/false"
- * @return Http::TestHeaderMapImpl
+ * @return Http::TestRequestHeaderMapImpl
  */
 static Http::TestRequestHeaderMapImpl genRedirectHeaders(const std::string& host,
                                                          const std::string& path, bool ssl,
@@ -4656,7 +4700,7 @@ virtual_hosts:
     Http::TestResponseHeaderMapImpl response_headers;
     StreamInfo::MockStreamInfo stream_info;
     route_entry->finalizeResponseHeaders(response_headers, stream_info);
-    EXPECT_EQ(response_headers, Http::TestHeaderMapImpl{});
+    EXPECT_EQ(response_headers, Http::TestResponseHeaderMapImpl{});
   }
 
   // Weighted Cluster with no runtime, total weight = 10000
@@ -6755,10 +6799,10 @@ virtual_hosts:
   const auto& retry_policy = config.route(headers, 0)->routeEntry()->retryPolicy();
   ASSERT_EQ(2, retry_policy.retriableHeaders().size());
 
-  Http::TestHeaderMapImpl expected_0{{":status", "500"}};
-  Http::TestHeaderMapImpl unexpected_0{{":status", "200"}};
-  Http::TestHeaderMapImpl expected_1{{"x-upstream-pushback", "bar"}};
-  Http::TestHeaderMapImpl unexpected_1{{"x-test", "foo"}};
+  Http::TestResponseHeaderMapImpl expected_0{{":status", "500"}};
+  Http::TestResponseHeaderMapImpl unexpected_0{{":status", "200"}};
+  Http::TestResponseHeaderMapImpl expected_1{{"x-upstream-pushback", "bar"}};
+  Http::TestResponseHeaderMapImpl unexpected_1{{"x-test", "foo"}};
 
   EXPECT_TRUE(retry_policy.retriableHeaders()[0]->matchesHeaders(expected_0));
   EXPECT_FALSE(retry_policy.retriableHeaders()[0]->matchesHeaders(unexpected_0));

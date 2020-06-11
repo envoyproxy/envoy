@@ -1,10 +1,10 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_mock",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -15,6 +15,7 @@ envoy_cc_mock(
     deps = [
         "//include/envoy/secret:secret_manager_interface",
         "//include/envoy/server:admin_interface",
+        "//include/envoy/server:bootstrap_extension_config_interface",
         "//include/envoy/server:configuration_interface",
         "//include/envoy/server:drain_manager_interface",
         "//include/envoy/server:filter_config_interface",

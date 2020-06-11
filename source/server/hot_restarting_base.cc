@@ -10,6 +10,14 @@ using HotRestartMessage = envoy::HotRestartMessage;
 
 static constexpr uint64_t MaxSendmsgSize = 4096;
 
+HotRestartingBase::~HotRestartingBase() {
+  if (my_domain_socket_ != -1) {
+    Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
+    Api::SysCallIntResult result = os_sys_calls.close(my_domain_socket_);
+    ASSERT(result.rc_ == 0);
+  }
+}
+
 void HotRestartingBase::initDomainSocketAddress(sockaddr_un* address) {
   memset(address, 0, sizeof(*address));
   address->sun_family = AF_UNIX;
@@ -40,8 +48,13 @@ void HotRestartingBase::bindDomainSocket(uint64_t id, const std::string& role) {
   Api::SysCallIntResult result =
       os_sys_calls.bind(my_domain_socket_, reinterpret_cast<sockaddr*>(&address), sizeof(address));
   if (result.rc_ != 0) {
-    throw EnvoyException(
-        fmt::format("unable to bind domain socket with id={} (see --base-id option)", id));
+    const auto msg = fmt::format(
+        "unable to bind domain socket with base_id={}, id={}, errno={} (see --base-id option)",
+        base_id_, id, result.errno_);
+    if (result.errno_ == EADDRINUSE) {
+      throw HotRestartDomainSocketInUseException(msg);
+    }
+    throw EnvoyException(msg);
   }
 }
 

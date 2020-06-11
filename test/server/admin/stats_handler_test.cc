@@ -511,7 +511,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(AdminInstanceTest, StatsInvalidRegex) {
-  Http::ResponseHeaderMapImpl header_map;
+  Http::TestResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl data;
   EXPECT_LOG_CONTAINS(
       "error", "Invalid regex: ",
@@ -526,7 +526,7 @@ TEST_P(AdminInstanceTest, StatsInvalidRegex) {
 }
 
 TEST_P(AdminInstanceTest, PrometheusStatsInvalidRegex) {
-  Http::ResponseHeaderMapImpl header_map;
+  Http::TestResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl data;
   EXPECT_LOG_CONTAINS(
       "error", ": *.ptest",
@@ -549,23 +549,21 @@ TEST_P(AdminInstanceTest, TracingStatsDisabled) {
 }
 
 TEST_P(AdminInstanceTest, GetRequestJson) {
-  Http::ResponseHeaderMapImpl response_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
   std::string body;
   EXPECT_EQ(Http::Code::OK, admin_.request("/stats?format=json", "GET", response_headers, body));
   EXPECT_THAT(body, HasSubstr("{\"stats\":["));
-  EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
-              HasSubstr("application/json"));
+  EXPECT_THAT(std::string(response_headers.getContentTypeValue()), HasSubstr("application/json"));
 }
 
 TEST_P(AdminInstanceTest, RecentLookups) {
-  Http::ResponseHeaderMapImpl response_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
   std::string body;
 
   // Recent lookup tracking is disabled by default.
   EXPECT_EQ(Http::Code::OK, admin_.request("/stats/recentlookups", "GET", response_headers, body));
   EXPECT_THAT(body, HasSubstr("Lookup tracking is not enabled"));
-  EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
-              HasSubstr("text/plain"));
+  EXPECT_THAT(std::string(response_headers.getContentTypeValue()), HasSubstr("text/plain"));
 
   // We can't test RecentLookups in admin unit tests as it doesn't work with a
   // fake symbol table. However we cover this solidly in integration tests.

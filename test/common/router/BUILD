@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_fuzz_test",
@@ -10,6 +8,8 @@ load(
     "envoy_package",
     "envoy_proto_library",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -253,7 +253,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "router_test",
     srcs = ["router_test.cc"],
-    tags = ["fails_on_windows"],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:context_lib",

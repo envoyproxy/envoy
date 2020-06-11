@@ -201,7 +201,7 @@ TEST_P(ListenerImplTest, WildcardListenerIpv4Compat) {
 
   EXPECT_CALL(listener, getLocalAddress(_))
       .WillOnce(Invoke([](os_fd_t fd) -> Address::InstanceConstSharedPtr {
-        return Address::addressFromFd(fd);
+        return SocketInterfaceSingleton::get().addressFromFd(fd);
       }));
 
   StreamInfo::StreamInfoImpl stream_info(dispatcher_->timeSource());
@@ -251,7 +251,7 @@ TEST_P(ListenerImplTest, DisableAndEnableListener) {
 
   EXPECT_CALL(listener, getLocalAddress(_))
       .WillOnce(Invoke([](os_fd_t fd) -> Address::InstanceConstSharedPtr {
-        return Address::addressFromFd(fd);
+        return SocketInterfaceSingleton::get().addressFromFd(fd);
       }));
   EXPECT_CALL(listener_callbacks, onAccept_(_)).WillOnce(Invoke([&](ConnectionSocketPtr&) -> void {
     client_connection->close(ConnectionCloseType::NoFlush);
