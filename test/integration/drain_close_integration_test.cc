@@ -73,9 +73,7 @@ TEST_P(DrainCloseIntegrationTest, DrainCloseImmediate) {
   }
 }
 
-TEST_P(DrainCloseIntegrationTest, AdminDrain) {
-  testAdminDrain(downstreamProtocol());
-}
+TEST_P(DrainCloseIntegrationTest, AdminDrain) { testAdminDrain(downstreamProtocol()); }
 
 INSTANTIATE_TEST_SUITE_P(Protocols, DrainCloseIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
