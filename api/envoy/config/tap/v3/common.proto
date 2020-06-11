@@ -119,8 +119,8 @@ message HttpGenericBodyMatch {
       // Text string to be located in HTTP body.
       string string_match = 1;
 
-      // Text with hex digits to be located in HTTP body.
-      string binary_match = 2;
+      // Base64 encoded bytes sequence to be located in HTTP body.
+      bytes binary_match = 2;
     }
   }
 

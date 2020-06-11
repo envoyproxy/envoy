@@ -146,10 +146,9 @@ TEST_F(TapMatcherGenericBodyTest, WrongConfigTest) {
   std::string matcher_yaml = R"EOF(
 http_request_generic_body_match:
   patterns:
-    - binary_match: beefa
+    - binary_match: 4rdHFh%2
 )EOF";
-  TestUtility::loadFromYaml(matcher_yaml, config_);
-  ASSERT_ANY_THROW(buildMatcher(config_, matchers_));
+  ASSERT_ANY_THROW(TestUtility::loadFromYaml(matcher_yaml, config_));
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -247,16 +246,17 @@ INSTANTIATE_TEST_SUITE_P(
             std::make_tuple(std::vector<std::string>{"    - string_match: \"envoyproxy\""},
                             std::list<std::list<uint32_t>>{{6}, {6}, {6}, {2}, {3}, {5}, {6}},
                             std::make_pair(true, false)),
-            // Should match - chunk #7 contains hex 0xdead
-            std::make_tuple(std::vector<std::string>{"    - binary_match: \"dead\""},
+            // Should match - chunk #7 contains hex '0xdead (3q0= in base64 format)'.
+            std::make_tuple(std::vector<std::string>{"    - binary_match: \"3q0=\""},
                             std::list<std::list<uint32_t>>{{6}, {6}, {7}, {6}},
                             std::make_pair(true, false)),
             // Should match - chunk #7 contains 0xdead and chunk 8 contains 0xbeef
-            std::make_tuple(std::vector<std::string>{"    - binary_match: \"deadbeef\""},
+            // 0xdeadbeef encoded in base64 format is '3q2+7w=='.
+            std::make_tuple(std::vector<std::string>{"    - binary_match: \"3q2+7w==\""},
                             std::list<std::list<uint32_t>>{{6}, {6}, {7}, {8}, {6}},
                             std::make_pair(true, false)),
-            // Should NOT match - hex 0xdeed is not there
-            std::make_tuple(std::vector<std::string>{"    - binary_match: \"deed\""},
+            // Should NOT match - hex 0xdeed (3u0= in base64 format) is not there
+            std::make_tuple(std::vector<std::string>{"    - binary_match: \"3u0=\""},
                             std::list<std::list<uint32_t>>{{6}, {6}, {7}, {8}, {6}},
                             std::make_pair(false, true)),
 
@@ -318,16 +318,17 @@ INSTANTIATE_TEST_SUITE_P(
             std::make_tuple(std::vector<std::string>{"    - string_match: \"envoy\"",
                                                      "    - string_match: \"proxy\""},
                             std::list<std::list<uint32_t>>{{0, 1}}, std::make_pair(true, false)),
+            // SPELLCHECKER(off)
             // Should match. Both patterns should be found. 'envoy' is in the first
-            // chunk and '0xbeef' is in the chunk 8
+            // chunk and '0xbeef' (`vu8=` in base64 format) is in the chunk 8.
             std::make_tuple(std::vector<std::string>{"    - string_match: \"envoy\"",
-                                                     "    - binary_match: \"beef\""},
+                                                     "    - binary_match: \"vu8=\""},
                             std::list<std::list<uint32_t>>{{0, 1}, {8}, {6}},
                             std::make_pair(true, false)),
             // Should match. Both patterns should be found. '0xdeadbeef' is spread
             // across two chunks - 7 and 8. The second pattern 'envoy' is in chunk 0.
             std::make_tuple(std::vector<std::string>{"    - string_match: \"envoy\"",
-                                                     "    - binary_match: \"deadbeef\""},
+                                                     "    - binary_match: \"3q2+7w==\""},
                             std::list<std::list<uint32_t>>{{7}, {8}, {6, 0}},
                             std::make_pair(true, false)),
             // Should match. One pattern is substring of the other and they both
@@ -367,40 +368,42 @@ INSTANTIATE_TEST_SUITE_P(
                                                      "  bytes_limit: 30"},
                             std::list<std::list<uint32_t>>{{0, 1}}, std::make_pair(false, false)),
             // Should match. Both patterns should be found. 'envoy' is in the first
-            // chunk and '0xbeef' is in the chunk 8 and search limit is large enough
-            // to include 2 patterns
+            // chunk and '0xbeef (vu8= in base64 format)' is in the chunk 8 and search limit is
+            // large enough to include 2 patterns
             std::make_tuple(
                 std::vector<std::string>{"    - string_match: \"envoy\"",
-                                         "    - binary_match: \"beef\"", "  bytes_limit: 90"},
+                                         "    - binary_match: \"vu8=\"", "  bytes_limit: 90"},
                 std::list<std::list<uint32_t>>{{0, 1}, {8}, {6}}, std::make_pair(true, false)),
-            // Should match. Both patterns should be found. '0xdeadbeef' is spread
-            // across two chunks - 7 and 8. The second pattern 'envoy' is in chunk 0.
+            // Should match. Both patterns should be found. '0xdeadbeef  (3q2+7w== in base64)' is
+            // spread across two chunks - 7 and 8. The second pattern 'envoy' is in chunk 0.
             std::make_tuple(
                 std::vector<std::string>{"    - string_match: \"envoy\"",
-                                         "    - binary_match: \"deadbeef\"", "  bytes_limit: 85"},
+                                         "    - binary_match: \"3q2+7w==\"", "  bytes_limit: 85"},
                 std::list<std::list<uint32_t>>{{7}, {8}, {6, 0}}, std::make_pair(true, false)),
-            // Should match. Search limit ends exactly where 0xdeadbeef ends.
+            // Should match. Search limit ends exactly where '0xdeadbeef (3q2+7w== in base64)' ends.
             std::make_tuple(
                 std::vector<std::string>{"    - string_match: \"envoy\"",
-                                         "    - binary_match: \"deadbeef\"", "  bytes_limit: 47"},
+                                         "    - binary_match: \"3q2+7w==\"", "  bytes_limit: 47"},
                 std::list<std::list<uint32_t>>{{0}, {7}, {8}, {6, 0}}, std::make_pair(true, false)),
-            // Should NOT match. Search limit ends exactly one byte before end of 0xdeadbeef.
+            // Should NOT match. Search limit ends exactly one byte before end of '0xdeadbeef
+            // (3q2+7w== in base64)'.
             std::make_tuple(std::vector<std::string>{"    - string_match: \"envoy\"",
-                                                     "    - binary_match: \"deadbeef\"",
+                                                     "    - binary_match: \"3q2+7w==\"",
                                                      "  bytes_limit: 46"},
                             std::list<std::list<uint32_t>>{{0}, {7}, {8}, {6, 0}},
                             std::make_pair(false, false)),
             // Test the situation when end of the search limit overlaps with end of first chunk.
             // Should NOT match. The second pattern should not be found.
             std::make_tuple(std::vector<std::string>{"    - string_match: \"envoy\"",
-                                                     "    - binary_match: \"deadbeef\"",
+                                                     "    - binary_match: \"3q2+7w==\"",
                                                      "  bytes_limit: 43"},
                             std::list<std::list<uint32_t>>{{0}, {7}, {8}, {6, 0}},
                             std::make_pair(false, false)),
 
-            // Now pass enormously large value. It should work just fine
+            // SPELLCHECKER(on)
+            // Now pass enormously large value. It should work just fine.
             std::make_tuple(std::vector<std::string>{"    - string_match: \"envoy\"",
-                                                     "    - binary_match: \"deadbeef\"",
+                                                     "    - binary_match: \"3q2+7w==\"",
                                                      "  bytes_limit: 50000000"},
                             std::list<std::list<uint32_t>>{{0}, {7}, {8}, {6, 0}},
                             std::make_pair(true, false)))));

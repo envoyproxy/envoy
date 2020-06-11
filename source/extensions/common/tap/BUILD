@@ -39,7 +39,6 @@ envoy_cc_library(
     hdrs = ["tap_matcher.h"],
     deps = [
         "//source/common/buffer:buffer_lib",
-        "//source/common/common:hex_lib",
         "//source/common/common:matchers_lib",
         "//source/common/http:header_utility_lib",
         "@envoy_api//envoy/config/tap/v3:pkg_cc_proto",

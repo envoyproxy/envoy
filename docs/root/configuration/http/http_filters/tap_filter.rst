@@ -138,19 +138,19 @@ Another example POST body:
           - http_request_generic_body_match:
               patterns:
                 - string_match: test
-                - binary_match: deadbeef
+                - binary_match: 3q2+7w==
               bytes_limit: 128
           - http_response_generic_body_match:
               patterns:
-                - binary_match: beef
+                - binary_match: vu8=
               bytes_limit: 64
     output_config:
       sinks:
         - streaming_admin: {}
 
 The preceding configuration instructs the tap filter to match any HTTP requests in which a request
-header ``foo: bar`` is present AND request body contains string ``test`` and hex bytes ``deadbeef``
-in the first 128 bytes AND response body contains hex bytes ``beef`` in the first 64 bytes. If all of these
+header ``foo: bar`` is present AND request body contains string ``test`` and hex bytes ``deadbeef`` (``3q2+7w==`` in base64 format)
+in the first 128 bytes AND response body contains hex bytes ``beef`` (``vu8=`` in base64 format) in the first 64 bytes. If all of these
 conditions are met, the request will be tapped and streamed out to the admin endpoint.
 
 Output format

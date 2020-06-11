@@ -3,7 +3,6 @@
 #include "envoy/config/tap/v3/common.pb.h"
 
 #include "common/common/assert.h"
-#include "common/common/hex.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -140,18 +139,11 @@ HttpGenericBodyMatcher::HttpGenericBodyMatcher(
     : HttpBodyMatcherBase(matchers) {
   for (const auto& i : config.patterns()) {
     switch (i.rule_case()) {
+    // For binary match 'i' contains sequence of bytes to locate in the body.
     case envoy::config::tap::v3::HttpGenericBodyMatch::GenericTextMatch::kBinaryMatch: {
-      // Convert the hex string to real hex values.
-      // String containing "01" will be converted to 1 byte: 0x01
-      const std::vector<unsigned char> hex = Hex::decode(i.binary_match());
-      if (hex.empty()) {
-        throw EnvoyException(fmt::format("invalid hex string '{}'", i.binary_match()));
-      }
-      std::string hex_string;
-      hex_string.assign(reinterpret_cast<const char*>(hex.data()), hex.size());
-      patterns_.push_back(hex_string);
+      patterns_.push_back(i.binary_match());
     } break;
-    // For text pattern just add the string to vector of patterns the matcher will look for.
+    // For string match 'i' contains exact string to locate in the body.
     case envoy::config::tap::v3::HttpGenericBodyMatch::GenericTextMatch::kStringMatch:
       patterns_.push_back(i.string_match());
       break;
