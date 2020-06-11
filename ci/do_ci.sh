@@ -224,6 +224,7 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     --define quiche=enabled \
     --define path_normalization_by_default=true \
     --define deprecated_features=disabled \
+    --define --cxxopt=-std=c++14 \
   "
   ENVOY_STDLIB="${ENVOY_STDLIB:-libstdc++}"
   setup_clang_toolchain

@@ -371,7 +371,11 @@ def _net_zlib():
     )
 
 def _com_google_cel_cpp():
-    _repository_impl("com_google_cel_cpp")
+    _repository_impl(
+        name = "com_google_cel_cpp",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:cel-cpp.patch"],
+    )
 
 def _com_github_nghttp2_nghttp2():
     location = _get_location("com_github_nghttp2_nghttp2")
