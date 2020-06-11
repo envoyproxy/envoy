@@ -317,7 +317,8 @@ TEST_P(Http2CodecImplTest, ShutdownNotice) {
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
   request_encoder_->encodeHeaders(request_headers, true);
 
-  EXPECT_CALL(client_callbacks_, onGoAway(_));
+  // Called once from the shutdown notice and once from the goaway.
+  EXPECT_CALL(client_callbacks_, onGoAway(_)).Times(2);
   server_->shutdownNotice();
   server_->goAway();
 

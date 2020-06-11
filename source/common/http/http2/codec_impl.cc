@@ -471,7 +471,7 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
           http2_options.max_inbound_priority_frames_per_stream().value()),
       max_inbound_window_update_frames_per_data_frame_sent_(
           http2_options.max_inbound_window_update_frames_per_data_frame_sent().value()),
-      dispatching_(false), raised_goaway_(false), pending_deferred_reset_(false) {}
+      dispatching_(false), pending_deferred_reset_(false) {}
 
 ConnectionImpl::~ConnectionImpl() { nghttp2_session_del(session_); }
 
@@ -587,11 +587,9 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
     }
   }
 
-  // Only raise GOAWAY once, since we don't currently expose stream information. Shutdown
-  // notifications are the same as a normal GOAWAY.
-  if (frame->hd.type == NGHTTP2_GOAWAY && !raised_goaway_) {
+  // Shutdown notifications are the same as a normal GOAWAY.
+  if (frame->hd.type == NGHTTP2_GOAWAY) {
     ASSERT(frame->hd.stream_id == 0);
-    raised_goaway_ = true;
     callbacks().onGoAway(ngHttp2ErrorCodeToErrorCode(frame->goaway.error_code));
     return 0;
   }
