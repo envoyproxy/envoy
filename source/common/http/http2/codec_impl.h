@@ -16,6 +16,7 @@
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"
+#include "common/common/statusor.h"
 #include "common/common/thread.h"
 #include "common/http/codec_helper.h"
 #include "common/http/header_map_impl.h"
@@ -206,7 +207,7 @@ protected:
 
     StreamImpl* base() { return this; }
     ssize_t onDataSourceRead(uint64_t length, uint32_t* data_flags);
-    int onDataSourceSend(const uint8_t* framehd, size_t length);
+    Status onDataSourceSend(const uint8_t* framehd, size_t length);
     void resetStreamWorker(StreamResetReason reason);
     static void buildHeaders(std::vector<nghttp2_nv>& final_headers, const HeaderMap& headers);
     void saveHeader(HeaderString&& name, HeaderString&& value);
@@ -395,7 +396,7 @@ protected:
   // that is not associated with an existing stream.
   StreamImpl* getStream(int32_t stream_id);
   int saveHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value);
-  void sendPendingFrames();
+  Status sendPendingFrames();
   void sendSettings(const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                     bool disable_push);
   // Callback triggered when the peer's SETTINGS frame is received.
@@ -425,7 +426,7 @@ protected:
   uint32_t per_stream_buffer_limit_;
   bool allow_metadata_;
   const bool stream_error_on_invalid_http_messaging_;
-  bool flood_detected_;
+  Status nghttp2_callback_status_;
 
   // Set if the type of frame that is about to be sent is PING or SETTINGS with the ACK flag set, or
   // RST_STREAM.
@@ -487,14 +488,14 @@ protected:
   // Http2FloodMitigationTest.* tests in test/integration/http2_integration_test.cc will break if
   // this changes in the future. Also it is important that onSend does not do partial writes, as the
   // nghttp2 library will keep calling this callback to write the rest of the frame.
-  ssize_t onSend(const uint8_t* data, size_t length);
+  StatusOr<ssize_t> onSend(const uint8_t* data, size_t length);
 
 private:
   virtual ConnectionCallbacks& callbacks() PURE;
-  virtual int onBeginHeaders(const nghttp2_frame* frame) PURE;
+  virtual Status onBeginHeaders(const nghttp2_frame* frame) PURE;
   int onData(int32_t stream_id, const uint8_t* data, size_t len);
-  int onBeforeFrameReceived(const nghttp2_frame_hd* hd);
-  int onFrameReceived(const nghttp2_frame* frame);
+  Status onBeforeFrameReceived(const nghttp2_frame_hd* hd);
+  Status onFrameReceived(const nghttp2_frame* frame);
   int onBeforeFrameSend(const nghttp2_frame* frame);
   int onFrameSend(const nghttp2_frame* frame);
   virtual int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) PURE;
@@ -506,12 +507,12 @@ private:
   ssize_t packMetadata(int32_t stream_id, uint8_t* buf, size_t len);
 
   // Adds buffer fragment for a new outbound frame to the supplied Buffer::OwnedImpl.
-  // Returns true on success or false if outbound queue limits were exceeded.
-  bool addOutboundFrameFragment(Buffer::OwnedImpl& output, const uint8_t* data, size_t length);
-  virtual void checkOutboundQueueLimits() PURE;
-  void incrementOutboundFrameCount(bool is_outbound_flood_monitored_control_frame);
-  virtual bool trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) PURE;
-  virtual bool checkInboundFrameLimits() PURE;
+  // Returns Ok Status on success or error if outbound queue limits were exceeded.
+  Status addOutboundFrameFragment(Buffer::OwnedImpl& output, const uint8_t* data, size_t length);
+  virtual Status checkOutboundQueueLimits() PURE;
+  Status incrementOutboundFrameCount(bool is_outbound_flood_monitored_control_frame);
+  virtual Status trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) PURE;
+  virtual Status checkInboundFrameLimits() PURE;
 
   void releaseOutboundFrame(const Buffer::OwnedBufferFragmentImpl* fragment);
   void releaseOutboundControlFrame(const Buffer::OwnedBufferFragmentImpl* fragment);
@@ -539,7 +540,7 @@ public:
 private:
   // ConnectionImpl
   ConnectionCallbacks& callbacks() override { return callbacks_; }
-  int onBeginHeaders(const nghttp2_frame* frame) override;
+  Status onBeginHeaders(const nghttp2_frame* frame) override;
   int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) override;
 
   // Presently client connections only perform accounting of outbound frames and do not
@@ -549,9 +550,9 @@ private:
   // mitigation on the downstream connections, which causes an exception to be thrown in the middle
   // of the clean-up loop, leaving resources in a half cleaned up state.
   // TODO(yanavlasov): add flood mitigation for upstream connections as well.
-  void checkOutboundQueueLimits() override {}
-  bool trackInboundFrames(const nghttp2_frame_hd*, uint32_t) override { return true; }
-  bool checkInboundFrameLimits() override { return true; }
+  Status checkOutboundQueueLimits() override { return okStatus(); }
+  Status trackInboundFrames(const nghttp2_frame_hd*, uint32_t) override { return okStatus(); }
+  Status checkInboundFrameLimits() override { return okStatus(); }
 
   Http::ConnectionCallbacks& callbacks_;
 };
@@ -572,11 +573,11 @@ public:
 private:
   // ConnectionImpl
   ConnectionCallbacks& callbacks() override { return callbacks_; }
-  int onBeginHeaders(const nghttp2_frame* frame) override;
+  Status onBeginHeaders(const nghttp2_frame* frame) override;
   int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) override;
-  void checkOutboundQueueLimits() override;
-  bool trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) override;
-  bool checkInboundFrameLimits() override;
+  Status checkOutboundQueueLimits() override;
+  Status trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) override;
+  Status checkInboundFrameLimits() override;
   absl::optional<int> checkHeaderNameForUnderscores(absl::string_view header_name) override;
 
   // Http::Connection

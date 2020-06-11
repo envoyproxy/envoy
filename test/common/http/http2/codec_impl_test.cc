@@ -1551,7 +1551,7 @@ TEST_P(Http2CodecImplTest, PingFlood) {
         buffer.move(frame);
       }));
 
-  EXPECT_THROW(client_->sendPendingFrames(), ServerCodecError);
+  EXPECT_THROW(client_->sendPendingFrames().IgnoreError(), ServerCodecError);
   EXPECT_EQ(ack_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES);
   EXPECT_EQ(1, stats_store_.counter("http2.outbound_control_flood").value());
 }
@@ -1574,7 +1574,7 @@ TEST_P(Http2CodecImplTest, PingFloodMitigationDisabled) {
 
   EXPECT_CALL(server_connection_, write(_, _))
       .Times(CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES + 1);
-  EXPECT_NO_THROW(client_->sendPendingFrames());
+  EXPECT_NO_THROW(client_->sendPendingFrames().IgnoreError());
 }
 
 // Verify that outbound control frame counter decreases when send buffer is drained
@@ -1601,7 +1601,7 @@ TEST_P(Http2CodecImplTest, PingFloodCounterReset) {
       }));
 
   // We should be 1 frame under the control frame flood mitigation threshold.
-  EXPECT_NO_THROW(client_->sendPendingFrames());
+  EXPECT_NO_THROW(client_->sendPendingFrames().IgnoreError());
   EXPECT_EQ(ack_count, kMaxOutboundControlFrames);
 
   // Drain kMaxOutboundFrames / 2 slices from the send buffer
@@ -1613,11 +1613,11 @@ TEST_P(Http2CodecImplTest, PingFloodCounterReset) {
   }
   // The number of outbound frames should be half of max so the connection should not be
   // terminated.
-  EXPECT_NO_THROW(client_->sendPendingFrames());
+  EXPECT_NO_THROW(client_->sendPendingFrames().IgnoreError());
 
   // 1 more ping frame should overflow the outbound frame limit.
   EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
-  EXPECT_THROW(client_->sendPendingFrames(), ServerCodecError);
+  EXPECT_THROW(client_->sendPendingFrames().IgnoreError(), ServerCodecError);
 }
 
 // Verify that codec detects flood of outbound HEADER frames
@@ -1644,7 +1644,7 @@ TEST_P(Http2CodecImplTest, ResponseHeadersFlood) {
   // Presently flood mitigation is done only when processing downstream data
   // So we need to send stream from downstream client to trigger mitigation
   EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
-  EXPECT_THROW(client_->sendPendingFrames(), ServerCodecError);
+  EXPECT_THROW(client_->sendPendingFrames().IgnoreError(), ServerCodecError);
 
   EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
   EXPECT_EQ(1, stats_store_.counter("http2.outbound_flood").value());
@@ -1677,7 +1677,7 @@ TEST_P(Http2CodecImplTest, ResponseDataFlood) {
   // Presently flood mitigation is done only when processing downstream data
   // So we need to send stream from downstream client to trigger mitigation
   EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
-  EXPECT_THROW(client_->sendPendingFrames(), ServerCodecError);
+  EXPECT_THROW(client_->sendPendingFrames().IgnoreError(), ServerCodecError);
 
   EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
   EXPECT_EQ(1, stats_store_.counter("http2.outbound_flood").value());
@@ -1709,7 +1709,7 @@ TEST_P(Http2CodecImplTest, ResponseDataFloodMitigationDisabled) {
   // Presently flood mitigation is done only when processing downstream data
   // So we need to send stream from downstream client to trigger mitigation
   EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
-  EXPECT_NO_THROW(client_->sendPendingFrames());
+  EXPECT_NO_THROW(client_->sendPendingFrames().IgnoreError());
 }
 
 // Verify that outbound frame counter decreases when send buffer is drained
@@ -1751,7 +1751,7 @@ TEST_P(Http2CodecImplTest, ResponseDataFloodCounterReset) {
   // Presently flood mitigation is done only when processing downstream data
   // So we need to send a frame from downstream client to trigger mitigation
   EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
-  EXPECT_THROW(client_->sendPendingFrames(), ServerCodecError);
+  EXPECT_THROW(client_->sendPendingFrames().IgnoreError(), ServerCodecError);
 }
 
 // Verify that control frames are added to the counter of outbound frames of all types.
@@ -1780,7 +1780,7 @@ TEST_P(Http2CodecImplTest, PingStacksWithDataFlood) {
   }
   // Send one PING frame above the outbound queue size limit
   EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
-  EXPECT_THROW(client_->sendPendingFrames(), ServerCodecError);
+  EXPECT_THROW(client_->sendPendingFrames().IgnoreError(), ServerCodecError);
 
   EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES);
   EXPECT_EQ(1, stats_store_.counter("http2.outbound_flood").value());
@@ -1788,25 +1788,25 @@ TEST_P(Http2CodecImplTest, PingStacksWithDataFlood) {
 
 TEST_P(Http2CodecImplTest, PriorityFlood) {
   priorityFlood();
-  EXPECT_THROW(client_->sendPendingFrames(), ServerCodecError);
+  EXPECT_THROW(client_->sendPendingFrames().IgnoreError(), ServerCodecError);
 }
 
 TEST_P(Http2CodecImplTest, PriorityFloodOverride) {
   max_inbound_priority_frames_per_stream_ = 2147483647;
 
   priorityFlood();
-  EXPECT_NO_THROW(client_->sendPendingFrames());
+  EXPECT_NO_THROW(client_->sendPendingFrames().IgnoreError());
 }
 
 TEST_P(Http2CodecImplTest, WindowUpdateFlood) {
   windowUpdateFlood();
-  EXPECT_THROW(client_->sendPendingFrames(), ServerCodecError);
+  EXPECT_THROW(client_->sendPendingFrames().IgnoreError(), ServerCodecError);
 }
 
 TEST_P(Http2CodecImplTest, WindowUpdateFloodOverride) {
   max_inbound_window_update_frames_per_data_frame_sent_ = 2147483647;
   windowUpdateFlood();
-  EXPECT_NO_THROW(client_->sendPendingFrames());
+  EXPECT_NO_THROW(client_->sendPendingFrames().IgnoreError());
 }
 
 TEST_P(Http2CodecImplTest, EmptyDataFlood) {
@@ -1910,9 +1910,13 @@ public:
         callbacks_,
         [](nghttp2_session*, const uint8_t* data, size_t length, int, void* user_data) -> ssize_t {
           // Cast down to MetadataTestClientConnectionImpl to leverage friendship.
-          return static_cast<MetadataTestClientConnectionImpl*>(
-                     static_cast<ConnectionImpl*>(user_data))
-              ->onSend(data, length);
+          auto status_or_len = static_cast<MetadataTestClientConnectionImpl*>(
+              static_cast<ConnectionImpl*>(user_data))
+                               ->onSend(data, length);
+          if (status_or_len.ok()) {
+            return status_or_len.value();
+          }
+          return NGHTTP2_ERR_CALLBACK_FAILURE;
         });
     nghttp2_option_new(&options_);
     nghttp2_option_set_user_recv_extension_type(options_, METADATA_FRAME_TYPE);
