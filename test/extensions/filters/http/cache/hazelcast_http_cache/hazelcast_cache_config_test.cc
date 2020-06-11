@@ -63,7 +63,7 @@ TEST_F(ConfigUtilsTest, ClientConfigTest) {
   const std::string group_name = "group_foo";
   const std::string group_pass = "foo_pass";
   const std::string member_address = "192.168.10.3"; // arbitrary address
-  constexpr int member_port = 5703; // arbitrary port
+  constexpr int member_port = 5703;                  // arbitrary port
 
   HazelcastHttpCacheConfig default_cache_config;
   default_cache_config.set_group_name(group_name);

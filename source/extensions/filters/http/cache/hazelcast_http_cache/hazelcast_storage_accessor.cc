@@ -12,7 +12,8 @@ void HazelcastClusterAccessor::putHeader(const int64_t map_key, const HazelcastH
   getHeaderMap().set(map_key, value);
 }
 
-void HazelcastClusterAccessor::putBody(const std::string& map_key, const HazelcastBodyEntry& value) {
+void HazelcastClusterAccessor::putBody(const std::string& map_key,
+                                       const HazelcastBodyEntry& value) {
   getBodyMap().set(map_key, value);
 }
 
@@ -28,9 +29,12 @@ void HazelcastClusterAccessor::removeBodyAsync(const std::string& map_key) {
   getBodyMap().removeAsync(map_key);
 }
 
-void HazelcastClusterAccessor::removeHeader(const int64_t map_key) { getHeaderMap().deleteEntry(map_key); }
+void HazelcastClusterAccessor::removeHeader(const int64_t map_key) {
+  getHeaderMap().deleteEntry(map_key);
+}
 
-void HazelcastClusterAccessor::putResponse(const int64_t map_key, const HazelcastResponseEntry& value) {
+void HazelcastClusterAccessor::putResponse(const int64_t map_key,
+                                           const HazelcastResponseEntry& value) {
   getResponseMap().set(map_key, value);
 }
 

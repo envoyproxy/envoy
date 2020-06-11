@@ -4,7 +4,7 @@ Work in Progress--Cache filter has not implemented features. The corresponding o
 Hazelcast Http Cache provides a pluggable storage implementation backed by Hazelcast In Memory Data Grid for the Http
 cache filter. Using Hazelcast C++ client, the plugin does not store any Http response locally but in a distributed map
 provided by Hazelcast cluster. After having a Hazelcast cluster up and running, passing the network address of a
-cluster member to the cache plugin will be enough for client to connect to the cluster.
+cluster member to the cache plugin via configuration will be enough for client to connect to the cluster.
 
 ## Offered cache modes
 The plugin comes with two modes:

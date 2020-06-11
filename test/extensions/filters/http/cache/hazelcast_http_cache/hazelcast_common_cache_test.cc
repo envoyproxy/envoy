@@ -18,7 +18,8 @@ class HazelcastHttpCacheTest : public HazelcastHttpCacheTestBase,
 protected:
   void SetUp() override {
     HazelcastHttpCacheConfig typed_config = HazelcastTestUtil::getTestTypedConfig(GetParam());
-    envoy::extensions::filters::http::cache::v3alpha::CacheConfig cache_config = HazelcastTestUtil::getTestCacheConfig();
+    envoy::extensions::filters::http::cache::v3alpha::CacheConfig cache_config =
+        HazelcastTestUtil::getTestCacheConfig();
     // To test the cache with a real Hazelcast instance, use remote test cache.
     // cache_ = std::make_unique<HazelcastRemoteTestCache>(std::move(typed_config), cache_config);
     cache_ = std::make_unique<HazelcastLocalTestCache>(std::move(typed_config), cache_config);
@@ -233,7 +234,6 @@ TEST(Registration, GetFactory) {
     EXPECT_EQ(cache->cacheInfo().name_, "envoy.extensions.http.cache.hazelcast");
     EXPECT_THROW_WITH_MESSAGE(cache->start(), EnvoyException,
                               "Hazelcast Client could not connect to any cluster.");
-    cache.reset();
   }
   EXPECT_THROW_WITH_MESSAGE(factory->getCache(config), EnvoyException,
                             "Hazelcast Client could not connect to any cluster.");

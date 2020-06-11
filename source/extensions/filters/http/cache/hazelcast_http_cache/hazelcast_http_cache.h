@@ -42,7 +42,8 @@ using envoy::source::extensions::filters::http::cache::HazelcastHttpCacheConfig;
 class HazelcastHttpCache : public HttpCache,
                            public Logger::Loggable<Logger::Id::hazelcast_http_cache> {
 public:
-  HazelcastHttpCache(HazelcastHttpCacheConfig&& typed_config,
+  HazelcastHttpCache(
+      HazelcastHttpCacheConfig&& typed_config,
       const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& cache_config);
 
   /// Divided mode
@@ -77,7 +78,9 @@ public:
    * @param key_hash    Hash of the filter's cache key
    * @return            HazelcastHeaderPtr to cached entry if found, nullptr otherwise
    */
-  HazelcastHeaderPtr getHeader(const uint64_t key_hash) { return accessor_->getHeader(mapKey(key_hash)); }
+  HazelcastHeaderPtr getHeader(const uint64_t key_hash) {
+    return accessor_->getHeader(mapKey(key_hash));
+  }
 
   /**
    * Performs a lookup to body cache for the given key hash and order pair.

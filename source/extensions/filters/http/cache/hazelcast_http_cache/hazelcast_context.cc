@@ -124,9 +124,8 @@ void UnifiedLookupContext::getHeaders(LookupHeadersCallback&& cb) {
       // is performed here. If a different response is found with the same
       // hash (probably on hash collisions), the new response is denied to
       // be cached and the old one remains.
-      handleLookupFailure("Mismatched keys found for key hash: " +
-                              std::to_string(variant_key_hash_),
-                          cb, false);
+      handleLookupFailure(
+          "Mismatched keys found for key hash: " + std::to_string(variant_key_hash_), cb, false);
       return;
     }
     cb(lookup_request_.makeLookupResult(std::move(response_->header().headerMap()),
@@ -246,9 +245,8 @@ void DividedLookupContext::getHeaders(LookupHeadersCallback&& cb) {
     ENVOY_LOG(debug, "Found divided response: [key: {}u, version: {}, body size: {}]",
               variant_key_hash_, header_entry->version(), header_entry->bodySize());
     if (!MessageDifferencer::Equals(header_entry->variantKey(), variantKey())) {
-      handleLookupFailure("Mismatched keys found for key hash: " +
-                              std::to_string(variant_key_hash_),
-                          cb, false);
+      handleLookupFailure(
+          "Mismatched keys found for key hash: " + std::to_string(variant_key_hash_), cb, false);
       return;
     }
     this->total_body_size_ = header_entry->bodySize();

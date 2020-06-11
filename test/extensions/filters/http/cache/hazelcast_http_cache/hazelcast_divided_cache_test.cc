@@ -17,7 +17,8 @@ class HazelcastDividedCacheTest : public HazelcastHttpCacheTestBase {
 protected:
   void SetUp() override {
     HazelcastHttpCacheConfig typed_config = HazelcastTestUtil::getTestTypedConfig(false);
-    envoy::extensions::filters::http::cache::v3alpha::CacheConfig cache_config = HazelcastTestUtil::getTestCacheConfig();
+    envoy::extensions::filters::http::cache::v3alpha::CacheConfig cache_config =
+        HazelcastTestUtil::getTestCacheConfig();
     // To test the cache with a real Hazelcast instance, use remote test cache.
     // cache_ = std::make_unique<HazelcastRemoteTestCache>(std::move(typed_config), cache_config);
     cache_ = std::make_unique<HazelcastLocalTestCache>(std::move(typed_config), cache_config);
@@ -77,14 +78,14 @@ TEST_F(HazelcastDividedCacheTest, CleanBodyOnHeaderEviction) {
   EXPECT_EQ(1, cache_->getTestAccessor().headerMapSize());
   EXPECT_EQ(BodyCount, cache_->getTestAccessor().bodyMapSize());
 
-  auto keyObject = std::make_unique<int64_t>(mapKey(variant_key_hash));
-  auto valueObject = cache_->getHeader(variant_key_hash);
-  EXPECT_NE(nullptr, valueObject);
+  auto key_object = std::make_unique<int64_t>(mapKey(variant_key_hash));
+  auto value_object = cache_->getHeader(variant_key_hash);
+  EXPECT_NE(nullptr, value_object);
 
   Member m;
   MockEntryEvictedEvent<int64_t, HazelcastHeaderEntry> mock_event(m);
-  EXPECT_CALL(mock_event, getOldValueObject()).WillRepeatedly(testing::Return(valueObject.get()));
-  EXPECT_CALL(mock_event, getKeyObject()).WillRepeatedly(testing::Return(keyObject.get()));
+  EXPECT_CALL(mock_event, getOldValueObject()).WillRepeatedly(testing::Return(value_object.get()));
+  EXPECT_CALL(mock_event, getKeyObject()).WillRepeatedly(testing::Return(key_object.get()));
 
   EXPECT_EQ(BodyCount, cache_->getTestAccessor().bodyMapSize());
 

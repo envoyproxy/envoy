@@ -167,8 +167,8 @@ public:
   bool tryLock(const int64_t map_key, bool unified) override {
     checkConnection(fail_on_lock_);
     if (unified) {
-      bool locked =
-          std::find(response_locks_.begin(), response_locks_.end(), map_key) != response_locks_.end();
+      bool locked = std::find(response_locks_.begin(), response_locks_.end(), map_key) !=
+                    response_locks_.end();
       if (locked) {
         return false;
       } else {

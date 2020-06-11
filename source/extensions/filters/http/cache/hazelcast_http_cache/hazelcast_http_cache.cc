@@ -13,10 +13,13 @@ using hazelcast::client::ClientConfig;
 using hazelcast::client::exception::HazelcastClientOfflineException;
 using hazelcast::client::serialization::DataSerializableFactory;
 
-HazelcastHttpCache::HazelcastHttpCache(HazelcastHttpCacheConfig&& typed_config, const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& cache_config) :
-      unified_(typed_config.unified()),
+HazelcastHttpCache::HazelcastHttpCache(
+    HazelcastHttpCacheConfig&& typed_config,
+    const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& cache_config)
+    : unified_(typed_config.unified()),
       body_partition_size_(ConfigUtil::validPartitionSize(typed_config.body_partition_size())),
-      max_body_bytes_(ConfigUtil::validMaxBodySize(cache_config.max_body_bytes(), typed_config.unified())),
+      max_body_bytes_(
+          ConfigUtil::validMaxBodySize(cache_config.max_body_bytes(), typed_config.unified())),
       cache_config_(std::move(typed_config)) {}
 
 void HazelcastHttpCache::onMissingBody(uint64_t key_hash, int32_t version, uint64_t body_size) {
