@@ -512,7 +512,7 @@ Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
       return bufferFloodError("Flooding was detected in this HTTP/2 session, and it must be closed");
     }
     if (rc != static_cast<ssize_t>(slice.len_)) {
-      throw CodecProtocolException(fmt::format("{}", nghttp2_strerror(rc)));
+      return codecProtocolError(nghttp2_strerror(rc));
     }
 
     dispatching_ = false;
