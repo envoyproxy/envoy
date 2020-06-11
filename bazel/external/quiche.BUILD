@@ -1843,6 +1843,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quic_core_crypto_boring_utils_lib",
+        ":quic_core_types_lib",
         ":quic_platform",
         ":quic_platform_ip_address",
         ":quiche_common_platform",
@@ -3565,6 +3566,7 @@ envoy_cc_library(
         "quiche/common/platform/api/quiche_str_cat.h",
         "quiche/common/platform/api/quiche_string_piece.h",
         "quiche/common/platform/api/quiche_text_utils.h",
+        "quiche/common/platform/api/quiche_time_utils.h",
         "quiche/common/platform/api/quiche_unordered_containers.h",
     ],
     repository = "@envoy",

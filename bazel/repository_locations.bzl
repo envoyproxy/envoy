@@ -74,16 +74,16 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["build"],
     ),
     boringssl = dict(
-        sha256 = "8ae14b52b7889cf92f3b107610b12afb5011506c77f90c7b3d4a36ed7283905a",
-        strip_prefix = "boringssl-107c03cf6d364939469194396bf7a6b2572d0f9c",
+        sha256 = "07f1524766b9ed1543674b48e7fce7e3569b6e2b6c0c43ec124dedee9b60f641",
+        strip_prefix = "boringssl-a0899df79b3a63e606448c72d63a090d86bdb75b",
         # To update BoringSSL, which tracks Chromium releases:
         # 1. Open https://omahaproxy.appspot.com/ and note <current_version> of linux/stable release.
         # 2. Open https://chromium.googlesource.com/chromium/src/+/refs/tags/<current_version>/DEPS and note <boringssl_revision>.
         # 3. Find a commit in BoringSSL's "master-with-bazel" branch that merges <boringssl_revision>.
         #
-        # chromium-83.0.4103.62
-        # 2020-03-16
-        urls = ["https://github.com/google/boringssl/archive/107c03cf6d364939469194396bf7a6b2572d0f9c.tar.gz"],
+        # chromium-84.0.4147.45(beta)
+        # 2020-06-11
+        urls = ["https://github.com/google/boringssl/archive/a0899df79b3a63e606448c72d63a090d86bdb75b.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),
@@ -402,9 +402,9 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "N/A",
     ),
     com_googlesource_quiche = dict(
-        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/25da9198727ef05edeb99d9f4ce5b6acb3cb87b5.tar.gz
-        sha256 = "52bac2f91a0900730fe3bfb14ffb668f205fe0de48e42ecfee677e3743ec33ee",
-        urls = ["https://storage.googleapis.com/quiche-envoy-integration/25da9198727ef05edeb99d9f4ce5b6acb3cb87b5.tar.gz"],
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/d88a2f7a9ff5f9f6be2f50411b15b091affe04d3.tar.gz
+        sha256 = "c1c5dc165f0509097fa3917d81988e4ac5f9f3da4c2361ee435dfa7f8f428016",
+        urls = ["https://storage.googleapis.com/quiche-envoy-integration/d88a2f7a9ff5f9f6be2f50411b15b091affe04d3.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),

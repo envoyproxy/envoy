@@ -242,6 +242,7 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "quiche_common_platform_impl_lib",
+    srcs = ["quiche_time_utils_impl.cc"],
     hdrs = [
         "quiche_arraysize_impl.h",
         "quiche_logging_impl.h",
@@ -251,6 +252,7 @@ envoy_cc_library(
         "quiche_str_cat_impl.h",
         "quiche_string_piece_impl.h",
         "quiche_text_utils_impl.h",
+        "quiche_time_utils_impl.h",
         "quiche_unordered_containers_impl.h",
     ],
     external_deps = [
