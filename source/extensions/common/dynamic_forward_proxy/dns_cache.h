@@ -44,6 +44,14 @@ public:
 
 using DnsHostInfoSharedPtr = std::shared_ptr<DnsHostInfo>;
 
+#define ALL_DNS_CACHE_CIRCUIT_BREAKERS_STATS(OPEN_GAUGE, REMAINING_GAUGE)                          \
+  OPEN_GAUGE(rq_pending_open, Accumulate)                                                          \
+  REMAINING_GAUGE(rq_pending_remaining, Accumulate)
+
+struct DnsCacheCircuitBreakersStats {
+  ALL_DNS_CACHE_CIRCUIT_BREAKERS_STATS(GENERATE_GAUGE_STRUCT, GENERATE_GAUGE_STRUCT)
+};
+
 /**
  * A resource manager of DNS Cache.
  */
@@ -55,9 +63,37 @@ public:
    * Returns the resource limit of pending requests to DNS.
    */
   virtual ResourceLimit& pendingRequests() PURE;
+
+  /**
+   * Returns the reference of stats for dns cache circuit breakers.
+   */
+  virtual DnsCacheCircuitBreakersStats& stats() PURE;
 };
 
 using DnsCacheResourceManagerPtr = std::unique_ptr<DnsCacheResourceManager>;
+using DnsCacheResourceManagerOptRef =
+    absl::optional<std::reference_wrapper<DnsCacheResourceManager>>;
+
+/**
+ * All DNS cache stats. @see stats_macros.h
+ */
+#define ALL_DNS_CACHE_STATS(COUNTER, GAUGE)                                                        \
+  COUNTER(dns_query_attempt)                                                                       \
+  COUNTER(dns_query_failure)                                                                       \
+  COUNTER(dns_query_success)                                                                       \
+  COUNTER(host_added)                                                                              \
+  COUNTER(host_address_changed)                                                                    \
+  COUNTER(host_overflow)                                                                           \
+  COUNTER(host_removed)                                                                            \
+  COUNTER(dns_rq_pending_overflow)                                                                 \
+  GAUGE(num_hosts, NeverImport)
+
+/**
+ * Struct definition for all DNS cache stats. @see stats_macros.h
+ */
+struct DnsCacheStats {
+  ALL_DNS_CACHE_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
+};
 
 /**
  * A cache of DNS hosts. Hosts will re-resolve their addresses or be automatically purged
@@ -166,9 +202,14 @@ public:
   virtual absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> hosts() PURE;
 
   /**
-   * @return A pointer to resource manager for dns cache.
+   * @return A reference of DnsCacheStats.
    */
-  virtual DnsCacheResourceManager* dnsCacheResourceManager() PURE;
+  virtual DnsCacheStats& stats() PURE;
+
+  /**
+   * @return A optional reference to resource manager for dns cache.
+   */
+  virtual DnsCacheResourceManagerOptRef dnsCacheResourceManager() PURE;
 };
 
 using DnsCacheSharedPtr = std::shared_ptr<DnsCache>;

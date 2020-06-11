@@ -201,6 +201,7 @@ TEST_P(ProxyFilterCircuitBreakerIntegrationTest, Basic) {
   auto response = codec_client_->makeRequestWithBody(request_headers, 1024);
   response->waitForEndStream();
   EXPECT_EQ(1, test_server_->gauge("dns_cache.foo.circuit_breakers.rq_pending_open"));
+  EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_rq_pending_overflow")->value());
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().Status()->value().getStringView());

@@ -12,6 +12,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/basic_resource_impl.h"
+#include "common/upstream/resource_manager_impl.h"
 
 #include "extensions/common/dynamic_forward_proxy/dns_cache.h"
 
@@ -20,55 +21,21 @@ namespace Extensions {
 namespace Common {
 namespace DynamicForwardProxy {
 
-#define ALL_DNS_CACHE_CIRCUIT_BREAKERS_STATS(OPEN_GAUGE, REMAINING_GAUGE)                          \
-  OPEN_GAUGE(rq_pending_open, Accumulate)                                                          \
-  REMAINING_GAUGE(rq_pending_remaining, Accumulate)
-
-struct DnsCacheCircuitBreakersStats {
-  ALL_DNS_CACHE_CIRCUIT_BREAKERS_STATS(GENERATE_GAUGE_STRUCT, GENERATE_GAUGE_STRUCT)
-};
-
-class DnsCacheResourceImpl : public BasicResourceLimitImpl {
-public:
-  using Base = BasicResourceLimitImpl;
-  explicit DnsCacheResourceImpl(uint64_t max, Runtime::Loader& runtime,
-                                const std::string& runtime_key, Stats::Gauge& open,
-                                Stats::Gauge& remaining)
-      : Envoy::BasicResourceLimitImpl(max, runtime, runtime_key), open_(open),
-        remaining_(remaining) {
-    remaining_.set(max);
-  }
-
-  void inc() override {
-    Base::inc();
-    remaining_.set(Base::canCreate() ? Base::max() - current_ : 0);
-    open_.set(Base::canCreate() ? 0 : 1);
-  }
-
-  void decBy(uint64_t amount) override {
-    Base::decBy(amount);
-    remaining_.set(Base::canCreate() ? Base::max() - current_ : 0);
-    open_.set(Base::canCreate() ? 0 : 1);
-  }
-
-private:
-  Stats::Gauge& open_;
-  Stats::Gauge& remaining_;
-};
-
 class DnsCacheResourceManagerImpl : public DnsCacheResourceManager {
 public:
   DnsCacheResourceManagerImpl(
-      DnsCacheCircuitBreakersStats&& cb_stats, Runtime::Loader& loader,
-      const std::string& config_name,
+      Stats::Scope& scope, Runtime::Loader& loader, const std::string& config_name,
       const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheCircuitBreakers&
           cb_config);
 
+  static DnsCacheCircuitBreakersStats generateDnsCacheCircuitBreakersStats(Stats::Scope& scope);
   // Envoy::Upstream::ResourceManager
   ResourceLimit& pendingRequests() override { return pending_requests_; }
+  DnsCacheCircuitBreakersStats& stats() override { return cb_stats_; }
 
 private:
-  DnsCacheResourceImpl pending_requests_;
+  DnsCacheCircuitBreakersStats cb_stats_;
+  Upstream::ManagedResourceImpl pending_requests_;
 };
 
 } // namespace DynamicForwardProxy

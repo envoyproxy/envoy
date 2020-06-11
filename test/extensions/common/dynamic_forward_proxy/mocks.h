@@ -4,9 +4,11 @@
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 #include "envoy/upstream/resource_manager.h"
 
-#include "extensions/common/dynamic_forward_proxy/dns_cache.h"
+#include "extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
 
 #include "gmock/gmock.h"
+
+using testing::NiceMock;
 
 namespace Envoy {
 namespace Extensions {
@@ -39,7 +41,8 @@ public:
               (UpdateCallbacks & callbacks));
 
   MOCK_METHOD((absl::flat_hash_map<std::string, DnsHostInfoSharedPtr>), hosts, ());
-  MOCK_METHOD(DnsCacheResourceManager*, dnsCacheResourceManager, ());
+  MOCK_METHOD(DnsCacheStats&, stats, ());
+  MOCK_METHOD(DnsCacheResourceManagerOptRef, dnsCacheResourceManager, ());
 };
 
 class MockLoadDnsCacheEntryHandle : public DnsCache::LoadDnsCacheEntryHandle {
@@ -58,7 +61,7 @@ public:
   MOCK_METHOD(DnsCacheSharedPtr, getCache,
               (const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config));
 
-  std::shared_ptr<MockDnsCache> dns_cache_{new MockDnsCache()};
+  std::shared_ptr<NiceMock<MockDnsCache>> dns_cache_{new NiceMock<MockDnsCache>()};
 };
 
 class MockDnsHostInfo : public DnsHostInfo {

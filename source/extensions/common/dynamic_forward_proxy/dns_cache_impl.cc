@@ -22,7 +22,7 @@ DnsCacheImpl::DnsCacheImpl(
       dns_lookup_family_(Upstream::getDnsLookupFamilyFromEnum(config.dns_lookup_family())),
       resolver_(main_thread_dispatcher.createDnsResolver({}, false)), tls_slot_(tls.allocateSlot()),
       scope_(root_scope.createScope(fmt::format("dns_cache.{}.", config.name()))),
-      stats_{ALL_DNS_CACHE_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_))},
+      stats_(generateDnsCacheStats(*scope_)),
       refresh_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_refresh_rate, 60000)),
       failure_backoff_strategy_(
           Config::Utility::prepareDnsRefreshStrategy<
@@ -32,8 +32,7 @@ DnsCacheImpl::DnsCacheImpl(
       max_hosts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_hosts, 1024)) {
   if (config.has_dns_cache_circuit_breaker()) {
     resource_manager_ = std::make_unique<DnsCacheResourceManagerImpl>(
-        DnsCacheImpl::generateDnsCacheCircuitBreakersStats(*scope_), loader, config.name(),
-        std::move(config.dns_cache_circuit_breaker()));
+        *scope_, loader, config.name(), std::move(config.dns_cache_circuit_breaker()));
   }
   tls_slot_->set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalHostInfo>(); });
   updateTlsHostsMap();
@@ -51,11 +50,8 @@ DnsCacheImpl::~DnsCacheImpl() {
   }
 }
 
-DnsCacheCircuitBreakersStats
-DnsCacheImpl::generateDnsCacheCircuitBreakersStats(Stats::Scope& scope) {
-  std::string stat_prefix = "circuit_breakers";
-  return {ALL_DNS_CACHE_CIRCUIT_BREAKERS_STATS(POOL_GAUGE_PREFIX(scope, stat_prefix),
-                                               POOL_GAUGE_PREFIX(scope, stat_prefix))};
+DnsCacheStats DnsCacheImpl::generateDnsCacheStats(Stats::Scope& scope) {
+  return {ALL_DNS_CACHE_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope))};
 }
 
 DnsCacheImpl::LoadDnsCacheEntryResult
@@ -93,6 +89,13 @@ absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> DnsCacheImpl::hosts() {
     }
   }
   return ret;
+}
+
+DnsCacheResourceManagerOptRef DnsCacheImpl::dnsCacheResourceManager() {
+  if (resource_manager_) {
+    return std::ref(*resource_manager_);
+  }
+  return absl::nullopt;
 }
 
 DnsCacheImpl::AddUpdateCallbacksHandlePtr
