@@ -7,6 +7,7 @@
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
+#include "common/common/utility.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/event/file_event_impl.h"
 #include "common/network/address_impl.h"
@@ -76,7 +77,7 @@ ListenerImpl::ListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr so
 void ListenerImpl::errorCallback(evconnlistener*, void*) {
   // We should never get an error callback. This can happen if we run out of FDs or memory. In those
   // cases just crash.
-  PANIC(fmt::format("listener accept failure: {}", strerror(errno)));
+  PANIC(fmt::format("listener accept failure: {}", errorDetails(errno)));
 }
 
 void ListenerImpl::enable() {

@@ -250,14 +250,14 @@ void ConnectionImpl::noDelay(bool enable) {
   Api::SysCallIntResult result =
       socket_->setSocketOption(IPPROTO_TCP, TCP_NODELAY, &new_value, sizeof(new_value));
 #if defined(__APPLE__)
-  if (SOCKET_FAILURE(result.rc_) && result.errno_ == EINVAL) {
+  if (SOCKET_FAILURE(result.rc_) && result.errno_ == SOCKET_ERROR_INVAL) {
     // Sometimes occurs when the connection is not yet fully formed. Empirically, TCP_NODELAY is
     // enabled despite this result.
     return;
   }
 #elif defined(WIN32)
   if (SOCKET_FAILURE(result.rc_) &&
-      (result.errno_ == WSAEWOULDBLOCK || result.errno_ == WSAEINVAL)) {
+      (result.errno_ == SOCKET_ERROR_AGAIN || result.errno_ == SOCKET_ERROR_INVAL)) {
     // Sometimes occurs when the connection is not yet fully formed. Empirically, TCP_NODELAY is
     // enabled despite this result.
     return;
@@ -736,7 +736,7 @@ ClientConnectionImpl::ClientConnectionImpl(
       if (result.rc_ < 0) {
         // TODO(lizan): consider add this error into transportFailureReason.
         ENVOY_LOG_MISC(debug, "Bind failure. Failed to bind to {}: {}", source->get()->asString(),
-                       strerror(result.errno_));
+                       errorDetails(result.errno_));
         bind_error_ = true;
         // Set a special error state to ensure asynchronous close to give the owner of the
         // ConnectionImpl a chance to add callbacks and detect the "disconnect".
@@ -757,7 +757,14 @@ void ClientConnectionImpl::connect() {
     ASSERT(connecting_);
   } else {
     ASSERT(result.rc_ == -1);
-    if (result.errno_ == EINPROGRESS) {
+#ifdef WIN32
+    // winsock2 connect returns EWOULDBLOCK if the socket is non-blocking and the connection
+    // cannot be completed immediately. We do not check for EINPROGRESS as that error is for
+    // blocking operations.
+    if (result.errno_ == SOCKET_ERROR_AGAIN) {
+#else
+    if (result.errno_ == SOCKET_ERROR_IN_PROGRESS) {
+#endif
       ASSERT(connecting_);
       ENVOY_CONN_LOG(debug, "connection in progress", *this);
     } else {

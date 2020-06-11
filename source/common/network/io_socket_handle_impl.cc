@@ -272,7 +272,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
                                                      RecvMsgOutput& output) {
   ASSERT(output.msg_.size() == slices.size());
   if (slices.empty()) {
-    return sysCallResultToIoCallResult(Api::SysCallIntResult{0, EAGAIN});
+    return sysCallResultToIoCallResult(Api::SysCallIntResult{0, SOCKET_ERROR_AGAIN});
   }
   const uint32_t num_packets_per_mmsg_call = slices.size();
   absl::FixedArray<mmsghdr> mmsg_hdr(num_packets_per_mmsg_call);

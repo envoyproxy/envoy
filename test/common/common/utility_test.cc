@@ -18,6 +18,8 @@
 #include "gtest/gtest.h"
 
 using testing::ContainerEq;
+using testing::HasSubstr;
+using testing::Not;
 
 namespace Envoy {
 
@@ -874,5 +876,17 @@ TEST(InlineStorageTest, InlineString) {
   EXPECT_EQ("Hello, world!", hello->toStringView());
   EXPECT_EQ("Hello, world!", hello->toString());
 }
+
+#ifdef WIN32
+TEST(ErrorDetailsTest, WindowsStripsNewline) {
+  // Test a winsock2 error
+  EXPECT_NE(errorDetails(SOCKET_ERROR_AGAIN), "");
+  EXPECT_THAT(errorDetails(SOCKET_ERROR_AGAIN), Not(HasSubstr("\r\n")));
+
+  // Test a regular Windows error
+  EXPECT_NE(errorDetails(ERROR_FILE_NOT_FOUND), "");
+  EXPECT_THAT(errorDetails(ERROR_FILE_NOT_FOUND), Not(HasSubstr("\r\n")));
+}
+#endif
 
 } // namespace Envoy

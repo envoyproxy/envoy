@@ -156,6 +156,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/api:io_error_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:utility_lib",
     ],
 )
 
@@ -185,6 +186,7 @@ envoy_cc_library(
         ":address_lib",
         "//include/envoy/network:socket_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:utility_lib",
         "//source/common/singleton:threadsafe_singleton",
     ],
 )
@@ -275,6 +277,7 @@ envoy_cc_library(
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

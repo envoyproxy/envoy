@@ -62,7 +62,7 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
 
   // Bind the socket to the desired address and port.
   const Api::SysCallIntResult result = sock.bind(addr_port);
-  ASSERT_EQ(result.rc_, 0) << addr_port->asString() << "\nerror: " << strerror(result.errno_)
+  ASSERT_EQ(result.rc_, 0) << addr_port->asString() << "\nerror: " << errorDetails(result.errno_)
                            << "\nerrno: " << result.errno_;
 
   // Do a bare listen syscall. Not bothering to accept connections as that would
@@ -83,7 +83,7 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
 
     // Connect to the server.
     const Api::SysCallIntResult result = client_sock.connect(addr_port);
-    ASSERT_EQ(result.rc_, 0) << addr_port->asString() << "\nerror: " << strerror(result.errno_)
+    ASSERT_EQ(result.rc_, 0) << addr_port->asString() << "\nerror: " << errorDetails(result.errno_)
                              << "\nerrno: " << result.errno_;
   };
 
@@ -331,7 +331,7 @@ TEST(PipeInstanceTest, BasicPermission) {
   ASSERT_GE(sock.ioHandle().fd(), 0) << pipe.asString();
 
   Api::SysCallIntResult result = sock.bind(address);
-  ASSERT_EQ(result.rc_, 0) << pipe.asString() << "\nerror: " << strerror(result.errno_)
+  ASSERT_EQ(result.rc_, 0) << pipe.asString() << "\nerror: " << errorDetails(result.errno_)
                            << "\terrno: " << result.errno_;
 
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
@@ -341,7 +341,7 @@ TEST(PipeInstanceTest, BasicPermission) {
   // Get file permissions bits
   ASSERT_EQ(stat_buf.st_mode & 07777, mode)
       << path << std::oct << "\t" << (stat_buf.st_mode & 07777) << std::dec << "\t"
-      << (stat_buf.st_mode) << strerror(result.errno_);
+      << (stat_buf.st_mode) << errorDetails(result.errno_);
 }
 #endif
 
@@ -431,7 +431,7 @@ TEST(PipeInstanceTest, UnlinksExistingFile) {
 
     const Api::SysCallIntResult result = sock.bind(address);
 
-    ASSERT_EQ(result.rc_, 0) << pipe.asString() << "\nerror: " << strerror(result.errno_)
+    ASSERT_EQ(result.rc_, 0) << pipe.asString() << "\nerror: " << errorDetails(result.errno_)
                              << "\nerrno: " << result.errno_;
   };
 

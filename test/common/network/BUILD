@@ -315,6 +315,7 @@ envoy_cc_test(
     name = "io_socket_handle_impl_test",
     srcs = ["io_socket_handle_impl_test.cc"],
     deps = [
+        "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
     ],
 )

@@ -38,6 +38,21 @@ using UnsignedMilliseconds = std::chrono::duration<uint64_t, std::milli>;
 
 } // namespace
 
+const std::string errorDetails(int error_code) {
+#ifdef WIN32
+  std::string buffer(128, '\0');
+  buffer.resize(FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
+                              error_code, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), &buffer[0],
+                              buffer.size(), NULL));
+  if (buffer.size() > 1 && buffer[buffer.size() - 2] == '\r' && buffer[buffer.size() - 1] == '\n') {
+    buffer.resize(buffer.size() - 2);
+  }
+  return buffer;
+#else
+  return strerror(error_code);
+#endif
+}
+
 std::string DateFormatter::fromTime(const SystemTime& time) const {
   struct CachedTime {
     // The string length of a number of seconds since the Epoch. E.g. for "1528270093", the length

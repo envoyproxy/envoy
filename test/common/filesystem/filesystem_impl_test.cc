@@ -117,7 +117,7 @@ TEST_F(FileSystemImplTest, CanonicalPathSuccess) { EXPECT_EQ("/", canonicalPath(
 TEST_F(FileSystemImplTest, CanonicalPathFail) {
   const Api::SysCallStringResult result = canonicalPath("/_some_non_existent_file");
   EXPECT_TRUE(result.rc_.empty());
-  EXPECT_STREQ("No such file or directory", ::strerror(result.errno_));
+  EXPECT_STREQ("No such file or directory", errorDetails(result.errno_));
 }
 #endif
 

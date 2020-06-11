@@ -876,7 +876,8 @@ void bindAndListenTcpSocket(const Network::Address::InstanceConstSharedPtr& addr
   // with some other socket already listening on it, see #7636.
   if (SOCKET_FAILURE(os_sys_calls.listen(socket->ioHandle().fd(), 1).rc_)) {
     // Mimic bind exception for the test simplicity.
-    throw Network::SocketBindException(fmt::format("cannot listen: {}", strerror(errno)), errno);
+    throw Network::SocketBindException(fmt::format("cannot listen: {}", errorDetails(errno)),
+                                       errno);
   }
 }
 } // namespace
@@ -891,7 +892,7 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithSocketOptions) {
   // First attempt to bind and listen socket should fail due to the lack of SO_REUSEPORT socket
   // options.
   EXPECT_THAT_THROWS_MESSAGE(bindAndListenTcpSocket(address, nullptr), EnvoyException,
-                             HasSubstr(strerror(EADDRINUSE)));
+                             HasSubstr(errorDetails(SOCKET_ERROR_ADDR_IN_USE)));
 
   // Second attempt should succeed as kernel allows multiple sockets to listen the same address iff
   // both of them use SO_REUSEPORT socket option.

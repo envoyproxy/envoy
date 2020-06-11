@@ -10,6 +10,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
+#include "common/common/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
@@ -22,9 +23,9 @@ Api::SysCallIntResult ListenSocketImpl::bind(Network::Address::InstanceConstShar
   const Api::SysCallIntResult result = SocketImpl::bind(local_address_);
   if (SOCKET_FAILURE(result.rc_)) {
     close();
-    throw SocketBindException(
-        fmt::format("cannot bind '{}': {}", local_address_->asString(), strerror(result.errno_)),
-        result.errno_);
+    throw SocketBindException(fmt::format("cannot bind '{}': {}", local_address_->asString(),
+                                          errorDetails(result.errno_)),
+                              result.errno_);
   }
   return {0, 0};
 }
