@@ -311,6 +311,7 @@ envoy_cc_library(
         "//source/common/tracing:http_tracer_lib",
         "//source/common/upstream:load_balancer_lib",
         "//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",
+        "//source/extensions/upstreams/http:well_known_names",
         "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",
     ],
 )
