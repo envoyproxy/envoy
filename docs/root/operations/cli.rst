@@ -262,6 +262,14 @@ following are the command line options that Envoy supports.
   desirable to have a very long drain time. In service to service scenarios, it might be possible
   to make the drain and shutdown time much shorter (e.g., 60s/90s).
 
+.. option:: --drain-strategy <string>
+
+  *(optional)* Determine behaviour of Envoy during the hot restart drain sequence. During the drain sequence, the drain manager encourages draining through terminating connections on request completion, sending "Connection: CLOSE" on HTTP1, and sending GOAWAY on HTTP2.
+
+  * ``gradual``: *(default)* The percentage of requests encouraged to drain increases to 100% as the drain time elapses.
+
+  * ``immediate``: All requests are encouraged to drain as soon as the drain sequence begins.
+
 .. option:: --parent-shutdown-time-s <integer>
 
   *(optional)* The time in seconds that Envoy will wait before shutting down the parent process

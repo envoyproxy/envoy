@@ -10,7 +10,7 @@
 namespace Envoy {
 namespace Network {
 
-IoHandlePtr SocketInterfaceImpl::socket(Address::SocketType socket_type, Address::Type addr_type,
+IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type addr_type,
                                         Address::IpVersion version) {
 #if defined(__APPLE__) || defined(WIN32)
   int flags = 0;
@@ -18,7 +18,7 @@ IoHandlePtr SocketInterfaceImpl::socket(Address::SocketType socket_type, Address
   int flags = SOCK_NONBLOCK;
 #endif
 
-  if (socket_type == Address::SocketType::Stream) {
+  if (socket_type == Socket::Type::Stream) {
     flags |= SOCK_STREAM;
   } else {
     flags |= SOCK_DGRAM;
@@ -51,7 +51,7 @@ IoHandlePtr SocketInterfaceImpl::socket(Address::SocketType socket_type, Address
   return io_handle;
 }
 
-IoHandlePtr SocketInterfaceImpl::socket(Address::SocketType socket_type,
+IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type,
                                         const Address::InstanceConstSharedPtr addr) {
   Address::IpVersion ip_version = addr->ip() ? addr->ip()->version() : Address::IpVersion::v4;
   IoHandlePtr io_handle = SocketInterfaceImpl::socket(socket_type, addr->type(), ip_version);

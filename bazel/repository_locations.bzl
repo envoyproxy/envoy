@@ -368,10 +368,10 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["build"],
     ),
     rules_foreign_cc = dict(
-        sha256 = "3184c244b32e65637a74213fc448964b687390eeeca42a36286f874c046bba15",
-        strip_prefix = "rules_foreign_cc-7bc4be735b0560289f6b86ab6136ee25d20b65b7",
-        # 2019-09-26
-        urls = ["https://github.com/bazelbuild/rules_foreign_cc/archive/7bc4be735b0560289f6b86ab6136ee25d20b65b7.tar.gz"],
+        sha256 = "7ca49ac5b0bc8f5a2c9a7e87b7f86aca604bda197259c9b96f8b7f0a4f38b57b",
+        strip_prefix = "rules_foreign_cc-f54b7ae56dcf1b81bcafed3a08d58fc08ac095a7",
+        # 2020-06-09
+        urls = ["https://github.com/bazelbuild/rules_foreign_cc/archive/f54b7ae56dcf1b81bcafed3a08d58fc08ac095a7.tar.gz"],
         use_category = ["build"],
     ),
     rules_python = dict(
@@ -411,9 +411,9 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "N/A",
     ),
     com_googlesource_quiche = dict(
-        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/41c9fdead26b31deefae3c325a2cf1a873688ba3.tar.gz
-        sha256 = "75af53154402e1654cfd32d8aaeed5fab4dbb79d3cab8c9866019d5369c1889e",
-        urls = ["https://storage.googleapis.com/quiche-envoy-integration/41c9fdead26b31deefae3c325a2cf1a873688ba3.tar.gz"],
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/25da9198727ef05edeb99d9f4ce5b6acb3cb87b5.tar.gz
+        sha256 = "52bac2f91a0900730fe3bfb14ffb668f205fe0de48e42ecfee677e3743ec33ee",
+        urls = ["https://storage.googleapis.com/quiche-envoy-integration/25da9198727ef05edeb99d9f4ce5b6acb3cb87b5.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),
