@@ -120,3 +120,8 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/compression/common @junr03 @rojkov
 /*/extensions/compression/gzip @junr03 @rojkov
 /*/extensions/filters/http/decompressor @rojkov @dio
+# Core upstream code
+extensions/upstreams/http @alyssawilk @snowp @mattklein123
+extensions/upstreams/http/http @alyssawilk @snowp @mattklein123
+extensions/upstreams/http/tcp @alyssawilk @mattklein123
+extensions/upstreams/http/default @alyssawilk @snowp @mattklein123
