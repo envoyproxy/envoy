@@ -105,7 +105,7 @@ void ProxyFilter::onAuth(PendingRequest& request, const std::string& username,
   if (config_->downstream_auth_username_.empty() && config_->downstream_auth_password_.empty()) {
     response->type(Common::Redis::RespType::Error);
     response->asString() = "ERR Client sent AUTH, but no username-password pair is set";
-  } else if ("" == config_->downstream_auth_username_ && username == "default" &&
+  } else if (config_->downstream_auth_username_.empty() && username == "default" &&
              password == config_->downstream_auth_password_) {
     // empty username and "default" are synonymous in Redis 6 ACLs
     response->type(Common::Redis::RespType::SimpleString);
