@@ -46,6 +46,10 @@ configure_make(
         # https://github.com/envoyproxy/envoy/issues/6084
         # TODO(htuch): Remove when #6084 is fixed
         "//bazel:asan_build": {"ENVOY_CONFIG_ASAN": "1"},
+        "//bazel/toolchains:gcc_aarch64_cross_cfg": {
+            "CC": "gcc",
+            "CROSS": "aarch64-linux-gnu-",
+        },
         "//conditions:default": {},
     }),
     lib_source = "@com_github_luajit_luajit//:all",
@@ -66,6 +70,10 @@ configure_make(
         # https://github.com/envoyproxy/envoy/issues/6084
         # TODO(htuch): Remove when #6084 is fixed
         "//bazel:asan_build": {"ENVOY_CONFIG_ASAN": "1"},
+        "//bazel/toolchains:gcc_aarch64_cross_cfg": {
+            "CC": "gcc",
+            "CROSS": "aarch64-linux-gnu-",
+        },
         "//conditions:default": {},
     }),
     lib_source = "@com_github_moonjit_moonjit//:all",
