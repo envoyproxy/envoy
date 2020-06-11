@@ -20,7 +20,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::AnyNumber;
 using testing::DoAll;
 using testing::InSequence;
 using testing::Invoke;
