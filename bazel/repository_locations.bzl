@@ -132,10 +132,10 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "N/A",
     ),
     com_github_envoyproxy_sqlparser = dict(
-        sha256 = "b2d3882698cf85b64c87121e208ce0b24d5fe2a00a5d058cf4571f1b25b45403",
-        strip_prefix = "sql-parser-b14d010afd4313f2372a1cc96aa2327e674cc798",
-        # 2020-01-10
-        urls = ["https://github.com/envoyproxy/sql-parser/archive/b14d010afd4313f2372a1cc96aa2327e674cc798.tar.gz"],
+        sha256 = "96c10c8e950a141a32034f19b19cdeb1da48fe859cf96ae5e19f894f36c62c71",
+        strip_prefix = "sql-parser-3b40ba2d106587bdf053a292f7e3bb17e818a57f",
+        # 2020-06-10
+        urls = ["https://github.com/envoyproxy/sql-parser/archive/3b40ba2d106587bdf053a292f7e3bb17e818a57f.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),
