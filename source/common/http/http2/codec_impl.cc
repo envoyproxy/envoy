@@ -638,7 +638,7 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
             // It would be cleaner to reset the stream rather than reset the/ entire connection but
             // it's also slightly more dangerous so currently we err on the side of safety.
             stats_.too_many_header_frames_.inc();
-            throw CodecProtocolException("Unexpected 'trailers' with no end stream.");
+            return codecProtocolError("Unexpected 'trailers' with no end stream.");
           } else {
             stream->decodeTrailers();
           }
