@@ -217,22 +217,23 @@ and false.
 
 # Adding new extensions
 
-For developers adding a new extension, one can largely model off of existing extensions.
+For developers adding a new extension, one can take an existing extension as the starting point.
 
 Extension configuration should be located in a directory structure like
 `api/envoy/extensions/area/plugin/`, for example `api/envoy/extensions/tracers/zipkin/`
 
 The code for the extension should be located under the equivalent
-`source/extensions/area/plugin`, and include an envoy_cc_extension with the
+`source/extensions/area/plugin`, and include an *envoy_cc_extension* with the
 configuration and tagged with the appropriate security posture, and an
-envoy_cc_library with the code.
+*envoy_cc_library* with the code.  More details on how to add a new extension
+API can be found [here](api/STYLE.md):
 
 Other changes will likely include
 
-  * Editing source/extensions/extensions_build_config.bzl to include the new extensions
-  * Editing docs/root/api-v3/config/config.rst to add area/area
-  * Adding docs/root/api-v3/config/area/area.rst to add a table of contents for the API docs
-  * Adding source/extensions/area/well_known_names.h for registered plugins
+  * Editing [source/extensions/extensions_build_config.bzl](source/extensions/extensions_build_config.bzl) to include the new extensions
+  * Editing [docs/root/api-v3/config/config.rst](docs/root/api-v3/config/config.rst) to add area/area
+  * Adding [docs/root/api-v3/config/area/area.rst](docs/root/api-v3/config/area/area.rst) to add a table of contents for the API docs
+  * Adding [source/extensions/area/well_known_names.h](source/extensions/area/well_known_names.h) for registered plugins
 
 # DCO: Sign your work
 
