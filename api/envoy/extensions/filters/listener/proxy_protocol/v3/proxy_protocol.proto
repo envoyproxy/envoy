@@ -4,6 +4,7 @@ package envoy.extensions.filters.listener.proxy_protocol.v3;
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.listener.proxy_protocol.v3";
 option java_outer_classname = "ProxyProtocolProto";
@@ -18,7 +19,56 @@ message ProxyProtocol {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.listener.proxy_protocol.v2.ProxyProtocol";
 
-  // Types of TLV extensions that will be extracted from Proxy Protocol (V2) Header and
-  // saved to dynamic metadata.
-  repeated uint32 tlv_types = 1;
+  enum ValueType { STRING = 0; }
+
+  // ValueEncode defines the encoding algorithm.
+  enum ValueEncode {
+    // The value is not encoded.
+    NONE = 0;
+  }
+
+  // [#next-free-field: 6]
+  message KeyValuePair {
+    // The namespace — if this is empty, the filter's namespace will be used.
+    string metadata_namespace = 1;
+
+    // The key to use within the namespace.
+    string key = 2 [(validate.rules).string = {min_bytes: 1}];
+
+    // The value to pair with the given key.
+    //
+    // When used for a `on_header_present` case, if value is non-empty it'll be used
+    // instead of the header value. If both are empty, no metadata is added.
+    //
+    // When used for a `on_header_missing` case, a non-empty value must be provided
+    // otherwise no metadata is added.
+    //string value = 3;
+
+    // The value's type — defaults to string.
+    ValueType type = 4;
+
+    // How is the value encoded, default is NONE (not encoded).
+    // The value will be decoded accordingly before storing to metadata.
+    ValueEncode encode = 5;
+  }
+
+  // A Rule defines what metadata to apply when a header is present or missing.
+  message Rule {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.config.filter.http.header_to_metadata.v2.Config.Rule";
+
+    // The type that triggers the rule - required
+    // TLV type is defined as uint8_t in proxy protocol. (see
+    // https://www.haproxy.org/download/2.1/doc/proxy-protocol.txt for details)
+    uint32 tlv_type = 1 [(validate.rules).uint32 = {lt: 256}];
+
+    // If the header is present, apply this metadata KeyValuePair.
+    //
+    // If the value in the KeyValuePair is non-empty, it'll be used instead
+    // of the header value.
+    KeyValuePair on_header_present = 2;
+  }
+
+  // The list of rules to apply to requests.
+  repeated Rule request_rules = 1;
 }

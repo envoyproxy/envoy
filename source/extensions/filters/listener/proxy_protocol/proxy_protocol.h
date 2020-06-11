@@ -1,6 +1,7 @@
 #pragma once
 
-#include <set>
+#include <map>
+#include <memory>
 
 #include "envoy/event/file_event.h"
 #include "envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.pb.h"
@@ -16,6 +17,9 @@ namespace Envoy {
 namespace Extensions {
 namespace ListenerFilters {
 namespace ProxyProtocol {
+
+using KeyValuePair =
+    envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::KeyValuePair;
 
 /**
  * All stats for the proxy protocol. @see stats_macros.h
@@ -44,9 +48,10 @@ public:
   ProxyProtocolStats stats_;
 
   /**
-   * Return true if the type of TLV needs to be parsed and saved to dynamic metadata
+   * Return null if the type of TLV is not needed otherwise a shared pointer to the KeyValuePair for
+   * emitting to dynamic metadata
    */
-  bool isTlvTypeNeeded(uint8_t type) const;
+  std::shared_ptr<const KeyValuePair> isTlvTypeNeeded(uint8_t type) const;
 
   /**
    * Number of TLV types that need to be parsed and saved to dynamic metadata
@@ -54,7 +59,7 @@ public:
   size_t numberOfNeededTlvTypes() const;
 
 private:
-  std::set<uint8_t> tlv_types_;
+  std::map<uint8_t, std::shared_ptr<KeyValuePair>> tlv_types_;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;

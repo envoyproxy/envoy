@@ -32,20 +32,24 @@ Config::Config(
     Stats::Scope& scope,
     const envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol& proto_config)
     : stats_{ALL_PROXY_PROTOCOL_STATS(POOL_COUNTER(scope))} {
-  for (const auto& tlv_type : proto_config.tlv_types()) {
-    if (tlv_type > 0xFF) {
+  for (const auto& rule : proto_config.request_rules()) {
+    if (rule.tlv_type() > 0xFF) {
       // the TLV type in Proxy Protocol V2 is defined as uint8_t, it should not be bigger than 0xFF.
       ENVOY_LOG(
           warn,
           "proxy_protocol: TLV type should be between 0~255. is out of the range and discarded.");
       continue;
     }
-    tlv_types_.insert(0xFF & tlv_type);
+    tlv_types_[0xFF & rule.tlv_type()] = std::make_shared<KeyValuePair>(rule.on_header_present());
   }
 }
 
-bool Config::isTlvTypeNeeded(uint8_t type) const {
-  return tlv_types_.end() != tlv_types_.find(type);
+std::shared_ptr<const KeyValuePair> Config::isTlvTypeNeeded(uint8_t type) const {
+  if (tlv_types_.end() != tlv_types_.find(type)) {
+    return tlv_types_.at(type);
+  }
+
+  return nullptr;
 }
 
 size_t Config::numberOfNeededTlvTypes() const { return tlv_types_.size(); }
@@ -295,7 +299,6 @@ bool Filter::parseExtensions(os_fd_t fd, uint8_t* buf, size_t buf_size, size_t* 
  *        See https://www.haproxy.org/download/2.1/doc/proxy-protocol.txt for details
  */
 void Filter::parseTlvs(const std::vector<uint8_t>& tlvs) {
-  std::string filter_name = ListenerFilterNames::get().ProxyProtocol;
   size_t size = tlvs.size();
   uint8_t tlv_type;
   uint8_t tlv_length_upper;
@@ -330,15 +333,21 @@ void Filter::parseTlvs(const std::vector<uint8_t>& tlvs) {
     }
 
     // only save to dynamic metadata if this type of TLV is needed
-    if (config_->isTlvTypeNeeded(tlv_type)) {
+    std::string filter_name = ListenerFilterNames::get().ProxyProtocol;
+    auto key_value_pair = config_->isTlvTypeNeeded(tlv_type);
+    if (nullptr != key_value_pair) {
       std::string tlv_value(reinterpret_cast<char const*>(tlvs.data() + idx), tlv_value_length);
       auto metadata_value = ProtobufWkt::Value();
       metadata_value.set_string_value(std::move(tlv_value));
 
+      std::string metadata_key = key_value_pair->metadata_namespace().empty()
+                                     ? filter_name
+                                     : key_value_pair->metadata_namespace();
+
       ProtobufWkt::Struct metadata(
-          (*cb_->dynamicMetadata().mutable_filter_metadata())[filter_name]);
-      metadata.mutable_fields()->insert({std::to_string(tlv_type), metadata_value});
-      cb_->setDynamicMetadata(filter_name, metadata);
+          (*cb_->dynamicMetadata().mutable_filter_metadata())[metadata_key]);
+      metadata.mutable_fields()->insert({key_value_pair->key(), metadata_value});
+      cb_->setDynamicMetadata(metadata_key, metadata);
     } else {
       ENVOY_LOG(debug, "proxy_protocol: Skip TLV of type {} since it's not needed", tlv_type);
     }
