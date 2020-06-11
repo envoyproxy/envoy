@@ -366,8 +366,8 @@ QUICHE_FLAG(bool, quic_enforce_single_packet_chlo, true,
             "If true, enforce that QUIC CHLOs fit in one packet")
 
 QUICHE_FLAG(int64_t, quic_time_wait_list_max_connections, 600000,
-            "Maximum number of connections on the time-wait list.  "
-            "A negative value implies no configured limit.")
+            "Maximum number of connections on the time-wait list. A negative value implies no "
+            "configured limit.")
 
 QUICHE_FLAG(int64_t, quic_time_wait_list_seconds, 200,
             "Time period for which a given connection_id should live in "
