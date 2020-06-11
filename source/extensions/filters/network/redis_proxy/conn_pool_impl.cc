@@ -51,7 +51,7 @@ InstanceImpl::InstanceImpl(
 
 void InstanceImpl::init() {
   // Note: `this` and `cluster_name` have a a lifetime of the filter.
-  // That may be shorter of the tls callback if the listener is torn shortly after it is created.
+  // That may be shorter than the tls callback if the listener is torn down shortly after it is created.
   // We use a weak pointer to make sure this object outlives the tls callbacks.
   auto this_shared_ptr = this->shared_from_this();
   std::weak_ptr<InstanceImpl> this_weak_ptr = this_shared_ptr;
