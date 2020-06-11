@@ -232,8 +232,8 @@ Other changes will likely include
 
   * Editing [source/extensions/extensions_build_config.bzl](source/extensions/extensions_build_config.bzl) to include the new extensions
   * Editing [docs/root/api-v3/config/config.rst](docs/root/api-v3/config/config.rst) to add area/area
-  * Adding [docs/root/api-v3/config/area/area.rst](docs/root/api-v3/config/area/area.rst) to add a table of contents for the API docs
-  * Adding [source/extensions/area/well_known_names.h](source/extensions/area/well_known_names.h) for registered plugins
+  * Adding `docs/root/api-v3/config/area/area.rst` to add a table of contents for the API docs
+  * Adding `source/extensions/area/well_known_names.h` for registered plugins
 
 # DCO: Sign your work
 
