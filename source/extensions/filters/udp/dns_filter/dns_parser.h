@@ -81,9 +81,14 @@ using DnsAnswerMap = std::unordered_multimap<std::string, DnsAnswerRecordPtr>;
  * parser. This is done to prevent dependency loops between the parser and filter headers
  */
 struct DnsParserCounters {
-  Stats::Counter* underflow_counter;
-  Stats::Counter* record_name_overflow;
-  Stats::Counter* query_parsing_failure;
+  Stats::Counter& underflow_counter;
+  Stats::Counter& record_name_overflow;
+  Stats::Counter& query_parsing_failure;
+
+  DnsParserCounters(Stats::Counter& underflow, Stats::Counter& record_name,
+                    Stats::Counter& query_parsing)
+      : underflow_counter(underflow), record_name_overflow(record_name),
+        query_parsing_failure(query_parsing) {}
 };
 
 /**

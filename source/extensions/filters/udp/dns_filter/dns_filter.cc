@@ -79,8 +79,8 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
     const auto& upstream_resolvers = client_config.upstream_resolvers();
     resolvers_.reserve(upstream_resolvers.size());
     for (const auto& resolver : upstream_resolvers) {
-      auto ipaddr = Network::Utility::parseInternetAddress(resolver, 0 /* port */);
-      resolvers_.push_back(std::move(ipaddr));
+      auto ipaddr = Network::Utility::protobufAddressToAddress(resolver);
+      resolvers_.emplace_back(std::move(ipaddr));
     }
     resolver_timeout_ = std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(
         client_config, resolver_timeout, DEFAULT_RESOLVER_TIMEOUT.count()));
@@ -128,7 +128,7 @@ DnsFilter::DnsFilter(Network::UdpReadFilterCallbacks& callbacks,
   resolver_callback_ = [this](DnsQueryContextPtr context, const DnsQueryRecord* query,
                               AddressConstPtrVec& iplist) -> void {
     if (context->resolution_status_ != Network::DnsResolver::ResolutionStatus::Success &&
-        context->retry_) {
+        context->retry_ > 0) {
       --context->retry_;
       ENVOY_LOG(debug, "resolving name [{}] via external resolvers [retry {}]", query->name_,
                 context->retry_);
@@ -156,10 +156,9 @@ void DnsFilter::onData(Network::UdpRecvData& client_request) {
   config_->stats().downstream_rx_queries_.inc();
 
   // Setup counters for the parser
-  DnsParserCounters parser_counters;
-  parser_counters.underflow_counter = &config_->stats().query_buffer_underflow_;
-  parser_counters.record_name_overflow = &config_->stats().record_name_overflow_;
-  parser_counters.query_parsing_failure = &config_->stats().query_parsing_failure_;
+  DnsParserCounters parser_counters(config_->stats().query_buffer_underflow_,
+                                    config_->stats().record_name_overflow_,
+                                    config_->stats().query_parsing_failure_);
 
   // Parse the query, if it fails return an response to the client
   DnsQueryContextPtr query_context =

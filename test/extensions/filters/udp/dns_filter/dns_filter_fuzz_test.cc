@@ -25,6 +25,11 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   static NiceMock<Stats::MockHistogram> histogram;
   histogram.unit_ = Stats::Histogram::Unit::Milliseconds;
   static Api::ApiPtr api = Api::createApiForTest();
+  static NiceMock<Stats::MockCounter> mock_query_buffer_underflow;
+  static NiceMock<Stats::MockCounter> mock_record_name_overflow;
+  static NiceMock<Stats::MockCounter> query_parsing_failure;
+  static DnsParserCounters counters(mock_query_buffer_underflow, mock_record_name_overflow,
+                                    query_parsing_failure);
 
   FuzzedDataProvider data_provider(buf, len);
   Buffer::InstancePtr query_buffer = std::make_unique<Buffer::OwnedImpl>();
@@ -40,7 +45,6 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
     const uint8_t fuzz_function = data_provider.ConsumeIntegralInRange<uint8_t>(0, 2);
     switch (fuzz_function) {
     case 0: {
-      DnsParserCounters counters{};
       DnsQueryContextPtr query_context =
           std::make_unique<DnsQueryContext>(local, peer, counters, retry_count);
       bool result = message_parser.parseDnsObject(query_context, query_buffer);

@@ -128,9 +128,7 @@ bool DnsMessageParser::parseDnsObject(DnsQueryContextPtr& context,
   while (state != DnsQueryParseState::Finish) {
     // Ensure that we have enough data remaining in the buffer to parse the query
     if (available_bytes < field_size) {
-      if (context->counters_.underflow_counter) {
-        context->counters_.underflow_counter->inc();
-      }
+      context->counters_.underflow_counter.inc();
       ENVOY_LOG(debug,
                 "Exhausted available bytes in the buffer. Insufficient data to parse query field.");
       return false;
@@ -217,9 +215,7 @@ bool DnsMessageParser::parseDnsObject(DnsQueryContextPtr& context,
     ENVOY_LOG(trace, "Parsing [{}/{}] questions", index, header_.questions);
     auto rec = parseDnsQueryRecord(buffer, &offset);
     if (rec == nullptr) {
-      if (context->counters_.query_parsing_failure) {
-        context->counters_.query_parsing_failure->inc();
-      }
+      context->counters_.query_parsing_failure.inc();
       ENVOY_LOG(debug, "Couldn't parse query record from buffer");
       return false;
     }
@@ -574,9 +570,8 @@ void DnsMessageParser::buildResponseBuffer(DnsQueryContextPtr& query_context,
       // names, we should not end up with a non-conforming name here.
       //
       // See Section 2.3.4 of https://tools.ietf.org/html/rfc1035
-
-      // TODO(abaptiste): add stats for record overflow
       if (query->name_.size() > MAX_DNS_NAME_SIZE) {
+        query_context->counters_.record_name_overflow.inc();
         ENVOY_LOG(
             debug,
             "Query name '{}' is longer than the maximum permitted length. Skipping serialization",

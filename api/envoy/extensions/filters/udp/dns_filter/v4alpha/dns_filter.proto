@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.udp.dns_filter.v4alpha;
 
+import "envoy/config/core/v4alpha/address.proto";
 import "envoy/config/core/v4alpha/base.proto";
 import "envoy/data/dns/v4alpha/dns_table.proto";
 
@@ -61,10 +62,8 @@ message DnsFilterConfig {
     google.protobuf.Duration resolver_timeout = 1 [(validate.rules).duration = {gte {seconds: 1}}];
 
     // A list of DNS servers to which we can forward queries
-    repeated string upstream_resolvers = 2 [(validate.rules).repeated = {
-      min_items: 1
-      items {string {min_len: 3}}
-    }];
+    repeated config.core.v4alpha.Address upstream_resolvers = 2
+        [(validate.rules).repeated = {min_items: 1}];
   }
 
   // The stat prefix used when emitting DNS filter statistics

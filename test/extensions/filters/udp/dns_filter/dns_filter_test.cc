@@ -36,7 +36,9 @@ class DnsFilterTest : public testing::Test, public Event::TestUsingSimulatedTime
 public:
   DnsFilterTest()
       : listener_address_(Network::Utility::parseInternetAddressAndPort("127.0.2.1:5353")),
-        api_(Api::createApiForTest()) {
+        api_(Api::createApiForTest()),
+        counters_(mock_query_buffer_underflow_, mock_record_name_overflow_,
+                  query_parsing_failure_) {
     udp_response_.addresses_.local_ = listener_address_;
     udp_response_.addresses_.peer_ = listener_address_;
     udp_response_.buffer_ = std::make_unique<Buffer::OwnedImpl>();
@@ -64,20 +66,13 @@ public:
     envoy::extensions::filters::udp::dns_filter::v3alpha::DnsFilterConfig config;
     TestUtility::loadFromYamlAndValidate(yaml, config);
     auto store = stats_store_.createScope("dns_scope");
-    EXPECT_CALL(listener_factory_, scope()).WillOnce(ReturnRef(*store));
-    EXPECT_CALL(listener_factory_, dispatcher()).Times(AtLeast(0));
-    EXPECT_CALL(listener_factory_, clusterManager()).Times(AtLeast(0));
-    EXPECT_CALL(listener_factory_, api()).WillOnce(ReturnRef(*api_));
+    ON_CALL(listener_factory_, scope()).WillByDefault(ReturnRef(*store));
+    ON_CALL(listener_factory_, api()).WillByDefault(ReturnRef(*api_));
     ON_CALL(random_, random()).WillByDefault(Return(3));
-    EXPECT_CALL(listener_factory_, random()).WillOnce(ReturnRef(random_));
+    ON_CALL(listener_factory_, random()).WillByDefault(ReturnRef(random_));
 
     resolver_ = std::make_shared<Network::MockDnsResolver>();
-    EXPECT_CALL(dispatcher_, createDnsResolver(_, _)).WillOnce(Return(resolver_));
-
-    timeout_timer_ = new Event::MockTimer(&dispatcher_);
-    EXPECT_CALL(*timeout_timer_, disableTimer()).Times(AtLeast(0));
-    EXPECT_CALL(*timeout_timer_, enableTimer(_, _)).Times(AtLeast(0));
-    EXPECT_CALL(dispatcher_, createTimer_(_)).WillRepeatedly(Return(timeout_timer_));
+    ON_CALL(dispatcher_, createDnsResolver(_, _)).WillByDefault(Return(resolver_));
 
     config_ = std::make_shared<DnsFilterEnvoyConfig>(listener_factory_, config);
     filter_ = std::make_unique<DnsFilter>(callbacks_, config_);
@@ -95,16 +90,18 @@ public:
   const Network::Address::InstanceConstSharedPtr listener_address_;
   Api::ApiPtr api_;
   DnsFilterEnvoyConfigSharedPtr config_;
+  NiceMock<Stats::MockCounter> mock_query_buffer_underflow_;
+  NiceMock<Stats::MockCounter> mock_record_name_overflow_;
+  NiceMock<Stats::MockCounter> query_parsing_failure_;
   DnsParserCounters counters_;
   DnsQueryContextPtr query_ctx_;
-  Event::MockTimer* timeout_timer_{};
-  Event::MockDispatcher dispatcher_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
   Network::MockUdpReadFilterCallbacks callbacks_;
   Network::UdpRecvData udp_response_;
   NiceMock<Filesystem::MockInstance> file_system_;
   NiceMock<Stats::MockHistogram> histogram_;
   NiceMock<Runtime::MockRandomGenerator> random_;
-  Server::Configuration::MockListenerFactoryContext listener_factory_;
+  NiceMock<Server::Configuration::MockListenerFactoryContext> listener_factory_;
   Stats::IsolatedStoreImpl stats_store_;
   std::shared_ptr<Network::MockDnsResolver> resolver_;
   std::unique_ptr<DnsFilter> filter_;
@@ -179,9 +176,15 @@ stat_prefix: "my_prefix"
 client_config:
   resolver_timeout: 1s
   upstream_resolvers:
-  - "1.1.1.1"
-  - "8.8.8.8"
-  - "8.8.4.4"
+  - socket_address:
+      address: "1.1.1.1"
+      port_value: 53
+  - socket_address:
+      address: "8.8.8.8"
+      port_value: 53
+  - socket_address:
+      address: "8.8.4.4"
+      port_value: 53
 server_config:
   inline_dns_table:
     external_retry_count: 0
@@ -199,9 +202,11 @@ server_config:
   const std::string external_dns_table_config = R"EOF(
 stat_prefix: "my_prefix"
 client_config:
-  resolver_timeout: 5s
+  resolver_timeout: 1s
   upstream_resolvers:
-  - "1.1.1.1"
+  - socket_address:
+      address: "1.1.1.1"
+      port_value: 53
 server_config:
   external_dns_table:
     filename: {}
@@ -489,24 +494,26 @@ TEST_F(DnsFilterTest, LocalTypeAAAAQuerySuccess) {
 TEST_F(DnsFilterTest, ExternalResolutionReturnSingleAddress) {
   InSequence s;
 
+  auto timeout_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
+  EXPECT_CALL(*timeout_timer, enableTimer(_, _)).Times(1);
+
   const std::string expected_address("130.207.244.251");
   const std::string domain("www.foobaz.com");
   setup(forward_query_on_config);
+
+  const std::string query =
+      Utils::buildQueryForDomain(domain, DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN);
+  ASSERT_FALSE(query.empty());
 
   // Verify that we are calling the resolver with the expected name
   Network::DnsResolver::ResolveCb resolve_cb;
   EXPECT_CALL(*resolver_, resolve(domain, _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
 
-  const std::string query =
-      Utils::buildQueryForDomain(domain, DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN);
-  ASSERT_FALSE(query.empty());
-
   // Send a query to for a name not in our configuration
   sendQueryFromClient("10.0.0.1:1000", query);
 
-  // Expect another disableTimer call from within the callback
-  EXPECT_CALL(*timeout_timer_, disableTimer()).Times(AnyNumber());
+  EXPECT_CALL(*timeout_timer, disableTimer()).Times(AnyNumber());
 
   // Execute resolve callback
   resolve_cb(Network::DnsResolver::ResolutionStatus::Success,
@@ -539,8 +546,12 @@ TEST_F(DnsFilterTest, ExternalResolutionReturnSingleAddress) {
 TEST_F(DnsFilterTest, ExternalResolutionIpv6SingleAddress) {
   InSequence s;
 
+  auto timeout_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
+  EXPECT_CALL(*timeout_timer, enableTimer(_, _)).Times(1);
+
   const std::string expected_address("2a04:4e42:d::323");
   const std::string domain("www.foobaz.com");
+
   setup(forward_query_on_config);
 
   // Verify that we are calling the resolver with the expected name
@@ -555,8 +566,7 @@ TEST_F(DnsFilterTest, ExternalResolutionIpv6SingleAddress) {
   // Send a query to for a name not in our configuration
   sendQueryFromClient("10.0.0.1:1000", query);
 
-  // Expect another disableTimer call from within the callback
-  EXPECT_CALL(*timeout_timer_, disableTimer()).Times(AnyNumber());
+  EXPECT_CALL(*timeout_timer, disableTimer()).Times(2);
 
   // Execute resolve callback
   resolve_cb(Network::DnsResolver::ResolutionStatus::Success,
@@ -589,6 +599,9 @@ TEST_F(DnsFilterTest, ExternalResolutionIpv6SingleAddress) {
 TEST_F(DnsFilterTest, ExternalResolutionReturnMultipleAddresses) {
   InSequence s;
 
+  auto timeout_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
+  EXPECT_CALL(*timeout_timer, enableTimer(_, _)).Times(1);
+
   const std::list<std::string> expected_address{"130.207.244.251", "130.207.244.252",
                                                 "130.207.244.253", "130.207.244.254"};
   const std::string domain("www.foobaz.com");
@@ -606,8 +619,7 @@ TEST_F(DnsFilterTest, ExternalResolutionReturnMultipleAddresses) {
   // Send a query to for a name not in our configuration
   sendQueryFromClient("10.0.0.1:1000", query);
 
-  // Expect another disableTimer call from within the callback
-  EXPECT_CALL(*timeout_timer_, disableTimer()).Times(AnyNumber());
+  EXPECT_CALL(*timeout_timer, disableTimer()).Times(2);
 
   // Execute resolve callback
   resolve_cb(Network::DnsResolver::ResolutionStatus::Success,
@@ -641,6 +653,9 @@ TEST_F(DnsFilterTest, ExternalResolutionReturnMultipleAddresses) {
 TEST_F(DnsFilterTest, ExternalResolutionReturnNoAddresses) {
   InSequence s;
 
+  auto timeout_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
+  EXPECT_CALL(*timeout_timer, enableTimer(_, _)).Times(1);
+
   const std::string domain("www.foobaz.com");
   setup(forward_query_on_config);
 
@@ -656,8 +671,7 @@ TEST_F(DnsFilterTest, ExternalResolutionReturnNoAddresses) {
   // Send a query to for a name not in our configuration
   sendQueryFromClient("10.0.0.1:1000", query);
 
-  // Expect another disableTimer call from within the callback
-  EXPECT_CALL(*timeout_timer_, disableTimer()).Times(AnyNumber());
+  EXPECT_CALL(*timeout_timer, disableTimer()).Times(2);
 
   // Execute resolve callback
   resolve_cb(Network::DnsResolver::ResolutionStatus::Success, TestUtility::makeDnsResponse({}));
@@ -682,6 +696,9 @@ TEST_F(DnsFilterTest, ExternalResolutionReturnNoAddresses) {
 TEST_F(DnsFilterTest, ExternalResolutionTimeout) {
   InSequence s;
 
+  auto timeout_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
+  EXPECT_CALL(*timeout_timer, enableTimer(_, _)).Times(1);
+
   const std::string domain("www.foobaz.com");
   setup(forward_query_on_config);
 
@@ -696,7 +713,7 @@ TEST_F(DnsFilterTest, ExternalResolutionTimeout) {
   simTime().advanceTimeWait(std::chrono::milliseconds(1500));
 
   // Execute timeout timer callback
-  timeout_timer_->invokeCallback();
+  timeout_timer->invokeCallback();
 
   // parse the result
   query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
@@ -718,6 +735,9 @@ TEST_F(DnsFilterTest, ExternalResolutionTimeout) {
 TEST_F(DnsFilterTest, ExternalResolutionTimeout2) {
   InSequence s;
 
+  auto timeout_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
+  EXPECT_CALL(*timeout_timer, enableTimer(_, _)).Times(1);
+
   const std::string domain("www.foobaz.com");
   setup(forward_query_on_config);
 
@@ -735,10 +755,7 @@ TEST_F(DnsFilterTest, ExternalResolutionTimeout2) {
   simTime().advanceTimeWait(std::chrono::milliseconds(1500));
 
   // Execute timeout timer callback
-  timeout_timer_->invokeCallback();
-
-  // Expect another disableTimer call from within the callback
-  EXPECT_CALL(*timeout_timer_, disableTimer()).Times(AnyNumber());
+  timeout_timer->invokeCallback();
 
   // Execute resolve callback. This should harmlessly return and not alter
   // the response received by the client. Even though we are returning a successful
