@@ -162,6 +162,16 @@ envoy_cc_fuzz_test(
     ],
 )
 
+envoy_cc_fuzz_test(
+    name = "utility_fuzz_test",
+    srcs = ["utility_fuzz_test.cc"],
+    corpus = "utility_corpus",
+    deps = [
+        "//source/common/stats:isolated_store_lib",
+        "//source/common/stats:utility_lib",
+    ],
+)
+
 envoy_cc_test_binary(
     name = "symbol_table_speed_test",
     srcs = [
