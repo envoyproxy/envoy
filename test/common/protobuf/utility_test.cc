@@ -1,6 +1,7 @@
 #include <unordered_set>
 
 #include "envoy/api/v2/cluster.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.validate.h"
@@ -8,6 +9,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.validate.h"
 #include "envoy/config/cluster/v3/filter.pb.h"
 #include "envoy/config/cluster/v3/filter.pb.validate.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/common/base64.h"
@@ -152,6 +154,34 @@ TEST_F(ProtobufUtilityTest, MessageUtilHash) {
   EXPECT_EQ(MessageUtil::hash(a2), MessageUtil::hash(a3));
   EXPECT_NE(0, MessageUtil::hash(a1));
   EXPECT_NE(MessageUtil::hash(s), MessageUtil::hash(a1));
+}
+
+TEST_F(ProtobufUtilityTest, MessageUtilHashAndEqualToIgnoreOriginalTypeField) {
+  ProtobufWkt::Struct s;
+  (*s.mutable_fields())["ab"].set_string_value("fgh");
+  EXPECT_EQ(1, s.fields_size());
+  envoy::api::v2::core::Metadata mv2;
+  mv2.mutable_filter_metadata()->insert({"xyz", s});
+  EXPECT_EQ(1, mv2.filter_metadata_size());
+
+  // Add the OriginalTypeFieldNumber as unknown field.
+  envoy::config::core::v3::Metadata mv3;
+  Config::VersionConverter::upgrade(mv2, mv3);
+
+  // Add another unknown field.
+  {
+    const Protobuf::Reflection* reflection = mv3.GetReflection();
+    auto* unknown_field_set = reflection->MutableUnknownFields(&mv3);
+    auto set_size = unknown_field_set->field_count();
+    // 183412668 is the magic number OriginalTypeFieldNumber. The successor number should not be
+    // occupied.
+    unknown_field_set->AddFixed32(183412668 + 1, 1);
+    EXPECT_EQ(set_size + 1, unknown_field_set->field_count()) << "Fail to add an unknown field";
+  }
+
+  envoy::config::core::v3::Metadata mv3dup = mv3;
+  ASSERT_EQ(MessageUtil::hash(mv3), MessageUtil::hash(mv3dup));
+  ASSERT(MessageUtil()(mv3, mv3dup));
 }
 
 TEST_F(ProtobufUtilityTest, RepeatedPtrUtilDebugString) {
@@ -1468,7 +1498,7 @@ TEST_P(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(IndividualFieldDisallowed))
   envoy::test::deprecation_test::Base base;
   base.set_is_deprecated_fatal("foo");
   EXPECT_THROW_WITH_REGEX(
-      checkForDeprecation(base), ProtoValidationException,
+      checkForDeprecation(base), Envoy::ProtobufMessage::DeprecatedProtoFieldException,
       "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'");
 }
 
@@ -1479,7 +1509,7 @@ TEST_P(DeprecatedFieldsTest,
 
   // Make sure this is set up right.
   EXPECT_THROW_WITH_REGEX(
-      checkForDeprecation(base), ProtoValidationException,
+      checkForDeprecation(base), Envoy::ProtobufMessage::DeprecatedProtoFieldException,
       "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'");
   // The config will be rejected, so the feature will not be used.
   EXPECT_EQ(0, runtime_deprecated_feature_use_.value());
@@ -1512,7 +1542,7 @@ TEST_P(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(DisallowViaRuntime)) {
       {{"envoy.deprecated_features:envoy.test.deprecation_test.Base.is_deprecated", " false"}});
 
   EXPECT_THROW_WITH_REGEX(
-      checkForDeprecation(base), ProtoValidationException,
+      checkForDeprecation(base), Envoy::ProtobufMessage::DeprecatedProtoFieldException,
       "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'");
   EXPECT_EQ(1, runtime_deprecated_feature_use_.value());
 }
@@ -1527,7 +1557,7 @@ TEST_P(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(MixOfFatalAndWarnings)) {
   EXPECT_LOG_CONTAINS(
       "warning", "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'", {
         EXPECT_THROW_WITH_REGEX(
-            checkForDeprecation(base), ProtoValidationException,
+            checkForDeprecation(base), Envoy::ProtobufMessage::DeprecatedProtoFieldException,
             "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'");
       });
 }
@@ -1620,7 +1650,8 @@ TEST_P(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(RuntimeOverrideEnumDefault)
       {{"envoy.deprecated_features:envoy.test.deprecation_test.Base.DEPRECATED_DEFAULT", "false"}});
 
   // Make sure this is set up right.
-  EXPECT_THROW_WITH_REGEX(checkForDeprecation(base), ProtoValidationException,
+  EXPECT_THROW_WITH_REGEX(checkForDeprecation(base),
+                          Envoy::ProtobufMessage::DeprecatedProtoFieldException,
                           "Using the default now-deprecated value DEPRECATED_DEFAULT");
 }
 
@@ -1629,7 +1660,8 @@ TEST_P(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(FatalEnum)) {
   envoy::test::deprecation_test::Base base;
   base.mutable_enum_container()->set_deprecated_enum(
       envoy::test::deprecation_test::Base::DEPRECATED_FATAL);
-  EXPECT_THROW_WITH_REGEX(checkForDeprecation(base), ProtoValidationException,
+  EXPECT_THROW_WITH_REGEX(checkForDeprecation(base),
+                          Envoy::ProtobufMessage::DeprecatedProtoFieldException,
                           "Using deprecated value DEPRECATED_FATAL");
 
   Runtime::LoaderSingleton::getExisting()->mergeValues(

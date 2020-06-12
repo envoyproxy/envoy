@@ -20,6 +20,7 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/scope_tracker.h"
 #include "common/common/utility.h"
+#include "common/config/utility.h"
 #include "common/grpc/common.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
@@ -49,9 +50,7 @@ uint32_t getLength(const Buffer::Instance* instance) { return instance ? instanc
 
 bool schemeIsHttp(const Http::RequestHeaderMap& downstream_headers,
                   const Network::Connection& connection) {
-  if (downstream_headers.ForwardedProto() &&
-      downstream_headers.ForwardedProto()->value().getStringView() ==
-          Http::Headers::get().SchemeValues.Http) {
+  if (downstream_headers.getForwardedProtoValue() == Http::Headers::get().SchemeValues.Http) {
     return true;
   }
   if (!connection.ssl()) {
@@ -61,20 +60,6 @@ bool schemeIsHttp(const Http::RequestHeaderMap& downstream_headers,
 }
 
 constexpr uint64_t TimeoutPrecisionFactor = 100;
-
-Http::ConnectionPool::Instance*
-httpPool(absl::variant<Http::ConnectionPool::Instance*, Tcp::ConnectionPool::Instance*> pool) {
-  return absl::get<Http::ConnectionPool::Instance*>(pool);
-}
-
-Tcp::ConnectionPool::Instance*
-tcpPool(absl::variant<Http::ConnectionPool::Instance*, Tcp::ConnectionPool::Instance*> pool) {
-  return absl::get<Tcp::ConnectionPool::Instance*>(pool);
-}
-
-const absl::string_view getPath(const Http::RequestHeaderMap& headers) {
-  return headers.Path() ? headers.Path()->value().getStringView() : "";
-}
 
 } // namespace
 
@@ -179,10 +164,10 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::RequestHeaderMap& req
   }
 
   // See if there is a per try/retry timeout. If it's >= global we just ignore it.
-  const Http::HeaderEntry* per_try_timeout_entry =
-      request_headers.EnvoyUpstreamRequestPerTryTimeoutMs();
-  if (per_try_timeout_entry) {
-    if (absl::SimpleAtoi(per_try_timeout_entry->value().getStringView(), &header_timeout)) {
+  const absl::string_view per_try_timeout_entry =
+      request_headers.getEnvoyUpstreamRequestPerTryTimeoutMsValue();
+  if (!per_try_timeout_entry.empty()) {
+    if (absl::SimpleAtoi(per_try_timeout_entry, &header_timeout)) {
       timeout.per_try_timeout_ = std::chrono::milliseconds(header_timeout);
     }
     request_headers.removeEnvoyUpstreamRequestPerTryTimeoutMs();
@@ -373,7 +358,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   route_ = callbacks_->route();
   if (!route_) {
     config_.stats_.no_route_.inc();
-    ENVOY_STREAM_LOG(debug, "no cluster match for URL '{}'", *callbacks_, getPath(headers));
+    ENVOY_STREAM_LOG(debug, "no cluster match for URL '{}'", *callbacks_, headers.getPathValue());
 
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
     callbacks_->sendLocalReply(Http::Code::NotFound, "", modify_headers, absl::nullopt,
@@ -438,7 +423,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // Set up stat prefixes, etc.
   request_vcluster_ = route_entry_->virtualCluster(headers);
   ENVOY_STREAM_LOG(debug, "cluster '{}' match for URL '{}'", *callbacks_,
-                   route_entry_->clusterName(), getPath(headers));
+                   route_entry_->clusterName(), headers.getPathValue());
 
   if (config_.strict_check_headers_ != nullptr) {
     for (const auto& header : *config_.strict_check_headers_) {
@@ -488,8 +473,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   const auto& upstream_http_protocol_options = cluster_->upstreamHttpProtocolOptions();
 
   if (upstream_http_protocol_options.has_value()) {
-    const auto parsed_authority =
-        Http::Utility::parseAuthority(headers.Host()->value().getStringView());
+    const auto parsed_authority = Http::Utility::parseAuthority(headers.getHostValue());
     if (!parsed_authority.is_ip_address_ && upstream_http_protocol_options.value().auto_sni()) {
       callbacks_->streamInfo().filterState()->setData(
           Network::UpstreamServerName::key(),
@@ -506,13 +490,15 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     }
   }
 
-  Upstream::HostDescriptionConstSharedPtr host;
-  Filter::HttpOrTcpPool conn_pool = createConnPool(host);
+  transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
+      *callbacks_->streamInfo().filterState());
+  std::unique_ptr<GenericConnPool> generic_conn_pool = createConnPool();
 
-  if (!host) {
+  if (!generic_conn_pool) {
     sendNoHealthyUpstreamResponse();
     return Http::FilterHeadersStatus::StopIteration;
   }
+  Upstream::HostDescriptionConstSharedPtr host = generic_conn_pool->host();
 
   if (debug_config && debug_config->append_upstream_host_) {
     // The hostname and address will be appended to any local or upstream responses from this point,
@@ -599,7 +585,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // Hang onto the modify_headers function for later use in handling upstream responses.
   modify_headers_ = modify_headers;
 
-  UpstreamRequestPtr upstream_request = createUpstreamRequest(conn_pool);
+  UpstreamRequestPtr upstream_request =
+      std::make_unique<UpstreamRequest>(*this, std::move(generic_conn_pool));
   upstream_request->moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->encodeHeaders(end_stream);
   if (end_stream) {
@@ -609,47 +596,23 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   return Http::FilterHeadersStatus::StopIteration;
 }
 
-Filter::HttpOrTcpPool Filter::createConnPool(Upstream::HostDescriptionConstSharedPtr& host) {
-  Filter::HttpOrTcpPool conn_pool;
-  const bool should_tcp_proxy = route_entry_->connectConfig().has_value() &&
-                                downstream_headers_->Method()->value().getStringView() ==
-                                    Http::Headers::get().MethodValues.Connect;
-
-  if (!should_tcp_proxy) {
-    conn_pool = getHttpConnPool();
-    if (httpPool(conn_pool)) {
-      host = httpPool(conn_pool)->host();
+std::unique_ptr<GenericConnPool> Filter::createConnPool() {
+  const bool should_tcp_proxy =
+      route_entry_->connectConfig().has_value() &&
+      downstream_headers_->getMethodValue() == Http::Headers::get().MethodValues.Connect;
+  Http::Protocol protocol = cluster_->upstreamHttpProtocol(callbacks_->streamInfo().protocol());
+  if (should_tcp_proxy) {
+    auto pool = std::make_unique<TcpConnPool>(config_.cm_, *route_entry_, protocol, this);
+    if (pool->valid()) {
+      return pool;
     }
   } else {
-    transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
-        *callbacks_->streamInfo().filterState());
-    conn_pool = config_.cm_.tcpConnPoolForCluster(route_entry_->clusterName(),
-                                                  Upstream::ResourcePriority::Default, this);
-    if (tcpPool(conn_pool)) {
-      host = tcpPool(conn_pool)->host();
+    auto pool = std::make_unique<HttpConnPool>(config_.cm_, *route_entry_, protocol, this);
+    if (pool->valid()) {
+      return pool;
     }
   }
-  return conn_pool;
-}
-
-UpstreamRequestPtr Filter::createUpstreamRequest(Filter::HttpOrTcpPool conn_pool) {
-  if (absl::holds_alternative<Http::ConnectionPool::Instance*>(conn_pool)) {
-    return std::make_unique<UpstreamRequest>(*this,
-                                             std::make_unique<HttpConnPool>(*httpPool(conn_pool)));
-  }
-  return std::make_unique<UpstreamRequest>(*this,
-                                           std::make_unique<TcpConnPool>(tcpPool(conn_pool)));
-}
-
-Http::ConnectionPool::Instance* Filter::getHttpConnPool() {
-  // Choose protocol based on cluster configuration and downstream connection
-  // Note: Cluster may downgrade HTTP2 to HTTP1 based on runtime configuration.
-  Http::Protocol protocol = cluster_->upstreamHttpProtocol(callbacks_->streamInfo().protocol());
-  transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
-      *callbacks_->streamInfo().filterState());
-
-  return config_.cm_.httpConnPoolForCluster(route_entry_->clusterName(), route_entry_->priority(),
-                                            protocol, this);
+  return nullptr;
 }
 
 void Filter::sendNoHealthyUpstreamResponse() {
@@ -1462,7 +1425,7 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
   }
 
   // Make sure the redirect response contains a URL to redirect to.
-  if (internal_redirect.value().getStringView().length() == 0) {
+  if (internal_redirect.value().getStringView().empty()) {
     config_.stats_.passthrough_internal_redirect_bad_location_.inc();
     return false;
   }
@@ -1496,8 +1459,9 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
     config_.stats_.passthrough_internal_redirect_too_many_redirects_.inc();
     return false;
   }
-  std::string original_host(downstream_headers.Host()->value().getStringView());
-  std::string original_path(downstream_headers.Path()->value().getStringView());
+  // Copy the old values, so they can be restored if the redirect fails.
+  const std::string original_host(downstream_headers.getHostValue());
+  const std::string original_path(downstream_headers.getPathValue());
   const bool scheme_is_set = (downstream_headers.Scheme() != nullptr);
   Cleanup restore_original_headers(
       [&downstream_headers, original_host, original_path, scheme_is_set, scheme_is_http]() {
@@ -1551,14 +1515,14 @@ void Filter::doRetry() {
   ASSERT(pending_retries_ > 0);
   pending_retries_--;
 
-  Upstream::HostDescriptionConstSharedPtr host;
-  Filter::HttpOrTcpPool conn_pool = createConnPool(host);
-  if (!host) {
+  std::unique_ptr<GenericConnPool> generic_conn_pool = createConnPool();
+  if (!generic_conn_pool) {
     sendNoHealthyUpstreamResponse();
     cleanup();
     return;
   }
-  UpstreamRequestPtr upstream_request = createUpstreamRequest(conn_pool);
+  UpstreamRequestPtr upstream_request =
+      std::make_unique<UpstreamRequest>(*this, std::move(generic_conn_pool));
 
   if (include_attempt_count_in_request_) {
     downstream_headers_->setEnvoyAttemptCount(attempt_count_);

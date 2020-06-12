@@ -506,7 +506,7 @@ TEST_F(HystrixSinkTest, HystrixEventStreamHandler) {
   // This value doesn't matter in handlerHystrixEventStream
   absl::string_view path_and_query;
 
-  Http::ResponseHeaderMapImpl response_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
 
   NiceMock<Server::MockAdminStream> admin_stream_mock;
   NiceMock<Network::MockConnection> connection_mock;
@@ -529,11 +529,8 @@ TEST_F(HystrixSinkTest, HystrixEventStreamHandler) {
   EXPECT_EQ(response_headers.ContentType()->value(), "text/event-stream");
   EXPECT_EQ(response_headers.CacheControl()->value(), "no-cache");
   EXPECT_EQ(response_headers.Connection()->value(), "close");
-  EXPECT_EQ(response_headers.AccessControlAllowOrigin()->value(), "*");
-
-  std::string access_control_allow_headers =
-      std::string(response_headers.AccessControlAllowHeaders()->value().getStringView());
-  EXPECT_THAT(access_control_allow_headers, HasSubstr("Accept"));
+  EXPECT_EQ(response_headers.get_("access-control-allow-origin"), "*");
+  EXPECT_THAT(response_headers.get_("access-control-allow-headers"), HasSubstr("Accept"));
 }
 
 } // namespace

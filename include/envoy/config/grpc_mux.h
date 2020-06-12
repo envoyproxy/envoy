@@ -13,16 +13,18 @@ namespace Config {
 /**
  * All control plane related stats. @see stats_macros.h
  */
-#define ALL_CONTROL_PLANE_STATS(COUNTER, GAUGE)                                                    \
+#define ALL_CONTROL_PLANE_STATS(COUNTER, GAUGE, TEXT_READOUT)                                      \
   COUNTER(rate_limit_enforced)                                                                     \
   GAUGE(connected_state, NeverImport)                                                              \
-  GAUGE(pending_requests, Accumulate)
+  GAUGE(pending_requests, Accumulate)                                                              \
+  TEXT_READOUT(identifier)
 
 /**
  * Struct definition for all control plane stats. @see stats_macros.h
  */
 struct ControlPlaneStats {
-  ALL_CONTROL_PLANE_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
+  ALL_CONTROL_PLANE_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT,
+                          GENERATE_TEXT_READOUT_STRUCT)
 };
 
 /**
@@ -119,7 +121,8 @@ public:
   /**
    * For the GrpcStream to pass received protos to the context.
    */
-  virtual void onDiscoveryResponse(std::unique_ptr<ResponseProto>&& message) PURE;
+  virtual void onDiscoveryResponse(std::unique_ptr<ResponseProto>&& message,
+                                   ControlPlaneStats& control_plane_stats) PURE;
 
   /**
    * For the GrpcStream to call when its rate limiting logic allows more requests to be sent.

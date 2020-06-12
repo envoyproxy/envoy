@@ -43,20 +43,20 @@ std::string badContentTypeMessage(const Http::ResponseHeaderMap& headers) {
   if (headers.ContentType() != nullptr) {
     return fmt::format(
         "envoy reverse bridge: upstream responded with unsupported content-type {}, status code {}",
-        headers.ContentType()->value().getStringView(), headers.Status()->value().getStringView());
+        headers.getContentTypeValue(), headers.getStatusValue());
   } else {
     return fmt::format(
         "envoy reverse bridge: upstream responded with no content-type header, status code {}",
-        headers.Status()->value().getStringView());
+        headers.getStatusValue());
   }
 }
 
 void adjustContentLength(Http::RequestOrResponseHeaderMap& headers,
                          const std::function<uint64_t(uint64_t value)>& adjustment) {
-  auto length_header = headers.ContentLength();
-  if (length_header != nullptr) {
+  auto length_header = headers.getContentLengthValue();
+  if (!length_header.empty()) {
     uint64_t length;
-    if (absl::SimpleAtoi(length_header->value().getStringView(), &length)) {
+    if (absl::SimpleAtoi(length_header, &length)) {
       if (length != 0) {
         headers.setContentLength(adjustment(length));
       }
@@ -91,7 +91,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
     // We keep track of the original content-type to ensure that we handle
     // gRPC content type variations such as application/grpc+proto.
-    content_type_ = std::string(headers.ContentType()->value().getStringView());
+    content_type_ = std::string(headers.getContentTypeValue());
     headers.setContentType(upstream_content_type_);
     headers.setAccept(upstream_content_type_);
 
@@ -128,12 +128,11 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& buffer, bool) {
 
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
   if (enabled_) {
-    auto content_type = headers.ContentType();
+    absl::string_view content_type = headers.getContentTypeValue();
 
     // If the response from upstream does not have the correct content-type,
     // perform an early return with a useful error message in grpc-message.
-    if (content_type == nullptr ||
-        content_type->value().getStringView() != upstream_content_type_) {
+    if (content_type != upstream_content_type_) {
       headers.setGrpcMessage(badContentTypeMessage(headers));
       headers.setGrpcStatus(Envoy::Grpc::Status::WellKnownGrpcStatus::Unknown);
       headers.setStatus(enumToInt(Http::Code::OK));
@@ -193,6 +192,10 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& buffer, bool end_str
 }
 
 Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
+  if (!enabled_) {
+    return Http::FilterTrailersStatus::Continue;
+  }
+
   trailers.setGrpcStatus(grpc_status_);
 
   if (withhold_grpc_frames_) {

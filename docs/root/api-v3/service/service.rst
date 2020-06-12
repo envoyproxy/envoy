@@ -6,6 +6,7 @@ Services
   :maxdepth: 2
 
   accesslog/v3/*
+  load_stats/v3/*
   auth/v3/*
   health/v3/*
   metrics/v3/*

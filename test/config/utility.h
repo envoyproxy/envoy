@@ -156,7 +156,7 @@ public:
   void addSslConfig() { addSslConfig({}); }
 
   // Set the HTTP access log for the first HCM (if present) to a given file. The default is
-  // /dev/null.
+  // the platform's null device.
   bool setAccessLog(const std::string& filename, absl::string_view format = "");
 
   // Set the listener access log for the first listener to a given file.
@@ -200,6 +200,10 @@ public:
   // Given an HCM with the default config, set the matcher to be a connect matcher and enable
   // CONNECT requests.
   static void setConnectConfig(HttpConnectionManager& hcm, bool terminate_connect);
+
+  void setLocalReply(
+      const envoy::extensions::filters::network::http_connection_manager::v3::LocalReplyConfig&
+          config);
 
 private:
   // Load the first HCM struct from the first listener into a parsed proto.

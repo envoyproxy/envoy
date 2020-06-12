@@ -263,8 +263,8 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
     return ProtobufUtil::Status(Code::INVALID_ARGUMENT,
                                 "Request headers has application/grpc content-type");
   }
-  const std::string method(headers.Method()->value().getStringView());
-  std::string path(headers.Path()->value().getStringView());
+  const std::string method(headers.getMethodValue());
+  std::string path(headers.getPathValue());
   std::string args;
 
   const size_t pos = path.find('?');
@@ -364,7 +364,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
 
   if (method_->request_type_is_http_body_) {
     if (headers.ContentType() != nullptr) {
-      absl::string_view content_type = headers.ContentType()->value().getStringView();
+      absl::string_view content_type = headers.getContentTypeValue();
       content_type_.assign(content_type.begin(), content_type.end());
     }
 
@@ -386,7 +386,8 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
 
   headers.removeContentLength();
   headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Grpc);
-  headers.setEnvoyOriginalPath(headers.Path()->value().getStringView());
+  headers.setEnvoyOriginalPath(headers.getPathValue());
+  headers.addReferenceKey(Http::Headers::get().EnvoyOriginalMethod, headers.getMethodValue());
   headers.setPath("/" + method_->descriptor_->service()->full_name() + "/" +
                   method_->descriptor_->name());
   headers.setReferenceMethod(Http::Headers::get().MethodValues.Post);
@@ -566,27 +567,23 @@ void JsonTranscoderFilter::doTrailers(Http::ResponseHeaderOrTrailerMap& headers_
     return;
   }
 
-  if (method_->response_type_is_http_body_ && method_->descriptor_->server_streaming()) {
-    // Do not add empty json when HttpBody + streaming
-    // Also, headers already sent, just continue.
-    return;
-  }
-
-  Buffer::OwnedImpl data;
-  readToBuffer(*transcoder_->ResponseOutput(), data);
-
-  if (data.length()) {
-    encoder_callbacks_->addEncodedData(data, true);
-  }
-
-  if (method_->descriptor_->server_streaming()) {
-    // For streaming case, the headers are already sent, so just continue here.
-    return;
+  if (!method_->response_type_is_http_body_) {
+    Buffer::OwnedImpl data;
+    readToBuffer(*transcoder_->ResponseOutput(), data);
+    if (data.length()) {
+      encoder_callbacks_->addEncodedData(data, true);
+    }
   }
 
   // If there was no previous headers frame, this |trailers| map is our |response_headers_|,
   // so there is no need to copy headers from one to the other.
-  bool is_trailers_only_response = response_headers_ == &headers_or_trailers;
+  const bool is_trailers_only_response = response_headers_ == &headers_or_trailers;
+  const bool is_server_streaming = method_->descriptor_->server_streaming();
+
+  if (is_server_streaming && !is_trailers_only_response) {
+    // Continue if headers were sent already.
+    return;
+  }
 
   if (!grpc_status || grpc_status.value() == Grpc::Status::WellKnownGrpcStatus::InvalidCode) {
     response_headers_->setStatus(enumToInt(Http::Code::ServiceUnavailable));
@@ -610,8 +607,11 @@ void JsonTranscoderFilter::doTrailers(Http::ResponseHeaderOrTrailerMap& headers_
     response_headers_->remove(trailerHeader());
   }
 
-  response_headers_->setContentLength(
-      encoder_callbacks_->encodingBuffer() ? encoder_callbacks_->encodingBuffer()->length() : 0);
+  if (!method_->descriptor_->server_streaming()) {
+    // Set content-length for non-streaming responses.
+    response_headers_->setContentLength(
+        encoder_callbacks_->encodingBuffer() ? encoder_callbacks_->encodingBuffer()->length() : 0);
+  }
 }
 
 void JsonTranscoderFilter::setEncoderFilterCallbacks(

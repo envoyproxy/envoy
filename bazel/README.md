@@ -3,6 +3,7 @@
 ## Installing Bazelisk as Bazel
 
 It is recommended to use [Bazelisk](https://github.com/bazelbuild/bazelisk) installed as `bazel`, to avoid Bazel compatibility issues.
+
 On Linux, run the following commands:
 
 ```
@@ -15,8 +16,12 @@ On macOS, run the following command:
 brew install bazelbuild/tap/bazelisk
 ```
 
-On Windows, download [bazelisk-windows-amd64.exe](https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-windows-amd64.exe)
-and save this binary in a directory on the PATH as `bazel.exe`.
+On Windows, run the following commands:
+```
+mkdir %USERPROFILE%\bazel
+powershell Invoke-WebRequest https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-windows-amd64.exe -OutFile %USERPROFILE%\bazel\bazel.exe
+set PATH=%PATH%;%USERPROFILE%\bazel
+```
 
 If you're building from an revision of Envoy prior to August 2019, which doesn't contains a `.bazelversion` file, run `ci/run_envoy_docker.sh "bazel version"`
 to find the right version of Bazel and set the version to `USE_BAZEL_VERSION` environment variable to build.
@@ -41,8 +46,9 @@ up-to-date with the latest security patches. See
 [this doc](https://github.com/envoyproxy/envoy/blob/master/bazel/EXTERNAL_DEPS.md#updating-an-external-dependency-version)
 for how to update or override dependencies.
 
-1. Install external dependencies libtool, cmake, ninja, realpath and curl libraries separately.
-    On Ubuntu, run the following command:
+1. Install external dependencies.
+    ### Ubuntu
+    On Ubuntu, run the following:
     ```
     sudo apt-get install \
        libtool \
@@ -56,11 +62,13 @@ for how to update or override dependencies.
        virtualenv
     ```
 
+    ### Fedora
     On Fedora (maybe also other red hat distros), run the following:
     ```
     dnf install cmake libtool libstdc++ libstdc++-static libatomic ninja-build lld patch aspell-en
     ```
 
+    ### Linux
     On Linux, we recommend using the prebuilt Clang+LLVM package from [LLVM official site](http://releases.llvm.org/download.html).
     Extract the tar.xz and run the following:
     ```
@@ -72,6 +80,7 @@ for how to update or override dependencies.
     echo "build --config=clang" >> user.bazelrc
     ```
 
+    ### macOS
     On macOS, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
     ```
     brew install coreutils wget cmake libtool go bazel automake ninja clang-format autoconf aspell
@@ -97,34 +106,49 @@ for how to update or override dependencies.
     version of `ar` on the PATH, so if you run into issues building third party code like luajit
     consider uninstalling binutils.
 
-    On Windows, additional dependencies are required:
+    ### Windows
+    On Windows, you'll need to install several dependencies manually.
 
-    Install the [MSYS2 shell](https://msys2.github.io/) and install the `diffutils`, `patch`,
-    `unzip`, and `zip` packages using `pacman`. Set the `BAZEL_SH` environment variable to the path
-    of the installed MSYS2 `bash.exe` executable. Setting the `MSYS2_ARG_CONV_EXCL` environment
-    variable to a value of `*` is often advisable to ensure argument parsing in the MSYS2 shell
-    behaves as expected.
-
-    `Git` is required. The version installable via MSYS2 is sufficient.
-
-    Install the Windows-native [python3](https://www.python.org/downloads/), the POSIX flavor
-    available via MSYS2 will not work. You need to add a symlink for `python3.exe` pointing to
+    [python3](https://www.python.org/downloads/): Specifically, the Windows-native flavor. The POSIX flavor
+    available via MSYS2 will not work, nor will the Windows Store flavor. You need to add a symlink for `python3.exe` pointing to
     the installed `python.exe` for Bazel rules which follow POSIX conventions. Be sure to add
     `pip.exe` to the PATH and install the `wheel` package.
+    ```
+    mklink %USERPROFILE%\Python38\python3.exe %USERPROFILE%\Python38\python.exe
+    set PATH=%PATH%;%USERPROFILE%\Python38
+    set PATH=%PATH%;%USERPROFILE%\Python38\Scripts
+    pip install wheel
+    ```
     
-    For building with MSVC (the `msvc-cl` config option), you must install at least the VC++
-    workload from the
-    [Build Tools for Visual Studio 2019](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2019). 
+    [Build Tools for Visual Studio 2019](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2019):
+    For building with MSVC (the `msvc-cl` config option), you must install at least the VC++ workload.
     You may also download Visual Studio 2019 and use the Build Tools packaged with that
     installation. Earlier versions of VC++ Build Tools/Visual Studio are not recommended at this
     time. If installed in a non-standard filesystem location, be sure to set the `BAZEL_VC`
     environment variable to the path of the VC++ package to allow Bazel to find your installation
     of VC++. Use caution to ensure the `link.exe` that resolves on your PATH is from VC++ Build Tools and
     not MSYS2.
+    ```
+    set BAZEL_VC=%USERPROFILE%\VSBT2019\VC
+    set PATH=%PATH%;%USERPROFILE%\VSBT2019\VC\Tools\MSVC\14.26.28801\bin\Hostx64\x64
+    ```
 
     Ensure `CMake` and `ninja` binaries are on the PATH. The versions packaged with VC++ Build
     Tools are sufficient.
+    ```
+    set PATH=%PATH%;%USERPROFILE%\VSBT2019\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin
+    set PATH=%PATH%;%USERPROFILE%\VSBT2019\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja
+    ```
 
+    [MSYS2 shell](https://msys2.github.io/): Set the `BAZEL_SH` environment variable to the path
+    of the installed MSYS2 `bash.exe` executable. Additionally, setting the `MSYS2_ARG_CONV_EXCL` environment
+    variable to a value of `*` is often advisable to ensure argument parsing in the MSYS2 shell
+    behaves as expected.
+    ```
+    set PATH=%PATH%;%USERPROFILE%\msys64\usr\bin
+    set BAZEL_SH=%USERPROFILE%\msys64\usr\bin\bash.exe
+    set MSYS2_ARG_CONV_EXCL=*
+    ```
     In addition, because of the behavior of the `rules_foreign_cc` component of Bazel, set the
     `TMPDIR` environment variable to a path usable as a temporary directory (e.g.
     `C:\Windows\TEMP`). This variable is used frequently by `mktemp` from MSYS2 in the Envoy Bazel
@@ -133,6 +157,28 @@ for how to update or override dependencies.
     symlink linking `C:\c` to `C:\` in order to enable build scripts run via MSYS2 to access
     dependencies in the temporary directory specified above. If you are not using that script, you
     will need to create that symlink manually.
+    ```
+    set TMPDIR=C:\Windows\TEMP
+    mklink /d C:\c C:\
+    ```
+    In the MSYS2 shell, install additional packages via pacman:
+    ```
+    pacman -S diffutils patch unzip zip
+    ```
+
+    [Git](https://git-scm.com/downloads): The version installable via MSYS2 is also sufficient.
+    ```
+    set PATH=%PATH%;%USERPROFILE%\Git\bin
+    ```
+
+    Lastly, persist environment variable changes.
+    ```
+    setx PATH "%PATH%"
+    setx BAZEL_SH "%BAZEL_SH%"
+    setx MSYS2_ARG_CONV_EXCL "%MSYS2_ARG_CONV_EXCL%"
+    setx BAZEL_VC "%BAZEL_VC%"
+    setx TMPDIR "%TMPDIR%"
+    ```
 
 1. Install Golang on your machine. This is required as part of building [BoringSSL](https://boringssl.googlesource.com/boringssl/+/HEAD/BUILDING.md)
    and also for [Buildifer](https://github.com/bazelbuild/buildtools) which is used for formatting bazel BUILD files.
@@ -144,10 +190,18 @@ for how to update or override dependencies.
 
 ## Building Envoy with the CI Docker image
 
-Envoy can also be built with the Docker image used for CI, by installing Docker and executing:
+Envoy can also be built with the Docker image used for CI, by installing Docker and executing the following.
+
+On Linux, run:
 
 ```
 ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev'
+```
+
+On Windows:
+
+```
+./ci/run_envoy_docker_windows.sh './ci/windows_ci_steps.sh'
 ```
 
 See also the [documentation](https://github.com/envoyproxy/envoy/tree/master/ci) for developer use of the
@@ -486,7 +540,7 @@ The following optional features can be enabled on the Bazel build command-line:
 * Perf annotation with `--define perf_annotation=enabled` (see
   source/common/common/perf_annotation.h for details).
 * BoringSSL can be built in a FIPS-compliant mode with `--define boringssl=fips`
-  (see [FIPS 140-2](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/ssl.html#fips-140-2) for details).
+  (see [FIPS 140-2](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/ssl#fips-140-2) for details).
 * ASSERT() can be configured to log failures and increment a stat counter in a release build with
   `--define log_debug_assert_in_release=enabled`. The default behavior is to compile debug assertions out of
   release builds so that the condition is not evaluated. This option has no effect in debug builds.
@@ -577,7 +631,7 @@ have seen some issues with seeing the artifacts tab. If you can't see it, log ou
 then log back in and it should start working.
 
 The latest coverage report for master is available
-[here](https://storage.googleapis.com/envoy-coverage/report-master/index.html).
+[here](https://storage.googleapis.com/envoy-postsubmit/master/coverage/index.html).
 
 It's also possible to specialize the coverage build to a specified test or test dir. This is useful
 when doing things like exploring the coverage of a fuzzer over its corpus. This can be done by

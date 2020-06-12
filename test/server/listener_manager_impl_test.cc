@@ -75,10 +75,10 @@ public:
                         const Network::SocketOptionName& expected_option, int expected_value,
                         uint32_t expected_num_options = 1,
                         ListenSocketCreationParams expected_creation_params = {true, true}) {
-    if (expected_option.has_value()) {
+    if (expected_option.hasValue()) {
       expectCreateListenSocket(expected_state, expected_num_options, expected_creation_params);
-      expectSetsockopt(os_sys_calls_, expected_option.level(), expected_option.option(),
-                       expected_value, expected_num_options);
+      expectSetsockopt(expected_option.level(), expected_option.option(), expected_value,
+                       expected_num_options);
       manager_->addOrUpdateListener(listener, "", true);
       EXPECT_EQ(1U, manager_->listeners().size());
     } else {
@@ -336,8 +336,13 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
   EXPECT_CALL(server_.random_, uuid());
   EXPECT_CALL(*worker_, addListener(_, _, _));
   EXPECT_CALL(listener_factory_,
-              createListenSocket(_, Network::Address::SocketType::Datagram, _, {{true, false}}));
-  EXPECT_CALL(os_sys_calls_, setsockopt_(_, _, _, _, _)).Times(testing::AtLeast(1));
+              createListenSocket(_, Network::Socket::Type::Datagram, _, {{true, false}}))
+      .WillOnce(Invoke([this](const Network::Address::InstanceConstSharedPtr&,
+                              Network::Socket::Type, const Network::Socket::OptionsSharedPtr&,
+                              const ListenSocketCreationParams&) -> Network::SocketSharedPtr {
+        return listener_factory_.socket_;
+      }));
+  EXPECT_CALL(*listener_factory_.socket_, setSocketOption(_, _, _, _)).Times(testing::AtLeast(1));
   EXPECT_CALL(os_sys_calls_, close(_)).WillRepeatedly(Return(Api::SysCallIntResult{0, errno}));
   manager_->addOrUpdateListener(listener_proto, "", true);
   EXPECT_EQ(1u, manager_->listeners().size());
@@ -1364,7 +1369,7 @@ filter_chains:
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, ListenSocketCreationParams(false)))
       .WillOnce(Invoke([this, &syscall_result, &real_listener_factory](
                            const Network::Address::InstanceConstSharedPtr& address,
-                           Network::Address::SocketType socket_type,
+                           Network::Socket::Type socket_type,
                            const Network::Socket::OptionsSharedPtr& options,
                            const ListenSocketCreationParams& params) -> Network::SocketSharedPtr {
         EXPECT_CALL(server_, hotRestart).Times(0);
@@ -1401,7 +1406,7 @@ filter_chains:
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {{true, false}}))
       .WillOnce(Invoke([this, &syscall_result, &real_listener_factory](
                            const Network::Address::InstanceConstSharedPtr& address,
-                           Network::Address::SocketType socket_type,
+                           Network::Socket::Type socket_type,
                            const Network::Socket::OptionsSharedPtr& options,
                            const ListenSocketCreationParams& params) -> Network::SocketSharedPtr {
         EXPECT_CALL(server_, hotRestart).Times(0);
@@ -1417,7 +1422,7 @@ TEST_F(ListenerManagerImplTest, NotSupportedDatagramUds) {
   ProdListenerComponentFactory real_listener_factory(server_);
   EXPECT_THROW_WITH_MESSAGE(real_listener_factory.createListenSocket(
                                 std::make_shared<Network::Address::PipeInstance>("/foo"),
-                                Network::Address::SocketType::Datagram, nullptr, {true}),
+                                Network::Socket::Type::Datagram, nullptr, {true}),
                             EnvoyException,
                             "socket type SocketType::Datagram not supported for pipes");
 }
@@ -3460,6 +3465,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
   Network::FilterChainFactory& filterChainFactory = listener.filterChainFactory();
   Network::MockListenerFilterManager manager;
 
+  // Return error when trying to retrieve the original dst on the invalid handle
+  EXPECT_CALL(os_sys_calls_, getsockopt_(_, _, _, _, _)).WillOnce(Return(-1));
+
   NiceMock<Network::MockListenerFilterCallbacks> callbacks;
   Network::AcceptedSocketImpl socket(std::make_unique<Network::IoSocketHandleImpl>(),
                                      Network::Address::InstanceConstSharedPtr{
@@ -3481,7 +3489,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
 }
 
 class OriginalDstTestFilter : public Extensions::ListenerFilters::OriginalDst::OriginalDstFilter {
-  Network::Address::InstanceConstSharedPtr getOriginalDst(os_fd_t) override {
+  Network::Address::InstanceConstSharedPtr getOriginalDst(Network::Socket&) override {
     return Network::Address::InstanceConstSharedPtr{
         new Network::Address::Ipv4Instance("127.0.0.2", 2345)};
   }
@@ -3555,7 +3563,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
 
 class OriginalDstTestFilterIPv6
     : public Extensions::ListenerFilters::OriginalDst::OriginalDstFilter {
-  Network::Address::InstanceConstSharedPtr getOriginalDst(os_fd_t) override {
+  Network::Address::InstanceConstSharedPtr getOriginalDst(Network::Socket&) override {
     return Network::Address::InstanceConstSharedPtr{
         new Network::Address::Ipv6Instance("1::2", 2345)};
   }
@@ -3641,7 +3649,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TransparentFreebindListenerDisabl
   )EOF",
                                                        Network::Address::IpVersion::v4);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}))
-      .WillOnce(Invoke([&](Network::Address::InstanceConstSharedPtr, Network::Address::SocketType,
+      .WillOnce(Invoke([&](Network::Address::InstanceConstSharedPtr, Network::Socket::Type,
                            const Network::Socket::OptionsSharedPtr& options,
                            const ListenSocketCreationParams&) -> Network::SocketSharedPtr {
         EXPECT_EQ(options, nullptr);
@@ -3728,14 +3736,12 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, ReusePortListenerDisabled) {
 #endif
                            /* expected_creation_params */ {true, false});
 
-  expectSetsockopt(os_sys_calls_,
-                   /* expected_sockopt_level */ IPPROTO_IP,
+  expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
                    /* expected_sockopt_name */ ENVOY_IP_PKTINFO,
                    /* expected_value */ 1,
                    /* expected_num_calls */ 1);
 #ifdef SO_RXQ_OVFL
-  expectSetsockopt(os_sys_calls_,
-                   /* expected_sockopt_level */ SOL_SOCKET,
+  expectSetsockopt(/* expected_sockopt_level */ SOL_SOCKET,
                    /* expected_sockopt_name */ SO_RXQ_OVFL,
                    /* expected_value */ 1,
                    /* expected_num_calls */ 1);
@@ -3764,14 +3770,14 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, LiteralSockoptListenerEnabled) {
 
   expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
                            /* expected_num_options */ 3);
-  expectSetsockopt(os_sys_calls_,
-                   /* expected_sockopt_level */ 1,
-                   /* expected_sockopt_name */ 2,
-                   /* expected_value */ 3);
-  expectSetsockopt(os_sys_calls_,
-                   /* expected_sockopt_level */ 4,
-                   /* expected_sockopt_name */ 5,
-                   /* expected_value */ 6);
+  expectSetsockopt(
+      /* expected_sockopt_level */ 1,
+      /* expected_sockopt_name */ 2,
+      /* expected_value */ 3);
+  expectSetsockopt(
+      /* expected_sockopt_level */ 4,
+      /* expected_sockopt_name */ 5,
+      /* expected_value */ 6);
   manager_->addOrUpdateListener(listener, "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 }

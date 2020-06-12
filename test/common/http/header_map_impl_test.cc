@@ -392,7 +392,7 @@ TEST(HeaderMapImplTest, InlineInsert) {
   EXPECT_FALSE(headers.empty());
   EXPECT_EQ(1, headers.size());
   EXPECT_EQ(":authority", headers.Host()->key().getStringView());
-  EXPECT_EQ("hello", headers.Host()->value().getStringView());
+  EXPECT_EQ("hello", headers.getHostValue());
   EXPECT_EQ("hello", headers.get(Headers::get().Host)->value().getStringView());
 }
 
@@ -402,43 +402,43 @@ TEST(HeaderMapImplTest, InlineAppend) {
     // Create via header and append.
     headers.setVia("");
     headers.appendVia("1.0 fred", ",");
-    EXPECT_EQ(headers.Via()->value().getStringView(), "1.0 fred");
+    EXPECT_EQ(headers.getViaValue(), "1.0 fred");
     headers.appendVia("1.1 nowhere.com", ",");
-    EXPECT_EQ(headers.Via()->value().getStringView(), "1.0 fred,1.1 nowhere.com");
+    EXPECT_EQ(headers.getViaValue(), "1.0 fred,1.1 nowhere.com");
   }
   {
     // Append to via header without explicitly creating first.
     TestRequestHeaderMapImpl headers;
     headers.appendVia("1.0 fred", ",");
-    EXPECT_EQ(headers.Via()->value().getStringView(), "1.0 fred");
+    EXPECT_EQ(headers.getViaValue(), "1.0 fred");
     headers.appendVia("1.1 nowhere.com", ",");
-    EXPECT_EQ(headers.Via()->value().getStringView(), "1.0 fred,1.1 nowhere.com");
+    EXPECT_EQ(headers.getViaValue(), "1.0 fred,1.1 nowhere.com");
   }
   {
     // Custom delimiter.
     TestRequestHeaderMapImpl headers;
     headers.setVia("");
     headers.appendVia("1.0 fred", ", ");
-    EXPECT_EQ(headers.Via()->value().getStringView(), "1.0 fred");
+    EXPECT_EQ(headers.getViaValue(), "1.0 fred");
     headers.appendVia("1.1 nowhere.com", ", ");
-    EXPECT_EQ(headers.Via()->value().getStringView(), "1.0 fred, 1.1 nowhere.com");
+    EXPECT_EQ(headers.getViaValue(), "1.0 fred, 1.1 nowhere.com");
   }
   {
     // Append and then later set.
     TestRequestHeaderMapImpl headers;
     headers.appendVia("1.0 fred", ",");
     headers.appendVia("1.1 nowhere.com", ",");
-    EXPECT_EQ(headers.Via()->value().getStringView(), "1.0 fred,1.1 nowhere.com");
+    EXPECT_EQ(headers.getViaValue(), "1.0 fred,1.1 nowhere.com");
     headers.setVia("2.0 override");
-    EXPECT_EQ(headers.Via()->value().getStringView(), "2.0 override");
+    EXPECT_EQ(headers.getViaValue(), "2.0 override");
   }
   {
     // Set and then append. This mimics how GrpcTimeout is set.
     TestRequestHeaderMapImpl headers;
     headers.setGrpcTimeout(42);
-    EXPECT_EQ(headers.GrpcTimeout()->value().getStringView(), "42");
+    EXPECT_EQ(headers.getGrpcTimeoutValue(), "42");
     headers.appendGrpcTimeout("s", "");
-    EXPECT_EQ(headers.GrpcTimeout()->value().getStringView(), "42s");
+    EXPECT_EQ(headers.getGrpcTimeoutValue(), "42s");
   }
 }
 
@@ -450,7 +450,7 @@ TEST(HeaderMapImplTest, MoveIntoInline) {
   value.setCopy("hello");
   headers.addViaMove(std::move(key), std::move(value));
   EXPECT_EQ("cache-control", headers.CacheControl()->key().getStringView());
-  EXPECT_EQ("hello", headers.CacheControl()->value().getStringView());
+  EXPECT_EQ("hello", headers.getCacheControlValue());
 
   HeaderString key2;
   key2.setCopy(Headers::get().CacheControl.get());
@@ -458,7 +458,7 @@ TEST(HeaderMapImplTest, MoveIntoInline) {
   value2.setCopy("there");
   headers.addViaMove(std::move(key2), std::move(value2));
   EXPECT_EQ("cache-control", headers.CacheControl()->key().getStringView());
-  EXPECT_EQ("hello,there", headers.CacheControl()->value().getStringView());
+  EXPECT_EQ("hello,there", headers.getCacheControlValue());
 }
 
 TEST(HeaderMapImplTest, Remove) {
@@ -480,7 +480,7 @@ TEST(HeaderMapImplTest, Remove) {
   // Add and remove by inline.
   EXPECT_EQ(0UL, headers.removeContentLength());
   headers.setContentLength(5);
-  EXPECT_EQ("5", headers.ContentLength()->value().getStringView());
+  EXPECT_EQ("5", headers.getContentLengthValue());
   EXPECT_EQ(1UL, headers.size());
   EXPECT_FALSE(headers.empty());
   EXPECT_EQ(1UL, headers.removeContentLength());
@@ -490,7 +490,7 @@ TEST(HeaderMapImplTest, Remove) {
 
   // Add inline and remove by name.
   headers.setContentLength(5);
-  EXPECT_EQ("5", headers.ContentLength()->value().getStringView());
+  EXPECT_EQ("5", headers.getContentLengthValue());
   EXPECT_EQ(1UL, headers.size());
   EXPECT_FALSE(headers.empty());
   EXPECT_EQ(1UL, headers.remove(Headers::get().ContentLength));
@@ -537,7 +537,7 @@ TEST(HeaderMapImplTest, RemoveRegex) {
 
   // Add inline and remove by regex
   headers.setContentLength(5);
-  EXPECT_EQ("5", headers.ContentLength()->value().getStringView());
+  EXPECT_EQ("5", headers.getContentLengthValue());
   EXPECT_EQ(1UL, headers.size());
   EXPECT_FALSE(headers.empty());
   EXPECT_EQ(1UL, headers.removePrefix(LowerCaseString("content")));
@@ -606,21 +606,21 @@ TEST(HeaderMapImplTest, DoubleInlineAdd) {
     const std::string bar("bar");
     headers.addReference(Headers::get().ContentLength, foo);
     headers.addReference(Headers::get().ContentLength, bar);
-    EXPECT_EQ("foo,bar", headers.ContentLength()->value().getStringView());
+    EXPECT_EQ("foo,bar", headers.getContentLengthValue());
     EXPECT_EQ(1UL, headers.size());
   }
   {
     TestRequestHeaderMapImpl headers;
     headers.addReferenceKey(Headers::get().ContentLength, "foo");
     headers.addReferenceKey(Headers::get().ContentLength, "bar");
-    EXPECT_EQ("foo,bar", headers.ContentLength()->value().getStringView());
+    EXPECT_EQ("foo,bar", headers.getContentLengthValue());
     EXPECT_EQ(1UL, headers.size());
   }
   {
     TestRequestHeaderMapImpl headers;
     headers.addReferenceKey(Headers::get().ContentLength, 5);
     headers.addReferenceKey(Headers::get().ContentLength, 6);
-    EXPECT_EQ("5,6", headers.ContentLength()->value().getStringView());
+    EXPECT_EQ("5,6", headers.getContentLengthValue());
     EXPECT_EQ(1UL, headers.size());
   }
   {
@@ -628,7 +628,7 @@ TEST(HeaderMapImplTest, DoubleInlineAdd) {
     const std::string foo("foo");
     headers.addReference(Headers::get().ContentLength, foo);
     headers.addReferenceKey(Headers::get().ContentLength, 6);
-    EXPECT_EQ("foo,6", headers.ContentLength()->value().getStringView());
+    EXPECT_EQ("foo,6", headers.getContentLengthValue());
     EXPECT_EQ(1UL, headers.size());
   }
 }
@@ -655,7 +655,7 @@ TEST(HeaderMapImplTest, DoubleInlineSet) {
   TestRequestHeaderMapImpl headers;
   headers.setReferenceKey(Headers::get().ContentType, "blah");
   headers.setReferenceKey(Headers::get().ContentType, "text/html");
-  EXPECT_EQ("text/html", headers.ContentType()->value().getStringView());
+  EXPECT_EQ("text/html", headers.getContentTypeValue());
   EXPECT_EQ(1UL, headers.size());
 }
 
@@ -725,10 +725,10 @@ TEST(HeaderMapImplTest, SetCopy) {
   EXPECT_EQ(headers.size(), 0);
   headers.setCopy(Headers::get().Path, "/");
   EXPECT_EQ(headers.size(), 1);
-  EXPECT_EQ(headers.Path()->value().getStringView(), "/");
+  EXPECT_EQ(headers.getPathValue(), "/");
   headers.setPath("/foo");
   EXPECT_EQ(headers.size(), 1);
-  EXPECT_EQ(headers.Path()->value().getStringView(), "/foo");
+  EXPECT_EQ(headers.getPathValue(), "/foo");
 }
 
 TEST(HeaderMapImplTest, AddCopy) {
@@ -790,7 +790,7 @@ TEST(HeaderMapImplTest, AddCopy) {
   LowerCaseString cache_control("cache-control");
   headers.addCopy(cache_control, "max-age=1345");
   EXPECT_EQ("max-age=1345", headers.get(cache_control)->value().getStringView());
-  EXPECT_EQ("max-age=1345", headers.CacheControl()->value().getStringView());
+  EXPECT_EQ("max-age=1345", headers.getCacheControlValue());
   headers.addCopy(cache_control, "public");
   EXPECT_EQ("max-age=1345,public", headers.get(cache_control)->value().getStringView());
   headers.addCopy(cache_control, "");
@@ -923,6 +923,15 @@ TEST(HeaderMapImplTest, Get) {
   }
 }
 
+TEST(HeaderMapImplTest, CreateHeaderMapFromIterator) {
+  std::vector<std::pair<LowerCaseString, std::string>> iter_headers{
+      {LowerCaseString(Headers::get().Path), "/"}, {LowerCaseString("hello"), "world"}};
+  auto headers = createHeaderMap<TestHeaderMapImpl>(iter_headers.cbegin(), iter_headers.cend());
+  EXPECT_EQ("/", headers->get(LowerCaseString(":path"))->value().getStringView());
+  EXPECT_EQ("world", headers->get(LowerCaseString("hello"))->value().getStringView());
+  EXPECT_EQ(nullptr, headers->get(LowerCaseString("foo")));
+}
+
 TEST(HeaderMapImplTest, TestHeaderList) {
   std::array<Http::LowerCaseString, 2> keys{Headers::get().Path, LowerCaseString("hello")};
   std::array<std::string, 2> values{"/", "world"};
@@ -976,19 +985,18 @@ TEST(HeaderMapImplTest, TestAppendHeader) {
     // Append with default delimiter.
     headers.appendPath(" ", ",");
     headers.setPath(0);
-    EXPECT_EQ("0", headers.Path()->value().getStringView());
+    EXPECT_EQ("0", headers.getPathValue());
     EXPECT_EQ(1U, headers.Path()->value().size());
   }
   // Test append for inline headers using this method and append##name.
   {
     TestRequestHeaderMapImpl headers;
     headers.addCopy(Headers::get().Via, "1.0 fred");
-    EXPECT_EQ(headers.Via()->value().getStringView(), "1.0 fred");
+    EXPECT_EQ(headers.getViaValue(), "1.0 fred");
     headers.appendCopy(Headers::get().Via, "1.1 p.example.net");
-    EXPECT_EQ(headers.Via()->value().getStringView(), "1.0 fred,1.1 p.example.net");
+    EXPECT_EQ(headers.getViaValue(), "1.0 fred,1.1 p.example.net");
     headers.appendVia("1.1 new.example.net", ",");
-    EXPECT_EQ(headers.Via()->value().getStringView(),
-              "1.0 fred,1.1 p.example.net,1.1 new.example.net");
+    EXPECT_EQ(headers.getViaValue(), "1.0 fred,1.1 p.example.net,1.1 new.example.net");
   }
 }
 
@@ -1273,7 +1281,7 @@ TEST(HeaderMapImplTest, ClearHeaderMap) {
 
   // Add inline and clear.
   headers.setContentLength(5);
-  EXPECT_EQ("5", headers.ContentLength()->value().getStringView());
+  EXPECT_EQ("5", headers.getContentLengthValue());
   EXPECT_EQ(1UL, headers.size());
   EXPECT_FALSE(headers.empty());
   headers.clear();
@@ -1348,6 +1356,12 @@ TEST(HeaderMapImplTest, InlineHeaderByteSize) {
     headers.setStatus(newStatus);
     EXPECT_EQ(headers.byteSize(), 10);
   }
+}
+
+TEST(HeaderMapImplTest, ValidHeaderString) {
+  EXPECT_TRUE(validHeaderString("abc"));
+  EXPECT_FALSE(validHeaderString(absl::string_view("a\000bc", 4)));
+  EXPECT_FALSE(validHeaderString("abc\n"));
 }
 
 } // namespace Http

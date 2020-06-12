@@ -119,11 +119,7 @@ public:
     use_lds_ = false;
   }
 
-  void TearDown() override {
-    cleanUpXdsConnection();
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
+  void TearDown() override { cleanUpXdsConnection(); }
 
   void initialize() override {
     use_lds_ = false;
@@ -196,10 +192,10 @@ TEST_P(AggregateIntegrationTest, ClusterUpDownUp) {
       IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/aggregatecluster", "",
                                          downstream_protocol_, version_, "foo.com");
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("503", response->headers().getStatusValue());
 
   cleanupUpstreamAndDownstream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // Tell Envoy that cluster_1 is back.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "42", {}, {}, {}));
@@ -218,7 +214,7 @@ TEST_P(AggregateIntegrationTest, TwoClusters) {
   testRouterHeaderOnlyRequestAndResponse(nullptr, FirstUpstreamIndex, "/aggregatecluster");
 
   cleanupUpstreamAndDownstream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // Tell Envoy that cluster_2 is here.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "55", {}, {}, {}));
@@ -230,7 +226,7 @@ TEST_P(AggregateIntegrationTest, TwoClusters) {
   // A request for aggregate cluster should be fine.
   testRouterHeaderOnlyRequestAndResponse(nullptr, FirstUpstreamIndex, "/aggregatecluster");
   cleanupUpstreamAndDownstream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // Tell Envoy that cluster_1 is gone.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "42", {}, {}, {}));
@@ -242,7 +238,7 @@ TEST_P(AggregateIntegrationTest, TwoClusters) {
 
   testRouterHeaderOnlyRequestAndResponse(nullptr, SecondUpstreamIndex, "/aggregatecluster");
   cleanupUpstreamAndDownstream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // Tell Envoy that cluster_1 is back.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "42", {}, {}, {}));
@@ -288,7 +284,7 @@ TEST_P(AggregateIntegrationTest, PreviousPrioritiesRetryPredicate) {
   EXPECT_TRUE(upstream_request_->complete());
 
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
   cleanupUpstreamAndDownstream();
 }
 

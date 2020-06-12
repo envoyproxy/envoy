@@ -343,47 +343,37 @@ Address::InstanceConstSharedPtr Utility::getAddressWithPort(const Address::Insta
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-Address::InstanceConstSharedPtr Utility::getOriginalDst(os_fd_t fd) {
+Address::InstanceConstSharedPtr Utility::getOriginalDst(Socket& sock) {
 #ifdef SOL_IP
+
+  if (sock.addressType() != Address::Type::Ip) {
+    return nullptr;
+  }
+
+  auto ipVersion = sock.ipVersion();
+  if (!ipVersion.has_value()) {
+    return nullptr;
+  }
+
   sockaddr_storage orig_addr;
   socklen_t addr_len = sizeof(sockaddr_storage);
-  int socket_domain;
-  socklen_t domain_len = sizeof(socket_domain);
-  auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  const Api::SysCallIntResult result =
-      os_syscalls.getsockopt(fd, SOL_SOCKET, SO_DOMAIN, &socket_domain, &domain_len);
-  int status = result.rc_;
+  int status;
 
-  if (status != 0) {
-    return nullptr;
-  }
-
-  if (socket_domain == AF_INET) {
-    status = os_syscalls.getsockopt(fd, SOL_IP, SO_ORIGINAL_DST, &orig_addr, &addr_len).rc_;
-  } else if (socket_domain == AF_INET6) {
-    status = os_syscalls.getsockopt(fd, SOL_IPV6, IP6T_SO_ORIGINAL_DST, &orig_addr, &addr_len).rc_;
+  if (*ipVersion == Address::IpVersion::v4) {
+    status = sock.getSocketOption(SOL_IP, SO_ORIGINAL_DST, &orig_addr, &addr_len).rc_;
   } else {
-    return nullptr;
+    status = sock.getSocketOption(SOL_IPV6, IP6T_SO_ORIGINAL_DST, &orig_addr, &addr_len).rc_;
   }
 
   if (status != 0) {
     return nullptr;
   }
 
-  switch (orig_addr.ss_family) {
-  case AF_INET:
-    return Address::InstanceConstSharedPtr{
-        new Address::Ipv4Instance(reinterpret_cast<sockaddr_in*>(&orig_addr))};
-  case AF_INET6:
-    return Address::InstanceConstSharedPtr{
-        new Address::Ipv6Instance(reinterpret_cast<sockaddr_in6&>(orig_addr))};
-  default:
-    return nullptr;
-  }
+  return Address::addressFromSockAddr(orig_addr, 0, true /* default for v6 constructor */);
 #else
   // TODO(zuercher): determine if connection redirection is possible under macOS (c.f. pfctl and
   // divert), and whether it's possible to find the learn destination address.
-  UNREFERENCED_PARAMETER(fd);
+  UNREFERENCED_PARAMETER(sock);
   return nullptr;
 #endif
 }
@@ -481,22 +471,22 @@ void Utility::addressToProtobufAddress(const Address::Instance& address,
   }
 }
 
-Address::SocketType
+Socket::Type
 Utility::protobufAddressSocketType(const envoy::config::core::v3::Address& proto_address) {
   switch (proto_address.address_case()) {
   case envoy::config::core::v3::Address::AddressCase::kSocketAddress: {
     const auto protocol = proto_address.socket_address().protocol();
     switch (protocol) {
     case envoy::config::core::v3::SocketAddress::TCP:
-      return Address::SocketType::Stream;
+      return Socket::Type::Stream;
     case envoy::config::core::v3::SocketAddress::UDP:
-      return Address::SocketType::Datagram;
+      return Socket::Type::Datagram;
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }
   case envoy::config::core::v3::Address::AddressCase::kPipe:
-    return Address::SocketType::Stream;
+    return Socket::Type::Stream;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }

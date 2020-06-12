@@ -42,8 +42,6 @@ public:
   void TearDown() override {
     if (!test_skipped_) {
       cleanUpXdsConnection();
-      test_server_.reset();
-      fake_upstreams_.clear();
     }
   }
 
@@ -147,6 +145,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, CdsIntegrationTest,
 TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
   // Calls our initialize(), which includes establishing a listener, route, and cluster.
   testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex1, "/cluster1");
+  test_server_->waitForCounterGe("cluster_manager.cluster_added", 1);
 
   // Tell Envoy that cluster_1 is gone.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "55", {}, {}, {}));
@@ -160,10 +159,10 @@ TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "GET", "/cluster1", "", downstream_protocol_, version_, "foo.com");
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("503", response->headers().getStatusValue());
 
   cleanupUpstreamAndDownstream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // Tell Envoy that cluster_1 is back.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "42", {}, {}, {}));
@@ -186,7 +185,7 @@ TEST_P(CdsIntegrationTest, TwoClusters) {
   testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex1, "/cluster1");
 
   cleanupUpstreamAndDownstream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // Tell Envoy that cluster_2 is here.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "55", {}, {}, {}));
@@ -198,7 +197,7 @@ TEST_P(CdsIntegrationTest, TwoClusters) {
   // A request for cluster_2 should be fine.
   testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex2, "/cluster2");
   cleanupUpstreamAndDownstream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // Tell Envoy that cluster_1 is gone.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "42", {}, {}, {}));
@@ -211,7 +210,7 @@ TEST_P(CdsIntegrationTest, TwoClusters) {
   // Even with cluster_1 gone, a request for cluster_2 should be fine.
   testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex2, "/cluster2");
   cleanupUpstreamAndDownstream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // Tell Envoy that cluster_1 is back.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "42", {}, {}, {}));
@@ -236,7 +235,7 @@ TEST_P(CdsIntegrationTest, VersionsRememberedAfterReconnect) {
   // Calls our initialize(), which includes establishing a listener, route, and cluster.
   testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex1, "/cluster1");
   cleanupUpstreamAndDownstream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // Close the connection carrying Envoy's xDS gRPC stream...
   AssertionResult result = xds_connection_->close();
@@ -265,11 +264,11 @@ TEST_P(CdsIntegrationTest, VersionsRememberedAfterReconnect) {
   // A request for cluster_1 should be fine.
   testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex1, "/cluster1");
   cleanupUpstreamAndDownstream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
   // A request for cluster_2 should be fine.
   testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex2, "/cluster2");
   cleanupUpstreamAndDownstream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
 
 } // namespace

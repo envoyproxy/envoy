@@ -77,6 +77,7 @@ extensions/filters/common/original_src @snowp @klarose
 # common crypto extension
 /*/extensions/common/crypto @lizan @PiotrSikora @bdecoste
 /*/extensions/common/proxy_protocol @alyssawilk @wez470
+/*/extensions/common/sqlutils @cpakulski @dio
 /*/extensions/filters/http/grpc_http1_bridge @snowp @jose
 /*/extensions/filters/http/gzip @gsagula @dio
 /*/extensions/filters/http/fault @rshriram @alyssawilk
@@ -118,3 +119,9 @@ extensions/filters/common/original_src @snowp @klarose
 # Compression
 /*/extensions/compression/common @junr03 @rojkov
 /*/extensions/compression/gzip @junr03 @rojkov
+/*/extensions/filters/http/decompressor @rojkov @dio
+# Core upstream code
+extensions/upstreams/http @alyssawilk @snowp @mattklein123
+extensions/upstreams/http/http @alyssawilk @snowp @mattklein123
+extensions/upstreams/http/tcp @alyssawilk @mattklein123
+extensions/upstreams/http/default @alyssawilk @snowp @mattklein123
