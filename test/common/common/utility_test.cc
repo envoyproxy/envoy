@@ -875,4 +875,29 @@ TEST(InlineStorageTest, InlineString) {
   EXPECT_EQ("Hello, world!", hello->toString());
 }
 
+TEST(ContainerRemoveElementsTest, Containers) {
+  auto l = StringUtil::splitToken("one,two,three", ",");
+  std::function<bool(const absl::string_view&)> onep = [](const absl::string_view& s) {
+    return "one" == s;
+  };
+  std::function<bool(const absl::string_view&)> truep =
+      [](ABSL_ATTRIBUTE_UNUSED const absl::string_view& s) { return true; };
+  std::function<bool(const absl::string_view&)> falsep =
+      [](ABSL_ATTRIBUTE_UNUSED const absl::string_view& s) { return false; };
+
+  Containers::removeMatchingElements(l, falsep);
+  // nothing is removed:
+  EXPECT_EQ(3, l.size());
+
+  Containers::removeMatchingElements(l, onep);
+  // one element is removed:
+  EXPECT_EQ(2, l.size());
+  // and the last element is now first:
+  EXPECT_EQ("three", l[0]);
+
+  Containers::removeMatchingElements(l, truep);
+  // everything is removed:
+  EXPECT_EQ(0, l.size());
+}
+
 } // namespace Envoy

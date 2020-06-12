@@ -709,4 +709,32 @@ private:
   char data_[];
 };
 
+/**
+ * Utilities for working with containers.
+ */
+class Containers {
+public:
+  /**
+   * Remove elements that match the predicate from the list by swapping them to
+   * the end and truncating. Iterates over c once, order is not preserved.
+   *
+   * @param c The container on which to operate
+   * @param predicate A function which will be called once for every entry in c,
+   * which returns true if that entry should be removed.
+   */
+  template <class Container, typename T>
+  static void removeMatchingElements(Container& c, std::function<bool(const T&)> predicate) {
+    auto erase_from = c.end();
+    for (auto i = c.begin(); i != erase_from;) {
+      if (predicate(*i)) {
+        *i = *(--erase_from);
+      } else {
+        ++i;
+      }
+    }
+
+    c.erase(erase_from, c.end());
+  }
+};
+
 } // namespace Envoy

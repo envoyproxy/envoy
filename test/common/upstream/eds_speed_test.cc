@@ -143,7 +143,8 @@ static void priorityAndLocalityWeighted(benchmark::State& state) {
   for (auto _ : state) {
     Envoy::Upstream::EdsSpeedTest speed_test(state);
     speed_test.initialize();
-    speed_test.priorityAndLocalityWeightedHelper(state.range(0), state.range(1), state.range(2), true);
+    speed_test.priorityAndLocalityWeightedHelper(state.range(0), state.range(1), state.range(2),
+                                                 true);
   }
 }
 
@@ -154,14 +155,14 @@ static void duplicateUpdate(benchmark::State& state) {
   Envoy::Logger::Context logging_state(spdlog::level::warn,
                                        Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
   for (auto _ : state) {
-    Envoy::Upstream::EdsSpeedTest speed_test;
+    Envoy::Upstream::EdsSpeedTest speed_test(state);
     speed_test.initialize();
-    speed_test.priorityAndLocalityWeightedHelper(state.range(0), true, state.range(1), true);
-    speed_test.priorityAndLocalityWeightedHelper(state.range(0), true, state.range(1), true);
+    speed_test.priorityAndLocalityWeightedHelper(false, true, state.range(0), true);
+    speed_test.priorityAndLocalityWeightedHelper(false, true, state.range(0), true);
   }
 }
 
-BENCHMARK(duplicateUpdate)->Range({false, true}, 2000, 100000);
+BENCHMARK(duplicateUpdate)->Range(2000, 100000);
 
 static void healthOnlyUpdate(benchmark::State& state) {
   Envoy::Thread::MutexBasicLockable lock;
@@ -170,8 +171,8 @@ static void healthOnlyUpdate(benchmark::State& state) {
   for (auto _ : state) {
     Envoy::Upstream::EdsSpeedTest speed_test(state);
     speed_test.initialize();
-    speed_test.priorityAndLocalityWeightedHelper(state.range(0), true, state.range(1), true);
-    speed_test.priorityAndLocalityWeightedHelper(state.range(0), true, state.range(1), false);
+    speed_test.priorityAndLocalityWeightedHelper(false, true, state.range(0), true);
+    speed_test.priorityAndLocalityWeightedHelper(false, true, state.range(0), false);
   }
 }
 
