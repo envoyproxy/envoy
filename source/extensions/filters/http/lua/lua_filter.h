@@ -19,30 +19,31 @@ namespace Lua {
 
 constexpr char GLOBAL_SCRIPT_NAME[] = "GLOBAL";
 
-class SingleScriptConfig : Logger::Loggable<Logger::Id::lua> {
+class PerLuaCodeSetup : Logger::Loggable<Logger::Id::lua> {
 public:
-  SingleScriptConfig(const std::string& lua_code, ThreadLocal::SlotAllocator& tls);
+  PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotAllocator& tls);
 
   Extensions::Filters::Common::Lua::CoroutinePtr createCoroutine() {
     return lua_state_.createCoroutine();
   }
 
-  int decodeFunctionRef() { return lua_state_.getGlobalRef(decode_function_slot_); }
-  int encodeFunctionRef() { return lua_state_.getGlobalRef(encode_function_slot_); }
+  int requestFunctionRef() { return lua_state_.getGlobalRef(request_function_slot_); }
+  int responseFunctionRef() { return lua_state_.getGlobalRef(response_function_slot_); }
 
   uint64_t runtimeBytesUsed() { return lua_state_.runtimeBytesUsed(); }
   void runtimeGC() { return lua_state_.runtimeGC(); }
 
 private:
-  uint64_t decode_function_slot_{};
-  uint64_t encode_function_slot_{};
+  uint64_t request_function_slot_{};
+  uint64_t response_function_slot_{};
 
   Filters::Common::Lua::ThreadLocalState lua_state_;
 };
 
-using SingleScriptConfigPtr = std::unique_ptr<SingleScriptConfig>;
+using PerLuaCodeSetupPtr = std::unique_ptr<PerLuaCodeSetup>;
 
 class FilterConfigPerRoute;
+class FilterConfig;
 
 namespace {
 const FilterConfigPerRoute* getConfigPerRoute(Http::StreamFilterCallbacks* callbacks) {
@@ -337,9 +338,9 @@ public:
                ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cluster_manager,
                Api::Api& api);
 
-  SingleScriptConfig* scriptConfig(const std::string& name) const {
-    auto iter = script_configs_map_.find(name);
-    if (iter != script_configs_map_.end()) {
+  PerLuaCodeSetup* perLuaCodeSetup(const std::string& name) const {
+    auto iter = per_lua_code_setups_map_.find(name);
+    if (iter != per_lua_code_setups_map_.end()) {
       return iter->second.get();
     } else {
       return nullptr;
@@ -353,7 +354,7 @@ private:
   readSourceCodes(const envoy::extensions::filters::http::lua::v3::Lua& config,
                   Api::Api& api) const;
 
-  absl::flat_hash_map<std::string, SingleScriptConfigPtr> script_configs_map_;
+  absl::flat_hash_map<std::string, PerLuaCodeSetupPtr> per_lua_code_setups_map_;
 };
 
 using FilterConfigConstSharedPtr = std::shared_ptr<FilterConfig>;
@@ -368,14 +369,43 @@ public:
 
   bool disabled() const { return disabled_; }
   const std::string& name() const { return name_; }
-  SingleScriptConfig* scriptConfig() const { return single_script_config_ptr_.get(); }
+  PerLuaCodeSetup* perLuaCodeSetup() const { return per_lua_code_setup_ptr_.get(); }
 
 private:
   const bool disabled_;
   const std::string name_;
 
-  SingleScriptConfigPtr single_script_config_ptr_{};
+  PerLuaCodeSetupPtr per_lua_code_setup_ptr_{};
 };
+
+namespace {
+
+PerLuaCodeSetup* getPerLuaCodeSetup(const FilterConfig* filter_config,
+                                    const FilterConfigPerRoute* config_per_route) {
+  // 'filter_config' will never be null.
+  ASSERT(filter_config);
+  if (!filter_config) {
+    // Although this position will never be executed, we still add a check to ensure that the
+    // function is absolutely safe.
+    return nullptr;
+  }
+  if (!config_per_route) {
+    // There is no per route config and 'GLOBAL' will be used to get the default Lua code.
+    return filter_config->perLuaCodeSetup(GLOBAL_SCRIPT_NAME);
+  } else if (config_per_route->disabled()) {
+    // Filter is disabled by route config.
+    return nullptr;
+  } else if (!config_per_route->name().empty()) {
+    // Get the Lua code referenced by 'name'.
+    return filter_config->perLuaCodeSetup(config_per_route->name());
+  } else {
+    // Get the inline Lua code in the route.
+    return config_per_route->perLuaCodeSetup();
+  }
+  return nullptr;
+}
+
+} // namespace
 
 // TODO(mattklein123): Filter stats.
 
@@ -396,28 +426,19 @@ public:
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override {
-    std::string name = GLOBAL_SCRIPT_NAME;
     const auto config_per_route = getConfigPerRoute(decoder_callbacks_.callbacks_);
-    if (config_per_route) {
-      // Filter is disabled by route config
-      if (config_per_route->disabled()) {
-        return Http::FilterHeadersStatus::Continue;
-      }
-      name = config_per_route->name().empty() ? name : config_per_route->name();
-      script_config_ = config_per_route->scriptConfig();
-    }
-    script_config_ = script_config_ ? script_config_ : config_->scriptConfig(name);
-    if (!script_config_) {
+    per_lua_code_setup_ = getPerLuaCodeSetup(config_.get(), config_per_route);
+    if (!per_lua_code_setup_) {
       return Http::FilterHeadersStatus::Continue;
     }
-    return doHeaders(decoder_stream_wrapper_, decoder_coroutine_, decoder_callbacks_,
-                     script_config_->decodeFunctionRef(), headers, end_stream);
+    return doHeaders(request_stream_wrapper_, request_coroutine_, decoder_callbacks_,
+                     per_lua_code_setup_->requestFunctionRef(), headers, end_stream);
   }
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override {
-    return doData(decoder_stream_wrapper_, data, end_stream);
+    return doData(request_stream_wrapper_, data, end_stream);
   }
   Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override {
-    return doTrailers(decoder_stream_wrapper_, trailers);
+    return doTrailers(request_stream_wrapper_, trailers);
   }
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     decoder_callbacks_.callbacks_ = &callbacks;
@@ -429,28 +450,19 @@ public:
   }
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override {
-    std::string name = GLOBAL_SCRIPT_NAME;
     const auto config_per_route = getConfigPerRoute(decoder_callbacks_.callbacks_);
-    if (config_per_route) {
-      // Filter is disabled by route config
-      if (config_per_route->disabled()) {
-        return Http::FilterHeadersStatus::Continue;
-      }
-      name = config_per_route->name().empty() ? name : config_per_route->name();
-      script_config_ = config_per_route->scriptConfig();
-    }
-    script_config_ = script_config_ ? script_config_ : config_->scriptConfig(name);
-    if (!script_config_) {
+    per_lua_code_setup_ = getPerLuaCodeSetup(config_.get(), config_per_route);
+    if (!per_lua_code_setup_) {
       return Http::FilterHeadersStatus::Continue;
     }
-    return doHeaders(encoder_stream_wrapper_, encoder_coroutine_, encoder_callbacks_,
-                     script_config_->encodeFunctionRef(), headers, end_stream);
+    return doHeaders(response_stream_wrapper_, response_coroutine_, encoder_callbacks_,
+                     per_lua_code_setup_->responseFunctionRef(), headers, end_stream);
   }
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override {
-    return doData(encoder_stream_wrapper_, data, end_stream);
+    return doData(response_stream_wrapper_, data, end_stream);
   };
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override {
-    return doTrailers(encoder_stream_wrapper_, trailers);
+    return doTrailers(response_stream_wrapper_, trailers);
   };
   Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override {
     return Http::FilterMetadataStatus::Continue;
@@ -512,11 +524,11 @@ private:
   Http::FilterTrailersStatus doTrailers(StreamHandleRef& handle, Http::HeaderMap& trailers);
 
   FilterConfigConstSharedPtr config_{};
-  SingleScriptConfig* script_config_{};
+  PerLuaCodeSetup* per_lua_code_setup_{};
   DecoderCallbacks decoder_callbacks_{*this};
   EncoderCallbacks encoder_callbacks_{*this};
-  StreamHandleRef decoder_stream_wrapper_;
-  StreamHandleRef encoder_stream_wrapper_;
+  StreamHandleRef request_stream_wrapper_;
+  StreamHandleRef response_stream_wrapper_;
   bool destroyed_{};
 
   // These coroutines used to be owned by the stream handles. After investigating #3570, it
@@ -531,8 +543,8 @@ private:
   // coroutine at all and it would be taken care of automatically via a runtime internal reference
   // when a yield happens. However, given that I don't fully understand the runtime internals, this
   // seems like a safer fix for now.
-  Filters::Common::Lua::CoroutinePtr decoder_coroutine_;
-  Filters::Common::Lua::CoroutinePtr encoder_coroutine_;
+  Filters::Common::Lua::CoroutinePtr request_coroutine_;
+  Filters::Common::Lua::CoroutinePtr response_coroutine_;
 };
 
 } // namespace Lua

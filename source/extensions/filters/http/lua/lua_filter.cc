@@ -141,7 +141,7 @@ Http::AsyncClient::Request* makeHttpCall(lua_State* state, Filter& filter,
 }
 } // namespace
 
-SingleScriptConfig::SingleScriptConfig(const std::string& lua_code, ThreadLocal::SlotAllocator& tls)
+PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotAllocator& tls)
     : lua_state_(lua_code, tls) {
   lua_state_.registerType<Filters::Common::Lua::BufferWrapper>();
   lua_state_.registerType<Filters::Common::Lua::MetadataMapWrapper>();
@@ -156,13 +156,13 @@ SingleScriptConfig::SingleScriptConfig(const std::string& lua_code, ThreadLocal:
   lua_state_.registerType<StreamHandleWrapper>();
   lua_state_.registerType<PublicKeyWrapper>();
 
-  decode_function_slot_ = lua_state_.registerGlobal("envoy_on_request");
-  if (lua_state_.getGlobalRef(decode_function_slot_) == LUA_REFNIL) {
+  request_function_slot_ = lua_state_.registerGlobal("envoy_on_request");
+  if (lua_state_.getGlobalRef(request_function_slot_) == LUA_REFNIL) {
     ENVOY_LOG(info, "envoy_on_request() function not found. Lua filter will not hook requests.");
   }
 
-  encode_function_slot_ = lua_state_.registerGlobal("envoy_on_response");
-  if (lua_state_.getGlobalRef(encode_function_slot_) == LUA_REFNIL) {
+  response_function_slot_ = lua_state_.registerGlobal("envoy_on_response");
+  if (lua_state_.getGlobalRef(response_function_slot_) == LUA_REFNIL) {
     ENVOY_LOG(info, "envoy_on_response() function not found. Lua filter will not hook responses.");
   }
 }
@@ -599,11 +599,11 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
                            Upstream::ClusterManager& cluster_manager, Api::Api& api)
     : cluster_manager_(cluster_manager) {
   for (const auto& source_code : readSourceCodes(proto_config, api)) {
-    auto single_script_config_ptr = std::make_unique<SingleScriptConfig>(source_code.second, tls);
-    if (!single_script_config_ptr) {
+    auto per_lua_code_setup_ptr = std::make_unique<PerLuaCodeSetup>(source_code.second, tls);
+    if (!per_lua_code_setup_ptr) {
       continue;
     }
-    script_configs_map_[source_code.first] = std::move(single_script_config_ptr);
+    per_lua_code_setups_map_[source_code.first] = std::move(per_lua_code_setup_ptr);
   }
 }
 
@@ -630,17 +630,18 @@ FilterConfigPerRoute::FilterConfigPerRoute(
       config.override_case() != envoy::extensions::filters::http::lua::v3::LuaPerRoute::kCode) {
     return;
   }
-  std::string code_str = Config::DataSource::read(config.code(), true, api);
-  single_script_config_ptr_ = std::make_unique<SingleScriptConfig>(code_str, tls);
+  // Read and parse the inline Lua code defined in the route configuration.
+  const std::string code_str = Config::DataSource::read(config.code(), true, api);
+  per_lua_code_setup_ptr_ = std::make_unique<PerLuaCodeSetup>(code_str, tls);
 }
 
 void Filter::onDestroy() {
   destroyed_ = true;
-  if (decoder_stream_wrapper_.get()) {
-    decoder_stream_wrapper_.get()->onReset();
+  if (request_stream_wrapper_.get()) {
+    request_stream_wrapper_.get()->onReset();
   }
-  if (encoder_stream_wrapper_.get()) {
-    encoder_stream_wrapper_.get()->onReset();
+  if (response_stream_wrapper_.get()) {
+    response_stream_wrapper_.get()->onReset();
   }
 }
 
@@ -652,7 +653,7 @@ Http::FilterHeadersStatus Filter::doHeaders(StreamHandleRef& handle,
     return Http::FilterHeadersStatus::Continue;
   }
 
-  coroutine = script_config_->createCoroutine();
+  coroutine = per_lua_code_setup_->createCoroutine();
   handle.reset(StreamHandleWrapper::create(coroutine->luaState(), *coroutine, headers, end_stream,
                                            *this, callbacks),
                true);
@@ -701,8 +702,8 @@ Http::FilterTrailersStatus Filter::doTrailers(StreamHandleRef& handle, Http::Hea
 
 void Filter::scriptError(const Filters::Common::Lua::LuaException& e) {
   scriptLog(spdlog::level::err, e.what());
-  decoder_stream_wrapper_.reset();
-  encoder_stream_wrapper_.reset();
+  request_stream_wrapper_.reset();
+  response_stream_wrapper_.reset();
 }
 
 void Filter::scriptLog(spdlog::level::level_enum level, const char* message) {

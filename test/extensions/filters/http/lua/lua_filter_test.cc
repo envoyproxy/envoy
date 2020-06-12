@@ -83,9 +83,9 @@ public:
 
   void setupConfig(envoy::extensions::filters::http::lua::v3::Lua& proto_config,
                    envoy::extensions::filters::http::lua::v3::LuaPerRoute& per_route_proto_config) {
-    // Setup filter config for lua filter.
+    // Setup filter config for Lua filter.
     config_ = std::make_shared<FilterConfig>(proto_config, tls_, cluster_manager_, api_);
-    // Setup per route config for lua filter
+    // Setup per route config for Lua filter.
     per_route_config_ = std::make_shared<FilterConfigPerRoute>(per_route_proto_config, tls_, api_);
   }
 
@@ -1946,7 +1946,7 @@ TEST_F(LuaHttpFilterTest, SignatureVerify) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
-// Test whether the route configuration can properly disable the lua filter.
+// Test whether the route configuration can properly disable the Lua filter.
 TEST_F(LuaHttpFilterTest, LuaFilterDisabled) {
   envoy::extensions::filters::http::lua::v3::Lua proto_config;
   proto_config.set_inline_code(ADD_HEADERS_SCRIPT);
@@ -1975,7 +1975,7 @@ TEST_F(LuaHttpFilterTest, LuaFilterDisabled) {
   EXPECT_EQ(nullptr, request_headers_2.get(Http::LowerCaseString("hello")));
 }
 
-// Test whether the route can directly reuse the Lua source code in the global configuration.
+// Test whether the route can directly reuse the Lua code in the global configuration.
 TEST_F(LuaHttpFilterTest, LuaFilterRefSourceCodes) {
   const std::string SCRIPT_FOR_ROUTE_ONE{R"EOF(
     function envoy_on_request(request_handle)
@@ -2039,7 +2039,7 @@ TEST_F(LuaHttpFilterTest, LuaFilterRefSourceCodeNotExist) {
   EXPECT_EQ(nullptr, request_headers.get(Http::LowerCaseString("hello")));
 }
 
-// Test whether the filter can get the script directly from the route.
+// Test whether the filter can get the Lua code directly from the route.
 TEST_F(LuaHttpFilterTest, LuaFilterGetSourceCodeFromRouteDirectly) {
   const std::string SCRIPT_FOR_ROUTE_ONE{R"EOF(
     function envoy_on_request(request_handle)
@@ -2073,8 +2073,9 @@ TEST_F(LuaHttpFilterTest, LuaFilterGetSourceCodeFromRouteDirectly) {
   EXPECT_EQ("Script in route", request_headers.get_("script_info"));
 }
 
-// Test whether the filter can get the script directly from the route.
-TEST_F(LuaHttpFilterTest, LuaFilterDualScript) {
+// Test whether the inline Lua code in the route can work normally in the request phase and the
+// response phase.
+TEST_F(LuaHttpFilterTest, LuaFilterWithInlineCodeInBothHooks) {
   const std::string SCRIPT_IN_ROUTE_DIRECTLY{R"EOF(
     function envoy_on_request(request_handle)
       request_handle:headers():add("script_info", "Script in route by decode");
