@@ -48,6 +48,15 @@ bool NewGrpcMuxImpl::paused(const std::string& type_url) const {
   return pausable_ack_queue_.paused(type_url);
 }
 
+bool NewGrpcMuxImpl::paused(const std::vector<std::string> type_urls) const {
+  for (const auto& type_url : type_urls) {
+    if (paused(type_url)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 void NewGrpcMuxImpl::onDiscoveryResponse(
     std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& message) {
   ENVOY_LOG(debug, "Received DeltaDiscoveryResponse for {} at version {}", message->type_url(),

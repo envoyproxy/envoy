@@ -135,6 +135,15 @@ bool GrpcMuxImpl::paused(const std::string& type_url) const {
   return entry->second.paused_;
 }
 
+bool GrpcMuxImpl::paused(const std::vector<std::string> type_urls) const {
+  for (const auto& type_url : type_urls) {
+    if (paused(type_url)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 void GrpcMuxImpl::onDiscoveryResponse(
     std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message) {
   const std::string& type_url = message->type_url();

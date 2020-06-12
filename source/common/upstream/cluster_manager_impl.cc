@@ -153,24 +153,14 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
       // If the first CDS response doesn't have any primary cluster, ClusterLoadAssignment
       // should be already paused by CdsApiImpl::onConfigUpdate(). Need to check that to
       // avoid double pause ClusterLoadAssignment.
-      std::unique_ptr<Cleanup> maybe_eds_resume_v2;
-      std::unique_ptr<Cleanup> maybe_eds_resume_v3;
+      std::unique_ptr<Cleanup> maybe_eds_resume;
       if (cm_.adsMux()) {
-        const auto type_url_v2 =
-            Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-                envoy::config::core::v3::ApiVersion::V2);
-        const auto type_url_v3 =
-            Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-                envoy::config::core::v3::ApiVersion::V3);
-        if (!cm_.adsMux()->paused(type_url_v2)) {
-          cm_.adsMux()->pause(type_url_v2);
-          maybe_eds_resume_v2 =
-              std::make_unique<Cleanup>([this, type_url_v2] { cm_.adsMux()->resume(type_url_v2); });
-        }
-        if (!cm_.adsMux()->paused(type_url_v3)) {
-          cm_.adsMux()->pause(type_url_v3);
-          maybe_eds_resume_v3 =
-              std::make_unique<Cleanup>([this, type_url_v3] { cm_.adsMux()->resume(type_url_v3); });
+        const auto type_urls =
+            Config::getAllVersionTypeUrls<envoy::config::endpoint::v3::ClusterLoadAssignment>();
+        if (!cm_.adsMux()->paused(type_urls)) {
+          cm_.adsMux()->pause(type_urls);
+          maybe_eds_resume =
+              std::make_unique<Cleanup>([this, type_urls] { cm_.adsMux()->resume(type_urls); });
         }
       }
       initializeSecondaryClusters();
