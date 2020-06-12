@@ -408,7 +408,6 @@ TEST_P(TcpProxyIntegrationTest, TestNoCloseOnHealthFailure) {
       cluster->mutable_health_checks(0)->mutable_tcp_health_check();
       cluster->mutable_health_checks(0)->mutable_tcp_health_check()->mutable_send()->set_text(
           "50696E67");
-      ;
       cluster->mutable_health_checks(0)->mutable_tcp_health_check()->add_receive()->set_text(
           "506F6E67");
     }
