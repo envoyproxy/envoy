@@ -14,6 +14,7 @@
 
 namespace quiche {
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 QuicheOptional<int64_t> QuicheUtcDateTimeToUnixSecondsImpl(int year, int month, int day, int hour,
                                                            int minute, int second);
 

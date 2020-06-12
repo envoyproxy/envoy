@@ -9,7 +9,7 @@
 namespace quiche {
 
 namespace {
-QuicheOptional<int64_t> QuicheUtcDateTimeToUnixSecondsInner(int year, int month, int day, int hour,
+QuicheOptional<int64_t> quicheUtcDateTimeToUnixSecondsInner(int year, int month, int day, int hour,
                                                             int minute, int second) {
   const absl::CivilSecond civil_time(year, month, day, hour, minute, second);
   if (second != 60 && (civil_time.year() != year || civil_time.month() != month ||
@@ -23,19 +23,20 @@ QuicheOptional<int64_t> QuicheUtcDateTimeToUnixSecondsInner(int year, int month,
 }
 } // namespace
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 QuicheOptional<int64_t> QuicheUtcDateTimeToUnixSecondsImpl(int year, int month, int day, int hour,
                                                            int minute, int second) {
   // Handle leap seconds without letting any other irregularities happen.
   if (second == 60) {
     auto previous_second =
-        QuicheUtcDateTimeToUnixSecondsInner(year, month, day, hour, minute, second - 1);
+        quicheUtcDateTimeToUnixSecondsInner(year, month, day, hour, minute, second - 1);
     if (!previous_second.has_value()) {
       return absl::nullopt;
     }
     return *previous_second + 1;
   }
 
-  return QuicheUtcDateTimeToUnixSecondsInner(year, month, day, hour, minute, second);
+  return quicheUtcDateTimeToUnixSecondsInner(year, month, day, hour, minute, second);
 }
 
 } // namespace quiche
