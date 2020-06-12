@@ -218,8 +218,6 @@ public:
     if (xds_stream_ != nullptr) {
       cleanUpXdsConnection();
     }
-    test_server_.reset();
-    fake_upstreams_.clear();
   }
 
   std::string endpoint_;

@@ -25,11 +25,6 @@ class StatsIntegrationTest : public testing::TestWithParam<Network::Address::IpV
 public:
   StatsIntegrationTest() : BaseIntegrationTest(GetParam()) {}
 
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
-
   void initialize() override { BaseIntegrationTest::initialize(); }
 };
 

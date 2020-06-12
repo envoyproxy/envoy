@@ -75,11 +75,6 @@ public:
     BaseIntegrationTest::initialize();
   }
 
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
-
   void requestResponseWithListenerAddress(const Network::Address::Instance& listener_address,
                                           const std::string& data_to_send,
                                           Network::UdpRecvData& response_datagram) {

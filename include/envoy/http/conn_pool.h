@@ -13,20 +13,8 @@ namespace Envoy {
 namespace Http {
 namespace ConnectionPool {
 
-/**
- * Handle that allows a pending request to be cancelled before it is bound to a connection.
- */
-class Cancellable {
-public:
-  virtual ~Cancellable() = default;
-
-  /**
-   * Cancel the pending request.
-   */
-  virtual void cancel() PURE;
-};
-
 using PoolFailureReason = ::Envoy::ConnectionPool::PoolFailureReason;
+using Cancellable = ::Envoy::ConnectionPool::Cancellable;
 
 /**
  * Pool callbacks invoked in the context of a newStream() call, either synchronously or
