@@ -507,9 +507,10 @@ Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
     // This error is returned when nghttp2 library detected a frame flood by one of its
     // internal mechanisms. Most flood protection is done by Envoy's codec and this error
     // should never be returned. However it is handled here in case nghttp2 has some flood
-    // prtections that Envoy's codec does not have.
+    // protections that Envoy's codec does not have.
     if (rc == NGHTTP2_ERR_FLOODED) {
-      return bufferFloodError("Flooding was detected in this HTTP/2 session, and it must be closed");
+      return bufferFloodError(
+          "Flooding was detected in this HTTP/2 session, and it must be closed");
     }
     if (rc != static_cast<ssize_t>(slice.len_)) {
       return codecProtocolError(nghttp2_strerror(rc));
@@ -1037,6 +1038,11 @@ void ConnectionImpl::sendSettings(
   }
 }
 
+bool ConnectionImpl::setAndCheckNghttp2CallbackStatus(Status&& status) {
+  nghttp2_callback_status_ = std::move(status);
+  return nghttp2_callback_status_.ok();
+}
+
 ConnectionImpl::Http2Callbacks::Http2Callbacks() {
   nghttp2_session_callbacks_new(&callbacks_);
   nghttp2_session_callbacks_set_send_callback(
@@ -1046,8 +1052,9 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
         if (status_or_len.ok()) {
           return status_or_len.value();
         }
-        static_cast<ConnectionImpl*>(user_data)->nghttp2_callback_status_ = status_or_len.status();
-        printf("Status 1: %s\n", static_cast<ConnectionImpl*>(user_data)->nghttp2_callback_status_.message().data());
+        auto status = status_or_len.status();
+        static_cast<ConnectionImpl*>(user_data)->setAndCheckNghttp2CallbackStatus(
+            std::move(status));
         return NGHTTP2_ERR_CALLBACK_FAILURE;
       });
 
@@ -1056,18 +1063,18 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
       [](nghttp2_session*, nghttp2_frame* frame, const uint8_t* framehd, size_t length,
          nghttp2_data_source* source, void*) -> int {
         ASSERT(frame->data.padlen == 0);
-        static_cast<StreamImpl*>(source->ptr)->parent_.nghttp2_callback_status_ = static_cast<StreamImpl*>(source->ptr)->onDataSourceSend(framehd, length);
-        if (!static_cast<StreamImpl*>(source->ptr)->parent_.nghttp2_callback_status_.ok())
-          printf("Status 2: %s\n", static_cast<StreamImpl*>(source->ptr)->parent_.nghttp2_callback_status_.message().data());
-        return static_cast<StreamImpl*>(source->ptr)->parent_.nghttp2_callback_status_.ok() ? 0 : NGHTTP2_ERR_CALLBACK_FAILURE;
+        auto status = static_cast<StreamImpl*>(source->ptr)->onDataSourceSend(framehd, length);
+        bool ok = static_cast<StreamImpl*>(source->ptr)
+                      ->parent_.setAndCheckNghttp2CallbackStatus(std::move(status));
+        return ok ? 0 : NGHTTP2_ERR_CALLBACK_FAILURE;
       });
 
   nghttp2_session_callbacks_set_on_begin_headers_callback(
       callbacks_, [](nghttp2_session*, const nghttp2_frame* frame, void* user_data) -> int {
-        static_cast<ConnectionImpl*>(user_data)->nghttp2_callback_status_ = static_cast<ConnectionImpl*>(user_data)->onBeginHeaders(frame);
-        if (!static_cast<ConnectionImpl*>(user_data)->nghttp2_callback_status_.ok())
-          printf("Status 5: %s\n", static_cast<ConnectionImpl*>(user_data)->nghttp2_callback_status_.message().data());
-        return static_cast<ConnectionImpl*>(user_data)->nghttp2_callback_status_.ok() ? 0 : NGHTTP2_ERR_CALLBACK_FAILURE;
+        auto status = static_cast<ConnectionImpl*>(user_data)->onBeginHeaders(frame);
+        bool ok = static_cast<ConnectionImpl*>(user_data)->setAndCheckNghttp2CallbackStatus(
+            std::move(status));
+        return ok ? 0 : NGHTTP2_ERR_CALLBACK_FAILURE;
       });
 
   nghttp2_session_callbacks_set_on_header_callback(
@@ -1092,18 +1099,18 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
 
   nghttp2_session_callbacks_set_on_begin_frame_callback(
       callbacks_, [](nghttp2_session*, const nghttp2_frame_hd* hd, void* user_data) -> int {
-        static_cast<ConnectionImpl*>(user_data)->nghttp2_callback_status_ = static_cast<ConnectionImpl*>(user_data)->onBeforeFrameReceived(hd);
-        if (!static_cast<ConnectionImpl*>(user_data)->nghttp2_callback_status_.ok())
-          printf("Status 3: %s\n", static_cast<ConnectionImpl*>(user_data)->nghttp2_callback_status_.message().data());
-        return static_cast<ConnectionImpl*>(user_data)->nghttp2_callback_status_.ok() ? 0 : NGHTTP2_ERR_CALLBACK_FAILURE;
+        auto status = static_cast<ConnectionImpl*>(user_data)->onBeforeFrameReceived(hd);
+        bool ok = static_cast<ConnectionImpl*>(user_data)->setAndCheckNghttp2CallbackStatus(
+            std::move(status));
+        return ok ? 0 : NGHTTP2_ERR_CALLBACK_FAILURE;
       });
 
   nghttp2_session_callbacks_set_on_frame_recv_callback(
       callbacks_, [](nghttp2_session*, const nghttp2_frame* frame, void* user_data) -> int {
-        static_cast<ConnectionImpl*>(user_data)->nghttp2_callback_status_ = static_cast<ConnectionImpl*>(user_data)->onFrameReceived(frame);
-        if (!static_cast<ConnectionImpl*>(user_data)->nghttp2_callback_status_.ok())
-          printf("Status 4: %s\n", static_cast<ConnectionImpl*>(user_data)->nghttp2_callback_status_.message().data());
-        return static_cast<ConnectionImpl*>(user_data)->nghttp2_callback_status_.ok() ? 0 : NGHTTP2_ERR_CALLBACK_FAILURE;
+        auto status = static_cast<ConnectionImpl*>(user_data)->onFrameReceived(frame);
+        bool ok = static_cast<ConnectionImpl*>(user_data)->setAndCheckNghttp2CallbackStatus(
+            std::move(status));
+        return ok ? 0 : NGHTTP2_ERR_CALLBACK_FAILURE;
       });
 
   nghttp2_session_callbacks_set_on_stream_close_callback(
@@ -1313,7 +1320,8 @@ int ServerConnectionImpl::onHeader(const nghttp2_frame* frame, HeaderString&& na
   return saveHeader(frame, std::move(name), std::move(value));
 }
 
-Status ServerConnectionImpl::trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) {
+Status ServerConnectionImpl::trackInboundFrames(const nghttp2_frame_hd* hd,
+                                                uint32_t padding_length) {
   ENVOY_CONN_LOG(trace, "track inbound frame type={} flags={} length={} padding_length={}",
                  connection_, static_cast<uint64_t>(hd->type), static_cast<uint64_t>(hd->flags),
                  static_cast<uint64_t>(hd->length), padding_length);
@@ -1406,8 +1414,7 @@ Http::Status ServerConnectionImpl::innerDispatch(Buffer::Instance& data) {
   ASSERT(!dispatching_downstream_data_);
   dispatching_downstream_data_ = true;
 
-  // Make sure the dispatching_downstream_data_ is set to false even
-  // when ConnectionImpl::dispatch throws an exception.
+  // Make sure the dispatching_downstream_data_ is set to false when innerDispatch ends.
   Cleanup cleanup([this]() { dispatching_downstream_data_ = false; });
 
   // Make sure downstream outbound queue was not flooded by the upstream frames.

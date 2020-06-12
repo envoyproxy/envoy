@@ -415,6 +415,8 @@ protected:
     return absl::nullopt;
   }
 
+  bool setAndCheckNghttp2CallbackStatus(Status&& status);
+
   static Http2Callbacks http2_callbacks_;
 
   std::list<StreamImplPtr> active_streams_;
@@ -426,6 +428,11 @@ protected:
   uint32_t per_stream_buffer_limit_;
   bool allow_metadata_;
   const bool stream_error_on_invalid_http_messaging_;
+
+  // Status for any errors encountered by the nghttp2 callbacks.
+  // nghttp2 library uses single return code to indicate callback failure and
+  // `nghttp2_callback_status_` is used to save right error information returned by a callback. The
+  // `nghttp2_callback_status_` is valid iff nghttp call returned NGHTTP2_ERR_CALLBACK_FAILURE.
   Status nghttp2_callback_status_;
 
   // Set if the type of frame that is about to be sent is PING or SETTINGS with the ACK flag set, or
@@ -547,8 +554,8 @@ private:
   // terminate connections when queue limits are exceeded. The primary reason is the complexity of
   // the clean-up of upstream connections. The clean-up of upstream connection causes RST_STREAM
   // messages to be sent on corresponding downstream connections. This may actually trigger flood
-  // mitigation on the downstream connections, which causes an exception to be thrown in the middle
-  // of the clean-up loop, leaving resources in a half cleaned up state.
+  // mitigation on the downstream connections, however there is currently no mechanism for
+  // handling these types of errors.
   // TODO(yanavlasov): add flood mitigation for upstream connections as well.
   Status checkOutboundQueueLimits() override { return okStatus(); }
   Status trackInboundFrames(const nghttp2_frame_hd*, uint32_t) override { return okStatus(); }

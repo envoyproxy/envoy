@@ -1911,8 +1911,8 @@ public:
         [](nghttp2_session*, const uint8_t* data, size_t length, int, void* user_data) -> ssize_t {
           // Cast down to MetadataTestClientConnectionImpl to leverage friendship.
           auto status_or_len = static_cast<MetadataTestClientConnectionImpl*>(
-              static_cast<ConnectionImpl*>(user_data))
-                               ->onSend(data, length);
+                                   static_cast<ConnectionImpl*>(user_data))
+                                   ->onSend(data, length);
           if (status_or_len.ok()) {
             return status_or_len.value();
           }
