@@ -757,10 +757,32 @@ message ScopedRds {
       [(validate.rules).message = {required: true}];
 }
 
-// [#next-free-field: 7]
+// [#next-free-field: 6]
 message HttpFilter {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.network.http_connection_manager.v3.HttpFilter";
+
+  // [#not-implemented-hide:] Config source specifier for the late-bound filter configuration.
+  // The connection manager listener is placed into the warming state until all the initial filter configurations
+  // are received. If the initial filter configuration is not received due to a timeout or another xDS failure,
+  // the optional fallback configuration is used.
+  // Filter configuration updates are atomic and apply to new streams while existing streams
+  // continue to use the previous configuration.
+  // Additionally, an optional configuration override is applied to each received configuration update to facilitate
+  // sharing of the filter configurations between xDS clients.
+  message HttpFilterConfigSource {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.extensions.filters.network.http_connection_manager.v3.HttpFilter."
+        "HttpFilterConfigSource";
+
+    config.core.v4alpha.ConfigSource config_source = 1;
+
+    // Optional fallback configuration to use if there is a failure to receive the initial filter configuration.
+    google.protobuf.Any fallback_config = 2;
+
+    // Optional config override that is merged into each configuration update using the protobuf merge strategy.
+    google.protobuf.Any override_config = 3;
+  }
 
   reserved 3, 2;
 
@@ -777,12 +799,7 @@ message HttpFilter {
     google.protobuf.Any typed_config = 4;
 
     // [#not-implemented-hide:] Configuration source specifier for FDS.
-    config.core.v4alpha.ConfigSource config_source = 5;
-  }
-
-  // [#not-implemented-hide:] Overrides for the filter instance to enable shared configuration via FDS.
-  oneof config_override {
-    google.protobuf.Any proto_merge = 6;
+    HttpFilterConfigSource fds_config_source = 5;
   }
 }
 
