@@ -750,6 +750,7 @@ message ScopedRds {
       [(validate.rules).message = {required: true}];
 }
 
+// [#next-free-field: 7]
 message HttpFilter {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpFilter";
@@ -770,6 +771,11 @@ message HttpFilter {
 
     // [#not-implemented-hide:] Configuration source specifier for FDS.
     config.core.v3.ConfigSource config_source = 5;
+  }
+
+  // [#not-implemented-hide:] Overrides for the filter instance to enable shared configuration via FDS.
+  oneof config_override {
+    google.protobuf.Any proto_merge = 6;
   }
 }
 

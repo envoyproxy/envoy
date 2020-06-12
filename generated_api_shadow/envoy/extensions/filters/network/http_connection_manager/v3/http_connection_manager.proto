@@ -755,14 +755,16 @@ message ScopedRds {
       [(validate.rules).message = {required: true}];
 }
 
+// [#next-free-field: 7]
 message HttpFilter {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpFilter";
 
   reserved 3;
 
-  // The name of the filter to instantiate. The name must match a
-  // :ref:`supported filter <config_http_filters>`.
+  // The name of the filter to instantiate. The name is used as a fallback to
+  // select an extension if the type of the configuration proto is not
+  // sufficient.
   string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
   // Filter specific configuration which depends on the filter being instantiated. See the supported
@@ -770,7 +772,15 @@ message HttpFilter {
   oneof config_type {
     google.protobuf.Any typed_config = 4;
 
+    // [#not-implemented-hide:] Configuration source specifier for FDS.
+    config.core.v3.ConfigSource config_source = 5;
+
     google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
+  }
+
+  // [#not-implemented-hide:] Overrides for the filter instance to enable shared configuration via FDS.
+  oneof config_override {
+    google.protobuf.Any proto_merge = 6;
   }
 }
 
