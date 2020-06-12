@@ -271,6 +271,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // 2020/01/09  9227     43637       44000   router: per-cluster histograms w/ timeout budget
   // 2020/01/12  9633     43797       44104   config: support recovery of original message when
   //                                          upgrading.
+  // 2020/06/09  11182    43989       44600   v1.13.x cherry-pick: Refactor resource manager
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -284,8 +285,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_cluster, 43797); // 104 bytes higher than a debug build.
-  EXPECT_MEMORY_LE(m_per_cluster, 44104);
+  EXPECT_MEMORY_EQ(m_per_cluster, 43989);
+  EXPECT_MEMORY_LE(m_per_cluster, 44600);
 }
 
 TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
@@ -325,6 +326,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // 2019/01/09  9227     35772       36500   router: per-cluster histograms w/ timeout budget
   // 2020/01/12  9633     35932       36500   config: support recovery of original message when
   //                                          upgrading.
+  // 2020/06/09  11182    36124       36800   v1.13.x cherry-pick: Refactor resource manager
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -338,8 +340,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_cluster, 35932); // 104 bytes higher than a debug build.
-  EXPECT_MEMORY_LE(m_per_cluster, 36500);
+  EXPECT_MEMORY_EQ(m_per_cluster, 36124);
+  EXPECT_MEMORY_LE(m_per_cluster, 36800);
 }
 
 TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
