@@ -12,5 +12,4 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
 }
 
 } // namespace Fuzz
-
 } // namespace Envoy
