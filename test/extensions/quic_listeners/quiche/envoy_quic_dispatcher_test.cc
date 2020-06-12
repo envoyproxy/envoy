@@ -59,12 +59,16 @@ public:
         crypto_config_(quic::QuicCryptoServerConfig::TESTING, quic::QuicRandom::GetInstance(),
                        std::make_unique<TestProofSource>(), quic::KeyExchangeSource::Default()),
         version_manager_([]() {
-          SetQuicReloadableFlag(quic_enable_version_draft_28, GetParam().second);
-          SetQuicReloadableFlag(quic_enable_version_draft_27, GetParam().second);
-          SetQuicReloadableFlag(quic_enable_version_draft_25_v3, GetParam().second);
+          if (GetParam().second == QuicVersionType::GQUIC_QUIC_CRYPTO) {
+            return quic::CurrentSupportedVersionsWithQuicCrypto();
+          }
+          bool use_http3 = GetParam().second == QuicVersionType::IQUIC;
+          SetQuicReloadableFlag(quic_enable_version_draft_28, use_http3);
+          SetQuicReloadableFlag(quic_enable_version_draft_27, use_http3);
+          SetQuicReloadableFlag(quic_enable_version_draft_25_v3, use_http3);
           return quic::CurrentSupportedVersions();
         }()),
-        quic_version_(quic::CurrentSupportedVersions()[0]),
+        quic_version_(version_manager_.GetSupportedVersions()[0]),
         listener_stats_({ALL_LISTENER_STATS(POOL_COUNTER(listener_config_.listenerScope()),
                                             POOL_GAUGE(listener_config_.listenerScope()),
                                             POOL_HISTOGRAM(listener_config_.listenerScope()))}),

@@ -50,9 +50,13 @@ public:
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP3, GetParam().first,
                             ConfigHelper::quicHttpProxyConfig()),
         supported_versions_([]() {
-          SetQuicReloadableFlag(quic_enable_version_draft_28, GetParam().second);
-          SetQuicReloadableFlag(quic_enable_version_draft_27, GetParam().second);
-          SetQuicReloadableFlag(quic_enable_version_draft_25_v3, GetParam().second);
+          if (GetParam().second == QuicVersionType::GQUIC_QUIC_CRYPTO) {
+            return quic::CurrentSupportedVersionsWithQuicCrypto();
+          }
+          bool use_http3 = GetParam().second == QuicVersionType::IQUIC;
+          SetQuicReloadableFlag(quic_enable_version_draft_28, use_http3);
+          SetQuicReloadableFlag(quic_enable_version_draft_27, use_http3);
+          SetQuicReloadableFlag(quic_enable_version_draft_25_v3, use_http3);
           return quic::CurrentSupportedVersions();
         }()),
         crypto_config_(std::make_unique<EnvoyQuicFakeProofVerifier>()), conn_helper_(*dispatcher_),

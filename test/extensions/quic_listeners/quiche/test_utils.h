@@ -114,7 +114,6 @@ generateChloPacketToSend(quic::ParsedQuicVersion quic_version, quic::QuicConfig&
         std::move(quic::test::GetFirstFlightOfPackets(quic_version, quic_config, connection_id)[0]);
     return Buffer::OwnedImpl(packet->data(), packet->length());
   }
-
   quic::CryptoHandshakeMessage chlo = quic::test::crypto_test_utils::GenerateDefaultInchoateCHLO(
       &clock, quic_version.transport_version, &crypto_config);
   chlo.SetVector(quic::kCOPT, quic::QuicTagVector{quic::kREJ});
@@ -133,10 +132,13 @@ generateChloPacketToSend(quic::ParsedQuicVersion quic_version, quic::QuicConfig&
   quic_config_tmp.ToHandshakeMessage(&full_chlo, quic_version.transport_version);
 
   std::string packet_content(full_chlo.GetSerialized().AsStringPiece());
-  auto encrypted_packet = std::unique_ptr<quic::QuicEncryptedPacket>(
-      quic::test::ConstructEncryptedPacket(connection_id, quic::EmptyQuicConnectionId(),
-                                           /*version_flag=*/true, /*reset_flag*/ false,
-                                           /*packet_number=*/1, packet_content));
+  quic::ParsedQuicVersionVector supported_versions{quic_version};
+  auto encrypted_packet =
+      std::unique_ptr<quic::QuicEncryptedPacket>(quic::test::ConstructEncryptedPacket(
+          connection_id, quic::EmptyQuicConnectionId(),
+          /*version_flag=*/true, /*reset_flag*/ false,
+          /*packet_number=*/1, packet_content, quic::CONNECTION_ID_PRESENT,
+          quic::CONNECTION_ID_ABSENT, quic::PACKET_4BYTE_PACKET_NUMBER, &supported_versions));
 
   return Buffer::OwnedImpl(encrypted_packet->data(), encrypted_packet->length());
 }
@@ -156,25 +158,39 @@ void setQuicConfigWithDefaultValues(quic::QuicConfig* config) {
       config, quic::kMinimumFlowControlSendWindow);
 }
 
+enum class QuicVersionType {
+  GQUIC_QUIC_CRYPTO,
+  GQUIC_TLS,
+  IQUIC,
+};
+
 // A test suite with variation of ip version and a knob to turn on/off IETF QUIC implementation.
 class QuicMultiVersionTest
-    : public testing::TestWithParam<std::pair<Network::Address::IpVersion, bool>> {};
+    : public testing::TestWithParam<std::pair<Network::Address::IpVersion, QuicVersionType>> {};
 
-std::vector<std::pair<Network::Address::IpVersion, bool>> generateTestParam() {
-  std::vector<std::pair<Network::Address::IpVersion, bool>> param;
+std::vector<std::pair<Network::Address::IpVersion, QuicVersionType>> generateTestParam() {
+  std::vector<std::pair<Network::Address::IpVersion, QuicVersionType>> param;
   for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
-    for (bool use_http3 : {true, false}) {
-      param.emplace_back(ip_version, use_http3);
-    }
+    param.emplace_back(ip_version, QuicVersionType::GQUIC_QUIC_CRYPTO);
+    param.emplace_back(ip_version, QuicVersionType::GQUIC_TLS);
+    param.emplace_back(ip_version, QuicVersionType::IQUIC);
   }
 
   return param;
 }
 
 std::string testParamsToString(
-    const ::testing::TestParamInfo<std::pair<Network::Address::IpVersion, bool>>& params) {
+    const ::testing::TestParamInfo<std::pair<Network::Address::IpVersion, QuicVersionType>>&
+        params) {
   std::string ip_version = params.param.first == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6";
-  return absl::StrCat(ip_version, params.param.second ? "_UseHttp3" : "_UseGQuic");
+  switch (params.param.second) {
+  case QuicVersionType::GQUIC_QUIC_CRYPTO:
+    return absl::StrCat(ip_version, "_UseGQuicWithQuicCrypto");
+  case QuicVersionType::GQUIC_TLS:
+    return absl::StrCat(ip_version, "_UseGQuicWithTLS");
+  case QuicVersionType::IQUIC:
+    return absl::StrCat(ip_version, "_UseHttp3");
+  }
 }
 
 } // namespace Quic
