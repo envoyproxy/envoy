@@ -501,7 +501,6 @@ Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
     ssize_t rc =
         nghttp2_session_mem_recv(session_, static_cast<const uint8_t*>(slice.mem_), slice.len_);
     if (!nghttp2_callback_status_.ok()) {
-      printf("nghttp2_session_mem_recv status: %s\n", nghttp2_callback_status_.message().data());
       return nghttp2_callback_status_;
     }
     // This error is returned when nghttp2 library detected a frame flood by one of its
@@ -936,7 +935,6 @@ Status ConnectionImpl::sendPendingFrames() {
     ASSERT(rc == NGHTTP2_ERR_CALLBACK_FAILURE);
 
     if (!nghttp2_callback_status_.ok()) {
-      printf("nghttp2_session_send status: %s\n", nghttp2_callback_status_.message().data());
       return nghttp2_callback_status_;
     }
 
