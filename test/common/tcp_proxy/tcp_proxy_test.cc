@@ -877,7 +877,7 @@ public:
           .WillByDefault(ReturnRef(*upstream_connections_.back()));
       upstream_hosts_.push_back(std::make_shared<NiceMock<Upstream::MockHost>>());
       conn_pool_handles_.push_back(
-          std::make_unique<NiceMock<Tcp::ConnectionPool::MockCancellable>>());
+          std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>());
 
       ON_CALL(*upstream_hosts_.at(i), cluster())
           .WillByDefault(ReturnPointee(
@@ -969,7 +969,7 @@ public:
   std::vector<std::unique_ptr<NiceMock<Tcp::ConnectionPool::MockConnectionData>>>
       upstream_connection_data_{};
   std::vector<Tcp::ConnectionPool::Callbacks*> conn_pool_callbacks_;
-  std::vector<std::unique_ptr<NiceMock<Tcp::ConnectionPool::MockCancellable>>> conn_pool_handles_;
+  std::vector<std::unique_ptr<NiceMock<Envoy::ConnectionPool::MockCancellable>>> conn_pool_handles_;
   NiceMock<Tcp::ConnectionPool::MockInstance> conn_pool_;
   Tcp::ConnectionPool::UpstreamCallbacks* upstream_callbacks_;
   StringViewSaver access_log_data_;

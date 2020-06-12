@@ -33,7 +33,9 @@ private:
 class HttpConnectionHandle : public ConnectionHandle {
 public:
   HttpConnectionHandle(Http::ConnectionPool::Cancellable* handle) : upstream_http_handle_(handle) {}
-  void cancel() override { upstream_http_handle_->cancel(); }
+  void cancel() override {
+    upstream_http_handle_->cancel(Tcp::ConnectionPool::CancelPolicy::Default);
+  }
 
 private:
   Http::ConnectionPool::Cancellable* upstream_http_handle_{};

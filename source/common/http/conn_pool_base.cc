@@ -15,10 +15,11 @@ ConnPoolImplBase::ConnPoolImplBase(
 ConnPoolImplBase::~ConnPoolImplBase() {
   ASSERT(ready_clients_.empty());
   ASSERT(busy_clients_.empty());
+  ASSERT(connecting_clients_.empty());
 }
 
 void ConnPoolImplBase::destructAllConnections() {
-  for (auto* list : {&ready_clients_, &busy_clients_}) {
+  for (auto* list : {&ready_clients_, &busy_clients_, &connecting_clients_}) {
     while (!list->empty()) {
       list->front()->close();
     }
@@ -43,7 +44,8 @@ void ConnPoolImplBase::tryCreateNewConnection() {
   // If we are at the connection circuit-breaker limit due to other upstreams having
   // too many open connections, and this upstream has no connections, always create one, to
   // prevent pending requests being queued to this upstream with no way to be processed.
-  if (can_create_connection || (ready_clients_.empty() && busy_clients_.empty())) {
+  if (can_create_connection ||
+      (ready_clients_.empty() && busy_clients_.empty() && connecting_clients_.empty())) {
     ENVOY_LOG(debug, "creating a new connection");
     ActiveClientPtr client = instantiateActiveClient();
     ASSERT(client->state_ == ActiveClient::State::CONNECTING);
@@ -156,7 +158,7 @@ std::list<ConnPoolImplBase::ActiveClientPtr>&
 ConnPoolImplBase::owningList(ActiveClient::State state) {
   switch (state) {
   case ActiveClient::State::CONNECTING:
-    return busy_clients_;
+    return connecting_clients_;
   case ActiveClient::State::READY:
     return ready_clients_;
   case ActiveClient::State::BUSY:
@@ -201,10 +203,8 @@ void ConnPoolImplBase::closeIdleConnections() {
   }
 
   if (pending_requests_.empty()) {
-    for (auto& client : busy_clients_) {
-      if (client->state_ == ActiveClient::State::CONNECTING) {
-        to_close.push_back(client.get());
-      }
+    for (auto& client : connecting_clients_) {
+      to_close.push_back(client.get());
     }
   }
 
@@ -227,12 +227,7 @@ void ConnPoolImplBase::drainConnections() {
   // so use a for-loop since the list is not mutated.
   ASSERT(&owningList(ActiveClient::State::DRAINING) == &busy_clients_);
   for (auto& busy_client : busy_clients_) {
-    // Moving a CONNECTING client to DRAINING would violate state assumptions, namely that DRAINING
-    // connections have active requests (otherwise they would be closed) and that clients receiving
-    // a Connected event are in state CONNECTING.
-    if (busy_client->state_ != ActiveClient::State::CONNECTING) {
-      transitionActiveClientState(*busy_client, ActiveClient::State::DRAINING);
-    }
+    transitionActiveClientState(*busy_client, ActiveClient::State::DRAINING);
   }
 }
 
@@ -243,7 +238,8 @@ void ConnPoolImplBase::checkForDrained() {
 
   closeIdleConnections();
 
-  if (pending_requests_.empty() && ready_clients_.empty() && busy_clients_.empty()) {
+  if (pending_requests_.empty() && ready_clients_.empty() && busy_clients_.empty() &&
+      connecting_clients_.empty()) {
     ENVOY_LOG(debug, "invoking drained callbacks");
     for (const DrainedCb& cb : drained_callbacks_) {
       cb();
@@ -363,7 +359,8 @@ void ConnPoolImplBase::purgePendingRequests(
   }
 }
 
-void ConnPoolImplBase::onPendingRequestCancel(PendingRequest& request) {
+void ConnPoolImplBase::onPendingRequestCancel(PendingRequest& request,
+                                              Envoy::ConnectionPool::CancelPolicy policy) {
   ENVOY_LOG(debug, "cancelling pending request");
   if (!pending_requests_to_purge_.empty()) {
     // If pending_requests_to_purge_ is not empty, it means that we are called from
@@ -373,6 +370,17 @@ void ConnPoolImplBase::onPendingRequestCancel(PendingRequest& request) {
     request.removeFromList(pending_requests_to_purge_);
   } else {
     request.removeFromList(pending_requests_);
+  }
+  // There's excess capacity if
+  // pending_requests < connecting_request_capacity_ - capacity of most recent client.
+  // It's calculated below with addition instead to avoid underflow issues, overflow being
+  // assumed to not be a problem across the connection pool.
+  if (policy == Envoy::ConnectionPool::CancelPolicy::CloseExcess && !connecting_clients_.empty() &&
+      (pending_requests_.size() + connecting_clients_.front()->effectiveConcurrentRequestLimit() <=
+       connecting_request_capacity_)) {
+    auto& client = *connecting_clients_.front();
+    transitionActiveClientState(client, ActiveClient::State::DRAINING);
+    client.close();
   }
 
   host_->cluster().stats().upstream_rq_cancelled_.inc();

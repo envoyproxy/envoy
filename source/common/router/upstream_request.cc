@@ -541,7 +541,7 @@ void TcpConnPool::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data
 
 bool HttpConnPool::cancelAnyPendingRequest() {
   if (conn_pool_stream_handle_) {
-    conn_pool_stream_handle_->cancel();
+    conn_pool_stream_handle_->cancel(Tcp::ConnectionPool::CancelPolicy::Default);
     conn_pool_stream_handle_ = nullptr;
     return true;
   }

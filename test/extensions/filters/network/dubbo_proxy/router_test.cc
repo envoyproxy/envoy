@@ -484,7 +484,7 @@ TEST_F(DubboRouterTest, DestroyWhileConnecting) {
   initializeRouter();
   initializeMetadata(MessageType::Request);
 
-  NiceMock<Tcp::ConnectionPool::MockCancellable> conn_pool_handle;
+  NiceMock<Envoy::ConnectionPool::MockCancellable> conn_pool_handle;
   EXPECT_CALL(context_.cluster_manager_.tcp_conn_pool_, newConnection(_))
       .WillOnce(Invoke([&](Tcp::ConnectionPool::Callbacks&) -> Tcp::ConnectionPool::Cancellable* {
         return &conn_pool_handle;
