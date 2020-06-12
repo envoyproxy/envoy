@@ -77,6 +77,7 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_rq_retry_limit_exceeded, Counter, Total requests not retried due to exceeding :ref:`the configured number of maximum retries <config_http_filters_router_x-envoy-max-retries>`
   upstream_rq_retry_success, Counter, Total request retry successes
   upstream_rq_retry_overflow, Counter, Total requests not retried due to circuit breaking or exceeding the :ref:`retry budget <envoy_v3_api_field_config.cluster.v3.CircuitBreakers.Thresholds.retry_budget>`
+  upstream_rq_headers_size, Histogram, Request headers size in bytes per upstream
   upstream_flow_control_paused_reading_total, Counter, Total number of times flow control paused reading from upstream
   upstream_flow_control_resumed_reading_total, Counter, Total number of times flow control resumed reading from upstream
   upstream_flow_control_backed_up_total, Counter, Total number of times the upstream connection backed up and paused reads from downstream
