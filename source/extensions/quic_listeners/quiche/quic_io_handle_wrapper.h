@@ -63,6 +63,27 @@ public:
     return io_handle_.recvmmsg(slices, self_port, output);
   }
   bool supportsMmsg() const override { return io_handle_.supportsMmsg(); }
+  Api::SysCallIntResult bind(const sockaddr* address, socklen_t addrlen) override {
+    return io_handle_.bind(address, addrlen);
+  }
+  Api::SysCallIntResult listen(int backlog) override { return io_handle_.listen(backlog); }
+  Api::SysCallIntResult connect(const sockaddr* address, socklen_t addrlen) override {
+    return io_handle_.connect(address, addrlen);
+  }
+  Api::SysCallIntResult setOption(int level, int optname, const void* optval,
+                                  socklen_t optlen) override {
+    return io_handle_.setOption(level, optname, optval, optlen);
+  }
+  Api::SysCallIntResult getOption(int level, int optname, void* optval,
+                                  socklen_t* optlen) override {
+    return io_handle_.getOption(level, optname, optval, optlen);
+  }
+  Api::SysCallIntResult getLocalAddress(sockaddr* address, socklen_t* addrlen) override {
+    return io_handle_.getLocalAddress(address, addrlen);
+  }
+  Api::SysCallIntResult setBlocking(bool blocking) override {
+    return io_handle_.setBlocking(blocking);
+  }
 
 private:
   Network::IoHandle& io_handle_;
