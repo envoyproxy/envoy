@@ -297,7 +297,7 @@ TEST_F(Http1ConnPoolImplTest, VerifyCancelInCallback) {
   EXPECT_CALL(callbacks1.pool_failure_, ready()).Times(0);
   ConnPoolCallbacks callbacks2;
   EXPECT_CALL(callbacks2.pool_failure_, ready()).WillOnce(Invoke([&]() -> void {
-    handle1->cancel();
+    handle1->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
   }));
 
   NiceMock<MockResponseDecoder> outer_decoder;
@@ -362,7 +362,7 @@ TEST_F(Http1ConnPoolImplTest, MaxPendingRequests) {
 
   EXPECT_EQ(1U, cluster_->circuit_breakers_stats_.rq_pending_open_.value());
 
-  handle->cancel();
+  handle->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
 
   EXPECT_CALL(conn_pool_, onClientDestroy());
   conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
@@ -497,12 +497,31 @@ TEST_F(Http1ConnPoolImplTest, CancelBeforeBound) {
   Http::ConnectionPool::Cancellable* handle = conn_pool_.newStream(outer_decoder, callbacks);
   EXPECT_NE(nullptr, handle);
 
-  handle->cancel();
+  handle->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
   conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
   // Cause the connection to go away.
   EXPECT_CALL(conn_pool_, onClientDestroy());
   conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  dispatcher_.clearDeferredDeleteList();
+}
+
+/**
+ * Test cancelling with CloseExcess
+ */
+TEST_F(Http1ConnPoolImplTest, CancelExcessBeforeBound) {
+  InSequence s;
+
+  // Request 1 should kick off a new connection.
+  NiceMock<MockResponseDecoder> outer_decoder;
+  ConnPoolCallbacks callbacks;
+  conn_pool_.expectClientCreate();
+  Http::ConnectionPool::Cancellable* handle = conn_pool_.newStream(outer_decoder, callbacks);
+  EXPECT_NE(nullptr, handle);
+
+  handle->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
+  // Unlike CancelBeforeBound there is no need to raise a close event to destroy the connection.
+  EXPECT_CALL(conn_pool_, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
 }
 
@@ -919,7 +938,7 @@ TEST_F(Http1ConnPoolImplTest, DrainCallback) {
 
   ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
   ActiveTestRequest r2(*this, 0, ActiveTestRequest::Type::Pending);
-  r2.handle_->cancel();
+  r2.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
   EXPECT_EQ(1U, cluster_->stats_.upstream_rq_total_.value());
 
   EXPECT_CALL(drained, ready());
@@ -945,7 +964,7 @@ TEST_F(Http1ConnPoolImplTest, DrainWhileConnecting) {
   EXPECT_CALL(*conn_pool_.test_clients_[0].connection_,
               close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(drained, ready());
-  handle->cancel();
+  handle->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
 
   EXPECT_CALL(conn_pool_, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
@@ -1030,7 +1049,7 @@ TEST_F(Http1ConnPoolImplTest, PendingRequestIsConsideredActive) {
   EXPECT_TRUE(conn_pool_.hasActiveConnections());
 
   EXPECT_CALL(conn_pool_, onClientDestroy());
-  r1.handle_->cancel();
+  r1.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
   EXPECT_EQ(0U, cluster_->stats_.upstream_rq_total_.value());
   conn_pool_.drainConnections();
   conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
