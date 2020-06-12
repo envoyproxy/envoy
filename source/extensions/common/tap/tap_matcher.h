@@ -370,7 +370,7 @@ public:
     // Initialize overlap_ buffer's capacity to fit the longest pattern - 1.
     overlap_.reserve(overlap_size);
   }
-  virtual ~HttpGenericBodyMatcherCtx() = default;
+  ~HttpGenericBodyMatcherCtx() override = default;
 
   // List is initialized based on the Matcher's configuration.
   // When data is passing through the matcher, found patterns are removed
