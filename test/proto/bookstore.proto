@@ -265,9 +265,17 @@ message DeepNestedBody {
       }
       Nested nested = 100000000;
     }
+    message Extra {
+      int32 field = 1;
+    }
     Nested nested = 1000000;
+    Extra extra = 50;
+  }
+  message Extra {
+    string field = 1;
   }
   Nested nested = 1;
+  Extra extra = 2;
 }
 
 // gRPC server is using BigBook, but envoy transcoder filter is using

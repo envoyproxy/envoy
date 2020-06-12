@@ -18,10 +18,7 @@ class HttpBodyUtilsTest : public testing::Test {
 public:
   HttpBodyUtilsTest() = default;
 
-  template <typename Message>
-  void basicTest(const std::string& content, const std::string& content_type,
-                 const std::vector<int>& body_field_path,
-                 std::function<google::api::HttpBody(Message message)> get_http_body) {
+  void setBodyFieldPath(const std::vector<int>& body_field_path) {
     for (int field_number : body_field_path) {
       Protobuf::Field field;
       field.set_number(field_number);
@@ -30,6 +27,13 @@ public:
     for (auto& field : raw_body_field_path_) {
       body_field_path_.push_back(&field);
     }
+  }
+
+  template <typename Message>
+  void basicTest(const std::string& content, const std::string& content_type,
+                 const std::vector<int>& body_field_path,
+                 std::function<google::api::HttpBody(Message message)> get_http_body) {
+    setBodyFieldPath(body_field_path);
 
     // Parse using concrete message type.
     {
@@ -92,6 +96,25 @@ TEST_F(HttpBodyUtilsTest, NestedFieldsList) {
   basicTest<bookstore::DeepNestedBody>(
       "abcd", "text/nested", {1, 1000000, 100000000, 500000000},
       [](bookstore::DeepNestedBody message) { return message.nested().nested().nested().body(); });
+}
+
+TEST_F(HttpBodyUtilsTest, SkipUnknownFields) {
+  bookstore::DeepNestedBody message;
+  auto* body = message.mutable_nested()->mutable_nested()->mutable_nested()->mutable_body();
+  body->set_content_type("text/nested");
+  body->set_data("abcd");
+  message.mutable_extra()->set_field("test");
+  message.mutable_nested()->mutable_extra()->set_field(123);
+
+  Buffer::InstancePtr message_buffer = std::make_unique<Buffer::OwnedImpl>();
+  message_buffer->add(message.SerializeAsString());
+  setBodyFieldPath({1, 1000000, 100000000, 500000000});
+
+  google::api::HttpBody http_body;
+  Buffer::ZeroCopyInputStreamImpl stream(std::move(message_buffer));
+  EXPECT_TRUE(HttpBodyUtils::parseMessageByFieldPath(&stream, body_field_path_, &http_body));
+  EXPECT_EQ(http_body.content_type(), "text/nested");
+  EXPECT_EQ(http_body.data(), "abcd");
 }
 
 } // namespace
