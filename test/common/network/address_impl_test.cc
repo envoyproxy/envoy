@@ -43,13 +43,13 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
   ASSERT_NE(addr_port, nullptr);
 
   if (addr_port->ip()->port() == 0) {
-    addr_port = Network::Test::findOrCheckFreePort(addr_port, SocketType::Stream);
+    addr_port = Network::Test::findOrCheckFreePort(addr_port, Socket::Type::Stream);
   }
   ASSERT_NE(addr_port, nullptr);
   ASSERT_NE(addr_port->ip(), nullptr);
 
   // Create a socket on which we'll listen for connections from clients.
-  SocketImpl sock(SocketType::Stream, addr_port);
+  SocketImpl sock(Socket::Type::Stream, addr_port);
   ASSERT_GE(sock.ioHandle().fd(), 0) << addr_port->asString();
 
   // Check that IPv6 sockets accept IPv6 connections only.
@@ -71,7 +71,7 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
 
   auto client_connect = [](Address::InstanceConstSharedPtr addr_port) {
     // Create a client socket and connect to the server.
-    SocketImpl client_sock(SocketType::Stream, addr_port);
+    SocketImpl client_sock(Socket::Type::Stream, addr_port);
 
     ASSERT_GE(client_sock.ioHandle().fd(), 0) << addr_port->asString();
 
@@ -319,13 +319,14 @@ TEST(PipeInstanceTest, Basic) {
   EXPECT_EQ(nullptr, address.ip());
 }
 
+#ifndef WIN32
 TEST(PipeInstanceTest, BasicPermission) {
   std::string path = TestEnvironment::unixDomainSocketPath("foo.sock");
 
   const mode_t mode = 0777;
   PipeInstance pipe(path, mode);
   InstanceConstSharedPtr address = std::make_shared<PipeInstance>(pipe);
-  SocketImpl sock(SocketType::Stream, address);
+  SocketImpl sock(Socket::Type::Stream, address);
 
   ASSERT_GE(sock.ioHandle().fd(), 0) << pipe.asString();
 
@@ -342,6 +343,7 @@ TEST(PipeInstanceTest, BasicPermission) {
       << path << std::oct << "\t" << (stat_buf.st_mode & 07777) << std::dec << "\t"
       << (stat_buf.st_mode) << strerror(result.errno_);
 }
+#endif
 
 TEST(PipeInstanceTest, PermissionFail) {
   NiceMock<Api::MockOsSysCalls> os_sys_calls;
@@ -351,7 +353,7 @@ TEST(PipeInstanceTest, PermissionFail) {
   const mode_t mode = 0777;
   PipeInstance pipe(path, mode);
   InstanceConstSharedPtr address = std::make_shared<PipeInstance>(pipe);
-  SocketImpl sock(SocketType::Stream, address);
+  SocketImpl sock(Socket::Type::Stream, address);
 
   ASSERT_GE(sock.ioHandle().fd(), 0) << pipe.asString();
 
@@ -423,7 +425,7 @@ TEST(PipeInstanceTest, UnlinksExistingFile) {
   const auto bind_uds_socket = [](const std::string& path) {
     PipeInstance pipe(path);
     InstanceConstSharedPtr address = std::make_shared<PipeInstance>(pipe);
-    SocketImpl sock(SocketType::Stream, address);
+    SocketImpl sock(Socket::Type::Stream, address);
 
     ASSERT_GE(sock.ioHandle().fd(), 0) << pipe.asString();
 

@@ -225,6 +225,8 @@ message Route {
     // [#not-implemented-hide:]
     // If true, a filter will define the action (e.g., it could dynamically generate the
     // RouteAction).
+    // [#comment: TODO(samflattery): Remove cleanup in route_fuzz_test.cc when
+    // implemented]
     FilterAction filter_action = 17;
   }
 
