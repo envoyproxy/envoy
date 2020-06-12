@@ -288,9 +288,150 @@ TEST_F(Http2ConnPoolImplTest, DrainConnectionConnecting) {
   pool_.drainConnections();
 
   // Cancel the pending request, and then the connection can be closed.
-  r.handle_->cancel();
+  r.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
   EXPECT_CALL(*this, onClientDestroy());
   pool_.drainConnections();
+}
+
+/**
+ * Verify that on CloseExcess, the connection is destroyed immediately.
+ */
+TEST_F(Http2ConnPoolImplTest, CloseExcess) {
+  InSequence s;
+
+  expectClientCreate();
+  ActiveTestRequest r(*this, 0, false);
+
+  // Pending request prevents the connection from being drained
+  pool_.drainConnections();
+
+  EXPECT_CALL(*this, onClientDestroy());
+  r.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
+}
+
+/**
+ * Verify that on CloseExcess connections are destroyed when they can be.
+ */
+TEST_F(Http2ConnPoolImplTest, CloseExcessTwo) {
+  cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(1);
+  InSequence s;
+
+  expectClientCreate();
+  ActiveTestRequest r1(*this, 0, false);
+
+  expectClientCreate();
+  ActiveTestRequest r2(*this, 0, false);
+  {
+    EXPECT_CALL(*this, onClientDestroy());
+    r1.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
+  }
+
+  {
+    EXPECT_CALL(*this, onClientDestroy());
+    r2.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
+  }
+}
+
+/**
+ * Verify that on CloseExcess, the connections are destroyed iff they are actually excess.
+ */
+TEST_F(Http2ConnPoolImplTest, CloseExcessMultipleRequests) {
+  cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(3);
+  InSequence s;
+
+  // With 3 requests per connection, the first request will result in a client
+  // connection, and the next two will be queued for that connection.
+  expectClientCreate();
+  ActiveTestRequest r1(*this, 0, false);
+  ActiveTestRequest r2(*this, 0, false);
+  ActiveTestRequest r3(*this, 0, false);
+
+  // The fourth request will kick off a second connection, and the fifth will plan to share it.
+  expectClientCreate();
+  ActiveTestRequest r4(*this, 0, false);
+  ActiveTestRequest r5(*this, 0, false);
+
+  // The section below cancels the active requests in fairly random order, to
+  // ensure there's no association between the requests and the clients created
+  // for them.
+
+  // The first cancel will not destroy any clients, as there are still four pending
+  // requests and they can not all share the first connection.
+  {
+    EXPECT_CALL(*this, onClientDestroy()).Times(0);
+    r5.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
+  }
+  // The second cancel will destroy one client, as there will be three pending requests
+  // remaining, and they only need one connection.
+  {
+    EXPECT_CALL(*this, onClientDestroy());
+    r1.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
+  }
+
+  // The next two calls will not destroy the final client, as there are two other
+  // pending requests waiting on it.
+  {
+    EXPECT_CALL(*this, onClientDestroy()).Times(0);
+    r2.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
+    r4.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
+  }
+  // Finally with the last request gone, the final client is destroyed.
+  {
+    EXPECT_CALL(*this, onClientDestroy());
+    r3.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
+  }
+}
+
+TEST_F(Http2ConnPoolImplTest, CloseExcessMixedMultiplexing) {
+  InSequence s;
+
+  // Create clients with in-order capacity:
+  // 3  2  6
+  // Connection capacity is min(max requests per connection, max concurrent streams).
+  // Use maxRequestsPerConnection here since max requests is tested above.
+  EXPECT_CALL(*cluster_, maxRequestsPerConnection).WillOnce(Return(3));
+  expectClientCreate();
+  ActiveTestRequest r1(*this, 0, false);
+  ActiveTestRequest r2(*this, 0, false);
+  ActiveTestRequest r3(*this, 0, false);
+
+  EXPECT_CALL(*cluster_, maxRequestsPerConnection).WillOnce(Return(2));
+  expectClientCreate();
+  ActiveTestRequest r4(*this, 0, false);
+  ActiveTestRequest r5(*this, 0, false);
+
+  EXPECT_CALL(*cluster_, maxRequestsPerConnection).WillOnce(Return(6));
+  expectClientCreate();
+  ActiveTestRequest r6(*this, 0, false);
+
+  // 6 requests, capacity [3, 2, 6] - the first cancel should tear down the client with [3]
+  // since we destroy oldest first and [3, 2] can handle the remaining 5 requests.
+  {
+    EXPECT_CALL(*this, onClientDestroy());
+    r1.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
+  }
+
+  // 5 requests, capacity [3, 2] - no teardown
+  {
+    EXPECT_CALL(*this, onClientDestroy()).Times(0);
+    r2.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
+  }
+  // 4 requests, capacity [3, 2] - canceling one destroys the client with [2]
+  {
+    EXPECT_CALL(*this, onClientDestroy());
+    r3.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
+  }
+
+  // 3 requests, capacity [3]. Tear down the last channel when all 3 are canceled.
+  {
+    EXPECT_CALL(*this, onClientDestroy()).Times(0);
+    r4.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
+    r5.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
+  }
+  {
+    EXPECT_CALL(*this, onClientDestroy());
+    r6.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
+  }
 }
 
 /**
