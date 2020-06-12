@@ -158,8 +158,6 @@ TEST_F(HazelcastUnifiedCacheTest, CoverRemoteOperations) {
   HazelcastClusterAccessor accessor(*cache_, ClientConfig(), "coverage", 10);
   EXPECT_FALSE(accessor.isRunning());
   EXPECT_STREQ("", accessor.clusterName().c_str());
-  EXPECT_STREQ("coverage:10-div", accessor.headerMapName().c_str());
-  EXPECT_STREQ("coverage-uni", accessor.responseMapName().c_str());
   EXPECT_THROW(accessor.putHeader(1, HazelcastHeaderEntry()), EnvoyException);
   EXPECT_THROW(accessor.putBody("1", HazelcastBodyEntry()), EnvoyException);
   EXPECT_THROW(accessor.putResponse(1, HazelcastResponseEntry()), EnvoyException);

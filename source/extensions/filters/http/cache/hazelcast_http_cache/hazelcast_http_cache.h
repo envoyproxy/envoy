@@ -173,6 +173,8 @@ public:
    */
   uint32_t maxBodyBytes() const { return max_body_bytes_; }
 
+  bool unified() const { return unified_; }
+
   /**
    * Makes the cache ready to serve. Storage accessor connection must be established
    * via StorageAccessor::connect() when the cache is started.

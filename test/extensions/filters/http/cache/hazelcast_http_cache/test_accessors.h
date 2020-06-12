@@ -198,9 +198,11 @@ public:
     }
   }
 
-  bool isRunning() override { return connected_; }
+  bool isRunning() const override { return connected_; }
 
-  std::string clusterName() override { return "LocalTestAccessor"; }
+  std::string clusterName() const override { return "LocalTestAccessor"; }
+
+  std::string startInfo() const override { return ""; }
 
   void connect() override { connected_ = true; }
 

@@ -2,6 +2,7 @@
 
 #include "envoy/common/exception.h"
 
+#include "absl/strings/str_format.h"
 #include "extensions/filters/http/cache/hazelcast_http_cache/hazelcast_cache_entry.h"
 
 #include "hazelcast/client/HazelcastClient.h"
@@ -37,8 +38,9 @@ public:
   virtual bool tryLock(const int64_t map_key, bool unified) PURE;
   virtual void unlock(const int64_t map_key, bool unified) PURE;
 
-  virtual bool isRunning() PURE;
-  virtual std::string clusterName() PURE;
+  virtual bool isRunning() const PURE;
+  virtual std::string clusterName() const PURE;
+  virtual std::string startInfo() const PURE;
 
   virtual void connect() PURE;
   virtual void disconnect() PURE;
@@ -73,14 +75,12 @@ public:
   bool tryLock(const int64_t map_key, bool unified) override;
   void unlock(const int64_t map_key, bool unified) override;
 
-  bool isRunning() override;
-  std::string clusterName() override;
+  bool isRunning() const override;
+  std::string clusterName() const override;
+  std::string startInfo() const override;
 
   void connect() override;
   void disconnect() override;
-
-  const std::string& headerMapName();
-  const std::string& responseMapName();
 
   ~HazelcastClusterAccessor() override = default;
 

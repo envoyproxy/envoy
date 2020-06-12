@@ -64,11 +64,11 @@ void HazelcastClusterAccessor::unlock(const int64_t map_key, bool unified) {
   }
 }
 
-bool HazelcastClusterAccessor::isRunning() {
+bool HazelcastClusterAccessor::isRunning() const {
   return hazelcast_client_ ? hazelcast_client_->getLifecycleService().isRunning() : false;
 }
 
-std::string HazelcastClusterAccessor::clusterName() {
+std::string HazelcastClusterAccessor::clusterName() const {
   return hazelcast_client_ ? hazelcast_client_->getClientConfig().getGroupConfig().getName() : "";
 }
 
@@ -77,10 +77,6 @@ void HazelcastClusterAccessor::disconnect() {
     hazelcast_client_->shutdown();
   }
 }
-
-const std::string& HazelcastClusterAccessor::headerMapName() { return header_map_name_; }
-
-const std::string& HazelcastClusterAccessor::responseMapName() { return response_map_name_; }
 
 HazelcastClusterAccessor::HazelcastClusterAccessor(HazelcastHttpCache& cache,
                                                    ClientConfig&& client_config,
@@ -102,12 +98,19 @@ void HazelcastClusterAccessor::connect() {
   getHeaderMap().addEntryListener(*listener_, true);
 }
 
+std::string HazelcastClusterAccessor::startInfo() const {
+  return absl::StrFormat("HazelcastHttpCache is created with profile: %s. Max body size: %d.\n"
+                         "Cache statistics can be observed on Hazelcast Management Center "
+                         "from the map named %s.",
+                         cache_.unified() ?
+                         "UNIFIED" :
+                         "DIVIDED, partition size: " + std::to_string(partition_size_),
+                         cache_.maxBodyBytes(),
+                         cache_.unified() ? response_map_name_ : header_map_name_);
+}
+
 std::string HazelcastClusterAccessor::constructMapName(const std::string& postfix, bool unified) {
-  std::string name(app_prefix_);
-  if (!unified) {
-    name.append(":").append(std::to_string(partition_size_));
-  }
-  return name.append("-").append(postfix);
+  return absl::StrFormat("%s-%d-%s", app_prefix_, unified ? cache_.maxBodyBytes() : partition_size_, postfix);
 }
 
 void HeaderMapEntryListener::entryEvicted(const EntryEvent<int64_t, HazelcastHeaderEntry>& event) {
