@@ -365,5 +365,35 @@ bool IoSocketHandleImpl::supportsMmsg() const {
   return Api::OsSysCallsSingleton::get().supportsMmsg();
 }
 
+Api::SysCallIntResult IoSocketHandleImpl::bind(const sockaddr* address, socklen_t addrlen) {
+  return Api::OsSysCallsSingleton::get().bind(fd_, address, addrlen);
+}
+
+Api::SysCallIntResult IoSocketHandleImpl::listen(int backlog) {
+  return Api::OsSysCallsSingleton::get().listen(fd_, backlog);
+}
+
+Api::SysCallIntResult IoSocketHandleImpl::connect(const sockaddr* address, socklen_t addrlen) {
+  return Api::OsSysCallsSingleton::get().connect(fd_, address, addrlen);
+}
+
+Api::SysCallIntResult IoSocketHandleImpl::setOption(int level, int optname, const void* optval,
+                                                    socklen_t optlen) {
+  return Api::OsSysCallsSingleton::get().setsockopt(fd_, level, optname, optval, optlen);
+}
+
+Api::SysCallIntResult IoSocketHandleImpl::getOption(int level, int optname, void* optval,
+                                                    socklen_t* optlen) {
+  return Api::OsSysCallsSingleton::get().getsockopt(fd_, level, optname, optval, optlen);
+}
+
+Api::SysCallIntResult IoSocketHandleImpl::getLocalAddress(sockaddr* address, socklen_t* addrlen) {
+  return Api::OsSysCallsSingleton::get().getsockname(fd_, address, addrlen);
+}
+
+Api::SysCallIntResult IoSocketHandleImpl::setBlocking(bool blocking) {
+  return Api::OsSysCallsSingleton::get().setsocketblocking(fd_, blocking);
+}
+
 } // namespace Network
 } // namespace Envoy
