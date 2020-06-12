@@ -186,6 +186,10 @@ TEST_P(AdminInstanceTest, ConfigDumpMaintainsOrder) {
     msg->set_value("clusters_config");
     return msg;
   });
+  auto endpoint_entry = admin_.getConfigTracker().add("endpoints", [] {
+    auto msg = std::make_unique<ProtobufWkt::StringValue>();
+    return msg;
+  });
   const std::string expected_json = R"EOF({
  "configs": [
   {
@@ -195,6 +199,10 @@ TEST_P(AdminInstanceTest, ConfigDumpMaintainsOrder) {
   {
    "@type": "type.googleapis.com/google.protobuf.StringValue",
    "value": "clusters_config"
+  },
+  {
+   "@type": "type.googleapis.com/google.protobuf.StringValue",
+   "value": "endpoints_config"
   },
   {
    "@type": "type.googleapis.com/google.protobuf.StringValue",

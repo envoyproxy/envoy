@@ -272,6 +272,10 @@ private:
   std::vector<const UrlHandler*> sortedHandlers() const;
   envoy::admin::v3::ServerInfo::State serverState();
   /**
+   * Helper method for the /config_dump url handler to add endpoints config
+   */
+  ProtobufTypes::MessagePtr dumpEndpointConfigs() const;
+  /**
    * URL handlers.
    */
   Http::Code handlerAdminHome(absl::string_view path_and_query,
