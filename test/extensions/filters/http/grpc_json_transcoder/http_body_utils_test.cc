@@ -107,7 +107,9 @@ TEST_F(HttpBodyUtilsTest, SkipUnknownFields) {
   message.mutable_nested()->mutable_extra()->set_field(123);
 
   Buffer::InstancePtr message_buffer = std::make_unique<Buffer::OwnedImpl>();
-  message_buffer->add(message.SerializeAsString());
+  std::string serialized_message;
+  EXPECT_TRUE(message.SerializeToString(&serialized_message));
+  message_buffer->add(serialized_message);
   setBodyFieldPath({1, 1000000, 100000000, 500000000});
 
   google::api::HttpBody http_body;
