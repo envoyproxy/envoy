@@ -3,5 +3,41 @@
 Is there a contract my HTTP filter must adhere to?
 ==================================================
 
-* A filter's ``decodeData`` implementation must not return ``FilterHeadersStatus::ContinueAndEndStream`` when called with ``end_stream`` set.
-  In this case ``FilterHeadersStatus::Continue`` should be returned.
+* Headers encoding/decoding
+
+  * During encoding/decoding of headers if a filter returns ``FilterHeadersStatus::StopIteration``,
+    the processing can be resumed if ``encodeData()``/``decodeData()`` return
+    ``FilterDataStatus::Continue`` or by explicitily calling
+    ``continueEncoding()``/``continueDecoding()``.
+
+  * During encoding/decoding of headers if a filter returns
+    ``FilterHeadersStatus::StopAllIterationAndBuffer`` or
+    ``FilterHeadersStatus::StopAllIterationAndWatermark``, the processing can be resumed by calling
+    ``continueEncoding()``/``continueDecoding()``.
+
+  * A filter's ``decodeHeaders()`` implementation must not return
+    ``FilterHeadersStatus::ContinueAndEndStream`` when called with ``end_stream`` set. In this case
+    ``FilterHeadersStatus::Continue`` should be returned.
+
+  * A filter's ``encode100ContinueHeaders()`` must return ``FilterHeadersStatus::Continue`` or
+    ``FilterHeadersStatus::StopIteration``.
+
+* Data encoding/decoding
+
+  * During encoding/decoding of data if a filter returns
+    ``FilterDataStatus::StopIterationAndBuffer``, ``FilterDataStatus::StopIterationAndWatermark``,
+    or ``FilterDataStatus::StopIterationNoBuffer``, the processing can be resumed if
+    ``encodeData()``/``decodeData()`` return ``FilterDataStatus::Continue`` or by explicitily
+    calling ``continueEncoding()``/``continueDecoding()``.
+
+* Trailers encoding/decoding
+
+  * During encoding/decoding of trailers if a filter returns ``FilterTrailersStatus::StopIteration``,
+    the processing can be resumed by explicitily calling ``continueEncoding()``/``continueDecoding()``.
+
+Are there well-known headers that will appear in the given headers map of ``decodeHeaders()``?
+==============================================================================================
+
+Yes. The map must contain the following headers: ``Host``, ``Path`` (this might be omitted for
+CONNECT requests).
+
