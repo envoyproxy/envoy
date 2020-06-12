@@ -3,6 +3,7 @@
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/stats/stats.h"
 
+#include "common/common/documentation_url.h"
 #include "common/common/logger.h"
 
 #include "absl/container/flat_hash_set.h"
@@ -14,6 +15,10 @@ class NullValidationVisitorImpl : public ValidationVisitor {
 public:
   // Envoy::ProtobufMessage::ValidationVisitor
   void onUnknownField(absl::string_view) override {}
+  void onDeprecatedField(absl::string_view, bool) override {}
+
+  // Envoy::ProtobufMessage::ValidationVisitor
+  bool skipValidation() override { return true; }
 };
 
 ValidationVisitor& getNullValidationVisitor();
@@ -21,25 +26,33 @@ ValidationVisitor& getNullValidationVisitor();
 class WarningValidationVisitorImpl : public ValidationVisitor,
                                      public Logger::Loggable<Logger::Id::config> {
 public:
-  void setCounter(Stats::Counter& counter);
+  void setUnknownCounter(Stats::Counter& counter);
 
   // Envoy::ProtobufMessage::ValidationVisitor
   void onUnknownField(absl::string_view description) override;
+  void onDeprecatedField(absl::string_view description, bool soft_deprecation) override;
+
+  // Envoy::ProtobufMessage::ValidationVisitor
+  bool skipValidation() override { return false; }
 
 private:
   // Track hashes of descriptions we've seen, to avoid log spam. A hash is used here to avoid
   // wasting memory with unused strings.
   absl::flat_hash_set<uint64_t> descriptions_;
-  // This can be late initialized via setCounter(), enabling the server bootstrap loading which
-  // occurs prior to the initialization of the stats subsystem.
-  Stats::Counter* counter_{};
-  uint64_t prestats_count_{};
+  // This can be late initialized via setUnknownCounter(), enabling the server bootstrap loading
+  // which occurs prior to the initialization of the stats subsystem.
+  Stats::Counter* unknown_counter_{};
+  uint64_t prestats_unknown_count_{};
 };
 
 class StrictValidationVisitorImpl : public ValidationVisitor {
 public:
   // Envoy::ProtobufMessage::ValidationVisitor
   void onUnknownField(absl::string_view description) override;
+
+  // Envoy::ProtobufMessage::ValidationVisitor
+  bool skipValidation() override { return false; }
+  void onDeprecatedField(absl::string_view description, bool soft_deprecation) override;
 };
 
 ValidationVisitor& getStrictValidationVisitor();
@@ -62,11 +75,14 @@ private:
 
 class ProdValidationContextImpl : public ValidationContextImpl {
 public:
-  ProdValidationContextImpl(bool allow_unknown_static_fields, bool allow_unknown_dynamic_fields)
+  ProdValidationContextImpl(bool allow_unknown_static_fields, bool allow_unknown_dynamic_fields,
+                            bool ignore_unknown_dynamic_fields)
       : ValidationContextImpl(allow_unknown_static_fields ? static_warning_validation_visitor_
                                                           : getStrictValidationVisitor(),
                               allow_unknown_dynamic_fields
-                                  ? dynamic_warning_validation_visitor_
+                                  ? (ignore_unknown_dynamic_fields
+                                         ? ProtobufMessage::getNullValidationVisitor()
+                                         : dynamic_warning_validation_visitor_)
                                   : ProtobufMessage::getStrictValidationVisitor()) {}
 
   ProtobufMessage::WarningValidationVisitorImpl& static_warning_validation_visitor() {

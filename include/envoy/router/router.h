@@ -9,14 +9,18 @@
 #include <string>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/common/conn_pool.h"
 #include "envoy/common/matchers.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
+#include "envoy/http/conn_pool.h"
 #include "envoy/http/hash_policy.h"
 #include "envoy/http/header_map.h"
+#include "envoy/router/internal_redirect.h"
+#include "envoy/tcp/conn_pool.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/type/v3/percent.pb.h"
 #include "envoy/upstream/resource_manager.h"
@@ -31,7 +35,8 @@ namespace Envoy {
 
 namespace Upstream {
 class ClusterManager;
-}
+class LoadBalancerContext;
+} // namespace Upstream
 
 namespace Router {
 
@@ -237,9 +242,42 @@ public:
 enum class RetryStatus { No, NoOverflow, NoRetryLimitExceeded, Yes };
 
 /**
- * InternalRedirectAction from the route configuration.
+ * InternalRedirectPolicy from the route configuration.
  */
-enum class InternalRedirectAction { PassThrough, Handle };
+class InternalRedirectPolicy {
+public:
+  virtual ~InternalRedirectPolicy() = default;
+
+  /**
+   * @return whether internal redirect is enabled on this route.
+   */
+  virtual bool enabled() const PURE;
+
+  /**
+   * @param response_code the response code from the upstream.
+   * @return whether the given response_code should trigger an internal redirect on this route.
+   */
+  virtual bool shouldRedirectForResponseCode(const Http::Code& response_code) const PURE;
+
+  /**
+   * Creates the target route predicates. This should really be called only once for each upstream
+   * redirect response. Creating the predicates lazily to avoid wasting CPU cycles on non-redirect
+   * responses, which should be the most common case.
+   * @return a vector of newly constructed InternalRedirectPredicate instances.
+   */
+  virtual std::vector<InternalRedirectPredicateSharedPtr> predicates() const PURE;
+
+  /**
+   * @return the maximum number of allowed internal redirects on this route.
+   */
+  virtual uint32_t maxInternalRedirects() const PURE;
+
+  /**
+   * @return if it is allowed to follow the redirect with a different scheme in
+   *         the target URI than the downstream request.
+   */
+  virtual bool isCrossSchemeRedirectAllowed() const PURE;
+};
 
 /**
  * Wraps retry state for an active routed request.
@@ -323,11 +361,13 @@ public:
    * Returns a reference to the PriorityLoad that should be used for the next retry.
    * @param priority_set current priority set.
    * @param original_priority_load original priority load.
+   * @param priority_mapping_func see @Upstream::RetryPriority::PriorityMappingFunc.
    * @return HealthyAndDegradedLoad that should be used to select a priority for the next retry.
    */
-  virtual const Upstream::HealthyAndDegradedLoad&
-  priorityLoadForRetry(const Upstream::PrioritySet& priority_set,
-                       const Upstream::HealthyAndDegradedLoad& original_priority_load) PURE;
+  virtual const Upstream::HealthyAndDegradedLoad& priorityLoadForRetry(
+      const Upstream::PrioritySet& priority_set,
+      const Upstream::HealthyAndDegradedLoad& original_priority_load,
+      const Upstream::RetryPriority::PriorityMappingFunc& priority_mapping_func) PURE;
   /**
    * return how many times host selection should be reattempted during host selection.
    */
@@ -685,6 +725,13 @@ public:
   virtual const RetryPolicy& retryPolicy() const PURE;
 
   /**
+   * @return const InternalRedirectPolicy& the internal redirect policy for the route. All routes
+   *         have a internal redirect policy even if it is not enabled, which means redirects are
+   *         simply proxied as normal responses.
+   */
+  virtual const InternalRedirectPolicy& internalRedirectPolicy() const PURE;
+
+  /**
    * @return uint32_t any route cap on bytes which should be buffered for shadowing or retries.
    *         This is an upper bound so does not necessarily reflect the bytes which will be buffered
    *         as other limits may apply.
@@ -831,17 +878,6 @@ public:
    * If present, informs how to handle proxying CONNECT requests on this route.
    */
   virtual const absl::optional<ConnectConfig>& connectConfig() const PURE;
-
-  /**
-   * @returns the internal redirect action which should be taken on this route.
-   */
-  virtual InternalRedirectAction internalRedirectAction() const PURE;
-
-  /**
-   * @returns the threshold of number of previously handled internal redirects, for this route to
-   * stop handle internal redirects.
-   */
-  virtual uint32_t maxInternalRedirects() const PURE;
 
   /**
    * @return std::string& the name of the route.
@@ -1058,6 +1094,153 @@ public:
 };
 
 using ConfigConstSharedPtr = std::shared_ptr<const Config>;
+
+class GenericConnectionPoolCallbacks;
+class UpstreamRequest;
+class GenericUpstream;
+
+/**
+ * An API for wrapping either an HTTP or a TCP connection pool.
+ *
+ * The GenericConnPool exists to create a GenericUpstream handle via a call to
+ * newStream resulting in an eventual call to onPoolReady
+ */
+class GenericConnPool {
+public:
+  virtual ~GenericConnPool() = default;
+
+  /**
+   * Called to create a new HTTP stream or TCP connection for "CONNECT streams".
+   *
+   * The implementation of the GenericConnPool will either call
+   * GenericConnectionPoolCallbacks::onPoolReady
+   * when a stream is available or GenericConnectionPoolCallbacks::onPoolFailure
+   * if stream creation fails.
+   *
+   * The caller is responsible for calling cancelAnyPendingRequest() if stream
+   * creation is no longer desired. newStream may only be called once per
+   * GenericConnPool.
+   *
+   * @param callbacks callbacks to communicate stream failure or creation on.
+   */
+  virtual void newStream(GenericConnectionPoolCallbacks* callbacks) PURE;
+  /**
+   * Called to cancel any pending newStream request,
+   */
+  virtual bool cancelAnyPendingRequest() PURE;
+  /**
+   * @return optionally returns the protocol for the connection pool.
+   */
+  virtual absl::optional<Http::Protocol> protocol() const PURE;
+  /**
+   * @return optionally returns the host for the connection pool.
+   */
+  virtual Upstream::HostDescriptionConstSharedPtr host() const PURE;
+};
+
+/**
+ * An API for wrapping callbacks from either an HTTP or a TCP connection pool.
+ *
+ * Just like the connection pool callbacks, the GenericConnectionPoolCallbacks
+ * will either call onPoolReady when a GenericUpstream is ready, or
+ * onPoolFailure if a connection/stream can not be established.
+ */
+class GenericConnectionPoolCallbacks {
+public:
+  virtual ~GenericConnectionPoolCallbacks() = default;
+
+  /**
+   * Called to indicate a failure for GenericConnPool::newStream to establish a stream.
+   *
+   * @param reason supplies the failure reason.
+   * @param transport_failure_reason supplies the details of the transport failure reason.
+   * @param host supplies the description of the host that caused the failure. This may be nullptr
+   *             if no host was involved in the failure (for example overflow).
+   */
+  virtual void onPoolFailure(ConnectionPool::PoolFailureReason reason,
+                             absl::string_view transport_failure_reason,
+                             Upstream::HostDescriptionConstSharedPtr host) PURE;
+  /**
+   * Called when GenericConnPool::newStream has established a new stream.
+   *
+   * @param upstream supplies the generic upstream for the stream.
+   * @param host supplies the description of the host that will carry the request. For logical
+   *             connection pools the description may be different each time this is called.
+   * @param upstream_local_address supplies the local address of the upstream connection.
+   * @param info supplies the stream info object associated with the upstream connection.
+   */
+  virtual void onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
+                           Upstream::HostDescriptionConstSharedPtr host,
+                           const Network::Address::InstanceConstSharedPtr& upstream_local_address,
+                           const StreamInfo::StreamInfo& info) PURE;
+
+  // TODO(alyssawilk) This exists because the Connection Pool creates the GenericUpstream, and the
+  // GenericUpstream needs a handle back to the upstream request to pass on events, as upstream
+  // data flows in. Do interface clean up in a follow-up PR.
+  virtual UpstreamRequest* upstreamRequest() PURE;
+};
+
+/**
+ * An API for sending information to either a TCP or HTTP upstream.
+ *
+ * It is similar logically to RequestEncoder, only without the getStream interface.
+ */
+class GenericUpstream {
+public:
+  virtual ~GenericUpstream() = default;
+  /**
+   * Encode a data frame.
+   * @param data supplies the data to encode. The data may be moved by the encoder.
+   * @param end_stream supplies whether this is the last data frame.
+   */
+  virtual void encodeData(Buffer::Instance& data, bool end_stream) PURE;
+  /**
+   * Encode metadata.
+   * @param metadata_map_vector is the vector of metadata maps to encode.
+   */
+  virtual void encodeMetadata(const Http::MetadataMapVector& metadata_map_vector) PURE;
+  /**
+   * Encode headers, optionally indicating end of stream.
+   * @param headers supplies the header map to encode.
+   * @param end_stream supplies whether this is a header only request.
+   */
+  virtual void encodeHeaders(const Http::RequestHeaderMap& headers, bool end_stream) PURE;
+  /**
+   * Encode trailers. This implicitly ends the stream.
+   * @param trailers supplies the trailers to encode.
+   */
+  virtual void encodeTrailers(const Http::RequestTrailerMap& trailers) PURE;
+  /**
+   * Enable/disable further data from this stream.
+   */
+  virtual void readDisable(bool disable) PURE;
+  /**
+   * Reset the stream. No events will fire beyond this point.
+   * @param reason supplies the reset reason.
+   */
+  virtual void resetStream() PURE;
+};
+
+using GenericConnPoolPtr = std::unique_ptr<GenericConnPool>;
+
+/*
+ * A factory for creating generic connection pools.
+ */
+class GenericConnPoolFactory : public Envoy::Config::TypedFactory {
+public:
+  ~GenericConnPoolFactory() override = default;
+
+  /*
+   * @param options for creating the transport socket
+   * @return may be null
+   */
+  virtual GenericConnPoolPtr createGenericConnPool(Upstream::ClusterManager& cm, bool is_connect,
+                                                   const RouteEntry& route_entry,
+                                                   Http::Protocol protocol,
+                                                   Upstream::LoadBalancerContext* ctx) const PURE;
+};
+
+using GenericConnPoolFactoryPtr = std::unique_ptr<GenericConnPoolFactory>;
 
 } // namespace Router
 } // namespace Envoy

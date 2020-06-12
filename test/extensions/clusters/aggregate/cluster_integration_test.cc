@@ -99,6 +99,12 @@ static_resources:
                   prefix: "/cluster2"
               - route:
                   cluster: aggregate_cluster
+                  retry_policy:
+                    retry_priority:
+                      name: envoy.retry_priorities.previous_priorities
+                      typed_config:
+                        "@type": type.googleapis.com/envoy.config.retry.previous_priorities.PreviousPrioritiesConfig
+                        update_frequency: 1
                 match:
                   prefix: "/aggregatecluster"
               domains: "*"
@@ -113,11 +119,7 @@ public:
     use_lds_ = false;
   }
 
-  void TearDown() override {
-    cleanUpXdsConnection();
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
+  void TearDown() override { cleanUpXdsConnection(); }
 
   void initialize() override {
     use_lds_ = false;
@@ -190,10 +192,10 @@ TEST_P(AggregateIntegrationTest, ClusterUpDownUp) {
       IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/aggregatecluster", "",
                                          downstream_protocol_, version_, "foo.com");
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("503", response->headers().getStatusValue());
 
   cleanupUpstreamAndDownstream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // Tell Envoy that cluster_1 is back.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "42", {}, {}, {}));
@@ -212,7 +214,7 @@ TEST_P(AggregateIntegrationTest, TwoClusters) {
   testRouterHeaderOnlyRequestAndResponse(nullptr, FirstUpstreamIndex, "/aggregatecluster");
 
   cleanupUpstreamAndDownstream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // Tell Envoy that cluster_2 is here.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "55", {}, {}, {}));
@@ -224,7 +226,7 @@ TEST_P(AggregateIntegrationTest, TwoClusters) {
   // A request for aggregate cluster should be fine.
   testRouterHeaderOnlyRequestAndResponse(nullptr, FirstUpstreamIndex, "/aggregatecluster");
   cleanupUpstreamAndDownstream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // Tell Envoy that cluster_1 is gone.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "42", {}, {}, {}));
@@ -236,7 +238,7 @@ TEST_P(AggregateIntegrationTest, TwoClusters) {
 
   testRouterHeaderOnlyRequestAndResponse(nullptr, SecondUpstreamIndex, "/aggregatecluster");
   cleanupUpstreamAndDownstream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // Tell Envoy that cluster_1 is back.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "42", {}, {}, {}));
@@ -246,6 +248,43 @@ TEST_P(AggregateIntegrationTest, TwoClusters) {
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 4);
   testRouterHeaderOnlyRequestAndResponse(nullptr, FirstUpstreamIndex, "/aggregatecluster");
 
+  cleanupUpstreamAndDownstream();
+}
+
+// Test that the PreviousPriorities retry predicate works as expected. It is configured
+// in this test to exclude a priority after a single failure, so the first failure
+// on cluster_1 results in the retry going to cluster_2.
+TEST_P(AggregateIntegrationTest, PreviousPrioritiesRetryPredicate) {
+  initialize();
+
+  // Tell Envoy that cluster_2 is here.
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      Config::TypeUrl::get().Cluster, {cluster1_, cluster2_}, {cluster2_}, {}, "42");
+  // The '4' includes the fake CDS server and aggregate cluster.
+  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 4);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/aggregatecluster"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"x-forwarded-for", "10.0.0.1"},
+                                     {"x-envoy-retry-on", "5xx"}},
+      1024);
+  waitForNextUpstreamRequest(FirstUpstreamIndex);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
+
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  fake_upstream_connection_.reset();
+  waitForNextUpstreamRequest(SecondUpstreamIndex);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  response->waitForEndStream();
+  EXPECT_TRUE(upstream_request_->complete());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
   cleanupUpstreamAndDownstream();
 }
 

@@ -77,6 +77,7 @@ extensions/filters/common/original_src @snowp @klarose
 # common crypto extension
 /*/extensions/common/crypto @lizan @PiotrSikora @bdecoste
 /*/extensions/common/proxy_protocol @alyssawilk @wez470
+/*/extensions/common/sqlutils @cpakulski @dio
 /*/extensions/filters/http/grpc_http1_bridge @snowp @jose
 /*/extensions/filters/http/gzip @gsagula @dio
 /*/extensions/filters/http/fault @rshriram @alyssawilk
@@ -92,6 +93,7 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/listener/tls_inspector @piotrsikora @htuch
 /*/extensions/grpc_credentials/example @wozz @htuch
 /*/extensions/grpc_credentials/file_based_metadata @wozz @htuch
+/*/extensions/internal_redirect @alyssawilk @penguingao
 /*/extensions/stat_sinks/dog_statsd @taiki45 @jmarantz
 /*/extensions/stat_sinks/hystrix @trabetti @jmarantz
 /*/extensions/stat_sinks/metrics_service @ramaraochavali @jmarantz
@@ -114,3 +116,12 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/network/local_ratelimit @mattklein123 @junr03
 /*/extensions/filters/http/aws_request_signing @rgs1 @derekargueta @mattklein123 @marcomagdy
 /*/extensions/filters/http/aws_lambda @mattklein123 @marcomagdy @lavignes
+# Compression
+/*/extensions/compression/common @junr03 @rojkov
+/*/extensions/compression/gzip @junr03 @rojkov
+/*/extensions/filters/http/decompressor @rojkov @dio
+# Core upstream code
+extensions/upstreams/http @alyssawilk @snowp @mattklein123
+extensions/upstreams/http/http @alyssawilk @snowp @mattklein123
+extensions/upstreams/http/tcp @alyssawilk @mattklein123
+extensions/upstreams/http/default @alyssawilk @snowp @mattklein123

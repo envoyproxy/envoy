@@ -83,6 +83,13 @@ def updatedSinceSHA(repo, last_sha):
   return git(None, 'rev-list', '%s..HEAD' % last_sha, 'api/envoy').split()
 
 
+def writeRevisionInfo(repo, sha):
+  # Put a file in the generated code root containing the latest mirrored SHA
+  dst = os.path.join(repo, 'envoy', 'COMMIT')
+  with open(dst, 'w') as fh:
+    fh.write(sha)
+
+
 def syncGoProtobufs(output, repo):
   # Sync generated content against repo and return true if there is a commit necessary
   dst = os.path.join(repo, 'envoy')
@@ -111,5 +118,7 @@ if __name__ == "__main__":
   changes = updatedSinceSHA(repo, last_sha)
   if changes:
     print('Changes detected: %s' % changes)
+    new_sha = changes[0]
     syncGoProtobufs(output, repo)
-    publishGoProtobufs(repo, changes[0])
+    writeRevisionInfo(repo, new_sha)
+    publishGoProtobufs(repo, new_sha)

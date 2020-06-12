@@ -10,6 +10,7 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/event/timer.h"
+#include "envoy/server/bootstrap_extension_config.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/guarddog.h"
 #include "envoy/server/instance.h"
@@ -35,8 +36,8 @@
 #include "common/secret/secret_manager_impl.h"
 #include "common/upstream/health_discovery_service.h"
 
+#include "server/admin/admin.h"
 #include "server/configuration_impl.h"
-#include "server/http/admin.h"
 #include "server/listener_hooks.h"
 #include "server/listener_manager_impl.h"
 #include "server/overload_manager_impl.h"
@@ -170,19 +171,20 @@ public:
   Api::Api& api() override { return server_.api(); }
   Grpc::Context& grpcContext() override { return server_.grpcContext(); }
   Envoy::Server::DrainManager& drainManager() override { return server_.drainManager(); }
+  ServerLifecycleNotifier& lifecycleNotifier() override { return server_.lifecycleNotifier(); }
 
   // Configuration::TransportSocketFactoryContext
   Ssl::ContextManager& sslContextManager() override { return server_.sslContextManager(); }
   Secret::SecretManager& secretManager() override { return server_.secretManager(); }
   Stats::Store& stats() override { return server_.stats(); }
-  Init::Manager* initManager() override { return &server_.initManager(); }
+  Init::Manager& initManager() override { return server_.initManager(); }
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
     // Server has two message validation visitors, one for static and
     // other for dynamic configuration. Choose the dynamic validation
     // visitor if server's init manager indicates that the server is
     // in the Initialized state, as this state is engaged right after
     // the static configuration (e.g., bootstrap) has been completed.
-    return initManager()->state() == Init::Manager::State::Initialized
+    return initManager().state() == Init::Manager::State::Initialized
                ? server_.messageValidationContext().dynamicValidationVisitor()
                : server_.messageValidationContext().staticValidationVisitor();
   }
@@ -346,6 +348,7 @@ private:
   Upstream::ProdClusterInfoFactory info_factory_;
   Upstream::HdsDelegatePtr hds_delegate_;
   std::unique_ptr<OverloadManagerImpl> overload_manager_;
+  std::vector<BootstrapExtensionPtr> bootstrap_extensions_;
   Envoy::MutexTracer* mutex_tracer_;
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
