@@ -671,20 +671,9 @@ std::string RouteEntryImplBase::newPath(const Http::RequestHeaderMap& headers) c
 
   std::string final_path_value;
   bool path_redirect_has_query = false;
-  /*
-    if `path_redirect` is not empty:
-      if `path_redirect` contains query string:
-        set `final_path` to `path_redirect` and keep query string anyway
-      else if `strip_query`:
-        set `final_path` to `path_redirect` and strip query string
-      else:
-        set `final_path` to `path_redirect` and keep query string if exists
-    else if `strip_query`:
-      set `final_path` to `current_path` and strip query
-    else:
-      set `final_path` to `current_path`
-  */
   if (!path_redirect_.empty()) {
+    // the path_redirect query string, if any, takes precedence over the request's query string,
+    // and it will not be stripped regardless of `strip_query`.
     absl::string_view current_path = headers.getPathValue();
     path_redirect_has_query = path_redirect_.find('?') != absl::string_view::npos;
     size_t path_end = current_path.find('?');
