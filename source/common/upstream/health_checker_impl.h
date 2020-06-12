@@ -32,8 +32,9 @@ public:
    * @param runtime supplies the runtime loader.
    * @param random supplies the random generator.
    * @param dispatcher supplies the dispatcher.
-   * @param event_logger supplies the event_logger.
+   * @param log_manager supplies the log_manager.
    * @param validation_visitor message validation visitor instance.
+   * @param api reference to the Api object
    * @return a health checker.
    */
   static HealthCheckerSharedPtr
