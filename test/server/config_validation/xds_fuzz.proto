@@ -2,27 +2,29 @@ syntax = "proto3";
 
 package test.server.config_validation;
 
+import "validate/validate.proto";
+
 // Structured input for xds_fuzz_test.
 message AddListener {
-  string name = 1;
-  string route_config = 2;
-  string version = 3;
+  string name = 1 [(validate.rules).string.min_len = 1];
+  string route_config = 2 [(validate.rules).string.min_len = 1];
+  string version = 3 [(validate.rules).string.min_len = 1];
 }
 
 message AddRoute {
-  string name = 1;
-  string cluster = 2;
-  string version = 3;
+  string name = 1 [(validate.rules).string.min_len = 1];
+  string cluster = 2 [(validate.rules).string.min_len = 1];
+  string version = 3 [(validate.rules).string.min_len = 1];
 }
 
 message RemoveListener {
-  string name = 1;
-  string version = 2;
+  string name = 1 [(validate.rules).string.min_len = 1];
+  string version = 2 [(validate.rules).string.min_len = 1];
 }
 
 message RemoveRoute {
-  string name = 1;
-  string version = 2;
+  string name = 1 [(validate.rules).string.min_len = 1];
+  string version = 2 [(validate.rules).string.min_len = 1];
 }
 
 message Action {
@@ -34,6 +36,25 @@ message Action {
   }
 }
 
+message Config {
+  enum IpVersion {
+    IPv4 = 0;
+    IPv6 = 1;
+  }
+  enum ClientType {
+    ENVOY_GRPC = 0;
+    GOOGLE_GRPC = 1;
+  }
+  enum SotwOrDelta {
+    SOTW = 0;
+    DELTA = 1;
+  }
+  IpVersion ip_version = 1;
+  ClientType client_type = 2;
+  SotwOrDelta sotw_or_delta = 3;
+}
+
 message XdsTestCase {
   repeated Action actions = 1;
+  Config config = 2;
 }

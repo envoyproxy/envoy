@@ -12,17 +12,14 @@
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
 #include "test/config/utility.h"
-#include "test/fuzz/utility.h"
-/* #include "test/fuzz/fuzz_runner.h" */
+/* #include "test/fuzz/utility.h" */
 #include "test/server/config_validation/xds_fuzz.pb.h"
 
 namespace Envoy {
 
-class XdsFuzzTest : public Grpc::DeltaSotwIntegrationParamTest, public HttpIntegrationTest {
+class XdsFuzzTest : public HttpIntegrationTest {
 public:
   XdsFuzzTest(const test::server::config_validation::XdsTestCase& input);
-
-  void TearDown() override;
 
   envoy::config::cluster::v3::Cluster buildCluster(const std::string& name);
 
@@ -36,13 +33,27 @@ public:
   envoy::config::route::v3::RouteConfiguration buildRouteConfig(const std::string& name,
                                                                 const std::string& cluster);
 
+  void updateListener(const std::vector<envoy::config::listener::v3::Listener>& listeners,
+                                 const std::string& version);
+
+  void updateRoute(const std::vector<envoy::config::route::v3::RouteConfiguration> routes,
+                              const std::string& version);
   void initialize() override;
   void replay();
+  void close();
 
 private:
+  void parseConfig(const test::server::config_validation::XdsTestCase &input);
+
   Protobuf::RepeatedPtrField<test::server::config_validation::Action> actions_;
-  std::vector<envoy::config::listener::v3::Listener> routes_;
+  std::vector<envoy::config::route::v3::RouteConfiguration> routes_;
   std::vector<envoy::config::listener::v3::Listener> listeners_;
+
+  Network::Address::IpVersion ip_version_ = Network::Address::IpVersion::v4;
+  Grpc::ClientType client_type_;
+  Grpc::SotwOrDelta sotw_or_delta_;
+
+  uint64_t num_lds_updates_;
 };
 
 } // namespace Envoy

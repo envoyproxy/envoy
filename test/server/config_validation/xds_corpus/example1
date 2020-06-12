@@ -29,3 +29,8 @@ actions {
     route_config : "route_config_1"
   }
 }
+config {
+  ip_version : IPv4
+  client_type : ENVOY_GRPC
+  sotw_or_delta : SOTW
+}
