@@ -366,8 +366,9 @@ protected:
 class HttpGenericBodyMatcherCtx : public MatcherCtx {
 public:
   HttpGenericBodyMatcherCtx(std::list<std::string> patterns, size_t overlap_size)
-      : patterns_(patterns), overlap_size_(overlap_size) {
-    overlap_ = std::make_unique<char[]>(overlap_size_);
+      : patterns_(patterns) {
+    // Initialize overlap_ buffer's capacity to fit the longest pattern - 1.
+    overlap_.reserve(overlap_size);
   }
   virtual ~HttpGenericBodyMatcherCtx() = default;
 
@@ -375,17 +376,13 @@ public:
   // When data is passing through the matcher, found patterns are removed
   // from the list. When all patterns have been found, the list is empty.
   std::list<std::string> patterns_;
-  // Stores the length of the longest pattern.
-  size_t overlap_size_;
   // Buffer to store the last bytes from previous body chunk(s).
   // It will store only as many bytes as is the length of the longest
   // pattern to be found minus 1.
   // It is necessary to locate patterns which are spread across 2 or more
   // body chunks.
-  std::unique_ptr<char[]> overlap_;
-  size_t bytes_in_overlap_{0};
-  // Tracks how many bytes has been already processed.
-  // Used only when limit_ is not zero.
+  std::vector<char> overlap_;
+  // processed_bytes_ tracks how many bytes of HTTP body have been processed.
   uint32_t processed_bytes_{};
 };
 
