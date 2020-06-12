@@ -185,7 +185,7 @@ TEST(Fancy, SetLevel) {
 
 TEST(Fancy, FastPath) {
   // for loop should expands with the same site?
-  printf("You should only see two 'Slow path' in the output..\n");
+  printf("You should only see one 'Slow path' in the output..\n");
   setFancyLogLevel(__FILE__, spdlog::level::info);
   for(int i = 0; i < 10; i ++) {
     FANCY_LOG(warn, "Fake warning No. {}", i);
@@ -194,7 +194,25 @@ TEST(Fancy, FastPath) {
 
 void *logThread(void* id) {
   int tid = *static_cast<int*>(id);
-  if (tid) {
+
+  if (tid == 0) {
+    FANCY_LOG(info, "Thread {}: thread to set levels", tid);
+    setFancyLogLevel(__FILE__, spdlog::level::trace);
+    printf(" - level = trace\n");
+    setFancyLogLevel(__FILE__, spdlog::level::debug);
+    printf(" - level = debug\n");
+    setFancyLogLevel(__FILE__, spdlog::level::info);
+    printf(" - level = info\n");
+    for (int j = 0; j < 10; j ++) {};
+    
+    setFancyLogLevel(__FILE__, spdlog::level::warn);
+    printf(" - level = warn\n");
+    setFancyLogLevel(__FILE__, spdlog::level::err);
+    printf(" - level = error\n");
+    setFancyLogLevel(__FILE__, spdlog::level::critical);
+    printf(" - level = critical\n");
+  }
+  else {
     for (int i = 0; i < 5; i ++) {
       FANCY_LOG(critical, "Thread {} round {}: fake critical log;", tid, i);
       FANCY_LOG(trace, "    fake trace log;");
@@ -205,38 +223,24 @@ void *logThread(void* id) {
       FANCY_LOG(critical, "   fake critical."); 
     }
   }
-  else {
-    FANCY_LOG(info, "Thread {}: thread to set levels", tid);
-    setFancyLogLevel(__FILE__, spdlog::level::trace);
-    printf(" - level = trace\n");
-    setFancyLogLevel(__FILE__, spdlog::level::debug);
-    printf(" - level = debug\n");
-    setFancyLogLevel(__FILE__, spdlog::level::info);
-    printf(" - level = info\n");
-    setFancyLogLevel(__FILE__, spdlog::level::warn);
-    printf(" - level = warn\n");
-    setFancyLogLevel(__FILE__, spdlog::level::err);
-    printf(" - level = error\n");
-    setFancyLogLevel(__FILE__, spdlog::level::critical);
-    printf(" - level = critical\n");
-  }
+
   pthread_exit(nullptr);
   return nullptr;
 }
 
-// TEST(FANCY, Threads) {
-//   // test with multiple threads
-//   pthread_t threads[2];
-//   int num[] = {0, 1};
-//   for (int id : {0, 1}) {
-//     int rc = pthread_create(&threads[id], nullptr, logThread, static_cast<void*>(&num[id]));
-//     EXPECT_EQ(rc, 0);
-//   }
-//   for (int id : {0, 1}) {
-//     pthread_join(threads[id], nullptr);
-//   }
-//   pthread_exit(nullptr);
-// }
+TEST(FANCY, Threads) {
+  // test with multiple threads
+  pthread_t threads[2];
+  std::vector<int> range = {0, 1, 2};
+  for (int id : range) {
+    int rc = pthread_create(&threads[id], nullptr, logThread, static_cast<void*>(&range[id]));
+    EXPECT_EQ(rc, 0);
+  }
+  for (int id : range) {
+    pthread_join(threads[id], nullptr);
+  }
+  // pthread_exit(nullptr);
+}
 
 
 } // namespace Envoy
