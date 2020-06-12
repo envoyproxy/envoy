@@ -169,40 +169,6 @@ TEST_F(DispatcherImplTest, Post) {
   }
 }
 
-TEST_F(DispatcherImplTest, EnableZeroTimerOutOfThread) {
-  Event::TimerPtr timer = dispatcher_->createTimer([&] {
-    {
-      Thread::LockGuard lock(mu_);
-      work_finished_ = true;
-    }
-    cv_.notifyOne();
-  });
-
-  timer->enableTimer(std::chrono::milliseconds(0));
-
-  Thread::LockGuard lock(mu_);
-  while (!work_finished_) {
-    cv_.wait(mu_);
-  }
-}
-
-TEST_F(DispatcherImplTest, EnableNonZeroTimerOutOfThread) {
-  Event::TimerPtr timer = dispatcher_->createTimer([&] {
-    {
-      Thread::LockGuard lock(mu_);
-      work_finished_ = true;
-    }
-    cv_.notifyOne();
-  });
-
-  timer->enableTimer(std::chrono::milliseconds(1));
-
-  Thread::LockGuard lock(mu_);
-  while (!work_finished_) {
-    cv_.wait(mu_);
-  }
-}
-
 // Ensure that there is no deadlock related to calling a posted callback, or
 // destructing a closure when finished calling it.
 TEST_F(DispatcherImplTest, RunPostCallbacksLocking) {
@@ -243,6 +209,7 @@ TEST_F(DispatcherImplTest, RunPostCallbacksLocking) {
 }
 
 TEST_F(DispatcherImplTest, Timer) {
+  timerTest([](Timer& timer) { timer.enableTimer(std::chrono::milliseconds(0)); });
   timerTest([](Timer& timer) { timer.enableTimer(std::chrono::milliseconds(50)); });
   timerTest([](Timer& timer) { timer.enableHRTimer(std::chrono::microseconds(50)); });
 }
