@@ -137,7 +137,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
       headers.setGrpcStatus(Envoy::Grpc::Status::WellKnownGrpcStatus::Unknown);
       headers.setStatus(enumToInt(Http::Code::OK));
 
-      if (content_type.size()) {
+      if (!content_type.empty()) {
         headers.setContentType(content_type_);
       }
 
