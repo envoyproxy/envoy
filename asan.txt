@@ -1,0 +1,144 @@
+WARNING: The following rc files are no longer being read, please transfer their contents or import their path into one of the standard rc files:
+/usr/local/google/home/jinhuisong/envoy-dev/tools/bazel.rc
+INFO: Invocation ID: 7341e0cf-221f-4728-9e5e-0f87f5fa420e
+Loading: 
+Loading: 0 packages loaded
+Analyzing: target //test/common/common:log_macros_test (0 packages loaded, 0 targets configured)
+DEBUG: /usr/local/google/home/jinhuisong/.cache/bazel/_bazel_jinhuisong/088cc0e568b23481959e9a92414bfa8b/external/bazel_toolchains/rules/rbe_repo.bzl:477:5: Bazel 3.1.0 is used in rbe_ubuntu_clang_libcxx.
+INFO: Analyzed target //test/common/common:log_macros_test (0 packages loaded, 0 targets configured).
+INFO: Found 1 test target...
+[0 / 2] [Prepa] BazelWorkspaceStatusAction stable-status.txt
+[2 / 630] CcCmakeMakeRule external/envoy/bazel/foreign_cc/event/include; 1s remote ... (3 actions running)
+ERROR: /usr/local/google/home/jinhuisong/.cache/bazel/_bazel_jinhuisong/088cc0e568b23481959e9a92414bfa8b/external/envoy/bazel/foreign_cc/BUILD:224:1: error executing shell command: '/bin/bash -c function cleanup_function() {
+local ecode=$?
+if [ $ecode -eq 0 ]; then
+cleanup_on_success
+else
+cleanup_on_failure
+fi
+}
+set -e
+function cleanup_on_success() {
+printf "rules_foreign_cc: ...' failed (Exit 1)
+
+rules_foreign_cc: Build failed!
+rules_foreign_cc: Keeping temp build directory  and dependencies directory  for debug.
+rules_foreign_cc: Please note that the directories inside a sandbox are still cleaned unless you specify '--sandbox_debug' Bazel command line flag.
+
+rules_foreign_cc: Printing build logs:
+
+_____ BEGIN BUILD LOGS _____
+Bazel external C/C++ Rules #0.0.8. Building library 'zlib'
+Environment:______________BAZEL_LINKLIBS=-l%:libstdc++.a
+ENVOY_ASAN=1
+EXT_BUILD_ROOT=/b/f/w
+HOSTNAME=905d516d3649
+ENVOY_UBSAN_VPTR=1
+HOST_NETWORK_NAME=network-name-dont-hardcode-use-HOST_NETWORK_NAME-env-var
+INSTALLDIR=/b/f/w/bazel-out/k8-dbg/bin/external/envoy/bazel/foreign_cc/zlib
+BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
+BAZEL_LINKOPTS=-lm
+CC=clang
+CXXFLAGS=-stdlib=libc++
+PWD=/b/f/w
+HOME=/home/nobody
+BUILD_TMPDIR=/tmp/tmp.54PhqgDjnk
+EXT_BUILD_DEPS=/tmp/tmp.lJyBSuVjZP
+CXX=clang++
+SHLVL=2
+BUILD_LOG=bazel-out/k8-dbg/bin/external/envoy/bazel/foreign_cc/zlib/logs/CMake.log
+BUILD_SCRIPT=bazel-out/k8-dbg/bin/external/envoy/bazel/foreign_cc/zlib/logs/CMake_script.sh
+LDFLAGS=-stdlib=libc++
+PATH=/b/f/w:/usr/sbin:/usr/bin:/sbin:/bin:/opt/llvm/bin
+HOST_CONTAINER_NAME=rbe-container-498d0166-467f-411e-b835-dada3f3fc6a3
+_=/usr/bin/env
+__________________________-- The C compiler identification is Clang 9.0.0
+-- Looking for sys/types.h
+-- Looking for sys/types.h - found
+-- Looking for stdint.h
+-- Looking for stdint.h - found
+-- Looking for stddef.h
+-- Looking for stddef.h - found
+-- Check size of off64_t
+-- Check size of off64_t - done
+-- Looking for fseeko
+-- Looking for fseeko - found
+-- Looking for unistd.h
+-- Looking for unistd.h - found
+-- Renaming
+--     /b/f/w/external/net_zlib/zconf.h
+-- to 'zconf.h.included' because this file is included with zlib
+-- but CMake generates it automatically in the build directory.
+-- Configuring done
+-- Generating done
+CMake Warning:
+  Manually-specified variables were not used by the project:
+
+    CMAKE_CXX_COMPILER_FORCED
+
+
+-- Build files have been written to: /tmp/tmp.54PhqgDjnk
+[1/33] /opt/llvm/bin/clang -D_LARGEFILE64_SOURCE=1 -I. -I/b/f/w/external/net_zlib -U_FORTIFY_SOURCE -fstack-protector -Wall -Wthread-safety -Wself-assign -fcolor-diagnostics -fno-omit-frame-pointer -g -no-canonical-prefixes -Wno-builtin-macro-redefined -D__DATE__="redacted" -D__TIMESTAMP__="redacted" -D__TIME__="redacted" -fPIC -fsanitize=address,undefined -fno-sanitize=vptr,function -DADDRESS_SANITIZER=1 -D__SANITIZE_ADDRESS__ -fsanitize=vptr,function -MD -MT CMakeFiles/zlibstatic.dir/compress.o -MF CMakeFiles/zlibstatic.dir/compress.o.d -o CMakeFiles/zlibstatic.dir/compress.o   -c /b/f/w/external/net_zlib/compress.c
+[2/33] /opt/llvm/bin/clang -D_LARGEFILE64_SOURCE=1 -I. -I/b/f/w/external/net_zlib -U_FORTIFY_SOURCE -fstack-protector -Wall -Wthread-safety -Wself-assign -fcolor-diagnostics -fno-omit-frame-pointer -g -no-canonical-prefixes -Wno-builtin-macro-redefined -D__DATE__="redacted" -D__TIMESTAMP__="redacted" -D__TIME__="redacted" -fPIC -fsanitize=address,undefined -fno-sanitize=vptr,function -DADDRESS_SANITIZER=1 -D__SANITIZE_ADDRESS__ -fsanitize=vptr,function -MD -MT CMakeFiles/zlibstatic.dir/adler32.o -MF CMakeFiles/zlibstatic.dir/adler32.o.d -o CMakeFiles/zlibstatic.dir/adler32.o   -c /b/f/w/external/net_zlib/adler32.c
+[3/33] /opt/llvm/bin/clang -D_LARGEFILE64_SOURCE=1 -I. -I/b/f/w/external/net_zlib -U_FORTIFY_SOURCE -fstack-protector -Wall -Wthread-safety -Wself-assign -fcolor-diagnostics -fno-omit-frame-pointer -g -no-canonical-prefixes -Wno-builtin-macro-redefined -D__DATE__="redacted" -D__TIMESTAMP__="redacted" -D__TIME__="redacted" -fPIC -fsanitize=address,undefined -fno-sanitize=vptr,function -DADDRESS_SANITIZER=1 -D__SANITIZE_ADDRESS__ -fsanitize=vptr,function -MD -MT CMakeFiles/zlibstatic.dir/gzlib.o -MF CMakeFiles/zlibstatic.dir/gzlib.o.d -o CMakeFiles/zlibstatic.dir/gzlib.o   -c /b/f/w/external/net_zlib/gzlib.c
+[4/33] /opt/llvm/bin/clang -D_LARGEFILE64_SOURCE=1 -I. -I/b/f/w/external/net_zlib -U_FORTIFY_SOURCE -fstack-protector -Wall -Wthread-safety -Wself-assign -fcolor-diagnostics -fno-omit-frame-pointer -g -no-canonical-prefixes -Wno-builtin-macro-redefined -D__DATE__="redacted" -D__TIMESTAMP__="redacted" -D__TIME__="redacted" -fPIC -fsanitize=address,undefined -fno-sanitize=vptr,function -DADDRESS_SANITIZER=1 -D__SANITIZE_ADDRESS__ -fsanitize=vptr,function -MD -MT CMakeFiles/zlibstatic.dir/gzclose.o -MF CMakeFiles/zlibstatic.dir/gzclose.o.d -o CMakeFiles/zlibstatic.dir/gzclose.o   -c /b/f/w/external/net_zlib/gzclose.c
+[5/33] /opt/llvm/bin/clang -D_LARGEFILE64_SOURCE=1 -I. -I/b/f/w/external/net_zlib -U_FORTIFY_SOURCE -fstack-protector -Wall -Wthread-safety -Wself-assign -fcolor-diagnostics -fno-omit-frame-pointer -g -no-canonical-prefixes -Wno-builtin-macro-redefined -D__DATE__="redacted" -D__TIMESTAMP__="redacted" -D__TIME__="redacted" -fPIC -fsanitize=address,undefined -fno-sanitize=vptr,function -DADDRESS_SANITIZER=1 -D__SANITIZE_ADDRESS__ -fsanitize=vptr,function -MD -MT CMakeFiles/zlibstatic.dir/crc32.o -MF CMakeFiles/zlibstatic.dir/crc32.o.d -o CMakeFiles/zlibstatic.dir/crc32.o   -c /b/f/w/external/net_zlib/crc32.c
+[6/33] /opt/llvm/bin/clang -D_LARGEFILE64_SOURCE=1 -I. -I/b/f/w/external/net_zlib -U_FORTIFY_SOURCE -fstack-protector -Wall -Wthread-safety -Wself-assign -fcolor-diagnostics -fno-omit-frame-pointer -g -no-canonical-prefixes -Wno-builtin-macro-redefined -D__DATE__="redacted" -D__TIMESTAMP__="redacted" -D__TIME__="redacted" -fPIC -fsanitize=address,undefined -fno-sanitize=vptr,function -DADDRESS_SANITIZER=1 -D__SANITIZE_ADDRESS__ -fsanitize=vptr,function -MD -MT CMakeFiles/zlibstatic.dir/inftrees.o -MF CMakeFiles/zlibstatic.dir/inftrees.o.d -o CMakeFiles/zlibstatic.dir/inftrees.o   -c /b/f/w/external/net_zlib/inftrees.c
+[7/33] /opt/llvm/bin/clang -D_LARGEFILE64_SOURCE=1 -I. -I/b/f/w/external/net_zlib -U_FORTIFY_SOURCE -fstack-protector -Wall -Wthread-safety -Wself-assign -fcolor-diagnostics -fno-omit-frame-pointer -g -no-canonical-prefixes -Wno-builtin-macro-redefined -D__DATE__="redacted" -D__TIMESTAMP__="redacted" -D__TIME__="redacted" -fPIC -fsanitize=address,undefined -fno-sanitize=vptr,function -DADDRESS_SANITIZER=1 -D__SANITIZE_ADDRESS__ -fsanitize=vptr,function -MD -MT CMakeFiles/zlibstatic.dir/gzread.o -MF CMakeFiles/zlibstatic.dir/gzread.o.d -o CMakeFiles/zlibstatic.dir/gzread.o   -c /b/f/w/external/net_zlib/gzread.c
+[8/33] /opt/llvm/bin/clang -D_LARGEFILE64_SOURCE=1 -I. -I/b/f/w/external/net_zlib -U_FORTIFY_SOURCE -fstack-protector -Wall -Wthread-safety -Wself-assign -fcolor-diagnostics -fno-omit-frame-pointer -g -no-canonical-prefixes -Wno-builtin-macro-redefined -D__DATE__="redacted" -D__TIMESTAMP__="redacted" -D__TIME__="redacted" -fPIC -fsanitize=address,undefined -fno-sanitize=vptr,function -DADDRESS_SANITIZER=1 -D__SANITIZE_ADDRESS__ -fsanitize=vptr,function -MD -MT CMakeFiles/zlibstatic.dir/gzwrite.o -MF CMakeFiles/zlibstatic.dir/gzwrite.o.d -o CMakeFiles/zlibstatic.dir/gzwrite.o   -c /b/f/w/external/net_zlib/gzwrite.c
+[9/33] /opt/llvm/bin/clang -D_LARGEFILE64_SOURCE=1 -I. -I/b/f/w/external/net_zlib -U_FORTIFY_SOURCE -fstack-protector -Wall -Wthread-safety -Wself-assign -fcolor-diagnostics -fno-omit-frame-pointer -g -no-canonical-prefixes -Wno-builtin-macro-redefined -D__DATE__="redacted" -D__TIMESTAMP__="redacted" -D__TIME__="redacted" -fPIC -fsanitize=address,undefined -fno-sanitize=vptr,function -DADDRESS_SANITIZER=1 -D__SANITIZE_ADDRESS__ -fsanitize=vptr,function -MD -MT CMakeFiles/zlibstatic.dir/inffast.o -MF CMakeFiles/zlibstatic.dir/inffast.o.d -o CMakeFiles/zlibstatic.dir/inffast.o   -c /b/f/w/external/net_zlib/inffast.c
+[10/33] /opt/llvm/bin/clang -D_LARGEFILE64_SOURCE=1 -I. -I/b/f/w/external/net_zlib -U_FORTIFY_SOURCE -fstack-protector -Wall -Wthread-safety -Wself-assign -fcolor-diagnostics -fno-omit-frame-pointer -g -no-canonical-prefixes -Wno-builtin-macro-redefined -D__DATE__="redacted" -D__TIMESTAMP__="redacted" -D__TIME__="redacted" -fPIC -fsanitize=address,undefined -fno-sanitize=vptr,function -DADDRESS_SANITIZER=1 -D__SANITIZE_ADDRESS__ -fsanitize=vptr,function -MD -MT CMakeFiles/zlibstatic.dir/uncompr.o -MF CMakeFiles/zlibstatic.dir/uncompr.o.d -o CMakeFiles/zlibstatic.dir/uncompr.o   -c /b/f/w/external/net_zlib/uncompr.c
+[11/33] /opt/llvm/bin/clang -D_LARGEFILE64_SOURCE=1 -I. -I/b/f/w/external/net_zlib -U_FORTIFY_SOURCE -fstack-protector -Wall -Wthread-safety -Wself-assign -fcolor-diagnostics -fno-omit-frame-pointer -g -no-canonical-prefixes -Wno-builtin-macro-redefined -D__DATE__="redacted" -D__TIMESTAMP__="redacted" -D__TIME__="redacted" -fPIC -fsanitize=address,undefined -fno-sanitize=vptr,function -DADDRESS_SANITIZER=1 -D__SANITIZE_ADDRESS__ -fsanitize=vptr,function -MD -MT CMakeFiles/zlibstatic.dir/infback.o -MF CMakeFiles/zlibstatic.dir/infback.o.d -o CMakeFiles/zlibstatic.dir/infback.o   -c /b/f/w/external/net_zlib/infback.c
+[12/33] /opt/llvm/bin/clang -DZLIB_DLL -D_LARGEFILE64_SOURCE=1 -I. -I/b/f/w/external/net_zlib -U_FORTIFY_SOURCE -fstack-protector -Wall -Wthread-safety -Wself-assign -fcolor-diagnostics -fno-omit-frame-pointer -g -no-canonical-prefixes -Wno-builtin-macro-redefined -D__DATE__="redacted" -D__TIMESTAMP__="redacted" -D__TIME__="redacted" -fPIC -fsanitize=address,undefined -fno-sanitize=vptr,function -DADDRESS_SANITIZER=1 -D__SANITIZE_ADDRESS__ -fsanitize=vptr,function -fPIC -MD -MT CMakeFiles/zlib.dir/adler32.o -MF CMakeFiles/zlib.dir/adler32.o.d -o CMakeFiles/zlib.dir/adler32.o   -c /b/f/w/external/net_zlib/adler32.c
+[13/33] /opt/llvm/bin/clang -D_LARGEFILE64_SOURCE=1 -I. -I/b/f/w/external/net_zlib -U_FORTIFY_SOURCE -fstack-protector -Wall -Wthread-safety -Wself-assign -fcolor-diagnostics -fno-omit-frame-pointer -g -no-canonical-prefixes -Wno-builtin-macro-redefined -D__DATE__="redacted" -D__TIMESTAMP__="redacted" -D__TIME__="redacted" -fPIC -fsanitize=address,undefined -fno-sanitize=vptr,function -DADDRESS_SANITIZER=1 -D__SANITIZE_ADDRESS__ -fsanitize=vptr,function -MD -MT CMakeFiles/zlibstatic.dir/zutil.o -MF CMakeFiles/zlibstatic.dir/zutil.o.d -o CMakeFiles/zlibstatic.dir/zutil.o   -c /b/f/w/external/net_zlib/zutil.c
+[14/33] /opt/llvm/bin/clang -DZLIB_DLL -D_LARGEFILE64_SOURCE=1 -I. -I/b/f/w/external/net_zlib -U_FORTIFY_SOURCE -fstack-protector -Wall -Wthread-safety -Wself-assign -fcolor-diagnostics -fno-omit-frame-pointer -g -no-canonical-prefixes -Wno-builtin-macro-redefined -D__DATE__="redacted" -D__TIMESTAMP__="redacted" -D__TIME__="redacted" -fPIC -fsanitize=address,undefined -fno-sanitize=vptr,function -DADDRESS_SANITIZER=1 -D__SANITIZE_ADDRESS__ -fsanitize=vptr,function -fPIC -MD -MT CMakeFiles/zlib.dir/compress.o -MF CMakeFiles/zlib.dir/compress.o.d -o CMakeFiles/zlib.dir/compress.o   -c /b/f/w/external/net_zlib/compress.c
+[15/33] /opt/llvm/bin/clang -D_LARGEFILE64_SOURCE=1 -I. -I/b/f/w/external/net_zlib -U_FORTIFY_SOURCE -fstack-protector -Wall -Wthread-safety -Wself-assign -fcolor-diagnostics -fno-omit-frame-pointer -g -no-canonical-prefixes -Wno-builtin-macro-redefined -D__DATE__="redacted" -D__TIMESTAMP__="redacted" -D__TIME__="redacted" -fPIC -fsanitize=address,undefined -fno-sanitize=vptr,function -DADDRESS_SANITIZER=1 -D__SANITIZE_ADDRESS__ -fsanitize=vptr,function -MD -MT CMakeFiles/zlibstatic.dir/inflate.o -MF CMakeFiles/zlibstatic.dir/inflate.o.d -o CMakeFiles/zlibstatic.dir/inflate.o   -c /b/f/w/external/net_zlib/inflate.c
+[16/33] /opt/llvm/bin/clang -DZLIB_DLL -D_LARGEFILE64_SOURCE=1 -I. -I/b/f/w/external/net_zlib -U_FORTIFY_SOURCE -fstack-protector -Wall -Wthread-safety -Wself-assign -fcolor-diagnostics -fno-omit-frame-pointer -g -no-canonical-prefixes -Wno-builtin-macro-redefined -D__DATE__="redacted" -D__TIMESTAMP__="redacted" -D__TIME__="redacted" -fPIC -fsanitize=address,undefined -fno-sanitize=vptr,function -DADDRESS_SANITIZER=1 -D__SANITIZE_ADDRESS__ -fsanitize=vptr,function -fPIC -MD -MT CMakeFiles/zlib.dir/gzclose.o -MF CMakeFiles/zlib.dir/gzclose.o.d -o CMakeFiles/zlib.dir/gzclose.o   -c /b/f/w/external/net_zlib/gzclose.c
+[17/33] /opt/llvm/bin/clang -DZLIB_DLL -D_LARGEFILE64_SOURCE=1 -I. -I/b/f/w/external/net_zlib -U_FORTIFY_SOURCE -fstack-protector -Wall -Wthread-safety -Wself-assign -fcolor-diagnostics -fno-omit-frame-pointer -g -no-canonical-prefixes -Wno-builtin-macro-redefined -D__DATE__="redacted" -D__TIMESTAMP__="redacted" -D__TIME__="redacted" -fPIC -fsanitize=address,undefined -fno-sanitize=vptr,function -DADDRESS_SANITIZER=1 -D__SANITIZE_ADDRESS__ -fsanitize=vptr,function -fPIC -MD -MT CMakeFiles/zlib.dir/crc32.o -MF CMakeFiles/zlib.dir/crc32.o.d -o CMakeFiles/zlib.dir/crc32.o   -c /b/f/w/external/net_zlib/crc32.c
+[18/33] /opt/llvm/bin/clang -D_LARGEFILE64_SOURCE=1 -I. -I/b/f/w/external/net_zlib -U_FORTIFY_SOURCE -fstack-protector -Wall -Wthread-safety -Wself-assign -fcolor-diagnostics -fno-omit-frame-pointer -g -no-canonical-prefixes -Wno-builtin-macro-redefined -D__DATE__="redacted" -D__TIMESTAMP__="redacted" -D__TIME__="redacted" -fPIC -fsanitize=address,undefined -fno-sanitize=vptr,function -DADDRESS_SANITIZER=1 -D__SANITIZE_ADDRESS__ -fsanitize=vptr,function -MD -MT CMakeFiles/zlibstatic.dir/deflate.o -MF CMakeFiles/zlibstatic.dir/deflate.o.d -o CMakeFiles/zlibstatic.dir/deflate.o   -c /b/f/w/external/net_zlib/deflate.c
+[19/33] /opt/llvm/bin/clang -D_LARGEFILE64_SOURCE=1 -I. -I/b/f/w/external/net_zlib -U_FORTIFY_SOURCE -fstack-protector -Wall -Wthread-safety -Wself-assign -fcolor-diagnostics -fno-omit-frame-pointer -g -no-canonical-prefixes -Wno-builtin-macro-redefined -D__DATE__="redacted" -D__TIMESTAMP__="redacted" -D__TIME__="redacted" -fPIC -fsanitize=address,undefined -fno-sanitize=vptr,function -DADDRESS_SANITIZER=1 -D__SANITIZE_ADDRESS__ -fsanitize=vptr,function -MD -MT CMakeFiles/zlibstatic.dir/trees.o -MF CMakeFiles/zlibstatic.dir/trees.o.d -o CMakeFiles/zlibstatic.dir/trees.o   -c /b/f/w/external/net_zlib/trees.c
+[20/33] : && /usr/bin/cmake -E rm -f libz.a && /usr/bin/ar qc libz.a  CMakeFiles/zlibstatic.dir/adler32.o CMakeFiles/zlibstatic.dir/compress.o CMakeFiles/zlibstatic.dir/crc32.o CMakeFiles/zlibstatic.dir/deflate.o CMakeFiles/zlibstatic.dir/gzclose.o CMakeFiles/zlibstatic.dir/gzlib.o CMakeFiles/zlibstatic.dir/gzread.o CMakeFiles/zlibstatic.dir/gzwrite.o CMakeFiles/zlibstatic.dir/inflate.o CMakeFiles/zlibstatic.dir/infback.o CMakeFiles/zlibstatic.dir/inftrees.o CMakeFiles/zlibstatic.dir/inffast.o CMakeFiles/zlibstatic.dir/trees.o CMakeFiles/zlibstatic.dir/uncompr.o CMakeFiles/zlibstatic.dir/zutil.o && :
+[21/33] /opt/llvm/bin/clang -DZLIB_DLL -D_LARGEFILE64_SOURCE=1 -I. -I/b/f/w/external/net_zlib -U_FORTIFY_SOURCE -fstack-protector -Wall -Wthread-safety -Wself-assign -fcolor-diagnostics -fno-omit-frame-pointer -g -no-canonical-prefixes -Wno-builtin-macro-redefined -D__DATE__="redacted" -D__TIMESTAMP__="redacted" -D__TIME__="redacted" -fPIC -fsanitize=address,undefined -fno-sanitize=vptr,function -DADDRESS_SANITIZER=1 -D__SANITIZE_ADDRESS__ -fsanitize=vptr,function -fPIC -MD -MT CMakeFiles/zlib.dir/gzlib.o -MF CMakeFiles/zlib.dir/gzlib.o.d -o CMakeFiles/zlib.dir/gzlib.o   -c /b/f/w/external/net_zlib/gzlib.c
+[22/33] /opt/llvm/bin/clang -DZLIB_DLL -D_LARGEFILE64_SOURCE=1 -I. -I/b/f/w/external/net_zlib -U_FORTIFY_SOURCE -fstack-protector -Wall -Wthread-safety -Wself-assign -fcolor-diagnostics -fno-omit-frame-pointer -g -no-canonical-prefixes -Wno-builtin-macro-redefined -D__DATE__="redacted" -D__TIMESTAMP__="redacted" -D__TIME__="redacted" -fPIC -fsanitize=address,undefined -fno-sanitize=vptr,function -DADDRESS_SANITIZER=1 -D__SANITIZE_ADDRESS__ -fsanitize=vptr,function -fPIC -MD -MT CMakeFiles/zlib.dir/gzread.o -MF CMakeFiles/zlib.dir/gzread.o.d -o CMakeFiles/zlib.dir/gzread.o   -c /b/f/w/external/net_zlib/gzread.c
+[23/33] /opt/llvm/bin/clang -DZLIB_DLL -D_LARGEFILE64_SOURCE=1 -I. -I/b/f/w/external/net_zlib -U_FORTIFY_SOURCE -fstack-protector -Wall -Wthread-safety -Wself-assign -fcolor-diagnostics -fno-omit-frame-pointer -g -no-canonical-prefixes -Wno-builtin-macro-redefined -D__DATE__="redacted" -D__TIMESTAMP__="redacted" -D__TIME__="redacted" -fPIC -fsanitize=address,undefined -fno-sanitize=vptr,function -DADDRESS_SANITIZER=1 -D__SANITIZE_ADDRESS__ -fsanitize=vptr,function -fPIC -MD -MT CMakeFiles/zlib.dir/inftrees.o -MF CMakeFiles/zlib.dir/inftrees.o.d -o CMakeFiles/zlib.dir/inftrees.o   -c /b/f/w/external/net_zlib/inftrees.c
+[24/33] /opt/llvm/bin/clang -DZLIB_DLL -D_LARGEFILE64_SOURCE=1 -I. -I/b/f/w/external/net_zlib -U_FORTIFY_SOURCE -fstack-protector -Wall -Wthread-safety -Wself-assign -fcolor-diagnostics -fno-omit-frame-pointer -g -no-canonical-prefixes -Wno-builtin-macro-redefined -D__DATE__="redacted" -D__TIMESTAMP__="redacted" -D__TIME__="redacted" -fPIC -fsanitize=address,undefined -fno-sanitize=vptr,function -DADDRESS_SANITIZER=1 -D__SANITIZE_ADDRESS__ -fsanitize=vptr,function -fPIC -MD -MT CMakeFiles/zlib.dir/gzwrite.o -MF CMakeFiles/zlib.dir/gzwrite.o.d -o CMakeFiles/zlib.dir/gzwrite.o   -c /b/f/w/external/net_zlib/gzwrite.c
+[25/33] /opt/llvm/bin/clang -DZLIB_DLL -D_LARGEFILE64_SOURCE=1 -I. -I/b/f/w/external/net_zlib -U_FORTIFY_SOURCE -fstack-protector -Wall -Wthread-safety -Wself-assign -fcolor-diagnostics -fno-omit-frame-pointer -g -no-canonical-prefixes -Wno-builtin-macro-redefined -D__DATE__="redacted" -D__TIMESTAMP__="redacted" -D__TIME__="redacted" -fPIC -fsanitize=address,undefined -fno-sanitize=vptr,function -DADDRESS_SANITIZER=1 -D__SANITIZE_ADDRESS__ -fsanitize=vptr,function -fPIC -MD -MT CMakeFiles/zlib.dir/infback.o -MF CMakeFiles/zlib.dir/infback.o.d -o CMakeFiles/zlib.dir/infback.o   -c /b/f/w/external/net_zlib/infback.c
+[26/33] /opt/llvm/bin/clang -DZLIB_DLL -D_LARGEFILE64_SOURCE=1 -I. -I/b/f/w/external/net_zlib -U_FORTIFY_SOURCE -fstack-protector -Wall -Wthread-safety -Wself-assign -fcolor-diagnostics -fno-omit-frame-pointer -g -no-canonical-prefixes -Wno-builtin-macro-redefined -D__DATE__="redacted" -D__TIMESTAMP__="redacted" -D__TIME__="redacted" -fPIC -fsanitize=address,undefined -fno-sanitize=vptr,function -DADDRESS_SANITIZER=1 -D__SANITIZE_ADDRESS__ -fsanitize=vptr,function -fPIC -MD -MT CMakeFiles/zlib.dir/inffast.o -MF CMakeFiles/zlib.dir/inffast.o.d -o CMakeFiles/zlib.dir/inffast.o   -c /b/f/w/external/net_zlib/inffast.c
+[27/33] /opt/llvm/bin/clang -DZLIB_DLL -D_LARGEFILE64_SOURCE=1 -I. -I/b/f/w/external/net_zlib -U_FORTIFY_SOURCE -fstack-protector -Wall -Wthread-safety -Wself-assign -fcolor-diagnostics -fno-omit-frame-pointer -g -no-canonical-prefixes -Wno-builtin-macro-redefined -D__DATE__="redacted" -D__TIMESTAMP__="redacted" -D__TIME__="redacted" -fPIC -fsanitize=address,undefined -fno-sanitize=vptr,function -DADDRESS_SANITIZER=1 -D__SANITIZE_ADDRESS__ -fsanitize=vptr,function -fPIC -MD -MT CMakeFiles/zlib.dir/uncompr.o -MF CMakeFiles/zlib.dir/uncompr.o.d -o CMakeFiles/zlib.dir/uncompr.o   -c /b/f/w/external/net_zlib/uncompr.c
+[28/33] /opt/llvm/bin/clang -DZLIB_DLL -D_LARGEFILE64_SOURCE=1 -I. -I/b/f/w/external/net_zlib -U_FORTIFY_SOURCE -fstack-protector -Wall -Wthread-safety -Wself-assign -fcolor-diagnostics -fno-omit-frame-pointer -g -no-canonical-prefixes -Wno-builtin-macro-redefined -D__DATE__="redacted" -D__TIMESTAMP__="redacted" -D__TIME__="redacted" -fPIC -fsanitize=address,undefined -fno-sanitize=vptr,function -DADDRESS_SANITIZER=1 -D__SANITIZE_ADDRESS__ -fsanitize=vptr,function -fPIC -MD -MT CMakeFiles/zlib.dir/zutil.o -MF CMakeFiles/zlib.dir/zutil.o.d -o CMakeFiles/zlib.dir/zutil.o   -c /b/f/w/external/net_zlib/zutil.c
+[29/33] /opt/llvm/bin/clang -DZLIB_DLL -D_LARGEFILE64_SOURCE=1 -I. -I/b/f/w/external/net_zlib -U_FORTIFY_SOURCE -fstack-protector -Wall -Wthread-safety -Wself-assign -fcolor-diagnostics -fno-omit-frame-pointer -g -no-canonical-prefixes -Wno-builtin-macro-redefined -D__DATE__="redacted" -D__TIMESTAMP__="redacted" -D__TIME__="redacted" -fPIC -fsanitize=address,undefined -fno-sanitize=vptr,function -DADDRESS_SANITIZER=1 -D__SANITIZE_ADDRESS__ -fsanitize=vptr,function -fPIC -MD -MT CMakeFiles/zlib.dir/inflate.o -MF CMakeFiles/zlib.dir/inflate.o.d -o CMakeFiles/zlib.dir/inflate.o   -c /b/f/w/external/net_zlib/inflate.c
+[30/33] /opt/llvm/bin/clang -DZLIB_DLL -D_LARGEFILE64_SOURCE=1 -I. -I/b/f/w/external/net_zlib -U_FORTIFY_SOURCE -fstack-protector -Wall -Wthread-safety -Wself-assign -fcolor-diagnostics -fno-omit-frame-pointer -g -no-canonical-prefixes -Wno-builtin-macro-redefined -D__DATE__="redacted" -D__TIMESTAMP__="redacted" -D__TIME__="redacted" -fPIC -fsanitize=address,undefined -fno-sanitize=vptr,function -DADDRESS_SANITIZER=1 -D__SANITIZE_ADDRESS__ -fsanitize=vptr,function -fPIC -MD -MT CMakeFiles/zlib.dir/deflate.o -MF CMakeFiles/zlib.dir/deflate.o.d -o CMakeFiles/zlib.dir/deflate.o   -c /b/f/w/external/net_zlib/deflate.c
+[31/33] /opt/llvm/bin/clang -DZLIB_DLL -D_LARGEFILE64_SOURCE=1 -I. -I/b/f/w/external/net_zlib -U_FORTIFY_SOURCE -fstack-protector -Wall -Wthread-safety -Wself-assign -fcolor-diagnostics -fno-omit-frame-pointer -g -no-canonical-prefixes -Wno-builtin-macro-redefined -D__DATE__="redacted" -D__TIMESTAMP__="redacted" -D__TIME__="redacted" -fPIC -fsanitize=address,undefined -fno-sanitize=vptr,function -DADDRESS_SANITIZER=1 -D__SANITIZE_ADDRESS__ -fsanitize=vptr,function -fPIC -MD -MT CMakeFiles/zlib.dir/trees.o -MF CMakeFiles/zlib.dir/trees.o.d -o CMakeFiles/zlib.dir/trees.o   -c /b/f/w/external/net_zlib/trees.c
+[32/33] : && /opt/llvm/bin/clang -fPIC -U_FORTIFY_SOURCE -fstack-protector -Wall -Wthread-safety -Wself-assign -fcolor-diagnostics -fno-omit-frame-pointer -g -no-canonical-prefixes -Wno-builtin-macro-redefined -D__DATE__="redacted" -D__TIMESTAMP__="redacted" -D__TIME__="redacted" -fPIC -fsanitize=address,undefined -fno-sanitize=vptr,function -DADDRESS_SANITIZER=1 -D__SANITIZE_ADDRESS__ -fsanitize=vptr,function  -shared -fuse-ld=/usr/bin/ld.gold -Wl,-no-as-needed -Wl,-z,relro,-z,now -B/opt/llvm/bin -lm -pthread -fuse-ld=lld -l:libc++.a -l:libc++abi.a -ldl -fsanitize=address,undefined -fno-sanitize=vptr,function -fsanitize=vptr,function -L/opt/llvm/lib/clang/10.0.0/lib/linux -l:libclang_rt.ubsan_standalone-x86_64.a -l:libclang_rt.ubsan_standalone_cxx-x86_64.a  -Wl,--version-script,"/b/f/w/external/net_zlib/zlib.map" -shared -Wl,-soname,libz.so.1 -o libz.so.1.2.11.1-motley CMakeFiles/zlib.dir/adler32.o CMakeFiles/zlib.dir/compress.o CMakeFiles/zlib.dir/crc32.o CMakeFiles/zlib.dir/deflate.o CMakeFiles/zlib.dir/gzclose.o CMakeFiles/zlib.dir/gzlib.o CMakeFiles/zlib.dir/gzread.o CMakeFiles/zlib.dir/gzwrite.o CMakeFiles/zlib.dir/inflate.o CMakeFiles/zlib.dir/infback.o CMakeFiles/zlib.dir/inftrees.o CMakeFiles/zlib.dir/inffast.o CMakeFiles/zlib.dir/trees.o CMakeFiles/zlib.dir/uncompr.o CMakeFiles/zlib.dir/zutil.o   && :
+FAILED: libz.so.1.2.11.1-motley 
+: && /opt/llvm/bin/clang -fPIC -U_FORTIFY_SOURCE -fstack-protector -Wall -Wthread-safety -Wself-assign -fcolor-diagnostics -fno-omit-frame-pointer -g -no-canonical-prefixes -Wno-builtin-macro-redefined -D__DATE__="redacted" -D__TIMESTAMP__="redacted" -D__TIME__="redacted" -fPIC -fsanitize=address,undefined -fno-sanitize=vptr,function -DADDRESS_SANITIZER=1 -D__SANITIZE_ADDRESS__ -fsanitize=vptr,function  -shared -fuse-ld=/usr/bin/ld.gold -Wl,-no-as-needed -Wl,-z,relro,-z,now -B/opt/llvm/bin -lm -pthread -fuse-ld=lld -l:libc++.a -l:libc++abi.a -ldl -fsanitize=address,undefined -fno-sanitize=vptr,function -fsanitize=vptr,function -L/opt/llvm/lib/clang/10.0.0/lib/linux -l:libclang_rt.ubsan_standalone-x86_64.a -l:libclang_rt.ubsan_standalone_cxx-x86_64.a  -Wl,--version-script,"/b/f/w/external/net_zlib/zlib.map" -shared -Wl,-soname,libz.so.1 -o libz.so.1.2.11.1-motley CMakeFiles/zlib.dir/adler32.o CMakeFiles/zlib.dir/compress.o CMakeFiles/zlib.dir/crc32.o CMakeFiles/zlib.dir/deflate.o CMakeFiles/zlib.dir/gzclose.o CMakeFiles/zlib.dir/gzlib.o CMakeFiles/zlib.dir/gzread.o CMakeFiles/zlib.dir/gzwrite.o CMakeFiles/zlib.dir/inflate.o CMakeFiles/zlib.dir/infback.o CMakeFiles/zlib.dir/inftrees.o CMakeFiles/zlib.dir/inffast.o CMakeFiles/zlib.dir/trees.o CMakeFiles/zlib.dir/uncompr.o CMakeFiles/zlib.dir/zutil.o   && :
+ld.lld: error: unable to find library -l:libclang_rt.ubsan_standalone-x86_64.a
+ld.lld: error: unable to find library -l:libclang_rt.ubsan_standalone_cxx-x86_64.a
+clang: error: linker command failed with exit code 1 (use -v to see invocation)
+ninja: build stopped: subcommand failed.
+
+_____ END BUILD LOGS _____
+rules_foreign_cc: Build script location: bazel-out/k8-dbg/bin/external/envoy/bazel/foreign_cc/zlib/logs/CMake_script.sh
+rules_foreign_cc: Build log location: bazel-out/k8-dbg/bin/external/envoy/bazel/foreign_cc/zlib/logs/CMake.log
+
+[5 / 630] 1 / 1 tests, 1 failed; checking cached actions
+Target //test/common/common:log_macros_test failed to build
+Use --verbose_failures to see the command lines of failed build steps.
+ERROR: /usr/local/google/home/jinhuisong/envoy-dev/test/common/common/BUILD:117:1 error executing shell command: '/bin/bash -c function cleanup_function() {
+local ecode=$?
+if [ $ecode -eq 0 ]; then
+cleanup_on_success
+else
+cleanup_on_failure
+fi
+}
+set -e
+function cleanup_on_success() {
+printf "rules_foreign_cc: ...' failed (Exit 1)
+INFO: Elapsed time: 6.983s, Critical Path: 6.59s
+INFO: 1 process: 1 remote cache hit.
+FAILED: Build did NOT complete successfully
+//test/common/common:log_macros_test                            FAILED TO BUILD
+
+Executed 0 out of 1 test: 1 fails to build.
+FAILED: Build did NOT complete successfully

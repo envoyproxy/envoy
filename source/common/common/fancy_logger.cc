@@ -50,6 +50,7 @@ void initFancyGlobalEpoch() {
   static std::atomic<int> global_epoch_val;
   global_epoch_val.store(0);
   global_epoch__ = &global_epoch_val;
+<<<<<<< HEAD
 
   spdlog::sink_ptr sink = getSink();
   Logger::DelegatingLogSinkSharedPtr sp = std::static_pointer_cast<Logger::DelegatingLogSink>(sink);
@@ -60,6 +61,8 @@ void initFancyGlobalEpoch() {
       sp->set_should_escape(false);         // unsure
       printf("sink lock: %s\n", sp->hasLock()? "true" : "false");
   }
+=======
+>>>>>>> 49258b4159776e84c96ae447e3e9f10b435dfa6f
 }
 
 /**
@@ -75,18 +78,25 @@ const FancyLogInfo* findFancyInfo(FancyLogInfo* list, std::string file) {
   }
   return cur;
 }
+<<<<<<< HEAD
 
 spdlog::sink_ptr getSink() {
     static spdlog::sink_ptr sink = Logger::DelegatingLogSink::init();
     return sink;
 }
+=======
+>>>>>>> 49258b4159776e84c96ae447e3e9f10b435dfa6f
 
 const char* LOG_PATTERN = "[%Y-%m-%d %T.%e][%t][%l][%n] %v";
 
 /**
  * Update logger when outdated.
  */
+<<<<<<< HEAD
 void updateFancyLogger(const char* file, spdlog::logger* logger, std::atomic<int>* local_epoch) {
+=======
+void updateFancyLogger(const char* file, spdlog::logger* logger, int* local_epoch) {
+>>>>>>> 49258b4159776e84c96ae447e3e9f10b435dfa6f
   absl::ReaderMutexLock l(&fancy_log_lock__);
   if (!global_epoch__) {
     initFancyGlobalEpoch();
@@ -99,15 +109,26 @@ void updateFancyLogger(const char* file, spdlog::logger* logger, std::atomic<int
     new_entry->next = fancy_log_list__;
     fancy_log_list__ = new_entry;
 
+<<<<<<< HEAD
     local_epoch->store(0);
     logger->set_level(new_entry->level);
   } else {
     local_epoch->store(global_epoch__->load(std::memory_order_relaxed));
+=======
+    *local_epoch = 0;
+    logger->set_level(new_entry->level);
+  } else {
+    *local_epoch = global_epoch__->load();
+>>>>>>> 49258b4159776e84c96ae447e3e9f10b435dfa6f
     logger->set_level(entry->level);
   }
   logger->set_pattern(LOG_PATTERN);
   logger->flush_on(level_enum::critical);
+<<<<<<< HEAD
   printf(" Slow path: global epoch = %d, level = %d\n", global_epoch__->load(std::memory_order_relaxed), logger->level());
+=======
+  printf(" Slow path: global epoch = %d, level = %d\n", global_epoch__->load(), logger->level());
+>>>>>>> 49258b4159776e84c96ae447e3e9f10b435dfa6f
 }
 
 /**
@@ -119,7 +140,11 @@ int setFancyLogLevel(const char* file, level_enum log_level) {
   if (!global_epoch__) {
     initFancyGlobalEpoch();
   } else {
+<<<<<<< HEAD
     new_epoch = global_epoch__->load(std::memory_order_relaxed) + 1;
+=======
+    new_epoch = global_epoch__->load() + 1;
+>>>>>>> 49258b4159776e84c96ae447e3e9f10b435dfa6f
     global_epoch__->store(new_epoch);
   }
 
