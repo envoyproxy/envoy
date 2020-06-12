@@ -59,7 +59,9 @@ public:
         crypto_config_(quic::QuicCryptoServerConfig::TESTING, quic::QuicRandom::GetInstance(),
                        std::make_unique<TestProofSource>(), quic::KeyExchangeSource::Default()),
         version_manager_([]() {
+          SetQuicReloadableFlag(quic_enable_version_draft_28, GetParam().second);
           SetQuicReloadableFlag(quic_enable_version_draft_27, GetParam().second);
+          SetQuicReloadableFlag(quic_enable_version_draft_25_v3, GetParam().second);
           return quic::CurrentSupportedVersions();
         }()),
         quic_version_(quic::CurrentSupportedVersions()[0]),
@@ -115,7 +117,7 @@ public:
         quic::test::ConstructReceivedPacket(*encrypted_packet, clock.Now()));
   }
 
-  bool quicVersionUsesHttp3() { return quic::VersionUsesHttp3(quic_version_.transport_version); }
+  bool quicVersionUsesTls() { return quic_version_.UsesTls(); }
 
 protected:
   Network::Address::IpVersion version_;
@@ -181,7 +183,7 @@ TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponCHLO) {
   EXPECT_CALL(*read_filter, onNewConnection())
       // Stop iteration to avoid calling getRead/WriteBuffer().
       .WillOnce(Return(Network::FilterStatus::StopIteration));
-  if (!quicVersionUsesHttp3()) {
+  if (!quicVersionUsesTls()) {
     // QUICHE doesn't support 0-RTT TLS1.3 handshake yet.
     EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
   }
@@ -260,7 +262,7 @@ TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponBufferedCHLO) {
   EXPECT_CALL(*read_filter, onNewConnection())
       // Stop iteration to avoid calling getRead/WriteBuffer().
       .WillOnce(Return(Network::FilterStatus::StopIteration));
-  if (!quicVersionUsesHttp3()) {
+  if (!quicVersionUsesTls()) {
     EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
   }
   quic::QuicBufferedPacketStore* buffered_packets =

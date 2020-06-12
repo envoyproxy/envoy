@@ -79,7 +79,9 @@ protected:
         dispatcher_(api_->allocateDispatcher("test_thread")), clock_(*dispatcher_),
         local_address_(Network::Test::getCanonicalLoopbackAddress(version_)),
         connection_handler_(*dispatcher_) {
+    SetQuicReloadableFlag(quic_enable_version_draft_28, GetParam().second);
     SetQuicReloadableFlag(quic_enable_version_draft_27, GetParam().second);
+    SetQuicReloadableFlag(quic_enable_version_draft_25_v3, GetParam().second);
   }
 
   template <typename A, typename B>
@@ -138,7 +140,7 @@ protected:
           Server::Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories);
           return true;
         }));
-    if (!quic::VersionUsesHttp3(quic::CurrentSupportedVersions()[0].transport_version)) {
+    if (!quic::CurrentSupportedVersions()[0].UsesTls()) {
       EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::Connected))
           .Times(connection_count);
     }

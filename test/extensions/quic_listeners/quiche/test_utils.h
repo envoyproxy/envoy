@@ -109,7 +109,7 @@ generateChloPacketToSend(quic::ParsedQuicVersion quic_version, quic::QuicConfig&
                          quic::QuicConnectionId connection_id, quic::QuicClock& clock,
                          const quic::QuicSocketAddress& server_address,
                          const quic::QuicSocketAddress& client_address, std::string sni) {
-  if (quic::VersionUsesHttp3(quic_version.transport_version)) {
+  if (quic_version.UsesTls()) {
     std::unique_ptr<quic::QuicReceivedPacket> packet =
         std::move(quic::test::GetFirstFlightOfPackets(quic_version, quic_config, connection_id)[0]);
     return Buffer::OwnedImpl(packet->data(), packet->length());
