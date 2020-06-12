@@ -46,8 +46,6 @@ envoy_cc_mock(
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
-        "//include/envoy/common:resource_interface",
-        "//include/envoy/upstream:resource_manager_interface",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_impl",
         "@envoy_api//envoy/extensions/common/dynamic_forward_proxy/v3:pkg_cc_proto",
     ],

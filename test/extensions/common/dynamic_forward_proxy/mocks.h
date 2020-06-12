@@ -1,8 +1,6 @@
 #pragma once
 
-#include "envoy/common/resource.h"
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
-#include "envoy/upstream/resource_manager.h"
 
 #include "extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
 

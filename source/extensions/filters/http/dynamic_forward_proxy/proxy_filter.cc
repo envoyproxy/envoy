@@ -66,9 +66,6 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
           : cluster_info_->resourceManager(route_entry->priority()).pendingRequests();
 
   if (!pending_requests.canCreate()) {
-    // When we use DNS Cache manager circuit breakers, we don't have to take care of upstream
-    // pending counter. Because DNSCacheCircuitBreakersStats will do that by counting
-    // rq_pending_remaining_.
     if (!should_use_dns_cache_circuit_breakers) {
       cluster_info_->stats().upstream_rq_pending_overflow_.inc();
     } else {
