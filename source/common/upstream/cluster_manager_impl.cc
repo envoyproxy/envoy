@@ -1153,6 +1153,10 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
     }
   }
   {
+    // Drain or close any TCP connection pool for the host. Draining a TCP pool doesn't lead to
+    // connections being closed, it only prevents new connections through the pool. The
+    // CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE can be used to make the pool close any
+    // active connections.
     const auto& container = config.host_tcp_conn_pool_map_.find(host);
     if (container != config.host_tcp_conn_pool_map_.end()) {
       for (const auto& pair : container->second.pools_) {
@@ -1169,7 +1173,11 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
 
   if (host->cluster().features() &
       ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE) {
-
+    // Close non connection pool TCP connections obtained from tcpConnForCluster()
+    //
+    // TODO(jono): The only remaining user of the non-pooled connections seems to be the statsd
+    // TCP client. Perhaps it could be rewritten to use a connection pool, and this code deleted.
+    //
     // Each connection will remove itself from the TcpConnectionsMap when it closes, via its
     // Network::ConnectionCallbacks. The last removed tcp conn will remove the TcpConnectionsMap
     // from host_tcp_conn_map_, so do not cache it between iterations.
