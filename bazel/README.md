@@ -80,8 +80,10 @@ for how to update or override dependencies.
     echo "build --config=clang" >> user.bazelrc
     ```
 
-    Note: `libstdc++-7-dev` (or higher) must be installed. This is typically available via a
-    package manager, but may not be available in default repositories depending on OS version.
+    Note: Either `libc++` or `libstdc++-7-dev` (or higher) must be installed. These are typically
+    available via a package manager, but may not be available in default repositories depending on
+    OS version. To build against `libc++` build with the `--config=libc++` instead of the
+    `--config=clang` flag.
 
     ### macOS
     On macOS, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
