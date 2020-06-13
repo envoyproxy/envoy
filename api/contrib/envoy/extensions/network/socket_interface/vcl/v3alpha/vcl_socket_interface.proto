@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package envoy.extensions.network.socket_interface.vcl.v3alpha;
+
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.network.socket_interface.vcl.v3alpha";
+option java_outer_classname = "VclSocketInterfaceProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Vcl Socket Interface configuration]
+
+// Configuration for vcl socket interface that relies on vpp comms library (VCL)
+message VclSocketInterface {
+}

@@ -1099,4 +1099,16 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2018-12-18",
         cpe = "N/A",
     ),
+    com_github_fdio_vpp_vcl = dict(
+        project_name = "VPP Comms Library",
+        project_desc = "FD.io Vector Packet Processor (VPP) Comms Library",
+        project_url = "https://fd.io/",
+        version = "895def45c82ea5d901987bc3049c8d1cc1c1da66",
+        sha256 = "cac3f8cceadec59d294435e805a89f42998340a4b4585ea0c416613d84672683",
+        strip_prefix = "vpp-{version}",
+        urls = ["https://github.com/FDio/vpp/archive/{version}.tar.gz"],
+        use_category = ["other"],
+        release_date = "2021-09-16",
+        cpe = "N/A",
+    ),
 )

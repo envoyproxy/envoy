@@ -203,3 +203,4 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /contrib/mysql_proxy/ @rshriram @venilnoronha
 /contrib/postgres_proxy/ @fabriziomello @cpakulski @dio
 /contrib/sxg/ @cpapazian @rgs1 @alyssawilk
+/contrib/vcl/ @florincoras @mattklein123

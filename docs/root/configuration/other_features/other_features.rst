@@ -7,3 +7,4 @@ Other features
   rate_limit
   wasm
   wasm_service
+  vcl

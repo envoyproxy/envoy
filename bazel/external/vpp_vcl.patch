@@ -1,0 +1,32 @@
+# Not a git repo so embed version
+--- src/scripts/version
++++ src/scripts/version
+@@ -17,15 +17,7 @@ path=$( cd "$(dirname "${BASH_SOURCE}")" ; pwd -P )
+
+ cd "$path"
+
+-if [ -f .version ]; then
+-    vstring=$(cat .version)
+-else
+-    vstring=$(git describe --long)
+-    if [ $? != 0 ]; then
+-      exit 1
+-    fi
+-fi
+-
++vstring=21.10
+ TAG=$(echo ${vstring} | cut -d- -f1 | sed -e 's/^v//')
+ ADD=$(echo ${vstring} | cut -s -d- -f2)
+ POINT=$(echo ${TAG} | cut -d. -f3)
+
+--- src/cmake/ccache.cmake
++++ src/cmake/ccache.cmake
+@@ -14,7 +14,7 @@
+ ##############################################################################
+ # ccache
+ ##############################################################################
+-option(VPP_USE_CCACHE "Use ccache compiler cache." ON)
++option(VPP_USE_CCACHE "Use ccache compiler cache." OFF)
+ if(VPP_USE_CCACHE)
+   find_program(CCACHE_FOUND ccache)
+   message(STATUS "Looking for ccache")
