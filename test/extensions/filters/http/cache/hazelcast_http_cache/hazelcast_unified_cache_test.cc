@@ -70,7 +70,6 @@ TEST_F(HazelcastUnifiedCacheTest, UnifiedHeaderOnlyResponse) {
 }
 
 TEST_F(HazelcastUnifiedCacheTest, MissUnifiedLookupOnDifferentKey) {
-
   const std::string RequestPath("/miss/on/different/key");
 
   LookupContextPtr lookup_context = lookup(RequestPath);
@@ -98,8 +97,11 @@ TEST_F(HazelcastUnifiedCacheTest, MissUnifiedLookupOnDifferentKey) {
 
   // New entry insertion should be aborted and not override the existing one with the
   // same hash key. This scenario is possible if there is a hash collision. No eviction
-  // or clean up is expected. Since overriding an entry is prevented.
-  insert(move(lookup_context), getResponseHeaders(), Body);
+  // or clean up is expected. Since overriding an entry is prevented in this case.
+  InsertContextPtr insert_context = cache_->makeInsertContext(std::move(lookup_context));
+  insert_context->insertHeaders(getResponseHeaders(), false);
+  insert_context->insertBody(
+      Buffer::OwnedImpl(Body), [](bool ready) { EXPECT_FALSE(ready); }, true);
   lookup_context = lookup(RequestPath);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
   EXPECT_EQ(1, getTestAccessor().responseMapSize());
@@ -156,6 +158,10 @@ TEST_F(HazelcastUnifiedCacheTest, CoverRemoteOperations) {
   // covers the calls made to Hazelcast cluster. Otherwise the coverage
   // stays at 90% without including the remote calls.
   HazelcastClusterAccessor accessor(*cache_, ClientConfig(), "coverage", 10);
+  const std::string info = accessor.startInfo();
+  EXPECT_NE(info.find("profile: UNIFIED"), std::string::npos);
+  EXPECT_NE(info.find(absl::StrFormat("Max body size: %d", cache_->maxBodyBytes())),
+            std::string::npos);
   EXPECT_FALSE(accessor.isRunning());
   EXPECT_STREQ("", accessor.clusterName().c_str());
   EXPECT_THROW(accessor.putHeader(1, HazelcastHeaderEntry()), EnvoyException);

@@ -172,7 +172,6 @@ TEST_F(HazelcastDividedCacheTest, MissLookupOnVersionMismatch) {
 }
 
 TEST_F(HazelcastDividedCacheTest, MissDividedLookupOnDifferentKey) {
-
   const std::string RequestPath("/miss/on/different/key");
 
   LookupContextPtr lookup_context = lookup(RequestPath);
@@ -199,8 +198,11 @@ TEST_F(HazelcastDividedCacheTest, MissDividedLookupOnDifferentKey) {
 
   // New entry insertion should be aborted and not override the existing one with the
   // same hash key. This scenario is possible if there is a hash collision. No eviction
-  // or clean up is expected. Since overriding an entry is prevented.
-  insert(move(lookup_context), getResponseHeaders(), Body);
+  // or clean up is expected. Since overriding an entry is prevented in this case.
+  InsertContextPtr insert_context = cache_->makeInsertContext(std::move(lookup_context));
+  insert_context->insertHeaders(getResponseHeaders(), false);
+  insert_context->insertBody(
+      Buffer::OwnedImpl(Body), [](bool ready) { EXPECT_FALSE(ready); }, true);
   lookup_context = lookup(RequestPath);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
   EXPECT_EQ(1, getTestAccessor().headerMapSize());
@@ -297,11 +299,16 @@ TEST_F(HazelcastDividedCacheTest, CleanUpCachedResponseOnMissingBody) {
 }
 
 TEST_F(HazelcastDividedCacheTest, NotCreateBodyOnHeaderOnlyResponse) {
-  auto headerOnlyTest = [this](std::string path, bool empty_body) {
+  auto headerOnlyTest = [this](std::string path, bool use_empty_body) {
     LookupContextPtr lookup_context = lookup(path);
     EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
-    insert(move(lookup_context), getResponseHeaders(), empty_body ? "" : nullptr);
-    lookup_context = lookup(path);
+    InsertContextPtr insert_context = cache_->makeInsertContext(std::move(lookup_context));
+    insert_context->insertHeaders(getResponseHeaders(), !use_empty_body);
+    if (use_empty_body) {
+      insert_context->insertBody(
+          Buffer::OwnedImpl(""), [](bool) {}, true);
+    }
+    lookup(path);
     EXPECT_EQ(CacheEntryStatus::Ok, lookup_result_.cache_entry_status_);
     EXPECT_EQ(0, lookup_result_.content_length_);
   };

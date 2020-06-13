@@ -3,6 +3,7 @@
 #include "extensions/filters/http/cache/hazelcast_http_cache/hazelcast_context.h"
 
 #include "test/extensions/filters/http/cache/hazelcast_http_cache/test_util.h"
+#include "test/test_common/logging.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -63,6 +64,7 @@ TEST_P(HazelcastHttpCacheTest, MissPutAndGetEntries) {
   EXPECT_TRUE(expectLookupSuccessWithFullBody(lookup(RequestPath1).get(), Body1));
   EXPECT_TRUE(expectLookupSuccessWithFullBody(lookup(RequestPath2).get(), Body2));
   EXPECT_TRUE(expectLookupSuccessWithFullBody(lookup(RequestPath3).get(), Body3));
+  EXPECT_EQ(GetParam(), cache_->unified());
 }
 
 TEST_P(HazelcastHttpCacheTest, HandleRangedResponses) {
@@ -212,6 +214,13 @@ TEST_P(HazelcastHttpCacheTest, StreamingPutAndRangeGet) {
   ASSERT_EQ(13, lookup_result_.content_length_);
   EXPECT_EQ("Hello, World!", getBody(*name_lookup_context, 0, 13));
   EXPECT_EQ("o, World!", getBody(*name_lookup_context, 4, 13));
+}
+
+TEST_P(HazelcastHttpCacheTest, CacheStartShutdown) {
+  EXPECT_LOG_CONTAINS("warn", "Client is already connected.",
+                      cache_->start(std::make_unique<LocalTestAccessor>()));
+  cache_->shutdown(false);
+  EXPECT_LOG_CONTAINS("warn", "Hazelcast client is already disconnected.", cache_->shutdown(true));
 }
 
 TEST(Registration, GetFactory) {

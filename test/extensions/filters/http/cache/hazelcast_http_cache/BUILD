@@ -63,6 +63,7 @@ envoy_extension_cc_test_library(
     extension_name = "envoy.filters.http.cache.hazelcast_http_cache",
     deps = [
         "//source/extensions/filters/http/cache/hazelcast_http_cache:hazelcast_http_cache_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
     ],
