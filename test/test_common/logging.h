@@ -8,6 +8,7 @@
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
+#include "absl/synchronization/mutex.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -58,7 +59,8 @@ public:
   const std::vector<std::string>& messages() const { return messages_; }
 
 private:
-  std::vector<std::string> messages_;
+  absl::Mutex mtx_;
+  std::vector<std::string> messages_ ABSL_GUARDED_BY(mtx_);
 };
 
 using StringPair = std::pair<std::string, std::string>;

@@ -147,7 +147,11 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       config_(config), version_info_(version_info),
       listener_filters_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, listener_filters_timeout, 15000)),
-      continue_on_listener_filters_timeout_(config.continue_on_listener_filters_timeout()) {
+      continue_on_listener_filters_timeout_(config.continue_on_listener_filters_timeout()),
+      cx_limit_runtime_key_("envoy.resource_limits.listener." + config_.name() +
+                            ".connection_limit"),
+      open_connections_(std::make_shared<BasicResourceLimitImpl>(
+          std::numeric_limits<uint64_t>::max(), parent.server_.runtime(), cx_limit_runtime_key_)) {
   Network::Address::SocketType socket_type =
       Network::Utility::protobufAddressSocketType(config.address());
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, transparent, false)) {
@@ -181,6 +185,15 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
     ProtobufTypes::MessagePtr message =
         Config::Utility::translateToFactoryConfig(udp_config, validation_visitor_, config_factory);
     udp_listener_factory_ = config_factory.createActiveUdpListenerFactory(*message);
+  }
+
+  const absl::optional<std::string> runtime_val =
+      parent_.server_.runtime().snapshot().get(cx_limit_runtime_key_);
+  if (runtime_val && runtime_val->empty()) {
+    ENVOY_LOG(warn,
+              "Listener connection limit runtime key {} is empty. There are currently no "
+              "limitations on the number of accepted connections for listener {}.",
+              cx_limit_runtime_key_, config_.name());
   }
 
   if (!config.listener_filters().empty()) {
