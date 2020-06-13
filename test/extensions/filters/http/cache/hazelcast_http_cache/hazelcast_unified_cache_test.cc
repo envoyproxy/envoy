@@ -18,11 +18,11 @@ class HazelcastUnifiedCacheTest : public HazelcastHttpCacheTestBase {
     HazelcastHttpCacheConfig typed_config = HazelcastTestUtil::getTestTypedConfig(true);
     envoy::extensions::filters::http::cache::v3alpha::CacheConfig cache_config =
         HazelcastTestUtil::getTestCacheConfig();
-    // To test the cache with a real Hazelcast instance, use remote test cache.
-    // cache_ = std::make_unique<HazelcastRemoteTestCache>(std::move(typed_config), cache_config);
-    cache_ = std::make_unique<HazelcastLocalTestCache>(std::move(typed_config), cache_config);
-    cache_->start();
-    cache_->getTestAccessor().clearMaps();
+    cache_ = std::make_unique<HazelcastHttpCache>(std::move(typed_config), cache_config);
+    // To test the cache with a real Hazelcast instance, use remote test accessor.
+    // cache_->start(HazelcastTestUtil::getTestRemoteAccessor(*cache_));
+    cache_->start(std::make_unique<LocalTestAccessor>());
+    getTestAccessor().clearMaps();
   }
 };
 
@@ -91,7 +91,7 @@ TEST_F(HazelcastUnifiedCacheTest, MissUnifiedLookupOnDifferentKey) {
   modified.add_custom_fields("custom1");
   modified.add_custom_fields("custom2");
   response->header().variantKey(std::move(modified));
-  cache_->getTestAccessor().insertResponse(mapKey(variant_key_hash), *response);
+  getTestAccessor().insertResponse(mapKey(variant_key_hash), *response);
 
   lookup_context = lookup(RequestPath);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
@@ -102,7 +102,7 @@ TEST_F(HazelcastUnifiedCacheTest, MissUnifiedLookupOnDifferentKey) {
   insert(move(lookup_context), getResponseHeaders(), Body);
   lookup_context = lookup(RequestPath);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
-  EXPECT_EQ(1, cache_->getTestAccessor().responseMapSize());
+  EXPECT_EQ(1, getTestAccessor().responseMapSize());
 }
 
 TEST_F(HazelcastUnifiedCacheTest, AbortUnifiedOperationsWhenOffline) {
@@ -121,7 +121,7 @@ TEST_F(HazelcastUnifiedCacheTest, AbortUnifiedOperationsWhenOffline) {
   LookupContextPtr succeed_lookup2 = lookup(RequestPath1);
   LookupContextPtr succeed_lookup3 = lookup(RequestPath1);
 
-  cache_->getTestAccessor().dropConnection();
+  getTestAccessor().dropConnection();
 
   // UnifiedLookupContext::getHeaders when HazelcastClientOfflineException is thrown.
   lookup_context1 = lookup(RequestPath1);
@@ -144,7 +144,7 @@ TEST_F(HazelcastUnifiedCacheTest, AbortUnifiedOperationsWhenOffline) {
   // UnifiedInsertContext::insertResponse when std::exception is thrown.
   insert(move(succeed_lookup3), getResponseHeaders(), Body);
 
-  cache_->getTestAccessor().restoreConnection();
+  getTestAccessor().restoreConnection();
 
   lookup_context1 = lookup(RequestPath1);
   EXPECT_TRUE(expectLookupSuccessWithFullBody(lookup_context1.get(), Body));

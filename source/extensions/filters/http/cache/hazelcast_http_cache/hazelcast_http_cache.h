@@ -175,15 +175,16 @@ public:
 
   bool unified() const { return unified_; }
 
+  const std::string& prefix() const { return cache_config_.app_prefix(); }
+
   /**
-   * Makes the cache ready to serve. Storage accessor connection must be established
-   * via StorageAccessor::connect() when the cache is started.
-   *
-   * @note Keeping this virtual allows tests to override access strategy.
-   * Using a local accessor will make the cache behavior testable without
-   * starting a Hazelcast instance.
+   * Makes the cache ready to serve using the accessor.
+   * @param accessor   Accessor to cache storage
+   * @note The accessor passed by the factory must establish a Hazelcast cluster
+   *       connection. Other local storage accessors might be used during tests to
+   *       test the cache behavior without running a real Hazelcast instance.
    */
-  virtual void start();
+  void start(StorageAccessorPtr&& accessor);
 
   /**
    * Drops accessor connection to the storage.
@@ -200,12 +201,8 @@ public:
 
   ~HazelcastHttpCache() override;
 
-protected:
-  std::unique_ptr<StorageAccessor> accessor_;
-
 private:
   friend class HazelcastHttpCacheTestBase;
-  friend class HazelcastRemoteTestCache;
 
   /**
    * Generates a Hazelcast map key from the hash of the filter's cache key.
@@ -235,6 +232,8 @@ private:
   std::string orderedMapKey(const uint64_t key_hash, const uint64_t order) {
     return std::to_string(key_hash).append("#").append(std::to_string(order));
   }
+
+  StorageAccessorPtr accessor_;
 
   /** Cache mode */
   const bool unified_;

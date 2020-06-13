@@ -56,21 +56,14 @@ void HazelcastHttpCache::onVersionMismatch(uint64_t key_hash, int32_t version, u
   onMissingBody(key_hash, version, body_size);
 }
 
-void HazelcastHttpCache::start() {
+void HazelcastHttpCache::start(StorageAccessorPtr&& accessor) {
   if (accessor_ && accessor_->isRunning()) {
     ENVOY_LOG(warn, "Client is already connected. Cluster name: {}", accessor_->clusterName());
     return;
   }
 
-  ClientConfig client_config = ConfigUtil::getClientConfig(cache_config_);
-  client_config.getSerializationConfig().addDataSerializableFactory(
-      HazelcastCacheEntrySerializableFactory::FACTORY_ID,
-      boost::shared_ptr<DataSerializableFactory>(new HazelcastCacheEntrySerializableFactory()));
-
   if (!accessor_) {
-    accessor_ = std::make_unique<HazelcastClusterAccessor>(
-        *this, std::move(client_config), cache_config_.app_prefix(), body_partition_size_);
-    ENVOY_LOG(debug, "New HazelcastClusterAccessor created.");
+    accessor_ = std::move(accessor);
   }
 
   try {
@@ -147,10 +140,13 @@ ProtobufTypes::MessagePtr HazelcastHttpCacheFactory::createEmptyConfigProto() {
 HttpCache& HazelcastHttpCacheFactory::getCache(
     const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& config) {
   if (!cache_) {
-    HazelcastHttpCacheConfig hz_cache_config;
-    MessageUtil::unpackTo(config.typed_config(), hz_cache_config);
-    cache_ = std::make_unique<HazelcastHttpCache>(std::move(hz_cache_config), config);
-    cache_->start();
+    HazelcastHttpCacheConfig typed_config;
+    MessageUtil::unpackTo(config.typed_config(), typed_config);
+    ClientConfig client_config = ConfigUtil::getClientConfig(typed_config);
+    cache_ = std::make_unique<HazelcastHttpCache>(std::move(typed_config), config);
+    StorageAccessorPtr accessor = std::make_unique<HazelcastClusterAccessor>(
+        *cache_, std::move(client_config), cache_->prefix(), cache_->bodySizePerEntry());
+    cache_->start(std::move(accessor));
   }
   return *cache_;
 }

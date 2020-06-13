@@ -20,11 +20,11 @@ protected:
     HazelcastHttpCacheConfig typed_config = HazelcastTestUtil::getTestTypedConfig(GetParam());
     envoy::extensions::filters::http::cache::v3alpha::CacheConfig cache_config =
         HazelcastTestUtil::getTestCacheConfig();
-    // To test the cache with a real Hazelcast instance, use remote test cache.
-    // cache_ = std::make_unique<HazelcastRemoteTestCache>(std::move(typed_config), cache_config);
-    cache_ = std::make_unique<HazelcastLocalTestCache>(std::move(typed_config), cache_config);
-    cache_->start();
-    cache_->getTestAccessor().clearMaps();
+    cache_ = std::make_unique<HazelcastHttpCache>(std::move(typed_config), cache_config);
+    // To test the cache with a real Hazelcast instance, use remote test accessor.
+    // cache_->start(HazelcastTestUtil::getTestRemoteAccessor(*cache_));
+    cache_->start(std::make_unique<LocalTestAccessor>());
+    getTestAccessor().clearMaps();
   }
 
   Key getVariantKey(LookupContextPtr& lookup,
@@ -152,7 +152,7 @@ TEST_P(HazelcastHttpCacheTest, Miss) {
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 
   // Do not left over a missed lookup without inserting or releasing its lock.
-  // This is required for HazelcastRemoteTestCache.
+  // This is required for remote accessor.
   cache_->unlock(variant_key_hash);
 }
 
@@ -223,16 +223,20 @@ TEST(Registration, GetFactory) {
   typed_config.set_group_name("do-not-connect-any-cluster");
   typed_config.set_connection_attempt_limit(1);
   typed_config.set_connection_attempt_period(1); // give up immediately.
+  ClientConfig client_config = ConfigUtil::getClientConfig(typed_config);
   config.mutable_typed_config()->PackFrom(typed_config);
 
   {
     // getOfflineCache() call is for testing. It creates a HazelcastHttpCache but does
     // not make it operational until a start() call. This is required to make cacheInfo()
-    // behavior testable when using HazelcastLocalTestCache.
+    // behavior testable when using local accessor.
     HazelcastHttpCachePtr cache =
         static_cast<HazelcastHttpCacheFactory*>(factory)->getOfflineCache(config);
     EXPECT_EQ(cache->cacheInfo().name_, "envoy.extensions.http.cache.hazelcast");
-    EXPECT_THROW_WITH_MESSAGE(cache->start(), EnvoyException,
+
+    StorageAccessorPtr accessor = std::make_unique<HazelcastClusterAccessor>(
+        *cache, std::move(client_config), cache->prefix(), cache->bodySizePerEntry());
+    EXPECT_THROW_WITH_MESSAGE(cache->start(std::move(accessor)), EnvoyException,
                               "Hazelcast Client could not connect to any cluster.");
   }
   EXPECT_THROW_WITH_MESSAGE(factory->getCache(config), EnvoyException,

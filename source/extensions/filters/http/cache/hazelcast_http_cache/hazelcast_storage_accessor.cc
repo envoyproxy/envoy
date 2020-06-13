@@ -99,18 +99,17 @@ void HazelcastClusterAccessor::connect() {
 }
 
 std::string HazelcastClusterAccessor::startInfo() const {
-  return absl::StrFormat("HazelcastHttpCache is created with profile: %s. Max body size: %d.\n"
-                         "Cache statistics can be observed on Hazelcast Management Center "
-                         "from the map named %s.",
-                         cache_.unified() ?
-                         "UNIFIED" :
-                         "DIVIDED, partition size: " + std::to_string(partition_size_),
-                         cache_.maxBodyBytes(),
-                         cache_.unified() ? response_map_name_ : header_map_name_);
+  return absl::StrFormat(
+      "HazelcastHttpCache is created with profile: %s. Max body size: %d.\n"
+      "Cache statistics can be observed on Hazelcast Management Center "
+      "from the map named %s.",
+      cache_.unified() ? "UNIFIED" : "DIVIDED, partition size: " + std::to_string(partition_size_),
+      cache_.maxBodyBytes(), cache_.unified() ? response_map_name_ : header_map_name_);
 }
 
 std::string HazelcastClusterAccessor::constructMapName(const std::string& postfix, bool unified) {
-  return absl::StrFormat("%s-%d-%s", app_prefix_, unified ? cache_.maxBodyBytes() : partition_size_, postfix);
+  return absl::StrFormat("%s-%d-%s", app_prefix_, unified ? cache_.maxBodyBytes() : partition_size_,
+                         postfix);
 }
 
 void HeaderMapEntryListener::entryEvicted(const EntryEvent<int64_t, HazelcastHeaderEntry>& event) {

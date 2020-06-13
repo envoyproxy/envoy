@@ -1,6 +1,8 @@
 #pragma once
 
-#include "test/extensions/filters/http/cache/hazelcast_http_cache/test_caches.h"
+#include "extensions/filters/http/cache/hazelcast_http_cache/util.h"
+
+#include "test/extensions/filters/http/cache/hazelcast_http_cache/test_accessors.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
@@ -49,6 +51,14 @@ public:
     return typed_config;
   }
 
+  static StorageAccessorPtr getTestRemoteAccessor(HazelcastHttpCache& cache) {
+    HazelcastHttpCacheConfig typed_config = getTestTypedConfig(cache.unified());
+    ClientConfig client_config = ConfigUtil::getClientConfig(typed_config);
+    StorageAccessorPtr accessor = std::make_unique<RemoteTestAccessor>(
+        cache, std::move(client_config), cache.prefix(), cache.bodySizePerEntry());
+    return accessor;
+  }
+
   static void setRequestHeaders(Http::TestRequestHeaderMapImpl& headers) {
     headers.setMethod("GET");
     headers.setHost("hazelcast.com");
@@ -69,6 +79,8 @@ protected:
   HazelcastHttpCacheTestBase() { HazelcastTestUtil::setRequestHeaders(request_headers_); }
 
   int64_t mapKey(const uint64_t key_hash) { return cache_->mapKey(key_hash); }
+
+  TestAccessor& getTestAccessor() { return dynamic_cast<TestAccessor&>(*cache_->accessor_); }
 
   std::string orderedMapKey(const uint64_t key_hash, const uint64_t order) {
     return cache_->orderedMapKey(key_hash, order);
@@ -161,7 +173,7 @@ protected:
     return AssertionSuccess();
   }
 
-  std::unique_ptr<HazelcastHttpTestCache> cache_;
+  std::unique_ptr<HazelcastHttpCache> cache_;
   LookupResult lookup_result_;
   Http::TestRequestHeaderMapImpl request_headers_;
   Event::SimulatedTimeSystem time_source_;

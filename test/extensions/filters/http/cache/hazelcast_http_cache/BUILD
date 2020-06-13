@@ -58,7 +58,6 @@ envoy_extension_cc_test_library(
     name = "hazelcast_test_lib",
     hdrs = [
         "test_accessors.h",
-        "test_caches.h",
         "test_util.h",
     ],
     extension_name = "envoy.filters.http.cache.hazelcast_http_cache",

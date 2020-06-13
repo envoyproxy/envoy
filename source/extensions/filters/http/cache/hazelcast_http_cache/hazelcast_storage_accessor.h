@@ -2,9 +2,9 @@
 
 #include "envoy/common/exception.h"
 
-#include "absl/strings/str_format.h"
 #include "extensions/filters/http/cache/hazelcast_http_cache/hazelcast_cache_entry.h"
 
+#include "absl/strings/str_format.h"
 #include "hazelcast/client/HazelcastClient.h"
 #include "hazelcast/client/IMap.h"
 
@@ -48,6 +48,7 @@ public:
   virtual ~StorageAccessor() = default;
 };
 
+using StorageAccessorPtr = std::unique_ptr<StorageAccessor>;
 class HazelcastHttpCache;
 class HeaderMapEntryListener;
 
@@ -56,7 +57,7 @@ class HeaderMapEntryListener;
  *
  * The cache uses this accessor in the production code.
  */
-class HazelcastClusterAccessor : public StorageAccessor {
+class HazelcastClusterAccessor : public virtual StorageAccessor {
 public:
   HazelcastClusterAccessor(HazelcastHttpCache& cache, ClientConfig&& client_config,
                            const std::string& app_prefix, const uint64_t partition_size);

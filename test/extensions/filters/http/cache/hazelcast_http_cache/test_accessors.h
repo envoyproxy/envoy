@@ -14,7 +14,7 @@ namespace HazelcastHttpCache {
  * Contains pure functions to obtain storage information, modify the storage and
  * change accessor behavior directly.
  */
-class TestAccessor {
+class TestAccessor : public virtual StorageAccessor {
 public:
   TestAccessor() = default;
 
@@ -76,7 +76,7 @@ public:
  * @note This accessor does not use any Hazelcast instance during tests.
  * Instead, it simulates Hazelcast instance with local storage.
  */
-class LocalTestAccessor : public StorageAccessor, public TestAccessor {
+class LocalTestAccessor : public TestAccessor {
 public:
   LocalTestAccessor() = default;
 

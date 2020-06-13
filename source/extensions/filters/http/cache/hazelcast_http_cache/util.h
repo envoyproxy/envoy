@@ -2,6 +2,8 @@
 
 #include "source/extensions/filters/http/cache/hazelcast_http_cache/config.pb.h"
 
+#include "extensions/filters/http/cache/hazelcast_http_cache/hazelcast_cache_entry.h"
+
 #include "hazelcast/client/ClientConfig.h"
 
 namespace Envoy {
@@ -58,6 +60,10 @@ public:
                        std::to_string(cache_config.invocation_timeout() == 0
                                           ? DEFAULT_INVOCATION_TIMEOUT_SEC
                                           : cache_config.invocation_timeout()));
+
+    config.getSerializationConfig().addDataSerializableFactory(
+        HazelcastCacheEntrySerializableFactory::FACTORY_ID,
+        boost::shared_ptr<DataSerializableFactory>(new HazelcastCacheEntrySerializableFactory()));
     return config;
   }
 
