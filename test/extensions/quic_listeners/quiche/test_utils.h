@@ -159,9 +159,9 @@ void setQuicConfigWithDefaultValues(quic::QuicConfig* config) {
 }
 
 enum class QuicVersionType {
-  GQUIC_QUIC_CRYPTO,
-  GQUIC_TLS,
-  IQUIC,
+  GquicQuicCrypto,
+  GquicTls,
+  Iquic,
 };
 
 // A test suite with variation of ip version and a knob to turn on/off IETF QUIC implementation.
@@ -171,9 +171,9 @@ class QuicMultiVersionTest
 std::vector<std::pair<Network::Address::IpVersion, QuicVersionType>> generateTestParam() {
   std::vector<std::pair<Network::Address::IpVersion, QuicVersionType>> param;
   for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
-    param.emplace_back(ip_version, QuicVersionType::GQUIC_QUIC_CRYPTO);
-    param.emplace_back(ip_version, QuicVersionType::GQUIC_TLS);
-    param.emplace_back(ip_version, QuicVersionType::IQUIC);
+    param.emplace_back(ip_version, QuicVersionType::GquicQuicCrypto);
+    param.emplace_back(ip_version, QuicVersionType::GquicTls);
+    param.emplace_back(ip_version, QuicVersionType::Iquic);
   }
 
   return param;
@@ -184,11 +184,11 @@ std::string testParamsToString(
         params) {
   std::string ip_version = params.param.first == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6";
   switch (params.param.second) {
-  case QuicVersionType::GQUIC_QUIC_CRYPTO:
+  case QuicVersionType::GquicQuicCrypto:
     return absl::StrCat(ip_version, "_UseGQuicWithQuicCrypto");
-  case QuicVersionType::GQUIC_TLS:
+  case QuicVersionType::GquicTls:
     return absl::StrCat(ip_version, "_UseGQuicWithTLS");
-  case QuicVersionType::IQUIC:
+  case QuicVersionType::Iquic:
     return absl::StrCat(ip_version, "_UseHttp3");
   }
 }

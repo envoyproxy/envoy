@@ -79,10 +79,10 @@ protected:
         dispatcher_(api_->allocateDispatcher("test_thread")), clock_(*dispatcher_),
         local_address_(Network::Test::getCanonicalLoopbackAddress(version_)),
         connection_handler_(*dispatcher_), quic_version_([]() {
-          if (GetParam().second == QuicVersionType::GQUIC_QUIC_CRYPTO) {
+          if (GetParam().second == QuicVersionType::GquicQuicCrypto) {
             return quic::CurrentSupportedVersionsWithQuicCrypto();
           }
-          bool use_http3 = GetParam().second == QuicVersionType::IQUIC;
+          bool use_http3 = GetParam().second == QuicVersionType::Iquic;
           SetQuicReloadableFlag(quic_enable_version_draft_28, use_http3);
           SetQuicReloadableFlag(quic_enable_version_draft_27, use_http3);
           SetQuicReloadableFlag(quic_enable_version_draft_25_v3, use_http3);
