@@ -5,11 +5,13 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/resource.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/assert.h"
+#include "common/common/basic_resource_impl.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -41,37 +43,33 @@ public:
                           cb_stats.cx_pool_open_, cb_stats.remaining_cx_pools_) {}
 
   // Upstream::ResourceManager
-  Resource& connections() override { return connections_; }
-  Resource& pendingRequests() override { return pending_requests_; }
-  Resource& requests() override { return requests_; }
-  Resource& retries() override { return retries_; }
-  Resource& connectionPools() override { return connection_pools_; }
+  ResourceLimit& connections() override { return connections_; }
+  ResourceLimit& pendingRequests() override { return pending_requests_; }
+  ResourceLimit& requests() override { return requests_; }
+  ResourceLimit& retries() override { return retries_; }
+  ResourceLimit& connectionPools() override { return connection_pools_; }
 
 private:
-  struct ResourceImpl : public Resource {
-    ResourceImpl(uint64_t max, Runtime::Loader& runtime, const std::string& runtime_key,
-                 Stats::Gauge& open_gauge, Stats::Gauge& remaining)
-        : max_(max), runtime_(runtime), runtime_key_(runtime_key), open_gauge_(open_gauge),
+  struct ManagedResourceImpl : public BasicResourceLimitImpl {
+    ManagedResourceImpl(uint64_t max, Runtime::Loader& runtime, const std::string& runtime_key,
+                        Stats::Gauge& open_gauge, Stats::Gauge& remaining)
+        : BasicResourceLimitImpl(max, runtime, runtime_key), open_gauge_(open_gauge),
           remaining_(remaining) {
       remaining_.set(max);
     }
-    ~ResourceImpl() override { ASSERT(current_ == 0); }
 
     // Upstream::Resource
     bool canCreate() override { return current_ < max(); }
     void inc() override {
-      current_++;
+      BasicResourceLimitImpl::inc();
       updateRemaining();
-      open_gauge_.set(canCreate() ? 0 : 1);
+      open_gauge_.set(BasicResourceLimitImpl::canCreate() ? 0 : 1);
     }
-    void dec() override { decBy(1); }
     void decBy(uint64_t amount) override {
-      ASSERT(current_ >= amount);
-      current_ -= amount;
+      BasicResourceLimitImpl::decBy(amount);
       updateRemaining();
-      open_gauge_.set(canCreate() ? 0 : 1);
+      open_gauge_.set(BasicResourceLimitImpl::canCreate() ? 0 : 1);
     }
-    uint64_t max() override { return runtime_.snapshot().getInteger(runtime_key_, max_); }
 
     /**
      * We set the gauge instead of incrementing and decrementing because,
@@ -87,11 +85,6 @@ private:
       remaining_.set(max() > current_copy ? max() - current_copy : 0);
     }
 
-    const uint64_t max_;
-    std::atomic<uint64_t> current_{};
-    Runtime::Loader& runtime_;
-    const std::string runtime_key_;
-
     /**
      * A gauge to notify the live circuit breaker state. The gauge is set to 0
      * to notify that the circuit breaker is closed, or to 1 to notify that it
@@ -105,11 +98,11 @@ private:
     Stats::Gauge& remaining_;
   };
 
-  ResourceImpl connections_;
-  ResourceImpl pending_requests_;
-  ResourceImpl requests_;
-  ResourceImpl retries_;
-  ResourceImpl connection_pools_;
+  ManagedResourceImpl connections_;
+  ManagedResourceImpl pending_requests_;
+  ManagedResourceImpl requests_;
+  ManagedResourceImpl retries_;
+  ManagedResourceImpl connection_pools_;
 };
 
 using ResourceManagerImplPtr = std::unique_ptr<ResourceManagerImpl>;
