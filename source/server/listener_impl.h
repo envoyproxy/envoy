@@ -8,6 +8,7 @@
 #include "envoy/server/filter_config.h"
 #include "envoy/stats/scope.h"
 
+#include "common/common/basic_resource_impl.h"
 #include "common/common/logger.h"
 #include "common/init/manager_impl.h"
 
@@ -101,6 +102,14 @@ public:
     return udp_listener_factory_.get();
   }
   Network::ConnectionBalancer& connectionBalancer() override { return *connection_balancer_; }
+  ResourceLimit& openConnections() override { return *open_connections_; }
+
+  void ensureSocketOptions() {
+    if (!listen_socket_options_) {
+      listen_socket_options_ =
+          std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
+    }
+  }
 
   // Server::Configuration::ListenerFactoryContext
   AccessLog::AccessLogManager& accessLogManager() override;
@@ -130,12 +139,6 @@ public:
   OptProcessContextRef processContext() override;
   Configuration::ServerFactoryContext& getServerFactoryContext() const override;
 
-  void ensureSocketOptions() {
-    if (!listen_socket_options_) {
-      listen_socket_options_ =
-          std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
-    }
-  }
   // Network::DrainDecision
   bool drainClose() const override;
 
@@ -153,6 +156,7 @@ private:
     ensureSocketOptions();
     listen_socket_options_->emplace_back(std::move(option));
   }
+
   void addListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) {
     ensureSocketOptions();
     Network::Socket::appendOptions(listen_socket_options_, options);
@@ -194,6 +198,12 @@ private:
   const bool continue_on_listener_filters_timeout_;
   Network::ActiveUdpListenerFactoryPtr udp_listener_factory_;
   Network::ConnectionBalancerPtr connection_balancer_;
+
+  // Per-listener connection limits are only specified via runtime.
+  //
+  // TODO (tonya11en): Move this functionality into the overload manager.
+  const std::string cx_limit_runtime_key_;
+  std::shared_ptr<BasicResourceLimitImpl> open_connections_;
 
   // to access ListenerManagerImpl::factory_.
   friend class ListenerFilterChainFactoryBuilder;

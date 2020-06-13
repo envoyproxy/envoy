@@ -6,6 +6,7 @@
 
 #include "envoy/api/io_error.h"
 #include "envoy/common/exception.h"
+#include "envoy/common/resource.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/connection_balancer.h"
 #include "envoy/network/listen_socket.h"
@@ -108,6 +109,11 @@ public:
    *         though the implementation may be a NOP balancer.
    */
   virtual ConnectionBalancer& connectionBalancer() PURE;
+
+  /**
+   * Open connection resources for this listener.
+   */
+  virtual ResourceLimit& openConnections() PURE;
 };
 
 /**

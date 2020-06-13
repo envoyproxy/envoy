@@ -330,6 +330,22 @@ void ConfigHelper::applyConfigModifiers() {
   config_modifiers_.clear();
 }
 
+void ConfigHelper::addRuntimeOverride(const std::string& key, const std::string& value) {
+  if (bootstrap_.mutable_layered_runtime()->layers_size() == 0) {
+    auto* static_layer = bootstrap_.mutable_layered_runtime()->add_layers();
+    static_layer->set_name("static_layer");
+    static_layer->mutable_static_layer();
+    auto* admin_layer = bootstrap_.mutable_layered_runtime()->add_layers();
+    admin_layer->set_name("admin");
+    admin_layer->mutable_admin_layer();
+  }
+  auto* static_layer =
+      bootstrap_.mutable_layered_runtime()->mutable_layers(0)->mutable_static_layer();
+  ProtobufWkt::Value string_value;
+  string_value.set_string_value(value);
+  (*static_layer->mutable_fields())[std::string(key)] = std::move(string_value);
+}
+
 void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
   RELEASE_ASSERT(!finalized_, "");
 

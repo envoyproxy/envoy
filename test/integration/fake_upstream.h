@@ -18,6 +18,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/zero_copy_input_stream_impl.h"
+#include "common/common/basic_resource_impl.h"
 #include "common/common/callback_impl.h"
 #include "common/common/linked_object.h"
 #include "common/common/lock_guard.h"
@@ -633,10 +634,17 @@ private:
     envoy::api::v2::core::TrafficDirection direction() const override {
       return envoy::api::v2::core::TrafficDirection::UNSPECIFIED;
     }
+    ResourceLimit& openConnections() override { return connection_resource_; }
+
+    void setMaxConnections(const uint32_t num_connections) {
+      connection_resource_.setMax(num_connections);
+    }
+    void clearMaxConnections() { connection_resource_.resetMax(); }
 
     FakeUpstream& parent_;
     const std::string name_;
     Network::NopConnectionBalancerImpl connection_balancer_;
+    BasicResourceLimitImpl connection_resource_;
   };
 
   void threadRoutine();

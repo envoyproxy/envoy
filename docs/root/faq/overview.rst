@@ -33,6 +33,7 @@ Configuration
   configuration/zipkin_tracing
   configuration/flow_control
   configuration/timeouts
+  configuration/resource_limits
 
 Load balancing
 --------------

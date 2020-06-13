@@ -10,10 +10,6 @@ load(
     "envoy_select_hot_restart",
     "envoy_sh_test",
 )
-load(
-    "//source/extensions:all_extensions.bzl",
-    "envoy_all_extensions",
-)
 
 envoy_package()
 
@@ -448,6 +444,7 @@ envoy_cc_test_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/common:assert_lib",
+        "//source/common/common:basic_resource_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/grpc:codec_lib",
@@ -911,5 +908,19 @@ envoy_cc_test(
         "//source/extensions/filters/network/http_connection_manager:config",
         "//test/server:utility_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "cx_limit_integration_test",
+    srcs = ["cx_limit_integration_test.cc"],
+    deps = [
+        ":http_integration_lib",
+        "//include/envoy/network:filter_interface",
+        "//include/envoy/registry",
+        "//source/extensions/filters/network/tcp_proxy:config",
+        "//test/config:utility_lib",
+        "//test/test_common:logging_lib",
+        "//test/test_common:simulated_time_system_lib",
     ],
 )
