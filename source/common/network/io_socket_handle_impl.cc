@@ -426,7 +426,7 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::localAddress() {
     // listening. So we can't use RELEASE_ASSERT and instead must throw an
     // exception
     if (SOCKET_FAILURE(result.rc_)) {
-      throw EnvoyException(fmt::format("getsockopt failed for '{}': ({}) {}", fd, result.errno_,
+      throw EnvoyException(fmt::format("getsockopt failed for '{}': ({}) {}", fd_, result.errno_,
                                        strerror(result.errno_)));
     }
 #else
