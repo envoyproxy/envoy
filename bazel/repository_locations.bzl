@@ -201,11 +201,9 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "N/A",
     ),
     com_github_nghttp2_nghttp2 = dict(
-        sha256 = "9f423ee596270a28b434dc9674680addbd950a1783d3d44cec550c803921c81f",
-        strip_prefix = "nghttp2-6d7f1256de281f8a793ecc383b78196373a2f9c5",
-        # This SHA is nghttp2 1.41.0 + build fix for ubsan in clang-10
-        # TODO(lizan): Pin back to released version once 1.42.0+ is released.
-        urls = ["https://github.com/nghttp2/nghttp2/archive/6d7f1256de281f8a793ecc383b78196373a2f9c5.tar.gz"],
+        sha256 = "eacc6f0f8543583ecd659faf0a3f906ed03826f1d4157b536b4b385fe47c5bb8",
+        strip_prefix = "nghttp2-1.41.0",
+        urls = ["https://github.com/nghttp2/nghttp2/releases/download/v1.41.0/nghttp2-1.41.0.tar.gz"],
         use_category = ["dataplane"],
         cpe = "cpe:2.3:a:nghttp2:nghttp2:*",
     ),
