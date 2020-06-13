@@ -160,6 +160,7 @@ VersionConverter::getJsonStringFromMessage(const Protobuf::Message& message,
   DynamicMessagePtr dynamic_message;
   switch (api_version) {
   case envoy::config::core::v3::ApiVersion::AUTO:
+    FALLTHRU;
   case envoy::config::core::v3::ApiVersion::V2: {
     // TODO(htuch): this works as long as there are no new fields in the v3+
     // DiscoveryRequest. When they are added, we need to do a full v2 conversion

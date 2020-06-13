@@ -3,6 +3,8 @@
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 
+#include "common/common/macros.h"
+
 #include "extensions/filters/http/well_known_names.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
@@ -17,7 +19,23 @@ using testing::AssertionResult;
 namespace Envoy {
 namespace {
 
-class ExtAuthzGrpcIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
+std::string
+getMethodPathFromApiTransportVersion(envoy::config::core::v3::ApiVersion transport_api_version,
+                                     bool use_alpha = false) {
+  switch (transport_api_version) {
+  case envoy::config::core::v3::ApiVersion::AUTO:
+    FALLTHRU;
+  case envoy::config::core::v3::ApiVersion::V2:
+    return use_alpha ? "/envoy.service.auth.v2alpha.Authorization/Check"
+                     : "/envoy.service.auth.v2.Authorization/Check";
+  case envoy::config::core::v3::ApiVersion::V3:
+    return "/envoy.service.auth.v3.Authorization/Check";
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+}
+
+class ExtAuthzGrpcIntegrationTest : public Grpc::VersionedGrpcClientIntegrationParamTest,
                                     public HttpIntegrationTest {
 public:
   ExtAuthzGrpcIntegrationTest()
@@ -44,6 +62,7 @@ public:
       proto_config_.mutable_filter_enabled()->mutable_default_value()->set_numerator(100);
       proto_config_.mutable_deny_at_disable()->set_runtime_key("envoy.ext_authz.deny_at_disable");
       proto_config_.mutable_deny_at_disable()->mutable_default_value()->set_value(false);
+      proto_config_.set_transport_api_version(apiVersion());
 
       envoy::config::listener::v3::Filter ext_authz_filter;
       ext_authz_filter.set_name(Extensions::HttpFilters::HttpFilterNames::get().ExtAuthorization);
@@ -83,7 +102,7 @@ public:
     RELEASE_ASSERT(result, result.message());
 
     EXPECT_EQ("POST", ext_authz_request_->headers().getMethodValue());
-    EXPECT_EQ("/envoy.service.auth.v2.Authorization/Check",
+    EXPECT_EQ(getMethodPathFromApiTransportVersion(apiVersion()),
               ext_authz_request_->headers().getPathValue());
     EXPECT_EQ("application/grpc", ext_authz_request_->headers().getContentTypeValue());
 
@@ -318,7 +337,7 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsCientType, ExtAuthzGrpcIntegrationTest,
-                         GRPC_CLIENT_INTEGRATION_PARAMS);
+                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Verifies that the request body is included in the CheckRequest when the downstream protocol is
 // HTTP/1.1.

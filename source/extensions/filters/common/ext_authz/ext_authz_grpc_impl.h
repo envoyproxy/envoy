@@ -44,7 +44,8 @@ class GrpcClientImpl : public Client,
 public:
   // TODO(gsagula): remove `use_alpha` param when V2Alpha gets deprecated.
   GrpcClientImpl(Grpc::RawAsyncClientPtr&& async_client,
-                 const absl::optional<std::chrono::milliseconds>& timeout, bool use_alpha);
+                 const absl::optional<std::chrono::milliseconds>& timeout,
+                 envoy::config::core::v3::ApiVersion transport_api_version, bool use_alpha);
   ~GrpcClientImpl() override;
 
   // ExtAuthz::Client
@@ -60,7 +61,8 @@ public:
                  Tracing::Span& span) override;
 
 private:
-  static const Protobuf::MethodDescriptor& getMethodDescriptor(bool use_alpha);
+  static const Protobuf::MethodDescriptor&
+  getMethodDescriptor(envoy::config::core::v3::ApiVersion transport_api_version, bool use_alpha);
   void toAuthzResponseHeader(
       ResponsePtr& response,
       const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers);
@@ -70,6 +72,7 @@ private:
   Grpc::AsyncRequest* request_{};
   absl::optional<std::chrono::milliseconds> timeout_;
   RequestCallbacks* callbacks_{};
+  const envoy::config::core::v3::ApiVersion transport_api_version_;
 };
 
 } // namespace ExtAuthz

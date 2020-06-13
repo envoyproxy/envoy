@@ -16,16 +16,23 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
-// Values used for selecting service paths.
-// TODO(gsagula): keep only V2 when V2Alpha gets deprecated.
+namespace {
+
+// The fully-qualified names of the Check method for each version.
+// TODO(gsagula): Keep only names without "alpha", when v2alpha gets removed.
 constexpr char V2[] = "envoy.service.auth.v2.Authorization.Check";
-constexpr char V2alpha[] = "envoy.service.auth.v2alpha.Authorization.Check";
+constexpr char V2_ALPHA[] = "envoy.service.auth.v2alpha.Authorization.Check";
+constexpr char V3[] = "envoy.service.auth.v3.Authorization.Check";
+
+} // namespace
 
 GrpcClientImpl::GrpcClientImpl(Grpc::RawAsyncClientPtr&& async_client,
                                const absl::optional<std::chrono::milliseconds>& timeout,
+                               envoy::config::core::v3::ApiVersion transport_api_version,
                                bool use_alpha)
-    : service_method_(getMethodDescriptor(use_alpha)), async_client_(std::move(async_client)),
-      timeout_(timeout) {}
+    : service_method_(getMethodDescriptor(transport_api_version, use_alpha)),
+      async_client_(std::move(async_client)), timeout_(timeout),
+      transport_api_version_(transport_api_version) {}
 
 GrpcClientImpl::~GrpcClientImpl() { ASSERT(!callbacks_); }
 
@@ -42,7 +49,12 @@ void GrpcClientImpl::check(RequestCallbacks& callbacks,
   callbacks_ = &callbacks;
 
   ENVOY_LOG(trace, "Sending CheckRequest: {}", request.DebugString());
-  request_ = async_client_->send(service_method_, request, *this, parent_span,
+
+  envoy::service::auth::v3::CheckRequest message;
+  message.MergeFrom(request);
+  Config::VersionConverter::prepareMessageForGrpcWire(message, transport_api_version_);
+
+  request_ = async_client_->send(service_method_, message, *this, parent_span,
                                  Http::AsyncClient::RequestOptions().setTimeout(timeout_));
 }
 
@@ -99,12 +111,29 @@ void GrpcClientImpl::toAuthzResponseHeader(
   }
 }
 
-const Protobuf::MethodDescriptor& GrpcClientImpl::getMethodDescriptor(bool use_alpha) {
-  const auto* descriptor =
-      use_alpha ? Protobuf::DescriptorPool::generated_pool()->FindMethodByName(V2alpha)
-                : Protobuf::DescriptorPool::generated_pool()->FindMethodByName(V2);
-  ASSERT(descriptor != nullptr);
-  return *descriptor;
+const Protobuf::MethodDescriptor&
+GrpcClientImpl::getMethodDescriptor(envoy::config::core::v3::ApiVersion api_version,
+                                    bool use_alpha) {
+  std::string method_name;
+  switch (api_version) {
+  case envoy::config::core::v3::ApiVersion::AUTO:
+    FALLTHRU;
+  case envoy::config::core::v3::ApiVersion::V2:
+    method_name = use_alpha ? V2_ALPHA : V2;
+    break;
+
+  case envoy::config::core::v3::ApiVersion::V3:
+    method_name = V3;
+    break;
+
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+
+  const auto* method_descriptor =
+      Protobuf::DescriptorPool::generated_pool()->FindMethodByName(method_name);
+  ASSERT(method_descriptor != nullptr);
+  return *method_descriptor;
 }
 
 } // namespace ExtAuthz
