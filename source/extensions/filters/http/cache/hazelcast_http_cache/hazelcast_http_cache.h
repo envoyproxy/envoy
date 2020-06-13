@@ -171,7 +171,7 @@ public:
    *            than this limit, the first max_body_size_ bytes of the response
    *            will be cached only.
    */
-  uint32_t maxBodyBytes() const { return max_body_bytes_; }
+  uint64_t maxBodyBytes() const { return max_body_bytes_; }
 
   bool unified() const { return unified_; }
 
@@ -242,7 +242,7 @@ private:
   const uint64_t body_partition_size_;
 
   /** Allowed max body size for a response */
-  const uint32_t max_body_bytes_;
+  const uint64_t max_body_bytes_;
 
   /** typed config from CacheConfig */
   HazelcastHttpCacheConfig cache_config_;
