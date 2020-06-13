@@ -193,8 +193,10 @@ envoy_cmake_external(
     name = "hazelcast_cpp_client",
     cache_entries = {
         "HZ_LIB_TYPE": "STATIC",
+        "HZ_BIT": "64",
         "CMAKE_BUILD_TYPE": "RELEASE",
     },
+    defines = ["HAZELCAST_USE_STATIC"],
     lib_source = "@com_github_hazelcast_cpp_client//:all",
     static_libraries = select({
         "//bazel:windows_x86_64": ["HazelcastClient3.12.1_64.lib"],
