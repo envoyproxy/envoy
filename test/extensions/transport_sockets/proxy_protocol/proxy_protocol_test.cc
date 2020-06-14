@@ -394,6 +394,57 @@ TEST_F(ProxyProtocolTest, V2IPV6DownstreamAddresses) {
   proxy_protocol_socket_->doWrite(msg, false);
 }
 
+// Test protocol method defers to inner socket
+TEST_F(ProxyProtocolTest, ProtocolDefersToInnerSocket) {
+  initialize(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2, nullptr);
+  EXPECT_CALL(*inner_socket_, protocol()).Times(1);
+  proxy_protocol_socket_->protocol();
+}
+
+// Test failureReason method defers to inner socket
+TEST_F(ProxyProtocolTest, FailureReasonDefersToInnerSocket) {
+  initialize(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2, nullptr);
+  EXPECT_CALL(*inner_socket_, failureReason()).Times(1);
+  proxy_protocol_socket_->failureReason();
+}
+
+// Test canFlushClose method defers to inner socket
+TEST_F(ProxyProtocolTest, CanFlushCloseDefersToInnerSocket) {
+  initialize(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2, nullptr);
+  EXPECT_CALL(*inner_socket_, canFlushClose()).Times(1);
+  proxy_protocol_socket_->canFlushClose();
+}
+
+// Test closeSocket method defers to inner socket
+TEST_F(ProxyProtocolTest, CloseSocketDefersToInnerSocket) {
+  initialize(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2, nullptr);
+  EXPECT_CALL(*inner_socket_, closeSocket(testing::Eq(Network::ConnectionEvent::LocalClose)))
+      .Times(1);
+  proxy_protocol_socket_->closeSocket(Network::ConnectionEvent::LocalClose);
+}
+
+// Test doRead method defers to inner socket
+TEST_F(ProxyProtocolTest, DoReadDefersToInnerSocket) {
+  initialize(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2, nullptr);
+  auto buff = Buffer::OwnedImpl("data");
+  EXPECT_CALL(*inner_socket_, doRead(BufferEqual(&buff))).Times(1);
+  proxy_protocol_socket_->doRead(buff);
+}
+
+// Test onConnected method defers to inner socket
+TEST_F(ProxyProtocolTest, OnConnectedDefersToInnerSocket) {
+  initialize(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2, nullptr);
+  EXPECT_CALL(*inner_socket_, onConnected()).Times(1);
+  proxy_protocol_socket_->onConnected();
+}
+
+// Test ssl method defers to inner socket
+TEST_F(ProxyProtocolTest, SslDefersToInnerSocket) {
+  initialize(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2, nullptr);
+  EXPECT_CALL(*inner_socket_, ssl()).Times(1);
+  proxy_protocol_socket_->ssl();
+}
+
 } // namespace
 } // namespace ProxyProtocol
 } // namespace TransportSockets

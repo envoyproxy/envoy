@@ -137,21 +137,6 @@ Ssl::ConnectionInfoConstSharedPtr ProxyProtocolSocket::ssl() const {
   return transport_socket_->ssl();
 }
 
-ProxyProtocolSocketFactory::ProxyProtocolSocketFactory(
-    Network::TransportSocketFactoryPtr transport_socket_factory,
-    ProxyProtocolConfig_Version version)
-    : transport_socket_factory_(std::move(transport_socket_factory)), version_(version) {}
-
-Network::TransportSocketPtr ProxyProtocolSocketFactory::createTransportSocket(
-    Network::TransportSocketOptionsSharedPtr options) const {
-  return std::make_unique<ProxyProtocolSocket>(
-      transport_socket_factory_->createTransportSocket(options), options, version_);
-}
-
-bool ProxyProtocolSocketFactory::implementsSecureTransport() const {
-  return transport_socket_factory_->implementsSecureTransport();
-}
-
 } // namespace ProxyProtocol
 } // namespace TransportSockets
 } // namespace Extensions
