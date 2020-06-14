@@ -14,6 +14,7 @@ envoy_cc_library(
     name = "proxy_protocol",
     srcs = ["proxy_protocol.cc"],
     hdrs = ["proxy_protocol.h"],
+    security_posture = "robust_to_untrusted_downstream",
     deps = [
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:transport_socket_interface",
