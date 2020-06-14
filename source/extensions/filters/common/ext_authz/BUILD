@@ -38,6 +38,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/grpc:async_client_lib",
         "//source/common/grpc:typed_async_client_lib",
+        "//source/common/grpc:version_options_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
         "//source/common/network:utility_lib",

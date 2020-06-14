@@ -19,6 +19,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/grpc/typed_async_client.h"
+#include "common/grpc/version_options.h"
 
 #include "extensions/filters/common/ext_authz/check_request_utils.h"
 #include "extensions/filters/common/ext_authz/ext_authz.h"
@@ -61,18 +62,16 @@ public:
                  Tracing::Span& span) override;
 
 private:
-  static const Protobuf::MethodDescriptor&
-  getMethodDescriptor(envoy::config::core::v3::ApiVersion transport_api_version, bool use_alpha);
   void toAuthzResponseHeader(
       ResponsePtr& response,
       const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers);
-  const Protobuf::MethodDescriptor& service_method_;
   Grpc::AsyncClient<envoy::service::auth::v3::CheckRequest, envoy::service::auth::v3::CheckResponse>
       async_client_;
   Grpc::AsyncRequest* request_{};
   absl::optional<std::chrono::milliseconds> timeout_;
   RequestCallbacks* callbacks_{};
-  const envoy::config::core::v3::ApiVersion transport_api_version_;
+  const Grpc::VersionOptions version_options_;
+  const Protobuf::MethodDescriptor& service_method_;
 };
 
 } // namespace ExtAuthz

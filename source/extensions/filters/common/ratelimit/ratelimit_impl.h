@@ -17,6 +17,7 @@
 
 #include "common/common/logger.h"
 #include "common/grpc/typed_async_client.h"
+#include "common/grpc/version_options.h"
 #include "common/singleton/const_singleton.h"
 
 #include "extensions/filters/common/ratelimit/ratelimit.h"
@@ -46,7 +47,8 @@ class GrpcClientImpl : public Client,
                        public Logger::Loggable<Logger::Id::config> {
 public:
   GrpcClientImpl(Grpc::RawAsyncClientPtr&& async_client,
-                 const absl::optional<std::chrono::milliseconds>& timeout);
+                 const absl::optional<std::chrono::milliseconds>& timeout,
+                 envoy::config::core::v3::ApiVersion transport_api_version);
   ~GrpcClientImpl() override;
 
   static void createRequest(envoy::service::ratelimit::v3::RateLimitRequest& request,
@@ -67,13 +69,14 @@ public:
                  Tracing::Span& span) override;
 
 private:
-  const Protobuf::MethodDescriptor& service_method_;
   Grpc::AsyncClient<envoy::service::ratelimit::v3::RateLimitRequest,
                     envoy::service::ratelimit::v3::RateLimitResponse>
       async_client_;
   Grpc::AsyncRequest* request_{};
   absl::optional<std::chrono::milliseconds> timeout_;
   RequestCallbacks* callbacks_{};
+  const Grpc::VersionOptions version_options_;
+  const Protobuf::MethodDescriptor& service_method_;
 };
 
 /**
@@ -81,7 +84,8 @@ private:
  */
 ClientPtr rateLimitClient(Server::Configuration::FactoryContext& context,
                           const envoy::config::core::v3::GrpcService& grpc_service,
-                          const std::chrono::milliseconds timeout);
+                          const std::chrono::milliseconds timeout,
+                          envoy::config::core::v3::ApiVersion transport_api_version);
 
 } // namespace RateLimit
 } // namespace Common

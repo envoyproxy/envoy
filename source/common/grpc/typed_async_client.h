@@ -4,6 +4,8 @@
 
 #include "envoy/grpc/async_client.h"
 
+#include "common/config/version_converter.h"
+
 namespace Envoy {
 namespace Grpc {
 namespace Internal {
@@ -108,6 +110,16 @@ public:
     return Internal::sendUntyped(client_.get(), service_method, request, callbacks, parent_span,
                                  options);
   }
+  virtual AsyncRequest* send(const Protobuf::MethodDescriptor& service_method,
+                             const Protobuf::Message& request,
+                             AsyncRequestCallbacks<Response>& callbacks, Tracing::Span& parent_span,
+                             const Http::AsyncClient::RequestOptions& options,
+                             envoy::config::core::v3::ApiVersion transport_api_version) {
+    Config::VersionConverter::prepareMessageForGrpcWire(const_cast<Protobuf::Message&>(request),
+                                                        transport_api_version);
+    return send(service_method, request, callbacks, parent_span, options);
+  }
+
   virtual AsyncStream<Request> start(const Protobuf::MethodDescriptor& service_method,
                                      AsyncStreamCallbacks<Response>& callbacks,
                                      const Http::AsyncClient::StreamOptions& options) {
