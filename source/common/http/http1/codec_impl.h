@@ -209,6 +209,20 @@ protected:
 
   bool resetStreamCalled() { return reset_stream_called_; }
 
+  /**
+   * Get memory used to represent HTTP headers or trailers currently being parsed.
+   * Computed by adding the partial header field and value that is currently being parsed and the
+   * estimated header size for previous header lines provided by HeaderMap::byteSize().
+   */
+  virtual uint32_t getHeadersSize();
+
+  /**
+   * Called from onUrl, onHeaderField and onHeaderValue to verify that the headers do not exceed the
+   * configured max header size limit. Throws a  CodecProtocolException if headers exceed the size
+   * limit.
+   */
+  void checkMaxHeadersSize();
+
   Network::Connection& connection_;
   CodecStats stats_;
   http_parser parser_;
@@ -367,6 +381,9 @@ private:
     ResponseStreamEncoderImpl response_encoder_;
     bool remote_complete_{};
   };
+  // ConnectionImpl
+  // Add the size of the request_url to the reported header size when processing request headers.
+  uint32_t getHeadersSize() override;
 
   /**
    * Manipulate the request's first line, parsing the url and converting to a relative path if

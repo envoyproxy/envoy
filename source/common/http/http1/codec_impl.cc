@@ -423,6 +423,20 @@ void ConnectionImpl::completeLastHeader() {
   ASSERT(current_header_value_.empty());
 }
 
+uint32_t ConnectionImpl::getHeadersSize() {
+  return current_header_field_.size() + current_header_value_.size() +
+         (current_header_map_->byteSize() ? *current_header_map_->byteSize() : 0);
+}
+
+void ConnectionImpl::checkMaxHeadersSize() {
+  const uint32_t total = getHeadersSize();
+  if (total > (max_headers_kb_ * 1024)) {
+    error_code_ = Http::Code::RequestHeaderFieldsTooLarge;
+    sendProtocolError();
+    throw CodecProtocolException("headers size exceeds limit");
+  }
+}
+
 bool ConnectionImpl::maybeDirectDispatch(Buffer::Instance& data) {
   if (!handling_upgrade_) {
     // Only direct dispatch for Upgrade requests.
@@ -494,6 +508,8 @@ void ConnectionImpl::onHeaderField(const char* data, size_t length) {
   }
 
   current_header_field_.append(data, length);
+
+  checkMaxHeadersSize();
 }
 
 void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
@@ -524,16 +540,7 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
   header_parsing_state_ = HeaderParsingState::Value;
   current_header_value_.append(header_value.data(), header_value.length());
 
-  // Verify that the cached value in byte size exists.
-  ASSERT(current_header_map_->byteSize().has_value());
-  const uint32_t total = current_header_field_.size() + current_header_value_.size() +
-                         current_header_map_->byteSize().value();
-  if (total > (max_headers_kb_ * 1024)) {
-
-    error_code_ = Http::Code::RequestHeaderFieldsTooLarge;
-    sendProtocolError();
-    throw CodecProtocolException("headers size exceeds limit");
-  }
+  checkMaxHeadersSize();
 }
 
 int ConnectionImpl::onHeadersCompleteBase() {
@@ -633,6 +640,12 @@ ServerConnectionImpl::ServerConnectionImpl(
       flood_protection_(
           Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_flood_protection")),
       headers_with_underscores_action_(headers_with_underscores_action) {}
+
+uint32_t ServerConnectionImpl::getHeadersSize() {
+  // Add in the the size of the request URL if processing request headers.
+  const uint32_t url_size = active_request_ ? active_request_->request_url_.size() : 0;
+  return url_size + ConnectionImpl::getHeadersSize();
+}
 
 void ServerConnectionImpl::onEncodeComplete() {
   ASSERT(active_request_);
@@ -741,6 +754,8 @@ void ServerConnectionImpl::onMessageBegin() {
 void ServerConnectionImpl::onUrl(const char* data, size_t length) {
   if (active_request_) {
     active_request_->request_url_.append(data, length);
+
+    checkMaxHeadersSize();
   }
 }
 

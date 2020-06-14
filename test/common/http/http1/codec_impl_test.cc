@@ -1553,6 +1553,26 @@ TEST_F(Http1ClientConnectionImplTest, HighwatermarkMultipleResponses) {
   static_cast<ClientConnection*>(codec_.get())
       ->onUnderlyingConnectionBelowWriteBufferLowWatermark();
 }
+
+TEST_F(Http1ServerConnectionImplTest, LargeRequestUrlRejected) {
+  initialize();
+
+  std::string exception_reason;
+  NiceMock<MockStreamDecoder> decoder;
+  Http::StreamEncoder* response_encoder = nullptr;
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](StreamEncoder& encoder, bool) -> StreamDecoder& {
+        response_encoder = &encoder;
+        return decoder;
+      }));
+
+  // Default limit of 60 KiB
+  std::string long_url = "/" + std::string(60 * 1024, 'q');
+  Buffer::OwnedImpl buffer("GET " + long_url + " HTTP/1.1\r\n");
+
+  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), EnvoyException, "headers size exceeds limit");
+}
+
 TEST_F(Http1ServerConnectionImplTest, LargeRequestHeadersRejected) {
   // Default limit of 60 KiB
   std::string long_string = "big: " + std::string(60 * 1024, 'q') + "\r\n";
@@ -1635,8 +1655,24 @@ TEST_F(Http1ServerConnectionImplTest, ManyRequestHeadersAccepted) {
   testRequestHeadersAccepted(createHeaderFragment(150));
 }
 
-// Tests that response headers of 80 kB fails.
-TEST_F(Http1ClientConnectionImplTest, LargeResponseHeadersRejected) {
+// Tests that incomplete response headers of 80 kB header value fails.
+TEST_F(Http1ClientConnectionImplTest, ResponseHeadersWithLargeValueRejected) {
+  initialize();
+
+  NiceMock<MockStreamDecoder> response_decoder;
+  Http::StreamEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  request_encoder.encodeHeaders(headers, true);
+
+  Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n");
+  codec_->dispatch(buffer);
+  std::string long_header = "big: " + std::string(80 * 1024, 'q');
+  buffer = Buffer::OwnedImpl(long_header);
+  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), EnvoyException, "headers size exceeds limit");
+}
+
+// Tests that incomplete response headers with a 80 kB header field fails.
+TEST_F(Http1ClientConnectionImplTest, ResponseHeadersWithLargeFieldRejected) {
   initialize();
 
   NiceMock<Http::MockStreamDecoder> response_decoder;
@@ -1646,7 +1682,7 @@ TEST_F(Http1ClientConnectionImplTest, LargeResponseHeadersRejected) {
 
   Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n");
   codec_->dispatch(buffer);
-  std::string long_header = "big: " + std::string(80 * 1024, 'q') + "\r\n";
+  std::string long_header = "bigfield" + std::string(80 * 1024, 'q');
   buffer = Buffer::OwnedImpl(long_header);
   EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), EnvoyException, "headers size exceeds limit");
 }
