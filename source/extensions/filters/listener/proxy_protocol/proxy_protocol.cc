@@ -40,7 +40,7 @@ Config::Config(
           "proxy_protocol: TLV type should be between 0~255. is out of the range and discarded.");
       continue;
     }
-    tlv_types_[0xFF & rule.tlv_type()] = std::make_shared<KeyValuePair>(rule.on_header_present());
+    tlv_types_[0xFF & rule.tlv_type()] = std::make_shared<KeyValuePair>(rule.on_tlv_present());
   }
 }
 
@@ -299,41 +299,35 @@ bool Filter::parseExtensions(os_fd_t fd, uint8_t* buf, size_t buf_size, size_t* 
  *        See https://www.haproxy.org/download/2.1/doc/proxy-protocol.txt for details
  */
 void Filter::parseTlvs(const std::vector<uint8_t>& tlvs) {
-  size_t size = tlvs.size();
-  uint8_t tlv_type;
-  uint8_t tlv_length_upper;
-  uint8_t tlv_length_lower;
-  size_t tlv_value_length;
   size_t idx{0};
-  while (idx < size) {
-    // get type
-    tlv_type = tlvs[idx];
+  while (idx < tlvs.size()) {
+    // Get TLV type.
+    uint8_t tlv_type = tlvs[idx];
     idx++;
 
-    // get length
-    if ((idx + 1) >= size) {
+    // Get value length.
+    if ((idx + 1) >= tlvs.size()) {
       throw EnvoyException(
           fmt::format("failed to read proxy protocol extension. No bytes for TLV length. "
                       "Extension length is {}, current index is {}, current type is {}.",
-                      size, idx, tlv_type));
+                      tlvs.size(), idx, tlv_type));
     }
 
-    tlv_length_upper = tlvs[idx];
-    tlv_length_lower = tlvs[idx + 1];
-    tlv_value_length = (tlv_length_upper << 8) + tlv_length_lower;
+    uint8_t tlv_length_upper = tlvs[idx];
+    uint8_t tlv_length_lower = tlvs[idx + 1];
+    size_t tlv_value_length = (tlv_length_upper << 8) + tlv_length_lower;
     idx += 2;
 
-    // get the value
-    if ((idx + tlv_value_length - 1) >= size) {
+    // Get the value.
+    if ((idx + tlv_value_length - 1) >= tlvs.size()) {
       throw EnvoyException(
           fmt::format("failed to read proxy protocol extension. No bytes for TLV value. "
                       "Extension length is {}, current index is {}, current type is {}, current "
                       "value length is {}.",
-                      size, idx, tlv_type, tlv_length_upper));
+                      tlvs.size(), idx, tlv_type, tlv_length_upper));
     }
 
-    // only save to dynamic metadata if this type of TLV is needed
-    std::string filter_name = ListenerFilterNames::get().ProxyProtocol;
+    // Only save to dynamic metadata if this type of TLV is needed.
     auto key_value_pair = config_->isTlvTypeNeeded(tlv_type);
     if (nullptr != key_value_pair) {
       std::string tlv_value(reinterpret_cast<char const*>(tlvs.data() + idx), tlv_value_length);
@@ -341,7 +335,7 @@ void Filter::parseTlvs(const std::vector<uint8_t>& tlvs) {
       metadata_value.set_string_value(std::move(tlv_value));
 
       std::string metadata_key = key_value_pair->metadata_namespace().empty()
-                                     ? filter_name
+                                     ? ListenerFilterNames::get().ProxyProtocol
                                      : key_value_pair->metadata_namespace();
 
       ProtobufWkt::Struct metadata(
@@ -353,12 +347,13 @@ void Filter::parseTlvs(const std::vector<uint8_t>& tlvs) {
     }
 
     idx += tlv_value_length;
+    ASSERT(idx <= tlvs.size());
   }
 }
 
 bool Filter::readExtensions(os_fd_t fd) {
-  // parse and discard the extensions if this is a local command or there's no TLV needs to be saved
-  // to metadata
+  // Parse and discard the extensions if this is a local command or there's no TLV needs to be saved
+  // to metadata.
   if (proxy_protocol_header_.value().local_command_ || 0 == config_->numberOfNeededTlvTypes()) {
     // buf_ is no longer in use so we re-use it to read/discard
     return parseExtensions(fd, reinterpret_cast<uint8_t*>(buf_), sizeof(buf_), nullptr);
@@ -370,7 +365,7 @@ bool Filter::readExtensions(os_fd_t fd) {
     buf_tlv_init_ = true;
   }
 
-  // parse until we have all the TLVs in buf_tlv
+  // Parse until we have all the TLVs in buf_tlv.
   if (!parseExtensions(fd, buf_tlv_.data(), buf_tlv_.size(), &buf_tlv_off_)) {
     return false;
   }

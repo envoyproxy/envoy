@@ -899,7 +899,7 @@ TEST_P(ProxyProtocolTest, V2ExtractTlvOfInterest) {
   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
   auto rule = proto_config.add_request_rules();
   rule->set_tlv_type(0x02);
-  rule->mutable_on_header_present()->set_key("PP2 type authority");
+  rule->mutable_on_tlv_present()->set_key("PP2 type authority");
 
   connect(true, &proto_config);
   write(buffer, sizeof(buffer));
@@ -938,9 +938,8 @@ TEST_P(ProxyProtocolTest, V2ExtractTlvOfInterestAndEmitWithSpecifiedMetadataName
   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
   auto rule = proto_config.add_request_rules();
   rule->set_tlv_type(0x02);
-  rule->mutable_on_header_present()->set_key("PP2 type authority");
-  rule->mutable_on_header_present()->set_metadata_namespace(
-      "We need a different metadta namespace");
+  rule->mutable_on_tlv_present()->set_key("PP2 type authority");
+  rule->mutable_on_tlv_present()->set_metadata_namespace("We need a different metadta namespace");
 
   connect(true, &proto_config);
   write(buffer, sizeof(buffer));
@@ -987,11 +986,11 @@ TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterest) {
   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
   auto rule_type_authority = proto_config.add_request_rules();
   rule_type_authority->set_tlv_type(0x02);
-  rule_type_authority->mutable_on_header_present()->set_key("PP2 type authority");
+  rule_type_authority->mutable_on_tlv_present()->set_key("PP2 type authority");
 
   auto rule_vpc_id = proto_config.add_request_rules();
   rule_vpc_id->set_tlv_type(0xea);
-  rule_vpc_id->mutable_on_header_present()->set_key("PP2 vpc id");
+  rule_vpc_id->mutable_on_tlv_present()->set_key("PP2 vpc id");
 
   connect(true, &proto_config);
   write(buffer, sizeof(buffer));
@@ -1045,7 +1044,7 @@ TEST_P(ProxyProtocolTest, V2WillNotOverwriteTLV) {
   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
   auto rule_type_authority = proto_config.add_request_rules();
   rule_type_authority->set_tlv_type(0x02);
-  rule_type_authority->mutable_on_header_present()->set_key("PP2 type authority");
+  rule_type_authority->mutable_on_tlv_present()->set_key("PP2 type authority");
 
   connect(true, &proto_config);
   write(buffer, sizeof(buffer));
@@ -1087,7 +1086,7 @@ TEST_P(ProxyProtocolTest, V2WrongTLVLength) {
   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
   auto rule_00 = proto_config.add_request_rules();
   rule_00->set_tlv_type(0x00);
-  rule_00->mutable_on_header_present()->set_key("00");
+  rule_00->mutable_on_tlv_present()->set_key("00");
 
   connect(false, &proto_config);
   write(buffer, sizeof(buffer));
@@ -1111,11 +1110,11 @@ TEST_P(ProxyProtocolTest, V2IncompleteTLV) {
   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
   auto rule_00 = proto_config.add_request_rules();
   rule_00->set_tlv_type(0x00);
-  rule_00->mutable_on_header_present()->set_key("00");
+  rule_00->mutable_on_tlv_present()->set_key("00");
 
   auto rule_01 = proto_config.add_request_rules();
   rule_01->set_tlv_type(0x01);
-  rule_01->mutable_on_header_present()->set_key("01");
+  rule_01->mutable_on_tlv_present()->set_key("01");
 
   connect(false, &proto_config);
   write(buffer, sizeof(buffer));
@@ -1395,14 +1394,14 @@ TEST(ProxyProtocolTest, InvalidPPVTypePassedToConfig) {
   // valid TLV types
   auto rule_00 = proto_config.add_request_rules();
   rule_00->set_tlv_type(0x00);
-  rule_00->mutable_on_header_present()->set_key("00");
+  rule_00->mutable_on_tlv_present()->set_key("00");
   auto rule_02 = proto_config.add_request_rules();
   rule_02->set_tlv_type(0x02);
-  rule_02->mutable_on_header_present()->set_key("02");
+  rule_02->mutable_on_tlv_present()->set_key("02");
   // invalid TLV types
   auto rule_bad = proto_config.add_request_rules();
   rule_bad->set_tlv_type(300);
-  rule_bad->mutable_on_header_present()->set_key("bad");
+  rule_bad->mutable_on_tlv_present()->set_key("bad");
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   ProxyProtocol::Config config(factory_context.scope_, proto_config);
@@ -1419,13 +1418,11 @@ TEST(ProxyProtocolConfigFactoryTest, TestCreateFactory) {
   const std::string yaml = R"EOF(
       request_rules:
         - tlv_type: 0x01
-          on_header_present:
+          on_tlv_present:
             key: "PP2_TYPE_ALPN"
-            type: STRING
         - tlv_type: 0x1a
-          on_header_present:
+          on_tlv_present:
             key: "PP2_TYPE_CUSTOMER_A"
-            type: STRING
       
 )EOF";
 
