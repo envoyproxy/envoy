@@ -12,6 +12,6 @@ namespace quiche {
 
 template <typename T> using QuicheOptionalImpl = absl::optional<T>;
 
-#define QuicheNullOptImpl absl::nullopt
+#define QUICHE_NULLOPT_IMPL absl::nullopt
 
 } // namespace quiche

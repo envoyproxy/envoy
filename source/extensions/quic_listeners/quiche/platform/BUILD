@@ -241,16 +241,26 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "quiche_common_platform_optional_impl_lib",
+    hdrs = ["quiche_optional_impl.h"],
+    external_deps = [
+        "abseil_node_hash_map",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+envoy_cc_library(
     name = "quiche_common_platform_impl_lib",
+    srcs = ["quiche_time_utils_impl.cc"],
     hdrs = [
         "quiche_arraysize_impl.h",
         "quiche_logging_impl.h",
         "quiche_map_util_impl.h",
-        "quiche_optional_impl.h",
         "quiche_ptr_util_impl.h",
         "quiche_str_cat_impl.h",
         "quiche_string_piece_impl.h",
         "quiche_text_utils_impl.h",
+        "quiche_time_utils_impl.h",
         "quiche_unordered_containers_impl.h",
     ],
     external_deps = [
@@ -261,6 +271,7 @@ envoy_cc_library(
     deps = [
         ":quic_platform_logging_impl_lib",
         ":string_utils_lib",
+        "@com_googlesource_quiche//:quiche_common_platform_optional",
     ],
 )
 
