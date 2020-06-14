@@ -274,6 +274,8 @@ void InstanceImpl::initialize(const Options& options,
 
   // Enable the selected buffer implementation (old libevent evbuffer version or new native
   // version) early in the initialization, before any buffers can be created.
+  RELEASE_ASSERT(!options.libeventBufferEnabled(),
+                 "old_impl not supported for buffers"); // This option is no longer supported.
   Buffer::OwnedImpl::useOldImpl(options.libeventBufferEnabled());
   ENVOY_LOG(info, "buffer implementation: {}",
             Buffer::OwnedImpl().usesOldImpl() ? "old (libevent)" : "new");

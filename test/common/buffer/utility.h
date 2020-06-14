@@ -22,10 +22,11 @@ enum class BufferImplementation {
 class BufferImplementationParamTest : public testing::TestWithParam<BufferImplementation> {
 protected:
   BufferImplementationParamTest() {
+    saved_buffer_old_impl_ = OwnedImpl::newBuffersUseOldImpl();
     OwnedImpl::useOldImpl(GetParam() == BufferImplementation::Old);
   }
 
-  ~BufferImplementationParamTest() override = default;
+  ~BufferImplementationParamTest() { OwnedImpl::useOldImpl(saved_buffer_old_impl_); }
 
   /** Verify that a buffer has been constructed using the expected implementation. */
   void verifyImplementation(const OwnedImpl& buffer) {
@@ -38,6 +39,9 @@ protected:
       break;
     }
   }
+
+private:
+  bool saved_buffer_old_impl_{false};
 };
 
 inline void addRepeated(Buffer::Instance& buffer, int n, int8_t value) {

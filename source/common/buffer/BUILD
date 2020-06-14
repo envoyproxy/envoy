@@ -28,6 +28,7 @@ envoy_cc_library(
         "//source/common/common:stack_array",
         "//source/common/common:utility_lib",
         "//source/common/event:libevent_lib",
+        "//source/server:backtrace_lib",
     ],
 )
 

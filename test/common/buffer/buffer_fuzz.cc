@@ -67,6 +67,12 @@ void releaseFragmentAllocation(const void* p, size_t, const Buffer::BufferFragme
 // walk off the edge; the caller should be guaranteeing this.
 class StringBuffer : public Buffer::Instance {
 public:
+  void addDrainTracker(std::function<void()> drain_tracker) override {
+    // Not implemented well.
+    ASSERT(false);
+    drain_tracker();
+  }
+
   void add(const void* data, uint64_t size) override {
     FUZZ_ASSERT(start_ + size_ + size <= data_.size());
     ::memcpy(mutableEnd(), data, size);
@@ -478,7 +484,8 @@ void executeActions(const test::common::buffer::BufferFuzzTestCase& input, Buffe
 
 void BufferFuzz::bufferFuzz(const test::common::buffer::BufferFuzzTestCase& input, bool old_impl) {
   ENVOY_LOG_MISC(trace, "Using {} buffer implementation", old_impl ? "old" : "new");
-  Buffer::OwnedImpl::useOldImpl(old_impl);
+  // Buffer::OwnedImpl::useOldImpl(old_impl); no longer supported
+  Buffer::OwnedImpl::useOldImpl(false);
   Context ctxt;
   // Fuzzed buffers.
   BufferList buffers;
