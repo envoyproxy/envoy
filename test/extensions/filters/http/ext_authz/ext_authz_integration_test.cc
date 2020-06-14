@@ -8,6 +8,7 @@
 #include "extensions/filters/http/well_known_names.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
+#include "test/extensions/filters/common/ext_authz/test_common.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/utility.h"
 
@@ -17,23 +18,6 @@
 using testing::AssertionResult;
 
 namespace Envoy {
-namespace {
-
-std::string
-getMethodPathFromApiTransportVersion(envoy::config::core::v3::ApiVersion transport_api_version,
-                                     bool use_alpha = false) {
-  switch (transport_api_version) {
-  case envoy::config::core::v3::ApiVersion::AUTO:
-    FALLTHRU;
-  case envoy::config::core::v3::ApiVersion::V2:
-    return use_alpha ? "/envoy.service.auth.v2alpha.Authorization/Check"
-                     : "/envoy.service.auth.v2.Authorization/Check";
-  case envoy::config::core::v3::ApiVersion::V3:
-    return "/envoy.service.auth.v3.Authorization/Check";
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
-}
 
 class ExtAuthzGrpcIntegrationTest : public Grpc::VersionedGrpcClientIntegrationParamTest,
                                     public HttpIntegrationTest {
@@ -102,8 +86,10 @@ public:
     RELEASE_ASSERT(result, result.message());
 
     EXPECT_EQ("POST", ext_authz_request_->headers().getMethodValue());
-    EXPECT_EQ(getMethodPathFromApiTransportVersion(apiVersion()),
-              ext_authz_request_->headers().getPathValue());
+    EXPECT_EQ(
+        Extensions::Filters::Common::ExtAuthz::TestCommon::getMethodPathFromApiTransportVersion(
+            apiVersion()),
+        ext_authz_request_->headers().getPathValue());
     EXPECT_EQ("application/grpc", ext_authz_request_->headers().getContentTypeValue());
 
     envoy::service::auth::v3::CheckRequest expected_check_request;
@@ -388,5 +374,4 @@ TEST_P(ExtAuthzHttpIntegrationTest, DisableCaseSensitiveStringMatcher) {
   EXPECT_EQ(case_sensitive_header_value_, header_entry->value().getStringView());
 }
 
-} // namespace
 } // namespace Envoy
