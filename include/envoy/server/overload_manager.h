@@ -31,27 +31,15 @@ using OverloadActionCb = std::function<void(OverloadActionState)>;
 /**
  * Thread-local copy of the state of each configured overload action.
  */
-class ThreadLocalOverloadState : public ThreadLocal::ThreadLocalObject {
+class ThreadLocalOverloadState {
 public:
-  const OverloadActionState& getState(const std::string& action) {
-    auto it = actions_.find(action);
-    if (it == actions_.end()) {
-      it = actions_.insert(std::make_pair(action, OverloadActionState::Inactive)).first;
-    }
-    return it->second;
-  }
+  virtual ~ThreadLocalOverloadState() = default;
 
-  void setState(const std::string& action, OverloadActionState state) {
-    auto it = actions_.find(action);
-    if (it == actions_.end()) {
-      actions_[action] = state;
-    } else {
-      it->second = state;
-    }
-  }
+  // Get a thread-local reference to the value for the given action key.
+  virtual const OverloadActionState& getState(const std::string& action) PURE;
 
-private:
-  std::unordered_map<std::string, OverloadActionState> actions_;
+  // Sets the thread-local value for the given action key to the given state.
+  virtual void setState(const std::string& action, OverloadActionState state) PURE;
 };
 
 /**

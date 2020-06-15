@@ -5600,11 +5600,12 @@ TEST(HttpConnectionManagerTracingStatsTest, verifyTracingStats) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, NoNewStreamWhenOverloaded) {
-  setup(false, "");
+  Server::OverloadActionState stop_accepting_requests = Server::OverloadActionState::Active;
+  ON_CALL(overload_manager_.overload_state_,
+          getState(Server::OverloadActionNames::get().StopAcceptingRequests))
+      .WillByDefault(ReturnRef(stop_accepting_requests));
 
-  overload_manager_.overload_state_.setState(
-      Server::OverloadActionNames::get().StopAcceptingRequests,
-      Server::OverloadActionState::Active);
+  setup(false, "");
 
   EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance&) -> Http::Status {
     RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
@@ -5630,10 +5631,12 @@ TEST_F(HttpConnectionManagerImplTest, NoNewStreamWhenOverloaded) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, DisableKeepAliveWhenOverloaded) {
-  setup(false, "");
+  Server::OverloadActionState disable_http_keep_alive = Server::OverloadActionState::Active;
+  ON_CALL(overload_manager_.overload_state_,
+          getState(Server::OverloadActionNames::get().DisableHttpKeepAlive))
+      .WillByDefault(ReturnRef(disable_http_keep_alive));
 
-  overload_manager_.overload_state_.setState(
-      Server::OverloadActionNames::get().DisableHttpKeepAlive, Server::OverloadActionState::Active);
+  setup(false, "");
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
   EXPECT_CALL(filter_factory_, createFilterChain(_))
