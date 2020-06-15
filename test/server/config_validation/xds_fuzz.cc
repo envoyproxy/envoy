@@ -11,104 +11,54 @@
 
 namespace Envoy {
 
+// helper functions to build API responses
 envoy::config::cluster::v3::Cluster XdsFuzzTest::buildCluster(const std::string& name) {
-  return TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(fmt::format(R"EOF(
-      name: {}
-      connect_timeout: 5s
-      type: EDS
-      eds_cluster_config: {{ eds_config: {{ ads: {{}} }} }}
-      lb_policy: ROUND_ROBIN
-      http2_protocol_options: {{}}
-    )EOF",
-                                                                                 name));
+  return ConfigHelper::buildCluster(name);
 }
 
 envoy::config::endpoint::v3::ClusterLoadAssignment
 XdsFuzzTest::buildClusterLoadAssignment(const std::string& name) {
-  return TestUtility::parseYaml<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-      fmt::format(R"EOF(
-      cluster_name: {}
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: {}
-                port_value: {}
-    )EOF",
-                  name, Network::Test::getLoopbackAddressString(ip_version_),
-                  fake_upstreams_[0]->localAddress()->ip()->port()));
+  return ConfigHelper::buildClusterLoadAssignment(name, Network::Test::getLoopbackAddressString(ip_version_), fake_upstreams_[0]->localAddress()->ip()->port());
 }
 
 envoy::config::listener::v3::Listener
-XdsFuzzTest::buildListener(const std::string& name, const std::string& route_config,
-                                  const std::string& stat_prefix) {
-  return TestUtility::parseYaml<envoy::config::listener::v3::Listener>(fmt::format(
-      R"EOF(
-      name: {}
-      address:
-        socket_address:
-          address: {}
-          port_value: 0
-      filter_chains:
-        filters:
-        - name: http
-          typed_config:
-            "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
-            stat_prefix: {}
-            codec_type: HTTP2
-            rds:
-              route_config_name: {}
-              config_source: {{ ads: {{}} }}
-            http_filters: [{{ name: envoy.filters.http.router }}]
-    )EOF",
-      name, Network::Test::getLoopbackAddressString(ip_version_), stat_prefix, route_config));
+XdsFuzzTest::buildListener(uint32_t listener_num, uint32_t route_num) {
+  std::string name = fmt::format("{}{}", "listener_", listener_num % NUM_LISTENERS);
+  std::string route = fmt::format("{}{}", "route_config_", route_num % NUM_ROUTES);
+  return ConfigHelper::buildListener(name, Network::Test::getLoopbackAddressString(ip_version_), route);
 }
 
 envoy::config::route::v3::RouteConfiguration
-XdsFuzzTest::buildRouteConfig(const std::string& name, const std::string& cluster) {
-  return TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(fmt::format(R"EOF(
-      name: {}
-      virtual_hosts:
-      - name: integration
-        domains: ["*"]
-        routes:
-        - match: {{ prefix: "/" }}
-          route: {{ cluster: {} }}
-    )EOF",
-                                                                                          name,
-                                                                                          cluster));
+XdsFuzzTest::buildRouteConfig(uint32_t route_num) {
+  std::string route = fmt::format("{}{}", "route_config_", route_num % NUM_ROUTES);
+  return ConfigHelper::buildRouteConfig(route, "cluster_0");
 }
 
+// helper functions to send API responses
 void XdsFuzzTest::updateListener(const std::vector<envoy::config::listener::v3::Listener>& listeners,
-                                 const std::string& version) {
-  // Parse action and state into a DiscoveryResponse.
-  ENVOY_LOG_MISC(debug, "Sending Listener DiscoveryResponse version {}", version);
-  sendDiscoveryResponse<envoy::config::listener::v3::Listener>(Config::TypeUrl::get().Listener, listeners, {},
-                                                  {}, version);
+                             const std::vector<envoy::config::listener::v3::Listener>& added_or_updated,
+                             const std::vector<envoy::config::listener::v3::Listener>& removed) {
+  ENVOY_LOG_MISC(debug, "Sending Listener DiscoveryResponse version {}", version_);
+  sendDiscoveryResponse<envoy::config::listener::v3::Listener>(Config::TypeUrl::get().Listener, listeners, added_or_updated,
+                                                  removed, version_);
 }
 
 void XdsFuzzTest::updateRoute(const std::vector<envoy::config::route::v3::RouteConfiguration> routes,
-                              const std::string& version) {
-  // Parse action and state into a DiscoveryResponse.
+                             const std::vector<envoy::config::route::v3::RouteConfiguration>& added_or_updated,
+                             const std::vector<envoy::config::route::v3::RouteConfiguration>& removed) {
+  ENVOY_LOG_MISC(debug, "Sending Route DiscoveryResponse version {}", version_);
   sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
-      Config::TypeUrl::get().RouteConfiguration, routes, {}, {}, version);
+      Config::TypeUrl::get().RouteConfiguration, routes, added_or_updated, removed, version_);
 }
 
 XdsFuzzTest::XdsFuzzTest(const test::server::config_validation::XdsTestCase &input)
     : HttpIntegrationTest(
-          Http::CodecClient::Type::HTTP2, Network::Address::IpVersion::v4,
-          /* ConfigHelper::adsBootstrap("GRPC")), */
+          Http::CodecClient::Type::HTTP2, input.config().ip_version() == test::server::config_validation::Config::IPv4 ? Network::Address::v4 ? Network::Address::IpVersion::v6,
           ConfigHelper::adsBootstrap(input.config().sotw_or_delta() == test::server::config_validation::Config::SOTW ? "GRPC" : "DELTA_GRPC")),
           actions_(input.actions()), num_lds_updates_(0) {
   use_lds_ = false;
   create_xds_upstream_ = true;
   tls_xds_upstream_ = false;
-  /* ip_version_ = Network::Address::IpVersion::v4; */
-  /* client_type_ = Grpc::ClientType::EnvoyGrpc; */
-  /* sotw_or_delta_ = Grpc::SotwOrDelta::Sotw; */
-
-  ENVOY_LOG_MISC(debug, "{}", input.DebugString());
 
   parseConfig(input);
 }
@@ -133,13 +83,14 @@ void XdsFuzzTest::parseConfig(const test::server::config_validation::XdsTestCase
   }
 }
 
+/**
+ * initialize an envoy running ADS
+ */
 void XdsFuzzTest::initialize() {
-  // Add ADS config with gRPC.
   config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* ads_config = bootstrap.mutable_dynamic_resources()->mutable_ads_config();
     auto* grpc_service = ads_config->add_grpc_services();
 
-    /* grpc_service->mutable_envoy_grpc()->set_cluster_name("ads_cluster"); */
     auto* ads_cluster = bootstrap.mutable_static_resources()->add_clusters();
     std::string cluster_name = "ads_cluster";
     switch (client_type_) {
@@ -174,6 +125,54 @@ void XdsFuzzTest::close() {
   fake_upstreams_.clear();
 }
 
+/**
+ * remove a listener from the list of listeners if it exists
+ * @param the listener number to be removed
+ * @return the listener as an optional so that it can be used in a delta request
+ */
+std::optional<envoy::config::listener::v3::Listener> XdsFuzzTest::removeListener(uint32_t listener_num) {
+  std::string match = fmt::format("{}{}", "listener_", listener_num % NUM_LISTENERS);
+
+  for (auto it = listeners_.begin(); it != listeners_.end(); ++it) {
+    if (it->name() == match) {
+      envoy::config::listener::v3::Listener listener = *it;
+      listeners_.erase(it);
+      return listener;
+    }
+  }
+  return {};
+  /* listeners_.erase(std::remove_if(listeners_.begin(), listeners_.end(), */
+  /*                                 [&match](const envoy::config::listener::v3::Listener& listener) { */
+  /*                                   return listener.name() == match; */
+  /*                                 }), */
+  /*                  listeners_.end()); */
+}
+
+/**
+ * remove a route from the list of routes if it exists
+ * @param the route number to be removed
+ * @return the route as an optional so that it can be used in a delta request
+ */
+std::optional<envoy::config::listener::v3::Listener> XdsFuzzTest::removeRoute(uint32_t route_num) {
+  std::string match = fmt::format("{}{}", "route_config_", route_num % NUM_ROUTES);
+  /* routes_.erase(std::remove_if(routes_.begin(), routes_.end(), */
+  /*                                 [&match](const envoy::config::route::v3::RouteConfiguration& route) { */
+  /*                                   return route.name() == match; */
+  /*                                 }), */
+  /*                  routes_.end()); */
+  for (auto it = routes_.begin(); it != routes_.end(); ++it) {
+    if (it->name() == match) {
+      envoy::config::route::v3::RouteConfiguration route = *it;
+      routes_.erase(it);
+      return route;
+    }
+  }
+  return {};
+}
+
+/**
+ * run the sequence of actions defined in the fuzzed protobuf
+ */
 void XdsFuzzTest::replay() {
   initialize();
   num_lds_updates_++;
@@ -184,67 +183,66 @@ void XdsFuzzTest::replay() {
       Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")},
       {buildClusterLoadAssignment("cluster_0")}, {}, "1");
 
+  // TODO(samflattery): compareDiscoveryResponse here?
+
   for (const auto& action : actions_) {
     ENVOY_LOG_MISC(trace, "Action: {}", action.DebugString());
     switch (action.action_selector_case()) {
     case test::server::config_validation::Action::kAddListener: {
-      // Update the listener list.
-      listeners_.erase(std::remove_if(listeners_.begin(), listeners_.end(),
-                                     [&action](const envoy::config::listener::v3::Listener& listener) {
-                                       return listener.name() == action.add_listener().name();
-                                     }),
-                      listeners_.end());
-      listeners_.push_back(
-          buildListener(action.add_listener().name(), action.add_listener().route_config()));
+      removeListener(action.add_listener().listener_num());
+      auto listener = buildListener(action.add_listener().listener_num(), action.add_listener().route_num());
+      listeners_.push_back(listener);
 
-      // Send Listener DiscoveryResponse and update count.
-      updateListener(listeners_, action.add_listener().version());
+      //TODO(samflattery): compareDiscoveryResponse to check ACK/NACK?
+
+      num_lds_updates_++;
+      test_server_->waitForCounterGe("listener_manager.lds.update_attempt", num_lds_updates_);
+      break;
+    }
+    case test::server::config_validation::Action::kRemoveListener: {
+      auto removed = removeListener(action.add_listener().listener_num());
+      updateListener(listeners_, {}, {listener});
+
+      if (removed) {
+        updateListener(listeners_, {}, {*removed});
+      } else {
+        updateListener(listeners_, {}, {});
+      }
+
       num_lds_updates_++;
       test_server_->waitForCounterGe("listener_manager.lds.update_attempt", num_lds_updates_);
       break;
     }
     case test::server::config_validation::Action::kAddRoute: {
-      // Update the route list.
-      routes_.erase(std::remove_if(routes_.begin(), routes_.end(),
-                                   [&action](const envoy::config::route::v3::RouteConfiguration& route) {
-                                     return route.name() == action.remove_route().name();
-                                   }),
-                    routes_.end());
-
-      routes_.push_back(buildRouteConfig(action.add_route().name(), action.add_route().cluster()));
-      updateRoute(routes_, action.add_route().version());
-      break;
-    }
-    case test::server::config_validation::Action::kRemoveListener: {
-      // Remove listener from list.
-      listeners_.erase(std::remove_if(listeners_.begin(), listeners_.end(),
-                                     [&action](const envoy::config::listener::v3::Listener& listener) {
-                                       return listener.name() == action.remove_listener().name();
-                                     }),
-                      listeners_.end());
-      // Send state of the world listener DiscoveryResponse.
-      updateListener(listeners_, action.remove_listener().version());
-      num_lds_updates_++;
-      test_server_->waitForCounterGe("listener_manager.lds.update_attempt", num_lds_updates_);
+      removeRoute(action.add_route().route_num());
+      auto route = buildRouteConfig(action.add_route().route_num())
+      routes_.push_back(route);
       break;
     }
     case test::server::config_validation::Action::kRemoveRoute: {
-      // Check if route with this name is in the list of routes, and if so, remove.
-      routes_.erase(std::remove_if(routes_.begin(), routes_.end(),
-                                   [&action](const envoy::config::route::v3::RouteConfiguration& route) {
-                                     return route.name() == action.remove_route().name();
-                                  }),
-                    routes_.end());
-      updateRoute(routes_, action.remove_route().version());
+      auto removed = removeRoute(action.remove_route().route_num());
+      if (removed) {
+        updateRoute(routes_, {}, {*removed}, version_);
+      } else {
+        updateRoute(routes_, {}, {}, version_);
+      }
       break;
     }
     default:
       break;
     }
+    version_++;
   }
 
-
+  verifyState();
   close();
 }
+
+void XdsFuzzTest::verifyState() {
+  EXPECT_EQ(test_server_->counter("listener_manager.lds.update_attempt")->value(),
+            num_lds_updates_);
+  //TODO(samflattery): check other stats
+}
+
 
 } // namespace Envoy

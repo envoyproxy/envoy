@@ -4,27 +4,21 @@ package test.server.config_validation;
 
 import "validate/validate.proto";
 
-// Structured input for xds_fuzz_test.
 message AddListener {
-  string name = 1 [(validate.rules).string.pattern = "[[:alnum:]]+"];
-  string route_config = 2 [(validate.rules).string.pattern = "[[:alnum:]]+"];
-  string version = 3 [(validate.rules).string.pattern = "[[:digit:]]+"];
+  uint32 listener_num;
+  uint32 route_num;
 }
 
 message AddRoute {
-  string name = 1 [(validate.rules).string.pattern = "[[:alnum:]]+"];
-  string cluster = 2 [(validate.rules).string.pattern = "[[:alnum:]]+"];
-  string version = 3 [(validate.rules).string.pattern = "[[:digit:]]+"];
+  uint32 route_num;
 }
 
 message RemoveListener {
-  string name = 1 [(validate.rules).string.pattern = "[[:alnum:]]+"];
-  string version = 2 [(validate.rules).string.pattern = "[[:digit:]]+"];
+  uint32 listener_num;
 }
 
 message RemoveRoute {
-  string name = 1 [(validate.rules).string.pattern = "[[:alnum:]]+"];
-  string version = 2 [(validate.rules).string.pattern = "[[:digit:]]+"];
+  uint32 route_num;
 }
 
 message Action {
