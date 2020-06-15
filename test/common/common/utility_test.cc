@@ -820,17 +820,17 @@ TEST(DateFormatter, ParseLongString) {
   std::string expected_output;
   int num_duplicates = 400;
   std::string duplicate_input = "%%1f %1f, %2f, %3f, %4f, ";
-  std::string duplicate_output= "%1 1, 14, 142, 1420, ";
+  std::string duplicate_output = "%1 1, 14, 142, 1420, ";
   for (int i = 0; i < num_duplicates; i++) {
     // ss << duplicate << '(';
-    absl::StrAppend(&input,duplicate_input,"(");
-    absl::StrAppend(&expected_output,duplicate_output,"(");
+    absl::StrAppend(&input, duplicate_input, "(");
+    absl::StrAppend(&expected_output, duplicate_output, "(");
   }
-  absl::StrAppend(&input,duplicate_input);
-  absl::StrAppend(&expected_output,duplicate_output);
+  absl::StrAppend(&input, duplicate_input);
+  absl::StrAppend(&expected_output, duplicate_output);
 
   const SystemTime time1(std::chrono::seconds(1522796769) + std::chrono::milliseconds(142));
-  std::string output=DateFormatter(input).fromTime(time1);
+  std::string output = DateFormatter(input).fromTime(time1);
   EXPECT_EQ(expected_output, output);
 }
 
