@@ -400,8 +400,8 @@ envoy::config::cluster::v3::Cluster ConfigHelper::buildRedisCluster(const std::s
 }
 
 envoy::config::endpoint::v3::ClusterLoadAssignment
-ConfigHelper::buildClusterLoadAssignment(const std::string& name,
-                                         const std::string& address, uint32_t port) {
+ConfigHelper::buildClusterLoadAssignment(const std::string& name, const std::string& address,
+                                         uint32_t port) {
   return TestUtility::parseYaml<envoy::config::endpoint::v3::ClusterLoadAssignment>(
       fmt::format(R"EOF(
       cluster_name: {}
@@ -416,10 +416,10 @@ ConfigHelper::buildClusterLoadAssignment(const std::string& name,
                   name, address, port));
 }
 
-envoy::config::listener::v3::Listener
-ConfigHelper::buildListener(const std::string& name, const std::string& route_config,
-                            const std::string& address,
-                            const std::string& stat_prefix) {
+envoy::config::listener::v3::Listener ConfigHelper::buildListener(const std::string& name,
+                                                                  const std::string& route_config,
+                                                                  const std::string& address,
+                                                                  const std::string& stat_prefix) {
   return TestUtility::parseYaml<envoy::config::listener::v3::Listener>(fmt::format(
       R"EOF(
       name: {}
@@ -442,9 +442,9 @@ ConfigHelper::buildListener(const std::string& name, const std::string& route_co
       name, address, stat_prefix, route_config));
 }
 
-envoy::config::listener::v3::Listener
-ConfigHelper::buildRedisListener(const std::string& name, const std::string& cluster,
-                                 const std::string& address) {
+envoy::config::listener::v3::Listener ConfigHelper::buildRedisListener(const std::string& name,
+                                                                       const std::string& cluster,
+                                                                       const std::string& address) {
   return TestUtility::parseYaml<envoy::config::listener::v3::Listener>(fmt::format(
       R"EOF(
       name: {}
