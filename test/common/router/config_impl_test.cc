@@ -7220,7 +7220,7 @@ virtual_hosts:
     per_filter_config: { test.default.filter: { seconds: 123} }
 )EOF";
 
-  checkNoPerFilterConfig(yaml /*, false*/);
+  checkNoPerFilterConfig(yaml);
 }
 
 TEST_F(PerFilterConfigsTest, DefaultFilterImplementationAny) {
@@ -7239,7 +7239,7 @@ virtual_hosts:
           seconds: 123
 )EOF";
 
-  checkNoPerFilterConfig(yaml /*, true*/);
+  checkNoPerFilterConfig(yaml);
 }
 
 TEST_F(PerFilterConfigsTest, DEPRECATED_FEATURE_TEST(RouteLocalConfig)) {
@@ -7255,7 +7255,7 @@ virtual_hosts:
     per_filter_config: { test.filter: { seconds: 456 } }
 )EOF";
 
-  checkEach(yaml, 123, 123, 456 /*, false*/);
+  checkEach(yaml, 123, 123, 456);
 }
 
 TEST_F(PerFilterConfigsTest, RouteLocalTypedConfig) {
@@ -7279,7 +7279,7 @@ virtual_hosts:
           seconds: 456
 )EOF";
 
-  checkEach(yaml, 123, 123, 456 /*, true*/);
+  checkEach(yaml, 123, 123, 456);
 }
 
 TEST_F(PerFilterConfigsTest, DEPRECATED_FEATURE_TEST(WeightedClusterConfig)) {
@@ -7299,7 +7299,7 @@ virtual_hosts:
     per_filter_config: { test.filter: { seconds: 1011 } }
 )EOF";
 
-  checkEach(yaml, 789, 789, 1011 /*, false*/);
+  checkEach(yaml, 789, 789, 1011);
 }
 
 TEST_F(PerFilterConfigsTest, WeightedClusterTypedConfig) {
@@ -7327,7 +7327,7 @@ virtual_hosts:
           seconds: 1011
 )EOF";
 
-  checkEach(yaml, 789, 789, 1011 /*, true*/);
+  checkEach(yaml, 789, 789, 1011);
 }
 
 TEST_F(PerFilterConfigsTest, DEPRECATED_FEATURE_TEST(WeightedClusterFallthroughConfig)) {
@@ -7347,7 +7347,7 @@ virtual_hosts:
     per_filter_config: { test.filter: { seconds: 1415 } }
 )EOF";
 
-  checkEach(yaml, 1213, 1213, 1415 /*, false*/);
+  checkEach(yaml, 1213, 1213, 1415);
 }
 
 TEST_F(PerFilterConfigsTest, WeightedClusterFallthroughTypedConfig) {
@@ -7375,7 +7375,7 @@ virtual_hosts:
           seconds: 1415
 )EOF";
 
-  checkEach(yaml, 1213, 1213, 1415 /*, true*/);
+  checkEach(yaml, 1213, 1213, 1415);
 }
 
 class RouteMatchOverrideTest : public testing::Test, public ConfigImplTestBase {};
