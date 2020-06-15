@@ -30,6 +30,7 @@ public:
   // ConnectionPool::Instance
   void addDrainedCallback(DrainedCb cb) override;
   void drainConnections() override;
+  void closeConnections() override;
   ConnectionPool::Cancellable* newConnection(ConnectionPool::Callbacks& callbacks) override;
   Upstream::HostDescriptionConstSharedPtr host() const override { return host_; }
 

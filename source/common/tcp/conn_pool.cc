@@ -53,6 +53,20 @@ void ConnPoolImpl::drainConnections() {
   }
 }
 
+void ConnPoolImpl::closeConnections() {
+  while (!ready_conns_.empty()) {
+    ready_conns_.front()->conn_->close(Network::ConnectionCloseType::NoFlush);
+  }
+
+  while (!busy_conns_.empty()) {
+    busy_conns_.front()->conn_->close(Network::ConnectionCloseType::NoFlush);
+  }
+
+  while (!pending_conns_.empty()) {
+    pending_conns_.front()->conn_->close(Network::ConnectionCloseType::NoFlush);
+  }
+}
+
 void ConnPoolImpl::addDrainedCallback(DrainedCb cb) {
   drained_callbacks_.push_back(cb);
   checkForDrained();
