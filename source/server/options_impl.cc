@@ -131,6 +131,10 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   TCLAP::ValueArg<uint32_t> drain_time_s("", "drain-time-s",
                                          "Hot restart and LDS removal drain time in seconds", false,
                                          600, "uint32_t", cmd);
+  TCLAP::ValueArg<std::string> drain_strategy(
+      "", "drain-strategy",
+      "Hot restart drain sequence behaviour, one of 'gradual' (default) or 'immediate'.", false,
+      "gradual", "string", cmd);
   TCLAP::ValueArg<uint32_t> parent_shutdown_time_s("", "parent-shutdown-time-s",
                                                    "Hot restart parent shutdown time in seconds",
                                                    false, 900, "uint32_t", cmd);
@@ -262,6 +266,15 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   drain_time_ = std::chrono::seconds(drain_time_s.getValue());
   parent_shutdown_time_ = std::chrono::seconds(parent_shutdown_time_s.getValue());
 
+  if (drain_strategy.getValue() == "immediate") {
+    drain_strategy_ = Server::DrainStrategy::Immediate;
+  } else if (drain_strategy.getValue() == "gradual") {
+    drain_strategy_ = Server::DrainStrategy::Gradual;
+  } else {
+    throw MalformedArgvException(
+        fmt::format("error: unknown drain-strategy '{}'", mode.getValue()));
+  }
+
   if (hot_restart_version_option.getValue()) {
     std::cerr << hot_restart_version_cb(!hot_restart_disabled_);
     throw NoServingException();
@@ -365,10 +378,15 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
   }
   command_line_options->mutable_file_flush_interval()->MergeFrom(
       Protobuf::util::TimeUtil::MillisecondsToDuration(fileFlushIntervalMsec().count()));
-  command_line_options->mutable_parent_shutdown_time()->MergeFrom(
-      Protobuf::util::TimeUtil::SecondsToDuration(parentShutdownTime().count()));
+
   command_line_options->mutable_drain_time()->MergeFrom(
       Protobuf::util::TimeUtil::SecondsToDuration(drainTime().count()));
+  command_line_options->set_drain_strategy(drainStrategy() == Server::DrainStrategy::Immediate
+                                               ? envoy::admin::v3::CommandLineOptions::Immediate
+                                               : envoy::admin::v3::CommandLineOptions::Gradual);
+  command_line_options->mutable_parent_shutdown_time()->MergeFrom(
+      Protobuf::util::TimeUtil::SecondsToDuration(parentShutdownTime().count()));
+
   command_line_options->set_disable_hot_restart(hotRestartDisabled());
   command_line_options->set_enable_mutex_tracing(mutexTracingEnabled());
   command_line_options->set_cpuset_threads(cpusetThreadsEnabled());
@@ -387,9 +405,9 @@ OptionsImpl::OptionsImpl(const std::string& service_cluster, const std::string& 
       log_format_(Logger::Logger::DEFAULT_LOG_FORMAT), log_format_escaped_(false),
       restart_epoch_(0u), service_cluster_(service_cluster), service_node_(service_node),
       service_zone_(service_zone), file_flush_interval_msec_(10000), drain_time_(600),
-      parent_shutdown_time_(900), mode_(Server::Mode::Serve), hot_restart_disabled_(false),
-      signal_handling_enabled_(true), mutex_tracing_enabled_(false), cpuset_threads_(false),
-      fake_symbol_table_enabled_(false) {}
+      parent_shutdown_time_(900), drain_strategy_(Server::DrainStrategy::Gradual),
+      mode_(Server::Mode::Serve), hot_restart_disabled_(false), signal_handling_enabled_(true),
+      mutex_tracing_enabled_(false), cpuset_threads_(false), fake_symbol_table_enabled_(false) {}
 
 void OptionsImpl::disableExtensions(const std::vector<std::string>& names) {
   for (const auto& name : names) {
