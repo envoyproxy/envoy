@@ -21,9 +21,9 @@ using testing::AssertionResult;
 namespace Envoy {
 
 AdsIntegrationTest::AdsIntegrationTest()
-    : HttpIntegrationTest(
-          Http::CodecClient::Type::HTTP2, ipVersion(),
-          ConfigHelper::adsBootstrap(sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
+    : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(),
+                          ConfigHelper::adsBootstrap(
+                              sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
   use_lds_ = false;
   create_xds_upstream_ = true;
   tls_xds_upstream_ = true;
@@ -46,7 +46,8 @@ envoy::config::cluster::v3::Cluster AdsIntegrationTest::buildRedisCluster(const 
 
 envoy::config::endpoint::v3::ClusterLoadAssignment
 AdsIntegrationTest::buildClusterLoadAssignment(const std::string& name) {
-  return ConfigHelper::buildClusterLoadAssignment(name, ipVersion(), fake_upstreams_[0]->localAddress()->ip()->port());
+  return ConfigHelper::buildClusterLoadAssignment(name, ipVersion(),
+                                                  fake_upstreams_[0]->localAddress()->ip()->port());
 }
 
 envoy::config::listener::v3::Listener
