@@ -10,10 +10,10 @@ namespace Cache {
 class CacheFilterUtils {
 public:
   // Checks if a request can be served from cache
-  static bool isCacheableRequest(Http::RequestHeaderMap& headers);
+  static bool isCacheableRequest(const Http::RequestHeaderMap& headers);
 
   // Checks if a response can be stored in cache
-  static bool isCacheableResponse(Http::ResponseHeaderMap& headers);
+  static bool isCacheableResponse(const Http::ResponseHeaderMap& headers);
 };
 } // namespace Cache
 } // namespace HttpFilters

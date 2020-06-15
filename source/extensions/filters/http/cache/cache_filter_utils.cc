@@ -6,7 +6,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
-bool CacheFilterUtils::isCacheableRequest(Http::RequestHeaderMap& headers) {
+bool CacheFilterUtils::isCacheableRequest(const Http::RequestHeaderMap& headers) {
   const Http::HeaderEntry* method = headers.Method();
   const Http::HeaderEntry* forwarded_proto = headers.ForwardedProto();
   const Http::HeaderValues& header_values = Http::Headers::get();
@@ -18,7 +18,7 @@ bool CacheFilterUtils::isCacheableRequest(Http::RequestHeaderMap& headers) {
           forwarded_proto->value() == header_values.SchemeValues.Https);
 }
 
-bool CacheFilterUtils::isCacheableResponse(Http::ResponseHeaderMap& headers) {
+bool CacheFilterUtils::isCacheableResponse(const Http::ResponseHeaderMap& headers) {
   const absl::string_view cache_control = headers.getCacheControlValue();
   // TODO(toddmgreer): fully check for cacheability. See for example
   // https://github.com/apache/incubator-pagespeed-mod/blob/master/pagespeed/kernel/http/caching_headers.h.
