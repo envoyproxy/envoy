@@ -117,8 +117,8 @@ public:
    * Load a bootstrap config and perform validation.
    * @param bootstrap supplies the bootstrap to fill.
    * @param options supplies the server options.
-   * @param api reference to the Api object
    * @param validation_visitor message validation visitor instance.
+   * @param api reference to the Api object
    */
   static void loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                                   const Options& options,

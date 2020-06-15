@@ -8,6 +8,7 @@ import "envoy/config/cluster/v3/outlier_detection.proto";
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/config_source.proto";
+import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/health_check.proto";
 import "envoy/config/core/v3/protocol.proto";
 import "envoy/config/endpoint/v3/endpoint.proto";
@@ -32,7 +33,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Cluster configuration]
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 48]
+// [#next-free-field: 49]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster";
 
@@ -816,6 +817,26 @@ message Cluster {
   // of 0 would indicate that none of the timeout was used or that the timeout was infinite. A value
   // of 100 would indicate that the request took the entirety of the timeout given to it.
   bool track_timeout_budgets = 47;
+
+  // [#not-implemented-hide:]
+  // Optional customization and configuration of upstream connection pool, and upstream type.
+  //
+  // Currently this field only applies for HTTP traffic but is designed for eventual use for custom
+  // TCP upstreams.
+  //
+  // For HTTP traffic, Envoy will generally take downstream HTTP and send it upstream as upstream
+  // HTTP, using the http connection pool and the codec from `http2_protocol_options`
+  //
+  // For routes where CONNECT termination is configured, Envoy will take downstream CONNECT
+  // requests and forward the CONNECT payload upstream over raw TCP using the tcp connection pool.
+  //
+  // The default pool used is the generic connection pool which creates the HTTP upstream for most
+  // HTTP requests, and the TCP upstream if CONNECT termination is configured.
+  //
+  // If users desire custom connection pool or upstream behavior, for example terminating
+  // CONNECT only if a custom filter indicates it is appropriate, the custom factories
+  // can be registered and configured here.
+  core.v3.TypedExtensionConfig upstream_config = 48;
 }
 
 // [#not-implemented-hide:] Extensible load balancing policy configuration.

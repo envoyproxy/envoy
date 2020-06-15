@@ -184,10 +184,7 @@ public:
 
   void TearDown() override {
     cleanUpXdsConnection();
-
     client_ssl_ctx_.reset();
-    cleanupUpstreamAndDownstream();
-    codec_client_.reset();
   }
 
   Network::ClientConnectionPtr makeSslClientConnection() {
@@ -347,9 +344,6 @@ public:
     client_ssl_ctx_.reset();
     cleanupUpstreamAndDownstream();
     codec_client_.reset();
-
-    test_server_.reset();
-    fake_upstreams_.clear();
   }
 
   void enableCombinedValidationContext(bool enable) { use_combined_validation_context_ = enable; }
