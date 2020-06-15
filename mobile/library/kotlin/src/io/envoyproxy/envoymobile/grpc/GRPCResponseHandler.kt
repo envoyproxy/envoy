@@ -5,9 +5,8 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.Executor
 
-
 class GRPCResponseHandler(
-    val executor: Executor
+  val executor: Executor
 ) {
 
   /**
@@ -35,8 +34,8 @@ class GRPCResponseHandler(
    * @return GRPCResponseHandler, this GRPCResponseHandler.
    */
   fun onHeaders(
-    closure: (headers: Map<String, List<String>>, statusCode: Int) -> Unit): GRPCResponseHandler
-  {
+    closure: (headers: Map<String, List<String>>, statusCode: Int) -> Unit
+  ): GRPCResponseHandler {
     underlyingHandler.onHeaders { headers, _, _ ->
       val grpcStatus = headers["grpc-status"]?.first()?.toIntOrNull() ?: 0
       closure(headers, grpcStatus)
@@ -106,9 +105,10 @@ class GRPCResponseHandler(
    * @return ProcessState, the state after processing the passed data.
    */
   private fun processData(
-      bufferedStream: ByteArrayOutputStream,
-      processState: ProcessState,
-      onMessage: (byteBuffer: ByteBuffer) -> Unit): ProcessState {
+    bufferedStream: ByteArrayOutputStream,
+    processState: ProcessState,
+    onMessage: (byteBuffer: ByteBuffer) -> Unit
+  ): ProcessState {
 
     var nextState = processState
 
@@ -155,11 +155,13 @@ class GRPCResponseHandler(
         }
 
         val byteArray = bufferedStream.toByteArray()
-        onMessage(ByteBuffer.wrap(
-          byteArray.sliceArray(
-            GRPC_PREFIX_LENGTH until GRPC_PREFIX_LENGTH + processState.messageLength
+        onMessage(
+          ByteBuffer.wrap(
+            byteArray.sliceArray(
+              GRPC_PREFIX_LENGTH until GRPC_PREFIX_LENGTH + processState.messageLength
+            )
           )
-        ))
+        )
         bufferedStream.reset()
         bufferedStream.write(
           byteArray.sliceArray(

@@ -1,12 +1,12 @@
 package io.envoyproxy.envoymobile.bazel
 
-import junit.framework.JUnit4TestAdapter
-import junit.framework.TestSuite
-import org.junit.runner.RunWith
 import java.io.File
 import java.lang.RuntimeException
 import java.net.URLClassLoader
 import java.util.zip.ZipFile
+import junit.framework.JUnit4TestAdapter
+import junit.framework.TestSuite
+import org.junit.runner.RunWith
 
 /**
  * This is class is taken from https://stackoverflow.com/questions/46365464/how-to-run-all-tests-in-bazel-from-a-single-java-test-rule

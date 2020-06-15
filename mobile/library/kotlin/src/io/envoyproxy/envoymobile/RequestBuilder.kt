@@ -1,6 +1,5 @@
 package io.envoyproxy.envoymobile
 
-
 /**
  * Builder used for constructing instances of `Request` types.
  *
@@ -10,10 +9,10 @@ package io.envoyproxy.envoymobile
  * @param path The URL path for the request (i.e., "/foo").
  */
 class RequestBuilder(
-    val method: RequestMethod,
-    val scheme: String = "https",
-    val authority: String,
-    val path: String
+  val method: RequestMethod,
+  val scheme: String = "https",
+  val authority: String,
+  val path: String
 ) {
   // Headers to send with the request.
   // Multiple values for a given name are valid, and will be sent as comma-separated values.
@@ -98,13 +97,13 @@ class RequestBuilder(
    */
   fun build(): Request {
     return Request(
-        method,
-        scheme,
-        authority,
-        path,
-        headers,
-        retryPolicy,
-        upstreamHttpProtocol
+      method,
+      scheme,
+      authority,
+      path,
+      headers,
+      retryPolicy,
+      upstreamHttpProtocol
     )
   }
 

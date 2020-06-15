@@ -4,7 +4,7 @@ package io.envoyproxy.envoymobile
  * Trailers representing an inbound response.
  */
 @Suppress("EmptyClassBlock")
-class ResponseTrailers: Headers {
+class ResponseTrailers : Headers {
   /**
    * Internal constructor used by builders.
    *

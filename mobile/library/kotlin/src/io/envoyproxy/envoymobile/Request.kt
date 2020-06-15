@@ -9,13 +9,13 @@ package io.envoyproxy.envoymobile
  * @param path The URL path for the request (i.e., "/foo").
  */
 data class Request internal constructor(
-    val method: RequestMethod,
-    val scheme: String,
-    val authority: String,
-    val path: String,
-    val headers: Map<String, List<String>>,
-    val retryPolicy: RetryPolicy?,
-    val upstreamHttpProtocol: UpstreamHttpProtocol?
+  val method: RequestMethod,
+  val scheme: String,
+  val authority: String,
+  val path: String,
+  val headers: Map<String, List<String>>,
+  val retryPolicy: RetryPolicy?,
+  val upstreamHttpProtocol: UpstreamHttpProtocol?
 ) {
 
   /**
@@ -25,8 +25,8 @@ data class Request internal constructor(
    */
   fun toBuilder(): RequestBuilder {
     return RequestBuilder(method, scheme, authority, path)
-        .setHeaders(headers)
-        .addRetryPolicy(retryPolicy)
-        .addUpstreamHttpProtocol(upstreamHttpProtocol)
+      .setHeaders(headers)
+      .addRetryPolicy(retryPolicy)
+      .addUpstreamHttpProtocol(upstreamHttpProtocol)
   }
 }

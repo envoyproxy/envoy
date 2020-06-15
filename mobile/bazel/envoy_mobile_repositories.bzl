@@ -127,6 +127,13 @@ def kotlin_repos():
         url = "https://github.com/Kotlin/dokka/releases/download/0.9.18/dokka-fatjar-0.9.18.jar",
     )
 
+    http_file(
+        name = "kotlin_formatter",
+        executable = 1,
+        sha256 = "115d4c5cb3421eae732c42c137f5db8881ff9cc1ef180a01e638283f3ccbae44",
+        urls = ["https://github.com/pinterest/ktlint/releases/download/0.37.1/ktlint"],
+    )
+
 def android_repos():
     http_archive(
         name = "build_bazel_rules_android",

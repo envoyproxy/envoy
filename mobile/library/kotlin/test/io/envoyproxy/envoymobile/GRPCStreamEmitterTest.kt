@@ -1,12 +1,12 @@
 package io.envoyproxy.envoymobile
 
+import java.io.ByteArrayOutputStream
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
-import java.io.ByteArrayOutputStream
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 
 class GRPCStreamEmitterTest {
   // TODO: Problems with nhaarman/mockito-kotlin https://github.com/lyft/envoy-mobile/issues/504
@@ -71,8 +71,10 @@ class GRPCStreamEmitterTest {
     GRPCStreamEmitter(emitter)
       .sendMessage(message)
 
-    assertThat(ByteBuffer.wrap(dataOutputStream.toByteArray().sliceArray(1..4))
-      .order(ByteOrder.BIG_ENDIAN).int).isEqualTo(payload.size)
+    assertThat(
+      ByteBuffer.wrap(dataOutputStream.toByteArray().sliceArray(1..4))
+        .order(ByteOrder.BIG_ENDIAN).int
+    ).isEqualTo(payload.size)
   }
 
   @Test

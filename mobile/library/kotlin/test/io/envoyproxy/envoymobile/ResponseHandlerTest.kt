@@ -1,9 +1,9 @@
 package io.envoyproxy.envoymobile
 
-import org.assertj.core.api.Assertions.assertThat
-import org.junit.Test
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executor
+import org.assertj.core.api.Assertions.assertThat
+import org.junit.Test
 
 class ResponseHandlerTest {
   @Test(timeout = 1000L)

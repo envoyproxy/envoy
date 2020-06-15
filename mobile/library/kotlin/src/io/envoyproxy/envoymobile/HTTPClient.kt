@@ -25,6 +25,9 @@ interface HTTPClient {
    * @return A cancelable request.
    */
   fun send(
-    request: Request, body: ByteBuffer?, trailers: Map<String, List<String>>?,
-    responseHandler: ResponseHandler): CancelableStream
+    request: Request,
+    body: ByteBuffer?,
+    trailers: Map<String, List<String>>?,
+    responseHandler: ResponseHandler
+  ): CancelableStream
 }

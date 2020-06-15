@@ -5,7 +5,7 @@ import java.nio.ByteBuffer
 /*
  * Filter executed for outbound requests, providing the ability to observe and mutate streams.
  */
-interface RequestFilter: Filter {
+interface RequestFilter : Filter {
   /**
    * Called by the filter manager once to initialize the filter callbacks that the filter should
    * use.

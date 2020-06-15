@@ -3,7 +3,7 @@ package io.envoyproxy.envoymobile
 /*
  * Builder used for constructing instances of RequestHeaders`.
  */
-class RequestHeadersBuilder: HeadersBuilder {
+class RequestHeadersBuilder : HeadersBuilder {
   /**
    * Initialize a new instance of the builder.
    *
@@ -12,12 +12,20 @@ class RequestHeadersBuilder: HeadersBuilder {
    * @param authority: The URL authority for the request (i.e., "api.foo.com").
    * @param path:      The URL path for the request (i.e., "/foo").
    */
-  constructor(method: RequestMethod, scheme: String = "https",
-              authority: String, path: String) :
-                super(mutableMapOf(":authority" to mutableListOf(authority),
-                                   ":method" to mutableListOf(method.stringValue),
-                                   ":path" to mutableListOf(path),
-                                   ":scheme" to mutableListOf(scheme)))
+  constructor(
+    method: RequestMethod,
+    scheme: String = "https",
+    authority: String,
+    path: String
+  ) :
+    super(
+      mutableMapOf(
+        ":authority" to mutableListOf(authority),
+        ":method" to mutableListOf(method.stringValue),
+        ":path" to mutableListOf(path),
+        ":scheme" to mutableListOf(scheme)
+      )
+    )
 
   /**
    * Instantiate a new builder. Used only by RequestHeaders to convert back to
@@ -49,12 +57,11 @@ class RequestHeadersBuilder: HeadersBuilder {
    *
    * @return RequestHeadersBuilder, This builder.
    */
-  fun addUpstreamHttpProtocol(upstreamHttpProtocol: UpstreamHttpProtocol)
-   : RequestHeadersBuilder
-  {
-    set("x-envoy-mobile-upstream-protocol", mutableListOf(upstreamHttpProtocol.stringValue))
-    return this
-  }
+  fun addUpstreamHttpProtocol(upstreamHttpProtocol: UpstreamHttpProtocol):
+    RequestHeadersBuilder {
+      set("x-envoy-mobile-upstream-protocol", mutableListOf(upstreamHttpProtocol.stringValue))
+      return this
+    }
 
   /**
    * Build the request headers using the current builder.

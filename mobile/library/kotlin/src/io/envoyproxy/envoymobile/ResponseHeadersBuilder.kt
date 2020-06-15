@@ -3,7 +3,7 @@ package io.envoyproxy.envoymobile
 /*
  * Builder used for constructing instances of `ResponseHeaders`.
  */
-class ResponseHeadersBuilder: HeadersBuilder {
+class ResponseHeadersBuilder : HeadersBuilder {
 
   /**
    * Initialize a new instance of the builder.
@@ -25,7 +25,7 @@ class ResponseHeadersBuilder: HeadersBuilder {
    *
    * @return ResponseHeadersBuilder, This builder.
    */
-  fun addHttpStatus(status: Int) : ResponseHeadersBuilder {
+  fun addHttpStatus(status: Int): ResponseHeadersBuilder {
     set(":status", mutableListOf("$status"))
     return this
   }

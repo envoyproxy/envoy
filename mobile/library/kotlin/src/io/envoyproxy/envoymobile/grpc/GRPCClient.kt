@@ -9,7 +9,7 @@ const val GRPC_PREFIX_LENGTH = 5
  * @param httpClient The HTTP client to use for gRPC streams.
  */
 class GRPCClient(
-    private val httpClient: HTTPClient
+  private val httpClient: HTTPClient
 ) {
 
   /**

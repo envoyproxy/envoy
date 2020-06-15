@@ -1,12 +1,12 @@
 package io.envoyproxy.envoymobile
 
-import org.assertj.core.api.Assertions.assertThat
-import org.junit.Test
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executor
+import org.assertj.core.api.Assertions.assertThat
+import org.junit.Test
 
 class GRPCResponseHandlerTest {
 
@@ -15,17 +15,18 @@ class GRPCResponseHandlerTest {
     val countDownLatch = CountDownLatch(1)
 
     val handler = GRPCResponseHandler(Executor { })
-        .onHeaders { headers, grpcStatus ->
-          assertThat(headers).isEqualTo(
-            mapOf("grpc-status" to listOf("1"), "other" to listOf("foo", "bar"))
-          )
-          assertThat(grpcStatus).isEqualTo(1)
-          countDownLatch.countDown()
-        }
+      .onHeaders { headers, grpcStatus ->
+        assertThat(headers).isEqualTo(
+          mapOf("grpc-status" to listOf("1"), "other" to listOf("foo", "bar"))
+        )
+        assertThat(grpcStatus).isEqualTo(1)
+        countDownLatch.countDown()
+      }
 
     handler.underlyingHandler.underlyingCallbacks.onHeaders(
-        mapOf("grpc-status" to listOf("1"), "other" to listOf("foo", "bar")),
-        true)
+      mapOf("grpc-status" to listOf("1"), "other" to listOf("foo", "bar")),
+      true
+    )
 
     countDownLatch.await()
   }
@@ -35,13 +36,14 @@ class GRPCResponseHandlerTest {
     val countDownLatch = CountDownLatch(1)
 
     val handler = GRPCResponseHandler(Executor { })
-        .onTrailers { trailers ->
-          assertThat(trailers).isEqualTo(mapOf("foo" to listOf("bar"), "baz" to listOf("1", "2")))
-          countDownLatch.countDown()
-        }
+      .onTrailers { trailers ->
+        assertThat(trailers).isEqualTo(mapOf("foo" to listOf("bar"), "baz" to listOf("1", "2")))
+        countDownLatch.countDown()
+      }
 
     handler.underlyingHandler.underlyingCallbacks.onTrailers(
-        mapOf("foo" to listOf("bar"), "baz" to listOf("1", "2")))
+      mapOf("foo" to listOf("bar"), "baz" to listOf("1", "2"))
+    )
 
     countDownLatch.await()
   }
@@ -63,10 +65,10 @@ class GRPCResponseHandlerTest {
     val byteBuffer = ByteBuffer.wrap(outputStream.toByteArray())
 
     val handler = GRPCResponseHandler(Executor { })
-        .onMessage { message ->
-          assertThat(message.array().toString(Charsets.UTF_8)).isEqualTo("data")
-          countDownLatch.countDown()
-        }
+      .onMessage { message ->
+        assertThat(message.array().toString(Charsets.UTF_8)).isEqualTo("data")
+        countDownLatch.countDown()
+      }
 
     handler.underlyingHandler.underlyingCallbacks.onData(byteBuffer, true)
 
@@ -93,10 +95,10 @@ class GRPCResponseHandlerTest {
     val initialBuffer = ByteBuffer.wrap(outputStream.toByteArray())
 
     val handler = GRPCResponseHandler(Executor { })
-        .onMessage { message ->
-          assertThat(message.array().toString(Charsets.UTF_8)).isEqualTo("data_by_parts")
-          countDownLatch.countDown()
-        }
+      .onMessage { message ->
+        assertThat(message.array().toString(Charsets.UTF_8)).isEqualTo("data_by_parts")
+        countDownLatch.countDown()
+      }
 
     handler.underlyingHandler.underlyingCallbacks.onData(initialBuffer, false)
     handler.underlyingHandler.underlyingCallbacks.onData(ByteBuffer.wrap(part2), false)
@@ -132,10 +134,10 @@ class GRPCResponseHandlerTest {
 
     val messages = mutableListOf<ByteBuffer>()
     val handler = GRPCResponseHandler(Executor { })
-        .onMessage { message ->
-          messages.add(message)
-          countDownLatch.countDown()
-        }
+      .onMessage { message ->
+        messages.add(message)
+        countDownLatch.countDown()
+      }
 
     handler.underlyingHandler.underlyingCallbacks.onData(part1AndPart2, false)
 
@@ -171,10 +173,10 @@ class GRPCResponseHandlerTest {
 
     val messages = mutableListOf<ByteBuffer>()
     val handler = GRPCResponseHandler(Executor { })
-        .onMessage { message ->
-          messages.add(message)
-          countDownLatch.countDown()
-        }
+      .onMessage { message ->
+        messages.add(message)
+        countDownLatch.countDown()
+      }
 
     handler.underlyingHandler.underlyingCallbacks.onData(part1AndPart2a, false)
     handler.underlyingHandler.underlyingCallbacks.onData(ByteBuffer.wrap(part2b), false)
@@ -208,10 +210,10 @@ class GRPCResponseHandlerTest {
 
     val messages = mutableListOf<ByteBuffer>()
     val handler = GRPCResponseHandler(Executor { })
-        .onMessage { message ->
-          messages.add(message)
-          countDownLatch.countDown()
-        }
+      .onMessage { message ->
+        messages.add(message)
+        countDownLatch.countDown()
+      }
 
     handler.underlyingHandler.underlyingCallbacks.onData(resultMessages, false)
 
@@ -219,7 +221,6 @@ class GRPCResponseHandlerTest {
     assertThat(messages[0].array()).isEmpty()
     assertThat(messages[1].array().toString(Charsets.UTF_8)).isEqualTo("part2")
   }
-
 
   @Test(timeout = 1000L)
   fun `zero length messages are passed as empty byte buffers`() {
@@ -235,16 +236,15 @@ class GRPCResponseHandlerTest {
 
     val messages = mutableListOf<ByteBuffer>()
     val handler = GRPCResponseHandler(Executor { })
-        .onMessage { message ->
-          messages.add(message)
-          countDownLatch.countDown()
-        }
+      .onMessage { message ->
+        messages.add(message)
+        countDownLatch.countDown()
+      }
 
     handler.underlyingHandler.underlyingCallbacks.onData(data, false)
 
     countDownLatch.await()
     assertThat(messages[0].array()).isEmpty()
-
   }
 
   @Test(timeout = 1000L)
@@ -252,10 +252,10 @@ class GRPCResponseHandlerTest {
     val countDownLatch = CountDownLatch(1)
 
     val handler = GRPCResponseHandler(Executor { })
-        .onHeaders { _, grpcStatus ->
-          assertThat(grpcStatus).isEqualTo(1)
-          countDownLatch.countDown()
-        }
+      .onHeaders { _, grpcStatus ->
+        assertThat(grpcStatus).isEqualTo(1)
+        countDownLatch.countDown()
+      }
 
     handler.underlyingHandler.underlyingCallbacks
       .onHeaders(mapOf("grpc-status" to listOf("1", "2")), true)
@@ -268,10 +268,10 @@ class GRPCResponseHandlerTest {
     val countDownLatch = CountDownLatch(1)
 
     val handler = GRPCResponseHandler(Executor { })
-        .onHeaders { _, grpcStatus ->
-          assertThat(grpcStatus).isEqualTo(0)
-          countDownLatch.countDown()
-        }
+      .onHeaders { _, grpcStatus ->
+        assertThat(grpcStatus).isEqualTo(0)
+        countDownLatch.countDown()
+      }
 
     handler.underlyingHandler.underlyingCallbacks.onHeaders(mapOf(), true)
 
@@ -283,10 +283,10 @@ class GRPCResponseHandlerTest {
     val countDownLatch = CountDownLatch(1)
 
     val handler = GRPCResponseHandler(Executor { })
-        .onHeaders { _, grpcStatus ->
-          assertThat(grpcStatus).isEqualTo(0)
-          countDownLatch.countDown()
-        }
+      .onHeaders { _, grpcStatus ->
+        assertThat(grpcStatus).isEqualTo(0)
+        countDownLatch.countDown()
+      }
 
     handler.underlyingHandler.underlyingCallbacks
       .onHeaders(mapOf("grpc-status" to listOf("invalid")), true)
