@@ -703,7 +703,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
 void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onResetStream(Http::StreamResetReason,
                                                                         absl::string_view) {
   const bool expected_reset = expect_reset_;
-  const bool goaway = received_goaway_;
+  const bool goaway = received_no_error_goaway_;
   resetState();
 
   if (expected_reset) {
@@ -738,7 +738,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onGoAway(Http::GoAwayE
   // The connection will be closed when the active check completes or another
   // terminal condition occurs, such as a timeout or stream reset.
   if (request_encoder_ && error_code == Http::GoAwayErrorCode::NoError) {
-    received_goaway_ = true;
+    received_no_error_goaway_ = true;
     return;
   }
 
@@ -775,7 +775,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onRpcComplete(
   }
 
   // Read the value as we may call resetState() and clear it.
-  const bool goaway = received_goaway_;
+  const bool goaway = received_no_error_goaway_;
 
   // |end_stream| will be false if we decided to stop healthcheck before HTTP stream has ended -
   // invalid gRPC payload, unexpected message stream or wrong content-type.
@@ -797,14 +797,14 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::resetState() {
   request_encoder_ = nullptr;
   decoder_ = Grpc::Decoder();
   health_check_response_.reset();
-  received_goaway_ = false;
+  received_no_error_goaway_ = false;
 }
 
 void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onTimeout() {
   ENVOY_CONN_LOG(debug, "connection/stream timeout health_flags={}", *client_,
                  HostUtility::healthFlagsToString(*host_));
   expect_reset_ = true;
-  if (received_goaway_ || !parent_.reuse_connection_) {
+  if (received_no_error_goaway_ || !parent_.reuse_connection_) {
     client_->close();
   } else {
     request_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);

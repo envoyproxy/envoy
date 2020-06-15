@@ -358,7 +358,9 @@ private:
     // e.g. remote reset. In this case healthcheck status has already been reported, only state
     // cleanup is required.
     bool expect_reset_ = false;
-    bool received_goaway_ = false;
+    // If true, we received a GOAWAY (NO_ERROR code) and are deferring closing the connection
+    // until the active probe completes.
+    bool received_no_error_goaway_ = false;
   };
 
   virtual Http::CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
