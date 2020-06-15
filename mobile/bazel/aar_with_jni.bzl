@@ -65,7 +65,7 @@ def aar_with_jni(name, android_library, manifest, archive_name, native_deps = []
         ],
         outs = [
             archive_name + ".aar",
-            archive_name + "_pom.xml",
+            archive_name + "-pom.xml",
             archive_name + "-sources.jar",
             archive_name + "-javadoc.jar",
         ],
