@@ -188,6 +188,7 @@ TEST_P(AdminInstanceTest, ConfigDumpMaintainsOrder) {
   });
   auto endpoint_entry = admin_.getConfigTracker().add("endpoints", [] {
     auto msg = std::make_unique<ProtobufWkt::StringValue>();
+    msg->set_value("endpoints_config");
     return msg;
   });
   const std::string expected_json = R"EOF({

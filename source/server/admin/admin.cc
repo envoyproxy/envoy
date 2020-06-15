@@ -451,7 +451,10 @@ Http::Code AdminImpl::handlerClusters(absl::string_view url,
 void AdminImpl::addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
                                    const absl::optional<std::string>& mask) const {
   Envoy::Server::ConfigTracker::CbsMap callbacks_map = std::move(config_tracker_.getCallbacksMap());
-  callbacks_map.emplace("endpoint", [this] { return dumpEndpointConfigs(); });
+  if (!server_.clusterManager().clusters().empty()) {
+    callbacks_map.emplace("endpoint", [this] { return dumpEndpointConfigs(); });
+  }
+
   for (const auto& key_callback_pair : callbacks_map) {
     ProtobufTypes::MessagePtr message = key_callback_pair.second();
     ASSERT(message);
@@ -474,7 +477,10 @@ AdminImpl::addResourceToDump(envoy::admin::v3::ConfigDump& dump,
                              const absl::optional<std::string>& mask,
                              const std::string& resource) const {
   Envoy::Server::ConfigTracker::CbsMap callbacks_map = std::move(config_tracker_.getCallbacksMap());
-  callbacks_map.emplace("endpoint", [this] { return dumpEndpointConfigs(); });
+  if (!server_.clusterManager().clusters().empty()) {
+    callbacks_map.emplace("endpoint", [this] { return dumpEndpointConfigs(); });
+  }
+
   for (const auto& key_callback_pair : callbacks_map) {
     ProtobufTypes::MessagePtr message = key_callback_pair.second();
     ASSERT(message);
