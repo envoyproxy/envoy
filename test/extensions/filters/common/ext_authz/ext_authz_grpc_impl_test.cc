@@ -51,9 +51,9 @@ public:
             Invoke([this](absl::string_view service_full_name, absl::string_view method_name,
                           Buffer::InstancePtr&&, Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
                           const Http::AsyncClient::RequestOptions& options) -> Grpc::AsyncRequest* {
-              EXPECT_EQ(
-                  TestCommon::getServiceFullNameFromApiTransportVersion(api_version_, use_alpha_),
-                  service_full_name);
+              EXPECT_EQ(TestUtility::getVersionedServiceFullName(
+                            "envoy.service.auth.{}.Authorization", api_version_, use_alpha_),
+                        service_full_name);
               EXPECT_EQ("Check", method_name);
               EXPECT_EQ(timeout_->count(), options.timeout->count());
               return &async_request_;

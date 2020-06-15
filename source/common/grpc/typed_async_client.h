@@ -2,6 +2,7 @@
 
 #include <chrono>
 
+#include "common/common/empty_string.h"
 #include "envoy/grpc/async_client.h"
 
 #include "common/config/version_converter.h"
