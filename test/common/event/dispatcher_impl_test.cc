@@ -359,7 +359,7 @@ TEST(TimerImplTest, TimerOrdering) {
   timer3->enableTimer(std::chrono::milliseconds(2));
 
   // Sleep for 5ms so timers above all trigger in the same loop iteration.
-  usleep(5000);
+  absl::SleepFor(absl::Milliseconds(5));
 
   EXPECT_TRUE(timer1->enabled());
   EXPECT_TRUE(timer2->enabled());
@@ -395,7 +395,7 @@ TEST(TimerImplTest, TimerOrderAndDisableAlarm) {
   timer3->enableTimer(std::chrono::milliseconds(2));
 
   // Sleep for 5ms so timers above all trigger in the same loop iteration.
-  usleep(5000);
+  absl::SleepFor(absl::Milliseconds(5));
 
   EXPECT_TRUE(timer1->enabled());
   EXPECT_TRUE(timer2->enabled());
@@ -438,7 +438,7 @@ TEST(TimerImplTest, TimerOrderAndReschedule) {
   timer4->enableTimer(std::chrono::milliseconds(3));
 
   // Sleep for 5ms so timers above all trigger in the same loop iteration.
-  usleep(5000);
+  absl::SleepFor(absl::Milliseconds(5));
 
   EXPECT_TRUE(timer1->enabled());
   EXPECT_TRUE(timer2->enabled());
