@@ -5,6 +5,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/http/header_map.h"
+
 #include "common/common/assert.h"
 #include "common/common/dump_state_utils.h"
 #include "common/common/empty_string.h"
@@ -618,6 +620,33 @@ size_t HeaderMapImpl::removeInline(HeaderEntryImpl** ptr_to_entry) {
   *ptr_to_entry = nullptr;
   headers_.erase(entry->entry_);
   return 1;
+}
+
+namespace {
+template <class T>
+HeaderMapImplUtility::HeaderMapImplInfo makeHeaderMapImplInfo(const std::string& name) {
+  // Constructing a header map implementation will force the custom headers and sizing to be
+  // finalized, so do that first.
+  auto header_map = T::create();
+
+  HeaderMapImplUtility::HeaderMapImplInfo info;
+  info.name_ = name;
+  info.size_ = T::inlineHeadersSize() + sizeof(T);
+  for (const auto& header : CustomInlineHeaderRegistry::headers<T::header_map_type>()) {
+    info.registered_headers_.push_back(header.first.get());
+  }
+  return info;
+}
+} // namespace
+
+std::vector<HeaderMapImplUtility::HeaderMapImplInfo>
+HeaderMapImplUtility::getAllHeaderMapImplInfo() {
+  std::vector<HeaderMapImplUtility::HeaderMapImplInfo> ret;
+  ret.push_back(makeHeaderMapImplInfo<RequestHeaderMapImpl>("request header map"));
+  ret.push_back(makeHeaderMapImplInfo<RequestTrailerMapImpl>("request trailer map"));
+  ret.push_back(makeHeaderMapImplInfo<ResponseHeaderMapImpl>("response header map"));
+  ret.push_back(makeHeaderMapImplInfo<ResponseTrailerMapImpl>("response trailer map"));
+  return ret;
 }
 
 } // namespace Http

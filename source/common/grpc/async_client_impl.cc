@@ -108,6 +108,10 @@ void AsyncStreamImpl::onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_s
     if (end_stream && grpc_status) {
       // Due to headers/trailers type differences we need to copy here. This is an uncommon case but
       // we can potentially optimize in the future.
+
+      // TODO(mattklein123): clang-tidy is showing a use after move when passing to
+      // onReceiveInitialMetadata() above. This looks like an actual bug that I will fix in a
+      // follow up.
       onTrailers(Http::createHeaderMap<Http::ResponseTrailerMapImpl>(*headers));
       return;
     }

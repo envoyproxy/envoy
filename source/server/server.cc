@@ -311,6 +311,11 @@ void InstanceImpl::initialize(const Options& options,
   }
   // TODO(mattklein123): Custom O(1) headers can be registered at this point for creating/finalizing
   // any header maps.
+  ENVOY_LOG(info, "HTTP header map info:");
+  for (const auto& info : Http::HeaderMapImplUtility::getAllHeaderMapImplInfo()) {
+    ENVOY_LOG(info, "  {}: {} bytes: {}", info.name_, info.size_,
+              absl::StrJoin(info.registered_headers_, ","));
+  }
 
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
   // stats.

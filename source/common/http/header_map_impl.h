@@ -39,10 +39,10 @@ public:                                                                         
 
 /**
  * Implementation of Http::HeaderMap. This is heavily optimized for performance. Roughly, when
- * headers are added to the map, we do a trie lookup to see if it's one of the O(1) headers.
- * If it is, we store a reference to it that can be accessed later directly. Most high performance
- * paths use O(1) direct access. In general, we try to copy as little as possible and allocate as
- * little as possible in any of the paths.
+ * headers are added to the map by string, we do a trie lookup to see if it's one of the O(1)
+ * headers. If it is, we store a reference to it that can be accessed later directly via direct
+ * method access. Most high performance paths use O(1) direct method access. In general, we try to
+ * copy as little as possible and allocate as little as possible in any of the paths.
  */
 class HeaderMapImpl : NonCopyable {
 public:
@@ -351,11 +351,11 @@ public:
     ASSERT(handle.it_->second < inlineHeadersSize());
     return HeaderMapImpl::removeInline(&inlineHeaders()[handle.it_->second]);
   }
-
-protected:
   static size_t inlineHeadersSize() {
     return StaticLookupTable<Interface>::size() * sizeof(HeaderEntryImpl*);
   }
+
+protected:
   absl::optional<StaticLookupResponse> staticLookup(absl::string_view key) override {
     return StaticLookupTable<Interface>::lookup(*this, key);
   }
@@ -511,6 +511,20 @@ struct EmptyHeaders {
 };
 
 using StaticEmptyHeaders = ConstSingleton<EmptyHeaders>;
+
+class HeaderMapImplUtility {
+public:
+  struct HeaderMapImplInfo {
+    std::string name_;
+    size_t size_;
+    std::vector<std::string> registered_headers_;
+  };
+
+  /**
+   * Fetch detailed information about each header map implementation for use in logging.
+   */
+  static std::vector<HeaderMapImplInfo> getAllHeaderMapImplInfo();
+};
 
 } // namespace Http
 } // namespace Envoy

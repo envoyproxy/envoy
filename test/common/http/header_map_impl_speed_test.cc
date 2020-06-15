@@ -17,7 +17,7 @@ static void addDummyHeaders(HeaderMap& headers, size_t num_headers) {
 }
 
 /** Measure the construction/destruction speed of RequestHeaderMapImpl.*/
-static void HeaderMapImplCreate(benchmark::State& state) {
+static void headerMapImplCreate(benchmark::State& state) {
   // Make sure first time construction is not counted.
   Http::ResponseHeaderMapImpl::create();
   for (auto _ : state) {
@@ -25,7 +25,7 @@ static void HeaderMapImplCreate(benchmark::State& state) {
     benchmark::DoNotOptimize(headers->size());
   }
 }
-BENCHMARK(HeaderMapImplCreate);
+BENCHMARK(headerMapImplCreate);
 
 /**
  * Measure the speed of setting/overwriting a header value. The numeric Arg passed
@@ -34,7 +34,7 @@ BENCHMARK(HeaderMapImplCreate);
  * identify whether the speed of setReference() is dependent on the number of other
  * headers in the HeaderMapImpl.
  */
-static void HeaderMapImplSetReference(benchmark::State& state) {
+static void headerMapImplSetReference(benchmark::State& state) {
   const LowerCaseString key("example-key");
   const std::string value("01234567890123456789");
   auto headers = Http::ResponseHeaderMapImpl::create();
@@ -44,7 +44,7 @@ static void HeaderMapImplSetReference(benchmark::State& state) {
   }
   benchmark::DoNotOptimize(headers->size());
 }
-BENCHMARK(HeaderMapImplSetReference)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
+BENCHMARK(headerMapImplSetReference)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
 
 /**
  * Measure the speed of retrieving a header value. The numeric Arg passed by the
@@ -54,7 +54,7 @@ BENCHMARK(HeaderMapImplSetReference)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
  * method depends (or doesn't depend) on the number of other headers in the
  * HeaderMapImpl.
  */
-static void HeaderMapImplGet(benchmark::State& state) {
+static void headerMapImplGet(benchmark::State& state) {
   const LowerCaseString key("example-key");
   const std::string value("01234567890123456789");
   auto headers = Http::ResponseHeaderMapImpl::create();
@@ -66,13 +66,13 @@ static void HeaderMapImplGet(benchmark::State& state) {
   }
   benchmark::DoNotOptimize(successes);
 }
-BENCHMARK(HeaderMapImplGet)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
+BENCHMARK(headerMapImplGet)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
 
 /**
  * Measure the retrieval speed of a header for which HeaderMapImpl is expected to
  * provide special optimizations.
  */
-static void HeaderMapImplGetInline(benchmark::State& state) {
+static void headerMapImplGetInline(benchmark::State& state) {
   const std::string value("01234567890123456789");
   auto headers = Http::ResponseHeaderMapImpl::create();
   addDummyHeaders(*headers, state.range(0));
@@ -83,13 +83,13 @@ static void HeaderMapImplGetInline(benchmark::State& state) {
   }
   benchmark::DoNotOptimize(size);
 }
-BENCHMARK(HeaderMapImplGetInline)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
+BENCHMARK(headerMapImplGetInline)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
 
 /**
  * Measure the speed of writing to a header for which HeaderMapImpl is expected to
  * provide special optimizations.
  */
-static void HeaderMapImplSetInlineMacro(benchmark::State& state) {
+static void headerMapImplSetInlineMacro(benchmark::State& state) {
   const std::string value("01234567890123456789");
   auto headers = Http::ResponseHeaderMapImpl::create();
   addDummyHeaders(*headers, state.range(0));
@@ -98,13 +98,13 @@ static void HeaderMapImplSetInlineMacro(benchmark::State& state) {
   }
   benchmark::DoNotOptimize(headers->size());
 }
-BENCHMARK(HeaderMapImplSetInlineMacro)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
+BENCHMARK(headerMapImplSetInlineMacro)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
 
 /**
  * Measure the speed of writing to a header for which HeaderMapImpl is expected to
  * provide special optimizations.
  */
-static void HeaderMapImplSetInlineInteger(benchmark::State& state) {
+static void headerMapImplSetInlineInteger(benchmark::State& state) {
   uint64_t value = 12345;
   auto headers = Http::ResponseHeaderMapImpl::create();
   addDummyHeaders(*headers, state.range(0));
@@ -113,10 +113,10 @@ static void HeaderMapImplSetInlineInteger(benchmark::State& state) {
   }
   benchmark::DoNotOptimize(headers->size());
 }
-BENCHMARK(HeaderMapImplSetInlineInteger)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
+BENCHMARK(headerMapImplSetInlineInteger)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
 
 /** Measure the speed of the byteSize() estimation method. */
-static void HeaderMapImplGetByteSize(benchmark::State& state) {
+static void headerMapImplGetByteSize(benchmark::State& state) {
   auto headers = Http::ResponseHeaderMapImpl::create();
   addDummyHeaders(*headers, state.range(0));
   uint64_t size = 0;
@@ -125,10 +125,10 @@ static void HeaderMapImplGetByteSize(benchmark::State& state) {
   }
   benchmark::DoNotOptimize(size);
 }
-BENCHMARK(HeaderMapImplGetByteSize)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
+BENCHMARK(headerMapImplGetByteSize)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
 
 /** Measure the speed of iteration with a lightweight callback. */
-static void HeaderMapImplIterate(benchmark::State& state) {
+static void headerMapImplIterate(benchmark::State& state) {
   auto headers = Http::ResponseHeaderMapImpl::create();
   size_t num_callbacks = 0;
   addDummyHeaders(*headers, state.range(0));
@@ -141,10 +141,10 @@ static void HeaderMapImplIterate(benchmark::State& state) {
   }
   benchmark::DoNotOptimize(num_callbacks);
 }
-BENCHMARK(HeaderMapImplIterate)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
+BENCHMARK(headerMapImplIterate)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
 
 /** Measure the speed of the HeaderMapImpl lookup() method. */
-static void HeaderMapImplLookup(benchmark::State& state) {
+static void headerMapImplLookup(benchmark::State& state) {
   const LowerCaseString key("connection");
   const std::string value("01234567890123456789");
   auto headers = Http::ResponseHeaderMapImpl::create();
@@ -156,14 +156,14 @@ static void HeaderMapImplLookup(benchmark::State& state) {
     benchmark::DoNotOptimize(result);
   }
 }
-BENCHMARK(HeaderMapImplLookup)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
+BENCHMARK(headerMapImplLookup)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
 
 /**
  * Measure the speed of removing a header by key name.
  * @note The measured time for each iteration includes the time needed to add
  *       one copy of the header.
  */
-static void HeaderMapImplRemove(benchmark::State& state) {
+static void headerMapImplRemove(benchmark::State& state) {
   const LowerCaseString key("example-key");
   const std::string value("01234567890123456789");
   auto headers = Http::ResponseHeaderMapImpl::create();
@@ -174,7 +174,7 @@ static void HeaderMapImplRemove(benchmark::State& state) {
   }
   benchmark::DoNotOptimize(headers->size());
 }
-BENCHMARK(HeaderMapImplRemove)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
+BENCHMARK(headerMapImplRemove)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
 
 /**
  * Measure the speed of removing a header by key name, for the special case of
@@ -182,7 +182,7 @@ BENCHMARK(HeaderMapImplRemove)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
  * @note The measured time for each iteration includes the time needed to add
  *       one copy of the header.
  */
-static void HeaderMapImplRemoveInline(benchmark::State& state) {
+static void headerMapImplRemoveInline(benchmark::State& state) {
   const LowerCaseString key("connection");
   const std::string value("01234567890123456789");
   auto headers = Http::ResponseHeaderMapImpl::create();
@@ -193,13 +193,13 @@ static void HeaderMapImplRemoveInline(benchmark::State& state) {
   }
   benchmark::DoNotOptimize(headers->size());
 }
-BENCHMARK(HeaderMapImplRemoveInline)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
+BENCHMARK(headerMapImplRemoveInline)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
 
 /**
  * Measure the speed of creating a HeaderMapImpl and populating it with a realistic
  * set of response headers.
  */
-static void HeaderMapImplPopulate(benchmark::State& state) {
+static void headerMapImplPopulate(benchmark::State& state) {
   const std::pair<LowerCaseString, std::string> headers_to_add[] = {
       {LowerCaseString("cache-control"), "max-age=0, private, must-revalidate"},
       {LowerCaseString("content-encoding"), "gzip"},
@@ -220,7 +220,7 @@ static void HeaderMapImplPopulate(benchmark::State& state) {
     benchmark::DoNotOptimize(headers->size());
   }
 }
-BENCHMARK(HeaderMapImplPopulate);
+BENCHMARK(headerMapImplPopulate);
 
 } // namespace Http
 } // namespace Envoy
