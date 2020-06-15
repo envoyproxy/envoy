@@ -1,7 +1,7 @@
 .. _faq_filter_contract:
 
 Is there a contract my HTTP filter must adhere to?
-==================================================
+--------------------------------------------------
 
 * Headers encoding/decoding
 
@@ -36,7 +36,7 @@ Is there a contract my HTTP filter must adhere to?
     the processing can be resumed by explicitly calling ``continueEncoding()``/``continueDecoding()``.
 
 Are there well-known headers that will appear in the given headers map of ``decodeHeaders()``?
-==============================================================================================
+----------------------------------------------------------------------------------------------
 
 Yes. The map must contain the following headers: ``Host``, ``Path`` (this might be omitted for
 CONNECT requests).
