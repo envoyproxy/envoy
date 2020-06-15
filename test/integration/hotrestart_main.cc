@@ -13,6 +13,9 @@
  *
  * If this test starts failing to run or build, please ensure that all changes
  * from source/exe/main.cc are incorporated in this file.
+ *
+ * TODO(jmarantz): factor out this code into MainCommon to avoid duplication,
+ * noting that absl::InitializeSymbolizer may want to be directly by main().
  */
 int main(int argc, char** argv) {
 #ifndef __APPLE__
