@@ -525,6 +525,8 @@ ProtobufTypes::MessagePtr AdminImpl::dumpEndpointConfigs() const {
     envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
     if (cluster_info->eds_service_name().has_value()) {
       cluster_load_assignment.set_cluster_name(cluster_info->eds_service_name().value());
+    } else {
+      cluster_load_assignment.set_cluster_name(cluster_info->name());
     }
     if (!cluster_info->addedViaApi()) {
       auto& static_endpoint = *endpoint_config_dump->mutable_static_endpoint_configs()->Add();
