@@ -340,10 +340,10 @@ TEST_P(AltsIntegrationTestCapturingHandshaker, CheckAltsVersion) {
             capturing_handshaker_service_->server_versions.min_rpc_version().major());
   EXPECT_EQ(capturing_handshaker_service_->client_versions.min_rpc_version().minor(),
             capturing_handshaker_service_->server_versions.min_rpc_version().minor());
-  EXPECT_EQ(capturing_handshaker_service_->client_versions.max_rpc_version().major(), 2);
-  EXPECT_EQ(capturing_handshaker_service_->client_versions.max_rpc_version().minor(), 1);
-  EXPECT_EQ(capturing_handshaker_service_->client_versions.min_rpc_version().major(), 2);
-  EXPECT_EQ(capturing_handshaker_service_->client_versions.min_rpc_version().minor(), 1);
+  EXPECT_NE(0, capturing_handshaker_service_->client_versions.max_rpc_version().major());
+  EXPECT_NE(0, capturing_handshaker_service_->client_versions.max_rpc_version().minor());
+  EXPECT_NE(0, capturing_handshaker_service_->client_versions.min_rpc_version().major());
+  EXPECT_NE(0, capturing_handshaker_service_->client_versions.min_rpc_version().minor());
 }
 
 } // namespace
