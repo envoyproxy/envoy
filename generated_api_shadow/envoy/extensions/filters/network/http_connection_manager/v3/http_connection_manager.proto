@@ -760,22 +760,21 @@ message HttpFilter {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpFilter";
 
-  // [#not-implemented-hide:] Config source specifier for the late-bound filter configuration.
-  // The connection manager listener is placed into the warming state until all the initial filter configurations
-  // are received. If the initial filter configuration is not received due to a timeout or another xDS failure,
-  // the optional fallback configuration is used.
-  // Filter configuration updates are atomic and apply to new streams while existing streams
-  // continue to use the previous configuration.
-  // Additionally, an optional configuration override is applied to each received configuration update to facilitate
-  // sharing of the filter configurations between xDS clients.
+  // [#not-implemented-hide:] Configuration source specifier for the late-bound
+  // filter configuration. The HTTP Listener is warmed until all the initial
+  // filter configurations are received. Subsequent filter updates are atomic,
+  // and apply to new streams while the active streams continue using the older
+  // filter configurations.
+  // If the initial delivery of the filter configuration fails, due to a
+  // timeout for example, the optional fallback configuration is applied.
+  // Without a fallback configuration, the filter is disabled, and the HTTP
+  // listener responds with 500 immediately. After the failure, the listener
+  // continues subscribing to the subsequent filter configurations.
   message HttpFilterConfigSource {
     config.core.v3.ConfigSource config_source = 1;
 
     // Optional fallback configuration to use if there is a failure to receive the initial filter configuration.
     google.protobuf.Any fallback_config = 2;
-
-    // Optional config override that is merged into each configuration update using the protobuf merge strategy.
-    google.protobuf.Any override_config = 3;
   }
 
   reserved 3;
