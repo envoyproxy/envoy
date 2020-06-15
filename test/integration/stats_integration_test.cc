@@ -25,11 +25,6 @@ class StatsIntegrationTest : public testing::TestWithParam<Network::Address::IpV
 public:
   StatsIntegrationTest() : BaseIntegrationTest(GetParam()) {}
 
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
-
   void initialize() override { BaseIntegrationTest::initialize(); }
 };
 
@@ -144,7 +139,9 @@ TEST_P(StatsIntegrationTest, WithTagSpecifierWithFixedValue) {
 class ClusterMemoryTestHelper : public BaseIntegrationTest {
 public:
   ClusterMemoryTestHelper()
-      : BaseIntegrationTest(testing::TestWithParam<Network::Address::IpVersion>::GetParam()) {}
+      : BaseIntegrationTest(testing::TestWithParam<Network::Address::IpVersion>::GetParam()) {
+    use_real_stats_ = true;
+  }
 
   static size_t computeMemoryDelta(int initial_num_clusters, int initial_num_hosts,
                                    int final_num_clusters, int final_num_hosts, bool allow_stats) {

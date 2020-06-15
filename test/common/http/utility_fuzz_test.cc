@@ -10,6 +10,12 @@ namespace Fuzz {
 namespace {
 
 DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
+  try {
+    TestUtility::validate(input);
+  } catch (ProtoValidationException& e) {
+    ENVOY_LOG_MISC(debug, "ProtoValidationException: {}", e.what());
+    return;
+  }
   switch (input.utility_selector_case()) {
   case test::common::http::UtilityTestCase::kParseQueryString: {
     Http::Utility::parseQueryString(input.parse_query_string());
@@ -64,6 +70,16 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
     std::chrono::seconds max_age(cookie_value.max_age());
     Http::Utility::makeSetCookieValue(cookie_value.key(), cookie_value.value(), cookie_value.path(),
                                       max_age, cookie_value.httponly());
+    break;
+  }
+  case test::common::http::UtilityTestCase::kParseAuthorityString: {
+    const auto& authority_string = input.parse_authority_string();
+    Http::Utility::parseAuthority(authority_string);
+    break;
+  }
+  case test::common::http::UtilityTestCase::kInitializeAndValidate: {
+    const auto& options = input.initialize_and_validate();
+    Http2::Utility::initializeAndValidateOptions(options);
     break;
   }
 

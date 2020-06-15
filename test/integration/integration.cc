@@ -282,6 +282,14 @@ BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
           },
           version, config) {}
 
+BaseIntegrationTest::~BaseIntegrationTest() {
+  // Tear down the fake upstream before the test server.
+  // When the HTTP codecs do runtime checks, it is important to finish all
+  // runtime access before the server, and the runtime singleton, go away.
+  fake_upstreams_.clear();
+  test_server_.reset();
+}
+
 Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnection(uint32_t port) {
   return makeClientConnectionWithOptions(port, nullptr);
 }
@@ -454,10 +462,10 @@ std::string getListenerDetails(Envoy::Server::Instance& server) {
 void BaseIntegrationTest::createGeneratedApiTestServer(
     const std::string& bootstrap_path, const std::vector<std::string>& port_names,
     Server::FieldValidationConfig validator_config, bool allow_lds_rejection) {
-  test_server_ = IntegrationTestServer::create(bootstrap_path, version_, on_server_ready_function_,
-                                               on_server_init_function_, deterministic_,
-                                               timeSystem(), *api_, defer_listener_finalization_,
-                                               process_object_, validator_config, concurrency_);
+  test_server_ = IntegrationTestServer::create(
+      bootstrap_path, version_, on_server_ready_function_, on_server_init_function_, deterministic_,
+      timeSystem(), *api_, defer_listener_finalization_, process_object_, validator_config,
+      concurrency_, drain_time_, drain_strategy_, use_real_stats_);
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0 &&
       !defer_listener_finalization_) {
 

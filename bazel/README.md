@@ -190,10 +190,18 @@ for how to update or override dependencies.
 
 ## Building Envoy with the CI Docker image
 
-Envoy can also be built with the Docker image used for CI, by installing Docker and executing:
+Envoy can also be built with the Docker image used for CI, by installing Docker and executing the following.
+
+On Linux, run:
 
 ```
 ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev'
+```
+
+On Windows:
+
+```
+./ci/run_envoy_docker_windows.sh './ci/windows_ci_steps.sh'
 ```
 
 See also the [documentation](https://github.com/envoyproxy/envoy/tree/master/ci) for developer use of the
@@ -532,7 +540,7 @@ The following optional features can be enabled on the Bazel build command-line:
 * Perf annotation with `--define perf_annotation=enabled` (see
   source/common/common/perf_annotation.h for details).
 * BoringSSL can be built in a FIPS-compliant mode with `--define boringssl=fips`
-  (see [FIPS 140-2](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/ssl.html#fips-140-2) for details).
+  (see [FIPS 140-2](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/ssl#fips-140-2) for details).
 * ASSERT() can be configured to log failures and increment a stat counter in a release build with
   `--define log_debug_assert_in_release=enabled`. The default behavior is to compile debug assertions out of
   release builds so that the condition is not evaluated. This option has no effect in debug builds.
