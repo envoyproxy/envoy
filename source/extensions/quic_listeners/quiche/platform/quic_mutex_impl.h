@@ -24,27 +24,27 @@ namespace quic {
 #define QUIC_ASSERT_SHARED_LOCK_IMPL ABSL_ASSERT_SHARED_LOCK
 
 // A class wrapping a non-reentrant mutex.
-class LOCKABLE QUIC_EXPORT_PRIVATE QuicLockImpl {
+class ABSL_LOCKABLE QUIC_EXPORT_PRIVATE QuicLockImpl {
 public:
   QuicLockImpl() = default;
   QuicLockImpl(const QuicLockImpl&) = delete;
   QuicLockImpl& operator=(const QuicLockImpl&) = delete;
 
   // Block until mu_ is free, then acquire it exclusively.
-  void WriterLock() EXCLUSIVE_LOCK_FUNCTION() { mu_.WriterLock(); }
+  void WriterLock() ABSL_EXCLUSIVE_LOCK_FUNCTION() { mu_.WriterLock(); }
 
   // Release mu_. Caller must hold it exclusively.
-  void WriterUnlock() UNLOCK_FUNCTION() { mu_.WriterUnlock(); }
+  void WriterUnlock() ABSL_UNLOCK_FUNCTION() { mu_.WriterUnlock(); }
 
   // Block until mu_ is free or shared, then acquire a share of it.
-  void ReaderLock() SHARED_LOCK_FUNCTION() { mu_.ReaderLock(); }
+  void ReaderLock() ABSL_SHARED_LOCK_FUNCTION() { mu_.ReaderLock(); }
 
   // Release mu_. Caller could hold it in shared mode.
-  void ReaderUnlock() UNLOCK_FUNCTION() { mu_.ReaderUnlock(); }
+  void ReaderUnlock() ABSL_UNLOCK_FUNCTION() { mu_.ReaderUnlock(); }
 
   // Returns immediately if current thread holds mu_ in at least shared
   // mode. Otherwise, reports an error by crashing with a diagnostic.
-  void AssertReaderHeld() const ASSERT_SHARED_LOCK() { mu_.AssertReaderHeld(); }
+  void AssertReaderHeld() const ABSL_ASSERT_SHARED_LOCK() { mu_.AssertReaderHeld(); }
 
 private:
   absl::Mutex mu_;

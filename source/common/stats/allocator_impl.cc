@@ -96,7 +96,7 @@ public:
    * our ref-count decrement hits zero. The counters and gauges are held in
    * distinct sets so we virtualize this removal helper.
    */
-  virtual void removeFromSetLockHeld() EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) PURE;
+  virtual void removeFromSetLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) PURE;
 
 protected:
   AllocatorImpl& alloc_;
@@ -121,7 +121,7 @@ public:
               const StatNameTagVector& stat_name_tags)
       : StatsSharedImpl(name, alloc, tag_extracted_name, stat_name_tags) {}
 
-  void removeFromSetLockHeld() EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) override {
+  void removeFromSetLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) override {
     const size_t count = alloc_.counters_.erase(statName());
     ASSERT(count == 1);
   }
@@ -165,7 +165,7 @@ public:
     }
   }
 
-  void removeFromSetLockHeld() override EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) {
+  void removeFromSetLockHeld() override ABSL_EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) {
     const size_t count = alloc_.gauges_.erase(statName());
     ASSERT(count == 1);
   }
@@ -234,7 +234,7 @@ public:
                   const StatNameTagVector& stat_name_tags)
       : StatsSharedImpl(name, alloc, tag_extracted_name, stat_name_tags) {}
 
-  void removeFromSetLockHeld() EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) override {
+  void removeFromSetLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) override {
     const size_t count = alloc_.text_readouts_.erase(statName());
     ASSERT(count == 1);
   }
