@@ -254,8 +254,6 @@ private:
     struct NullThreadOverloadState : public ThreadLocalOverloadState {
       NullThreadOverloadState(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
       const OverloadActionState& getState(const std::string&) override { return inactive_; }
-      void setState(const std::string&, OverloadActionState) override {}
-      OverloadTimerFactory getTimerFactory() override;
 
       const OverloadActionState inactive_ = OverloadActionState::Inactive;
       Event::Dispatcher& dispatcher_;

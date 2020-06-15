@@ -650,12 +650,6 @@ ConfigTracker& AdminImpl::getConfigTracker() { return config_tracker_; }
 AdminImpl::NullRouteConfigProvider::NullRouteConfigProvider(TimeSource& time_source)
     : config_(new Router::NullConfigImpl()), time_source_(time_source) {}
 
-OverloadTimerFactory AdminImpl::NullOverloadManager::NullThreadOverloadState::getTimerFactory() {
-  return [this](absl::string_view, Event::TimerCb callback) {
-    return dispatcher_.createTimer(callback);
-  };
-}
-
 void AdminImpl::startHttpListener(const std::string& access_log_path,
                                   const std::string& address_out_path,
                                   Network::Address::InstanceConstSharedPtr address,

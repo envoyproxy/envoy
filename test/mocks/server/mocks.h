@@ -331,6 +331,15 @@ public:
   std::function<void()> remove_filter_chains_completion_;
 };
 
+class MockThreadLocalOverloadState : public ThreadLocalOverloadState {
+public:
+  MockThreadLocalOverloadState();
+  MOCK_METHOD(const OverloadActionState&, getState, (const std::string&), (override));
+
+private:
+  const OverloadActionState disabled_state_;
+};
+
 class MockOverloadManager : public OverloadManager {
 public:
   MockOverloadManager();
@@ -343,7 +352,7 @@ public:
                OverloadActionCb callback));
   MOCK_METHOD(ThreadLocalOverloadState&, getThreadLocalOverloadState, ());
 
-  ThreadLocalOverloadState overload_state_;
+  NiceMock<MockThreadLocalOverloadState> overload_state_;
 };
 
 class MockInstance : public Instance {
