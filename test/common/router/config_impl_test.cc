@@ -1423,8 +1423,7 @@ TEST_F(RouteMatcherTest, TestRequestHeadersToAddWithAppendFalse) {
   const std::string yaml = requestHeadersConfig(false);
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
-  envoy::config::route::v3::RouteConfiguration route_config =
-      parseRouteConfigurationFromYaml(yaml);
+  envoy::config::route::v3::RouteConfiguration route_config = parseRouteConfigurationFromYaml(yaml);
 
   TestConfigImpl config(route_config, factory_context_, true);
 
@@ -3156,8 +3155,8 @@ virtual_hosts:
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-      EnvoyException, "Cannot specify both request_mirror_policy and request_mirror_policies");
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
+      "Cannot specify both request_mirror_policy and request_mirror_policies");
 }
 
 class RouteConfigurationV2 : public testing::Test, public ConfigImplTestBase {};
@@ -3709,9 +3708,8 @@ internal_only_headers:
 - x-lyft-user-id
   )EOF";
 
-  EXPECT_THROW(
-      TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-      EnvoyException);
+  EXPECT_THROW(TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
+               EnvoyException);
 }
 
 TEST_F(RouteMatcherTest, TestDuplicateDomainConfig) {
@@ -3735,9 +3733,8 @@ virtual_hosts:
       cluster: www2_staging
   )EOF";
 
-  EXPECT_THROW(
-      TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-      EnvoyException);
+  EXPECT_THROW(TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
+               EnvoyException);
 }
 
 // Test to detect if hostname matches are case-insensitive
@@ -3779,8 +3776,8 @@ virtual_hosts:
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-      EnvoyException, "Only a single wildcard domain is permitted");
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
+      "Only a single wildcard domain is permitted");
 }
 
 TEST_F(RouteMatcherTest, TestDuplicateSuffixWildcardDomainConfig) {
@@ -3799,8 +3796,7 @@ virtual_hosts:
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-      EnvoyException,
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
       "Only unique values for domains are permitted. Duplicate entry of domain *.lyft.com");
 }
 
@@ -3820,8 +3816,7 @@ virtual_hosts:
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-      EnvoyException,
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
       "Only unique values for domains are permitted. Duplicate entry of domain bar.*");
 }
 
@@ -3838,8 +3833,7 @@ virtual_hosts:
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-      EnvoyException,
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
       "RouteActionValidationError.PrefixRewrite:.*value does not match regex pattern");
 }
 
@@ -3856,8 +3850,7 @@ virtual_hosts:
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-      EnvoyException,
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
       "RouteActionValidationError.HostRewriteLiteral:.*value does not match regex pattern");
 }
 
@@ -3874,8 +3867,7 @@ virtual_hosts:
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-      EnvoyException,
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
       "RouteActionValidationError.HostRewriteHeader:.*value does not match regex pattern");
 }
 
@@ -3890,8 +3882,7 @@ virtual_hosts:
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-      EnvoyException,
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
       "RedirectActionValidationError.HostRedirect:.*value does not match regex pattern");
 }
 
@@ -3906,8 +3897,7 @@ virtual_hosts:
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-      EnvoyException,
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
       "RedirectActionValidationError.PathRedirect:.*value does not match regex pattern");
 }
 
@@ -3922,8 +3912,7 @@ virtual_hosts:
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-      EnvoyException,
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
       "RedirectActionValidationError.PrefixRewrite:.*value does not match regex pattern");
 }
 
@@ -3945,8 +3934,8 @@ virtual_hosts:
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-      EnvoyException, "Cannot specify both prefix_rewrite and regex_rewrite");
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
+      "Cannot specify both prefix_rewrite and regex_rewrite");
 }
 
 TEST_F(RouteMatcherTest, TestDomainMatchOrderConfig) {
@@ -4863,8 +4852,8 @@ virtual_hosts:
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-      EnvoyException, "Sum of weights in the weighted_cluster should add up to 100");
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
+      "Sum of weights in the weighted_cluster should add up to 100");
 
   yaml = R"EOF(
 virtual_hosts:
@@ -4885,8 +4874,8 @@ virtual_hosts:
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-      EnvoyException, "Sum of weights in the weighted_cluster should add up to 99");
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
+      "Sum of weights in the weighted_cluster should add up to 99");
 }
 
 TEST_F(RouteMatcherTest, TestWeightedClusterWithMissingWeights) {
@@ -5091,8 +5080,7 @@ virtual_hosts:
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-      EnvoyException,
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
       "invalid value oneof field 'path_specifier' is already set. Cannot set '(prefix|path)' for "
       "type oneof");
 }
@@ -5109,8 +5097,8 @@ virtual_hosts:
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-      EnvoyException, "RouteValidationError.Match: \\[\"value is required\"\\]");
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
+      "RouteValidationError.Match: \\[\"value is required\"\\]");
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPrefixAndRegex) {
@@ -5128,8 +5116,7 @@ virtual_hosts:
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-      EnvoyException,
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
       "invalid value oneof field 'path_specifier' is already set. Cannot set '(prefix|regex)' for "
       "type oneof");
 }
@@ -5146,8 +5133,8 @@ virtual_hosts:
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-      EnvoyException, "caused by field: \"action\", reason: is required");
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
+      "caused by field: \"action\", reason: is required");
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPathAndRegex) {
@@ -5165,8 +5152,7 @@ virtual_hosts:
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-      EnvoyException,
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
       "invalid value oneof field 'path_specifier' is already set. Cannot set '(path|regex)' for "
       "type oneof");
 }
@@ -5187,8 +5173,8 @@ virtual_hosts:
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-      EnvoyException, "invalid value oneof field 'path_specifier' is already set.");
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
+      "invalid value oneof field 'path_specifier' is already set.");
 }
 
 TEST_F(RouteMatcherTest, TestOpaqueConfig) {
@@ -5519,8 +5505,8 @@ virtual_hosts:
 )EOF";
 
   EXPECT_THROW_WITH_REGEX(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-      EnvoyException, "Unable to parse JSON as proto .*: invalid value 0 for type TYPE_BOOL");
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
+      "Unable to parse JSON as proto .*: invalid value 0 for type TYPE_BOOL");
 }
 
 TEST_F(RouteMatcherTest, Decorator) {
@@ -5959,9 +5945,9 @@ virtual_hosts:
             inline_string: )EOF" +
                            response_body + "\n";
 
-  EXPECT_THROW_WITH_MESSAGE(TestConfigImpl invalid_config(parseRouteConfigurationFromYaml(yaml),
-                                                          factory_context_, true),
-                            EnvoyException, "response body size is 4097 bytes; maximum is 4096");
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl invalid_config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
+      EnvoyException, "response body size is 4097 bytes; maximum is 4096");
 }
 
 void checkPathMatchCriterion(const Route* route, const std::string& expected_matcher,
@@ -6795,8 +6781,7 @@ virtual_hosts:
             - name: X-Upstream-Pushback
   )EOF";
 
-  TestConfigImpl config(parseRouteConfigurationFromYaml(RetriableHeaders), factory_context_,
-                        true);
+  TestConfigImpl config(parseRouteConfigurationFromYaml(RetriableHeaders), factory_context_, true);
   Http::TestRequestHeaderMapImpl headers =
       genRedirectHeaders("idle.lyft.com", "/regex", true, false);
   const auto& retry_policy = config.route(headers, 0)->routeEntry()->retryPolicy();
@@ -6861,8 +6846,8 @@ virtual_hosts:
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-      EnvoyException, "Duplicate upgrade WebSocket");
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
+      "Duplicate upgrade WebSocket");
 }
 
 TEST_F(RouteConfigurationV2, BadConnectConfig) {
@@ -6885,8 +6870,8 @@ virtual_hosts:
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-      EnvoyException, "Non-CONNECT upgrade type Websocket has ConnectConfig");
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
+      "Non-CONNECT upgrade type Websocket has ConnectConfig");
 }
 
 // Verifies that we're creating a new instance of the retry plugins on each call instead of always
@@ -6947,8 +6932,8 @@ virtual_hosts:
           cluster: some-cluster
   )EOF";
 
-  TestConfigImpl config(parseRouteConfigurationFromYaml(InternalRedirectEnabled),
-                        factory_context_, true);
+  TestConfigImpl config(parseRouteConfigurationFromYaml(InternalRedirectEnabled), factory_context_,
+                        true);
   Http::TestRequestHeaderMapImpl headers =
       genRedirectHeaders("idle.lyft.com", "/regex", true, false);
   const auto& internal_redirect_policy =
@@ -6972,8 +6957,8 @@ virtual_hosts:
           internal_redirect_policy: {}
   )EOF";
 
-  TestConfigImpl config(parseRouteConfigurationFromYaml(InternalRedirectEnabled),
-                        factory_context_, true);
+  TestConfigImpl config(parseRouteConfigurationFromYaml(InternalRedirectEnabled), factory_context_,
+                        true);
   Http::TestRequestHeaderMapImpl headers =
       genRedirectHeaders("idle.lyft.com", "/regex", true, false);
   const auto& internal_redirect_policy =
@@ -7004,8 +6989,8 @@ virtual_hosts:
             redirect_response_codes: [301, 302, 303, 304]
   )EOF";
 
-  TestConfigImpl config(parseRouteConfigurationFromYaml(InternalRedirectEnabled),
-                        factory_context_, true);
+  TestConfigImpl config(parseRouteConfigurationFromYaml(InternalRedirectEnabled), factory_context_,
+                        true);
   Http::TestRequestHeaderMapImpl headers =
       genRedirectHeaders("idle.lyft.com", "/regex", true, false);
   const auto& internal_redirect_policy =
@@ -7041,8 +7026,8 @@ virtual_hosts:
             redirect_response_codes: [200, 304]
   )EOF";
 
-  TestConfigImpl config(parseRouteConfigurationFromYaml(InternalRedirectEnabled),
-                        factory_context_, true);
+  TestConfigImpl config(parseRouteConfigurationFromYaml(InternalRedirectEnabled), factory_context_,
+                        true);
   Http::TestRequestHeaderMapImpl headers =
       genRedirectHeaders("idle.lyft.com", "/regex", true, false);
   const auto& internal_redirect_policy =
@@ -7198,8 +7183,8 @@ virtual_hosts:
 )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-      EnvoyException, "Didn't find a registered implementation for name: 'unknown.filter'");
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
+      "Didn't find a registered implementation for name: 'unknown.filter'");
 }
 
 TEST_F(PerFilterConfigsTest, UnknownFilterAny) {
@@ -7217,8 +7202,8 @@ virtual_hosts:
 )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-      EnvoyException, "Didn't find a registered implementation for name: 'unknown.filter'");
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
+      "Didn't find a registered implementation for name: 'unknown.filter'");
 }
 
 // Test that a trivially specified NamedHttpFilterConfigFactory ignores per_filter_config without
@@ -7235,7 +7220,7 @@ virtual_hosts:
     per_filter_config: { test.default.filter: { seconds: 123} }
 )EOF";
 
-  checkNoPerFilterConfig(yaml/*, false*/);
+  checkNoPerFilterConfig(yaml /*, false*/);
 }
 
 TEST_F(PerFilterConfigsTest, DefaultFilterImplementationAny) {
@@ -7254,7 +7239,7 @@ virtual_hosts:
           seconds: 123
 )EOF";
 
-  checkNoPerFilterConfig(yaml/*, true*/);
+  checkNoPerFilterConfig(yaml /*, true*/);
 }
 
 TEST_F(PerFilterConfigsTest, DEPRECATED_FEATURE_TEST(RouteLocalConfig)) {
@@ -7270,7 +7255,7 @@ virtual_hosts:
     per_filter_config: { test.filter: { seconds: 456 } }
 )EOF";
 
-  checkEach(yaml, 123, 123, 456/*, false*/);
+  checkEach(yaml, 123, 123, 456 /*, false*/);
 }
 
 TEST_F(PerFilterConfigsTest, RouteLocalTypedConfig) {
@@ -7294,7 +7279,7 @@ virtual_hosts:
           seconds: 456
 )EOF";
 
-  checkEach(yaml, 123, 123, 456/*, true*/);
+  checkEach(yaml, 123, 123, 456 /*, true*/);
 }
 
 TEST_F(PerFilterConfigsTest, DEPRECATED_FEATURE_TEST(WeightedClusterConfig)) {
@@ -7314,7 +7299,7 @@ virtual_hosts:
     per_filter_config: { test.filter: { seconds: 1011 } }
 )EOF";
 
-  checkEach(yaml, 789, 789, 1011/*, false*/);
+  checkEach(yaml, 789, 789, 1011 /*, false*/);
 }
 
 TEST_F(PerFilterConfigsTest, WeightedClusterTypedConfig) {
@@ -7342,7 +7327,7 @@ virtual_hosts:
           seconds: 1011
 )EOF";
 
-  checkEach(yaml, 789, 789, 1011/*, true*/);
+  checkEach(yaml, 789, 789, 1011 /*, true*/);
 }
 
 TEST_F(PerFilterConfigsTest, DEPRECATED_FEATURE_TEST(WeightedClusterFallthroughConfig)) {
@@ -7362,7 +7347,7 @@ virtual_hosts:
     per_filter_config: { test.filter: { seconds: 1415 } }
 )EOF";
 
-  checkEach(yaml, 1213, 1213, 1415/*, false*/);
+  checkEach(yaml, 1213, 1213, 1415 /*, false*/);
 }
 
 TEST_F(PerFilterConfigsTest, WeightedClusterFallthroughTypedConfig) {
@@ -7390,7 +7375,7 @@ virtual_hosts:
           seconds: 1415
 )EOF";
 
-  checkEach(yaml, 1213, 1213, 1415/*, true*/);
+  checkEach(yaml, 1213, 1213, 1415 /*, true*/);
 }
 
 class RouteMatchOverrideTest : public testing::Test, public ConfigImplTestBase {};

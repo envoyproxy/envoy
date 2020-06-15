@@ -343,8 +343,8 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
   // If the filename ends with .pb, attempt to parse it as a binary proto.
   if (absl::EndsWith(path, FileExtensions::get().ProtoBinary)) {
     // Attempt to parse the binary format.
-    auto read_proto_binary = [&contents, &validation_visitor](
-                                 Protobuf::Message& message, MessageVersion message_version) {
+    auto read_proto_binary = [&contents, &validation_visitor](Protobuf::Message& message,
+                                                              MessageVersion message_version) {
       try {
         if (message.ParseFromString(contents)) {
           MessageUtil::checkForUnexpectedFields(message, validation_visitor);
@@ -462,8 +462,8 @@ public:
             !runtime_->snapshot().deprecatedFeatureEnabled(
                 absl::StrCat("envoy.deprecated_features:", field.full_name()), false)) {
           const std::string fatal_error = absl::StrCat(
-              "Illegal use of deprecated V2 option '", field.full_name(), "' from file ",
-              filename, " while using the latest V3 configuration. This option has been removed "
+              "Illegal use of deprecated V2 option '", field.full_name(), "' from file ", filename,
+              " while using the latest V3 configuration. This option has been removed "
               "from the current Envoy API. Please see " ENVOY_DOC_URL_VERSION_HISTORY " for "
               "details.");
           throw ProtoValidationException(fatal_error, message);
