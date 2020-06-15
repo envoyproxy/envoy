@@ -7,7 +7,7 @@ Is there a contract my HTTP filter must adhere to?
 
   * During encoding/decoding of headers if a filter returns ``FilterHeadersStatus::StopIteration``,
     the processing can be resumed if ``encodeData()``/``decodeData()`` return
-    ``FilterDataStatus::Continue`` or by explicitily calling
+    ``FilterDataStatus::Continue`` or by explicitly calling
     ``continueEncoding()``/``continueDecoding()``.
 
   * During encoding/decoding of headers if a filter returns
@@ -27,13 +27,13 @@ Is there a contract my HTTP filter must adhere to?
   * During encoding/decoding of data if a filter returns
     ``FilterDataStatus::StopIterationAndBuffer``, ``FilterDataStatus::StopIterationAndWatermark``,
     or ``FilterDataStatus::StopIterationNoBuffer``, the processing can be resumed if
-    ``encodeData()``/``decodeData()`` return ``FilterDataStatus::Continue`` or by explicitily
+    ``encodeData()``/``decodeData()`` return ``FilterDataStatus::Continue`` or by explicitly
     calling ``continueEncoding()``/``continueDecoding()``.
 
 * Trailers encoding/decoding
 
   * During encoding/decoding of trailers if a filter returns ``FilterTrailersStatus::StopIteration``,
-    the processing can be resumed by explicitily calling ``continueEncoding()``/``continueDecoding()``.
+    the processing can be resumed by explicitly calling ``continueEncoding()``/``continueDecoding()``.
 
 Are there well-known headers that will appear in the given headers map of ``decodeHeaders()``?
 ==============================================================================================
