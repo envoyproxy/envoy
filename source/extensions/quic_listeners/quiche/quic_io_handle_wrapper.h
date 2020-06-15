@@ -81,7 +81,7 @@ public:
   Api::SysCallIntResult setBlocking(bool blocking) override {
     return io_handle_.setBlocking(blocking);
   }
-  Api::SysCallIntResult domain(int& domain) override { return io_handle_.domain(domain); }
+  absl::optional<int> domain() override { return io_handle_.domain(); }
   Network::Address::InstanceConstSharedPtr localAddress() override {
     return io_handle_.localAddress();
   }

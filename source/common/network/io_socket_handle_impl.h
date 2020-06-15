@@ -52,7 +52,7 @@ public:
                                   socklen_t optlen) override;
   Api::SysCallIntResult getOption(int level, int optname, void* optval, socklen_t* optlen) override;
   Api::SysCallIntResult setBlocking(bool blocking) override;
-  Api::SysCallIntResult domain(int& domain) override;
+  absl::optional<int> domain() override;
   Address::InstanceConstSharedPtr localAddress() override;
   Address::InstanceConstSharedPtr peerAddress() override;
 

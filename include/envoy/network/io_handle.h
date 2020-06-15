@@ -8,6 +8,7 @@
 #include "envoy/network/address.h"
 
 #include "absl/container/fixed_array.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Buffer {
@@ -193,7 +194,7 @@ public:
    * @return a Api::SysCallIntResult with rc_ = 0 for success and rc_ = -1 for failure. If the call
    * is successful, errno_ shouldn't be used.
    */
-  virtual Api::SysCallIntResult domain(int& domain) PURE;
+  virtual absl::optional<int> domain() PURE;
 
   /**
    * Get local address (ip:port pair)

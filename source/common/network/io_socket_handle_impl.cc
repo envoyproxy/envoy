@@ -391,7 +391,7 @@ Api::SysCallIntResult IoSocketHandleImpl::setBlocking(bool blocking) {
   return Api::OsSysCallsSingleton::get().setsocketblocking(fd_, blocking);
 }
 
-Api::SysCallIntResult IoSocketHandleImpl::domain(int& domain) {
+absl::optional<int> IoSocketHandleImpl::domain() {
   sockaddr_storage addr;
   socklen_t len = sizeof(addr);
   Api::SysCallIntResult result;
@@ -400,10 +400,10 @@ Api::SysCallIntResult IoSocketHandleImpl::domain(int& domain) {
       fd_, reinterpret_cast<struct sockaddr*>(&addr), &len);
 
   if (result.rc_ == 0) {
-    domain = addr.ss_family;
+    return {addr.ss_family};
   }
 
-  return result;
+  return absl::nullopt;
 }
 
 Address::InstanceConstSharedPtr IoSocketHandleImpl::localAddress() {

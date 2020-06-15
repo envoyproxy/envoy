@@ -32,15 +32,14 @@ SocketImpl::SocketImpl(IoHandlePtr&& io_handle,
     return;
   }
 
-  int domain;
-  auto result = io_handle_->domain(domain);
+  auto domain = io_handle_->domain();
 
   // This should never happen in practice but too many tests inject fake fds ...
-  if (result.rc_ != 0) {
+  if (!domain.has_value()) {
     return;
   }
 
-  addr_type_ = domain == AF_UNIX ? Address::Type::Pipe : Address::Type::Ip;
+  addr_type_ = *domain == AF_UNIX ? Address::Type::Pipe : Address::Type::Ip;
 }
 
 Api::SysCallIntResult SocketImpl::bind(Network::Address::InstanceConstSharedPtr address) {
@@ -106,22 +105,17 @@ absl::optional<Address::IpVersion> SocketImpl::ipVersion() const {
     if (local_address_ != nullptr) {
       return local_address_->ip()->version();
     } else {
-      // TODO(fcoras) maybe use io_handle_->domain()?
-#ifdef SOL_IP
-      int socket_domain;
-      socklen_t domain_len = sizeof(socket_domain);
-      auto result = getSocketOption(SOL_SOCKET, SO_DOMAIN, &socket_domain, &domain_len);
-      if (result.rc_ != 0) {
+      auto domain = io_handle_->domain();
+      if (!domain.has_value()) {
         return absl::nullopt;
       }
-      if (socket_domain == AF_INET) {
+      if (*domain == AF_INET) {
         return Address::IpVersion::v4;
-      } else if (socket_domain == AF_INET6) {
+      } else if (*domain == AF_INET6) {
         return Address::IpVersion::v6;
       } else {
         return absl::nullopt;
       }
-#endif
     }
   }
   return absl::nullopt;
