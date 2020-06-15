@@ -53,6 +53,7 @@ public:
   // Tcp::ConnectionPool::Instance
   MOCK_METHOD(void, addDrainedCallback, (DrainedCb cb));
   MOCK_METHOD(void, drainConnections, ());
+  MOCK_METHOD(void, closeConnections, ());
   MOCK_METHOD(Cancellable*, newConnection, (Tcp::ConnectionPool::Callbacks & callbacks));
   MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, host, (), (const));
 
