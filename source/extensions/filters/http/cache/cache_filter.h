@@ -42,10 +42,6 @@ private:
   void onBody(Buffer::InstancePtr&& body);
   void onTrailers(Http::ResponseTrailerMapPtr&& trailers);
 
-  // These don't require private access, but are members per envoy convention.
-  static bool isCacheableRequest(Http::RequestHeaderMap& headers);
-  static bool isCacheableResponse(Http::ResponseHeaderMap& headers);
-
   TimeSource& time_source_;
   HttpCache& cache_;
   LookupContextPtr lookup_;
