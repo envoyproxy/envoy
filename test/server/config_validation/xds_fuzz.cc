@@ -37,23 +37,23 @@ XdsFuzzTest::buildRouteConfig(uint32_t route_num) {
 // helper functions to send API responses
 void XdsFuzzTest::updateListener(const std::vector<envoy::config::listener::v3::Listener>& listeners,
                              const std::vector<envoy::config::listener::v3::Listener>& added_or_updated,
-                             const std::vector<envoy::config::listener::v3::Listener>& removed) {
+                             const std::vector<std::string>& removed) {
   ENVOY_LOG_MISC(debug, "Sending Listener DiscoveryResponse version {}", version_);
   sendDiscoveryResponse<envoy::config::listener::v3::Listener>(Config::TypeUrl::get().Listener, listeners, added_or_updated,
-                                                  removed, version_);
+                                                  removed, std::to_string(version_));
 }
 
 void XdsFuzzTest::updateRoute(const std::vector<envoy::config::route::v3::RouteConfiguration> routes,
                              const std::vector<envoy::config::route::v3::RouteConfiguration>& added_or_updated,
-                             const std::vector<envoy::config::route::v3::RouteConfiguration>& removed) {
+                             const std::vector<std::string>& removed) {
   ENVOY_LOG_MISC(debug, "Sending Route DiscoveryResponse version {}", version_);
   sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
-      Config::TypeUrl::get().RouteConfiguration, routes, added_or_updated, removed, version_);
+      Config::TypeUrl::get().RouteConfiguration, routes, added_or_updated, removed, std::to_string(version_));
 }
 
 XdsFuzzTest::XdsFuzzTest(const test::server::config_validation::XdsTestCase &input)
     : HttpIntegrationTest(
-          Http::CodecClient::Type::HTTP2, input.config().ip_version() == test::server::config_validation::Config::IPv4 ? Network::Address::v4 ? Network::Address::IpVersion::v6,
+          Http::CodecClient::Type::HTTP2, input.config().ip_version() == test::server::config_validation::Config::IPv4 ? Network::Address::IpVersion::v4 : Network::Address::IpVersion::v6,
           ConfigHelper::adsBootstrap(input.config().sotw_or_delta() == test::server::config_validation::Config::SOTW ? "GRPC" : "DELTA_GRPC")),
           actions_(input.actions()), num_lds_updates_(0) {
   use_lds_ = false;
@@ -130,14 +130,16 @@ void XdsFuzzTest::close() {
  * @param the listener number to be removed
  * @return the listener as an optional so that it can be used in a delta request
  */
-std::optional<envoy::config::listener::v3::Listener> XdsFuzzTest::removeListener(uint32_t listener_num) {
+absl::optional<std::string> XdsFuzzTest::removeListener(uint32_t listener_num) {
   std::string match = fmt::format("{}{}", "listener_", listener_num % NUM_LISTENERS);
 
   for (auto it = listeners_.begin(); it != listeners_.end(); ++it) {
     if (it->name() == match) {
-      envoy::config::listener::v3::Listener listener = *it;
+      std::string name = it->name();
+      /* envoy::config::listener::v3::Listener listener = *it; */
       listeners_.erase(it);
-      return listener;
+      return name;
+      /* return listener; */
     }
   }
   return {};
@@ -153,7 +155,7 @@ std::optional<envoy::config::listener::v3::Listener> XdsFuzzTest::removeListener
  * @param the route number to be removed
  * @return the route as an optional so that it can be used in a delta request
  */
-std::optional<envoy::config::listener::v3::Listener> XdsFuzzTest::removeRoute(uint32_t route_num) {
+absl::optional<std::string> XdsFuzzTest::removeRoute(uint32_t route_num) {
   std::string match = fmt::format("{}{}", "route_config_", route_num % NUM_ROUTES);
   /* routes_.erase(std::remove_if(routes_.begin(), routes_.end(), */
   /*                                 [&match](const envoy::config::route::v3::RouteConfiguration& route) { */
@@ -162,9 +164,10 @@ std::optional<envoy::config::listener::v3::Listener> XdsFuzzTest::removeRoute(ui
   /*                  routes_.end()); */
   for (auto it = routes_.begin(); it != routes_.end(); ++it) {
     if (it->name() == match) {
-      envoy::config::route::v3::RouteConfiguration route = *it;
+      std::string name = it->name();
+      /* envoy::config::route::v3::RouteConfiguration route = *it; */
       routes_.erase(it);
-      return route;
+      return name;
     }
   }
   return {};
@@ -175,7 +178,7 @@ std::optional<envoy::config::listener::v3::Listener> XdsFuzzTest::removeRoute(ui
  */
 void XdsFuzzTest::replay() {
   initialize();
-  num_lds_updates_++;
+  /* num_lds_updates_++; */
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
                                                              {buildCluster("cluster_0")},
                                                              {buildCluster("cluster_0")}, {}, "1");
@@ -193,6 +196,8 @@ void XdsFuzzTest::replay() {
       auto listener = buildListener(action.add_listener().listener_num(), action.add_listener().route_num());
       listeners_.push_back(listener);
 
+      updateListener(listeners_, {listener}, {});
+
       //TODO(samflattery): compareDiscoveryResponse to check ACK/NACK?
 
       num_lds_updates_++;
@@ -201,7 +206,6 @@ void XdsFuzzTest::replay() {
     }
     case test::server::config_validation::Action::kRemoveListener: {
       auto removed = removeListener(action.add_listener().listener_num());
-      updateListener(listeners_, {}, {listener});
 
       if (removed) {
         updateListener(listeners_, {}, {*removed});
@@ -215,16 +219,17 @@ void XdsFuzzTest::replay() {
     }
     case test::server::config_validation::Action::kAddRoute: {
       removeRoute(action.add_route().route_num());
-      auto route = buildRouteConfig(action.add_route().route_num())
+      auto route = buildRouteConfig(action.add_route().route_num());
       routes_.push_back(route);
+      updateRoute(routes_, {route}, {});
       break;
     }
     case test::server::config_validation::Action::kRemoveRoute: {
       auto removed = removeRoute(action.remove_route().route_num());
       if (removed) {
-        updateRoute(routes_, {}, {*removed}, version_);
+        updateRoute(routes_, {}, {*removed});
       } else {
-        updateRoute(routes_, {}, {}, version_);
+        updateRoute(routes_, {}, {});
       }
       break;
     }

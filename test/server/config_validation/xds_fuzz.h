@@ -14,7 +14,7 @@
 #include "test/config/utility.h"
 #include "test/server/config_validation/xds_fuzz.pb.h"
 
-#include <optional>
+#include "absl/types/optional.h"
 
 // TODO(samflattery): add these to fuzz config instead?
 #define NUM_LISTENERS 10
@@ -35,11 +35,17 @@ public:
 
   envoy::config::route::v3::RouteConfiguration buildRouteConfig(uint32_t route_num);
 
+  /* void updateListener(const std::vector<envoy::config::listener::v3::Listener>& listeners, */
+  /*                                const std::string& version); */
   void updateListener(const std::vector<envoy::config::listener::v3::Listener>& listeners,
-                                 const std::string& version);
+                                   const std::vector<envoy::config::listener::v3::Listener>& added_or_updated,
+                                   const std::vector<std::string>& removed);
 
   void updateRoute(const std::vector<envoy::config::route::v3::RouteConfiguration> routes,
-                              const std::string& version);
+                               const std::vector<envoy::config::route::v3::RouteConfiguration>& added_or_updated,
+                               const std::vector<std::string>& removed);
+  /* void updateRoute(const std::vector<envoy::config::route::v3::RouteConfiguration> routes, */
+                              /* const std::string& version); */
   void initialize() override;
   void replay();
   void close();
@@ -49,8 +55,8 @@ private:
   void parseConfig(const test::server::config_validation::XdsTestCase &input);
   void initializePools();
 
-  std::optional<envoy::config::listener::v3::Listener> XdsFuzzTest::removeListener(uint32_t listener_num);
-  std::optional<envoy::config::route::v3::RouteConfiguration> XdsFuzzTest::removeRoute(uint32_t listener_num);
+  absl::optional<std::string> removeListener(uint32_t listener_num);
+  absl::optional<std::string> removeRoute(uint32_t route_num);
   /* void removeListener(uint32_t listener_num); */
   /* void removeRoute(uint32_t route_num); */
 

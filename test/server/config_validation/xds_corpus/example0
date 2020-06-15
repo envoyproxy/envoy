@@ -1,36 +1,31 @@
 actions {
   add_listener {
-    version : "1"
-    name : "listener_0"
-    route_config : "route_config_0"
+    listener_num : 0
+    route_num : 0
   }
 }
 actions {
   add_route {
-    name : "route_config_0"
-    cluster : "cluster_0"
+    route_num : 0
   }
 }
 
 actions {
   add_listener {
-    version : "1"
-    name : "listener_1"
-    route_config : "route_config_1"
+    listener_num : 1
+    route_num : 1
   }
 }
 
 actions {
   add_route {
-    name : "route_config_1"
-    cluster : "cluster_0"
+    route_num : 1
   }
 }
 actions {
   add_listener {
-    version : "1"
-    name : "listener_2"
-    route_config : "route_config_1"
+    listener_num : 2
+    route_num : 2
   }
 }
 config {

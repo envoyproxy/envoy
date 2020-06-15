@@ -5,20 +5,20 @@ package test.server.config_validation;
 import "validate/validate.proto";
 
 message AddListener {
-  uint32 listener_num;
-  uint32 route_num;
+  uint32 listener_num = 1;
+  uint32 route_num = 2;
 }
 
 message AddRoute {
-  uint32 route_num;
+  uint32 route_num = 1;
 }
 
 message RemoveListener {
-  uint32 listener_num;
+  uint32 listener_num = 1;
 }
 
 message RemoveRoute {
-  uint32 route_num;
+  uint32 route_num = 1;
 }
 
 message Action {
