@@ -762,19 +762,27 @@ message HttpFilter {
 
   // [#not-implemented-hide:] Configuration source specifier for the late-bound
   // filter configuration. The HTTP Listener is warmed until all the initial
-  // filter configurations are received. Subsequent filter updates are atomic,
-  // and apply to new streams while the active streams continue using the older
-  // filter configurations.
+  // filter configurations are received, unless the flag to apply the default
+  // configuration is set. Subsequent filter updates are atomic, and apply to
+  // new streams while the active streams continue using the older filter
+  // configurations.
   // If the initial delivery of the filter configuration fails, due to a
-  // timeout for example, the optional fallback configuration is applied.
-  // Without a fallback configuration, the filter is disabled, and the HTTP
+  // timeout for example, the optional default configuration is applied.
+  // Without a default configuration, the filter is disabled, and the HTTP
   // listener responds with 500 immediately. After the failure, the listener
   // continues subscribing to the subsequent filter configurations.
   message HttpFilterConfigSource {
     config.core.v3.ConfigSource config_source = 1;
 
-    // Optional fallback configuration to use if there is a failure to receive the initial filter configuration.
-    google.protobuf.Any fallback_config = 2;
+    // Optional default configuration to use as the initial configuration if
+    // there is a failure to receive the initial filter configuration or if
+    // `apply_default_config` flag is set.
+    google.protobuf.Any default_config = 2;
+
+    // Use the default config as the initial configuration without warming and
+    // waiting for the first xDS response. Requires the default configuration
+    // to be supplied.
+    bool apply_default_config = 3;
   }
 
   reserved 3;
