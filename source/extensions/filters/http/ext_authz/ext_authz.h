@@ -78,9 +78,8 @@ public:
         metadata_context_namespaces_(config.metadata_context_namespaces().begin(),
                                      config.metadata_context_namespaces().end()),
         include_peer_certificate_(config.include_peer_certificate()),
-        stats_(generateStats(stats_prefix, scope)),
-        transport_api_version_(config.transport_api_version()),
-        ext_authz_ok_(pool_.add("ext_authz.ok")), ext_authz_denied_(pool_.add("ext_authz.denied")),
+        stats_(generateStats(stats_prefix, scope)), ext_authz_ok_(pool_.add("ext_authz.ok")),
+        ext_authz_denied_(pool_.add("ext_authz.denied")),
         ext_authz_error_(pool_.add("ext_authz.error")),
         ext_authz_failure_mode_allowed_(pool_.add("ext_authz.failure_mode_allowed")) {}
 
@@ -118,10 +117,6 @@ public:
 
   bool includePeerCertificate() const { return include_peer_certificate_; }
 
-  const envoy::config::core::v3::ApiVersion& transportApiVersion() const {
-    return transport_api_version_;
-  }
-
 private:
   static Http::Code toErrorCode(uint64_t status) {
     const auto code = static_cast<Http::Code>(status);
@@ -157,8 +152,6 @@ private:
 
   // The stats for the filter.
   ExtAuthzFilterStats stats_;
-
-  const envoy::config::core::v3::ApiVersion transport_api_version_;
 
 public:
   // TODO(nezdolik): deprecate cluster scope stats counters in favor of filter scope stats
@@ -236,13 +229,14 @@ private:
   bool isBufferFull() const;
   bool skipCheckForRoute(const Router::RouteConstSharedPtr& route) const;
 
-  // State of this filter's communication with the external authorization service. The filter has
-  // either not started calling the external service, in the middle of calling it or has completed.
+  // State of this filter's communication with the external authorization service.
+  // The filter has either not started calling the external service, in the middle of calling
+  // it or has completed.
   enum class State { NotStarted, Calling, Complete };
 
-  // FilterReturn is used to capture what the return code should be to the filter chain. if this
-  // filter is either in the middle of calling the service or the result is denied then the filter
-  // chain should stop. Otherwise the filter chain can continue to the next filter.
+  // FilterReturn is used to capture what the return code should be to the filter chain.
+  // if this filter is either in the middle of calling the service or the result is denied then
+  // the filter chain should stop. Otherwise the filter chain can continue to the next filter.
   enum class FilterReturn { ContinueDecoding, StopDecoding };
 
   Http::HeaderMapPtr getHeaderMap(const Filters::Common::ExtAuthz::ResponsePtr& response);
