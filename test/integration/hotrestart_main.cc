@@ -28,8 +28,8 @@ int main(int argc, char** argv) {
   try {
     main_common = std::make_unique<Envoy::MainCommon>(argc, argv);
 
-    // This block is specific to hotrestart_main.cc, and should be the only difference
-    // with source/exe/main.cc.
+    // This block is specific to hotrestart_main.cc, and should be the only
+    // functional difference with source/exe/main.cc.
     Envoy::Server::Instance* server = main_common->server();
     if (server != nullptr) {
       // Creates a gauge that will be incremented once and then never touched. This is

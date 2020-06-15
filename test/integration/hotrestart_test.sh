@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# For this test we use a slightly modiified test binary, based on on
-# source/exe/enovy-static. If this starts failing to run or build,
-# ensure that source/exe/main.cc and ./hotrestart_main.cc have not
-# diverged except for adding the new stat.
+# For this test we use a slightly modiified test binary, based on
+# source/exe/enovy-static. If this starts failing to run or build, ensure that
+# source/exe/main.cc and ./hotrestart_main.cc have not diverged except for
+# adding the new gauge.
 export ENVOY_BIN="${TEST_SRCDIR}"/envoy/test/integration/hotrestart_main
 source "$TEST_SRCDIR/envoy/test/integration/test_utility.sh"
 echo ENVOY_BIN=${ENVOY_BIN}
