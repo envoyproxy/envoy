@@ -1,8 +1,8 @@
 #include "common/common/assert.h"
 
 #include "absl/container/flat_hash_map.h"
-#include "absl/synchronization/mutex.h"
 #include "absl/strings/str_join.h"
+#include "absl/synchronization/mutex.h"
 
 namespace Envoy {
 namespace Assert {
@@ -46,13 +46,13 @@ public:
     envoy_bug_failure_record_action_ = nullptr;
   }
 
-  static bool shouldLogAndInvoke(const char* filename, int line) {
-    const auto name = absl::StrCat(filename, ",", line);
-
+  static bool shouldLogAndInvoke(absl::string_view bug_name) {
     // Increment counter, inserting first if counter does not exist.
-    absl::ReleasableMutexLock lock(&mutex_);
-    auto counter_value = ++counters_[name];
-    lock.Release();
+    uint64_t counter_value = 0;
+    {
+      absl::MutexLock lock(&mutex_);
+      counter_value = ++counters_[bug_name];
+    }
 
     // Check if counter is power of two by its bitwise representation.
     if ((counter_value & (counter_value - 1)) == 0) {
@@ -99,8 +99,8 @@ void invokeEnvoyBugFailureRecordActionForEnvoyBugMacroUseOnly() {
   EnvoyBugRegistrationImpl::invokeAction();
 }
 
-bool shouldLogAndInvokeEnvoyBugForEnvoyBugMacroUseOnly(const char* filename, int line) {
-  return EnvoyBugRegistrationImpl::shouldLogAndInvoke(filename, line);
+bool shouldLogAndInvokeEnvoyBugForEnvoyBugMacroUseOnly(absl::string_view bug_name) {
+  return EnvoyBugRegistrationImpl::shouldLogAndInvoke(bug_name);
 }
 
 } // namespace Assert

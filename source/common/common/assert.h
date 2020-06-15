@@ -69,7 +69,7 @@ void invokeEnvoyBugFailureRecordActionForEnvoyBugMacroUseOnly();
  *
  * This should only be called by ENVOY_BUG macros in this file.
  */
-bool shouldLogAndInvokeEnvoyBugForEnvoyBugMacroUseOnly(const char* filename, int line);
+bool shouldLogAndInvokeEnvoyBugForEnvoyBugMacroUseOnly(absl::string_view bug_name);
 
 // CONDITION_STR is needed to prevent macros in condition from being expected, which obfuscates
 // the logged failure, e.g., "EAGAIN" vs "11".
@@ -176,8 +176,8 @@ bool shouldLogAndInvokeEnvoyBugForEnvoyBugMacroUseOnly(const char* filename, int
 // ENVOY_BUG logging and actions are invoked only on power-of-two instances per log line.
 #define _ENVOY_BUG_IMPL(CONDITION, CONDITION_STR, ACTION, DETAILS)                                 \
   do {                                                                                             \
-    if (!(CONDITION) &&                                                                            \
-        Envoy::Assert::shouldLogAndInvokeEnvoyBugForEnvoyBugMacroUseOnly(__FILE__, __LINE__)) {    \
+    if (!(CONDITION) && Envoy::Assert::shouldLogAndInvokeEnvoyBugForEnvoyBugMacroUseOnly(          \
+                            absl::StrCat(__FILE__, __LINE__))) {                                   \
       const std::string& details = (DETAILS);                                                      \
       ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::envoy_bug), error,    \
                           "envoy bug failure: {}.{}{}", CONDITION_STR,                             \
