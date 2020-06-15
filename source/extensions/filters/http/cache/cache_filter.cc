@@ -1,7 +1,8 @@
 #include "extensions/filters/http/cache/cache_filter.h"
-#include "extensions/filters/http/cache/cache_filter_utils.h"
 
 #include "common/http/headers.h"
+
+#include "extensions/filters/http/cache/cache_filter_utils.h"
 
 #include "absl/strings/string_view.h"
 

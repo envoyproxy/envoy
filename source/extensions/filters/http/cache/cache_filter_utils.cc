@@ -1,4 +1,5 @@
 #include "extensions/filters/http/cache/cache_filter_utils.h"
+
 #include "common/common/utility.h"
 
 namespace Envoy {
@@ -12,8 +13,8 @@ bool CacheFilterUtils::isCacheableRequest(const Http::RequestHeaderMap& headers)
   const Http::HeaderValues& header_values = Http::Headers::get();
   // TODO(toddmgreer): Also serve HEAD requests from cache.
   // TODO(toddmgreer): Check all the other cache-related headers.
-  return method && forwarded_proto && !headers.Authorization() && headers.Path() && headers.Host() &&
-         (method->value() == header_values.MethodValues.Get) &&
+  return method && forwarded_proto && !headers.Authorization() && headers.Path() &&
+         headers.Host() && (method->value() == header_values.MethodValues.Get) &&
          (forwarded_proto->value() == header_values.SchemeValues.Http ||
           forwarded_proto->value() == header_values.SchemeValues.Https);
 }
@@ -25,7 +26,6 @@ bool CacheFilterUtils::isCacheableResponse(const Http::ResponseHeaderMap& header
   return !StringUtil::caseFindToken(cache_control, ",",
                                     Http::Headers::get().CacheControlValues.Private);
 }
-
 
 } // namespace Cache
 } // namespace HttpFilters
