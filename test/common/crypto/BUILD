@@ -3,6 +3,7 @@ load(
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
     "envoy_package",
+    "envoy_proto_library",
 )
 
 licenses(["notice"])  # Apache 2
@@ -25,11 +26,12 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_fuzz_test(
-    name = "import_public_key_fuzz_test",
-    srcs = ["import_public_key_fuzz_test.cc"],
-    corpus = "import_public_key_corpus",
-    deps = ["//source/extensions/common/crypto:utility_lib"],
+envoy_proto_library(
+    name = "verify_signature_fuzz_proto",
+    srcs = ["verify_signature_fuzz.proto"],
+    deps = [
+        "@envoy_api//envoy/type/v3:pkg",
+    ],
 )
 
 envoy_cc_fuzz_test(
@@ -37,4 +39,18 @@ envoy_cc_fuzz_test(
     srcs = ["get_sha_256_digest_fuzz_test.cc"],
     corpus = "get_sha_256_digest_corpus",
     deps = ["//source/extensions/common/crypto:utility_lib"],
+)
+
+envoy_cc_fuzz_test(
+    name = "verify_signature_fuzz_test",
+    srcs = ["verify_signature_fuzz_test.cc"],
+    corpus = "verify_signature_corpus",
+    deps = [
+        ":verify_signature_fuzz_proto_cc_proto",
+        "//source/common/common:hex_lib",
+        "//source/common/crypto:utility_lib",
+        "//source/common/protobuf:utility_lib",
+        "//source/extensions/common/crypto:utility_lib",
+        "//test/test_common:utility_lib",
+    ],
 )
