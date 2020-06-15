@@ -26,8 +26,8 @@ using GrpcAltsCredentialsOptionsPtr =
 
 namespace {
 
-// There is an equivalent function grpc_alts_set_rpc_protocol_versions in newer
-// release of gRPC that should be called directly when available.
+// TODO: gRPC v1.30.0-pre1 defines the equivalent function grpc_alts_set_rpc_protocol_versions
+// that should be called directly when available.
 void grpcAltsSetRpcProtocolVersions(grpc_gcp_rpc_protocol_versions* rpc_versions) {
   grpc_gcp_rpc_protocol_versions_set_max(rpc_versions, GRPC_PROTOCOL_VERSION_MAX_MAJOR,
                                          GRPC_PROTOCOL_VERSION_MAX_MINOR);
