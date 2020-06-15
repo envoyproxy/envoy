@@ -3,6 +3,7 @@
 #include <chrono>
 
 #include "envoy/common/pure.h"
+#include "envoy/common/time.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -41,9 +42,9 @@ public:
    * request latency to update the internal state of the controller for
    * concurrency limit calculations.
    *
-   * @param rq_latency is the clocked round-trip time for the request.
+   * @param rq_send_time the time point which the sampled request was sent
    */
-  virtual void recordLatencySample(std::chrono::nanoseconds rq_latency) PURE;
+  virtual void recordLatencySample(MonotonicTime rq_send_time) PURE;
 
   /**
    * Omit sampling an outstanding request and update the internal state of the controller to reflect

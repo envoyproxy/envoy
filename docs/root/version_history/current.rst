@@ -28,6 +28,9 @@ Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
+* adaptive concurrency: fixed a minRTT calculation bug where requests started before the concurrency
+  limit was pinned to the minimum would skew the new minRTT value if the replies arrived after the
+  start of the new minRTT window.
 * grpc-json: fix a bug when in trailers only gRPC response (e.g. error) HTTP status code is not being re-written.
 * http: fixed a bug in the grpc_http1_reverse_bridge filter where header-only requests were forwarded with a non-zero content length.
 * http: fixed a bug where in some cases slash was moved from path to query string when :ref:`merging of adjacent slashes<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.merge_slashes>` is enabled.

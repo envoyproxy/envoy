@@ -46,10 +46,11 @@ GradientControllerConfig::GradientControllerConfig(
 GradientController::GradientController(GradientControllerConfig config,
                                        Event::Dispatcher& dispatcher, Runtime::Loader&,
                                        const std::string& stats_prefix, Stats::Scope& scope,
-                                       Runtime::RandomGenerator& random)
+                                       Runtime::RandomGenerator& random, TimeSource& time_source)
     : config_(std::move(config)), dispatcher_(dispatcher), scope_(scope),
-      stats_(generateStats(scope_, stats_prefix)), random_(random), deferred_limit_value_(0),
-      num_rq_outstanding_(0), concurrency_limit_(config_.minConcurrency()),
+      stats_(generateStats(scope_, stats_prefix)), random_(random), time_source_(time_source),
+      deferred_limit_value_(0), num_rq_outstanding_(0),
+      concurrency_limit_(config_.minConcurrency()),
       latency_sample_hist_(hist_fast_alloc(), hist_free) {
   min_rtt_calc_timer_ = dispatcher_.createTimer([this]() -> void { enterMinRTTSamplingWindow(); });
 
@@ -102,6 +103,8 @@ void GradientController::enterMinRTTSamplingWindow() {
   // Throw away any latency samples from before the recalculation window as it may not represent
   // the minRTT.
   hist_clear(latency_sample_hist_.get());
+
+  min_rtt_epoch_ = time_source_.monotonicTime();
 }
 
 void GradientController::updateMinRTT() {
@@ -192,16 +195,22 @@ RequestForwardingAction GradientController::forwardingDecision() {
   return RequestForwardingAction::Block;
 }
 
-void GradientController::recordLatencySample(std::chrono::nanoseconds rq_latency) {
-  const uint32_t latency_usec =
-      std::chrono::duration_cast<std::chrono::microseconds>(rq_latency).count();
+void GradientController::recordLatencySample(MonotonicTime rq_send_time) {
   ASSERT(num_rq_outstanding_.load() > 0);
   --num_rq_outstanding_;
 
+  if (rq_send_time < min_rtt_epoch_) {
+    // Disregard samples from requests started in the previous minRTT window.
+    return;
+  }
+
+  const std::chrono::microseconds rq_latency =
+      std::chrono::duration_cast<std::chrono::microseconds>(time_source_.monotonicTime() -
+                                                            rq_send_time);
   uint32_t sample_count;
   {
     absl::MutexLock ml(&sample_mutation_mtx_);
-    hist_insert(latency_sample_hist_.get(), latency_usec, 1);
+    hist_insert(latency_sample_hist_.get(), rq_latency.count(), 1);
     sample_count = hist_sample_count(latency_sample_hist_.get());
   }
 
