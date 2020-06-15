@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "envoy/common/conn_pool.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/common/time.h"
 #include "envoy/common/token_bucket.h"
@@ -94,5 +95,17 @@ class MockScopedTrackedObject : public ScopeTrackedObject {
 public:
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
 };
+
+namespace ConnectionPool {
+
+class MockCancellable : public Cancellable {
+public:
+  MockCancellable();
+  ~MockCancellable() override;
+
+  // ConnectionPool::Cancellable
+  MOCK_METHOD(void, cancel, (CancelPolicy cancel_policy));
+};
+} // namespace ConnectionPool
 
 } // namespace Envoy

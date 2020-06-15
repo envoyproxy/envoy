@@ -96,9 +96,6 @@ TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
   check_listener_stats(0, 1);
 }
 
-// Validates that the drain actually drains the listeners.
-TEST_P(IntegrationTest, AdminDrainDrainsListeners) { testAdminDrain(downstreamProtocol()); }
-
 TEST_P(IntegrationTest, RouterDirectResponse) {
   const std::string body = "Response body";
   const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", body);
@@ -844,8 +841,6 @@ TEST_P(IntegrationTest, TestHead) {
   EXPECT_THAT(response->headers(), HeaderValueOf(Headers::get().ContentLength, "12"));
   EXPECT_EQ(response->headers().TransferEncoding(), nullptr);
   EXPECT_EQ(0, response->body().size());
-
-  cleanupUpstreamAndDownstream();
 }
 
 // The Envoy HTTP/1.1 codec ASSERTs that T-E headers are cleared in
@@ -1302,7 +1297,6 @@ TEST_P(IntegrationTest, TestUpgradeHeaderInResponse) {
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("Hello World", response->body());
-  cleanupUpstreamAndDownstream();
 }
 
 TEST_P(IntegrationTest, ConnectWithNoBody) {

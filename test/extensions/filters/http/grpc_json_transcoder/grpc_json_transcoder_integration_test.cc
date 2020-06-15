@@ -28,9 +28,7 @@ class GrpcJsonTranscoderIntegrationTest
 public:
   GrpcJsonTranscoderIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
-  /**
-   * Global initializer for all integration tests.
-   */
+
   void SetUp() override {
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
     const std::string filter =
@@ -43,15 +41,6 @@ public:
             )EOF";
     config_helper_.addFilter(
         fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
-  }
-
-  /**
-   * Global destructor for all integration tests.
-   */
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstream_connection_.reset();
-    fake_upstreams_.clear();
   }
 
 protected:
