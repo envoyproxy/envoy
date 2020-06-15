@@ -1,6 +1,13 @@
 #!/bin/bash
 
+# For this test we use a slightly modiified test binary, based on on
+# source/exe/enovy-static. If this starts failing to run or build,
+# ensure that source/exe/main.cc and ./hotrestart_main.cc have not
+# diverged except for adding the new stat.
+export ENVOY_BIN="${TEST_SRCDIR}"/envoy/test/integration/hotrestart_main
 source "$TEST_SRCDIR/envoy/test/integration/test_utility.sh"
+echo ENVOY_BIN=${ENVOY_BIN}
+ls -l ${ENVOY_BIN}
 
 # TODO(htuch): In this test script, we are duplicating work done in test_environment.cc via sed.
 # Instead, we can add a simple C++ binary that links against test_environment.cc and uses the
@@ -70,19 +77,10 @@ JSON_TEST_ARRAY+=("${HOT_RESTART_JSON_REUSE_PORT}")
 
 echo "Hot restart test using dynamic base id"
 
-function scrape_stat() {
-  local ADMIN_ADDRESS="$1"
-  local STAT_NAME="$2"
-  curl -sg "$ADMIN_ADDRESS"/stats | grep "^${STAT_NAME}: " | cut -f2 -d" "
-}
-
 TEST_INDEX=0
 function run_testsuite() {
   local HOT_RESTART_JSON="$1"
   local FAKE_SYMBOL_TABLE="$2"
-
-  echo cat "${HOT_RESTART_JSON}"
-  cat "${HOT_RESTART_JSON}"
 
   start_test validation
   check "${ENVOY_BIN}" -c "${HOT_RESTART_JSON}" --mode validate --service-cluster cluster \
@@ -153,20 +151,16 @@ function run_testsuite() {
   check [ "${ADMIN_HOT_RESTART_VERSION}" = "${CLI_HOT_RESTART_VERSION}" ]
 
   start_test Checking server.hot_restart_generation 1
-  GENERATION_0=$(curl -sg http://${ADMIN_ADDRESS_0}/stats | grep server.hot_restart_generation)
-  check [ "$GENERATION_0" = "server.hot_restart_generation: 1" ];
+  GENERATION_0=$(scrape_stat "${ADMIN_ADDRESS_0}" "server.hot_restart_generation")
+  check [ "$GENERATION_0" = "1" ];
 
   # Verify we can see server.live in the admin port.
-  SERVER_LIVE_0=$(curl -sg http://${ADMIN_ADDRESS_0}/stats | grep server.live)
-  check [ "$SERVER_LIVE_0" = "server.live: 1" ];
+  SERVER_LIVE_0=$(scrape_stat "${ADMIN_ADDRESS_0}" "server.live")
+  check [ "$SERVER_LIVE_0" = "1" ];
 
-  # Capture the amount of memory allocated with one server, which we'll use to
-  # make sure parent gauge accumulation and erasure works via approximate 
-  # comparisons. Note that on some platforms or build options, memory is not
-  # captured and comes out as 0, in which case we'll ignore the tests.
-  start_test Capturing memory use per-server
-  SERVER_MEMORY_0=$(scrape_stat "${ADMIN_ADDRESS_0}" "server.memory_allocated")
-  echo SERVER_MEMORY_0 = ${SERVER_MEMORY_0}
+  # Capture the value of test_gauge from the initial parent: it should be 1.
+  TEST_GAUGE_0=$(scrape_stat "${ADMIN_ADDRESS_0}" "hotrestart_test_gauge")
+  echo TEST_GAUGE_0 = ${TEST_GAUGE_0}
 
   enableHeapCheck
 
@@ -181,17 +175,16 @@ function run_testsuite() {
   sleep 7
 
   ADMIN_ADDRESS_1=$(cat "${ADMIN_ADDRESS_PATH_1}")
-  SERVER_LIVE_1=$(curl -sg http://${ADMIN_ADDRESS_1}/stats | grep server.live)
-  check [ "$SERVER_LIVE_1" = "server.live: 1" ];
+  SERVER_LIVE_1=$(scrape_stat "${ADMIN_ADDRESS_1}" "server.live")
+  check [ "$SERVER_LIVE_1" = "1" ];
 
-  # Check to see that the SERVER_1 reports roughly twice the memory of SERVER_0,
-  # since it is accumulating server.memory_allocated from the parent. This will
-  # be erased once SERVER_0 terminates.
-  if [ "$SERVER_MEMORY_0" != 0 ]; then
-    start_test Checking that the memory allocation reported in SERVER_2 excludes that from parents.
-    SERVER_MEMORY_1=$(scrape_stat "${ADMIN_ADDRESS_1}" "server.memory_allocated")
-    echo SERVER_MEMORY_1 = ${SERVER_MEMORY_1}
-    check [ $SERVER_MEMORY_1 -ge $((2*SERVER_MEMORY_0)) ]
+  # Check to see that the SERVER_1 accumulates the test_gauge value from
+  # SERVER_0, This will be erased once SERVER_0 terminates.
+  if [ "$TEST_GAUGE_0" != 0 ]; then
+    start_test Checking that the hotrestart_test_gauge incorporates SERVER_0 and SERVER_1.
+    TEST_GAUGE_1=$(scrape_stat "${ADMIN_ADDRESS_1}" "hotrestart_test_gauge")
+    echo TEST_GAUGE_1 = ${TEST_GAUGE_1}
+    check [ $TEST_GAUGE_1 = "2" ]
   fi
 
   start_test Checking that listener addresses have not changed
@@ -208,8 +201,8 @@ function run_testsuite() {
   sleep 3
 
   start_test Checking server.hot_restart_generation 2
-  GENERATION_1=$(curl -sg http://${ADMIN_ADDRESS_1}/stats | grep server.hot_restart_generation)
-  check [ "$GENERATION_1" = "server.hot_restart_generation: 2" ];
+  GENERATION_1=$(scrape_stat "${ADMIN_ADDRESS_1}" "server.hot_restart_generation")
+  check [ "$GENERATION_1" = "2" ];
 
   ADMIN_ADDRESS_PATH_2="${TEST_TMPDIR}"/admin.2."${TEST_INDEX}".address
   start_test Starting epoch 2
@@ -243,21 +236,16 @@ function run_testsuite() {
   # with the generation being decremented back to 1.
   start_test Checking server.hot_restart_generation 2
   ADMIN_ADDRESS_2=$(cat "${ADMIN_ADDRESS_PATH_2}")
-  echo curl -sg http://${ADMIN_ADDRESS_2}/stats
-  curl -sg http://${ADMIN_ADDRESS_2}/stats
-  echo curl -sg http://${ADMIN_ADDRESS_2}/stats
-  curl -sg http://${ADMIN_ADDRESS_2}/stats
-  GENERATION_2=$(curl -sg http://${ADMIN_ADDRESS_2}/stats | grep server.hot_restart_generation)
-  check [ "$GENERATION_2" = "server.hot_restart_generation: 3" ];
+  GENERATION_2=$(scrape_stat "${ADMIN_ADDRESS_2}" "server.hot_restart_generation")
+  check [ "$GENERATION_2" = "3" ];
 
-  # Check to see that the SERVER_2 has approximately the same amount of memory 
-  # as SERVER_0, since its parents have now exited and we have erased their
-  # gauge contributions.
-  if [ "$SERVER_MEMORY_0" != 0 ]; then
-    start_test Checking that the memory allocation reported in SERVER_2 includes that from SERVER_1
-    SERVER_MEMORY_2=$(scrape_stat "${ADMIN_ADDRESS_2}" "server.memory_allocated")
-    echo SERVER_MEMORY_2 = ${SERVER_MEMORY_2}
-    check [ $SERVER_MEMORY_2 -lt $((2*SERVER_MEMORY_0)) ]
+  # Check to see that the SERVER_2's test_gauge value reverts bac to 1, since
+  # its parents have now exited and we have erased their gauge contributions.
+  start_test Check that the hotrestart_test_gauge reported in SERVER_2 excludes parent contribution
+  wait_status=$(wait_for_stat "$ADMIN_ADDRESS_2" "hotrestart_test_gauge" -eq 1 5)
+  echo $wait_status
+  if [[ "$wait_status" != success* ]]; then
+    handle_failure timeout
   fi
 
   start_test Checking that listener addresses have not changed
