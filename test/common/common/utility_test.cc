@@ -1,7 +1,6 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
-#include <sstream>
 #include <string>
 #include <vector>
 
@@ -815,16 +814,24 @@ TEST(DateFormatter, FromTime) {
 }
 
 // Check the time complexity. Make sure DateFormatter can finish parsing long messy string without
-// crashing/freezing Finish in 0-2 seconds if O(n). Finish in 30-120 seconds if O(n^2)
+// crashing/freezing. This should pass in 0-2 seconds if O(n). Finish in 30-120 seconds if O(n^2)
 TEST(DateFormatter, ParseLongString) {
-  std::stringstream ss;
+  std::string input;
+  std::string expected_output;
   int num_duplicates = 400;
-  std::string duplicate = "%%1f %1f, %2f, %3f, %4f, ";
+  std::string duplicate_input = "%%1f %1f, %2f, %3f, %4f, ";
+  std::string duplicate_output= "%1 1, 14, 142, 1420, ";
   for (int i = 0; i < num_duplicates; i++) {
-    ss << duplicate << '(';
+    // ss << duplicate << '(';
+    absl::StrAppend(&input,duplicate_input,"(");
+    absl::StrAppend(&expected_output,duplicate_output,"(");
   }
-  ss << duplicate;
-  DateFormatter(ss.str());
+  absl::StrAppend(&input,duplicate_input);
+  absl::StrAppend(&expected_output,duplicate_output);
+
+  const SystemTime time1(std::chrono::seconds(1522796769) + std::chrono::milliseconds(142));
+  std::string output=DateFormatter(input).fromTime(time1);
+  EXPECT_EQ(expected_output, output);
 }
 
 // Verify that two DateFormatter patterns with the same ??? patterns but

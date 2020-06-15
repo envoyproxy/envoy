@@ -129,9 +129,9 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
 void DateFormatter::parse(const std::string& format_string) {
   std::string suffix = format_string;
   std::smatch matched;
-  // step is last specifier's position+ last specifier's width. It's not the current position in
-  // "format_string" because the length has changes. It is actually the index which points to the
-  // end of the last specifier in formatted string(generated in the future).
+  // "step" is the last specifier's position + the last specifier's width. It's not the current position in
+  // "format_string" because the length has changed. It is actually the index which points to the
+  // end of the last specifier in formatted string (generated in the future).
   size_t step = 0;
   while (regex_search(suffix, matched, SpecifierConstants::get().PATTERN)) {
     // The std::smatch matched for (%([1-9])?f)|(%s): [all, subsecond-specifier, subsecond-specifier
