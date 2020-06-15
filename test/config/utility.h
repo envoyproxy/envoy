@@ -100,8 +100,30 @@ public:
   static std::string discoveredClustersBootstrap(const std::string& api_type);
   static std::string adsBootstrap(const std::string& api_type);
   // Builds a standard Cluster config fragment, with a single endpoint (at address:port).
-  static envoy::config::cluster::v3::Cluster buildCluster(const std::string& name, int port,
+  static envoy::config::cluster::v3::Cluster buildStaticCluster(const std::string& name, int port,
                                                           const std::string& address);
+
+  // ADS configurations
+  static envoy::config::cluster::v3::Cluster buildCluster(const std::string& name);
+
+  static envoy::config::cluster::v3::Cluster buildRedisCluster(const std::string& name);
+
+  static envoy::config::endpoint::v3::ClusterLoadAssignment
+  buildClusterLoadAssignment(const std::string& name, Network::Address::IpVersion, uint32_t port);
+
+  static envoy::config::listener::v3::Listener buildListener(const std::string& name,
+                                                      const std::string& route_config,
+                                                      Network::Address::IpVersion ip_version,
+                                                      const std::string& stat_prefix = "ads_test");
+
+  static envoy::config::listener::v3::Listener buildRedisListener(const std::string& name,
+                                                           const std::string& cluster,
+                                                           Network::Address::IpVersion ip_version);
+
+  static envoy::config::route::v3::RouteConfiguration buildRouteConfig(const std::string& name,
+                                                                const std::string& cluster);
+
+
 
   // Builds a standard Endpoint suitable for population by finalize().
   static envoy::config::endpoint::v3::Endpoint buildEndpoint(const std::string& address);
