@@ -119,7 +119,7 @@ public:
   virtual ~VersionedService() = default;
 
   /**
-   * @return std::string template of a fully-qualified servoce method name. For example:
+   * @return std::string template of a fully-qualified service method name. For example:
    *                     envoy.service.auth.{}.Authorization.Check.
    */
   virtual const std::string methodNameTemplate() const PURE;
