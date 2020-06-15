@@ -221,6 +221,7 @@ public:
   MOCK_METHOD(const IoHandle&, ioHandle, (), (const));
   MOCK_METHOD(Socket::Type, socketType, (), (const));
   MOCK_METHOD(Address::Type, addressType, (), (const));
+  MOCK_METHOD(absl::optional<Address::IpVersion>, ipVersion, (), (const));
   MOCK_METHOD(void, close, ());
   MOCK_METHOD(bool, isOpen, (), (const));
   MOCK_METHOD(void, addOption_, (const Socket::OptionConstSharedPtr& option));
@@ -233,7 +234,7 @@ public:
   MOCK_METHOD(Api::SysCallIntResult, connect, (const Address::InstanceConstSharedPtr));
   MOCK_METHOD(Api::SysCallIntResult, listen, (int));
   MOCK_METHOD(Api::SysCallIntResult, setSocketOption, (int, int, const void*, socklen_t));
-  MOCK_METHOD(Api::SysCallIntResult, getSocketOption, (int, int, void*, socklen_t*));
+  MOCK_METHOD(Api::SysCallIntResult, getSocketOption, (int, int, void*, socklen_t*), (const));
   MOCK_METHOD(Api::SysCallIntResult, setBlockingForTest, (bool));
 
   IoHandlePtr io_handle_;
@@ -282,6 +283,7 @@ public:
   MOCK_METHOD(const IoHandle&, ioHandle, (), (const));
   MOCK_METHOD(Socket::Type, socketType, (), (const));
   MOCK_METHOD(Address::Type, addressType, (), (const));
+  MOCK_METHOD(absl::optional<Address::IpVersion>, ipVersion, (), (const));
   MOCK_METHOD(void, close, ());
   MOCK_METHOD(bool, isOpen, (), (const));
   MOCK_METHOD(IoHandlePtr, socket, (Socket::Type, Address::Type, Address::IpVersion), (const));
@@ -291,7 +293,7 @@ public:
   MOCK_METHOD(Api::SysCallIntResult, connect, (const Address::InstanceConstSharedPtr));
   MOCK_METHOD(Api::SysCallIntResult, listen, (int));
   MOCK_METHOD(Api::SysCallIntResult, setSocketOption, (int, int, const void*, socklen_t));
-  MOCK_METHOD(Api::SysCallIntResult, getSocketOption, (int, int, void*, socklen_t*));
+  MOCK_METHOD(Api::SysCallIntResult, getSocketOption, (int, int, void*, socklen_t*), (const));
   MOCK_METHOD(Api::SysCallIntResult, setBlockingForTest, (bool));
 
   IoHandlePtr io_handle_;

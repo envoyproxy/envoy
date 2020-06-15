@@ -171,6 +171,7 @@ TEST_P(NetworkUtilityGetLocalAddress, GetLocalAddress) {
 
 TEST(NetworkUtility, GetOriginalDst) {
   testing::NiceMock<Network::MockConnectionSocket> socket;
+  EXPECT_CALL(socket, ipVersion()).WillOnce(testing::Return(absl::nullopt));
   EXPECT_EQ(nullptr, Utility::getOriginalDst(socket));
 }
 
