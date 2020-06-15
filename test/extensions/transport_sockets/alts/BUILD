@@ -80,7 +80,6 @@ envoy_extension_cc_test(
     ],
     tags = ["fails_on_windows"],
     deps = [
-#        ":capturing_handshaker_lib",
         "//source/common/common:utility_lib",
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",

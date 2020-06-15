@@ -81,12 +81,12 @@ class AltsIntegrationTestBase : public testing::TestWithParam<Network::Address::
 public:
   AltsIntegrationTestBase(const std::string& server_peer_identity,
                           const std::string& client_peer_identity, bool server_connect_handshaker,
-                          bool client_connect_handshaker, bool swap_handshaker = false)
+                          bool client_connect_handshaker, bool capturing_handshaker = false)
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()),
         server_peer_identity_(server_peer_identity), client_peer_identity_(client_peer_identity),
         server_connect_handshaker_(server_connect_handshaker),
         client_connect_handshaker_(client_connect_handshaker),
-        swap_handshaker_(swap_handshaker) {}
+        capturing_handshaker_(capturing_handshaker) {}
 
   void initialize() override {
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -109,7 +109,7 @@ public:
   void SetUp() override {
     fake_handshaker_server_thread_ = api_->threadFactory().createThread([this]() {
       std::unique_ptr<grpc::Service> service;
-      if (swap_handshaker_) {
+      if (capturing_handshaker_) {
         capturing_handshaker_service_ = new CapturingHandshakerService();
         service = std::unique_ptr<grpc::Service>{capturing_handshaker_service_};
       } else {
@@ -198,7 +198,7 @@ public:
   ConditionalInitializer fake_handshaker_server_ci_;
   int fake_handshaker_server_port_{};
   Network::TransportSocketFactoryPtr client_alts_;
-  bool swap_handshaker_;
+  bool capturing_handshaker_;
   CapturingHandshakerService* capturing_handshaker_service_;
 };
 
