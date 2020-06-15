@@ -355,7 +355,7 @@ admin:
 }
 
 envoy::config::cluster::v3::Cluster
-ConfigHelper::buildStaticCluster(const std::string& name, int port, const std::string& ip_version) {
+ConfigHelper::buildStaticCluster(const std::string& name, int port, const std::string& address) {
   return TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(fmt::format(R"EOF(
       name: {}
       connect_timeout: 5s
@@ -373,7 +373,7 @@ ConfigHelper::buildStaticCluster(const std::string& name, int port, const std::s
       http2_protocol_options: {{}}
     )EOF",
                                                                                  name, name,
-                                                                                 ip_version, port));
+                                                                                 address, port));
 }
 
 envoy::config::cluster::v3::Cluster ConfigHelper::buildCluster(const std::string& name) {
@@ -401,7 +401,7 @@ envoy::config::cluster::v3::Cluster ConfigHelper::buildRedisCluster(const std::s
 
 envoy::config::endpoint::v3::ClusterLoadAssignment
 ConfigHelper::buildClusterLoadAssignment(const std::string& name,
-                                         Network::Address::IpVersion ip_version, uint32_t port) {
+                                         const std::string& address, uint32_t port) {
   return TestUtility::parseYaml<envoy::config::endpoint::v3::ClusterLoadAssignment>(
       fmt::format(R"EOF(
       cluster_name: {}
@@ -413,12 +413,12 @@ ConfigHelper::buildClusterLoadAssignment(const std::string& name,
                 address: {}
                 port_value: {}
     )EOF",
-                  name, Network::Test::getLoopbackAddressString(ip_version), port));
+                  name, address, port));
 }
 
 envoy::config::listener::v3::Listener
 ConfigHelper::buildListener(const std::string& name, const std::string& route_config,
-                            Network::Address::IpVersion ip_version,
+                            const std::string& address,
                             const std::string& stat_prefix) {
   return TestUtility::parseYaml<envoy::config::listener::v3::Listener>(fmt::format(
       R"EOF(
@@ -439,12 +439,12 @@ ConfigHelper::buildListener(const std::string& name, const std::string& route_co
               config_source: {{ ads: {{}} }}
             http_filters: [{{ name: envoy.filters.http.router }}]
     )EOF",
-      name, Network::Test::getLoopbackAddressString(ip_version), stat_prefix, route_config));
+      name, address, stat_prefix, route_config));
 }
 
 envoy::config::listener::v3::Listener
 ConfigHelper::buildRedisListener(const std::string& name, const std::string& cluster,
-                                 Network::Address::IpVersion ip_version) {
+                                 const std::string& address) {
   return TestUtility::parseYaml<envoy::config::listener::v3::Listener>(fmt::format(
       R"EOF(
       name: {}
@@ -464,7 +464,7 @@ ConfigHelper::buildRedisListener(const std::string& name, const std::string& clu
               catch_all_route:
                 cluster: {}
     )EOF",
-      name, Network::Test::getLoopbackAddressString(ip_version), name, cluster));
+      name, address, name, cluster));
 }
 
 envoy::config::route::v3::RouteConfiguration

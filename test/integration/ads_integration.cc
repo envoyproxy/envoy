@@ -46,19 +46,19 @@ envoy::config::cluster::v3::Cluster AdsIntegrationTest::buildRedisCluster(const 
 
 envoy::config::endpoint::v3::ClusterLoadAssignment
 AdsIntegrationTest::buildClusterLoadAssignment(const std::string& name) {
-  return ConfigHelper::buildClusterLoadAssignment(name, ipVersion(),
+  return ConfigHelper::buildClusterLoadAssignment(name, Network::Test::getLoopbackAddressString(ipVersion()),
                                                   fake_upstreams_[0]->localAddress()->ip()->port());
 }
 
 envoy::config::listener::v3::Listener
 AdsIntegrationTest::buildListener(const std::string& name, const std::string& route_config,
                                   const std::string& stat_prefix) {
-  return ConfigHelper::buildListener(name, route_config, ipVersion(), stat_prefix);
+  return ConfigHelper::buildListener(name, route_config, Network::Test::getLoopbackAddressString(ipVersion()), stat_prefix);
 }
 
 envoy::config::listener::v3::Listener
 AdsIntegrationTest::buildRedisListener(const std::string& name, const std::string& cluster) {
-  return ConfigHelper::buildRedisListener(name, cluster, ipVersion());
+  return ConfigHelper::buildRedisListener(name, cluster, Network::Test::getLoopbackAddressString(ipVersion()));
 }
 
 envoy::config::route::v3::RouteConfiguration
