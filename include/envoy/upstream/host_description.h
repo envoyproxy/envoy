@@ -9,10 +9,9 @@
 #include "envoy/network/transport_socket.h"
 #include "envoy/stats/primitive_stats_macros.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/stats/symbol_table.h"
 #include "envoy/upstream/health_check_host_monitor.h"
 #include "envoy/upstream/outlier_detection.h"
-
-#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Upstream {

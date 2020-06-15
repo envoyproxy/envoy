@@ -245,6 +245,7 @@ HostDescriptionImpl::HostDescriptionImpl(
     ClusterInfoConstSharedPtr cluster, const std::string& hostname,
     Network::Address::InstanceConstSharedPtr dest_address, MetadataConstSharedPtr metadata,
     const envoy::config::core::v3::Locality& locality,
+    Stats::StatName locality_zone_stat_name,
     const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
     uint32_t priority)
     : cluster_(cluster), hostname_(hostname),
@@ -254,8 +255,7 @@ HostDescriptionImpl::HostDescriptionImpl(
                                               Config::MetadataEnvoyLbKeys::get().CANARY)
                   .bool_value()),
       metadata_(metadata), locality_(locality),
-      locality_zone_stat_name_(locality.zone(), cluster->statsScope().symbolTable()),
-      priority_(priority),
+      locality_zone_stat_name_(locality_zone_stat_name), priority_(priority),
       socket_factory_(resolveTransportSocketFactory(dest_address, metadata_.get())) {
   if (health_check_config.port_value() != 0 && dest_address->type() != Network::Address::Type::Ip) {
     // Setting the health check port to non-0 only works for IP-type addresses. Setting the port

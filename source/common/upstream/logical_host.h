@@ -17,12 +17,14 @@ public:
   LogicalHost(const ClusterInfoConstSharedPtr& cluster, const std::string& hostname,
               const Network::Address::InstanceConstSharedPtr& address,
               const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
+              Stats::StatName locality_zone_stat_name,
               const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
               const Network::TransportSocketOptionsSharedPtr& override_transport_socket_options)
       : HostImpl(cluster, hostname, address,
                  // TODO(zyfjeff): Created through metadata shared pool
                  std::make_shared<const envoy::config::core::v3::Metadata>(lb_endpoint.metadata()),
                  lb_endpoint.load_balancing_weight().value(), locality_lb_endpoint.locality(),
+                 locality_zone_stat_name,
                  lb_endpoint.endpoint().health_check_config(), locality_lb_endpoint.priority(),
                  lb_endpoint.health_status()),
         override_transport_socket_options_(override_transport_socket_options) {}
