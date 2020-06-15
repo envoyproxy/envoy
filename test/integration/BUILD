@@ -232,6 +232,18 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "drain_close_integration_test",
+    srcs = [
+        "drain_close_integration_test.cc",
+    ],
+    deps = [
+        ":http_protocol_integration_lib",
+        "//source/extensions/filters/http/health_check:config",
+        "//test/test_common:utility_lib",
+    ],
+)
+
 exports_files(["test_utility.sh"])
 
 envoy_cc_test_binary(
