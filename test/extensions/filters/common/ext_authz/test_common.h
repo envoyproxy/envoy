@@ -45,31 +45,6 @@ public:
   static HeaderValueOptionVector makeHeaderValueOption(KeyValueOptionVector&& headers);
 
   static bool compareHeaderVector(const Http::HeaderVector& lhs, const Http::HeaderVector& rhs);
-
-  static std::string
-  getMethodPathFromApiTransportVersion(envoy::config::core::v3::ApiVersion transport_api_version,
-                                       absl::string_view method_name = "Check",
-                                       bool use_alpha = false) {
-    return absl::StrCat(
-        "/",
-        TestCommon::getServiceFullNameFromApiTransportVersion(transport_api_version, use_alpha),
-        "/", method_name);
-  }
-
-  static std::string getServiceFullNameFromApiTransportVersion(
-      envoy::config::core::v3::ApiVersion transport_api_version, bool use_alpha = false) {
-    switch (transport_api_version) {
-    case envoy::config::core::v3::ApiVersion::AUTO:
-      FALLTHRU;
-    case envoy::config::core::v3::ApiVersion::V2:
-      return use_alpha ? "envoy.service.auth.v2alpha.Authorization"
-                       : "envoy.service.auth.v2.Authorization";
-    case envoy::config::core::v3::ApiVersion::V3:
-      return "envoy.service.auth.v3.Authorization";
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
-    }
-  }
 };
 
 MATCHER_P(AuthzErrorResponse, status, "") {

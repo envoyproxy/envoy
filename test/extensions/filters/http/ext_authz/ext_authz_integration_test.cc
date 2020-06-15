@@ -86,10 +86,9 @@ public:
     RELEASE_ASSERT(result, result.message());
 
     EXPECT_EQ("POST", ext_authz_request_->headers().getMethodValue());
-    EXPECT_EQ(
-        Extensions::Filters::Common::ExtAuthz::TestCommon::getMethodPathFromApiTransportVersion(
-            apiVersion()),
-        ext_authz_request_->headers().getPathValue());
+    EXPECT_EQ(TestUtility::getVersionedMethodPath("envoy.service.auth.{}.Authorization", "Check",
+                                                  apiVersion()),
+              ext_authz_request_->headers().getPathValue());
     EXPECT_EQ("application/grpc", ext_authz_request_->headers().getContentTypeValue());
 
     envoy::service::auth::v3::CheckRequest expected_check_request;

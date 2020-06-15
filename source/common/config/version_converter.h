@@ -2,6 +2,8 @@
 
 #include "envoy/config/core/v3/config_source.pb.h"
 
+#include "common/common/assert.h"
+#include "common/common/macros.h"
 #include "common/protobuf/protobuf.h"
 
 // Convenience macro for downgrading a message and obtaining a reference.
@@ -115,6 +117,21 @@ class VersionUtil {
 public:
   // Some helpers for working with earlier message version deprecated fields.
   static void scrubHiddenEnvoyDeprecated(Protobuf::Message& message);
+
+  /**
+   * Given a method name template and version, return the method descriptor for a specific version.
+   *
+   * @param method_name_template template of a fully-qualified gRPC method name. For example:
+   *                             envoy.service.auth.{}.Authorization.Check.
+   * @param api_version target API version.
+   * @param use_alpha if this is an alpha version of an API.
+   *
+   * @return Protobuf::MethodDescriptor of a method for a specific version.
+   */
+  static const Protobuf::MethodDescriptor&
+  getMethodDescriptorForVersion(const std::string& method_name_template,
+                                envoy::config::core::v3::ApiVersion api_version,
+                                bool use_alpha = false);
 };
 
 } // namespace Config

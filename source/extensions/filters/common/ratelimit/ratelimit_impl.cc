@@ -11,6 +11,7 @@
 #include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
+#include "common/config/version_converter.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 
@@ -21,7 +22,7 @@ namespace Common {
 namespace RateLimit {
 
 namespace {
-// The fully-qualified name for the rate-limit service's ShouldRateLimit method.
+// The fully-qualified name template for the rate-limit service's ShouldRateLimit method.
 constexpr char METHOD_NAME_TEMPLATE[] =
     "envoy.service.ratelimit.{}.RateLimitService.ShouldRateLimit";
 
@@ -30,9 +31,10 @@ constexpr char METHOD_NAME_TEMPLATE[] =
 GrpcClientImpl::GrpcClientImpl(Grpc::RawAsyncClientPtr&& async_client,
                                const absl::optional<std::chrono::milliseconds>& timeout,
                                envoy::config::core::v3::ApiVersion transport_api_version)
-    : async_client_(std::move(async_client)),
-      timeout_(timeout), version_options_{transport_api_version, false, METHOD_NAME_TEMPLATE},
-      service_method_(version_options_.getMethodDescriptor()) {}
+    : async_client_(std::move(async_client)), timeout_(timeout),
+      service_method_(Config::VersionUtil::getMethodDescriptorForVersion(METHOD_NAME_TEMPLATE,
+                                                                         transport_api_version)),
+      transport_api_version_(transport_api_version) {}
 
 GrpcClientImpl::~GrpcClientImpl() { ASSERT(!callbacks_); }
 
@@ -69,7 +71,7 @@ void GrpcClientImpl::limit(RequestCallbacks& callbacks, const std::string& domai
 
   request_ = async_client_->send(service_method_, request, *this, parent_span,
                                  Http::AsyncClient::RequestOptions().setTimeout(timeout_),
-                                 version_options_.api_version_);
+                                 transport_api_version_);
 }
 
 void GrpcClientImpl::onSuccess(

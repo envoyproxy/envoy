@@ -5,6 +5,7 @@
 #include "envoy/service/auth/v3/external_auth.pb.h"
 
 #include "common/common/assert.h"
+#include "common/config/version_converter.h"
 #include "common/grpc/async_client_impl.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
@@ -19,7 +20,7 @@ namespace ExtAuthz {
 
 namespace {
 
-// The fully-qualified name for the ext_authz's Check method.
+// The fully-qualified name template for the ext_authz's Check method.
 constexpr char METHOD_NAME_TEMPLATE[] = "envoy.service.auth.{}.Authorization.Check";
 
 } // namespace
@@ -28,9 +29,10 @@ GrpcClientImpl::GrpcClientImpl(Grpc::RawAsyncClientPtr&& async_client,
                                const absl::optional<std::chrono::milliseconds>& timeout,
                                envoy::config::core::v3::ApiVersion transport_api_version,
                                bool use_alpha)
-    : async_client_(std::move(async_client)),
-      timeout_(timeout), version_options_{transport_api_version, use_alpha, METHOD_NAME_TEMPLATE},
-      service_method_(version_options_.getMethodDescriptor()) {}
+    : async_client_(std::move(async_client)), timeout_(timeout),
+      service_method_(Config::VersionUtil::getMethodDescriptorForVersion(
+          METHOD_NAME_TEMPLATE, transport_api_version, use_alpha)),
+      transport_api_version_(transport_api_version) {}
 
 GrpcClientImpl::~GrpcClientImpl() { ASSERT(!callbacks_); }
 
@@ -49,7 +51,7 @@ void GrpcClientImpl::check(RequestCallbacks& callbacks,
   ENVOY_LOG(trace, "Sending CheckRequest: {}", request.DebugString());
   request_ = async_client_->send(service_method_, request, *this, parent_span,
                                  Http::AsyncClient::RequestOptions().setTimeout(timeout_),
-                                 version_options_.api_version_);
+                                 transport_api_version_);
 }
 
 void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckResponse>&& response,

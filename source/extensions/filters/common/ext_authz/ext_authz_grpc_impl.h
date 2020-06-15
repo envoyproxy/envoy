@@ -19,7 +19,6 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/grpc/typed_async_client.h"
-#include "common/grpc/version_options.h"
 
 #include "extensions/filters/common/ext_authz/check_request_utils.h"
 #include "extensions/filters/common/ext_authz/ext_authz.h"
@@ -70,8 +69,8 @@ private:
   Grpc::AsyncRequest* request_{};
   absl::optional<std::chrono::milliseconds> timeout_;
   RequestCallbacks* callbacks_{};
-  const Grpc::VersionOptions version_options_;
   const Protobuf::MethodDescriptor& service_method_;
+  const envoy::config::core::v3::ApiVersion transport_api_version_;
 };
 
 } // namespace ExtAuthz

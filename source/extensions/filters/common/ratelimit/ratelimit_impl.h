@@ -17,7 +17,6 @@
 
 #include "common/common/logger.h"
 #include "common/grpc/typed_async_client.h"
-#include "common/grpc/version_options.h"
 #include "common/singleton/const_singleton.h"
 
 #include "extensions/filters/common/ratelimit/ratelimit.h"
@@ -75,8 +74,8 @@ private:
   Grpc::AsyncRequest* request_{};
   absl::optional<std::chrono::milliseconds> timeout_;
   RequestCallbacks* callbacks_{};
-  const Grpc::VersionOptions version_options_;
   const Protobuf::MethodDescriptor& service_method_;
+  const envoy::config::core::v3::ApiVersion transport_api_version_;
 };
 
 /**
