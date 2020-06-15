@@ -15,11 +15,15 @@ class Envoy private constructor(
 ) : HTTPClient {
 
   constructor(
-    engine: EnvoyEngine, envoyConfiguration: EnvoyConfiguration,
-    logLevel: LogLevel = LogLevel.INFO) : this(engine, envoyConfiguration, null, logLevel)
+    engine: EnvoyEngine,
+    envoyConfiguration: EnvoyConfiguration,
+    logLevel: LogLevel = LogLevel.INFO
+  ) : this(engine, envoyConfiguration, null, logLevel)
   constructor(
-    engine: EnvoyEngine, configurationYAML: String,
-    logLevel: LogLevel = LogLevel.INFO) : this(engine, null, configurationYAML, logLevel)
+    engine: EnvoyEngine,
+    configurationYAML: String,
+    logLevel: LogLevel = LogLevel.INFO
+  ) : this(engine, null, configurationYAML, logLevel)
 
   /**
    * Create a new Envoy instance.
@@ -39,9 +43,11 @@ class Envoy private constructor(
   }
 
   override fun send(
-    request: Request, body: ByteBuffer?, trailers: Map<String, List<String>>?,
-    responseHandler: ResponseHandler): CancelableStream
-  {
+    request: Request,
+    body: ByteBuffer?,
+    trailers: Map<String, List<String>>?,
+    responseHandler: ResponseHandler
+  ): CancelableStream {
     val stream = engine.startStream(responseHandler.underlyingCallbacks)
     if (body != null && trailers != null) { // Close with trailers
       stream.sendHeaders(request.outboundHeaders(), false)

@@ -25,21 +25,23 @@ class EnvoyClientTest {
     val envoy = Envoy(engine, config)
 
     val expectedHeaders = mapOf(
-        "key_1" to listOf("value_a"),
-        ":method" to listOf("POST"),
-        ":scheme" to listOf("https"),
-        ":authority" to listOf("www.envoyproxy.io"),
-        ":path" to listOf("/test")
+      "key_1" to listOf("value_a"),
+      ":method" to listOf("POST"),
+      ":scheme" to listOf("https"),
+      ":authority" to listOf("www.envoyproxy.io"),
+      ":path" to listOf("/test")
     )
     envoy.start(
-        RequestBuilder(
-            method = RequestMethod.POST,
-            scheme = "https",
-            authority = "www.envoyproxy.io",
-            path = "/test")
-            .setHeaders(mapOf("key_1" to listOf("value_a")))
-            .build(),
-        ResponseHandler(Executor {}))
+      RequestBuilder(
+        method = RequestMethod.POST,
+        scheme = "https",
+        authority = "www.envoyproxy.io",
+        path = "/test"
+      )
+        .setHeaders(mapOf("key_1" to listOf("value_a")))
+        .build(),
+      ResponseHandler(Executor {})
+    )
 
     verify(stream).sendHeaders(expectedHeaders, false)
   }
@@ -50,13 +52,15 @@ class EnvoyClientTest {
     val envoy = Envoy(engine, config)
 
     val emitter = envoy.start(
-        RequestBuilder(
-            method = RequestMethod.POST,
-            scheme = "https",
-            authority = "www.envoyproxy.io",
-            path = "/test")
-            .build(),
-        ResponseHandler(Executor {}))
+      RequestBuilder(
+        method = RequestMethod.POST,
+        scheme = "https",
+        authority = "www.envoyproxy.io",
+        path = "/test"
+      )
+        .build(),
+      ResponseHandler(Executor {})
+    )
 
     val data = ByteBuffer.allocate(0)
 
@@ -71,13 +75,15 @@ class EnvoyClientTest {
     val envoy = Envoy(engine, config)
 
     val emitter = envoy.start(
-        RequestBuilder(
-            method = RequestMethod.POST,
-            scheme = "https",
-            authority = "www.envoyproxy.io",
-            path = "/test")
-            .build(),
-        ResponseHandler(Executor {}))
+      RequestBuilder(
+        method = RequestMethod.POST,
+        scheme = "https",
+        authority = "www.envoyproxy.io",
+        path = "/test"
+      )
+        .build(),
+      ResponseHandler(Executor {})
+    )
 
     emitter.close(ByteBuffer.allocate(0))
 
@@ -91,13 +97,15 @@ class EnvoyClientTest {
 
     val trailers = mapOf("key_1" to listOf("value_a"))
     val emitter = envoy.start(
-        RequestBuilder(
-            method = RequestMethod.POST,
-            scheme = "https",
-            authority = "www.envoyproxy.io",
-            path = "/test")
-            .build(),
-        ResponseHandler(Executor {}))
+      RequestBuilder(
+        method = RequestMethod.POST,
+        scheme = "https",
+        authority = "www.envoyproxy.io",
+        path = "/test"
+      )
+        .build(),
+      ResponseHandler(Executor {})
+    )
 
     emitter.close(trailers)
 
@@ -110,23 +118,25 @@ class EnvoyClientTest {
     val envoy = Envoy(engine, config)
 
     val expectedHeaders = mapOf(
-        "key_1" to listOf("value_a"),
-        ":method" to listOf("POST"),
-        ":scheme" to listOf("https"),
-        ":authority" to listOf("www.envoyproxy.io"),
-        ":path" to listOf("/test")
+      "key_1" to listOf("value_a"),
+      ":method" to listOf("POST"),
+      ":scheme" to listOf("https"),
+      ":authority" to listOf("www.envoyproxy.io"),
+      ":path" to listOf("/test")
     )
     envoy.send(
-        RequestBuilder(
-            method = RequestMethod.POST,
-            scheme = "https",
-            authority = "www.envoyproxy.io",
-            path = "/test")
-            .setHeaders(mapOf("key_1" to listOf("value_a")))
-            .build(),
-        null,
-        null,
-        ResponseHandler(Executor {}))
+      RequestBuilder(
+        method = RequestMethod.POST,
+        scheme = "https",
+        authority = "www.envoyproxy.io",
+        path = "/test"
+      )
+        .setHeaders(mapOf("key_1" to listOf("value_a")))
+        .build(),
+      null,
+      null,
+      ResponseHandler(Executor {})
+    )
 
     verify(stream).sendHeaders(expectedHeaders, true)
   }
@@ -138,15 +148,17 @@ class EnvoyClientTest {
 
     val expectedBody = ByteBuffer.allocate(0)
     envoy.send(
-        RequestBuilder(
-            method = RequestMethod.POST,
-            scheme = "https",
-            authority = "www.envoyproxy.io",
-            path = "/test")
-            .build(),
-        expectedBody,
-        null,
-        ResponseHandler(Executor {}))
+      RequestBuilder(
+        method = RequestMethod.POST,
+        scheme = "https",
+        authority = "www.envoyproxy.io",
+        path = "/test"
+      )
+        .build(),
+      expectedBody,
+      null,
+      ResponseHandler(Executor {})
+    )
 
     verify(stream).sendData(expectedBody, true)
   }
@@ -159,15 +171,17 @@ class EnvoyClientTest {
     val expectedBody = ByteBuffer.allocate(0)
     val expectedTrailers = mapOf("key_1" to listOf("value_a"))
     envoy.send(
-        RequestBuilder(
-            method = RequestMethod.POST,
-            scheme = "https",
-            authority = "www.envoyproxy.io",
-            path = "/test")
-            .build(),
-        expectedBody,
-        expectedTrailers,
-        ResponseHandler(Executor {}))
+      RequestBuilder(
+        method = RequestMethod.POST,
+        scheme = "https",
+        authority = "www.envoyproxy.io",
+        path = "/test"
+      )
+        .build(),
+      expectedBody,
+      expectedTrailers,
+      ResponseHandler(Executor {})
+    )
 
     verify(stream).sendData(expectedBody, false)
     verify(stream).sendTrailers(expectedTrailers)
@@ -179,15 +193,17 @@ class EnvoyClientTest {
     val envoy = Envoy(engine, config)
 
     val emitter = envoy.send(
-        RequestBuilder(
-            method = RequestMethod.POST,
-            scheme = "https",
-            authority = "www.envoyproxy.io",
-            path = "/test")
-            .build(),
-        ByteBuffer.allocate(0),
-        mapOf("key_1" to listOf("value_a")),
-        ResponseHandler(Executor {}))
+      RequestBuilder(
+        method = RequestMethod.POST,
+        scheme = "https",
+        authority = "www.envoyproxy.io",
+        path = "/test"
+      )
+        .build(),
+      ByteBuffer.allocate(0),
+      mapOf("key_1" to listOf("value_a")),
+      ResponseHandler(Executor {})
+    )
 
     emitter.cancel()
 

@@ -3,7 +3,7 @@ package io.envoyproxy.envoymobile
 /*
  * Builder used for constructing instances of `RequestTrailers`.
  */
-class RequestTrailersBuilder: HeadersBuilder {
+class RequestTrailersBuilder : HeadersBuilder {
   /**
    * Initialize a new instance of the builder.
    */

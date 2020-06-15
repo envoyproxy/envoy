@@ -63,3 +63,33 @@ filegroup(
     srcs = [".kotlinlint.yml"],
     visibility = ["//visibility:public"],
 )
+
+filegroup(
+    name = "editor_config",
+    srcs = [".editorconfig"],
+    visibility = ["//visibility:public"],
+)
+
+genrule(
+    name = "kotlin_format",
+    srcs = ["//:editor_config"],
+    outs = ["kotlin_format.txt"],
+    cmd = """
+    $(location @kotlin_formatter//file) --android "**/*.kt" \
+        --reporter=plain --reporter=checkstyle,output=$@ \
+        --editorconfig=$(location //:editor_config)
+    """,
+    tools = ["@kotlin_formatter//file"],
+)
+
+genrule(
+    name = "kotlin_format_fix",
+    srcs = ["//:editor_config"],
+    outs = ["kotlin_format_fix.txt"],
+    cmd = """
+    $(location @kotlin_formatter//file) -F --android "**/*.kt" \
+        --reporter=plain --reporter=checkstyle,output=$@ \
+        --editorconfig=$(location //:editor_config)
+    """,
+    tools = ["@kotlin_formatter//file"],
+)

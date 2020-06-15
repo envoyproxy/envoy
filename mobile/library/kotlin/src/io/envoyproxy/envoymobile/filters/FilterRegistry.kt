@@ -23,11 +23,12 @@ class FilterRegistry {
     factories.add(factory)
   }
 
-  private fun createChain() : Pair<List<RequestFilter>, List<ResponseFilter>> {
+  private fun createChain(): Pair<List<RequestFilter>, List<ResponseFilter>> {
     // TODO: Finish implementing this function, linking up callbacks, and adding docs.
     val filters = factories.map { factory -> factory() }
-    return Pair(filters.filterIsInstance<RequestFilter>(),
-               filters.reversed().filterIsInstance<ResponseFilter>())
+    return Pair(
+      filters.filterIsInstance<RequestFilter>(),
+      filters.reversed().filterIsInstance<ResponseFilter>()
+    )
   }
-
 }

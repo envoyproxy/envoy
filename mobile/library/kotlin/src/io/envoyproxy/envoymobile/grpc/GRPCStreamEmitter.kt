@@ -4,7 +4,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 class GRPCStreamEmitter(
-    private val emitter: StreamEmitter
+  private val emitter: StreamEmitter
 ) {
   /**
    * Send a protobuf messageData's binary data over the gRPC stream.

@@ -10,8 +10,8 @@ package io.envoyproxy.envoymobile
  * @param cause an optional cause for the exception.
  */
 class EnvoyError constructor(
-    val errorCode: Int,
-    val message: String,
-    val attemptCount: Int? = null,
-    val cause: Throwable? = null
+  val errorCode: Int,
+  val message: String,
+  val attemptCount: Int? = null,
+  val cause: Throwable? = null
 )

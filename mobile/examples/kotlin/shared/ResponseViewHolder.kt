@@ -15,20 +15,20 @@ class ResponseViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
   fun setResult(count: Int, response: Response) {
     countTextView.text = count.toString()
     response.fold(
-        { success ->
-          responseTextView.text = responseTextView.resources
-            .getString(R.string.title_string, success.title)
-          headerTextView.text = headerTextView.resources
-            .getString(R.string.header_string, success.header)
-          headerTextView.visibility = View.VISIBLE
-          itemView.setBackgroundResource(R.color.success_color)
-        },
-        { failure ->
-          responseTextView.text = responseTextView.resources
-            .getString(R.string.title_string, failure.message)
-          headerTextView.visibility = View.GONE
-          itemView.setBackgroundResource(R.color.failed_color)
-        }
+      { success ->
+        responseTextView.text = responseTextView.resources
+          .getString(R.string.title_string, success.title)
+        headerTextView.text = headerTextView.resources
+          .getString(R.string.header_string, success.header)
+        headerTextView.visibility = View.VISIBLE
+        itemView.setBackgroundResource(R.color.success_color)
+      },
+      { failure ->
+        responseTextView.text = responseTextView.resources
+          .getString(R.string.title_string, failure.message)
+        headerTextView.visibility = View.GONE
+        itemView.setBackgroundResource(R.color.failed_color)
+      }
     )
   }
 }

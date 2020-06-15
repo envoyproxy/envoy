@@ -4,7 +4,7 @@ package io.envoyproxy.envoymobile
 /*
  * Headers representing an outbound request.
  */
-class RequestHeaders: Headers {
+class RequestHeaders : Headers {
   /**
    * Internal constructor used by builders.
    *
@@ -42,7 +42,8 @@ class RequestHeaders: Headers {
    */
   val upstreamHttpProtocol: UpstreamHttpProtocol? by lazy {
     value("x-envoy-mobile-upstream-protocol")?.firstOrNull()
-      ?.let { UpstreamHttpProtocol.enumValue(it) } }
+      ?.let { UpstreamHttpProtocol.enumValue(it) }
+  }
 
   /**
    * Convert the headers back to a builder for mutation.

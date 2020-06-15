@@ -10,7 +10,7 @@ class Standard : BaseConfiguration()
 class Custom(val yaml: String) : BaseConfiguration()
 
 open class EnvoyClientBuilder(
-    private val configuration: BaseConfiguration = Standard()
+  private val configuration: BaseConfiguration = Standard()
 ) {
   private var logLevel = LogLevel.INFO
   private var engineType: () -> EnvoyEngine = { EnvoyEngineImpl() }

@@ -3,7 +3,7 @@ package io.envoyproxy.envoymobile
 /*
  * Headers representing an inbound response.
  */
-class ResponseHeaders: Headers {
+class ResponseHeaders : Headers {
   /**
    * Internal constructor used by builders.
    *

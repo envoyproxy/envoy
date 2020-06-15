@@ -8,8 +8,8 @@ package io.envoyproxy.envoymobile
 internal fun RetryPolicy.outboundHeaders(): Map<String, List<String>> {
   val upstreamTimeoutMS = totalUpstreamTimeoutMS ?: 0L
   val headers = mutableMapOf(
-      "x-envoy-max-retries" to listOf("$maxRetryCount"),
-      "x-envoy-upstream-rq-timeout-ms" to listOf("$upstreamTimeoutMS")
+    "x-envoy-max-retries" to listOf("$maxRetryCount"),
+    "x-envoy-upstream-rq-timeout-ms" to listOf("$upstreamTimeoutMS")
   )
 
   if (perRetryTimeoutMS != null) {

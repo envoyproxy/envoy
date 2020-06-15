@@ -1,9 +1,10 @@
 package io.envoyproxy.envoymobile.engine
 
-import org.junit.Test
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.Test
 
-private const val TEST_CONFIG = """
+private const val TEST_CONFIG =
+  """
 mock_template:
 - name: mock
   stats_domain: {{ stats_domain }}
@@ -19,12 +20,11 @@ mock_template:
   virtual_clusters: {{ virtual_clusters }}
 """
 
-
 class EnvoyConfigurationTest {
 
   @Test
   fun `resolving with default configuration resolves with values`() {
-    val envoyConfiguration = EnvoyConfiguration("stats.foo.com", 123, 234, 345, 456, 567, "v1.2.3", "com.mydomain.myapp", "[test]");
+    val envoyConfiguration = EnvoyConfiguration("stats.foo.com", 123, 234, 345, 456, 567, "v1.2.3", "com.mydomain.myapp", "[test]")
 
     val resolvedTemplate = envoyConfiguration.resolveTemplate(TEST_CONFIG)
     assertThat(resolvedTemplate).contains("stats_domain: stats.foo.com")
@@ -38,7 +38,6 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("app_id: com.mydomain.myapp")
     assertThat(resolvedTemplate).contains("virtual_clusters: [test]")
   }
-
 
   @Test(expected = EnvoyConfiguration.ConfigurationException::class)
   fun `resolve templates with invalid templates will throw on build`() {

@@ -2,7 +2,7 @@ package io.envoyproxy.envoymobile
 
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks
 import java.nio.ByteBuffer
-import java.util.concurrent.Executor;
+import java.util.concurrent.Executor
 
 /**
  * Callback interface for receiving stream events.
@@ -10,20 +10,25 @@ import java.util.concurrent.Executor;
 class ResponseHandler(val executor: Executor) {
 
   class EnvoyHTTPCallbacksAdapter(
-      private val executor: Executor
+    private val executor: Executor
   ) : EnvoyHTTPCallbacks {
 
     internal var onHeadersClosure: (
-      headers: Map<String, List<String>>, statusCode: Int, endStream: Boolean
+      headers: Map<String, List<String>>,
+      statusCode: Int,
+      endStream: Boolean
     ) -> Unit = { _, _, _ -> Unit }
     internal var onDataClosure: (
-      byteBuffer: ByteBuffer, endStream: Boolean
+      byteBuffer: ByteBuffer,
+      endStream: Boolean
     ) -> Unit = { _, _ -> Unit }
     internal var onTrailersClosure: (
       trailers: Map<String, List<String>>
     ) -> Unit = { Unit }
     internal var onErrorClosure: (
-      errorCode: Int, message: String, attemptCount: Int
+      errorCode: Int,
+      message: String,
+      attemptCount: Int
     ) -> Unit = { _, _, _ -> Unit }
     internal var onCancelClosure: () -> Unit = { Unit }
 
