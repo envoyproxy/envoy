@@ -171,13 +171,17 @@ bool shouldLogAndInvokeEnvoyBugForEnvoyBugMacroUseOnly(absl::string_view bug_nam
 #define ENVOY_BUG_ACTION Envoy::Assert::invokeEnvoyBugFailureRecordActionForEnvoyBugMacroUseOnly()
 #endif
 
+// These macros are needed to stringify __LINE__ correctly.
+#define STRINGIFY(X) #X
+#define TOSTRING(X) STRINGIFY(X)
+
 // CONDITION_STR is needed to prevent macros in condition from being expected, which obfuscates
 // the logged failure, e.g., "EAGAIN" vs "11".
 // ENVOY_BUG logging and actions are invoked only on power-of-two instances per log line.
 #define _ENVOY_BUG_IMPL(CONDITION, CONDITION_STR, ACTION, DETAILS)                                 \
   do {                                                                                             \
     if (!(CONDITION) && Envoy::Assert::shouldLogAndInvokeEnvoyBugForEnvoyBugMacroUseOnly(          \
-                            absl::StrCat(__FILE__, __LINE__))) {                                   \
+                            __FILE__ ":" TOSTRING(__LINE__))) {                                    \
       const std::string& details = (DETAILS);                                                      \
       ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::envoy_bug), error,    \
                           "envoy bug failure: {}.{}{}", CONDITION_STR,                             \
