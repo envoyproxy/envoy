@@ -28,11 +28,6 @@ public:
   PostgresIntegrationTest() : BaseIntegrationTest(GetParam(), postgresConfig()){};
 
   void SetUp() override { BaseIntegrationTest::initialize(); }
-
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
 };
 INSTANTIATE_TEST_SUITE_P(IpVersions, PostgresIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));

@@ -47,11 +47,16 @@ public:
    */
   bool isMutexLockedForTest();
 
+protected:
+  virtual Counter* makeCounterInternal(StatName name, StatName tag_extracted_name,
+                                       const StatNameTagVector& stat_name_tags);
+
 private:
   template <class BaseClass> friend class StatsSharedImpl;
   friend class CounterImpl;
   friend class GaugeImpl;
   friend class TextReadoutImpl;
+  friend class NotifyingAllocatorImpl;
 
   struct HeapStatHash {
     using is_transparent = void; // NOLINT(readability-identifier-naming)

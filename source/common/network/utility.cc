@@ -345,25 +345,24 @@ Address::InstanceConstSharedPtr Utility::getAddressWithPort(const Address::Insta
 
 Address::InstanceConstSharedPtr Utility::getOriginalDst(Socket& sock) {
 #ifdef SOL_IP
-  sockaddr_storage orig_addr;
-  socklen_t addr_len = sizeof(sockaddr_storage);
-  int socket_domain;
-  socklen_t domain_len = sizeof(socket_domain);
-  // TODO(fcoras): improve once we store ip version in socket
-  const Api::SysCallIntResult result =
-      sock.getSocketOption(SOL_SOCKET, SO_DOMAIN, &socket_domain, &domain_len);
-  int status = result.rc_;
 
-  if (status != 0) {
+  if (sock.addressType() != Address::Type::Ip) {
     return nullptr;
   }
 
-  if (socket_domain == AF_INET) {
-    status = sock.getSocketOption(SOL_IP, SO_ORIGINAL_DST, &orig_addr, &addr_len).rc_;
-  } else if (socket_domain == AF_INET6) {
-    status = sock.getSocketOption(SOL_IPV6, IP6T_SO_ORIGINAL_DST, &orig_addr, &addr_len).rc_;
-  } else {
+  auto ipVersion = sock.ipVersion();
+  if (!ipVersion.has_value()) {
     return nullptr;
+  }
+
+  sockaddr_storage orig_addr;
+  socklen_t addr_len = sizeof(sockaddr_storage);
+  int status;
+
+  if (*ipVersion == Address::IpVersion::v4) {
+    status = sock.getSocketOption(SOL_IP, SO_ORIGINAL_DST, &orig_addr, &addr_len).rc_;
+  } else {
+    status = sock.getSocketOption(SOL_IPV6, IP6T_SO_ORIGINAL_DST, &orig_addr, &addr_len).rc_;
   }
 
   if (status != 0) {
@@ -472,22 +471,22 @@ void Utility::addressToProtobufAddress(const Address::Instance& address,
   }
 }
 
-Address::SocketType
+Socket::Type
 Utility::protobufAddressSocketType(const envoy::config::core::v3::Address& proto_address) {
   switch (proto_address.address_case()) {
   case envoy::config::core::v3::Address::AddressCase::kSocketAddress: {
     const auto protocol = proto_address.socket_address().protocol();
     switch (protocol) {
     case envoy::config::core::v3::SocketAddress::TCP:
-      return Address::SocketType::Stream;
+      return Socket::Type::Stream;
     case envoy::config::core::v3::SocketAddress::UDP:
-      return Address::SocketType::Datagram;
+      return Socket::Type::Datagram;
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }
   case envoy::config::core::v3::Address::AddressCase::kPipe:
-    return Address::SocketType::Stream;
+    return Socket::Type::Stream;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }

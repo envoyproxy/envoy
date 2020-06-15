@@ -290,8 +290,8 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
 void InstanceImpl::initialize(const Options& options,
                               Network::Address::InstanceConstSharedPtr local_address,
                               ComponentFactory& component_factory, ListenerHooks& hooks) {
-  ENVOY_LOG(info, "initializing epoch {} (hot restart version={})", options.restartEpoch(),
-            restarter_.version());
+  ENVOY_LOG(info, "initializing epoch {} (base id={}, hot restart version={})",
+            options.restartEpoch(), restarter_.baseId(), restarter_.version());
 
   ENVOY_LOG(info, "statically linked extensions:");
   for (const auto& ext : Envoy::Registry::FactoryCategoryRegistry::registeredFactories()) {
@@ -320,9 +320,9 @@ void InstanceImpl::initialize(const Options& options,
       ServerStats{ALL_SERVER_STATS(POOL_COUNTER_PREFIX(stats_store_, server_stats_prefix),
                                    POOL_GAUGE_PREFIX(stats_store_, server_stats_prefix),
                                    POOL_HISTOGRAM_PREFIX(stats_store_, server_stats_prefix))});
-  validation_context_.static_warning_validation_visitor().setCounter(
+  validation_context_.static_warning_validation_visitor().setUnknownCounter(
       server_stats_->static_unknown_fields_);
-  validation_context_.dynamic_warning_validation_visitor().setCounter(
+  validation_context_.dynamic_warning_validation_visitor().setUnknownCounter(
       server_stats_->dynamic_unknown_fields_);
 
   initialization_timer_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(

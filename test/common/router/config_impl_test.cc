@@ -4019,7 +4019,7 @@ virtual_hosts:
  * @brief  Generate headers for testing
  * @param ssl set true to insert "x-forwarded-proto: https", else "x-forwarded-proto: http"
  * @param internal nullopt for no such "x-envoy-internal" header, or explicit "true/false"
- * @return Http::TestHeaderMapImpl
+ * @return Http::TestRequestHeaderMapImpl
  */
 static Http::TestRequestHeaderMapImpl genRedirectHeaders(const std::string& host,
                                                          const std::string& path, bool ssl,
@@ -4703,7 +4703,7 @@ virtual_hosts:
     Http::TestResponseHeaderMapImpl response_headers;
     StreamInfo::MockStreamInfo stream_info;
     route_entry->finalizeResponseHeaders(response_headers, stream_info);
-    EXPECT_EQ(response_headers, Http::TestHeaderMapImpl{});
+    EXPECT_EQ(response_headers, Http::TestResponseHeaderMapImpl{});
   }
 
   // Weighted Cluster with no runtime, total weight = 10000
@@ -6802,10 +6802,10 @@ virtual_hosts:
   const auto& retry_policy = config.route(headers, 0)->routeEntry()->retryPolicy();
   ASSERT_EQ(2, retry_policy.retriableHeaders().size());
 
-  Http::TestHeaderMapImpl expected_0{{":status", "500"}};
-  Http::TestHeaderMapImpl unexpected_0{{":status", "200"}};
-  Http::TestHeaderMapImpl expected_1{{"x-upstream-pushback", "bar"}};
-  Http::TestHeaderMapImpl unexpected_1{{"x-test", "foo"}};
+  Http::TestResponseHeaderMapImpl expected_0{{":status", "500"}};
+  Http::TestResponseHeaderMapImpl unexpected_0{{":status", "200"}};
+  Http::TestResponseHeaderMapImpl expected_1{{"x-upstream-pushback", "bar"}};
+  Http::TestResponseHeaderMapImpl unexpected_1{{"x-test", "foo"}};
 
   EXPECT_TRUE(retry_policy.retriableHeaders()[0]->matchesHeaders(expected_0));
   EXPECT_FALSE(retry_policy.retriableHeaders()[0]->matchesHeaders(unexpected_0));

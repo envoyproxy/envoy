@@ -28,18 +28,7 @@ public:
       )EOF");
   }
 
-  /**
-   * Initializer for an individual test.
-   */
   void SetUp() override { BaseIntegrationTest::initialize(); }
-
-  /**
-   *  Destructor for an individual test.
-   */
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, EchoIntegrationTest,
