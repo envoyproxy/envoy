@@ -211,6 +211,8 @@ envoy_cc_library(
     name = "version_options_lib",
     hdrs = ["version_options.h"],
     deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:macros",
         "//source/common/protobuf",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],

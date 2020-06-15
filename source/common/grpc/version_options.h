@@ -4,6 +4,9 @@
 
 #include "envoy/config/core/v3/config_source.pb.h"
 
+#include "common/common/assert.h"
+#include "common/common/fmt.h"
+#include "common/common/macros.h"
 #include "common/protobuf/protobuf.h"
 
 namespace Envoy {
