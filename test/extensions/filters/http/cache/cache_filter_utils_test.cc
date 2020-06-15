@@ -33,23 +33,27 @@ IsCacheableRequestParams params[] = {
         false
     },
     {
-        {{":path", "/"}, {":method", "GET"}, {"x-forwarded-proto", "https"}, {":authority", "test"}},
+        {{":path", "/"}, {":method", "GET"}, {"x-forwarded-proto", "https"}, {":authority", "test.com"}},
         true
     },
     {
-        {{":path", "/"}, {":method", "POST"}, {"x-forwarded-proto", "https"}, {":authority", "test"}},
+        {{":path", "/"}, {":method", "POST"}, {"x-forwarded-proto", "https"}, {":authority", "test.com"}},
         false
     },
     {
-        {{":path", "/"}, {":method", "GET"}, {"x-forwarded-proto", "http"}, {":authority", "test"}},
+        {{":path", "/"}, {":method", "GET"}, {"x-forwarded-proto", "http"}, {":authority", "test.com"}},
         true
     },
     {
-        {{":path", "/"}, {":method", "GET"}, {"x-forwarded-proto", "http"}, {":authority", "test"}},
+        {{":path", "/"}, {":method", "GET"}, {"x-forwarded-proto", "http"}, {":authority", "test.com"}},
         true
     },
     {
-        {{":path", "/"}, {":method", "GET"}, {"x-forwarded-proto", "ftp"}, {":authority", "test"}},
+        {{":path", "/"}, {":method", "GET"}, {"x-forwarded-proto", "ftp"}, {":authority", "test.com"}},
+        false
+    },
+    {
+        {{":path", "/"}, {":method", "GET"}, {"x-forwarded-proto", "http"}, {":authority", "test.com"}, {"authorization", "basic YWxhZGRpbjpvcGVuc2VzYW1l"}},
         false
     },
 };
