@@ -6,25 +6,25 @@ import "validate/validate.proto";
 
 // Structured input for xds_fuzz_test.
 message AddListener {
-  string name = 1 [(validate.rules).string.min_len = 1];
-  string route_config = 2 [(validate.rules).string.min_len = 1];
-  string version = 3 [(validate.rules).string.min_len = 1];
+  string name = 1 [(validate.rules).string.pattern = "[[:alnum:]]+"];
+  string route_config = 2 [(validate.rules).string.pattern = "[[:alnum:]]+"];
+  string version = 3 [(validate.rules).string.pattern = "[[:digit:]]+"];
 }
 
 message AddRoute {
-  string name = 1 [(validate.rules).string.min_len = 1];
-  string cluster = 2 [(validate.rules).string.min_len = 1];
-  string version = 3 [(validate.rules).string.min_len = 1];
+  string name = 1 [(validate.rules).string.pattern = "[[:alnum:]]+"];
+  string cluster = 2 [(validate.rules).string.pattern = "[[:alnum:]]+"];
+  string version = 3 [(validate.rules).string.pattern = "[[:digit:]]+"];
 }
 
 message RemoveListener {
-  string name = 1 [(validate.rules).string.min_len = 1];
-  string version = 2 [(validate.rules).string.min_len = 1];
+  string name = 1 [(validate.rules).string.pattern = "[[:alnum:]]+"];
+  string version = 2 [(validate.rules).string.pattern = "[[:digit:]]+"];
 }
 
 message RemoveRoute {
-  string name = 1 [(validate.rules).string.min_len = 1];
-  string version = 2 [(validate.rules).string.min_len = 1];
+  string name = 1 [(validate.rules).string.pattern = "[[:alnum:]]+"];
+  string version = 2 [(validate.rules).string.pattern = "[[:digit:]]+"];
 }
 
 message Action {
