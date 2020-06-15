@@ -90,12 +90,12 @@ Http::StreamResetReason quicErrorCodeToEnvoyResetReason(quic::QuicErrorCode erro
   }
 }
 
-Http::ErrorCode quicErrorCodeToEnvoyErrorCode(quic::QuicErrorCode error) noexcept {
+Http::GoAwayErrorCode quicErrorCodeToEnvoyErrorCode(quic::QuicErrorCode error) noexcept {
   switch (error) {
   case quic::QUIC_NO_ERROR:
-    return Http::ErrorCode::NoError;
+    return Http::GoAwayErrorCode::NoError;
   default:
-    return Http::ErrorCode::Other;
+    return Http::GoAwayErrorCode::Other;
   }
 }
 

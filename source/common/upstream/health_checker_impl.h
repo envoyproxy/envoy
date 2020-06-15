@@ -323,7 +323,7 @@ private:
     void onBelowWriteBufferLowWatermark() override {}
 
     void onEvent(Network::ConnectionEvent event);
-    void onGoAway(Http::ErrorCode error_code);
+    void onGoAway(Http::GoAwayErrorCode error_code);
 
     class ConnectionCallbackImpl : public Network::ConnectionCallbacks {
     public:
@@ -341,7 +341,7 @@ private:
     public:
       HttpConnectionCallbackImpl(GrpcActiveHealthCheckSession& parent) : parent_(parent) {}
       // Http::ConnectionCallbacks
-      void onGoAway(Http::ErrorCode error_code) override { parent_.onGoAway(error_code); }
+      void onGoAway(Http::GoAwayErrorCode error_code) override { parent_.onGoAway(error_code); }
 
     private:
       GrpcActiveHealthCheckSession& parent_;

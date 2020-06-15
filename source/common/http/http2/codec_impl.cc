@@ -564,12 +564,12 @@ int ConnectionImpl::onBeforeFrameReceived(const nghttp2_frame_hd* hd) {
 }
 
 ABSL_MUST_USE_RESULT
-enum ErrorCode ngHttp2ErrorCodeToErrorCode(uint32_t code) noexcept {
+enum GoAwayErrorCode ngHttp2ErrorCodeToErrorCode(uint32_t code) noexcept {
   switch (code) {
   case NGHTTP2_NO_ERROR:
-    return ErrorCode::NoError;
+    return GoAwayErrorCode::NoError;
   default:
-    return ErrorCode::Other;
+    return GoAwayErrorCode::Other;
   }
 }
 

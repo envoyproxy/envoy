@@ -4600,7 +4600,7 @@ TEST_F(GrpcHealthCheckerImplTest, GoAwayErrorProbeInProgress) {
 
   // GOAWAY with non-NO_ERROR code will result in a healthcheck failure
   // and the connection closing.
-  test_sessions_[0]->codec_client_->raiseGoAway(Http::ErrorCode::Other);
+  test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::Other);
 
   EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
       Host::HealthFlag::FAILED_ACTIVE_HC));
@@ -4622,7 +4622,7 @@ TEST_F(GrpcHealthCheckerImplTest, GoAwayProbeInProgress) {
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
 
   // GOAWAY with NO_ERROR code during check should be handle gracefully.
-  test_sessions_[0]->codec_client_->raiseGoAway(Http::ErrorCode::NoError);
+  test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
   respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
   expectHostHealthy(true);
 
@@ -4648,12 +4648,12 @@ TEST_F(GrpcHealthCheckerImplTest, GoAwayErrorAfterGracefulProbeInProgress) {
   EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
 
   // GOAWAY (NO_ERROR) during check should be handled gracefully.
-  test_sessions_[0]->codec_client_->raiseGoAway(Http::ErrorCode::NoError);
+  test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
   expectHostHealthy(true);
 
   // GOAWAY with non-NO_ERROR code will result in a healthcheck failure
   // and the connection closing.
-  test_sessions_[0]->codec_client_->raiseGoAway(Http::ErrorCode::Other);
+  test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::Other);
 
   EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
       Host::HealthFlag::FAILED_ACTIVE_HC));
@@ -4675,8 +4675,8 @@ TEST_F(GrpcHealthCheckerImplTest, MultipleGoAwayProbeInProgress) {
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
 
   // Multiple GOAWAY with NO_ERROR code during check should be handle gracefully.
-  test_sessions_[0]->codec_client_->raiseGoAway(Http::ErrorCode::NoError);
-  test_sessions_[0]->codec_client_->raiseGoAway(Http::ErrorCode::NoError);
+  test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
+  test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
   respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
   expectHostHealthy(true);
 
@@ -4709,7 +4709,7 @@ TEST_F(GrpcHealthCheckerImplTest, GoAwayProbeInProgressTimeout) {
   EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _));
 
   // GOAWAY during check should be handled gracefully.
-  test_sessions_[0]->codec_client_->raiseGoAway(Http::ErrorCode::NoError);
+  test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
   expectHostHealthy(true);
 
   test_sessions_[0]->timeout_timer_->invokeCallback();
@@ -4744,7 +4744,7 @@ TEST_F(GrpcHealthCheckerImplTest, GoAwayProbeInProgressStreamReset) {
   EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _));
 
   // GOAWAY during check should be handled gracefully.
-  test_sessions_[0]->codec_client_->raiseGoAway(Http::ErrorCode::NoError);
+  test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
   expectHostHealthy(true);
 
   test_sessions_[0]->request_encoder_.stream_.resetStream(Http::StreamResetReason::RemoteReset);
@@ -4779,7 +4779,7 @@ TEST_F(GrpcHealthCheckerImplTest, GoAwayProbeInProgressBadResponse) {
   EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _));
 
   // GOAWAY during check should be handled gracefully.
-  test_sessions_[0]->codec_client_->raiseGoAway(Http::ErrorCode::NoError);
+  test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
   expectHostHealthy(true);
 
   respondResponseSpec(0, ResponseSpec{{{":status", "200"}, {"content-type", "application/grpc"}},
@@ -4816,7 +4816,7 @@ TEST_F(GrpcHealthCheckerImplTest, GoAwayProbeInProgressConnectionClose) {
   EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _));
 
   // GOAWAY during check should be handled gracefully.
-  test_sessions_[0]->codec_client_->raiseGoAway(Http::ErrorCode::NoError);
+  test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
   expectHostHealthy(true);
 
   test_sessions_[0]->client_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
@@ -4850,7 +4850,7 @@ TEST_F(GrpcHealthCheckerImplTest, GoAwayBetweenChecks) {
   expectHostHealthy(true);
 
   // GOAWAY between checks should go unnoticed.
-  test_sessions_[0]->codec_client_->raiseGoAway(Http::ErrorCode::NoError);
+  test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
 
   expectClientCreate(0);
   expectHealthcheckStart(0);

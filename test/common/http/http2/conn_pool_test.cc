@@ -971,7 +971,7 @@ TEST_F(Http2ConnPoolImplTest, GoAway) {
   r1.inner_decoder_->decodeHeaders(
       ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
 
-  test_clients_[0].codec_client_->raiseGoAway(Http::ErrorCode::NoError);
+  test_clients_[0].codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
 
   expectClientCreate();
   ActiveTestRequest r2(*this, 1, false);

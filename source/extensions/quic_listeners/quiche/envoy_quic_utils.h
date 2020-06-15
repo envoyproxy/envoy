@@ -71,7 +71,7 @@ Http::StreamResetReason quicErrorCodeToEnvoyResetReason(quic::QuicErrorCode erro
 
 // Called when a GOAWAY frame is received.
 ABSL_MUST_USE_RESULT
-Http::ErrorCode quicErrorCodeToEnvoyErrorCode(quic::QuicErrorCode error) noexcept;
+Http::GoAwayErrorCode quicErrorCodeToEnvoyErrorCode(quic::QuicErrorCode error) noexcept;
 
 // Create a connection socket instance and apply given socket options to the
 // socket. IP_PKTINFO and SO_RXQ_OVFL is always set if supported.

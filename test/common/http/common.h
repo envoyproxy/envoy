@@ -28,7 +28,7 @@ public:
       destroy_cb_(this);
     }
   }
-  void raiseGoAway(Http::ErrorCode error_code) { onGoAway(error_code); }
+  void raiseGoAway(Http::GoAwayErrorCode error_code) { onGoAway(error_code); }
   Event::Timer* idleTimer() { return idle_timer_.get(); }
 
   DestroyCb destroy_cb_;

@@ -36,7 +36,7 @@ const char MaxResponseHeadersCountOverrideKey[] =
 
 class Stream;
 
-enum class ErrorCode {
+enum class GoAwayErrorCode {
   NoError,
   Other,
 };
@@ -329,7 +329,7 @@ public:
   /**
    * Fires when the remote indicates "go away." No new streams should be created.
    */
-  virtual void onGoAway(ErrorCode error_code) PURE;
+  virtual void onGoAway(GoAwayErrorCode error_code) PURE;
 };
 
 /**
