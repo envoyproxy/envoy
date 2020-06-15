@@ -6,8 +6,6 @@
 # adding the new gauge.
 export ENVOY_BIN="${TEST_SRCDIR}"/envoy/test/integration/hotrestart_main
 source "$TEST_SRCDIR/envoy/test/integration/test_utility.sh"
-echo ENVOY_BIN=${ENVOY_BIN}
-ls -l ${ENVOY_BIN}
 
 # TODO(htuch): In this test script, we are duplicating work done in test_environment.cc via sed.
 # Instead, we can add a simple C++ binary that links against test_environment.cc and uses the
@@ -221,8 +219,7 @@ function run_testsuite() {
   [[ $? == 0 ]]
 
   # Then wait for the SERVER_1 to exit, which should happen within a few seconds
-  # due to '--parent-shutdown-time-s 3' on SERVER_2, and '--drain-time-s 2' on
-  # SERVER_1.
+  # due to '--parent-shutdown-time-s 3' on SERVER_2.
   start_test Waiting for epoch 1 to finish.
   echo time wait ${SERVER_1_PID}
   time wait ${SERVER_1_PID}
