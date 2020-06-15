@@ -1897,7 +1897,7 @@ TEST_F(EdsTest, DeprecatedFieldsError) {
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
   resources.Add()->PackFrom(cluster_load_assignment);
   EXPECT_THROW_WITH_REGEX(eds_callbacks_->onConfigUpdate(resources, ""), ProtoValidationException,
-                          "Illegal use of deprecated option "
+                          "Illegal use of deprecated V2 option "
                           "'envoy.config.endpoint.v3.ClusterLoadAssignment.Policy.hidden_envoy_"
                           "deprecated_disable_overprovisioning'");
 }

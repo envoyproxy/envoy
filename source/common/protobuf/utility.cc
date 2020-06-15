@@ -347,7 +347,7 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
   // If the filename ends with .pb, attempt to parse it as a binary proto.
   if (absl::EndsWith(path, FileExtensions::get().ProtoBinary)) {
     // Attempt to parse the binary format.
-    auto read_proto_binary = [&contents, &path, &validation_visitor](
+    auto read_proto_binary = [&contents, &validation_visitor](
                                  Protobuf::Message& message, MessageVersion message_version) {
       try {
         if (message.ParseFromString(contents)) {
@@ -360,13 +360,8 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
           throw ex;
         }
       }
-      if (message_version == MessageVersion::LATEST_VERSION) {
-        throw EnvoyException("Unable to parse file \"" + path + "\" as a binary protobuf (type " +
-                             message.GetTypeName() + ")");
-      } else {
-        throw ApiBoostRetryException(
-            "Failed to parse at earlier version, trying again at later version.");
-      }
+      throw ApiBoostRetryException(
+          "Failed to parse at earlier version, trying again at later version.");
     };
 
     if (do_boosting) {
@@ -471,9 +466,10 @@ public:
             !runtime_->snapshot().deprecatedFeatureEnabled(
                 absl::StrCat("envoy.deprecated_features:", field.full_name()), false)) {
           const std::string fatal_error = absl::StrCat(
-              "Illegal use of deprecated option '", field.full_name(), "' from file ", filename,
-              ". This configuration has been removed from the current Envoy API. "
-              "Please see " ENVOY_DOC_URL_VERSION_HISTORY " for details.");
+              "Illegal use of deprecated V2 option '", field.full_name(), "' from file ",
+              filename, " while using the latest V3 configuration. This option has been removed "
+              "from the current Envoy API. Please see " ENVOY_DOC_URL_VERSION_HISTORY " for "
+              "details.");
           throw ProtoValidationException(fatal_error, message);
         }
       }
@@ -573,13 +569,6 @@ std::string MessageUtil::getJsonStringFromMessage(const Protobuf::Message& messa
   // This should always succeed unless something crash-worthy such as out-of-memory.
   RELEASE_ASSERT(status.ok(), "");
   return json;
-}
-
-std::string MessageUtil::getProtobufBinaryStringFromMessage(const Protobuf::Message& message) {
-  std::string pb_binary_str;
-  pb_binary_str.reserve(message.ByteSizeLong());
-  message.SerializeToString(&pb_binary_str);
-  return pb_binary_str;
 }
 
 void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Message& message) {

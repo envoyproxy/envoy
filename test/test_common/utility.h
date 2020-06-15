@@ -587,6 +587,18 @@ public:
     MessageUtil::loadFromJson(json, message);
     return message;
   }
+
+  /**
+   * Extract the Protobuf binary format of a google.protobuf.Message as a string.
+   * @param message message of type type.googleapis.com/google.protobuf.Message.
+   * @return std::string of the Protobuf binary object.
+   */
+  static std::string getProtobufBinaryStringFromMessage(const Protobuf::Message& message) {
+    std::string pb_binary_str;
+    pb_binary_str.reserve(message.ByteSizeLong());
+    message.SerializeToString(&pb_binary_str);
+    return pb_binary_str;
+  }
 };
 
 /**

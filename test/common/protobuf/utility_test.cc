@@ -1681,10 +1681,12 @@ TEST_P(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(FatalEnum)) {
       checkForDeprecation(base));
 }
 
+// Verify that direct use of a hidden_envoy_deprecated field fails, but upgrade
+// succeeds
 TEST_P(DeprecatedFieldsTest, ManualDeprecatdFieldAddition) {
   // Create a base message and insert a deprecated field. When upgrading the
   // deprecated field should be set as deprecated, and a warning should be logged
-  envoy::test::deprecation_test::Base baseShouldWarn =
+  envoy::test::deprecation_test::Base base_should_warn =
       TestUtility::parseYaml<envoy::test::deprecation_test::Base>(R"EOF(
       not_deprecated: field1
       is_deprecated: hidden_field1
@@ -1697,13 +1699,13 @@ TEST_P(DeprecatedFieldsTest, ManualDeprecatdFieldAddition) {
   // Non-fatal checks for a deprecated field should log rather than throw an exception.
   EXPECT_LOG_CONTAINS("warning",
                       "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'",
-                      checkForDeprecation(baseShouldWarn));
+                      checkForDeprecation(base_should_warn));
   EXPECT_EQ(1, runtime_deprecated_feature_use_.value());
   EXPECT_EQ(1, deprecated_feature_seen_since_process_start_.value());
 
   // Create an upgraded message and insert a deprecated field. This is a bypass
   // of the upgrading procedure validation, and should fail
-  envoy::test::deprecation_test::UpgradedBase baseShouldFail =
+  envoy::test::deprecation_test::UpgradedBase base_should_fail =
       TestUtility::parseYaml<envoy::test::deprecation_test::UpgradedBase>(R"EOF(
       not_deprecated: field1
       hidden_envoy_deprecated_is_deprecated: hidden_field1
@@ -1714,10 +1716,10 @@ TEST_P(DeprecatedFieldsTest, ManualDeprecatdFieldAddition) {
     )EOF");
 
   EXPECT_THROW_WITH_REGEX(
-      MessageUtil::checkForUnexpectedFields(baseShouldFail,
+      MessageUtil::checkForUnexpectedFields(base_should_fail,
                                             ProtobufMessage::getStrictValidationVisitor()),
       ProtoValidationException,
-      "Illegal use of deprecated option "
+      "Illegal use of deprecated V2 option "
       "'envoy.test.deprecation_test.UpgradedBase.hidden_envoy_deprecated_is_deprecated'");
   // The config will be rejected, so the feature will not be used.
   EXPECT_EQ(1, runtime_deprecated_feature_use_.value());
