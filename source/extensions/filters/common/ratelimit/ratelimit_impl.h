@@ -16,6 +16,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/logger.h"
+#include "common/config/version_converter.h"
 #include "common/grpc/typed_async_client.h"
 #include "common/singleton/const_singleton.h"
 
@@ -26,6 +27,13 @@ namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace RateLimit {
+
+namespace {
+// The fully-qualified name template for the rate-limit service's ShouldRateLimit method.
+constexpr char METHOD_NAME_TEMPLATE[] =
+    "envoy.service.ratelimit.{}.RateLimitService.ShouldRateLimit";
+
+} // namespace
 
 using RateLimitAsyncCallbacks =
     Grpc::AsyncRequestCallbacks<envoy::service::ratelimit::v3::RateLimitResponse>;
@@ -43,6 +51,7 @@ using Constants = ConstSingleton<ConstantValues>;
 // one today).
 class GrpcClientImpl : public Client,
                        public RateLimitAsyncCallbacks,
+                       public Config::VersionedService,
                        public Logger::Loggable<Logger::Id::config> {
 public:
   GrpcClientImpl(Grpc::RawAsyncClientPtr&& async_client,
@@ -66,6 +75,9 @@ public:
                  Tracing::Span& span) override;
   void onFailure(Grpc::Status::GrpcStatus status, const std::string& message,
                  Tracing::Span& span) override;
+
+  // Config::VersionedService
+  const std::string methodNameTemplate() const override { return METHOD_NAME_TEMPLATE; }
 
 private:
   Grpc::AsyncClient<envoy::service::ratelimit::v3::RateLimitRequest,

@@ -220,7 +220,7 @@ void VersionUtil::scrubHiddenEnvoyDeprecated(Protobuf::Message& message) {
 }
 
 const Protobuf::MethodDescriptor&
-VersionUtil::getMethodDescriptorForVersion(const std::string& method_name_template,
+VersionUtil::getMethodDescriptorForVersion(const VersionedService* service,
                                            envoy::config::core::v3::ApiVersion api_version,
                                            bool use_alpha) {
   std::string method_name;
@@ -228,11 +228,11 @@ VersionUtil::getMethodDescriptorForVersion(const std::string& method_name_templa
   case envoy::config::core::v3::ApiVersion::AUTO:
     FALLTHRU;
   case envoy::config::core::v3::ApiVersion::V2:
-    method_name = fmt::format(method_name_template, use_alpha ? "v2alpha" : "v2");
+    method_name = fmt::format(service->methodNameTemplate(), use_alpha ? "v2alpha" : "v2");
     break;
 
   case envoy::config::core::v3::ApiVersion::V3:
-    method_name = fmt::format(method_name_template, "v3");
+    method_name = fmt::format(service->methodNameTemplate(), "v3");
     break;
 
   default:

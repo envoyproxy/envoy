@@ -11,7 +11,6 @@
 #include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
-#include "common/config/version_converter.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 
@@ -21,19 +20,12 @@ namespace Filters {
 namespace Common {
 namespace RateLimit {
 
-namespace {
-// The fully-qualified name template for the rate-limit service's ShouldRateLimit method.
-constexpr char METHOD_NAME_TEMPLATE[] =
-    "envoy.service.ratelimit.{}.RateLimitService.ShouldRateLimit";
-
-} // namespace
-
 GrpcClientImpl::GrpcClientImpl(Grpc::RawAsyncClientPtr&& async_client,
                                const absl::optional<std::chrono::milliseconds>& timeout,
                                envoy::config::core::v3::ApiVersion transport_api_version)
     : async_client_(std::move(async_client)), timeout_(timeout),
-      service_method_(Config::VersionUtil::getMethodDescriptorForVersion(METHOD_NAME_TEMPLATE,
-                                                                         transport_api_version)),
+      service_method_(
+          Config::VersionUtil::getMethodDescriptorForVersion(this, transport_api_version)),
       transport_api_version_(transport_api_version) {}
 
 GrpcClientImpl::~GrpcClientImpl() { ASSERT(!callbacks_); }

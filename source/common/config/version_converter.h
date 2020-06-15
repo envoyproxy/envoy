@@ -113,6 +113,18 @@ public:
   static void eraseOriginalTypeInformation(Protobuf::Message& message);
 };
 
+// A versioned service.
+class VersionedService {
+public:
+  virtual ~VersionedService() = default;
+
+  /**
+   * @return std::string template of a fully-qualified servoce method name. For example:
+   *                     envoy.service.auth.{}.Authorization.Check.
+   */
+  virtual const std::string methodNameTemplate() const PURE;
+};
+
 class VersionUtil {
 public:
   // Some helpers for working with earlier message version deprecated fields.
@@ -129,7 +141,7 @@ public:
    * @return Protobuf::MethodDescriptor of a method for a specific version.
    */
   static const Protobuf::MethodDescriptor&
-  getMethodDescriptorForVersion(const std::string& method_name_template,
+  getMethodDescriptorForVersion(const VersionedService* service,
                                 envoy::config::core::v3::ApiVersion api_version,
                                 bool use_alpha = false);
 };

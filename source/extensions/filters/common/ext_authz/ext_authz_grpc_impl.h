@@ -18,6 +18,7 @@
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/config/version_converter.h"
 #include "common/grpc/typed_async_client.h"
 
 #include "extensions/filters/common/ext_authz/check_request_utils.h"
@@ -28,6 +29,12 @@ namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace ExtAuthz {
+
+namespace {
+// The fully-qualified name template for the ext_authz's Check method.
+constexpr char METHOD_NAME_TEMPLATE[] = "envoy.service.auth.{}.Authorization.Check";
+
+} // namespace
 
 using ExtAuthzAsyncCallbacks = Grpc::AsyncRequestCallbacks<envoy::service::auth::v3::CheckResponse>;
 
@@ -40,6 +47,7 @@ using ExtAuthzAsyncCallbacks = Grpc::AsyncRequestCallbacks<envoy::service::auth:
  */
 class GrpcClientImpl : public Client,
                        public ExtAuthzAsyncCallbacks,
+                       public Config::VersionedService,
                        public Logger::Loggable<Logger::Id::ext_authz> {
 public:
   // TODO(gsagula): remove `use_alpha` param when V2Alpha gets deprecated.
@@ -59,6 +67,9 @@ public:
                  Tracing::Span& span) override;
   void onFailure(Grpc::Status::GrpcStatus status, const std::string& message,
                  Tracing::Span& span) override;
+
+  // Config::VersionedService
+  const std::string methodNameTemplate() const override { return METHOD_NAME_TEMPLATE; }
 
 private:
   void toAuthzResponseHeader(
