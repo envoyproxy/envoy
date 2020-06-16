@@ -47,12 +47,13 @@ constexpr char kClientInitFrame[] = "ClientInit";
 // responds correctly to first client request and capturing client and server
 // ALTS versions.
 class CapturingHandshakerService : public grpc::gcp::HandshakerService::Service {
- public:
+public:
   CapturingHandshakerService() {}
 
-  grpc::Status DoHandshake(
-      grpc::ServerContext*,
-      grpc::ServerReaderWriter<grpc::gcp::HandshakerResp, grpc::gcp::HandshakerReq>* stream) override {
+  grpc::Status
+  DoHandshake(grpc::ServerContext*,
+              grpc::ServerReaderWriter<grpc::gcp::HandshakerResp, grpc::gcp::HandshakerReq>* stream)
+      override {
     grpc::gcp::HandshakerReq request;
     grpc::gcp::HandshakerResp response;
     while (stream->Read(&request)) {
