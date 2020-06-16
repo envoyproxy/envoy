@@ -878,14 +878,24 @@ TEST(InlineStorageTest, InlineString) {
 }
 
 #ifdef WIN32
-TEST(ErrorDetailsTest, WindowsStripsNewline) {
-  // Test a winsock2 error
+TEST(ErrorDetailsTest, WindowsFormatMessage) {
+  // winsock2 error
   EXPECT_NE(errorDetails(SOCKET_ERROR_AGAIN), "");
   EXPECT_THAT(errorDetails(SOCKET_ERROR_AGAIN), Not(HasSubstr("\r\n")));
+  EXPECT_NE(errorDetails(SOCKET_ERROR_AGAIN), "Unknown error");
 
-  // Test a regular Windows error
+  // winsock2 error with a long message
+  EXPECT_NE(errorDetails(SOCKET_ERROR_MSG_SIZE), "");
+  EXPECT_THAT(errorDetails(SOCKET_ERROR_MSG_SIZE), Not(HasSubstr("\r\n")));
+  EXPECT_NE(errorDetails(SOCKET_ERROR_MSG_SIZE), "Unknown error");
+
+  // regular Windows error
   EXPECT_NE(errorDetails(ERROR_FILE_NOT_FOUND), "");
   EXPECT_THAT(errorDetails(ERROR_FILE_NOT_FOUND), Not(HasSubstr("\r\n")));
+  EXPECT_NE(errorDetails(ERROR_FILE_NOT_FOUND), "Unknown error");
+
+  // invalid error code
+  EXPECT_EQ(errorDetails(99999), "Unknown error");
 }
 #endif
 

@@ -39,17 +39,22 @@ using UnsignedMilliseconds = std::chrono::duration<uint64_t, std::milli>;
 } // namespace
 
 const std::string errorDetails(int error_code) {
-#ifdef WIN32
-  std::string buffer(128, '\0');
-  buffer.resize(FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                              error_code, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), &buffer[0],
-                              buffer.size(), NULL));
-  if (buffer.size() > 1 && buffer[buffer.size() - 2] == '\r' && buffer[buffer.size() - 1] == '\n') {
-    buffer.resize(buffer.size() - 2);
-  }
-  return buffer;
-#else
+#ifndef WIN32
   return strerror(error_code);
+#else
+  char* buffer = NULL;
+  DWORD msg_size = FormatMessage(
+      FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_ALLOCATE_BUFFER,
+      NULL, error_code, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR)&buffer, 0, NULL);
+  if (msg_size == 0) {
+    return "Unknown error";
+  }
+  if (msg_size > 1 && buffer[msg_size - 2] == '\r' && buffer[msg_size - 1] == '\n') {
+    msg_size -= 2;
+  }
+  std::string error_details(buffer, msg_size);
+  ASSERT(LocalFree(buffer) == NULL);
+  return error_details;
 #endif
 }
 

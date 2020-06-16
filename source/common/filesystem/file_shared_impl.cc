@@ -9,7 +9,7 @@ namespace Filesystem {
 
 Api::IoError::IoErrorCode IoFileError::getErrorCode() const { return IoErrorCode::UnknownError; }
 
-std::string IoFileError::getErrorDetails() const { return errorDetails(errno_); }
+std::string IoFileError::getErrorDetails() const { return strerror(errno_); }
 
 Api::IoCallBoolResult FileSharedImpl::open(FlagSet in) {
   if (isOpen()) {
