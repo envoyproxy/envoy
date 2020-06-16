@@ -172,21 +172,21 @@ public:
 
   // Stats::Gauge
   void add(uint64_t amount) override {
-    value_ += amount;
+    child_value_ += amount;
     flags_ |= Flags::Used;
   }
   void dec() override { sub(1); }
   void inc() override { add(1); }
   void set(uint64_t value) override {
-    value_ = value;
+    child_value_ = value;
     flags_ |= Flags::Used;
   }
   void sub(uint64_t amount) override {
-    ASSERT(value_ >= amount);
+    ASSERT(child_value_ >= amount);
     ASSERT(used() || amount == 0);
-    value_ -= amount;
+    child_value_ -= amount;
   }
-  uint64_t value() const override { return value_; }
+  uint64_t value() const override { return child_value_ + parent_value_; }
 
   ImportMode importMode() const override {
     if (flags_ & Flags::NeverImport) {
@@ -217,15 +217,18 @@ public:
       // A previous revision of Envoy may have transferred a gauge that it
       // thought was Accumulate. But the new version thinks it's NeverImport, so
       // we clear the accumulated value.
-      value_ = 0;
+      parent_value_ = 0;
       flags_ &= ~Flags::Used;
       flags_ |= Flags::NeverImport;
       break;
     }
   }
 
+  void setParentValue(uint64_t value) override { parent_value_ = value; }
+
 private:
-  std::atomic<uint64_t> value_{0};
+  std::atomic<uint64_t> parent_value_{0};
+  std::atomic<uint64_t> child_value_{0};
 };
 
 class TextReadoutImpl : public StatsSharedImpl<TextReadout> {
