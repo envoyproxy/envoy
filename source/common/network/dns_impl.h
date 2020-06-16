@@ -57,6 +57,14 @@ private:
      * @param addrinfo structure to store address info.
      */
     void onAresGetAddrInfoCallback(int status, int timeouts, ares_addrinfo* addrinfo);
+
+
+    /**
+     * Manually resolves the address "localhost".
+     * @param family currently AF_INET and AF_INET6 are supported.
+     */
+    void onManualResolution(int family);
+
     /**
      * wrapper function of call to ares_getaddrinfo.
      * @param family currently AF_INET and AF_INET6 are supported.

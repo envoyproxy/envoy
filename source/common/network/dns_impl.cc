@@ -79,6 +79,26 @@ void DnsResolverImpl::initializeChannel(ares_options* options, int optmask) {
   ares_init_options(&channel_, options, optmask | ARES_OPT_SOCK_STATE_CB);
 }
 
+void DnsResolverImpl::PendingResolution::onManualResolution(int family){
+  std::list<DnsResponse> address_list;
+
+  DnsResponse response = [](int family) {
+    auto seconds = 0ll;
+    if (family == AF_INET)
+    {
+      return DnsResponse(std::make_shared<const Address::Ipv4Instance>("127.0.0.1"), std::chrono::seconds(seconds));
+    }
+    else
+    {
+      return DnsResponse(std::make_shared<const Address::Ipv6Instance>("::1"), std::chrono::seconds(seconds));
+    }
+  }(family);
+
+  address_list.emplace_back(response);
+  completed_ = true;
+  callback_(ResolutionStatus::Success, std::move(address_list));
+}
+
 void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, int timeouts,
                                                                    ares_addrinfo* addrinfo) {
   // We receive ARES_EDESTRUCTION when destructing with pending queries.
@@ -172,8 +192,8 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
       }
     }
     if (owned_) {
-      delete this;
-      return;
+    delete this;
+    return;
     }
   }
 
@@ -271,6 +291,15 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
 }
 
 void DnsResolverImpl::PendingResolution::getAddrInfo(int family) {
+
+#ifdef WIN32
+  // On Windows localhost is not added by default to the list of hosts
+  // as a result c-ares fails to resolve it. See  https://github.com/c-ares/c-ares/issues/85
+  if (dns_name_ == "localhost"){
+    onManualResolution(family);
+    return;
+  }
+#endif
   struct ares_addrinfo_hints hints = {};
   hints.ai_family = family;
 
