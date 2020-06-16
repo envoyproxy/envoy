@@ -72,8 +72,11 @@ public:
   // TODO(#8479) Propagate INVALID_VERSION error to caller and let caller to use server advertised
   // version list to create a new connection with mutually supported version and make client codec
   // again.
-  IntegrationCodecClientPtr makeRawHttpConnection(Network::ClientConnectionPtr&& conn) override {
-    IntegrationCodecClientPtr codec = HttpIntegrationTest::makeRawHttpConnection(std::move(conn));
+  IntegrationCodecClientPtr
+  makeRawHttpConnection(Network::ClientConnectionPtr&& conn,
+                        absl::optional<Http::Http2Settings> http2_options) override {
+    IntegrationCodecClientPtr codec =
+        HttpIntegrationTest::makeRawHttpConnection(std::move(conn), http2_options);
     if (codec->disconnected()) {
       // Connection may get closed during version negotiation or handshake.
       ENVOY_LOG(error, "Fail to connect to server with error: {}",

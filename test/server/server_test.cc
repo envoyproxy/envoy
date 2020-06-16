@@ -1072,6 +1072,9 @@ TEST_P(ServerInstanceImplTest, DisabledExtension) {
     if (extension.category() == "envoy.filters.http" && extension.name() == "envoy.buffer") {
       ASSERT_TRUE(extension.disabled());
       disabled_filter_found = true;
+    } else if (absl::StartsWith(extension.category(), "test")) {
+      // Workaround for non-hermetic tests in coverage build.
+      continue;
     } else {
       ASSERT_FALSE(extension.disabled());
     }

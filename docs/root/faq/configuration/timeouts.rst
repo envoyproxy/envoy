@@ -52,7 +52,9 @@ context request/stream is interchangeable.
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.stream_idle_timeout>`
   is the amount of time that the connection manager will allow a stream to exist with no upstream
   or downstream activity. The default stream idle timeout is *5 minutes*. This timeout is strongly
-  recommended for streaming APIs (requests or responses that never end).
+  recommended for all requests (not just streaming requests/responses) as it additionally defends
+  against an HTTP/2 peer that does not open stream window once an entire response has been buffered
+  to be sent to a downstream client).
 
 Route timeouts
 ^^^^^^^^^^^^^^

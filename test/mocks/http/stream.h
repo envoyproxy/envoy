@@ -20,6 +20,7 @@ public:
   MOCK_METHOD2(setWriteBufferWatermarks, void(uint32_t, uint32_t));
   MOCK_METHOD0(bufferLimit, uint32_t());
   MOCK_METHOD0(connectionLocalAddress, const Network::Address::InstanceConstSharedPtr&());
+  MOCK_METHOD1(setFlushTimeout, void(std::chrono::milliseconds timeout));
 
   std::list<StreamCallbacks*> callbacks_{};
   Network::Address::InstanceConstSharedPtr connection_local_address_;

@@ -56,9 +56,23 @@ ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_l
       waiting_for_non_informational_headers_(false),
       pending_receive_buffer_high_watermark_called_(false),
       pending_send_buffer_high_watermark_called_(false), reset_due_to_messaging_error_(false) {
+  parent_.stats_.streams_active_.inc();
   if (buffer_limit > 0) {
     setWriteBufferWatermarks(buffer_limit / 2, buffer_limit);
   }
+}
+
+ConnectionImpl::StreamImpl::~StreamImpl() { ASSERT(stream_idle_timer_ == nullptr); }
+
+void ConnectionImpl::StreamImpl::destroy() {
+  if (stream_idle_timer_ != nullptr) {
+    // To ease testing and the destructor assertion.
+    stream_idle_timer_->disableTimer();
+    stream_idle_timer_.reset();
+  }
+
+  parent_.stats_.streams_active_.dec();
+  parent_.stats_.pending_send_bytes_.sub(pending_send_data_.length());
 }
 
 static void insertHeader(std::vector<nghttp2_nv>& headers, const HeaderEntry& header) {
@@ -130,6 +144,7 @@ void ConnectionImpl::StreamImpl::encodeTrailers(const HeaderMap& trailers) {
     // waiting on window updates. We need to save the trailers so that we can emit them later.
     ASSERT(!pending_trailers_);
     pending_trailers_ = std::make_unique<HeaderMapImpl>(trailers);
+    createPendingFlushTimer();
   } else {
     submitTrailers(trailers);
     parent_.sendPendingFrames();
@@ -262,6 +277,7 @@ int ConnectionImpl::StreamImpl::onDataSourceSend(const uint8_t* framehd, size_t 
     return NGHTTP2_ERR_FLOODED;
   }
 
+  parent_.stats_.pending_send_bytes_.sub(length);
   output.move(pending_send_data_, length);
   parent_.connection_.write(output, false);
   return 0;
@@ -283,9 +299,30 @@ void ConnectionImpl::ServerStreamImpl::submitHeaders(const std::vector<nghttp2_n
   ASSERT(rc == 0);
 }
 
+void ConnectionImpl::ServerStreamImpl::createPendingFlushTimer() {
+  ASSERT(stream_idle_timer_ == nullptr);
+  if (stream_idle_timeout_.count() > 0) {
+    stream_idle_timer_ =
+        parent_.connection_.dispatcher().createTimer([this] { onPendingFlushTimer(); });
+    stream_idle_timer_->enableTimer(stream_idle_timeout_);
+  }
+}
+
+void ConnectionImpl::StreamImpl::onPendingFlushTimer() {
+  ENVOY_CONN_LOG(debug, "pending stream flush timeout", parent_.connection_);
+  stream_idle_timer_.reset();
+  parent_.stats_.tx_flush_timeout_.inc();
+  ASSERT(local_end_stream_ && !local_end_stream_sent_);
+  // This will emit a reset frame for this stream and close the stream locally. No reset callbacks
+  // will be run because higher layers think the stream is already finished.
+  resetStreamWorker(StreamResetReason::LocalReset);
+  parent_.sendPendingFrames();
+}
+
 void ConnectionImpl::StreamImpl::encodeData(Buffer::Instance& data, bool end_stream) {
   ASSERT(!local_end_stream_);
   local_end_stream_ = end_stream;
+  parent_.stats_.pending_send_bytes_.add(data.length());
   pending_send_data_.move(data);
   if (data_deferred_) {
     int rc = nghttp2_session_resume_data(parent_.session_, stream_id_);
@@ -295,6 +332,9 @@ void ConnectionImpl::StreamImpl::encodeData(Buffer::Instance& data, bool end_str
   }
 
   parent_.sendPendingFrames();
+  if (local_end_stream_ && pending_send_data_.length() > 0) {
+    createPendingFlushTimer();
+  }
 }
 
 void ConnectionImpl::StreamImpl::resetStream(StreamResetReason reason) {
@@ -373,8 +413,10 @@ bool checkRuntimeOverride(bool config_value, const char* override_key) {
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
                                const Http2Settings& http2_settings, const uint32_t max_headers_kb,
                                const uint32_t max_headers_count)
-    : stats_{ALL_HTTP2_CODEC_STATS(POOL_COUNTER_PREFIX(stats, "http2."))}, connection_(connection),
-      max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count),
+    : stats_{ALL_HTTP2_CODEC_STATS(POOL_COUNTER_PREFIX(stats, "http2."),
+                                   POOL_GAUGE_PREFIX(stats, "http2."))},
+      connection_(connection), max_headers_kb_(max_headers_kb),
+      max_headers_count_(max_headers_count),
       per_stream_buffer_limit_(http2_settings.initial_stream_window_size_),
       stream_error_on_invalid_http_messaging_(checkRuntimeOverride(
           http2_settings.stream_error_on_invalid_http_messaging_, InvalidHttpMessagingOverrideKey)),
@@ -396,7 +438,12 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& st
           http2_settings.max_inbound_window_update_frames_per_data_frame_sent_)),
       dispatching_(false), raised_goaway_(false), pending_deferred_reset_(false) {}
 
-ConnectionImpl::~ConnectionImpl() { nghttp2_session_del(session_); }
+ConnectionImpl::~ConnectionImpl() {
+  for (const auto& stream : active_streams_) {
+    stream->destroy();
+  }
+  nghttp2_session_del(session_);
+}
 
 void ConnectionImpl::dispatch(Buffer::Instance& data) {
   ENVOY_CONN_LOG(trace, "dispatching {} bytes", connection_, data.length());
@@ -740,6 +787,7 @@ int ConnectionImpl::onStreamClose(int32_t stream_id, uint32_t error_code) {
       stream->runResetCallbacks(reason);
     }
 
+    stream->destroy();
     connection_.dispatcher().deferredDelete(stream->removeFromList(active_streams_));
     // Any unconsumed data must be consumed before the stream is deleted.
     // nghttp2 does not appear to track this internally, and any stream deleted

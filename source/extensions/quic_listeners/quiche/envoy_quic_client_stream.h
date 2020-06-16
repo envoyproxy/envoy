@@ -31,6 +31,7 @@ public:
 
   // Http::Stream
   void resetStream(Http::StreamResetReason reason) override;
+  void setFlushTimeout(std::chrono::milliseconds) override {}
   // quic::QuicSpdyStream
   void OnBodyAvailable() override;
   void OnStreamReset(const quic::QuicRstStreamFrame& frame) override;
