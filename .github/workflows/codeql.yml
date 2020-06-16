@@ -49,5 +49,9 @@ jobs:
        bazelisk shutdown
        bazelisk build -c fastbuild --spawn_strategy=local --discard_analysis_cache --nouse_action_cache --config clang --config libc++ //source/exe:envoy-static --verbose_failures
 
+    - name: Clean Artifacts
+      run: |
+        git clean -xdf
+       
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v1
