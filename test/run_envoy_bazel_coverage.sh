@@ -49,7 +49,7 @@ if [[ "$VALIDATE_COVERAGE" == "true" ]]; then
   if [[ "${FUZZ_COVERAGE}" == "true" ]]; then
     COVERAGE_THRESHOLD=27.0
   else
-    COVERAGE_THRESHOLD=96.6
+    COVERAGE_THRESHOLD=96.5
   fi
   COVERAGE_FAILED=$(echo "${COVERAGE_VALUE}<${COVERAGE_THRESHOLD}" | bc)
   if test ${COVERAGE_FAILED} -eq 1; then
