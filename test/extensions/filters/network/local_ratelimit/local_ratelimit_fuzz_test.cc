@@ -1,5 +1,3 @@
-#include <memory>
-
 #include "envoy/extensions/filters/network/local_ratelimit/v3/local_rate_limit.pb.h"
 
 #include "common/buffer/buffer_impl.h"
