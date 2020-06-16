@@ -45,6 +45,15 @@ public:
 
   bool supportsMmsg() const override;
 
+  Api::SysCallIntResult bind(const sockaddr* address, socklen_t addrlen) override;
+  Api::SysCallIntResult listen(int backlog) override;
+  Api::SysCallIntResult connect(const sockaddr* address, socklen_t addrlen) override;
+  Api::SysCallIntResult setOption(int level, int optname, const void* optval,
+                                  socklen_t optlen) override;
+  Api::SysCallIntResult getOption(int level, int optname, void* optval, socklen_t* optlen) override;
+  Api::SysCallIntResult getLocalAddress(sockaddr* address, socklen_t* addrlen) override;
+  Api::SysCallIntResult setBlocking(bool blocking) override;
+
 private:
   // Converts a SysCallSizeResult to IoCallUint64Result.
   template <typename T>

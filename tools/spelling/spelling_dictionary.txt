@@ -297,6 +297,7 @@ STL
 STRLEN
 STS
 SVG
+Symbolizer
 TBD
 TCLAP
 TCP
@@ -645,6 +646,7 @@ hoc
 hostname
 hostnames
 hostset
+hotrestart
 hrefs
 huffman
 hystrix
