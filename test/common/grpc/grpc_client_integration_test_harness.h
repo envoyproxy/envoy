@@ -521,7 +521,7 @@ public:
   Network::TransportSocketFactoryPtr createUpstreamSslContext() {
     envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
     auto* common_tls_context = tls_context.mutable_common_tls_context();
-    common_tls_context->add_alpn_protocols("h2");
+    common_tls_context->add_alpn_protocols(Http::Utility::AlpnNames::get().Http2);
     auto* tls_cert = common_tls_context->add_tls_certificates();
     tls_cert->mutable_certificate_chain()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"));

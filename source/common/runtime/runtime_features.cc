@@ -66,6 +66,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.ext_authz_http_service_enable_case_sensitive_string_matcher",
     "envoy.reloadable_features.fix_upgrade_response",
     "envoy.reloadable_features.fixed_connection_close",
+    "envoy.reloadable_features.http_default_alpn",
     "envoy.reloadable_features.listener_in_place_filterchain_update",
     "envoy.reloadable_features.preserve_upstream_date",
     "envoy.reloadable_features.stop_faking_paths",

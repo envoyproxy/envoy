@@ -180,9 +180,25 @@ public:
   virtual const std::vector<std::string>& verifySubjectAltNameListOverride() const PURE;
 
   /**
+   * The application protocols to use when negotiating an upstream connection. When an application
+   * protocol override is provided, it will *always* be used.
    * @return the optional overridden application protocols.
    */
   virtual const std::vector<std::string>& applicationProtocolListOverride() const PURE;
+
+  /**
+   * The application protocol to use when negotiating an upstream connection and no other
+   * application protocol has been configured. Both
+   * TransportSocketOptions::applicationProtocolListOverride and application protocols configured
+   * in the CommonTlsContext on the Cluster will take precedence.
+   *
+   * Note that this option is intended for intermediate code (e.g. the HTTP connection pools) to
+   * specify a default ALPN when no specific values are specified elsewhere. As such, providing a
+   * value here might not make sense prior to load balancing.
+   * @return the optional fallback for application protocols, for when they are not specified in the
+   *         TLS configuration.
+   */
+  virtual const absl::optional<std::string>& applicationProtocolFallback() const PURE;
 
   /**
    * @param vector of bytes to which the option should append hash key data that will be used

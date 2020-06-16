@@ -85,7 +85,8 @@ static void BM_TlsInspector(benchmark::State& state) {
     RELEASE_ASSERT(socket.detectedTransportProtocol() == "tls", "");
     RELEASE_ASSERT(socket.requestedServerName() == "example.com", "");
     RELEASE_ASSERT(socket.requestedApplicationProtocols().size() == 2 &&
-                       socket.requestedApplicationProtocols().front() == "h2",
+                       socket.requestedApplicationProtocols().front() ==
+                           Http::Utility::AlpnNames::get().Http2,
                    "");
     socket.setDetectedTransportProtocol("");
     socket.setRequestedServerName("");

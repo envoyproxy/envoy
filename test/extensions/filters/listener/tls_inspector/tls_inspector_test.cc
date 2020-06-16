@@ -127,8 +127,8 @@ TEST_P(TlsInspectorTest, SniRegistered) {
 // Test that a ClientHello with an ALPN value causes the correct name notification.
 TEST_P(TlsInspectorTest, AlpnRegistered) {
   init();
-  const std::vector<absl::string_view> alpn_protos = {absl::string_view("h2"),
-                                                      absl::string_view("http/1.1")};
+  const auto alpn_protos = std::vector<absl::string_view>{Http::Utility::AlpnNames::get().Http2,
+                                                          Http::Utility::AlpnNames::get().Http11};
   std::vector<uint8_t> client_hello = Tls::Test::generateClientHello(
       std::get<0>(GetParam()), std::get<1>(GetParam()), "", "\x02h2\x08http/1.1");
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
@@ -151,7 +151,7 @@ TEST_P(TlsInspectorTest, AlpnRegistered) {
 // Test with the ClientHello spread over multiple socket reads.
 TEST_P(TlsInspectorTest, MultipleReads) {
   init();
-  const std::vector<absl::string_view> alpn_protos = {absl::string_view("h2")};
+  const auto alpn_protos = std::vector<absl::string_view>{Http::Utility::AlpnNames::get().Http2};
   const std::string servername("example.com");
   std::vector<uint8_t> client_hello = Tls::Test::generateClientHello(
       std::get<0>(GetParam()), std::get<1>(GetParam()), servername, "\x02h2");
@@ -256,7 +256,7 @@ TEST_P(TlsInspectorTest, InlineReadSucceed) {
   EXPECT_CALL(cb_, socket()).WillRepeatedly(ReturnRef(socket_));
   EXPECT_CALL(cb_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
   EXPECT_CALL(socket_, ioHandle()).WillRepeatedly(ReturnRef(*io_handle_));
-  const std::vector<absl::string_view> alpn_protos = {absl::string_view("h2")};
+  const auto alpn_protos = std::vector<absl::string_view>{Http::Utility::AlpnNames::get().Http2};
   const std::string servername("example.com");
   std::vector<uint8_t> client_hello = Tls::Test::generateClientHello(
       std::get<0>(GetParam()), std::get<1>(GetParam()), servername, "\x02h2");

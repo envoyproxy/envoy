@@ -31,8 +31,6 @@ namespace Envoy {
 namespace Http {
 namespace Http2 {
 
-const std::string ALPN_STRING = "h2";
-
 // This is not the full client magic, but it's the smallest size that should be able to
 // differentiate between HTTP/1 and HTTP/2.
 const std::string CLIENT_MAGIC_PREFIX = "PRI * HTTP/2";

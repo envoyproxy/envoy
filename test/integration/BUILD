@@ -286,6 +286,23 @@ envoy_sh_test(
 )
 
 envoy_cc_test(
+    name = "alpn_selection_integration_test",
+    srcs = [
+        "alpn_selection_integration_test.cc",
+    ],
+    data = [
+        "//test/config/integration/certs",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "header_integration_test",
     srcs = [
         "header_integration_test.cc",

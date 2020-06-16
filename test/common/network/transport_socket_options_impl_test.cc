@@ -1,3 +1,4 @@
+#include "common/http/utility.h"
 #include "common/network/application_protocol.h"
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/upstream_server_name.h"
@@ -37,7 +38,8 @@ TEST_F(TransportSocketOptionsImplTest, UpstreamServer) {
 }
 
 TEST_F(TransportSocketOptionsImplTest, ApplicationProtocols) {
-  std::vector<std::string> http_alpns{"h2", "http/1.1"};
+  std::vector<std::string> http_alpns{Http::Utility::AlpnNames::get().Http2,
+                                      Http::Utility::AlpnNames::get().Http11};
   filter_state_.setData(
       ApplicationProtocols::key(), std::make_unique<ApplicationProtocols>(http_alpns),
       StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
@@ -47,7 +49,8 @@ TEST_F(TransportSocketOptionsImplTest, ApplicationProtocols) {
 }
 
 TEST_F(TransportSocketOptionsImplTest, Both) {
-  std::vector<std::string> http_alpns{"h2", "http/1.1"};
+  std::vector<std::string> http_alpns{Http::Utility::AlpnNames::get().Http2,
+                                      Http::Utility::AlpnNames::get().Http11};
   filter_state_.setData(
       UpstreamServerName::key(), std::make_unique<UpstreamServerName>("www.example.com"),
       StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
