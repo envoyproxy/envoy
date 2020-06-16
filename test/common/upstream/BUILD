@@ -104,6 +104,9 @@ envoy_cc_benchmark_binary(
     ],
     deps = [
         ":utility_lib",
+        "//source/common/config:grpc_mux_lib",
+        "//source/common/config:grpc_subscription_lib",
+        "//source/common/config:protobuf_link_hacks",
         "//source/common/config:utility_lib",
         "//source/common/upstream:eds_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
