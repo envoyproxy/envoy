@@ -82,7 +82,6 @@ DEFINE_PROTO_FUZZER(
       default:
         // Unhandled actions
         PANIC("A case is missing for an action");
-        break;
       }
     }
   } catch (const EnvoyException e) {
