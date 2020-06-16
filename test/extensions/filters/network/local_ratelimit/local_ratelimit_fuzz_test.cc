@@ -80,7 +80,8 @@ DEFINE_PROTO_FUZZER(
         break;
       }
       default:
-        // other actions
+        // Unhanddled actions
+        PANIC("A case is missing for an action");
         break;
       }
     }
