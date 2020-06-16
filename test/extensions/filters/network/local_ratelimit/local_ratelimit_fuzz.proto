@@ -10,17 +10,13 @@ message OnData {
   bool end_stream = 2;
 }
 
-message AdvanceTime {
-  uint32 milliseconds = 1;
-}
-
 message Action {
   oneof action_selector {
     // Call onNewConnection().
     google.protobuf.Empty on_new_connection = 1;
     // Call onData().
     OnData on_data = 2;
-    // Advance the timer
+    // Timer ends and refill the bucket.
     google.protobuf.Empty refill = 3;
   }
 }
