@@ -29,9 +29,6 @@ envoy_cc_test(
 envoy_proto_library(
     name = "verify_signature_fuzz_proto",
     srcs = ["verify_signature_fuzz.proto"],
-    deps = [
-        "@envoy_api//envoy/type/v3:pkg",
-    ],
 )
 
 envoy_cc_fuzz_test(
