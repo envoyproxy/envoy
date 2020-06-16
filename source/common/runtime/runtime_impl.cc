@@ -604,7 +604,7 @@ const Snapshot& LoaderImpl::snapshot() {
   return tls_->getTyped<Snapshot>();
 }
 
-std::shared_ptr<const Snapshot> LoaderImpl::threadsafeSnapshot() {
+SnapshotConstSharedPtr LoaderImpl::threadsafeSnapshot() {
   if (tls_->currentThreadRegistered()) {
     return std::dynamic_pointer_cast<const Snapshot>(tls_->get());
   }
