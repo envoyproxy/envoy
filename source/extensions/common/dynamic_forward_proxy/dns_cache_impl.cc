@@ -91,6 +91,8 @@ absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> DnsCacheImpl::hosts() {
   return ret;
 }
 
+void DnsCacheImpl::dnsCacheStatsOverflowInc() { stats_.dns_rq_pending_overflow_.inc(); }
+
 DnsCacheResourceManagerOptRef DnsCacheImpl::dnsCacheResourceManager() {
   if (resource_manager_) {
     return std::ref(*resource_manager_);

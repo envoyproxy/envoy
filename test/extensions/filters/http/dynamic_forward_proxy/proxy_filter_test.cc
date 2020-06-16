@@ -73,8 +73,6 @@ public:
     dns_cache_resource_manager_ =
         std::make_unique<Extensions::Common::DynamicForwardProxy::DnsCacheResourceManagerImpl>(
             *scope_, loader_, config_name_, cb_config);
-
-    ON_CALL(*dns_cache_manager_->dns_cache_, stats()).WillByDefault(ReturnRef(dns_cache_stats_));
   }
 
   std::shared_ptr<Extensions::Common::DynamicForwardProxy::MockDnsCacheManager> dns_cache_manager_{
@@ -228,6 +226,7 @@ TEST_F(ProxyFilterTest, CircuitBreakerOverflowWithDnsCacheResourceManager) {
   EXPECT_CALL(cm_, get(_));
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, dnsCacheResourceManager())
       .WillOnce(Return(std::ref(*dns_cache_resource_manager_)));
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, dnsCacheStatsOverflowInc());
   EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::ServiceUnavailable,
                                          Eq("Dynamic forward proxy pending request overflow"), _, _,
                                          Eq("Dynamic forward proxy pending request overflow")));
@@ -236,7 +235,6 @@ TEST_F(ProxyFilterTest, CircuitBreakerOverflowWithDnsCacheResourceManager) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter2->decodeHeaders(request_headers_, false));
 
-  EXPECT_EQ(1, filter_config_->cache().stats().dns_rq_pending_overflow_.value());
   filter2->onDestroy();
   EXPECT_CALL(*handle, onDestroy());
   filter_->onDestroy();

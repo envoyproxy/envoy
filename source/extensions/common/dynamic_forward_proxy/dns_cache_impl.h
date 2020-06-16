@@ -30,7 +30,7 @@ public:
                                             LoadDnsCacheEntryCallbacks& callbacks) override;
   AddUpdateCallbacksHandlePtr addUpdateCallbacks(UpdateCallbacks& callbacks) override;
   absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> hosts() override;
-  DnsCacheStats& stats() override { return stats_; }
+  void dnsCacheStatsOverflowInc() override;
   DnsCacheResourceManagerOptRef dnsCacheResourceManager() override;
 
 private:

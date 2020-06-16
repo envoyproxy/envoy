@@ -202,9 +202,9 @@ public:
   virtual absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> hosts() PURE;
 
   /**
-   * @return A reference of DnsCacheStats.
+   * increment overflow counter.
    */
-  virtual DnsCacheStats& stats() PURE;
+  virtual void dnsCacheStatsOverflowInc() PURE;
 
   /**
    * @return A optional reference to resource manager for dns cache.
