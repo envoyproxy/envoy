@@ -188,9 +188,18 @@ void SimulatedTimeSystemHelper::Alarm::Alarm::disableTimerLockHeld() {
 
 void SimulatedTimeSystemHelper::Alarm::Alarm::enableHRTimer(
     const std::chrono::microseconds& duration, const ScopeTrackedObject* scope) {
-  base_timer_->disableTimer();
+  if (duration.count() != 0) {
+    disableTimer();
+  }
   absl::MutexLock lock(&time_system_.mutex_);
-  disableTimerLockHeld();
+  if (pending_) {
+    // Calling enableTimer on a timer that is already pending is a no-op. Timer will still fire
+    // based on the original time it was scheduled.
+    return;
+  } else if (armed_) {
+    disableTimerLockHeld();
+  }
+
   armed_ = true;
   if (duration.count() == 0) {
     activateLockHeld(scope);
