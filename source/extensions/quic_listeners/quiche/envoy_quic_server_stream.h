@@ -34,6 +34,9 @@ public:
   // Http::Stream
   void resetStream(Http::StreamResetReason reason) override;
   void readDisable(bool disable) override;
+  void setFlushTimeout(std::chrono::milliseconds) override {
+    // TODO(mattklein123): Actually implement this for HTTP/3 similar to HTTP/2.
+  }
   // quic::QuicSpdyStream
   void OnBodyAvailable() override;
   void OnStreamReset(const quic::QuicRstStreamFrame& frame) override;

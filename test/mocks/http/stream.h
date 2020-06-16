@@ -19,6 +19,7 @@ public:
   MOCK_METHOD1(readDisable, void(bool disable));
   MOCK_METHOD2(setWriteBufferWatermarks, void(uint32_t, uint32_t));
   MOCK_METHOD0(bufferLimit, uint32_t());
+  MOCK_METHOD1(setFlushTimeout, void(std::chrono::milliseconds timeout));
 
   std::list<StreamCallbacks*> callbacks_{};
 

@@ -40,7 +40,7 @@ const std::string CLIENT_MAGIC_PREFIX = "PRI * HTTP/2";
 /**
  * All stats for the HTTP/2 codec. @see stats_macros.h
  */
-#define ALL_HTTP2_CODEC_STATS(COUNTER)                                                             \
+#define ALL_HTTP2_CODEC_STATS(COUNTER, GAUGE)                                                      \
   COUNTER(dropped_headers_with_underscores)                                                        \
   COUNTER(header_overflow)                                                                         \
   COUNTER(headers_cb_no_stream)                                                                    \
@@ -54,13 +54,16 @@ const std::string CLIENT_MAGIC_PREFIX = "PRI * HTTP/2";
   COUNTER(rx_reset)                                                                                \
   COUNTER(too_many_header_frames)                                                                  \
   COUNTER(trailers)                                                                                \
-  COUNTER(tx_reset)
+  COUNTER(tx_flush_timeout)                                                                        \
+  COUNTER(tx_reset)                                                                                \
+  GAUGE(streams_active, Accumulate)                                                                \
+  GAUGE(pending_send_bytes, Accumulate)
 
 /**
  * Wrapper struct for the HTTP/2 codec stats. @see stats_macros.h
  */
 struct CodecStats {
-  ALL_HTTP2_CODEC_STATS(GENERATE_COUNTER_STRUCT)
+  ALL_HTTP2_CODEC_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
 class Utility {
@@ -150,6 +153,11 @@ protected:
                       public StreamCallbackHelper {
 
     StreamImpl(ConnectionImpl& parent, uint32_t buffer_limit);
+    ~StreamImpl() override;
+    // TODO(mattklein123): Optimally this would be done in the destructor but there are currently
+    // deferred delete lifetime issues that need sorting out if the destructor of the stream is
+    // going to be able to refer to the parent connection.
+    void destroy();
 
     StreamImpl* base() { return this; }
     ssize_t onDataSourceRead(uint64_t length, uint32_t* data_flags);
@@ -161,6 +169,8 @@ protected:
                                nghttp2_data_provider* provider) PURE;
     void submitTrailers(const HeaderMap& trailers);
     void submitMetadata();
+    virtual void createPendingFlushTimer() PURE;
+    void onPendingFlushTimer();
 
     // Http::StreamEncoder
     void encode100ContinueHeaders(const HeaderMap& headers) override;
@@ -176,6 +186,9 @@ protected:
     void resetStream(StreamResetReason reason) override;
     void readDisable(bool disable) override;
     uint32_t bufferLimit() override { return pending_recv_data_.highWatermark(); }
+    void setFlushTimeout(std::chrono::milliseconds timeout) override {
+      stream_idle_timeout_ = timeout;
+    }
 
     void setWriteBufferWatermarks(uint32_t low_watermark, uint32_t high_watermark) {
       pending_recv_data_.setWatermarks(low_watermark, high_watermark);
@@ -231,6 +244,9 @@ protected:
     bool pending_receive_buffer_high_watermark_called_ : 1;
     bool pending_send_buffer_high_watermark_called_ : 1;
     bool reset_due_to_messaging_error_ : 1;
+    // See HttpConnectionManager.stream_idle_timeout.
+    std::chrono::milliseconds stream_idle_timeout_{};
+    Event::TimerPtr stream_idle_timer_;
   };
 
   using StreamImplPtr = std::unique_ptr<StreamImpl>;
@@ -252,6 +268,10 @@ protected:
       if (!upgrade_type_.empty() && headers_->Status()) {
         Http::Utility::transformUpgradeResponseFromH2toH1(*headers_, upgrade_type_);
       }
+    }
+    void createPendingFlushTimer() override {
+      // Client streams do not create a flush timer because we currently assume that any failure
+      // to flush would be covered by a request/stream/etc. timeout.
     }
     std::string upgrade_type_;
   };
@@ -278,6 +298,7 @@ protected:
         Http::Utility::transformUpgradeRequestFromH2toH1(*headers_);
       }
     }
+    void createPendingFlushTimer() override;
   };
 
   ConnectionImpl* base() { return this; }

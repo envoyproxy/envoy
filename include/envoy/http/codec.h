@@ -203,6 +203,13 @@ public:
    * @return uint32_t the stream's configured buffer limits.
    */
   virtual uint32_t bufferLimit() PURE;
+
+  /**
+   * Set the flush timeout for the stream. At the codec level this is used to bound the amount of
+   * time the codec will wait to flush body data pending open stream window. It does *not* count
+   * small window updates as satisfying the idle timeout as this is a potential DoS vector.
+   */
+  virtual void setFlushTimeout(std::chrono::milliseconds timeout) PURE;
 };
 
 /**

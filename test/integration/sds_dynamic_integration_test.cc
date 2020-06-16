@@ -222,7 +222,7 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, WrongSecretFirst) {
   };
   initialize();
 
-  codec_client_ = makeRawHttpConnection(makeSslClientConnection());
+  codec_client_ = makeRawHttpConnection(makeSslClientConnection(), absl::nullopt);
   // the connection state is not connected.
   EXPECT_FALSE(codec_client_->connected());
   codec_client_->connection()->close(Network::ConnectionCloseType::NoFlush);

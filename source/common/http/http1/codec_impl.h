@@ -65,6 +65,11 @@ public:
   void resetStream(StreamResetReason reason) override;
   void readDisable(bool disable) override;
   uint32_t bufferLimit() override;
+  void setFlushTimeout(std::chrono::milliseconds) override {
+    // HTTP/1 has one stream per connection, thus any data encoded is immediately written to the
+    // connection, invoking any watermarks as necessary. There is no internal buffering that would
+    // require a flush timeout not already covered by other timeouts.
+  }
 
   void isResponseToHeadRequest(bool value) { is_response_to_head_request_ = value; }
 

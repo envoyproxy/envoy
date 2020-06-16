@@ -189,11 +189,16 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeHttpConnection(uint32_t port)
 }
 
 IntegrationCodecClientPtr
-HttpIntegrationTest::makeRawHttpConnection(Network::ClientConnectionPtr&& conn) {
+HttpIntegrationTest::makeRawHttpConnection(Network::ClientConnectionPtr&& conn,
+                                           absl::optional<Http::Http2Settings> http2_options) {
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   cluster->max_response_headers_count_ = 200;
-  cluster->http2_settings_.allow_connect_ = true;
-  cluster->http2_settings_.allow_metadata_ = true;
+  if (http2_options.has_value()) {
+    cluster->http2_settings_ = http2_options.value();
+  } else {
+    cluster->http2_settings_.allow_connect_ = true;
+    cluster->http2_settings_.allow_metadata_ = true;
+  }
   Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
       cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)))};
   return std::make_unique<IntegrationCodecClient>(*dispatcher_, std::move(conn), host_description,
@@ -202,7 +207,7 @@ HttpIntegrationTest::makeRawHttpConnection(Network::ClientConnectionPtr&& conn) 
 
 IntegrationCodecClientPtr
 HttpIntegrationTest::makeHttpConnection(Network::ClientConnectionPtr&& conn) {
-  auto codec = makeRawHttpConnection(std::move(conn));
+  auto codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
   EXPECT_TRUE(codec->connected());
   return codec;
 }
