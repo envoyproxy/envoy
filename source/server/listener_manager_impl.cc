@@ -668,7 +668,7 @@ void ListenerManagerImpl::addListenerToWorker(Worker& worker,
             // TODO(mattklein123): In addition to a critical log and a stat, we should consider
             // adding a startup option here to cause the server to exit. I think we probably want
             // this at Lyft but I will do it in a follow up.
-            ENVOY_LOG(critical, "listener '{}' failed to listen on address '{}' on worker",
+            ENVOY_LOG(error, "listener '{}' failed to listen on address '{}' on worker",
                       listener.name(), listener.listenSocketFactory().localAddress()->asString());
             stats_.listener_create_failure_.inc();
             removeListener(listener.name());

@@ -513,14 +513,6 @@ void BaseIntegrationTest::createApiTestServer(const ApiFilesystemConfig& api_fil
                                port_names, validator_config, allow_lds_rejection);
 }
 
-void BaseIntegrationTest::createTestServer(const std::string& json_path,
-                                           const std::vector<std::string>& port_names) {
-  test_server_ = createIntegrationTestServer(
-      TestEnvironment::temporaryFileSubstitute(json_path, port_map_, version_), nullptr, nullptr,
-      timeSystem());
-  registerTestServerPorts(port_names);
-}
-
 void BaseIntegrationTest::sendRawHttpAndWaitForResponse(int port, const char* raw_http,
                                                         std::string* response,
                                                         bool disconnect_after_headers_complete) {

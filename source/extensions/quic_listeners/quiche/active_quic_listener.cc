@@ -1,5 +1,7 @@
 #include "extensions/quic_listeners/quiche/active_quic_listener.h"
 
+#include "envoy/network/exception.h"
+
 #if defined(__linux__)
 #include <linux/filter.h>
 #endif
@@ -56,7 +58,7 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
     if (!ok) {
       ENVOY_LOG(warn, "Failed to apply socket options to socket {} on listener {} after binding",
                 listen_socket_.ioHandle().fd(), listener_config.name());
-      throw EnvoyException("Failed to apply socket options.");
+      throw Network::CreateListenerException("Failed to apply socket options.");
     }
     listen_socket_.addOptions(options);
   }

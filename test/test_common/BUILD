@@ -57,6 +57,7 @@ envoy_cc_test_library(
         "//source/common/network:address_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:raw_buffer_socket_lib",
+        "//source/common/network:socket_option_factory_lib",
         "//source/common/network:utility_lib",
         "//source/common/runtime:runtime_lib",
     ],

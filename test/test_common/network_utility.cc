@@ -10,6 +10,7 @@
 #include "common/network/address_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/raw_buffer_socket.h"
+#include "common/network/socket_option_factory.h"
 #include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
 
@@ -159,9 +160,14 @@ std::string ipVersionToDnsFamily(Network::Address::IpVersion version) {
 }
 
 std::pair<Address::InstanceConstSharedPtr, Network::SocketPtr>
-bindFreeLoopbackPort(Address::IpVersion version, Socket::Type type) {
+bindFreeLoopbackPort(Address::IpVersion version, Socket::Type type, bool reuse_port) {
   Address::InstanceConstSharedPtr addr = getCanonicalLoopbackAddress(version);
   SocketPtr sock = std::make_unique<SocketImpl>(type, addr);
+  if (reuse_port) {
+    sock->addOptions(SocketOptionFactory::buildReusePortOptions());
+    Socket::applyOptions(sock->options(), *sock,
+                         envoy::config::core::v3::SocketOption::STATE_PREBIND);
+  }
   Api::SysCallIntResult result = sock->bind(addr);
   if (0 != result.rc_) {
     sock->close();
