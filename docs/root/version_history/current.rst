@@ -39,10 +39,16 @@ Bug Fixes
 * adaptive concurrency: fixed a minRTT calculation bug where requests started before the concurrency
   limit was pinned to the minimum would skew the new minRTT value if the replies arrived after the
   start of the new minRTT window.
+* buffer: fixed CVE-2020-12603 by avoiding fragmentation, and tracking of HTTP/2 data and control frames in the output buffer.
 * grpc-json: fix a bug when in trailers only gRPC response (e.g. error) HTTP status code is not being re-written.
 * http: fixed a bug in the grpc_http1_reverse_bridge filter where header-only requests were forwarded with a non-zero content length.
 * http: fixed a bug where in some cases slash was moved from path to query string when :ref:`merging of adjacent slashes<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.merge_slashes>` is enabled.
+* http: fixed CVE-2020-12604 by changing :ref:`stream_idle_timeout <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.stream_idle_timeout>`
+  to also defend against an HTTP/2 peer that does not open stream window once an entire response has been buffered to be sent to a downstream client.
+* http: fixed CVE-2020-12605 by including request URL in request header size computation, and rejecting partial headers that exceed configured limits.
 * http: fixed several bugs with applying correct connection close behavior across the http connection manager, health checker, and connection pool. This behavior may be temporarily reverted by setting runtime feature `envoy.reloadable_features.fix_connection_close` to false.
+* listener: fixed CVE-2020-8663 by adding runtime support for :ref:`per-listener limits <config_listeners_runtime>` on active/accepted connections.
+* overload management: fixed CVE-2020-8663 by adding runtime support for :ref:`global limits <config_overload_manager>` on active/accepted connections.
 * prometheus stats: fix the sort order of output lines to comply with the standard.
 * udp: the :ref:`reuse_port <envoy_api_field_Listener.reuse_port>` listener option must now be
   specified for UDP listeners if concurrency is > 1. This previously crashed so is considered a

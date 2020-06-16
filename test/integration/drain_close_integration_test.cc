@@ -116,7 +116,7 @@ TEST_P(DrainCloseIntegrationTest, AdminGracefulDrain) {
   }
 
   // New connections can still be made.
-  auto second_codec_client_ = makeRawHttpConnection(makeClientConnection(http_port));
+  auto second_codec_client_ = makeRawHttpConnection(makeClientConnection(http_port), absl::nullopt);
   EXPECT_TRUE(second_codec_client_->connected());
 
   // Invoke /drain_listeners and shut down listeners.

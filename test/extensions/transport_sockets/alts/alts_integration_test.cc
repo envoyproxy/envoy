@@ -332,7 +332,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AltsIntegrationTestCapturingHandshaker,
 // Verifies that handshake request should include ALTS version.
 TEST_P(AltsIntegrationTestCapturingHandshaker, CheckAltsVersion) {
   initialize();
-  codec_client_ = makeRawHttpConnection(makeAltsConnection());
+  codec_client_ = makeRawHttpConnection(makeAltsConnection(), absl::nullopt);
   EXPECT_FALSE(codec_client_->connected());
   EXPECT_EQ(capturing_handshaker_service_->client_versions.max_rpc_version().major(),
             capturing_handshaker_service_->server_versions.max_rpc_version().major());

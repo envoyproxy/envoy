@@ -30,8 +30,7 @@ HTTP proxies should additionally configure:
 The following is a YAML example of the above recommendation (taken from the :ref:`Google VRP
 <arch_overview_google_vrp>` edge server configuration):
 
-.. literalinclude:: envoy-edge.yaml
-  :language: yaml
+.. code-block:: yaml
 
   overload_manager:
     refresh_interval: 0.25s
