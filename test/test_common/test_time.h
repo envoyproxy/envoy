@@ -16,7 +16,7 @@ public:
   void advanceTimeWait(const Duration& duration) override;
   Thread::CondVar::WaitStatus waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
                                       const Duration& duration) noexcept
-      EXCLUSIVE_LOCKS_REQUIRED(mutex) override;
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) override;
 
   // Event::TimeSystem
   Event::SchedulerPtr createScheduler(Scheduler& base_scheduler) override {
