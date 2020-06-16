@@ -122,11 +122,6 @@ public:
     BaseThriftIntegrationTest::initialize();
   }
 
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
-
 protected:
   // Multiplexed requests are handled by the service name route match,
   // while oneway's are handled by the "poke" method. All other requests

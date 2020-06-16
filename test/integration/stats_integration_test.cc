@@ -25,11 +25,6 @@ class StatsIntegrationTest : public testing::TestWithParam<Network::Address::IpV
 public:
   StatsIntegrationTest() : BaseIntegrationTest(GetParam()) {}
 
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
-
   void initialize() override { BaseIntegrationTest::initialize(); }
 };
 
@@ -277,7 +272,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // 2020/05/05  10908    44233       44600   router: add InternalRedirectPolicy and predicate
   // 2020/05/13  10531    44425       44600   Refactor resource manager
   // 2020/05/20  11223    44491       44600   Add primary clusters tracking to cluster manager.
-  // 2020/06/10  11327    44491       44811   Make upstreams pluggable
+  // 2020/06/10  11561    44491       44811   Make upstreams pluggable
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -340,7 +335,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // 2020/05/05  10908    36345       36800   router: add InternalRedirectPolicy and predicate
   // 2020/05/13  10531    36537       36800   Refactor resource manager
   // 2020/05/20  11223    36603       36800   Add primary clusters tracking to cluster manager.
-  // 2020/06/10  11327    36603       36923   Make upstreams pluggable
+  // 2020/06/10  11561    36603       36923   Make upstreams pluggable
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you

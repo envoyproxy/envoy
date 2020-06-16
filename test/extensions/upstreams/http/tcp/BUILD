@@ -18,6 +18,7 @@ envoy_cc_test(
         "//source/common/upstream:upstream_lib",
         "//source/extensions/upstreams/http/tcp:upstream_request_lib",
         "//test/common/http:common_lib",
+        "//test/mocks:common_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/router:router_mocks",

@@ -7,6 +7,7 @@
 #include "extensions/upstreams/http/tcp/upstream_request.h"
 
 #include "test/common/http/common.h"
+#include "test/mocks/common.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/server/mocks.h"
@@ -112,7 +113,7 @@ public:
   Envoy::Tcp::ConnectionPool::MockInstance mock_pool_;
   Router::MockGenericConnectionPoolCallbacks mock_generic_callbacks_;
   std::shared_ptr<NiceMock<Upstream::MockHost>> host_;
-  NiceMock<Envoy::Tcp::ConnectionPool::MockCancellable> cancellable_;
+  NiceMock<Envoy::ConnectionPool::MockCancellable> cancellable_;
 };
 
 TEST_F(TcpConnPoolTest, Basic) {

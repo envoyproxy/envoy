@@ -196,9 +196,6 @@ public:
       RELEASE_ASSERT(result, result.message());
       eds_connection_.reset();
     }
-    cleanupUpstreamAndDownstream();
-    test_server_.reset();
-    fake_upstreams_.clear();
   }
 
   void addHeader(Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>* field,

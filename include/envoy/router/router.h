@@ -13,7 +13,6 @@
 #include "envoy/common/matchers.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
-#include "envoy/config/typed_config.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
@@ -300,8 +299,8 @@ public:
    * @param callback supplies the callback that will be invoked when the retry should take place.
    *                 This is used to add timed backoff, etc. The callback will never be called
    *                 inline.
-   * @return RetryStatus if a retry should take place. @param callback will be called at some
-   * point in the future. Otherwise a retry should not take place and the callback will never be
+   * @return RetryStatus if a retry should take place. @param callback will be called at some point
+   *         in the future. Otherwise a retry should not take place and the callback will never be
    *         called. Calling code should proceed with error handling.
    */
   virtual RetryStatus shouldRetryHeaders(const Http::ResponseHeaderMap& response_headers,
@@ -318,14 +317,13 @@ public:
   virtual bool wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_headers) PURE;
 
   /**
-   * Determine whether a request should be retried after a reset based on the reason for the
-   * reset.
+   * Determine whether a request should be retried after a reset based on the reason for the reset.
    * @param reset_reason supplies the reset reason.
    * @param callback supplies the callback that will be invoked when the retry should take place.
    *                 This is used to add timed backoff, etc. The callback will never be called
    *                 inline.
-   * @return RetryStatus if a retry should take place. @param callback will be called at some
-   * point in the future. Otherwise a retry should not take place and the callback will never be
+   * @return RetryStatus if a retry should take place. @param callback will be called at some point
+   *         in the future. Otherwise a retry should not take place and the callback will never be
    *         called. Calling code should proceed with error handling.
    */
   virtual RetryStatus shouldRetryReset(const Http::StreamResetReason reset_reason,
@@ -338,8 +336,8 @@ public:
    * @param callback supplies the callback that will be invoked when the retry should take place.
    *                 This is used to add timed backoff, etc. The callback will never be called
    *                 inline.
-   * @return RetryStatus if a retry should take place. @param callback will be called at some
-   * point in the future. Otherwise a retry should not take place and the callback will never be
+   * @return RetryStatus if a retry should take place. @param callback will be called at some point
+   *         in the future. Otherwise a retry should not take place and the callback will never be
    *         called. Calling code should proceed with error handling.
    */
   virtual RetryStatus shouldHedgeRetryPerTryTimeout(DoRetryCallback callback) PURE;
@@ -522,10 +520,11 @@ public:
 
   /**
    * @return uint32_t any route cap on bytes which should be buffered for shadowing or retries.
-   *         This is an upper bound so does not necessarily reflect the bytes which will be
-   * buffered as other limits may apply. If a per route limit exists, it takes precedence over
-   * this configuration. Unlike some other buffer limits, 0 here indicates buffering should not be
-   * performed rather than no limit applies.
+   *         This is an upper bound so does not necessarily reflect the bytes which will be buffered
+   *         as other limits may apply.
+   *         If a per route limit exists, it takes precedence over this configuration.
+   *         Unlike some other buffer limits, 0 here indicates buffering should not be performed
+   *         rather than no limit applies.
    */
   virtual uint32_t retryShadowBufferLimit() const PURE;
 };
@@ -704,8 +703,8 @@ public:
   virtual const Http::HashPolicy* hashPolicy() const PURE;
 
   /**
-   * @return const HedgePolicy& the hedge policy for the route. All routes have a hedge policy
-   * even if it is empty and does not allow for hedged requests.
+   * @return const HedgePolicy& the hedge policy for the route. All routes have a hedge policy even
+   *         if it is empty and does not allow for hedged requests.
    */
   virtual const HedgePolicy& hedgePolicy() const PURE;
 
@@ -720,8 +719,8 @@ public:
   virtual const RateLimitPolicy& rateLimitPolicy() const PURE;
 
   /**
-   * @return const RetryPolicy& the retry policy for the route. All routes have a retry policy
-   * even if it is empty and does not allow retries.
+   * @return const RetryPolicy& the retry policy for the route. All routes have a retry policy even
+   *         if it is empty and does not allow retries.
    */
   virtual const RetryPolicy& retryPolicy() const PURE;
 
@@ -734,15 +733,16 @@ public:
 
   /**
    * @return uint32_t any route cap on bytes which should be buffered for shadowing or retries.
-   *         This is an upper bound so does not necessarily reflect the bytes which will be
-   * buffered as other limits may apply. Unlike some other buffer limits, 0 here indicates
-   * buffering should not be performed rather than no limit applies.
+   *         This is an upper bound so does not necessarily reflect the bytes which will be buffered
+   *         as other limits may apply.
+   *         Unlike some other buffer limits, 0 here indicates buffering should not be performed
+   *         rather than no limit applies.
    */
   virtual uint32_t retryShadowBufferLimit() const PURE;
 
   /**
-   * @return const std::vector<ShadowPolicy>& the shadow policies for the route. The vector is
-   * empty if no shadowing takes place.
+   * @return const std::vector<ShadowPolicy>& the shadow policies for the route. The vector is empty
+   *         if no shadowing takes place.
    */
   virtual const std::vector<ShadowPolicyPtr>& shadowPolicies() const PURE;
 
@@ -759,15 +759,15 @@ public:
 
   /**
    * @return absl::optional<std::chrono::milliseconds> the maximum allowed timeout value derived
-   * from 'grpc-timeout' header of a gRPC request. Non-present value disables use of
-   * 'grpc-timeout' header, while 0 represents infinity.
+   * from 'grpc-timeout' header of a gRPC request. Non-present value disables use of 'grpc-timeout'
+   * header, while 0 represents infinity.
    */
   virtual absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const PURE;
 
   /**
    * @return absl::optional<std::chrono::milliseconds> the timeout offset to apply to the timeout
-   * provided by the 'grpc-timeout' header of a gRPC request. This value will be positive and
-   * should be subtracted from the value provided by the header.
+   * provided by the 'grpc-timeout' header of a gRPC request. This value will be positive and should
+   * be subtracted from the value provided by the header.
    */
   virtual absl::optional<std::chrono::milliseconds> grpcTimeoutOffset() const PURE;
 
@@ -818,8 +818,8 @@ public:
   virtual const envoy::config::core::v3::Metadata& metadata() const PURE;
 
   /**
-   * @return TlsContextMatchCriteria* the tls context match criterion for this route. If there is
-   * no tls context match criteria, nullptr is returned.
+   * @return TlsContextMatchCriteria* the tls context match criterion for this route. If there is no
+   * tls context match criteria, nullptr is returned.
    */
   virtual const TlsContextMatchCriteria* tlsContextMatchCriteria() const PURE;
 
@@ -1020,14 +1020,14 @@ enum class RouteEvalStatus {
  * this callback is passed the RouteConstSharedPtr, when a matching route is found, and
  * RouteEvalStatus indicating whether there are more routes available for evaluation.
  *
- * RouteCallback will be called back only when at least one matching route is found, if no
- * matching routes are found RouteCallback will not be invoked. RouteCallback can return one of
- * the RouteMatchStatus enum to indicate if the match has been accepted or should the route match
+ * RouteCallback will be called back only when at least one matching route is found, if no matching
+ * routes are found RouteCallback will not be invoked. RouteCallback can return one of the
+ * RouteMatchStatus enum to indicate if the match has been accepted or should the route match
  * evaluation continue.
  *
- * Returning RouteMatchStatus::Continue, when no more routes available for evaluation will result
- * in no further callbacks and no route is deemed to be accepted and nullptr is returned to the
- * caller of Route::Config::route.
+ * Returning RouteMatchStatus::Continue, when no more routes available for evaluation will result in
+ * no further callbacks and no route is deemed to be accepted and nullptr is returned to the caller
+ * of Route::Config::route.
  */
 using RouteCallback = std::function<RouteMatchStatus(RouteConstSharedPtr, RouteEvalStatus)>;
 
@@ -1094,6 +1094,7 @@ public:
 };
 
 using ConfigConstSharedPtr = std::shared_ptr<const Config>;
+
 class GenericConnectionPoolCallbacks;
 class UpstreamRequest;
 class GenericUpstream;
@@ -1175,7 +1176,7 @@ public:
 
   // TODO(alyssawilk) This exists because the Connection Pool creates the GenericUpstream, and the
   // GenericUpstream needs a handle back to the upstream request to pass on events, as upstream
-  // data flows in. I suppose we should split it into a proper interface?
+  // data flows in. Do interface clean up in a follow-up PR.
   virtual UpstreamRequest* upstreamRequest() PURE;
 };
 

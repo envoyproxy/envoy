@@ -33,7 +33,7 @@ public:
   void insert(const Key& key, Http::ResponseHeaderMapPtr&& response_headers, std::string&& body);
 
   absl::Mutex mutex_;
-  absl::flat_hash_map<Key, Entry, MessageUtil, MessageUtil> map_ GUARDED_BY(mutex_);
+  absl::flat_hash_map<Key, Entry, MessageUtil, MessageUtil> map_ ABSL_GUARDED_BY(mutex_);
 };
 
 } // namespace Cache
