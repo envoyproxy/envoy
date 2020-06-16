@@ -71,6 +71,7 @@ public:
   void initialize();
 
   bool encrypted() const { return encrypted_; }
+  const std::map<std::string, std::string>& getAttributes() const { return attributes_; }
 
 protected:
   // Message action defines the Decoder's method which will be invoked
@@ -116,6 +117,7 @@ protected:
   void decodeFrontendTerminate();
   void decodeErrorNotice(MsgParserDict& types);
   void onQuery();
+  void onStartup();
 
   void incMessagesUnknown() { callbacks_->incMessagesUnknown(); }
   void incSessionsEncrypted() { callbacks_->incSessionsEncrypted(); }
@@ -129,8 +131,9 @@ protected:
   std::string message_;
   uint32_t message_len_{};
 
-  bool startup_{true};    // startup stage does not have 1st byte command
-  bool encrypted_{false}; // tells if exchange is encrypted
+  bool startup_{true};                            // startup stage does not have 1st byte command
+  bool encrypted_{false};                         // tells if exchange is encrypted
+  std::map<std::string, std::string> attributes_; // attributes extracted from Startup message
 
   // Dispatchers for Backend (BE) and Frontend (FE) messages.
   MsgGroup FE_messages_;

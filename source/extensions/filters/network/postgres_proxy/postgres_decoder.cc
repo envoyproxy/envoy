@@ -2,6 +2,8 @@
 
 #include <vector>
 
+#include "absl/strings/str_split.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -9,7 +11,7 @@ namespace PostgresProxy {
 
 void DecoderImpl::initialize() {
   // Special handler for first message of the transaction.
-  first_ = MsgProcessor{"Startup", {}};
+  first_ = MsgProcessor{"Startup", {&DecoderImpl::onStartup}};
 
   // Frontend messages.
   FE_messages_.direction_ = "Frontend";
@@ -169,6 +171,7 @@ bool DecoderImpl::parseMessage(Buffer::Instance& data) {
   // The 1 byte message type and message length should be in the buffer
   // Check if the entire message has been read.
   std::string message;
+
   uint32_t length = data.peekBEInt<uint32_t>(startup_ ? 0 : 1);
   if (data.length() < (length + (startup_ ? 0 : 1))) {
     ENVOY_LOG(trace, "postgres_proxy: cannot parse message. Need {} bytes in buffer",
@@ -190,6 +193,7 @@ bool DecoderImpl::parseMessage(Buffer::Instance& data) {
       return false;
     } else {
       ENVOY_LOG(debug, "Detected version {}.{} of Postgres", code >> 16, code & 0x0000FFFF);
+      // 4 bytes of length and 4 bytes of version code.
     }
   }
 
@@ -325,6 +329,20 @@ void DecoderImpl::decodeBackendErrorResponse() { decodeErrorNotice(BE_errors_); 
 void DecoderImpl::decodeBackendNoticeResponse() { decodeErrorNotice(BE_notices_); }
 
 void DecoderImpl::onQuery() { callbacks_->processQuery(message_); }
+
+// Method is invoked on clear-text Startup message.
+// The message format is continuous string of the following format:
+// user<username>database<database-name>application_name<application>encoding<encoding-type>
+void DecoderImpl::onStartup() {
+  // First 4 bytes of startup message contains version code.
+  // It is skipped. After that message contains attributes.
+  attributes_ = absl::StrSplit(message_.substr(4), absl::ByChar('\0'), absl::SkipEmpty());
+
+  // If "database" attribute is not found, default it to "user" attribute.
+  if (attributes_.find("database") == attributes_.end()) {
+    attributes_["database"] = attributes_["user"];
+  }
+}
 
 } // namespace PostgresProxy
 } // namespace NetworkFilters
