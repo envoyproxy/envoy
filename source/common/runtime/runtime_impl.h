@@ -130,6 +130,8 @@ private:
   RuntimeStats& stats_;
 };
 
+using SnapshotImplPtr = std::unique_ptr<SnapshotImpl>;
+
 /**
  * Base implementation of OverrideLayer that by itself provides an empty values map.
  */
@@ -260,7 +262,7 @@ private:
   friend RtdsSubscription;
 
   // Create a new Snapshot
-  virtual std::unique_ptr<SnapshotImpl> createNewSnapshot();
+  virtual SnapshotImplPtr createNewSnapshot();
   // Load a new Snapshot into TLS
   void loadNewSnapshot();
   RuntimeStats generateStats(Stats::Store& store);

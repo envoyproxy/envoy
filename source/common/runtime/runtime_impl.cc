@@ -630,7 +630,7 @@ RuntimeStats LoaderImpl::generateStats(Stats::Store& store) {
   return stats;
 }
 
-std::unique_ptr<SnapshotImpl> LoaderImpl::createNewSnapshot() {
+SnapshotImplPtr LoaderImpl::createNewSnapshot() {
   std::vector<Snapshot::OverrideLayerConstPtr> layers;
   uint32_t disk_layers = 0;
   uint32_t error_layers = 0;
