@@ -554,13 +554,13 @@ TEST_F(Http1ConnPoolImplTest, CancelExcessBeforeBound) {
   // Request 1 should kick off a new connection.
   NiceMock<MockResponseDecoder> outer_decoder;
   ConnPoolCallbacks callbacks;
-  conn_pool_.expectClientCreate();
-  Http::ConnectionPool::Cancellable* handle = conn_pool_.newStream(outer_decoder, callbacks);
+  conn_pool_->expectClientCreate();
+  Http::ConnectionPool::Cancellable* handle = conn_pool_->newStream(outer_decoder, callbacks);
   EXPECT_NE(nullptr, handle);
 
   handle->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
   // Unlike CancelBeforeBound there is no need to raise a close event to destroy the connection.
-  EXPECT_CALL(conn_pool_, onClientDestroy());
+  EXPECT_CALL(*conn_pool_, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
 }
 
@@ -1087,7 +1087,7 @@ TEST_F(Http1ConnPoolImplTest, PendingRequestIsConsideredActive) {
 
   EXPECT_TRUE(conn_pool_->hasActiveConnections());
 
-  EXPECT_CALL(conn_pool_, onClientDestroy());
+  EXPECT_CALL(*conn_pool_, onClientDestroy());
   r1.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
   EXPECT_EQ(0U, cluster_->stats_.upstream_rq_total_.value());
   conn_pool_->drainConnections();
