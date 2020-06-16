@@ -31,13 +31,13 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
-class ExtAuthzGrpcClientTest
-    : public testing::TestWithParam<
-          std::tuple<envoy::config::core::v3::ApiVersion, /* use_alpha */ bool>> {
+using Params = std::tuple<envoy::config::core::v3::ApiVersion, bool>;
+
+class ExtAuthzGrpcClientTest : public testing::TestWithParam<Params> {
 public:
   ExtAuthzGrpcClientTest() : async_client_(new Grpc::MockAsyncClient()), timeout_(10) {}
 
-  void initialize(const std::tuple<envoy::config::core::v3::ApiVersion, bool>& param) {
+  void initialize(const Params& param) {
     api_version_ = std::get<0>(param);
     use_alpha_ = std::get<1>(param);
     client_ = std::make_unique<GrpcClientImpl>(Grpc::RawAsyncClientPtr{async_client_}, timeout_,
@@ -72,10 +72,10 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(Parameterized, ExtAuthzGrpcClientTest,
-                         Values(std::make_tuple(envoy::config::core::v3::ApiVersion::AUTO, false),
-                                std::make_tuple(envoy::config::core::v3::ApiVersion::V2, false),
-                                std::make_tuple(envoy::config::core::v3::ApiVersion::V2, true),
-                                std::make_tuple(envoy::config::core::v3::ApiVersion::V3, false)));
+                         Values(Params(envoy::config::core::v3::ApiVersion::AUTO, false),
+                                Params(envoy::config::core::v3::ApiVersion::V2, false),
+                                Params(envoy::config::core::v3::ApiVersion::V2, true),
+                                Params(envoy::config::core::v3::ApiVersion::V3, false)));
 
 // Test the client when an ok response is received.
 TEST_P(ExtAuthzGrpcClientTest, AuthorizationOk) {
