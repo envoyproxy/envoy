@@ -32,6 +32,8 @@ private:
   static std::function<void()> debug_assertion_failure_record_action_;
 };
 
+// This class implements the logic for triggering ENVOY_BUG logs and actions. Logging and actions
+// will be triggered with exponential back-off per file and line bug.
 class EnvoyBugRegistrationImpl : public ActionRegistration {
 public:
   EnvoyBugRegistrationImpl(std::function<void()> action) {
@@ -46,6 +48,15 @@ public:
     envoy_bug_failure_record_action_ = nullptr;
   }
 
+  // This method is invoked when an ENVOY_BUG condition fails. It increments a per file and line
+  // counter for every ENVOY_BUG hit in a mutex guarded map.
+  // The implementation may also be a inline static counter per-file and line. There is no benchmark
+  // to show that the performance of this mutex is any worse than atomic counters. Acquiring and
+  // releasing a mutex is cheaper than a cache miss, but the mutex here is contended for every
+  // ENVOY_BUG failure rather than per individual bug. Currently, this choice reduces code size and
+  // has the advantage that behavior is easier to understand and debug, and test behavior is
+  // predictable.
+  // TODO(asraa): Re-evaluate implementation as usage increases or mutex contention is observed.
   static bool shouldLogAndInvoke(absl::string_view bug_name) {
     // Increment counter, inserting first if counter does not exist.
     uint64_t counter_value = 0;
