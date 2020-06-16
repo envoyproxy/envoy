@@ -50,15 +50,18 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::network::local_ratelimit::
 //   Event::SimulatedTimeSystem time_system;
   
   ConfigSharedPtr config_;
-
-
  
-
-
+ 
   envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit proto_config = input.config();
   config_ = ::std::make_shared<Config>(proto_config, dispatcher_, stats_store_, runtime_);
   ActiveFilter active_filter(config_);
-  runtime_
+
+  std::chrono::milliseconds fill_interval_(PROTOBUF_GET_MS_REQUIRED(proto_config.token_bucket(), fill_interval));
+
+  if (fill_interval_ < std::chrono::milliseconds(50)) {
+    //invalid interval for local_ratelimit filter.
+    return;
+  }
 
   for (const auto& action : input.actions()) {
     ENVOY_LOG_MISC(trace, "action {}", action.DebugString());
@@ -74,9 +77,8 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::network::local_ratelimit::
       break;
     }
     case envoy::extensions::filters::network::local_ratelimit::Action::kAdvanceTime:{
-      EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(action.advance_time().milliseconds()), nullptr));
+      EXPECT_CALL(*fill_timer_, enableTimer(fill_interval_, nullptr));
       fill_timer_->invokeCallback();
-      
       break;
     }
     default:
