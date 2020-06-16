@@ -49,8 +49,6 @@ envoy_cc_fuzz_test(
         ":verify_signature_fuzz_proto_cc_proto",
         "//source/common/common:hex_lib",
         "//source/common/crypto:utility_lib",
-        "//source/common/protobuf:utility_lib",
         "//source/extensions/common/crypto:utility_lib",
-        "//test/test_common:utility_lib",
     ],
 )
