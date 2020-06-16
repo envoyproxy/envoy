@@ -152,6 +152,13 @@ public:
   virtual void drainConnections() PURE;
 
   /**
+   * Immediately close all existing connection pool connections. This method can be used in cases
+   * where the connection pool is not being destroyed, but the caller wishes to terminate all
+   * existing connections. For example, when a health check failure occurs.
+   */
+  virtual void closeConnections() PURE;
+
+  /**
    * Create a new connection on the pool.
    * @param cb supplies the callbacks to invoke when the connection is ready or has failed. The
    *           callbacks may be invoked immediately within the context of this call if there is a

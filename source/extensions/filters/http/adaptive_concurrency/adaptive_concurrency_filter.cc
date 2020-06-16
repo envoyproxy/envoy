@@ -43,16 +43,11 @@ Http::FilterHeadersStatus AdaptiveConcurrencyFilter::decodeHeaders(Http::Request
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  // When the deferred_sample_task_ object is destroyed, the time difference between its destruction
-  // and the request start time is measured as the request latency. This value is sampled by the
-  // concurrency controller either when encoding is complete or during destruction of this filter
-  // object.
+  // When the deferred_sample_task_ object is destroyed, the request start time is sampled. This
+  // occurs either when encoding is complete or during destruction of this filter object.
+  const auto now = config_->timeSource().monotonicTime();
   deferred_sample_task_ =
-      std::make_unique<Cleanup>([this, rq_start_time = config_->timeSource().monotonicTime()]() {
-        const auto now = config_->timeSource().monotonicTime();
-        const std::chrono::nanoseconds rq_latency = now - rq_start_time;
-        controller_->recordLatencySample(rq_latency);
-      });
+      std::make_unique<Cleanup>([this, now]() { controller_->recordLatencySample(now); });
 
   return Http::FilterHeadersStatus::Continue;
 }
