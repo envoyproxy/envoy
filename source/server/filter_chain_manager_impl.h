@@ -179,7 +179,7 @@ public:
                          Init::Manager& init_manager, const FilterChainManagerImpl& parent_manager);
 
   // FilterChainFactoryContextCreator
-  std::unique_ptr<Configuration::FilterChainFactoryContext> createFilterChainFactoryContext(
+  Configuration::FilterChainFactoryContextPtr createFilterChainFactoryContext(
       const ::envoy::config::listener::v3::FilterChain* const filter_chain) override;
 
   // Network::FilterChainManager

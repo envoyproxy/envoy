@@ -609,8 +609,7 @@ std::shared_ptr<Network::DrainableFilterChain> FilterChainManagerImpl::findExist
   return nullptr;
 }
 
-std::unique_ptr<Configuration::FilterChainFactoryContext>
-FilterChainManagerImpl::createFilterChainFactoryContext(
+Configuration::FilterChainFactoryContextPtr FilterChainManagerImpl::createFilterChainFactoryContext(
     const ::envoy::config::listener::v3::FilterChain* const filter_chain) {
   // TODO(lambdai): add stats
   UNREFERENCED_PARAMETER(filter_chain);

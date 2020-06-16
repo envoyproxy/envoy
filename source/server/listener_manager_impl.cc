@@ -946,8 +946,7 @@ std::shared_ptr<Network::DrainableFilterChain> ListenerFilterChainFactoryBuilder
 std::shared_ptr<Network::DrainableFilterChain>
 ListenerFilterChainFactoryBuilder::buildFilterChainInternal(
     const envoy::config::listener::v3::FilterChain& filter_chain,
-    std::unique_ptr<Configuration::FilterChainFactoryContext>&& filter_chain_factory_context)
-    const {
+    Configuration::FilterChainFactoryContextPtr&& filter_chain_factory_context) const {
   // If the cluster doesn't have transport socket configured, then use the default "raw_buffer"
   // transport socket or BoringSSL-based "tls" transport socket if TLS settings are configured.
   // We copy by value first then override if necessary.

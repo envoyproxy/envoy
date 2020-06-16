@@ -323,10 +323,9 @@ public:
                    FilterChainFactoryContextCreator& context_creator) const override;
 
 private:
-  std::shared_ptr<Network::DrainableFilterChain>
-  buildFilterChainInternal(const envoy::config::listener::v3::FilterChain& filter_chain,
-                           std::unique_ptr<Configuration::FilterChainFactoryContext>&&
-                               filter_chain_factory_context) const;
+  std::shared_ptr<Network::DrainableFilterChain> buildFilterChainInternal(
+      const envoy::config::listener::v3::FilterChain& filter_chain,
+      Configuration::FilterChainFactoryContextPtr&& filter_chain_factory_context) const;
 
   ProtobufMessage::ValidationVisitor& validator_;
   ListenerComponentFactory& listener_component_factory_;
