@@ -11,12 +11,12 @@ import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 
 option java_package = "io.envoyproxy.envoy.service.filter.v3";
-option java_outer_classname = "FdsProto";
+option java_outer_classname = "FcdsProto";
 option java_multiple_files = true;
 option java_generic_services = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: FDS]
+// [#protodoc-title: FCDS]
 
 // Return filter configurations.
 service FilterConfigDiscoveryService {

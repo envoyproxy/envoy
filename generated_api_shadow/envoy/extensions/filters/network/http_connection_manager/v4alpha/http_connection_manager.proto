@@ -782,22 +782,22 @@ message HttpFilter {
 
     // Optional default configuration to use as the initial configuration if
     // there is a failure to receive the initial filter configuration or if
-    // `apply_default_config` flag is set.
+    // `apply_default_config_without_warming` flag is set.
     google.protobuf.Any default_config = 2;
 
     // Use the default config as the initial configuration without warming and
     // waiting for the first xDS response. Requires the default configuration
     // to be supplied.
-    bool apply_default_config = 3;
+    bool apply_default_config_without_warming = 3;
   }
 
   reserved 3, 2;
 
   reserved "config";
 
-  // The name of the filter to instantiate. The name is used as a fallback to
+  // The name of the filter configuration. The name is used as a fallback to
   // select an extension if the type of the configuration proto is not
-  // sufficient.
+  // sufficient. It also serves as a resource name in FCDS.
   string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
   // Filter specific configuration which depends on the filter being instantiated. See the supported
@@ -805,8 +805,8 @@ message HttpFilter {
   oneof config_type {
     google.protobuf.Any typed_config = 4;
 
-    // [#not-implemented-hide:] Configuration source specifier for FDS.
-    HttpFilterConfigSource fds_config_source = 5;
+    // [#not-implemented-hide:] Configuration source specifier for FCDS.
+    HttpFilterConfigSource fcds = 5;
   }
 }
 
