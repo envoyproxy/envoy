@@ -209,7 +209,7 @@ public:
     router_.decodeHeaders(headers, true);
 
     // When the router filter gets reset we should cancel the pool request.
-    EXPECT_CALL(cancellable_, cancel());
+    EXPECT_CALL(cancellable_, cancel(_));
     router_.onDestroy();
   }
 
@@ -230,7 +230,7 @@ public:
     EXPECT_EQ(expected_count, atoi(std::string(headers.getEnvoyAttemptCountValue()).c_str()));
 
     // When the router filter gets reset we should cancel the pool request.
-    EXPECT_CALL(cancellable_, cancel());
+    EXPECT_CALL(cancellable_, cancel(_));
     router_.onDestroy();
     EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
     EXPECT_EQ(0U,
@@ -353,7 +353,7 @@ public:
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
-  Http::ConnectionPool::MockCancellable cancellable_;
+  Envoy::ConnectionPool::MockCancellable cancellable_;
   Http::ContextImpl http_context_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   MockShadowWriter* shadow_writer_;
@@ -411,7 +411,7 @@ TEST_F(RouterTest, UpdateServerNameFilterState) {
             stream_info.filterState()
                 ->getDataReadOnly<Network::UpstreamServerName>(Network::UpstreamServerName::key())
                 .value());
-  EXPECT_CALL(cancellable_, cancel());
+  EXPECT_CALL(cancellable_, cancel(_));
   router_.onDestroy();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(0U,
@@ -439,7 +439,7 @@ TEST_F(RouterTest, UpdateSubjectAltNamesFilterState) {
                         ->getDataReadOnly<Network::UpstreamSubjectAltNames>(
                             Network::UpstreamSubjectAltNames::key())
                         .value()[0]);
-  EXPECT_CALL(cancellable_, cancel());
+  EXPECT_CALL(cancellable_, cancel(_));
   router_.onDestroy();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(0U,
@@ -524,7 +524,7 @@ TEST_F(RouterTest, Http1Upstream) {
   EXPECT_EQ("10", headers.get_("x-envoy-expected-rq-timeout-ms"));
 
   // When the router filter gets reset we should cancel the pool request.
-  EXPECT_CALL(cancellable_, cancel());
+  EXPECT_CALL(cancellable_, cancel(_));
   router_.onDestroy();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(0U,
@@ -549,7 +549,7 @@ TEST_F(RouterTestSuppressEnvoyHeaders, Http1Upstream) {
   EXPECT_FALSE(headers.has("x-envoy-expected-rq-timeout-ms"));
 
   // When the router filter gets reset we should cancel the pool request.
-  EXPECT_CALL(cancellable_, cancel());
+  EXPECT_CALL(cancellable_, cancel(_));
   router_.onDestroy();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(0U,
@@ -570,7 +570,7 @@ TEST_F(RouterTest, Http2Upstream) {
   router_.decodeHeaders(headers, true);
 
   // When the router filter gets reset we should cancel the pool request.
-  EXPECT_CALL(cancellable_, cancel());
+  EXPECT_CALL(cancellable_, cancel(_));
   router_.onDestroy();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(0U,
@@ -597,7 +597,7 @@ TEST_F(RouterTest, HashPolicy) {
   router_.decodeHeaders(headers, true);
 
   // When the router filter gets reset we should cancel the pool request.
-  EXPECT_CALL(cancellable_, cancel());
+  EXPECT_CALL(cancellable_, cancel(_));
   router_.onDestroy();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(0U,
@@ -624,7 +624,7 @@ TEST_F(RouterTest, HashPolicyNoHash) {
   router_.decodeHeaders(headers, true);
 
   // When the router filter gets reset we should cancel the pool request.
-  EXPECT_CALL(cancellable_, cancel());
+  EXPECT_CALL(cancellable_, cancel(_));
   router_.onDestroy();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(0U,
@@ -820,7 +820,7 @@ TEST_F(RouterTest, MetadataMatchCriteria) {
   router_.decodeHeaders(headers, true);
 
   // When the router filter gets reset we should cancel the pool request.
-  EXPECT_CALL(cancellable_, cancel());
+  EXPECT_CALL(cancellable_, cancel(_));
   router_.onDestroy();
 }
 
@@ -849,7 +849,7 @@ TEST_F(RouterTest, NoMetadataMatchCriteria) {
   router_.decodeHeaders(headers, true);
 
   // When the router filter gets reset we should cancel the pool request.
-  EXPECT_CALL(cancellable_, cancel());
+  EXPECT_CALL(cancellable_, cancel(_));
   router_.onDestroy();
 }
 
@@ -862,7 +862,7 @@ TEST_F(RouterTest, CancelBeforeBoundToPool) {
   router_.decodeHeaders(headers, true);
 
   // When the router filter gets reset we should cancel the pool request.
-  EXPECT_CALL(cancellable_, cancel());
+  EXPECT_CALL(cancellable_, cancel(_));
   router_.onDestroy();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(0U,
@@ -4070,7 +4070,7 @@ TEST_F(RouterTest, RetryTimeoutDuringRetryDelayWithUpstreamRequestNoHost) {
   response_decoder->decodeHeaders(std::move(response_headers1), true);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 
-  Http::ConnectionPool::MockCancellable cancellable;
+  Envoy::ConnectionPool::MockCancellable cancellable;
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::ResponseDecoder& decoder,
                            Http::ConnectionPool::Callbacks&) -> Http::ConnectionPool::Cancellable* {
@@ -4080,7 +4080,7 @@ TEST_F(RouterTest, RetryTimeoutDuringRetryDelayWithUpstreamRequestNoHost) {
   router_.retry_state_->callback_();
 
   // Fire timeout.
-  EXPECT_CALL(cancellable, cancel());
+  EXPECT_CALL(cancellable, cancel(_));
   EXPECT_CALL(callbacks_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::UpstreamRequestTimeout));
 
@@ -4126,7 +4126,7 @@ TEST_F(RouterTest, RetryTimeoutDuringRetryDelayWithUpstreamRequestNoHostAltRespo
   response_decoder->decodeHeaders(std::move(response_headers1), true);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 
-  Http::ConnectionPool::MockCancellable cancellable;
+  Envoy::ConnectionPool::MockCancellable cancellable;
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::ResponseDecoder& decoder,
                            Http::ConnectionPool::Callbacks&) -> Http::ConnectionPool::Cancellable* {
@@ -4136,7 +4136,7 @@ TEST_F(RouterTest, RetryTimeoutDuringRetryDelayWithUpstreamRequestNoHostAltRespo
   router_.retry_state_->callback_();
 
   // Fire timeout.
-  EXPECT_CALL(cancellable, cancel());
+  EXPECT_CALL(cancellable, cancel(_));
   EXPECT_CALL(callbacks_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::UpstreamRequestTimeout));
 
@@ -5892,7 +5892,7 @@ TEST_F(RouterTest, ApplicationProtocols) {
   router_.decodeHeaders(headers, true);
 
   // When the router filter gets reset we should cancel the pool request.
-  EXPECT_CALL(cancellable_, cancel());
+  EXPECT_CALL(cancellable_, cancel(_));
   router_.onDestroy();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(0U,

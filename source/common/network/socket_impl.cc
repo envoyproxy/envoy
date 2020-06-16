@@ -32,8 +32,7 @@ SocketImpl::SocketImpl(IoHandlePtr&& io_handle,
   socklen_t len = sizeof(addr);
   Api::SysCallIntResult result;
 
-  result = Api::OsSysCallsSingleton::get().getsockname(
-      io_handle_->fd(), reinterpret_cast<struct sockaddr*>(&addr), &len);
+  result = io_handle_->getLocalAddress(reinterpret_cast<struct sockaddr*>(&addr), &len);
 
   // This should never happen in practice but too many tests inject fake fds ...
   if (result.rc_ < 0) {
@@ -58,8 +57,7 @@ Api::SysCallIntResult SocketImpl::bind(Network::Address::InstanceConstSharedPtr 
       unlink(pipe_sa->sun_path);
     }
     // Not storing a reference to syscalls singleton because of unit test mocks
-    bind_result = Api::OsSysCallsSingleton::get().bind(io_handle_->fd(), address->sockAddr(),
-                                                       address->sockAddrLen());
+    bind_result = io_handle_->bind(address->sockAddr(), address->sockAddrLen());
     if (pipe->mode() != 0 && !abstract_namespace && bind_result.rc_ == 0) {
       auto set_permissions = Api::OsSysCallsSingleton::get().chmod(pipe_sa->sun_path, pipe->mode());
       if (set_permissions.rc_ != 0) {
@@ -71,21 +69,17 @@ Api::SysCallIntResult SocketImpl::bind(Network::Address::InstanceConstSharedPtr 
     return bind_result;
   }
 
-  bind_result = Api::OsSysCallsSingleton::get().bind(io_handle_->fd(), address->sockAddr(),
-                                                     address->sockAddrLen());
+  bind_result = io_handle_->bind(address->sockAddr(), address->sockAddrLen());
   if (bind_result.rc_ == 0 && address->ip()->port() == 0) {
     local_address_ = SocketInterfaceSingleton::get().addressFromFd(io_handle_->fd());
   }
   return bind_result;
 }
 
-Api::SysCallIntResult SocketImpl::listen(int backlog) {
-  return Api::OsSysCallsSingleton::get().listen(io_handle_->fd(), backlog);
-}
+Api::SysCallIntResult SocketImpl::listen(int backlog) { return io_handle_->listen(backlog); }
 
 Api::SysCallIntResult SocketImpl::connect(const Network::Address::InstanceConstSharedPtr address) {
-  auto result = Api::OsSysCallsSingleton::get().connect(io_handle_->fd(), address->sockAddr(),
-                                                        address->sockAddrLen());
+  auto result = io_handle_->connect(address->sockAddr(), address->sockAddrLen());
   if (address->type() == Address::Type::Ip) {
     local_address_ = SocketInterfaceSingleton::get().addressFromFd(io_handle_->fd());
   }
@@ -94,18 +88,16 @@ Api::SysCallIntResult SocketImpl::connect(const Network::Address::InstanceConstS
 
 Api::SysCallIntResult SocketImpl::setSocketOption(int level, int optname, const void* optval,
                                                   socklen_t optlen) {
-  return Api::OsSysCallsSingleton::get().setsockopt(io_handle_->fd(), level, optname, optval,
-                                                    optlen);
+  return io_handle_->setOption(level, optname, optval, optlen);
 }
 
 Api::SysCallIntResult SocketImpl::getSocketOption(int level, int optname, void* optval,
                                                   socklen_t* optlen) const {
-  return Api::OsSysCallsSingleton::get().getsockopt(io_handle_->fd(), level, optname, optval,
-                                                    optlen);
+  return io_handle_->getOption(level, optname, optval, optlen);
 }
 
 Api::SysCallIntResult SocketImpl::setBlockingForTest(bool blocking) {
-  return Api::OsSysCallsSingleton::get().setsocketblocking(io_handle_->fd(), blocking);
+  return io_handle_->setBlocking(blocking);
 }
 
 absl::optional<Address::IpVersion> SocketImpl::ipVersion() const {
