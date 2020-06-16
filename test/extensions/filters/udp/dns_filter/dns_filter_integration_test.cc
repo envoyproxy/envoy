@@ -1,4 +1,5 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/network/address.h"
 
 #include "extensions/filters/udp/dns_filter/dns_filter.h"
 
