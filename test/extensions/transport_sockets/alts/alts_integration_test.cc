@@ -40,7 +40,7 @@ namespace TransportSockets {
 namespace Alts {
 namespace {
 
-// Fake handshaker message, copied from grpc::gcp::FakeHandshkerService implementation.
+// Fake handshaker message, copied from grpc::gcp::FakeHandshakerService implementation.
 constexpr char kClientInitFrame[] = "ClientInit";
 
 // Hollowed out implementation of HandshakerService that is disfunctional, but
