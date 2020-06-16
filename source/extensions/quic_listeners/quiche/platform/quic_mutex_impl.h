@@ -24,7 +24,7 @@ namespace quic {
 #define QUIC_ASSERT_SHARED_LOCK_IMPL ABSL_ASSERT_SHARED_LOCK
 
 // A class wrapping a non-reentrant mutex.
-class ABSL_LOCKABLE QUIC_EXPORT_PRIVATE QuicLockImpl {
+class QUIC_LOCKABLE_IMPL QUIC_EXPORT_PRIVATE QuicLockImpl {
 public:
   QuicLockImpl() = default;
   QuicLockImpl(const QuicLockImpl&) = delete;
