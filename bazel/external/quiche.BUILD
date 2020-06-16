@@ -1843,6 +1843,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quic_core_crypto_boring_utils_lib",
+        ":quic_core_types_lib",
         ":quic_platform",
         ":quic_platform_ip_address",
         ":quiche_common_platform",
@@ -3554,10 +3555,21 @@ envoy_cc_test_library(
 )
 
 envoy_cc_library(
+    name = "quiche_common_platform_optional",
+    hdrs = ["quiche/common/platform/api/quiche_optional.h"],
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quiche_common_platform_export",
+        "@envoy//source/extensions/quic_listeners/quiche/platform:quiche_common_platform_optional_impl_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "quiche_common_platform",
     hdrs = [
         "quiche/common/platform/api/quiche_arraysize.h",
-        "quiche/common/platform/api/quiche_export.h",
         "quiche/common/platform/api/quiche_logging.h",
         "quiche/common/platform/api/quiche_map_util.h",
         "quiche/common/platform/api/quiche_optional.h",
@@ -3565,6 +3577,7 @@ envoy_cc_library(
         "quiche/common/platform/api/quiche_str_cat.h",
         "quiche/common/platform/api/quiche_string_piece.h",
         "quiche/common/platform/api/quiche_text_utils.h",
+        "quiche/common/platform/api/quiche_time_utils.h",
         "quiche/common/platform/api/quiche_unordered_containers.h",
     ],
     repository = "@envoy",
@@ -3572,6 +3585,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
+        ":quiche_common_platform_optional",
         "@envoy//source/extensions/quic_listeners/quiche/platform:quiche_common_platform_impl_lib",
     ],
 )
@@ -3582,6 +3596,7 @@ envoy_cc_test_library(
         "quiche/common/platform/api/quiche_endian_test.cc",
         "quiche/common/platform/api/quiche_str_cat_test.cc",
         "quiche/common/platform/api/quiche_text_utils_test.cc",
+        "quiche/common/platform/api/quiche_time_utils_test.cc",
     ],
     hdrs = ["quiche/common/platform/api/quiche_test.h"],
     repository = "@envoy",
