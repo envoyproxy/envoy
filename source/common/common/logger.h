@@ -401,17 +401,6 @@ extern spdlog::sink_ptr getSink();
                 __VA_ARGS__);                                                                \
   } while (0)
 
-// #define FANCY_LOG(LEVEL, ...) ENVOY_LOG_TO_LOGGER(FANCY_LOGGER(), LEVEL, ##__VA_ARGS__)
-
-
-/**
- * Convenience macros for logging with a stream ID and a connection ID.
- */
-#define ENVOY_STREAM_LOG_TO_LOGGER(LOGGER, LEVEL, FORMAT, STREAM, ...)                             \
-  ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, "[C{}][S{}] " FORMAT,                                         \
-                      (STREAM).connection() ? (STREAM).connection()->id() : 0,                     \
-                      (STREAM).streamId(), ##__VA_ARGS__)
-
 
 /**
  * Convenient macro for connection log.
