@@ -40,7 +40,6 @@
 #include "common/tracing/http_tracer_impl.h"
 
 #include "extensions/filters/http/well_known_names.h"
-#include "extensions/upstreams/http/well_known_names.h"
 
 namespace Envoy {
 namespace Router {
@@ -604,7 +603,7 @@ std::unique_ptr<GenericConnPool> Filter::createConnPool() {
         cluster_->upstreamConfig().value());
   } else {
     factory = &Envoy::Config::Utility::getAndCheckFactoryByName<GenericConnPoolFactory>(
-        Extensions::Upstreams::Http::HttpConnectionPoolNames::get().Generic);
+        "envoy.filters.connection_pools.http.generic");
   }
   const bool should_tcp_proxy =
       route_entry_->connectConfig().has_value() &&

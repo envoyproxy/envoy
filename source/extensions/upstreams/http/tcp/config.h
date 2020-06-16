@@ -4,8 +4,6 @@
 #include "envoy/registry/registry.h"
 #include "envoy/router/router.h"
 
-#include "extensions/upstreams/http/well_known_names.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace Upstreams {
@@ -17,7 +15,7 @@ namespace Tcp {
  */
 class TcpGenericConnPoolFactory : public Router::GenericConnPoolFactory {
 public:
-  std::string name() const override { return HttpConnectionPoolNames::get().Tcp; }
+  std::string name() const override { return "envoy.filters.connection_pools.http.tcp"; }
   std::string category() const override { return "envoy.upstreams"; }
   Router::GenericConnPoolPtr
   createGenericConnPool(Upstream::ClusterManager& cm, bool is_connect,
