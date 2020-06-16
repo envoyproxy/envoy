@@ -10,11 +10,6 @@ public:
   LocalRateLimitIntegrationTest()
       : BaseIntegrationTest(GetParam(), ConfigHelper::tcpProxyConfig()) {}
 
-  ~LocalRateLimitIntegrationTest() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
-
   void setup(const std::string& filter_yaml) {
     config_helper_.addNetworkFilter(filter_yaml);
     BaseIntegrationTest::initialize();

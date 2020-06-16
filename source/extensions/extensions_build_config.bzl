@@ -164,6 +164,7 @@ EXTENSIONS = {
     "envoy.transport_sockets.alts":                     "//source/extensions/transport_sockets/alts:config",
     "envoy.transport_sockets.raw_buffer":               "//source/extensions/transport_sockets/raw_buffer:config",
     "envoy.transport_sockets.tap":                      "//source/extensions/transport_sockets/tap:config",
+    "envoy.transport_sockets.quic":                     "//source/extensions/quic_listeners/quiche:quic_transport_socket_factory_lib",
 
     #
     # Retry host predicates
@@ -191,4 +192,12 @@ EXTENSIONS = {
     "envoy.internal_redirect_predicates.allow_listed_routes": "//source/extensions/internal_redirect/allow_listed_routes:config",
     "envoy.internal_redirect_predicates.previous_routes":     "//source/extensions/internal_redirect/previous_routes:config",
     "envoy.internal_redirect_predicates.safe_cross_scheme":   "//source/extensions/internal_redirect/safe_cross_scheme:config",
+
+    # Http Upstreams
+
+    "envoy.upstreams.http.generic":                     "//source/extensions/upstreams/http/generic:config",
+    "envoy.upstreams.http.http":                     "//source/extensions/upstreams/http/http:config",
+    "envoy.upstreams.http.tcp":                     "//source/extensions/upstreams/http/tcp:config",
+
+
 }

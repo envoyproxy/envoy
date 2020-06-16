@@ -162,7 +162,7 @@ public:
                       Network::Address::IpVersion version,
                       const std::string& config = ConfigHelper::httpProxyConfig());
 
-  virtual ~BaseIntegrationTest() = default;
+  virtual ~BaseIntegrationTest();
 
   // TODO(jmarantz): Remove this once
   // https://github.com/envoyproxy/envoy-filter-example/pull/69 is reverted.
@@ -436,6 +436,10 @@ protected:
   // The duration of the drain manager graceful drain period.
   std::chrono::seconds drain_time_{1};
 
+  // The DrainStrategy that dictates the behaviour of
+  // DrainManagerImpl::drainClose().
+  Server::DrainStrategy drain_strategy_{Server::DrainStrategy::Gradual};
+
   // Member variables for xDS testing.
   FakeUpstream* xds_upstream_{};
   FakeHttpConnectionPtr xds_connection_;
@@ -446,6 +450,10 @@ protected:
   bool tls_xds_upstream_{false};
   bool use_lds_{true}; // Use the integration framework's LDS set up.
   Grpc::SotwOrDelta sotw_or_delta_{Grpc::SotwOrDelta::Sotw};
+
+  // By default the test server will use custom stats to notify on increment.
+  // This override exists for tests measuring stats memory.
+  bool use_real_stats_{};
 
 private:
   // The type for the Envoy-to-backend connection
