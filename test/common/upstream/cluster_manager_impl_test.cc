@@ -3093,6 +3093,8 @@ public:
                 return {0, 0};
               }));
     }
+    EXPECT_CALL(socket, ipVersion())
+        .WillRepeatedly(testing::Return(Network::Address::IpVersion::v4));
     EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
         .WillOnce(Invoke([this, &names_vals, expect_success, &socket](
                              Network::Address::InstanceConstSharedPtr,

@@ -92,7 +92,7 @@ TEST_F(SocketOptionFactoryTest, TestBuildIpv4TransparentOptions) {
         EXPECT_EQ(1, *static_cast<const int*>(optval));
         return {0, 0};
       }));
-
+  EXPECT_CALL(socket_mock_, ipVersion()).WillRepeatedly(testing::Return(Address::IpVersion::v4));
   EXPECT_TRUE(Network::Socket::applyOptions(options, socket_mock_,
                                             envoy::config::core::v3::SocketOption::STATE_PREBIND));
   EXPECT_TRUE(Network::Socket::applyOptions(options, socket_mock_,
@@ -120,6 +120,7 @@ TEST_F(SocketOptionFactoryTest, TestBuildIpv6TransparentOptions) {
         return {0, 0};
       }));
 
+  EXPECT_CALL(socket_mock_, ipVersion()).WillRepeatedly(testing::Return(Address::IpVersion::v6));
   EXPECT_TRUE(Network::Socket::applyOptions(options, socket_mock_,
                                             envoy::config::core::v3::SocketOption::STATE_PREBIND));
   EXPECT_TRUE(Network::Socket::applyOptions(options, socket_mock_,
