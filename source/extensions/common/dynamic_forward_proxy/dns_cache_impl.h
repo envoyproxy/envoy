@@ -17,6 +17,27 @@ namespace Extensions {
 namespace Common {
 namespace DynamicForwardProxy {
 
+/**
+ * All DNS cache stats. @see stats_macros.h
+ */
+#define ALL_DNS_CACHE_STATS(COUNTER, GAUGE)                                                        \
+  COUNTER(dns_query_attempt)                                                                       \
+  COUNTER(dns_query_failure)                                                                       \
+  COUNTER(dns_query_success)                                                                       \
+  COUNTER(host_added)                                                                              \
+  COUNTER(host_address_changed)                                                                    \
+  COUNTER(host_overflow)                                                                           \
+  COUNTER(host_removed)                                                                            \
+  COUNTER(dns_rq_pending_overflow)                                                                 \
+  GAUGE(num_hosts, NeverImport)
+
+/**
+ * Struct definition for all DNS cache stats. @see stats_macros.h
+ */
+struct DnsCacheStats {
+  ALL_DNS_CACHE_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
+};
+
 class DnsCacheImpl : public DnsCache, Logger::Loggable<Logger::Id::forward_proxy> {
 public:
   DnsCacheImpl(Event::Dispatcher& main_thread_dispatcher, ThreadLocal::SlotAllocator& tls,
@@ -30,7 +51,7 @@ public:
                                             LoadDnsCacheEntryCallbacks& callbacks) override;
   AddUpdateCallbacksHandlePtr addUpdateCallbacks(UpdateCallbacks& callbacks) override;
   absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> hosts() override;
-  DnsCacheStats& stats() override { return stats_; }
+  void dnsCacheStatsOverflowInc() override;
   DnsCacheResourceManagerOptRef dnsCacheResourceManager() override;
 
 private:

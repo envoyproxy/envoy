@@ -39,7 +39,7 @@ public:
               (UpdateCallbacks & callbacks));
 
   MOCK_METHOD((absl::flat_hash_map<std::string, DnsHostInfoSharedPtr>), hosts, ());
-  MOCK_METHOD(DnsCacheStats&, stats, ());
+  MOCK_METHOD(void, dnsCacheStatsOverflowInc, ());
   MOCK_METHOD(DnsCacheResourceManagerOptRef, dnsCacheResourceManager, ());
 };
 

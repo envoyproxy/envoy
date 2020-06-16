@@ -75,27 +75,6 @@ using DnsCacheResourceManagerOptRef =
     absl::optional<std::reference_wrapper<DnsCacheResourceManager>>;
 
 /**
- * All DNS cache stats. @see stats_macros.h
- */
-#define ALL_DNS_CACHE_STATS(COUNTER, GAUGE)                                                        \
-  COUNTER(dns_query_attempt)                                                                       \
-  COUNTER(dns_query_failure)                                                                       \
-  COUNTER(dns_query_success)                                                                       \
-  COUNTER(host_added)                                                                              \
-  COUNTER(host_address_changed)                                                                    \
-  COUNTER(host_overflow)                                                                           \
-  COUNTER(host_removed)                                                                            \
-  COUNTER(dns_rq_pending_overflow)                                                                 \
-  GAUGE(num_hosts, NeverImport)
-
-/**
- * Struct definition for all DNS cache stats. @see stats_macros.h
- */
-struct DnsCacheStats {
-  ALL_DNS_CACHE_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
-};
-
-/**
  * A cache of DNS hosts. Hosts will re-resolve their addresses or be automatically purged
  * depending on configured policy.
  */
@@ -202,9 +181,9 @@ public:
   virtual absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> hosts() PURE;
 
   /**
-   * @return A reference of DnsCacheStats.
+   * increment overflow counter.
    */
-  virtual DnsCacheStats& stats() PURE;
+  virtual void dnsCacheStatsOverflowInc() PURE;
 
   /**
    * @return A optional reference to resource manager for dns cache.

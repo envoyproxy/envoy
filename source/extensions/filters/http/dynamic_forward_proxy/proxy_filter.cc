@@ -69,7 +69,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
     if (!should_use_dns_cache_circuit_breakers) {
       cluster_info_->stats().upstream_rq_pending_overflow_.inc();
     } else {
-      config_->cache().stats().dns_rq_pending_overflow_.inc();
+      config_->cache().dnsCacheStatsOverflowInc();
     }
 
     ENVOY_STREAM_LOG(debug, "pending request overflow", *decoder_callbacks_);
