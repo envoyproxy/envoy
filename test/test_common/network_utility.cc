@@ -5,7 +5,6 @@
 
 #include "envoy/common/platform.h"
 
-#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/network/address_impl.h"
@@ -21,23 +20,23 @@ namespace Network {
 namespace Test {
 
 Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstSharedPtr addr_port,
-                                                    Address::SocketType type) {
+                                                    Socket::Type type) {
   if (addr_port == nullptr || addr_port->type() != Address::Type::Ip) {
     ADD_FAILURE() << "Not an internet address: "
                   << (addr_port == nullptr ? "nullptr" : addr_port->asString());
     return nullptr;
   }
-  IoHandlePtr io_handle = addr_port->socket(type);
+  SocketImpl sock(type, addr_port);
   // Not setting REUSEADDR, therefore if the address has been recently used we won't reuse it here.
   // However, because we're going to use the address while checking if it is available, we'll need
   // to set REUSEADDR on listener sockets created by tests using an address validated by this means.
-  Api::SysCallIntResult result = addr_port->bind(io_handle->fd());
+  Api::SysCallIntResult result = sock.bind(addr_port);
   const char* failing_fn = nullptr;
   if (result.rc_ != 0) {
     failing_fn = "bind";
-  } else if (type == Address::SocketType::Stream) {
+  } else if (type == Socket::Type::Stream) {
     // Try listening on the port also, if the type is TCP.
-    result = Api::OsSysCallsSingleton::get().listen(io_handle->fd(), 1);
+    result = sock.listen(1);
     if (result.rc_ != 0) {
       failing_fn = "listen";
     }
@@ -55,16 +54,11 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
                   << "' with error: " << strerror(result.errno_) << " (" << result.errno_ << ")";
     return nullptr;
   }
-  // If the port we bind is zero, then the OS will pick a free port for us (assuming there are
-  // any), and we need to find out the port number that the OS picked so we can return it.
-  if (addr_port->ip()->port() == 0) {
-    return Address::addressFromFd(io_handle->fd());
-  }
-  return addr_port;
+  return sock.localAddress();
 }
 
 Address::InstanceConstSharedPtr findOrCheckFreePort(const std::string& addr_port,
-                                                    Address::SocketType type) {
+                                                    Socket::Type type) {
   auto instance = Utility::parseInternetAddressAndPort(addr_port);
   if (instance != nullptr) {
     instance = findOrCheckFreePort(instance, type);
@@ -74,35 +68,35 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(const std::string& addr_port
   return instance;
 }
 
-const std::string getLoopbackAddressUrlString(const Address::IpVersion version) {
+std::string getLoopbackAddressUrlString(const Address::IpVersion version) {
   if (version == Address::IpVersion::v6) {
     return std::string("[::1]");
   }
   return std::string("127.0.0.1");
 }
 
-const std::string getLoopbackAddressString(const Address::IpVersion version) {
+std::string getLoopbackAddressString(const Address::IpVersion version) {
   if (version == Address::IpVersion::v6) {
     return std::string("::1");
   }
   return std::string("127.0.0.1");
 }
 
-const std::string getAnyAddressUrlString(const Address::IpVersion version) {
+std::string getAnyAddressUrlString(const Address::IpVersion version) {
   if (version == Address::IpVersion::v6) {
     return std::string("[::]");
   }
   return std::string("0.0.0.0");
 }
 
-const std::string getAnyAddressString(const Address::IpVersion version) {
+std::string getAnyAddressString(const Address::IpVersion version) {
   if (version == Address::IpVersion::v6) {
     return std::string("::");
   }
   return std::string("0.0.0.0");
 }
 
-const std::string addressVersionAsString(const Address::IpVersion version) {
+std::string addressVersionAsString(const Address::IpVersion version) {
   if (version == Address::IpVersion::v4) {
     return std::string("v4");
   }
@@ -148,15 +142,8 @@ Address::InstanceConstSharedPtr getAnyAddress(const Address::IpVersion version, 
 }
 
 bool supportsIpVersion(const Address::IpVersion version) {
-  Address::InstanceConstSharedPtr addr = getCanonicalLoopbackAddress(version);
-  IoHandlePtr io_handle = addr->socket(Address::SocketType::Stream);
-  if (0 != addr->bind(io_handle->fd()).rc_) {
-    // Socket bind failed.
-    RELEASE_ASSERT(io_handle->close().err_ == nullptr, "");
-    return false;
-  }
-  RELEASE_ASSERT(io_handle->close().err_ == nullptr, "");
-  return true;
+  return Network::SocketInterfaceSingleton::get().ipFamilySupported(
+      version == Address::IpVersion::v4 ? AF_INET : AF_INET6);
 }
 
 std::string ipVersionToDnsFamily(Network::Address::IpVersion version) {
@@ -171,19 +158,20 @@ std::string ipVersionToDnsFamily(Network::Address::IpVersion version) {
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-std::pair<Address::InstanceConstSharedPtr, Network::IoHandlePtr>
-bindFreeLoopbackPort(Address::IpVersion version, Address::SocketType type) {
+std::pair<Address::InstanceConstSharedPtr, Network::SocketPtr>
+bindFreeLoopbackPort(Address::IpVersion version, Socket::Type type) {
   Address::InstanceConstSharedPtr addr = getCanonicalLoopbackAddress(version);
-  IoHandlePtr io_handle = addr->socket(type);
-  Api::SysCallIntResult result = addr->bind(io_handle->fd());
+  SocketPtr sock = std::make_unique<SocketImpl>(type, addr);
+  Api::SysCallIntResult result = sock->bind(addr);
   if (0 != result.rc_) {
-    io_handle->close();
+    sock->close();
     std::string msg = fmt::format("bind failed for address {} with error: {} ({})",
                                   addr->asString(), strerror(result.errno_), result.errno_);
     ADD_FAILURE() << msg;
     throw EnvoyException(msg);
   }
-  return std::make_pair(Address::addressFromFd(io_handle->fd()), std::move(io_handle));
+
+  return std::make_pair(sock->localAddress(), std::move(sock));
 }
 
 TransportSocketPtr createRawBufferSocket() { return std::make_unique<RawBufferSocket>(); }
@@ -228,9 +216,7 @@ Api::IoCallUint64Result readFromSocket(IoHandle& handle, const Address::Instance
 UdpSyncPeer::UdpSyncPeer(Network::Address::IpVersion version)
     : socket_(
           std::make_unique<UdpListenSocket>(getCanonicalLoopbackAddress(version), nullptr, true)) {
-  RELEASE_ASSERT(
-      Api::OsSysCallsSingleton::get().setsocketblocking(socket_->ioHandle().fd(), true).rc_ != -1,
-      "");
+  RELEASE_ASSERT(socket_->setBlockingForTest(true).rc_ != -1, "");
 }
 
 void UdpSyncPeer::write(const std::string& buffer, const Network::Address::Instance& peer) {

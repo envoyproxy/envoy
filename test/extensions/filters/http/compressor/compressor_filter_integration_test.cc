@@ -25,8 +25,8 @@ public:
     codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   }
 
-  void doRequestAndCompression(Http::TestHeaderMapImpl&& request_headers,
-                               Http::TestHeaderMapImpl&& response_headers) {
+  void doRequestAndCompression(Http::TestRequestHeaderMapImpl&& request_headers,
+                               Http::TestResponseHeaderMapImpl&& response_headers) {
     uint64_t content_length;
     ASSERT_TRUE(absl::SimpleAtoi(response_headers.get_("content-length"), &content_length));
     const Buffer::OwnedImpl expected_response{std::string(content_length, 'a')};
@@ -35,13 +35,11 @@ public:
     EXPECT_TRUE(upstream_request_->complete());
     EXPECT_EQ(0U, upstream_request_->bodyLength());
     EXPECT_TRUE(response->complete());
-    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
-    ASSERT_TRUE(response->headers().ContentEncoding() != nullptr);
+    EXPECT_EQ("200", response->headers().getStatusValue());
     EXPECT_EQ(Http::Headers::get().ContentEncodingValues.Gzip,
-              response->headers().ContentEncoding()->value().getStringView());
-    ASSERT_TRUE(response->headers().TransferEncoding() != nullptr);
+              response->headers().getContentEncodingValue());
     EXPECT_EQ(Http::Headers::get().TransferEncodingValues.Chunked,
-              response->headers().TransferEncoding()->value().getStringView());
+              response->headers().getTransferEncodingValue());
 
     Buffer::OwnedImpl decompressed_response{};
     const Buffer::OwnedImpl compressed_response{response->body()};
@@ -50,8 +48,8 @@ public:
     EXPECT_TRUE(TestUtility::buffersEqual(expected_response, decompressed_response));
   }
 
-  void doRequestAndNoCompression(Http::TestHeaderMapImpl&& request_headers,
-                                 Http::TestHeaderMapImpl&& response_headers) {
+  void doRequestAndNoCompression(Http::TestRequestHeaderMapImpl&& request_headers,
+                                 Http::TestResponseHeaderMapImpl&& response_headers) {
     uint64_t content_length;
     ASSERT_TRUE(absl::SimpleAtoi(response_headers.get_("content-length"), &content_length));
     auto response =
@@ -59,7 +57,7 @@ public:
     EXPECT_TRUE(upstream_request_->complete());
     EXPECT_EQ(0U, upstream_request_->bodyLength());
     EXPECT_TRUE(response->complete());
-    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+    EXPECT_EQ("200", response->headers().getStatusValue());
     ASSERT_TRUE(response->headers().ContentEncoding() == nullptr);
     ASSERT_EQ(content_length, response->body().size());
     EXPECT_EQ(response->body(), std::string(content_length, 'a'));
@@ -184,8 +182,8 @@ TEST_P(CompressorIntegrationTest, UpstreamResponseAlreadyEncoded) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
-  ASSERT_EQ("br", response->headers().ContentEncoding()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  ASSERT_EQ("br", response->headers().getContentEncodingValue());
   EXPECT_EQ(128U, response->body().size());
 }
 
@@ -208,7 +206,7 @@ TEST_P(CompressorIntegrationTest, NotEnoughContentLength) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
   ASSERT_TRUE(response->headers().ContentEncoding() == nullptr);
   EXPECT_EQ(10U, response->body().size());
 }
@@ -231,7 +229,7 @@ TEST_P(CompressorIntegrationTest, EmptyResponse) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("204", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("204", response->headers().getStatusValue());
   ASSERT_TRUE(response->headers().ContentEncoding() == nullptr);
   EXPECT_EQ(0U, response->body().size());
 }
@@ -286,9 +284,9 @@ TEST_P(CompressorIntegrationTest, AcceptanceFullConfigChunkedResponse) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
-  ASSERT_EQ("gzip", response->headers().ContentEncoding()->value().getStringView());
-  ASSERT_EQ("chunked", response->headers().TransferEncoding()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  ASSERT_EQ("gzip", response->headers().getContentEncodingValue());
+  ASSERT_EQ("chunked", response->headers().getTransferEncodingValue());
 }
 
 /**
@@ -310,8 +308,8 @@ TEST_P(CompressorIntegrationTest, AcceptanceFullConfigVeryHeader) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
-  ASSERT_EQ("gzip", response->headers().ContentEncoding()->value().getStringView());
-  ASSERT_EQ("Cookie, Accept-Encoding", response->headers().Vary()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  ASSERT_EQ("gzip", response->headers().getContentEncodingValue());
+  ASSERT_EQ("Cookie, Accept-Encoding", response->headers().getVaryValue());
 }
 } // namespace Envoy

@@ -4211,7 +4211,7 @@ TEST_P(SslSocketTest, DownstreamNotReadySslSocket) {
   EXPECT_CALL(factory_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
   EXPECT_CALL(factory_context, localInfo()).WillOnce(ReturnRef(local_info));
   EXPECT_CALL(factory_context, stats()).WillOnce(ReturnRef(stats_store));
-  EXPECT_CALL(factory_context, initManager()).WillRepeatedly(Return(&init_manager));
+  EXPECT_CALL(factory_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   auto sds_secret_configs =
@@ -4246,7 +4246,7 @@ TEST_P(SslSocketTest, UpstreamNotReadySslSocket) {
   NiceMock<Event::MockDispatcher> dispatcher;
   EXPECT_CALL(factory_context, localInfo()).WillOnce(ReturnRef(local_info));
   EXPECT_CALL(factory_context, stats()).WillOnce(ReturnRef(stats_store));
-  EXPECT_CALL(factory_context, initManager()).WillRepeatedly(Return(&init_manager));
+  EXPECT_CALL(factory_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
   EXPECT_CALL(factory_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
@@ -4368,16 +4368,16 @@ protected:
     dispatcher_ = api_->allocateDispatcher("test_thread", Buffer::WatermarkFactoryPtr{factory});
 
     // By default, expect 4 buffers to be created - the client and server read and write buffers.
-    EXPECT_CALL(*factory, create_(_, _))
+    EXPECT_CALL(*factory, create_(_, _, _))
         .Times(2)
-        .WillOnce(Invoke([&](std::function<void()> below_low,
-                             std::function<void()> above_high) -> Buffer::Instance* {
-          client_write_buffer = new MockWatermarkBuffer(below_low, above_high);
+        .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
+                             std::function<void()> above_overflow) -> Buffer::Instance* {
+          client_write_buffer = new MockWatermarkBuffer(below_low, above_high, above_overflow);
           return client_write_buffer;
         }))
-        .WillRepeatedly(Invoke([](std::function<void()> below_low,
-                                  std::function<void()> above_high) -> Buffer::Instance* {
-          return new Buffer::WatermarkBuffer(below_low, above_high);
+        .WillRepeatedly(Invoke([](std::function<void()> below_low, std::function<void()> above_high,
+                                  std::function<void()> above_overflow) -> Buffer::Instance* {
+          return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
         }));
 
     initialize();

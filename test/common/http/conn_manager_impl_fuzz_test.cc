@@ -67,7 +67,8 @@ public:
                                         POOL_HISTOGRAM(fake_stats_))},
                "", fake_stats_),
         tracing_stats_{CONN_MAN_TRACING_STATS(POOL_COUNTER(fake_stats_))},
-        listener_stats_{CONN_MAN_LISTENER_STATS(POOL_COUNTER(fake_stats_))} {
+        listener_stats_{CONN_MAN_LISTENER_STATS(POOL_COUNTER(fake_stats_))},
+        local_reply_(LocalReply::Factory::createDefault()) {
     ON_CALL(route_config_provider_, lastUpdated()).WillByDefault(Return(time_system_.systemTime()));
     ON_CALL(scoped_route_config_provider_, lastUpdated())
         .WillByDefault(Return(time_system_.systemTime()));
@@ -161,6 +162,7 @@ public:
   headersWithUnderscoresAction() const override {
     return envoy::config::core::v3::HttpProtocolOptions::ALLOW;
   }
+  const LocalReply::LocalReply& localReply() const override { return *local_reply_; }
 
   const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
       config_;
@@ -203,6 +205,7 @@ public:
   Http::Http1Settings http1_settings_;
   Http::DefaultInternalAddressConfig internal_address_config_;
   bool normalize_path_{true};
+  LocalReply::LocalReplyPtr local_reply_;
 };
 
 // Internal representation of stream state. Encapsulates the stream state, mocks
@@ -234,11 +237,10 @@ public:
             headers->setReferenceKey(Headers::get().Method, "GET");
           }
           if (headers->Host() != nullptr &&
-              !HeaderUtility::authorityIsValid(headers->Host()->value().getStringView())) {
+              !HeaderUtility::authorityIsValid(headers->getHostValue())) {
             // Sanitize host header so we don't fail at ASSERTs that verify header sanity checks
             // which should have been performed by the codec.
-            headers->setHost(
-                Fuzz::replaceInvalidHostCharacters(headers->Host()->value().getStringView()));
+            headers->setHost(Fuzz::replaceInvalidHostCharacters(headers->getHostValue()));
           }
           // If sendLocalReply is called:
           ON_CALL(encoder_, encodeHeaders(_, true))
@@ -487,6 +489,9 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
     TestUtility::validate(input);
   } catch (const ProtoValidationException& e) {
     ENVOY_LOG_MISC(debug, "ProtoValidationException: {}", e.what());
+    return;
+  } catch (const Envoy::ProtobufMessage::DeprecatedProtoFieldException& e) {
+    ENVOY_LOG_MISC(debug, "DeprecatedProtoFieldException: {}", e.what());
     return;
   }
 
