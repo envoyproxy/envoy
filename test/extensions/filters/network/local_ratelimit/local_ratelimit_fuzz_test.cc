@@ -42,26 +42,30 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::network::local_ratelimit::
   } catch (const ProtobufMessage::DeprecatedProtoFieldException& e) {
     ENVOY_LOG_MISC(debug, "DeprecatedProtoFieldException: {}", e.what());
     return;
+  } 
+  if(input.config().token_bucket().fill_interval().nanos()<0){
+      ENVOY_LOG_MISC(debug, "Nanos should not be negative!");
+      return;
   }
+
   NiceMock<Event::MockDispatcher> dispatcher_;
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
   Event::MockTimer* fill_timer_=new Event::MockTimer(&dispatcher_);
-//   Event::SimulatedTimeSystem time_system;
-  
   ConfigSharedPtr config_;
- 
+  ActiveFilter* active_filter;
  
   envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit proto_config = input.config();
   config_ = ::std::make_shared<Config>(proto_config, dispatcher_, stats_store_, runtime_);
-  ActiveFilter active_filter(config_);
 
-  std::chrono::milliseconds fill_interval_(PROTOBUF_GET_MS_REQUIRED(proto_config.token_bucket(), fill_interval));
-
-  if (fill_interval_ < std::chrono::milliseconds(50)) {
-    //invalid interval for local_ratelimit filter.
+  try{
+    active_filter=new active_filter(config_);
+  }catch (const EnvoyException e){
+    ENVOY_LOG_MISC(debug, "EnvoyException in constructor of ActiveFilter: {}", e.what());
     return;
   }
+
+  std::chrono::milliseconds fill_interval_(PROTOBUF_GET_MS_REQUIRED(proto_config.token_bucket(), fill_interval));
 
   for (const auto& action : input.actions()) {
     ENVOY_LOG_MISC(trace, "action {}", action.DebugString());
@@ -69,14 +73,14 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::network::local_ratelimit::
     switch (action.action_selector_case()) {
     case envoy::extensions::filters::network::local_ratelimit::Action::kOnData: {
       Buffer::OwnedImpl buffer(action.on_data().data());
-      active_filter.filter_.onData(buffer, action.on_data().end_stream());
+      active_filter->filter_.onData(buffer, action.on_data().end_stream());
       break;
     }
     case envoy::extensions::filters::network::local_ratelimit::Action::kOnNewConnection: {
-      active_filter.filter_.onNewConnection();
+      active_filter->filter_.onNewConnection();
       break;
     }
-    case envoy::extensions::filters::network::local_ratelimit::Action::kAdvanceTime:{
+    case envoy::extensions::filters::network::local_ratelimit::Action::kRefill:{
       EXPECT_CALL(*fill_timer_, enableTimer(fill_interval_, nullptr));
       fill_timer_->invokeCallback();
       break;
