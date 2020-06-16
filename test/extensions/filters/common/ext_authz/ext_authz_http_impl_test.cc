@@ -73,6 +73,10 @@ public:
               value: "value"
             - key: "x-authz-header2"
               value: "value"
+            - key: "append-authz-header1"
+              value: "append-value1"
+            - key: "append-authz-header1"
+              value: "append-value2"
 
           authorization_response:
             allowed_upstream_headers:
@@ -80,6 +84,12 @@ public:
               - exact: Bar
                 ignore_case: true
               - prefix: "X-"
+                ignore_case: true
+            allowed_upstream_headers_to_append:
+              patterns:
+              - exact: Alice
+                ignore_case: true
+              - prefix: "Append-"
                 ignore_case: true
             allowed_client_headers:
               patterns:
@@ -141,6 +151,7 @@ TEST_F(ExtAuthzHttpClientTest, ClientConfig) {
   const Http::LowerCaseString foo{"foo"};
   const Http::LowerCaseString baz{"baz"};
   const Http::LowerCaseString bar{"bar"};
+  const Http::LowerCaseString alice{"alice"};
 
   // Check allowed request headers.
   EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Method.get()));
@@ -160,6 +171,9 @@ TEST_F(ExtAuthzHttpClientTest, ClientConfig) {
 
   // // Check allowed upstream headers.
   EXPECT_TRUE(config_->upstreamHeaderMatchers()->matches(bar.get()));
+
+  // // Check allowed upstream headers to append.
+  EXPECT_TRUE(config_->upstreamHeaderToAppendMatchers()->matches(alice.get()));
 
   // // Check other attributes.
   EXPECT_EQ(config_->pathPrefix(), "/bar");
@@ -314,8 +328,12 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeaders) {
   // append property of header value option should always be false.
   const HeaderValuePair header1{"x-authz-header1", "value"};
   const HeaderValuePair header2{"x-authz-header2", "value"};
+  const HeaderValuePair header3{"append-authz-header1", "append-value1"};
+  const HeaderValuePair header4{"append-authz-header1", "append-value2"};
   EXPECT_CALL(async_client_,
-              send_(AllOf(ContainsPairAsHeader(header1), ContainsPairAsHeader(header2)), _, _));
+              send_(AllOf(ContainsPairAsHeader(header1), ContainsPairAsHeader(header2),
+                          ContainsPairAsHeader(header3), ContainsPairAsHeader(header4)),
+                    _, _));
   client_->check(request_callbacks_, request, active_span_, stream_info_);
 
   EXPECT_CALL(request_callbacks_,
