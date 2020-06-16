@@ -49,7 +49,7 @@ public:
    * exceptions.
    *
    * @param counter_deltas map of counter changes from parent
-   * @param counter_deltas map of gauge changes from parent
+   * @param gauges map of gauge changes from parent
    * @param dynamics information about which segments of the names are dynamic.
    */
   void mergeStats(const Protobuf::Map<std::string, uint64_t>& counter_deltas,
