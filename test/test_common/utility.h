@@ -171,9 +171,10 @@ public:
    * @param v the vector of stats.
    * @return the stat
    */
-  template <typename T> static T findByName(const std::vector<T>& v, const std::string& name) {
+  template <typename T>
+   static T findByName(const std::vector<T>& v,absl::string_view name) {
     auto pos = std::find_if(v.begin(), v.end(),
-                            [&name](const T& stat) -> bool { return stat->name() == name; });
+    [name](const T& stat) -> bool { return stat->name() == name;});
     if (pos == v.end()) {
       return nullptr;
     }
@@ -186,7 +187,7 @@ public:
    * @param name supplies the name to search for.
    * @return Stats::CounterSharedPtr the counter or nullptr if there is none.
    */
-  static Stats::CounterSharedPtr findCounter(Stats::Store& store, const std::string& name);
+  static Stats::CounterSharedPtr findCounter(Stats::Store& store, absl::string_view name);
 
   /**
    * Find a gauge in a stats store.
@@ -203,7 +204,7 @@ public:
    * @param value supplies the value of the counter.
    * @param time_system the time system to use for waiting.
    */
-  static void waitForCounterEq(Stats::Store& store, const std::string& name, uint64_t value,
+  static void waitForCounterEq(Stats::Store& store, absl::string_view name, uint64_t value,
                                Event::TestTimeSystem& time_system);
 
   /**
@@ -441,7 +442,7 @@ public:
   //
   // Tests using this will be of the form IpVersions/SslSocketTest.HalfClose/IPv4
   // instead of IpVersions/SslSocketTest.HalfClose/1
-  static std::string
+  static absl::string_view
   ipTestParamsToString(const ::testing::TestParamInfo<Network::Address::IpVersion>& params) {
     return params.param == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6";
   }

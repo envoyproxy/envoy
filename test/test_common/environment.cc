@@ -76,7 +76,7 @@ std::string getTemporaryDirectory() {
     return makeTempDir("envoy_test_tmp.XXXXXX");
   }
   TestEnvironment::createPath(temp_dir);
-  return temp_dir;
+  return  temp_dir;
 }
 
 // Allow initializeOptions() to remember CLI args for getOptions().

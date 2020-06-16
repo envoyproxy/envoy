@@ -133,7 +133,7 @@ void TestUtility::feedBufferWithRandomCharacters(Buffer::Instance& buffer, uint6
   buffer.add(str);
 }
 
-Stats::CounterSharedPtr TestUtility::findCounter(Stats::Store& store, const std::string& name) {
+Stats::CounterSharedPtr TestUtility::findCounter(Stats::Store& store, absl::string_view name) {
   return findByName(store.counters(), name);
 }
 
@@ -146,7 +146,7 @@ Stats::TextReadoutSharedPtr TestUtility::findTextReadout(Stats::Store& store,
   return findByName(store.textReadouts(), name);
 }
 
-void TestUtility::waitForCounterEq(Stats::Store& store, const std::string& name, uint64_t value,
+void TestUtility::waitForCounterEq(Stats::Store& store, absl::string_view name, uint64_t value,
                                    Event::TestTimeSystem& time_system) {
   while (findCounter(store, name) == nullptr || findCounter(store, name)->value() != value) {
     time_system.advanceTimeWait(std::chrono::milliseconds(10));

@@ -381,7 +381,7 @@ TEST(UtilityTest, StructToClusterV2) {
 // Verify that regular Struct can be translated into an arbitrary message of correct type
 // (v3 API, upgrading).
 TEST(UtilityTest, StructToClusterV3) {
-  ProtobufWkt::Any typed_config;
+  ProtobufWkt::Any typed_config; 
   API_NO_BOOST(envoy::config::cluster::v3::Cluster) cluster;
   ProtobufWkt::Struct cluster_struct;
   const std::string cluster_config_yaml = R"EOF(

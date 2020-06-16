@@ -83,11 +83,11 @@ public:
           if (!cluster_names.empty()) {
             std::string joined_cluster_names;
             {
-              std::string delimiter = "\",\"";
+              absl::string_view delimiter = "\",\"";
               std::ostringstream buf;
               std::copy(cluster_names.begin(), cluster_names.end(),
                         std::ostream_iterator<std::string>(buf, delimiter.c_str()));
-              std::string with_comma = buf.str();
+              absl::string_view with_comma = buf.str();
               joined_cluster_names = with_comma.substr(0, with_comma.length() - delimiter.length());
             }
             expected_request += "\"resource_names\":[\"" + joined_cluster_names + "\"]";
