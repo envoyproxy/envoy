@@ -36,6 +36,9 @@ const char MaxResponseHeadersCountOverrideKey[] =
 
 class Stream;
 
+/**
+ * Error codes used to convey the reason for a GOAWAY.
+ */
 enum class GoAwayErrorCode {
   NoError,
   Other,
