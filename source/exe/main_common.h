@@ -94,6 +94,8 @@ private:
 // go through MainCommonBase directly.
 class MainCommon {
 public:
+  using PostServerHook = std::function<void(Server::Instance& server)>;
+
   MainCommon(int argc, const char* const* argv);
   bool run() { return base_.run(); }
   // Only tests have a legitimate need for this today.
@@ -121,6 +123,8 @@ public:
    */
   Server::Instance* server() { return base_.server(); }
 
+  static int main(int argc, char** argv, PostServerHook hook = nullptr);
+
 private:
 #ifdef ENVOY_HANDLE_SIGNALS
   Envoy::SignalAction handle_sigs_;
@@ -133,6 +137,7 @@ private:
   DefaultListenerHooks default_listener_hooks_;
   ProdComponentFactory prod_component_factory_;
   MainCommonBase base_;
+  PostServerHook post_server_hook_;
 };
 
 } // namespace Envoy
