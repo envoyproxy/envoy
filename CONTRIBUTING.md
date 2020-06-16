@@ -220,7 +220,7 @@ and false.
 For developers adding a new extension, one can take an existing extension as the starting point.
 
 Extension configuration should be located in a directory structure like
-`api/envoy/extensions/area/plugin/`, for example `api/envoy/extensions/tracers/zipkin/`
+`api/envoy/extensions/area/plugin/`, for example `api/envoy/extensions/access_loggers/file/`
 
 The code for the extension should be located under the equivalent
 `source/extensions/area/plugin`, and include an *envoy_cc_extension* with the
