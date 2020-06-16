@@ -166,7 +166,7 @@ TEST(StringUtil, strlcpy) {
 
   {
     char dest[6];
-    EXPECT_EQ(5U, StringUtil::strlcpy(dest, std::string{"hello"}.c_str(), 3));
+    EXPECT_EQ(5U, StringUtil::strlcpy(dest, std::string {"hello"}.c_str(), 3));
     EXPECT_STREQ("he", dest);
   }
 

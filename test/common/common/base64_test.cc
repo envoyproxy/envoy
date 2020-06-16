@@ -64,7 +64,7 @@ TEST(Base64Test, Decode) {
   }
 
   {
-    std::string test_string = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    const std::string test_string = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     std::string decoded = Base64::decode(test_string);
     Buffer::OwnedImpl buffer(decoded);
     EXPECT_EQ(test_string, Base64::encode(buffer, decoded.length()));
