@@ -54,14 +54,13 @@ static_resources:
   }
 
   Network::Address::InstanceConstSharedPtr getListenerBindAddressAndPort() {
-    auto addr = Envoy::Network::Utility::parseInternetAddressAndPort(
+    auto addr = Network::Utility::parseInternetAddressAndPort(
         fmt::format("{}:{}", Envoy::Network::Test::getLoopbackAddressUrlString(version_), 0),
         false);
 
     ASSERT(addr != nullptr);
 
-    addr = Envoy::Network::Test::findOrCheckFreePort(addr,
-                                                     Envoy::Network::Address::SocketType::Datagram);
+    addr = Envoy::Network::Test::findOrCheckFreePort(addr, Network::Address::SocketType::Datagram);
     ASSERT(addr != nullptr && addr->ip() != nullptr);
 
     return addr;
