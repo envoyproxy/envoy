@@ -11,12 +11,19 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/config/version_converter.h"
 #include "common/grpc/typed_async_client.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace StatSinks {
 namespace MetricsService {
+
+namespace {
+// The fully-qualified name template for the metrics service's StreamMetrics method.
+constexpr char METHOD_NAME_TEMPLATE[] = "envoy.service.metrics.{}.MetricsService.StreamMetrics";
+
+} // namespace
 
 /**
  * Interface for metrics streamer.
@@ -47,10 +54,13 @@ using GrpcMetricsStreamerSharedPtr = std::shared_ptr<GrpcMetricsStreamer>;
 /**
  * Production implementation of GrpcMetricsStreamer
  */
-class GrpcMetricsStreamerImpl : public Singleton::Instance, public GrpcMetricsStreamer {
+class GrpcMetricsStreamerImpl : public Singleton::Instance,
+                                public GrpcMetricsStreamer,
+                                public Config::VersionedService {
 public:
   GrpcMetricsStreamerImpl(Grpc::AsyncClientFactoryPtr&& factory,
-                          const LocalInfo::LocalInfo& local_info);
+                          const LocalInfo::LocalInfo& local_info,
+                          envoy::config::core::v3::ApiVersion transport_api_version);
 
   // GrpcMetricsStreamer
   void send(envoy::service::metrics::v3::StreamMetricsMessage& message) override;
@@ -58,12 +68,17 @@ public:
   // Grpc::AsyncStreamCallbacks
   void onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) override { stream_ = nullptr; }
 
+  // Config::VersionedService
+  const std::string methodNameTemplate() const override { return METHOD_NAME_TEMPLATE; }
+
 private:
   Grpc::AsyncStream<envoy::service::metrics::v3::StreamMetricsMessage> stream_{};
   Grpc::AsyncClient<envoy::service::metrics::v3::StreamMetricsMessage,
                     envoy::service::metrics::v3::StreamMetricsResponse>
       client_;
   const LocalInfo::LocalInfo& local_info_;
+  const Protobuf::MethodDescriptor& service_method_;
+  const envoy::config::core::v3::ApiVersion transport_api_version_;
 };
 
 /**

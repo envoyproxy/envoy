@@ -24,7 +24,7 @@ void clearPort(envoy::config::core::v3::Address& address) {
   address.mutable_socket_address()->clear_port_specifier();
 }
 
-class TcpGrpcAccessLogIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
+class TcpGrpcAccessLogIntegrationTest : public Grpc::VersionedGrpcClientIntegrationParamTest,
                                         public BaseIntegrationTest {
 public:
   TcpGrpcAccessLogIntegrationTest()
@@ -76,7 +76,8 @@ public:
     envoy::service::accesslog::v3::StreamAccessLogsMessage request_msg;
     VERIFY_ASSERTION(access_log_request_->waitForGrpcMessage(*dispatcher_, request_msg));
     EXPECT_EQ("POST", access_log_request_->headers().getMethodValue());
-    EXPECT_EQ("/envoy.service.accesslog.v2.AccessLogService/StreamAccessLogs",
+    EXPECT_EQ(TestUtility::getVersionedMethodPath("envoy.service.accesslog.{}.AccessLogService",
+                                                  "StreamAccessLogs", apiVersion()),
               access_log_request_->headers().getPathValue());
     EXPECT_EQ("application/grpc", access_log_request_->headers().getContentTypeValue());
 
@@ -119,7 +120,7 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsCientType, TcpGrpcAccessLogIntegrationTest,
-                         GRPC_CLIENT_INTEGRATION_PARAMS);
+                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Test a basic full access logging flow.
 TEST_P(TcpGrpcAccessLogIntegrationTest, BasicAccessLogFlow) {

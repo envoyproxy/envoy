@@ -35,7 +35,13 @@ public:
   AsyncStream() = default;
   AsyncStream(RawAsyncStream* stream) : stream_(stream) {}
   AsyncStream(const AsyncStream& other) = default;
-  void sendMessage(const Request& request, bool end_stream) {
+  void sendMessage(const Protobuf::Message& request, bool end_stream) {
+    Internal::sendMessageUntyped(stream_, std::move(request), end_stream);
+  }
+  void sendMessage(const Protobuf::Message& request,
+                   envoy::config::core::v3::ApiVersion transport_api_version, bool end_stream) {
+    Config::VersionConverter::prepareMessageForGrpcWire(const_cast<Protobuf::Message&>(request),
+                                                        transport_api_version);
     Internal::sendMessageUntyped(stream_, std::move(request), end_stream);
   }
   void closeStream() { stream_->closeStream(); }
@@ -117,7 +123,8 @@ public:
                              envoy::config::core::v3::ApiVersion transport_api_version) {
     Config::VersionConverter::prepareMessageForGrpcWire(const_cast<Protobuf::Message&>(request),
                                                         transport_api_version);
-    return send(service_method, request, callbacks, parent_span, options);
+    return Internal::sendUntyped(client_.get(), service_method, request, callbacks, parent_span,
+                                 options);
   }
 
   virtual AsyncStream<Request> start(const Protobuf::MethodDescriptor& service_method,

@@ -42,7 +42,7 @@ message ExtAuthz {
   }
 
   // API version for ext_authz transport protocol. This describes the ext_authz gRPC endpoint and
-  // version of Check{Request,Response} used on the wire.
+  // version of messages used on the wire.
   config.core.v4alpha.ApiVersion transport_api_version = 12
       [(validate.rules).enum = {defined_only: true}];
 

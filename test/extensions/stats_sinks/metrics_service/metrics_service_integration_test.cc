@@ -18,7 +18,7 @@ using testing::AssertionResult;
 namespace Envoy {
 namespace {
 
-class MetricsServiceIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
+class MetricsServiceIntegrationTest : public Grpc::VersionedGrpcClientIntegrationParamTest,
                                       public HttpIntegrationTest {
 public:
   MetricsServiceIntegrationTest()
@@ -80,7 +80,8 @@ public:
       envoy::service::metrics::v3::StreamMetricsMessage request_msg;
       VERIFY_ASSERTION(metrics_service_request_->waitForGrpcMessage(*dispatcher_, request_msg));
       EXPECT_EQ("POST", metrics_service_request_->headers().getMethodValue());
-      EXPECT_EQ("/envoy.service.metrics.v2.MetricsService/StreamMetrics",
+      EXPECT_EQ(TestUtility::getVersionedMethodPath("envoy.service.metrics.{}.MetricsService",
+                                                    "StreamMetrics", apiVersion()),
                 metrics_service_request_->headers().getPathValue());
       EXPECT_EQ("application/grpc", metrics_service_request_->headers().getContentTypeValue());
       EXPECT_TRUE(request_msg.envoy_metrics_size() > 0);
@@ -140,7 +141,7 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, MetricsServiceIntegrationTest,
-                         GRPC_CLIENT_INTEGRATION_PARAMS);
+                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Test a basic metric service flow.
 TEST_P(MetricsServiceIntegrationTest, BasicFlow) {
