@@ -1,0 +1,30 @@
+config{
+    stat_prefix: local_rate_limit_stats
+    token_bucket:{
+        max_tokens: 1
+        fill_interval: 0.2s
+    }
+    runtime_enabled:
+    default_value: true
+    runtime_key: foo_key
+}
+actions {
+  on_new_connection {
+  }
+}
+actions {
+}
+actions {
+  on_data {
+    data: "\000\000"
+  }
+}
+actions {
+  on_new_connection {
+  }
+}
+actions {
+  on_data {
+    data: "\000\000"
+  }
+}
