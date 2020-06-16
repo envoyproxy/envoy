@@ -48,11 +48,14 @@ double AdmissionControlFilterConfig::aggression() const {
 
 AdmissionControlFilter::AdmissionControlFilter(AdmissionControlFilterConfigSharedPtr config,
                                                const std::string& stats_prefix)
-    : config_(std::move(config)), stats_(generateStats(config_->scope(), stats_prefix)) {}
+    : config_(std::move(config)), stats_(generateStats(config_->scope(), stats_prefix)),
+      record_request_(true) {}
 
 Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
   // TODO(tonya11en): Ensure we document the fact that healthchecks are ignored.
   if (!config_->filterEnabled() || decoder_callbacks_->streamInfo().healthCheck()) {
+    // We must forego recording the success/failure of this request during encoding.
+    record_request_ = false;
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -63,12 +66,15 @@ Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::RequestHea
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  deferred_record_failure_.emplace([this]() { config_->getController().recordFailure(); });
   return Http::FilterHeadersStatus::Continue;
 }
 
 Http::FilterHeadersStatus AdmissionControlFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                                 bool end_stream) {
+  if (!record_request_) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+
   bool successful_response = false;
   if (Grpc::Common::isGrpcResponseHeaders(headers, end_stream)) {
     absl::optional<GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(headers);

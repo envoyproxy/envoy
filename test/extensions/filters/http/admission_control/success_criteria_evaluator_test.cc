@@ -39,7 +39,17 @@ public:
   void expectGrpcFail(int code) { EXPECT_FALSE(evaluator_->isGrpcSuccess(code)); }
 
   void verifyGrpcDefaultEval() {
-    expectGrpcSuccess(enumToInt(Grpc::Status::WellKnownGrpcStatus::Ok));
+    expectGrpcSuccess(Grpc::Status::WellKnownGrpcStatus::AlreadyExists);
+    expectGrpcSuccess(Grpc::Status::WellKnownGrpcStatus::Canceled);
+    expectGrpcSuccess(Grpc::Status::WellKnownGrpcStatus::FailedPrecondition);
+    expectGrpcSuccess(Grpc::Status::WellKnownGrpcStatus::InvalidArgument);
+    expectGrpcSuccess(Grpc::Status::WellKnownGrpcStatus::NotFound);
+    expectGrpcSuccess(Grpc::Status::WellKnownGrpcStatus::Ok);
+    expectGrpcSuccess(Grpc::Status::WellKnownGrpcStatus::OutOfRange);
+    expectGrpcSuccess(Grpc::Status::WellKnownGrpcStatus::PermissionDenied);
+    expectGrpcSuccess(Grpc::Status::WellKnownGrpcStatus::Unauthenticated);
+    expectGrpcSuccess(Grpc::Status::WellKnownGrpcStatus::Unimplemented);
+    expectGrpcSuccess(Grpc::Status::WellKnownGrpcStatus::Unknown);
 
     expectGrpcFail(enumToInt(Grpc::Status::WellKnownGrpcStatus::Aborted));
     expectGrpcFail(enumToInt(Grpc::Status::WellKnownGrpcStatus::DataLoss));

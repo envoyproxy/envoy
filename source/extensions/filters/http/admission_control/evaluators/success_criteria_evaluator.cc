@@ -43,16 +43,17 @@ SuccessCriteriaEvaluator::SuccessCriteriaEvaluator(const SuccessCriteria& succes
     }
   } else {
     grpc_success_codes_ = {
-        enumToInt(Grpc::Status::WellKnownGrpcStatus::Ok),
+        enumToInt(Grpc::Status::WellKnownGrpcStatus::AlreadyExists),
         enumToInt(Grpc::Status::WellKnownGrpcStatus::Canceled),
-        enumToInt(Grpc::Status::WellKnownGrpcStatus::Unknown),
+        enumToInt(Grpc::Status::WellKnownGrpcStatus::FailedPrecondition),
         enumToInt(Grpc::Status::WellKnownGrpcStatus::InvalidArgument),
         enumToInt(Grpc::Status::WellKnownGrpcStatus::NotFound),
-        enumToInt(Grpc::Status::WellKnownGrpcStatus::AlreadyExists),
-        enumToInt(Grpc::Status::WellKnownGrpcStatus::Unauthenticated),
-        enumToInt(Grpc::Status::WellKnownGrpcStatus::FailedPrecondition),
+        enumToInt(Grpc::Status::WellKnownGrpcStatus::Ok),
         enumToInt(Grpc::Status::WellKnownGrpcStatus::OutOfRange),
+        enumToInt(Grpc::Status::WellKnownGrpcStatus::PermissionDenied),
+        enumToInt(Grpc::Status::WellKnownGrpcStatus::Unauthenticated),
         enumToInt(Grpc::Status::WellKnownGrpcStatus::Unimplemented),
+        enumToInt(Grpc::Status::WellKnownGrpcStatus::Unknown),
     };
   }
 }

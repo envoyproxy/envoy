@@ -168,7 +168,9 @@ TEST_F(AdmissionControlTest, DisregardHealthChecks) {
   EXPECT_CALL(controller_, requestSuccessCount()).Times(0);
 
   Http::TestRequestHeaderMapImpl request_headers;
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
 }
 
 // Validate simple HTTP failure case.
@@ -186,7 +188,6 @@ TEST_F(AdmissionControlTest, HttpFailureBehavior) {
   Http::TestRequestHeaderMapImpl request_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, true));
-  Http::TestResponseHeaderMapImpl response_headers;
   sampleHttpRequest("500");
 
   TestUtility::waitForCounterEq(scope_, "test_prefix.rq_rejected", 1, time_system_);
@@ -225,7 +226,6 @@ TEST_F(AdmissionControlTest, GrpcFailureBehavior) {
   Http::TestRequestHeaderMapImpl request_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, true));
-  Http::TestResponseHeaderMapImpl response_headers;
   sampleGrpcRequest(Grpc::Status::WellKnownGrpcStatus::PermissionDenied);
 
   // We expect rejection counter to increment upon failure.
@@ -265,7 +265,6 @@ TEST_F(AdmissionControlTest, GrpcFailureBehaviorTrailer) {
   Http::TestRequestHeaderMapImpl request_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, true));
-  Http::TestResponseHeaderMapImpl response_headers;
   sampleGrpcRequestTrailer(Grpc::Status::WellKnownGrpcStatus::PermissionDenied);
 
   // We expect rejection counter to increment upon failure.

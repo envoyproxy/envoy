@@ -97,18 +97,16 @@ private:
 
   bool shouldRejectRequest() const;
 
-  void recordSuccess() {
-    config_->getController().recordSuccess();
-    ASSERT(deferred_record_failure_);
-    deferred_record_failure_->cancel();
-  }
+  void recordSuccess() { config_->getController().recordSuccess(); }
 
-  void recordFailure() { deferred_record_failure_.reset(); }
+  void recordFailure() { config_->getController().recordFailure(); }
 
-  AdmissionControlFilterConfigSharedPtr config_;
+  const AdmissionControlFilterConfigSharedPtr config_;
   AdmissionControlStats stats_;
-  absl::optional<Cleanup> deferred_record_failure_;
   bool expect_grpc_status_in_trailer_;
+
+  // If false, the filter will forego recording a request success or failure during encoding.
+  bool record_request_;
 };
 
 } // namespace AdmissionControl

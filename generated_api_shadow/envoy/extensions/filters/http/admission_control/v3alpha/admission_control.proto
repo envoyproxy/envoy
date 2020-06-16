@@ -30,24 +30,36 @@ message AdmissionControl {
   message SuccessCriteria {
     message HttpCriteria {
       // Status code ranges that constitute a successful request. Configurable codes are in the
-      // range [100, 600). If empty, all HTTP requests will be considered unsuccessful.
-      repeated type.v3.Int32Range http_success_status = 1;
+      // range [100, 600).
+      repeated type.v3.Int32Range http_success_status = 1
+          [(validate.rules).repeated = {min_items: 1}];
     }
 
     message GrpcCriteria {
-      // Status codes that constitute a successful request. If empty, all gRPC requests will be
-      // considered unsuccessful.
+      // Status codes that constitute a successful request.
       // Mappings can be found at: https://github.com/grpc/grpc/blob/master/doc/statuscodes.md.
-      repeated uint32 grpc_success_status = 1;
+      repeated uint32 grpc_success_status = 1 [(validate.rules).repeated = {min_items: 1}];
     }
 
     // If HTTP criteria are unspecified, all HTTP status codes below 500 are treated as successful
     // responses.
+    //
+    // .. note::
+    //
+    //    The default HTTP codes considered successful by the admission controller are done so due
+    //    to the unlikelihood that sending fewer requests would change their behavior (for example:
+    //    redirects, unauthorized access, or bad requests won't be alleviated by sending less
+    //    traffic).
     HttpCriteria http_criteria = 1;
 
     // GRPC status codes to consider as request successes. If unspecified, defaults to: Ok,
     // Cancelled, Unknown, InvalidArgument, NotFound, AlreadyExists, Unauthenticated,
-    // FailedPrecondition, OutOfRange, and Unimplemented.
+    // FailedPrecondition, OutOfRange, PermissionDenied, and Unimplemented.
+    //
+    // .. note::
+    //
+    //    The default gRPC codes that are considered successful by the admission controller are
+    //    chosen because of the unlikelihood that sending fewer requests will change the behavior.
     GrpcCriteria grpc_criteria = 2;
   }
 
