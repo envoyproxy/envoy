@@ -354,6 +354,7 @@ admin:
       api_type, TestEnvironment::nullDevicePath());
 }
 
+// TODO(samflattery): bundle this up with buildCluster
 envoy::config::cluster::v3::Cluster
 ConfigHelper::buildStaticCluster(const std::string& name, int port, const std::string& address) {
   return TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(fmt::format(R"EOF(
@@ -376,27 +377,16 @@ ConfigHelper::buildStaticCluster(const std::string& name, int port, const std::s
                                                                                  address, port));
 }
 
-envoy::config::cluster::v3::Cluster ConfigHelper::buildCluster(const std::string& name) {
+envoy::config::cluster::v3::Cluster ConfigHelper::buildCluster(const std::string& name, const std::string& lb_policy) {
   return TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(fmt::format(R"EOF(
       name: {}
       connect_timeout: 5s
       type: EDS
       eds_cluster_config: {{ eds_config: {{ ads: {{}} }} }}
-      lb_policy: ROUND_ROBIN
+      lb_policy: {}
       http2_protocol_options: {{}}
     )EOF",
-                                                                                 name));
-}
-
-envoy::config::cluster::v3::Cluster ConfigHelper::buildRedisCluster(const std::string& name) {
-  return TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(fmt::format(R"EOF(
-      name: {}
-      connect_timeout: 5s
-      type: EDS
-      eds_cluster_config: {{ eds_config: {{ ads: {{}} }} }}
-      lb_policy: MAGLEV
-    )EOF",
-                                                                                 name));
+                                                                                 name, lb_policy));
 }
 
 envoy::config::endpoint::v3::ClusterLoadAssignment
@@ -416,10 +406,9 @@ ConfigHelper::buildClusterLoadAssignment(const std::string& name, const std::str
                   name, address, port));
 }
 
-envoy::config::listener::v3::Listener ConfigHelper::buildListener(const std::string& name,
-                                                                  const std::string& route_config,
-                                                                  const std::string& address,
-                                                                  const std::string& stat_prefix) {
+envoy::config::listener::v3::Listener ConfigHelper::buildBaseListener(const std::string& name,
+                                                                      const std::string& address,
+                                                                      const std::string& filter_chains) {
   return TestUtility::parseYaml<envoy::config::listener::v3::Listener>(fmt::format(
       R"EOF(
       name: {}
@@ -428,6 +417,16 @@ envoy::config::listener::v3::Listener ConfigHelper::buildListener(const std::str
           address: {}
           port_value: 0
       filter_chains:
+        {}
+    )EOF",
+      name, address, filter_chains));
+}
+envoy::config::listener::v3::Listener ConfigHelper::buildListener(const std::string& name,
+                                                                  const std::string& route_config,
+                                                                  const std::string& address,
+                                                                  const std::string& stat_prefix) {
+  std::string hcm = fmt::format(
+      R"EOF(
         filters:
         - name: http
           typed_config:
@@ -439,32 +438,8 @@ envoy::config::listener::v3::Listener ConfigHelper::buildListener(const std::str
               config_source: {{ ads: {{}} }}
             http_filters: [{{ name: envoy.filters.http.router }}]
     )EOF",
-      name, address, stat_prefix, route_config));
-}
-
-envoy::config::listener::v3::Listener ConfigHelper::buildRedisListener(const std::string& name,
-                                                                       const std::string& cluster,
-                                                                       const std::string& address) {
-  return TestUtility::parseYaml<envoy::config::listener::v3::Listener>(fmt::format(
-      R"EOF(
-      name: {}
-      address:
-        socket_address:
-          address: {}
-          port_value: 0
-      filter_chains:
-        filters:
-        - name: redis
-          typed_config:
-            "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProxy
-            settings:
-              op_timeout: 1s
-            stat_prefix: {}
-            prefix_routes:
-              catch_all_route:
-                cluster: {}
-    )EOF",
-      name, address, name, cluster));
+      stat_prefix, route_config);
+  return buildBaseListener(name, address, hcm);
 }
 
 envoy::config::route::v3::RouteConfiguration

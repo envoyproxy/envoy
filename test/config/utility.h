@@ -104,20 +104,24 @@ public:
                                                                 const std::string& address);
 
   // ADS configurations
-  static envoy::config::cluster::v3::Cluster buildCluster(const std::string& name);
+  static envoy::config::cluster::v3::Cluster buildCluster(const std::string& name, const std::string& lb_policy="ROUND_ROBIN");
 
-  static envoy::config::cluster::v3::Cluster buildRedisCluster(const std::string& name);
+  /* static envoy::config::cluster::v3::Cluster buildRedisCluster(const std::string& name); */
 
   static envoy::config::endpoint::v3::ClusterLoadAssignment
   buildClusterLoadAssignment(const std::string& name, const std::string& ip_version, uint32_t port);
 
+  static envoy::config::listener::v3::Listener buildBaseListener(const std::string& name,
+                                                                 const std::string& address,
+                                                                 const std::string& filter_chains="");
+
   static envoy::config::listener::v3::Listener
   buildListener(const std::string& name, const std::string& route_config,
-                const std::string& ip_version, const std::string& stat_prefix = "ads_test");
+                const std::string& address, const std::string& stat_prefix = "ads_test");
 
-  static envoy::config::listener::v3::Listener buildRedisListener(const std::string& name,
-                                                                  const std::string& cluster,
-                                                                  const std::string& ip_version);
+  /* static envoy::config::listener::v3::Listener buildRedisListener(const std::string& name, */
+  /*                                                                 const std::string& cluster, */
+  /*                                                                 const std::string& ip_version); */
 
   static envoy::config::route::v3::RouteConfiguration buildRouteConfig(const std::string& name,
                                                                        const std::string& cluster);

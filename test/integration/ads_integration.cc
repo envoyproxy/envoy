@@ -37,7 +37,7 @@ envoy::config::cluster::v3::Cluster AdsIntegrationTest::buildCluster(const std::
 }
 
 envoy::config::cluster::v3::Cluster AdsIntegrationTest::buildRedisCluster(const std::string& name) {
-  return ConfigHelper::buildRedisCluster(name);
+  return ConfigHelper::buildCluster(name, "MAGLEV");
 }
 
 envoy::config::endpoint::v3::ClusterLoadAssignment
@@ -56,8 +56,21 @@ AdsIntegrationTest::buildListener(const std::string& name, const std::string& ro
 
 envoy::config::listener::v3::Listener
 AdsIntegrationTest::buildRedisListener(const std::string& name, const std::string& cluster) {
-  return ConfigHelper::buildRedisListener(name, cluster,
-                                          Network::Test::getLoopbackAddressString(ipVersion()));
+  std::string redis = fmt::format(
+      R"EOF(
+        filters:
+        - name: redis
+          typed_config:
+            "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProxy
+            settings:
+              op_timeout: 1s
+            stat_prefix: {}
+            prefix_routes:
+              catch_all_route:
+                cluster: {}
+    )EOF",
+       name, cluster);
+  return ConfigHelper::buildBaseListener(name, Network::Test::getLoopbackAddressString(ipVersion()), redis);
 }
 
 envoy::config::route::v3::RouteConfiguration
