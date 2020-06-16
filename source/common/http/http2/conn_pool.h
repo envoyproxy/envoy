@@ -52,7 +52,9 @@ protected:
     }
 
     // Http::ConnectionCallbacks
-    void onGoAway(Http::GoAwayErrorCode error_code) override { parent().onGoAway(*this, error_code); }
+    void onGoAway(Http::GoAwayErrorCode error_code) override {
+      parent().onGoAway(*this, error_code);
+    }
 
     bool closed_with_active_rq_{};
   };
