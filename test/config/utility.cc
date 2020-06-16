@@ -377,7 +377,8 @@ ConfigHelper::buildStaticCluster(const std::string& name, int port, const std::s
                                                                                  address, port));
 }
 
-envoy::config::cluster::v3::Cluster ConfigHelper::buildCluster(const std::string& name, const std::string& lb_policy) {
+envoy::config::cluster::v3::Cluster ConfigHelper::buildCluster(const std::string& name,
+                                                               const std::string& lb_policy) {
   return TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(fmt::format(R"EOF(
       name: {}
       connect_timeout: 5s
@@ -406,9 +407,9 @@ ConfigHelper::buildClusterLoadAssignment(const std::string& name, const std::str
                   name, address, port));
 }
 
-envoy::config::listener::v3::Listener ConfigHelper::buildBaseListener(const std::string& name,
-                                                                      const std::string& address,
-                                                                      const std::string& filter_chains) {
+envoy::config::listener::v3::Listener
+ConfigHelper::buildBaseListener(const std::string& name, const std::string& address,
+                                const std::string& filter_chains) {
   return TestUtility::parseYaml<envoy::config::listener::v3::Listener>(fmt::format(
       R"EOF(
       name: {}

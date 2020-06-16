@@ -69,8 +69,9 @@ AdsIntegrationTest::buildRedisListener(const std::string& name, const std::strin
               catch_all_route:
                 cluster: {}
     )EOF",
-       name, cluster);
-  return ConfigHelper::buildBaseListener(name, Network::Test::getLoopbackAddressString(ipVersion()), redis);
+      name, cluster);
+  return ConfigHelper::buildBaseListener(name, Network::Test::getLoopbackAddressString(ipVersion()),
+                                         redis);
 }
 
 envoy::config::route::v3::RouteConfiguration
