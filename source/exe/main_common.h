@@ -94,6 +94,7 @@ private:
 // go through MainCommonBase directly.
 class MainCommon {
 public:
+  // Hook to run after a server is created.
   using PostServerHook = std::function<void(Server::Instance& server)>;
 
   MainCommon(int argc, const char* const* argv);
@@ -123,6 +124,18 @@ public:
    */
   Server::Instance* server() { return base_.server(); }
 
+  /**
+   * Instantiates a MainCommon using default factory implements, parses args,
+   * and runs an event loop depending on the mode.
+   *
+   * Note that MainCommonBase can also be directly instantiated, providing the
+   * opportunity to override subsystem implementations for custom
+   * implementations.
+   *
+   * @param argc number of command-line args
+   * @param argv command-line argument array
+   * @param hook optional hook to run after a server is created
+   */
   static int main(int argc, char** argv, PostServerHook hook = nullptr);
 
 private:
@@ -137,7 +150,6 @@ private:
   DefaultListenerHooks default_listener_hooks_;
   ProdComponentFactory prod_component_factory_;
   MainCommonBase base_;
-  PostServerHook post_server_hook_;
 };
 
 } // namespace Envoy

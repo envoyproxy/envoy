@@ -158,7 +158,7 @@ function run_testsuite() {
 
   # Capture the value of test_gauge from the initial parent: it should be 1.
   TEST_GAUGE_0=$(scrape_stat "${ADMIN_ADDRESS_0}" "hotrestart_test_gauge")
-  echo TEST_GAUGE_0 = ${TEST_GAUGE_0}
+  check [ "$TEST_GAUGE_0" = "1" ];
 
   enableHeapCheck
 
@@ -181,7 +181,6 @@ function run_testsuite() {
   if [ "$TEST_GAUGE_0" != 0 ]; then
     start_test Checking that the hotrestart_test_gauge incorporates SERVER_0 and SERVER_1.
     TEST_GAUGE_1=$(scrape_stat "${ADMIN_ADDRESS_1}" "hotrestart_test_gauge")
-    echo TEST_GAUGE_1 = ${TEST_GAUGE_1}
     check [ $TEST_GAUGE_1 = "2" ]
   fi
 
