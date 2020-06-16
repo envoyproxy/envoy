@@ -229,6 +229,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "quic_platform_udp_socket_impl_lib",
+    hdrs = select({
+        "//bazel:linux": ["quic_udp_socket_platform_impl.h"],
+        "//conditions:default": [],
+    }),
+    repository = "@envoy",
+    tags = ["nofips"],
+)
+
+envoy_cc_library(
     name = "envoy_quic_clock_lib",
     srcs = ["envoy_quic_clock.cc"],
     hdrs = ["envoy_quic_clock.h"],
