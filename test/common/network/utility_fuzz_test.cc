@@ -9,10 +9,18 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   {
     const std::string string_buffer(reinterpret_cast<const char*>(buf), len);
     try {
+      Network::Utility::parseInternetAddress(string_buffer);
+    } catch (const EnvoyException& e) {
+      ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
+    }
+  }
+
+  {
+    const std::string string_buffer(reinterpret_cast<const char*>(buf), len);
+    try {
       Network::Utility::parseInternetAddressAndPort(string_buffer);
     } catch (const EnvoyException& e) {
       ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
-      return;
     }
   }
 
@@ -23,7 +31,6 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
       Network::Utility::parsePortRangeList(string_buffer, port_range_list);
     } catch (const EnvoyException& e) {
       ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
-      return;
     }
   }
 }
