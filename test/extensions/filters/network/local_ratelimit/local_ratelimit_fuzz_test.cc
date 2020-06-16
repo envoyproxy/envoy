@@ -58,12 +58,10 @@ DEFINE_PROTO_FUZZER(
     Stats::IsolatedStoreImpl stats_store_;
     NiceMock<Runtime::MockLoader> runtime_;
     Event::MockTimer* fill_timer_ = new Event::MockTimer(&dispatcher_);
-    // auto fill_timer_=std::make_shared<Event::MockTimer>(&dispatcher_);
-    ConfigSharedPtr config_;
-
     envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit proto_config =
         input.config();
-    config_ = ::std::make_shared<Config>(proto_config, dispatcher_, stats_store_, runtime_);
+    ConfigSharedPtr config_ =
+        std::make_shared<Config>(proto_config, dispatcher_, stats_store_, runtime_);
     ActiveFilter active_filter(config_);
     std::chrono::milliseconds fill_interval_(
         PROTOBUF_GET_MS_REQUIRED(proto_config.token_bucket(), fill_interval));
