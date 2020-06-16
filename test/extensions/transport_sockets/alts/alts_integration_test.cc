@@ -43,9 +43,9 @@ namespace {
 // Fake handshaker message, copied from grpc::gcp::FakeHandshakerService implementation.
 constexpr char kClientInitFrame[] = "ClientInit";
 
-// Hollowed out implementation of HandshakerService that is disfunctional, but
-// responds correctly to first client request and capturing client and server
-// ALTS versions.
+// Hollowed out implementation of HandshakerService that is dysfunctional, but
+// responds correctly to the first client request, capturing client and server
+// ALTS versions in the process.
 class CapturingHandshakerService : public grpc::gcp::HandshakerService::Service {
 public:
   CapturingHandshakerService() {}
