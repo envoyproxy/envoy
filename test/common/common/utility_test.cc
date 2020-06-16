@@ -822,7 +822,6 @@ TEST(DateFormatter, ParseLongString) {
   std::string duplicate_input = "%%1f %1f, %2f, %3f, %4f, ";
   std::string duplicate_output = "%1 1, 14, 142, 1420, ";
   for (int i = 0; i < num_duplicates; i++) {
-    // ss << duplicate << '(';
     absl::StrAppend(&input, duplicate_input, "(");
     absl::StrAppend(&expected_output, duplicate_output, "(");
   }
