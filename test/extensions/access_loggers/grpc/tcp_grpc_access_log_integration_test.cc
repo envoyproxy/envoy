@@ -54,6 +54,7 @@ public:
       envoy::extensions::access_loggers::grpc::v3::TcpGrpcAccessLogConfig access_log_config;
       auto* common_config = access_log_config.mutable_common_config();
       common_config->set_log_name("foo");
+      common_config->set_transport_api_version(apiVersion());
       setGrpcService(*common_config->mutable_grpc_service(), "accesslog",
                      fake_upstreams_.back()->localAddress());
       access_log->mutable_typed_config()->PackFrom(access_log_config);
@@ -100,7 +101,10 @@ public:
       node->clear_extensions();
       node->clear_user_agent_build_version();
     }
-    EXPECT_EQ(request_msg.DebugString(), expected_request_msg.DebugString());
+    Config::VersionUtil::scrubHiddenEnvoyDeprecated(request_msg);
+    Config::VersionUtil::scrubHiddenEnvoyDeprecated(expected_request_msg);
+    EXPECT_TRUE(TestUtility::protoEqual(request_msg, expected_request_msg,
+                                        /*ignore_repeated_field_ordering=*/false));
 
     return AssertionSuccess();
   }
