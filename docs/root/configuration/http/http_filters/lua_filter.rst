@@ -530,7 +530,7 @@ its keys can only be *string* or *numeric*.
   end
 
   function envoy_on_response(response_handle)
-    local meta = response_handle:streamInfo():dynamicMetadata()["request.info"]
+    local meta = response_handle:streamInfo():dynamicMetadata():get("envoy.filters.http.lua")["request.info"]
     response_handle:logInfo("Auth: "..meta.auth..", token: "..meta.token)
   end
 
