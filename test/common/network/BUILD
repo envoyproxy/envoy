@@ -305,7 +305,9 @@ envoy_cc_fuzz_test(
     srcs = ["utility_fuzz_test.cc"],
     corpus = "utility_corpus",
     deps = [
+        "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
