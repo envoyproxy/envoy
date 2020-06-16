@@ -112,6 +112,7 @@ public:
   uint32_t getFrontendBufLength() const { return frontend_buffer_.length(); }
   uint32_t getBackendBufLength() const { return backend_buffer_.length(); }
   const PostgresProxyStats& getStats() const { return config_->stats_; }
+  Network::Connection& connection() const { return read_callbacks_->connection(); }
 
 private:
   Network::ReadFilterCallbacks* read_callbacks_{};

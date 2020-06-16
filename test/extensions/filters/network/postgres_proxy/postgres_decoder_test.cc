@@ -207,6 +207,13 @@ TEST_F(PostgresProxyFrontendDecoderTest, TerminateMessage) {
   ASSERT_FALSE(decoder_->getSession().inTransaction());
 }
 
+// Query message should invoke filter's callback message
+TEST_F(PostgresProxyFrontendDecoderTest, QueryMessage) {
+  EXPECT_CALL(callbacks_, processQuery).Times(1);
+  createPostgresMsg(data_, "Q", "SELECT * FROM whatever;");
+  decoder_->onData(data_, true);
+}
+
 // Test if each backend command calls incMessagesBackend()) method.
 TEST_P(PostgresProxyBackendDecoderTest, BackendInc) {
   EXPECT_CALL(callbacks_, incMessagesBackend()).Times(1);
