@@ -301,11 +301,9 @@ bool Filter::parseExtensions(os_fd_t fd, uint8_t* buf, size_t buf_size, size_t* 
 void Filter::parseTlvs(const std::vector<uint8_t>& tlvs) {
   size_t idx{0};
   while (idx < tlvs.size()) {
-    // Get TLV type.
-    uint8_t tlv_type = tlvs[idx];
+    const uint8_t tlv_type = tlvs[idx];
     idx++;
 
-    // Get value length.
     if ((idx + 1) >= tlvs.size()) {
       throw EnvoyException(
           fmt::format("failed to read proxy protocol extension. No bytes for TLV length. "
@@ -313,9 +311,9 @@ void Filter::parseTlvs(const std::vector<uint8_t>& tlvs) {
                       tlvs.size(), idx, tlv_type));
     }
 
-    uint8_t tlv_length_upper = tlvs[idx];
-    uint8_t tlv_length_lower = tlvs[idx + 1];
-    size_t tlv_value_length = (tlv_length_upper << 8) + tlv_length_lower;
+    const uint8_t tlv_length_upper = tlvs[idx];
+    const uint8_t tlv_length_lower = tlvs[idx + 1];
+    const size_t tlv_value_length = (tlv_length_upper << 8) + tlv_length_lower;
     idx += 2;
 
     // Get the value.
