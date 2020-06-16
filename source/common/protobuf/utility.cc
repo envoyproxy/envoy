@@ -456,16 +456,17 @@ public:
     // If this field is deprecated, warn or throw an error.
     if (field.options().deprecated()) {
       if (absl::StartsWith(field.name(), Config::VersionUtil::DeprecatedFieldShadowPrefix)) {
-        // The field was marked as hidden_envoy_deprecated and an error must be thrown
+        // The field was marked as hidden_envoy_deprecated and an error must be thrown,
         // unless it is part of an explicit test that needs access to the deprecated field
+        // when we enable runtime deprecation override to allow point field overrides for tests.
         if (!runtime_ ||
             !runtime_->snapshot().deprecatedFeatureEnabled(
                 absl::StrCat("envoy.deprecated_features:", field.full_name()), false)) {
           const std::string fatal_error = absl::StrCat(
-              "Illegal use of deprecated V2 option '", field.full_name(), "' from file ", filename,
-              " while using the latest V3 configuration. This option has been removed "
-              "from the current Envoy API. Please see " ENVOY_DOC_URL_VERSION_HISTORY " for "
-              "details.");
+              "Illegal use of hidden_envoy_deprecated_ V2 field '", field.full_name(),
+              "' from file ", filename,
+              " while using the latest V3 configuration. This field has been removed from the "
+              "current Envoy API. Please see " ENVOY_DOC_URL_VERSION_HISTORY " for details.");
           throw ProtoValidationException(fatal_error, message);
         }
       }
