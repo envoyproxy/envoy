@@ -59,13 +59,14 @@ public:
     while (stream->Read(&request)) {
       if (request.has_client_start()) {
         client_versions = request.client_start().rpc_versions();
+        // Sets response to make first request successful.
+        response.set_out_frames(kClientInitFrame);
+        response.set_bytes_consumed(0);
+        response.mutable_status()->set_code(grpc::StatusCode::OK);
       } else if (request.has_server_start()) {
         server_versions = request.server_start().rpc_versions();
+        response.mutable_status()->set_code(grpc::StatusCode::CANCELLED);
       }
-      // Sets response to make first request successful.
-      response.set_out_frames(kClientInitFrame);
-      response.set_bytes_consumed(0);
-      response.mutable_status()->set_code(grpc::StatusCode::OK);
       stream->Write(response);
       request.Clear();
     }
