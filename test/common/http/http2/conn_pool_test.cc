@@ -362,7 +362,7 @@ TEST_F(Http2ConnPoolImplTest, CloseExcess) {
   ActiveTestRequest r(*this, 0, false);
 
   // Pending request prevents the connection from being drained
-  pool_.drainConnections();
+  pool_->drainConnections();
 
   EXPECT_CALL(*this, onClientDestroy());
   r.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
