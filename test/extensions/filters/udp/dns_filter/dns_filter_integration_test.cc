@@ -1,5 +1,4 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
-#include "envoy/network/address.h"
 
 #include "extensions/filters/udp/dns_filter/dns_filter.h"
 
@@ -61,7 +60,7 @@ static_resources:
 
     ASSERT(addr != nullptr);
 
-    addr = Envoy::Network::Test::findOrCheckFreePort(addr, Network::Address::SocketType::Datagram);
+    addr = Network::Test::findOrCheckFreePort(addr, Network::Socket::Type::Datagram);
     ASSERT(addr != nullptr && addr->ip() != nullptr);
 
     return addr;
