@@ -18,8 +18,10 @@
 #include "gtest/gtest.h"
 
 using testing::ContainerEq;
+#ifdef WIN32
 using testing::HasSubstr;
 using testing::Not;
+#endif
 
 namespace Envoy {
 
