@@ -3,10 +3,9 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/network/connection.h"
 
+#include "extensions/common/sqlutils/sqlutils.h"
 #include "extensions/filters/network/postgres_proxy/postgres_decoder.h"
 #include "extensions/filters/network/well_known_names.h"
-
-#include "extensions/common/sqlutils/sqlutils.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -24,7 +23,8 @@ PostgresFilter::PostgresFilter(PostgresFilterConfigSharedPtr config) : config_{c
 
 // Network::ReadFilter
 Network::FilterStatus PostgresFilter::onData(Buffer::Instance& data, bool) {
-  ENVOY_CONN_LOG(trace, "echo: got {} bytes", read_callbacks_->connection(), data.length());
+  ENVOY_CONN_LOG(trace, "postgres_proxy: got {} bytes", read_callbacks_->connection(),
+                 data.length());
 
   // Frontend Buffer
   frontend_buffer_.add(data);
@@ -167,15 +167,16 @@ void PostgresFilter::processQuery(const std::string& sql) {
 
   auto result = Common::SQLUtils::SQLUtils::setMetadata(sql, metadata);
 
-  //
-  // ENVOY_CONN_LOG(trace, "postgres_proxy: query processed {}", read_callbacks_->connection(),
-  //		                     command.getData());
-
   if (!result) {
-    // config_->stats_.queries_parse_error_.inc();
-    ENVOY_CONN_LOG(trace, "Cannot parse SQL: {}", read_callbacks_->connection(), sql.c_str());
+    config_->stats_.queries_parse_error_.inc();
+    ENVOY_CONN_LOG(trace, "postgres_proxy: cannot parse SQL: {}", read_callbacks_->connection(),
+                   sql.c_str());
     return;
   }
+
+  config_->stats_.queries_parsed_.inc();
+  ENVOY_CONN_LOG(trace, "postgres_proxy: query processed {}", read_callbacks_->connection(),
+                 sql.c_str());
 
   // Set dynamic metadata
   read_callbacks_->connection().streamInfo().setDynamicMetadata(

@@ -17,7 +17,7 @@ void DecoderImpl::initialize() {
   // Setup handlers for known messages.
   absl::flat_hash_map<char, MsgProcessor>& FE_known_msgs = FE_messages_.messages_;
 
-  // Handler for know messages.
+  // Handler for known Frontend messages.
   FE_known_msgs['B'] = MsgProcessor{"Bind", {}};
   FE_known_msgs['C'] = MsgProcessor{"Close", {}};
   FE_known_msgs['d'] = MsgProcessor{"CopyData", {}};
@@ -34,7 +34,7 @@ void DecoderImpl::initialize() {
   FE_known_msgs['S'] = MsgProcessor{"Sync", {}};
   FE_known_msgs['X'] = MsgProcessor{"Terminate", {&DecoderImpl::decodeFrontendTerminate}};
 
-  // Handler for unknown messages.
+  // Handler for unknown Frontend messages.
   FE_messages_.unknown_ = MsgProcessor{"Other", {&DecoderImpl::incMessagesUnknown}};
 
   // Backend messages.
@@ -43,7 +43,7 @@ void DecoderImpl::initialize() {
   // Setup handlers for known messages.
   absl::flat_hash_map<char, MsgProcessor>& BE_known_msgs = BE_messages_.messages_;
 
-  // Handler for know messages.
+  // Handler for known Backend messages.
   BE_known_msgs['R'] = MsgProcessor{"Authentication", {&DecoderImpl::decodeAuthentication}};
   BE_known_msgs['K'] = MsgProcessor{"BackendKeyData", {}};
   BE_known_msgs['2'] = MsgProcessor{"BindComplete", {}};
@@ -68,7 +68,7 @@ void DecoderImpl::initialize() {
   BE_known_msgs['Z'] = MsgProcessor{"ReadyForQuery", {}};
   BE_known_msgs['T'] = MsgProcessor{"RowDescription", {}};
 
-  // Handler for unknown messages.
+  // Handler for unknown Backend messages.
   BE_messages_.unknown_ = MsgProcessor{"Other", {&DecoderImpl::incMessagesUnknown}};
 
   // Setup hash map for handling backend statements.

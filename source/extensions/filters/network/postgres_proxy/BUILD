@@ -33,7 +33,7 @@ envoy_cc_library(
         "//include/envoy/stats:stats_macros",
         "//source/common/buffer:buffer_lib",
         "//source/common/network:filter_lib",
-	"//source/extensions/common/sqlutils:sqlutils_lib",
+        "//source/extensions/common/sqlutils:sqlutils_lib",
         "//source/extensions/filters/network:well_known_names",
     ],
 )
