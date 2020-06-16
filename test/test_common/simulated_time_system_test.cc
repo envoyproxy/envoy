@@ -28,25 +28,19 @@ protected:
   }
 
   void addTask(int64_t delay_ms, char marker, bool expect_monotonic = true) {
+    addCustomTask(
+        delay_ms, marker, []() {}, expect_monotonic);
+  }
+
+  void addCustomTask(int64_t delay_ms, char marker, std::function<void()> cb,
+                     bool expect_monotonic = true) {
     std::chrono::milliseconds delay(delay_ms);
     TimerPtr timer = scheduler_->createTimer(
-        [this, marker, delay, expect_monotonic]() {
+        [this, marker, delay, cb, expect_monotonic]() {
           output_.append(1, marker);
           if (expect_monotonic) {
             EXPECT_GE(time_system_.monotonicTime(), start_monotonic_time_ + delay);
           }
-        },
-        dispatcher_);
-    timer->enableTimer(delay);
-    timers_.push_back(std::move(timer));
-  }
-
-  void addCustomTask(int64_t delay_ms, char marker, std::function<void()> cb) {
-    std::chrono::milliseconds delay(delay_ms);
-    TimerPtr timer = scheduler_->createTimer(
-        [this, marker, delay, cb]() {
-          output_.append(1, marker);
-          EXPECT_GE(time_system_.monotonicTime(), start_monotonic_time_ + delay);
           cb();
         },
         dispatcher_);
