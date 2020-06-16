@@ -21,6 +21,7 @@
 using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
+using testing::Return;
 
 namespace Envoy {
 namespace Server {
@@ -307,6 +308,20 @@ TEST_F(OverloadManagerImplTest, SkippedUpdates) {
   post_cb();
   timer_cb_();
   EXPECT_EQ(2, skipped_updates.value());
+
+  manager->stop();
+}
+
+TEST_F(OverloadManagerImplTest, TimerFactoryIsPassThrough) {
+  setDispatcherExpectation();
+  auto manager(createOverloadManager(getConfig()));
+  manager->start();
+
+  Event::Timer* timer = new Event::MockTimer();
+  EXPECT_CALL(thread_local_.dispatcher_, createTimer_).WillOnce(Return(timer));
+
+  auto factory = manager->getThreadLocalOverloadState().getTimerFactory();
+  EXPECT_EQ(factory("envoy.test.test_timer", [] {}).get(), timer);
 
   manager->stop();
 }
