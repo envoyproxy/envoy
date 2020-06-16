@@ -59,6 +59,7 @@ TEST(EnvoyBugDeathTest, VariousLogs) {
   for (int i = 0; i < 4; i++) {
     ENVOY_BUG(false, "");
   }
+  // 3 counts because 1st, 2nd, and 4th instances are powers of 2.
   EXPECT_EQ(3, envoy_bug_fail_count);
 
   // Different log lines have separate counters for exponential back-off.

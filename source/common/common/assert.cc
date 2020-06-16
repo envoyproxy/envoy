@@ -56,7 +56,6 @@ public:
   // ENVOY_BUG failure rather than per individual bug. Currently, this choice reduces code size and
   // has the advantage that behavior is easier to understand and debug, and test behavior is
   // predictable.
-  // TODO(asraa): Re-evaluate implementation as usage increases or mutex contention is observed.
   static bool shouldLogAndInvoke(absl::string_view bug_name) {
     // Increment counter, inserting first if counter does not exist.
     uint64_t counter_value = 0;
@@ -66,10 +65,7 @@ public:
     }
 
     // Check if counter is power of two by its bitwise representation.
-    if ((counter_value & (counter_value - 1)) == 0) {
-      return true;
-    }
-    return false;
+    return (counter_value & (counter_value - 1)) == 0;
   }
 
   static void invokeAction() {
