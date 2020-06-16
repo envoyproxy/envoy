@@ -988,7 +988,7 @@ void HttpIntegrationTest::testLargeRequestUrl(uint32_t url_size, uint32_t max_he
     auto response = std::move(encoder_decoder.second);
 
     if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
-      codec_client_->waitForDisconnect();
+      ASSERT_TRUE(codec_client_->waitForDisconnect());
       EXPECT_TRUE(response->complete());
       EXPECT_EQ("431", response->headers().Status()->value().getStringView());
     } else {
