@@ -40,7 +40,7 @@ namespace TransportSockets {
 namespace Alts {
 namespace {
 
-// Fake handshake messages, copied from grpc::gcp::FakeHandshkerService implementation.
+// Fake handshaker message, copied from grpc::gcp::FakeHandshkerService implementation.
 constexpr char kClientInitFrame[] = "ClientInit";
 
 // Hollowed out implementation of HandshakerService that is disfunctional, but
@@ -59,7 +59,7 @@ public:
     while (stream->Read(&request)) {
       if (request.has_client_start()) {
         client_versions = request.client_start().rpc_versions();
-        // Sets response to make first request successfull.
+        // Sets response to make first request successful.
         response.set_out_frames(kClientInitFrame);
         response.set_bytes_consumed(0);
         response.mutable_status()->set_code(grpc::StatusCode::OK);
