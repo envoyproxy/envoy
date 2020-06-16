@@ -163,6 +163,12 @@ TEST(Fancy, Global) {
   EXPECT_EQ(global_epoch__->load(), 0);
   EXPECT_EQ(fancy_log_list__->file, __FILE__);
   EXPECT_EQ(fancy_log_list__->level, 2);       // file level is default
+
+  // Connection and stream log
+  NiceMock<Network::MockConnection> connection_;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> stream_;
+  FANCY_CONN_LOG(warn, "Fake info {} of connection", connection_, 1);
+  FANCY_STREAM_LOG(warn, "Fake warning {} of stream", stream_, 1);
 }
 
 TEST(Fancy, SetLevel) {
@@ -241,20 +247,6 @@ TEST(FANCY, Threads) {
   }
   // pthread_exit(nullptr);
 }
-
-// TEST(FANCY, Threads) {
-//   // test with multiple threads
-//   pthread_t threads[2];
-//   int num[] = {0, 1};
-//   for (int id : {0, 1}) {
-//     int rc = pthread_create(&threads[id], nullptr, logThread, static_cast<void*>(&num[id]));
-//     EXPECT_EQ(rc, 0);
-//   }
-//   for (int id : {0, 1}) {
-//     pthread_join(threads[id], nullptr);
-//   }
-//   pthread_exit(nullptr);
-// }
 
 
 } // namespace Envoy
