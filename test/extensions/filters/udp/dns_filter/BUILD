@@ -48,6 +48,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/udp/dns_filter:config",
         "//source/extensions/filters/udp/dns_filter:dns_filter_lib",
         "//test/integration:integration_lib",
+        "//test/test_common:network_utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
