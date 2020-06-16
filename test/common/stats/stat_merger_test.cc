@@ -400,9 +400,10 @@ TEST_F(StatMergerThreadLocalTest, RetainImportModeAfterMerge) {
     Protobuf::Map<std::string, uint64_t> gauges;
     gauges["mygauge"] = 789;
     stat_merger.mergeStats(counter_deltas, gauges);
+    EXPECT_EQ(789 + 42, gauge.value());
   }
+  EXPECT_EQ(42, gauge.value());
   EXPECT_EQ(Gauge::ImportMode::Accumulate, gauge.importMode());
-  EXPECT_EQ(789 + 42, gauge.value());
 }
 
 // Verify that if we create a never import stat in the child process which then gets merged

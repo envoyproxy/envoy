@@ -3,6 +3,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
+    "envoy_cc_test_binary",
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
@@ -245,13 +246,26 @@ envoy_cc_test(
 
 exports_files(["test_utility.sh"])
 
+envoy_cc_test_binary(
+    name = "hotrestart_main",
+    srcs = ["hotrestart_main.cc"],
+    external_deps = [
+        "abseil_symbolize",
+    ],
+    stamped = True,
+    deps = [
+        "//source/exe:envoy_main_common_lib",
+        "//source/exe:platform_impl_lib",
+    ],
+)
+
 envoy_sh_test(
     name = "hotrestart_test",
     size = "enormous",
     srcs = envoy_select_hot_restart([
         "hotrestart_test.sh",
     ]),
-    cc_binary = ["//source/exe:envoy-static"],
+    cc_binary = [":hotrestart_main"],
     data = [
         "test_utility.sh",
         "//test/config/integration:server_config_files",

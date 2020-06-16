@@ -27,6 +27,7 @@ private:
   bool parent_terminated_{};
   sockaddr_un parent_address_;
   std::unique_ptr<Stats::StatMerger> stat_merger_{};
+  Stats::StatName hot_restart_generation_stat_name_;
 };
 
 } // namespace Server
