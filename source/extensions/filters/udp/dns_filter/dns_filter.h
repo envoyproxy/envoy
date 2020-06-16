@@ -88,6 +88,7 @@ public:
   Upstream::ClusterManager& clusterManager() const { return cluster_manager_; }
   uint64_t retryCount() const { return retry_count_; }
   Runtime::RandomGenerator& random() const { return random_; }
+  uint64_t maxPendingLookups() const { return max_pending_lookups_; }
 
 private:
   static DnsFilterStats generateStats(const std::string& stat_prefix, Stats::Scope& scope) {
@@ -114,6 +115,7 @@ private:
   AddressConstPtrVec resolvers_;
   std::chrono::milliseconds resolver_timeout_;
   Runtime::RandomGenerator& random_;
+  uint64_t max_pending_lookups_;
 };
 
 using DnsFilterEnvoyConfigSharedPtr = std::shared_ptr<const DnsFilterEnvoyConfig>;

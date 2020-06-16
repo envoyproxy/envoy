@@ -19,11 +19,13 @@ enum class DnsFilterResolverStatus { Pending, Complete, TimedOut };
 class DnsFilterResolver : Logger::Loggable<Logger::Id::filter> {
 public:
   DnsFilterResolver(DnsFilterResolverCallback& callback, AddressConstPtrVec resolvers,
-                    std::chrono::milliseconds timeout, Event::Dispatcher& dispatcher)
+                    std::chrono::milliseconds timeout, Event::Dispatcher& dispatcher,
+                    uint64_t max_pending_lookups)
       : dispatcher_(dispatcher),
         resolver_(dispatcher.createDnsResolver(resolvers, false /* use_tcp_for_dns_lookups */)),
         callback_(callback), timeout_(timeout),
-        timeout_timer_(dispatcher.createTimer([this]() -> void { onResolveTimeout(); })) {}
+        timeout_timer_(dispatcher.createTimer([this]() -> void { onResolveTimeout(); })),
+        max_pending_lookups_(max_pending_lookups) {}
   /**
    * @brief entry point to resolve the name in a DnsQueryRecord
    *
@@ -66,7 +68,8 @@ private:
   DnsFilterResolverCallback& callback_;
   std::chrono::milliseconds timeout_;
   Event::TimerPtr timeout_timer_;
-  absl::flat_hash_map<uint16_t, LookupContext> lookups_;
+  absl::flat_hash_map<const DnsQueryRecord*, LookupContext> lookups_;
+  uint64_t max_pending_lookups_;
 };
 
 using DnsFilterResolverPtr = std::unique_ptr<DnsFilterResolver>;

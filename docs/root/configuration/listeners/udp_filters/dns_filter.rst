@@ -46,6 +46,7 @@ Example Configuration
         - socket_address:
             address: "8.8.4.4"
             port_value: 53
+        max_pending_lookups: 256
       server_config:
         inline_dns_table:
           known_suffixes:

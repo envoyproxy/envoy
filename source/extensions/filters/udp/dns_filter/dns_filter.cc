@@ -84,6 +84,8 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
     }
     resolver_timeout_ = std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(
         client_config, resolver_timeout, DEFAULT_RESOLVER_TIMEOUT.count()));
+
+    max_pending_lookups_ = client_config.max_pending_lookups();
   }
 }
 
@@ -147,8 +149,9 @@ DnsFilter::DnsFilter(Network::UdpReadFilterCallbacks& callbacks,
     sendDnsResponse(std::move(context));
   };
 
-  resolver_ = std::make_unique<DnsFilterResolver>(
-      resolver_callback_, config->resolvers(), config->resolverTimeout(), listener_.dispatcher());
+  resolver_ = std::make_unique<DnsFilterResolver>(resolver_callback_, config->resolvers(),
+                                                  config->resolverTimeout(), listener_.dispatcher(),
+                                                  config->maxPendingLookups());
 }
 
 void DnsFilter::onData(Network::UdpRecvData& client_request) {

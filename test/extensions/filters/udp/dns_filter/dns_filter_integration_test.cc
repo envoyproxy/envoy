@@ -86,6 +86,7 @@ listener_filters:
       - socket_address:
           address: {}
           port_value: {}
+      max_pending_lookups: 256
     server_config:
       inline_dns_table:
         external_retry_count: 0

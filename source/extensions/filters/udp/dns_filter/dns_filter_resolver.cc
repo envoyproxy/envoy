@@ -38,7 +38,16 @@ void DnsFilterResolver::resolveExternalQuery(DnsQueryContextPtr context,
     return;
   }
 
-  const uint16_t id = ctx.query_context->id_;
+  const DnsQueryRecord* id = domain_query;
+
+  // If we have too many pending lookups, invoke the callback to retry the query.
+  if (lookups_.size() > max_pending_lookups_) {
+    ENVOY_LOG(trace, "Retrying query for [{}] because there are too many pending lookups: [{}/{}]",
+              domain_query->name_, lookups_.size(), max_pending_lookups_);
+    invokeCallback(ctx);
+    return;
+  }
+
   lookups_.emplace(id, std::move(ctx));
 
   ENVOY_LOG(trace, "Pending queries: {}", lookups_.size());
@@ -51,7 +60,7 @@ void DnsFilterResolver::resolveExternalQuery(DnsQueryContextPtr context,
                                std::list<Network::DnsResponse>&& response) -> void {
     auto ctx_iter = lookups_.find(id);
     if (ctx_iter == lookups_.end()) {
-      ENVOY_LOG(debug, "Unable to find context for DNS query for ID [{}]", id);
+      ENVOY_LOG(debug, "Unable to find context for DNS query for ID [{}]", id->name_);
       return;
     }
 
@@ -100,7 +109,7 @@ void DnsFilterResolver::onResolveTimeout() {
         ctx_iter.second.resolver_status == DnsFilterResolverStatus::Pending) {
       auto ctx = std::move(ctx_iter.second);
 
-      ENVOY_LOG(trace, "Purging expired query: {}", ctx_iter.first);
+      ENVOY_LOG(trace, "Purging expired query: {}", ctx_iter.first->name_);
 
       ctx.query_context->resolution_status_ = Network::DnsResolver::ResolutionStatus::Failure;
 

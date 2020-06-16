@@ -185,6 +185,7 @@ client_config:
   - socket_address:
       address: "8.8.4.4"
       port_value: 53
+  max_pending_lookups: 256
 server_config:
   inline_dns_table:
     external_retry_count: 0
@@ -207,6 +208,7 @@ client_config:
   - socket_address:
       address: "1.1.1.1"
       port_value: 53
+  max_pending_lookups: 256
 server_config:
   external_dns_table:
     filename: {}
