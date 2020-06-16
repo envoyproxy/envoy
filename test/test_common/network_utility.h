@@ -25,7 +25,7 @@ namespace Test {
  *          listening, else nullptr if the address and port are not free.
  */
 Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstSharedPtr addr_port,
-                                                    Address::SocketType type);
+                                                    Socket::Type type);
 
 /**
  * As above, but addr_port is specified as a string. For example:
@@ -35,7 +35,7 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
  *    - [::]:45678       Check whether a specific port on all local IPv6 addresses is free.
  */
 Address::InstanceConstSharedPtr findOrCheckFreePort(const std::string& addr_port,
-                                                    Address::SocketType type);
+                                                    Socket::Type type);
 
 /**
  * Get a URL ready IP loopback address as a string.
@@ -115,7 +115,7 @@ std::string ipVersionToDnsFamily(Network::Address::IpVersion version);
  * @returns the address and the fd of the socket bound to that address.
  */
 std::pair<Address::InstanceConstSharedPtr, Network::SocketPtr>
-bindFreeLoopbackPort(Address::IpVersion version, Address::SocketType type);
+bindFreeLoopbackPort(Address::IpVersion version, Socket::Type type);
 
 /**
  * Create a transport socket for testing purposes.

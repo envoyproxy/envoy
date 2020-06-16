@@ -545,7 +545,7 @@ public:
    * should consider using StopAllIterationAndBuffer or StopAllIterationAndWatermark in
    * decodeHeaders() to prevent metadata passing to the following filters.
    *
-   * @param metadata supplies the decoded metadata.
+   * @param metadata_map supplies the decoded metadata.
    */
   virtual FilterMetadataStatus decodeMetadata(MetadataMap& /* metadata_map */) {
     return Http::FilterMetadataStatus::Continue;

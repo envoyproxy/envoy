@@ -25,30 +25,6 @@ namespace Envoy {
 namespace Router {
 namespace {
 
-class MockGenericConnPool : public GenericConnPool {
-  MOCK_METHOD(void, newStream, (GenericConnectionPoolCallbacks * request));
-  MOCK_METHOD(bool, cancelAnyPendingRequest, ());
-  MOCK_METHOD(absl::optional<Http::Protocol>, protocol, (), (const));
-  MOCK_METHOD(bool, initialize,
-              (Upstream::ClusterManager&, const RouteEntry&, Http::Protocol,
-               Upstream::LoadBalancerContext*));
-  MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, host, (), (const));
-};
-
-class MockGenericConnectionPoolCallbacks : public GenericConnectionPoolCallbacks {
-public:
-  MOCK_METHOD(void, onPoolFailure,
-              (Http::ConnectionPool::PoolFailureReason reason,
-               absl::string_view transport_failure_reason,
-               Upstream::HostDescriptionConstSharedPtr host));
-  MOCK_METHOD(void, onPoolReady,
-              (std::unique_ptr<GenericUpstream> && upstream,
-               Upstream::HostDescriptionConstSharedPtr host,
-               const Network::Address::InstanceConstSharedPtr& upstream_local_address,
-               const StreamInfo::StreamInfo& info));
-  MOCK_METHOD(UpstreamRequest*, upstreamRequest, ());
-};
-
 class MockRouterFilterInterface : public RouterFilterInterface {
 public:
   MockRouterFilterInterface()
@@ -115,52 +91,53 @@ public:
     NiceMock<MockRouteEntry> route_entry;
     NiceMock<Upstream::MockClusterManager> cm;
     EXPECT_CALL(cm, tcpConnPoolForCluster(_, _, _)).WillOnce(Return(&mock_pool_));
-    EXPECT_TRUE(conn_pool_.initialize(cm, route_entry, Http::Protocol::Http11, nullptr));
+    conn_pool_ = std::make_unique<TcpConnPool>(cm, route_entry, Http::Protocol::Http11, nullptr);
+    EXPECT_TRUE(conn_pool_->valid());
   }
 
-  TcpConnPool conn_pool_;
+  std::unique_ptr<TcpConnPool> conn_pool_;
   Tcp::ConnectionPool::MockInstance mock_pool_;
   MockGenericConnectionPoolCallbacks mock_generic_callbacks_;
   std::shared_ptr<NiceMock<Upstream::MockHost>> host_;
-  NiceMock<Tcp::ConnectionPool::MockCancellable> cancellable_;
+  NiceMock<Envoy::ConnectionPool::MockCancellable> cancellable_;
 };
 
 TEST_F(TcpConnPoolTest, Basic) {
   NiceMock<Network::MockClientConnection> connection;
 
   EXPECT_CALL(mock_pool_, newConnection(_)).WillOnce(Return(&cancellable_));
-  conn_pool_.newStream(&mock_generic_callbacks_);
+  conn_pool_->newStream(&mock_generic_callbacks_);
 
   EXPECT_CALL(mock_generic_callbacks_, upstreamRequest());
   EXPECT_CALL(mock_generic_callbacks_, onPoolReady(_, _, _, _));
   auto data = std::make_unique<NiceMock<Tcp::ConnectionPool::MockConnectionData>>();
   EXPECT_CALL(*data, connection()).Times(AnyNumber()).WillRepeatedly(ReturnRef(connection));
-  conn_pool_.onPoolReady(std::move(data), host_);
+  conn_pool_->onPoolReady(std::move(data), host_);
 }
 
 TEST_F(TcpConnPoolTest, OnPoolFailure) {
   EXPECT_CALL(mock_pool_, newConnection(_)).WillOnce(Return(&cancellable_));
-  conn_pool_.newStream(&mock_generic_callbacks_);
+  conn_pool_->newStream(&mock_generic_callbacks_);
 
   EXPECT_CALL(mock_generic_callbacks_, onPoolFailure(_, _, _));
-  conn_pool_.onPoolFailure(Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure, host_);
+  conn_pool_->onPoolFailure(Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure, host_);
 
   // Make sure that the pool failure nulled out the pending request.
-  EXPECT_FALSE(conn_pool_.cancelAnyPendingRequest());
+  EXPECT_FALSE(conn_pool_->cancelAnyPendingRequest());
 }
 
 TEST_F(TcpConnPoolTest, Cancel) {
   // Initially cancel should fail as there is no pending request.
-  EXPECT_FALSE(conn_pool_.cancelAnyPendingRequest());
+  EXPECT_FALSE(conn_pool_->cancelAnyPendingRequest());
 
   EXPECT_CALL(mock_pool_, newConnection(_)).WillOnce(Return(&cancellable_));
-  conn_pool_.newStream(&mock_generic_callbacks_);
+  conn_pool_->newStream(&mock_generic_callbacks_);
 
   // Canceling should now return true as there was an active request.
-  EXPECT_TRUE(conn_pool_.cancelAnyPendingRequest());
+  EXPECT_TRUE(conn_pool_->cancelAnyPendingRequest());
 
   // A second cancel should return false as there is not a pending request.
-  EXPECT_FALSE(conn_pool_.cancelAnyPendingRequest());
+  EXPECT_FALSE(conn_pool_->cancelAnyPendingRequest());
 }
 
 class TcpUpstreamTest : public ::testing::Test {
