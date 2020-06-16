@@ -91,7 +91,7 @@ public:
 
 private:
   mutable absl::Mutex mutex_;
-  T value_ GUARDED_BY(mutex_);
+  T value_ ABSL_GUARDED_BY(mutex_);
   T default_value_;
 };
 

@@ -233,7 +233,7 @@ protected:
   }
 
   virtual Stats::Counter* getCounterLockHeld(const std::string& name)
-      EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
     auto it = counters_.find(name);
     if (it != counters_.end()) {
       return it->second;

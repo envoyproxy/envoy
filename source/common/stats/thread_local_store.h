@@ -115,7 +115,7 @@ public:
   uint32_t use_count() const override { return refcount_helper_.use_count(); }
 
 private:
-  bool usedLockHeld() const EXCLUSIVE_LOCKS_REQUIRED(merge_lock_);
+  bool usedLockHeld() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(merge_lock_);
 
   Histogram::Unit unit_;
   Store& parent_;
@@ -125,7 +125,7 @@ private:
   HistogramStatisticsImpl interval_statistics_;
   HistogramStatisticsImpl cumulative_statistics_;
   mutable Thread::MutexBasicLockable merge_lock_;
-  std::list<TlsHistogramSharedPtr> tls_histograms_ GUARDED_BY(merge_lock_);
+  std::list<TlsHistogramSharedPtr> tls_histograms_ ABSL_GUARDED_BY(merge_lock_);
   bool merged_;
   RefcountHelper refcount_helper_;
 };
@@ -424,7 +424,7 @@ private:
   Event::Dispatcher* main_thread_dispatcher_{};
   ThreadLocal::SlotPtr tls_;
   mutable Thread::MutexBasicLockable lock_;
-  absl::flat_hash_set<ScopeImpl*> scopes_ GUARDED_BY(lock_);
+  absl::flat_hash_set<ScopeImpl*> scopes_ ABSL_GUARDED_BY(lock_);
   ScopePtr default_scope_;
   std::list<std::reference_wrapper<Sink>> timer_sinks_;
   TagProducerPtr tag_producer_;

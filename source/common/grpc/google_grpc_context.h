@@ -21,7 +21,7 @@ public:
 private:
   struct InstanceTracker {
     Thread::MutexBasicLockable mutex_;
-    uint64_t live_instances_ GUARDED_BY(mutex_) = 0;
+    uint64_t live_instances_ ABSL_GUARDED_BY(mutex_) = 0;
   };
 
   static InstanceTracker& instanceTracker();
