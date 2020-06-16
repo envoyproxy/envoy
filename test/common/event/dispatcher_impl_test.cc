@@ -410,7 +410,7 @@ TEST(TimerImplTest, TimerOrderAndDisableAlarm) {
 
 // Change the registration time for a timer that is already activated by disabling and re-enabling
 // the timer. Verify that execution is delayed.
-TEST(TimerImplTest, TimerOrderAndReschedule) {
+TEST(TimerImplTest, TimerOrderDisableAndReschedule) {
   Api::ApiPtr api = Api::createApiForTest();
   DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
 
@@ -451,6 +451,52 @@ TEST(TimerImplTest, TimerOrderAndReschedule) {
   EXPECT_CALL(watcher1, ready());
   EXPECT_CALL(watcher4, ready());
   EXPECT_CALL(watcher2, ready());
+  EXPECT_CALL(watcher3, ready());
+  dispatcher->run(Dispatcher::RunType::Block);
+}
+
+// Change the registration time for a timer that is already activated by re-enabling the timer
+// without calling disableTimer first.
+TEST(TimerImplTest, TimerOrderAndReschedule) {
+  Api::ApiPtr api = Api::createApiForTest();
+  DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
+
+  ReadyWatcher watcher4;
+  Event::TimerPtr timer4 = dispatcher->createTimer([&] { watcher4.ready(); });
+
+  ReadyWatcher watcher3;
+  Event::TimerPtr timer3 = dispatcher->createTimer([&] { watcher3.ready(); });
+
+  ReadyWatcher watcher2;
+  Event::TimerPtr timer2 = dispatcher->createTimer([&] { watcher2.ready(); });
+
+  ReadyWatcher watcher1;
+  Event::TimerPtr timer1 = dispatcher->createTimer([&] {
+    timer2->enableTimer(std::chrono::milliseconds(0));
+    timer3->enableTimer(std::chrono::milliseconds(1));
+    watcher1.ready();
+  });
+
+  timer1->enableTimer(std::chrono::milliseconds(0));
+  timer2->enableTimer(std::chrono::milliseconds(1));
+  timer3->enableTimer(std::chrono::milliseconds(2));
+  timer4->enableTimer(std::chrono::milliseconds(3));
+
+  // Sleep for 5ms so timers above all trigger in the same loop iteration.
+  absl::SleepFor(absl::Milliseconds(5));
+
+  EXPECT_TRUE(timer1->enabled());
+  EXPECT_TRUE(timer2->enabled());
+  EXPECT_TRUE(timer3->enabled());
+  EXPECT_TRUE(timer4->enabled());
+
+  // Rescheduling timers that are already scheduled to run in the current event loop iteration has
+  // no effect if the time delta is 0. Expect timers 1, 2 and 4 to execute in the original order.
+  // Timer 3 is delayed since it is rescheduled with a non-zero delta.
+  InSequence s;
+  EXPECT_CALL(watcher1, ready());
+  EXPECT_CALL(watcher2, ready());
+  EXPECT_CALL(watcher4, ready());
   EXPECT_CALL(watcher3, ready());
   dispatcher->run(Dispatcher::RunType::Block);
 }
