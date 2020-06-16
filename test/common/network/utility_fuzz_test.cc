@@ -46,6 +46,20 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
       ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
     }
   }
+
+  {
+    FuzzedDataProvider provider(buf, len);
+    envoy::config::core::v3::Address proto_address;
+    const auto port_value = provider.ConsumeIntegral<uint16_t>();
+    const std::string address_value = provider.ConsumeRemainingBytesAsString();
+    try {
+      proto_address.mutable_socket_address()->set_address(address_value);
+      proto_address.mutable_socket_address()->set_port_value(port_value);
+      Network::Utility::protobufAddressToAddress(proto_address);
+    } catch (const EnvoyException& e) {
+      ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
+    }
+  }
 }
 
 } // namespace Fuzz
