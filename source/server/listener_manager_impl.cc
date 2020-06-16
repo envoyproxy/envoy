@@ -474,7 +474,7 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
     // We have no warming or active listener so we need to make a new one. What we do depends on
     // whether workers have been started or not. Additionally, search through draining listeners
     // to see if there is a listener that has a socket factory for the same address we are
-    // configured for and doesn't not use SO_REUSEPORT. This is an edge case, but may happen if a
+    // configured for and doesn't use SO_REUSEPORT. This is an edge case, but may happen if a
     // listener is removed and then added back with a same or different name and intended to listen
     // on the same address. This should work and not fail.
     Network::ListenSocketFactorySharedPtr draining_listen_socket_factory;
