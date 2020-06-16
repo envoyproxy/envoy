@@ -27,7 +27,7 @@ public:
 
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
-  void onDestroy() override {}
+  void onDestroy() override;
 
 private:
   Http::StreamDecoderFilterCallbacks* callbacks_{};

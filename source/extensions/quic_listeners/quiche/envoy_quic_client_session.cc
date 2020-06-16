@@ -27,7 +27,9 @@ void EnvoyQuicClientSession::connect() {
   // Start version negotiation and crypto handshake during which the connection may fail if server
   // doesn't support the one and only supported version.
   CryptoConnect();
-  SetMaxAllowedPushId(0u);
+  if (quic::VersionUsesHttp3(transport_version())) {
+    SetMaxPushId(0u);
+  }
 }
 
 void EnvoyQuicClientSession::OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
@@ -80,6 +82,10 @@ EnvoyQuicClientSession::CreateIncomingStream(quic::PendingStream* /*pending*/) {
 }
 
 bool EnvoyQuicClientSession::hasDataToWrite() { return HasDataToWrite(); }
+
+void EnvoyQuicClientSession::OnOneRttKeysAvailable() {
+  raiseConnectionEvent(Network::ConnectionEvent::Connected);
+}
 
 } // namespace Quic
 } // namespace Envoy

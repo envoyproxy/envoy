@@ -54,7 +54,7 @@ message ServerInfo {
   CommandLineOptions command_line_options = 6;
 }
 
-// [#next-free-field: 33]
+// [#next-free-field: 34]
 message CommandLineOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.admin.v2alpha.CommandLineOptions";
@@ -73,6 +73,14 @@ message CommandLineOptions {
 
     // Completely load and initialize the config, and then exit without running the listener loop.
     InitOnly = 2;
+  }
+
+  enum DrainStrategy {
+    // Gradually discourage connections over the course of the drain period.
+    Gradual = 0;
+
+    // Discourage all connections for the duration of the drain sequence.
+    Immediate = 1;
   }
 
   reserved 12, 20, 21;
@@ -141,6 +149,9 @@ message CommandLineOptions {
 
   // See :option:`--drain-time-s` for details.
   google.protobuf.Duration drain_time = 17;
+
+  // See :option:`--drain-strategy` for details.
+  DrainStrategy drain_strategy = 33;
 
   // See :option:`--parent-shutdown-time-s` for details.
   google.protobuf.Duration parent_shutdown_time = 18;

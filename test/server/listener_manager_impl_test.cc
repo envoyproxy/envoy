@@ -336,13 +336,12 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
   EXPECT_CALL(server_.random_, uuid());
   EXPECT_CALL(*worker_, addListener(_, _, _));
   EXPECT_CALL(listener_factory_,
-              createListenSocket(_, Network::Address::SocketType::Datagram, _, {{true, false}}))
-      .WillOnce(
-          Invoke([this](const Network::Address::InstanceConstSharedPtr&,
-                        Network::Address::SocketType, const Network::Socket::OptionsSharedPtr&,
-                        const ListenSocketCreationParams&) -> Network::SocketSharedPtr {
-            return listener_factory_.socket_;
-          }));
+              createListenSocket(_, Network::Socket::Type::Datagram, _, {{true, false}}))
+      .WillOnce(Invoke([this](const Network::Address::InstanceConstSharedPtr&,
+                              Network::Socket::Type, const Network::Socket::OptionsSharedPtr&,
+                              const ListenSocketCreationParams&) -> Network::SocketSharedPtr {
+        return listener_factory_.socket_;
+      }));
   EXPECT_CALL(*listener_factory_.socket_, setSocketOption(_, _, _, _)).Times(testing::AtLeast(1));
   EXPECT_CALL(os_sys_calls_, close(_)).WillRepeatedly(Return(Api::SysCallIntResult{0, errno}));
   manager_->addOrUpdateListener(listener_proto, "", true);
@@ -1370,7 +1369,7 @@ filter_chains:
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, ListenSocketCreationParams(false)))
       .WillOnce(Invoke([this, &syscall_result, &real_listener_factory](
                            const Network::Address::InstanceConstSharedPtr& address,
-                           Network::Address::SocketType socket_type,
+                           Network::Socket::Type socket_type,
                            const Network::Socket::OptionsSharedPtr& options,
                            const ListenSocketCreationParams& params) -> Network::SocketSharedPtr {
         EXPECT_CALL(server_, hotRestart).Times(0);
@@ -1407,7 +1406,7 @@ filter_chains:
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {{true, false}}))
       .WillOnce(Invoke([this, &syscall_result, &real_listener_factory](
                            const Network::Address::InstanceConstSharedPtr& address,
-                           Network::Address::SocketType socket_type,
+                           Network::Socket::Type socket_type,
                            const Network::Socket::OptionsSharedPtr& options,
                            const ListenSocketCreationParams& params) -> Network::SocketSharedPtr {
         EXPECT_CALL(server_, hotRestart).Times(0);
@@ -1423,7 +1422,7 @@ TEST_F(ListenerManagerImplTest, NotSupportedDatagramUds) {
   ProdListenerComponentFactory real_listener_factory(server_);
   EXPECT_THROW_WITH_MESSAGE(real_listener_factory.createListenSocket(
                                 std::make_shared<Network::Address::PipeInstance>("/foo"),
-                                Network::Address::SocketType::Datagram, nullptr, {true}),
+                                Network::Socket::Type::Datagram, nullptr, {true}),
                             EnvoyException,
                             "socket type SocketType::Datagram not supported for pipes");
 }
@@ -3466,6 +3465,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
   Network::FilterChainFactory& filterChainFactory = listener.filterChainFactory();
   Network::MockListenerFilterManager manager;
 
+  // Return error when trying to retrieve the original dst on the invalid handle
+  EXPECT_CALL(os_sys_calls_, getsockopt_(_, _, _, _, _)).WillOnce(Return(-1));
+
   NiceMock<Network::MockListenerFilterCallbacks> callbacks;
   Network::AcceptedSocketImpl socket(std::make_unique<Network::IoSocketHandleImpl>(),
                                      Network::Address::InstanceConstSharedPtr{
@@ -3647,7 +3649,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TransparentFreebindListenerDisabl
   )EOF",
                                                        Network::Address::IpVersion::v4);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}))
-      .WillOnce(Invoke([&](Network::Address::InstanceConstSharedPtr, Network::Address::SocketType,
+      .WillOnce(Invoke([&](Network::Address::InstanceConstSharedPtr, Network::Socket::Type,
                            const Network::Socket::OptionsSharedPtr& options,
                            const ListenSocketCreationParams&) -> Network::SocketSharedPtr {
         EXPECT_EQ(options, nullptr);
