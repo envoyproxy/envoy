@@ -103,8 +103,7 @@ ScopeKeyBuilderImpl::ScopeKeyBuilderImpl(ScopedRoutes::ScopeKeyBuilder&& config)
   }
 }
 
-std::unique_ptr<ScopeKey>
-ScopeKeyBuilderImpl::computeScopeKey(const Http::HeaderMap& headers) const {
+ScopeKeyPtr ScopeKeyBuilderImpl::computeScopeKey(const Http::HeaderMap& headers) const {
   ScopeKey key;
   for (const auto& builder : fragment_builders_) {
     // returns nullopt if a null fragment is found.
@@ -139,7 +138,7 @@ void ScopedConfigImpl::removeRoutingScope(const std::string& scope_name) {
 
 Router::ConfigConstSharedPtr
 ScopedConfigImpl::getRouteConfig(const Http::HeaderMap& headers) const {
-  std::unique_ptr<ScopeKey> scope_key = scope_key_builder_.computeScopeKey(headers);
+  ScopeKeyPtr scope_key = scope_key_builder_.computeScopeKey(headers);
   if (scope_key == nullptr) {
     return nullptr;
   }

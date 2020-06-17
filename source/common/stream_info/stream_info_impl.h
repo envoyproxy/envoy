@@ -27,7 +27,7 @@ struct StreamInfoImpl : public StreamInfo {
                        std::make_shared<FilterStateImpl>(FilterState::LifeSpan::FilterChain)) {}
 
   StreamInfoImpl(Http::Protocol protocol, TimeSource& time_source,
-                 std::shared_ptr<FilterState>& parent_filter_state)
+                 FilterStateSharedPtr& parent_filter_state)
       : StreamInfoImpl(protocol, time_source,
                        std::make_shared<FilterStateImpl>(
                            FilterStateImpl::LazyCreateAncestor(parent_filter_state,

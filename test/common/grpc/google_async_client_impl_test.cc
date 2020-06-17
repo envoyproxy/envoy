@@ -39,12 +39,12 @@ public:
 
 class MockStubFactory : public GoogleStubFactory {
 public:
-  std::shared_ptr<GoogleStub> createStub(std::shared_ptr<grpc::Channel> /*channel*/) override {
+  GoogleStubSharedPtr createStub(std::shared_ptr<grpc::Channel> /*channel*/) override {
     return shared_stub_;
   }
 
   MockGenericStub* stub_ = new MockGenericStub();
-  std::shared_ptr<GoogleStub> shared_stub_{stub_};
+  GoogleStubSharedPtr shared_stub_{stub_};
 };
 
 class EnvoyGoogleAsyncClientImplTest : public testing::Test {

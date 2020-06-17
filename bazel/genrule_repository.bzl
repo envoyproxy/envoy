@@ -68,7 +68,7 @@ def _genrule_cc_deps(ctx):
 genrule_cc_deps = rule(
     attrs = {
         "deps": attr.label_list(
-            providers = [],  # CcSkylarkApiProvider
+            providers = [],  # CcStarlarkApiProvider
             mandatory = True,
             allow_empty = False,
         ),

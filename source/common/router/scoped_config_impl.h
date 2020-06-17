@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <typeinfo>
 
 #include "envoy/config/route/v3/scoped_route.pb.h"
@@ -77,6 +78,8 @@ private:
   std::vector<std::unique_ptr<ScopeKeyFragmentBase>> fragments_;
 };
 
+using ScopeKeyPtr = std::unique_ptr<ScopeKey>;
+
 // String fragment.
 class StringKeyFragment : public ScopeKeyFragmentBase {
 public:
@@ -130,7 +133,7 @@ public:
   virtual ~ScopeKeyBuilderBase() = default;
 
   // Computes scope key for given headers, returns nullptr if a key can't be computed.
-  virtual std::unique_ptr<ScopeKey> computeScopeKey(const Http::HeaderMap& headers) const PURE;
+  virtual ScopeKeyPtr computeScopeKey(const Http::HeaderMap& headers) const PURE;
 
 protected:
   const ScopedRoutes::ScopeKeyBuilder config_;
@@ -140,7 +143,7 @@ class ScopeKeyBuilderImpl : public ScopeKeyBuilderBase {
 public:
   explicit ScopeKeyBuilderImpl(ScopedRoutes::ScopeKeyBuilder&& config);
 
-  std::unique_ptr<ScopeKey> computeScopeKey(const Http::HeaderMap& headers) const override;
+  ScopeKeyPtr computeScopeKey(const Http::HeaderMap& headers) const override;
 
 private:
   std::vector<std::unique_ptr<FragmentBuilderBase>> fragment_builders_;
