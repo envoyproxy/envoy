@@ -681,6 +681,130 @@ actions:
   EXPECT_TRUE(descriptors_.empty());
 }
 
+TEST_F(RateLimitPolicyEntryTest, DynamicMetadataRateLimitOverride) {
+  const std::string yaml = R"EOF(
+actions:
+- generic_key:
+    descriptor_value: limited_fake_key
+limit:
+ dynamic_metadata:
+   metadata_key:
+     key: test.filter.key
+     path:
+      - key: test
+  )EOF";
+
+  setupTest(yaml);
+
+  std::string metadata_yaml = R"EOF(
+filter_metadata:
+  test.filter.key:
+    test:
+      requests_per_unit: 42
+      unit: HOUR
+  )EOF";
+
+  envoy::config::core::v3::Metadata metadata;
+  TestUtility::loadFromYaml(metadata_yaml, metadata);
+  rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header_, default_remote_address_,
+                                         &metadata);
+  EXPECT_THAT(
+      std::vector<Envoy::RateLimit::Descriptor>(
+          {{{{"generic_key", "limited_fake_key"}}, {{42, envoy::type::v3::RateLimitUnit::HOUR}}}}),
+      testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, DynamicMetadataRateLimitOverrideNotFound) {
+  const std::string yaml = R"EOF(
+actions:
+- generic_key:
+    descriptor_value: limited_fake_key
+limit:
+ dynamic_metadata:
+   metadata_key:
+     key: unknown.key
+     path:
+      - key: test
+  )EOF";
+
+  setupTest(yaml);
+
+  std::string metadata_yaml = R"EOF(
+filter_metadata:
+  test.filter.key:
+    test:
+      requests_per_unit: 42
+      unit: HOUR
+  )EOF";
+
+  envoy::config::core::v3::Metadata metadata;
+  TestUtility::loadFromYaml(metadata_yaml, metadata);
+  rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header_, default_remote_address_,
+                                         &metadata);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"generic_key", "limited_fake_key"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, DynamicMetadataRateLimitOverrideWrongType) {
+  const std::string yaml = R"EOF(
+actions:
+- generic_key:
+    descriptor_value: limited_fake_key
+limit:
+ dynamic_metadata:
+   metadata_key:
+     key: test.filter.key
+     path:
+      - key: test
+  )EOF";
+
+  setupTest(yaml);
+
+  std::string metadata_yaml = R"EOF(
+filter_metadata:
+  test.filter.key:
+    test: some_string
+  )EOF";
+
+  envoy::config::core::v3::Metadata metadata;
+  TestUtility::loadFromYaml(metadata_yaml, metadata);
+  rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header_, default_remote_address_,
+                                         &metadata);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"generic_key", "limited_fake_key"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, DynamicMetadataRateLimitOverrideWrongUnit) {
+  const std::string yaml = R"EOF(
+actions:
+- generic_key:
+    descriptor_value: limited_fake_key
+limit:
+ dynamic_metadata:
+   metadata_key:
+     key: test.filter.key
+     path:
+      - key: test
+  )EOF";
+
+  setupTest(yaml);
+
+  std::string metadata_yaml = R"EOF(
+filter_metadata:
+  test.filter.key:
+    test:
+      requests_per_unit: 42
+      unit: NOT_A_UNIT
+  )EOF";
+
+  envoy::config::core::v3::Metadata metadata;
+  TestUtility::loadFromYaml(metadata_yaml, metadata);
+  rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header_, default_remote_address_,
+                                         &metadata);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"generic_key", "limited_fake_key"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
 } // namespace
 } // namespace Router
 } // namespace Envoy
