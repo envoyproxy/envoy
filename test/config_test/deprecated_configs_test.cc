@@ -169,7 +169,7 @@ TEST(DeprecatedConfigsTest, DEPRECATED_FEATURE_TEST(LoadV2BootstrapYamlDeprecate
                 "'envoy.config.core.v3.Node.hidden_envoy_deprecated_build_version'"));
 }
 
-// A deprecated field can be used in previous version yaml and upgraded.
+// A deprecated field can be used in previous version json and upgraded.
 TEST(DeprecatedConfigsTest, DEPRECATED_FEATURE_TEST(LoadV2BootstrapJsonDeprecatedField)) {
   API_NO_BOOST(envoy::config::bootstrap::v2::Bootstrap)
   bootstrap = TestUtility::parseYaml<envoy::config::bootstrap::v2::Bootstrap>(R"EOF(
