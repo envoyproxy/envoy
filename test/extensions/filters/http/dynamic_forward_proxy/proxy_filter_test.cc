@@ -77,9 +77,12 @@ public:
     dns_cache_resource_manager_ =
         std::make_unique<Extensions::Common::DynamicForwardProxy::DnsCacheResourceManagerImpl>(
             *scope_, loader_, config_name_, cb_config);
+<<<<<<< HEAD
 
     ON_CALL(*dns_cache_manager_->dns_cache_, dnsCacheResourceManager())
         .WillByDefault(Return(std::ref(*dns_cache_resource_manager_)));
+=======
+>>>>>>> 9612a5fbc85fe8878cb5e99d751d318b7374dcce
   }
 
   std::shared_ptr<Extensions::Common::DynamicForwardProxy::MockDnsCacheManager> dns_cache_manager_{
