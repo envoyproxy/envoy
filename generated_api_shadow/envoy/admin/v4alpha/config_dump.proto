@@ -30,9 +30,11 @@ message ConfigDump {
   //
   // * *bootstrap*: :ref:`BootstrapConfigDump <envoy_api_msg_admin.v4alpha.BootstrapConfigDump>`
   // * *clusters*: :ref:`ClustersConfigDump <envoy_api_msg_admin.v4alpha.ClustersConfigDump>`
-  // [#not-implemented-hide:] * *endpoints*:  :ref:`EndpointsConfigDump <envoy_api_msg_admin.v4alpha.EndpointsConfigDump>`
+  // * *endpoints*:  :ref:`EndpointsConfigDump <envoy_api_msg_admin.v4alpha.EndpointsConfigDump>`
   // * *listeners*: :ref:`ListenersConfigDump <envoy_api_msg_admin.v4alpha.ListenersConfigDump>`
   // * *routes*:  :ref:`RoutesConfigDump <envoy_api_msg_admin.v4alpha.RoutesConfigDump>`
+  //
+  // EDS Configuration will only be dumped by using parameter `?includeEds`
   //
   // You can filter output with the resource and mask query parameters.
   // See :ref:`/config_dump?resource={} <operations_admin_interface_config_dump_by_resource>`,
@@ -342,8 +344,7 @@ message SecretsConfigDump {
   repeated DynamicSecret dynamic_warming_secrets = 3;
 }
 
-// [#not-implemented-hide:]
-// Envoy's EDS implementation *will* fill this message with all currently known endpoints. Endpoint
+// Envoy's admin fill this message with all currently known endpoints. Endpoint
 // configuration information can be used to recreate an Envoy configuration by populating all
 // endpoints as static endpoints or by returning them in an EDS response.
 message EndpointsConfigDump {
@@ -356,7 +357,7 @@ message EndpointsConfigDump {
     // The endpoint config.
     google.protobuf.Any endpoint_config = 1;
 
-    // The timestamp when the Endpoint was last updated.
+    // [#not-implemented-hide:] The timestamp when the Endpoint was last updated.
     google.protobuf.Timestamp last_updated = 2;
   }
 
@@ -369,10 +370,10 @@ message EndpointsConfigDump {
     // the endpoint configuration was loaded.
     string version_info = 1;
 
-    // The endpoint config.
+    // [#not-implemented-hide:] The endpoint config.
     google.protobuf.Any endpoint_config = 2;
 
-    // The timestamp when the Endpoint was last updated.
+    // [#not-implemented-hide:] The timestamp when the Endpoint was last updated.
     google.protobuf.Timestamp last_updated = 3;
   }
 

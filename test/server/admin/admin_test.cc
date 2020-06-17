@@ -186,11 +186,6 @@ TEST_P(AdminInstanceTest, ConfigDumpMaintainsOrder) {
     msg->set_value("clusters_config");
     return msg;
   });
-  auto endpoint_entry = admin_.getConfigTracker().add("endpoints", [] {
-    auto msg = std::make_unique<ProtobufWkt::StringValue>();
-    msg->set_value("endpoints_config");
-    return msg;
-  });
   const std::string expected_json = R"EOF({
  "configs": [
   {
@@ -200,10 +195,6 @@ TEST_P(AdminInstanceTest, ConfigDumpMaintainsOrder) {
   {
    "@type": "type.googleapis.com/google.protobuf.StringValue",
    "value": "clusters_config"
-  },
-  {
-   "@type": "type.googleapis.com/google.protobuf.StringValue",
-   "value": "endpoints_config"
   },
   {
    "@type": "type.googleapis.com/google.protobuf.StringValue",
@@ -217,13 +208,109 @@ TEST_P(AdminInstanceTest, ConfigDumpMaintainsOrder) {
 }
 )EOF";
   // Run it multiple times and validate that order is preserved.
-  for (size_t i = 0; i < 5; i++) {
+  for (size_t i = 0; i < 4; i++) {
     Buffer::OwnedImpl response;
     Http::TestResponseHeaderMapImpl header_map;
     EXPECT_EQ(Http::Code::OK, getCallback("/config_dump", header_map, response));
     const std::string output = response.toString();
     EXPECT_EQ(expected_json, output);
   }
+}
+
+// Test that using ?includeEds parameter adds EDS to the config dump.
+TEST_P(AdminInstanceTest, ConfigDumpWithEndpoint) {
+  Upstream::ClusterManager::ClusterInfoMap cluster_map;
+  ON_CALL(server_.cluster_manager_, clusters()).WillByDefault(ReturnPointee(&cluster_map));
+
+  NiceMock<Upstream::MockClusterMockPrioritySet> cluster;
+  cluster_map.emplace(cluster.info_->name_, cluster);
+
+  ON_CALL(*cluster.info_, addedViaApi()).WillByDefault(Return(false));
+
+  Upstream::MockHostSet* host_set = cluster.priority_set_.getMockHostSet(0);
+  auto host = std::make_shared<NiceMock<Upstream::MockHost>>();
+
+  envoy::config::core::v3::Locality locality;
+  locality.set_region("test_region");
+  locality.set_zone("test_zone");
+  locality.set_sub_zone("test_sub_zone");
+  ON_CALL(*host, locality()).WillByDefault(ReturnRef(locality));
+
+  host_set->hosts_.emplace_back(host);
+  Network::Address::InstanceConstSharedPtr address =
+      Network::Utility::resolveUrl("tcp://1.2.3.4:80");
+  ON_CALL(*host, address()).WillByDefault(Return(address));
+  const std::string hostname = "foo.com";
+  ON_CALL(*host, hostname()).WillByDefault(ReturnRef(hostname));
+
+  auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
+  ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
+
+  const std::string hostname_for_health_checks = "test_hostname_healthcheck";
+  ON_CALL(*host, hostnameForHealthChecks()).WillByDefault(ReturnRef(hostname_for_health_checks));
+  Network::Address::InstanceConstSharedPtr healthcheck_address =
+      Network::Utility::resolveUrl("tcp://1.2.3.5:90");
+  ON_CALL(*host, healthCheckAddress()).WillByDefault(Return(healthcheck_address));
+
+  ON_CALL(*host, health()).WillByDefault(Return(Upstream::Host::Health::Healthy));
+
+  ON_CALL(*host, weight()).WillByDefault(Return(5));
+  ON_CALL(*host, priority()).WillByDefault(Return(6));
+
+  Buffer::OwnedImpl response;
+  Http::TestResponseHeaderMapImpl header_map;
+  EXPECT_EQ(Http::Code::OK, getCallback("/config_dump?includeEds", header_map, response));
+  std::string output = response.toString();
+  const std::string expected_json = R"EOF({
+ "configs": [
+  {
+   "@type": "type.googleapis.com/envoy.admin.v3.EndpointsConfigDump",
+   "static_endpoint_configs": [
+    {
+     "endpoint_config": {
+      "@type": "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment",
+      "cluster_name": "fake_cluster",
+      "endpoints": [
+       {
+        "locality": {
+         "region": "test_region",
+         "zone": "test_zone",
+         "sub_zone": "test_sub_zone"
+        },
+        "lb_endpoints": [
+         {
+          "endpoint": {
+           "address": {
+            "socket_address": {
+             "address": "1.2.3.4",
+             "port_value": 80
+            }
+           },
+           "health_check_config": {
+            "port_value": 90,
+            "hostname": "test_hostname_healthcheck"
+           },
+           "hostname": "foo.com"
+          },
+          "health_status": "HEALTHY",
+          "metadata": {},
+          "load_balancing_weight": 5
+         }
+        ],
+        "priority": 6
+       }
+      ],
+      "policy": {
+       "overprovisioning_factor": 140
+      }
+     }
+    }
+   ]
+  }
+ ]
+}
+)EOF";
+  EXPECT_EQ(expected_json, output);
 }
 
 // Test that using the resource query parameter filters the config dump.
