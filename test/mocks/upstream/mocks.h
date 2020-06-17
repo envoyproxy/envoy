@@ -318,8 +318,7 @@ public:
   MOCK_METHOD(ThreadLocalCluster*, get, (absl::string_view cluster));
   MOCK_METHOD(Http::ConnectionPool::Instance*, httpConnPoolForCluster,
               (const std::string& cluster, ResourcePriority priority,
-               Upstream::ClusterManager::ProtocolResolutionFunc protocol,
-               LoadBalancerContext* context));
+               absl::optional<Http::Protocol> downstream_protocol, LoadBalancerContext* context));
   MOCK_METHOD(Tcp::ConnectionPool::Instance*, tcpConnPoolForCluster,
               (const std::string& cluster, ResourcePriority priority,
                LoadBalancerContext* context));

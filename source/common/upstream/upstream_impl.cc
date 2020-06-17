@@ -856,7 +856,8 @@ void ClusterInfoImpl::createNetworkFilterChain(Network::Connection& connection) 
 
 Http::Protocol
 ClusterInfoImpl::upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const {
-  if (features_ & Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL) {
+  if (downstream_protocol.has_value() &&
+      features_ & Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL) {
     return downstream_protocol.value();
   } else {
     return (features_ & Upstream::ClusterInfo::Features::HTTP2) ? Http::Protocol::Http2

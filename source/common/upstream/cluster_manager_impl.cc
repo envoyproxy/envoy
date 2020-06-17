@@ -822,9 +822,10 @@ ThreadLocalCluster* ClusterManagerImpl::get(absl::string_view cluster) {
   }
 }
 
-Http::ConnectionPool::Instance* ClusterManagerImpl::httpConnPoolForCluster(
-    const std::string& cluster, ResourcePriority priority,
-    Upstream::ClusterManager::ProtocolResolutionFunc protocol, LoadBalancerContext* context) {
+Http::ConnectionPool::Instance*
+ClusterManagerImpl::httpConnPoolForCluster(const std::string& cluster, ResourcePriority priority,
+                                           absl::optional<Http::Protocol> protocol,
+                                           LoadBalancerContext* context) {
   ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
 
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);
@@ -1277,7 +1278,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::~ClusterEntry()
 
 Http::ConnectionPool::Instance*
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
-    ResourcePriority priority, Upstream::ClusterManager::ProtocolResolutionFunc protocol,
+    ResourcePriority priority, absl::optional<Http::Protocol> downstream_protocol,
     LoadBalancerContext* context) {
   HostConstSharedPtr host = lb_->chooseHost(context);
   if (!host) {
@@ -1286,8 +1287,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
     return nullptr;
   }
 
-  auto final_protocol = protocol(*host);
-  std::vector<uint8_t> hash_key = {uint8_t(final_protocol)};
+  auto upstream_protocol = host->cluster().upstreamHttpProtocol(downstream_protocol);
+  std::vector<uint8_t> hash_key = {uint8_t(upstream_protocol)};
 
   Network::Socket::OptionsSharedPtr upstream_options(std::make_shared<Network::Socket::Options>());
   if (context) {
@@ -1318,7 +1319,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
   ConnPoolsContainer::ConnPools::PoolOptRef pool =
       container.pools_->getPool(priority, hash_key, [&]() {
         return parent_.parent_.factory_.allocateConnPool(
-            parent_.thread_local_dispatcher_, host, priority, final_protocol,
+            parent_.thread_local_dispatcher_, host, priority, upstream_protocol,
             !upstream_options->empty() ? upstream_options : nullptr,
             have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr);
       });

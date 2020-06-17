@@ -64,10 +64,9 @@ public:
                            Http::Context& http_context, Grpc::Context& grpc_context,
                            Event::TimeSystem& time_system);
 
-  Http::ConnectionPool::Instance*
-  httpConnPoolForCluster(const std::string&, ResourcePriority,
-                         Upstream::ClusterManager::ProtocolResolutionFunc,
-                         LoadBalancerContext*) override;
+  Http::ConnectionPool::Instance* httpConnPoolForCluster(const std::string&, ResourcePriority,
+                                                         absl::optional<Http::Protocol>,
+                                                         LoadBalancerContext*) override;
   Host::CreateConnectionData tcpConnForCluster(const std::string&, LoadBalancerContext*) override;
   Http::AsyncClient& httpAsyncClientForCluster(const std::string&) override;
 

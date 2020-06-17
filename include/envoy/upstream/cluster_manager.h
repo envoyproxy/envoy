@@ -151,8 +151,6 @@ public:
    */
   virtual ThreadLocalCluster* get(absl::string_view cluster) PURE;
 
-  using ProtocolResolutionFunc = std::function<Http::Protocol(const HostDescription&)>;
-
   /**
    * Allocate a load balanced HTTP connection pool for a cluster. This is *per-thread* so that
    * callers do not need to worry about per thread synchronization. The load balancing policy that
@@ -161,22 +159,12 @@ public:
    * Can return nullptr if there is no host available in the cluster or if the cluster does not
    * exist.
    *
-   * Since the desired protocol might depend on the cluster of the selected host (which could be
-   * different than the top level cluster), we accept a callback that allows protocol selection to
-   * depend on the selected cluster.
+   * To resolve the protocol to use, we provide the downstream protocol (if one exists).
    */
-  virtual Http::ConnectionPool::Instance* httpConnPoolForCluster(const std::string& cluster,
-                                                                 ResourcePriority priority,
-                                                                 ProtocolResolutionFunc protocol,
-                                                                 LoadBalancerContext* context) PURE;
-
-  Http::ConnectionPool::Instance* httpConnPoolForCluster(const std::string& cluster,
-                                                         ResourcePriority priority,
-                                                         Http::Protocol protocol,
-                                                         LoadBalancerContext* context) {
-    return httpConnPoolForCluster(
-        cluster, priority, [protocol](auto&) { return protocol; }, context);
-  }
+  virtual Http::ConnectionPool::Instance*
+  httpConnPoolForCluster(const std::string& cluster, ResourcePriority priority,
+                         absl::optional<Http::Protocol> downstream_protocol,
+                         LoadBalancerContext* context) PURE;
 
   /**
    * Allocate a load balanced TCP connection pool for a cluster. This is *per-thread* so that

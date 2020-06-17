@@ -228,7 +228,7 @@ public:
 
   Http::ConnectionPool::Instance*
   httpConnPoolForCluster(const std::string& cluster, ResourcePriority priority,
-                         Upstream::ClusterManager::ProtocolResolutionFunc protocol,
+                         absl::optional<Http::Protocol> downstream_protocol,
                          LoadBalancerContext* context) override;
   Tcp::ConnectionPool::Instance* tcpConnPoolForCluster(const std::string& cluster,
                                                        ResourcePriority priority,
@@ -330,9 +330,9 @@ private:
                    const LoadBalancerFactorySharedPtr& lb_factory);
       ~ClusterEntry() override;
 
-      Http::ConnectionPool::Instance*
-      connPool(ResourcePriority priority, Upstream::ClusterManager::ProtocolResolutionFunc protocol,
-               LoadBalancerContext* context);
+      Http::ConnectionPool::Instance* connPool(ResourcePriority priority,
+                                               absl::optional<Http::Protocol> downstream_protocol,
+                                               LoadBalancerContext* context);
 
       Tcp::ConnectionPool::Instance* tcpConnPool(ResourcePriority priority,
                                                  LoadBalancerContext* context);

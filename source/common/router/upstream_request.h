@@ -38,7 +38,7 @@ public:
   // Initializes the connection pool. This must be called before the connection
   // pool is valid, and can be used.
   virtual bool initialize(Upstream::ClusterManager& cm, const RouteEntry& route_entry,
-                          Upstream::ClusterManager::ProtocolResolutionFunc protocol,
+                          absl::optional<Http::Protocol> downstream_protocol,
                           Upstream::LoadBalancerContext* ctx) PURE;
 
   // Called to create a new HTTP stream or TCP connection. The implementation
@@ -206,10 +206,10 @@ class HttpConnPool : public GenericConnPool, public Http::ConnectionPool::Callba
 public:
   // GenericConnPool
   bool initialize(Upstream::ClusterManager& cm, const RouteEntry& route_entry,
-                  Upstream::ClusterManager::ProtocolResolutionFunc protocol,
+                  absl::optional<Http::Protocol> downstream_protocol,
                   Upstream::LoadBalancerContext* ctx) override {
-    conn_pool_ =
-        cm.httpConnPoolForCluster(route_entry.clusterName(), route_entry.priority(), protocol, ctx);
+    conn_pool_ = cm.httpConnPoolForCluster(route_entry.clusterName(), route_entry.priority(),
+                                           downstream_protocol, ctx);
     return conn_pool_ != nullptr;
   }
 
@@ -236,8 +236,7 @@ private:
 class TcpConnPool : public GenericConnPool, public Tcp::ConnectionPool::Callbacks {
 public:
   bool initialize(Upstream::ClusterManager& cm, const RouteEntry& route_entry,
-                  Upstream::ClusterManager::ProtocolResolutionFunc,
-                  Upstream::LoadBalancerContext* ctx) override {
+                  absl::optional<Http::Protocol>, Upstream::LoadBalancerContext* ctx) override {
     conn_pool_ = cm.tcpConnPoolForCluster(route_entry.clusterName(),
                                           Upstream::ResourcePriority::Default, ctx);
     return conn_pool_ != nullptr;
