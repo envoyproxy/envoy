@@ -15,6 +15,10 @@
 namespace Envoy {
 namespace StreamInfo {
 
+class FilterState;
+
+using FilterStateSharedPtr = std::shared_ptr<FilterState>;
+
 /**
  * FilterState represents dynamically generated information regarding a stream (TCP or HTTP level)
  * or a connection by various filters in Envoy. FilterState can be write-once or write-many.
@@ -146,14 +150,12 @@ public:
    * @return the pointer of the parent FilterState that has longer life span. nullptr means this is
    * either the top LifeSpan or the parent is not yet created.
    */
-  virtual std::shared_ptr<FilterState> parent() const PURE;
+  virtual FilterStateSharedPtr parent() const PURE;
 
 protected:
   virtual const Object* getDataReadOnlyGeneric(absl::string_view data_name) const PURE;
   virtual Object* getDataMutableGeneric(absl::string_view data_name) PURE;
 };
-
-using FilterStateSharedPtr = std::shared_ptr<FilterState>;
 
 } // namespace StreamInfo
 } // namespace Envoy

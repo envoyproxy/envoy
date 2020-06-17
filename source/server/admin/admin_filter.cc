@@ -66,7 +66,7 @@ void AdminFilter::onComplete() {
   ENVOY_STREAM_LOG(debug, "request complete: path: {}", *decoder_callbacks_, path);
 
   Buffer::OwnedImpl response;
-  Http::ResponseHeaderMapPtr header_map{new Http::ResponseHeaderMapImpl};
+  auto header_map = Http::ResponseHeaderMapImpl::create();
   RELEASE_ASSERT(request_headers_, "");
   Http::Code code = admin_server_callback_func_(path, *header_map, response, *this);
   Utility::populateFallbackResponseHeaders(code, *header_map);
