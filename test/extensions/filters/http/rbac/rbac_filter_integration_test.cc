@@ -64,6 +64,20 @@ typed_config:
           - any: true
 )EOF";
 
+// const std::string RBAC_CONFIG_WITH_LOG_ACTION = R"EOF(
+// name: rbac
+// typed_config:
+//   "@type": type.googleapis.com/envoy.config.filter.http.rbac.v3.RBAC
+//   rules:
+//     action: LOG
+//     policies:
+//       foo:
+//         permissions:
+//           - header: { name: ":method", exact_match: "GET" }
+//         principals:
+//           - any: true
+// )EOF";
+
 using RBACIntegrationTest = HttpProtocolIntegrationTest;
 
 INSTANTIATE_TEST_SUITE_P(Protocols, RBACIntegrationTest,
@@ -276,6 +290,29 @@ TEST_P(RBACIntegrationTest, PathIgnoreCase) {
     EXPECT_EQ("200", response->headers().getStatusValue());
   }
 }
+
+// TEST_P(RBACIntegrationTest, LogConnectionAllow) {
+//   config_helper_.addFilter(RBAC_CONFIG_WITH_LOG_ACTION);
+//   initialize();
+
+//   codec_client_ = makeHttpConnection(lookupPort("http"));
+
+//   auto response = codec_client_->makeRequestWithBody(
+//       Http::TestRequestHeaderMapImpl{
+//           {":method", "GET"},
+//           {":path", "/"},
+//           {":scheme", "http"},
+//           {":authority", "host"},
+//           {"x-forwarded-for", "10.0.0.1"},
+//       },
+//       1024);
+//   response->waitForEndStream();
+//   ASSERT_TRUE(response->complete());
+//   EXPECT_EQ("200", response->headers().getStatusValue());
+//   ASSERT_TRUE(response->headers().ContentLength());
+//   EXPECT_NE("0", response->headers().getContentLengthValue());
+//   EXPECT_THAT(response->body(), ::testing::IsEmpty());
+// }
 
 } // namespace
 } // namespace Envoy
