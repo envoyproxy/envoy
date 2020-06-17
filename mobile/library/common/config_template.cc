@@ -193,15 +193,6 @@ stats_config:
             regex: 'cluster\.[\w]+?\.upstream_rq_[1|2|3|4|5]xx'
         - safe_regex:
             google_re2: {}
-            regex: 'cluster\.[\w]+?\.upstream_rq_40[0|1|3|4|9]'
-        - safe_regex:
-            google_re2: {}
-            regex: 'cluster\.[\w]+?\.upstream_rq_41[2|3]'
-        - safe_regex:
-            google_re2: {}
-            regex: 'cluster\.[\w]+?\.upstream_rq_42[2|3|9]'
-        - safe_regex:
-            google_re2: {}
             regex: 'cluster\.[\w]+?\.upstream_rq_active'
         - safe_regex:
             google_re2: {}
