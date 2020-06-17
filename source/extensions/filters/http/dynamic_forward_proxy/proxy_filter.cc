@@ -1,8 +1,9 @@
+#include "extensions/filters/http/dynamic_forward_proxy/proxy_filter.h"
+
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
 
 #include "extensions/common/dynamic_forward_proxy/dns_cache.h"
-#include "extensions/filters/http/dynamic_forward_proxy/proxy_filter.h"
 #include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
