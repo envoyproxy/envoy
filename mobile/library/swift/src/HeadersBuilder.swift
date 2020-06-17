@@ -73,6 +73,13 @@ public class HeadersBuilder: NSObject {
     return self
   }
 
+  // Only explicitly implemented to work around a swiftinterface issue in Swift 5.1. This can be
+  // removed once envoy is only built with Swift 5.2+
+  public override init() {
+    self.headers = [:]
+    super.init()
+  }
+
   /// Initialize a new builder. Subclasses should provide their own public convenience initializers.
   ///
   /// - parameter headers: The headers with which to start.
