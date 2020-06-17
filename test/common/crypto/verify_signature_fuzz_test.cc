@@ -4,18 +4,16 @@
 #include "test/common/crypto/verify_signature_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
 
-// #include "common/common/logger.h"
-
 namespace Envoy {
 namespace Common {
 namespace Crypto {
 namespace {
 
 DEFINE_PROTO_FUZZER(const test::common::crypto::VerifySignatureFuzzTestCase& input) {
-  auto key = input.key();
-  auto hash_func = input.hash_func();
-  auto signature = input.signature();
-  auto data = input.data();
+  auto const& key = input.key();
+  auto const& hash_func = input.hash_func();
+  auto const& signature = input.signature();
+  auto const& data = input.data();
 
   Common::Crypto::CryptoObjectPtr crypto_ptr(
       Common::Crypto::UtilitySingleton::get().importPublicKey(Hex::decode(key)));
