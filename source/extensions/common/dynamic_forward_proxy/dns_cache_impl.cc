@@ -307,10 +307,9 @@ DnsCacheCircuitBreakersHandler::DnsCacheCircuitBreakersHandler(DnsCache& dns_cac
       dns_cache_resource_manager.has_value();
 }
 
-Http::FilterHeadersStatus
-DnsCacheCircuitBreakersHandler::handleRequest(const Router::RouteEntry* route_entry,
-                                              Upstream::ClusterInfoConstSharedPtr cluster_info,
-                                              DnsCacheOverflowHandler handle_overflow) {
+bool DnsCacheCircuitBreakersHandler::handleRequest(const Router::RouteEntry* route_entry,
+                                                   Upstream::ClusterInfoConstSharedPtr cluster_info,
+                                                   DnsCacheOverflowHandler handle_overflow) {
   ResourceLimit& pending_requests =
       should_use_dns_cache_circuit_breakers_
           ? dns_cache_.dnsCacheResourceManager()->get().pendingRequests()
@@ -321,10 +320,11 @@ DnsCacheCircuitBreakersHandler::handleRequest(const Router::RouteEntry* route_en
     } else {
       dns_cache_.dnsCacheStatsOverflowInc();
     }
-    return handle_overflow();
+    handle_overflow();
+    return false;
   }
   circuit_breaker_ = std::make_unique<Upstream::ResourceAutoIncDec>(pending_requests);
-  return Http::FilterHeadersStatus::Continue;
+  return true;
 }
 
 } // namespace DynamicForwardProxy

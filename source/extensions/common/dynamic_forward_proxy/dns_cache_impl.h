@@ -152,7 +152,7 @@ private:
   const uint32_t max_hosts_;
 };
 
-using DnsCacheOverflowHandler = std::function<Http::FilterHeadersStatus()>;
+using DnsCacheOverflowHandler = std::function<void()>;
 
 class DnsCacheCircuitBreakersHandler {
 public:
@@ -161,9 +161,9 @@ public:
     // Make sure that circuit breaker RAII completed.
     circuit_breaker_.reset();
   }
-  Http::FilterHeadersStatus handleRequest(const Router::RouteEntry* route_entry,
-                                          Upstream::ClusterInfoConstSharedPtr cluster_info,
-                                          DnsCacheOverflowHandler handle_overflow);
+  bool handleRequest(const Router::RouteEntry* route_entry,
+                     Upstream::ClusterInfoConstSharedPtr cluster_info,
+                     DnsCacheOverflowHandler handle_overflow);
   void handleRequestFinished() { circuit_breaker_.reset(); }
   bool isPending() { return circuit_breaker_ != nullptr; }
 

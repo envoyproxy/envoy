@@ -53,16 +53,14 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   }
   cluster_info_ = cluster->info();
 
-  const auto handle_status =
-      cb_handler_->handleRequest(route_entry, cluster_info_, [this]() -> Http::FilterHeadersStatus {
-        ENVOY_STREAM_LOG(debug, "pending request overflow", *this->decoder_callbacks_);
-        this->decoder_callbacks_->sendLocalReply(
-            Http::Code::ServiceUnavailable, ResponseStrings::get().PendingRequestOverflow, nullptr,
-            absl::nullopt, ResponseStrings::get().PendingRequestOverflow);
-        return Http::FilterHeadersStatus::StopIteration;
-      });
-  if (handle_status != Http::FilterHeadersStatus::Continue) {
-    return handle_status;
+  const auto handle_status = cb_handler_->handleRequest(route_entry, cluster_info_, [this]() {
+    ENVOY_STREAM_LOG(debug, "pending request overflow", *this->decoder_callbacks_);
+    this->decoder_callbacks_->sendLocalReply(
+        Http::Code::ServiceUnavailable, ResponseStrings::get().PendingRequestOverflow, nullptr,
+        absl::nullopt, ResponseStrings::get().PendingRequestOverflow);
+  });
+  if (!handle_status) {
+    return Http::FilterHeadersStatus::StopIteration;
   }
 
   uint16_t default_port = 80;
