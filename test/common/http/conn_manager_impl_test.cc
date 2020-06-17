@@ -133,7 +133,7 @@ public:
         std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
     conn_manager_ = std::make_unique<ConnectionManagerImpl>(
         *this, drain_close_, random_, http_context_, runtime_, local_info_, cluster_manager_,
-        &overload_manager_, test_time_.timeSystem());
+        overload_manager_, test_time_.timeSystem());
     conn_manager_->initializeReadFilterCallbacks(filter_callbacks_);
 
     if (tracing) {

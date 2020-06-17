@@ -536,6 +536,12 @@ ConfigTracker& AdminImpl::getConfigTracker() { return config_tracker_; }
 AdminImpl::NullRouteConfigProvider::NullRouteConfigProvider(TimeSource& time_source)
     : config_(new Router::NullConfigImpl()), time_source_(time_source) {}
 
+OverloadTimerFactory AdminImpl::NullOverloadManager::NullThreadOverloadState::getTimerFactory() {
+  return [this](absl::string_view, Event::TimerCb callback) {
+    return dispatcher_.createTimer(callback);
+  };
+}
+
 void AdminImpl::startHttpListener(const std::string& access_log_path,
                                   const std::string& address_out_path,
                                   Network::Address::InstanceConstSharedPtr address,
@@ -565,6 +571,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
       request_id_extension_(Http::RequestIDExtensionFactory::defaultInstance(server_.random())),
       profile_path_(profile_path),
       stats_(Http::ConnectionManagerImpl::generateStats("http.admin.", server_.stats())),
+      overload_manager_(server_.dispatcher()),
       tracing_stats_(
           Http::ConnectionManagerImpl::generateTracingStats("http.admin.", no_op_store_)),
       route_config_provider_(server.timeSource()),
@@ -646,11 +653,9 @@ Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection
 
 bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
                                          const std::vector<Network::FilterFactoryCb>&) {
-  // Don't pass in the overload manager so that the admin interface is accessible even when
-  // the envoy is overloaded.
   connection.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
       *this, server_.drainManager(), server_.random(), server_.httpContext(), server_.runtime(),
-      server_.localInfo(), server_.clusterManager(), nullptr, server_.timeSource())});
+      server_.localInfo(), server_.clusterManager(), overload_manager_, server_.timeSource())});
   return true;
 }
 

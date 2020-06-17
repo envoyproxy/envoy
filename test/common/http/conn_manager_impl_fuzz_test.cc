@@ -30,6 +30,7 @@
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/common.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
@@ -541,6 +542,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
+  NiceMock<Server::MockOverloadManager> overload_manager;
   auto ssl_connection = std::make_shared<Ssl::MockConnectionInfo>();
   bool connection_alive = true;
 
@@ -554,7 +556,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
       std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
 
   ConnectionManagerImpl conn_manager(config, drain_close, random, http_context, runtime, local_info,
-                                     cluster_manager, nullptr, config.time_system_);
+                                     cluster_manager, overload_manager, config.time_system_);
   conn_manager.initializeReadFilterCallbacks(filter_callbacks);
 
   std::vector<FuzzStreamPtr> streams;
