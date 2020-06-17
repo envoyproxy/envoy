@@ -1363,22 +1363,30 @@ TEST_F(OutlierDetectorImplTest, EjectionActiveValueIsAccountedWithoutMetricStora
   ON_CALL(runtime_.snapshot_, getInteger("outlier_detection.max_ejection_percent", _))
       .WillByDefault(Return(1));
 
- loadRq(hosts_[0], 4, 500);
+  loadRq(hosts_[0], 4, 500);
 
   time_system_.setMonotonicTime(std::chrono::milliseconds(0));
 
+  // Manually increase the gauge. From metric's perspective it's overflowed.
   outlier_detection_ejections_active_.inc();
+
+  // Since the overflow is not determined by the metric. Host[0] can be ejected.
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
                                        _, envoy::data::cluster::v2alpha::CONSECUTIVE_5XX, true));
   hosts_[0]->outlierDetector().putHttpResponseCode(500);
   EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
-  
-  // loadRq(hosts_[1], 5, 500);
-  // EXPECT_FALSE(hosts_[1]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 
+  // Expect active helper_ has the value 1. However, helper is private and it cannot be tested.
   EXPECT_EQ(2UL, outlier_detection_ejections_active_.value());
   EXPECT_EQ(0UL,
+            cluster_.info_->stats_store_.counter("outlier_detection.ejections_overflow").value());
+
+  // Now it starts to overflow.
+  loadRq(hosts_[1], 5, 500);
+  EXPECT_FALSE(hosts_[1]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+  EXPECT_EQ(2UL, outlier_detection_ejections_active_.value());
+  EXPECT_EQ(1UL,
             cluster_.info_->stats_store_.counter("outlier_detection.ejections_overflow").value());
 }
 
@@ -1403,7 +1411,6 @@ TEST_F(OutlierDetectorImplTest, CrossThreadRemoveRace) {
 
   EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
 }
-
 
 TEST_F(OutlierDetectorImplTest, CrossThreadDestroyRace) {
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
