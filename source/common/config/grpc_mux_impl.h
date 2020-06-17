@@ -39,8 +39,11 @@ public:
 
   // GrpcMux
   void pause(const std::string& type_url) override;
+  void pause(const std::vector<std::string> type_urls) override;
   void resume(const std::string& type_url) override;
+  void resume(const std::vector<std::string> type_urls) override;
   bool paused(const std::string& type_url) const override;
+  bool paused(const std::vector<std::string> type_urls) const override;
 
   GrpcMuxWatchPtr addWatch(const std::string& type_url, const std::set<std::string>& resources,
                            SubscriptionCallbacks& callbacks) override;
@@ -142,8 +145,11 @@ class NullGrpcMuxImpl : public GrpcMux,
 public:
   void start() override {}
   void pause(const std::string&) override {}
+  void pause(const std::vector<std::string>) override {}
   void resume(const std::string&) override {}
+  void resume(const std::vector<std::string>) override {}
   bool paused(const std::string&) const override { return false; }
+  bool paused(const std::vector<std::string>) const override { return false; }
 
   GrpcMuxWatchPtr addWatch(const std::string&, const std::set<std::string>&,
                            SubscriptionCallbacks&) override {

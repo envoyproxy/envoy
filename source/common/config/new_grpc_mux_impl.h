@@ -38,8 +38,12 @@ public:
                            SubscriptionCallbacks& callbacks) override;
 
   void pause(const std::string& type_url) override;
+  void pause(const std::vector<std::string> type_urls) override;
   void resume(const std::string& type_url) override;
+  void resume(const std::vector<std::string> type_urls) override;
   bool paused(const std::string& type_url) const override;
+  bool paused(const std::vector<std::string> type_urls) const override;
+
   void onDiscoveryResponse(
       std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& message,
       ControlPlaneStats& control_plane_stats) override;

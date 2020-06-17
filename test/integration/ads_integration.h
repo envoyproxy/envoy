@@ -15,16 +15,20 @@
 // TODO(fredlas) set_node_on_first_message_only was true; the delta+SotW unification
 //               work restores it here.
 namespace Envoy {
-static std::string AdsIntegrationConfig(const std::string& api_type) {
+static std::string adsIntegrationConfig(const std::string& api_type,
+                                        const std::string& api_version = "V2") {
   // Note: do not use CONSTRUCT_ON_FIRST_USE here!
   return fmt::format(R"EOF(
 dynamic_resources:
   lds_config:
+    resource_api_version: {1}
     ads: {{}}
   cds_config:
+    resource_api_version: {1}
     ads: {{}}
   ads_config:
-    api_type: {}
+    transport_api_version: {1}
+    api_type: {0}
     set_node_on_first_message_only: false
 static_resources:
   clusters:
@@ -50,12 +54,13 @@ admin:
       address: 127.0.0.1
       port_value: 0
 )EOF",
-                     api_type);
+                     api_type, api_version);
 }
 
 class AdsIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest, public HttpIntegrationTest {
 public:
-  AdsIntegrationTest();
+  AdsIntegrationTest(const envoy::config::core::v3::ApiVersion api_version);
+  AdsIntegrationTest() : AdsIntegrationTest(envoy::config::core::v3::ApiVersion::V2) {}
 
   void TearDown() override;
 
@@ -86,6 +91,10 @@ public:
   envoy::admin::v3::ClustersConfigDump getClustersConfigDump();
   envoy::admin::v3::ListenersConfigDump getListenersConfigDump();
   envoy::admin::v3::RoutesConfigDump getRoutesConfigDump();
+
+  envoy::config::core::v3::ApiVersion api_version_;
+
+  bool shouldBoost();
 };
 
 } // namespace Envoy

@@ -41,13 +41,13 @@ void LdsApiImpl::onConfigUpdate(
     const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& system_version_info) {
-  std::unique_ptr<Cleanup> maybe_eds_resume;
+  std::unique_ptr<Cleanup> maybe_rds_resume;
   if (cm_.adsMux()) {
-    const auto type_url = Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>(
-        envoy::config::core::v3::ApiVersion::V2);
-    cm_.adsMux()->pause(type_url);
-    maybe_eds_resume =
-        std::make_unique<Cleanup>([this, type_url] { cm_.adsMux()->resume(type_url); });
+    const auto type_urls =
+        Config::getAllVersionTypeUrls<envoy::config::route::v3::RouteConfiguration>();
+    cm_.adsMux()->pause(type_urls);
+    maybe_rds_resume =
+        std::make_unique<Cleanup>([this, type_urls] { cm_.adsMux()->resume(type_urls); });
   }
 
   bool any_applied = false;

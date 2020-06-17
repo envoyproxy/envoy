@@ -248,11 +248,12 @@ public:
   template <class T>
   void sendDiscoveryResponse(const std::string& type_url, const std::vector<T>& state_of_the_world,
                              const std::vector<T>& added_or_updated,
-                             const std::vector<std::string>& removed, const std::string& version) {
+                             const std::vector<std::string>& removed, const std::string& version,
+                             const bool api_downgrade = true) {
     if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
-      sendSotwDiscoveryResponse(type_url, state_of_the_world, version);
+      sendSotwDiscoveryResponse(type_url, state_of_the_world, version, api_downgrade);
     } else {
-      sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version);
+      sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, api_downgrade);
     }
   }
 
@@ -284,12 +285,16 @@ public:
 
   template <class T>
   void sendSotwDiscoveryResponse(const std::string& type_url, const std::vector<T>& messages,
-                                 const std::string& version) {
+                                 const std::string& version, const bool api_downgrade = true) {
     API_NO_BOOST(envoy::api::v2::DiscoveryResponse) discovery_response;
     discovery_response.set_version_info(version);
     discovery_response.set_type_url(type_url);
     for (const auto& message : messages) {
-      discovery_response.add_resources()->PackFrom(API_DOWNGRADE(message));
+      if (api_downgrade) {
+        discovery_response.add_resources()->PackFrom(API_DOWNGRADE(message));
+      } else {
+        discovery_response.add_resources()->PackFrom(message);
+      }
     }
     static int next_nonce_counter = 0;
     discovery_response.set_nonce(absl::StrCat("nonce", next_nonce_counter++));
@@ -297,18 +302,21 @@ public:
   }
 
   template <class T>
-  void
-  sendDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
-                             const std::vector<std::string>& removed, const std::string& version) {
-    sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, xds_stream_);
+  void sendDeltaDiscoveryResponse(const std::string& type_url,
+                                  const std::vector<T>& added_or_updated,
+                                  const std::vector<std::string>& removed,
+                                  const std::string& version, const bool api_downgrade = true) {
+    sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, xds_stream_, {},
+                               api_downgrade);
   }
   template <class T>
   void
   sendDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
                              const std::vector<std::string>& removed, const std::string& version,
-                             FakeStreamPtr& stream, const std::vector<std::string>& aliases = {}) {
-    auto response =
-        createDeltaDiscoveryResponse<T>(type_url, added_or_updated, removed, version, aliases);
+                             FakeStreamPtr& stream, const std::vector<std::string>& aliases = {},
+                             const bool api_downgrade = true) {
+    auto response = createDeltaDiscoveryResponse<T>(type_url, added_or_updated, removed, version,
+                                                    aliases, api_downgrade);
     stream->sendGrpcMessage(response);
   }
 
@@ -316,7 +324,8 @@ public:
   envoy::api::v2::DeltaDiscoveryResponse
   createDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
                                const std::vector<std::string>& removed, const std::string& version,
-                               const std::vector<std::string>& aliases) {
+                               const std::vector<std::string>& aliases,
+                               const bool api_downgrade = true) {
 
     API_NO_BOOST(envoy::api::v2::DeltaDiscoveryResponse) response;
     response.set_system_version_info("system_version_info_this_is_a_test");
@@ -324,10 +333,15 @@ public:
     for (const auto& message : added_or_updated) {
       auto* resource = response.add_resources();
       ProtobufWkt::Any temp_any;
-      temp_any.PackFrom(API_DOWNGRADE(message));
+      if (api_downgrade) {
+        temp_any.PackFrom(API_DOWNGRADE(message));
+        resource->mutable_resource()->PackFrom(API_DOWNGRADE(message));
+      } else {
+        temp_any.PackFrom(message);
+        resource->mutable_resource()->PackFrom(message);
+      }
       resource->set_name(TestUtility::xdsResourceName(temp_any));
       resource->set_version(version);
-      resource->mutable_resource()->PackFrom(API_DOWNGRADE(message));
       for (const auto& alias : aliases) {
         resource->add_aliases(alias);
       }
