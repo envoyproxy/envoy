@@ -1685,7 +1685,7 @@ TEST_P(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(FatalEnum)) {
 
 // Verify that direct use of a hidden_envoy_deprecated field fails, but upgrade
 // succeeds
-TEST_P(DeprecatedFieldsTest, ManualDeprecatedFieldAddition) {
+TEST_P(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(ManualDeprecatedFieldAddition)) {
   // Create a base message and insert a deprecated field. When upgrading the
   // deprecated field should be set as deprecated, and a warning should be logged
   envoy::test::deprecation_test::Base base_should_warn =
