@@ -75,4 +75,40 @@ enableHeapCheck () {
   HEAPCHECK=${SAVED_HEAPCHECK}
 }
 
+# Scrapes a stat value from an an admin port.
+scrape_stat() {
+  local ADMIN_ADDRESS="$1"
+  local STAT_NAME="$2"
+  curl -sg "$ADMIN_ADDRESS"/stats | grep "^${STAT_NAME}: " | cut -f2 -d" "
+}
+
+milliseconds() {
+  local nanos=$(date +%N | sed 's/^0*//')
+  local seconds=$(date +%s)
+  echo $((1000*seconds + nanos/1000000))
+}
+
+wait_for_stat() {
+  local ADMIN_ADDRESS="$1"
+  local STAT_NAME="$2"
+  local OP="$3"
+  local VALUE="$4"
+  local TIMEOUT_SEC="$5"
+  local start_time_ms=$(milliseconds)
+  local end_time=$((SECONDS + TIMEOUT_SEC))
+  local ret=""
+  while [ "$ret" = "" ]; do
+    local stat=$(scrape_stat "$ADMIN_ADDRESS" "$STAT_NAME")
+    if [ $stat $OP $VALUE ]; then
+      local end_time_ms=$(milliseconds)
+      ret="success: $STAT_NAME reached $stat after $((end_time_ms - start_time_ms)) ms"
+    elif [ "$SECONDS" -gt "$end_time" ]; then
+      ret="timeout: waiting $TIMEOUT_SEC seconds for $STAT_NAME=$stat to reach $VALUE"
+    else
+      sleep 0.1
+    fi
+  done
+  echo "$ret"
+}
+
 [[ -z "${ENVOY_BIN}" ]] && ENVOY_BIN="${TEST_SRCDIR}"/envoy/source/exe/envoy-static

@@ -40,8 +40,11 @@ static const uint64_t SHMEM_FLAGS_INITIALIZING = 0x1;
 /**
  * Initialize the shared memory segment, depending on whether we are the first running
  * envoy, or a host restarted envoy process.
+ *
+ * @param base_id uint32_t that is the base id flag used to start this Envoy.
+ * @param restart_epoch uint32_t the restart epoch flag used to start this Envoy.
  */
-SharedMemory* attachSharedMemory(const Options& options);
+SharedMemory* attachSharedMemory(uint32_t base_id, uint32_t restart_epoch);
 
 /**
  * Initialize a pthread mutex for process shared locking.
@@ -55,7 +58,7 @@ class ProcessSharedMutex : public Thread::BasicLockable {
 public:
   ProcessSharedMutex(pthread_mutex_t& mutex) : mutex_(mutex) {}
 
-  void lock() EXCLUSIVE_LOCK_FUNCTION() override {
+  void lock() ABSL_EXCLUSIVE_LOCK_FUNCTION() override {
     // Deal with robust handling here. If the other process dies without unlocking, we are going
     // to die shortly but try to make sure that we can handle any signals, etc. that happen without
     // getting into a further messed up state.
@@ -66,7 +69,7 @@ public:
     }
   }
 
-  bool tryLock() EXCLUSIVE_TRYLOCK_FUNCTION(true) override {
+  bool tryLock() ABSL_EXCLUSIVE_TRYLOCK_FUNCTION(true) override {
     int rc = pthread_mutex_trylock(&mutex_);
     if (rc == EBUSY) {
       return false;
@@ -80,7 +83,7 @@ public:
     return true;
   }
 
-  void unlock() UNLOCK_FUNCTION() override {
+  void unlock() ABSL_UNLOCK_FUNCTION() override {
     int rc = pthread_mutex_unlock(&mutex_);
     ASSERT(rc == 0);
   }
@@ -95,7 +98,7 @@ private:
  */
 class HotRestartImpl : public HotRestart {
 public:
-  HotRestartImpl(const Options& options);
+  HotRestartImpl(uint32_t base_id, uint32_t restart_epoch);
 
   // Server::HotRestart
   void drainParentListeners() override;
@@ -105,6 +108,7 @@ public:
   void sendParentTerminateRequest() override;
   ServerStatsFromParent mergeParentStatsIfAny(Stats::StoreRoot& stats_store) override;
   void shutdown() override;
+  uint32_t baseId() override;
   std::string version() override;
   Thread::BasicLockable& logLock() override { return log_lock_; }
   Thread::BasicLockable& accessLogLock() override { return access_log_lock_; }
@@ -116,6 +120,8 @@ public:
   static std::string hotRestartVersion();
 
 private:
+  uint32_t base_id_;
+  uint32_t scaled_base_id_;
   HotRestartingChild as_child_;
   HotRestartingParent as_parent_;
   // This pointer is shared memory, and is expected to exist until process end.

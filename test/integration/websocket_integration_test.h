@@ -39,7 +39,7 @@ protected:
     if (downstreamProtocol() != Http::CodecClient::Type::HTTP1) {
       response_->waitForReset();
     } else {
-      codec_client_->waitForDisconnect();
+      ASSERT_TRUE(codec_client_->waitForDisconnect());
     }
   }
 

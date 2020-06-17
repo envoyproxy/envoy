@@ -3,7 +3,7 @@ load("//tools/api_proto_plugin:plugin.bzl", "api_proto_plugin_aspect", "api_prot
 def _protodoc_impl(target, ctx):
     return api_proto_plugin_impl(target, ctx, "rst", "protodoc", [".rst"])
 
-# Bazel aspect (https://docs.bazel.build/versions/master/skylark/aspects.html)
+# Bazel aspect (https://docs.bazel.build/versions/master/starlark/aspects.html)
 # that can be invoked from the CLI to produce docs via //tools/protodoc for
 # proto_library targets. Example use:
 #

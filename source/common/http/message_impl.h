@@ -19,7 +19,7 @@ template <class HeadersInterfaceType, class HeadersImplType, class TrailersInter
           class TrailersImplType>
 class MessageImpl : public Message<HeadersInterfaceType, TrailersInterfaceType> {
 public:
-  MessageImpl() : headers_(std::make_unique<HeadersImplType>()) {}
+  MessageImpl() : headers_(HeadersImplType::create()) {}
   MessageImpl(std::unique_ptr<HeadersInterfaceType>&& headers) : headers_(std::move(headers)) {}
 
   // Http::Message

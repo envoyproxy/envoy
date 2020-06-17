@@ -32,10 +32,7 @@ protected:
   ScopedRdsIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion(), realTime()) {}
 
-  ~ScopedRdsIntegrationTest() override {
-    resetConnections();
-    cleanupUpstreamAndDownstream();
-  }
+  ~ScopedRdsIntegrationTest() override { resetConnections(); }
 
   void initialize() override {
     // Setup two upstream hosts, one for each cluster.
@@ -278,7 +275,7 @@ key:
                                      {":scheme", "http"},
                                      {"Addr", "x-foo-key=xyz-route"}});
   response->waitForEndStream();
-  verifyResponse(std::move(response), "404", Http::TestHeaderMapImpl{}, "");
+  verifyResponse(std::move(response), "404", Http::TestResponseHeaderMapImpl{}, "");
   cleanupUpstreamAndDownstream();
 
   // Test "foo-route" and 'bar-route' both gets routed to cluster_0.
@@ -349,7 +346,7 @@ key:
                                      {":scheme", "http"},
                                      {"Addr", "x-foo-key=foo-route"}});
   response->waitForEndStream();
-  verifyResponse(std::move(response), "404", Http::TestHeaderMapImpl{}, "");
+  verifyResponse(std::move(response), "404", Http::TestResponseHeaderMapImpl{}, "");
   cleanupUpstreamAndDownstream();
   // Add a new scope foo_scope4.
   const std::string& scope_route4 =
@@ -366,7 +363,7 @@ key:
   response->waitForEndStream();
   // Get 404 because RDS hasn't pushed route configuration "foo_route4" yet.
   // But scope is found and the Router::NullConfigImpl is returned.
-  verifyResponse(std::move(response), "404", Http::TestHeaderMapImpl{}, "");
+  verifyResponse(std::move(response), "404", Http::TestResponseHeaderMapImpl{}, "");
   cleanupUpstreamAndDownstream();
 
   // RDS updated foo_route4, requests with scope key "xyz-route" now hit cluster_1.
@@ -410,7 +407,7 @@ key:
                                      {":scheme", "http"},
                                      {"Addr", "x-foo-key=foo"}});
   response->waitForEndStream();
-  verifyResponse(std::move(response), "404", Http::TestHeaderMapImpl{}, "");
+  verifyResponse(std::move(response), "404", Http::TestResponseHeaderMapImpl{}, "");
   cleanupUpstreamAndDownstream();
 
   // SRDS update fixed the problem.
