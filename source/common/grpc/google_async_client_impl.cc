@@ -171,9 +171,9 @@ void GoogleAsyncStreamImpl::initialize(bool /*buffer_body_for_retry*/) {
   }
   // Due to the different HTTP header implementations, we effectively double
   // copy headers here.
-  Http::RequestHeaderMapImpl initial_metadata;
-  callbacks_.onCreateInitialMetadata(initial_metadata);
-  initial_metadata.iterate(
+  auto initial_metadata = Http::RequestHeaderMapImpl::create();
+  callbacks_.onCreateInitialMetadata(*initial_metadata);
+  initial_metadata->iterate(
       [](const Http::HeaderEntry& header, void* ctxt) {
         auto* client_context = static_cast<grpc::ClientContext*>(ctxt);
         client_context->AddMetadata(std::string(header.key().getStringView()),
@@ -207,9 +207,8 @@ void GoogleAsyncStreamImpl::notifyRemoteClose(Status::GrpcStatus grpc_status,
     parent_.stats_.streams_closed_[grpc_status]->inc();
   }
   ENVOY_LOG(debug, "notifyRemoteClose {} {}", grpc_status, message);
-  callbacks_.onReceiveTrailingMetadata(trailing_metadata
-                                           ? std::move(trailing_metadata)
-                                           : std::make_unique<Http::ResponseTrailerMapImpl>());
+  callbacks_.onReceiveTrailingMetadata(trailing_metadata ? std::move(trailing_metadata)
+                                                         : Http::ResponseTrailerMapImpl::create());
   callbacks_.onRemoteClose(grpc_status, message);
 }
 
@@ -312,7 +311,7 @@ void GoogleAsyncStreamImpl::handleOpCompletion(GoogleAsyncTag::Operation op, boo
     ASSERT(call_initialized_);
     rw_->Read(&read_buf_, &read_tag_);
     ++inflight_tags_;
-    Http::ResponseHeaderMapPtr initial_metadata = std::make_unique<Http::ResponseHeaderMapImpl>();
+    Http::ResponseHeaderMapPtr initial_metadata = Http::ResponseHeaderMapImpl::create();
     metadataTranslate(ctxt_.GetServerInitialMetadata(), *initial_metadata);
     callbacks_.onReceiveInitialMetadata(std::move(initial_metadata));
     break;
@@ -346,8 +345,7 @@ void GoogleAsyncStreamImpl::handleOpCompletion(GoogleAsyncTag::Operation op, boo
   case GoogleAsyncTag::Operation::Finish: {
     ASSERT(finish_pending_);
     ENVOY_LOG(debug, "Finish with grpc-status code {}", status_.error_code());
-    Http::ResponseTrailerMapPtr trailing_metadata =
-        std::make_unique<Http::ResponseTrailerMapImpl>();
+    Http::ResponseTrailerMapPtr trailing_metadata = Http::ResponseTrailerMapImpl::create();
     metadataTranslate(ctxt_.GetServerTrailingMetadata(), *trailing_metadata);
     notifyRemoteClose(static_cast<Status::GrpcStatus>(status_.error_code()),
                       std::move(trailing_metadata), status_.error_message());

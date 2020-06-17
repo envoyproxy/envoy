@@ -54,8 +54,8 @@ public:
   /**
    * @return HeaderMap of current headers (never throws)
    */
-  const Http::HeaderMap& headers() const { return headers_; }
-  Http::HeaderMap& headers() { return headers_; }
+  const Http::HeaderMap& headers() const { return *headers_; }
+  Http::HeaderMap& headers() { return *headers_; }
 
   /**
    * @return SpanList an immutable list of Spans
@@ -104,7 +104,7 @@ private:
   absl::optional<std::string> method_name_{};
   absl::optional<int32_t> seq_id_{};
   absl::optional<MessageType> msg_type_{};
-  Http::HeaderMapImpl headers_;
+  Http::HeaderMapPtr headers_{Http::RequestHeaderMapImpl::create()};
   absl::optional<AppExceptionType> app_ex_type_;
   absl::optional<std::string> app_ex_msg_;
   bool protocol_upgrade_message_{false};
