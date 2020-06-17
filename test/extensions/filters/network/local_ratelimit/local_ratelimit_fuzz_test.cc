@@ -48,12 +48,11 @@ DEFINE_PROTO_FUZZER(
     ENVOY_LOG_MISC(debug, "In fill_interval, nanos should not be negative!");
     return;
   }
-
+  static NiceMock<Event::MockDispatcher> dispatcher_;
+  Stats::IsolatedStoreImpl stats_store_;
+  static NiceMock<Runtime::MockLoader> runtime_;
+  Event::MockTimer* fill_timer_ = new Event::MockTimer(&dispatcher_);
   try {
-    static NiceMock<Event::MockDispatcher> dispatcher_;
-    Stats::IsolatedStoreImpl stats_store_;
-    static NiceMock<Runtime::MockLoader> runtime_;
-    Event::MockTimer* fill_timer_ = new Event::MockTimer(&dispatcher_);
     envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit proto_config =
         input.config();
     ConfigSharedPtr config_ =
@@ -89,8 +88,11 @@ DEFINE_PROTO_FUZZER(
     ENVOY_LOG_MISC(debug, "EnvoyException in fuzz test: {}", e.what());
     return;
   }
-}
-
+} // NOLINT
+  // Silence clang-tidy here because it thinks there is a memory leak for "fill_timer_"
+  // However, ownership of each MockTimer instance is transferred to the (caller of) dispatcher's
+  // createTimer_(), so to avoid destructing it twice, the MockTimer must have been dynamically
+  // allocated and must not be deleted by it's creator. See test/mocks/event/mocks.cc for detail.
 } // namespace LocalRateLimitFilter
 } // namespace NetworkFilters
 } // namespace Extensions
