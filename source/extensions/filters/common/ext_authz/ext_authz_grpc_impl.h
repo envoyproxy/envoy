@@ -18,7 +18,6 @@
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/config/version_converter.h"
 #include "common/grpc/typed_async_client.h"
 
 #include "extensions/filters/common/ext_authz/check_request_utils.h"
@@ -47,7 +46,7 @@ using ExtAuthzAsyncCallbacks = Grpc::AsyncRequestCallbacks<envoy::service::auth:
  */
 class GrpcClientImpl : public Client,
                        public ExtAuthzAsyncCallbacks,
-                       public Config::VersionedService,
+                       public Grpc::VersionedClient,
                        public Logger::Loggable<Logger::Id::ext_authz> {
 public:
   // TODO(gsagula): remove `use_alpha` param when V2Alpha gets deprecated.
@@ -68,7 +67,7 @@ public:
   void onFailure(Grpc::Status::GrpcStatus status, const std::string& message,
                  Tracing::Span& span) override;
 
-  // Config::VersionedService
+  // Config::VersionedClient
   const std::string methodNameTemplate() const override { return METHOD_NAME_TEMPLATE; }
 
 private:

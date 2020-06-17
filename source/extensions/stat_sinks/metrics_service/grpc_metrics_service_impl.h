@@ -11,7 +11,6 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/buffer/buffer_impl.h"
-#include "common/config/version_converter.h"
 #include "common/grpc/typed_async_client.h"
 
 namespace Envoy {
@@ -56,7 +55,7 @@ using GrpcMetricsStreamerSharedPtr = std::shared_ptr<GrpcMetricsStreamer>;
  */
 class GrpcMetricsStreamerImpl : public Singleton::Instance,
                                 public GrpcMetricsStreamer,
-                                public Config::VersionedService {
+                                public Grpc::VersionedClient {
 public:
   GrpcMetricsStreamerImpl(Grpc::AsyncClientFactoryPtr&& factory,
                           const LocalInfo::LocalInfo& local_info,
@@ -68,7 +67,7 @@ public:
   // Grpc::AsyncStreamCallbacks
   void onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) override { stream_ = nullptr; }
 
-  // Config::VersionedService
+  // Grpc::VersionedClient
   const std::string methodNameTemplate() const override { return METHOD_NAME_TEMPLATE; }
 
 private:

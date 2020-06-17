@@ -21,7 +21,6 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
-        "//source/common/config:version_converter_lib",
         "//source/common/grpc:typed_async_client_lib",
         "//source/common/http:headers_lib",
         "//source/common/tracing:http_tracer_lib",

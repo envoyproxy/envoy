@@ -83,6 +83,32 @@ private:
 };
 
 /**
+ * A versioned gRPC client.
+ */
+class VersionedClient {
+public:
+  virtual ~VersionedClient() = default;
+
+  /**
+   * @return std::string template of a fully-qualified service method name. For example:
+   *                     envoy.service.auth.{}.Authorization.Check.
+   */
+  virtual const std::string methodNameTemplate() const PURE;
+
+  /**
+   * Given a version, return the method descriptor for a specific version.
+   *
+   * @param api_version target API version.
+   * @param use_alpha if this is an alpha version of an API client.
+   *
+   * @return Protobuf::MethodDescriptor of a method for a specific version.
+   */
+  const Protobuf::MethodDescriptor&
+  getMethodDescriptorForVersion(envoy::config::core::v3::ApiVersion api_version,
+                                bool use_alpha = false);
+};
+
+/**
  * Convenience subclasses for AsyncStreamCallbacks.
  */
 template <typename Response> class AsyncStreamCallbacks : public RawAsyncStreamCallbacks {

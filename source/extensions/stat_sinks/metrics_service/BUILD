@@ -32,7 +32,6 @@ envoy_cc_library(
     hdrs = ["grpc_metrics_proto_descriptors.h"],
     deps = [
         "//source/common/common:assert_lib",
-        "//source/common/config:api_version_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/config/metrics/v2:pkg_cc_proto",
         "@envoy_api//envoy/service/metrics/v2:pkg_cc_proto",

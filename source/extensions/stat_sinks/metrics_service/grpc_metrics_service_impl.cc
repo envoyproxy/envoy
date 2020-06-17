@@ -20,8 +20,7 @@ GrpcMetricsStreamerImpl::GrpcMetricsStreamerImpl(
     Grpc::AsyncClientFactoryPtr&& factory, const LocalInfo::LocalInfo& local_info,
     envoy::config::core::v3::ApiVersion transport_api_version)
     : client_(factory->create()), local_info_(local_info),
-      service_method_(
-          Config::VersionUtil::getMethodDescriptorForVersion(this, transport_api_version)),
+      service_method_(getMethodDescriptorForVersion(transport_api_version)),
       transport_api_version_(transport_api_version) {}
 
 void GrpcMetricsStreamerImpl::send(envoy::service::metrics::v3::StreamMetricsMessage& message) {

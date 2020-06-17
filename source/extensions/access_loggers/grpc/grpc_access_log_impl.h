@@ -87,7 +87,7 @@ public:
 
 using GrpcAccessLoggerCacheSharedPtr = std::shared_ptr<GrpcAccessLoggerCache>;
 
-class GrpcAccessLoggerImpl : public GrpcAccessLogger, public Config::VersionedService {
+class GrpcAccessLoggerImpl : public GrpcAccessLogger, public Grpc::VersionedClient {
 public:
   GrpcAccessLoggerImpl(Grpc::RawAsyncClientPtr&& client, std::string log_name,
                        std::chrono::milliseconds buffer_flush_interval_msec,
@@ -99,7 +99,7 @@ public:
   void log(envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry) override;
   void log(envoy::data::accesslog::v3::TCPAccessLogEntry&& entry) override;
 
-  // Config::VersionedService
+  // Grpc::VersionedClient
   const std::string methodNameTemplate() const override { return METHOD_NAME_TEMPLATE; }
 
 private:

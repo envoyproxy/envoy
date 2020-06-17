@@ -38,8 +38,7 @@ GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
         flush_timer_->enableTimer(buffer_flush_interval_msec_);
       })),
       max_buffer_size_bytes_(max_buffer_size_bytes), local_info_(local_info),
-      service_method_(
-          Config::VersionUtil::getMethodDescriptorForVersion(this, transport_api_version)),
+      service_method_(getMethodDescriptorForVersion(transport_api_version)),
       transport_api_version_(transport_api_version) {
   flush_timer_->enableTimer(buffer_flush_interval_msec_);
 }

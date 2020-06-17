@@ -16,7 +16,6 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/logger.h"
-#include "common/config/version_converter.h"
 #include "common/grpc/typed_async_client.h"
 #include "common/singleton/const_singleton.h"
 
@@ -51,7 +50,7 @@ using Constants = ConstSingleton<ConstantValues>;
 // one today).
 class GrpcClientImpl : public Client,
                        public RateLimitAsyncCallbacks,
-                       public Config::VersionedService,
+                       public Grpc::VersionedClient,
                        public Logger::Loggable<Logger::Id::config> {
 public:
   GrpcClientImpl(Grpc::RawAsyncClientPtr&& async_client,
@@ -76,7 +75,7 @@ public:
   void onFailure(Grpc::Status::GrpcStatus status, const std::string& message,
                  Tracing::Span& span) override;
 
-  // Config::VersionedService
+  // Grpc::VersionedClient
   const std::string methodNameTemplate() const override { return METHOD_NAME_TEMPLATE; }
 
 private:

@@ -24,8 +24,7 @@ GrpcClientImpl::GrpcClientImpl(Grpc::RawAsyncClientPtr&& async_client,
                                const absl::optional<std::chrono::milliseconds>& timeout,
                                envoy::config::core::v3::ApiVersion transport_api_version)
     : async_client_(std::move(async_client)), timeout_(timeout),
-      service_method_(
-          Config::VersionUtil::getMethodDescriptorForVersion(this, transport_api_version)),
+      service_method_(getMethodDescriptorForVersion(transport_api_version)),
       transport_api_version_(transport_api_version) {}
 
 GrpcClientImpl::~GrpcClientImpl() { ASSERT(!callbacks_); }
