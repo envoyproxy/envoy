@@ -158,6 +158,13 @@ protected:
     // deferred delete lifetime issues that need sorting out if the destructor of the stream is
     // going to be able to refer to the parent connection.
     void destroy();
+    void disarmStreamIdleTimer() {
+      if (stream_idle_timer_ != nullptr) {
+        // To ease testing and the destructor assertion.
+        stream_idle_timer_->disableTimer();
+        stream_idle_timer_.reset();
+      }
+    }
 
     StreamImpl* base() { return this; }
     ssize_t onDataSourceRead(uint64_t length, uint32_t* data_flags);
