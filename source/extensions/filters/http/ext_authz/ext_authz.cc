@@ -176,8 +176,11 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     }
     for (const auto& header : response->headers_to_append) {
       const Http::HeaderEntry* header_to_modify = request_headers_->get(header.first);
-      if (header_to_modify) {
+      if (header_to_modify != nullptr) {
         ENVOY_STREAM_LOG(trace, "'{}':'{}'", *callbacks_, header.first.get(), header.second);
+        // The current behavior of appending is by combining entries with the same key, into one
+        // entry. The value of that combined entry is separated by ",".
+        // TODO(dio): Consider to use addCopy instead.
         request_headers_->appendCopy(header.first, header.second);
       }
     }
