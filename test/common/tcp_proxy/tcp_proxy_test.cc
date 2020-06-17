@@ -1277,6 +1277,7 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(RouteWithMetadataMatch)) {
 // LoadBalancerContext.
 TEST_F(TcpProxyTest, WeightedClusterWithMetadataMatch) {
   const std::string yaml = R"EOF(
+  max_connect_attempts: 2
   stat_prefix: name
   weighted_clusters:
     clusters:

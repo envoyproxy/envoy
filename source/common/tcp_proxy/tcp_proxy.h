@@ -17,6 +17,7 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stats/timespan.h"
 #include "envoy/stream_info/filter_state.h"
+#include "envoy/tcp/upstream.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
@@ -26,7 +27,6 @@
 #include "common/network/hash_policy.h"
 #include "common/network/utility.h"
 #include "common/stream_info/stream_info_impl.h"
-#include "common/tcp_proxy/upstream.h"
 #include "common/upstream/load_balancer_impl.h"
 
 namespace Envoy {
@@ -232,8 +232,7 @@ private:
  */
 class Filter : public Network::ReadFilter,
                public Upstream::LoadBalancerContextBase,
-               Tcp::ConnectionPool::Callbacks,
-               public Http::ConnectionPool::Callbacks,
+               public Tcp::GenericUpstreamPoolCallbacks,
                protected Logger::Loggable<Logger::Id::filter> {
 public:
   Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager);
@@ -241,26 +240,19 @@ public:
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
-  Network::FilterStatus onNewConnection() override { return initializeUpstreamConnection(); }
+  Network::FilterStatus onNewConnection() override {
+    initializeUpstreamConnection();
+    return Network::FilterStatus::StopIteration;
+  }
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
 
-  // Tcp::ConnectionPool::Callbacks
-  void onPoolFailure(ConnectionPool::PoolFailureReason reason,
+  // Tcp::GenericPoolCallbacks
+  void onPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason,
                      Upstream::HostDescriptionConstSharedPtr host) override;
-  void onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
-                   Upstream::HostDescriptionConstSharedPtr host) override;
-
-  // Http::ConnectionPool::Callbacks,
-  void onPoolFailure(ConnectionPool::PoolFailureReason reason,
-                     absl::string_view transport_failure_reason,
-                     Upstream::HostDescriptionConstSharedPtr host) override;
-  void onPoolReady(Http::RequestEncoder& request_encoder,
-                   Upstream::HostDescriptionConstSharedPtr host,
-                   const StreamInfo::StreamInfo& info) override;
-
-  void onPoolReadyBase(Upstream::HostDescriptionConstSharedPtr& host,
-                       const Network::Address::InstanceConstSharedPtr& local_address,
-                       Ssl::ConnectionInfoConstSharedPtr ssl_info);
+  void onPoolReady(const Tcp::GenericUpstreamSharedPtr& upstream,
+                   Upstream::HostDescriptionConstSharedPtr& host,
+                   const Network::Address::InstanceConstSharedPtr& local_address,
+                   StreamInfo::StreamInfo& info) override;
 
   // Upstream::LoadBalancerContext
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override {
@@ -342,6 +334,15 @@ protected:
     NoRoute,
   };
 
+  enum class UpstreamStatus {
+    // Waiting for connect event.
+    Ok,
+    // Hard failure.
+    Error,
+    // Immediate retryable failure.
+    Retry
+  };
+
   // Callbacks for different error and success states during connection establishment
   virtual RouteConstSharedPtr pickRoute() {
     return config_->getRouteFromEntries(read_callbacks_->connection());
@@ -352,8 +353,8 @@ protected:
   }
 
   void initialize(Network::ReadFilterCallbacks& callbacks, bool set_connection_stats);
-  Network::FilterStatus initializeUpstreamConnection();
-  bool maybeTunnel(const std::string& cluster_name);
+  void initializeUpstreamConnection();
+  UpstreamStatus maybeTunnel(const std::string& cluster_name);
   void onConnectTimeout();
   void onDownstreamEvent(Network::ConnectionEvent event);
   void onUpstreamData(Buffer::Instance& data, bool end_stream);
@@ -369,10 +370,10 @@ protected:
   DownstreamCallbacks downstream_callbacks_;
   Event::TimerPtr idle_timer_;
 
-  std::shared_ptr<ConnectionHandle> upstream_handle_;
+  Tcp::ConnectionHandlePtr upstream_handle_;
   std::shared_ptr<UpstreamCallbacks> upstream_callbacks_; // shared_ptr required for passing as a
                                                           // read filter.
-  std::unique_ptr<GenericUpstream> upstream_;
+  std::shared_ptr<Tcp::GenericUpstream> upstream_;
   RouteConstSharedPtr route_;
   Network::TransportSocketOptionsSharedPtr transport_socket_options_;
   uint32_t connect_attempts_{};
