@@ -145,7 +145,12 @@ protected:
 
     static size_t size() {
       // The size of the lookup table is finalized when the singleton lookup table is created. This
-      // allows for late binding of custom headers as well as envoy header prefix changes.
+      // allows for late binding of custom headers as well as envoy header prefix changes. This
+      // does mean that once the first header map is created of this type, no further changes are
+      // possible.
+      // TODO(mattklein123): If we decide to keep this implementation, it is conceivable that header
+      // maps could be created by an API factory that is owned by the listener/HCM, thus making
+      // O(1) header delivery over xDS possible.
       return ConstSingleton<StaticLookupTable>::get().size_;
     }
 
@@ -380,6 +385,15 @@ public:
   INLINE_REQ_HEADERS(DEFINE_INLINE_HEADER_FUNCS)
   INLINE_REQ_RESP_HEADERS(DEFINE_INLINE_HEADER_FUNCS)
 
+protected:
+  // NOTE: Because inline_headers_ is a variable size member, it must be the last member in the
+  // most derived class. This forces the definition of the following three functions to also be
+  // in the most derived class and thus duplicated. There may be a way to consolidate thus but it's
+  // not clear and can be deferred for now.
+  void clearInline() override { memset(inline_headers_, 0, inlineHeadersSize()); }
+  const HeaderEntryImpl* const* constInlineHeaders() const override { return inline_headers_; }
+  HeaderEntryImpl** inlineHeaders() override { return inline_headers_; }
+
 private:
   struct HeaderHandleValues {
     INLINE_REQ_HEADERS(DEFINE_HEADER_HANDLE)
@@ -389,9 +403,6 @@ private:
   using HeaderHandles = ConstSingleton<HeaderHandleValues>;
 
   RequestHeaderMapImpl() { clearInline(); }
-  void clearInline() override { memset(inline_headers_, 0, inlineHeadersSize()); }
-  const HeaderEntryImpl* const* constInlineHeaders() const override { return inline_headers_; }
-  HeaderEntryImpl** inlineHeaders() override { return inline_headers_; }
 
   HeaderEntryImpl* inline_headers_[];
 };
@@ -408,11 +419,14 @@ public:
                                                       RequestTrailerMapImpl());
   }
 
-private:
-  RequestTrailerMapImpl() { clearInline(); }
+protected:
+  // See comment in RequestHeaderMapImpl.
   void clearInline() override { memset(inline_headers_, 0, inlineHeadersSize()); }
   const HeaderEntryImpl* const* constInlineHeaders() const override { return inline_headers_; }
   HeaderEntryImpl** inlineHeaders() override { return inline_headers_; }
+
+private:
+  RequestTrailerMapImpl() { clearInline(); }
 
   HeaderEntryImpl* inline_headers_[];
 };
@@ -433,6 +447,12 @@ public:
   INLINE_REQ_RESP_HEADERS(DEFINE_INLINE_HEADER_FUNCS)
   INLINE_RESP_HEADERS_TRAILERS(DEFINE_INLINE_HEADER_FUNCS)
 
+protected:
+  // See comment in RequestHeaderMapImpl.
+  void clearInline() override { memset(inline_headers_, 0, inlineHeadersSize()); }
+  const HeaderEntryImpl* const* constInlineHeaders() const override { return inline_headers_; }
+  HeaderEntryImpl** inlineHeaders() override { return inline_headers_; }
+
 private:
   struct HeaderHandleValues {
     INLINE_RESP_HEADERS(DEFINE_HEADER_HANDLE)
@@ -443,9 +463,6 @@ private:
   using HeaderHandles = ConstSingleton<HeaderHandleValues>;
 
   ResponseHeaderMapImpl() { clearInline(); }
-  void clearInline() override { memset(inline_headers_, 0, inlineHeadersSize()); }
-  const HeaderEntryImpl* const* constInlineHeaders() const override { return inline_headers_; }
-  HeaderEntryImpl** inlineHeaders() override { return inline_headers_; }
 
   HeaderEntryImpl* inline_headers_[];
 };
@@ -464,6 +481,12 @@ public:
 
   INLINE_RESP_HEADERS_TRAILERS(DEFINE_INLINE_HEADER_FUNCS)
 
+protected:
+  // See comment in RequestHeaderMapImpl.
+  void clearInline() override { memset(inline_headers_, 0, inlineHeadersSize()); }
+  const HeaderEntryImpl* const* constInlineHeaders() const override { return inline_headers_; }
+  HeaderEntryImpl** inlineHeaders() override { return inline_headers_; }
+
 private:
   struct HeaderHandleValues {
     INLINE_RESP_HEADERS_TRAILERS(DEFINE_HEADER_HANDLE)
@@ -472,9 +495,6 @@ private:
   using HeaderHandles = ConstSingleton<HeaderHandleValues>;
 
   ResponseTrailerMapImpl() { clearInline(); }
-  void clearInline() override { memset(inline_headers_, 0, inlineHeadersSize()); }
-  const HeaderEntryImpl* const* constInlineHeaders() const override { return inline_headers_; }
-  HeaderEntryImpl** inlineHeaders() override { return inline_headers_; }
 
   HeaderEntryImpl* inline_headers_[];
 };
@@ -515,8 +535,12 @@ using StaticEmptyHeaders = ConstSingleton<EmptyHeaders>;
 class HeaderMapImplUtility {
 public:
   struct HeaderMapImplInfo {
+    // Human readable name for the header map used in info logging.
     std::string name_;
+    // The byte size of the header map including both fixed space as well as variable space used
+    // by the registered custom headers.
     size_t size_;
+    // All registered custom headers for the header map.
     std::vector<std::string> registered_headers_;
   };
 
