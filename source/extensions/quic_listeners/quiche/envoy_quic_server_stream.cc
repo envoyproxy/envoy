@@ -64,8 +64,18 @@ void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers
   // Same vulnerability exists in crypto stream which can infinitely buffer data
   // if handshake implementation goes wrong.
   // TODO(#8826) Modify QUICHE to have an upper bound for header stream send buffer.
+  // This is counting not serialized bytes in the send buffer.
+  quic::QuicStream* writing_stream =
+      quic::VersionUsesHttp3(transport_version())
+          ? static_cast<quic::QuicStream*>(this)
+          : (dynamic_cast<quic::QuicSpdySession*>(session())->headers_stream());
+  uint64_t bytes_to_send_old = writing_stream->BufferedDataBytes();
+
   WriteHeaders(envoyHeadersToSpdyHeaderBlock(headers), end_stream, nullptr);
   local_end_stream_ = end_stream;
+  uint64_t bytes_to_send_new = writing_stream->BufferedDataBytes();
+  ASSERT(bytes_to_send_old <= bytes_to_send_new);
+  maybeCheckWatermark(bytes_to_send_old, bytes_to_send_new, *filterManagerConnection());
 }
 
 void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) {
@@ -91,7 +101,15 @@ void EnvoyQuicServerStream::encodeTrailers(const Http::ResponseTrailerMap& trail
   ASSERT(!local_end_stream_);
   local_end_stream_ = true;
   ENVOY_STREAM_LOG(debug, "encodeTrailers: {}.", *this, trailers);
+  quic::QuicStream* writing_stream =
+      quic::VersionUsesHttp3(transport_version())
+          ? static_cast<quic::QuicStream*>(this)
+          : (dynamic_cast<quic::QuicSpdySession*>(session())->headers_stream());
+  uint64_t bytes_to_send_old = writing_stream->BufferedDataBytes();
   WriteTrailers(envoyHeadersToSpdyHeaderBlock(trailers), nullptr);
+  uint64_t bytes_to_send_new = writing_stream->BufferedDataBytes();
+  ASSERT(bytes_to_send_old <= bytes_to_send_new);
+  maybeCheckWatermark(bytes_to_send_old, bytes_to_send_new, *filterManagerConnection());
 }
 
 void EnvoyQuicServerStream::encodeMetadata(const Http::MetadataMapVector& /*metadata_map_vector*/) {
