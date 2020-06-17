@@ -379,7 +379,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   // Validate we can parse as proto.
   envoy::admin::v3::ConfigDump config_dump_with_eds;
   TestUtility::loadFromJson(response->body(), config_dump_with_eds);
-  EXPECT_EQ(6, config_dump_with_eds.configs_size());
+  EXPECT_EQ(7, config_dump_with_eds.configs_size());
 
   // Validate that the "inboundonly" does not stop the default listener.
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST",
