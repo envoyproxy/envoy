@@ -21,10 +21,11 @@ using testing::AssertionResult;
 namespace Envoy {
 
 AdsIntegrationTest::AdsIntegrationTest(const envoy::config::core::v3::ApiVersion api_version)
-    : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(),
-                          ConfigHelper::adsBootstrap(
-                              sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC",
-                              api_version == envoy::config::core::v3::ApiVersion::V2 ? "V2" : "V3")) {
+    : HttpIntegrationTest(
+          Http::CodecClient::Type::HTTP2, ipVersion(),
+          ConfigHelper::adsBootstrap(
+              sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC",
+              api_version == envoy::config::core::v3::ApiVersion::V2 ? "V2" : "V3")) {
   use_lds_ = false;
   create_xds_upstream_ = true;
   tls_xds_upstream_ = true;
@@ -52,8 +53,9 @@ AdsIntegrationTest::buildClusterLoadAssignment(const std::string& name) {
 envoy::config::listener::v3::Listener
 AdsIntegrationTest::buildListener(const std::string& name, const std::string& route_config,
                                   const std::string& stat_prefix) {
-  return ConfigHelper::buildListener(
-      name, route_config, Network::Test::getLoopbackAddressString(ipVersion()), stat_prefix, api_version_);
+  return ConfigHelper::buildListener(name, route_config,
+                                     Network::Test::getLoopbackAddressString(ipVersion()),
+                                     stat_prefix, api_version_);
 }
 
 envoy::config::listener::v3::Listener

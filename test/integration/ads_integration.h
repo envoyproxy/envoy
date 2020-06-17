@@ -50,7 +50,6 @@ public:
   envoy::admin::v3::RoutesConfigDump getRoutesConfigDump();
 
   envoy::config::core::v3::ApiVersion api_version_;
-
 };
 
 } // namespace Envoy

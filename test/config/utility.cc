@@ -315,7 +315,8 @@ static_resources:
 // TODO(#6327) cleaner approach to testing with static config.
 // TODO(fredlas) set_node_on_first_message_only was true; the delta+SotW unification
 //               work restores it here. (moved from ads_integration.h)
-std::string ConfigHelper::adsBootstrap(const std::string& api_type, const std::string& api_version) {
+std::string ConfigHelper::adsBootstrap(const std::string& api_type,
+                                       const std::string& api_version) {
   // Note: do not use CONSTRUCT_ON_FIRST_USE here!
   return fmt::format(R"EOF(
 dynamic_resources:
@@ -379,12 +380,11 @@ ConfigHelper::buildStaticCluster(const std::string& name, int port, const std::s
                                                                                  address, port));
 }
 
-envoy::config::cluster::v3::Cluster ConfigHelper::buildCluster(const std::string& name,
-                                                               const std::string& lb_policy,
-                                                               envoy::config::core::v3::ApiVersion api_version) {
+envoy::config::cluster::v3::Cluster
+ConfigHelper::buildCluster(const std::string& name, const std::string& lb_policy,
+                           envoy::config::core::v3::ApiVersion api_version) {
   API_NO_BOOST(envoy::config::cluster::v3::Cluster) cluster;
-  TestUtility::loadFromYaml(
-      fmt::format(R"EOF(
+  TestUtility::loadFromYaml(fmt::format(R"EOF(
       name: {}
       connect_timeout: 5s
       type: EDS
@@ -395,14 +395,15 @@ envoy::config::cluster::v3::Cluster ConfigHelper::buildCluster(const std::string
       lb_policy: {}
       http2_protocol_options: {{}}
     )EOF",
-                  name, apiVersionStr(api_version), lb_policy),
-      cluster, shouldBoost(api_version));
+                                        name, apiVersionStr(api_version), lb_policy),
+                            cluster, shouldBoost(api_version));
   return cluster;
 }
 
 envoy::config::endpoint::v3::ClusterLoadAssignment
 ConfigHelper::buildClusterLoadAssignment(const std::string& name, const std::string& address,
-                                         uint32_t port, envoy::config::core::v3::ApiVersion api_version) {
+                                         uint32_t port,
+                                         envoy::config::core::v3::ApiVersion api_version) {
   API_NO_BOOST(envoy::config::endpoint::v3::ClusterLoadAssignment) cluster_load_assignment;
   TestUtility::loadFromYaml(fmt::format(R"EOF(
       cluster_name: {}
@@ -421,11 +422,11 @@ ConfigHelper::buildClusterLoadAssignment(const std::string& name, const std::str
 
 envoy::config::listener::v3::Listener
 ConfigHelper::buildBaseListener(const std::string& name, const std::string& address,
-                                const std::string& filter_chains, envoy::config::core::v3::ApiVersion api_version) {
+                                const std::string& filter_chains,
+                                envoy::config::core::v3::ApiVersion api_version) {
   API_NO_BOOST(envoy::config::listener::v3::Listener) listener;
-  TestUtility::loadFromYaml(
-      fmt::format(
-          R"EOF(
+  TestUtility::loadFromYaml(fmt::format(
+                                R"EOF(
       name: {}
       address:
         socket_address:
@@ -434,16 +435,15 @@ ConfigHelper::buildBaseListener(const std::string& name, const std::string& addr
       filter_chains:
       {}
     )EOF",
-          name, address, filter_chains),
-      listener, shouldBoost(api_version));
+                                name, address, filter_chains),
+                            listener, shouldBoost(api_version));
   return listener;
 }
 
-envoy::config::listener::v3::Listener ConfigHelper::buildListener(const std::string& name,
-                                                                  const std::string& route_config,
-                                                                  const std::string& address,
-                                                                  const std::string& stat_prefix,
-                                                                  envoy::config::core::v3::ApiVersion api_version) {
+envoy::config::listener::v3::Listener
+ConfigHelper::buildListener(const std::string& name, const std::string& route_config,
+                            const std::string& address, const std::string& stat_prefix,
+                            envoy::config::core::v3::ApiVersion api_version) {
   std::string hcm = fmt::format(
       R"EOF(
         filters:
