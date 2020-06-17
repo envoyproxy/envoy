@@ -877,27 +877,40 @@ TEST(InlineStorageTest, InlineString) {
 
 TEST(ContainerRemoveElementsTest, Containers) {
   auto l = StringUtil::splitToken("one,two,three", ",");
-  std::function<bool(const absl::string_view&)> onep = [](const absl::string_view& s) {
-    return "one" == s;
+  std::function<bool(absl::string_view)> onep = [](absl::string_view s) { return "one" == s; };
+  std::function<bool(absl::string_view)> threep = [](absl::string_view s) { return "three" == s; };
+  std::function<bool(absl::string_view)> truep = [](ABSL_ATTRIBUTE_UNUSED absl::string_view s) {
+    return true;
   };
-  std::function<bool(const absl::string_view&)> truep =
-      [](ABSL_ATTRIBUTE_UNUSED const absl::string_view& s) { return true; };
-  std::function<bool(const absl::string_view&)> falsep =
-      [](ABSL_ATTRIBUTE_UNUSED const absl::string_view& s) { return false; };
+  std::function<bool(absl::string_view)> falsep = [](ABSL_ATTRIBUTE_UNUSED absl::string_view s) {
+    return false;
+  };
 
   Containers::removeMatchingElements(l, falsep);
   // nothing is removed:
   EXPECT_EQ(3, l.size());
 
+  Containers::removeMatchingElements(l, threep);
+  // one element is removed from the end:
+  EXPECT_EQ(2, l.size());
+  EXPECT_EQ("two", l[1]);
+
   Containers::removeMatchingElements(l, onep);
   // one element is removed:
-  EXPECT_EQ(2, l.size());
-  // and the last element is now first:
-  EXPECT_EQ("three", l[0]);
+  EXPECT_EQ(1, l.size());
+  // and the last element is now first (and only):
+  EXPECT_EQ("two", l[0]);
 
   Containers::removeMatchingElements(l, truep);
   // everything is removed:
   EXPECT_EQ(0, l.size());
+}
+
+TEST(ContainerRemoveElementsListTest, Containers) {
+  std::list<int> l = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+  std::function<bool(int)> evens = [](int i) { return i % 2 == 0; };
+  Containers::removeMatchingElements(l, evens);
+  EXPECT_EQ(5, l.size());
 }
 
 } // namespace Envoy

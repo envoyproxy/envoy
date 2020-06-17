@@ -723,7 +723,7 @@ public:
    * which returns true if that entry should be removed.
    */
   template <class Container, typename T>
-  static void removeMatchingElements(Container& c, std::function<bool(const T&)> predicate) {
+  static void removeMatchingElements(Container& c, std::function<bool(T)> predicate) {
     auto erase_from = c.end();
     for (auto i = c.begin(); i != erase_from;) {
       if (predicate(*i)) {

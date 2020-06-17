@@ -60,6 +60,8 @@ public:
 
     EXPECT_CALL(*cm_.subscription_factory_.subscription_, start(_));
     cluster_->initialize([this] { initialized_ = true; });
+    EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(testing::Return(&async_stream_));
+    subscription_->start({"fare"});
   }
 
   void resetCluster(const std::string& yaml_config, Cluster::InitializePhase initialize_phase) {
@@ -85,6 +87,7 @@ public:
   void priorityAndLocalityWeightedHelper(bool ignore_unknown_dynamic_fields, size_t num_hosts,
                                          bool healthy) {
     state_.PauseTiming();
+
     envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
     cluster_load_assignment.set_cluster_name("fare");
 
@@ -124,9 +127,6 @@ public:
                      "");
       resource->set_type_url("type.googleapis.com/envoy.api.v2.ClusterLoadAssignment");
     }
-    EXPECT_CALL(*async_client_, startRaw(_, _, _, _))
-        .WillRepeatedly(testing::Return(&async_stream_));
-    subscription_->start({"fare"});
     state_.ResumeTiming();
     grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));
     ASSERT(cluster_->prioritySet().hostSetsPerPriority()[1]->hostsPerLocality().get()[0].size() ==
