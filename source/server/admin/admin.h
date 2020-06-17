@@ -12,6 +12,7 @@
 #include "envoy/admin/v3/server_info.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
+#include "envoy/event/timer.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/request_id_extension.h"
@@ -20,6 +21,7 @@
 #include "envoy/server/admin.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/listener_manager.h"
+#include "envoy/server/overload_manager.h"
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/resource_manager.h"
 
@@ -245,6 +247,33 @@ private:
   };
 
   /**
+   * Implementation of OverloadManager that is never overloaded. Using this instead of the real
+   * OverloadManager keeps the admin interface accessible even when the proxy is overloaded.
+   */
+  struct NullOverloadManager : public OverloadManager {
+    struct NullThreadOverloadState : public ThreadLocalOverloadState {
+      NullThreadOverloadState(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
+      const OverloadActionState& getState(const std::string&) override { return inactive_; }
+      void setState(const std::string&, OverloadActionState) override {}
+      OverloadTimerFactory getTimerFactory() override;
+
+      const OverloadActionState inactive_ = OverloadActionState::Inactive;
+      Event::Dispatcher& dispatcher_;
+    };
+
+    NullOverloadManager(Event::Dispatcher& dispatcher) : thread_local_overload_state_(dispatcher) {}
+    void start() override {}
+    ThreadLocalOverloadState& getThreadLocalOverloadState() override {
+      return thread_local_overload_state_;
+    }
+    bool registerForAction(const std::string&, Event::Dispatcher&, OverloadActionCb) override {
+      return false;
+    }
+
+    NullThreadOverloadState thread_local_overload_state_;
+  };
+
+  /**
    * Helper methods for the /clusters url handler.
    */
   void addCircuitSettings(const std::string& cluster_name, const std::string& priority_str,
@@ -386,6 +415,7 @@ private:
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
   const std::string profile_path_;
   Http::ConnectionManagerStats stats_;
+  NullOverloadManager overload_manager_;
   // Note: this is here to essentially blackhole the tracing stats since they aren't used in the
   // Admin case.
   Stats::IsolatedStoreImpl no_op_store_;
