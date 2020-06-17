@@ -8,7 +8,6 @@
 #include "extensions/filters/http/well_known_names.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
-#include "test/extensions/filters/common/ext_authz/test_common.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/utility.h"
 

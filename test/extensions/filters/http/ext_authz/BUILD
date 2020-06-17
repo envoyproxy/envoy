@@ -60,7 +60,6 @@ envoy_extension_cc_test(
     tags = ["fails_on_windows"],
     deps = [
         "//source/extensions/filters/http/ext_authz:config",
-        "//test/extensions/filters/common/ext_authz:ext_authz_test_common",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
