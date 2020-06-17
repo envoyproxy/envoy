@@ -71,6 +71,9 @@ Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::RequestHea
 
 Http::FilterHeadersStatus AdmissionControlFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                                 bool end_stream) {
+  // TODO(tonya11en): It's not possible for an HTTP filter to understand why a stream is reset, so
+  // we are not currently accounting for resets when recording requests.
+
   if (!record_request_) {
     return Http::FilterHeadersStatus::Continue;
   }
