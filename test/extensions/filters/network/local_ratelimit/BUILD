@@ -42,7 +42,6 @@ envoy_proto_library(
     name = "local_ratelimit_fuzz_proto",
     srcs = ["local_ratelimit_fuzz.proto"],
     deps = [
-        "//test/fuzz:common_proto",
         "@envoy_api//envoy/extensions/filters/network/local_ratelimit/v3:pkg",
     ],
 )

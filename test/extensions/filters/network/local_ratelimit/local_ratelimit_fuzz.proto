@@ -12,6 +12,7 @@ message OnData {
 
 message Action {
   oneof action_selector {
+    option (validate.required) = true;
     // Call onNewConnection().
     google.protobuf.Empty on_new_connection = 1;
     // Call onData().

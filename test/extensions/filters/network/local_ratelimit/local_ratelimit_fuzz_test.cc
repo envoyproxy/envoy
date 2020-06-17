@@ -5,10 +5,8 @@
 
 #include "extensions/filters/network/local_ratelimit/local_ratelimit.h"
 
-#include "test/extensions/filters/network/local_ratelimit/local_ratelimit_fuzz.pb.h"
 #include "test/extensions/filters/network/local_ratelimit/local_ratelimit_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
-#include "test/fuzz/utility.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
@@ -44,14 +42,17 @@ DEFINE_PROTO_FUZZER(
     return;
   }
   if (input.config().token_bucket().fill_interval().nanos() < 0) {
+    // TODO:
+    // protoc-gen-validate has an issue on type "Duration" which may generate interval with seconds
+    // > 0 while nanos < 0. And negative nanos will cause validation inside the filter to fail.
     ENVOY_LOG_MISC(debug, "In fill_interval, nanos should not be negative!");
     return;
   }
 
   try {
-    NiceMock<Event::MockDispatcher> dispatcher_;
+    static NiceMock<Event::MockDispatcher> dispatcher_;
     Stats::IsolatedStoreImpl stats_store_;
-    NiceMock<Runtime::MockLoader> runtime_;
+    static NiceMock<Runtime::MockLoader> runtime_;
     Event::MockTimer* fill_timer_ = new Event::MockTimer(&dispatcher_);
     envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit proto_config =
         input.config();
