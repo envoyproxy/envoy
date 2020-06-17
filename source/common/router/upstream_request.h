@@ -183,7 +183,7 @@ public:
                      Upstream::HostDescriptionConstSharedPtr host) override;
   void onPoolReady(Http::RequestEncoder& callbacks_encoder,
                    Upstream::HostDescriptionConstSharedPtr host,
-                   const StreamInfo::StreamInfo& info) override;
+                   StreamInfo::StreamInfo& info) override;
 
 private:
   // Points to the actual connection pool to create streams from.

@@ -9,12 +9,12 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
-    name = "tcp_proxy",
+    name = "tcp_upstream",
     srcs = [
-        "tcp_proxy.cc",
+        "upstream_request.cc",
     ],
     hdrs = [
-        "tcp_proxy.h",
+        "upstream_request.h",
     ],
     deps = [
         "//include/envoy/access_log:access_log_interface",
@@ -49,8 +49,5 @@ envoy_cc_library(
         "//source/common/router:metadatamatchcriteria_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/upstream:load_balancer_lib",
-        "//source/extensions/upstreams/tcp/factories:default_tcp_upstream_factory",
-        "@envoy_api//envoy/config/accesslog/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
     ],
 )

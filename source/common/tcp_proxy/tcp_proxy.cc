@@ -10,6 +10,8 @@
 #include "envoy/event/timer.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/stats/scope.h"
+#include "envoy/tcp/config.h"
+#include "envoy/tcp/factory.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
@@ -25,6 +27,8 @@
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/upstream_server_name.h"
 #include "common/router/metadatamatchcriteria_impl.h"
+
+#include "extensions/upstreams/tcp/factories/default_tcp_upstream_factory.h"
 
 namespace Envoy {
 namespace TcpProxy {
@@ -219,7 +223,7 @@ Filter::~Filter() {
     access_log->log(nullptr, nullptr, nullptr, getStreamInfo());
   }
 
-  ASSERT(upstream_handle_ == nullptr);
+  // ASSERT(upstream_handle_ == nullptr);
   ASSERT(upstream_ == nullptr);
 }
 
@@ -366,96 +370,97 @@ void Filter::UpstreamCallbacks::drain(Drainer& drainer) {
   parent_ = nullptr;
 }
 
-Network::FilterStatus Filter::initializeUpstreamConnection() {
+void Filter::initializeUpstreamConnection() {
   ASSERT(upstream_ == nullptr);
+  while (true) {
+    route_ = pickRoute();
 
-  route_ = pickRoute();
+    const std::string& cluster_name = route_ ? route_->clusterName() : EMPTY_STRING;
 
-  const std::string& cluster_name = route_ ? route_->clusterName() : EMPTY_STRING;
+    Upstream::ThreadLocalCluster* thread_local_cluster = cluster_manager_.get(cluster_name);
 
-  Upstream::ThreadLocalCluster* thread_local_cluster = cluster_manager_.get(cluster_name);
-
-  if (thread_local_cluster) {
-    ENVOY_CONN_LOG(debug, "Creating connection to cluster {}", read_callbacks_->connection(),
-                   cluster_name);
-  } else {
-    config_->stats().downstream_cx_no_route_.inc();
-    getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
-    onInitFailure(UpstreamFailureReason::NoRoute);
-    return Network::FilterStatus::StopIteration;
-  }
-
-  Upstream::ClusterInfoConstSharedPtr cluster = thread_local_cluster->info();
-  getStreamInfo().setUpstreamClusterInfo(cluster);
-
-  // Check this here because the TCP conn pool will queue our request waiting for a connection that
-  // will never be released.
-  if (!cluster->resourceManager(Upstream::ResourcePriority::Default).connections().canCreate()) {
-    getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow);
-    cluster->stats().upstream_cx_overflow_.inc();
-    onInitFailure(UpstreamFailureReason::ResourceLimitExceeded);
-    return Network::FilterStatus::StopIteration;
-  }
-
-  const uint32_t max_connect_attempts = config_->maxConnectAttempts();
-  if (connect_attempts_ >= max_connect_attempts) {
-    getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded);
-    cluster->stats().upstream_cx_connect_attempts_exceeded_.inc();
-    onInitFailure(UpstreamFailureReason::ConnectFailed);
-    return Network::FilterStatus::StopIteration;
-  }
-
-  if (downstreamConnection()) {
-    transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
-        downstreamConnection()->streamInfo().filterState());
-  }
-
-  if (!config_->tunnelingConfig()) {
-    Tcp::ConnectionPool::Instance* conn_pool = cluster_manager_.tcpConnPoolForCluster(
-        cluster_name, Upstream::ResourcePriority::Default, this);
-    if (conn_pool) {
-      connecting_ = true;
-      connect_attempts_++;
-
-      // Given this function is reentrant, make sure we only reset the upstream_handle_ if given a
-      // valid connection handle. If newConnection fails inline it may result in attempting to
-      // select a new host, and a recursive call to initializeUpstreamConnection. In this case the
-      // first call to newConnection will return null and the inner call will persist.
-      Tcp::ConnectionPool::Cancellable* handle = conn_pool->newConnection(*this);
-      if (handle) {
-        ASSERT(upstream_handle_.get() == nullptr);
-        upstream_handle_ = std::make_shared<TcpConnectionHandle>(handle);
-      }
-      // Because we never return open connections to the pool, this either has a handle waiting on
-      // connection completion, or onPoolFailure has been invoked. Either way, stop iteration.
-      return Network::FilterStatus::StopIteration;
+    if (thread_local_cluster) {
+      ENVOY_CONN_LOG(debug, "Creating connection to cluster {}", read_callbacks_->connection(),
+                     cluster_name);
+    } else {
+      config_->stats().downstream_cx_no_route_.inc();
+      getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
+      onInitFailure(UpstreamFailureReason::NoRoute);
+      return;
     }
-  } else {
-    Http::ConnectionPool::Instance* conn_pool = cluster_manager_.httpConnPoolForCluster(
-        cluster_name, Upstream::ResourcePriority::Default, Http::Protocol::Http2, this);
-    if (conn_pool) {
-      upstream_ = std::make_unique<HttpUpstream>(*upstream_callbacks_,
-                                                 config_->tunnelingConfig()->hostname());
-      HttpUpstream* http_upstream = static_cast<HttpUpstream*>(upstream_.get());
-      Http::ConnectionPool::Cancellable* cancellable =
-          conn_pool->newStream(http_upstream->responseDecoder(), *this);
-      if (cancellable) {
-        ASSERT(upstream_handle_.get() == nullptr);
-        upstream_handle_ = std::make_shared<HttpConnectionHandle>(cancellable);
-      }
-      return Network::FilterStatus::StopIteration;
+
+    Upstream::ClusterInfoConstSharedPtr cluster = thread_local_cluster->info();
+    getStreamInfo().setUpstreamClusterInfo(cluster);
+
+    // Check this here because the TCP conn pool will queue our request waiting for a connection
+    // that will never be released.
+    if (!cluster->resourceManager(Upstream::ResourcePriority::Default).connections().canCreate()) {
+      getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow);
+      cluster->stats().upstream_cx_overflow_.inc();
+      onInitFailure(UpstreamFailureReason::ResourceLimitExceeded);
+      return;
     }
+
+    const uint32_t max_connect_attempts = config_->maxConnectAttempts();
+    if (connect_attempts_ >= max_connect_attempts) {
+      getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded);
+      cluster->stats().upstream_cx_connect_attempts_exceeded_.inc();
+      onInitFailure(UpstreamFailureReason::ConnectFailed);
+      return;
+    }
+
+    if (downstreamConnection()) {
+      transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
+          downstreamConnection()->streamInfo().filterState());
+    }
+
+    Tcp::TcpUpstreamFactory&& factory = Extensions::Upstreams::Tcp::DefaultTcpUpstreamFactory();
+
+    // Tcp::TcpUpstreamFactorySharedPtr factory = cluster_manager_.tcpUpstreamFactory(cluster_name);
+    auto& tunnel_config = config_->tunnelingConfig();
+
+    connecting_ = true;
+    connect_attempts_++;
+
+    upstream_handle_ = factory.createTcpUpstreamHandle(
+        cluster_manager_, this, *this, upstream_callbacks_,
+        tunnel_config ? tunnel_config->hostname() : "", cluster_name);
+
+    // Put connecting_ and connect_attempts_ here?
+    if (upstream_handle_ == nullptr ||
+        // Error during creating the conn pool.
+        (upstream_handle_->failingOnPool() && !upstream_handle_->hasFailure())) {
+      connecting_ = false;
+      // Either cluster is unknown or there are no healthy hosts. tcpConnPoolForCluster() increments
+      // cluster->stats().upstream_cx_none_healthy in the latter case.
+      getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoHealthyUpstream);
+      onInitFailure(UpstreamFailureReason::NoHealthyUpstream);
+      return;
+    } else if (upstream_handle_->hasFailure()) {
+      // An immediate failure during creating connection. An example is overflow. Retry
+      // initialization.
+      continue;
+    } else if (upstream_handle_->isConnecting()) {
+      // Connecting state applies to both H2 CONNECT and raw tcp.
+      // Any connecting failure should be allowed to retry, including
+      // 1. raw tcp fails to connect
+      // 2. H2 CONNECT header is not encoded yet.
+    } else {
+      connecting_ = false;
+      // Upstream could be available now powered by conn reuse.
+      // Theoretically tcp proxy could read the buffer source instead of waiting for the next event
+      // cycle.
+      // TODO(lambdai): Invoke inline the onData here.
+    }
+    // http: always get upstream regardless handle is cancellable or not.
+    upstream_ = upstream_handle_->upstream();
+    return;
   }
-  // Either cluster is unknown or there are no healthy hosts. tcpConnPoolForCluster() increments
-  // cluster->stats().upstream_cx_none_healthy in the latter case.
-  getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoHealthyUpstream);
-  onInitFailure(UpstreamFailureReason::NoHealthyUpstream);
-  return Network::FilterStatus::StopIteration;
 }
 
 void Filter::onPoolFailure(ConnectionPool::PoolFailureReason reason,
                            Upstream::HostDescriptionConstSharedPtr host) {
-  upstream_handle_.reset();
+  upstream_handle_->cancel();
 
   read_callbacks_->upstreamHost(host);
   getStreamInfo().onUpstreamHostSelected(host);
@@ -479,45 +484,19 @@ void Filter::onPoolFailure(ConnectionPool::PoolFailureReason reason,
   }
 }
 
-void Filter::onPoolReadyBase(Upstream::HostDescriptionConstSharedPtr& host,
-                             const Network::Address::InstanceConstSharedPtr& local_address,
-                             Ssl::ConnectionInfoConstSharedPtr ssl_info) {
-  upstream_handle_.reset();
+void Filter::onPoolReady(const Tcp::GenericUpstreamSharedPtr& upstream,
+                         Upstream::HostDescriptionConstSharedPtr& host,
+                         const Network::Address::InstanceConstSharedPtr& local_address,
+                         StreamInfo::StreamInfo& info) {
+  read_callbacks_->connection().streamInfo().setUpstreamFilterState(info.filterState());
+  upstream_ = upstream;
   read_callbacks_->upstreamHost(host);
   getStreamInfo().onUpstreamHostSelected(host);
   getStreamInfo().setUpstreamLocalAddress(local_address);
-  getStreamInfo().setUpstreamSslConnection(ssl_info);
+  getStreamInfo().setUpstreamSslConnection(info.downstreamSslConnection());
   // Simulate the event that onPoolReady represents.
   upstream_callbacks_->onEvent(Network::ConnectionEvent::Connected);
   read_callbacks_->continueReading();
-}
-
-void Filter::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
-                         Upstream::HostDescriptionConstSharedPtr host) {
-  Tcp::ConnectionPool::ConnectionData* latched_data = conn_data.get();
-
-  upstream_ = std::make_unique<TcpUpstream>(std::move(conn_data), *upstream_callbacks_);
-  onPoolReadyBase(host, latched_data->connection().localAddress(),
-                  latched_data->connection().streamInfo().downstreamSslConnection());
-  read_callbacks_->connection().streamInfo().setUpstreamFilterState(
-      latched_data->connection().streamInfo().filterState());
-}
-
-void Filter::onPoolFailure(ConnectionPool::PoolFailureReason failure, absl::string_view,
-                           Upstream::HostDescriptionConstSharedPtr host) {
-  onPoolFailure(failure, host);
-}
-
-void Filter::onPoolReady(Http::RequestEncoder& request_encoder,
-                         Upstream::HostDescriptionConstSharedPtr host,
-                         const StreamInfo::StreamInfo& info) {
-  Http::RequestEncoder* latched_encoder = &request_encoder;
-  HttpUpstream* http_upstream = static_cast<HttpUpstream*>(upstream_.get());
-  http_upstream->setRequestEncoder(request_encoder,
-                                   host->transportSocketFactory().implementsSecureTransport());
-
-  onPoolReadyBase(host, latched_encoder->getStream().connectionLocalAddress(),
-                  info.downstreamSslConnection());
 }
 
 void Filter::onConnectTimeout() {
@@ -563,7 +542,6 @@ void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
         event == Network::ConnectionEvent::RemoteClose) {
       // Cancel the conn pool request and close any excess pending requests.
       upstream_handle_->cancel();
-      upstream_handle_.reset();
     }
   }
 }

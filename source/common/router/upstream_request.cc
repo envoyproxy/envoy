@@ -558,7 +558,7 @@ void HttpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason,
 
 void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
                                Upstream::HostDescriptionConstSharedPtr host,
-                               const StreamInfo::StreamInfo& info) {
+                               StreamInfo::StreamInfo& info) {
   conn_pool_stream_handle_ = nullptr;
   auto upstream = std::make_unique<HttpUpstream>(*callbacks_->upstreamRequest(), &request_encoder);
   callbacks_->onPoolReady(std::move(upstream), host,

@@ -480,6 +480,7 @@ private:
   std::unique_ptr<GenericConnPool> createConnPool();
   UpstreamRequestPtr createUpstreamRequest();
 
+  Http::ConnectionPool::Instance* getHttpConnPool();
   void maybeDoShadowing();
   bool maybeRetryReset(Http::StreamResetReason reset_reason, UpstreamRequest& upstream_request);
   uint32_t numRequestsAwaitingHeaders();

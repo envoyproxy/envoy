@@ -42,7 +42,7 @@ public:
    * @param info supplies the stream info object associated with the upstream connection.
    */
   virtual void onPoolReady(RequestEncoder& encoder, Upstream::HostDescriptionConstSharedPtr host,
-                           const StreamInfo::StreamInfo& info) PURE;
+                           StreamInfo::StreamInfo& info) PURE;
 };
 
 /**

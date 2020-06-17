@@ -1,6 +1,8 @@
 #include <memory>
 
-#include "common/tcp_proxy/upstream.h"
+#include "envoy/tcp/upstream.h"
+
+#include "extensions/upstreams/tcp/http/upstream_request.h"
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/stream_encoder.h"
@@ -13,8 +15,10 @@ using testing::_;
 using testing::AnyNumber;
 
 namespace Envoy {
-namespace TcpProxy {
-namespace {
+namespace Extensions {
+namespace Upstreams {
+namespace Tcp {
+namespace Http {
 
 class HttpUpstreamTest : public testing::Test {
 public:
@@ -25,8 +29,8 @@ public:
     upstream_->setRequestEncoder(encoder_, true);
   }
 
-  Http::MockRequestEncoder encoder_;
-  NiceMock<Tcp::ConnectionPool::MockUpstreamCallbacks> callbacks_;
+  Envoy::Http::MockRequestEncoder encoder_;
+  NiceMock<Envoy::Tcp::ConnectionPool::MockUpstreamCallbacks> callbacks_;
   std::unique_ptr<HttpUpstream> upstream_;
   std::string hostname_{"default.host.com"};
 };
@@ -57,13 +61,15 @@ TEST_F(HttpUpstreamTest, WriteDownstream) {
 
 TEST_F(HttpUpstreamTest, InvalidUpgradeWithEarlyFin) {
   EXPECT_CALL(callbacks_, onEvent(_));
-  Http::ResponseHeaderMapPtr headers{new Http::TestResponseHeaderMapImpl{{":status", "200"}}};
+  Envoy::Http::ResponseHeaderMapPtr headers{
+      new Envoy::Http::TestResponseHeaderMapImpl{{":status", "200"}}};
   upstream_->responseDecoder().decodeHeaders(std::move(headers), true);
 }
 
 TEST_F(HttpUpstreamTest, InvalidUpgradeWithNon200) {
   EXPECT_CALL(callbacks_, onEvent(_));
-  Http::ResponseHeaderMapPtr headers{new Http::TestResponseHeaderMapImpl{{":status", "301"}}};
+  Envoy::Http::ResponseHeaderMapPtr headers{
+      new Envoy::Http::TestResponseHeaderMapImpl{{":status", "301"}}};
   upstream_->responseDecoder().decodeHeaders(std::move(headers), false);
 }
 
@@ -84,7 +90,7 @@ TEST_F(HttpUpstreamTest, AddBytesSentCallbackForCoverage) {
 }
 
 TEST_F(HttpUpstreamTest, DownstreamDisconnect) {
-  EXPECT_CALL(encoder_.stream_, resetStream(Http::StreamResetReason::LocalReset));
+  EXPECT_CALL(encoder_.stream_, resetStream(Envoy::Http::StreamResetReason::LocalReset));
   EXPECT_CALL(callbacks_, onEvent(_)).Times(0);
   EXPECT_TRUE(upstream_->onDownstreamEvent(Network::ConnectionEvent::LocalClose) == nullptr);
 }
@@ -92,7 +98,7 @@ TEST_F(HttpUpstreamTest, DownstreamDisconnect) {
 TEST_F(HttpUpstreamTest, UpstreamReset) {
   EXPECT_CALL(encoder_.stream_, resetStream(_)).Times(0);
   EXPECT_CALL(callbacks_, onEvent(_));
-  upstream_->onResetStream(Http::StreamResetReason::ConnectionTermination, "");
+  upstream_->onResetStream(Envoy::Http::StreamResetReason::ConnectionTermination, "");
 }
 
 TEST_F(HttpUpstreamTest, UpstreamWatermarks) {
@@ -103,6 +109,15 @@ TEST_F(HttpUpstreamTest, UpstreamWatermarks) {
   upstream_->onBelowWriteBufferLowWatermark();
 }
 
-} // namespace
-} // namespace TcpProxy
+class HttpConnectionHandleTest : public testing::Test {
+public:
+  HttpConnectionHandleTest() {}
+};
+
+TEST_F(HttpConnectionHandleTest, UpstreamWatermarks) {}
+
+} // namespace Http
+} // namespace Tcp
+} // namespace Upstreams
+} // namespace Extensions
 } // namespace Envoy

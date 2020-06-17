@@ -125,3 +125,4 @@ extensions/upstreams/http @alyssawilk @snowp @mattklein123
 extensions/upstreams/http/http @alyssawilk @snowp @mattklein123
 extensions/upstreams/http/tcp @alyssawilk @mattklein123
 extensions/upstreams/http/default @alyssawilk @snowp @mattklein123
+extensions/upstreams/tcp @lambdai @alyssawilk @mattklein123
