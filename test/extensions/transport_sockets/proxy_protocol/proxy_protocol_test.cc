@@ -45,6 +45,7 @@ public:
     proxy_protocol_socket_ =
         std::make_unique<ProxyProtocolSocket>(std::move(inner_socket), socket_options, version);
     proxy_protocol_socket_->setTransportSocketCallbacks(transport_callbacks_);
+    proxy_protocol_socket_->onConnected();
   }
 
   NiceMock<Network::MockTransportSocket>* inner_socket_;

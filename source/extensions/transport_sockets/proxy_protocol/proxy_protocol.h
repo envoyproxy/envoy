@@ -41,7 +41,6 @@ private:
   Network::TransportSocketOptionsSharedPtr options_;
   Network::TransportSocketCallbacks* callbacks_{};
   Buffer::OwnedImpl header_buffer_{};
-  bool generated_header_{false};
   ProxyProtocolConfig_Version version_{ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1};
 };
 

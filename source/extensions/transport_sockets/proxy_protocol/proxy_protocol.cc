@@ -57,10 +57,6 @@ Network::IoResult ProxyProtocolSocket::doRead(Buffer::Instance& buffer) {
 }
 
 Network::IoResult ProxyProtocolSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
-  if (!generated_header_) {
-    generateHeader();
-    generated_header_ = true;
-  }
   if (header_buffer_.length() > 0) {
     auto header_res = writeHeader();
     if (header_buffer_.length() == 0 && header_res.action_ == Network::PostIoAction::KeepOpen) {
@@ -131,7 +127,10 @@ Network::IoResult ProxyProtocolSocket::writeHeader() {
   return {action, bytes_written, false};
 }
 
-void ProxyProtocolSocket::onConnected() { transport_socket_->onConnected(); }
+void ProxyProtocolSocket::onConnected() {
+  generateHeader();
+  transport_socket_->onConnected();
+}
 
 Ssl::ConnectionInfoConstSharedPtr ProxyProtocolSocket::ssl() const {
   return transport_socket_->ssl();
