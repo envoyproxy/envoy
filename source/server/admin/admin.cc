@@ -532,7 +532,9 @@ void AdminImpl::addLbEndpoint(
     const Upstream::HostSharedPtr& host,
     envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint) const {
   auto& lb_endpoint = *locality_lb_endpoint.mutable_lb_endpoints()->Add();
-  lb_endpoint.mutable_metadata()->MergeFrom(*host->metadata());
+  if (host->metadata() != nullptr) {
+    lb_endpoint.mutable_metadata()->MergeFrom(*host->metadata());
+  }
   lb_endpoint.mutable_load_balancing_weight()->set_value(host->weight());
 
   switch (host->health()) {
