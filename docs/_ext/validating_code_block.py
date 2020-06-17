@@ -35,7 +35,10 @@ class ValidatingCodeBlock(CodeBlock):
       raise ExtensionError("Expected type name in: {0} line: {1}".format(source, line))
 
     if not ValidatingCodeBlock.skip_validation:
-      args = ['bazel-bin/tools/config_validation/validate_fragment', self.options.get('type-name'), '-s', '\n'.join(self.content)]
+      args = [
+          'bazel-bin/tools/config_validation/validate_fragment',
+          self.options.get('type-name'), '-s', '\n'.join(self.content)
+      ]  
       process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
       stdout, stderr = process.communicate()
       if process.poll():
