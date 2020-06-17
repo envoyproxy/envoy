@@ -353,6 +353,20 @@ protected:
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
 };
 
+TEST_F(GrpcJsonTranscoderFilterTest, EmptyRoute) {
+  ON_CALL(decoder_callbacks_, route()).WillByDefault(Return(nullptr));
+
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers, false));
+}
+
+TEST_F(GrpcJsonTranscoderFilterTest, EmptyRouteEntry) {
+  ON_CALL(*decoder_callbacks_.route_, routeEntry()).WillByDefault(Return(nullptr));
+
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers, false));
+}
+
 TEST_F(GrpcJsonTranscoderFilterTest, PerRouteDisabledConfigOverride) {
   // not setting up services list (which disables filter)
   envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder route_cfg;

@@ -366,7 +366,6 @@ JsonTranscoderFilter::JsonTranscoderFilter(JsonTranscoderConfig& config) : confi
 
 void JsonTranscoderFilter::initPerRouteConfig() {
   if (!decoder_callbacks_->route() || !decoder_callbacks_->route()->routeEntry()) {
-    per_route_config_ = &config_;
     return;
   }
 
@@ -381,6 +380,10 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
                                                               bool end_stream) {
 
   initPerRouteConfig();
+  if (per_route_config_ == nullptr) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+
   const auto status =
       per_route_config_->createTranscoder(headers, request_in_, response_in_, transcoder_, method_);
 
