@@ -153,10 +153,19 @@ public:
     for (const auto& header_to_append : headers_to_append) {
       // The current behavior of appending is using the "appendCopy", which ALWAYS combines entries
       // with the same key into one key, and the values are separated by ",".
-      EXPECT_THAT(upstream_request_->headers(),
-                  Http::HeaderValueOf(header_to_append.first, header_to_append.second));
-      EXPECT_TRUE(absl::EndsWith(header_to_append.second, "-appended"));
-      auto values = StringUtil::splitToken(header_to_append.second, ",", true);
+      EXPECT_THAT(
+          upstream_request_->headers(),
+          Http::HeaderValueOf(
+              header_to_append.first,
+              // In this test, the keys and values of the original request headers have the same
+              // string value. Hence for "header2" key, the value is "header2,header2-appended".
+              absl::StrCat(header_to_append.first, ",", header_to_append.second)));
+      const auto value = upstream_request_->headers()
+                             .get(Http::LowerCaseString(header_to_append.first))
+                             ->value()
+                             .getStringView();
+      EXPECT_TRUE(absl::EndsWith(value, "-appended"));
+      const auto values = StringUtil::splitToken(value, ",");
       EXPECT_EQ(2, values.size());
     }
 
