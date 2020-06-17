@@ -4,9 +4,11 @@ Postgres proxy
 ================
 
 The Postgres proxy filter decodes the wire protocol between a Postgres client (downstream) and a Postgres server
-(upstream). The decoded information is currently used only to produce Postgres level statistics like sessions,
-statements or transactions executed, among others. This current version does not decode SQL queries. Future versions may
-add more statistics and more advanced capabilities. When the Postgres filter detects that a session is encrypted, the messages are ignored and no decoding takes
+(upstream). The decoded information is used to produce Postgres level statistics like sessions,
+statements or transactions executed, among others. The Postgres proxy filter parses SQL queries carried in ``Query`` messages.
+When SQL query has been parsed successfully, the :ref:`metadata <config_network_filters_postgres_proxy_dynamic_metadata>` is created, 
+which may be used by other filters like :ref:`RBAC <config_network_filters_rbac>`.
+When the Postgres filter detects that a session is encrypted, the messages are ignored and no decoding takes
 place. More information:
 
 * Postgres :ref:`architecture overview <arch_overview_postgres>`
@@ -81,6 +83,8 @@ Every configured Postgres proxy filter has statistics rooted at postgres.<stat_p
   transactions, Counter, Total number of SQL transactions
   transactions_commit, Counter, Number of COMMIT transactions
   transactions_rollback, Counter, Number of ROLLBACK transactions
+  queries_parsed, Counter, Number of SQL queries parsed successfully
+  queries_parse_error, Counter, Number of SQL queries not parsed successfully
   notices, Counter, Total number of NOTICE messages
   notices_notice, Counter, Number of NOTICE messages with NOTICE subtype
   notices_log, Counter, Number of NOTICE messages with LOG subtype
@@ -89,4 +93,19 @@ Every configured Postgres proxy filter has statistics rooted at postgres.<stat_p
   notices_info, Counter, Number of NOTICE messages with INFO severity
   notices_unknown, Counter, Number of NOTICE messages which could not be recognized
 
+
+.. _config_network_filters_postgres_proxy_dynamic_metadata:
+
+Dynamic Metadata
+----------------
+
+The Postgres filter emits dynamic metadata based on SQL statements carried in ``Query`` messages. ``queries_parsed`` statistics Counter tracks how many times
+SQL statement was parsed successfully and metadata was created. The metadata is emitted in the following format:
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  <table.db>, string, The resource name in *table.db* format.
+  [], list, A list of strings representing the operations executed on the resource. Operations can be one of insert/update/select/drop/delete/create/alter/show.
 

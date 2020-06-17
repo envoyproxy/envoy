@@ -339,7 +339,8 @@ void DecoderImpl::onStartup() {
   attributes_ = absl::StrSplit(message_.substr(4), absl::ByChar('\0'), absl::SkipEmpty());
 
   // If "database" attribute is not found, default it to "user" attribute.
-  if (attributes_.find("database") == attributes_.end()) {
+  if ((attributes_.find("database") == attributes_.end()) &&
+      (attributes_.find("user") != attributes_.end())) {
     attributes_["database"] = attributes_["user"];
   }
 }
