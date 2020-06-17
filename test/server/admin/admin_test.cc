@@ -208,7 +208,7 @@ TEST_P(AdminInstanceTest, ConfigDumpMaintainsOrder) {
 }
 )EOF";
   // Run it multiple times and validate that order is preserved.
-  for (size_t i = 0; i < 4; i++) {
+  for (size_t i = 0; i < 5; i++) {
     Buffer::OwnedImpl response;
     Http::TestResponseHeaderMapImpl header_map;
     EXPECT_EQ(Http::Code::OK, getCallback("/config_dump", header_map, response));
