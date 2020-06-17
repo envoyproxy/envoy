@@ -356,6 +356,8 @@ public:
   virtual void startDraining() PURE;
 };
 
+using DrainableFilterChainSharedPtr = std::shared_ptr<DrainableFilterChain>;
+
 /**
  * Interface for searching through configured filter chains.
  */
