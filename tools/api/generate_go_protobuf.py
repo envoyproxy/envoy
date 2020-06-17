@@ -109,7 +109,6 @@ def publishGoProtobufs(repo, sha):
 
 
 if __name__ == "__main__":
-  print("=======================================================GENERATING PROTOBUFS=========================================")
   workspace = check_output(['bazel', 'info', 'workspace']).decode().strip()
   output = os.path.join(workspace, OUTPUT_BASE)
   generateProtobufs(output)
