@@ -42,8 +42,6 @@ public:
   void TearDown() override {
     if (!test_skipped_) {
       cleanUpXdsConnection();
-      test_server_.reset();
-      fake_upstreams_.clear();
     }
   }
 

@@ -80,6 +80,11 @@ for how to update or override dependencies.
     echo "build --config=clang" >> user.bazelrc
     ```
 
+    Note: Either `libc++` or `libstdc++-7-dev` (or higher) must be installed. These are typically
+    available via a package manager, but may not be available in default repositories depending on
+    OS version. To build against `libc++` build with the `--config=libc++` instead of the
+    `--config=clang` flag.
+
     ### macOS
     On macOS, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
     ```
@@ -119,7 +124,7 @@ for how to update or override dependencies.
     set PATH=%PATH%;%USERPROFILE%\Python38\Scripts
     pip install wheel
     ```
-    
+
     [Build Tools for Visual Studio 2019](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2019):
     For building with MSVC (the `msvc-cl` config option), you must install at least the VC++ workload.
     You may also download Visual Studio 2019 and use the Build Tools packaged with that
