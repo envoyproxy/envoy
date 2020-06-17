@@ -1216,6 +1216,12 @@ message RedirectAction {
     // The path portion of the URL will be swapped with this value.
     // Please note that query string in path_redirect will override the
     // request's query string and will not be stripped.
+    //
+    // When the path redirection take place, the following rules apply:
+    //  1. If path_redirect contains query string, requests will be redirected to the given
+    //     path with the specified query string regardless of the value of strip_query
+    //  2. If strip_query is set to true, request's query string will be stripped
+    //  3. If strip_query is set to false, request's query string is left intact
     string path_redirect = 2
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
