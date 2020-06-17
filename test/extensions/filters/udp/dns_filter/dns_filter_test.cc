@@ -568,7 +568,7 @@ TEST_F(DnsFilterTest, ExternalResolutionIpv6SingleAddress) {
   // Send a query to for a name not in our configuration
   sendQueryFromClient("10.0.0.1:1000", query);
 
-  EXPECT_CALL(*timeout_timer, disableTimer()).Times(2);
+  EXPECT_CALL(*timeout_timer, disableTimer()).Times(1);
 
   // Execute resolve callback
   resolve_cb(Network::DnsResolver::ResolutionStatus::Success,
@@ -621,7 +621,7 @@ TEST_F(DnsFilterTest, ExternalResolutionReturnMultipleAddresses) {
   // Send a query to for a name not in our configuration
   sendQueryFromClient("10.0.0.1:1000", query);
 
-  EXPECT_CALL(*timeout_timer, disableTimer()).Times(2);
+  EXPECT_CALL(*timeout_timer, disableTimer()).Times(1);
 
   // Execute resolve callback
   resolve_cb(Network::DnsResolver::ResolutionStatus::Success,
@@ -673,7 +673,7 @@ TEST_F(DnsFilterTest, ExternalResolutionReturnNoAddresses) {
   // Send a query to for a name not in our configuration
   sendQueryFromClient("10.0.0.1:1000", query);
 
-  EXPECT_CALL(*timeout_timer, disableTimer()).Times(2);
+  EXPECT_CALL(*timeout_timer, disableTimer()).Times(1);
 
   // Execute resolve callback
   resolve_cb(Network::DnsResolver::ResolutionStatus::Success, TestUtility::makeDnsResponse({}));

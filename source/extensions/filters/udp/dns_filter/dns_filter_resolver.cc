@@ -19,8 +19,6 @@ void DnsFilterResolver::resolveExternalQuery(DnsQueryContextPtr context,
                std::chrono::duration_cast<std::chrono::seconds>(timeout_).count();
   ctx.resolver_status = DnsFilterResolverStatus::Pending;
 
-  timeout_timer_->disableTimer();
-
   Network::DnsLookupFamily lookup_family;
   switch (domain_query->type_) {
   case DNS_RECORD_TYPE_A:
@@ -48,27 +46,28 @@ void DnsFilterResolver::resolveExternalQuery(DnsQueryContextPtr context,
     return;
   }
 
+  ctx.timeout_timer = dispatcher_.createTimer([this]() -> void { onResolveTimeout(); });
+  ctx.timeout_timer->enableTimer(timeout_);
+
   lookups_.emplace(id, std::move(ctx));
 
   ENVOY_LOG(trace, "Pending queries: {}", lookups_.size());
-
-  // Re-arm the timeout timer
-  timeout_timer_->enableTimer(timeout_);
 
   // Define the callback that is executed when resolution completes
   auto resolve_cb = [this, id](Network::DnsResolver::ResolutionStatus status,
                                std::list<Network::DnsResponse>&& response) -> void {
     auto ctx_iter = lookups_.find(id);
     if (ctx_iter == lookups_.end()) {
-      ENVOY_LOG(debug, "Unable to find context for DNS query for ID [{}]", id->name_);
+      ENVOY_LOG(debug, "Unable to find context for DNS query for ID [{}]",
+                reinterpret_cast<intptr_t>(id));
       return;
     }
 
-    // We are processing the response here, so we did not timeout. Cancel the timer
-    timeout_timer_->disableTimer();
-
     auto ctx = std::move(ctx_iter->second);
     lookups_.erase(ctx_iter->first);
+
+    // We are processing the response here, so we did not timeout. Cancel the timer
+    ctx.timeout_timer->disableTimer();
 
     ENVOY_LOG(trace, "async query status returned. Entries {}", response.size());
     if (ctx.resolver_status != DnsFilterResolverStatus::Pending) {

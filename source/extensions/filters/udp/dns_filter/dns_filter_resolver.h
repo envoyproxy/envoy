@@ -23,9 +23,7 @@ public:
                     uint64_t max_pending_lookups)
       : dispatcher_(dispatcher),
         resolver_(dispatcher.createDnsResolver(resolvers, false /* use_tcp_for_dns_lookups */)),
-        callback_(callback), timeout_(timeout),
-        timeout_timer_(dispatcher.createTimer([this]() -> void { onResolveTimeout(); })),
-        max_pending_lookups_(max_pending_lookups) {}
+        callback_(callback), timeout_(timeout), max_pending_lookups_(max_pending_lookups) {}
   /**
    * @brief entry point to resolve the name in a DnsQueryRecord
    *
@@ -44,6 +42,7 @@ private:
     uint64_t expiry;
     AddressConstPtrVec resolved_hosts;
     DnsFilterResolverStatus resolver_status;
+    Event::TimerPtr timeout_timer;
   };
   /**
    * @brief invokes the DNS Filter callback only if our state indicates we have not timed out
@@ -52,7 +51,6 @@ private:
   void invokeCallback(LookupContext& context) {
     // If we've timed out. Guard against sending a response
     if (context.resolver_status == DnsFilterResolverStatus::Complete) {
-      timeout_timer_->disableTimer();
       callback_(std::move(context.query_context), context.query_rec, context.resolved_hosts);
     }
   }
@@ -67,7 +65,6 @@ private:
   const Network::DnsResolverSharedPtr resolver_;
   DnsFilterResolverCallback& callback_;
   std::chrono::milliseconds timeout_;
-  Event::TimerPtr timeout_timer_;
   absl::flat_hash_map<const DnsQueryRecord*, LookupContext> lookups_;
   uint64_t max_pending_lookups_;
 };
