@@ -2,10 +2,12 @@
 
 #include "envoy/common/backoff_strategy.h"
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
+#include "envoy/http/filter.h"
 #include "envoy/network/dns.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/cleanup.h"
+#include "common/runtime/runtime_features.h"
 
 #include "extensions/common/dynamic_forward_proxy/dns_cache.h"
 #include "extensions/common/dynamic_forward_proxy/dns_cache_resource_manager.h"
@@ -149,6 +151,29 @@ private:
   const std::chrono::milliseconds host_ttl_;
   const uint32_t max_hosts_;
 };
+
+using DnsCacheOverflowHandler = std::function<Http::FilterHeadersStatus()>;
+
+class DnsCacheCircuitBreakersHandler {
+public:
+  DnsCacheCircuitBreakersHandler(DnsCache& dns_cache);
+  ~DnsCacheCircuitBreakersHandler() {
+    // Make sure that circuit breaker RAII completed.
+    circuit_breaker_.reset();
+  }
+  Http::FilterHeadersStatus handleRequest(const Router::RouteEntry* route_entry,
+                                          Upstream::ClusterInfoConstSharedPtr cluster_info,
+                                          DnsCacheOverflowHandler handle_overflow);
+  void handleRequestFinished() { circuit_breaker_.reset(); }
+  bool isPending() { return circuit_breaker_ != nullptr; }
+
+private:
+  bool should_use_dns_cache_circuit_breakers_{false};
+  DnsCache& dns_cache_;
+  Upstream::ResourceAutoIncDecPtr circuit_breaker_;
+};
+
+using DnsCacheCircuitBreakersHandlerPtr = std::unique_ptr<DnsCacheCircuitBreakersHandler>;
 
 } // namespace DynamicForwardProxy
 } // namespace Common

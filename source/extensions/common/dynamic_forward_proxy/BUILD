@@ -43,6 +43,7 @@ envoy_cc_library(
         "//source/common/common:cleanup_lib",
         "//source/common/config:utility_lib",
         "//source/common/network:utility_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/common/upstream:upstream_lib",
         "@envoy_api//envoy/extensions/common/dynamic_forward_proxy/v3:pkg_cc_proto",
     ],

@@ -3,7 +3,7 @@
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "extensions/common/dynamic_forward_proxy/dns_cache.h"
+#include "extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
 #include "extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
@@ -47,7 +47,11 @@ class ProxyFilter
       public Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryCallbacks,
       Logger::Loggable<Logger::Id::forward_proxy> {
 public:
-  ProxyFilter(const ProxyFilterConfigSharedPtr& config) : config_(config) {}
+  ProxyFilter(const ProxyFilterConfigSharedPtr& config) : config_(config) {
+    cb_handler_ =
+        std::make_unique<Extensions::Common::DynamicForwardProxy::DnsCacheCircuitBreakersHandler>(
+            config_->cache());
+  }
 
   // Http::PassThroughDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
@@ -60,8 +64,8 @@ public:
 private:
   const ProxyFilterConfigSharedPtr config_;
   Upstream::ClusterInfoConstSharedPtr cluster_info_;
-  Upstream::ResourceAutoIncDecPtr circuit_breaker_;
   Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryHandlePtr cache_load_handle_;
+  Extensions::Common::DynamicForwardProxy::DnsCacheCircuitBreakersHandlerPtr cb_handler_;
 };
 
 } // namespace DynamicForwardProxy

@@ -1,10 +1,10 @@
-#include "extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
-
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 
 #include "common/config/utility.h"
 #include "common/http/utility.h"
 #include "common/network/utility.h"
+
+#include "extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
 
 // TODO(mattklein123): Move DNS family helpers to a smaller include.
 #include "common/upstream/upstream_impl.h"
@@ -296,6 +296,35 @@ DnsCacheImpl::PrimaryHostInfo::PrimaryHostInfo(DnsCacheImpl& parent,
 DnsCacheImpl::PrimaryHostInfo::~PrimaryHostInfo() {
   parent_.stats_.host_removed_.inc();
   parent_.stats_.num_hosts_.dec();
+}
+
+DnsCacheCircuitBreakersHandler::DnsCacheCircuitBreakersHandler(DnsCache& dns_cache)
+    : dns_cache_(dns_cache) {
+  const auto& dns_cache_resource_manager = dns_cache_.dnsCacheResourceManager();
+  should_use_dns_cache_circuit_breakers_ =
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.enable_dns_cache_circuit_breakers") &&
+      dns_cache_resource_manager.has_value();
+}
+
+Http::FilterHeadersStatus
+DnsCacheCircuitBreakersHandler::handleRequest(const Router::RouteEntry* route_entry,
+                                              Upstream::ClusterInfoConstSharedPtr cluster_info,
+                                              DnsCacheOverflowHandler handle_overflow) {
+  ResourceLimit& pending_requests =
+      should_use_dns_cache_circuit_breakers_
+          ? dns_cache_.dnsCacheResourceManager()->get().pendingRequests()
+          : cluster_info->resourceManager(route_entry->priority()).pendingRequests();
+  if (!pending_requests.canCreate()) {
+    if (!should_use_dns_cache_circuit_breakers_) {
+      cluster_info->stats().upstream_rq_pending_overflow_.inc();
+    } else {
+      dns_cache_.dnsCacheStatsOverflowInc();
+    }
+    return handle_overflow();
+  }
+  circuit_breaker_ = std::make_unique<Upstream::ResourceAutoIncDec>(pending_requests);
+  return Http::FilterHeadersStatus::Continue;
 }
 
 } // namespace DynamicForwardProxy
