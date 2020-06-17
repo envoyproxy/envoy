@@ -21,7 +21,7 @@ def tcmalloc_external_deps(repository):
 
 # Envoy C++ library targets that need no transformations or additional dependencies before being
 # passed to cc_library should be specified with this function. Note: this exists to ensure that
-# all envoy targets pass through an envoy-declared skylark function where they can be modified
+# all envoy targets pass through an envoy-declared starlark function where they can be modified
 # before being passed to a native bazel function.
 def envoy_basic_cc_library(name, deps = [], external_deps = [], **kargs):
     cc_library(
