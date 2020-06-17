@@ -186,6 +186,8 @@ public:
   virtual ReadPolicy readPolicy() const PURE;
 };
 
+using ConfigSharedPtr = std::shared_ptr<Config>;
+
 /**
  * A factory for individual redis client connections.
  */
