@@ -47,11 +47,10 @@ public:
 class TestConfig : public AdmissionControlFilterConfig {
 public:
   TestConfig(const AdmissionControlProto& proto_config, Runtime::Loader& runtime,
-             TimeSource& time_source, Runtime::RandomGenerator& random, Stats::Scope& scope,
-             ThreadLocal::SlotPtr&& tls, MockThreadLocalController& controller,
-             std::shared_ptr<ResponseEvaluator> evaluator)
-      : AdmissionControlFilterConfig(proto_config, runtime, time_source, random, scope,
-                                     std::move(tls), std::move(evaluator)),
+             Runtime::RandomGenerator& random, Stats::Scope& scope, ThreadLocal::SlotPtr&& tls,
+             MockThreadLocalController& controller, std::shared_ptr<ResponseEvaluator> evaluator)
+      : AdmissionControlFilterConfig(proto_config, runtime, random, scope, std::move(tls),
+                                     std::move(evaluator)),
         controller_(controller) {}
   ThreadLocalController& getController() const override { return controller_; }
 
@@ -69,8 +68,8 @@ public:
     auto tls = context_.threadLocal().allocateSlot();
     evaluator_ = std::make_shared<MockResponseEvaluator>();
 
-    return std::make_shared<TestConfig>(proto, runtime_, time_system_, random_, scope_,
-                                        std::move(tls), controller_, evaluator_);
+    return std::make_shared<TestConfig>(proto, runtime_, random_, scope_, std::move(tls),
+                                        controller_, evaluator_);
   }
 
   void setupFilter(std::shared_ptr<AdmissionControlFilterConfig> config) {

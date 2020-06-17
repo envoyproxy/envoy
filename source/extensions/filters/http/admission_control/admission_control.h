@@ -49,12 +49,14 @@ using AdmissionControlProto =
 class AdmissionControlFilterConfig {
 public:
   AdmissionControlFilterConfig(const AdmissionControlProto& proto_config, Runtime::Loader& runtime,
-                               TimeSource&, Runtime::RandomGenerator& random, Stats::Scope& scope,
+                               Runtime::RandomGenerator& random, Stats::Scope& scope,
                                ThreadLocal::SlotPtr&& tls,
                                std::shared_ptr<ResponseEvaluator> response_evaluator);
   virtual ~AdmissionControlFilterConfig() = default;
 
-  virtual ThreadLocalController& getController() const { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  virtual ThreadLocalController& getController() const {
+    return tls_->getTyped<ThreadLocalControllerImpl>();
+  }
 
   Runtime::RandomGenerator& random() const { return random_; }
   bool filterEnabled() const { return admission_control_feature_.enabled(); }
