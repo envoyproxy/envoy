@@ -18,6 +18,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/network/dns.h"
 #include "envoy/registry/registry.h"
+#include "envoy/server/bootstrap_extension_config.h"
 #include "envoy/server/options.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -289,8 +290,8 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
 void InstanceImpl::initialize(const Options& options,
                               Network::Address::InstanceConstSharedPtr local_address,
                               ComponentFactory& component_factory, ListenerHooks& hooks) {
-  ENVOY_LOG(info, "initializing epoch {} (hot restart version={})", options.restartEpoch(),
-            restarter_.version());
+  ENVOY_LOG(info, "initializing epoch {} (base id={}, hot restart version={})",
+            options.restartEpoch(), restarter_.baseId(), restarter_.version());
 
   ENVOY_LOG(info, "statically linked extensions:");
   for (const auto& ext : Envoy::Registry::FactoryCategoryRegistry::registeredFactories()) {
@@ -319,9 +320,9 @@ void InstanceImpl::initialize(const Options& options,
       ServerStats{ALL_SERVER_STATS(POOL_COUNTER_PREFIX(stats_store_, server_stats_prefix),
                                    POOL_GAUGE_PREFIX(stats_store_, server_stats_prefix),
                                    POOL_HISTOGRAM_PREFIX(stats_store_, server_stats_prefix))});
-  validation_context_.static_warning_validation_visitor().setCounter(
+  validation_context_.static_warning_validation_visitor().setUnknownCounter(
       server_stats_->static_unknown_fields_);
-  validation_context_.dynamic_warning_validation_visitor().setCounter(
+  validation_context_.dynamic_warning_validation_visitor().setUnknownCounter(
       server_stats_->dynamic_unknown_fields_);
 
   initialization_timer_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
@@ -481,6 +482,16 @@ void InstanceImpl::initialize(const Options& options,
   // GuardDog (deadlock detection) object and thread setup before workers are
   // started and before our own run() loop runs.
   guard_dog_ = std::make_unique<Server::GuardDogImpl>(stats_store_, config_, *api_);
+
+  for (const auto& bootstrap_extension : bootstrap_.bootstrap_extensions()) {
+    auto& factory = Config::Utility::getAndCheckFactory<Configuration::BootstrapExtensionFactory>(
+        bootstrap_extension);
+    auto config = Config::Utility::translateAnyToFactoryConfig(
+        bootstrap_extension.typed_config(), messageValidationContext().staticValidationVisitor(),
+        factory);
+    bootstrap_extensions_.push_back(
+        factory.createBootstrapExtension(*config, serverFactoryContext()));
+  }
 }
 
 void InstanceImpl::onClusterManagerPrimaryInitializationComplete() {
@@ -589,13 +600,13 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
       return;
     }
 
-    const auto type_url = Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>(
-        envoy::config::core::v3::ApiVersion::V2);
+    const auto type_urls =
+        Config::getAllVersionTypeUrls<envoy::config::route::v3::RouteConfiguration>();
     // Pause RDS to ensure that we don't send any requests until we've
     // subscribed to all the RDS resources. The subscriptions happen in the init callbacks,
     // so we pause RDS until we've completed all the callbacks.
     if (cm.adsMux()) {
-      cm.adsMux()->pause(type_url);
+      cm.adsMux()->pause(type_urls);
     }
 
     ENVOY_LOG(info, "all clusters initialized. initializing init manager");
@@ -604,7 +615,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
     // Now that we're execute all the init callbacks we can resume RDS
     // as we've subscribed to all the statically defined RDS resources.
     if (cm.adsMux()) {
-      cm.adsMux()->resume(type_url);
+      cm.adsMux()->resume(type_urls);
     }
   });
 }

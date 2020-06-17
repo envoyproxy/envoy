@@ -1,5 +1,6 @@
 #include "common/network/transport_socket_options_impl.h"
 
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <utility>
@@ -13,22 +14,39 @@
 
 namespace Envoy {
 namespace Network {
-void TransportSocketOptionsImpl::hashKey(std::vector<uint8_t>& key) const {
-  if (override_server_name_.has_value()) {
-    pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(override_server_name_.value()), key);
+namespace {
+void commonHashKey(const TransportSocketOptions& options, std::vector<std::uint8_t>& key) {
+  const auto& server_name_overide = options.serverNameOverride();
+  if (server_name_overide.has_value()) {
+    pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(server_name_overide.value()), key);
   }
 
-  if (!override_verify_san_list_.empty()) {
-    for (const auto& san : override_verify_san_list_) {
+  const auto& verify_san_list = options.verifySubjectAltNameListOverride();
+  if (!verify_san_list.empty()) {
+    for (const auto& san : verify_san_list) {
       pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(san), key);
     }
   }
 
-  if (!override_alpn_list_.empty()) {
-    for (const auto& protocol : override_alpn_list_) {
+  const auto& alpn_list = options.applicationProtocolListOverride();
+  if (!alpn_list.empty()) {
+    for (const auto& protocol : alpn_list) {
       pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(protocol), key);
     }
   }
+  const auto& alpn_fallback = options.applicationProtocolFallback();
+  if (alpn_fallback.has_value()) {
+    pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(*alpn_fallback), key);
+  }
+}
+} // namespace
+
+void AlpnDecoratingTransportSocketOptions::hashKey(std::vector<uint8_t>& key) const {
+  commonHashKey(*this, key);
+}
+
+void TransportSocketOptionsImpl::hashKey(std::vector<uint8_t>& key) const {
+  commonHashKey(*this, key);
 }
 
 TransportSocketOptionsSharedPtr
