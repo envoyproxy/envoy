@@ -20,38 +20,40 @@ using testing::AssertionResult;
 
 namespace Envoy {
 
-AdsIntegrationTest::AdsIntegrationTest()
+AdsIntegrationTest::AdsIntegrationTest(const envoy::config::core::v3::ApiVersion api_version)
     : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(),
                           ConfigHelper::adsBootstrap(
-                              sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
+                              sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC",
+                              api_version == envoy::config::core::v3::ApiVersion::V2 ? "V2" : "V3")) {
   use_lds_ = false;
   create_xds_upstream_ = true;
   tls_xds_upstream_ = true;
   sotw_or_delta_ = sotwOrDelta();
+  api_version_ = api_version;
 }
 
 void AdsIntegrationTest::TearDown() { cleanUpXdsConnection(); }
 
 envoy::config::cluster::v3::Cluster AdsIntegrationTest::buildCluster(const std::string& name) {
-  return ConfigHelper::buildCluster(name);
+  return ConfigHelper::buildCluster(name, "ROUND_ROBIN", api_version_);
 }
 
 envoy::config::cluster::v3::Cluster AdsIntegrationTest::buildRedisCluster(const std::string& name) {
-  return ConfigHelper::buildCluster(name, "MAGLEV");
+  return ConfigHelper::buildCluster(name, "MAGLEV", api_version_);
 }
 
 envoy::config::endpoint::v3::ClusterLoadAssignment
 AdsIntegrationTest::buildClusterLoadAssignment(const std::string& name) {
   return ConfigHelper::buildClusterLoadAssignment(
       name, Network::Test::getLoopbackAddressString(ipVersion()),
-      fake_upstreams_[0]->localAddress()->ip()->port());
+      fake_upstreams_[0]->localAddress()->ip()->port(), api_version_);
 }
 
 envoy::config::listener::v3::Listener
 AdsIntegrationTest::buildListener(const std::string& name, const std::string& route_config,
                                   const std::string& stat_prefix) {
   return ConfigHelper::buildListener(
-      name, route_config, Network::Test::getLoopbackAddressString(ipVersion()), stat_prefix);
+      name, route_config, Network::Test::getLoopbackAddressString(ipVersion()), stat_prefix, api_version_);
 }
 
 envoy::config::listener::v3::Listener
@@ -71,12 +73,12 @@ AdsIntegrationTest::buildRedisListener(const std::string& name, const std::strin
     )EOF",
       name, cluster);
   return ConfigHelper::buildBaseListener(name, Network::Test::getLoopbackAddressString(ipVersion()),
-                                         redis);
+                                         redis, api_version_);
 }
 
 envoy::config::route::v3::RouteConfiguration
 AdsIntegrationTest::buildRouteConfig(const std::string& name, const std::string& cluster) {
-  return ConfigHelper::buildRouteConfig(name, cluster);
+  return ConfigHelper::buildRouteConfig(name, cluster, api_version_);
 }
 
 void AdsIntegrationTest::makeSingleRequest() {

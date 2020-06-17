@@ -16,7 +16,8 @@ namespace Envoy {
 
 class AdsIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest, public HttpIntegrationTest {
 public:
-  AdsIntegrationTest();
+  AdsIntegrationTest(const envoy::config::core::v3::ApiVersion api_version);
+  AdsIntegrationTest() : AdsIntegrationTest(envoy::config::core::v3::ApiVersion::V2) {}
 
   void TearDown() override;
 
@@ -47,6 +48,9 @@ public:
   envoy::admin::v3::ClustersConfigDump getClustersConfigDump();
   envoy::admin::v3::ListenersConfigDump getListenersConfigDump();
   envoy::admin::v3::RoutesConfigDump getRoutesConfigDump();
+
+  envoy::config::core::v3::ApiVersion api_version_;
+
 };
 
 } // namespace Envoy
