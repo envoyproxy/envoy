@@ -777,9 +777,6 @@ private:
 // methods such as Stats::Utility::counterFromElements in common/stats/utility.h
 // to simplify the process of allocating and combining stat names and creating
 // counters, gauges, and histograms from them.
-//
-// For convenience, the StatNameSet offers pass-through thread-safe access to
-// its mutex-protected pool.
 class StatNameSet {
 public:
   // This object must be instantiated via SymbolTable::makeSet(), thus constructor is private.
@@ -815,6 +812,22 @@ public:
 
   /**
    * Adds a StatName using the pool, but without remembering it in any maps.
+   *
+   * For convenience, StatNameSet offers pass-through thread-safe access to
+   * its mutex-protected pool. This is useful in constructor initializers, when
+   * StatNames are needed both from compile-time constants, as well as from
+   * other constructor args, e.g.
+   *    MyClass(const std::vector<absl::string_view>& strings, Stats::SymbolTable& symbol_table)
+   *        : stat_name_set_(symbol_table),
+   *          known_const_(stat_name_set_.add("known_const")) { // unmapped constants from pool
+   *      stat_name_set_.rememberBuiltins(strings); // mapped builtins.
+   *    }
+   * This avoids the need to make two different pools; one backing the
+   * StatNameSet mapped entries, and the other backing the set passed in via the
+   * constructor.
+   *
+   * @param str The string to add as a StatName
+   * @return The StatName for str.
    */
   StatName add(absl::string_view str) {
     absl::MutexLock lock(&mutex_);
