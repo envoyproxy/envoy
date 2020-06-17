@@ -27,7 +27,6 @@ class ValidatingCodeBlock(CodeBlock):
   }
   option_spec.update(CodeBlock.option_spec)
   skip_validation = (os.getenv('SPHINX_SKIP_CONFIG_VALIDATION') or 'false').lower() == 'true'
-  bazel_build_options = os.getenv('BAZEL_BUILD_OPTIONS') or ''
 
   def run(self):
     source, line = self.state_machine.get_source_and_line(self.lineno)
@@ -36,11 +35,7 @@ class ValidatingCodeBlock(CodeBlock):
       raise ExtensionError("Expected type name in: {0} line: {1}".format(source, line))
 
     if not ValidatingCodeBlock.skip_validation:
-      args = [
-          arg for arg in ['bazel-bin/tools/config_validation/validate_fragment'] +
-          ValidatingCodeBlock.bazel_build_options.split() +
-          [self.options.get('type-name'), '-s', '\n'.join(self.content)] if arg != None
-      ]
+      args = ['bazel-bin/tools/config_validation/validate_fragment', self.options.get('type-name'), '-s', '\n'.join(self.content)]
       process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
       stdout, stderr = process.communicate()
       if process.poll():
