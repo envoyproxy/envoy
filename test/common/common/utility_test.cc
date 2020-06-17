@@ -909,8 +909,10 @@ TEST(ContainerRemoveElementsTest, Containers) {
 TEST(ContainerRemoveElementsListTest, Containers) {
   std::list<int> l = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
   std::function<bool(int)> evens = [](int i) { return i % 2 == 0; };
+
   Containers::removeMatchingElements(l, evens);
-  EXPECT_EQ(5, l.size());
+  // since the swap-and-erase happens iteratively, the list is very reordered
+  EXPECT_EQ((std::list<int>{1, 9, 3, 7, 5}), l);
 }
 
 } // namespace Envoy
