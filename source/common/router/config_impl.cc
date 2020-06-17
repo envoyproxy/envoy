@@ -671,14 +671,14 @@ std::string RouteEntryImplBase::newPath(const Http::RequestHeaderMap& headers) c
 
   std::string final_path_value;
   if (!path_redirect_.empty()) {
-    // the path_redirect query string, if any, takes precedence over the request's query string,
+    // The path_redirect query string, if any, takes precedence over the request's query string,
     // and it will not be stripped regardless of `strip_query`.
     if (path_redirect_has_query_) {
       final_path = path_redirect_.c_str();
     } else {
-      absl::string_view current_path = headers.getPathValue();
-      size_t path_end = current_path.find('?');
-      bool current_path_has_query = path_end != absl::string_view::npos;
+      const absl::string_view current_path = headers.getPathValue();
+      const size_t path_end = current_path.find('?');
+      const bool current_path_has_query = path_end != absl::string_view::npos;
       if (current_path_has_query) {
         final_path_value = path_redirect_;
         final_path_value.append(current_path.data() + path_end, current_path.length() - path_end);
@@ -691,7 +691,7 @@ std::string RouteEntryImplBase::newPath(const Http::RequestHeaderMap& headers) c
     final_path = headers.getPathValue();
   }
   if (!path_redirect_has_query_ && strip_query_) {
-    size_t path_end = final_path.find('?');
+    const size_t path_end = final_path.find('?');
     if (path_end != absl::string_view::npos) {
       final_path = final_path.substr(0, path_end);
     }
