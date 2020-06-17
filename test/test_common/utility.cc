@@ -137,7 +137,7 @@ Stats::CounterSharedPtr TestUtility::findCounter(Stats::Store& store, absl::stri
   return findByName(store.counters(), name);
 }
 
-Stats::GaugeSharedPtr TestUtility::findGauge(Stats::Store& store, const std::string& name) {
+Stats::GaugeSharedPtr TestUtility::findGauge(Stats::Store& store, absl::string_view name) {
   return findByName(store.gauges(), name);
 }
 
@@ -167,7 +167,7 @@ void TestUtility::waitForGaugeGe(Stats::Store& store, const std::string& name, u
   }
 }
 
-void TestUtility::waitForGaugeEq(Stats::Store& store, const std::string& name, uint64_t value,
+void TestUtility::waitForGaugeEq(Stats::Store& store, absl::string_view name, uint64_t value,
                                  Event::TestTimeSystem& time_system) {
   while (findGauge(store, name) == nullptr || findGauge(store, name)->value() != value) {
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
