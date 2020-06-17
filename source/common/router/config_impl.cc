@@ -149,14 +149,11 @@ InternalRedirectPolicyImpl::InternalRedirectPolicyImpl(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(policy_config, max_internal_redirects, 1)),
       enabled_(true), allow_cross_scheme_redirect_(policy_config.allow_cross_scheme_redirect()) {
   for (const auto& predicate : policy_config.predicates()) {
-    const std::string type{
-        TypeUtil::typeUrlToDescriptorFullName(predicate.typed_config().type_url())};
-    auto* factory =
-        Registry::FactoryRegistry<InternalRedirectPredicateFactory>::getFactoryByType(type);
-
-    auto config = factory->createEmptyConfigProto();
+    auto& factory =
+        Envoy::Config::Utility::getAndCheckFactory<InternalRedirectPredicateFactory>(predicate);
+    auto config = factory.createEmptyConfigProto();
     Envoy::Config::Utility::translateOpaqueConfig(predicate.typed_config(), {}, validator, *config);
-    predicate_factories_.emplace_back(factory, std::move(config));
+    predicate_factories_.emplace_back(&factory, std::move(config));
   }
 }
 
