@@ -6,12 +6,10 @@ load(
 
 licenses(["notice"])  # Apache 2
 
-# Built-in plaintext connection transport socket.
-
 envoy_package()
 
 envoy_cc_extension(
-    name = "proxy_protocol",
+    name = "upstream_proxy_protocol",
     srcs = ["proxy_protocol.cc"],
     hdrs = ["proxy_protocol.h"],
     security_posture = "robust_to_untrusted_downstream",

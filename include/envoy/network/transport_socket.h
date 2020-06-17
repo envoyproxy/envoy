@@ -188,7 +188,7 @@ public:
   /**
    * @return optional proxy protocol address info.
    */
-  virtual absl::optional<Network::ProxyProtocolHeader> proxyProtocolHeader() const PURE;
+  virtual absl::optional<Network::ProxyProtocolOptions> proxyProtocolOptions() const PURE;
 
   /**
    * @param vector of bytes to which the option should append hash key data that will be used

@@ -242,8 +242,8 @@ TEST_F(ProxyProtocolTest, V1IPV4DownstreamAddresses) {
   Network::TransportSocketOptionsSharedPtr socket_options =
       std::make_shared<Network::TransportSocketOptionsImpl>(
           "", std::vector<std::string>{}, std::vector<std::string>{},
-          absl::optional<Network::ProxyProtocolHeader>(
-              Network::ProxyProtocolHeader{src_addr, dst_addr}));
+          absl::optional<Network::ProxyProtocolOptions>(
+              Network::ProxyProtocolOptions{src_addr, dst_addr}));
   transport_callbacks_.connection_.local_address_ =
       Network::Utility::resolveUrl("tcp://174.2.2.222:50000");
   transport_callbacks_.connection_.remote_address_ =
@@ -272,8 +272,8 @@ TEST_F(ProxyProtocolTest, V1IPV6DownstreamAddresses) {
   Network::TransportSocketOptionsSharedPtr socket_options =
       std::make_shared<Network::TransportSocketOptionsImpl>(
           "", std::vector<std::string>{}, std::vector<std::string>{},
-          absl::optional<Network::ProxyProtocolHeader>(
-              Network::ProxyProtocolHeader{src_addr, dst_addr}));
+          absl::optional<Network::ProxyProtocolOptions>(
+              Network::ProxyProtocolOptions{src_addr, dst_addr}));
   transport_callbacks_.connection_.local_address_ =
       Network::Utility::resolveUrl("tcp://[a:b:c:d::]:50000");
   transport_callbacks_.connection_.remote_address_ =
@@ -343,8 +343,8 @@ TEST_F(ProxyProtocolTest, V2IPV4DownstreamAddresses) {
   Network::TransportSocketOptionsSharedPtr socket_options =
       std::make_shared<Network::TransportSocketOptionsImpl>(
           "", std::vector<std::string>{}, std::vector<std::string>{},
-          absl::optional<Network::ProxyProtocolHeader>(
-              Network::ProxyProtocolHeader{src_addr, dst_addr}));
+          absl::optional<Network::ProxyProtocolOptions>(
+              Network::ProxyProtocolOptions{src_addr, dst_addr}));
   transport_callbacks_.connection_.local_address_ =
       Network::Utility::resolveUrl("tcp://0.1.1.2:50000");
   transport_callbacks_.connection_.remote_address_ =
@@ -373,8 +373,8 @@ TEST_F(ProxyProtocolTest, V2IPV6DownstreamAddresses) {
   Network::TransportSocketOptionsSharedPtr socket_options =
       std::make_shared<Network::TransportSocketOptionsImpl>(
           "", std::vector<std::string>{}, std::vector<std::string>{},
-          absl::optional<Network::ProxyProtocolHeader>(
-              Network::ProxyProtocolHeader{src_addr, dst_addr}));
+          absl::optional<Network::ProxyProtocolOptions>(
+              Network::ProxyProtocolOptions{src_addr, dst_addr}));
   transport_callbacks_.connection_.local_address_ =
       Network::Utility::resolveUrl("tcp://[1:100:200:3::]:50000");
   transport_callbacks_.connection_.remote_address_ =

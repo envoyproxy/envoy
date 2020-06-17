@@ -107,7 +107,7 @@ envoy_cc_library(
     hdrs = ["transport_socket.h"],
     deps = [
         ":io_handle_interface",
-        ":proxy_protocol_header",
+        ":proxy_protocol_options_lib",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/ssl:connection_interface",
     ],
@@ -146,7 +146,7 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "proxy_protocol_header",
+    name = "proxy_protocol_options_lib",
     hdrs = ["proxy_protocol.h"],
     deps = [
         ":address_interface",

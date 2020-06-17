@@ -8,6 +8,7 @@
 #include "common/common/scalar_to_byte_vector.h"
 #include "common/common/utility.h"
 #include "common/network/application_protocol.h"
+#include "common/network/proxy_protocol_filter_state.h"
 #include "common/network/upstream_server_name.h"
 #include "common/network/upstream_subject_alt_names.h"
 
@@ -33,16 +34,10 @@ void TransportSocketOptionsImpl::hashKey(std::vector<uint8_t>& key) const {
 
 TransportSocketOptionsSharedPtr
 TransportSocketOptionsUtility::fromFilterState(const StreamInfo::FilterState& filter_state) {
-  return fromFilterStateWithProxyProtocolHeader(filter_state, absl::nullopt);
-}
-
-TransportSocketOptionsSharedPtr
-TransportSocketOptionsUtility::fromFilterStateWithProxyProtocolHeader(
-    const StreamInfo::FilterState& filter_state,
-    absl::optional<Network::ProxyProtocolHeader> proxy_proto_header) {
   absl::string_view server_name;
   std::vector<std::string> application_protocols;
   std::vector<std::string> subject_alt_names;
+  absl::optional<Network::ProxyProtocolOptions> proxy_protocol_options = absl::nullopt;
 
   bool needs_transport_socket_options = false;
   if (filter_state.hasData<UpstreamServerName>(UpstreamServerName::key())) {
@@ -66,14 +61,17 @@ TransportSocketOptionsUtility::fromFilterStateWithProxyProtocolHeader(
     needs_transport_socket_options = true;
   }
 
-  if (proxy_proto_header.has_value()) {
+  if (filter_state.hasData<ProxyProtocolFilterState>(ProxyProtocolFilterState::key())) {
+    const auto& proxy_protocol_filter_state =
+        filter_state.getDataReadOnly<ProxyProtocolFilterState>(ProxyProtocolFilterState::key());
+    proxy_protocol_options.emplace(proxy_protocol_filter_state.value());
     needs_transport_socket_options = true;
   }
 
   if (needs_transport_socket_options) {
     return std::make_shared<Network::TransportSocketOptionsImpl>(
         server_name, std::move(subject_alt_names), std::move(application_protocols),
-        proxy_proto_header);
+        proxy_protocol_options);
   } else {
     return nullptr;
   }

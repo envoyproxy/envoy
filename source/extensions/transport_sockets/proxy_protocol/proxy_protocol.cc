@@ -86,21 +86,21 @@ void ProxyProtocolSocket::generateHeaderV1() {
   auto src_addr = callbacks_->connection().localAddress();
   auto dst_addr = callbacks_->connection().remoteAddress();
 
-  if (options_ && options_->proxyProtocolHeader().has_value()) {
-    const auto header = options_->proxyProtocolHeader().value();
-    src_addr = header.src_addr_;
-    dst_addr = header.dst_addr_;
+  if (options_ && options_->proxyProtocolOptions().has_value()) {
+    const auto options = options_->proxyProtocolOptions().value();
+    src_addr = options.src_addr_;
+    dst_addr = options.dst_addr_;
   }
 
   Common::ProxyProtocol::generateV1Header(*src_addr->ip(), *dst_addr->ip(), header_buffer_);
 }
 
 void ProxyProtocolSocket::generateHeaderV2() {
-  if (!options_ || !options_->proxyProtocolHeader().has_value()) {
+  if (!options_ || !options_->proxyProtocolOptions().has_value()) {
     Common::ProxyProtocol::generateV2LocalHeader(header_buffer_);
   } else {
-    const auto header = options_->proxyProtocolHeader().value();
-    Common::ProxyProtocol::generateV2Header(*header.src_addr_->ip(), *header.dst_addr_->ip(),
+    const auto options = options_->proxyProtocolOptions().value();
+    Common::ProxyProtocol::generateV2Header(*options.src_addr_->ip(), *options.dst_addr_->ip(),
                                             header_buffer_);
   }
 }
