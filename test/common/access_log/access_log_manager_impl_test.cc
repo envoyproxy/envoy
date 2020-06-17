@@ -39,11 +39,11 @@ protected:
     EXPECT_CALL(api_, threadFactory()).WillRepeatedly(ReturnRef(thread_factory_));
   }
 
-  void waitForCounterEq(const std::string& name, uint64_t value) {
+  void waitForCounterEq(absl::string_view name, uint64_t value) {
     TestUtility::waitForCounterEq(store_, name, value, time_system_);
   }
 
-  void waitForGaugeEq(const std::string& name, uint64_t value) {
+  void waitForGaugeEq( absl::string_view name, uint64_t value) {
     TestUtility::waitForGaugeEq(store_, name, value, time_system_);
   }
 
