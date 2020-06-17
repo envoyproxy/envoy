@@ -53,11 +53,12 @@ VersionedClient::getMethodDescriptorForVersion(envoy::config::core::v3::ApiVersi
   case envoy::config::core::v3::ApiVersion::AUTO:
     FALLTHRU;
   case envoy::config::core::v3::ApiVersion::V2:
-    method_name = fmt::format(methodNameTemplate(), use_alpha ? "v2alpha" : "v2");
+    method_name = fmt::format(methodNameTemplate(), use_alpha ? "v2alpha" : "v2",
+                              serviceNamespace(api_version));
     break;
 
   case envoy::config::core::v3::ApiVersion::V3:
-    method_name = fmt::format(methodNameTemplate(), "v3");
+    method_name = fmt::format(methodNameTemplate(), "v3", serviceNamespace(api_version));
     break;
 
   default:

@@ -4,6 +4,7 @@
 
 #include "envoy/grpc/async_client.h"
 
+#include "common/common/empty_string.h"
 #include "common/config/version_converter.h"
 
 namespace Envoy {
@@ -91,9 +92,19 @@ public:
 
   /**
    * @return std::string template of a fully-qualified service method name. For example:
-   *                     envoy.service.auth.{}.Authorization.Check.
+   * envoy.service.auth.{}.Authorization.Check.
    */
   virtual const std::string methodNameTemplate() const PURE;
+
+  /**
+   * @return std::string to override the namespace of a service for a specific version. When it
+   * returns non-EMPTY_STRING, methodNameTemplate() should return a template in the following
+   * format: envoy.service.{1}.{0}.SERVICE_NAME.METHOD_NAME. For example,
+   * envoy.service.{1}.{0}.Authorization.Check.
+   */
+  virtual const std::string serviceNamespace(envoy::config::core::v3::ApiVersion) const {
+    return EMPTY_STRING;
+  };
 
   /**
    * Given a version, return the method descriptor for a specific version.

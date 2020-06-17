@@ -6,9 +6,17 @@
 
 #include "common/common/logger.h"
 #include "common/grpc/async_client_impl.h"
+#include "common/grpc/typed_async_client.h"
 
 namespace Envoy {
 namespace Upstream {
+
+namespace {
+// The fully-qualified name template for the load reporting service's StreamLoadStats method.
+constexpr char STREAM_LOAD_STATS_METHOD_NAME_TEMPLATE[] =
+    "envoy.service.load_stats.{}.LoadReportingService.StreamLoadStats";
+
+} // namespace
 
 /**
  * All load reporter stats. @see stats_macros.h
@@ -27,6 +35,7 @@ struct LoadReporterStats {
 
 class LoadStatsReporter
     : Grpc::AsyncStreamCallbacks<envoy::service::load_stats::v3::LoadStatsResponse>,
+      Grpc::VersionedClient,
       Logger::Loggable<Logger::Id::upstream> {
 public:
   LoadStatsReporter(const LocalInfo::LocalInfo& local_info, ClusterManager& cluster_manager,
@@ -41,6 +50,11 @@ public:
       std::unique_ptr<envoy::service::load_stats::v3::LoadStatsResponse>&& message) override;
   void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&& metadata) override;
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
+
+  // Config::VersionedClient
+  const std::string methodNameTemplate() const override {
+    return STREAM_LOAD_STATS_METHOD_NAME_TEMPLATE;
+  }
 
   // TODO(htuch): Make this configurable or some static.
   const uint32_t RETRY_DELAY_MS = 5000;
