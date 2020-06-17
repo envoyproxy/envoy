@@ -3,7 +3,6 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/network/connection.h"
 
-#include "extensions/common/sqlutils/sqlutils.h"
 #include "extensions/filters/network/postgres_proxy/postgres_decoder.h"
 #include "extensions/filters/network/well_known_names.h"
 
@@ -165,7 +164,7 @@ void PostgresFilter::incStatements(StatementType type) {
 void PostgresFilter::processQuery(const std::string& sql) {
   ProtobufWkt::Struct metadata;
 
-  auto result = Common::SQLUtils::SQLUtils::setMetadata(sql, metadata);
+  auto result = Common::SQLUtils::SQLUtils::setMetadata(sql, decoder_->getAttributes(), metadata);
 
   if (!result) {
     config_->stats_.queries_parse_error_.inc();

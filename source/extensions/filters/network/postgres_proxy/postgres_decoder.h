@@ -6,6 +6,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"
 
+#include "extensions/common/sqlutils/sqlutils.h"
 #include "extensions/filters/network/postgres_proxy/postgres_session.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -50,6 +51,15 @@ public:
 
   virtual bool onData(Buffer::Instance& data, bool frontend) PURE;
   virtual PostgresSession& getSession() PURE;
+
+  const Extensions::Common::SQLUtils::SQLUtils::decoderAttributes& getAttributes() const {
+    return attributes_;
+  }
+
+protected:
+  // Decoder attributes extracted from Startup message.
+  // It can be username, database name, client app type, etc.
+  Extensions::Common::SQLUtils::SQLUtils::decoderAttributes attributes_;
 };
 
 using DecoderPtr = std::unique_ptr<Decoder>;
@@ -71,7 +81,6 @@ public:
   void initialize();
 
   bool encrypted() const { return encrypted_; }
-  const std::map<std::string, std::string>& getAttributes() const { return attributes_; }
 
 protected:
   // Message action defines the Decoder's method which will be invoked
@@ -131,9 +140,8 @@ protected:
   std::string message_;
   uint32_t message_len_{};
 
-  bool startup_{true};                            // startup stage does not have 1st byte command
-  bool encrypted_{false};                         // tells if exchange is encrypted
-  std::map<std::string, std::string> attributes_; // attributes extracted from Startup message
+  bool startup_{true};    // startup stage does not have 1st byte command
+  bool encrypted_{false}; // tells if exchange is encrypted
 
   // Dispatchers for Backend (BE) and Frontend (FE) messages.
   MsgGroup FE_messages_;
