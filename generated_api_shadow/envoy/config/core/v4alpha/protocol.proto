@@ -172,7 +172,7 @@ message Http2ProtocolOptions {
 
     // The 16 bit parameter identifier.
     google.protobuf.UInt32Value identifier = 1 [
-      (validate.rules).uint32 = {lte: 65536 gte: 1},
+      (validate.rules).uint32 = {lte: 65535 gte: 0},
       (validate.rules).message = {required: true}
     ];
 
