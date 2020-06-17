@@ -15,11 +15,11 @@ namespace SQLUtils {
 // The map is checked only when parsing was successful. Map is indexed by table name and points to
 // list of operations performed on the table. For example table1: "select", "insert" says that there
 // was SELECT and INSERT operations on table1.
-// decoderAttributes is a map containing additional attributes which augment creating metadata.
+// DecoderAttributes is a map containing additional attributes which augment creating metadata.
 class MetadataFromSQLTest
     : public ::testing::TestWithParam<
           std::tuple<std::string, bool, std::map<std::string, std::list<std::string>>,
-                     SQLUtils::decoderAttributes>> {};
+                     SQLUtils::DecoderAttributes>> {};
 
 // Test takes SQL query as a parameter and checks if the parsing
 // produces the correct metadata.
@@ -103,7 +103,7 @@ TEST_P(MetadataFromSQLTest, ParsingAndMetadataTest) {
 // only.
 #define TEST_VALUE(...)                                                                            \
   std::tuple<std::string, bool, std::map<std::string, std::list<std::string>>,                     \
-             SQLUtils::decoderAttributes> {                                                        \
+             SQLUtils::DecoderAttributes> {                                                        \
     __VA_ARGS__                                                                                    \
   }
 INSTANTIATE_TEST_SUITE_P(

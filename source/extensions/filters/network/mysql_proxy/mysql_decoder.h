@@ -47,13 +47,13 @@ public:
   virtual void onData(Buffer::Instance& data) PURE;
   virtual MySQLSession& getSession() PURE;
 
-  const Extensions::Common::SQLUtils::SQLUtils::decoderAttributes& getAttributes() const {
+  const Extensions::Common::SQLUtils::SQLUtils::DecoderAttributes& getAttributes() const {
     return attributes_;
   }
 
 protected:
   // Decoder attributes.
-  Extensions::Common::SQLUtils::SQLUtils::decoderAttributes attributes_;
+  Extensions::Common::SQLUtils::SQLUtils::DecoderAttributes attributes_;
 };
 
 using DecoderPtr = std::unique_ptr<Decoder>;

@@ -52,14 +52,14 @@ public:
   virtual bool onData(Buffer::Instance& data, bool frontend) PURE;
   virtual PostgresSession& getSession() PURE;
 
-  const Extensions::Common::SQLUtils::SQLUtils::decoderAttributes& getAttributes() const {
+  const Extensions::Common::SQLUtils::SQLUtils::DecoderAttributes& getAttributes() const {
     return attributes_;
   }
 
 protected:
   // Decoder attributes extracted from Startup message.
   // It can be username, database name, client app type, etc.
-  Extensions::Common::SQLUtils::SQLUtils::decoderAttributes attributes_;
+  Extensions::Common::SQLUtils::SQLUtils::DecoderAttributes attributes_;
 };
 
 using DecoderPtr = std::unique_ptr<Decoder>;

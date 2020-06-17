@@ -9,7 +9,7 @@ namespace SQLUtils {
 
 class SQLUtils {
 public:
-  using decoderAttributes = std::map<std::string, std::string>;
+  using DecoderAttributes = std::map<std::string, std::string>;
   /**
    * Method parses SQL query string and writes output to metadata.
    * @param query supplies SQL statement.
@@ -21,7 +21,7 @@ public:
    *         If True was returned the metadata contains result of parsing. The results are
    *         stored in metadata.mutable_fields.
    **/
-  static bool setMetadata(const std::string& query, const decoderAttributes& attr,
+  static bool setMetadata(const std::string& query, const DecoderAttributes& attr,
                           ProtobufWkt::Struct& metadata);
 };
 
