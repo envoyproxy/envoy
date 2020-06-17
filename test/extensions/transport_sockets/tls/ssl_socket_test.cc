@@ -3847,6 +3847,11 @@ TEST_P(SslSocketTest, ALPN) {
   testUtilV2(test_options);
   client_ctx->clear_alpn_protocols();
   server_ctx->clear_alpn_protocols();
+
+  // Client attempts to configure ALPN that is too large.
+  client_ctx->add_alpn_protocols(std::string(100000, 'a'));
+  EXPECT_THROW_WITH_MESSAGE(testUtilV2(test_options), EnvoyException,
+                            "Invalid ALPN protocol string");
 }
 
 TEST_P(SslSocketTest, CipherSuites) {
@@ -4189,15 +4194,29 @@ TEST_P(SslSocketTest, OverrideApplicationProtocols) {
   server_ctx->add_alpn_protocols("test");
   testUtilV2(test_options);
   server_ctx->clear_alpn_protocols();
-
   // Override client side ALPN, "test" ALPN is used.
   server_ctx->add_alpn_protocols("test");
-  Network::TransportSocketOptionsSharedPtr transport_socket_options(
-      new Network::TransportSocketOptionsImpl("", {}, {"foo", "test", "bar"}));
+  auto transport_socket_options = std::make_shared<Network::TransportSocketOptionsImpl>(
+      "", std::vector<std::string>{}, std::vector<std::string>{"foo", "test", "bar"});
 
   testUtilV2(test_options.setExpectedALPNProtocol("test").setTransportSocketOptions(
       transport_socket_options));
-  server_ctx->clear_alpn_protocols();
+
+  // Set fallback ALPN on the client side ALPN, "test" ALPN is used since no ALPN is specified
+  // in the config.
+  server_ctx->add_alpn_protocols("test");
+  transport_socket_options = std::make_shared<Network::TransportSocketOptionsImpl>(
+      "", std::vector<std::string>{}, std::vector<std::string>{}, "test");
+  testUtilV2(test_options.setExpectedALPNProtocol("test").setTransportSocketOptions(
+      transport_socket_options));
+
+  // Update the client TLS config to specify ALPN. The fallback value should no longer be used.
+  // Note that the server prefers "test" over "bar", but since the client only configures "bar",
+  // the resulting ALPN will be "bar" even though "test" is included in the fallback.
+  server_ctx->add_alpn_protocols("bar");
+  client.mutable_common_tls_context()->add_alpn_protocols("bar");
+  testUtilV2(test_options.setExpectedALPNProtocol("bar").setTransportSocketOptions(
+      transport_socket_options));
 }
 
 // Validate that if downstream secrets are not yet downloaded from SDS server, Envoy creates

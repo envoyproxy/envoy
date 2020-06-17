@@ -72,18 +72,18 @@ private:
     bool operator()(const Metric* a, StatName b) const { return a->statName() == b; }
   };
 
-  void removeCounterFromSetLockHeld(Counter* counter) EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-  void removeGaugeFromSetLockHeld(Gauge* gauge) EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-  void removeTextReadoutFromSetLockHeld(Counter* counter) EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  void removeCounterFromSetLockHeld(Counter* counter) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  void removeGaugeFromSetLockHeld(Gauge* gauge) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  void removeTextReadoutFromSetLockHeld(Counter* counter) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   // An unordered set of HeapStatData pointers which keys off the key()
   // field in each object. This necessitates a custom comparator and hasher, which key off of the
   // StatNamePtr's own StatNamePtrHash and StatNamePtrCompare operators.
   template <class StatType>
   using StatSet = absl::flat_hash_set<StatType*, HeapStatHash, HeapStatCompare>;
-  StatSet<Counter> counters_ GUARDED_BY(mutex_);
-  StatSet<Gauge> gauges_ GUARDED_BY(mutex_);
-  StatSet<TextReadout> text_readouts_ GUARDED_BY(mutex_);
+  StatSet<Counter> counters_ ABSL_GUARDED_BY(mutex_);
+  StatSet<Gauge> gauges_ ABSL_GUARDED_BY(mutex_);
+  StatSet<TextReadout> text_readouts_ ABSL_GUARDED_BY(mutex_);
 
   SymbolTable& symbol_table_;
 

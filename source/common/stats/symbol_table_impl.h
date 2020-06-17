@@ -237,7 +237,7 @@ private:
    * @param sv the individual string to be encoded as a symbol.
    * @return Symbol the encoded string.
    */
-  Symbol toSymbol(absl::string_view sv) EXCLUSIVE_LOCKS_REQUIRED(lock_);
+  Symbol toSymbol(absl::string_view sv) ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   /**
    * Convenience function for decode(), decoding one symbol at a time.
@@ -245,7 +245,7 @@ private:
    * @param symbol the individual symbol to be decoded.
    * @return absl::string_view the decoded string.
    */
-  absl::string_view fromSymbol(Symbol symbol) const EXCLUSIVE_LOCKS_REQUIRED(lock_);
+  absl::string_view fromSymbol(Symbol symbol) const ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   /**
    * Stages a new symbol for use. To be called after a successful insertion.
@@ -268,7 +268,7 @@ private:
 
   // Stores the symbol to be used at next insertion. This should exist ahead of insertion time so
   // that if insertion succeeds, the value written is the correct one.
-  Symbol next_symbol_ GUARDED_BY(lock_);
+  Symbol next_symbol_ ABSL_GUARDED_BY(lock_);
 
   // If the free pool is exhausted, we monotonically increase this counter.
   Symbol monotonic_counter_;
@@ -278,14 +278,14 @@ private:
   // Using absl::string_view lets us only store the complete string once, in the decode map.
   using EncodeMap = absl::flat_hash_map<absl::string_view, SharedSymbol>;
   using DecodeMap = absl::flat_hash_map<Symbol, InlineStringPtr>;
-  EncodeMap encode_map_ GUARDED_BY(lock_);
-  DecodeMap decode_map_ GUARDED_BY(lock_);
+  EncodeMap encode_map_ ABSL_GUARDED_BY(lock_);
+  DecodeMap decode_map_ ABSL_GUARDED_BY(lock_);
 
   // Free pool of symbols for re-use.
   // TODO(ambuc): There might be an optimization here relating to storing ranges of freed symbols
   // using an Envoy::IntervalSet.
-  std::stack<Symbol> pool_ GUARDED_BY(lock_);
-  RecentLookups recent_lookups_ GUARDED_BY(lock_);
+  std::stack<Symbol> pool_ ABSL_GUARDED_BY(lock_);
+  RecentLookups recent_lookups_ ABSL_GUARDED_BY(lock_);
 };
 
 // Base class for holding the backing-storing for a StatName. The two derived
@@ -818,7 +818,7 @@ private:
 
   const std::string name_;
   Stats::SymbolTable& symbol_table_;
-  Stats::StatNamePool pool_ GUARDED_BY(mutex_);
+  Stats::StatNamePool pool_ ABSL_GUARDED_BY(mutex_);
   mutable absl::Mutex mutex_;
   using StringStatNameMap = absl::flat_hash_map<std::string, Stats::StatName>;
   StringStatNameMap builtin_stat_names_;
