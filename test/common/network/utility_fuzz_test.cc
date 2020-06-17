@@ -9,8 +9,9 @@ namespace Envoy {
 namespace Fuzz {
 
 DEFINE_FUZZER(const uint8_t* buf, size_t len) {
+  const std::string string_buffer(reinterpret_cast<const char*>(buf), len);
+
   {
-    const std::string string_buffer(reinterpret_cast<const char*>(buf), len);
     try {
       Network::Utility::parseInternetAddress(string_buffer);
     } catch (const EnvoyException& e) {
@@ -19,7 +20,6 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   }
 
   {
-    const std::string string_buffer(reinterpret_cast<const char*>(buf), len);
     try {
       Network::Utility::parseInternetAddressAndPort(string_buffer);
     } catch (const EnvoyException& e) {
@@ -28,7 +28,6 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   }
 
   {
-    const std::string string_buffer(reinterpret_cast<const char*>(buf), len);
     std::list<Network::PortRange> port_range_list;
     try {
       Network::Utility::parsePortRangeList(string_buffer, port_range_list);
@@ -38,7 +37,6 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   }
 
   {
-    const std::string string_buffer(reinterpret_cast<const char*>(buf), len);
     envoy::config::core::v3::Address proto_address;
     try {
       proto_address.mutable_pipe()->set_path(string_buffer);
@@ -63,7 +61,6 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   }
 
   {
-    const std::string string_buffer(reinterpret_cast<const char*>(buf), len);
     envoy::config::core::v3::Address proto_address;
     try {
       Network::Address::Ipv4Instance address(string_buffer);
@@ -74,7 +71,6 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   }
 
   {
-    const std::string string_buffer(reinterpret_cast<const char*>(buf), len);
     envoy::config::core::v3::Address proto_address;
     try {
       Network::Address::PipeInstance address(string_buffer);
