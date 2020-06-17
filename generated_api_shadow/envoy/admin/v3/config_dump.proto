@@ -363,12 +363,12 @@ message EndpointsConfigDump {
   }
 
   message DynamicEndpointConfig {
-    // This is the per-resource version information. This version is currently taken from the
+    // [#not-implemented-hide:] This is the per-resource version information. This version is currently taken from the
     // :ref:`version_info <envoy_api_field_service.discovery.v3.DiscoveryResponse.version_info>` field at the time that
     // the endpoint configuration was loaded.
     string version_info = 1;
 
-    // [#not-implemented-hide:] The endpoint config.
+    // The endpoint config.
     google.protobuf.Any endpoint_config = 2;
 
     // [#not-implemented-hide:] The timestamp when the Endpoint was last updated.
