@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# set SPHINX_SKIP_CONFIG_VALIDATION environment variable to true to skip 
+# validation of configuration examples
+
 . tools/shell_utils.sh
 
 set -e

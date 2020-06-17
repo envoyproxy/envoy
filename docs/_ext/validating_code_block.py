@@ -37,10 +37,9 @@ class ValidatingCodeBlock(CodeBlock):
 
     if not ValidatingCodeBlock.skip_validation:
       args = [
-          arg for arg in ['bazel', 'run'] + ValidatingCodeBlock.bazel_build_options.split() + [
-              '//tools/config_validation:validate_fragment', '--',
-              self.options.get('type-name'), '-s', '\n'.join(self.content)
-          ] if arg != None
+          arg for arg in ['bazel-bin/tools/config_validation/validate_fragment'] +
+          ValidatingCodeBlock.bazel_build_options.split() +
+          [self.options.get('type-name'), '-s', '\n'.join(self.content)] if arg != None
       ]
       process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
       stdout, stderr = process.communicate()
