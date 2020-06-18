@@ -3,9 +3,7 @@
 set -e
 
 # The image tag for the Windows image is the same as the Linux one so we use the same mechanism to find it
-# TODO(sunjayBhatia, wrowe): uncomment this once Linux CI catches up to using the latest toolchain container image
-# . $(dirname $0)/envoy_build_sha.sh
-ENVOY_BUILD_SHA="78d0e79e619c823d52d192a9b2fd030f66c5ac2c"
+. $(dirname $0)/envoy_build_sha.sh
 
 [[ -z "${IMAGE_NAME}" ]] && IMAGE_NAME="envoyproxy/envoy-build-windows2019"
 # The IMAGE_ID defaults to the CI hash but can be set to an arbitrary image ID (found with 'docker
