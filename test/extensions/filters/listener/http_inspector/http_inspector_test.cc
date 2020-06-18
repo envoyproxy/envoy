@@ -104,7 +104,7 @@ TEST_F(HttpInspectorTest, InlineReadInspectHttp10) {
             memcpy(buffer, header.data(), header.size());
             return Api::SysCallSizeResult{ssize_t(header.size()), 0};
           }));
-  const std::vector<absl::string_view> alpn_protos{absl::string_view("http/1.0")};
+  const std::vector<absl::string_view> alpn_protos{Http::Utility::AlpnNames::get().Http10};
 
   EXPECT_CALL(dispatcher_, createFileEvent_(_, _, _, _)).Times(0);
 
@@ -152,7 +152,7 @@ TEST_F(HttpInspectorTest, InspectHttp10) {
             return Api::SysCallSizeResult{ssize_t(header.size()), 0};
           }));
 
-  const std::vector<absl::string_view> alpn_protos{absl::string_view("http/1.0")};
+  const std::vector<absl::string_view> alpn_protos{Http::Utility::AlpnNames::get().Http10};
 
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
   EXPECT_CALL(cb_, continueFilterChain(true));
@@ -176,7 +176,7 @@ TEST_F(HttpInspectorTest, InspectHttp11) {
             return Api::SysCallSizeResult{ssize_t(header.size()), 0};
           }));
 
-  const std::vector<absl::string_view> alpn_protos{absl::string_view("http/1.1")};
+  const std::vector<absl::string_view> alpn_protos{Http::Utility::AlpnNames::get().Http11};
 
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
   EXPECT_CALL(cb_, continueFilterChain(true));
@@ -200,7 +200,7 @@ TEST_F(HttpInspectorTest, InspectHttp11WithNonEmptyRequestBody) {
             return Api::SysCallSizeResult{ssize_t(header.size()), 0};
           }));
 
-  const std::vector<absl::string_view> alpn_protos{absl::string_view("http/1.1")};
+  const std::vector<absl::string_view> alpn_protos{Http::Utility::AlpnNames::get().Http11};
 
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
   EXPECT_CALL(cb_, continueFilterChain(true));
@@ -221,7 +221,7 @@ TEST_F(HttpInspectorTest, ExtraSpaceInRequestLine) {
             return Api::SysCallSizeResult{ssize_t(header.size()), 0};
           }));
 
-  const std::vector<absl::string_view> alpn_protos{absl::string_view("http/1.1")};
+  const std::vector<absl::string_view> alpn_protos{Http::Utility::AlpnNames::get().Http11};
 
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
   EXPECT_CALL(cb_, continueFilterChain(true));
@@ -277,7 +277,7 @@ TEST_F(HttpInspectorTest, OldHttpProtocol) {
             return Api::SysCallSizeResult{ssize_t(header.size()), 0};
           }));
 
-  const std::vector<absl::string_view> alpn_protos{absl::string_view("http/1.0")};
+  const std::vector<absl::string_view> alpn_protos{Http::Utility::AlpnNames::get().Http10};
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
   EXPECT_CALL(cb_, continueFilterChain(true));
   file_event_callback_(Event::FileReadyType::Read);
@@ -321,7 +321,7 @@ TEST_F(HttpInspectorTest, InspectHttp2) {
             return Api::SysCallSizeResult{ssize_t(data.size()), 0};
           }));
 
-  const std::vector<absl::string_view> alpn_protos{absl::string_view("h2c")};
+  const std::vector<absl::string_view> alpn_protos{Http::Utility::AlpnNames::get().Http2c};
 
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
   EXPECT_CALL(cb_, continueFilterChain(true));
@@ -362,7 +362,7 @@ TEST_F(HttpInspectorTest, ReadError) {
 
 TEST_F(HttpInspectorTest, MultipleReadsHttp2) {
   init();
-  const std::vector<absl::string_view> alpn_protos = {absl::string_view("h2c")};
+  const std::vector<absl::string_view> alpn_protos{Http::Utility::AlpnNames::get().Http2c};
 
   const std::string header =
       "505249202a20485454502f322e300d0a0d0a534d0d0a0d0a00000c04000000000000041000000000020000000000"
@@ -455,7 +455,7 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp1) {
   }
 
   bool got_continue = false;
-  const std::vector<absl::string_view> alpn_protos = {absl::string_view("http/1.0")};
+  const std::vector<absl::string_view> alpn_protos{Http::Utility::AlpnNames::get().Http10};
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
   EXPECT_CALL(cb_, continueFilterChain(true)).WillOnce(InvokeWithoutArgs([&got_continue]() {
     got_continue = true;
@@ -599,7 +599,7 @@ TEST_F(HttpInspectorTest, Http1WithLargeRequestLine) {
   }
 
   bool got_continue = false;
-  const std::vector<absl::string_view> alpn_protos = {absl::string_view("http/1.0")};
+  const std::vector<absl::string_view> alpn_protos{Http::Utility::AlpnNames::get().Http10};
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
   EXPECT_CALL(cb_, continueFilterChain(true)).WillOnce(InvokeWithoutArgs([&got_continue]() {
     got_continue = true;
@@ -635,7 +635,7 @@ TEST_F(HttpInspectorTest, Http1WithLargeHeader) {
   }
 
   bool got_continue = false;
-  const std::vector<absl::string_view> alpn_protos = {absl::string_view("http/1.0")};
+  const std::vector<absl::string_view> alpn_protos{Http::Utility::AlpnNames::get().Http10};
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
   EXPECT_CALL(cb_, continueFilterChain(true)).WillOnce(InvokeWithoutArgs([&got_continue]() {
     got_continue = true;
