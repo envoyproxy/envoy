@@ -70,7 +70,6 @@ public:
   Router* router_{new NullRouterImpl()};
   Stats::IsolatedStoreImpl store_;
   Event::SimulatedTimeSystem time_system_;
-  NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<MockFaultManager> fault_manager_;
   CommandSplitter::InstanceImpl splitter_{
       RouterPtr{router_},
@@ -78,7 +77,6 @@ public:
       "redis.foo.",
       time_system_,
       false,
-      dispatcher_,
       std::make_unique<NiceMock<MockFaultManager>>(fault_manager_)};
   NoOpSplitCallbacks callbacks_;
   CommandSplitter::SplitRequestPtr handle_;
