@@ -14,8 +14,6 @@ namespace Config {
 
 namespace {
 
-const char DeprecatedFieldShadowPrefix[] = "hidden_envoy_deprecated_";
-
 class ProtoVisitor {
 public:
   virtual ~ProtoVisitor() = default;
@@ -217,6 +215,8 @@ void VersionUtil::scrubHiddenEnvoyDeprecated(Protobuf::Message& message) {
   HiddenFieldScrubbingProtoVisitor proto_visitor;
   ProtobufMessage::traverseMutableMessage(proto_visitor, message, nullptr);
 }
+
+const char VersionUtil::DeprecatedFieldShadowPrefix[] = "hidden_envoy_deprecated_";
 
 } // namespace Config
 } // namespace Envoy
