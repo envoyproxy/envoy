@@ -72,12 +72,8 @@ public:
   Event::SimulatedTimeSystem time_system_;
   NiceMock<MockFaultManager> fault_manager_;
   CommandSplitter::InstanceImpl splitter_{
-      RouterPtr{router_},
-      store_,
-      "redis.foo.",
-      time_system_,
-      false,
-      std::make_unique<NiceMock<MockFaultManager>>(fault_manager_)};
+      RouterPtr{router_}, store_, "redis.foo.",
+      time_system_,       false,  std::make_unique<NiceMock<MockFaultManager>>(fault_manager_)};
   NoOpSplitCallbacks callbacks_;
   CommandSplitter::SplitRequestPtr handle_;
 };
