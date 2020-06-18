@@ -23,10 +23,6 @@ supported Lua version is mostly 5.1 with some 5.2 features. See the `LuaJIT docu
   supports more 5.2 features and additional architectures. Envoy can be built with moonjit support
   by using the following bazel option: ``--//source/extensions/filters/common/lua:moonjit=1``.
 
-The filter only supports loading Lua code in-line in the configuration. If local filesystem code
-is desired, a trivial in-line script can be used to load the rest of the code from the local
-environment.
-
 The design of the filter and Lua support at a high level is as follows:
 
 * All Lua environments are :ref:`per worker thread <arch_overview_threading>`. This means that
@@ -62,6 +58,70 @@ Configuration
 
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.lua.v3.Lua>`
 * This filter should be configured with the name *envoy.filters.http.lua*.
+
+.. _config_http_filters_lua_configuration:
+
+The filter can configure a set of named Lua code (inline code or filename) in the :ref:`filter 
+configuration <envoy_v3_api_msg_extensions.filters.http.lua.v3.Lua>`. And with :ref:`configuration 
+<envoy_v3_api_msg_extensions.filters.http.lua.v3.LuaPerRoute>` on the virtual host, route, 
+or weighted cluster, users can disable the Lua filter or reference a Lua code in the filter 
+configuration, or define a Lua code inline directly.
+
+As an example, given the following Lua filter configuration:
+
+.. code-block:: yaml
+  name: envoy.filters.http.lua
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.lua
+    inline_code: |
+      function envoy_on_request(request_handle)
+        -- do something
+      end
+    source_codes:
+      hello.lua:
+        inline_string: |
+          function envoy_on_request(request_handle)
+            request_handle:logInfo("Hello World.")
+          end
+      bye.lua:
+        inline_string: |
+          function envoy_on_response(response_handle)
+            response_handle:logInfo("Bye Bye.")
+          end
+
+If there is no route configuration, Lua code defined in the 'inline_code' will be called. If some 
+route configuration exists, the filter can be disabled by the route configuration.
+
+.. code-block:: yaml
+  per_filter_config:
+    envoy.filters.http.lua:
+      disabled: true
+
+And We can refer to the Lua code in the filter configuration by specifying the name in the route 
+configuration.
+
+.. code-block:: yaml
+  per_filter_config:
+    envoy.filters.http.lua:
+      name: hello.lua
+
+.. attention::
+
+  The name 'GLOBAL' is reserved for :ref:`inline_code 
+  <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.inline_code>`, so don't use it easily.
+
+Or We can defined Lua code in the route configuration directly.
+
+.. code-block:: yaml
+  per_filter_config:
+    envoy.filters.http.lua:
+      code:
+        inline_string: |
+          function envoy_on_response(response_handle)
+            response_handle:logInfo("Go Go C Plus Plus.")
+          end
+
+    
 
 Script examples
 ---------------
