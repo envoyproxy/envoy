@@ -93,12 +93,7 @@ ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_l
 ConnectionImpl::StreamImpl::~StreamImpl() { ASSERT(stream_idle_timer_ == nullptr); }
 
 void ConnectionImpl::StreamImpl::destroy() {
-  if (stream_idle_timer_ != nullptr) {
-    // To ease testing and the destructor assertion.
-    stream_idle_timer_->disableTimer();
-    stream_idle_timer_.reset();
-  }
-
+  disarmStreamIdleTimer();
   parent_.stats_.streams_active_.dec();
   parent_.stats_.pending_send_bytes_.sub(pending_send_data_.length());
 }
@@ -686,6 +681,15 @@ int ConnectionImpl::onFrameSend(const nghttp2_frame* frame) {
   case NGHTTP2_GOAWAY: {
     ENVOY_CONN_LOG(debug, "sent goaway code={}", connection_, frame->goaway.error_code);
     if (frame->goaway.error_code != NGHTTP2_NO_ERROR) {
+      // TODO(mattklein123): Returning this error code abandons standard nghttp2 frame accounting.
+      // As such, it is not reliable to call sendPendingFrames() again after this and we assume
+      // that the connection is going to get torn down immediately. One byproduct of this is that
+      // we need to cancel all pending flush stream timeouts since they can race with connection
+      // teardown. As part of the work to remove exceptions we should aim to clean up all of this
+      // error handling logic and only handle this type of case at the end of dispatch.
+      for (auto& stream : active_streams_) {
+        stream->disarmStreamIdleTimer();
+      }
       return NGHTTP2_ERR_CALLBACK_FAILURE;
     }
     break;

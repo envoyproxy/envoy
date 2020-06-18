@@ -1070,6 +1070,40 @@ TEST_P(Http2CodecImplFlowControlTest, LargeServerBodyFlushTimeout) {
   EXPECT_EQ(1, server_stats_store_.counter("http2.tx_flush_timeout").value());
 }
 
+// Verify that when an incoming protocol error races with a stream flush timeout we correctly
+// disable the flush timeout and do not attempt to reset the stream.
+TEST_P(Http2CodecImplFlowControlTest, LargeServerBodyFlushTimeoutAfterGoaway) {
+  initialize();
+
+  InSequence s;
+  MockStreamCallbacks client_stream_callbacks;
+  request_encoder_->getStream().addCallbacks(client_stream_callbacks);
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  request_encoder_->encodeHeaders(request_headers, true);
+
+  ON_CALL(client_connection_, write(_, _))
+      .WillByDefault(
+          Invoke([&](Buffer::Instance& data, bool) -> void { server_wrapper_.buffer_.add(data); }));
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
+  response_encoder_->encodeHeaders(response_headers, false);
+  EXPECT_CALL(response_decoder_, decodeData(_, false)).Times(AtLeast(1));
+  auto flush_timer = new Event::MockTimer(&server_connection_.dispatcher_);
+  EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
+  Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
+  response_encoder_->encodeData(body, true);
+
+  // Force a protocol error.
+  Buffer::OwnedImpl garbage_data("this should cause a protocol error");
+  EXPECT_CALL(client_callbacks_, onGoAway());
+  EXPECT_CALL(*flush_timer, disableTimer());
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _)).Times(0);
+  EXPECT_THROW(server_wrapper_.dispatch(garbage_data, *server_), CodecProtocolException);
+  EXPECT_EQ(0, server_stats_store_.counter("http2.tx_flush_timeout").value());
+}
+
 TEST_P(Http2CodecImplTest, WatermarkUnderEndStream) {
   initialize();
   MockStreamCallbacks callbacks;
