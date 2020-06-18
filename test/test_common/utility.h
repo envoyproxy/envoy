@@ -534,11 +534,13 @@ public:
   }
 
   static void loadFromYaml(const std::string& yaml, Protobuf::Message& message,
-                           bool preserve_original_type = false, bool Avoid_boosting = true) {
-    if(Avoid_boosting)
-    MessageUtil::loadFromYaml(yaml, message, ProtobufMessage::getStrictValidationVisitor(),false);
-    else
-    MessageUtil::loadFromYaml(yaml, message, ProtobufMessage::getStrictValidationVisitor());
+                           bool preserve_original_type = false, bool avoid_boosting = true) {
+    if (avoid_boosting) {
+      MessageUtil::loadFromYaml(yaml, message, ProtobufMessage::getStrictValidationVisitor(),
+                                false);
+    } else {
+      MessageUtil::loadFromYaml(yaml, message, ProtobufMessage::getStrictValidationVisitor());
+    }
     if (!preserve_original_type) {
       Config::VersionConverter::eraseOriginalTypeInformation(message);
     }

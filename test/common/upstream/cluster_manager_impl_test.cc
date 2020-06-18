@@ -20,9 +20,10 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
-envoy::config::bootstrap::v3::Bootstrap parseBootstrapFromV3Yaml(const std::string& yaml, bool Avoid_boosting = true) {
+envoy::config::bootstrap::v3::Bootstrap parseBootstrapFromV3Yaml(const std::string& yaml,
+                                                                 bool avoid_boosting = true) {
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  TestUtility::loadFromYaml(yaml, bootstrap, true, Avoid_boosting);
+  TestUtility::loadFromYaml(yaml, bootstrap, true, avoid_boosting);
   return bootstrap;
 }
 
@@ -79,7 +80,7 @@ public:
 
     yaml += enable_merge_window ? merge_window_enabled : merge_window_disabled;
 
-    const auto& bootstrap = parseBootstrapFromV3Yaml(yaml, true);
+    const auto& bootstrap = parseBootstrapFromV3Yaml(yaml);
 
     cluster_manager_ = std::make_unique<MockedUpdatedClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
@@ -143,7 +144,7 @@ static_resources:
   clusters: []
   )EOF";
 
-  return parseBootstrapFromV3Yaml(yaml, true);
+  return parseBootstrapFromV3Yaml(yaml);
 }
 
 TEST_F(ClusterManagerImplTest, MultipleProtocolClusterFail) {
@@ -196,7 +197,7 @@ TEST_F(ClusterManagerImplTest, MultipleProtocolCluster) {
       http_protocol_options: {}
       protocol_selection: USE_DOWNSTREAM_PROTOCOL
   )EOF";
-  create(parseBootstrapFromV3Yaml(yaml, true));
+  create(parseBootstrapFromV3Yaml(yaml));
   checkConfigDump(R"EOF(
 static_clusters:
   - cluster:
@@ -242,7 +243,7 @@ static_resources:
     type: eds
     lb_policy: round_robin
   )EOF";
-  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(yaml, true)), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
                             "cannot create an EDS cluster without an EDS config");
 }
 
@@ -349,7 +350,7 @@ static_resources:
                 port_value: 11001
   )EOF";
 
-  create(parseBootstrapFromV3Yaml(yaml, true));
+  create(parseBootstrapFromV3Yaml(yaml));
   cluster_manager_->clusters()
       .find("cluster:name")
       ->second.get()
@@ -402,7 +403,7 @@ static_resources:
             envoy_grpc:
               cluster_name: static_cluster
   )EOF";
-  create(parseBootstrapFromV3Yaml(yaml, true));
+  create(parseBootstrapFromV3Yaml(yaml));
   const auto& primary_clusters = cluster_manager_->primaryClusters();
   EXPECT_THAT(primary_clusters, testing::UnorderedElementsAre(
                                     "static_cluster", "strict_dns_cluster", "logical_dns_cluster"));
@@ -419,7 +420,7 @@ static_resources:
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
-      create(parseBootstrapFromV3Yaml(yaml, true)), EnvoyException,
+      create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
       "cluster: LB policy ROUND_ROBIN is not valid for Cluster type ORIGINAL_DST. Only "
       "'CLUSTER_PROVIDED' or 'ORIGINAL_DST_LB' is allowed with cluster type 'ORIGINAL_DST'");
 }
@@ -520,12 +521,12 @@ TEST_P(ClusterManagerSubsetInitializationTest, SubsetLoadBalancerInitialization)
   if (GetParam() == envoy::config::cluster::v3::Cluster::hidden_envoy_deprecated_ORIGINAL_DST_LB ||
       GetParam() == envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
     EXPECT_THROW_WITH_MESSAGE(
-        create(parseBootstrapFromV3Yaml(yaml, true)), EnvoyException,
+        create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
         fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
                     envoy::config::cluster::v3::Cluster::LbPolicy_Name(GetParam())));
 
   } else {
-    create(parseBootstrapFromV3Yaml(yaml, true));
+    create(parseBootstrapFromV3Yaml(yaml));
     checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
 
     Upstream::ThreadLocalCluster* tlc = cluster_manager_->get("cluster_1");
@@ -579,7 +580,7 @@ TEST_F(ClusterManagerImplTest, SubsetLoadBalancerClusterProvidedLbRestriction) {
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
-      create(parseBootstrapFromV3Yaml(yaml, true)), EnvoyException,
+      create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
       "cluster: LB policy CLUSTER_PROVIDED cannot be combined with lb_subset_config");
 }
 
@@ -612,7 +613,7 @@ TEST_F(ClusterManagerImplTest, SubsetLoadBalancerLocalityAware) {
                   port_value: 8001
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(yaml, true)), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
                             "Locality weight aware subset LB requires that a "
                             "locality_weighted_lb_config be set in cluster_1");
 }
@@ -642,7 +643,7 @@ TEST_F(ClusterManagerImplTest, RingHashLoadBalancerInitialization) {
                 address: 127.0.0.1
                 port_value: 8001
   )EOF";
-  create(parseBootstrapFromV3Yaml(yaml, true));
+  create(parseBootstrapFromV3Yaml(yaml));
 }
 
 TEST_F(ClusterManagerImplTest, RingHashLoadBalancerV2Initialization) {
@@ -670,7 +671,7 @@ TEST_F(ClusterManagerImplTest, RingHashLoadBalancerV2Initialization) {
       ring_hash_lb_config:
         minimum_ring_size: 125
   )EOF";
-  create(parseBootstrapFromV3Yaml(yaml, true));
+  create(parseBootstrapFromV3Yaml(yaml));
 }
 
 // Verify EDS clusters have EDS config.
@@ -682,7 +683,7 @@ TEST_F(ClusterManagerImplTest, EdsClustersRequireEdsConfig) {
       type: EDS
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(yaml, true)), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
                             "cannot create an EDS cluster without an EDS config");
 }
 
@@ -790,7 +791,7 @@ TEST_F(ClusterManagerImplTest, TcpHealthChecker) {
               createClientConnection_(
                   PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:11001")), _, _, _))
       .WillOnce(Return(connection));
-  create(parseBootstrapFromV3Yaml(yaml, true));
+  create(parseBootstrapFromV3Yaml(yaml));
   factory_.tls_.shutdownThread();
 }
 
@@ -825,7 +826,7 @@ TEST_F(ClusterManagerImplTest, HttpHealthChecker) {
               createClientConnection_(
                   PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:11001")), _, _, _))
       .WillOnce(Return(connection));
-  create(parseBootstrapFromV3Yaml(yaml, true));
+  create(parseBootstrapFromV3Yaml(yaml));
   factory_.tls_.shutdownThread();
 }
 
@@ -875,7 +876,7 @@ TEST_F(ClusterManagerImplTest, VerifyBufferLimits) {
                 port_value: 11001
   )EOF";
 
-  create(parseBootstrapFromV3Yaml(yaml, true));
+  create(parseBootstrapFromV3Yaml(yaml));
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
   EXPECT_CALL(*connection, setBufferLimits(8192));
   EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
@@ -1634,7 +1635,7 @@ TEST_F(ClusterManagerImplTest, CloseTcpConnectionsOnHealthFailure) {
           // Test inline init.
           initialize_callback();
         }));
-    create(parseBootstrapFromV3Yaml(yaml, true));
+    create(parseBootstrapFromV3Yaml(yaml));
 
     EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
         .WillOnce(Return(connection1));
@@ -1707,7 +1708,7 @@ TEST_F(ClusterManagerImplTest, DoNotCloseTcpConnectionsOnHealthFailure) {
         // Test inline init.
         initialize_callback();
       }));
-  create(parseBootstrapFromV3Yaml(yaml, true));
+  create(parseBootstrapFromV3Yaml(yaml));
 
   EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
       .WillOnce(Return(connection1));
@@ -1754,7 +1755,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   Network::MockActiveDnsQuery active_dns_query;
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
-  create(parseBootstrapFromV3Yaml(yaml, true));
+  create(parseBootstrapFromV3Yaml(yaml));
   EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
 
   // Test for no hosts returning the correct values before we have hosts.
@@ -1898,7 +1899,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   Network::MockActiveDnsQuery active_dns_query;
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
-  create(parseBootstrapFromV3Yaml(yaml, true));
+  create(parseBootstrapFromV3Yaml(yaml));
   EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
 
   NiceMock<MockLoadBalancerContext> example_com_context;
@@ -2133,7 +2134,7 @@ TEST_F(ClusterManagerImplTest, UseTcpInDefaultDnsResolver) {
   Network::MockActiveDnsQuery active_dns_query;
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
-  create(parseBootstrapFromV3Yaml(yaml, true));
+  create(parseBootstrapFromV3Yaml(yaml));
   factory_.tls_.shutdownThread();
 }
 
@@ -2160,7 +2161,7 @@ TEST_F(ClusterManagerImplTest, UseUdpWithCustomDnsResolver) {
   Network::MockActiveDnsQuery active_dns_query;
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
-  create(parseBootstrapFromV3Yaml(yaml, true));
+  create(parseBootstrapFromV3Yaml(yaml));
   factory_.tls_.shutdownThread();
 }
 
@@ -2188,7 +2189,7 @@ TEST_F(ClusterManagerImplTest, UseTcpWithCustomDnsResolver) {
   Network::MockActiveDnsQuery active_dns_query;
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
-  create(parseBootstrapFromV3Yaml(yaml, true));
+  create(parseBootstrapFromV3Yaml(yaml));
   factory_.tls_.shutdownThread();
 }
 
@@ -2227,7 +2228,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
   Network::MockActiveDnsQuery active_dns_query;
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
-  create(parseBootstrapFromV3Yaml(yaml, true));
+  create(parseBootstrapFromV3Yaml(yaml));
   EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
 
   dns_callback(Network::DnsResolver::ResolutionStatus::Success,
@@ -2308,7 +2309,7 @@ TEST_F(ClusterManagerImplTest, ConnPoolDestroyWithDraining) {
   Network::MockActiveDnsQuery active_dns_query;
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
-  create(parseBootstrapFromV3Yaml(yaml, true));
+  create(parseBootstrapFromV3Yaml(yaml));
   EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
 
   dns_callback(Network::DnsResolver::ResolutionStatus::Success,
@@ -2360,7 +2361,7 @@ TEST_F(ClusterManagerImplTest, OriginalDstInitialization) {
   ReadyWatcher initialized;
   EXPECT_CALL(initialized, ready());
 
-  create(parseBootstrapFromV3Yaml(yaml, true));
+  create(parseBootstrapFromV3Yaml(yaml));
 
   // Set up for an initialize callback.
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
@@ -2874,7 +2875,7 @@ TEST_F(ClusterManagerImplTest, AddUpstreamFilters) {
       - name: envoy.test.filter
   )EOF";
 
-  create(parseBootstrapFromV3Yaml(yaml, true));
+  create(parseBootstrapFromV3Yaml(yaml));
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
   EXPECT_CALL(*connection, addReadFilter(_)).Times(0);
   EXPECT_CALL(*connection, addWriteFilter(_)).Times(1);
@@ -3095,7 +3096,7 @@ TEST_F(ClusterManagerInitHelperTest, RemoveClusterWithinInitLoop) {
 // socket_option_impl_test.cc.
 class SockoptsTest : public ClusterManagerImplTest {
 public:
-  void initialize(const std::string& yaml) { create(parseBootstrapFromV3Yaml(yaml, true)); }
+  void initialize(const std::string& yaml) { create(parseBootstrapFromV3Yaml(yaml)); }
 
   void TearDown() override { factory_.tls_.shutdownThread(); }
 
@@ -3360,7 +3361,7 @@ TEST_F(SockoptsTest, SockoptsClusterOverride) {
 // tcp_keepalive_option_impl_test.cc.
 class TcpKeepaliveTest : public ClusterManagerImplTest {
 public:
-  void initialize(const std::string& yaml) { create(parseBootstrapFromV3Yaml(yaml, true)); }
+  void initialize(const std::string& yaml) { create(parseBootstrapFromV3Yaml(yaml)); }
 
   void TearDown() override { factory_.tls_.shutdownThread(); }
 
@@ -3565,7 +3566,7 @@ TEST_F(ClusterManagerImplTest, ConnPoolsDrainedOnHostSetChange) {
   ReadyWatcher initialized;
   EXPECT_CALL(initialized, ready());
 
-  create(parseBootstrapFromV3Yaml(yaml, true));
+  create(parseBootstrapFromV3Yaml(yaml));
 
   // Set up for an initialize callback.
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
@@ -3683,7 +3684,7 @@ TEST_F(ClusterManagerImplTest, ConnPoolsNotDrainedOnHostSetChange) {
 
   ReadyWatcher initialized;
   EXPECT_CALL(initialized, ready());
-  create(parseBootstrapFromV3Yaml(yaml, true));
+  create(parseBootstrapFromV3Yaml(yaml));
 
   // Set up for an initialize callback.
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
@@ -3756,7 +3757,7 @@ cluster_manager:
   local_cluster_name: new_cluster
 )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(yaml, true)), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
                             "Unexpected non-zero priority for local cluster 'new_cluster'.");
 }
 
@@ -3781,7 +3782,7 @@ cluster_manager:
   local_cluster_name: new_cluster
 )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(yaml, true)), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
                             "Unexpected non-zero priority for local cluster 'new_cluster'.");
 }
 
@@ -3808,7 +3809,7 @@ cluster_manager:
 
   // The priority for LOGICAL_DNS endpoints are written, so we just verify that there is only a
   // single priority even if the endpoint was configured to be priority 10.
-  create(parseBootstrapFromV3Yaml(yaml, true));
+  create(parseBootstrapFromV3Yaml(yaml));
   const auto cluster = cluster_manager_->get("new_cluster");
   EXPECT_EQ(1, cluster->prioritySet().hostSetsPerPriority().size());
 }
