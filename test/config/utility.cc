@@ -801,8 +801,8 @@ bool ConfigHelper::setListenerAccessLog(const std::string& filename, absl::strin
 void ConfigHelper::initializeTls(
     const ServerSslOptions& options,
     envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
-  common_tls_context.add_alpn_protocols("h2");
-  common_tls_context.add_alpn_protocols("http/1.1");
+  common_tls_context.add_alpn_protocols(Http::Utility::AlpnNames::get().Http2);
+  common_tls_context.add_alpn_protocols(Http::Utility::AlpnNames::get().Http11);
 
   auto* validation_context = common_tls_context.mutable_validation_context();
   validation_context->mutable_trusted_ca()->set_filename(
@@ -1003,6 +1003,8 @@ void EdsHelper::setEds(const std::vector<envoy::config::endpoint::v3::ClusterLoa
 void EdsHelper::setEdsAndWait(
     const std::vector<envoy::config::endpoint::v3::ClusterLoadAssignment>& cluster_load_assignments,
     IntegrationTestServerStats& server_stats) {
+  // Make sure the last version has been accepted before setting a new one.
+  server_stats.waitForCounterGe("cluster.cluster_0.update_success", update_successes_);
   setEds(cluster_load_assignments);
   // Make sure Envoy has consumed the update now that it is running.
   ++update_successes_;

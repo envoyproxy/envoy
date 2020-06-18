@@ -87,7 +87,7 @@ STD_REGEX_WHITELIST = (
 # Only one C++ file should instantiate grpc_init
 GRPC_INIT_WHITELIST = ("./source/common/grpc/google_grpc_context.cc")
 
-CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-9")
+CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-10")
 BUILDIFIER_PATH = paths.getBuildifier()
 BUILDOZER_PATH = paths.getBuildozer()
 ENVOY_BUILD_FIXER_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])),
@@ -214,7 +214,7 @@ def readFile(path):
 # environment variable. If it cannot be found, empty string is returned.
 def lookPath(executable):
   for path_dir in os.environ["PATH"].split(os.pathsep):
-    executable_path = os.path.join(path_dir, executable)
+    executable_path = os.path.expanduser(os.path.join(path_dir, executable))
     if os.path.exists(executable_path):
       return executable_path
   return ""
@@ -245,13 +245,13 @@ def checkTools():
                             "users".format(CLANG_FORMAT_PATH))
   else:
     error_messages.append(
-        "Command {} not found. If you have clang-format in version 9.x.x "
+        "Command {} not found. If you have clang-format in version 10.x.x "
         "installed, but the binary name is different or it's not available in "
         "PATH, please use CLANG_FORMAT environment variable to specify the path. "
         "Examples:\n"
-        "    export CLANG_FORMAT=clang-format-9.0.0\n"
-        "    export CLANG_FORMAT=/opt/bin/clang-format-9\n"
-        "    export CLANG_FORMAT=/usr/local/opt/llvm@9/bin/clang-format".format(CLANG_FORMAT_PATH))
+        "    export CLANG_FORMAT=clang-format-10.0.0\n"
+        "    export CLANG_FORMAT=/opt/bin/clang-format-10\n"
+        "    export CLANG_FORMAT=/usr/local/opt/llvm@10/bin/clang-format".format(CLANG_FORMAT_PATH))
 
   def checkBazelTool(name, path, var):
     bazel_tool_abs_path = lookPath(path)
@@ -727,7 +727,7 @@ def fixBuildPath(file_path):
     if os.system("%s %s %s" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)) != 0:
       error_messages += ["envoy_build_fixer rewrite failed for file: %s" % file_path]
 
-  if os.system("%s -mode=fix %s" % (BUILDIFIER_PATH, file_path)) != 0:
+  if os.system("%s -lint=fix -mode=fix %s" % (BUILDIFIER_PATH, file_path)) != 0:
     error_messages += ["buildifier rewrite failed for file: %s" % file_path]
   return error_messages
 

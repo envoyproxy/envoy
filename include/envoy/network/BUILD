@@ -1,10 +1,10 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -12,7 +12,6 @@ envoy_cc_library(
     name = "address_interface",
     hdrs = ["address.h"],
     deps = [
-        ":io_handle_interface",
         "//include/envoy/api:os_sys_calls_interface",
     ],
 )
@@ -76,8 +75,11 @@ envoy_cc_library(
 envoy_cc_library(
     name = "io_handle_interface",
     hdrs = ["io_handle.h"],
+    external_deps = ["abseil_optional"],
     deps = [
+        ":address_interface",
         "//include/envoy/api:io_error_interface",
+        "//include/envoy/api:os_sys_calls_interface",
         "//source/common/common:assert_lib",
     ],
 )

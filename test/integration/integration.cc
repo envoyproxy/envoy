@@ -282,6 +282,14 @@ BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
           },
           version, config) {}
 
+BaseIntegrationTest::~BaseIntegrationTest() {
+  // Tear down the fake upstream before the test server.
+  // When the HTTP codecs do runtime checks, it is important to finish all
+  // runtime access before the server, and the runtime singleton, go away.
+  fake_upstreams_.clear();
+  test_server_.reset();
+}
+
 Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnection(uint32_t port) {
   return makeClientConnectionWithOptions(port, nullptr);
 }
@@ -364,7 +372,7 @@ void BaseIntegrationTest::createEnvoy() {
                  MessageUtil::getYamlStringFromMessage(bootstrap));
 
   const std::string bootstrap_path = TestEnvironment::writeStringToFileForTest(
-      "bootstrap.json", MessageUtil::getJsonStringFromMessage(bootstrap));
+      "bootstrap.pb", TestUtility::getProtobufBinaryStringFromMessage(bootstrap));
 
   std::vector<std::string> named_ports;
   const auto& static_resources = config_helper_.bootstrap().static_resources();
@@ -454,10 +462,10 @@ std::string getListenerDetails(Envoy::Server::Instance& server) {
 void BaseIntegrationTest::createGeneratedApiTestServer(
     const std::string& bootstrap_path, const std::vector<std::string>& port_names,
     Server::FieldValidationConfig validator_config, bool allow_lds_rejection) {
-  test_server_ = IntegrationTestServer::create(bootstrap_path, version_, on_server_ready_function_,
-                                               on_server_init_function_, deterministic_,
-                                               timeSystem(), *api_, defer_listener_finalization_,
-                                               process_object_, validator_config, concurrency_);
+  test_server_ = IntegrationTestServer::create(
+      bootstrap_path, version_, on_server_ready_function_, on_server_init_function_, deterministic_,
+      timeSystem(), *api_, defer_listener_finalization_, process_object_, validator_config,
+      concurrency_, drain_time_, drain_strategy_, use_real_stats_);
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0 &&
       !defer_listener_finalization_) {
 
@@ -582,7 +590,7 @@ void BaseIntegrationTest::createXdsUpstream() {
   } else {
     envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
     auto* common_tls_context = tls_context.mutable_common_tls_context();
-    common_tls_context->add_alpn_protocols("h2");
+    common_tls_context->add_alpn_protocols(Http::Utility::AlpnNames::get().Http2);
     auto* tls_cert = common_tls_context->add_tls_certificates();
     tls_cert->mutable_certificate_chain()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"));

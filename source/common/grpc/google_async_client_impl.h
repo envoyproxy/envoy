@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <queue>
 
 #include "envoy/api/api.h"
@@ -128,6 +129,8 @@ public:
               grpc::CompletionQueue* cq) PURE;
 };
 
+using GoogleStubSharedPtr = std::shared_ptr<GoogleStub>;
+
 class GoogleGenericStub : public GoogleStub {
 public:
   GoogleGenericStub(std::shared_ptr<grpc::Channel> channel) : stub_(channel) {}
@@ -148,12 +151,12 @@ public:
   virtual ~GoogleStubFactory() = default;
 
   // Create a stub from a given channel.
-  virtual std::shared_ptr<GoogleStub> createStub(std::shared_ptr<grpc::Channel> channel) PURE;
+  virtual GoogleStubSharedPtr createStub(std::shared_ptr<grpc::Channel> channel) PURE;
 };
 
 class GoogleGenericStubFactory : public GoogleStubFactory {
 public:
-  std::shared_ptr<GoogleStub> createStub(std::shared_ptr<grpc::Channel> channel) override {
+  GoogleStubSharedPtr createStub(std::shared_ptr<grpc::Channel> channel) override {
     return std::make_shared<GoogleGenericStub>(channel);
   }
 };
@@ -185,7 +188,7 @@ private:
   // This is shared with child streams, so that they can cleanup independent of
   // the client if it gets destructed. The streams need to wait for their tags
   // to drain from the CQ.
-  std::shared_ptr<GoogleStub> stub_;
+  GoogleStubSharedPtr stub_;
   std::list<std::unique_ptr<GoogleAsyncStreamImpl>> active_streams_;
   const std::string stat_prefix_;
   const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue> initial_metadata_;
@@ -272,7 +275,7 @@ private:
   Event::Dispatcher& dispatcher_;
   // We hold a ref count on the stub_ to allow the stream to wait for its tags
   // to drain from the CQ on cleanup.
-  std::shared_ptr<GoogleStub> stub_;
+  GoogleStubSharedPtr stub_;
   std::string service_full_name_;
   std::string method_name_;
   RawAsyncStreamCallbacks& callbacks_;

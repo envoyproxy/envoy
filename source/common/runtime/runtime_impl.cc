@@ -621,7 +621,7 @@ const Snapshot& LoaderImpl::snapshot() {
   return tls_->getTyped<Snapshot>();
 }
 
-std::shared_ptr<const Snapshot> LoaderImpl::threadsafeSnapshot() {
+SnapshotConstSharedPtr LoaderImpl::threadsafeSnapshot() {
   if (tls_->currentThreadRegistered()) {
     return std::dynamic_pointer_cast<const Snapshot>(tls_->get());
   }
@@ -647,7 +647,7 @@ RuntimeStats LoaderImpl::generateStats(Stats::Store& store) {
   return stats;
 }
 
-std::unique_ptr<SnapshotImpl> LoaderImpl::createNewSnapshot() {
+SnapshotImplPtr LoaderImpl::createNewSnapshot() {
   std::vector<Snapshot::OverrideLayerConstPtr> layers;
   uint32_t disk_layers = 0;
   uint32_t error_layers = 0;

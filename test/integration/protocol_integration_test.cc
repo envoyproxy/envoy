@@ -274,32 +274,6 @@ typed_config:
   }
 }
 
-// Add a health check filter and verify correct behavior when draining.
-TEST_P(ProtocolIntegrationTest, DrainClose) {
-  config_helper_.addFilter(ConfigHelper::defaultHealthCheckFilter());
-  initialize();
-
-  absl::Notification drain_sequence_started;
-  test_server_->server().dispatcher().post([this, &drain_sequence_started]() {
-    test_server_->drainManager().startDrainSequence([] {});
-    drain_sequence_started.Notify();
-  });
-  drain_sequence_started.WaitForNotification();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  response->waitForEndStream();
-  codec_client_->waitForDisconnect();
-
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().getStatusValue());
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP2) {
-    EXPECT_TRUE(codec_client_->sawGoAway());
-  } else {
-    EXPECT_EQ("close", response->headers().getConnectionValue());
-  }
-}
-
 // Regression test for https://github.com/envoyproxy/envoy/issues/9873
 TEST_P(ProtocolIntegrationTest, ResponseWithHostHeader) {
   initialize();
@@ -981,7 +955,7 @@ TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresCauseRequestRejectedByDefa
                                      {"foo_bar", "baz"}});
 
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
-    codec_client_->waitForDisconnect();
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("400", response->headers().getStatusValue());
   } else {
@@ -1116,7 +1090,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLength) {
                                                                  {"content-length", "-1"}});
   auto response = std::move(encoder_decoder.second);
 
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     ASSERT_TRUE(response->complete());
@@ -1147,7 +1121,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLengthAllowed) {
   auto response = std::move(encoder_decoder.second);
 
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
-    codec_client_->waitForDisconnect();
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
     response->waitForReset();
     codec_client_->close();
@@ -1172,7 +1146,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengths) {
                                                                  {"content-length", "3,2"}});
   auto response = std::move(encoder_decoder.second);
 
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     ASSERT_TRUE(response->complete());
@@ -1201,7 +1175,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengthsAllowed) {
   auto response = std::move(encoder_decoder.second);
 
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
-    codec_client_->waitForDisconnect();
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
     response->waitForReset();
     codec_client_->close();
@@ -1409,7 +1383,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersRejected) {
   codec_client_->sendTrailers(*request_encoder_, request_trailers);
 
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
-    codec_client_->waitForDisconnect();
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("431", response->headers().getStatusValue());
   } else {
@@ -1480,9 +1454,9 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyTrailerHeaders) {
             max_request_headers_count_);
       });
 
-  Http::RequestTrailerMapImpl request_trailers;
+  auto request_trailers = Http::RequestTrailerMapImpl::create();
   for (int i = 0; i < 20000; i++) {
-    request_trailers.addCopy(Http::LowerCaseString(std::to_string(i)), "");
+    request_trailers->addCopy(Http::LowerCaseString(std::to_string(i)), "");
   }
 
   initialize();
@@ -1494,7 +1468,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyTrailerHeaders) {
                                                                  {":authority", "host"}});
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
-  codec_client_->sendTrailers(*request_encoder_, request_trailers);
+  codec_client_->sendTrailers(*request_encoder_, *request_trailers);
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(default_response_headers_, true);
   response->waitForEndStream();
@@ -1532,7 +1506,7 @@ TEST_P(ProtocolIntegrationTest, LargeRequestMethod) {
     auto encoder_decoder = codec_client_->startRequest(request_headers);
     request_encoder_ = &encoder_decoder.first;
     auto response = std::move(encoder_decoder.second);
-    codec_client_->waitForDisconnect();
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("400", response->headers().getStatusValue());
   } else {
@@ -1834,7 +1808,7 @@ TEST_P(ProtocolIntegrationTest, TestDownstreamResetIdleTimeout) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   }
 
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
 
 // Test connection is closed after single request processed.
@@ -1943,7 +1917,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidAuthority) {
   } else {
     // For HTTP/2 this is handled by nghttp2 which resets the connection without
     // sending an HTTP response.
-    codec_client_->waitForDisconnect();
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
     ASSERT_FALSE(response->complete());
   }
 }
@@ -1962,7 +1936,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectIsBlocked) {
     EXPECT_TRUE(response->complete());
   } else {
     response->waitForReset();
-    codec_client_->waitForDisconnect();
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
   }
 }
 

@@ -78,6 +78,17 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   skip_check_ = skipCheckForRoute(route);
 
   if (!config_->filterEnabled() || skip_check_) {
+    if (skip_check_) {
+      return Http::FilterHeadersStatus::Continue;
+    }
+    if (config_->denyAtDisable()) {
+      ENVOY_STREAM_LOG(trace, "ext_authz filter is disabled. Deny the request.", *callbacks_);
+      callbacks_->streamInfo().setResponseFlag(
+          StreamInfo::ResponseFlag::UnauthorizedExternalService);
+      callbacks_->sendLocalReply(config_->statusOnError(), EMPTY_STRING, nullptr, absl::nullopt,
+                                 RcDetails::get().AuthzError);
+      return Http::FilterHeadersStatus::StopIteration;
+    }
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -201,7 +212,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
 
     callbacks_->sendLocalReply(
         response->status_code, response->body,
-        [& headers = response->headers_to_add,
+        [&headers = response->headers_to_add,
          &callbacks = *callbacks_](Http::HeaderMap& response_headers) -> void {
           ENVOY_STREAM_LOG(trace,
                            "ext_authz filter added header(s) to the local response:", callbacks);

@@ -115,7 +115,7 @@ Http::AsyncClient::Request* makeHttpCall(lua_State* state, Filter& filter,
     luaL_error(state, "http call cluster invalid. Must be configured");
   }
 
-  auto headers = std::make_unique<Http::RequestHeaderMapImpl>();
+  auto headers = Http::RequestHeaderMapImpl::create();
   buildHeadersFromTable(*headers, state, 3);
   Http::RequestMessagePtr message(new Http::RequestMessageImpl(std::move(headers)));
 
@@ -240,7 +240,7 @@ int StreamHandleWrapper::luaRespond(lua_State* state) {
   luaL_checktype(state, 2, LUA_TTABLE);
   size_t body_size;
   const char* raw_body = luaL_optlstring(state, 3, nullptr, &body_size);
-  auto headers = std::make_unique<Http::ResponseHeaderMapImpl>();
+  auto headers = Http::ResponseHeaderMapImpl::create();
   buildHeadersFromTable(*headers, state, 2);
 
   uint64_t status;
