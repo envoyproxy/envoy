@@ -797,7 +797,7 @@ message HttpFilter {
 
   // The name of the filter configuration. The name is used as a fallback to
   // select an extension if the type of the configuration proto is not
-  // sufficient. It also serves as a resource name in FCDS.
+  // sufficient. It also serves as a resource name in FilterConfigDS.
   string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
   // Filter specific configuration which depends on the filter being instantiated. See the supported
@@ -805,8 +805,8 @@ message HttpFilter {
   oneof config_type {
     google.protobuf.Any typed_config = 4;
 
-    // [#not-implemented-hide:] Configuration source specifier for FCDS.
-    HttpFilterConfigSource fcds = 5;
+    // [#not-implemented-hide:] Configuration source specifier for FilterConfigDS.
+    HttpFilterConfigSource filter_config_ds = 5;
   }
 }
 
