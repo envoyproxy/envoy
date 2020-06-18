@@ -1,4 +1,3 @@
-#include <__bit_reference>
 #include <algorithm>
 #include <fstream>
 #include <memory>
