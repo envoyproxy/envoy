@@ -109,19 +109,27 @@ public:
     switch (api_version) {
     case envoy::config::core::v3::ApiVersion::AUTO:
       FALLTHRU;
-    case envoy::config::core::v3::ApiVersion::V2:
-      return use_alpha ? *v2_alpha_ : *v2_;
-    case envoy::config::core::v3::ApiVersion::V3:
-      return *v3_;
+    case envoy::config::core::v3::ApiVersion::V2: {
+      const auto* descriptor = use_alpha ? v2_alpha_ : v2_;
+      ASSERT(descriptor != nullptr);
+      return *descriptor;
+    }
+
+    case envoy::config::core::v3::ApiVersion::V3: {
+      const auto* descriptor = v3_;
+      ASSERT(descriptor != nullptr);
+      return *descriptor;
+    }
+
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }
 
 private:
-  const Protobuf::MethodDescriptor* v3_;
-  const Protobuf::MethodDescriptor* v2_;
-  const Protobuf::MethodDescriptor* v2_alpha_;
+  const Protobuf::MethodDescriptor* v3_{nullptr};
+  const Protobuf::MethodDescriptor* v2_{nullptr};
+  const Protobuf::MethodDescriptor* v2_alpha_{nullptr};
 };
 
 /**
