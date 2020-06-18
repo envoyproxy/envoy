@@ -460,7 +460,7 @@ ConfigHelper::buildListener(const std::string& name, const std::string& route_co
             http_filters: [{{ name: envoy.filters.http.router }}]
     )EOF",
       stat_prefix, route_config, apiVersionStr(api_version));
-  return buildBaseListener(name, address, hcm);
+  return buildBaseListener(name, address, hcm, api_version);
 }
 
 envoy::config::route::v3::RouteConfiguration
