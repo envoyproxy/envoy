@@ -20,7 +20,9 @@ public class EnvoyEngineImpl implements EnvoyEngine {
   @Override
   public EnvoyHTTPStream startStream(EnvoyHTTPCallbacks callbacks) {
     long streamHandle = JniLibrary.initStream(engineHandle);
-    return new EnvoyHTTPStream(streamHandle, callbacks);
+    EnvoyHTTPStream stream = new EnvoyHTTPStream(streamHandle, callbacks);
+    stream.start();
+    return stream;
   }
 
   /**

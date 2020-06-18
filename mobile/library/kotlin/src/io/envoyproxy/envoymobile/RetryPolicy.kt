@@ -40,7 +40,6 @@ data class RetryPolicy(
 
       return RetryPolicy(
         maxRetries,
-        // TODO: should we have ? after the map?
         headers.value("x-envoy-retry-on")
           ?.map { retryOn -> RetryRule.enumValue(retryOn) }?.filterNotNull() ?: emptyList(),
         headers.value("x-envoy-retriable-status-codes")
@@ -68,7 +67,7 @@ enum class RetryRule(internal val stringValue: String) {
   companion object {
     internal fun enumValue(stringRepresentation: String): RetryRule? {
       return when (stringRepresentation) {
-        "status-5xx" -> STATUS_5XX
+        "5xx" -> STATUS_5XX
         "gateway-error" -> GATEWAY_ERROR
         "connect-failure" -> CONNECT_FAILURE
         "refused-stream" -> REFUSED_STREAM

@@ -52,13 +52,14 @@ final class GRPCRequestHeadersBuilderTests: XCTestCase {
                                             path: "/pb.api.v1.Foo/GetBar")
       .build()
     XCTAssertEqual(.post, headers.method)
+    XCTAssertEqual(["POST"], headers.value(forName: ":method"))
   }
 
   func testAddsTimeoutHeaderWhenSetToValue() {
     let headers = GRPCRequestHeadersBuilder(scheme: "https",
                                             authority: "envoyproxy.io",
                                             path: "/pb.api.v1.Foo/GetBar")
-      .addTimeoutMS(200)
+      .addTimeoutMs(200)
       .build()
     XCTAssertEqual(["200m"], headers.value(forName: "grpc-timeout"))
   }
@@ -67,8 +68,8 @@ final class GRPCRequestHeadersBuilderTests: XCTestCase {
     let headers = GRPCRequestHeadersBuilder(scheme: "https",
                                             authority: "envoyproxy.io",
                                             path: "/pb.api.v1.Foo/GetBar")
-      .addTimeoutMS(200)
-      .addTimeoutMS(nil)
+      .addTimeoutMs(200)
+      .addTimeoutMs(nil)
       .build()
     XCTAssertNil(headers.value(forName: "grpc-timeout"))
   }

@@ -1,7 +1,7 @@
 @_implementationOnly import EnvoyEngine
 import Foundation
 
-/// Envoy's implementation of `HTTPClient`, buildable using `StreamClientBuilder`.
+/// Envoy's implementation of `StreamClient`, buildable using `StreamClientBuilder`.
 @objcMembers
 final class EnvoyClient: NSObject {
   private let engine: EnvoyEngine

@@ -18,6 +18,26 @@ class ResponseHeadersBuilder : HeadersBuilder {
    */
   internal constructor(headers: MutableMap<String, MutableList<String>>) : super(headers)
 
+  override fun add(name: String, value: String): ResponseHeadersBuilder {
+    super.add(name, value)
+    return this
+  }
+
+  override fun set(name: String, value: MutableList<String>): ResponseHeadersBuilder {
+    super.set(name, value)
+    return this
+  }
+
+  override fun remove(name: String): ResponseHeadersBuilder {
+    super.remove(name)
+    return this
+  }
+
+  override fun internalSet(name: String, value: MutableList<String>): ResponseHeadersBuilder {
+    super.internalSet(name, value)
+    return this
+  }
+
   /**
    * Add an HTTP status to the response headers.
    *
@@ -26,7 +46,7 @@ class ResponseHeadersBuilder : HeadersBuilder {
    * @return ResponseHeadersBuilder, This builder.
    */
   fun addHttpStatus(status: Int): ResponseHeadersBuilder {
-    set(":status", mutableListOf("$status"))
+    internalSet(":status", mutableListOf("$status"))
     return this
   }
 
