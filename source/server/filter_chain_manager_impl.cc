@@ -593,7 +593,7 @@ void FilterChainManagerImpl::convertIPsToTries() {
   }
 }
 
-std::shared_ptr<Network::DrainableFilterChain> FilterChainManagerImpl::findExistingFilterChain(
+Network::DrainableFilterChainSharedPtr FilterChainManagerImpl::findExistingFilterChain(
     const envoy::config::listener::v3::FilterChain& filter_chain_message) {
   // Origin filter chain manager could be empty if the current is the ancestor.
   const auto* origin = getOriginFilterChainManager();
@@ -609,8 +609,7 @@ std::shared_ptr<Network::DrainableFilterChain> FilterChainManagerImpl::findExist
   return nullptr;
 }
 
-std::unique_ptr<Configuration::FilterChainFactoryContext>
-FilterChainManagerImpl::createFilterChainFactoryContext(
+Configuration::FilterChainFactoryContextPtr FilterChainManagerImpl::createFilterChainFactoryContext(
     const ::envoy::config::listener::v3::FilterChain* const filter_chain) {
   // TODO(lambdai): add stats
   UNREFERENCED_PARAMETER(filter_chain);
