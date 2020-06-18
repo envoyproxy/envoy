@@ -1,4 +1,5 @@
 #include "envoy/config/overload/v3/overload.pb.h"
+#include "envoy/server/overload_manager.h"
 #include "envoy/server/resource_monitor.h"
 #include "envoy/server/resource_monitor_config.h"
 
@@ -19,6 +20,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::DoubleEq;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
@@ -84,8 +86,10 @@ class OverloadManagerImplTest : public testing::Test {
 protected:
   OverloadManagerImplTest()
       : factory1_("envoy.resource_monitors.fake_resource1"),
-        factory2_("envoy.resource_monitors.fake_resource2"), register_factory1_(factory1_),
-        register_factory2_(factory2_), api_(Api::createApiForTest(stats_)) {}
+        factory2_("envoy.resource_monitors.fake_resource2"),
+        factory3_("envoy.resource_monitors.fake_resource3"), register_factory1_(factory1_),
+        register_factory2_(factory2_), register_factory3_(factory3_),
+        api_(Api::createApiForTest(stats_)) {}
 
   void setDispatcherExpectation() {
     timer_ = new NiceMock<Event::MockTimer>();
@@ -113,6 +117,9 @@ protected:
       resource_monitors {
         name: "envoy.resource_monitors.fake_resource2"
       }
+      resource_monitors {
+        name: "envoy.resource_monitors.fake_resource3"
+      }
       actions {
         name: "envoy.overload_actions.dummy_action"
         triggers {
@@ -125,6 +132,15 @@ protected:
           name: "envoy.resource_monitors.fake_resource2"
           threshold {
             value: 0.8
+          }
+        }
+        triggers {
+          name: "envoy.resource_monitors.fake_resource3"
+          range {
+            min_value: 0.5
+            max_value {
+              value: 0.8
+            }
           }
         }
       }
@@ -158,8 +174,10 @@ protected:
 
   FakeResourceMonitorFactory<Envoy::ProtobufWkt::Struct> factory1_;
   FakeResourceMonitorFactory<Envoy::ProtobufWkt::Timestamp> factory2_;
+  FakeResourceMonitorFactory<Envoy::ProtobufWkt::Timestamp> factory3_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory1_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory2_;
+  Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory3_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Event::MockTimer>* timer_; // not owned
   Stats::TestUtil::TestStore stats_;
@@ -269,6 +287,35 @@ TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
   manager->stop();
 }
 
+TEST_F(OverloadManagerImplTest, RangeTrigger) {
+  setDispatcherExpectation();
+
+  auto manager(createOverloadManager(getConfig()));
+  manager->start();
+  const auto& action_state =
+      manager->getThreadLocalOverloadState().getState("envoy.overload_actions.dummy_action");
+
+  factory3_.monitor_->setPressure(0.5);
+  timer_cb_();
+  
+  EXPECT_EQ(action_state, OverloadActionState::inactive());
+
+  factory3_.monitor_->setPressure(0.65);
+  timer_cb_();
+
+  EXPECT_THAT(action_state.action_value, DoubleEq(0.5));
+
+  factory3_.monitor_->setPressure(0.8);
+  timer_cb_();
+
+  EXPECT_EQ(action_state, OverloadActionState::saturated());
+
+  factory3_.monitor_->setPressure(0.9);
+  timer_cb_();
+
+  EXPECT_EQ(action_state, OverloadActionState::saturated());
+}
+
 TEST_F(OverloadManagerImplTest, FailedUpdates) {
   setDispatcherExpectation();
   auto manager(createOverloadManager(getConfig()));
@@ -352,6 +399,28 @@ TEST_F(OverloadManagerImplTest, DuplicateOverloadAction) {
 
   EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
                           "Duplicate overload action .*");
+}
+
+TEST_F(OverloadManagerImplTest, RangeTriggerInvalidMax) {
+  const std::string config = R"EOF(
+    resource_monitors {
+      name: "envoy.resource_monitors.fake_resource1"
+    }
+    actions {
+      name: "envoy.overload_actions.dummy_action"
+      triggers {
+        name: "envoy.resource_monitors.fake_resource1"
+        range {
+          min_value: 0.9
+          max_value {
+            value: 0.8
+          }
+        }
+      }
+    }
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException, "min_value.*max_value.*");
 }
 
 TEST_F(OverloadManagerImplTest, UnknownTrigger) {
