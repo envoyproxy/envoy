@@ -281,11 +281,10 @@ public:
       }
       mergeLoadStats(loadstats_request, local_loadstats_request);
 
-      EXPECT_EQ("POST", loadstats_stream_->headers().Method()->value().getStringView());
+      EXPECT_EQ("POST", loadstats_stream_->headers().getMethodValue());
       EXPECT_EQ("/envoy.service.load_stats.v2.LoadReportingService/StreamLoadStats",
-                loadstats_stream_->headers().Path()->value().getStringView());
-      EXPECT_EQ("application/grpc",
-                loadstats_stream_->headers().ContentType()->value().getStringView());
+                loadstats_stream_->headers().getPathValue());
+      EXPECT_EQ("application/grpc", loadstats_stream_->headers().getContentTypeValue());
     } while (!TestUtility::assertRepeatedPtrFieldEqual(expected_cluster_stats,
                                                        loadstats_request.cluster_stats(), true));
   }
@@ -308,8 +307,7 @@ public:
     EXPECT_EQ(request_size_, upstream_request_->bodyLength());
 
     ASSERT_TRUE(response_->complete());
-    EXPECT_EQ(std::to_string(response_code),
-              response_->headers().Status()->value().getStringView());
+    EXPECT_EQ(std::to_string(response_code), response_->headers().getStatusValue());
     EXPECT_EQ(response_size_, response_->body().size());
   }
 
@@ -627,7 +625,7 @@ TEST_P(LoadStatsIntegrationTest, Dropped) {
   initiateClientConnection();
   response_->waitForEndStream();
   ASSERT_TRUE(response_->complete());
-  EXPECT_EQ("503", response_->headers().Status()->value().getStringView());
+  EXPECT_EQ("503", response_->headers().getStatusValue());
   cleanupUpstreamAndDownstream();
 
   waitForLoadStatsRequest({}, 1);

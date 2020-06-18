@@ -20,6 +20,9 @@ public:
     config_helper_.addFilter("name: envoy.filters.http.grpc_web");
   }
 };
+INSTANTIATE_TEST_SUITE_P(IpVersions, GrpcWebFilterIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(GrpcWebFilterIntegrationTest, GRPCWebTrailersNotDuplicated) {
   config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
@@ -53,7 +56,7 @@ TEST_P(GrpcWebFilterIntegrationTest, GRPCWebTrailersNotDuplicated) {
   EXPECT_THAT(*upstream_request_->trailers(), HeaderMapEqualRef(&request_trailers));
 
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_TRUE(absl::StrContains(response->body(), "response1:trailer1"));
   EXPECT_TRUE(absl::StrContains(response->body(), "response2:trailer2"));
   // Expect that the trailers be in the response-body instead

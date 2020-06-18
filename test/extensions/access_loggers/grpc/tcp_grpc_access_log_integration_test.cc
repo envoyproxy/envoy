@@ -32,11 +32,6 @@ public:
     enable_half_close_ = true;
   }
 
-  ~TcpGrpcAccessLogIntegrationTest() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
-
   void createUpstreams() override {
     BaseIntegrationTest::createUpstreams();
     fake_upstreams_.emplace_back(
@@ -80,11 +75,10 @@ public:
   AssertionResult waitForAccessLogRequest(const std::string& expected_request_msg_yaml) {
     envoy::service::accesslog::v3::StreamAccessLogsMessage request_msg;
     VERIFY_ASSERTION(access_log_request_->waitForGrpcMessage(*dispatcher_, request_msg));
-    EXPECT_EQ("POST", access_log_request_->headers().Method()->value().getStringView());
+    EXPECT_EQ("POST", access_log_request_->headers().getMethodValue());
     EXPECT_EQ("/envoy.service.accesslog.v2.AccessLogService/StreamAccessLogs",
-              access_log_request_->headers().Path()->value().getStringView());
-    EXPECT_EQ("application/grpc",
-              access_log_request_->headers().ContentType()->value().getStringView());
+              access_log_request_->headers().getPathValue());
+    EXPECT_EQ("application/grpc", access_log_request_->headers().getContentTypeValue());
 
     envoy::service::accesslog::v3::StreamAccessLogsMessage expected_request_msg;
     TestUtility::loadFromYaml(expected_request_msg_yaml, expected_request_msg);

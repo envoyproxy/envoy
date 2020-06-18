@@ -105,6 +105,11 @@ public:
   using OverrideLayerConstPtr = std::unique_ptr<const OverrideLayer>;
 
   /**
+   * Updates deprecated feature use stats.
+   */
+  virtual void countDeprecatedFeatureUse() const PURE;
+
+  /**
    * Returns true if a deprecated feature is allowed.
    *
    * Fundamentally, deprecated features are boolean values.
@@ -252,6 +257,8 @@ public:
   virtual const std::vector<OverrideLayerConstPtr>& getLayers() const PURE;
 };
 
+using SnapshotConstSharedPtr = std::shared_ptr<const Snapshot>;
+
 /**
  * Loads runtime snapshots from storage (local disk, etc.).
  */
@@ -280,7 +287,7 @@ public:
    * @return shared_ptr<const Snapshot> the current snapshot. This function may safely be called
    *         from non-worker threads.
    */
-  virtual std::shared_ptr<const Snapshot> threadsafeSnapshot() PURE;
+  virtual SnapshotConstSharedPtr threadsafeSnapshot() PURE;
 
   /**
    * Merge the given map of key-value pairs into the runtime's state. To remove a previous merge for

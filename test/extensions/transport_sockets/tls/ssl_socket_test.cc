@@ -3847,6 +3847,11 @@ TEST_P(SslSocketTest, ALPN) {
   testUtilV2(test_options);
   client_ctx->clear_alpn_protocols();
   server_ctx->clear_alpn_protocols();
+
+  // Client attempts to configure ALPN that is too large.
+  client_ctx->add_alpn_protocols(std::string(100000, 'a'));
+  EXPECT_THROW_WITH_MESSAGE(testUtilV2(test_options), EnvoyException,
+                            "Invalid ALPN protocol string");
 }
 
 TEST_P(SslSocketTest, CipherSuites) {
@@ -4189,15 +4194,29 @@ TEST_P(SslSocketTest, OverrideApplicationProtocols) {
   server_ctx->add_alpn_protocols("test");
   testUtilV2(test_options);
   server_ctx->clear_alpn_protocols();
-
   // Override client side ALPN, "test" ALPN is used.
   server_ctx->add_alpn_protocols("test");
-  Network::TransportSocketOptionsSharedPtr transport_socket_options(
-      new Network::TransportSocketOptionsImpl("", {}, {"foo", "test", "bar"}));
+  auto transport_socket_options = std::make_shared<Network::TransportSocketOptionsImpl>(
+      "", std::vector<std::string>{}, std::vector<std::string>{"foo", "test", "bar"});
 
   testUtilV2(test_options.setExpectedALPNProtocol("test").setTransportSocketOptions(
       transport_socket_options));
-  server_ctx->clear_alpn_protocols();
+
+  // Set fallback ALPN on the client side ALPN, "test" ALPN is used since no ALPN is specified
+  // in the config.
+  server_ctx->add_alpn_protocols("test");
+  transport_socket_options = std::make_shared<Network::TransportSocketOptionsImpl>(
+      "", std::vector<std::string>{}, std::vector<std::string>{}, "test");
+  testUtilV2(test_options.setExpectedALPNProtocol("test").setTransportSocketOptions(
+      transport_socket_options));
+
+  // Update the client TLS config to specify ALPN. The fallback value should no longer be used.
+  // Note that the server prefers "test" over "bar", but since the client only configures "bar",
+  // the resulting ALPN will be "bar" even though "test" is included in the fallback.
+  server_ctx->add_alpn_protocols("bar");
+  client.mutable_common_tls_context()->add_alpn_protocols("bar");
+  testUtilV2(test_options.setExpectedALPNProtocol("bar").setTransportSocketOptions(
+      transport_socket_options));
 }
 
 // Validate that if downstream secrets are not yet downloaded from SDS server, Envoy creates
@@ -4211,7 +4230,7 @@ TEST_P(SslSocketTest, DownstreamNotReadySslSocket) {
   EXPECT_CALL(factory_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
   EXPECT_CALL(factory_context, localInfo()).WillOnce(ReturnRef(local_info));
   EXPECT_CALL(factory_context, stats()).WillOnce(ReturnRef(stats_store));
-  EXPECT_CALL(factory_context, initManager()).WillRepeatedly(Return(&init_manager));
+  EXPECT_CALL(factory_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   auto sds_secret_configs =
@@ -4246,7 +4265,7 @@ TEST_P(SslSocketTest, UpstreamNotReadySslSocket) {
   NiceMock<Event::MockDispatcher> dispatcher;
   EXPECT_CALL(factory_context, localInfo()).WillOnce(ReturnRef(local_info));
   EXPECT_CALL(factory_context, stats()).WillOnce(ReturnRef(stats_store));
-  EXPECT_CALL(factory_context, initManager()).WillRepeatedly(Return(&init_manager));
+  EXPECT_CALL(factory_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
   EXPECT_CALL(factory_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
@@ -4368,16 +4387,16 @@ protected:
     dispatcher_ = api_->allocateDispatcher("test_thread", Buffer::WatermarkFactoryPtr{factory});
 
     // By default, expect 4 buffers to be created - the client and server read and write buffers.
-    EXPECT_CALL(*factory, create_(_, _))
+    EXPECT_CALL(*factory, create_(_, _, _))
         .Times(2)
-        .WillOnce(Invoke([&](std::function<void()> below_low,
-                             std::function<void()> above_high) -> Buffer::Instance* {
-          client_write_buffer = new MockWatermarkBuffer(below_low, above_high);
+        .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
+                             std::function<void()> above_overflow) -> Buffer::Instance* {
+          client_write_buffer = new MockWatermarkBuffer(below_low, above_high, above_overflow);
           return client_write_buffer;
         }))
-        .WillRepeatedly(Invoke([](std::function<void()> below_low,
-                                  std::function<void()> above_high) -> Buffer::Instance* {
-          return new Buffer::WatermarkBuffer(below_low, above_high);
+        .WillRepeatedly(Invoke([](std::function<void()> below_low, std::function<void()> above_high,
+                                  std::function<void()> above_overflow) -> Buffer::Instance* {
+          return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
         }));
 
     initialize();

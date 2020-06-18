@@ -53,7 +53,9 @@ public:
       const uint32_t start_offset_trim = std::min<uint32_t>(start_offset, slice.len_);
       slice.len_ -= start_offset_trim;
       start_offset -= start_offset_trim;
-      slice.mem_ = static_cast<char*>(slice.mem_) + start_offset_trim;
+      if (slice.mem_ != nullptr) {
+        slice.mem_ = static_cast<char*>(slice.mem_) + start_offset_trim;
+      }
 
       const uint32_t final_length = std::min<uint32_t>(length, slice.len_);
       slice.len_ = final_length;

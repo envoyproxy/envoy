@@ -157,6 +157,12 @@ std::string RandomGeneratorImpl::uuid() {
   return std::string(uuid, UUID_LENGTH);
 }
 
+void SnapshotImpl::countDeprecatedFeatureUse() const {
+  stats_.deprecated_feature_use_.inc();
+  // Similar to the above, but a gauge that isn't imported during a hot restart.
+  stats_.deprecated_feature_seen_since_process_start_.inc();
+}
+
 bool SnapshotImpl::deprecatedFeatureEnabled(absl::string_view key, bool default_value) const {
   // If the value is not explicitly set as a runtime boolean, trust the proto annotations passed as
   // default_value.
@@ -167,10 +173,7 @@ bool SnapshotImpl::deprecatedFeatureEnabled(absl::string_view key, bool default_
 
   // The feature is allowed. It is assumed this check is called when the feature
   // is about to be used, so increment the feature use stat.
-  stats_.deprecated_feature_use_.inc();
-
-  // Similar to the above, but a gauge that isn't imported during a hot restart.
-  stats_.deprecated_feature_seen_since_process_start_.inc();
+  countDeprecatedFeatureUse();
 
 #ifdef ENVOY_DISABLE_DEPRECATED_FEATURES
   return false;
@@ -601,7 +604,7 @@ const Snapshot& LoaderImpl::snapshot() {
   return tls_->getTyped<Snapshot>();
 }
 
-std::shared_ptr<const Snapshot> LoaderImpl::threadsafeSnapshot() {
+SnapshotConstSharedPtr LoaderImpl::threadsafeSnapshot() {
   if (tls_->currentThreadRegistered()) {
     return std::dynamic_pointer_cast<const Snapshot>(tls_->get());
   }
@@ -627,7 +630,7 @@ RuntimeStats LoaderImpl::generateStats(Stats::Store& store) {
   return stats;
 }
 
-std::unique_ptr<SnapshotImpl> LoaderImpl::createNewSnapshot() {
+SnapshotImplPtr LoaderImpl::createNewSnapshot() {
   std::vector<Snapshot::OverrideLayerConstPtr> layers;
   uint32_t disk_layers = 0;
   uint32_t error_layers = 0;

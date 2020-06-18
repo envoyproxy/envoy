@@ -27,7 +27,7 @@ ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSha
                            const Network::ConnectionSocket::OptionsSharedPtr& options,
                            const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
     : ConnPoolImplBase(std::move(host), std::move(priority), dispatcher, options,
-                       transport_socket_options),
+                       transport_socket_options, Protocol::Http11),
       upstream_ready_timer_(dispatcher_.createTimer([this]() {
         upstream_ready_enabled_ = false;
         onUpstreamReady();
@@ -92,16 +92,13 @@ void ConnPoolImpl::StreamWrapper::decodeHeaders(ResponseHeaderMapPtr&& headers, 
     // If Connection: close OR
     //    Http/1.0 and not Connection: keep-alive OR
     //    Proxy-Connection: close
-    if ((headers->Connection() &&
-         (absl::EqualsIgnoreCase(headers->Connection()->value().getStringView(),
-                                 Headers::get().ConnectionValues.Close))) ||
+    if ((absl::EqualsIgnoreCase(headers->getConnectionValue(),
+                                Headers::get().ConnectionValues.Close)) ||
         (parent_.codec_client_->protocol() == Protocol::Http10 &&
-         (!headers->Connection() ||
-          !absl::EqualsIgnoreCase(headers->Connection()->value().getStringView(),
-                                  Headers::get().ConnectionValues.KeepAlive))) ||
-        (headers->ProxyConnection() &&
-         (absl::EqualsIgnoreCase(headers->ProxyConnection()->value().getStringView(),
-                                 Headers::get().ConnectionValues.Close)))) {
+         !absl::EqualsIgnoreCase(headers->getConnectionValue(),
+                                 Headers::get().ConnectionValues.KeepAlive)) ||
+        (absl::EqualsIgnoreCase(headers->getProxyConnectionValue(),
+                                Headers::get().ConnectionValues.Close))) {
       parent_.parent_.host_->cluster().stats().upstream_cx_close_notify_.inc();
       close_connection_ = true;
     }

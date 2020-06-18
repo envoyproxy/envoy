@@ -75,7 +75,7 @@ public:
       RELEASE_ASSERT(result, result.message());
       result = xds_stream_->waitForHeadersComplete();
       RELEASE_ASSERT(result, result.message());
-      endpoint_ = std::string(xds_stream_->headers().Path()->value().getStringView());
+      endpoint_ = std::string(xds_stream_->headers().getPathValue());
       ENVOY_LOG_MISC(debug, "xDS endpoint {}", endpoint_);
     }
   }
@@ -218,8 +218,6 @@ public:
     if (xds_stream_ != nullptr) {
       cleanUpXdsConnection();
     }
-    test_server_.reset();
-    fake_upstreams_.clear();
   }
 
   std::string endpoint_;

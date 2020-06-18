@@ -32,15 +32,7 @@ public:
     response = IntegrationUtil::makeSingleRequest(lookupPort(port_key), method, endpoint, "",
                                                   downstreamProtocol(), version_);
     EXPECT_TRUE(response->complete());
-    return response->headers().Status()->value().getStringView();
-  }
-
-  /**
-   *  Destructor for an individual test.
-   */
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
+    return response->headers().getStatusValue();
   }
 
   /**

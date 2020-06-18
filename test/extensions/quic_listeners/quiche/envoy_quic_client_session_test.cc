@@ -16,6 +16,7 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_connection_helper.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_alarm_factory.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
+#include "test/extensions/quic_listeners/quiche/test_utils.h"
 
 #include "envoy/stats/stats_macros.h"
 #include "test/mocks/event/mocks.h"
@@ -62,9 +63,9 @@ public:
   TestQuicCryptoClientStream(const quic::QuicServerId& server_id, quic::QuicSession* session,
                              std::unique_ptr<quic::ProofVerifyContext> verify_context,
                              quic::QuicCryptoClientConfig* crypto_config,
-                             ProofHandler* proof_handler)
+                             ProofHandler* proof_handler, bool has_application_state)
       : quic::QuicCryptoClientStream(server_id, session, std::move(verify_context), crypto_config,
-                                     proof_handler) {}
+                                     proof_handler, has_application_state) {}
 
   bool encryption_established() const override { return true; }
 };
@@ -84,7 +85,7 @@ public:
   std::unique_ptr<quic::QuicCryptoClientStreamBase> CreateQuicCryptoStream() override {
     return std::make_unique<TestQuicCryptoClientStream>(
         server_id(), this, crypto_config()->proof_verifier()->CreateDefaultContext(),
-        crypto_config(), this);
+        crypto_config(), this, true);
   }
 };
 
@@ -94,7 +95,9 @@ public:
       : api_(Api::createApiForTest(time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")), connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
+          SetQuicReloadableFlag(quic_enable_version_draft_28, GetParam());
           SetQuicReloadableFlag(quic_enable_version_draft_27, GetParam());
+          SetQuicReloadableFlag(quic_enable_version_draft_25_v3, GetParam());
           return quic::ParsedVersionOfIndex(quic::CurrentSupportedVersions(), 0);
         }()),
         peer_addr_(Network::Utility::getAddressWithPort(*Network::Utility::getIpv6LoopbackAddress(),
@@ -122,6 +125,8 @@ public:
 
   void SetUp() override {
     envoy_quic_session_.Initialize();
+    setQuicConfigWithDefaultValues(envoy_quic_session_.config());
+    envoy_quic_session_.OnConfigNegotiated();
     envoy_quic_session_.addConnectionCallbacks(network_connection_callbacks_);
     envoy_quic_session_.setConnectionStats(
         {read_total_, read_current_, write_total_, write_current_, nullptr, nullptr});
@@ -188,7 +193,7 @@ TEST_P(EnvoyQuicClientSessionTest, NewStream) {
   // Response headers should be propagated to decoder.
   EXPECT_CALL(response_decoder, decodeHeaders_(_, /*end_stream=*/true))
       .WillOnce(Invoke([](const Http::ResponseHeaderMapPtr& decoded_headers, bool) {
-        EXPECT_EQ("200", decoded_headers->Status()->value().getStringView());
+        EXPECT_EQ("200", decoded_headers->getStatusValue());
       }));
   stream.OnStreamHeaderList(/*fin=*/true, headers.uncompressed_header_bytes(), headers);
 }

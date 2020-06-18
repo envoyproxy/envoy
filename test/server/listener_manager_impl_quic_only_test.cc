@@ -26,19 +26,21 @@ filter_chains:
   filters: []
   transport_socket:
     name: envoy.transport_sockets.quic
-    config:
-      common_tls_context:
-        tls_certificates:
-        - certificate_chain:
-            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
-          private_key:
-            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
-        validation_context:
-          trusted_ca:
-            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-          match_subject_alt_names:
-          - exact: localhost
-          - exact: 127.0.0.1
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.transport_sockets.quic.v3.QuicDownstreamTransport
+      downstream_tls_context:
+        common_tls_context:
+          tls_certificates:
+          - certificate_chain:
+              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+            private_key:
+              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+          validation_context:
+            trusted_ca:
+              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+            match_subject_alt_names:
+            - exact: localhost
+            - exact: 127.0.0.1
 reuse_port: true
 udp_listener_config:
   udp_listener_name: "quiche_quic_listener"
@@ -55,21 +57,18 @@ udp_listener_config:
 #endif
                            /* expected_creation_params */ {true, false});
 
-  expectSetsockopt(os_sys_calls_,
-                   /* expected_sockopt_level */ IPPROTO_IP,
+  expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
                    /* expected_sockopt_name */ ENVOY_IP_PKTINFO,
                    /* expected_value */ 1,
                    /* expected_num_calls */ 1);
 #ifdef SO_RXQ_OVFL
-  expectSetsockopt(os_sys_calls_,
-                   /* expected_sockopt_level */ SOL_SOCKET,
+  expectSetsockopt(/* expected_sockopt_level */ SOL_SOCKET,
                    /* expected_sockopt_name */ SO_RXQ_OVFL,
                    /* expected_value */ 1,
                    /* expected_num_calls */ 1);
 #endif
 
-  expectSetsockopt(os_sys_calls_,
-                   /* expected_sockopt_level */ SOL_SOCKET,
+  expectSetsockopt(/* expected_sockopt_level */ SOL_SOCKET,
                    /* expected_sockopt_name */ SO_REUSEPORT,
                    /* expected_value */ 1,
                    /* expected_num_calls */ 1);

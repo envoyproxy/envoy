@@ -16,12 +16,13 @@ namespace JwtAuthn {
 
 namespace {
 
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    access_control_request_method(Http::Headers::get().AccessControlRequestMethod);
+
 bool isCorsPreflightRequest(const Http::RequestHeaderMap& headers) {
-  return headers.Method() &&
-         headers.Method()->value().getStringView() == Http::Headers::get().MethodValues.Options &&
+  return headers.getMethodValue() == Http::Headers::get().MethodValues.Options &&
          headers.Origin() && !headers.Origin()->value().empty() &&
-         headers.AccessControlRequestMethod() &&
-         !headers.AccessControlRequestMethod()->value().empty();
+         !headers.getInlineValue(access_control_request_method.handle()).empty();
 }
 
 } // namespace

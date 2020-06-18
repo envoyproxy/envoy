@@ -153,8 +153,6 @@ TEST_P(ListenerImplTest, WildcardListenerUseActualDst) {
       Network::Test::createRawBufferSocket(), nullptr);
   client_connection->connect();
 
-  EXPECT_CALL(listener, getLocalAddress(_)).WillOnce(Return(local_dst_address));
-
   StreamInfo::StreamInfoImpl stream_info(dispatcher_->timeSource());
   EXPECT_CALL(listener_callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
@@ -198,11 +196,6 @@ TEST_P(ListenerImplTest, WildcardListenerIpv4Compat) {
       local_dst_address, Network::Address::InstanceConstSharedPtr(),
       Network::Test::createRawBufferSocket(), nullptr);
   client_connection->connect();
-
-  EXPECT_CALL(listener, getLocalAddress(_))
-      .WillOnce(Invoke([](os_fd_t fd) -> Address::InstanceConstSharedPtr {
-        return Address::addressFromFd(fd);
-      }));
 
   StreamInfo::StreamInfoImpl stream_info(dispatcher_->timeSource());
   EXPECT_CALL(listener_callbacks, onAccept_(_))
@@ -249,10 +242,6 @@ TEST_P(ListenerImplTest, DisableAndEnableListener) {
   // When the listener is re-enabled, the pending connection should be accepted.
   listener.enable();
 
-  EXPECT_CALL(listener, getLocalAddress(_))
-      .WillOnce(Invoke([](os_fd_t fd) -> Address::InstanceConstSharedPtr {
-        return Address::addressFromFd(fd);
-      }));
   EXPECT_CALL(listener_callbacks, onAccept_(_)).WillOnce(Invoke([&](ConnectionSocketPtr&) -> void {
     client_connection->close(ConnectionCloseType::NoFlush);
   }));

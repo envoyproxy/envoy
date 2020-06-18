@@ -157,7 +157,7 @@ void ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& hea
   Http::RequestHeaderMapPtr modified_headers;
   if (Http::Utility::isUpgrade(headers)) {
     modified_headers = createHeaderMap<RequestHeaderMapImpl>(headers);
-    upgrade_type_ = std::string(headers.Upgrade()->value().getStringView());
+    upgrade_type_ = std::string(headers.getUpgradeValue());
     Http::Utility::transformUpgradeRequestFromH1toH2(*modified_headers);
     buildHeaders(final_headers, *modified_headers);
   } else if (headers.Method() && headers.Method()->value() == "CONNECT") {
@@ -205,7 +205,7 @@ void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
     // In this case we want trailers to come after we release all pending body data that is
     // waiting on window updates. We need to save the trailers so that we can emit them later.
     ASSERT(!pending_trailers_to_encode_);
-    pending_trailers_to_encode_ = createHeaderMap<HeaderMapImpl>(trailers);
+    pending_trailers_to_encode_ = cloneTrailers(trailers);
   } else {
     submitTrailers(trailers);
     parent_.sendPendingFrames();

@@ -643,6 +643,7 @@ TEST_F(LookupWithStatNameTest, NotFound) {
   EXPECT_FALSE(store_->findCounter(not_found));
   EXPECT_FALSE(store_->findGauge(not_found));
   EXPECT_FALSE(store_->findHistogram(not_found));
+  EXPECT_FALSE(store_->findTextReadout(not_found));
 }
 
 class StatsMatcherTLSTest : public StatsThreadLocalStoreTest {
@@ -716,6 +717,7 @@ TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
       store_->histogramFromString("noop_histogram", Stats::Histogram::Unit::Unspecified);
   EXPECT_EQ(noop_histogram.name(), "");
   EXPECT_FALSE(noop_histogram.used());
+  EXPECT_EQ(Stats::Histogram::Unit::Null, noop_histogram.unit());
   Histogram& noop_histogram_2 =
       store_->histogramFromString("noop_histogram_2", Stats::Histogram::Unit::Unspecified);
   EXPECT_EQ(&noop_histogram, &noop_histogram_2);
@@ -938,6 +940,12 @@ public:
     };
   }
 
+  LookupStatFn lookupTextReadoutFn() {
+    return [this](const std::string& stat_name) -> std::string {
+      return scope_->textReadoutFromString(stat_name).name();
+    };
+  }
+
   Stats::SymbolTablePtr symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -978,6 +986,14 @@ TEST_P(RememberStatsMatcherTest, HistogramRejectOne) { testRememberMatcher(looku
 TEST_P(RememberStatsMatcherTest, HistogramRejectsAll) { testRejectsAll(lookupHistogramFn()); }
 
 TEST_P(RememberStatsMatcherTest, HistogramAcceptsAll) { testAcceptsAll(lookupHistogramFn()); }
+
+TEST_P(RememberStatsMatcherTest, TextReadoutRejectOne) {
+  testRememberMatcher(lookupTextReadoutFn());
+}
+
+TEST_P(RememberStatsMatcherTest, TextReadoutRejectsAll) { testRejectsAll(lookupTextReadoutFn()); }
+
+TEST_P(RememberStatsMatcherTest, TextReadoutAcceptsAll) { testAcceptsAll(lookupTextReadoutFn()); }
 
 TEST_F(StatsThreadLocalStoreTest, RemoveRejectedStats) {
   store_->initializeThreading(main_thread_dispatcher_, tls_);
