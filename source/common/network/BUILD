@@ -191,6 +191,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "socket_interface_factory_lib",
+    srcs = ["socket_interface_factory.cc"],
+    hdrs = ["socket_interface_factory.h"],
+    deps = [
+        ":socket_lib",
+        "//include/envoy/server:bootstrap_extension_config_interface",
+        "//source/extensions/network/vcl:vcl_interface_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "listen_socket_lib",
     srcs = ["listen_socket_impl.cc"],
     hdrs = ["listen_socket_impl.h"],
