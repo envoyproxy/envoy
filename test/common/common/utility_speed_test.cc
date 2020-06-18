@@ -65,6 +65,7 @@ BENCHMARK(BM_DateTimeFormatterWithSubseconds);
 // This benchmark is basically similar with the above BM_DateTimeFormatterWithSubseconds, the
 // differences are: 1. the format string input is long with duplicated subseconds. 2. The purpose
 // is to test DateFormatter.parse() which is called in constructor.
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_DateTimeFormatterWithLongSubsecondsString(benchmark::State& state) {
   int outputBytes = 0;
 
@@ -88,6 +89,7 @@ static void BM_DateTimeFormatterWithLongSubsecondsString(benchmark::State& state
 }
 BENCHMARK(BM_DateTimeFormatterWithLongSubsecondsString);
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_DateTimeFormatterWithoutSubseconds(benchmark::State& state) {
   int outputBytes = 0;
 
