@@ -200,7 +200,7 @@ TEST_F(ClusterManagerImplTest, MultipleProtocolCluster) {
   checkConfigDump(R"EOF(
 static_clusters:
   - cluster:
-      "@type": type.googleapis.com/envoy.config.cluster.v3.cluster
+      "@type": type.googleapis.com/envoy.api.v2.Cluster
       name: http12_cluster
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
@@ -402,7 +402,7 @@ static_resources:
             envoy_grpc:
               cluster_name: static_cluster
   )EOF";
-  create(parseBootstrapFromV2Yaml(yaml));
+  create(parseBootstrapFromV3Yaml(yaml));
   const auto& primary_clusters = cluster_manager_->primaryClusters();
   EXPECT_THAT(primary_clusters, testing::UnorderedElementsAre(
                                     "static_cluster", "strict_dns_cluster", "logical_dns_cluster"));
@@ -431,9 +431,8 @@ TEST_F(ClusterManagerImplTest, OriginalDstLbRestriction2) {
   - name: cluster_1
     connect_timeout: 0.250s
     type: static
-    lb_policy: cluster_provided
+    lb_policy: original_dst_lb
     load_assignment:
-      cluster_name: cluster_1
       endpoints:
       - lb_endpoints:
         - endpoint:
@@ -553,7 +552,7 @@ TEST_F(ClusterManagerImplTest, SubsetLoadBalancerOriginalDstRestriction) {
   - name: cluster_1
     connect_timeout: 0.250s
     type: original_dst
-    lb_policy: cluster_provided
+    lb_policy: original_dst_lb
     lb_subset_config:
       fallback_policy: ANY_ENDPOINT
       subset_selectors:
@@ -918,7 +917,7 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
     "dynamic_resources": {
       "cds_config": {
         "api_config_source": {
-          "api_type": "DEPRECATED_AND_UNAVAILABLE_DO_NOT_USE",
+          "api_type": "UNSUPPORTED_REST_LEGACY",
           "refresh_delay": "30s",
           "cluster_names": ["cds_cluster"]
         }
@@ -1000,108 +999,78 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
  version_info: version3
  static_clusters:
   - cluster:
-      "@type": type.googleapis.com/envoy.config.cluster.v3.cluster
+      "@type": type.googleapis.com/envoy.api.v2.Cluster
       name: "cds_cluster"
       type: "STATIC"
       connect_timeout: 0.25s
-      load_assignment:
-        cluster_name: cds_cluster
-        endpoints:
-        - lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  address: 127.0.0.1
-                  port_value: 11001
+      hosts:
+      - socket_address:
+          address: "127.0.0.1"
+          port_value: 11001
     last_updated:
       seconds: 1234567891
       nanos: 234000000
   - cluster:
-      "@type": type.googleapis.com/envoy.config.cluster.v3.cluster
+      "@type": type.googleapis.com/envoy.api.v2.Cluster
       name: "fake_cluster"
       type: "STATIC"
       connect_timeout: 0.25s
-      load_assignment:
-        cluster_name: fake_cluster
-        endpoints:
-        - lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  address: 127.0.0.1
-                  port_value: 11001
+      hosts:
+      - socket_address:
+          address: "127.0.0.1"
+          port_value: 11001
     last_updated:
       seconds: 1234567891
       nanos: 234000000
   - cluster:
-      "@type": type.googleapis.com/envoy.config.cluster.v3.cluster
+      "@type": type.googleapis.com/envoy.api.v2.Cluster
       name: "fake_cluster2"
       type: "STATIC"
       connect_timeout: 0.25s
-      load_assignment:
-        cluster_name: fake_cluster2
-        endpoints:
-        - lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  address: 127.0.0.1
-                  port_value: 11001
+      hosts:
+      - socket_address:
+          address: "127.0.0.1"
+          port_value: 11001
     last_updated:
       seconds: 1234567891
       nanos: 234000000
  dynamic_active_clusters:
-  - version_info: "version3"
+  - version_info: "version1"
     cluster:
-      "@type": type.googleapis.com/envoy.config.cluster.v3.cluster
+      "@type": type.googleapis.com/envoy.api.v2.Cluster
       name: "cluster3"
       type: "STATIC"
       connect_timeout: 0.25s
-      load_assignment:
-        cluster_name: cluster3
-        endpoints:
-        - lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  address: 127.0.0.1
-                  port_value: 11001
+      hosts:
+      - socket_address:
+          address: "127.0.0.1"
+          port_value: 11001
     last_updated:
       seconds: 1234567891
       nanos: 234000000
-  - version_info: "version3"
+  - version_info: "version2"
     cluster:
-      "@type": type.googleapis.com/envoy.config.cluster.v3.cluster
+      "@type": type.googleapis.com/envoy.api.v2.Cluster
       name: "cluster4"
       type: "STATIC"
       connect_timeout: 0.25s
-      load_assignment:
-        cluster_name: cluster4
-        endpoints:
-        - lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  address: 127.0.0.1
-                  port_value: 11001
+      hosts:
+      - socket_address:
+          address: "127.0.0.1"
+          port_value: 11001
     last_updated:
       seconds: 1234567891
       nanos: 234000000
   - version_info: "version3"
     cluster:
-      "@type": type.googleapis.com/envoy.config.cluster.v3.cluster
+      "@type": type.googleapis.com/envoy.api.v2.Cluster
       name: "cluster5"
       type: "STATIC"
       connect_timeout: 0.25s
-      load_assignment:
-        cluster_name: cluster5
-        endpoints:
-        - lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  address: 127.0.0.1
-                  port_value: 11001
+      hosts:
+      - socket_address:
+          address: "127.0.0.1"
+          port_value: 11001
     last_updated:
       seconds: 1234567891
       nanos: 234000000
@@ -1208,19 +1177,14 @@ TEST_F(ClusterManagerImplTest, RemoveWarmingCluster) {
 dynamic_warming_clusters:
   - version_info: "version3"
     cluster:
-      "@type": type.googleapis.com/envoy.config.cluster.v3.cluster
+      "@type": type.googleapis.com/envoy.api.v2.Cluster
       name: "fake_cluster"
       type: STATIC
       connect_timeout: 0.25s
-      load_assignment:
-        cluster_name: fake_cluster
-        endpoints:
-        - lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  address: 127.0.0.1
-                  port_value: 11001
+      hosts:
+      - socket_address:
+          address: "127.0.0.1"
+          port_value: 11001
     last_updated:
       seconds: 1234567891
       nanos: 234000000
@@ -1256,19 +1220,14 @@ TEST_F(ClusterManagerImplTest, ModifyWarmingCluster) {
  dynamic_warming_clusters:
    - version_info: "version3"
      cluster:
-       "@type": type.googleapis.com/envoy.config.cluster.v3.cluster
+       "@type": type.googleapis.com/envoy.api.v2.Cluster
        name: "fake_cluster"
        type: STATIC
        connect_timeout: 0.25s
-       load_assignment:
-         cluster_name: fake_cluster
-         endpoints:
-         - lb_endpoints:
-           - endpoint:
-               address:
-                 socket_address:
-                   address: 127.0.0.1
-                   port_value: 11001
+       hosts:
+       - socket_address:
+           address: "127.0.0.1"
+           port_value: 11001
      last_updated:
        seconds: 1234567891
        nanos: 234000000
@@ -1294,19 +1253,14 @@ TEST_F(ClusterManagerImplTest, ModifyWarmingCluster) {
  dynamic_warming_clusters:
    - version_info: "version3"
      cluster:
-       "@type": type.googleapis.com/envoy.config.cluster.v3.cluster
+       "@type": type.googleapis.com/envoy.api.v2.Cluster
        name: "fake_cluster"
        type: STATIC
        connect_timeout: 0.25s
-       load_assignment:
-         cluster_name: fake_cluster
-         endpoints:
-         - lb_endpoints:
-           - endpoint:
-               address:
-                 socket_address:
-                   address: 127.0.0.1
-                   port_value: 11002
+       hosts:
+       - socket_address:
+           address: "127.0.0.1"
+           port_value: 11002
      last_updated:
        seconds: 1234567891
        nanos: 234000000
