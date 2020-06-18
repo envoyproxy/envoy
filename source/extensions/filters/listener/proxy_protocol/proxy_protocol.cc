@@ -32,21 +32,14 @@ Config::Config(
     Stats::Scope& scope,
     const envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol& proto_config)
     : stats_{ALL_PROXY_PROTOCOL_STATS(POOL_COUNTER(scope))} {
-  for (const auto& rule : proto_config.request_rules()) {
-    if (rule.tlv_type() > 0xFF) {
-      // the TLV type in Proxy Protocol V2 is defined as uint8_t, it should not be bigger than 0xFF.
-      ENVOY_LOG(
-          warn,
-          "proxy_protocol: TLV type should be between 0~255. is out of the range and discarded.");
-      continue;
-    }
-    tlv_types_[0xFF & rule.tlv_type()] = std::make_shared<KeyValuePair>(rule.on_tlv_present());
+  for (const auto& rule : proto_config.rules()) {
+    tlv_types_[0xFF & rule.tlv_type()] = KeyValuePair(rule.on_tlv_present());
   }
 }
 
-std::shared_ptr<const KeyValuePair> Config::isTlvTypeNeeded(uint8_t type) const {
+const KeyValuePair* Config::isTlvTypeNeeded(uint8_t type) const {
   if (tlv_types_.end() != tlv_types_.find(type)) {
-    return tlv_types_.at(type);
+    return &tlv_types_.at(type);
   }
 
   return nullptr;
@@ -358,9 +351,8 @@ bool Filter::readExtensions(os_fd_t fd) {
   }
 
   // Initialize the buf_tlv_ only when we need to read the TLVs.
-  if (!buf_tlv_init_) {
+  if (buf_tlv_.empty()) {
     buf_tlv_.resize(proxy_protocol_header_.value().extensions_length_);
-    buf_tlv_init_ = true;
   }
 
   // Parse until we have all the TLVs in buf_tlv.

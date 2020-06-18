@@ -39,5 +39,5 @@ message ProxyProtocol {
   }
 
   // The list of rules to apply to requests.
-  repeated Rule request_rules = 1;
+  repeated Rule rules = 1;
 }

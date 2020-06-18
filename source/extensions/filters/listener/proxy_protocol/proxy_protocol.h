@@ -1,6 +1,5 @@
 #pragma once
 
-#include <map>
 #include <memory>
 
 #include "envoy/event/file_event.h"
@@ -11,6 +10,7 @@
 
 #include "common/common/logger.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "proxy_protocol_header.h"
 
 namespace Envoy {
@@ -48,10 +48,10 @@ public:
   ProxyProtocolStats stats_;
 
   /**
-   * Return null if the type of TLV is not needed otherwise a shared pointer to the KeyValuePair for
+   * Return null if the type of TLV is not needed otherwise a pointer to the KeyValuePair for
    * emitting to dynamic metadata
    */
-  std::shared_ptr<const KeyValuePair> isTlvTypeNeeded(uint8_t type) const;
+  const KeyValuePair* isTlvTypeNeeded(uint8_t type) const;
 
   /**
    * Number of TLV types that need to be parsed and saved to dynamic metadata
@@ -59,7 +59,7 @@ public:
   size_t numberOfNeededTlvTypes() const;
 
 private:
-  std::map<uint8_t, std::shared_ptr<KeyValuePair>> tlv_types_;
+  absl::flat_hash_map<uint8_t, KeyValuePair> tlv_types_;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
@@ -131,11 +131,6 @@ private:
    * Store the extension TLVs if they need to be read.
    */
   std::vector<uint8_t> buf_tlv_;
-
-  /**
-   * Flag showing whether the buf_tlv_ has been initialized
-   */
-  bool buf_tlv_init_{false};
 
   /**
    * The index in buf_tlv_ that has been fully read.
