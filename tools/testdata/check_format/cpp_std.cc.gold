@@ -4,7 +4,7 @@
 
 namespace Envoy {
 
-std::unique_ptr<int> to_be_fix = std::make_unique<int>(0);
+auto to_be_fix = std::make_unique<int>(0);
 
 // Awesome stuff goes here.
 

@@ -696,6 +696,15 @@ def checkSourceLine(line, file_path, reportError):
         reportError("Don't call grpc_init() or grpc_shutdown() directly, instantiate " +
                     "Grpc::GoogleGrpcContext. See #8282")
 
+  if not line.startswith("using"):
+    smart_ptr_m = re.search("std::(unique_ptr|shared_ptr)<(.*?)>", line)
+    if smart_ptr_m:
+      reportError(f"Use type alias for '{smart_ptr_m.group(2)}' instead. See STYLE.md")
+
+    optional_m = re.search("absl::optional<std::reference_wrapper<(.*?)>>", line)
+    if optional_m:
+      reportError(f"Use type alias for '{optional_m.group(1)}' instead. See STYLE.md")
+
 
 def checkBuildLine(line, file_path, reportError):
   if "@bazel_tools" in line and not (isSkylarkFile(file_path) or file_path.startswith("./bazel/") or

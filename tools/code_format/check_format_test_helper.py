@@ -216,6 +216,11 @@ def runChecks():
       "grpc_shutdown.cc",
       "Don't call grpc_init() or grpc_shutdown() directly, instantiate Grpc::GoogleGrpcContext. " +
       "See #8282")
+  errors += checkUnfixableError("non_type_alias_smart_ptr.cc",
+                                "Use type alias for 'Network::Connection' instead. See STYLE.md")
+  errors += checkUnfixableError(
+      "non_type_alias_optional.cc",
+      "Use type alias for 'ConnectionHandlerImpl::ActiveTcpListener' instead. See STYLE.md")
   errors += checkUnfixableError("clang_format_double_off.cc", "clang-format nested off")
   errors += checkUnfixableError("clang_format_trailing_off.cc", "clang-format remains off")
   errors += checkUnfixableError("clang_format_double_on.cc", "clang-format nested on")
