@@ -1,3 +1,4 @@
+#include "envoy/common/exception.h"
 #include "envoy/extensions/filters/network/local_ratelimit/v3/local_rate_limit.pb.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -52,42 +53,44 @@ DEFINE_PROTO_FUZZER(
   Stats::IsolatedStoreImpl stats_store_;
   static NiceMock<Runtime::MockLoader> runtime_;
   Event::MockTimer* fill_timer_ = new Event::MockTimer(&dispatcher_);
+  envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit proto_config =
+      input.config();
+  ConfigSharedPtr config_ = nullptr;
   try {
-    envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit proto_config =
-        input.config();
-    ConfigSharedPtr config_ =
-        std::make_shared<Config>(proto_config, dispatcher_, stats_store_, runtime_);
-    ActiveFilter active_filter(config_);
-    std::chrono::milliseconds fill_interval_(
-        PROTOBUF_GET_MS_REQUIRED(proto_config.token_bucket(), fill_interval));
-
-    for (const auto& action : input.actions()) {
-      ENVOY_LOG_MISC(trace, "action {}", action.DebugString());
-
-      switch (action.action_selector_case()) {
-      case envoy::extensions::filters::network::local_ratelimit::Action::kOnData: {
-        Buffer::OwnedImpl buffer(action.on_data().data());
-        active_filter.filter_.onData(buffer, action.on_data().end_stream());
-        break;
-      }
-      case envoy::extensions::filters::network::local_ratelimit::Action::kOnNewConnection: {
-        active_filter.filter_.onNewConnection();
-        break;
-      }
-      case envoy::extensions::filters::network::local_ratelimit::Action::kRefill: {
-        EXPECT_CALL(*fill_timer_, enableTimer(fill_interval_, nullptr));
-        fill_timer_->invokeCallback();
-        break;
-      }
-      default:
-        // Unhandled actions
-        PANIC("A case is missing for an action");
-      }
-    }
-  } catch (const EnvoyException e) {
-    ENVOY_LOG_MISC(debug, "EnvoyException in fuzz test: {}", e.what());
+    config_ = std::make_shared<Config>(proto_config, dispatcher_, stats_store_, runtime_);
+  } catch (EnvoyException e) {
+    ENVOY_LOG_MISC(debug, "EnvoyException in config's constructor: {}", e.what());
     return;
   }
+
+  ActiveFilter active_filter(config_);
+  std::chrono::milliseconds fill_interval_(
+      PROTOBUF_GET_MS_REQUIRED(proto_config.token_bucket(), fill_interval));
+
+  for (const auto& action : input.actions()) {
+    ENVOY_LOG_MISC(trace, "action {}", action.DebugString());
+
+    switch (action.action_selector_case()) {
+    case envoy::extensions::filters::network::local_ratelimit::Action::kOnData: {
+      Buffer::OwnedImpl buffer(action.on_data().data());
+      active_filter.filter_.onData(buffer, action.on_data().end_stream());
+      break;
+    }
+    case envoy::extensions::filters::network::local_ratelimit::Action::kOnNewConnection: {
+      active_filter.filter_.onNewConnection();
+      break;
+    }
+    case envoy::extensions::filters::network::local_ratelimit::Action::kRefill: {
+      EXPECT_CALL(*fill_timer_, enableTimer(fill_interval_, nullptr));
+      fill_timer_->invokeCallback();
+      break;
+    }
+    default:
+      // Unhandled actions
+      PANIC("A case is missing for an action");
+    }
+  }
+
 } // NOLINT
   // Silence clang-tidy here because it thinks there is a memory leak for "fill_timer_"
   // However, ownership of each MockTimer instance is transferred to the (caller of) dispatcher's
