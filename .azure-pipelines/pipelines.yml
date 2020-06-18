@@ -102,7 +102,7 @@ jobs:
           rbe: false
           bazelBuildExtraOptions: "--test_env=ENVOY_IP_TEST_VERSIONS=v4only"
 
-      - script: ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /build/envoy/generated/coverage coverage'
+      - script: ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /source/generated/coverage coverage'
         displayName: "Upload Report to GCS"
         env:
           ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
