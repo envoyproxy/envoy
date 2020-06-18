@@ -649,6 +649,9 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
 
   endpoint_metadata_ = lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}});
 
+  config_helper_.addRuntimeOverride("envoy.deprecated_features:envoy.extensions.filters.network."
+                                    "tcp_proxy.v3.TcpProxy.hidden_envoy_deprecated_deprecated_v1",
+                                    "true");
   initialize();
 
   expectEndpointToMatchRoute();
@@ -737,6 +740,9 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
 
   endpoint_metadata_ = lbMetadata({{"role", "replica"}, {"version", "v1"}, {"stage", "prod"}});
 
+  config_helper_.addRuntimeOverride("envoy.deprecated_features:envoy.extensions.filters.network."
+                                    "tcp_proxy.v3.TcpProxy.hidden_envoy_deprecated_deprecated_v1",
+                                    "true");
   initialize();
 
   expectEndpointNotToMatchRoute();

@@ -115,6 +115,9 @@ class VersionUtil {
 public:
   // Some helpers for working with earlier message version deprecated fields.
   static void scrubHiddenEnvoyDeprecated(Protobuf::Message& message);
+
+  // A prefix that is added to deprecated fields names upon shadowing.
+  static const char DeprecatedFieldShadowPrefix[];
 };
 
 } // namespace Config

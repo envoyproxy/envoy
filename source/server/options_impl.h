@@ -58,6 +58,7 @@ public:
     config_proto_ = config_proto;
   }
   void setConfigYaml(const std::string& config_yaml) { config_yaml_ = config_yaml; }
+  void setBootstrapVersion(uint32_t bootstrap_version) { bootstrap_version_ = bootstrap_version; }
   void setAdminAddressPath(const std::string& admin_address_path) {
     admin_address_path_ = admin_address_path;
   }

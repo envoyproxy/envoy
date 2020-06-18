@@ -555,10 +555,13 @@ public:
   }
 
   template <class MessageType>
-  static void loadFromYamlAndValidate(const std::string& yaml, MessageType& message) {
+  static void loadFromYamlAndValidate(const std::string& yaml, MessageType& message,
+                                      bool preserve_original_type = false) {
     MessageUtil::loadFromYamlAndValidate(yaml, message,
                                          ProtobufMessage::getStrictValidationVisitor());
-    Config::VersionConverter::eraseOriginalTypeInformation(message);
+    if (!preserve_original_type) {
+      Config::VersionConverter::eraseOriginalTypeInformation(message);
+    }
   }
 
   template <class MessageType> static void validate(const MessageType& message) {
@@ -583,6 +586,18 @@ public:
     ProtobufWkt::Struct message;
     MessageUtil::loadFromJson(json, message);
     return message;
+  }
+
+  /**
+   * Extract the Protobuf binary format of a google.protobuf.Message as a string.
+   * @param message message of type type.googleapis.com/google.protobuf.Message.
+   * @return std::string of the Protobuf binary object.
+   */
+  static std::string getProtobufBinaryStringFromMessage(const Protobuf::Message& message) {
+    std::string pb_binary_str;
+    pb_binary_str.reserve(message.ByteSizeLong());
+    message.SerializeToString(&pb_binary_str);
+    return pb_binary_str;
   }
 };
 
