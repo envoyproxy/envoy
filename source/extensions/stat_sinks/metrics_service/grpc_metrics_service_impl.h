@@ -18,12 +18,6 @@ namespace Extensions {
 namespace StatSinks {
 namespace MetricsService {
 
-namespace {
-// The fully-qualified name template for the metrics service's StreamMetrics method.
-constexpr char METHOD_NAME_TEMPLATE[] = "envoy.service.metrics.{}.MetricsService.StreamMetrics";
-
-} // namespace
-
 /**
  * Interface for metrics streamer.
  */
@@ -53,9 +47,7 @@ using GrpcMetricsStreamerSharedPtr = std::shared_ptr<GrpcMetricsStreamer>;
 /**
  * Production implementation of GrpcMetricsStreamer
  */
-class GrpcMetricsStreamerImpl : public Singleton::Instance,
-                                public GrpcMetricsStreamer,
-                                public Grpc::VersionedClient {
+class GrpcMetricsStreamerImpl : public Singleton::Instance, public GrpcMetricsStreamer {
 public:
   GrpcMetricsStreamerImpl(Grpc::AsyncClientFactoryPtr&& factory,
                           const LocalInfo::LocalInfo& local_info,
@@ -66,9 +58,6 @@ public:
 
   // Grpc::AsyncStreamCallbacks
   void onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) override { stream_ = nullptr; }
-
-  // Grpc::VersionedClient
-  const std::string methodNameTemplate() const override { return METHOD_NAME_TEMPLATE; }
 
 private:
   Grpc::AsyncStream<envoy::service::metrics::v3::StreamMetricsMessage> stream_{};

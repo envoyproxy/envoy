@@ -5,6 +5,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/assert.h"
+#include "common/grpc/typed_async_client.h"
 #include "common/network/utility.h"
 #include "common/runtime/runtime_features.h"
 #include "common/stream_info/utility.h"
@@ -38,7 +39,10 @@ GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
         flush_timer_->enableTimer(buffer_flush_interval_msec_);
       })),
       max_buffer_size_bytes_(max_buffer_size_bytes), local_info_(local_info),
-      service_method_(getMethodDescriptorForVersion(transport_api_version)),
+      service_method_(
+          Grpc::VersionedMethods("envoy.service.accesslog.v3.AccessLogService.StreamAccessLogs",
+                                 "envoy.service.accesslog.v2.AccessLogService.StreamAccessLogs")
+              .getMethodDescriptorForVersion(transport_api_version)),
       transport_api_version_(transport_api_version) {
   flush_timer_->enableTimer(buffer_flush_interval_msec_);
 }

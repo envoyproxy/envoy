@@ -22,7 +22,10 @@ GrpcClientImpl::GrpcClientImpl(Grpc::RawAsyncClientPtr&& async_client,
                                envoy::config::core::v3::ApiVersion transport_api_version,
                                bool use_alpha)
     : async_client_(std::move(async_client)), timeout_(timeout),
-      service_method_(getMethodDescriptorForVersion(transport_api_version, use_alpha)),
+      service_method_(Grpc::VersionedMethods("envoy.service.auth.v3.Authorization.Check",
+                                             "envoy.service.auth.v2.Authorization.Check",
+                                             "envoy.service.auth.v2alpha.Authorization.Check")
+                          .getMethodDescriptorForVersion(transport_api_version, use_alpha)),
       transport_api_version_(transport_api_version) {}
 
 GrpcClientImpl::~GrpcClientImpl() { ASSERT(!callbacks_); }

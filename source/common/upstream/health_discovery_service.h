@@ -99,13 +99,6 @@ using HdsClusterPtr = std::shared_ptr<HdsCluster>;
   COUNTER(responses)                                                                               \
   COUNTER(errors)
 
-namespace {
-// The fully-qualified name template for the health discovery service's StreamHealthCheck method.
-constexpr char STREAM_HEALTH_CHECK_METHOD_NAME_TEMPLATE[] =
-    "envoy.service.{1}.{0}.HealthDiscoveryService.StreamHealthCheck";
-
-} // namespace
-
 /**
  * Struct definition for all hds stats. @see stats_macros.h
  */
@@ -121,7 +114,6 @@ struct HdsDelegateStats {
  * back the results.
  */
 class HdsDelegate : Grpc::AsyncStreamCallbacks<envoy::service::health::v3::HealthCheckSpecifier>,
-                    Grpc::VersionedClient,
                     Logger::Loggable<Logger::Id::upstream> {
 public:
   HdsDelegate(Stats::Scope& scope, Grpc::RawAsyncClientPtr async_client,
@@ -141,24 +133,6 @@ public:
   void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&& metadata) override;
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
   envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse sendResponse();
-
-  // Config::VersionedClient
-  const std::string methodNameTemplate() const override {
-    return STREAM_HEALTH_CHECK_METHOD_NAME_TEMPLATE;
-  }
-  const std::string
-  serviceNamespace(envoy::config::core::v3::ApiVersion transport_api_version) const override {
-    switch (transport_api_version) {
-    case envoy::config::core::v3::ApiVersion::AUTO:
-      FALLTHRU;
-    case envoy::config::core::v3::ApiVersion::V2:
-      return "discovery";
-    case envoy::config::core::v3::ApiVersion::V3:
-      return "health";
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
-    }
-  }
 
   std::vector<HdsClusterPtr> hdsClusters() { return hds_clusters_; };
 

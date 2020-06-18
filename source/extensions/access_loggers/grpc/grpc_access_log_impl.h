@@ -21,13 +21,6 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace GrpcCommon {
 
-namespace {
-// The fully-qualified name template for the access log service's StreamAccessLogs method.
-constexpr char METHOD_NAME_TEMPLATE[] =
-    "envoy.service.accesslog.{}.AccessLogService.StreamAccessLogs";
-
-} // namespace
-
 /**
  * All stats for the grpc access logger. @see stats_macros.h
  */
@@ -87,7 +80,7 @@ public:
 
 using GrpcAccessLoggerCacheSharedPtr = std::shared_ptr<GrpcAccessLoggerCache>;
 
-class GrpcAccessLoggerImpl : public GrpcAccessLogger, public Grpc::VersionedClient {
+class GrpcAccessLoggerImpl : public GrpcAccessLogger {
 public:
   GrpcAccessLoggerImpl(Grpc::RawAsyncClientPtr&& client, std::string log_name,
                        std::chrono::milliseconds buffer_flush_interval_msec,
@@ -98,9 +91,6 @@ public:
   // Extensions::AccessLoggers::GrpcCommon::GrpcAccessLogger
   void log(envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry) override;
   void log(envoy::data::accesslog::v3::TCPAccessLogEntry&& entry) override;
-
-  // Grpc::VersionedClient
-  const std::string methodNameTemplate() const override { return METHOD_NAME_TEMPLATE; }
 
 private:
   struct LocalStream

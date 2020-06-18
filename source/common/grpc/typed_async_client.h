@@ -84,39 +84,44 @@ private:
 };
 
 /**
- * A versioned gRPC client.
+ * Versioned methods wrapper.
  */
-class VersionedClient {
+class VersionedMethods {
 public:
-  virtual ~VersionedClient() = default;
-
-  /**
-   * @return std::string template of a fully-qualified service method name. For example:
-   * envoy.service.auth.{}.Authorization.Check.
-   */
-  virtual const std::string methodNameTemplate() const PURE;
-
-  /**
-   * @return std::string to override the namespace of a service for a specific version. When it
-   * returns non-EMPTY_STRING, methodNameTemplate() should return a template in the following
-   * format: envoy.service.{1}.{0}.SERVICE_NAME.METHOD_NAME. For example,
-   * envoy.service.{1}.{0}.Authorization.Check.
-   */
-  virtual const std::string serviceNamespace(envoy::config::core::v3::ApiVersion) const {
-    return EMPTY_STRING;
-  };
+  VersionedMethods(const std::string& v3, const std::string& v2, const std::string& v2_alpha = "")
+      : v3_(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(v3)),
+        v2_(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(v2)),
+        v2_alpha_(v2_alpha.empty()
+                      ? nullptr
+                      : Protobuf::DescriptorPool::generated_pool()->FindMethodByName(v2_alpha)) {}
 
   /**
    * Given a version, return the method descriptor for a specific version.
    *
    * @param api_version target API version.
-   * @param use_alpha if this is an alpha version of an API client.
+   * @param use_alpha if this is an alpha version of an API method.
    *
-   * @return Protobuf::MethodDescriptor of a method for a specific version.
+   * @return Protobuf::MethodDescriptor& of a method for a specific version.
    */
   const Protobuf::MethodDescriptor&
   getMethodDescriptorForVersion(envoy::config::core::v3::ApiVersion api_version,
-                                bool use_alpha = false);
+                                bool use_alpha = false) const {
+    switch (api_version) {
+    case envoy::config::core::v3::ApiVersion::AUTO:
+      FALLTHRU;
+    case envoy::config::core::v3::ApiVersion::V2:
+      return use_alpha ? *v2_alpha_ : *v2_;
+    case envoy::config::core::v3::ApiVersion::V3:
+      return *v3_;
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
+  }
+
+private:
+  const Protobuf::MethodDescriptor* v3_;
+  const Protobuf::MethodDescriptor* v2_;
+  const Protobuf::MethodDescriptor* v2_alpha_;
 };
 
 /**

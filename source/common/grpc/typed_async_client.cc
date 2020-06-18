@@ -44,31 +44,5 @@ AsyncRequest* sendUntyped(RawAsyncClient* client, const Protobuf::MethodDescript
 }
 
 } // namespace Internal
-
-const Protobuf::MethodDescriptor&
-VersionedClient::getMethodDescriptorForVersion(envoy::config::core::v3::ApiVersion api_version,
-                                               bool use_alpha) {
-  std::string method_name;
-  switch (api_version) {
-  case envoy::config::core::v3::ApiVersion::AUTO:
-    FALLTHRU;
-  case envoy::config::core::v3::ApiVersion::V2:
-    method_name = fmt::format(methodNameTemplate(), use_alpha ? "v2alpha" : "v2",
-                              serviceNamespace(api_version));
-    break;
-
-  case envoy::config::core::v3::ApiVersion::V3:
-    method_name = fmt::format(methodNameTemplate(), "v3", serviceNamespace(api_version));
-    break;
-
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
-  const auto* method_descriptor =
-      Protobuf::DescriptorPool::generated_pool()->FindMethodByName(method_name);
-  ASSERT(method_descriptor != nullptr);
-  return *method_descriptor;
-}
-
 } // namespace Grpc
 } // namespace Envoy
