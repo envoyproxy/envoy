@@ -8,7 +8,7 @@ load("@config_validation_pip3//:requirements.bzl", config_validation_pip_install
 load("@protodoc_pip3//:requirements.bzl", protodoc_pip_install = "pip_install")
 
 # go version for rules_go
-GO_VERSION = "1.13.12"
+GO_VERSION = "1.14.4"
 
 def envoy_dependency_imports(go_version = GO_VERSION):
     rules_foreign_cc_dependencies()
