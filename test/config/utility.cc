@@ -313,11 +313,8 @@ static_resources:
 }
 
 // TODO(#6327) cleaner approach to testing with static config.
-// TODO(fredlas) set_node_on_first_message_only was true; the delta+SotW unification
-//               work restores it here. (moved from ads_integration.h)
 std::string ConfigHelper::adsBootstrap(const std::string& api_type,
                                        envoy::config::core::v3::ApiVersion api_version) {
-  // Note: do not use CONSTRUCT_ON_FIRST_USE here!
   return fmt::format(R"EOF(
 dynamic_resources:
   lds_config:
@@ -329,7 +326,6 @@ dynamic_resources:
   ads_config:
     transport_api_version: {1}
     api_type: {0}
-    set_node_on_first_message_only: false
 static_resources:
   clusters:
     name: dummy_cluster
