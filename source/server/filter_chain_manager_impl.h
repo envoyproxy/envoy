@@ -30,7 +30,7 @@ public:
    * @return Shared filter chain where builder is allowed to determine and reuse duplicated filter
    * chain. Throw exception if failed.
    */
-  virtual std::shared_ptr<Network::DrainableFilterChain>
+  virtual Network::DrainableFilterChainSharedPtr
   buildFilterChain(const envoy::config::listener::v3::FilterChain& filter_chain,
                    FilterChainFactoryContextCreator& context_creator) const PURE;
 };
@@ -168,7 +168,7 @@ class FilterChainManagerImpl : public Network::FilterChainManager,
 public:
   using FcContextMap =
       absl::flat_hash_map<envoy::config::listener::v3::FilterChain,
-                          std::shared_ptr<Network::DrainableFilterChain>, MessageUtil, MessageUtil>;
+                          Network::DrainableFilterChainSharedPtr, MessageUtil, MessageUtil>;
   FilterChainManagerImpl(const Network::Address::InstanceConstSharedPtr& address,
                          Configuration::FactoryContext& factory_context,
                          Init::Manager& init_manager)
@@ -179,7 +179,7 @@ public:
                          Init::Manager& init_manager, const FilterChainManagerImpl& parent_manager);
 
   // FilterChainFactoryContextCreator
-  std::unique_ptr<Configuration::FilterChainFactoryContext> createFilterChainFactoryContext(
+  Configuration::FilterChainFactoryContextPtr createFilterChainFactoryContext(
       const ::envoy::config::listener::v3::FilterChain* const filter_chain) override;
 
   // Network::FilterChainManager
@@ -288,7 +288,7 @@ private:
 
   const FilterChainManagerImpl* getOriginFilterChainManager() { return origin_.value(); }
   // Duplicate the inherent factory context if any.
-  std::shared_ptr<Network::DrainableFilterChain>
+  Network::DrainableFilterChainSharedPtr
   findExistingFilterChain(const envoy::config::listener::v3::FilterChain& filter_chain_message);
 
   // Mapping from filter chain message to filter chain. This is used by LDS response handler to

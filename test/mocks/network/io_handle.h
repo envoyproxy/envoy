@@ -36,8 +36,10 @@ public:
               (int level, int optname, const void* optval, socklen_t optlen));
   MOCK_METHOD(Api::SysCallIntResult, getOption,
               (int level, int optname, void* optval, socklen_t* optlen));
-  MOCK_METHOD(Api::SysCallIntResult, getLocalAddress, (sockaddr * address, socklen_t* addrlen));
   MOCK_METHOD(Api::SysCallIntResult, setBlocking, (bool blocking));
+  MOCK_METHOD(absl::optional<int>, domain, ());
+  MOCK_METHOD(Address::InstanceConstSharedPtr, localAddress, ());
+  MOCK_METHOD(Address::InstanceConstSharedPtr, peerAddress, ());
 };
 
 } // namespace Network
