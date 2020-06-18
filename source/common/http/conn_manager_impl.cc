@@ -1254,7 +1254,7 @@ RequestTrailerMap& ConnectionManagerImpl::ActiveStream::addDecodedTrailers() {
   // Trailers can only be added once.
   ASSERT(!request_trailers_);
 
-  request_trailers_ = std::make_unique<RequestTrailerMapImpl>();
+  request_trailers_ = RequestTrailerMapImpl::create();
   return *request_trailers_;
 }
 
@@ -1817,7 +1817,7 @@ ResponseTrailerMap& ConnectionManagerImpl::ActiveStream::addEncodedTrailers() {
   // Trailers can only be added once.
   ASSERT(!response_trailers_);
 
-  response_trailers_ = std::make_unique<ResponseTrailerMapImpl>();
+  response_trailers_ = ResponseTrailerMapImpl::create();
   return *response_trailers_;
 }
 
