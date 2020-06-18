@@ -35,7 +35,7 @@ ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSha
 
 ConnPoolImpl::~ConnPoolImpl() { destructAllConnections(); }
 
-ConnPoolImplBase::ActiveClientPtr ConnPoolImpl::instantiateActiveClient() {
+ActiveClientPtr ConnPoolImpl::instantiateActiveClient() {
   return std::make_unique<ActiveClient>(*this);
 }
 
@@ -112,7 +112,7 @@ void ConnPoolImpl::StreamWrapper::onDecodeComplete() {
 }
 
 ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
-    : ConnPoolImplBase::ActiveClient(
+    : Envoy::Http::ActiveClient(
           parent, parent.host_->cluster().maxRequestsPerConnection(),
           1 // HTTP1 always has a concurrent-request-limit of 1 per connection.
       ) {
