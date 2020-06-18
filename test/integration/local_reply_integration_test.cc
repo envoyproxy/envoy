@@ -78,6 +78,59 @@ body_format:
   EXPECT_TRUE(TestUtility::jsonStringEqual(response->body(), expected_body));
 }
 
+// For grpc, the error message is in grpc-message header.
+// If it is json, the header value is in json format.
+TEST_P(LocalReplyIntegrationTest, MapStatusCodeAndFormatToJson4Grpc) {
+  const std::string yaml = R"EOF(
+body_format:
+  json_format:
+    code: "%RESPONSE_CODE%"
+    message: "%LOCAL_REPLY_BODY%"
+)EOF";
+  setLocalReplyConfig(yaml);
+  initialize();
+
+  const std::string expected_grpc_message = R"({
+      "code": 503,
+      "message":"upstream connect error or disconnect/reset before headers. reset reason: connection termination"
+})";
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto encoder_decoder = codec_client_->startRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/package.service/method"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/grpc"}});
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  response->waitForEndStream();
+
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+  } else {
+    codec_client_->close();
+  }
+
+  EXPECT_FALSE(upstream_request_->complete());
+  EXPECT_EQ(0U, upstream_request_->bodyLength());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("application/grpc", response->headers().ContentType()->value().getStringView());
+  EXPECT_EQ("14", response->headers().GrpcStatus()->value().getStringView());
+  // Check if grpc-message value is same as expected
+  EXPECT_TRUE(TestUtility::jsonStringEqual(
+      std::string(response->headers().GrpcMessage()->value().getStringView()),
+      expected_grpc_message));
+}
+
 // Matched second filter has code and body rewrite and its format
 TEST_P(LocalReplyIntegrationTest, MapStatusCodeAndFormatToJsonForFirstMatchingFilter) {
   const std::string yaml = R"EOF(
