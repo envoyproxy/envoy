@@ -3,7 +3,7 @@
 
 #include "common/event/dispatcher_impl.h"
 #include "common/network/utility.h"
-#include "common/tcp/conn_pool.h"
+#include "common/tcp/original_conn_pool.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "test/common/upstream/utility.h"
@@ -65,13 +65,14 @@ struct ConnPoolCallbacks : public Tcp::ConnectionPool::Callbacks {
 };
 
 /**
- * A test version of ConnPoolImpl that allows for mocking.
+ * A test version of OriginalConnPoolImpl that allows for mocking.
  */
-class ConnPoolImplForTest : public ConnPoolImpl {
+class ConnPoolImplForTest : public OriginalConnPoolImpl {
 public:
   ConnPoolImplForTest(Event::MockDispatcher& dispatcher, Upstream::HostSharedPtr host,
                       NiceMock<Event::MockTimer>* upstream_ready_timer)
-      : ConnPoolImpl(dispatcher, host, Upstream::ResourcePriority::Default, nullptr, nullptr),
+      : OriginalConnPoolImpl(dispatcher, host, Upstream::ResourcePriority::Default, nullptr,
+                             nullptr),
         mock_dispatcher_(dispatcher), mock_upstream_ready_timer_(upstream_ready_timer) {}
 
   ~ConnPoolImplForTest() override {
@@ -120,7 +121,7 @@ public:
   std::vector<TestConnection> test_conns_;
 
 protected:
-  void onConnReleased(ConnPoolImpl::ActiveConn& conn) override {
+  void onConnReleased(OriginalConnPoolImpl::ActiveConn& conn) override {
     for (auto& test_conn : test_conns_) {
       if (conn.conn_.get() == test_conn.connection_) {
         onConnReleasedForTest();
@@ -128,10 +129,10 @@ protected:
       }
     }
 
-    ConnPoolImpl::onConnReleased(conn);
+    OriginalConnPoolImpl::onConnReleased(conn);
   }
 
-  void onConnDestroyed(ConnPoolImpl::ActiveConn& conn) override {
+  void onConnDestroyed(OriginalConnPoolImpl::ActiveConn& conn) override {
     for (auto i = test_conns_.begin(); i != test_conns_.end(); i++) {
       if (conn.conn_.get() == i->connection_) {
         onConnDestroyedForTest();
@@ -140,21 +141,21 @@ protected:
       }
     }
 
-    ConnPoolImpl::onConnDestroyed(conn);
+    OriginalConnPoolImpl::onConnDestroyed(conn);
   }
 };
 
 /**
  * Test fixture for connection pool tests.
  */
-class TcpConnPoolImplTest : public testing::Test {
+class TcpOriginalConnPoolImplTest : public testing::Test {
 public:
-  TcpConnPoolImplTest()
+  TcpOriginalConnPoolImplTest()
       : upstream_ready_timer_(new NiceMock<Event::MockTimer>(&dispatcher_)),
         host_(Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000")),
         conn_pool_(dispatcher_, host_, upstream_ready_timer_) {}
 
-  ~TcpConnPoolImplTest() override {
+  ~TcpOriginalConnPoolImplTest() override {
     EXPECT_TRUE(TestUtility::gaugesZeroed(cluster_->stats_store_.gauges()));
   }
 
@@ -169,15 +170,15 @@ public:
 /**
  * Test fixture for connection pool destructor tests.
  */
-class TcpConnPoolImplDestructorTest : public testing::Test {
+class TcpOriginalConnPoolImplDestructorTest : public testing::Test {
 public:
-  TcpConnPoolImplDestructorTest()
+  TcpOriginalConnPoolImplDestructorTest()
       : upstream_ready_timer_(new NiceMock<Event::MockTimer>(&dispatcher_)),
-        conn_pool_{new ConnPoolImpl(dispatcher_,
-                                    Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000"),
-                                    Upstream::ResourcePriority::Default, nullptr, nullptr)} {}
+        conn_pool_{new OriginalConnPoolImpl(
+            dispatcher_, Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000"),
+            Upstream::ResourcePriority::Default, nullptr, nullptr)} {}
 
-  ~TcpConnPoolImplDestructorTest() override = default;
+  ~TcpOriginalConnPoolImplDestructorTest() override = default;
 
   void prepareConn() {
     connection_ = new NiceMock<Network::MockClientConnection>();
@@ -199,7 +200,7 @@ public:
   NiceMock<Event::MockTimer>* upstream_ready_timer_;
   NiceMock<Event::MockTimer>* connect_timer_;
   NiceMock<Network::MockClientConnection>* connection_;
-  std::unique_ptr<ConnPoolImpl> conn_pool_;
+  std::unique_ptr<OriginalConnPoolImpl> conn_pool_;
   std::unique_ptr<ConnPoolCallbacks> callbacks_;
 };
 
@@ -214,7 +215,7 @@ struct ActiveTestConn {
     Immediate,        // connection callback occurs during newConnection
   };
 
-  ActiveTestConn(TcpConnPoolImplTest& parent, size_t conn_index, Type type)
+  ActiveTestConn(TcpOriginalConnPoolImplTest& parent, size_t conn_index, Type type)
       : parent_(parent), conn_index_(conn_index) {
     if (type == Type::CreateConnection || type == Type::InProgress) {
       parent.conn_pool_.expectConnCreate();
@@ -257,19 +258,19 @@ struct ActiveTestConn {
               parent_.conn_pool_.test_conns_[conn_index_].connection_);
   }
 
-  TcpConnPoolImplTest& parent_;
+  TcpOriginalConnPoolImplTest& parent_;
   size_t conn_index_;
   Tcp::ConnectionPool::Cancellable* handle_{};
   ConnPoolCallbacks callbacks_;
   bool completed_{};
 };
 
-TEST_F(TcpConnPoolImplTest, HostAccessor) { EXPECT_EQ(conn_pool_.host(), host_); }
+TEST_F(TcpOriginalConnPoolImplTest, HostAccessor) { EXPECT_EQ(conn_pool_.host(), host_); }
 
 /**
  * Verify that connections are drained when requested.
  */
-TEST_F(TcpConnPoolImplTest, DrainConnections) {
+TEST_F(TcpOriginalConnPoolImplTest, DrainConnections) {
   cluster_->resetResourceManager(3, 1024, 1024, 1, 1);
   InSequence s;
 
@@ -305,7 +306,7 @@ TEST_F(TcpConnPoolImplTest, DrainConnections) {
 /**
  * Test all timing stats are set.
  */
-TEST_F(TcpConnPoolImplTest, VerifyTimingStats) {
+TEST_F(TcpOriginalConnPoolImplTest, VerifyTimingStats) {
   EXPECT_CALL(cluster_->stats_store_,
               deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_connect_ms"), _));
   EXPECT_CALL(cluster_->stats_store_,
@@ -325,7 +326,7 @@ TEST_F(TcpConnPoolImplTest, VerifyTimingStats) {
 /**
  * Test that buffer limits are set.
  */
-TEST_F(TcpConnPoolImplTest, VerifyBufferLimits) {
+TEST_F(TcpOriginalConnPoolImplTest, VerifyBufferLimits) {
   ConnPoolCallbacks callbacks;
   conn_pool_.expectConnCreate();
   EXPECT_CALL(*cluster_, perConnectionBufferLimitBytes()).WillOnce(Return(8192));
@@ -343,7 +344,7 @@ TEST_F(TcpConnPoolImplTest, VerifyBufferLimits) {
 /**
  * Test that upstream callback fire for assigned connections.
  */
-TEST_F(TcpConnPoolImplTest, UpstreamCallbacks) {
+TEST_F(TcpOriginalConnPoolImplTest, UpstreamCallbacks) {
   Buffer::OwnedImpl buffer;
 
   InSequence s;
@@ -380,7 +381,7 @@ TEST_F(TcpConnPoolImplTest, UpstreamCallbacks) {
 /**
  * Test that upstream callback close event fires for assigned connections.
  */
-TEST_F(TcpConnPoolImplTest, UpstreamCallbacksCloseEvent) {
+TEST_F(TcpOriginalConnPoolImplTest, UpstreamCallbacksCloseEvent) {
   Buffer::OwnedImpl buffer;
 
   InSequence s;
@@ -400,7 +401,7 @@ TEST_F(TcpConnPoolImplTest, UpstreamCallbacksCloseEvent) {
 /**
  * Test that a connection pool functions without upstream callbacks.
  */
-TEST_F(TcpConnPoolImplTest, NoUpstreamCallbacks) {
+TEST_F(TcpOriginalConnPoolImplTest, NoUpstreamCallbacks) {
   Buffer::OwnedImpl buffer;
 
   InSequence s;
@@ -419,7 +420,7 @@ TEST_F(TcpConnPoolImplTest, NoUpstreamCallbacks) {
  * Tests a request that generates a new connection, completes, and then a second request that uses
  * the same connection.
  */
-TEST_F(TcpConnPoolImplTest, MultipleRequestAndResponse) {
+TEST_F(TcpOriginalConnPoolImplTest, MultipleRequestAndResponse) {
   InSequence s;
 
   // Request 1 should kick off a new connection.
@@ -443,7 +444,7 @@ TEST_F(TcpConnPoolImplTest, MultipleRequestAndResponse) {
 /**
  * Tests ConnectionState assignment, lookup and destruction.
  */
-TEST_F(TcpConnPoolImplTest, ConnectionStateLifecycle) {
+TEST_F(TcpOriginalConnPoolImplTest, ConnectionStateLifecycle) {
   InSequence s;
 
   bool state_destroyed = false;
@@ -482,7 +483,7 @@ TEST_F(TcpConnPoolImplTest, ConnectionStateLifecycle) {
 /**
  * Test when we overflow max pending requests.
  */
-TEST_F(TcpConnPoolImplTest, MaxPendingRequests) {
+TEST_F(TcpOriginalConnPoolImplTest, MaxPendingRequests) {
   cluster_->resetResourceManager(1, 1, 1024, 1, 1);
 
   ConnPoolCallbacks callbacks;
@@ -510,7 +511,7 @@ TEST_F(TcpConnPoolImplTest, MaxPendingRequests) {
  * Tests a connection failure before a request is bound which should result in the pending request
  * getting purged.
  */
-TEST_F(TcpConnPoolImplTest, RemoteConnectFailure) {
+TEST_F(TcpOriginalConnPoolImplTest, RemoteConnectFailure) {
   InSequence s;
 
   // Request 1 should kick off a new connection.
@@ -536,7 +537,7 @@ TEST_F(TcpConnPoolImplTest, RemoteConnectFailure) {
  * Tests a connection failure before a request is bound which should result in the pending request
  * getting purged.
  */
-TEST_F(TcpConnPoolImplTest, LocalConnectFailure) {
+TEST_F(TcpOriginalConnPoolImplTest, LocalConnectFailure) {
   InSequence s;
 
   // Request 1 should kick off a new connection.
@@ -561,7 +562,7 @@ TEST_F(TcpConnPoolImplTest, LocalConnectFailure) {
 /**
  * Tests a connect timeout. Also test that we can add a new request during ejection processing.
  */
-TEST_F(TcpConnPoolImplTest, ConnectTimeout) {
+TEST_F(TcpOriginalConnPoolImplTest, ConnectTimeout) {
   InSequence s;
 
   // Request 1 should kick off a new connection.
@@ -593,7 +594,7 @@ TEST_F(TcpConnPoolImplTest, ConnectTimeout) {
 /**
  * Test cancelling before the request is bound to a connection.
  */
-TEST_F(TcpConnPoolImplTest, CancelBeforeBound) {
+TEST_F(TcpOriginalConnPoolImplTest, CancelBeforeBound) {
   InSequence s;
 
   // Request 1 should kick off a new connection.
@@ -614,7 +615,7 @@ TEST_F(TcpConnPoolImplTest, CancelBeforeBound) {
 /**
  * Test cancelling before the request is bound to a connection, with connection close.
  */
-TEST_F(TcpConnPoolImplTest, CancelAndCloseBeforeBound) {
+TEST_F(TcpOriginalConnPoolImplTest, CancelAndCloseBeforeBound) {
   InSequence s;
 
   // Request 1 should kick off a new connection.
@@ -633,7 +634,7 @@ TEST_F(TcpConnPoolImplTest, CancelAndCloseBeforeBound) {
 /**
  * Test an upstream disconnection while there is a bound request.
  */
-TEST_F(TcpConnPoolImplTest, DisconnectWhileBound) {
+TEST_F(TcpOriginalConnPoolImplTest, DisconnectWhileBound) {
   InSequence s;
 
   // Request 1 should kick off a new connection.
@@ -655,7 +656,7 @@ TEST_F(TcpConnPoolImplTest, DisconnectWhileBound) {
 /**
  * Test upstream disconnection of one request while another is pending.
  */
-TEST_F(TcpConnPoolImplTest, DisconnectWhilePending) {
+TEST_F(TcpOriginalConnPoolImplTest, DisconnectWhilePending) {
   cluster_->resetResourceManager(1, 1024, 1024, 1, 1);
   InSequence s;
 
@@ -698,7 +699,7 @@ TEST_F(TcpConnPoolImplTest, DisconnectWhilePending) {
 /**
  * Test that we correctly handle reaching max connections.
  */
-TEST_F(TcpConnPoolImplTest, MaxConnections) {
+TEST_F(TcpOriginalConnPoolImplTest, MaxConnections) {
   InSequence s;
 
   // Request 1 should kick off a new connection.
@@ -738,7 +739,7 @@ TEST_F(TcpConnPoolImplTest, MaxConnections) {
 /**
  * Test when we reach max requests per connection.
  */
-TEST_F(TcpConnPoolImplTest, MaxRequestsPerConnection) {
+TEST_F(TcpOriginalConnPoolImplTest, MaxRequestsPerConnection) {
   InSequence s;
 
   cluster_->max_requests_per_connection_ = 1;
@@ -765,7 +766,7 @@ TEST_F(TcpConnPoolImplTest, MaxRequestsPerConnection) {
 /*
  * Test that multiple connections can be assigned at once.
  */
-TEST_F(TcpConnPoolImplTest, ConcurrentConnections) {
+TEST_F(TcpOriginalConnPoolImplTest, ConcurrentConnections) {
   cluster_->resetResourceManager(2, 1024, 1024, 1, 1);
   InSequence s;
 
@@ -794,7 +795,7 @@ TEST_F(TcpConnPoolImplTest, ConcurrentConnections) {
 /**
  * Tests ConnectionState lifecycle with multiple concurrent connections.
  */
-TEST_F(TcpConnPoolImplTest, ConnectionStateWithConcurrentConnections) {
+TEST_F(TcpOriginalConnPoolImplTest, ConnectionStateWithConcurrentConnections) {
   InSequence s;
 
   int state_destroyed = 0;
@@ -845,7 +846,7 @@ TEST_F(TcpConnPoolImplTest, ConnectionStateWithConcurrentConnections) {
 /**
  * Tests that the DrainCallback is invoked when the number of connections goes to zero.
  */
-TEST_F(TcpConnPoolImplTest, DrainCallback) {
+TEST_F(TcpOriginalConnPoolImplTest, DrainCallback) {
   InSequence s;
   ReadyWatcher drained;
 
@@ -868,7 +869,7 @@ TEST_F(TcpConnPoolImplTest, DrainCallback) {
 /**
  * Test draining a connection pool that has a pending connection.
  */
-TEST_F(TcpConnPoolImplTest, DrainWhileConnecting) {
+TEST_F(TcpOriginalConnPoolImplTest, DrainWhileConnecting) {
   InSequence s;
   ReadyWatcher drained;
 
@@ -890,7 +891,7 @@ TEST_F(TcpConnPoolImplTest, DrainWhileConnecting) {
 /**
  * Test that the DrainCallback is invoked when a connection is closed.
  */
-TEST_F(TcpConnPoolImplTest, DrainOnClose) {
+TEST_F(TcpOriginalConnPoolImplTest, DrainOnClose) {
   ReadyWatcher drained;
   EXPECT_CALL(drained, ready());
   conn_pool_.addDrainedCallback([&]() -> void { drained.ready(); });
@@ -916,7 +917,7 @@ TEST_F(TcpConnPoolImplTest, DrainOnClose) {
 /**
  * Test that pending connections are closed when the connection pool is destroyed.
  */
-TEST_F(TcpConnPoolImplDestructorTest, TestPendingConnectionsAreClosed) {
+TEST_F(TcpOriginalConnPoolImplDestructorTest, TestPendingConnectionsAreClosed) {
   connection_ = new NiceMock<Network::MockClientConnection>();
   connect_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
   EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillOnce(Return(connection_));
@@ -935,7 +936,7 @@ TEST_F(TcpConnPoolImplDestructorTest, TestPendingConnectionsAreClosed) {
 /**
  * Test that busy connections are closed when the connection pool is destroyed.
  */
-TEST_F(TcpConnPoolImplDestructorTest, TestBusyConnectionsAreClosed) {
+TEST_F(TcpOriginalConnPoolImplDestructorTest, TestBusyConnectionsAreClosed) {
   prepareConn();
 
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
@@ -946,7 +947,7 @@ TEST_F(TcpConnPoolImplDestructorTest, TestBusyConnectionsAreClosed) {
 /**
  * Test that ready connections are closed when the connection pool is destroyed.
  */
-TEST_F(TcpConnPoolImplDestructorTest, TestReadyConnectionsAreClosed) {
+TEST_F(TcpOriginalConnPoolImplDestructorTest, TestReadyConnectionsAreClosed) {
   prepareConn();
 
   // Transition connection to ready list
