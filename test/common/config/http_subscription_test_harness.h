@@ -70,7 +70,7 @@ public:
                                                         Http::AsyncClient::Callbacks& callbacks,
                                                         const Http::AsyncClient::RequestOptions&) {
           http_callbacks_ = &callbacks;
-          EXPECT_EQ("POST", request->headers().getMethodValue());
+          EXPECT_EQ("POST", std::string(request->headers().getMethodValue()));
           EXPECT_EQ(Http::Headers::get().ContentTypeValues.Json,
                     request->headers().getContentTypeValue());
           EXPECT_EQ("eds_cluster", request->headers().getHostValue());
