@@ -33,7 +33,8 @@ public:
   LoadStatsReporter(const LocalInfo::LocalInfo& local_info, ClusterManager& cluster_manager,
                     Stats::Scope& scope, Grpc::RawAsyncClientPtr async_client,
                     envoy::config::core::v3::ApiVersion transport_api_version,
-                    Event::Dispatcher& dispatcher);
+                    Event::Dispatcher& dispatcher,
+                    const Server::InternalStatsHandlerPtr& internal_stats_handler);
 
   // Grpc::AsyncStreamCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override;
@@ -68,6 +69,7 @@ private:
   // Map from cluster name to start of measurement interval.
   std::unordered_map<std::string, std::chrono::steady_clock::duration> clusters_;
   TimeSource& time_source_;
+  const Server::InternalStatsHandlerPtr& internal_stats_handler_;
 };
 
 using LoadStatsReporterPtr = std::unique_ptr<LoadStatsReporter>;

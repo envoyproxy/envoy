@@ -19,6 +19,7 @@
 #include "envoy/network/dns.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/bootstrap_extension_config.h"
+#include "envoy/server/internal_stats_handler.h"
 #include "envoy/server/options.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -80,7 +81,7 @@ InstanceImpl::InstanceImpl(
                                                   : nullptr),
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
       process_context_(std::move(process_context)), main_thread_id_(std::this_thread::get_id()),
-      server_contexts_(*this) {
+      server_contexts_(*this), internal_stats_handler_(new InternalStatsHandler(store)) {
   try {
     if (!options.logPath().empty()) {
       try {
@@ -508,7 +509,8 @@ void InstanceImpl::onClusterManagerPrimaryInitializationComplete() {
 
 void InstanceImpl::onRuntimeReady() {
   // Begin initializing secondary clusters after RTDS configuration has been applied.
-  clusterManager().initializeSecondaryClusters(bootstrap_);
+
+  clusterManager().initializeSecondaryClusters(bootstrap_, internal_stats_handler_);
 
   if (bootstrap_.has_hds_config()) {
     const auto& hds_config = bootstrap_.hds_config();

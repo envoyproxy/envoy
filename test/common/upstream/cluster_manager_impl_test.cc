@@ -41,8 +41,10 @@ public:
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
         *api_, http_context_, grpc_context_);
-    cluster_manager_->setPrimaryClustersInitializedCb(
-        [this, bootstrap]() { cluster_manager_->initializeSecondaryClusters(bootstrap); });
+    auto internal_stats_handler = std::make_unique<Server::MockInternalStatsHandler>();
+    cluster_manager_->setPrimaryClustersInitializedCb([this, bootstrap]() {
+      cluster_manager_->initializeSecondaryClusters(bootstrap, internal_stats_handler);
+    });
   }
 
   void createWithLocalClusterUpdate(const bool enable_merge_window = true) {

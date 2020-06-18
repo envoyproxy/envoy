@@ -7,6 +7,7 @@ import "envoy/config/core/v3/base.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
+import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -119,8 +120,8 @@ message EndpointLoadMetricStats {
 
 // Per cluster load stats. Envoy reports these stats a management server in a
 // :ref:`LoadStatsRequest<envoy_api_msg_service.load_stats.v3.LoadStatsRequest>`
-// Next ID: 7
-// [#next-free-field: 7]
+// Next ID: 8
+// [#next-free-field: 8]
 message ClusterStats {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.endpoint.ClusterStats";
 
@@ -158,6 +159,14 @@ message ClusterStats {
   // Information about deliberately dropped requests for each category specified
   // in the DropOverload policy.
   repeated DroppedRequests dropped_requests = 5;
+
+  // the request latencies in this cluster. Only HTTP requests are currently
+  // supported. This field is not aggregated over the load_reporting_interval
+  // due to the way Envoy histograms are flushed, so these will only
+  // have data for the configured metrics interval.
+  // The set of quantiles are the stringified values from
+  // HistogramStatisticsImpl::supportedQuantiles()
+  map<string, google.protobuf.DoubleValue> request_latency_percentiles = 7;
 
   // Period over which the actual load report occurred. This will be guaranteed to include every
   // request reported. Due to system load and delays between the *LoadStatsRequest* sent from Envoy

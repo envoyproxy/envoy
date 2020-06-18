@@ -391,7 +391,8 @@ ClusterManagerImpl::ClusterManagerImpl(
 }
 
 void ClusterManagerImpl::initializeSecondaryClusters(
-    const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+    const Server::InternalStatsHandlerPtr& internal_stats_handler) {
   init_helper_.startInitializingSecondaryClusters();
 
   const auto& cm_config = bootstrap.cluster_manager();
@@ -403,7 +404,7 @@ void ClusterManagerImpl::initializeSecondaryClusters(
         Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, load_stats_config,
                                                        stats_, false)
             ->create(),
-        load_stats_config.transport_api_version(), dispatcher_);
+        load_stats_config.transport_api_version(), dispatcher_, internal_stats_handler);
   }
 }
 

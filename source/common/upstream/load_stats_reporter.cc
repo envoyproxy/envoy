@@ -1,5 +1,10 @@
 #include "common/upstream/load_stats_reporter.h"
 
+#include <math.h>
+
+#include <map>
+#include <set>
+
 #include "envoy/service/load_stats/v3/lrs.pb.h"
 #include "envoy/stats/scope.h"
 
@@ -13,7 +18,8 @@ LoadStatsReporter::LoadStatsReporter(const LocalInfo::LocalInfo& local_info,
                                      ClusterManager& cluster_manager, Stats::Scope& scope,
                                      Grpc::RawAsyncClientPtr async_client,
                                      envoy::config::core::v3::ApiVersion transport_api_version,
-                                     Event::Dispatcher& dispatcher)
+                                     Event::Dispatcher& dispatcher,
+                                     const Server::InternalStatsHandlerPtr& internal_stats_handler)
     : cm_(cluster_manager), stats_{ALL_LOAD_REPORTER_STATS(
                                 POOL_COUNTER_PREFIX(scope, "load_reporter."))},
       async_client_(std::move(async_client)), transport_api_version_(transport_api_version),
@@ -62,6 +68,8 @@ void LoadStatsReporter::sendLoadStatsRequest() {
   // added to the cluster manager. When we get the notification, we record the current time in
   // clusters_ as the start time for the load reporting window for that cluster.
   request_.mutable_cluster_stats()->Clear();
+  std::map<std::string, envoy::config::endpoint::v3::ClusterStats*> metrics_to_cluster_map;
+  std::set<std::string> relevant_metrics;
   for (const auto& cluster_name_and_timestamp : clusters_) {
     const std::string& cluster_name = cluster_name_and_timestamp.first;
     auto cluster_info_map = cm_.clusters();
@@ -109,17 +117,44 @@ void LoadStatsReporter::sendLoadStatsRequest() {
         Protobuf::util::TimeUtil::MicrosecondsToDuration(
             std::chrono::duration_cast<std::chrono::microseconds>(measured_interval).count()));
     clusters_[cluster_name] = now;
+    auto metric_name = cluster.info()->loadReportRouterStats().http_upstream_rq_time_.name();
+    relevant_metrics.insert(metric_name);
+    metrics_to_cluster_map.insert({metric_name, cluster_stats});
   }
 
-  Config::VersionConverter::prepareMessageForGrpcWire(request_, transport_api_version_);
-  ENVOY_LOG(trace, "Sending LoadStatsRequest: {}", request_.DebugString());
-  stream_->sendMessage(request_, false);
-  stats_.responses_.inc();
-  // When the connection is established, the message has not yet been read so we
-  // will not have a load reporting period.
-  if (message_) {
-    startLoadReportPeriod();
-  }
+  internal_stats_handler_->receiveGlobalStats(
+      relevant_metrics,
+      [&](std::multimap<std::string, const Envoy::Stats::HistogramStatistics&> histogram_stats)
+          -> void {
+        for (auto entry : histogram_stats) {
+          if (metrics_to_cluster_map.find(entry.first) != metrics_to_cluster_map.end()) {
+            auto* cluster_stats = metrics_to_cluster_map[entry.first];
+            auto supported_quantiles = entry.second.supportedQuantiles();
+            auto computed_quantiles = entry.second.computedQuantiles();
+            for (size_t i = 0; i < supported_quantiles.size(); i++) {
+              double val = computed_quantiles[i];
+              if (std::isnan(val)) {
+                val = 0;
+              }
+              auto num = ProtobufWkt::DoubleValue();
+              num.set_value(val);
+              cluster_stats->mutable_request_latency_percentiles()->insert(
+                  Protobuf::MapPair<std::string, ProtobufWkt::DoubleValue>(
+                      std::to_string(supported_quantiles[i]), num));
+            }
+          }
+        }
+
+        Config::VersionConverter::prepareMessageForGrpcWire(request_, transport_api_version_);
+        ENVOY_LOG(trace, "Sending LoadStatsRequest: {}", request_.DebugString());
+        stream_->sendMessage(request_, false);
+        stats_.responses_.inc();
+        // When the connection is established, the message has not yet been read so we
+        // will not have a load reporting period.
+        if (message_) {
+          startLoadReportPeriod();
+        }
+      });
 }
 
 void LoadStatsReporter::handleFailure() {

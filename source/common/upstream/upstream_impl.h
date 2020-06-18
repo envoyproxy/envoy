@@ -520,6 +520,7 @@ public:
 
   static ClusterStats generateStats(Stats::Scope& scope);
   static ClusterLoadReportStats generateLoadReportStats(Stats::Scope& scope);
+  static ClusterLoadReportRouterStats generateLoadReportRouterStats(Stats::Scope& scope);
   static ClusterCircuitBreakersStats generateCircuitBreakersStats(Stats::Scope& scope,
                                                                   const std::string& stat_prefix,
                                                                   bool track_remaining);
@@ -578,6 +579,9 @@ public:
   ClusterStats& stats() const override { return stats_; }
   Stats::Scope& statsScope() const override { return *stats_scope_; }
   ClusterLoadReportStats& loadReportStats() const override { return load_report_stats_; }
+  ClusterLoadReportRouterStats& loadReportRouterStats() const override {
+    return load_report_router_stats_;
+  }
   const absl::optional<ClusterTimeoutBudgetStats>& timeoutBudgetStats() const override {
     return timeout_budget_stats_;
   }
@@ -635,6 +639,7 @@ private:
   mutable ClusterStats stats_;
   Stats::IsolatedStoreImpl load_report_stats_store_;
   mutable ClusterLoadReportStats load_report_stats_;
+  mutable ClusterLoadReportRouterStats load_report_router_stats_;
   const absl::optional<ClusterTimeoutBudgetStats> timeout_budget_stats_;
   const uint64_t features_;
   const Http::Http1Settings http1_settings_;

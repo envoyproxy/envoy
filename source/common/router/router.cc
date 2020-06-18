@@ -1359,6 +1359,8 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
                                              upstreamZone(upstream_request.upstreamHost())};
 
     code_stats.chargeResponseTiming(info);
+    cluster_->loadReportRouterStats().http_upstream_rq_time_.recordValue(
+        info.response_time_.count());
 
     if (alt_stat_prefix_ != nullptr) {
       Http::CodeStats::ResponseTimingInfo info{config_.scope_,

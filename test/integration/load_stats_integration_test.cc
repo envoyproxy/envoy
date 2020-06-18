@@ -269,7 +269,7 @@ public:
         EXPECT_THAT(local_loadstats_request.node().client_features(),
                     ::testing::ElementsAre("envoy.lrs.supports_send_all_clusters"));
       }
-      // Sanity check and clear the measured load report interval.
+      // Sanity check and clear the measured load report interval and request latencies
       for (auto& cluster_stats : *local_loadstats_request.mutable_cluster_stats()) {
         const uint32_t actual_load_report_interval_ms =
             Protobuf::util::TimeUtil::DurationToMilliseconds(cluster_stats.load_report_interval());
@@ -279,6 +279,13 @@ public:
         // Allow for some skew in test environment.
         EXPECT_LT(actual_load_report_interval_ms, load_report_interval_ms_ + 1000);
         cluster_stats.mutable_load_report_interval()->Clear();
+
+        // sanity check request latencies aren't NAN
+        auto percentiles = cluster_stats.mutable_request_latency_percentiles();
+        for (auto iterator = percentiles->begin(); iterator != percentiles->end(); iterator++) {
+          EXPECT_THAT(std::isnan(iterator->second.value()), false);
+        }
+        cluster_stats.mutable_request_latency_percentiles()->clear();
       }
       mergeLoadStats(loadstats_request, local_loadstats_request);
 

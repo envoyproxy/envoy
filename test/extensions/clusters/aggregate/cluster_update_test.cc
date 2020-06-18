@@ -34,13 +34,14 @@ public:
   AggregateClusterUpdateTest()
       : http_context_(stats_store_.symbolTable()), grpc_context_(stats_store_.symbolTable()) {}
 
+  auto internal_stats_handler = std::make_unique<MockInternalStatsHandler>();
   void initialize(const std::string& yaml_config) {
     auto bootstrap = parseBootstrapFromV2Yaml(yaml_config);
     cluster_manager_ = std::make_unique<Upstream::TestClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
         *api_, http_context_, grpc_context_);
-    cluster_manager_->initializeSecondaryClusters(bootstrap);
+    cluster_manager_->initializeSecondaryClusters(bootstrap, internal_stats_handler);
     EXPECT_EQ(cluster_manager_->activeClusters().size(), 1);
     cluster_ = cluster_manager_->get("aggregate_cluster");
   }
@@ -264,7 +265,9 @@ TEST_F(AggregateClusterUpdateTest, InitializeAggregateClusterAfterOtherClusters)
       bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
       factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_, *api_,
       http_context_, grpc_context_);
-  cluster_manager_->initializeSecondaryClusters(bootstrap);
+
+  cluster_manager_->initializeSecondaryClusters(bootstrap,
+                                                std::make_unique<MockInternalStatsHandler>());
   EXPECT_EQ(cluster_manager_->activeClusters().size(), 2);
   cluster_ = cluster_manager_->get("aggregate_cluster");
   auto primary = cluster_manager_->get("primary");

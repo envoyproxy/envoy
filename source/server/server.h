@@ -360,6 +360,7 @@ private:
   Stats::TimespanPtr initialization_timer_;
 
   ServerFactoryContextImpl server_contexts_;
+  InternalStatsHandlerPtr internal_stats_handler_;
 
   template <class T>
   class LifecycleCallbackHandle : public ServerLifecycleNotifier::Handle, RaiiListElement<T> {

@@ -240,6 +240,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "internal_stats_handler_interface",
+    hdrs = ["internal_stats_handler.h"],
+    deps = [
+        "//include/envoy/stats:stats_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "transport_socket_config_interface",
     hdrs = ["transport_socket_config.h"],
     deps = [

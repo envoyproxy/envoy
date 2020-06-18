@@ -259,8 +259,9 @@ public:
 
   Config::SubscriptionFactory& subscriptionFactory() override { return subscription_factory_; }
 
-  void
-  initializeSecondaryClusters(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override;
+  void initializeSecondaryClusters(
+      const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+      const Server::InternalStatsHandlerPtr& internal_stats_handler) override;
 
 protected:
   virtual void postThreadLocalDrainConnections(const Cluster& cluster,

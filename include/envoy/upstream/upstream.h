@@ -600,11 +600,18 @@ public:
   HISTOGRAM(upstream_cx_length_ms, Milliseconds)
 
 /**
- * All cluster load report stats. These are only use for EDS load reporting and not sent to the
- * stats sink. See envoy.api.v2.endpoint.ClusterStats for the definition of upstream_rq_dropped.
+ * Primitive cluster load report stats. These are only use for EDS load reporting and not sent to
+ * the stats sink. See envoy.api.v2.endpoint.ClusterStats for the definition of upstream_rq_dropped.
  * These are latched by LoadStatsReporter, independent of the normal stats sink flushing.
  */
-#define ALL_CLUSTER_LOAD_REPORT_STATS(COUNTER) COUNTER(upstream_rq_dropped)
+#define PRIMITVE_CLUSTER_LOAD_REPORT_STATS(COUNTER) COUNTER(upstream_rq_dropped)
+
+/**
+ * Load Report Stats from Routers. These are used for load reporting, but will also be sent to a
+ * stats sink.
+ */
+#define ALL_CLUSTER_LOAD_REPORT_ROUTER_STATS(HISTOGRAM)                                            \
+  HISTOGRAM(http_upstream_rq_time, Milliseconds)
 
 /**
  * Cluster circuit breakers stats. Open circuit breaker stats and remaining resource stats
@@ -637,10 +644,18 @@ struct ClusterStats {
 };
 
 /**
- * Struct definition for all cluster load report stats. @see stats_macros.h
+ * Struct definition for all cluster primitive (non histogram) load report stats. @see
+ * stats_macros.h
  */
 struct ClusterLoadReportStats {
-  ALL_CLUSTER_LOAD_REPORT_STATS(GENERATE_COUNTER_STRUCT)
+  PRIMITVE_CLUSTER_LOAD_REPORT_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+/**
+ * Struct definition for cluster load report router stats. @see stats_macros.h
+ */
+struct ClusterLoadReportRouterStats {
+  ALL_CLUSTER_LOAD_REPORT_ROUTER_STATS(GENERATE_HISTOGRAM_STRUCT)
 };
 
 /**
@@ -849,6 +864,11 @@ public:
    * @return ClusterLoadReportStats& strongly named load report stats for this cluster.
    */
   virtual ClusterLoadReportStats& loadReportStats() const PURE;
+
+  /**
+   * @return ClusterLoadReportRouterStats& strongly named load report stats for this cluster.
+   */
+  virtual ClusterLoadReportRouterStats& loadReportRouterStats() const PURE;
 
   /**
    * @return absl::optional<ClusterTimeoutBudgetStats>& stats on timeout budgets for this cluster.

@@ -612,7 +612,11 @@ ClusterStats ClusterInfoImpl::generateStats(Stats::Scope& scope) {
 }
 
 ClusterLoadReportStats ClusterInfoImpl::generateLoadReportStats(Stats::Scope& scope) {
-  return {ALL_CLUSTER_LOAD_REPORT_STATS(POOL_COUNTER(scope))};
+  return {PRIMITVE_CLUSTER_LOAD_REPORT_STATS(POOL_COUNTER(scope))};
+}
+
+ClusterLoadReportRouterStats ClusterInfoImpl::generateLoadReportRouterStats(Stats::Scope& scope) {
+  return {ALL_CLUSTER_LOAD_REPORT_ROUTER_STATS(POOL_HISTOGRAM(scope))};
 }
 
 ClusterTimeoutBudgetStats ClusterInfoImpl::generateTimeoutBudgetStats(Stats::Scope& scope) {
@@ -680,6 +684,7 @@ ClusterInfoImpl::ClusterInfoImpl(
       socket_matcher_(std::move(socket_matcher)), stats_scope_(std::move(stats_scope)),
       stats_(generateStats(*stats_scope_)), load_report_stats_store_(stats_scope_->symbolTable()),
       load_report_stats_(generateLoadReportStats(load_report_stats_store_)),
+      load_report_router_stats_(generateLoadReportRouterStats(*stats_scope_)),
       timeout_budget_stats_(config.track_timeout_budgets()
                                 ? absl::make_optional<ClusterTimeoutBudgetStats>(
                                       generateTimeoutBudgetStats(*stats_scope_))
