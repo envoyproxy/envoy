@@ -178,7 +178,8 @@ void OriginalConnPoolImpl::onConnectionEvent(ActiveConn& conn, Network::Connecti
         reason = ConnectionPool::PoolFailureReason::LocalConnectionFailure;
       }
 
-      std::list<PendingRequestPtr> pending_requests_to_purge(std::move(pending_requests_));
+      std::list<PendingRequestPtr> pending_requests_to_purge;
+      pending_requests_to_purge.swap(pending_requests_);
       while (!pending_requests_to_purge.empty()) {
         PendingRequestPtr request =
             pending_requests_to_purge.front()->removeFromList(pending_requests_to_purge);
