@@ -73,13 +73,13 @@ public:
   ConnPoolBase(Event::MockDispatcher& dispatcher, Upstream::HostSharedPtr host,
                NiceMock<Event::MockTimer>* upstream_ready_timer, bool test_new_connection_pool);
 
-  void addDrainedCallback(DrainedCb cb) { conn_pool_->addDrainedCallback(cb); }
-  void drainConnections() { conn_pool_->drainConnections(); }
-  void closeConnections() { conn_pool_->closeConnections(); }
-  ConnectionPool::Cancellable* newConnection(Tcp::ConnectionPool::Callbacks& callbacks) {
+  void addDrainedCallback(DrainedCb cb) override { conn_pool_->addDrainedCallback(cb); }
+  void drainConnections() override { conn_pool_->drainConnections(); }
+  void closeConnections() override { conn_pool_->closeConnections(); }
+  ConnectionPool::Cancellable* newConnection(Tcp::ConnectionPool::Callbacks& callbacks) override {
     return conn_pool_->newConnection(callbacks);
   }
-  Upstream::HostDescriptionConstSharedPtr host() const { return conn_pool_->host(); }
+  Upstream::HostDescriptionConstSharedPtr host() const override { return conn_pool_->host(); }
 
   MOCK_METHOD(void, onConnReleasedForTest, ());
   MOCK_METHOD(void, onConnDestroyedForTest, ());
