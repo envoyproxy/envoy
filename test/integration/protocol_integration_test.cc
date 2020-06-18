@@ -1454,9 +1454,9 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyTrailerHeaders) {
             max_request_headers_count_);
       });
 
-  Http::RequestTrailerMapImpl request_trailers;
+  auto request_trailers = Http::RequestTrailerMapImpl::create();
   for (int i = 0; i < 20000; i++) {
-    request_trailers.addCopy(Http::LowerCaseString(std::to_string(i)), "");
+    request_trailers->addCopy(Http::LowerCaseString(std::to_string(i)), "");
   }
 
   initialize();
@@ -1468,7 +1468,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyTrailerHeaders) {
                                                                  {":authority", "host"}});
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
-  codec_client_->sendTrailers(*request_encoder_, request_trailers);
+  codec_client_->sendTrailers(*request_encoder_, *request_trailers);
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(default_response_headers_, true);
   response->waitForEndStream();

@@ -55,7 +55,7 @@ struct NullVm : public WasmVmBase {
 #undef _REGISTER_CALLBACK
 
   std::string plugin_name_;
-  std::unique_ptr<NullVmPlugin> plugin_;
+  NullVmPluginPtr plugin_;
 };
 
 } // namespace Null
