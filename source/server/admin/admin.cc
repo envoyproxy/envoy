@@ -578,7 +578,7 @@ ProtobufTypes::MessagePtr AdminImpl::dumpEndpointConfigs() const {
     for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
       policy.mutable_overprovisioning_factor()->set_value(host_set->overprovisioningFactor());
 
-      if (host_set->hostsPerLocality().hasLocalLocality()) {
+      if (!host_set->hostsPerLocality().get().empty()) {
         for (int index = 0; index < static_cast<int>(host_set->hostsPerLocality().get().size());
              index++) {
           auto locality_host_set = host_set->hostsPerLocality().get()[index];
@@ -587,8 +587,10 @@ ProtobufTypes::MessagePtr AdminImpl::dumpEndpointConfigs() const {
             auto& locality_lb_endpoint = *cluster_load_assignment.mutable_endpoints()->Add();
             locality_lb_endpoint.mutable_locality()->MergeFrom(locality_host_set[0]->locality());
             locality_lb_endpoint.set_priority(locality_host_set[0]->priority());
-            locality_lb_endpoint.mutable_load_balancing_weight()->set_value(
-                (*host_set->localityWeights())[index]);
+            if (host_set->localityWeights() != nullptr && !host_set->localityWeights()->empty()) {
+              locality_lb_endpoint.mutable_load_balancing_weight()->set_value(
+                  (*host_set->localityWeights())[index]);
+            }
 
             for (auto& host : locality_host_set) {
               addLbEndpoint(host, locality_lb_endpoint);

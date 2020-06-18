@@ -1,7 +1,10 @@
+#include <__bit_reference>
 #include <algorithm>
 #include <fstream>
+#include <memory>
 #include <regex>
 #include <unordered_map>
+#include <vector>
 
 #include "envoy/admin/v3/clusters.pb.h"
 #include "envoy/admin/v3/config_dump.pb.h"
@@ -10,11 +13,14 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/json/json_object.h"
+#include "envoy/upstream/outlier_detection.h"
+#include "envoy/upstream/upstream.h"
 
 #include "common/http/message_impl.h"
 #include "common/json/json_loader.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
+#include "common/upstream/upstream_impl.h"
 
 #include "test/server/admin/admin_instance.h"
 #include "test/test_common/logging.h"
@@ -231,9 +237,6 @@ TEST_P(AdminInstanceTest, ConfigDumpWithEndpoint) {
   auto host = std::make_shared<NiceMock<Upstream::MockHost>>();
 
   envoy::config::core::v3::Locality locality;
-  locality.set_region("test_region");
-  locality.set_zone("test_zone");
-  locality.set_sub_zone("test_sub_zone");
   ON_CALL(*host, locality()).WillByDefault(ReturnRef(locality));
 
   host_set->hosts_.emplace_back(host);
@@ -272,11 +275,7 @@ TEST_P(AdminInstanceTest, ConfigDumpWithEndpoint) {
       "cluster_name": "fake_cluster",
       "endpoints": [
        {
-        "locality": {
-         "region": "test_region",
-         "zone": "test_zone",
-         "sub_zone": "test_sub_zone"
-        },
+        "locality": {},
         "lb_endpoints": [
          {
           "endpoint": {
@@ -311,6 +310,153 @@ TEST_P(AdminInstanceTest, ConfigDumpWithEndpoint) {
 }
 )EOF";
   EXPECT_EQ(expected_json, output);
+}
+
+// Test EDS config dump while locality and locality weight exists
+TEST_P(AdminInstanceTest, ConfigDumpWithLocalityEndpoint) {
+  Upstream::ClusterManager::ClusterInfoMap cluster_map;
+  ON_CALL(server_.cluster_manager_, clusters()).WillByDefault(ReturnPointee(&cluster_map));
+
+  NiceMock<Upstream::MockClusterMockPrioritySet> cluster;
+  cluster_map.emplace(cluster.info_->name_, cluster);
+
+  ON_CALL(*cluster.info_, addedViaApi()).WillByDefault(Return(false));
+
+  Upstream::MockHostSet* host_set = cluster.priority_set_.getMockHostSet(0);
+  auto host = std::make_shared<NiceMock<Upstream::MockHost>>();
+
+  envoy::config::core::v3::Locality locality;
+  locality.set_region("oceania");
+  locality.set_zone("hello");
+  locality.set_sub_zone("world");
+  ON_CALL(*host, locality()).WillByDefault(ReturnRef(locality));
+
+  host_set->hosts_.emplace_back(host);
+  Network::Address::InstanceConstSharedPtr address =
+      Network::Utility::resolveUrl("tcp://1.2.3.4:80");
+  ON_CALL(*host, address()).WillByDefault(Return(address));
+  const std::string hostname = "foo.com";
+  ON_CALL(*host, hostname()).WillByDefault(ReturnRef(hostname));
+
+  auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
+  ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
+
+  const std::string hostname_for_health_checks = "test_hostname_healthcheck";
+  ON_CALL(*host, hostnameForHealthChecks()).WillByDefault(ReturnRef(hostname_for_health_checks));
+  Network::Address::InstanceConstSharedPtr healthcheck_address =
+      Network::Utility::resolveUrl("tcp://1.2.3.5:90");
+  ON_CALL(*host, healthCheckAddress()).WillByDefault(Return(healthcheck_address));
+
+  ON_CALL(*host, health()).WillByDefault(Return(Upstream::Host::Health::Healthy));
+
+  ON_CALL(*host, weight()).WillByDefault(Return(5));
+  ON_CALL(*host, priority()).WillByDefault(Return(6));
+
+  auto host_2 = std::make_shared<NiceMock<Upstream::MockHost>>();
+
+  // envoy::config::core::v3::Locality locality_2;
+  ON_CALL(*host_2, locality()).WillByDefault(ReturnRef(locality));
+
+  host_set->hosts_.emplace_back(host_2);
+  Network::Address::InstanceConstSharedPtr address_2 =
+      Network::Utility::resolveUrl("tcp://1.2.3.7:8");
+  ON_CALL(*host_2, address()).WillByDefault(Return(address_2));
+  const std::string hostname_2 = "boo.com";
+  ON_CALL(*host_2, hostname()).WillByDefault(ReturnRef(hostname_2));
+
+  auto metadata_2 = std::make_shared<envoy::config::core::v3::Metadata>();
+  ON_CALL(*host_2, metadata()).WillByDefault(Return(metadata_2));
+
+  const std::string hostname_for_health_checks_2 = "";
+  ON_CALL(*host_2, hostnameForHealthChecks())
+      .WillByDefault(ReturnRef(hostname_for_health_checks_2));
+  Network::Address::InstanceConstSharedPtr healthcheck_address_2 =
+      Network::Utility::resolveUrl("tcp://1.2.3.7:8");
+  ON_CALL(*host_2, healthCheckAddress()).WillByDefault(Return(healthcheck_address_2));
+
+  ON_CALL(*host_2, health()).WillByDefault(Return(Upstream::Host::Health::Healthy));
+
+  ON_CALL(*host_2, weight()).WillByDefault(Return(3));
+  ON_CALL(*host_2, priority()).WillByDefault(Return(4));
+
+  auto hosts_per_locality = new Upstream::HostsPerLocalityImpl(
+      {Upstream::HostSharedPtr(host), Upstream::HostSharedPtr(host_2)});
+
+  Upstream::LocalityWeightsConstSharedPtr locality_weights{new Upstream::LocalityWeights{1}};
+  ON_CALL(*host_set, hostsPerLocality()).WillByDefault(ReturnRef(*hosts_per_locality));
+  ON_CALL(*host_set, localityWeights()).WillByDefault(Return(locality_weights));
+
+  Buffer::OwnedImpl response;
+  Http::TestResponseHeaderMapImpl header_map;
+  EXPECT_EQ(Http::Code::OK, getCallback("/config_dump?includeEds", header_map, response));
+  std::string output = response.toString();
+  const std::string expected_json = R"EOF({
+ "configs": [
+  {
+   "@type": "type.googleapis.com/envoy.admin.v3.EndpointsConfigDump",
+   "static_endpoint_configs": [
+    {
+     "endpoint_config": {
+      "@type": "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment",
+      "cluster_name": "fake_cluster",
+      "endpoints": [
+       {
+        "locality": {
+         "region": "oceania",
+         "zone": "hello",
+         "sub_zone": "world"
+        },
+        "lb_endpoints": [
+         {
+          "endpoint": {
+           "address": {
+            "socket_address": {
+             "address": "1.2.3.4",
+             "port_value": 80
+            }
+           },
+           "health_check_config": {
+            "port_value": 90,
+            "hostname": "test_hostname_healthcheck"
+           },
+           "hostname": "foo.com"
+          },
+          "health_status": "HEALTHY",
+          "metadata": {},
+          "load_balancing_weight": 5
+         },
+         {
+          "endpoint": {
+           "address": {
+            "socket_address": {
+             "address": "1.2.3.7",
+             "port_value": 8
+            }
+           },
+           "health_check_config": {},
+           "hostname": "boo.com"
+          },
+          "health_status": "HEALTHY",
+          "metadata": {},
+          "load_balancing_weight": 3
+         }
+        ],
+        "load_balancing_weight": 1,
+        "priority": 6
+       }
+      ],
+      "policy": {
+       "overprovisioning_factor": 140
+      }
+     }
+    }
+   ]
+  }
+ ]
+}
+)EOF";
+  EXPECT_EQ(expected_json, output);
+  delete (hosts_per_locality);
 }
 
 // Test that using the resource query parameter filters the config dump.
