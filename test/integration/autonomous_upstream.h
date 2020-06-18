@@ -58,7 +58,7 @@ public:
         allow_incomplete_streams_(allow_incomplete_streams),
         response_trailers_(std::make_unique<Http::TestResponseTrailerMapImpl>()),
         response_headers_(std::make_unique<Http::TestResponseHeaderMapImpl>(
-            Http::TestHeaderMapImpl({{":status", "200"}}))) {}
+            Http::TestResponseHeaderMapImpl({{":status", "200"}}))) {}
 
   AutonomousUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory, uint32_t port,
                      FakeHttpConnection::Type type, Network::Address::IpVersion version,
@@ -67,7 +67,7 @@ public:
         allow_incomplete_streams_(allow_incomplete_streams),
         response_trailers_(std::make_unique<Http::TestResponseTrailerMapImpl>()),
         response_headers_(std::make_unique<Http::TestResponseHeaderMapImpl>(
-            Http::TestHeaderMapImpl({{":status", "200"}}))) {}
+            Http::TestResponseHeaderMapImpl({{":status", "200"}}))) {}
 
   ~AutonomousUpstream() override;
   bool
@@ -82,7 +82,7 @@ public:
   void setResponseTrailers(std::unique_ptr<Http::TestResponseTrailerMapImpl>&& response_trailers);
   void setResponseHeaders(std::unique_ptr<Http::TestResponseHeaderMapImpl>&& response_headers);
   Http::TestResponseTrailerMapImpl responseTrailers();
-  Http::TestHeaderMapImpl responseHeaders();
+  Http::TestResponseHeaderMapImpl responseHeaders();
   const bool allow_incomplete_streams_{false};
 
 private:

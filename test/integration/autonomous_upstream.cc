@@ -129,7 +129,7 @@ Http::TestResponseTrailerMapImpl AutonomousUpstream::responseTrailers() {
   return return_trailers;
 }
 
-Http::TestHeaderMapImpl AutonomousUpstream::responseHeaders() {
+Http::TestResponseHeaderMapImpl AutonomousUpstream::responseHeaders() {
   Thread::LockGuard lock(headers_lock_);
   Http::TestHeaderMapImpl return_headers = *response_headers_;
   return return_headers;
