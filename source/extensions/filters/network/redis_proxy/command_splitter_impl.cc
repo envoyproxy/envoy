@@ -112,7 +112,7 @@ SplitRequestPtr ErrorFaultRequest::create(SplitCallbacks& callbacks, CommandStat
 
   request_ptr->onFailure(Common::Redis::FaultMessages::get().Error);
   command_stats.error_fault_.inc();
-  return request_ptr;
+  return nullptr;
 }
 
 std::unique_ptr<DelayFaultRequest> DelayFaultRequest::create(SplitCallbacks& callbacks,
