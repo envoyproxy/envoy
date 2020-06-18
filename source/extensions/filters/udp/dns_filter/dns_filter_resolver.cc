@@ -32,6 +32,7 @@ void DnsFilterResolver::resolveExternalQuery(DnsQueryContextPtr context,
     // retry for something that we are certain will fail.
     ENVOY_LOG(debug, "Unknown query type [{}] for upstream lookup", domain_query->type_);
     ctx.query_context->resolution_status_ = Network::DnsResolver::ResolutionStatus::Success;
+    ctx.resolver_status = DnsFilterResolverStatus::Complete;
     invokeCallback(ctx);
     return;
   }
@@ -40,8 +41,11 @@ void DnsFilterResolver::resolveExternalQuery(DnsQueryContextPtr context,
 
   // If we have too many pending lookups, invoke the callback to retry the query.
   if (lookups_.size() > max_pending_lookups_) {
-    ENVOY_LOG(trace, "Retrying query for [{}] because there are too many pending lookups: [{}/{}]",
-              domain_query->name_, lookups_.size(), max_pending_lookups_);
+    ENVOY_LOG(
+        trace,
+        "Retrying query for [{}] because there are too many pending lookups: [pending {}/max {}]",
+        domain_query->name_, lookups_.size(), max_pending_lookups_);
+    ctx.resolver_status = DnsFilterResolverStatus::Complete;
     invokeCallback(ctx);
     return;
   }
@@ -57,6 +61,9 @@ void DnsFilterResolver::resolveExternalQuery(DnsQueryContextPtr context,
   auto resolve_cb = [this, id](Network::DnsResolver::ResolutionStatus status,
                                std::list<Network::DnsResponse>&& response) -> void {
     auto ctx_iter = lookups_.find(id);
+
+    // If the context is not in the map, the lookup has timed out and was removed
+    // when the timer executed
     if (ctx_iter == lookups_.end()) {
       ENVOY_LOG(debug, "Unable to find context for DNS query for ID [{}]",
                 reinterpret_cast<intptr_t>(id));
@@ -70,10 +77,7 @@ void DnsFilterResolver::resolveExternalQuery(DnsQueryContextPtr context,
     ctx.timeout_timer->disableTimer();
 
     ENVOY_LOG(trace, "async query status returned. Entries {}", response.size());
-    if (ctx.resolver_status != DnsFilterResolverStatus::Pending) {
-      ENVOY_LOG(debug, "Resolution timed out before callback was executed");
-      return;
-    }
+    ASSERT(ctx.resolver_status == DnsFilterResolverStatus::Pending);
 
     ctx.query_context->resolution_status_ = status;
     ctx.resolver_status = DnsFilterResolverStatus::Complete;

@@ -139,6 +139,9 @@ DnsFilter::DnsFilter(Network::UdpReadFilterCallbacks& callbacks,
     }
 
     config_->stats().externally_resolved_queries_.inc();
+    if (iplist.empty()) {
+      config_->stats().unanswered_queries_.inc();
+    }
 
     incrementExternalQueryTypeCount(query->type_);
     for (const auto& ip : iplist) {

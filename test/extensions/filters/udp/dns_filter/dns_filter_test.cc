@@ -185,7 +185,7 @@ client_config:
   - socket_address:
       address: "8.8.4.4"
       port_value: 53
-  max_pending_lookups: 256
+  max_pending_lookups: 1
 server_config:
   inline_dns_table:
     external_retry_count: 0
@@ -690,7 +690,7 @@ TEST_F(DnsFilterTest, ExternalResolutionReturnNoAddresses) {
   EXPECT_EQ(0, config_->stats().external_a_record_answers_.value());
   EXPECT_EQ(1, config_->stats().a_record_queries_.value());
   EXPECT_EQ(0, config_->stats().aaaa_record_queries_.value());
-  EXPECT_EQ(0, config_->stats().unanswered_queries_.value());
+  EXPECT_EQ(1, config_->stats().unanswered_queries_.value());
 
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(resolver_.get()));
 }
@@ -729,7 +729,7 @@ TEST_F(DnsFilterTest, ExternalResolutionTimeout) {
   EXPECT_EQ(0, config_->stats().external_a_record_answers_.value());
   EXPECT_EQ(1, config_->stats().a_record_queries_.value());
   EXPECT_EQ(0, config_->stats().aaaa_record_queries_.value());
-  EXPECT_EQ(0, config_->stats().unanswered_queries_.value());
+  EXPECT_EQ(1, config_->stats().unanswered_queries_.value());
 
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(resolver_.get()));
 }
@@ -777,9 +777,57 @@ TEST_F(DnsFilterTest, ExternalResolutionTimeout2) {
   EXPECT_EQ(0, config_->stats().external_a_record_answers_.value());
   EXPECT_EQ(1, config_->stats().a_record_queries_.value());
   EXPECT_EQ(0, config_->stats().aaaa_record_queries_.value());
-  EXPECT_EQ(0, config_->stats().unanswered_queries_.value());
+  EXPECT_EQ(1, config_->stats().unanswered_queries_.value());
 
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(resolver_.get()));
+}
+
+TEST_F(DnsFilterTest, ExternalResolutionExceedMaxPendingLookups) {
+  InSequence s;
+
+  const std::string domain("www.foobaz.com");
+  setup(forward_query_on_config);
+  const std::string query1 =
+      Utils::buildQueryForDomain(domain, DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN);
+  ASSERT_FALSE(query1.empty());
+
+  const std::string query2 =
+      Utils::buildQueryForDomain(domain, DNS_RECORD_TYPE_AAAA, DNS_RECORD_CLASS_IN);
+  ASSERT_FALSE(query2.empty());
+
+  const std::string query3 =
+      Utils::buildQueryForDomain(domain, DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN);
+  ASSERT_FALSE(query3.empty());
+
+  // Send the first query. This will remain 'in-flight'
+  EXPECT_CALL(dispatcher_, createTimer_(_));
+  EXPECT_CALL(*resolver_, resolve(domain, _, _));
+  sendQueryFromClient("10.0.0.1:1000", query1);
+
+  // Send the second query. This will remain 'in-flight' also
+  EXPECT_CALL(dispatcher_, createTimer_(_));
+  EXPECT_CALL(*resolver_, resolve(domain, _, _));
+  sendQueryFromClient("10.0.0.1:1000", query2);
+
+  // The third query should be rejected since pending queries (2) > 1, and
+  // we've disabled retries. The client will get a response for this single
+  // query
+  sendQueryFromClient("10.0.0.1:1000", query3);
+
+  // Parse the result for the third query. Since the first two queries are
+  // still in flight, the third query is the only one to generate a response
+  query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
+  EXPECT_TRUE(query_ctx_->parse_status_);
+  EXPECT_EQ(0, query_ctx_->answers_.size());
+  EXPECT_EQ(DNS_RESPONSE_CODE_NAME_ERROR, response_parser_->getQueryResponseCode());
+
+  // Validate stats
+  EXPECT_EQ(3, config_->stats().downstream_rx_queries_.value());
+  EXPECT_EQ(1, config_->stats().external_a_record_queries_.value());
+  EXPECT_EQ(0, config_->stats().external_a_record_answers_.value());
+  EXPECT_EQ(2, config_->stats().a_record_queries_.value());
+  EXPECT_EQ(1, config_->stats().aaaa_record_queries_.value());
+  EXPECT_EQ(1, config_->stats().unanswered_queries_.value());
 }
 
 TEST_F(DnsFilterTest, ConsumeExternalJsonTableTest) {
