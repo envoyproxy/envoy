@@ -191,6 +191,7 @@ EXTENSIONS = {
     "envoy.internal_redirect_predicates.safe_cross_scheme":   "//source/extensions/internal_redirect/safe_cross_scheme:config",
 
     # Http Upstreams
+    # TODO(alyssawilk) these are linked in the default build and shouldn't be here: fix tooling and remove.
 
     "envoy.upstreams.http.generic":                     "//source/extensions/upstreams/http/generic:config",
     "envoy.upstreams.http.http":                     "//source/extensions/upstreams/http/http:config",
