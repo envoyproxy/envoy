@@ -1211,7 +1211,7 @@ message RedirectAction {
     // Please note that query string in path_redirect will override the
     // request's query string and will not be stripped.
     //
-    // For exmaple, let's say we have the following routes:
+    // For example, let's say we have the following routes:
     //
     // - match: { path: "/old-path-1" }
     //   redirect: { path_redirect: "/new-path-1" }
