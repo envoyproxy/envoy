@@ -25,33 +25,6 @@ namespace Envoy {
 namespace Router {
 namespace {
 
-<<<<<<< HEAD
-class MockGenericConnPool : public GenericConnPool {
-  MOCK_METHOD(void, newStream, (GenericConnectionPoolCallbacks * request));
-  MOCK_METHOD(bool, cancelAnyPendingRequest, ());
-  MOCK_METHOD(absl::optional<Http::Protocol>, protocol, (), (const));
-  MOCK_METHOD(bool, initialize,
-              (Upstream::ClusterManager&, const RouteEntry&, absl::optional<Http::Protocol>,
-               Upstream::LoadBalancerContext*));
-  MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, host, (), (const));
-};
-
-class MockGenericConnectionPoolCallbacks : public GenericConnectionPoolCallbacks {
-public:
-  MOCK_METHOD(void, onPoolFailure,
-              (Http::ConnectionPool::PoolFailureReason reason,
-               absl::string_view transport_failure_reason,
-               Upstream::HostDescriptionConstSharedPtr host));
-  MOCK_METHOD(void, onPoolReady,
-              (std::unique_ptr<GenericUpstream> && upstream,
-               Upstream::HostDescriptionConstSharedPtr host,
-               const Network::Address::InstanceConstSharedPtr& upstream_local_address,
-               const StreamInfo::StreamInfo& info));
-  MOCK_METHOD(UpstreamRequest*, upstreamRequest, ());
-};
-
-=======
->>>>>>> envoy/master
 class MockRouterFilterInterface : public RouterFilterInterface {
 public:
   MockRouterFilterInterface()
