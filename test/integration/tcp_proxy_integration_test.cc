@@ -26,14 +26,36 @@ using testing::NiceMock;
 
 namespace Envoy {
 
+std::vector<TcpProxyIntegrationTestParams> getProtocolTestParams() {
+  std::vector<TcpProxyIntegrationTestParams> ret;
+
+  for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
+    ret.push_back(TcpProxyIntegrationTestParams{ip_version, true});
+    ret.push_back(TcpProxyIntegrationTestParams{ip_version, false});
+  }
+  return ret;
+}
+
+std::string
+protocolTestParamsToString(const ::testing::TestParamInfo<TcpProxyIntegrationTestParams>& params) {
+  return absl::StrCat(
+      (params.param.version == Network::Address::IpVersion::v4 ? "IPv4_" : "IPv6_"),
+      (params.param.test_original_version == true ? "OriginalConnPool" : "NewConnPool"));
+}
+
 void TcpProxyIntegrationTest::initialize() {
+  if (GetParam().test_original_version) {
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.new_tcp_connection_pool", "false");
+  } else {
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.new_tcp_connection_pool", "true");
+  }
+
   config_helper_.renameListener("tcp_proxy");
   BaseIntegrationTest::initialize();
 }
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, TcpProxyIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, TcpProxyIntegrationTest,
+                         testing::ValuesIn(getProtocolTestParams()), protocolTestParamsToString);
 
 // Test upstream writing before downstream downstream does.
 TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
@@ -235,7 +257,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamFlushEnvoyExit) {
 
 TEST_P(TcpProxyIntegrationTest, AccessLog) {
   std::string access_log_path = TestEnvironment::temporaryPath(
-      fmt::format("access_log{}.txt", GetParam() == Network::Address::IpVersion::v4 ? "v4" : "v6"));
+      fmt::format("access_log{}.txt", version_ == Network::Address::IpVersion::v4 ? "v4" : "v6"));
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* filter_chain = listener->mutable_filter_chains(0);
@@ -286,17 +308,17 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
 
   // Regex matching localhost:port
 #ifndef GTEST_USES_SIMPLE_RE
-  const std::string ip_port_regex = (GetParam() == Network::Address::IpVersion::v4)
+  const std::string ip_port_regex = (version_ == Network::Address::IpVersion::v4)
                                         ? R"EOF(127\.0\.0\.1:[0-9]+)EOF"
                                         : R"EOF(\[::1\]:[0-9]+)EOF";
 #else
-  const std::string ip_port_regex = (GetParam() == Network::Address::IpVersion::v4)
+  const std::string ip_port_regex = (version_ == Network::Address::IpVersion::v4)
                                         ? R"EOF(127\.0\.0\.1:\d+)EOF"
                                         : R"EOF(\[::1\]:\d+)EOF";
 #endif
 
   const std::string ip_regex =
-      (GetParam() == Network::Address::IpVersion::v4) ? R"EOF(127\.0\.0\.1)EOF" : R"EOF(::1)EOF";
+      (version_ == Network::Address::IpVersion::v4) ? R"EOF(127\.0\.0\.1)EOF" : R"EOF(::1)EOF";
 
   // Test that all three addresses were populated correctly. Only check the first line of
   // log output for simplicity.
@@ -616,9 +638,8 @@ void TcpProxyMetadataMatchIntegrationTest::expectEndpointNotToMatchRoute() {
   tcp_client->close();
 }
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, TcpProxyMetadataMatchIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, TcpProxyMetadataMatchIntegrationTest,
+                         testing::ValuesIn(getProtocolTestParams()), protocolTestParamsToString);
 
 // Test subset load balancing for a regular cluster when endpoint selector is defined at the top
 // level.
@@ -803,9 +824,8 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
   expectEndpointNotToMatchRoute();
 }
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, TcpProxySslIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, TcpProxySslIntegrationTest,
+                         testing::ValuesIn(getProtocolTestParams()), protocolTestParamsToString);
 
 void TcpProxySslIntegrationTest::initialize() {
   config_helper_.addSslConfig();

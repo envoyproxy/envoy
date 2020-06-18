@@ -943,6 +943,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
+    shard_count = 2,
     tags = ["fails_on_windows"],
     deps = [
         ":integration_lib",

@@ -3,6 +3,7 @@
 
 #include "common/event/dispatcher_impl.h"
 #include "common/network/utility.h"
+#include "common/tcp/conn_pool.h"
 #include "common/tcp/original_conn_pool.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -121,15 +122,31 @@ public:
   bool test_new_connection_pool_;
 
 protected:
-  class ConnPoolImplForTest : public OriginalConnPoolImpl {
+  class ConnPoolImplForTest : public ConnPoolImpl {
   public:
     ConnPoolImplForTest(Event::MockDispatcher& dispatcher, Upstream::HostSharedPtr host,
                         ConnPoolBase& parent)
+        : ConnPoolImpl(dispatcher, host, Upstream::ResourcePriority::Default, nullptr, nullptr),
+          parent_(parent) {}
+
+    void onConnReleased(Envoy::ConnectionPool::ActiveClient& client) override {
+      ConnPoolImpl::onConnReleased(client);
+      parent_.onConnReleasedForTest();
+    }
+
+    void onConnDestroyed() override { parent_.onConnDestroyedForTest(); }
+    ConnPoolBase& parent_;
+  };
+
+  class OriginalConnPoolImplForTest : public OriginalConnPoolImpl {
+  public:
+    OriginalConnPoolImplForTest(Event::MockDispatcher& dispatcher, Upstream::HostSharedPtr host,
+                                ConnPoolBase& parent)
         : OriginalConnPoolImpl(dispatcher, host, Upstream::ResourcePriority::Default, nullptr,
                                nullptr),
           parent_(parent) {}
 
-    ~ConnPoolImplForTest() override {
+    ~OriginalConnPoolImplForTest() override {
       EXPECT_EQ(0U, ready_conns_.size());
       EXPECT_EQ(0U, busy_conns_.size());
       EXPECT_EQ(0U, pending_requests_.size());
@@ -165,16 +182,16 @@ ConnPoolBase::ConnPoolBase(Event::MockDispatcher& dispatcher, Upstream::HostShar
                            bool test_new_connection_pool)
     : mock_dispatcher_(dispatcher), mock_upstream_ready_cb_(upstream_ready_cb),
       test_new_connection_pool_(test_new_connection_pool) {
-  // TODO(alyssarwilk) remove this assert and test the old and the new when it lands.
-  ASSERT(!test_new_connection_pool_);
-  if (!test_new_connection_pool_) {
+  if (test_new_connection_pool_) {
     conn_pool_ = std::make_unique<ConnPoolImplForTest>(dispatcher, host, *this);
+  } else {
+    conn_pool_ = std::make_unique<OriginalConnPoolImplForTest>(dispatcher, host, *this);
   }
 }
 
 void ConnPoolBase::expectEnableUpstreamReady(bool run) {
   if (!test_new_connection_pool_) {
-    dynamic_cast<ConnPoolImplForTest*>(conn_pool_.get())->expectEnableUpstreamReady(run);
+    dynamic_cast<OriginalConnPoolImplForTest*>(conn_pool_.get())->expectEnableUpstreamReady(run);
   } else {
     if (!run) {
       EXPECT_CALL(*mock_upstream_ready_cb_, scheduleCallbackCurrentIteration())
@@ -195,10 +212,7 @@ public:
       : test_new_connection_pool_(GetParam()),
         upstream_ready_cb_(new NiceMock<Event::MockSchedulableCallback>(&dispatcher_)),
         host_(Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000")),
-        conn_pool_(dispatcher_, host_, upstream_ready_cb_, test_new_connection_pool_) {
-    // TODO(alyssarwilk) remove this assert and test the old and the new when it lands.
-    ASSERT(!test_new_connection_pool_);
-  }
+        conn_pool_(dispatcher_, host_, upstream_ready_cb_, test_new_connection_pool_) {}
 
   ~TcpConnPoolImplTest() override {
     EXPECT_TRUE(TestUtility::gaugesZeroed(cluster_->stats_store_.gauges()))
@@ -223,8 +237,10 @@ public:
       : test_new_connection_pool_(GetParam()),
         upstream_ready_cb_(new NiceMock<Event::MockSchedulableCallback>(&dispatcher_)) {
     host_ = Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000");
-    ASSERT(!test_new_connection_pool_);
-    if (!test_new_connection_pool_) {
+    if (test_new_connection_pool_) {
+      conn_pool_ = std::make_unique<ConnPoolImpl>(
+          dispatcher_, host_, Upstream::ResourcePriority::Default, nullptr, nullptr);
+    } else {
       conn_pool_ = std::make_unique<OriginalConnPoolImpl>(
           dispatcher_, host_, Upstream::ResourcePriority::Default, nullptr, nullptr);
     }
@@ -914,10 +930,18 @@ TEST_P(TcpConnPoolImplTest, DrainWhileConnecting) {
   EXPECT_NE(nullptr, handle);
 
   conn_pool_.addDrainedCallback([&]() -> void { drained.ready(); });
-  handle->cancel(ConnectionPool::CancelPolicy::Default);
-  EXPECT_CALL(*conn_pool_.test_conns_[0].connection_, close(Network::ConnectionCloseType::NoFlush));
-  EXPECT_CALL(drained, ready());
-  conn_pool_.test_conns_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
+  if (test_new_connection_pool_) {
+    // The shared connection pool removes and closes connecting clients if there are no
+    // pending requests.
+    EXPECT_CALL(drained, ready());
+    handle->cancel(ConnectionPool::CancelPolicy::Default);
+  } else {
+    handle->cancel(ConnectionPool::CancelPolicy::Default);
+    EXPECT_CALL(*conn_pool_.test_conns_[0].connection_,
+                close(Network::ConnectionCloseType::NoFlush));
+    EXPECT_CALL(drained, ready());
+    conn_pool_.test_conns_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
+  }
   EXPECT_CALL(conn_pool_, onConnDestroyedForTest());
   dispatcher_.clearDeferredDeleteList();
 }
@@ -991,8 +1015,8 @@ TEST_P(TcpConnPoolImplDestructorTest, TestReadyConnectionsAreClosed) {
   conn_pool_.reset();
 }
 
-INSTANTIATE_TEST_SUITE_P(ConnectionPools, TcpConnPoolImplTest, testing::Values(false));
-INSTANTIATE_TEST_SUITE_P(ConnectionPools, TcpConnPoolImplDestructorTest, testing::Values(false));
+INSTANTIATE_TEST_SUITE_P(ConnectionPools, TcpConnPoolImplTest, testing::Bool());
+INSTANTIATE_TEST_SUITE_P(ConnectionPools, TcpConnPoolImplDestructorTest, testing::Bool());
 
 } // namespace Tcp
 } // namespace Envoy
