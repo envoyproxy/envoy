@@ -273,6 +273,7 @@ elif [[ "$CI_TARGET" == "bazel.coverage" ]]; then
   collect_build_profile coverage
   exit 0
 elif [[ "$CI_TARGET" == "bazel.fuzz_coverage" ]]; then
+  ENVOY_STDLIB=libstdc++
   setup_clang_toolchain
   echo "bazel coverage build with fuzz tests ${COVERAGE_TEST_TARGETS}"
 
