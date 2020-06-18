@@ -42,6 +42,9 @@ const std::string errorDetails(int error_code) {
 #ifndef WIN32
   return strerror(error_code);
 #else
+  // strerror is a POSIX subsystem function and is unable to fetch error descriptions of Windows
+  // errors. Instead, we use FormatMessage and return "Unknown error" if it fails. Failures could be
+  // due to the error code not being found, or otherwise.
   char* buffer = NULL;
   DWORD msg_size = FormatMessage(
       FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_ALLOCATE_BUFFER,

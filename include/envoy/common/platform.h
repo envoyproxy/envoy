@@ -125,7 +125,10 @@ struct msghdr {
 #define ENVOY_SHUT_WR SD_SEND
 #define ENVOY_SHUT_RDWR SD_BOTH
 
-// Mapping winsock2 errors to common error names
+// winsock2 functions return distinct set of error codes, disjoint from POSIX errors (that are
+// also available on Windows and set by POSIX function invocations). Here we map winsock2 error
+// codes with platform agnostic macros that correspond to the same or roughly similar errors on
+// POSIX systems for use in cross-platform socket error handling.
 #define SOCKET_ERROR_AGAIN WSAEWOULDBLOCK
 #define SOCKET_ERROR_NOT_SUP WSAEOPNOTSUPP
 #define SOCKET_ERROR_AF_NO_SUP WSAEAFNOSUPPORT
