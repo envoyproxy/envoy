@@ -168,6 +168,7 @@ envoy_cc_fuzz_test(
     corpus = "utility_corpus",
     deps = [
         "//source/common/stats:utility_lib",
+        "//source/common/stats:isolated_store_lib",
     ],
 )
 
