@@ -15,3 +15,73 @@ index 35c77d1d..47bd63f5 100644
  endif()
  # AC_TYPE_UINT8_T
  # AC_TYPE_UINT16_T
+# https://github.com/nghttp2/nghttp2/pull/1468
+diff --git a/lib/nghttp2_buf.c b/lib/nghttp2_buf.c
+index 2a435bebf..92f97f7f2 100644
+--- a/lib/nghttp2_buf.c
++++ b/lib/nghttp2_buf.c
+@@ -82,8 +82,10 @@ void nghttp2_buf_reset(nghttp2_buf *buf) {
+ }
+ 
+ void nghttp2_buf_wrap_init(nghttp2_buf *buf, uint8_t *begin, size_t len) {
+-  buf->begin = buf->pos = buf->last = buf->mark = begin;
+-  buf->end = begin + len;
++  buf->begin = buf->pos = buf->last = buf->mark = buf->end = begin;
++  if (buf->end != NULL) {
++    buf->end += len;
++  }
+ }
+ 
+ static int buf_chain_new(nghttp2_buf_chain **chain, size_t chunk_length,
+diff --git a/lib/nghttp2_frame.c b/lib/nghttp2_frame.c
+index 4821de408..940c723b0 100644
+--- a/lib/nghttp2_frame.c
++++ b/lib/nghttp2_frame.c
+@@ -818,8 +818,10 @@ int nghttp2_frame_unpack_origin_payload(nghttp2_extension *frame,
+   size_t len = 0;
+ 
+   origin = frame->payload;
+-  p = payload;
+-  end = p + payloadlen;
++  p = end = payload;
++  if (end != NULL) {
++    end += payloadlen;
++  }
+ 
+   for (; p != end;) {
+     if (end - p < 2) {
+diff --git a/lib/nghttp2_session.c b/lib/nghttp2_session.c
+index 563ccd7de..794f141a1 100644
+--- a/lib/nghttp2_session.c
++++ b/lib/nghttp2_session.c
+@@ -5349,7 +5349,7 @@ static ssize_t inbound_frame_effective_readlen(nghttp2_inbound_frame *iframe,
+ 
+ ssize_t nghttp2_session_mem_recv(nghttp2_session *session, const uint8_t *in,
+                                  size_t inlen) {
+-  const uint8_t *first = in, *last = in + inlen;
++  const uint8_t *first = in, *last = in;
+   nghttp2_inbound_frame *iframe = &session->iframe;
+   size_t readlen;
+   ssize_t padlen;
+@@ -5360,6 +5360,10 @@ ssize_t nghttp2_session_mem_recv(nghttp2_session *session, const uint8_t *in,
+   size_t pri_fieldlen;
+   nghttp2_mem *mem;
+ 
++  if (in != NULL) {
++    last += inlen;
++  }
++
+   DEBUGF("recv: connection recv_window_size=%d, local_window=%d\n",
+          session->recv_window_size, session->local_window_size);
+ 
+@@ -5389,7 +5393,9 @@ ssize_t nghttp2_session_mem_recv(nghttp2_session *session, const uint8_t *in,
+       }
+ 
+       iframe->payloadleft -= readlen;
+-      in += readlen;
++      if (in != NULL) {
++        in += readlen;
++      }
+ 
+       if (iframe->payloadleft == 0) {
+         session_inbound_frame_reset(session);
