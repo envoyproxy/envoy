@@ -354,9 +354,8 @@ admin:
       address: 127.0.0.1
       port_value: 0
 )EOF",
-                                api_type,
-                                api_version == envoy::config::core::v3::ApiVersion::V2 ? "V2" : "V3",
-                                TestEnvironment::nullDevicePath());
+                     api_type, api_version == envoy::config::core::v3::ApiVersion::V2 ? "V2" : "V3",
+                     TestEnvironment::nullDevicePath());
 }
 
 // TODO(samflattery): bundle this up with buildCluster

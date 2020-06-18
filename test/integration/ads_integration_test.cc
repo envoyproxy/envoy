@@ -597,10 +597,10 @@ public:
                             ConfigHelper::adsBootstrap(
                                 sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC",
                                 envoy::config::core::v3::ApiVersion::V2)) {
-        create_xds_upstream_ = true;
-        use_lds_ = false;
-        sotw_or_delta_ = sotwOrDelta();
-      }
+    create_xds_upstream_ = true;
+    use_lds_ = false;
+    sotw_or_delta_ = sotwOrDelta();
+  }
 
   void TearDown() override { cleanUpXdsConnection(); }
 
@@ -616,7 +616,7 @@ public:
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
     HttpIntegrationTest::initialize();
   }
-                               };
+};
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, AdsFailIntegrationTest,
                          DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
@@ -631,41 +631,41 @@ TEST_P(AdsFailIntegrationTest, ConnectDisconnect) {
 }
 
 class AdsConfigIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest,
-  public HttpIntegrationTest {
-   public:
-    AdsConfigIntegrationTest()
-        : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(),
-                              ConfigHelper::adsBootstrap(
-                                  sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC",
-                                  envoy::config::core::v3::ApiVersion::V2)) {
-          create_xds_upstream_ = true;
-          use_lds_ = false;
-          sotw_or_delta_ = sotwOrDelta();
-        }
+                                 public HttpIntegrationTest {
+public:
+  AdsConfigIntegrationTest()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(),
+                            ConfigHelper::adsBootstrap(
+                                sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC",
+                                envoy::config::core::v3::ApiVersion::V2)) {
+    create_xds_upstream_ = true;
+    use_lds_ = false;
+    sotw_or_delta_ = sotwOrDelta();
+  }
 
-    void TearDown() override { cleanUpXdsConnection(); }
+  void TearDown() override { cleanUpXdsConnection(); }
 
-    void initialize() override {
-      config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-        auto* grpc_service =
-            bootstrap.mutable_dynamic_resources()->mutable_ads_config()->add_grpc_services();
-        setGrpcService(*grpc_service, "ads_cluster", xds_upstream_->localAddress());
-        auto* ads_cluster = bootstrap.mutable_static_resources()->add_clusters();
-        ads_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
-        ads_cluster->set_name("ads_cluster");
+  void initialize() override {
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* grpc_service =
+          bootstrap.mutable_dynamic_resources()->mutable_ads_config()->add_grpc_services();
+      setGrpcService(*grpc_service, "ads_cluster", xds_upstream_->localAddress());
+      auto* ads_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      ads_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      ads_cluster->set_name("ads_cluster");
 
-        // Add EDS static Cluster that uses ADS as config Source.
-        auto* ads_eds_cluster = bootstrap.mutable_static_resources()->add_clusters();
-        ads_eds_cluster->set_name("ads_eds_cluster");
-        ads_eds_cluster->set_type(envoy::config::cluster::v3::Cluster::EDS);
-        auto* eds_cluster_config = ads_eds_cluster->mutable_eds_cluster_config();
-        auto* eds_config = eds_cluster_config->mutable_eds_config();
-        eds_config->mutable_ads();
-      });
-      setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
-      HttpIntegrationTest::initialize();
-    }
-  };
+      // Add EDS static Cluster that uses ADS as config Source.
+      auto* ads_eds_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      ads_eds_cluster->set_name("ads_eds_cluster");
+      ads_eds_cluster->set_type(envoy::config::cluster::v3::Cluster::EDS);
+      auto* eds_cluster_config = ads_eds_cluster->mutable_eds_cluster_config();
+      auto* eds_config = eds_cluster_config->mutable_eds_config();
+      eds_config->mutable_ads();
+    });
+    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+    HttpIntegrationTest::initialize();
+  }
+};
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, AdsConfigIntegrationTest,
                          DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
@@ -713,10 +713,10 @@ TEST_P(AdsIntegrationTest, XdsBatching) {
     sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
         Config::TypeUrl::get().RouteConfiguration,
         {buildRouteConfig("route_config2", "eds_cluster2"),
-          buildRouteConfig("route_config", "dummy_cluster")},
-          {buildRouteConfig("route_config2", "eds_cluster2"),
-            buildRouteConfig("route_config", "dummy_cluster")},
-            {}, "1");
+         buildRouteConfig("route_config", "dummy_cluster")},
+        {buildRouteConfig("route_config2", "eds_cluster2"),
+         buildRouteConfig("route_config", "dummy_cluster")},
+        {}, "1");
   };
 
   initialize();
@@ -793,12 +793,12 @@ TEST_P(AdsIntegrationTest, NodeMessage) {
 
 // Check if EDS cluster defined in file is loaded before ADS request and used as xDS server
 class AdsClusterFromFileIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest,
-  public HttpIntegrationTest {
-   public:
-    AdsClusterFromFileIntegrationTest()
-        : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(),
-                              ConfigHelper::adsBootstrap(
-                                  sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC",
+                                          public HttpIntegrationTest {
+public:
+  AdsClusterFromFileIntegrationTest()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(),
+                            ConfigHelper::adsBootstrap(
+                                sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC",
                                 envoy::config::core::v3::ApiVersion::V2)) {
     create_xds_upstream_ = true;
     use_lds_ = false;
