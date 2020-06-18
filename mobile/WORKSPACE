@@ -37,6 +37,7 @@ envoy_mobile_dependencies()
 load("@envoy_mobile//bazel:envoy_mobile_toolchains.bzl", "envoy_mobile_toolchains")
 envoy_mobile_toolchains()
 
-android_sdk_repository(name = "androidsdk")
+# Fixing to API 29 since proguard seems to be failing for 30+
+android_sdk_repository(name = "androidsdk", api_level = 29)
 
 android_ndk_repository(name = "androidndk")
