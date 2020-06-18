@@ -1,0 +1,272 @@
+cluster_manager {
+  load_stats_config {
+    api_type: GRPC
+    grpc_services {
+      google_grpc {
+        target_uri: "18446744073709551617"
+        call_credentials {
+          access_token: "?"
+        }
+        call_credentials {
+          access_token: "#"
+        }
+        call_credentials {
+          access_token: "?"
+        }
+        call_credentials {
+          access_token: "#"
+        }
+        call_credentials {
+          access_token: "-5894"
+        }
+        call_credentials {
+          access_token: "?"
+        }
+        call_credentials {
+          google_compute_engine {
+          }
+        }
+        call_credentials {
+          access_token: "-5894"
+        }
+        call_credentials {
+          access_token: "#"
+        }
+        call_credentials {
+          access_token: "\177\177\177\177\n\0007k?"
+        }
+        call_credentials {
+          access_token: "#"
+        }
+        call_credentials {
+          access_token: "?"
+        }
+        call_credentials {
+          access_token: "#"
+        }
+        call_credentials {
+          access_token: "#"
+        }
+        call_credentials {
+          access_token: "4294967296"
+        }
+        call_credentials {
+          access_token: "?"
+        }
+        call_credentials {
+          access_token: "#"
+        }
+        call_credentials {
+          access_token: "#"
+        }
+        call_credentials {
+          access_token: "#"
+        }
+        call_credentials {
+          access_token: "?"
+        }
+        call_credentials {
+          access_token: "257"
+        }
+        call_credentials {
+          access_token: "#"
+        }
+        call_credentials {
+          access_token: "?"
+        }
+        call_credentials {
+          access_token: "#"
+        }
+        call_credentials {
+          access_token: ""
+        }
+        call_credentials {
+          access_token: "?"
+        }
+        call_credentials {
+          access_token: "?"
+        }
+        call_credentials {
+          access_token: "4294967296"
+        }
+        call_credentials {
+          access_token: "257"
+        }
+        call_credentials {
+          access_token: "#"
+        }
+        call_credentials {
+          access_token: "#"
+        }
+        call_credentials {
+          google_compute_engine {
+          }
+        }
+        call_credentials {
+          access_token: "?"
+        }
+        call_credentials {
+          access_token: "?"
+        }
+        call_credentials {
+          access_token: "?"
+        }
+        call_credentials {
+          access_token: "257"
+        }
+        call_credentials {
+          access_token: "?"
+        }
+        call_credentials {
+          access_token: "-5894"
+        }
+        call_credentials {
+          access_token: "#"
+        }
+        call_credentials {
+          access_token: "#"
+        }
+        call_credentials {
+          access_token: "#"
+        }
+        call_credentials {
+          access_token: "#"
+        }
+        call_credentials {
+          access_token: "?"
+        }
+        call_credentials {
+          access_token: "#"
+        }
+        call_credentials {
+          access_token: "#"
+        }
+        call_credentials {
+          access_token: "#"
+        }
+        call_credentials {
+          access_token: "-0"
+        }
+        call_credentials {
+          access_token: "@"
+        }
+        call_credentials {
+          access_token: "#"
+        }
+        call_credentials {
+          access_token: "#"
+        }
+        call_credentials {
+          access_token: "#"
+        }
+        call_credentials {
+          access_token: "257"
+        }
+        call_credentials {
+          access_token: "?"
+        }
+        call_credentials {
+          access_token: "#"
+        }
+        call_credentials {
+          access_token: "-5894"
+        }
+        call_credentials {
+          access_token: "?"
+        }
+        call_credentials {
+          access_token: "#"
+        }
+        call_credentials {
+          access_token: "-65535"
+        }
+        call_credentials {
+          access_token: "#"
+        }
+        call_credentials {
+          access_token: "#"
+        }
+        call_credentials {
+          access_token: "?"
+        }
+        call_credentials {
+          access_token: "?"
+        }
+        call_credentials {
+          service_account_jwt_access {
+            json_key: "+"
+          }
+        }
+        call_credentials {
+          access_token: "#"
+        }
+        call_credentials {
+          google_refresh_token: "\004\000\000\000"
+        }
+        call_credentials {
+          access_token: "#"
+        }
+        call_credentials {
+          access_token: "#"
+        }
+        call_credentials {
+          google_refresh_token: ";"
+        }
+        call_credentials {
+          access_token: "#"
+        }
+        call_credentials {
+          access_token: "#"
+        }
+        call_credentials {
+          access_token: "#"
+        }
+        call_credentials {
+          access_token: "?"
+        }
+        call_credentials {
+          access_token: "#"
+        }
+        call_credentials {
+          access_token: "-65535"
+        }
+        call_credentials {
+          access_token: "4294967296"
+        }
+        call_credentials {
+          access_token: "#"
+        }
+        call_credentials {
+          access_token: "?"
+        }
+        call_credentials {
+          google_compute_engine {
+          }
+        }
+        call_credentials {
+          access_token: "#"
+        }
+        call_credentials {
+          access_token: "#"
+        }
+        call_credentials {
+          access_token: ";"
+        }
+        call_credentials {
+          access_token: "---66923175758411142"
+        }
+        call_credentials {
+          access_token: "?"
+        }
+        stat_prefix: "2147483649"
+        channel_args {
+          args {
+            key: "\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000"
+            value {
+            }
+          }
+        }
+      }
+    }
+  }
+}

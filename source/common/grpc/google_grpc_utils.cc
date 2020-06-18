@@ -127,7 +127,7 @@ GoogleGrpcUtils::channelArgsFromConfig(const envoy::config::core::v3::GrpcServic
       break;
     }
     default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      throw EnvoyException("Oneof name not set");
     }
   }
   return args;
