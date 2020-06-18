@@ -1873,6 +1873,34 @@ TEST_F(EdsAssignmentTimeoutTest, AssignmentLeaseExpired) {
   }
 }
 
+// Validate that onConfigUpdate() verifies that no deprecated fields are used.
+TEST_F(EdsTest, DeprecatedFieldsError) {
+  // This test is only valid in API-v3, and should be updated for API-v4, as
+  // the deprecated fields of API-v2 will be removed.
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment =
+      TestUtility::parseYaml<envoy::config::endpoint::v3::ClusterLoadAssignment>(R"EOF(
+      cluster_name: fare
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 1.2.3.4
+                port_value: 80
+      policy:
+        overprovisioning_factor: 100
+        hidden_envoy_deprecated_disable_overprovisioning: true
+    )EOF");
+
+  initialize();
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
+  resources.Add()->PackFrom(cluster_load_assignment);
+  EXPECT_THROW_WITH_REGEX(eds_callbacks_->onConfigUpdate(resources, ""), ProtoValidationException,
+                          "Illegal use of hidden_envoy_deprecated_ V2 field "
+                          "'envoy.config.endpoint.v3.ClusterLoadAssignment.Policy.hidden_envoy_"
+                          "deprecated_disable_overprovisioning'");
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy

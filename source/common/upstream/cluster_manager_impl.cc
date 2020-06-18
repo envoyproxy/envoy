@@ -32,7 +32,7 @@
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/router/shadow_writer_impl.h"
-#include "common/tcp/conn_pool.h"
+#include "common/tcp/original_conn_pool.h"
 #include "common/upstream/cds_api_impl.h"
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/maglev_lb.h"
@@ -1416,7 +1416,7 @@ Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsSharedPtr transport_socket_options) {
   return Tcp::ConnectionPool::InstancePtr{
-      new Tcp::ConnPoolImpl(dispatcher, host, priority, options, transport_socket_options)};
+      new Tcp::OriginalConnPoolImpl(dispatcher, host, priority, options, transport_socket_options)};
 }
 
 std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ProdClusterManagerFactory::clusterFromProto(

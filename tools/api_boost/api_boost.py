@@ -44,7 +44,8 @@ def ApiBoostFile(llvm_include_path, debug_log, path):
     result = sp.run([
         './bazel-bin/external/envoy_dev/clang_tools/api_booster/api_booster',
         '--extra-arg-before=-xc++',
-        '--extra-arg=-isystem%s' % llvm_include_path, '--extra-arg=-Wno-undefined-internal', path
+        '--extra-arg=-isystem%s' % llvm_include_path, '--extra-arg=-Wno-undefined-internal',
+        '--extra-arg=-Wno-old-style-cast', path
     ],
                     capture_output=True,
                     check=True)

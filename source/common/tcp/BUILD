@@ -10,8 +10,8 @@ envoy_package()
 
 envoy_cc_library(
     name = "conn_pool_lib",
-    srcs = ["conn_pool.cc"],
-    hdrs = ["conn_pool.h"],
+    srcs = ["original_conn_pool.cc"],
+    hdrs = ["original_conn_pool.h"],
     external_deps = ["abseil_optional"],
     deps = [
         "//include/envoy/event:deferred_deletable",

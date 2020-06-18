@@ -148,7 +148,7 @@ success_criteria:
   EXPECT_CALL(controller_, requestSuccessCount()).Times(0);
 
   // We expect no rejections.
-  Http::RequestHeaderMapImpl request_headers;
+  Http::TestRequestHeaderMapImpl request_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
