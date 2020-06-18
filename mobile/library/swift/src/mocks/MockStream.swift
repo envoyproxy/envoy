@@ -12,7 +12,7 @@ public final class MockStream: Stream {
   public var onRequestData: ((_ data: Data, _ endStream: Bool) -> Void)?
   /// Closure that will be called when request trailers are sent.
   public var onRequestTrailers: ((_ trailers: RequestTrailers) -> Void)?
-  /// Closure that will be called when the stream is canceled.
+  /// Closure that will be called when the stream is canceled by the client.
   public var onCancel: (() -> Void)?
 
   init(mockStream: MockEnvoyHTTPStream) {

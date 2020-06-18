@@ -5,14 +5,115 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.Executor
 
-class GRPCResponseHandler(
-  val executor: Executor
+/**
+ * A type representing a gRPC stream that has not yet been started.
+ *
+ * Constructed via `GRPCClient`, and used to assign response callbacks
+ * prior to starting a `GRPCStream` by calling `start()`.
+ */
+class GRPCStreamPrototype(
+  private val underlyingStream: StreamPrototype
 ) {
+  /**
+   * Start a new gRPC stream.
+   * @param executor Executor on which to receive callback events.
+   * @return The new gRPC stream.
+   */
+  fun start(executor: Executor): GRPCStream {
+    val stream = underlyingStream.start(executor)
+    return GRPCStream(stream)
+  }
 
+  /**
+   * Specify a callback for when response headers are received by the stream.
+   *
+   * @param closure Closure which will receive the headers and flag indicating if the stream is headers-only.
+   * @return This stream, for chaining syntax.
+   */
+  fun setOnResponseHeaders(
+    closure: (headers: ResponseHeaders, endStream: Boolean) -> Unit
+  ): GRPCStreamPrototype {
+    underlyingStream.setOnResponseHeaders(closure)
+    return this
+  }
+
+  /**
+   * Specify a callback for when a new message has been received by the stream.
+   * If `endStream` is `true`, the stream is complete.
+   *
+   * @param closure Closure which will receive messages on the stream.
+   * @return This stream, for chaining syntax.
+   */
+  fun setOnResponseMessage(
+    closure: (data: ByteBuffer) -> Unit
+  ): GRPCStreamPrototype {
+    val byteBufferedOutputStream = ByteArrayOutputStream()
+    val processor = GRPCMessageProcessor()
+    var processState: GRPCMessageProcessor.ProcessState = GRPCMessageProcessor.ProcessState.CompressionFlag
+    underlyingStream.setOnResponseData { byteBuffer, _ ->
+      val byteBufferArray = if (byteBuffer.hasArray()) {
+        byteBuffer.array()
+      } else {
+        val array = ByteArray(byteBuffer.remaining())
+        byteBuffer.get(array)
+        array
+      }
+      byteBufferedOutputStream.write(byteBufferArray)
+
+      processState = processor.processData(byteBufferedOutputStream, processState, closure)
+    }
+
+    return this
+  }
+
+  /**
+   * Specify a callback for when trailers are received by the stream.
+   * If the closure is called, the stream is complete.
+   *
+   * @param closure Closure which will receive the trailers.
+   * @return This stream, for chaining syntax.
+   */
+  fun setOnResponseTrailers(
+    closure: (trailers: ResponseTrailers) -> Unit
+  ): GRPCStreamPrototype {
+    underlyingStream.setOnResponseTrailers(closure)
+    return this
+  }
+
+  /**
+   * Specify a callback for when an internal Envoy exception occurs with the stream.
+   * If the closure is called, the stream is complete.
+   *
+   * @param closure Closure which will be called when an error occurs.
+   * @return This stream, for chaining syntax.
+   */
+  fun setOnError(
+    closure: (error: EnvoyError) -> Unit
+  ): GRPCStreamPrototype {
+    underlyingStream.setOnError(closure)
+    return this
+  }
+
+  /**
+   * Specify a callback for when the stream is canceled.
+   * If the closure is called, the stream is complete.
+   *
+   * @param closure Closure which will be called when the stream is canceled.
+   * @return This stream, for chaining syntax.
+   */
+  fun setOnCancel(
+    closure: () -> Unit
+  ): GRPCStreamPrototype {
+    underlyingStream.setOnCancel(closure)
+    return this
+  }
+}
+
+private class GRPCMessageProcessor {
   /**
    * Represents the process state of the response stream's body data.
    */
-  private sealed class ProcessState {
+  sealed class ProcessState {
     // Awaiting a gRPC compression flag.
     object CompressionFlag : ProcessState()
 
@@ -23,78 +124,6 @@ class GRPCResponseHandler(
     class Message(val messageLength: Int) : ProcessState()
   }
 
-  internal val underlyingHandler: ResponseHandler = ResponseHandler(executor)
-  private var errorClosure: (error: EnvoyError) -> Unit = { }
-
-  /**
-   * Specify a callback for when response headers are received by the stream.
-   *
-   * @param closure: Closure which will receive the headers, status code,
-   *                 and flag indicating if the stream is complete.
-   * @return GRPCResponseHandler, this GRPCResponseHandler.
-   */
-  fun onHeaders(
-    closure: (headers: Map<String, List<String>>, statusCode: Int) -> Unit
-  ): GRPCResponseHandler {
-    underlyingHandler.onHeaders { headers, _, _ ->
-      val grpcStatus = headers["grpc-status"]?.first()?.toIntOrNull() ?: 0
-      closure(headers, grpcStatus)
-    }
-    return this
-  }
-
-  /**
-   * Specify a callback for when a data frame is received by the stream.
-   *
-   * @param closure: Closure which will receive the data,
-   *                 and flag indicating if the stream is complete.
-   * @return GRPCResponseHandler, this GRPCResponseHandler.
-   */
-  fun onMessage(closure: (byteBuffer: ByteBuffer) -> Unit): GRPCResponseHandler {
-    val byteBufferedOutputStream = ByteArrayOutputStream()
-    var processState: ProcessState = ProcessState.CompressionFlag
-    underlyingHandler.onData { byteBuffer, _ ->
-
-      val byteBufferArray = if (byteBuffer.hasArray()) {
-        byteBuffer.array()
-      } else {
-        val array = ByteArray(byteBuffer.remaining())
-        byteBuffer.get(array)
-        array
-      }
-      byteBufferedOutputStream.write(byteBufferArray)
-
-      processState = processData(byteBufferedOutputStream, processState, closure)
-    }
-
-    return this
-  }
-
-  /**
-   * Specify a callback for when trailers are received by the stream.
-   * If the closure is called, the stream is complete.
-   *
-   * @param closure: Closure which will receive the trailers.
-   * @return GRPCResponseHandler, this GRPCResponseHandler.
-   */
-  fun onTrailers(closure: (trailers: Map<String, List<String>>) -> Unit): GRPCResponseHandler {
-    underlyingHandler.onTrailers(closure)
-    return this
-  }
-
-  /**
-   * Specify a callback for when an internal Envoy exception occurs with the stream.
-   * If the closure is called, the stream is complete.
-   *
-   * @param closure: Closure which will be called when an error occurs.
-   * @return GRPCResponseHandler, this GRPCResponseHandler.
-   */
-  fun onError(closure: (error: EnvoyError) -> Unit): GRPCResponseHandler {
-    this.errorClosure = closure
-    underlyingHandler.onError(closure)
-    return this
-  }
-
   /**
    * Recursively processes a buffer of data, buffering it into messages based on state.
    * When a message has been fully buffered, `onMessage` will be called with the message.
@@ -102,14 +131,13 @@ class GRPCResponseHandler(
    * @param bufferedStream The buffer of data from which to determine state and messages.
    * @param processState The current process state of the buffering.
    * @param onMessage Closure to call when a new message is available.
-   * @return ProcessState, the state after processing the passed data.
+   * @return The state after processing the passed data.
    */
-  private fun processData(
+  fun processData(
     bufferedStream: ByteArrayOutputStream,
-    processState: ProcessState,
+    processState: GRPCMessageProcessor.ProcessState,
     onMessage: (byteBuffer: ByteBuffer) -> Unit
-  ): ProcessState {
-
+  ): GRPCMessageProcessor.ProcessState {
     var nextState = processState
 
     when (processState) {
@@ -123,14 +151,6 @@ class GRPCResponseHandler(
         val compressionFlag = byteArray[0]
         // TODO: Support gRPC compression https://github.com/lyft/envoy-mobile/issues/501.
         if (compressionFlag.compareTo(0) != 0) {
-          errorClosure(EnvoyError(0, "Unable to read compressed gRPC response message"))
-
-          // no op the current onData and clean up
-          errorClosure = { }
-          underlyingHandler.onHeaders { _, _, _ -> }
-          underlyingHandler.onData { _, _ -> }
-          underlyingHandler.onTrailers { }
-          underlyingHandler.onError { }
           bufferedStream.reset()
         }
 

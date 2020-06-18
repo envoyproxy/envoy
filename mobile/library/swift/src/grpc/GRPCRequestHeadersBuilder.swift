@@ -21,14 +21,14 @@ public final class GRPCRequestHeadersBuilder: HeadersBuilder {
 
   /// Add a specific timeout for the gRPC request. This will be sent in the `grpc-timeout` header.
   ///
-  /// - parameter timeoutMS: Timeout, in milliseconds.
+  /// - parameter timeoutMs: Timeout, in milliseconds.
   ///
   /// - returns: This builder.
   @discardableResult
-  public func addTimeoutMS(_ timeoutMS: UInt?) -> GRPCRequestHeadersBuilder {
+  public func addTimeoutMs(_ timeoutMs: UInt?) -> GRPCRequestHeadersBuilder {
     let headerName = "grpc-timeout"
-    if let timeoutMS = timeoutMS {
-      self.set(name: headerName, value: ["\(timeoutMS)m"])
+    if let timeoutMs = timeoutMs {
+      self.set(name: headerName, value: ["\(timeoutMs)m"])
     } else {
       self.remove(name: headerName)
     }

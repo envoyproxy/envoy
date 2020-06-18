@@ -56,13 +56,13 @@ final class StreamClientBuilderTests: XCTestCase {
   func testAddingStatsDomainAddsToConfigurationWhenRunningEnvoy() throws {
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertEqual("stats.foo.com", config.statsDomain)
+      XCTAssertEqual("stats.envoyproxy.io", config.statsDomain)
       expectation.fulfill()
     }
 
     _ = try StreamClientBuilder()
       .addEngineType(MockEnvoyEngine.self)
-      .addStatsDomain("stats.foo.com")
+      .addStatsDomain("stats.envoyproxy.io")
       .build()
     self.waitForExpectations(timeout: 0.01)
   }
@@ -141,13 +141,13 @@ final class StreamClientBuilderTests: XCTestCase {
   func testAddingAppIdAddsToConfigurationWhenRunningEnvoy() throws {
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertEqual("com.mydomain.myapp", config.appId)
+      XCTAssertEqual("com.envoymobile.ios", config.appId)
       expectation.fulfill()
     }
 
     _ = try StreamClientBuilder()
       .addEngineType(MockEnvoyEngine.self)
-      .addAppId("com.mydomain.myapp")
+      .addAppId("com.envoymobile.ios")
       .build()
     self.waitForExpectations(timeout: 0.01)
   }
@@ -167,17 +167,17 @@ final class StreamClientBuilderTests: XCTestCase {
   }
 
   func testResolvesYAMLWithIndividuallySetValues() throws {
-    let config = EnvoyConfiguration(statsDomain: "stats.foo.com",
+    let config = EnvoyConfiguration(statsDomain: "stats.envoyproxy.io",
                                     connectTimeoutSeconds: 200,
                                     dnsRefreshSeconds: 300,
                                     dnsFailureRefreshSecondsBase: 400,
                                     dnsFailureRefreshSecondsMax: 500,
                                     statsFlushSeconds: 600,
                                     appVersion: "v1.2.3",
-                                    appId: "com.mydomain.myapp",
+                                    appId: "com.envoymobile.ios",
                                     virtualClusters: "[test]")
     let resolvedYAML = try XCTUnwrap(config.resolveTemplate(kMockTemplate))
-    XCTAssertTrue(resolvedYAML.contains("stats_domain: stats.foo.com"))
+    XCTAssertTrue(resolvedYAML.contains("stats_domain: stats.envoyproxy.io"))
     XCTAssertTrue(resolvedYAML.contains("connect_timeout: 200s"))
     XCTAssertTrue(resolvedYAML.contains("dns_refresh_rate: 300s"))
     XCTAssertTrue(resolvedYAML.contains("base_interval: 400s"))
@@ -185,19 +185,19 @@ final class StreamClientBuilderTests: XCTestCase {
     XCTAssertTrue(resolvedYAML.contains("stats_flush_interval: 600s"))
     XCTAssertTrue(resolvedYAML.contains("device_os: iOS"))
     XCTAssertTrue(resolvedYAML.contains("app_version: v1.2.3"))
-    XCTAssertTrue(resolvedYAML.contains("app_id: com.mydomain.myapp"))
+    XCTAssertTrue(resolvedYAML.contains("app_id: com.envoymobile.ios"))
     XCTAssertTrue(resolvedYAML.contains("virtual_clusters: [test]"))
   }
 
   func testReturnsNilWhenUnresolvedValueInTemplate() {
-    let config = EnvoyConfiguration(statsDomain: "stats.foo.com",
+    let config = EnvoyConfiguration(statsDomain: "stats.envoyproxy.io",
                                     connectTimeoutSeconds: 200,
                                     dnsRefreshSeconds: 300,
                                     dnsFailureRefreshSecondsBase: 400,
                                     dnsFailureRefreshSecondsMax: 500,
                                     statsFlushSeconds: 600,
                                     appVersion: "v1.2.3",
-                                    appId: "com.mydomain.myapp",
+                                    appId: "com.envoymobile.ios",
                                     virtualClusters: "[test]")
     XCTAssertNil(config.resolveTemplate("{{ missing }}"))
   }

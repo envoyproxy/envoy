@@ -11,4 +11,15 @@ class ResponseTrailers : Headers {
    * @param trailers: Trailers to set.
    */
   internal constructor(trailers: Map<String, List<String>>) : super(trailers)
+
+  /**
+   * Convert the trailers back to a builder for mutation.
+   *
+   * @return ResponseTrailersBuilder, The new builder.
+   */
+  fun toResponseTrailersBuilder() = ResponseTrailersBuilder(
+    headers.mapValues {
+      it.value.toMutableList()
+    }.toMutableMap()
+  )
 }

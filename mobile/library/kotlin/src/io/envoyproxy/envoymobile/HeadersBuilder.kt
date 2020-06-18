@@ -20,11 +20,14 @@ open class HeadersBuilder {
    * Append a value to the header name.
    *
    * @param name:  The header name.
-   * @param value: Value the value associated to the header name.
+   * @param value: The value associated to the header name.
    *
    * @return HeadersBuilder, This builder.
    */
-  fun add(name: String, value: String): HeadersBuilder {
+  open fun add(name: String, value: String): HeadersBuilder {
+    if (isRestrictedHeader(name)) {
+      return this
+    }
     headers.getOrPut(name) { mutableListOf<String>() }.add(value)
     return this
   }
@@ -33,11 +36,14 @@ open class HeadersBuilder {
    * Replace all values at the provided name with a new set of header values.
    *
    * @param name: The header name.
-   * @param value: Value the value associated to the header name.
+   * @param value: The value associated to the header name.
    *
    * @return HeadersBuilder, This builder.
    */
-  fun set(name: String, value: MutableList<String>): HeadersBuilder {
+  open fun set(name: String, value: MutableList<String>): HeadersBuilder {
+    if (isRestrictedHeader(name)) {
+      return this
+    }
     headers[name] = value
     return this
   }
@@ -49,8 +55,27 @@ open class HeadersBuilder {
    *
    * @return HeadersBuilder, This builder.
    */
-  fun remove(name: String): HeadersBuilder {
+  open fun remove(name: String): HeadersBuilder {
+    if (isRestrictedHeader(name)) {
+      return this
+    }
     headers.remove(name)
     return this
   }
+
+  /**
+   * Allows for setting headers that are not publicly mutable (i.e., restricted headers).
+   *
+   * @param name: The header name.
+   * @param value: The value associated to the header name.
+   *
+   * @return HeadersBuilder, This builder.
+   */
+  internal open fun internalSet(name: String, value: MutableList<String>): HeadersBuilder {
+    headers[name] = value
+    return this
+  }
+
+  private fun isRestrictedHeader(name: String) = name.startsWith(":") ||
+    name.startsWith("x-envoy-mobile")
 }

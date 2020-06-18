@@ -15,7 +15,7 @@ public class HeadersBuilder: NSObject {
   /// Append a value to the header name.
   ///
   /// - parameter name:  The header name.
-  /// - parameter value: Value the value associated to the header name.
+  /// - parameter value: The value associated to the header name.
   ///
   /// - returns: This builder.
   @discardableResult
@@ -31,7 +31,7 @@ public class HeadersBuilder: NSObject {
   /// Replace all values at the provided name with a new set of header values.
   ///
   /// - parameter name: The header name.
-  /// - parameter value: Value the value associated to the header name.
+  /// - parameter value: The value associated to the header name.
   ///
   /// - returns: This builder.
   @discardableResult
@@ -64,7 +64,7 @@ public class HeadersBuilder: NSObject {
   /// Allows for setting headers that are not publicly mutable (i.e., restricted headers).
   ///
   /// - parameter name: The header name.
-  /// - parameter value: Value the value associated to the header name.
+  /// - parameter value: The value associated to the header name.
   ///
   /// - returns: This builder.
   @discardableResult

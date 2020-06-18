@@ -5,7 +5,7 @@ import org.junit.Test
 
 class RetryPolicyMapperTest {
   @Test
-  fun `all retry policy properties should all be encoded`() {
+  fun `converting to headers with per retry timeout includes all headers`() {
     val retryPolicy = RetryPolicy(
       maxRetryCount = 3,
       retryOn = listOf(
@@ -37,7 +37,7 @@ class RetryPolicyMapperTest {
   }
 
   @Test
-  fun `retry policy without perRetryTimeoutMS should exclude per try time ms header key`() {
+  fun `converting to headers without retry timeout excludes per retry timeout header`() {
     val retryPolicy = RetryPolicy(
       maxRetryCount = 123,
       retryOn = listOf(RetryRule.STATUS_5XX, RetryRule.GATEWAY_ERROR)
@@ -48,7 +48,7 @@ class RetryPolicyMapperTest {
   }
 
   @Test
-  fun `retry policy with null totalUpstreamTimeoutMS should include zero ms header`() {
+  fun `converting to headers without upstream timeout includes zero for timeout header`() {
     val retryPolicy = RetryPolicy(
       maxRetryCount = 123,
       retryOn = listOf(RetryRule.STATUS_5XX),
@@ -66,7 +66,7 @@ class RetryPolicyMapperTest {
 
   @Test(expected = IllegalArgumentException::class)
   fun `throws error when per-retry timeout is larger than total timeout`() {
-    val retryPolicy = RetryPolicy(
+    RetryPolicy(
       maxRetryCount = 3,
       retryOn = listOf(RetryRule.STATUS_5XX),
       perRetryTimeoutMS = 2,

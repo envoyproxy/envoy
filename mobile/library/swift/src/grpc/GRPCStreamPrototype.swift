@@ -96,6 +96,20 @@ public final class GRPCStreamPrototype: NSObject {
     self.underlyingStream.setOnError(closure: closure)
     return self
   }
+
+  /// Specify a callback for when the stream is canceled.
+  /// If the closure is called, the stream is complete.
+  ///
+  /// - parameter closure: Closure which will be called when the stream is canceled.
+  ///
+  /// - returns: This stream, for chaining syntax.
+  @discardableResult
+  public func setOnCancel(
+    closure: @escaping () -> Void) -> GRPCStreamPrototype
+  {
+    self.underlyingStream.setOnCancel(closure: closure)
+    return self
+  }
 }
 
 private enum GRPCMessageProcessor {

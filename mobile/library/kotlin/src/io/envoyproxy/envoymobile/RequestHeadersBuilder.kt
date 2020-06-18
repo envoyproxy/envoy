@@ -35,6 +35,26 @@ class RequestHeadersBuilder : HeadersBuilder {
    */
   internal constructor(headers: MutableMap<String, MutableList<String>>) : super(headers)
 
+  override fun add(name: String, value: String): RequestHeadersBuilder {
+    super.add(name, value)
+    return this
+  }
+
+  override fun set(name: String, value: MutableList<String>): RequestHeadersBuilder {
+    super.set(name, value)
+    return this
+  }
+
+  override fun remove(name: String): RequestHeadersBuilder {
+    super.remove(name)
+    return this
+  }
+
+  override fun internalSet(name: String, value: MutableList<String>): RequestHeadersBuilder {
+    super.internalSet(name, value)
+    return this
+  }
+
   /**
    * Add a retry policy to be used with this request.
    *
@@ -44,7 +64,7 @@ class RequestHeadersBuilder : HeadersBuilder {
    */
   fun addRetryPolicy(retryPolicy: RetryPolicy): RequestHeadersBuilder {
     for ((name, value) in retryPolicy.outboundHeaders()) {
-      set(name, value.toMutableList())
+      internalSet(name, value.toMutableList())
     }
 
     return this
@@ -59,7 +79,10 @@ class RequestHeadersBuilder : HeadersBuilder {
    */
   fun addUpstreamHttpProtocol(upstreamHttpProtocol: UpstreamHttpProtocol):
     RequestHeadersBuilder {
-      set("x-envoy-mobile-upstream-protocol", mutableListOf(upstreamHttpProtocol.stringValue))
+      internalSet(
+        "x-envoy-mobile-upstream-protocol",
+        mutableListOf(upstreamHttpProtocol.stringValue)
+      )
       return this
     }
 

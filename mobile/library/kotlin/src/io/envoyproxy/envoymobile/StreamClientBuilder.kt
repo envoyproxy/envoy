@@ -9,7 +9,10 @@ sealed class BaseConfiguration
 class Standard : BaseConfiguration()
 class Custom(val yaml: String) : BaseConfiguration()
 
-open class EnvoyClientBuilder(
+/**
+ * Builder used for creating new instances of a `StreamClient`.
+ */
+open class StreamClientBuilder(
   private val configuration: BaseConfiguration = Standard()
 ) {
   private var logLevel = LogLevel.INFO
@@ -32,7 +35,7 @@ open class EnvoyClientBuilder(
    *
    * @return this builder.
    */
-  fun addLogLevel(logLevel: LogLevel): EnvoyClientBuilder {
+  fun addLogLevel(logLevel: LogLevel): StreamClientBuilder {
     this.logLevel = logLevel
     return this
   }
@@ -44,7 +47,7 @@ open class EnvoyClientBuilder(
    *
    * @return this builder.
    */
-  fun addStatsDomain(statsDomain: String): EnvoyClientBuilder {
+  fun addStatsDomain(statsDomain: String): StreamClientBuilder {
     this.statsDomain = statsDomain
     return this
   }
@@ -56,7 +59,7 @@ open class EnvoyClientBuilder(
    *
    * @return this builder.
    */
-  fun addConnectTimeoutSeconds(connectTimeoutSeconds: Int): EnvoyClientBuilder {
+  fun addConnectTimeoutSeconds(connectTimeoutSeconds: Int): StreamClientBuilder {
     this.connectTimeoutSeconds = connectTimeoutSeconds
     return this
   }
@@ -68,7 +71,7 @@ open class EnvoyClientBuilder(
    *
    * @return this builder.
    */
-  fun addDNSRefreshSeconds(dnsRefreshSeconds: Int): EnvoyClientBuilder {
+  fun addDNSRefreshSeconds(dnsRefreshSeconds: Int): StreamClientBuilder {
     this.dnsRefreshSeconds = dnsRefreshSeconds
     return this
   }
@@ -81,7 +84,7 @@ open class EnvoyClientBuilder(
    *
    * @return this builder.
    */
-  fun addDNSFailureRefreshSeconds(base: Int, max: Int): EnvoyClientBuilder {
+  fun addDNSFailureRefreshSeconds(base: Int, max: Int): StreamClientBuilder {
     this.dnsFailureRefreshSecondsBase = base
     this.dnsFailureRefreshSecondsMax = max
     return this
@@ -94,7 +97,7 @@ open class EnvoyClientBuilder(
    *
    * @return this builder.
    */
-  fun addStatsFlushSeconds(statsFlushSeconds: Int): EnvoyClientBuilder {
+  fun addStatsFlushSeconds(statsFlushSeconds: Int): StreamClientBuilder {
     this.statsFlushSeconds = statsFlushSeconds
     return this
   }
@@ -106,7 +109,7 @@ open class EnvoyClientBuilder(
    *
    * @return this builder.
    */
-  fun addAppVersion(appVersion: String): EnvoyClientBuilder {
+  fun addAppVersion(appVersion: String): StreamClientBuilder {
     this.appVersion = appVersion
     return this
   }
@@ -118,7 +121,7 @@ open class EnvoyClientBuilder(
    *
    * @return this builder.
    */
-  fun addAppId(appId: String): EnvoyClientBuilder {
+  fun addAppId(appId: String): StreamClientBuilder {
     this.appId = appId
     return this
   }
@@ -130,7 +133,7 @@ open class EnvoyClientBuilder(
    *
    * @return this builder.
    */
-  fun addVirtualClusters(virtualClusters: String): EnvoyClientBuilder {
+  fun addVirtualClusters(virtualClusters: String): StreamClientBuilder {
     this.virtualClusters = virtualClusters
     return this
   }
@@ -140,13 +143,13 @@ open class EnvoyClientBuilder(
    *
    * @return A new instance of Envoy.
    */
-  fun build(): Envoy {
+  fun build(): StreamClient {
     return when (configuration) {
       is Custom -> {
-        return Envoy(engineType(), configuration.yaml, logLevel)
+        return EnvoyClient(engineType(), configuration.yaml, logLevel)
       }
       is Standard -> {
-        Envoy(
+        EnvoyClient(
           engineType(),
           EnvoyConfiguration(
             statsDomain, connectTimeoutSeconds,
@@ -164,7 +167,7 @@ open class EnvoyClientBuilder(
    *
    * A new instance of this engine will be created when `build()` is called.
    */
-  fun addEngineType(engineType: () -> EnvoyEngine): EnvoyClientBuilder {
+  fun addEngineType(engineType: () -> EnvoyEngine): StreamClientBuilder {
     this.engineType = engineType
     return this
   }

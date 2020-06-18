@@ -87,7 +87,8 @@ final class GRPCStreamTests: XCTestCase {
 
   func testHeadersCallbackPassesHeaders() {
     let expectation = self.expectation(description: "Closure is called")
-    let expectedHeaders = ResponseHeaders(headers: ["grpc-status": ["1"], "other": ["foo", "bar"]])
+    let expectedHeaders = ResponseHeaders(
+      headers: ["grpc-status": ["1"], "x-other": ["foo", "bar"]])
 
     var stream: MockStream!
     let streamClient = MockStreamClient { stream = $0 }
@@ -107,7 +108,7 @@ final class GRPCStreamTests: XCTestCase {
 
   func testTrailersCallbackPassesTrailers() {
     let expectation = self.expectation(description: "Closure is called")
-    let expectedTrailers = ResponseTrailers(headers: ["foo": ["bar"], "baz": ["1", "2"]])
+    let expectedTrailers = ResponseTrailers(headers: ["x-foo": ["bar"], "x-baz": ["1", "2"]])
 
     var stream: MockStream!
     let streamClient = MockStreamClient { stream = $0 }
@@ -188,7 +189,7 @@ final class GRPCStreamTests: XCTestCase {
 
   func testMessageCallbackCanBeCalledWithZeroLengthMessage() {
     let expectation = self.expectation(description: "Closure is called")
-    let firstMessage = Data([
+    let emptyMessage = Data([
       0x0, // Compression flag
       0x0, 0x0, 0x0, 0x0, // Length bytes
     ])
@@ -204,14 +205,14 @@ final class GRPCStreamTests: XCTestCase {
       }
       .start()
 
-    stream.receiveData(firstMessage, endStream: false)
+    stream.receiveData(emptyMessage, endStream: false)
     self.waitForExpectations(timeout: 0.1)
   }
 
   func testMessageCallbackCanBeCalledWithMessageAfterZeroLengthMessage() {
     let expectation = self.expectation(description: "Closure is called")
     expectation.expectedFulfillmentCount = 2
-    let firstMessage = Data([
+    let emptyMessage = Data([
       0x0, // Compression flag
       0x0, 0x0, 0x0, 0x0, // Length bytes
     ])
@@ -233,7 +234,7 @@ final class GRPCStreamTests: XCTestCase {
       }
       .start()
 
-    stream.receiveData(firstMessage, endStream: false)
+    stream.receiveData(emptyMessage, endStream: false)
     stream.receiveData(secondMessage, endStream: false)
     self.waitForExpectations(timeout: 0.1)
     XCTAssertTrue(expectedMessages.isEmpty)
