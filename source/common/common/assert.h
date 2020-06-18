@@ -193,7 +193,7 @@ bool shouldLogAndInvokeEnvoyBugForEnvoyBugMacroUseOnly(absl::string_view bug_nam
 #define _ENVOY_BUG_VERBOSE(X, Y) _ENVOY_BUG_IMPL(X, #X, ENVOY_BUG_ACTION, Y)
 
 /**
- * Indicate a efficient condition that should never be met in normal circumstances. In contrast
+ * Indicate a failure condition that should never be met in normal circumstances. In contrast
  * with ASSERT, an ENVOY_BUG is compiled in release mode. If a failure condition is met in release
  * mode, it is logged and a stat is incremented with exponential back-off per ENVOY_BUG. In debug
  * mode, it will crash if the condition is not met. ENVOY_BUG must be called with two arguments for
