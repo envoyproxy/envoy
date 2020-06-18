@@ -73,6 +73,7 @@ test_suite(
     name = "ci_tests",
     tests = [
         "http2_platform_api_test",
+        "quic_core_batch_writer_batch_writer_test_lib",
         "quic_platform_api_test",
         "quiche_common_test",
         "spdy_platform_api_test",
@@ -3942,7 +3943,10 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "quic_core_batch_writer_batch_writer_test",
-    srcs = ["quiche/quic/core/batch_writer/quic_batch_writer_test.cc"],
+    srcs = select({
+        "@envoy//bazel:linux": ["quiche/quic/core/batch_writer/quic_batch_writer_test.cc"],
+        "//conditions:default": [],
+    }),
     copts = quiche_copts,
     repository = "@envoy",
     tags = ["nofips"],
