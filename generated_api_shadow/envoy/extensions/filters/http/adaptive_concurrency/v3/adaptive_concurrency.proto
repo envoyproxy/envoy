@@ -5,7 +5,6 @@ package envoy.extensions.filters.http.adaptive_concurrency.v3;
 import "envoy/config/core/v3/base.proto";
 import "envoy/type/v3/percent.proto";
 
-import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 

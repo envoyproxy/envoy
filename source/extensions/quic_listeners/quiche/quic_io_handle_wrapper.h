@@ -78,11 +78,15 @@ public:
                                   socklen_t* optlen) override {
     return io_handle_.getOption(level, optname, optval, optlen);
   }
-  Api::SysCallIntResult getLocalAddress(sockaddr* address, socklen_t* addrlen) override {
-    return io_handle_.getLocalAddress(address, addrlen);
-  }
   Api::SysCallIntResult setBlocking(bool blocking) override {
     return io_handle_.setBlocking(blocking);
+  }
+  absl::optional<int> domain() override { return io_handle_.domain(); }
+  Network::Address::InstanceConstSharedPtr localAddress() override {
+    return io_handle_.localAddress();
+  }
+  Network::Address::InstanceConstSharedPtr peerAddress() override {
+    return io_handle_.peerAddress();
   }
 
 private:
