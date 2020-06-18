@@ -38,6 +38,11 @@ Is there a contract my HTTP filter must adhere to?
 Are there well-known headers that will appear in the given headers map of ``decodeHeaders()``?
 ----------------------------------------------------------------------------------------------
 
-Yes. The map must contain the following headers: ``Host``, ``Path`` (this might be omitted for
-CONNECT requests).
+The first filter of the decoding filter chain will have the following headers in the map:
+
+* ``Host``
+* ``Path`` (this might be omitted for CONNECT requests).
+
+Although these headers may be omitted by one of the filters on the decoding filter chain,
+they should be reinserted before the terminal filter is triggered.
 
