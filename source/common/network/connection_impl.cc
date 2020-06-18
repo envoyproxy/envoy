@@ -595,7 +595,7 @@ ConnectionImpl::unixSocketPeerCredentials() const {
   struct ucred ucred;
   socklen_t ucred_size = sizeof(ucred);
   int rc = socket_->getSocketOption(SOL_SOCKET, SO_PEERCRED, &ucred, &ucred_size).rc_;
-  if (rc == -1) {
+  if (SOCKET_FAILURE(rc)) {
     return absl::nullopt;
   }
 
@@ -756,7 +756,7 @@ void ClientConnectionImpl::connect() {
     // write will become ready.
     ASSERT(connecting_);
   } else {
-    ASSERT(result.rc_ == -1);
+    ASSERT(SOCKET_FAILURE(result.rc_));
 #ifdef WIN32
     // winsock2 connect returns EWOULDBLOCK if the socket is non-blocking and the connection
     // cannot be completed immediately. We do not check for EINPROGRESS as that error is for
