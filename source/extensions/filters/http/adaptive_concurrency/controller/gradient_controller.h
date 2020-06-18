@@ -3,6 +3,7 @@
 #include <chrono>
 #include <vector>
 
+#include "envoy/common/time.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.pb.h"
 #include "envoy/runtime/runtime.h"
@@ -210,11 +211,11 @@ class GradientController : public ConcurrencyController {
 public:
   GradientController(GradientControllerConfig config, Event::Dispatcher& dispatcher,
                      Runtime::Loader& runtime, const std::string& stats_prefix, Stats::Scope& scope,
-                     Runtime::RandomGenerator& random);
+                     Runtime::RandomGenerator& random, TimeSource& time_source);
 
   // ConcurrencyController.
   RequestForwardingAction forwardingDecision() override;
-  void recordLatencySample(std::chrono::nanoseconds rq_latency) override;
+  void recordLatencySample(MonotonicTime rq_send_time) override;
   void cancelLatencySample() override;
   uint32_t concurrencyLimit() const override { return concurrency_limit_.load(); }
 
@@ -238,6 +239,7 @@ private:
   Stats::Scope& scope_;
   GradientControllerStats stats_;
   Runtime::RandomGenerator& random_;
+  TimeSource& time_source_;
 
   // Protects data related to latency sampling and RTT values. In addition to protecting the latency
   // sample histogram, the mutex ensures that the minRTT calculation window and the sample window
@@ -273,6 +275,10 @@ private:
   // is used to determine whether the controller should trigger an additional minRTT measurement
   // after remaining at the minimum limit for too long.
   uint32_t consecutive_min_concurrency_set_ ABSL_GUARDED_BY(sample_mutation_mtx_);
+
+  // We will disregard sampling any requests admitted before this timestamp to prevent sampling
+  // requests admitted before the start of a minRTT window and potentially skewing the minRTT.
+  MonotonicTime min_rtt_epoch_;
 
   Event::TimerPtr min_rtt_calc_timer_;
   Event::TimerPtr sample_reset_timer_;

@@ -20,6 +20,7 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/scope_tracker.h"
 #include "common/common/utility.h"
+#include "common/config/utility.h"
 #include "common/grpc/common.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
@@ -493,8 +494,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       *callbacks_->streamInfo().filterState());
   std::unique_ptr<GenericConnPool> generic_conn_pool = createConnPool();
 
-  if (!generic_conn_pool->initialize(config_.cm_, *route_entry_,
-                                     callbacks_->streamInfo().protocol(), this)) {
+  if (!generic_conn_pool) {
     sendNoHealthyUpstreamResponse();
     return Http::FilterHeadersStatus::StopIteration;
   }
@@ -597,14 +597,19 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 }
 
 std::unique_ptr<GenericConnPool> Filter::createConnPool() {
+  GenericConnPoolFactory* factory = nullptr;
+  if (cluster_->upstreamConfig().has_value()) {
+    factory = &Envoy::Config::Utility::getAndCheckFactory<GenericConnPoolFactory>(
+        cluster_->upstreamConfig().value());
+  } else {
+    factory = &Envoy::Config::Utility::getAndCheckFactoryByName<GenericConnPoolFactory>(
+        "envoy.filters.connection_pools.http.generic");
+  }
   const bool should_tcp_proxy =
       route_entry_->connectConfig().has_value() &&
       downstream_headers_->getMethodValue() == Http::Headers::get().MethodValues.Connect;
-
-  if (should_tcp_proxy) {
-    return std::make_unique<TcpConnPool>();
-  }
-  return std::make_unique<HttpConnPool>();
+  return factory->createGenericConnPool(config_.cm_, should_tcp_proxy, *route_entry_,
+                                        callbacks_->streamInfo().protocol(), this);
 }
 
 void Filter::sendNoHealthyUpstreamResponse() {
@@ -1507,12 +1512,8 @@ void Filter::doRetry() {
   ASSERT(pending_retries_ > 0);
   pending_retries_--;
 
-  Upstream::HostDescriptionConstSharedPtr host;
-
   std::unique_ptr<GenericConnPool> generic_conn_pool = createConnPool();
-
-  if (!generic_conn_pool->initialize(config_.cm_, *route_entry_,
-                                     callbacks_->streamInfo().protocol(), this)) {
+  if (!generic_conn_pool) {
     sendNoHealthyUpstreamResponse();
     cleanup();
     return;

@@ -694,7 +694,12 @@ ClusterInfoImpl::ClusterInfoImpl(
       source_address_(getSourceAddress(config, bind_config)),
       lb_least_request_config_(config.least_request_lb_config()),
       lb_ring_hash_config_(config.ring_hash_lb_config()),
-      lb_original_dst_config_(config.original_dst_lb_config()), added_via_api_(added_via_api),
+      lb_original_dst_config_(config.original_dst_lb_config()),
+      upstream_config_(config.has_upstream_config()
+                           ? absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>(
+                                 config.upstream_config())
+                           : absl::nullopt),
+      added_via_api_(added_via_api),
       lb_subset_(LoadBalancerSubsetInfoImpl(config.lb_subset_config())),
       metadata_(config.metadata()), typed_metadata_(config.metadata()),
       common_lb_config_(config.common_lb_config()),

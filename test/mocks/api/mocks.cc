@@ -52,7 +52,7 @@ SysCallIntResult MockOsSysCalls::setsockopt(os_fd_t sockfd, int level, int optna
 
 SysCallIntResult MockOsSysCalls::getsockopt(os_fd_t sockfd, int level, int optname, void* optval,
                                             socklen_t* optlen) {
-  ASSERT(*optlen == sizeof(int));
+  ASSERT(*optlen == sizeof(int) || *optlen == sizeof(sockaddr_storage));
   int val = 0;
   const auto& it = boolsockopts_.find(SockOptKey(sockfd, level, optname));
   if (it != boolsockopts_.end()) {

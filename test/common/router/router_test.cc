@@ -5,6 +5,8 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+#include "envoy/extensions/upstreams/http/http/v3/http_connection_pool.pb.h"
+#include "envoy/extensions/upstreams/http/tcp/v3/tcp_connection_pool.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -174,9 +176,9 @@ public:
     }
 
     EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
-        .WillOnce(
-            Invoke([&](const std::string&, Upstream::ResourcePriority, auto,
-                       Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
+        .WillOnce(Invoke(
+            [&](const std::string&, Upstream::ResourcePriority, absl::optional<Http::Protocol>,
+                Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
               auto match = context->metadataMatchCriteria()->metadataMatchCriteria();
               EXPECT_EQ(match.size(), 2);
               auto it = match.begin();
@@ -207,7 +209,7 @@ public:
     router_.decodeHeaders(headers, true);
 
     // When the router filter gets reset we should cancel the pool request.
-    EXPECT_CALL(cancellable_, cancel());
+    EXPECT_CALL(cancellable_, cancel(_));
     router_.onDestroy();
   }
 
@@ -228,7 +230,7 @@ public:
     EXPECT_EQ(expected_count, atoi(std::string(headers.getEnvoyAttemptCountValue()).c_str()));
 
     // When the router filter gets reset we should cancel the pool request.
-    EXPECT_CALL(cancellable_, cancel());
+    EXPECT_CALL(cancellable_, cancel(_));
     router_.onDestroy();
     EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
     EXPECT_EQ(0U,
@@ -351,7 +353,7 @@ public:
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
-  Http::ConnectionPool::MockCancellable cancellable_;
+  Envoy::ConnectionPool::MockCancellable cancellable_;
   Http::ContextImpl http_context_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   MockShadowWriter* shadow_writer_;
@@ -409,7 +411,7 @@ TEST_F(RouterTest, UpdateServerNameFilterState) {
             stream_info.filterState()
                 ->getDataReadOnly<Network::UpstreamServerName>(Network::UpstreamServerName::key())
                 .value());
-  EXPECT_CALL(cancellable_, cancel());
+  EXPECT_CALL(cancellable_, cancel(_));
   router_.onDestroy();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(0U,
@@ -437,7 +439,7 @@ TEST_F(RouterTest, UpdateSubjectAltNamesFilterState) {
                         ->getDataReadOnly<Network::UpstreamSubjectAltNames>(
                             Network::UpstreamSubjectAltNames::key())
                         .value()[0]);
-  EXPECT_CALL(cancellable_, cancel());
+  EXPECT_CALL(cancellable_, cancel(_));
   router_.onDestroy();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(0U,
@@ -507,14 +509,7 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
 }
 
 TEST_F(RouterTest, Http1Upstream) {
-  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
-      .WillOnce(Invoke(
-          [this](const auto&, auto, auto protocol_cb, auto) -> Http::ConnectionPool::Instance* {
-            EXPECT_CALL(cm_.conn_pool_.host_->cluster_, upstreamHttpProtocol(_))
-                .WillOnce(Return(Http::Protocol::Http11));
-            EXPECT_EQ(Http::Protocol::Http11, protocol_cb(*cm_.conn_pool_.host_));
-            return &cm_.conn_pool_;
-          }));
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, absl::optional<Http::Protocol>(), _));
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();
 
@@ -526,7 +521,7 @@ TEST_F(RouterTest, Http1Upstream) {
   EXPECT_EQ("10", headers.get_("x-envoy-expected-rq-timeout-ms"));
 
   // When the router filter gets reset we should cancel the pool request.
-  EXPECT_CALL(cancellable_, cancel());
+  EXPECT_CALL(cancellable_, cancel(_));
   router_.onDestroy();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(0U,
@@ -537,14 +532,7 @@ TEST_F(RouterTest, Http1Upstream) {
 // x-envoy-original-path in the basic upstream test when Envoy header
 // suppression is configured.
 TEST_F(RouterTestSuppressEnvoyHeaders, Http1Upstream) {
-  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
-      .WillOnce(Invoke(
-          [this](const auto&, auto, auto protocol_cb, auto) -> Http::ConnectionPool::Instance* {
-            EXPECT_CALL(cm_.conn_pool_.host_->cluster_, upstreamHttpProtocol(_))
-                .WillOnce(Return(Http::Protocol::Http11));
-            EXPECT_EQ(Http::Protocol::Http11, protocol_cb(*cm_.conn_pool_.host_));
-            return &cm_.conn_pool_;
-          }));
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, absl::optional<Http::Protocol>(), _));
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();
 
@@ -555,7 +543,7 @@ TEST_F(RouterTestSuppressEnvoyHeaders, Http1Upstream) {
   EXPECT_FALSE(headers.has("x-envoy-expected-rq-timeout-ms"));
 
   // When the router filter gets reset we should cancel the pool request.
-  EXPECT_CALL(cancellable_, cancel());
+  EXPECT_CALL(cancellable_, cancel(_));
   router_.onDestroy();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(0U,
@@ -563,14 +551,7 @@ TEST_F(RouterTestSuppressEnvoyHeaders, Http1Upstream) {
 }
 
 TEST_F(RouterTest, Http2Upstream) {
-  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
-      .WillOnce(Invoke(
-          [this](const auto&, auto, auto protocol_cb, auto) -> Http::ConnectionPool::Instance* {
-            EXPECT_CALL(cm_.conn_pool_.host_->cluster_, upstreamHttpProtocol(_))
-                .WillOnce(Return(Http::Protocol::Http2));
-            EXPECT_EQ(Http::Protocol::Http2, protocol_cb(*cm_.conn_pool_.host_));
-            return &cm_.conn_pool_;
-          }));
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, absl::optional<Http::Protocol>(), _));
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();
 
@@ -580,7 +561,7 @@ TEST_F(RouterTest, Http2Upstream) {
   router_.decodeHeaders(headers, true);
 
   // When the router filter gets reset we should cancel the pool request.
-  EXPECT_CALL(cancellable_, cancel());
+  EXPECT_CALL(cancellable_, cancel(_));
   router_.onDestroy();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(0U,
@@ -594,7 +575,7 @@ TEST_F(RouterTest, HashPolicy) {
       .WillOnce(Return(absl::optional<uint64_t>(10)));
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
       .WillOnce(
-          Invoke([&](const std::string&, Upstream::ResourcePriority, auto,
+          Invoke([&](const std::string&, Upstream::ResourcePriority, absl::optional<Http::Protocol>,
                      Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
             EXPECT_EQ(10UL, context->computeHashKey().value());
             return &cm_.conn_pool_;
@@ -607,7 +588,7 @@ TEST_F(RouterTest, HashPolicy) {
   router_.decodeHeaders(headers, true);
 
   // When the router filter gets reset we should cancel the pool request.
-  EXPECT_CALL(cancellable_, cancel());
+  EXPECT_CALL(cancellable_, cancel(_));
   router_.onDestroy();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(0U,
@@ -621,7 +602,7 @@ TEST_F(RouterTest, HashPolicyNoHash) {
       .WillOnce(Return(absl::optional<uint64_t>()));
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, &router_))
       .WillOnce(
-          Invoke([&](const std::string&, Upstream::ResourcePriority, auto,
+          Invoke([&](const std::string&, Upstream::ResourcePriority, absl::optional<Http::Protocol>,
                      Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
             EXPECT_FALSE(context->computeHashKey());
             return &cm_.conn_pool_;
@@ -634,7 +615,7 @@ TEST_F(RouterTest, HashPolicyNoHash) {
   router_.decodeHeaders(headers, true);
 
   // When the router filter gets reset we should cancel the pool request.
-  EXPECT_CALL(cancellable_, cancel());
+  EXPECT_CALL(cancellable_, cancel(_));
   router_.onDestroy();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(0U,
@@ -663,7 +644,7 @@ TEST_F(RouterTest, AddCookie) {
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
       .WillOnce(
-          Invoke([&](const std::string&, Upstream::ResourcePriority, auto,
+          Invoke([&](const std::string&, Upstream::ResourcePriority, absl::optional<Http::Protocol>,
                      Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
             EXPECT_EQ(10UL, context->computeHashKey().value());
             return &cm_.conn_pool_;
@@ -715,7 +696,7 @@ TEST_F(RouterTest, AddCookieNoDuplicate) {
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
       .WillOnce(
-          Invoke([&](const std::string&, Upstream::ResourcePriority, auto,
+          Invoke([&](const std::string&, Upstream::ResourcePriority, absl::optional<Http::Protocol>,
                      Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
             EXPECT_EQ(10UL, context->computeHashKey().value());
             return &cm_.conn_pool_;
@@ -765,7 +746,7 @@ TEST_F(RouterTest, AddMultipleCookies) {
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
       .WillOnce(
-          Invoke([&](const std::string&, Upstream::ResourcePriority, auto,
+          Invoke([&](const std::string&, Upstream::ResourcePriority, absl::optional<Http::Protocol>,
                      Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
             EXPECT_EQ(10UL, context->computeHashKey().value());
             return &cm_.conn_pool_;
@@ -816,7 +797,7 @@ TEST_F(RouterTest, MetadataMatchCriteria) {
       .WillByDefault(Return(&callbacks_.route_->route_entry_.metadata_matches_criteria_));
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
       .WillOnce(
-          Invoke([&](const std::string&, Upstream::ResourcePriority, auto,
+          Invoke([&](const std::string&, Upstream::ResourcePriority, absl::optional<Http::Protocol>,
                      Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
             EXPECT_EQ(context->metadataMatchCriteria(),
                       &callbacks_.route_->route_entry_.metadata_matches_criteria_);
@@ -830,7 +811,7 @@ TEST_F(RouterTest, MetadataMatchCriteria) {
   router_.decodeHeaders(headers, true);
 
   // When the router filter gets reset we should cancel the pool request.
-  EXPECT_CALL(cancellable_, cancel());
+  EXPECT_CALL(cancellable_, cancel(_));
   router_.onDestroy();
 }
 
@@ -846,7 +827,7 @@ TEST_F(RouterTest, NoMetadataMatchCriteria) {
   ON_CALL(callbacks_.route_->route_entry_, metadataMatchCriteria()).WillByDefault(Return(nullptr));
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
       .WillOnce(
-          Invoke([&](const std::string&, Upstream::ResourcePriority, auto,
+          Invoke([&](const std::string&, Upstream::ResourcePriority, absl::optional<Http::Protocol>,
                      Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
             EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
             return &cm_.conn_pool_;
@@ -859,7 +840,7 @@ TEST_F(RouterTest, NoMetadataMatchCriteria) {
   router_.decodeHeaders(headers, true);
 
   // When the router filter gets reset we should cancel the pool request.
-  EXPECT_CALL(cancellable_, cancel());
+  EXPECT_CALL(cancellable_, cancel(_));
   router_.onDestroy();
 }
 
@@ -872,7 +853,7 @@ TEST_F(RouterTest, CancelBeforeBoundToPool) {
   router_.decodeHeaders(headers, true);
 
   // When the router filter gets reset we should cancel the pool request.
-  EXPECT_CALL(cancellable_, cancel());
+  EXPECT_CALL(cancellable_, cancel(_));
   router_.onDestroy();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(0U,
@@ -4080,7 +4061,7 @@ TEST_F(RouterTest, RetryTimeoutDuringRetryDelayWithUpstreamRequestNoHost) {
   response_decoder->decodeHeaders(std::move(response_headers1), true);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 
-  Http::ConnectionPool::MockCancellable cancellable;
+  Envoy::ConnectionPool::MockCancellable cancellable;
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::ResponseDecoder& decoder,
                            Http::ConnectionPool::Callbacks&) -> Http::ConnectionPool::Cancellable* {
@@ -4090,7 +4071,7 @@ TEST_F(RouterTest, RetryTimeoutDuringRetryDelayWithUpstreamRequestNoHost) {
   router_.retry_state_->callback_();
 
   // Fire timeout.
-  EXPECT_CALL(cancellable, cancel());
+  EXPECT_CALL(cancellable, cancel(_));
   EXPECT_CALL(callbacks_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::UpstreamRequestTimeout));
 
@@ -4136,7 +4117,7 @@ TEST_F(RouterTest, RetryTimeoutDuringRetryDelayWithUpstreamRequestNoHostAltRespo
   response_decoder->decodeHeaders(std::move(response_headers1), true);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 
-  Http::ConnectionPool::MockCancellable cancellable;
+  Envoy::ConnectionPool::MockCancellable cancellable;
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::ResponseDecoder& decoder,
                            Http::ConnectionPool::Callbacks&) -> Http::ConnectionPool::Cancellable* {
@@ -4146,7 +4127,7 @@ TEST_F(RouterTest, RetryTimeoutDuringRetryDelayWithUpstreamRequestNoHostAltRespo
   router_.retry_state_->callback_();
 
   // Fire timeout.
-  EXPECT_CALL(cancellable, cancel());
+  EXPECT_CALL(cancellable, cancel(_));
   EXPECT_CALL(callbacks_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::UpstreamRequestTimeout));
 
@@ -5881,7 +5862,7 @@ TEST_F(RouterTest, ApplicationProtocols) {
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
       .WillOnce(
-          Invoke([&](const std::string&, Upstream::ResourcePriority, auto,
+          Invoke([&](const std::string&, Upstream::ResourcePriority, absl::optional<Http::Protocol>,
                      Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
             Network::TransportSocketOptionsSharedPtr transport_socket_options =
                 context->upstreamTransportSocketOptions();
@@ -5902,7 +5883,7 @@ TEST_F(RouterTest, ApplicationProtocols) {
   router_.decodeHeaders(headers, true);
 
   // When the router filter gets reset we should cancel the pool request.
-  EXPECT_CALL(cancellable_, cancel());
+  EXPECT_CALL(cancellable_, cancel(_));
   router_.onDestroy();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(0U,
@@ -5944,6 +5925,14 @@ TEST_F(RouterTest, ConnectPauseAndResume) {
 
 // Verify that CONNECT payload is not sent upstream if non-200 response headers are received.
 TEST_F(RouterTest, ConnectPauseNoResume) {
+  // Explicitly configure an HTTP upstream, to test factory creation.
+  cm_.thread_local_cluster_.cluster_.info_->upstream_config_ =
+      absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>();
+  envoy::extensions::upstreams::http::http::v3::HttpConnectionPoolProto http_config;
+  cm_.thread_local_cluster_.cluster_.info_->upstream_config_.value()
+      .mutable_typed_config()
+      ->PackFrom(http_config);
+
   NiceMock<Http::MockRequestEncoder> encoder;
   Http::ResponseDecoder* response_decoder = nullptr;
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
@@ -5972,6 +5961,27 @@ TEST_F(RouterTest, ConnectPauseNoResume) {
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "400"}});
   response_decoder->decodeHeaders(std::move(response_headers), true);
+}
+
+TEST_F(RouterTest, ConnectExplicitTcpUpstream) {
+  // Explicitly configure an TCP upstream, to test factory creation.
+  cm_.thread_local_cluster_.cluster_.info_->upstream_config_ =
+      absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>();
+  envoy::extensions::upstreams::http::tcp::v3::TcpConnectionPoolProto tcp_config;
+  cm_.thread_local_cluster_.cluster_.info_->upstream_config_.value()
+      .mutable_typed_config()
+      ->PackFrom(tcp_config);
+  callbacks_.route_->route_entry_.connect_config_ =
+      absl::make_optional<RouteEntry::ConnectConfig>();
+
+  // Make sure newConnection is called on the TCP pool, not newStream on the HTTP pool.
+  EXPECT_CALL(cm_.tcp_conn_pool_, newConnection(_));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  headers.setMethod("CONNECT");
+  router_.decodeHeaders(headers, false);
+
+  router_.onDestroy();
 }
 
 class WatermarkTest : public RouterTest {

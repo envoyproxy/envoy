@@ -3,6 +3,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
+    "envoy_cc_test_binary",
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
@@ -105,6 +106,11 @@ py_binary(
 envoy_proto_library(
     name = "capture_fuzz_proto",
     srcs = [":capture_fuzz.proto"],
+)
+
+envoy_proto_library(
+    name = "h2_capture_fuzz_proto",
+    srcs = [":h2_capture_fuzz.proto"],
 )
 
 envoy_cc_test(
@@ -226,7 +232,32 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "drain_close_integration_test",
+    srcs = [
+        "drain_close_integration_test.cc",
+    ],
+    deps = [
+        ":http_protocol_integration_lib",
+        "//source/extensions/filters/http/health_check:config",
+        "//test/test_common:utility_lib",
+    ],
+)
+
 exports_files(["test_utility.sh"])
+
+envoy_cc_test_binary(
+    name = "hotrestart_main",
+    srcs = ["hotrestart_main.cc"],
+    external_deps = [
+        "abseil_symbolize",
+    ],
+    stamped = True,
+    deps = [
+        "//source/exe:envoy_main_common_lib",
+        "//source/exe:platform_impl_lib",
+    ],
+)
 
 envoy_sh_test(
     name = "hotrestart_test",
@@ -234,7 +265,7 @@ envoy_sh_test(
     srcs = envoy_select_hot_restart([
         "hotrestart_test.sh",
     ]),
-    cc_binary = ["//source/exe:envoy-static"],
+    cc_binary = [":hotrestart_main"],
     data = [
         "test_utility.sh",
         "//test/config/integration:server_config_files",
@@ -251,6 +282,23 @@ envoy_sh_test(
     data = [
         "test_utility.sh",
         "//test/config/integration:server_config_files",
+    ],
+)
+
+envoy_cc_test(
+    name = "alpn_selection_integration_test",
+    srcs = [
+        "alpn_selection_integration_test.cc",
+    ],
+    data = [
+        "//test/config/integration/certs",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
 
@@ -1106,6 +1154,69 @@ envoy_cc_fuzz_test(
     corpus = "h1_corpus",
     deps = [
         ":h1_fuzz_persistent_lib",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
+H2_FUZZ_LIB_DEPS = [
+    ":h2_capture_fuzz_proto_cc_proto",
+    ":http_integration_lib",
+    "//source/common/common:assert_lib",
+    "//source/common/common:logger_lib",
+    "//test/common/http/http2:http2_frame",
+    "//test/fuzz:fuzz_runner_lib",
+    "//test/fuzz:utility_lib",
+    "//test/integration:integration_lib",
+    "//test/test_common:environment_lib",
+]
+
+envoy_cc_test_library(
+    name = "h2_fuzz_lib",
+    srcs = ["h2_fuzz.cc"],
+    hdrs = ["h2_fuzz.h"],
+    deps = H2_FUZZ_LIB_DEPS,
+)
+
+envoy_cc_test_library(
+    name = "h2_fuzz_persistent_lib",
+    srcs = ["h2_fuzz.cc"],
+    hdrs = ["h2_fuzz.h"],
+    copts = ["-DPERSISTENT_FUZZER"],
+    deps = H2_FUZZ_LIB_DEPS,
+)
+
+envoy_cc_fuzz_test(
+    name = "h2_capture_fuzz_test",
+    srcs = ["h2_capture_fuzz_test.cc"],
+    corpus = "h2_corpus",
+    deps = [":h2_fuzz_lib"],
+)
+
+envoy_cc_fuzz_test(
+    name = "h2_capture_persistent_fuzz_test",
+    srcs = ["h2_capture_fuzz_test.cc"],
+    copts = ["-DPERSISTENT_FUZZER"],
+    corpus = "h2_corpus",
+    deps = [":h2_fuzz_persistent_lib"],
+)
+
+envoy_cc_fuzz_test(
+    name = "h2_capture_direct_response_fuzz_test",
+    srcs = ["h2_capture_direct_response_fuzz_test.cc"],
+    corpus = "h2_corpus",
+    deps = [
+        ":h2_fuzz_lib",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "h2_capture_direct_response_persistent_fuzz_test",
+    srcs = ["h2_capture_direct_response_fuzz_test.cc"],
+    copts = ["-DPERSISTENT_FUZZER"],
+    corpus = "h2_corpus",
+    deps = [
+        ":h2_fuzz_persistent_lib",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
