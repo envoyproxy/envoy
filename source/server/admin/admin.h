@@ -256,7 +256,7 @@ private:
       void setState(const std::string&, OverloadActionState) override {}
       OverloadTimerFactory getTimerFactory() override;
 
-      const OverloadActionState inactive_ = OverloadActionState::Inactive;
+      const OverloadActionState inactive_ = OverloadActionState::inactive();
       Event::Dispatcher& dispatcher_;
     };
 

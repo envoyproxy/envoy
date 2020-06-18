@@ -1,6 +1,7 @@
 #include "server/overload_manager_impl.h"
 
 #include "envoy/config/overload/v3/overload.pb.h"
+#include "envoy/server/overload_manager.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/fmt.h"
@@ -17,22 +18,25 @@ namespace Server {
 
 namespace {
 
-class ThresholdTriggerImpl : public OverloadAction::Trigger {
+class ThresholdTriggerImpl final : public OverloadAction::Trigger {
 public:
   ThresholdTriggerImpl(const envoy::config::overload::v3::ThresholdTrigger& config)
       : threshold_(config.value()) {}
 
   bool updateValue(double value) override {
-    const bool fired = isFired();
-    value_ = value;
-    return fired != isFired();
+    const OverloadActionState state = actionState();
+    state_ =
+        value >= threshold_ ? OverloadActionState::saturated() : OverloadActionState::inactive();
+    return state != actionState();
   }
 
-  bool isFired() const override { return value_.has_value() && value_ >= threshold_; }
+  OverloadActionState actionState() const override {
+    return state_.value_or(OverloadActionState::inactive());
+  }
 
 private:
   const double threshold_;
-  absl::optional<double> value_;
+  absl::optional<OverloadActionState> state_;
 };
 
 /**
@@ -46,17 +50,15 @@ public:
   const OverloadActionState& getState(const std::string& action) override {
     auto it = actions_.find(action);
     if (it == actions_.end()) {
-      it = actions_.insert(std::make_pair(action, OverloadActionState::Inactive)).first;
+      it = actions_.insert(std::make_pair(action, OverloadActionState::inactive())).first;
     }
     return it->second;
   }
 
   void setState(const std::string& action, OverloadActionState state) override {
-    auto it = actions_.find(action);
-    if (it == actions_.end()) {
-      actions_[action] = state;
-    } else {
-      it->second = state;
+    auto insert = actions_.emplace(action, state);
+    if (!insert.second) {
+      insert.first->second = state;
     }
   }
 
@@ -88,7 +90,8 @@ Stats::Gauge& makeGauge(Stats::Scope& scope, absl::string_view a, absl::string_v
 
 OverloadAction::OverloadAction(const envoy::config::overload::v3::OverloadAction& config,
                                Stats::Scope& stats_scope)
-    : active_gauge_(
+    : state_(OverloadActionState::inactive()),
+      active_gauge_(
           makeGauge(stats_scope, config.name(), "active", Stats::Gauge::ImportMode::Accumulate)) {
   for (const auto& trigger_config : config.triggers()) {
     TriggerPtr trigger;
@@ -111,26 +114,32 @@ OverloadAction::OverloadAction(const envoy::config::overload::v3::OverloadAction
 }
 
 bool OverloadAction::updateResourcePressure(const std::string& name, double pressure) {
-  const bool active = isActive();
+  const OverloadActionState old_state = getState();
 
   auto it = triggers_.find(name);
   ASSERT(it != triggers_.end());
-  if (it->second->updateValue(pressure)) {
-    if (it->second->isFired()) {
-      active_gauge_.set(1);
-      const auto result = fired_triggers_.insert(name);
-      ASSERT(result.second);
-    } else {
-      active_gauge_.set(0);
-      const auto result = fired_triggers_.erase(name);
-      ASSERT(result == 1);
-    }
+  if (!it->second->updateValue(pressure)) {
+    return false;
+  }
+  const auto trigger_new_state = it->second->actionState();
+  if (trigger_new_state == OverloadActionState::inactive()) {
+    active_gauge_.set(0);
+  } else if (trigger_new_state == OverloadActionState::saturated()) {
+    active_gauge_.set(1);
   }
 
-  return active != isActive();
+  {
+    OverloadActionState new_state = OverloadActionState::inactive();
+    for (auto& trigger : triggers_) {
+      new_state = std::max(new_state, trigger.second->actionState());
+    }
+    state_ = new_state;
+  }
+
+  return state_ != old_state;
 }
 
-bool OverloadAction::isActive() const { return !fired_triggers_.empty(); }
+OverloadActionState OverloadAction::getState() const { return state_; }
 
 OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::Scope& stats_scope,
                                          ThreadLocal::SlotAllocator& slot_allocator,
@@ -238,11 +247,9 @@ void OverloadManagerImpl::updateResourcePressure(const std::string& resource, do
                   auto action_it = actions_.find(action);
                   ASSERT(action_it != actions_.end());
                   if (action_it->second.updateResourcePressure(resource, pressure)) {
-                    const bool is_active = action_it->second.isActive();
-                    const auto state =
-                        is_active ? OverloadActionState::Active : OverloadActionState::Inactive;
+                    const auto state = action_it->second.getState();
                     ENVOY_LOG(info, "Overload action {} became {}", action,
-                              is_active ? "active" : "inactive");
+                              (state == OverloadActionState::saturated()) ? "active" : "inactive");
                     tls_->runOnAllThreads([this, action, state] {
                       tls_->getTyped<ThreadLocalOverloadStateImpl>().setState(action, state);
                     });

@@ -61,7 +61,7 @@ TEST_F(HeapShrinkerTest, ShrinkWhenTriggered) {
 
   Envoy::Stats::Counter& shrink_count =
       stats_.counter("overload.envoy.overload_actions.shrink_heap.shrink_count");
-  action_cb(Server::OverloadActionState::Active);
+  action_cb(Server::OverloadActionState::saturated());
   step();
   EXPECT_EQ(1, shrink_count.value());
 
@@ -77,7 +77,7 @@ TEST_F(HeapShrinkerTest, ShrinkWhenTriggered) {
   step();
   EXPECT_EQ(2, shrink_count.value());
 
-  action_cb(Server::OverloadActionState::Inactive);
+  action_cb(Server::OverloadActionState::inactive());
   step();
   step();
   EXPECT_EQ(2, shrink_count.value());

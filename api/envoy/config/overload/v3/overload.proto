@@ -50,7 +50,7 @@ message ThresholdTrigger {
       "envoy.config.overload.v2alpha.ThresholdTrigger";
 
   // If the resource pressure is greater than or equal to this value, the trigger
-  // will fire.
+  // will enter saturation.
   double value = 1 [(validate.rules).double = {lte: 1.0 gte: 0.0}];
 }
 

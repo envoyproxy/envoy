@@ -7,21 +7,48 @@
 #include "envoy/event/timer.h"
 #include "envoy/thread_local/thread_local.h"
 
+#include "absl/types/variant.h"
+
 #include "common/common/macros.h"
 #include "common/singleton/const_singleton.h"
 
 namespace Envoy {
 namespace Server {
 
-enum class OverloadActionState {
-  /**
-   * Indicates that an overload action is active because at least one of its triggers has fired.
-   */
-  Active,
-  /**
-   * Indicates that an overload action is inactive because none of its triggers have fired.
-   */
-  Inactive
+/**
+ * Tracks the state of an overload action. The state is a number between 0 and 1 that represents the
+ * level of saturation. The values are categorized in three groups:
+ * - Inactive (value = 0): indicates that an overload action is inactive because none of its
+ *   triggers have fired.
+ * - Scaling (0 < value < 1): indicates that an overload action is taking effect because at least
+ *   one of its triggers is partially active.
+ * - Saturated (value = 1): indicates that an overload action is active because at least one of its
+ *   triggers has reached saturation.
+ */
+struct OverloadActionState {
+
+  static OverloadActionState inactive() { return OverloadActionState(0); }
+
+  static OverloadActionState saturated() { return OverloadActionState(1.0); }
+
+  explicit constexpr OverloadActionState(double value)
+      : action_value(value < 0   ? 0
+                     : value > 1 ? 1
+                                 : value) {}
+                                 
+#define CMP_OPERATOR(OP)                                                                           \
+  bool operator OP(const OverloadActionState& other) const {                                       \
+    return action_value OP other.action_value;                                                     \
+  }
+  CMP_OPERATOR(==);
+  CMP_OPERATOR(!=);
+  CMP_OPERATOR(<);
+  CMP_OPERATOR(<=);
+  CMP_OPERATOR(>=);
+  CMP_OPERATOR(>);
+#undef CMP_OPERATOR
+
+  double action_value;
 };
 
 /**

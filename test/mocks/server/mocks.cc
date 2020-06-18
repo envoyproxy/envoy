@@ -92,7 +92,7 @@ MockHotRestart::MockHotRestart() : stats_allocator_(*symbol_table_) {
 MockHotRestart::~MockHotRestart() = default;
 
 MockThreadLocalOverloadState::MockThreadLocalOverloadState()
-    : disabled_state_(OverloadActionState::Inactive) {
+    : disabled_state_(OverloadActionState::inactive()) {
   ON_CALL(*this, getState).WillByDefault(ReturnRef(disabled_state_));
 }
 
