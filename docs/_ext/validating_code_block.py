@@ -38,7 +38,7 @@ class ValidatingCodeBlock(CodeBlock):
       args = [
           'bazel-bin/tools/config_validation/validate_fragment',
           self.options.get('type-name'), '-s', '\n'.join(self.content)
-      ]  
+      ]
       process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
       stdout, stderr = process.communicate()
       if process.poll():
