@@ -161,40 +161,27 @@ HttpGenericBodyMatcher::HttpGenericBodyMatcher(
 
 void HttpGenericBodyMatcher::onBody(const Buffer::Instance& data, MatchStatusVector& statuses) {
   // Get the context associated with this stream.
-  // auto ctx = static_cast<HttpGenericBodyMatcherCtx*>(statuses[my_index_].ctx_.get());
   HttpGenericBodyMatcherCtx* ctx =
       static_cast<HttpGenericBodyMatcherCtx*>(statuses[my_index_].ctx_.get());
-  if (((0 != limit_) && (limit_ == ctx->processed_bytes_)) || (ctx->patterns_.empty())) {
+
+  if (statuses[my_index_].might_change_status_ == false) {
     // End of search limit has been already reached or all patterns have been found.
     // Status is not going to change.
-    ASSERT(statuses[my_index_].might_change_status_ == false);
+    ASSERT(((0 != limit_) && (limit_ == ctx->processed_bytes_)) || (ctx->patterns_.empty()));
     return;
   }
 
   // Iterate through all patterns to be found and check if they are located across body
   // chunks: part of the pattern was in previous body chunk and remaining of the pattern
-  // is in the current body chunk.
-  if (!ctx->overlap_.empty()) {
-    auto it = ctx->patterns_.begin();
-    while (it != ctx->patterns_.end()) {
-      const auto& pattern = *it;
-      if (locatePatternAcrossChunks(pattern, data, ctx)) {
-        // Pattern found. Remove it from the list of patterns to be found.
-        // If it was the last one of the patterns to be found update
-        // matcher's state.
-        it = ctx->patterns_.erase(it);
-      } else {
-        it++;
-      }
-    }
-  }
-
-  // Iterate through all patterns to be found and try to find them in the current body
-  // chunk.
-  auto search_limit = limit_ - ctx->processed_bytes_;
-  for (auto it = ctx->patterns_.begin(); it != ctx->patterns_.end();) {
-    if (-1 != data.search(static_cast<const void*>(it->data()), it->length(), 0, search_limit)) {
-      // Pattern found. Remove it from list of patterns to be located.
+  // is in the current body chunk on in the current body chunk.
+  auto body_search_limit = limit_ - ctx->processed_bytes_;
+  auto it = ctx->patterns_.begin();
+  while (it != ctx->patterns_.end()) {
+    const auto& pattern = *it;
+    if ((!ctx->overlap_.empty() && (locatePatternAcrossChunks(pattern, data, ctx))) ||
+        (-1 !=
+         data.search(static_cast<const void*>(it->data()), it->length(), 0, body_search_limit))) {
+      // Pattern found. Remove it from the list of patterns to be found.
       it = ctx->patterns_.erase(it);
     } else {
       it++;
@@ -208,7 +195,7 @@ void HttpGenericBodyMatcher::onBody(const Buffer::Instance& data, MatchStatusVec
     return;
   }
 
-  // Check if next body chunks should be searched for patterns. It the search limit
+  // Check if next body chunks should be searched for patterns. If the search limit
   // ends on the current body chunk, there is no need to check next chunks.
   if (0 != limit_) {
     ctx->processed_bytes_ = std::min(uint64_t(limit_), ctx->processed_bytes_ + data.length());
@@ -220,37 +207,7 @@ void HttpGenericBodyMatcher::onBody(const Buffer::Instance& data, MatchStatusVec
     }
   }
 
-  // The matcher buffers the last seen X bytes where X is equal to the length of the
-  // longest pattern - 1. With the arrival of the new 'data' the following situations
-  // are possible:
-  // 1. The new data's length is larger or equal to X. In this case just copy last X bytes
-  // from the data to overlap_ buffer.
-  // 2. The new data length is smaller than X and there enough room in overlap buffer to just copy
-  // the bytes from data.
-  // 3. The new data length is smaller than X and there is not enough room in overlap buffer.
-  if (data.length() >= ctx->overlap_.capacity()) {
-    // Case 1:
-    // Just overwrite the entire overlap_ buffer with new data.
-    ctx->overlap_.resize(overlap_size_);
-    data.copyOut(data.length() - overlap_size_, overlap_size_, ctx->overlap_.data());
-  } else {
-    if (data.length() <= (overlap_size_ - ctx->overlap_.size())) {
-      // Case 2. Just add the new data on top of already buffered.
-      const auto size = ctx->overlap_.size();
-      ctx->overlap_.resize(ctx->overlap_.size() + data.length());
-      data.copyOut(0, data.length(), ctx->overlap_.data() + size);
-    } else {
-      // Case 3. First shift data to make room for new data and then copy
-      // entire new buffer.
-      const size_t shift = ctx->overlap_.size() - (overlap_size_ - data.length());
-      for (size_t i = 0; i < (ctx->overlap_.size() - shift); i++) {
-        ctx->overlap_[i] = ctx->overlap_[i + shift];
-      }
-      const auto size = ctx->overlap_.size();
-      ctx->overlap_.resize(overlap_size_);
-      data.copyOut(0, data.length(), ctx->overlap_.data() + (size - shift));
-    }
-  }
+  bufferLastBytes(data, ctx);
 }
 
 // Here we handle a situation when a pattern is spread across multiple body buffers.
@@ -286,6 +243,43 @@ bool HttpGenericBodyMatcher::locatePatternAcrossChunks(const std::string& patter
     return false;
   }
   return ((pattern_remainder.length() <= data.length()) && data.startsWith(pattern_remainder));
+}
+
+// Method buffers last bytes from the currently processed body in overlap_.
+// This is required to find patterns which spans across multiple body chunks.
+void HttpGenericBodyMatcher::bufferLastBytes(const Buffer::Instance& data,
+                                             HttpGenericBodyMatcherCtx* ctx) {
+  // The matcher buffers the last seen X bytes where X is equal to the length of the
+  // longest pattern - 1. With the arrival of the new 'data' the following situations
+  // are possible:
+  // 1. The new data's length is larger or equal to X. In this case just copy last X bytes
+  // from the data to overlap_ buffer.
+  // 2. The new data length is smaller than X and there is enough room in overlap buffer to just
+  // copy the bytes from data.
+  // 3. The new data length is smaller than X and there is not enough room in overlap buffer.
+  if (data.length() >= ctx->overlap_.capacity()) {
+    // Case 1:
+    // Just overwrite the entire overlap_ buffer with new data.
+    ctx->overlap_.resize(overlap_size_);
+    data.copyOut(data.length() - overlap_size_, overlap_size_, ctx->overlap_.data());
+  } else {
+    if (data.length() <= (overlap_size_ - ctx->overlap_.size())) {
+      // Case 2. Just add the new data on top of already buffered.
+      const auto size = ctx->overlap_.size();
+      ctx->overlap_.resize(ctx->overlap_.size() + data.length());
+      data.copyOut(0, data.length(), ctx->overlap_.data() + size);
+    } else {
+      // Case 3. First shift data to make room for new data and then copy
+      // entire new buffer.
+      const size_t shift = ctx->overlap_.size() - (overlap_size_ - data.length());
+      for (size_t i = 0; i < (ctx->overlap_.size() - shift); i++) {
+        ctx->overlap_[i] = ctx->overlap_[i + shift];
+      }
+      const auto size = ctx->overlap_.size();
+      ctx->overlap_.resize(overlap_size_);
+      data.copyOut(0, data.length(), ctx->overlap_.data() + (size - shift));
+    }
+  }
 }
 
 } // namespace Tap

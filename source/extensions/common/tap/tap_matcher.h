@@ -400,6 +400,7 @@ protected:
   }
   bool locatePatternAcrossChunks(const std::string& pattern, const Buffer::Instance& data,
                                  const HttpGenericBodyMatcherCtx* ctx);
+  void bufferLastBytes(const Buffer::Instance& data, HttpGenericBodyMatcherCtx* ctx);
 
 private:
   // The following fields are initialized based on matcher config and are used
