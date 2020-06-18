@@ -41,4 +41,5 @@ HTTP filters
 .. toctree::
   :hidden:
 
+  ../../../api-v3/extensions/filters/http/admission_control/v3alpha/admission_control.proto
   ../../../api-v3/extensions/filters/http/cache/v3alpha/cache.proto

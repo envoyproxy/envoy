@@ -38,7 +38,7 @@ quic::QuicSocketAddress envoyAddressInstanceToQuicSocketAddress(
 // The returned header map has all keys in lower case.
 template <class T>
 std::unique_ptr<T> quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_list) {
-  auto headers = std::make_unique<T>();
+  auto headers = T::create();
   for (const auto& entry : header_list) {
     // TODO(danzh): Avoid copy by referencing entry as header_list is already validated by QUIC.
     headers->addCopy(Http::LowerCaseString(entry.first), entry.second);
@@ -48,7 +48,7 @@ std::unique_ptr<T> quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_
 
 template <class T>
 std::unique_ptr<T> spdyHeaderBlockToEnvoyHeaders(const spdy::SpdyHeaderBlock& header_block) {
-  auto headers = std::make_unique<T>();
+  auto headers = T::create();
   for (auto entry : header_block) {
     // TODO(danzh): Avoid temporary strings and addCopy() with std::string_view.
     std::string key(entry.first);
