@@ -316,7 +316,7 @@ static_resources:
 // TODO(fredlas) set_node_on_first_message_only was true; the delta+SotW unification
 //               work restores it here. (moved from ads_integration.h)
 std::string ConfigHelper::adsBootstrap(const std::string& api_type,
-                                       const std::string& api_version) {
+                                       envoy::config::core::v3::ApiVersion api_version) {
   // Note: do not use CONSTRUCT_ON_FIRST_USE here!
   return fmt::format(R"EOF(
 dynamic_resources:
@@ -354,7 +354,9 @@ admin:
       address: 127.0.0.1
       port_value: 0
 )EOF",
-                     api_type, api_version, TestEnvironment::nullDevicePath());
+                                api_type,
+                                api_version == envoy::config::core::v3::ApiVersion::V2 ? "V2" : "V3",
+                                TestEnvironment::nullDevicePath());
 }
 
 // TODO(samflattery): bundle this up with buildCluster

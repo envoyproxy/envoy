@@ -25,7 +25,7 @@ AdsIntegrationTest::AdsIntegrationTest(const envoy::config::core::v3::ApiVersion
           Http::CodecClient::Type::HTTP2, ipVersion(),
           ConfigHelper::adsBootstrap(
               sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC",
-              api_version == envoy::config::core::v3::ApiVersion::V2 ? "V2" : "V3")) {
+              api_version)) {
   use_lds_ = false;
   create_xds_upstream_ = true;
   tls_xds_upstream_ = true;

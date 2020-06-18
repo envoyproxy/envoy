@@ -100,7 +100,7 @@ public:
   // api_type should be REST, GRPC, or DELTA_GRPC.
   static std::string discoveredClustersBootstrap(const std::string& api_type);
   static std::string adsBootstrap(const std::string& api_type,
-                                  const std::string& api_version = "V3");
+                                  envoy::config::core::v3::ApiVersion api_version);
   // Builds a standard Cluster config fragment, with a single endpoint (at address:port).
   static envoy::config::cluster::v3::Cluster buildStaticCluster(const std::string& name, int port,
                                                                 const std::string& address);
