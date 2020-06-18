@@ -386,12 +386,7 @@ public:
       return H::combine(std::move(h), absl::string_view());
     }
 
-    // Casts the raw data as a string_view. Note that this string_view will not
-    // be in human-readable form, but it will be compatible with a string-view
-    // hasher.
-    const char* cdata = reinterpret_cast<const char*>(stat_name.data());
-    absl::string_view data_as_string_view = absl::string_view(cdata, stat_name.dataSize());
-    return H::combine(std::move(h), data_as_string_view);
+    return H::combine(std::move(h), stat_name.dataAsStringView());
   }
 
   /**
@@ -403,8 +398,7 @@ public:
   uint64_t hash() const { return absl::Hash<StatName>()(*this); }
 
   bool operator==(const StatName& rhs) const {
-    const uint64_t sz = dataSize();
-    return sz == rhs.dataSize() && memcmp(data(), rhs.data(), sz * sizeof(uint8_t)) == 0;
+    return dataAsStringView() == rhs.dataAsStringView();
   }
   bool operator!=(const StatName& rhs) const { return !(*this == rhs); }
 
@@ -452,6 +446,9 @@ public:
    * @return A pointer to the first byte of data (skipping over size bytes).
    */
   const uint8_t* data() const {
+    if (size_and_data_ == nullptr) {
+      return nullptr;
+    }
     return size_and_data_ + SymbolTableImpl::Encoding::encodingSizeBytes(dataSize());
   }
 
@@ -463,6 +460,15 @@ public:
   bool empty() const { return size_and_data_ == nullptr || dataSize() == 0; }
 
 private:
+  /**
+   * Casts the raw data as a string_view. Note that this string_view will not
+   * be in human-readable form, but it will be compatible with a string-view
+   * hasher and comparator.
+   */
+  absl::string_view dataAsStringView() const {
+    return {reinterpret_cast<const char*>(data()), dataSize()};
+  }
+
   const uint8_t* size_and_data_{nullptr};
 };
 
