@@ -283,7 +283,7 @@ Driver::Driver(const envoy::config::trace::v3::OpenCensusConfig& oc_config,
       auto channel = Envoy::Grpc::GoogleGrpcUtils::createChannel(stackdriver_service, api);
       opts.trace_service_stub = ::google::devtools::cloudtrace::v2::TraceService::NewStub(channel);
 #else
-      throw EnvoyException("Opencensus tracer: cannot handle stackdriver grpc option, google grpc is not built.");
+      throw EnvoyException("Opencensus tracer: cannot handle stackdriver grpc option, google grpc is not built in.");
 #endif
     }
     ::opencensus::exporters::trace::StackdriverExporter::Register(std::move(opts));
@@ -306,7 +306,7 @@ Driver::Driver(const envoy::config::trace::v3::OpenCensusConfig& oc_config,
       opts.trace_service_stub =
           ::opencensus::proto::agent::trace::v1::TraceService::NewStub(channel);
 #else
-      throw EnvoyException("Opencensus tracer: cannot handle stackdriver grpc option, google grpc is not built.");
+      throw EnvoyException("Opencensus tracer: cannot handle stackdriver grpc option, google grpc is not built in.");
 #endif
     }
     opts.service_name = local_info_.clusterName();
