@@ -9,6 +9,13 @@ public final class MockStreamClient: NSObject {
   /// Typically, this is used to capture streams on creation before sending values through them.
   public var onStartStream: ((MockStream) -> Void)?
 
+  // Only explicitly implemented to work around a swiftinterface issue in Swift 5.1. This can be
+  // removed once envoy is only built with Swift 5.2+
+  public override init() {
+    self.onStartStream = nil
+    super.init()
+  }
+
   /// Initialize a new instance of the stream client.
   ///
   /// - parameter onStartStream: Closure that may be set to observe the creation of new streams.
