@@ -100,7 +100,7 @@ jobs:
           managedAgent: false
           ciTarget: bazel.coverage
           rbe: false
-          bazelBuildExtraOptions: "--test_env=ENVOY_IP_TEST_VERSIONS=v4only"
+          bazelBuildExtraOptions: "--test_env=ENVOY_IP_TEST_VERSIONS=v4only --local_test_jobs=HOST_CPUS*.7"
 
       - script: ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /source/generated/coverage coverage'
         displayName: "Upload Report to GCS"
