@@ -274,74 +274,6 @@ typed_config:
   }
 }
 
-// Add a health check filter and verify correct behavior when draining.
-TEST_P(ProtocolIntegrationTest, DrainCloseGradual) {
-  // The probability of drain close increases over time. With a high timeout,
-  // the probability will be very low, but the rapid retries prevent this from
-  // increasing total test time.
-  drain_time_ = std::chrono::seconds(100);
-  config_helper_.addFilter(ConfigHelper::defaultHealthCheckFilter());
-  initialize();
-
-  absl::Notification drain_sequence_started;
-  test_server_->server().dispatcher().post([this, &drain_sequence_started]() {
-    test_server_->drainManager().startDrainSequence([] {});
-    drain_sequence_started.Notify();
-  });
-  drain_sequence_started.WaitForNotification();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  EXPECT_FALSE(codec_client_->disconnected());
-
-  IntegrationStreamDecoderPtr response;
-  while (!test_server_->counter("http.config_test.downstream_cx_drain_close")->value()) {
-    response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-    response->waitForEndStream();
-  }
-  EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_drain_close")->value(), 1L);
-
-  ASSERT_TRUE(codec_client_->waitForDisconnect());
-  EXPECT_TRUE(response->complete());
-
-  EXPECT_EQ("200", response->headers().getStatusValue());
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP2) {
-    EXPECT_TRUE(codec_client_->sawGoAway());
-  } else {
-    EXPECT_EQ("close", response->headers().getConnectionValue());
-  }
-}
-
-TEST_P(ProtocolIntegrationTest, DrainCloseImmediate) {
-  drain_strategy_ = Server::DrainStrategy::Immediate;
-  drain_time_ = std::chrono::seconds(100);
-  config_helper_.addFilter(ConfigHelper::defaultHealthCheckFilter());
-  initialize();
-
-  absl::Notification drain_sequence_started;
-  test_server_->server().dispatcher().post([this, &drain_sequence_started]() {
-    test_server_->drainManager().startDrainSequence([] {});
-    drain_sequence_started.Notify();
-  });
-  drain_sequence_started.WaitForNotification();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  EXPECT_FALSE(codec_client_->disconnected());
-
-  IntegrationStreamDecoderPtr response;
-  response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  response->waitForEndStream();
-
-  ASSERT_TRUE(codec_client_->waitForDisconnect());
-  EXPECT_TRUE(response->complete());
-
-  EXPECT_EQ("200", response->headers().getStatusValue());
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP2) {
-    EXPECT_TRUE(codec_client_->sawGoAway());
-  } else {
-    EXPECT_EQ("close", response->headers().getConnectionValue());
-  }
-}
-
 // Regression test for https://github.com/envoyproxy/envoy/issues/9873
 TEST_P(ProtocolIntegrationTest, ResponseWithHostHeader) {
   initialize();
@@ -1522,9 +1454,9 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyTrailerHeaders) {
             max_request_headers_count_);
       });
 
-  Http::RequestTrailerMapImpl request_trailers;
+  auto request_trailers = Http::RequestTrailerMapImpl::create();
   for (int i = 0; i < 20000; i++) {
-    request_trailers.addCopy(Http::LowerCaseString(std::to_string(i)), "");
+    request_trailers->addCopy(Http::LowerCaseString(std::to_string(i)), "");
   }
 
   initialize();
@@ -1536,7 +1468,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyTrailerHeaders) {
                                                                  {":authority", "host"}});
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
-  codec_client_->sendTrailers(*request_encoder_, request_trailers);
+  codec_client_->sendTrailers(*request_encoder_, *request_trailers);
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(default_response_headers_, true);
   response->waitForEndStream();
