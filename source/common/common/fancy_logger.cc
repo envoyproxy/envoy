@@ -84,15 +84,17 @@ spdlog::sink_ptr getSink() {
 const char* LOG_PATTERN = "[%Y-%m-%d %T.%e][%t][%l][%n] %v";
 
 /**
- * Update logger when outdated.
+ * Init logger in global linked list.
  */
-void updateFancyLogger(const char* file, spdlog::logger* logger, std::atomic<int>* local_epoch) {
-  absl::ReaderMutexLock l(&fancy_log_lock__);
-  if (!global_epoch__) {
-    initFancyGlobalEpoch();
-  }
-  const FancyLogInfo* entry = findFancyInfo(fancy_log_list__, file);
-  if (!entry) {
+void initFancyLogger(const char* file, spdlog::logger* logger, std::atomic<int>* local_epoch) {
+    absl::WriterMutexLock l(&fancy_log_lock__);
+    const FancyLogInfo* entry = findFancyInfo( fancy_log_list__, file);
+    if (entry) {
+        local_epoch->store(0);
+        logger->set_level(entry->level);
+        return;
+    }
+
     FancyLogInfo* new_entry = new FancyLogInfo;
     new_entry->file = std::string(file);
     new_entry->level = level_enum::info;
@@ -101,9 +103,25 @@ void updateFancyLogger(const char* file, spdlog::logger* logger, std::atomic<int
 
     local_epoch->store(0);
     logger->set_level(new_entry->level);
+}
+
+/**
+ * Update logger when outdated.
+ */
+void updateFancyLogger(const char* file, spdlog::logger* logger, std::atomic<int>* local_epoch) {
+  fancy_log_lock__.ReaderLock();
+  if (!global_epoch__) {
+    initFancyGlobalEpoch();
+  }
+  const FancyLogInfo* entry = findFancyInfo(fancy_log_list__, file);
+  if (!entry) {
+    fancy_log_lock__.ReaderUnlock();
+    initFancyLogger(file, logger, local_epoch);
+    
   } else {
     local_epoch->store(global_epoch__->load(std::memory_order_relaxed));
     logger->set_level(entry->level);
+    fancy_log_lock__.ReaderUnlock();
   }
   logger->set_pattern(LOG_PATTERN);
   logger->flush_on(level_enum::critical);
