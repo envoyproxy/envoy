@@ -62,6 +62,7 @@ using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::NiceMock;
+using testing::Property;
 using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
@@ -6047,6 +6048,35 @@ TEST_F(HttpConnectionManagerImplTest, NewConnection) {
   EXPECT_EQ(Network::FilterStatus::StopIteration, conn_manager_->onNewConnection());
   EXPECT_EQ(1U, stats_.named_.downstream_cx_http3_total_.value());
   EXPECT_EQ(1U, stats_.named_.downstream_cx_http3_active_.value());
+}
+
+TEST_F(HttpConnectionManagerImplTest, UpstreamHeadersSize) {
+  setup(false, "");
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
+    RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{
+        new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+    decoder->decodeHeaders(std::move(headers), true);
+    return Http::okStatus();
+  }));
+
+  setupFilterChain(1, 0);
+
+  std::shared_ptr<Upstream::MockClusterInfo> cluster_info{
+      new NiceMock<Upstream::MockClusterInfo>()};
+
+  EXPECT_CALL(*decoder_filters_[0]->callbacks_, clusterInfo())
+      .WillByDefault(ReturnRef(cluster_info));
+  EXPECT_CALL(cluster_info->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_headers_size"),
+                                      _)); // TODO: put exact headers size value
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  EXPECT_EQ(
+      Stats::Histogram::Unit::Bytes,
+      decoder_filters_[0]->callbacks_->clusterInfo()->stats().upstream_rq_headers_size_.unit());
 }
 
 TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponseUsingHttp3) {
