@@ -83,14 +83,14 @@ void GrpcClientImpl::onSuccess(
   Http::ResponseHeaderMapPtr response_headers_to_add;
   Http::RequestHeaderMapPtr request_headers_to_add;
   if (!response->response_headers_to_add().empty()) {
-    response_headers_to_add = std::make_unique<Http::ResponseHeaderMapImpl>();
+    response_headers_to_add = Http::ResponseHeaderMapImpl::create();
     for (const auto& h : response->response_headers_to_add()) {
       response_headers_to_add->addCopy(Http::LowerCaseString(h.key()), h.value());
     }
   }
 
   if (!response->request_headers_to_add().empty()) {
-    request_headers_to_add = std::make_unique<Http::RequestHeaderMapImpl>();
+    request_headers_to_add = Http::RequestHeaderMapImpl::create();
     for (const auto& h : response->request_headers_to_add()) {
       request_headers_to_add->addCopy(Http::LowerCaseString(h.key()), h.value());
     }

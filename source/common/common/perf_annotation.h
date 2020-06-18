@@ -117,7 +117,14 @@ private:
    */
   PerfAnnotationContext();
 
-  using CategoryDescription = std::pair<std::string, std::string>;
+  struct CategoryDescription {
+    std::string category;
+    std::string description;
+
+    bool operator==(const CategoryDescription& other) const {
+      return category == other.category && description == other.description;
+    }
+  };
 
   struct DurationStats {
     std::chrono::nanoseconds total_{0};
@@ -128,7 +135,7 @@ private:
 
   struct Hash {
     size_t operator()(const CategoryDescription& a) const {
-      return std::hash<std::string>()(a.first) + 13 * std::hash<std::string>()(a.second);
+      return std::hash<std::string>()(a.category) + 13 * std::hash<std::string>()(a.description);
     }
   };
 
