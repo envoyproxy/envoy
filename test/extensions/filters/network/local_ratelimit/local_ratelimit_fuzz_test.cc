@@ -46,6 +46,7 @@ DEFINE_PROTO_FUZZER(
     // TODO:
     // protoc-gen-validate has an issue on type "Duration" which may generate interval with seconds
     // > 0 while "nanos" < 0. And negative "nanos" will cause validation inside the filter to fail.
+    // see https://github.com/envoyproxy/protoc-gen-validate/issues/348 for detail.
     ENVOY_LOG_MISC(debug, "In fill_interval, nanos should not be negative!");
     return;
   }
