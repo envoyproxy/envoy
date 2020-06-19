@@ -279,7 +279,6 @@ TEST_F(PostgresFilterTest, QueryMessageMetadata) {
   setMetadata();
 
   // Disable creating parsing SQL and creating metadata.
-  static_cast<DecoderImpl*>(filter_->getDecoder())->setParseSql(false);
   filter_->getConfig()->enable_sql_parsing_ = false;
   createPostgresMsg(data_, "Q", "SELECT * FROM whatever");
   filter_->onData(data_, false);
@@ -291,7 +290,6 @@ TEST_F(PostgresFilterTest, QueryMessageMetadata) {
   ASSERT_THAT(filter_->getStats().queries_parsed_.value(), 0);
 
   // Now enable SQL parsing and creating metadata.
-  static_cast<DecoderImpl*>(filter_->getDecoder())->setParseSql(true);
   filter_->getConfig()->enable_sql_parsing_ = true;
   filter_->onData(data_, false);
 

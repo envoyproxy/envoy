@@ -109,3 +109,4 @@ SQL statement was parsed successfully and metadata was created. The metadata is 
   <table.db>, string, The resource name in *table.db* format.
   [], list, A list of strings representing the operations executed on the resource. Operations can be one of insert/update/select/drop/delete/create/alter/show.
 
+Parsing SQL statements and emitting metadata can be disabled by setting :ref:`enable_sql_parsing<envoy_v3_api_field_extensions.filters.network.postgres_proxy.v3alpha.PostgresProxy.enable_sql_parsing>` to false.

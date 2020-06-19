@@ -15,6 +15,7 @@ The following Envoy filters emit dynamic metadata that other filters can leverag
 
 * :ref:`Mongo Proxy Filter <config_network_filters_mongo_proxy_dynamic_metadata>`
 * :ref:`MySQL Proxy Filter <config_network_filters_mysql_proxy_dynamic_metadata>`
+* :ref:`Postgres Proxy Filter <config_network_filters_postgres_proxy_dynamic_metadata>`
 * :ref:`Role Based Access Control (RBAC) Filter <config_http_filters_rbac_dynamic_metadata>`
 * :ref:`Role Based Access Control (RBAC) Network Filter <config_network_filters_rbac_dynamic_metadata>`
 * :ref:`ZooKeeper Proxy Filter <config_network_filters_zookeeper_proxy_dynamic_metadata>`
