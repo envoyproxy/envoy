@@ -35,7 +35,8 @@ Network::FilterFactoryCb RateLimitConfigFactory::createFilterFactoryFromProtoTyp
         filter_config,
 
         Filters::Common::RateLimit::rateLimitClient(
-            context, proto_config.rate_limit_service().grpc_service(), timeout)));
+            context, proto_config.rate_limit_service().grpc_service(), timeout,
+            proto_config.rate_limit_service().transport_api_version())));
   };
 }
 

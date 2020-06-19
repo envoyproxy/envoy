@@ -164,6 +164,7 @@ proto_library(
         "//envoy/extensions/compression/gzip/decompressor/v3:pkg",
         "//envoy/extensions/filters/common/fault/v3:pkg",
         "//envoy/extensions/filters/http/adaptive_concurrency/v3:pkg",
+        "//envoy/extensions/filters/http/admission_control/v3alpha:pkg",
         "//envoy/extensions/filters/http/aws_lambda/v3:pkg",
         "//envoy/extensions/filters/http/aws_request_signing/v3:pkg",
         "//envoy/extensions/filters/http/buffer/v3:pkg",

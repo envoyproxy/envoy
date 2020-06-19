@@ -110,7 +110,7 @@ void AdminHandler::AdminPerTapSinkHandle::submitTrace(
   std::shared_ptr<envoy::data::tap::v3::TraceWrapper> shared_trace{std::move(trace)};
   // The handle can be destroyed before the cross thread post is complete. Thus, we capture a
   // reference to our parent.
-  parent_.main_thread_dispatcher_.post([& parent = parent_, trace = shared_trace, format]() {
+  parent_.main_thread_dispatcher_.post([&parent = parent_, trace = shared_trace, format]() {
     if (!parent.attached_request_.has_value()) {
       return;
     }
