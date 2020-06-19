@@ -191,10 +191,10 @@ public:
     }
 
     if (!headers_to_append_multiple.empty()) {
-      // headers_to_append_multiple has append = false for the first entry of append1 entries, and
+      // headers_to_append_multiple has append = false for the first entry of multiple entries, and
       // append = true for the rest entries.
       EXPECT_THAT(upstream_request_->headers(),
-                  Http::HeaderValueOf("append1", "append1-first,append1-second"));
+                  Http::HeaderValueOf("multiple", "multiple-first,multiple-second"));
     }
 
     response_->waitForEndStream();
@@ -504,7 +504,8 @@ TEST_P(ExtAuthzGrpcIntegrationTest, SendHeadersToAddAndToAppendToUpstream) {
       /*headers_to_append=*/Headers{{"header2", "header2"}},
       /*new_headers_from_upstream=*/Http::TestRequestHeaderMapImpl{{"new1", "new1"}},
       /*headers_to_append_multiple=*/
-      Http::TestRequestHeaderMapImpl{{"append1", "append1-first"}, {"append1", "append1-second"}});
+      Http::TestRequestHeaderMapImpl{{"multiple", "multiple-first"},
+                                     {"multiple", "multiple-second"}});
 }
 
 TEST_P(ExtAuthzGrpcIntegrationTest, AllowAtDisable) { expectFilterDisableCheck(false, "200"); }
