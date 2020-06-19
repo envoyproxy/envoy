@@ -44,6 +44,7 @@ public:
     // TODO(danzh) make this variable configurable to support jumbo frames.
     return MAX_UDP_PACKET_SIZE;
   }
+
 protected:
   void handleWriteCallback();
   void handleReadCallback();

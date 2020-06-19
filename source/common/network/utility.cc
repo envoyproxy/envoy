@@ -560,7 +560,7 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
                                                 UdpPacketProcessor& udp_packet_processor,
                                                 MonotonicTime receive_time,
                                                 uint32_t* packets_dropped) {
-                                                
+
   if (handle.supportsUdpGro()) {
     Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
     Buffer::RawSlice slice;
@@ -594,10 +594,10 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
     slice.len_ = std::min(slice.len_, static_cast<size_t>(result.rc_));
     buffer->commit(&slice, 1);
     const uint64_t gso_size = output.msg_[0].gso_size_;
-    
+
     // Segment the read slice into gso_sized buffers
     for (uint64_t bytes_to_skip = 0; bytes_to_skip < slice.len_; bytes_to_skip += gso_size) {
-      
+
       const uint64_t bytes_to_copy = std::min(slice.len_ - bytes_to_skip, gso_size);
 
       Buffer::InstancePtr sub_buffer = std::make_unique<Buffer::OwnedImpl>();
@@ -606,9 +606,9 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
       ASSERT(num_slices == 1u);
       buffer->copyOut(bytes_to_skip, bytes_to_copy, sub_slice.mem_);
 
-      passPayloadToProcessor(
-          bytes_to_copy, sub_slice, std::move(sub_buffer), output.msg_[0].peer_address_,
-          output.msg_[0].local_address_, udp_packet_processor, receive_time);
+      passPayloadToProcessor(bytes_to_copy, sub_slice, std::move(sub_buffer),
+                             output.msg_[0].peer_address_, output.msg_[0].local_address_,
+                             udp_packet_processor, receive_time);
     }
 
     return result;

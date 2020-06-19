@@ -1,5 +1,7 @@
 #pragma once
 
+#include <sys/socket.h>
+
 #include "envoy/api/io_error.h"
 #include "envoy/api/os_sys_calls.h"
 #include "envoy/common/platform.h"
@@ -7,7 +9,6 @@
 
 #include "common/common/logger.h"
 #include "common/network/io_socket_error_impl.h"
-#include <sys/socket.h>
 
 namespace Envoy {
 namespace Network {
