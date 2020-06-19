@@ -266,9 +266,9 @@ TEST_P(EnvoyQuicClientStreamTest, WatermarkSendBuffer) {
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
 
-// Tests that headers and trailers buffered in send buffer are counted into
-// watermark. Only IETF QUIC writes them on data stream, gQUIC writes them on
-// dedicated headers stream and only contributes to connection watermark buffer.
+// Tests that headers and trailers buffered in send buffer contribute towards buffer watermark
+// limits. Only IETF QUIC writes them on data stream, gQUIC writes them on dedicated headers stream
+// and only contributes to connection watermark buffer.
 TEST_P(EnvoyQuicClientStreamTest, HeadersContributeToWatermarkIquic) {
   if (!quic::VersionUsesHttp3(quic_version_.transport_version)) {
     EXPECT_CALL(stream_callbacks_, onResetStream(_, _));

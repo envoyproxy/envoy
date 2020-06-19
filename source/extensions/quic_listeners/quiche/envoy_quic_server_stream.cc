@@ -69,11 +69,11 @@ void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers
       quic::VersionUsesHttp3(transport_version())
           ? static_cast<quic::QuicStream*>(this)
           : (dynamic_cast<quic::QuicSpdySession*>(session())->headers_stream());
-  uint64_t bytes_to_send_old = writing_stream->BufferedDataBytes();
+  const uint64_t bytes_to_send_old = writing_stream->BufferedDataBytes();
 
   WriteHeaders(envoyHeadersToSpdyHeaderBlock(headers), end_stream, nullptr);
   local_end_stream_ = end_stream;
-  uint64_t bytes_to_send_new = writing_stream->BufferedDataBytes();
+  const uint64_t bytes_to_send_new = writing_stream->BufferedDataBytes();
   ASSERT(bytes_to_send_old <= bytes_to_send_new);
   maybeCheckWatermark(bytes_to_send_old, bytes_to_send_new, *filterManagerConnection());
 }
@@ -83,7 +83,7 @@ void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) 
                    data.length());
   local_end_stream_ = end_stream;
   // This is counting not serialized bytes in the send buffer.
-  uint64_t bytes_to_send_old = BufferedDataBytes();
+  const uint64_t bytes_to_send_old = BufferedDataBytes();
   // QUIC stream must take all.
   WriteBodySlices(quic::QuicMemSliceSpan(quic::QuicMemSliceSpanImpl(data)), end_stream);
   if (data.length() > 0) {
@@ -92,7 +92,7 @@ void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) 
     return;
   }
 
-  uint64_t bytes_to_send_new = BufferedDataBytes();
+  const uint64_t bytes_to_send_new = BufferedDataBytes();
   ASSERT(bytes_to_send_old <= bytes_to_send_new);
   maybeCheckWatermark(bytes_to_send_old, bytes_to_send_new, *filterManagerConnection());
 }
@@ -105,9 +105,9 @@ void EnvoyQuicServerStream::encodeTrailers(const Http::ResponseTrailerMap& trail
       quic::VersionUsesHttp3(transport_version())
           ? static_cast<quic::QuicStream*>(this)
           : (dynamic_cast<quic::QuicSpdySession*>(session())->headers_stream());
-  uint64_t bytes_to_send_old = writing_stream->BufferedDataBytes();
+  const uint64_t bytes_to_send_old = writing_stream->BufferedDataBytes();
   WriteTrailers(envoyHeadersToSpdyHeaderBlock(trailers), nullptr);
-  uint64_t bytes_to_send_new = writing_stream->BufferedDataBytes();
+  const uint64_t bytes_to_send_new = writing_stream->BufferedDataBytes();
   ASSERT(bytes_to_send_old <= bytes_to_send_new);
   maybeCheckWatermark(bytes_to_send_old, bytes_to_send_new, *filterManagerConnection());
 }
@@ -248,9 +248,9 @@ void EnvoyQuicServerStream::OnClose() {
 }
 
 void EnvoyQuicServerStream::OnCanWrite() {
-  uint64_t buffered_data_old = BufferedDataBytes();
+  const uint64_t buffered_data_old = BufferedDataBytes();
   quic::QuicSpdyServerStreamBase::OnCanWrite();
-  uint64_t buffered_data_new = BufferedDataBytes();
+  const uint64_t buffered_data_new = BufferedDataBytes();
   // As long as OnCanWriteNewData() is no-op, data to sent in buffer shouldn't
   // increase.
   ASSERT(buffered_data_new <= buffered_data_old);
