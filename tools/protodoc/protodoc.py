@@ -188,15 +188,20 @@ def FormatExtension(extension):
   Returns:
     RST formatted extension description.
   """
-  extension_metadata = json.loads(pathlib.Path(
-      os.getenv('EXTENSION_DB_PATH')).read_text())[extension]
-  anchor = FormatAnchor('extension_' + extension)
-  status = EXTENSION_STATUS_VALUES.get(extension_metadata['status'], '')
-  security_posture = EXTENSION_SECURITY_POSTURES[extension_metadata['security_posture']]
-  return EXTENSION_TEMPLATE.substitute(anchor=anchor,
-                                       extension=extension,
-                                       status=status,
-                                       security_posture=security_posture)
+  try:
+    extension_metadata = json.loads(pathlib.Path(
+        os.getenv('EXTENSION_DB_PATH')).read_text())[extension]
+    anchor = FormatAnchor('extension_' + extension)
+    status = EXTENSION_STATUS_VALUES.get(extension_metadata['status'], '')
+    security_posture = EXTENSION_SECURITY_POSTURES[extension_metadata['security_posture']]
+    return EXTENSION_TEMPLATE.substitute(anchor=anchor,
+                                         extension=extension,
+                                         status=status,
+                                         security_posture=security_posture)
+  except KeyError as e:
+    sys.stderr.write(
+        '\n\nDid you forget to add an entry to source/extensions/extensions_build_config.bzl?\n\n')
+    exit(1)  # Raising the error buries the above message in tracebacks.
 
 
 def FormatHeaderFromFile(style, source_code_info, proto_name):

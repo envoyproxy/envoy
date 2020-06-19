@@ -215,6 +215,26 @@ and false.
 * If a PR includes a deprecation/breaking change, notification should be sent to the
   [envoy-announce](https://groups.google.com/forum/#!forum/envoy-announce) email list.
 
+# Adding new extensions
+
+For developers adding a new extension, one can take an existing extension as the starting point.
+
+Extension configuration should be located in a directory structure like
+`api/envoy/extensions/area/plugin/`, for example `api/envoy/extensions/access_loggers/file/`
+
+The code for the extension should be located under the equivalent
+`source/extensions/area/plugin`, and include an *envoy_cc_extension* with the
+configuration and tagged with the appropriate security posture, and an
+*envoy_cc_library* with the code. More details on how to add a new extension
+API can be found [here](api/STYLE.md#adding-an-extension-configuration-to-the-api):
+
+Other changes will likely include
+
+  * Editing [source/extensions/extensions_build_config.bzl](source/extensions/extensions_build_config.bzl) to include the new extensions
+  * Editing [docs/root/api-v3/config/config.rst](docs/root/api-v3/config/config.rst) to add area/area
+  * Adding `docs/root/api-v3/config/area/area.rst` to add a table of contents for the API docs
+  * Adding `source/extensions/area/well_known_names.h` for registered plugins
+
 # DCO: Sign your work
 
 Envoy ships commit hooks that allow you to auto-generate the DCO signoff line if

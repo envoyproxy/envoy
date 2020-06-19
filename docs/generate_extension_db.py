@@ -40,7 +40,9 @@ def GetExtensionMetadata(target):
       stderr=subprocess.PIPE)
   security_posture, status, undocumented = r.stdout.decode('utf-8').strip().split(' ')
   if IsMissing(security_posture):
-    raise ExtensionDbError('Missing security posture for %s' % target)
+    raise ExtensionDbError(
+        'Missing security posture for %s.  Please make sure the target is an envoy_cc_extension and security_posture is set'
+        % target)
   return {
       'security_posture': security_posture,
       'undocumented': False if IsMissing(undocumented) else bool(undocumented),
