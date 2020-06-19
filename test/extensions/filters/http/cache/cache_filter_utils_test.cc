@@ -14,14 +14,24 @@ Http::TestRequestHeaderMapImpl non_cacheable_request_headers[] = {
     {},
     {{":path", "/"}},
     {{":path", "/"}, {":method", "GET"}},
-    {{":path", "/"}, {":method", "GET"}, {"x-forwarded-proto", "https"}}, 
-    {{":path", "/"}, {":method", "POST"}, {"x-forwarded-proto", "https"}, {":authority", "test.com"}},
+    {{":path", "/"}, {":method", "GET"}, {"x-forwarded-proto", "https"}},
+    {{":path", "/"},
+     {":method", "POST"},
+     {"x-forwarded-proto", "https"},
+     {":authority", "test.com"}},
     {{":path", "/"}, {":method", "GET"}, {"x-forwarded-proto", "ftp"}, {":authority", "test.com"}},
-    {{":path", "/"}, {":method", "GET"}, {"x-forwarded-proto", "http"}, {":authority", "test.com"}, {"authorization", "basic YWxhZGRpbjpvcGVuc2VzYW1l"}},
+    {{":path", "/"},
+     {":method", "GET"},
+     {"x-forwarded-proto", "http"},
+     {":authority", "test.com"},
+     {"authorization", "basic YWxhZGRpbjpvcGVuc2VzYW1l"}},
 };
 
 Http::TestRequestHeaderMapImpl cacheable_request_headers[] = {
-    {{":path", "/"}, {":method", "GET"}, {"x-forwarded-proto", "https"}, {":authority", "test.com"}},
+    {{":path", "/"},
+     {":method", "GET"},
+     {"x-forwarded-proto", "https"},
+     {":authority", "test.com"}},
     {{":path", "/"}, {":method", "GET"}, {"x-forwarded-proto", "http"}, {":authority", "test.com"}},
     {{":path", "/"}, {":method", "GET"}, {"x-forwarded-proto", "http"}, {":authority", "test.com"}},
 };
@@ -29,10 +39,10 @@ Http::TestRequestHeaderMapImpl cacheable_request_headers[] = {
 class NonCacheableRequestsTest : public testing::TestWithParam<Http::TestRequestHeaderMapImpl> {};
 class CacheableRequestsTest : public testing::TestWithParam<Http::TestRequestHeaderMapImpl> {};
 
-
-INSTANTIATE_TEST_SUITE_P(NonCacheableRequestsTest, NonCacheableRequestsTest, testing::ValuesIn(non_cacheable_request_headers));
-INSTANTIATE_TEST_SUITE_P(CacheableRequestsTest, CacheableRequestsTest, testing::ValuesIn(cacheable_request_headers));
-
+INSTANTIATE_TEST_SUITE_P(NonCacheableRequestsTest, NonCacheableRequestsTest,
+                         testing::ValuesIn(non_cacheable_request_headers));
+INSTANTIATE_TEST_SUITE_P(CacheableRequestsTest, CacheableRequestsTest,
+                         testing::ValuesIn(cacheable_request_headers));
 
 TEST_P(NonCacheableRequestsTest, NonCacheableRequests) {
   EXPECT_FALSE(CacheFilterUtils::isCacheableRequest(GetParam()));
