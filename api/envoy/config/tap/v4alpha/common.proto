@@ -123,7 +123,7 @@ message HttpGenericBodyMatch {
       // Text string to be located in HTTP body.
       string string_match = 1;
 
-      // Base64 encoded bytes sequence to be located in HTTP body.
+      // Sequence of bytes to be located in HTTP body.
       bytes binary_match = 2;
     }
   }
