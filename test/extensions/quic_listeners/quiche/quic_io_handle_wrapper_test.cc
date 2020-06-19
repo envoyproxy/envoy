@@ -93,6 +93,10 @@ TEST_F(QuicIoHandleWrapperTest, DelegateIoHandleCalls) {
   EXPECT_DEBUG_DEATH(wrapper_->recvmmsg(slices, /*self_port=*/12345, output2),
                      "recvmmsg is called after close");
 
+  // TODO(yugant)
+  EXPECT_CALL(os_sys_calls_, supportsUdpGro());
+  wrapper_->supportsUdpGro();
+
   EXPECT_CALL(os_sys_calls_, supportsMmsg());
   wrapper_->supportsMmsg();
 }

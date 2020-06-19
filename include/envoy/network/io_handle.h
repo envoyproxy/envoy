@@ -89,6 +89,7 @@ public:
     Address::InstanceConstSharedPtr peer_address_;
     // The payload length of this packet.
     unsigned int msg_len_{0};
+    // The gso_size, if specified in the transport header
     unsigned int gso_size_{0};
   };
 

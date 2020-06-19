@@ -29,6 +29,7 @@ public:
   MOCK_METHOD(Api::IoCallUint64Result, recvmmsg,
               (RawSliceArrays & slices, uint32_t self_port, RecvMsgOutput& output));
   MOCK_METHOD(bool, supportsMmsg, (), (const));
+  MOCK_METHOD(bool, supportsUdpGro, (), (const));
 };
 
 } // namespace Network

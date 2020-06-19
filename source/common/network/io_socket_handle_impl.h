@@ -70,6 +70,8 @@ private:
   // The minimum cmsg buffer size to filled in destination address and packets dropped when
   // receiving a packet. It is possible for a received packet to contain both IPv4 and IPv6
   // addresses.
+
+  // TODO(yugant): Should add gso_size sizeof(int)
   const size_t cmsg_space_{CMSG_SPACE(sizeof(int)) + CMSG_SPACE(sizeof(struct in_pktinfo)) +
                            CMSG_SPACE(sizeof(struct in6_pktinfo))};
 };

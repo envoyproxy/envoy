@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/buffer/buffer.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/address.pb.h"
@@ -559,11 +560,14 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
                                                 UdpPacketProcessor& udp_packet_processor,
                                                 MonotonicTime receive_time,
                                                 uint32_t* packets_dropped) {
-  // TODO(yugant)
+                                                
   if (handle.supportsUdpGro()) {
     Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
     Buffer::RawSlice slice;
-    const uint64_t num_slices = buffer->reserve(udp_packet_processor.maxPacketSize(), &slice, 1);
+
+    // TODO(yugant): See if you can find a place for this constant
+    const uint64_t maxPacketSizeWithGro = 65535;
+    const uint64_t num_slices = buffer->reserve(maxPacketSizeWithGro, &slice, 1);
     ASSERT(num_slices == 1u);
 
     IoHandle::RecvMsgOutput output(1, packets_dropped);
@@ -579,29 +583,32 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
 
     // Get gso_size
     if (output.msg_[0].gso_size_ == 0u) {
-      // skip gso segmentation and proceed
-      // PRINT_WARNING
+      // Skip gso segmentation and proceed as if a single recvmsg syscall
+      ENVOY_LOG_MISC(warn, "Unspecified or zero gso_size received.");
       passPayloadToProcessor(
           result.rc_, slice, std::move(buffer), std::move(output.msg_[0].peer_address_),
           std::move(output.msg_[0].local_address_), udp_packet_processor, receive_time);
       return result;
     }
 
-    // Segment the buffer into gso_sized buffers
-    // Not Worrying about not being a multiple of gso_size | TODO(yugant): maybe worry
-    for (uint64_t bytes_to_skip = 0; bytes_to_skip < (slice.len_ - output.msg_[0].gso_size_);
-         bytes_to_skip += output.msg_[0].gso_size_) {
+    slice.len_ = std::min(slice.len_, static_cast<size_t>(result.rc_));
+    buffer->commit(&slice, 1);
+    const uint64_t gso_size = output.msg_[0].gso_size_;
+    
+    // Segment the read slice into gso_sized buffers
+    for (uint64_t bytes_to_skip = 0; bytes_to_skip < slice.len_; bytes_to_skip += gso_size) {
+      
+      const uint64_t bytes_to_copy = std::min(slice.len_ - bytes_to_skip, gso_size);
+
       Buffer::InstancePtr sub_buffer = std::make_unique<Buffer::OwnedImpl>();
       Buffer::RawSlice sub_slice;
-      const uint64_t num_slices =
-          sub_buffer->reserve(udp_packet_processor.maxPacketSize(), &sub_slice, 1);
+      const uint64_t num_slices = sub_buffer->reserve(bytes_to_copy, &sub_slice, 1);
       ASSERT(num_slices == 1u);
+      buffer->copyOut(bytes_to_skip, bytes_to_copy, sub_slice.mem_);
 
-      memcpy(&sub_slice.mem_, (&slice.mem_) + bytes_to_skip,
-             output.msg_[0].gso_size_); // copy contents of slice[i:i+gso_size] to new_slice;
       passPayloadToProcessor(
-          result.rc_, sub_slice, std::move(sub_buffer), std::move(output.msg_[0].peer_address_),
-          std::move(output.msg_[0].local_address_), udp_packet_processor, receive_time);
+          bytes_to_copy, sub_slice, std::move(sub_buffer), output.msg_[0].peer_address_,
+          output.msg_[0].local_address_, udp_packet_processor, receive_time);
     }
 
     return result;
