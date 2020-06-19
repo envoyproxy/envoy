@@ -38,7 +38,6 @@
 
 #include "server/admin/admin.h"
 #include "server/configuration_impl.h"
-#include "server/internal_stats_handler.h"
 #include "server/listener_hooks.h"
 #include "server/listener_manager_impl.h"
 #include "server/overload_manager_impl.h"
