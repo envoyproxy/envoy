@@ -423,3 +423,6 @@ for the HTTP/2 codec upstream send buffer.
    receiving an `onBelowWriteBufferLowWatermark()` callback.
 From this point on the `Envoy::Router::Filter` picks up the event and the code path is the same as
 for the HTTP/2 codec upstream send buffer.
+
+### HTTP3 implementation details
+HTTP3 network buffer and stream send buffer works differently from HTTP2 and HTTP. See quiche_integration.md.
