@@ -321,15 +321,17 @@ public:
     // The original client request header value of "bat" is "foo". Since we configure to "append"
     // the value of "bat", we expect the request headers to be sent to upstream contain two "bat"s,
     // with values: "foo" and "bar" (the "bat: bar" header is appended by the authorization server).
-    const auto& baz_values =
-        TestUtility::getAllHeadersValuesForKey(upstream_request_->headers(), "bat");
-    EXPECT_TRUE(std::is_permutation(baz_values.begin(), baz_values.end(),
-                                    (std::vector<absl::string_view>{"foo", "bar"}).begin()));
+    const auto& request_existed_headers =
+        Http::TestRequestHeaderMapImpl{{"bat", "foo"}, {"bat", "bar"}};
+    EXPECT_THAT(request_existed_headers, Http::IsSubsetOfHeaders(upstream_request_->headers()));
 
-    const auto& x_success_values =
-        TestUtility::getAllHeadersValuesForKey(upstream_request_->headers(), "x-append-bat");
-    EXPECT_TRUE(std::is_permutation(x_success_values.begin(), x_success_values.end(),
-                                    (std::vector<absl::string_view>{"append-foo", "append-bar"}).begin()));
+    // The original client request header does not contain x-append-bat. Since we configure to
+    // "append" the value of "x-append-bat", we expect the headers to be sent to upstream contain
+    // two "x-append-bat"s, instead of replacing the first with the last one, with values:
+    // "append-foo" and "append-bar"
+    const auto& request_nonexisted_headers = Http::TestRequestHeaderMapImpl{
+        {"x-append-bat", "append-foo"}, {"x-append-bat", "append-bar"}};
+    EXPECT_THAT(request_nonexisted_headers, Http::IsSubsetOfHeaders(upstream_request_->headers()));
 
     response_->waitForEndStream();
     EXPECT_TRUE(response_->complete());
