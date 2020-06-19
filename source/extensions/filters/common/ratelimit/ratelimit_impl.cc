@@ -21,10 +21,14 @@ namespace Common {
 namespace RateLimit {
 
 GrpcClientImpl::GrpcClientImpl(Grpc::RawAsyncClientPtr&& async_client,
-                               const absl::optional<std::chrono::milliseconds>& timeout)
-    : service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-          "envoy.service.ratelimit.v2.RateLimitService.ShouldRateLimit")),
-      async_client_(std::move(async_client)), timeout_(timeout) {}
+                               const absl::optional<std::chrono::milliseconds>& timeout,
+                               envoy::config::core::v3::ApiVersion transport_api_version)
+    : async_client_(std::move(async_client)), timeout_(timeout),
+      service_method_(
+          Grpc::VersionedMethods("envoy.service.ratelimit.v3.RateLimitService.ShouldRateLimit",
+                                 "envoy.service.ratelimit.v2.RateLimitService.ShouldRateLimit")
+              .getMethodDescriptorForVersion(transport_api_version)),
+      transport_api_version_(transport_api_version) {}
 
 GrpcClientImpl::~GrpcClientImpl() { ASSERT(!callbacks_); }
 
@@ -60,7 +64,8 @@ void GrpcClientImpl::limit(RequestCallbacks& callbacks, const std::string& domai
   createRequest(request, domain, descriptors);
 
   request_ = async_client_->send(service_method_, request, *this, parent_span,
-                                 Http::AsyncClient::RequestOptions().setTimeout(timeout_));
+                                 Http::AsyncClient::RequestOptions().setTimeout(timeout_),
+                                 transport_api_version_);
 }
 
 void GrpcClientImpl::onSuccess(
@@ -78,14 +83,14 @@ void GrpcClientImpl::onSuccess(
   Http::ResponseHeaderMapPtr response_headers_to_add;
   Http::RequestHeaderMapPtr request_headers_to_add;
   if (!response->response_headers_to_add().empty()) {
-    response_headers_to_add = std::make_unique<Http::ResponseHeaderMapImpl>();
+    response_headers_to_add = Http::ResponseHeaderMapImpl::create();
     for (const auto& h : response->response_headers_to_add()) {
       response_headers_to_add->addCopy(Http::LowerCaseString(h.key()), h.value());
     }
   }
 
   if (!response->request_headers_to_add().empty()) {
-    request_headers_to_add = std::make_unique<Http::RequestHeaderMapImpl>();
+    request_headers_to_add = Http::RequestHeaderMapImpl::create();
     for (const auto& h : response->request_headers_to_add()) {
       request_headers_to_add->addCopy(Http::LowerCaseString(h.key()), h.value());
     }
@@ -104,14 +109,15 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
 
 ClientPtr rateLimitClient(Server::Configuration::FactoryContext& context,
                           const envoy::config::core::v3::GrpcService& grpc_service,
-                          const std::chrono::milliseconds timeout) {
+                          const std::chrono::milliseconds timeout,
+                          envoy::config::core::v3::ApiVersion transport_api_version) {
   // TODO(ramaraochavali): register client to singleton when GrpcClientImpl supports concurrent
   // requests.
   const auto async_client_factory =
       context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
           grpc_service, context.scope(), true);
   return std::make_unique<Filters::Common::RateLimit::GrpcClientImpl>(
-      async_client_factory->create(), timeout);
+      async_client_factory->create(), timeout, transport_api_version);
 }
 
 } // namespace RateLimit

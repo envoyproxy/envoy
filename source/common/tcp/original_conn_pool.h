@@ -18,18 +18,19 @@
 namespace Envoy {
 namespace Tcp {
 
-class ConnPoolImpl : Logger::Loggable<Logger::Id::pool>, public ConnectionPool::Instance {
+class OriginalConnPoolImpl : Logger::Loggable<Logger::Id::pool>, public ConnectionPool::Instance {
 public:
-  ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
-               Upstream::ResourcePriority priority,
-               const Network::ConnectionSocket::OptionsSharedPtr& options,
-               Network::TransportSocketOptionsSharedPtr transport_socket_options);
+  OriginalConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
+                       Upstream::ResourcePriority priority,
+                       const Network::ConnectionSocket::OptionsSharedPtr& options,
+                       Network::TransportSocketOptionsSharedPtr transport_socket_options);
 
-  ~ConnPoolImpl() override;
+  ~OriginalConnPoolImpl() override;
 
   // ConnectionPool::Instance
   void addDrainedCallback(DrainedCb cb) override;
   void drainConnections() override;
+  void closeConnections() override;
   ConnectionPool::Cancellable* newConnection(ConnectionPool::Callbacks& callbacks) override;
   Upstream::HostDescriptionConstSharedPtr host() const override { return host_; }
 
@@ -92,7 +93,7 @@ protected:
   struct ActiveConn : LinkedObject<ActiveConn>,
                       public Network::ConnectionCallbacks,
                       public Event::DeferredDeletable {
-    ActiveConn(ConnPoolImpl& parent);
+    ActiveConn(OriginalConnPoolImpl& parent);
     ~ActiveConn() override;
 
     void onConnectTimeout();
@@ -108,7 +109,7 @@ protected:
     }
     ConnectionPool::ConnectionState* connectionState() { return conn_state_.get(); }
 
-    ConnPoolImpl& parent_;
+    OriginalConnPoolImpl& parent_;
     Upstream::HostDescriptionConstSharedPtr real_host_description_;
     ConnectionWrapperSharedPtr wrapper_;
     Network::ClientConnectionPtr conn_;
@@ -122,7 +123,7 @@ protected:
   using ActiveConnPtr = std::unique_ptr<ActiveConn>;
 
   struct PendingRequest : LinkedObject<PendingRequest>, public ConnectionPool::Cancellable {
-    PendingRequest(ConnPoolImpl& parent, ConnectionPool::Callbacks& callbacks);
+    PendingRequest(OriginalConnPoolImpl& parent, ConnectionPool::Callbacks& callbacks);
     ~PendingRequest() override;
 
     // ConnectionPool::Cancellable
@@ -130,7 +131,7 @@ protected:
       parent_.onPendingRequestCancel(*this, cancel_policy);
     }
 
-    ConnPoolImpl& parent_;
+    OriginalConnPoolImpl& parent_;
     ConnectionPool::Callbacks& callbacks_;
   };
 
