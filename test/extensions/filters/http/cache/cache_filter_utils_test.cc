@@ -10,46 +10,54 @@ namespace HttpFilters {
 namespace Cache {
 namespace {
 
-Http::TestRequestHeaderMapImpl non_cacheable_request_headers[] = {
-    {},
-    {{":path", "/"}},
-    {{":path", "/"}, {":method", "GET"}},
-    {{":path", "/"}, {":method", "GET"}, {"x-forwarded-proto", "https"}},
-    {{":path", "/"},
-     {":method", "POST"},
-     {"x-forwarded-proto", "https"},
-     {":authority", "test.com"}},
-    {{":path", "/"}, {":method", "GET"}, {"x-forwarded-proto", "ftp"}, {":authority", "test.com"}},
-    {{":path", "/"},
-     {":method", "GET"},
-     {"x-forwarded-proto", "http"},
-     {":authority", "test.com"},
-     {"authorization", "basic YWxhZGRpbjpvcGVuc2VzYW1l"}},
+class IsCacheableRequestTest : public testing::Test {
+protected:
+  const Http::TestRequestHeaderMapImpl cacheable_request_headers = {{":path", "/"},
+                                                                    {":method", "GET"},
+                                                                    {"x-forwarded-proto", "http"},
+                                                                    {":authority", "test.com"}};
 };
 
-Http::TestRequestHeaderMapImpl cacheable_request_headers[] = {
-    {{":path", "/"},
-     {":method", "GET"},
-     {"x-forwarded-proto", "https"},
-     {":authority", "test.com"}},
-    {{":path", "/"}, {":method", "GET"}, {"x-forwarded-proto", "http"}, {":authority", "test.com"}},
-    {{":path", "/"}, {":method", "GET"}, {"x-forwarded-proto", "http"}, {":authority", "test.com"}},
-};
-
-class NonCacheableRequestsTest : public testing::TestWithParam<Http::TestRequestHeaderMapImpl> {};
-class CacheableRequestsTest : public testing::TestWithParam<Http::TestRequestHeaderMapImpl> {};
-
-INSTANTIATE_TEST_SUITE_P(NonCacheableRequestsTest, NonCacheableRequestsTest,
-                         testing::ValuesIn(non_cacheable_request_headers));
-INSTANTIATE_TEST_SUITE_P(CacheableRequestsTest, CacheableRequestsTest,
-                         testing::ValuesIn(cacheable_request_headers));
-
-TEST_P(NonCacheableRequestsTest, NonCacheableRequests) {
-  EXPECT_FALSE(CacheFilterUtils::isCacheableRequest(GetParam()));
+TEST_F(IsCacheableRequestTest, PathHeader) {
+  Http::TestRequestHeaderMapImpl request_headers = cacheable_request_headers;
+  EXPECT_TRUE(CacheFilterUtils::isCacheableRequest(request_headers));
+  request_headers.removePath();
+  EXPECT_FALSE(CacheFilterUtils::isCacheableRequest(request_headers));
 }
 
-TEST_P(CacheableRequestsTest, CacheableRequests) {
-  EXPECT_TRUE(CacheFilterUtils::isCacheableRequest(GetParam()));
+TEST_F(IsCacheableRequestTest, HostHeader) {
+  Http::TestRequestHeaderMapImpl request_headers = cacheable_request_headers;
+  EXPECT_TRUE(CacheFilterUtils::isCacheableRequest(request_headers));
+  request_headers.removeHost();
+  EXPECT_FALSE(CacheFilterUtils::isCacheableRequest(request_headers));
+}
+
+TEST_F(IsCacheableRequestTest, MethodHeader) {
+  const Http::HeaderValues& header_values = Http::Headers::get();
+  Http::TestRequestHeaderMapImpl request_headers = cacheable_request_headers;
+  EXPECT_TRUE(CacheFilterUtils::isCacheableRequest(request_headers));
+  request_headers.setMethod(header_values.MethodValues.Post);
+  EXPECT_FALSE(CacheFilterUtils::isCacheableRequest(request_headers));
+  request_headers.setMethod(header_values.MethodValues.Put);
+  EXPECT_FALSE(CacheFilterUtils::isCacheableRequest(request_headers));
+  request_headers.removeMethod();
+  EXPECT_FALSE(CacheFilterUtils::isCacheableRequest(request_headers));
+}
+
+TEST_F(IsCacheableRequestTest, ForwardedProtoHeader) {
+  Http::TestRequestHeaderMapImpl request_headers = cacheable_request_headers;
+  EXPECT_TRUE(CacheFilterUtils::isCacheableRequest(request_headers));
+  request_headers.setForwardedProto("ftp");
+  EXPECT_FALSE(CacheFilterUtils::isCacheableRequest(request_headers));
+  request_headers.removeForwardedProto();
+  EXPECT_FALSE(CacheFilterUtils::isCacheableRequest(request_headers));
+}
+
+TEST_F(IsCacheableRequestTest, AuthorizationHeader) {
+  Http::TestRequestHeaderMapImpl request_headers = cacheable_request_headers;
+  EXPECT_TRUE(CacheFilterUtils::isCacheableRequest(request_headers));
+  request_headers.setAuthorization("basic YWxhZGRpbjpvcGVuc2VzYW1l");
+  EXPECT_FALSE(CacheFilterUtils::isCacheableRequest(request_headers));
 }
 
 } // namespace
