@@ -30,7 +30,11 @@ else
   BAZEL_BUILD_OPTIONS+=" --config=test-coverage --test_tag_filters=-nocoverage,-fuzz_target"
 fi
 
-bazel coverage ${BAZEL_BUILD_OPTIONS} --test_output=all ${COVERAGE_TARGETS}
+bazel coverage ${BAZEL_BUILD_OPTIONS} ${COVERAGE_TARGETS}
+
+# Collecting profile and testlogs
+[[ -z "${ENVOY_BUILD_PROFILE}" ]] || cp -f "$(bazel info output_base)/command.profile.gz" "${ENVOY_BUILD_PROFILE}/coverage.profile.gz" || true
+[[ -z "${ENVOY_BUILD_DIR}"]] || find bazel-testlogs/ -name test.log | tar zcf "${ENVOY_BUILD_DIR}/testlogs.tar.gz" -T -
 
 COVERAGE_DIR="${SRCDIR}"/generated/coverage
 
