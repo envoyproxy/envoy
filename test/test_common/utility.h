@@ -677,6 +677,75 @@ public:
         : Config::OpaqueResourceDecoderImpl<Current>(ProtobufMessage::getStrictValidationVisitor(),
                                                      name_field) {}
   };
+
+  /**
+   * Returns the string representation of a envoy::config::core::v3::ApiVersion.
+   *
+   * @param api_version to be converted.
+   * @return std::string representation of envoy::config::core::v3::ApiVersion.
+   */
+  static std::string
+  getVersionStringFromApiVersion(envoy::config::core::v3::ApiVersion api_version) {
+    switch (api_version) {
+    case envoy::config::core::v3::ApiVersion::AUTO:
+      return "AUTO";
+    case envoy::config::core::v3::ApiVersion::V2:
+      return "V2";
+    case envoy::config::core::v3::ApiVersion::V3:
+      return "V3";
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
+  }
+
+  /**
+   * Returns the fully-qualified name of a service, rendered from service_full_name_template.
+   *
+   * @param service_full_name_template the service fully-qualified name template.
+   * @param api_version version of a service.
+   * @param use_alpha if the alpha version is preferred.
+   * @param service_namespace to override the service namespace.
+   * @return std::string full path of a service method.
+   */
+  static std::string
+  getVersionedServiceFullName(const std::string& service_full_name_template,
+                              envoy::config::core::v3::ApiVersion api_version,
+                              bool use_alpha = false,
+                              const std::string& service_namespace = EMPTY_STRING) {
+    switch (api_version) {
+    case envoy::config::core::v3::ApiVersion::AUTO:
+      FALLTHRU;
+    case envoy::config::core::v3::ApiVersion::V2:
+      return fmt::format(service_full_name_template, use_alpha ? "v2alpha" : "v2",
+                         service_namespace);
+
+    case envoy::config::core::v3::ApiVersion::V3:
+      return fmt::format(service_full_name_template, "v3", service_namespace);
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
+  }
+
+  /**
+   * Returns the full path of a service method.
+   *
+   * @param service_full_name_template the service fully-qualified name template.
+   * @param method_name the method name.
+   * @param api_version version of a service method.
+   * @param use_alpha if the alpha version is preferred.
+   * @param service_namespace to override the service namespace.
+   * @return std::string full path of a service method.
+   */
+  static std::string getVersionedMethodPath(const std::string& service_full_name_template,
+                                            absl::string_view method_name,
+                                            envoy::config::core::v3::ApiVersion api_version,
+                                            bool use_alpha = false,
+                                            const std::string& service_namespace = EMPTY_STRING) {
+    return absl::StrCat("/",
+                        getVersionedServiceFullName(service_full_name_template, api_version,
+                                                    use_alpha, service_namespace),
+                        "/", method_name);
+  }
 };
 
 /**

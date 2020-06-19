@@ -6,6 +6,7 @@
 #include "extensions/filters/network/ext_authz/config.h"
 
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -18,14 +19,8 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ExtAuthz {
 
-TEST(ExtAuthzFilterConfigTest, ValidateFail) {
-  NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW(ExtAuthzConfigFactory().createFilterFactoryFromProto(
-                   envoy::extensions::filters::network::ext_authz::v3::ExtAuthz(), context),
-               ProtoValidationException);
-}
-
-TEST(ExtAuthzFilterConfigTest, ExtAuthzCorrectProto) {
+namespace {
+void expectCorrectProto(envoy::config::core::v3::ApiVersion api_version) {
   std::string yaml = R"EOF(
   grpc_service:
     google_grpc:
@@ -33,11 +28,13 @@ TEST(ExtAuthzFilterConfigTest, ExtAuthzCorrectProto) {
       stat_prefix: google
   failure_mode_allow: false
   stat_prefix: name
+  transport_api_version: {}
 )EOF";
 
   ExtAuthzConfigFactory factory;
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
-  TestUtility::loadFromYaml(yaml, *proto_config);
+  TestUtility::loadFromYaml(
+      fmt::format(yaml, TestUtility::getVersionStringFromApiVersion(api_version)), *proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
@@ -49,6 +46,20 @@ TEST(ExtAuthzFilterConfigTest, ExtAuthzCorrectProto) {
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
+}
+} // namespace
+
+TEST(ExtAuthzFilterConfigTest, ValidateFail) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_THROW(ExtAuthzConfigFactory().createFilterFactoryFromProto(
+                   envoy::extensions::filters::network::ext_authz::v3::ExtAuthz(), context),
+               ProtoValidationException);
+}
+
+TEST(ExtAuthzFilterConfigTest, ExtAuthzCorrectProto) {
+  expectCorrectProto(envoy::config::core::v3::ApiVersion::AUTO);
+  expectCorrectProto(envoy::config::core::v3::ApiVersion::V2);
+  expectCorrectProto(envoy::config::core::v3::ApiVersion::V3);
 }
 
 // Test that the deprecated extension name still functions.

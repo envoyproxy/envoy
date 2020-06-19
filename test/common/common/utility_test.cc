@@ -813,6 +813,26 @@ TEST(DateFormatter, FromTime) {
   EXPECT_EQ("aaa00", DateFormatter(std::string(3, 'a') + "%H").fromTime(time2));
 }
 
+// Check the time complexity. Make sure DateFormatter can finish parsing long messy string without
+// crashing/freezing. This should pass in 0-2 seconds if O(n). Finish in 30-120 seconds if O(n^2)
+TEST(DateFormatter, ParseLongString) {
+  std::string input;
+  std::string expected_output;
+  int num_duplicates = 400;
+  std::string duplicate_input = "%%1f %1f, %2f, %3f, %4f, ";
+  std::string duplicate_output = "%1 1, 14, 142, 1420, ";
+  for (int i = 0; i < num_duplicates; i++) {
+    absl::StrAppend(&input, duplicate_input, "(");
+    absl::StrAppend(&expected_output, duplicate_output, "(");
+  }
+  absl::StrAppend(&input, duplicate_input);
+  absl::StrAppend(&expected_output, duplicate_output);
+
+  const SystemTime time1(std::chrono::seconds(1522796769) + std::chrono::milliseconds(142));
+  std::string output = DateFormatter(input).fromTime(time1);
+  EXPECT_EQ(expected_output, output);
+}
+
 // Verify that two DateFormatter patterns with the same ??? patterns but
 // different format strings don't false share cache entries. This is a
 // regression test for when they did.
