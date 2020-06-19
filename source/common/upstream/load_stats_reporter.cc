@@ -27,7 +27,7 @@ LoadStatsReporter::LoadStatsReporter(const LocalInfo::LocalInfo& local_info,
           Grpc::VersionedMethods("envoy.service.load_stats.v3.LoadReportingService.StreamLoadStats",
                                  "envoy.service.load_stats.v2.LoadReportingService.StreamLoadStats")
               .getMethodDescriptorForVersion(transport_api_version)),
-      time_source_(dispatcher.timeSource()) {
+      time_source_(dispatcher.timeSource()), internal_stats_handler_(internal_stats_handler) {
   request_.mutable_node()->MergeFrom(local_info.node());
   request_.mutable_node()->add_client_features("envoy.lrs.supports_send_all_clusters");
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
