@@ -671,7 +671,7 @@ void ListenerManagerImpl::addListenerToWorker(Worker& worker,
             ENVOY_LOG(critical, "listener '{}' failed to listen on address '{}' on worker",
                       listener.name(), listener.listenSocketFactory().localAddress()->asString());
             stats_.listener_create_failure_.inc();
-            removeListenerOnCreationFailure(listener.name());
+            removeListenerInternal(listener.name(), false);
           }
           if (success) {
             stats_.listener_create_success_.inc();
@@ -796,10 +796,6 @@ uint64_t ListenerManagerImpl::numConnections() const {
 
 bool ListenerManagerImpl::removeListener(const std::string& name) {
   return removeListenerInternal(name, true);
-}
-
-bool ListenerManagerImpl::removeListenerOnCreationFailure(const std::string& listener_name) {
-  return removeListenerInternal(listener_name, false);
 }
 
 bool ListenerManagerImpl::removeListenerInternal(const std::string& name,

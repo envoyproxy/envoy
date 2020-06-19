@@ -210,7 +210,6 @@ private:
   bool addOrUpdateListenerInternal(const envoy::config::listener::v3::Listener& config,
                                    const std::string& version_info, bool added_via_api,
                                    const std::string& name);
-  bool removeListenerOnCreationFailure(const std::string& listener_name);
   bool removeListenerInternal(const std::string& listener_name, bool dynamic_listeners_only);
 
   struct DrainingListener {
