@@ -73,7 +73,7 @@ test_suite(
     name = "ci_tests",
     tests = [
         "http2_platform_api_test",
-        "quic_core_batch_writer_batch_writer_test_lib",
+        "quic_core_batch_writer_batch_writer_test",
         "quic_platform_api_test",
         "quiche_common_test",
         "spdy_platform_api_test",
