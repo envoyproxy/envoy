@@ -34,6 +34,7 @@ enum class FilterHeadersStatus {
   StopIteration,
   // Continue iteration to remaining filters, but ignore any subsequent data or trailers. This
   // results in creating a header only request/response.
+  // This status MUST NOT be returned by decodeHeaders() when end_stream is set to true.
   ContinueAndEndStream,
   // Do not iterate for headers as well as data and trailers for the current filter and the filters
   // following, and buffer body data for later dispatching. ContinueDecoding() MUST
