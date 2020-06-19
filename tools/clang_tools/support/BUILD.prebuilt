@@ -1,8 +1,8 @@
-# Clang 9.0 library pre-built Bazel.
+# Clang 10.0 library pre-built Bazel.
 #
 # This file was mostly manually assembled (with some hacky Python scripts) from
-# clang+llvm-9.0.0-x86_64-linux-gnu-ubuntu-16.04.tar.xz and corresponding
-# https://github.com/llvm/llvm-project.git source. It needs Clang 9.0 to work.
+# clang+llvm-10.0.0-x86_64-linux-gnu-ubuntu-18.04.tar.xz and corresponding
+# https://github.com/llvm/llvm-project.git source. It needs Clang 10.0 to work.
 #
 # The BUILD file has sufficient dependency relationships
 # between the prebuilt libraries in a clang-llvm distribution to support building libtooling
@@ -152,6 +152,7 @@ cc_library(
         ":clang_basic",
         ":clang_lex",
         ":clang_sema",
+        ":llvm_frontend_omp",
         ":llvm_mc",
         ":llvm_mcparser",
         ":llvm_support",
@@ -304,6 +305,12 @@ cc_library(
     name = "llvm_demangle",
     srcs = ["lib/libLLVMDemangle.a"],
     hdrs = glob(["llvm/Demangle/**"]),
+)
+
+cc_library(
+    name = "llvm_frontend_omp",
+    srcs = ["lib/libLLVMFrontendOpenMP.a"],
+    hdrs = glob(["llvm/Frontend/OpenMP/**"]),
 )
 
 cc_library(

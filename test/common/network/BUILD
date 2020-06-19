@@ -2,6 +2,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_benchmark_test",
     "envoy_cc_benchmark_binary",
+    "envoy_cc_fuzz_test",
     "envoy_cc_test",
     "envoy_cc_test_binary",
     "envoy_cc_test_library",
@@ -33,7 +34,6 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "address_impl_test",
     srcs = ["address_impl_test.cc"],
-    tags = ["fails_on_windows"],
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
@@ -59,7 +59,6 @@ envoy_cc_benchmark_binary(
 envoy_benchmark_test(
     name = "address_impl_speed_test_benchmark_test",
     benchmark_binary = "address_impl_speed_test",
-    tags = ["fails_on_windows"],
 )
 
 envoy_cc_test(
@@ -167,7 +166,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "listen_socket_impl_test",
     srcs = ["listen_socket_impl_test.cc"],
-    tags = ["fails_on_windows"],
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:listen_socket_lib",
@@ -266,7 +264,6 @@ envoy_cc_test(
     name = "socket_option_factory_test",
     srcs = ["socket_option_factory_test.cc"],
     external_deps = ["abseil_str_format"],
-    tags = ["fails_on_windows"],
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:socket_option_factory_lib",
@@ -299,6 +296,17 @@ envoy_cc_test(
         "//source/common/network:utility_lib",
         "//test/mocks/network:network_mocks",
         "//test/test_common:environment_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "utility_fuzz_test",
+    srcs = ["utility_fuzz_test.cc"],
+    corpus = "utility_corpus",
+    deps = [
+        "//source/common/network:address_lib",
+        "//source/common/network:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

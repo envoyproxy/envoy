@@ -8,6 +8,8 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
+#include "common/config/grpc_mux_impl.h"
+#include "common/config/grpc_subscription_impl.h"
 #include "common/config/utility.h"
 #include "common/singleton/manager_impl.h"
 #include "common/upstream/eds.h"
@@ -30,7 +32,18 @@ namespace Upstream {
 
 class EdsSpeedTest {
 public:
-  EdsSpeedTest() : api_(Api::createApiForTest(stats_)) {}
+  EdsSpeedTest(benchmark::State& state, bool v2_config)
+      : state_(state), v2_config_(v2_config),
+        type_url_(v2_config_
+                      ? "type.googleapis.com/envoy.api.v2.ClusterLoadAssignment"
+                      : "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment"),
+        subscription_stats_(Config::Utility::generateStats(stats_)),
+        api_(Api::createApiForTest(stats_)), async_client_(new Grpc::MockAsyncClient()),
+        grpc_mux_(new Config::GrpcMuxImpl(
+            local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
+            *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+                "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints"),
+            envoy::config::core::v3::ApiVersion::AUTO, random_, stats_, {}, true)) {}
 
   void resetCluster(const std::string& yaml_config, Cluster::InitializePhase initialize_phase) {
     local_info_.node_.mutable_locality()->set_zone("us-east-1a");
@@ -45,6 +58,9 @@ public:
                                                 std::move(scope), false);
     EXPECT_EQ(initialize_phase, cluster_->initializePhase());
     eds_callbacks_ = cm_.subscription_factory_.callbacks_;
+    subscription_ = std::make_unique<Config::GrpcSubscriptionImpl>(
+        grpc_mux_, *eds_callbacks_, subscription_stats_, type_url_, dispatcher_,
+        std::chrono::milliseconds(), false);
   }
 
   void initialize() {
@@ -54,7 +70,8 @@ public:
 
   // Set up an EDS config with multiple priorities, localities, weights and make sure
   // they are loaded and reloaded as expected.
-  void priorityAndLocalityWeightedHelper(bool ignore_unknown_dynamic_fields, int num_hosts) {
+  void priorityAndLocalityWeightedHelper(bool ignore_unknown_dynamic_fields, size_t num_hosts) {
+    state_.PauseTiming();
     envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
     cluster_load_assignment.set_cluster_name("fare");
     resetCluster(R"EOF(
@@ -81,7 +98,7 @@ public:
     endpoints->mutable_load_balancing_weight()->set_value(1);
 
     uint32_t port = 1000;
-    for (int i = 0; i < num_hosts; ++i) {
+    for (size_t i = 0; i < num_hosts; ++i) {
       auto* socket_address = endpoints->add_lb_endpoints()
                                  ->mutable_endpoint()
                                  ->mutable_address()
@@ -94,14 +111,31 @@ public:
     validation_visitor_.setSkipValidation(ignore_unknown_dynamic_fields);
 
     initialize();
-    Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
-    resources.Add()->PackFrom(cluster_load_assignment);
-    eds_callbacks_->onConfigUpdate(resources, "");
+    auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
+    response->set_type_url(type_url_);
+    auto* resource = response->mutable_resources()->Add();
+    resource->PackFrom(cluster_load_assignment);
+    if (v2_config_) {
+      RELEASE_ASSERT(resource->type_url() ==
+                         "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment",
+                     "");
+      resource->set_type_url("type.googleapis.com/envoy.api.v2.ClusterLoadAssignment");
+    }
+    EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(testing::Return(&async_stream_));
+    subscription_->start({"fare"});
+    state_.ResumeTiming();
+    grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));
     ASSERT(initialized_);
+    ASSERT(cluster_->prioritySet().hostSetsPerPriority()[1]->hostsPerLocality().get()[0].size() ==
+           num_hosts);
   }
 
+  benchmark::State& state_;
+  const bool v2_config_;
+  const std::string type_url_;
   bool initialized_{};
   Stats::IsolatedStoreImpl stats_;
+  Config::SubscriptionStats subscription_stats_;
   Ssl::MockContextManager ssl_context_manager_;
   envoy::config::cluster::v3::Cluster eds_cluster_;
   NiceMock<MockClusterManager> cm_;
@@ -116,6 +150,10 @@ public:
   NiceMock<ThreadLocal::MockInstance> tls_;
   ProtobufMessage::MockValidationVisitor validation_visitor_;
   Api::ApiPtr api_;
+  Grpc::MockAsyncClient* async_client_;
+  NiceMock<Grpc::MockAsyncStream> async_stream_;
+  std::shared_ptr<Config::GrpcMuxImpl> grpc_mux_;
+  std::unique_ptr<Config::GrpcSubscriptionImpl> subscription_;
 };
 
 } // namespace Upstream
@@ -126,9 +164,9 @@ static void priorityAndLocalityWeighted(benchmark::State& state) {
   Envoy::Logger::Context logging_state(spdlog::level::warn,
                                        Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
   for (auto _ : state) {
-    Envoy::Upstream::EdsSpeedTest speed_test;
-    speed_test.priorityAndLocalityWeightedHelper(state.range(0), state.range(1));
+    Envoy::Upstream::EdsSpeedTest speed_test(state, state.range(0));
+    speed_test.priorityAndLocalityWeightedHelper(state.range(1), state.range(2));
   }
 }
 
-BENCHMARK(priorityAndLocalityWeighted)->Ranges({{false, true}, {2000, 100000}});
+BENCHMARK(priorityAndLocalityWeighted)->Ranges({{false, true}, {false, true}, {2000, 100000}});

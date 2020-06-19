@@ -49,8 +49,8 @@ class RateLimitGrpcClientTest : public testing::Test {
 public:
   RateLimitGrpcClientTest()
       : async_client_(new Grpc::MockAsyncClient()),
-        client_(Grpc::RawAsyncClientPtr{async_client_},
-                absl::optional<std::chrono::milliseconds>()) {}
+        client_(Grpc::RawAsyncClientPtr{async_client_}, absl::optional<std::chrono::milliseconds>(),
+                envoy::config::core::v3::ApiVersion::AUTO) {}
 
   Grpc::MockAsyncClient* async_client_;
   Grpc::MockAsyncRequest async_request_;
@@ -64,7 +64,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
 
   {
     envoy::service::ratelimit::v3::RateLimitRequest request;
-    Http::RequestHeaderMapImpl headers;
+    Http::TestRequestHeaderMapImpl headers;
     GrpcClientImpl::createRequest(request, "foo", {{{{"foo", "bar"}}}});
     EXPECT_CALL(*async_client_, sendRaw(_, _, Grpc::ProtoBufferEq(request), Ref(client_), _, _))
         .WillOnce(
@@ -91,7 +91,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
 
   {
     envoy::service::ratelimit::v3::RateLimitRequest request;
-    Http::RequestHeaderMapImpl headers;
+    Http::TestRequestHeaderMapImpl headers;
     GrpcClientImpl::createRequest(request, "foo", {{{{"foo", "bar"}, {"bar", "baz"}}}});
     EXPECT_CALL(*async_client_, sendRaw(_, _, Grpc::ProtoBufferEq(request), _, _, _))
         .WillOnce(Return(&async_request_));
