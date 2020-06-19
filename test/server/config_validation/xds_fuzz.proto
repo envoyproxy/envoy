@@ -47,8 +47,7 @@ message Config {
   }
   IpVersion ip_version = 1;
   ClientType client_type = 2;
-  SotwOrDelta sotw_or_delta = 3;
-  // [(validate.rules).enum.const = 0];
+  SotwOrDelta sotw_or_delta = 3 [(validate.rules).enum.const = 0];
 }
 
 message XdsTestCase {
