@@ -127,10 +127,13 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
 }
 
 void DateFormatter::parse(const std::string& format_string) {
-  std::string new_format_string = format_string;
+  std::string suffix = format_string;
   std::smatch matched;
+  // "step" is the last specifier's position + the last specifier's width. It's not the current
+  // position in "format_string" because the length has changed. It is actually the index which
+  // points to the end of the last specifier in formatted string (generated in the future).
   size_t step = 0;
-  while (regex_search(new_format_string, matched, SpecifierConstants::get().PATTERN)) {
+  while (regex_search(suffix, matched, SpecifierConstants::get().PATTERN)) {
     // The std::smatch matched for (%([1-9])?f)|(%s): [all, subsecond-specifier, subsecond-specifier
     // width, second-specifier].
     const std::string& width_specifier = matched[2];
@@ -139,27 +142,22 @@ void DateFormatter::parse(const std::string& format_string) {
     // In the template string to be used in runtime substitution, the width is the number of
     // characters to be replaced.
     const size_t width = width_specifier.empty() ? 9 : width_specifier.at(0) - '0';
-    new_format_string.replace(matched.position(), matched.length(),
-                              std::string(second_specifier.empty() ? width : 2, '?'));
 
-    ASSERT(step < new_format_string.size());
-
+    ASSERT(!suffix.empty());
     // This records matched position, the width of current subsecond pattern, and also the string
     // segment before the matched position. These values will be used later at data path.
     specifiers_.emplace_back(
         second_specifier.empty()
-            ? Specifier(matched.position(), width,
-                        new_format_string.substr(step, matched.position() - step))
-            : Specifier(matched.position(),
-                        new_format_string.substr(step, matched.position() - step)));
-
+            ? Specifier(step + matched.position(), width, suffix.substr(0, matched.position()))
+            : Specifier(step + matched.position(), suffix.substr(0, matched.position())));
     step = specifiers_.back().position_ + specifiers_.back().width_;
+    suffix = matched.suffix();
   }
 
   // To capture the segment after the last specifier pattern of a format string by creating a zero
   // width specifier. E.g. %3f-this-is-the-last-%s-segment-%Y-until-this.
-  if (step < new_format_string.size()) {
-    Specifier specifier(step, 0, new_format_string.substr(step));
+  if (!suffix.empty()) {
+    Specifier specifier(step, 0, suffix);
     specifiers_.emplace_back(specifier);
   }
 }

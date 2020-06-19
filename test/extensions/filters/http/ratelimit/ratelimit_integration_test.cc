@@ -20,7 +20,7 @@ namespace Envoy {
 namespace {
 
 // Tests Ratelimit functionality with config in filter.
-class RatelimitIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
+class RatelimitIntegrationTest : public Grpc::VersionedGrpcClientIntegrationParamTest,
                                  public HttpIntegrationTest {
 public:
   RatelimitIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
@@ -46,6 +46,7 @@ public:
       proto_config_.set_failure_mode_deny(failure_mode_deny_);
       setGrpcService(*proto_config_.mutable_rate_limit_service()->mutable_grpc_service(),
                      "ratelimit", fake_upstreams_.back()->localAddress());
+      proto_config_.mutable_rate_limit_service()->set_transport_api_version(apiVersion());
 
       envoy::config::listener::v3::Filter ratelimit_filter;
       ratelimit_filter.set_name("envoy.filters.http.ratelimit");
@@ -86,7 +87,8 @@ public:
     result = ratelimit_request_->waitForEndStream(*dispatcher_);
     RELEASE_ASSERT(result, result.message());
     EXPECT_EQ("POST", ratelimit_request_->headers().getMethodValue());
-    EXPECT_EQ("/envoy.service.ratelimit.v2.RateLimitService/ShouldRateLimit",
+    EXPECT_EQ(TestUtility::getVersionedMethodPath("envoy.service.ratelimit.{}.RateLimitService",
+                                                  "ShouldRateLimit", apiVersion()),
               ratelimit_request_->headers().getPathValue());
     EXPECT_EQ("application/grpc", ratelimit_request_->headers().getContentTypeValue());
 
@@ -203,9 +205,9 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, RatelimitIntegrationTest,
-                         GRPC_CLIENT_INTEGRATION_PARAMS);
+                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS);
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, RatelimitFailureModeIntegrationTest,
-                         GRPC_CLIENT_INTEGRATION_PARAMS);
+                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS);
 
 TEST_P(RatelimitIntegrationTest, Ok) { basicFlow(); }
 
