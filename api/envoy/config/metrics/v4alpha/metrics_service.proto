@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.config.metrics.v4alpha;
 
+import "envoy/config/core/v4alpha/config_source.proto";
 import "envoy/config/core/v4alpha/grpc_service.proto";
 
 import "google/protobuf/wrappers.proto";
@@ -27,6 +28,10 @@ message MetricsServiceConfig {
 
   // The upstream gRPC cluster that hosts the metrics service.
   core.v4alpha.GrpcService grpc_service = 1 [(validate.rules).message = {required: true}];
+
+  // API version for metric service transport protocol. This describes the metric service gRPC
+  // endpoint and version of messages used on the wire.
+  core.v4alpha.ApiVersion transport_api_version = 3 [(validate.rules).enum = {defined_only: true}];
 
   // If true, counters are reported as the delta between flushing intervals. Otherwise, the current
   // counter value is reported. Defaults to false.

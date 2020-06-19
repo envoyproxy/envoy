@@ -31,8 +31,9 @@ public:
     EXPECT_CALL(*factory_, create()).WillOnce(Invoke([this] {
       return Grpc::RawAsyncClientPtr{async_client_};
     }));
-    streamer_ = std::make_unique<GrpcMetricsStreamerImpl>(Grpc::AsyncClientFactoryPtr{factory_},
-                                                          local_info_);
+    streamer_ = std::make_unique<GrpcMetricsStreamerImpl>(
+        Grpc::AsyncClientFactoryPtr{factory_}, local_info_,
+        envoy::config::core::v3::ApiVersion::AUTO);
   }
 
   void expectStreamStart(MockMetricsStream& stream, MetricsServiceCallbacks** callbacks_to_set) {

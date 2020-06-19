@@ -19,7 +19,7 @@ using testing::AssertionResult;
 namespace Envoy {
 namespace {
 
-class AccessLogIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
+class AccessLogIntegrationTest : public Grpc::VersionedGrpcClientIntegrationParamTest,
                                  public HttpIntegrationTest {
 public:
   AccessLogIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
@@ -48,12 +48,21 @@ public:
           envoy::extensions::access_loggers::grpc::v3::HttpGrpcAccessLogConfig config;
           auto* common_config = config.mutable_common_config();
           common_config->set_log_name("foo");
+          common_config->set_transport_api_version(apiVersion());
           setGrpcService(*common_config->mutable_grpc_service(), "accesslog",
                          fake_upstreams_.back()->localAddress());
           access_log->mutable_typed_config()->PackFrom(config);
         });
 
     HttpIntegrationTest::initialize();
+  }
+
+  static ProtobufTypes::MessagePtr scrubHiddenEnvoyDeprecated(const Protobuf::Message& message) {
+    ProtobufTypes::MessagePtr mutable_clone;
+    mutable_clone.reset(message.New());
+    mutable_clone->MergeFrom(message);
+    Config::VersionUtil::scrubHiddenEnvoyDeprecated(*mutable_clone);
+    return mutable_clone;
   }
 
   ABSL_MUST_USE_RESULT
@@ -71,7 +80,8 @@ public:
     envoy::service::accesslog::v3::StreamAccessLogsMessage request_msg;
     VERIFY_ASSERTION(access_log_request_->waitForGrpcMessage(*dispatcher_, request_msg));
     EXPECT_EQ("POST", access_log_request_->headers().getMethodValue());
-    EXPECT_EQ("/envoy.service.accesslog.v2.AccessLogService/StreamAccessLogs",
+    EXPECT_EQ(TestUtility::getVersionedMethodPath("envoy.service.accesslog.{}.AccessLogService",
+                                                  "StreamAccessLogs", apiVersion()),
               access_log_request_->headers().getPathValue());
     EXPECT_EQ("application/grpc", access_log_request_->headers().getContentTypeValue());
 
@@ -93,8 +103,10 @@ public:
       node->clear_extensions();
       node->clear_user_agent_build_version();
     }
-    EXPECT_EQ(request_msg.DebugString(), expected_request_msg.DebugString());
-
+    Config::VersionUtil::scrubHiddenEnvoyDeprecated(request_msg);
+    Config::VersionUtil::scrubHiddenEnvoyDeprecated(expected_request_msg);
+    EXPECT_TRUE(TestUtility::protoEqual(request_msg, expected_request_msg,
+                                        /*ignore_repeated_field_ordering=*/false));
     return AssertionSuccess();
   }
 
@@ -112,7 +124,7 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsCientType, AccessLogIntegrationTest,
-                         GRPC_CLIENT_INTEGRATION_PARAMS);
+                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Test a basic full access logging flow.
 TEST_P(AccessLogIntegrationTest, BasicAccessLogFlow) {

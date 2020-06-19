@@ -85,7 +85,8 @@ public:
   GrpcAccessLoggerImpl(Grpc::RawAsyncClientPtr&& client, std::string log_name,
                        std::chrono::milliseconds buffer_flush_interval_msec,
                        uint64_t max_buffer_size_bytes, Event::Dispatcher& dispatcher,
-                       const LocalInfo::LocalInfo& local_info, Stats::Scope& scope);
+                       const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
+                       envoy::config::core::v3::ApiVersion transport_api_version);
 
   // Extensions::AccessLoggers::GrpcCommon::GrpcAccessLogger
   void log(envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry) override;
@@ -124,6 +125,8 @@ private:
   envoy::service::accesslog::v3::StreamAccessLogsMessage message_;
   absl::optional<LocalStream> stream_;
   const LocalInfo::LocalInfo& local_info_;
+  const Protobuf::MethodDescriptor& service_method_;
+  const envoy::config::core::v3::ApiVersion transport_api_version_;
 };
 
 class GrpcAccessLoggerCacheImpl : public Singleton::Instance, public GrpcAccessLoggerCache {

@@ -12,6 +12,7 @@
 
 #include "common/common/backoff_strategy.h"
 #include "common/common/logger.h"
+#include "common/common/macros.h"
 #include "common/config/utility.h"
 #include "common/grpc/async_client_impl.h"
 #include "common/network/resolver_impl.h"

@@ -44,7 +44,7 @@ public:
 
   static HeaderValueOptionVector makeHeaderValueOption(KeyValueOptionVector&& headers);
 
-  static bool CompareHeaderVector(const Http::HeaderVector& lhs, const Http::HeaderVector& rhs);
+  static bool compareHeaderVector(const Http::HeaderVector& lhs, const Http::HeaderVector& rhs);
 };
 
 MATCHER_P(AuthzErrorResponse, status, "") {
@@ -77,7 +77,7 @@ MATCHER_P(AuthzDeniedResponse, response, "") {
     return false;
   }
   // Compare headers_to_add.
-  return TestCommon::CompareHeaderVector(response.headers_to_add, arg->headers_to_add);
+  return TestCommon::compareHeaderVector(response.headers_to_add, arg->headers_to_add);
 }
 
 MATCHER_P(AuthzOkResponse, response, "") {
@@ -85,12 +85,12 @@ MATCHER_P(AuthzOkResponse, response, "") {
     return false;
   }
   // Compare headers_to_append.
-  if (!TestCommon::CompareHeaderVector(response.headers_to_append, arg->headers_to_append)) {
+  if (!TestCommon::compareHeaderVector(response.headers_to_append, arg->headers_to_append)) {
     return false;
   }
 
   // Compare headers_to_add.
-  return TestCommon::CompareHeaderVector(response.headers_to_add, arg->headers_to_add);
+  return TestCommon::compareHeaderVector(response.headers_to_add, arg->headers_to_add);
   ;
 }
 

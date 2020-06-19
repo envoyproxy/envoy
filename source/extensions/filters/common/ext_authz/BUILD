@@ -44,6 +44,7 @@ envoy_cc_library(
         "//source/common/protobuf",
         "//source/common/tracing:http_tracer_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/auth/v2alpha:pkg_cc_proto",
         "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
     ],
 )
