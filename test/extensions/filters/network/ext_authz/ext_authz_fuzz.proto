@@ -8,7 +8,7 @@ import "validate/validate.proto";
 message Result {
   oneof result_selector {
     option (validate.required) = true;
-    // Autherization check status
+    // Authorization check status
     google.protobuf.Empty check_status_error = 1;
     google.protobuf.Empty check_status_denied = 2;
     google.protobuf.Empty check_status_ok = 3;
