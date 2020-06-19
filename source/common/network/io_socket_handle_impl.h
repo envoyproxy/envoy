@@ -7,6 +7,7 @@
 
 #include "common/common/logger.h"
 #include "common/network/io_socket_error_impl.h"
+#include <sys/socket.h>
 
 namespace Envoy {
 namespace Network {
@@ -73,7 +74,7 @@ private:
 
   // TODO(yugant): Should add gso_size sizeof(int)
   const size_t cmsg_space_{CMSG_SPACE(sizeof(int)) + CMSG_SPACE(sizeof(struct in_pktinfo)) +
-                           CMSG_SPACE(sizeof(struct in6_pktinfo))};
+                           CMSG_SPACE(sizeof(struct in6_pktinfo)) + CMSG_SPACE(sizeof(int))};
 };
 
 } // namespace Network
