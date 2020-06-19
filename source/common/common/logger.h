@@ -17,7 +17,6 @@
 #include "absl/synchronization/mutex.h"
 #include "fmt/ostream.h"
 #include "spdlog/spdlog.h"
-#include "absl/container/flat_hash_map.h" // addition by Jinhui Song
 
 namespace Envoy {
 namespace Logger {
@@ -364,50 +363,37 @@ protected:
  * Fancy logging macros by Jinhui Song
  */
 
-extern spdlog::level::level_enum kDefaultFancyLevel;
+extern void setFancyLogger(std::string key, spdlog::level::level_enum log_level);
 
-extern std::atomic<int>* global_epoch__;
-
-/**
- * Log info struct for the linked list.
- */
-struct FancyLogInfo {
-  std::string file;
-  mutable spdlog::level::level_enum level;
-  const FancyLogInfo* next;
-};
-
-extern FancyLogInfo* fancy_log_list__;
-
-extern int setFancyLogLevel(const char* file, spdlog::level::level_enum log_level);
-
-extern void updateFancyLogger(const char* file, spdlog::logger* logger, std::atomic<int>* local_epoch);
+extern void initFancyLogger(std::string key, std::atomic<spdlog::logger*>& logger);
 
 extern spdlog::sink_ptr getSink();
 
+#define FANCY_KEY std::string(__FILE__)
+
+// #define FANCY_KEY std::string(__FILE__ ":" __func__)
+
+// #define FANCY_KEY std::string(__FILE__ ":" __func__) + std::to_string(__LINE__)
+
 /**
  * Macro for fancy logger.
- * Use atomic global_epoch here to avoid the lock overhead and update all logger
- * if one logger's log level is updated.
+ * Use a global map to store logger and take use of thread-safe spdlog::logger.
  */
 #define FANCY_LOG(LEVEL, ...)                                                                \
   do {                                                                                       \
-    static std::atomic<int> local_epoch(-1);                                                             \
-    static spdlog::logger flogger(__FILE__, getSink());                  \
-    if (!global_epoch__ || local_epoch.load() < global_epoch__->load()) {                           \
-      updateFancyLogger(__FILE__, &flogger, &local_epoch);                                       \
+    static std::atomic<spdlog::logger*> flogger{0};                                          \
+    if (!flogger.load(std::memory_order_relaxed)) {                                          \
+      initFancyLogger(FANCY_KEY, flogger);                                                   \
     }                                                                                        \
-    flogger.log(spdlog::source_loc{__FILE__, __LINE__, __func__}, ENVOY_SPDLOG_LEVEL(LEVEL), \
-                __VA_ARGS__);                                                                \
+    flogger.load(std::memory_order_relaxed)->log(spdlog::source_loc{__FILE__, __LINE__, __func__},                           \
+                ENVOY_SPDLOG_LEVEL(LEVEL), __VA_ARGS__);                                     \
   } while (0)
-
 
 /**
  * Convenient macro for connection log.
  */
 #define FANCY_CONN_LOG(LEVEL, FORMAT, CONNECTION, ...)        \
   FANCY_LOG(LEVEL, "[C{}] " FORMAT, (CONNECTION).id(), ##__VA_ARGS__)
-
 
 /**
  * Convenient macro for stream log.

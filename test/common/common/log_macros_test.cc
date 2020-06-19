@@ -149,20 +149,10 @@ TEST_F(FormatTest, OutputEscaped) {
  */
 TEST(Fancy, Global) {
   // First log
-  EXPECT_THAT(global_epoch__, testing::Eq(nullptr));
-  EXPECT_EQ(fancy_log_list__, nullptr);
   FANCY_LOG(info, "Hello world! Here's a line of fancy log!");
-  EXPECT_THAT(global_epoch__->load(), testing::Eq(0));
-  
-  EXPECT_NE(fancy_log_list__, nullptr);
-  EXPECT_EQ(fancy_log_list__->file, __FILE__);
-  EXPECT_EQ(fancy_log_list__->level, 2);       // info
   
   // Second log
   FANCY_LOG(error, "Fancy Error! Here's the second message!");
-  EXPECT_EQ(global_epoch__->load(), 0);
-  EXPECT_EQ(fancy_log_list__->file, __FILE__);
-  EXPECT_EQ(fancy_log_list__->level, 2);       // file level is default
 
   // Connection and stream log
   NiceMock<Network::MockConnection> connection_;
@@ -172,27 +162,16 @@ TEST(Fancy, Global) {
 }
 
 TEST(Fancy, SetLevel) {
-  int gepoch = global_epoch__->load();
   const char* file = "P=NP_file";
-  setFancyLogLevel(file, spdlog::level::trace);
-  EXPECT_EQ(global_epoch__->load(), gepoch + 1);
-  EXPECT_EQ(fancy_log_list__->file, file);
-  EXPECT_EQ(fancy_log_list__->level, 0);      // trace level
+  setFancyLogger(file, spdlog::level::trace);
 
-  setFancyLogLevel(__FILE__, spdlog::level::err);
-  EXPECT_EQ(fancy_log_list__->file, "P=NP_file");
-  EXPECT_EQ(fancy_log_list__->level, 0);
-  EXPECT_EQ(fancy_log_list__->next->file, __FILE__);
-  EXPECT_EQ(fancy_log_list__->next->level, 4);
+  setFancyLogger(__FILE__, spdlog::level::err);
   FANCY_LOG(error, "Fancy Error! Here's a test for level.");
   FANCY_LOG(warn, "Warning: you shouldn't see this message!");
-
 }
 
 TEST(Fancy, FastPath) {
-  // for loop should expands with the same site?
-  printf("You should only see one 'Slow path' in the output..\n");
-  setFancyLogLevel(__FILE__, spdlog::level::info);
+  setFancyLogger(__FILE__, spdlog::level::info);
   for(int i = 0; i < 10; i ++) {
     FANCY_LOG(warn, "Fake warning No. {}", i);
   }
@@ -203,23 +182,23 @@ void *logThread(void* id) {
 
   if (tid == 0) {
     FANCY_LOG(info, "Thread {}: thread to set levels", tid);
-    setFancyLogLevel(__FILE__, spdlog::level::trace);
+    setFancyLogger(__FILE__, spdlog::level::trace);
     printf(" - level = trace\n");
-    setFancyLogLevel(__FILE__, spdlog::level::debug);
+    setFancyLogger(__FILE__, spdlog::level::debug);
     printf(" - level = debug\n");
-    setFancyLogLevel(__FILE__, spdlog::level::info);
+    setFancyLogger(__FILE__, spdlog::level::info);
     printf(" - level = info\n");
     for (int j = 0; j < 10; j ++) {};
     
-    setFancyLogLevel(__FILE__, spdlog::level::warn);
+    setFancyLogger(__FILE__, spdlog::level::warn);
     printf(" - level = warn\n");
-    setFancyLogLevel(__FILE__, spdlog::level::err);
+    setFancyLogger(__FILE__, spdlog::level::err);
     printf(" - level = error\n");
-    setFancyLogLevel(__FILE__, spdlog::level::critical);
+    setFancyLogger(__FILE__, spdlog::level::critical);
     printf(" - level = critical\n");
   }
   else {
-    for (int i = 0; i < 5; i ++) {
+    for (int i = 0; i < 30; i ++) {
       FANCY_LOG(critical, "Thread {} round {}: fake critical log;", tid, i);
       FANCY_LOG(trace, "    fake trace log;");
       FANCY_LOG(debug, "    fake debug log;");
