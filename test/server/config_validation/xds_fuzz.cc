@@ -69,7 +69,7 @@ XdsFuzzTest::XdsFuzzTest(const test::server::config_validation::XdsTestCase& inp
                                          ? "GRPC"
                                          : "DELTA_GRPC",
                                      api_version)),
-      actions_(input.actions()), version_(1), num_lds_updates_(0), api_version_(api_version) {
+      actions_(input.actions()), version_(1), api_version_(api_version) {
   use_lds_ = false;
   create_xds_upstream_ = true;
   tls_xds_upstream_ = false;
@@ -202,11 +202,7 @@ void XdsFuzzTest::replay() {
       listeners_.push_back(listener);
 
       updateListener(listeners_, {listener}, {});
-
       // TODO(samflattery): compareDiscoveryResponse to check ACK/NACK?
-
-      num_lds_updates_++;
-      test_server_->waitForCounterGe("listener_manager.lds.update_attempt", num_lds_updates_);
       break;
     }
     case test::server::config_validation::Action::kRemoveListener: {
@@ -218,8 +214,6 @@ void XdsFuzzTest::replay() {
         updateListener(listeners_, {}, {});
       }
 
-      num_lds_updates_++;
-      test_server_->waitForCounterGe("listener_manager.lds.update_attempt", num_lds_updates_);
       break;
     }
     case test::server::config_validation::Action::kAddRoute: {
@@ -250,14 +244,7 @@ void XdsFuzzTest::replay() {
     version_++;
   }
 
-  verifyState();
   close();
-}
-
-void XdsFuzzTest::verifyState() {
-  EXPECT_EQ(test_server_->counter("listener_manager.lds.update_attempt")->value(),
-            num_lds_updates_);
-  // TODO(samflattery): check other stats
 }
 
 } // namespace Envoy

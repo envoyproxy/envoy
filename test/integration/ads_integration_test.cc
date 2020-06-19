@@ -798,7 +798,7 @@ public:
   AdsClusterFromFileIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(),
                             ConfigHelper::adsBootstrap(
-                                sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
+                                sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC",
                                 envoy::config::core::v3::ApiVersion::V2)) {
     create_xds_upstream_ = true;
     use_lds_ = false;

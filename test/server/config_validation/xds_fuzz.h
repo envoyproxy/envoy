@@ -17,7 +17,7 @@
 #include "absl/types/optional.h"
 
 // TODO(samflattery): add these to fuzz config instead?
-#define NUM_LISTENERS 10
+#define NUM_LISTENERS 3
 #define NUM_ROUTES 5
 
 namespace Envoy {
@@ -26,7 +26,6 @@ class XdsFuzzTest : public HttpIntegrationTest {
 public:
   XdsFuzzTest(const test::server::config_validation::XdsTestCase& input,
               envoy::config::core::v3::ApiVersion api_version);
-  /* XdsFuzzTest(const test::server::config_validation::XdsTestCase& input); */
 
   envoy::config::cluster::v3::Cluster buildCluster(const std::string& name);
 
@@ -49,7 +48,6 @@ public:
   void initialize() override;
   void replay();
   void close();
-  void verifyState();
 
 private:
   void parseConfig(const test::server::config_validation::XdsTestCase& input);
@@ -70,7 +68,6 @@ private:
   Grpc::SotwOrDelta sotw_or_delta_;
 
   uint64_t version_;
-  uint64_t num_lds_updates_;
   envoy::config::core::v3::ApiVersion api_version_;
 };
 
