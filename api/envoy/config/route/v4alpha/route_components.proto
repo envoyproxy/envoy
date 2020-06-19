@@ -542,7 +542,7 @@ message CorsPolicy {
   core.v4alpha.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
-// [#next-free-field: 35]
+// [#next-free-field: 36]
 message RouteAction {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.route.v3.RouteAction";
 
@@ -747,10 +747,52 @@ message RouteAction {
     ConnectConfig connect_config = 3;
   }
 
+  message ClusterSelector {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.config.route.v3.RouteAction.ClusterSelector";
+
+    // Indicates the upstream cluster to which the request should be routed
+    // to.
+    string cluster = 1 [(validate.rules).string = {min_bytes: 1}];
+
+    // Envoy will determine the cluster to route to by reading the value of the
+    // HTTP header named by cluster_header from the request headers. If the
+    // header is not found or the referenced cluster does not exist, Envoy will
+    // return a 404 response.
+    //
+    // .. attention::
+    //
+    //   Internally, Envoy always uses the HTTP/2 *:authority* header to represent the HTTP/1
+    //   *Host* header. Thus, if attempting to match on *Host*, match on *:authority* instead.
+    string cluster_header = 2
+        [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+
+    // Multiple upstream clusters can be specified for a given route. The
+    // request is routed to one of the upstream clusters based on weights
+    // assigned to each cluster. See
+    // :ref:`traffic splitting <config_http_conn_man_route_table_traffic_splitting_split>`
+    // for additional documentation.
+    WeightedCluster weighted_clusters = 3;
+
+    // Envoy will determine the cluster to route to by reading the value of the filter state
+    // referenced by the key specified in this field. If the key is not found or the referenced
+    // cluster does not exist, Envoy will return an error response.
+    string cluster_filter_state_key = 4 [(validate.rules).string = {min_bytes: 1}];
+  }
+
+  // A wrapper to enable repeated |ClusterSelector|s in a oneof.
+  message ClusterSelectorRepeatedWrapper {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.config.route.v3.RouteAction.ClusterSelectorRepeatedWrapper";
+
+    repeated ClusterSelector cluster_selectors = 1;
+  }
+
   reserved 12, 18, 19, 16, 22, 21, 10, 26, 31;
 
   reserved "request_mirror_policy", "internal_redirect_action", "max_internal_redirects";
 
+  // NOTE: This oneof can be deprecated for a `repeated ClusterSelector`.
   oneof cluster_specifier {
     option (validate.required) = true;
 
@@ -776,6 +818,11 @@ message RouteAction {
     // :ref:`traffic splitting <config_http_conn_man_route_table_traffic_splitting_split>`
     // for additional documentation.
     WeightedCluster weighted_clusters = 3;
+
+    // A list of selectors that will be iterated in order. If a selector is unable to return an
+    // active cluster, the next selector in the list will be attempted. If an active cluster can't
+    // be found after iterating this list, an error response will be returned to the client.
+    ClusterSelectorRepeatedWrapper cluster_selectors = 35;
   }
 
   // The HTTP status code to use when configured cluster is not found.
