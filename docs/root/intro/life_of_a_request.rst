@@ -18,8 +18,9 @@ Envoy uses the following terms through its codebase and documentation:
 * *Downstream*: an entity connecting to Envoy. This may be a local application (in a sidecar model) or
   a network node. In non-sidecar models, this is a remote client.
 * *Endpoints*:  nodes that implement a logical service. They are grouped into clusters.
-* *Filter*: a module in the request processing pipeline providing some aspect of request handling. An
-  analogy from Unix is the composition of small utilities (filters) with Unix pipes (filter chains).
+* *Filter*: a module in the connection or request processing pipeline providing some aspect of
+  request handling. An analogy from Unix is the composition of small utilities (filters) with Unix
+  pipes (filter chains).
 * *Filter chain*: a series of filters.
 * *Listeners*: Envoy module responsible for binding to an IP/port, accepting new TCP connections (or
   UDP datagrams) and orchestrating the downstream facing aspects of request processing.
@@ -42,8 +43,7 @@ applications. In the service mesh model, requests flow through Envoys as a gatew
 Requests arrive at an Envoy via either ingress or egress listeners:
 
 * Ingress listeners take requests from other nodes in the service mesh and forward them to the
-  local application. Responses from the local application flow back through Envoy to the other nodes
-  in the service mesh.
+  local application. Responses from the local application flow back through Envoy to the downstream.
 * Egress listeners take requests from the local application and forward them to other nodes in the
   network. These nodes will also be typically running Envoy and accepting the request via their
   ingress listeners.
@@ -207,9 +207,8 @@ High level architecture
 The request processing path in Envoy has two main parts:
 
 * :ref:`Listener subsystem <arch_overview_listeners>` which handles **downstream** request
-  processing. This includes all processing from when the first bytes are read from the socket until
-  the HTTP request is ready to forward to an upstream cluster. It is also responsible for the
-  response path to the client, the downstream HTTP/2 codec lives here.
+  processing. It is also responsible for managing the downstream request lifecycle and for the
+  response path to the client. The downstream HTTP/2 codec lives here.
 * :ref:`Cluster subsystem <arch_overview_cluster_manager>` which is responsible for selecting and
   configuring the **upstream** connection to an endpoint. This is where knowledge of cluster and
   endpoint health, load balancing and connection pooling exists. The upstream HTTP/2 codec lives
@@ -236,10 +235,11 @@ the server lifecycle, configuration processing, stats, etc. and some number of :
 <https://libevent.org/>`_) and any given downstream TCP connection (including all the multiplexed
 streams on it) will be handled by exactly one worker thread for its lifetime. Each worker thread
 maintains its own pool of TCP connections to upstream endpoints. :ref:`UDP
-<arch_overview_listeners_udp>` handling makes use of SO_REUSEPORT to have the kernel consistency
-hash the source/destination IP:port tuples to the same worker thread. UDP filter state is global to
-a worker thread, with the filter responsible for providing session semantics as needed. This is in
-contrast to the connection oriented TCP filters we discuss below.
+<arch_overview_listeners_udp>` handling makes use of SO_REUSEPORT to have the kernel consistently
+hash the source/destination IP:port tuples to the same worker thread. UDP filter state is shared for
+a given worker thread, with the filter responsible for providing session semantics as needed. This
+is in contrast to the connection oriented TCP filters we discuss below, where filter state exists on
+a per connection and, in the case of HTTP filters, per-request basis.
 
 Worker threads rarely share state and operate in a trivially parallel fashion. This threading model
 enables scaling to very high core count CPUs.
@@ -513,10 +513,11 @@ When ``decodeHeaders()`` is invoked on the :ref:`router <arch_overview_http_rout
 route selection is finalized and a cluster is picked. HCM selects a route from its
 ``RouteConfiguration`` at the start of HTTP filter chain execution. This is referred to as the
 *cached route*. Filters may modify headers and cause a new route to be selected, by asking HCM to
-clear the route cache. When the router filter is invoked, the route is finalized. The selected
-route’s configuration will point at an upstream cluster name. The router filter then asks the
-`ClusterManager` for an HTTP :ref:`connection pool <arch_overview_conn_pool>` for the cluster. This
-involves load balancing and the connection pool, discussed in the next section.
+clear the route cache and requesting HCM to reevaluate the route selection. When the router filter
+is invoked, the route is finalized. The selected route’s configuration will point at an upstream
+cluster name. The router filter then asks the `ClusterManager` for an HTTP :ref:`connection pool
+<arch_overview_conn_pool>` for the cluster. This involves load balancing and the connection pool,
+discussed in the next section.
 
 .. image:: /_static/lor-route-config.svg
    :width: 70%
