@@ -696,7 +696,7 @@ def checkSourceLine(line, file_path, reportError):
         reportError("Don't call grpc_init() or grpc_shutdown() directly, instantiate " +
                     "Grpc::GoogleGrpcContext. See #8282")
 
-  if not line.startswith("using"):
+  if not re.search("using .* = .*;", line):
     smart_ptr_m = re.search("std::(unique_ptr|shared_ptr)<(.*?)>", line)
     if smart_ptr_m:
       reportError(f"Use type alias for '{smart_ptr_m.group(2)}' instead. See STYLE.md")

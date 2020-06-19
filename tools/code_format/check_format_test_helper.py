@@ -276,6 +276,7 @@ def runChecks():
   errors += checkFileExpectingOK("real_time_source_override.cc")
   errors += checkFileExpectingOK("time_system_wait_for.cc")
   errors += checkFileExpectingOK("clang_format_off.cc")
+  errors += checkFileExpectingOK("using_type_alias.cc")
   return errors
 
 
