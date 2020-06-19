@@ -1437,7 +1437,7 @@ TEST_F(LuaHttpFilterTest, ImmediateResponse) {
   setup(SCRIPT);
 
   // Perform a GC and snap bytes currently used by the runtime.
-  SingleScriptConfig* script_config = config_->scriptConfig(GLOBAL_SCRIPT_NAME);
+  auto script_config = config_->perLuaCodeSetup(GLOBAL_SCRIPT_NAME);
   script_config->runtimeGC();
   const uint64_t mem_use_at_start = script_config->runtimeBytesUsed();
 
