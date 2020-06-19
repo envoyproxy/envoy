@@ -28,9 +28,9 @@ public:
   // TestTimeSystem
   void advanceTimeWait(const Duration& duration) override;
   void advanceTimeAsync(const Duration& duration) override;
-  Thread::CondVar::WaitStatus
-  waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
-          const Duration& duration) noexcept ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) override;
+  Thread::CondVar::WaitStatus waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
+                                      const Duration& duration) noexcept
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) override;
 
   // TimeSource
   SystemTime systemTime() override;
@@ -97,8 +97,9 @@ private:
   void incPendingLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) { ++pending_alarms_; }
   void decPending() {
     absl::MutexLock lock(&mutex_);
-    --pending_alarms_;
+    decPendingLockHeld();
   }
+  void decPendingLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) { --pending_alarms_; }
   void waitForNoPendingLockHeld() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   RealTimeSource real_time_source_; // Used to initialize monotonic_time_ and system_time_;

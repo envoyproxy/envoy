@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.filters.http.ext_authz.v4alpha;
 
 import "envoy/config/core/v4alpha/base.proto";
+import "envoy/config/core/v4alpha/config_source.proto";
 import "envoy/config/core/v4alpha/grpc_service.proto";
 import "envoy/config/core/v4alpha/http_uri.proto";
 import "envoy/type/matcher/v4alpha/string.proto";
@@ -22,7 +23,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.http.ext_authz.v3.ExtAuthz";
@@ -39,6 +40,11 @@ message ExtAuthz {
     // HTTP service configuration (default timeout: 200ms).
     HttpService http_service = 3;
   }
+
+  // API version for ext_authz transport protocol. This describes the ext_authz gRPC endpoint and
+  // version of messages used on the wire.
+  config.core.v4alpha.ApiVersion transport_api_version = 12
+      [(validate.rules).enum = {defined_only: true}];
 
   //  Changes filter's behaviour on errors:
   //

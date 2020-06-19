@@ -115,7 +115,8 @@ coverage --config=coverage
 build:coverage --action_env=BAZEL_USE_LLVM_NATIVE_COVERAGE=1
 build:coverage --action_env=GCOV=llvm-profdata
 build:coverage --copt=-DNDEBUG
-build:coverage --test_timeout=900
+# 1.5x original timeout + 300s for trace merger in all categories
+build:coverage --test_timeout=390,750,1500,5700
 build:coverage --define=ENVOY_CONFIG_COVERAGE=1
 build:coverage --cxxopt="-DENVOY_CONFIG_COVERAGE=1"
 build:coverage --coverage_support=@envoy//bazel/coverage:coverage_support
@@ -182,7 +183,7 @@ build:remote-msan --config=rbe-toolchain-msan
 
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/master/toolchains/rbe_toolchains_config.bzl#L8
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:04f06115b6ee7cfea74930353fb47a41149cbec3
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:12b3d2c2ffa582507e5d6dd34632b2b990f1b195
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker
