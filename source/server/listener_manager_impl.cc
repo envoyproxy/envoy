@@ -671,7 +671,7 @@ void ListenerManagerImpl::addListenerToWorker(Worker& worker,
             ENVOY_LOG(critical, "listener '{}' failed to listen on address '{}' on worker",
                       listener.name(), listener.listenSocketFactory().localAddress()->asString());
             stats_.listener_create_failure_.inc();
-            removeListener(listener.name());
+            removeListenerOnCreationFailure(listener.name());
           }
           if (success) {
             stats_.listener_create_success_.inc();
@@ -795,14 +795,23 @@ uint64_t ListenerManagerImpl::numConnections() const {
 }
 
 bool ListenerManagerImpl::removeListener(const std::string& name) {
+  return removeListenerInternal(name, true);
+}
+
+bool ListenerManagerImpl::removeListenerOnCreationFailure(const std::string& listener_name) {
+  return removeListenerInternal(listener_name, false);
+}
+
+bool ListenerManagerImpl::removeListenerInternal(const std::string& name,
+                                                 bool dynamic_listeners_only) {
   ENVOY_LOG(debug, "begin remove listener: name={}", name);
 
   auto existing_active_listener = getListenerByName(active_listeners_, name);
   auto existing_warming_listener = getListenerByName(warming_listeners_, name);
   if ((existing_warming_listener == warming_listeners_.end() ||
-       (*existing_warming_listener)->blockRemove()) &&
+       (dynamic_listeners_only && (*existing_warming_listener)->blockRemove())) &&
       (existing_active_listener == active_listeners_.end() ||
-       (*existing_active_listener)->blockRemove())) {
+       (dynamic_listeners_only && (*existing_active_listener)->blockRemove()))) {
     ENVOY_LOG(debug, "unknown/locked listener '{}'. no remove", name);
     return false;
   }
