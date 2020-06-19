@@ -70,6 +70,7 @@ configuration, or define a Lua code inline directly.
 As an example, given the following Lua filter configuration:
 
 .. code-block:: yaml
+
   name: envoy.filters.http.lua
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.lua
@@ -93,6 +94,7 @@ If there is no route configuration, Lua code defined in the 'inline_code' will b
 route configuration exists, the filter can be disabled by the route configuration.
 
 .. code-block:: yaml
+
   per_filter_config:
     envoy.filters.http.lua:
       disabled: true
@@ -101,6 +103,7 @@ And We can refer to the Lua code in the filter configuration by specifying the n
 configuration.
 
 .. code-block:: yaml
+
   per_filter_config:
     envoy.filters.http.lua:
       name: hello.lua
@@ -113,6 +116,7 @@ configuration.
 Or We can defined Lua code in the route configuration directly.
 
 .. code-block:: yaml
+
   per_filter_config:
     envoy.filters.http.lua:
       code:
