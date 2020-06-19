@@ -379,30 +379,32 @@ extern spdlog::sink_ptr getSink();
  * Macro for fancy logger.
  * Use a global map to store logger and take use of thread-safe spdlog::logger.
  */
-#define FANCY_LOG(LEVEL, ...)                                                                \
-  do {                                                                                       \
-    static std::atomic<spdlog::logger*> flogger{0};                                          \
-    if (!flogger.load(std::memory_order_relaxed)) {                                          \
-      initFancyLogger(FANCY_KEY, flogger);                                                   \
-    }                                                                                        \
-    flogger.load(std::memory_order_relaxed)->log(spdlog::source_loc{__FILE__, __LINE__, __func__},                           \
-                ENVOY_SPDLOG_LEVEL(LEVEL), __VA_ARGS__);                                     \
+#define FANCY_LOG(LEVEL, ...)                                                                      \
+  do {                                                                                             \
+    static std::atomic<spdlog::logger*> flogger{0};                                                \
+    spdlog::logger* local_flogger = flogger.load();                                                \
+    if (!local_flogger) {                                                                          \
+      initFancyLogger(FANCY_KEY, flogger);                                                         \
+      flogger.load()->log(spdlog::source_loc{__FILE__, __LINE__, __func__},                        \
+                          ENVOY_SPDLOG_LEVEL(LEVEL), __VA_ARGS__);                                 \
+    } else {                                                                                       \
+      local_flogger->log(spdlog::source_loc{__FILE__, __LINE__, __func__},                         \
+                         ENVOY_SPDLOG_LEVEL(LEVEL), __VA_ARGS__);                                  \
+    }                                                                                              \
   } while (0)
 
 /**
  * Convenient macro for connection log.
  */
-#define FANCY_CONN_LOG(LEVEL, FORMAT, CONNECTION, ...)        \
+#define FANCY_CONN_LOG(LEVEL, FORMAT, CONNECTION, ...)                                             \
   FANCY_LOG(LEVEL, "[C{}] " FORMAT, (CONNECTION).id(), ##__VA_ARGS__)
 
 /**
  * Convenient macro for stream log.
  */
-#define FANCY_STREAM_LOG(LEVEL, FORMAT, STREAM, ...)          \
-  FANCY_LOG(LEVEL, "[C{}][S{}] " FORMAT,                      \
-  (STREAM).connection() ? (STREAM).connection()->id() : 0,    \
-  (STREAM).streamId(), ##__VA_ARGS__)
-
+#define FANCY_STREAM_LOG(LEVEL, FORMAT, STREAM, ...)                                               \
+  FANCY_LOG(LEVEL, "[C{}][S{}] " FORMAT, (STREAM).connection() ? (STREAM).connection()->id() : 0,  \
+            (STREAM).streamId(), ##__VA_ARGS__)
 
 /**
  * End

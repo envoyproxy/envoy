@@ -83,9 +83,15 @@ void initFancyLogger(std::string key, std::atomic<spdlog::logger*>& logger) {
     initSink();
   }
   auto it = fancy_log_map__.find(key);
-  spdlog::logger* target = it == fancy_log_map__.end()? createLogger(key) : it->second;
+  spdlog::logger* target;
+  if (it == fancy_log_map__.end()) {
+    target = createLogger(key);
+  } else {
+    target = it->second;
+  }
   logger.store(target);
-//   printf("  Init: key: %s, level: %d\n", key.c_str(), logger.load(std::memory_order_relaxed)->level());
+  //   printf("  Init: key: %s, level: %d\n", key.c_str(),
+  //   logger.load(std::memory_order_relaxed)->level());
 }
 
 /**
