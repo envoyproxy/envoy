@@ -10,8 +10,8 @@
 #include "envoy/config/route/v3/route.pb.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
-#include "test/integration/http_integration.h"
 #include "test/config/utility.h"
+#include "test/integration/http_integration.h"
 #include "test/server/config_validation/xds_fuzz.pb.h"
 
 #include "absl/types/optional.h"
@@ -24,7 +24,9 @@ namespace Envoy {
 
 class XdsFuzzTest : public HttpIntegrationTest {
 public:
-  XdsFuzzTest(const test::server::config_validation::XdsTestCase& input);
+  XdsFuzzTest(const test::server::config_validation::XdsTestCase& input,
+              envoy::config::core::v3::ApiVersion api_version);
+  /* XdsFuzzTest(const test::server::config_validation::XdsTestCase& input); */
 
   envoy::config::cluster::v3::Cluster buildCluster(const std::string& name);
 
@@ -35,30 +37,26 @@ public:
 
   envoy::config::route::v3::RouteConfiguration buildRouteConfig(uint32_t route_num);
 
-  /* void updateListener(const std::vector<envoy::config::listener::v3::Listener>& listeners, */
-  /*                                const std::string& version); */
   void updateListener(const std::vector<envoy::config::listener::v3::Listener>& listeners,
-                                   const std::vector<envoy::config::listener::v3::Listener>& added_or_updated,
-                                   const std::vector<std::string>& removed);
+                      const std::vector<envoy::config::listener::v3::Listener>& added_or_updated,
+                      const std::vector<std::string>& removed);
 
-  void updateRoute(const std::vector<envoy::config::route::v3::RouteConfiguration> routes,
-                               const std::vector<envoy::config::route::v3::RouteConfiguration>& added_or_updated,
-                               const std::vector<std::string>& removed);
-  /* void updateRoute(const std::vector<envoy::config::route::v3::RouteConfiguration> routes, */
-                              /* const std::string& version); */
+  void
+  updateRoute(const std::vector<envoy::config::route::v3::RouteConfiguration> routes,
+              const std::vector<envoy::config::route::v3::RouteConfiguration>& added_or_updated,
+              const std::vector<std::string>& removed);
+
   void initialize() override;
   void replay();
   void close();
   void verifyState();
 
 private:
-  void parseConfig(const test::server::config_validation::XdsTestCase &input);
+  void parseConfig(const test::server::config_validation::XdsTestCase& input);
   void initializePools();
 
   absl::optional<std::string> removeListener(uint32_t listener_num);
   absl::optional<std::string> removeRoute(uint32_t route_num);
-  /* void removeListener(uint32_t listener_num); */
-  /* void removeRoute(uint32_t route_num); */
 
   Protobuf::RepeatedPtrField<test::server::config_validation::Action> actions_;
   std::vector<envoy::config::route::v3::RouteConfiguration> routes_;
@@ -67,13 +65,13 @@ private:
   std::vector<envoy::config::listener::v3::Listener> listener_pool_;
   std::vector<envoy::config::route::v3::RouteConfiguration> route_pool_;
 
-  uint64_t version_;
-
   Network::Address::IpVersion ip_version_;
   Grpc::ClientType client_type_;
   Grpc::SotwOrDelta sotw_or_delta_;
 
+  uint64_t version_;
   uint64_t num_lds_updates_;
+  envoy::config::core::v3::ApiVersion api_version_;
 };
 
 } // namespace Envoy
