@@ -875,39 +875,4 @@ TEST(InlineStorageTest, InlineString) {
   EXPECT_EQ("Hello, world!", hello->toString());
 }
 
-TEST(ContainerRemoveElementsTest, Containers) {
-  auto l = StringUtil::splitToken("one,two,three", ",");
-  auto onep = [](absl::string_view s) { return "one" == s; };
-  auto threep = [](absl::string_view s) { return "three" == s; };
-
-  Containers::removeMatchingElements(
-      l, [](ABSL_ATTRIBUTE_UNUSED absl::string_view s) { return false; });
-  // nothing is removed:
-  EXPECT_EQ(3, l.size());
-
-  Containers::removeMatchingElements(l, threep);
-  // one element is removed from the end:
-  EXPECT_EQ(2, l.size());
-  EXPECT_EQ("two", l[1]);
-
-  Containers::removeMatchingElements(l, onep);
-  // one element is removed:
-  EXPECT_EQ(1, l.size());
-  // and the last element is now first (and only):
-  EXPECT_EQ("two", l[0]);
-
-  Containers::removeMatchingElements(
-      l, [](ABSL_ATTRIBUTE_UNUSED absl::string_view s) { return true; });
-  // everything is removed:
-  EXPECT_EQ(0, l.size());
-}
-
-TEST(ContainerRemoveElementsListTest, Containers) {
-  std::list<int> l = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
-
-  Containers::removeMatchingElements(l, [](int i) { return i % 2 == 0; });
-  // since the swap-and-erase happens iteratively, the list is very reordered
-  EXPECT_EQ((std::list<int>{1, 9, 3, 7, 5}), l);
-}
-
 } // namespace Envoy

@@ -1430,17 +1430,20 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
 
   // Remove hosts from current_priority_hosts that were matched to an existing host in the previous
   // loop.
-  Containers::removeMatchingElements(current_priority_hosts, [&existing_hosts_for_current_priority](
-                                                                 const HostSharedPtr& p) mutable {
-    auto existing_itr = existing_hosts_for_current_priority.find(p->address()->asString());
+  auto erase_from =
+      std::remove_if(current_priority_hosts.begin(), current_priority_hosts.end(),
+                     [&existing_hosts_for_current_priority](const HostSharedPtr& p) mutable {
+                       auto existing_itr =
+                           existing_hosts_for_current_priority.find(p->address()->asString());
 
-    if (existing_itr != existing_hosts_for_current_priority.end()) {
-      existing_hosts_for_current_priority.erase(existing_itr);
-      return true;
-    }
+                       if (existing_itr != existing_hosts_for_current_priority.end()) {
+                         existing_hosts_for_current_priority.erase(existing_itr);
+                         return true;
+                       }
 
-    return false;
-  });
+                       return false;
+                     });
+  current_priority_hosts.erase(erase_from, current_priority_hosts.end());
 
   // If we saw existing hosts during this iteration from a different priority, then we've moved
   // a host from another priority into this one, so we should mark the priority as having changed.
@@ -1458,8 +1461,8 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
   const bool dont_remove_healthy_hosts =
       health_checker_ != nullptr && !info()->drainConnectionsOnHostRemoval();
   if (!current_priority_hosts.empty() && dont_remove_healthy_hosts) {
-    Containers::removeMatchingElements(
-        current_priority_hosts,
+    erase_from = std::remove_if(
+        current_priority_hosts.begin(), current_priority_hosts.end(),
         [&updated_hosts, &final_hosts, &max_host_weight](const HostSharedPtr& p) mutable {
           if (!(p->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC) ||
                 p->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH))) {
@@ -1474,6 +1477,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
           }
           return false;
         });
+    current_priority_hosts.erase(erase_from, current_priority_hosts.end());
   }
 
   // At this point we've accounted for all the new hosts as well the hosts that previously
