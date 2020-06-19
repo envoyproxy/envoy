@@ -209,6 +209,8 @@ message GrpcService {
         // Pointer values are not supported, since they don't make any sense when
         // delivered via the API.
         oneof value_specifier {
+          option (validate.required) = true;
+
           string string_value = 1;
 
           int64 int_value = 2;
