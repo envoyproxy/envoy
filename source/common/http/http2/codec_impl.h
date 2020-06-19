@@ -415,7 +415,11 @@ protected:
     return absl::nullopt;
   }
 
-  bool setAndCheckNghttp2CallbackStatus(Status&& status);
+  /**
+   * Save `status` into nghttp2_callback_status_.
+   * Return nghttp2 callback return code corresponding to `status`.
+   */
+  int setAndCheckNghttp2CallbackStatus(Status&& status);
 
   static Http2Callbacks http2_callbacks_;
 

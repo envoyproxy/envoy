@@ -1036,9 +1036,9 @@ void ConnectionImpl::sendSettings(
   }
 }
 
-bool ConnectionImpl::setAndCheckNghttp2CallbackStatus(Status&& status) {
+int ConnectionImpl::setAndCheckNghttp2CallbackStatus(Status&& status) {
   nghttp2_callback_status_ = std::move(status);
-  return nghttp2_callback_status_.ok();
+  return nghttp2_callback_status_.ok() ? 0 : NGHTTP2_ERR_CALLBACK_FAILURE;
 }
 
 ConnectionImpl::Http2Callbacks::Http2Callbacks() {
@@ -1051,9 +1051,8 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
           return status_or_len.value();
         }
         auto status = status_or_len.status();
-        static_cast<ConnectionImpl*>(user_data)->setAndCheckNghttp2CallbackStatus(
+        return static_cast<ConnectionImpl*>(user_data)->setAndCheckNghttp2CallbackStatus(
             std::move(status));
-        return NGHTTP2_ERR_CALLBACK_FAILURE;
       });
 
   nghttp2_session_callbacks_set_send_data_callback(
@@ -1062,17 +1061,15 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
          nghttp2_data_source* source, void*) -> int {
         ASSERT(frame->data.padlen == 0);
         auto status = static_cast<StreamImpl*>(source->ptr)->onDataSourceSend(framehd, length);
-        bool ok = static_cast<StreamImpl*>(source->ptr)
-                      ->parent_.setAndCheckNghttp2CallbackStatus(std::move(status));
-        return ok ? 0 : NGHTTP2_ERR_CALLBACK_FAILURE;
+        return static_cast<StreamImpl*>(source->ptr)
+            ->parent_.setAndCheckNghttp2CallbackStatus(std::move(status));
       });
 
   nghttp2_session_callbacks_set_on_begin_headers_callback(
       callbacks_, [](nghttp2_session*, const nghttp2_frame* frame, void* user_data) -> int {
         auto status = static_cast<ConnectionImpl*>(user_data)->onBeginHeaders(frame);
-        bool ok = static_cast<ConnectionImpl*>(user_data)->setAndCheckNghttp2CallbackStatus(
+        return static_cast<ConnectionImpl*>(user_data)->setAndCheckNghttp2CallbackStatus(
             std::move(status));
-        return ok ? 0 : NGHTTP2_ERR_CALLBACK_FAILURE;
       });
 
   nghttp2_session_callbacks_set_on_header_callback(
@@ -1098,17 +1095,15 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
   nghttp2_session_callbacks_set_on_begin_frame_callback(
       callbacks_, [](nghttp2_session*, const nghttp2_frame_hd* hd, void* user_data) -> int {
         auto status = static_cast<ConnectionImpl*>(user_data)->onBeforeFrameReceived(hd);
-        bool ok = static_cast<ConnectionImpl*>(user_data)->setAndCheckNghttp2CallbackStatus(
+        return static_cast<ConnectionImpl*>(user_data)->setAndCheckNghttp2CallbackStatus(
             std::move(status));
-        return ok ? 0 : NGHTTP2_ERR_CALLBACK_FAILURE;
       });
 
   nghttp2_session_callbacks_set_on_frame_recv_callback(
       callbacks_, [](nghttp2_session*, const nghttp2_frame* frame, void* user_data) -> int {
         auto status = static_cast<ConnectionImpl*>(user_data)->onFrameReceived(frame);
-        bool ok = static_cast<ConnectionImpl*>(user_data)->setAndCheckNghttp2CallbackStatus(
+        return static_cast<ConnectionImpl*>(user_data)->setAndCheckNghttp2CallbackStatus(
             std::move(status));
-        return ok ? 0 : NGHTTP2_ERR_CALLBACK_FAILURE;
       });
 
   nghttp2_session_callbacks_set_on_stream_close_callback(
