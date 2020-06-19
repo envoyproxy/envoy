@@ -40,7 +40,8 @@ EdsClusterImpl::EdsClusterImpl(
   const auto resource_name = getResourceName();
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
-          eds_config, Grpc::Common::typeUrl(resource_name), info_->statsScope(), *this, *this);
+          eds_config, Grpc::Common::typeUrl(resource_name), info_->statsScope(), *this,
+          resource_decoder_);
 }
 
 void EdsClusterImpl::startPreInit() { subscription_->start({cluster_name_}); }
@@ -176,7 +177,7 @@ void EdsClusterImpl::onAssignmentTimeout() {
   resource.set_cluster_name(cluster_name_);
   ProtobufWkt::Any any_resource;
   any_resource.PackFrom(resource);
-  Config::DecodedResourceImpl decoded_resource(*this, any_resource, "");
+  Config::DecodedResourceImpl decoded_resource(resource_decoder_, any_resource, "");
   std::vector<Config::DecodedResourceRef> resource_refs = {decoded_resource};
   onConfigUpdate(resource_refs, "");
   // Stat to track how often we end up with stale assignments.

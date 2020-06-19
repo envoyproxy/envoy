@@ -30,7 +30,7 @@ LdsApiImpl::LdsApiImpl(const envoy::config::core::v3::ConfigSource& lds_config,
       init_target_("LDS", [this]() { subscription_->start({}); }) {
   const auto resource_name = getResourceName();
   subscription_ = cm.subscriptionFactory().subscriptionFromConfigSource(
-      lds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this, *this);
+      lds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_);
   init_manager.add(init_target_);
 }
 

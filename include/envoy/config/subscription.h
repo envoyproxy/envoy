@@ -74,7 +74,7 @@ public:
   virtual ProtobufTypes::MessagePtr decodeResource(const ProtobufWkt::Any& resource) PURE;
 
   /**
-   * @param resource some opaque resourec (Protobuf::Message).
+   * @param resource some opaque resource (Protobuf::Message).
    * @return std::String the resource name in a Protobuf::Message returned by decodeResource(), e.g.
    *         the route config name for a envoy.config.route.v3.RouteConfiguration message.
    */

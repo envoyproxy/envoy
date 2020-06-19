@@ -111,7 +111,7 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           scoped_rds.scoped_rds_config_source(), Grpc::Common::typeUrl(resource_name), *scope_,
-          *this, *this);
+          *this, resource_decoder_);
 
   initialize([scope_key_builder]() -> Envoy::Config::ConfigProvider::ConfigConstSharedPtr {
     return std::make_shared<ScopedConfigImpl>(
