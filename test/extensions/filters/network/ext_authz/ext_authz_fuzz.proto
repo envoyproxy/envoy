@@ -5,14 +5,14 @@ import "envoy/extensions/filters/network/ext_authz/v3/ext_authz.proto";
 import "google/protobuf/empty.proto";
 import "validate/validate.proto";
 
-message Result{
-    oneof result_selector{
-        option (validate.required) = true;
-        // Autherization check status
-        google.protobuf.Empty check_status_error = 1;
-        google.protobuf.Empty check_status_denied = 2;
-        google.protobuf.Empty check_status_ok = 3;
-    }
+message Result {
+  oneof result_selector {
+    option (validate.required) = true;
+    // Autherization check status
+    google.protobuf.Empty check_status_error = 1;
+    google.protobuf.Empty check_status_denied = 2;
+    google.protobuf.Empty check_status_ok = 3;
+  }
 }
 
 message OnData {
@@ -21,7 +21,6 @@ message OnData {
   // optional: to set the default authorization check result for this and the following onData()
   Result result = 3;
 }
-
 
 message Action {
   oneof action_selector {
@@ -33,7 +32,6 @@ message Action {
     // Connection close
     google.protobuf.Empty remote_close = 3;
     google.protobuf.Empty local_close = 4;
-
   }
 }
 message ExtAuthzTestCase {
