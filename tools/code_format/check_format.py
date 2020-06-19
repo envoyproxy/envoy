@@ -168,6 +168,52 @@ UNOWNED_EXTENSIONS = {
   "extensions/filters/network/common",
   "extensions/filters/network/common/redis",
 }
+
+NON_TYPE_ALIAS_ALLOWED_TYPES = {
+  "void",
+  "bool",
+  "short",
+  "short int",
+  "signed short",
+  "signed short int",
+  "unsigned short",
+  "unsigned short int",
+  "int",
+  "signed",
+  "signed int",
+  "unsigned",
+  "unsigned int",
+  "long",
+  "long int",
+  "signed long",
+  "signed long int",
+  "unsigned long",
+  "unsigned long int",
+  "long long",
+  "long long int",
+  "signed long long",
+  "signed long long int",
+  "unsigned long long",
+  "unsigned long long int",
+  "int8_t",
+  "int16_t",
+  "int32_t",
+  "int64_t",
+  "uint8_t",
+  "uint16_t",
+  "uint32_t",
+  "uint64_t",
+  "signed char",
+  "unsigned char",
+  "char",
+  "wchar_t",
+  "char16_t",
+  "char32_t",
+  "std::string",
+  "float",
+  "double",
+  "long double",  
+}
 # yapf: enable
 
 
@@ -351,6 +397,9 @@ def whitelistedForUnpackTo(file_path):
   return file_path.startswith("./test") or file_path in [
       "./source/common/protobuf/utility.cc", "./source/common/protobuf/utility.h"
   ]
+
+def whitelistedForNonTypeAlias(name):
+  return re.match(r".*\[\]$", name) or re.match("^std::vector<.*", name) or re.match(f"^({'|'.join(NON_TYPE_ALIAS_ALLOWED_TYPES)})$", name)
 
 
 def findSubstringAndReturnError(pattern, file_path, error_message):
@@ -699,11 +748,13 @@ def checkSourceLine(line, file_path, reportError):
   if not re.search("using .* = .*;", line):
     smart_ptr_m = re.finditer("std::(unique_ptr|shared_ptr)<(.*?)>", line)
     for m in smart_ptr_m:
-      reportError(f"Use type alias for '{m.group(2)}' instead. See STYLE.md")
+      if not whitelistedForNonTypeAlias(m.group(2)):
+        reportError(f"Use type alias for '{m.group(2)}' instead. See STYLE.md")
 
     optional_m = re.finditer("absl::optional<std::reference_wrapper<(.*?)>>", line)
     for m in optional_m:
-      reportError(f"Use type alias for '{m.group(1)}' instead. See STYLE.md")
+      if not whitelistedForNonTypeAlias(m.group(1)):
+        reportError(f"Use type alias for '{m.group(1)}' instead. See STYLE.md")
 
 
 def checkBuildLine(line, file_path, reportError):

@@ -277,6 +277,7 @@ def runChecks():
   errors += checkFileExpectingOK("time_system_wait_for.cc")
   errors += checkFileExpectingOK("clang_format_off.cc")
   errors += checkFileExpectingOK("using_type_alias.cc")
+  errors += checkFileExpectingOK("non_type_alias_allowed_type.cc")
   return errors
 
 
