@@ -47,14 +47,17 @@ struct SuccessResponse {
           auto* context = static_cast<SuccessResponse*>(ctx);
           // UpstreamHeaderMatcher
           if (context->matchers_->matches(header.key().getStringView())) {
-            context->response_->headers_to_add.emplace_back(
+            context->response_->headers_to_set.emplace_back(
                 Http::LowerCaseString{std::string(header.key().getStringView())},
                 std::string(header.value().getStringView()));
           }
           if (context->append_matchers_->matches(header.key().getStringView())) {
-            // if there's an existing key, we're appending it, for example, if headers are
-            // 'match-key: value1' and 'match-key: value2', this will add both value1 and value2
-            context->response_->headers_to_add_and_append.emplace_back(
+            // If there is an existing matching key in the current headers, the new entry will be
+            // appended with the same key. For example, given {"key": "value1"} headers, if there is
+            // a matching "key" from the authorization response headers {"key": "value2"}, the
+            // request to upstream server will have two entries for "key": {"key": "value1", "key":
+            // "value2"}.
+            context->response_->headers_to_add.emplace_back(
                 Http::LowerCaseString{std::string(header.key().getStringView())},
                 std::string(header.value().getStringView()));
           }

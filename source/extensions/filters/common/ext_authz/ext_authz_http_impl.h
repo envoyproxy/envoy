@@ -100,7 +100,8 @@ public:
 
   /**
    * Returns a list of matchers used for selecting the authorization response headers that
-   * will be appended when using the same key should be sent to the upstream server.
+   * should be sent to the upstream server. The same header keys will be appended, instead of
+   * be replaced.
    */
   const MatcherSharedPtr& upstreamHeaderToAppendMatchers() const {
     return upstream_header_to_append_matchers_;
