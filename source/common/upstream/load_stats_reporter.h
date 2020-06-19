@@ -1,4 +1,5 @@
 #include "envoy/event/dispatcher.h"
+#include "envoy/server/internal_stats_handler.h"
 #include "envoy/service/load_stats/v3/lrs.pb.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"

@@ -9,13 +9,13 @@ namespace Envoy {
 namespace Server {
 
 using PostReceiveCb =
-    std::function<void(std::multimap<std::string, const Envoy::Stats::HistogramStatistics&> stats)>;
+    std::function<void(std::multimap<std::string, const Stats::HistogramStatistics&> stats)>;
 
 class InternalStatsHandler {
 
 public:
-  InternalStatsHandler(Envoy::Stats::StoreRoot& root) : store_root_(root) {}
-  void receiveGlobalStats(std::set<std::string>&, PostReceiveCb) const;
+  explicit InternalStatsHandler(Stats::StoreRoot& root) : store_root_(root) {}
+  void receiveGlobalStats(std::set<std::string>& stat_names, PostReceiveCb cb) const;
 
 private:
   Stats::StoreRoot& store_root_;

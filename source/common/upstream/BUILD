@@ -196,6 +196,7 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:version_converter_lib",
         "//source/common/grpc:async_client_lib",
+        "//source/server:internal_stats_handler_lib",
         "@envoy_api//envoy/service/load_stats/v3:pkg_cc_proto",
     ],
 )

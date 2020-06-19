@@ -7,6 +7,7 @@
 
 #include "envoy/service/load_stats/v3/lrs.pb.h"
 #include "envoy/stats/scope.h"
+#include "envoy/server/internal_stats_handler.h"
 
 #include "common/config/version_converter.h"
 #include "common/protobuf/protobuf.h"
