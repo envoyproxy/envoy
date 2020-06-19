@@ -262,10 +262,6 @@ public:
         },
         &check_response);
 
-    if (!new_headers_from_upstream.empty()) {
-      std::cerr << check_response.DebugString() << "\n";
-    }
-
     ext_authz_request_->sendGrpcMessage(check_response);
     ext_authz_request_->finishGrpcStream(Grpc::Status::Ok);
   }
