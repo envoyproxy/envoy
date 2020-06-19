@@ -53,10 +53,10 @@
 #include "test/test_common/test_time_system.h"
 
 #include "absl/strings/string_view.h"
+#include "config_tracker.h"
 #include "gmock/gmock.h"
 #include "spdlog/spdlog.h"
 
-#include "config_tracker.h"
 namespace Envoy {
 namespace Server {
 class MockAdmin : public Admin {
@@ -83,6 +83,6 @@ public:
 
   NiceMock<MockConfigTracker> config_tracker_;
 };
-}
+} // namespace Server
 
-}
+} // namespace Envoy

@@ -53,11 +53,10 @@
 #include "test/test_common/test_time_system.h"
 
 #include "absl/strings/string_view.h"
+#include "admin.h"
+#include "config_tracker.h"
 #include "gmock/gmock.h"
 #include "spdlog/spdlog.h"
-
-#include "config_tracker.h"
-#include "admin.h"
 
 namespace Envoy {
 namespace Server {
@@ -130,7 +129,6 @@ public:
   bool cpuset_threads_enabled_{};
   std::vector<std::string> disabled_extensions_;
 };
-
 
 class MockAdminStream : public AdminStream {
 public:

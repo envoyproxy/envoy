@@ -91,6 +91,7 @@ envoy_cc_mock(
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
+        "//test/mocks/server:config_tracker_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:upstream_mocks",
@@ -99,11 +100,8 @@ envoy_cc_mock(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
-        "//test/mocks/server:config_tracker_mocks",
     ],
 )
-
-
 
 envoy_cc_mock(
     name = "server_mocks",
@@ -141,6 +139,8 @@ envoy_cc_mock(
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
+        "//test/mocks/server:admin_mocks",
+        "//test/mocks/server:config_tracker_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:upstream_mocks",
@@ -149,9 +149,5 @@ envoy_cc_mock(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
-        "//test/mocks/server:config_tracker_mocks",
-        "//test/mocks/server:admin_mocks"
     ],
 )
-
-

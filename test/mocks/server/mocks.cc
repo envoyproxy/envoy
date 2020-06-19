@@ -53,7 +53,6 @@ MockOptions::MockOptions(const std::string& config_path) : config_path_(config_p
 }
 MockOptions::~MockOptions() = default;
 
-
 MockAdminStream::MockAdminStream() = default;
 MockAdminStream::~MockAdminStream() = default;
 

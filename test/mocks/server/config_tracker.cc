@@ -30,8 +30,6 @@ MockConfigTracker::MockConfigTracker() {
 
 MockConfigTracker::~MockConfigTracker() = default;
 
+} // namespace Server
 
-
-}
-
-}
+} // namespace Envoy
