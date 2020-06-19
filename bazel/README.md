@@ -80,6 +80,11 @@ for how to update or override dependencies.
     echo "build --config=clang" >> user.bazelrc
     ```
 
+    Note: Either `libc++` or `libstdc++-7-dev` (or higher) must be installed. These are typically
+    available via a package manager, but may not be available in default repositories depending on
+    OS version. To build against `libc++` build with the `--config=libc++` instead of the
+    `--config=clang` flag.
+
     ### macOS
     On macOS, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
     ```
@@ -119,7 +124,7 @@ for how to update or override dependencies.
     set PATH=%PATH%;%USERPROFILE%\Python38\Scripts
     pip install wheel
     ```
-    
+
     [Build Tools for Visual Studio 2019](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2019):
     For building with MSVC (the `msvc-cl` config option), you must install at least the VC++ workload.
     You may also download Visual Studio 2019 and use the Build Tools packaged with that
@@ -267,7 +272,7 @@ for more details.
 ## Supported compiler versions
 
 We now require Clang >= 5.0 due to known issues with std::string thread safety and C++14 support. GCC >= 7 is also
-known to work. Currently the CI is running with Clang 9.
+known to work. Currently the CI is running with Clang 10.
 
 ## Clang STL debug symbols
 
@@ -725,7 +730,7 @@ also have 'buildifier' installed from the bazel distribution.
 Edit the paths shown here to reflect the installation locations on your system:
 
 ```shell
-export CLANG_FORMAT="$HOME/ext/clang+llvm-9.0.0-x86_64-linux-gnu-ubuntu-16.04/bin/clang-format"
+export CLANG_FORMAT="$HOME/ext/clang+llvm-10.0.0-x86_64-linux-gnu-ubuntu-18.04/bin/clang-format"
 export BUILDIFIER_BIN="/usr/bin/buildifier"
 ```
 

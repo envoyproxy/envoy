@@ -21,6 +21,7 @@
 #include "server/options_impl.h"
 #include "server/server.h"
 
+#include "absl/debugging/symbolize.h"
 #include "absl/strings/str_split.h"
 
 #ifdef ENVOY_HOT_RESTART
@@ -177,10 +178,10 @@ void MainCommonBase::adminRequest(absl::string_view path_and_query, absl::string
   std::string path_and_query_buf = std::string(path_and_query);
   std::string method_buf = std::string(method);
   server_->dispatcher().post([this, path_and_query_buf, method_buf, handler]() {
-    Http::ResponseHeaderMapImpl response_headers;
+    auto response_headers = Http::ResponseHeaderMapImpl::create();
     std::string body;
-    server_->admin().request(path_and_query_buf, method_buf, response_headers, body);
-    handler(response_headers, body);
+    server_->admin().request(path_and_query_buf, method_buf, *response_headers, body);
+    handler(*response_headers, body);
   });
 }
 
@@ -199,6 +200,38 @@ std::string MainCommon::hotRestartVersion(bool hot_restart_enabled) {
   UNREFERENCED_PARAMETER(hot_restart_enabled);
 #endif
   return "disabled";
+}
+
+int MainCommon::main(int argc, char** argv, PostServerHook hook) {
+#ifndef __APPLE__
+  // absl::Symbolize mostly works without this, but this improves corner case
+  // handling, such as running in a chroot jail.
+  absl::InitializeSymbolizer(argv[0]);
+#endif
+  std::unique_ptr<Envoy::MainCommon> main_common;
+
+  // Initialize the server's main context under a try/catch loop and simply return EXIT_FAILURE
+  // as needed. Whatever code in the initialization path that fails is expected to log an error
+  // message so the user can diagnose.
+  try {
+    main_common = std::make_unique<Envoy::MainCommon>(argc, argv);
+    Envoy::Server::Instance* server = main_common->server();
+    if (server != nullptr && hook != nullptr) {
+      hook(*server);
+    }
+  } catch (const Envoy::NoServingException& e) {
+    return EXIT_SUCCESS;
+  } catch (const Envoy::MalformedArgvException& e) {
+    std::cerr << e.what() << std::endl;
+    return EXIT_FAILURE;
+  } catch (const Envoy::EnvoyException& e) {
+    std::cerr << e.what() << std::endl;
+    return EXIT_FAILURE;
+  }
+
+  // Run the server listener loop outside try/catch blocks, so that unexpected exceptions
+  // show up as a core-dumps for easier diagnostics.
+  return main_common->run() ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 } // namespace Envoy
