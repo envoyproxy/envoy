@@ -20,8 +20,7 @@
 namespace Envoy {
 
 /**
- * Retrieve string description of error code, wraps strerror on POSIX systems and FormatMessage on
- * Windows
+ * Retrieve string description of error code
  * @param int error code
  * @return const std::string error detail description
  */

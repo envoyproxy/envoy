@@ -40,11 +40,13 @@ using UnsignedMilliseconds = std::chrono::duration<uint64_t, std::milli>;
 
 const std::string errorDetails(int error_code) {
 #ifndef WIN32
+  // clang-format off
   return strerror(error_code);
+  // clang-format on
 #else
-  // strerror is a POSIX subsystem function and is unable to fetch error descriptions of Windows
-  // errors. Instead, we use FormatMessage and return "Unknown error" if it fails. Failures could be
-  // due to the error code not being found, or otherwise.
+  // Windows error codes do not correspond to POSIX errno values
+  // Use FormatMessage, strip trailing newline, and return "Unknown error" on failure (as on POSIX).
+  // Failures will usually be due to the error message not being found.
   char* buffer = NULL;
   DWORD msg_size = FormatMessage(
       FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_ALLOCATE_BUFFER,

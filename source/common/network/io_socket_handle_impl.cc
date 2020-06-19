@@ -414,7 +414,7 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::localAddress() {
       os_sys_calls.getsockname(fd_, reinterpret_cast<sockaddr*>(&ss), &ss_len);
   if (result.rc_ != 0) {
     throw EnvoyException(fmt::format("getsockname failed for '{}': ({}) {}", fd_, result.errno_,
-                                     strerror(result.errno_)));
+                                     errorDetails(result.errno_)));
   }
   int socket_v6only = 0;
   if (ss.ss_family == AF_INET6) {
@@ -427,7 +427,7 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::localAddress() {
     // exception
     if (SOCKET_FAILURE(result.rc_)) {
       throw EnvoyException(fmt::format("getsockopt failed for '{}': ({}) {}", fd_, result.errno_,
-                                       strerror(result.errno_)));
+                                       errorDetails(result.errno_)));
     }
 #else
     RELEASE_ASSERT(result.rc_ == 0, "");
@@ -444,7 +444,7 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
       os_sys_calls.getpeername(fd_, reinterpret_cast<sockaddr*>(&ss), &ss_len);
   if (result.rc_ != 0) {
     throw EnvoyException(
-        fmt::format("getpeername failed for '{}': {}", fd_, strerror(result.errno_)));
+        fmt::format("getpeername failed for '{}': {}", fd_, errorDetails(result.errno_)));
   }
 #ifdef __APPLE__
   if (ss_len == sizeof(sockaddr) && ss.ss_family == AF_UNIX)
@@ -459,7 +459,7 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
     result = os_sys_calls.getsockname(fd_, reinterpret_cast<sockaddr*>(&ss), &ss_len);
     if (result.rc_ != 0) {
       throw EnvoyException(
-          fmt::format("getsockname failed for '{}': {}", fd_, strerror(result.errno_)));
+          fmt::format("getsockname failed for '{}': {}", fd_, errorDetails(result.errno_)));
     }
   }
   return Address::addressFromSockAddr(ss, ss_len);
