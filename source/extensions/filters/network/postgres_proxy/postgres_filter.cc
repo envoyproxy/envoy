@@ -11,8 +11,11 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace PostgresProxy {
 
-PostgresFilterConfig::PostgresFilterConfig(const std::string& stat_prefix, Stats::Scope& scope)
-    : stat_prefix_{stat_prefix}, scope_{scope}, stats_{generateStats(stat_prefix, scope)} {}
+PostgresFilterConfig::PostgresFilterConfig(const std::string& stat_prefix, bool enable_sql_parsing,
+                                           Stats::Scope& scope)
+    : stat_prefix_{stat_prefix},
+      enable_sql_parsing_(enable_sql_parsing), scope_{scope}, stats_{generateStats(stat_prefix,
+                                                                                   scope)} {}
 
 PostgresFilter::PostgresFilter(PostgresFilterConfigSharedPtr config) : config_{config} {
   if (!decoder_) {
@@ -162,24 +165,26 @@ void PostgresFilter::incStatements(StatementType type) {
 }
 
 void PostgresFilter::processQuery(const std::string& sql) {
-  ProtobufWkt::Struct metadata;
+  if (config_->enable_sql_parsing_) {
+    ProtobufWkt::Struct metadata;
 
-  auto result = Common::SQLUtils::SQLUtils::setMetadata(sql, decoder_->getAttributes(), metadata);
+    auto result = Common::SQLUtils::SQLUtils::setMetadata(sql, decoder_->getAttributes(), metadata);
 
-  if (!result) {
-    config_->stats_.queries_parse_error_.inc();
-    ENVOY_CONN_LOG(trace, "postgres_proxy: cannot parse SQL: {}", read_callbacks_->connection(),
+    if (!result) {
+      config_->stats_.queries_parse_error_.inc();
+      ENVOY_CONN_LOG(trace, "postgres_proxy: cannot parse SQL: {}", read_callbacks_->connection(),
+                     sql.c_str());
+      return;
+    }
+
+    config_->stats_.queries_parsed_.inc();
+    ENVOY_CONN_LOG(trace, "postgres_proxy: query processed {}", read_callbacks_->connection(),
                    sql.c_str());
-    return;
+
+    // Set dynamic metadata
+    read_callbacks_->connection().streamInfo().setDynamicMetadata(
+        NetworkFilterNames::get().PostgresProxy, metadata);
   }
-
-  config_->stats_.queries_parsed_.inc();
-  ENVOY_CONN_LOG(trace, "postgres_proxy: query processed {}", read_callbacks_->connection(),
-                 sql.c_str());
-
-  // Set dynamic metadata
-  read_callbacks_->connection().streamInfo().setDynamicMetadata(
-      NetworkFilterNames::get().PostgresProxy, metadata);
 }
 
 void PostgresFilter::doDecode(Buffer::Instance& data, bool frontend) {

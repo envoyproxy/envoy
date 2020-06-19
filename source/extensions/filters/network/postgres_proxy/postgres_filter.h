@@ -62,9 +62,11 @@ struct PostgresProxyStats {
  */
 class PostgresFilterConfig {
 public:
-  PostgresFilterConfig(const std::string& stat_prefix, Stats::Scope& scope);
+  PostgresFilterConfig(const std::string& stat_prefix, bool enable_sql_parsing,
+                       Stats::Scope& scope);
 
   const std::string stat_prefix_;
+  bool enable_sql_parsing_{true};
   Stats::Scope& scope_;
   PostgresProxyStats stats_;
 
@@ -115,6 +117,7 @@ public:
   uint32_t getBackendBufLength() const { return backend_buffer_.length(); }
   const PostgresProxyStats& getStats() const { return config_->stats_; }
   Network::Connection& connection() const { return read_callbacks_->connection(); }
+  const PostgresFilterConfigSharedPtr& getConfig() const { return config_; }
 
 private:
   Network::ReadFilterCallbacks* read_callbacks_{};

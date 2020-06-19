@@ -31,7 +31,7 @@ class PostgresFilterTest
                      std::function<uint32_t(const PostgresFilter*)>>> {
 public:
   PostgresFilterTest() {
-    config_ = std::make_shared<PostgresFilterConfig>(stat_prefix_, scope_);
+    config_ = std::make_shared<PostgresFilterConfig>(stat_prefix_, true, scope_);
     filter_ = std::make_unique<PostgresFilter>(config_);
 
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
@@ -272,12 +272,27 @@ TEST_F(PostgresFilterTest, MetadataIncorrectSQL) {
 }
 
 // Test verifies that Postgres metadata is created for correct SQL statement.
+// and it happens only when parse_sql flag is true.
 TEST_F(PostgresFilterTest, QueryMessageMetadata) {
   // Pretend that startup message has been received.
   static_cast<DecoderImpl*>(filter_->getDecoder())->setStartup(false);
   setMetadata();
 
+  // Disable creating parsing SQL and creating metadata.
+  static_cast<DecoderImpl*>(filter_->getDecoder())->setParseSql(false);
+  filter_->getConfig()->enable_sql_parsing_ = false;
   createPostgresMsg(data_, "Q", "SELECT * FROM whatever");
+  filter_->onData(data_, false);
+
+  ASSERT_THAT(filter_->connection().streamInfo().dynamicMetadata().filter_metadata().contains(
+                  NetworkFilterNames::get().PostgresProxy),
+              false);
+  ASSERT_THAT(filter_->getStats().queries_parse_error_.value(), 0);
+  ASSERT_THAT(filter_->getStats().queries_parsed_.value(), 0);
+
+  // Now enable SQL parsing and creating metadata.
+  static_cast<DecoderImpl*>(filter_->getDecoder())->setParseSql(true);
+  filter_->getConfig()->enable_sql_parsing_ = true;
   filter_->onData(data_, false);
 
   auto& filter_meta = filter_->connection().streamInfo().dynamicMetadata().filter_metadata().at(
