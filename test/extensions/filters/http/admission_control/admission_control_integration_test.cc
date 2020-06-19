@@ -77,7 +77,7 @@ protected:
     // Set the response headers on the autonomous upstream.
     auto* au = reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get());
     au->setResponseHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(
-        Http::TestHeaderMapImpl({{":status", code}})));
+        Http::TestResponseHeaderMapImpl({{":status", code}})));
 
     auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
     response->waitForEndStream();

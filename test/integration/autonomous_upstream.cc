@@ -3,7 +3,8 @@
 namespace Envoy {
 namespace {
 
-void HeaderToInt(const char header_name[], int32_t& return_int, Http::TestHeaderMapImpl& headers) {
+void HeaderToInt(const char header_name[], int32_t& return_int,
+                 Http::TestResponseHeaderMapImpl& headers) {
   const std::string header_value(headers.get_(header_name));
   if (!header_value.empty()) {
     uint64_t parsed_value;
@@ -41,7 +42,7 @@ void AutonomousStream::setEndStream(bool end_stream) {
 
 // Check all the special headers and send a customized response based on them.
 void AutonomousStream::sendResponse() {
-  Http::TestHeaderMapImpl headers(*headers_);
+  Http::TestResponseHeaderMapImpl headers(*headers_);
   upstream_.setLastRequestHeaders(*headers_);
 
   int32_t request_body_length = -1;
@@ -131,7 +132,7 @@ Http::TestResponseTrailerMapImpl AutonomousUpstream::responseTrailers() {
 
 Http::TestResponseHeaderMapImpl AutonomousUpstream::responseHeaders() {
   Thread::LockGuard lock(headers_lock_);
-  Http::TestHeaderMapImpl return_headers = *response_headers_;
+  Http::TestResponseHeaderMapImpl return_headers = *response_headers_;
   return return_headers;
 }
 
