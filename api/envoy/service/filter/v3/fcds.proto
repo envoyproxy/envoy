@@ -20,7 +20,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Return filter configurations.
 service FilterConfigDiscoveryService {
-  option (envoy.annotations.resource).type = "google.protobuf.Any";
+  option (envoy.annotations.resource).type = "envoy.config.core.v3.TypedExtensionConfig";
 
   rpc StreamFilterConfigs(stream discovery.v3.DiscoveryRequest)
       returns (stream discovery.v3.DiscoveryResponse) {
