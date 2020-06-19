@@ -115,8 +115,9 @@ public:
     return timeSystem().waitFor(mutex, condvar, duration);
   }
 
-  SchedulerPtr createScheduler(Scheduler& base_scheduler) override {
-    return timeSystem().createScheduler(base_scheduler);
+  SchedulerPtr createScheduler(Scheduler& base_scheduler,
+                               CallbackScheduler& cb_scheduler) override {
+    return timeSystem().createScheduler(base_scheduler, cb_scheduler);
   }
   SystemTime systemTime() override { return timeSystem().systemTime(); }
   MonotonicTime monotonicTime() override { return timeSystem().monotonicTime(); }

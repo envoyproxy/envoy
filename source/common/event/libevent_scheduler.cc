@@ -1,6 +1,7 @@
 #include "common/event/libevent_scheduler.h"
 
 #include "common/common/assert.h"
+#include "common/event/schedulable_cb_impl.h"
 #include "common/event/timer_impl.h"
 
 #include "event2/util.h"
@@ -21,6 +22,11 @@ LibeventScheduler::LibeventScheduler() : libevent_(event_base_new()) {
 
 TimerPtr LibeventScheduler::createTimer(const TimerCb& cb, Dispatcher& dispatcher) {
   return std::make_unique<TimerImpl>(libevent_, cb, dispatcher);
+};
+
+SchedulableCallbackPtr
+LibeventScheduler::createSchedulableCallback(const std::function<void()>& cb) {
+  return std::make_unique<SchedulableCallbackImpl>(libevent_, cb);
 };
 
 void LibeventScheduler::run(Dispatcher::RunType mode) {

@@ -70,10 +70,10 @@ struct ConnPoolCallbacks : public Tcp::ConnectionPool::Callbacks {
 class ConnPoolImplForTest : public OriginalConnPoolImpl {
 public:
   ConnPoolImplForTest(Event::MockDispatcher& dispatcher, Upstream::HostSharedPtr host,
-                      NiceMock<Event::MockTimer>* upstream_ready_timer)
+                      NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb)
       : OriginalConnPoolImpl(dispatcher, host, Upstream::ResourcePriority::Default, nullptr,
                              nullptr),
-        mock_dispatcher_(dispatcher), mock_upstream_ready_timer_(upstream_ready_timer) {}
+        mock_dispatcher_(dispatcher), mock_upstream_ready_cb_(upstream_ready_cb) {}
 
   ~ConnPoolImplForTest() override {
     EXPECT_EQ(0U, ready_conns_.size());
@@ -107,17 +107,17 @@ public:
 
   void expectEnableUpstreamReady() {
     EXPECT_FALSE(upstream_ready_enabled_);
-    EXPECT_CALL(*mock_upstream_ready_timer_, enableTimer(_, _)).Times(1).RetiresOnSaturation();
+    EXPECT_CALL(*mock_upstream_ready_cb_, scheduleCallback()).Times(1).RetiresOnSaturation();
   }
 
   void expectAndRunUpstreamReady() {
     EXPECT_TRUE(upstream_ready_enabled_);
-    mock_upstream_ready_timer_->invokeCallback();
+    mock_upstream_ready_cb_->invokeCallback();
     EXPECT_FALSE(upstream_ready_enabled_);
   }
 
   Event::MockDispatcher& mock_dispatcher_;
-  NiceMock<Event::MockTimer>* mock_upstream_ready_timer_;
+  NiceMock<Event::MockSchedulableCallback>* mock_upstream_ready_cb_;
   std::vector<TestConnection> test_conns_;
 
 protected:
@@ -151,9 +151,9 @@ protected:
 class TcpConnPoolImplTest : public testing::Test {
 public:
   TcpConnPoolImplTest()
-      : upstream_ready_timer_(new NiceMock<Event::MockTimer>(&dispatcher_)),
+      : upstream_ready_cb_(new NiceMock<Event::MockSchedulableCallback>(&dispatcher_)),
         host_(Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000")),
-        conn_pool_(dispatcher_, host_, upstream_ready_timer_) {}
+        conn_pool_(dispatcher_, host_, upstream_ready_cb_) {}
 
   ~TcpConnPoolImplTest() override {
     EXPECT_TRUE(TestUtility::gaugesZeroed(cluster_->stats_store_.gauges()));
@@ -161,7 +161,7 @@ public:
 
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
-  NiceMock<Event::MockTimer>* upstream_ready_timer_;
+  NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb_;
   Upstream::HostSharedPtr host_;
   ConnPoolImplForTest conn_pool_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -173,7 +173,7 @@ public:
 class TcpConnPoolImplDestructorTest : public testing::Test {
 public:
   TcpConnPoolImplDestructorTest()
-      : upstream_ready_timer_(new NiceMock<Event::MockTimer>(&dispatcher_)),
+      : upstream_ready_cb_(new NiceMock<Event::MockSchedulableCallback>(&dispatcher_)),
         conn_pool_{new OriginalConnPoolImpl(
             dispatcher_, Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000"),
             Upstream::ResourcePriority::Default, nullptr, nullptr)} {}
@@ -197,7 +197,7 @@ public:
 
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
-  NiceMock<Event::MockTimer>* upstream_ready_timer_;
+  NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb_;
   NiceMock<Event::MockTimer>* connect_timer_;
   NiceMock<Network::MockClientConnection>* connection_;
   std::unique_ptr<OriginalConnPoolImpl> conn_pool_;
