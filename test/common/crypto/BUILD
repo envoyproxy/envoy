@@ -42,7 +42,7 @@ envoy_cc_fuzz_test(
     name = "verify_signature_fuzz_test",
     srcs = ["verify_signature_fuzz_test.cc"],
     corpus = "verify_signature_corpus",
-    dictionaries = ["verify_signature_fuzz_test.dict"]
+    dictionaries = ["verify_signature_fuzz_test.dict"],
     deps = [
         ":verify_signature_fuzz_proto_cc_proto",
         "//source/common/common:hex_lib",
