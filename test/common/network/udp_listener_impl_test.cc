@@ -474,7 +474,7 @@ TEST_P(UdpListenerImplTest, UdpGroBasic) {
 
   EXPECT_CALL(os_sys_calls, recvmsg(_, _, _))
       .WillOnce(Invoke([](os_fd_t, msghdr* msg, int) {
-        // Set msg_name and namelen
+        // Set msg_name and name-len
         sockaddr_storage ss;
         auto ipv4_addr = reinterpret_cast<sockaddr_in*>(&ss);
         memset(ipv4_addr, 0, sizeof(sockaddr_in));
@@ -484,7 +484,7 @@ TEST_P(UdpListenerImplTest, UdpGroBasic) {
         *reinterpret_cast<sockaddr_in*>(msg->msg_name) = *ipv4_addr;
         msg->msg_namelen = sizeof(sockaddr_in);
 
-        // Set msg_iov
+        // Set msg_iovec
         EXPECT_EQ(msg->msg_iovlen, 1);
         std::string stacked_payload("HelloEnvoyWorld");
         memcpy(msg->msg_iov[0].iov_base, stacked_payload.data(), stacked_payload.length());
