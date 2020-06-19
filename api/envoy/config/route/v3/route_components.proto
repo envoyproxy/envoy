@@ -539,7 +539,7 @@ message CorsPolicy {
   core.v3.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
-// [#next-free-field: 35]
+// [#next-free-field: 36]
 message RouteAction {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteAction";
 
@@ -819,7 +819,7 @@ message RouteAction {
     // A list of selectors that will be iterated in order. If a selector is unable to return an
     // active cluster, the next selector in the list will be attempted. If an active cluster can't
     // be found after iterating this list, an error response will be returned to the client.
-    ClusterSelectorRepeatedWrapper cluster_selectors = 4;
+    ClusterSelectorRepeatedWrapper cluster_selectors = 35;
   }
 
   // The HTTP status code to use when configured cluster is not found.
