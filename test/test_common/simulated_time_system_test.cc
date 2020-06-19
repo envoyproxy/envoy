@@ -3,6 +3,7 @@
 #include "common/event/libevent_scheduler.h"
 #include "common/event/timer_impl.h"
 
+#include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
@@ -22,12 +23,25 @@ protected:
         start_monotonic_time_(time_system_.monotonicTime()),
         start_system_time_(time_system_.systemTime()) {}
 
-  void addTask(int64_t delay_ms, char marker) {
+  void trackPrepareCalls() {
+    base_scheduler_.registerOnPrepareCallback([this]() { output_.append(1, 'p'); });
+  }
+
+  void addTask(int64_t delay_ms, char marker, bool expect_monotonic = true) {
+    addCustomTask(
+        delay_ms, marker, []() {}, expect_monotonic);
+  }
+
+  void addCustomTask(int64_t delay_ms, char marker, std::function<void()> cb,
+                     bool expect_monotonic = true) {
     std::chrono::milliseconds delay(delay_ms);
     TimerPtr timer = scheduler_->createTimer(
-        [this, marker, delay]() {
+        [this, marker, delay, cb, expect_monotonic]() {
           output_.append(1, marker);
-          EXPECT_GE(time_system_.monotonicTime(), start_monotonic_time_ + delay);
+          if (expect_monotonic) {
+            EXPECT_GE(time_system_.monotonicTime(), start_monotonic_time_ + delay);
+          }
+          cb();
         },
         dispatcher_);
     timer->enableTimer(delay);
@@ -60,6 +74,95 @@ TEST_F(SimulatedTimeSystemTest, AdvanceTimeAsync) {
   advanceMsAndLoop(5);
   EXPECT_EQ(start_monotonic_time_ + std::chrono::milliseconds(5), time_system_.monotonicTime());
   EXPECT_EQ(start_system_time_ + std::chrono::milliseconds(5), time_system_.systemTime());
+}
+
+TEST_F(SimulatedTimeSystemTest, TimerOrdering) {
+  trackPrepareCalls();
+
+  addTask(0, '0');
+  addTask(1, '1');
+  addTask(2, '2');
+  EXPECT_EQ(3, timers_.size());
+
+  advanceMsAndLoop(5);
+
+  // Verify order.
+  EXPECT_EQ("p012", output_);
+}
+
+// Timers that are scheduled to execute and but are disabled first do not trigger.
+TEST_F(SimulatedTimeSystemTest, TimerOrderAndDisableTimer) {
+  trackPrepareCalls();
+
+  // Create 3 timers. The first timer should disable the second, so it doesn't trigger.
+  addCustomTask(0, '0', [this]() { timers_[1]->disableTimer(); });
+  addTask(1, '1');
+  addTask(2, '2');
+  EXPECT_EQ(3, timers_.size());
+
+  // Expect timers to execute in order since the timers are scheduled at have different times and
+  // that timer 1 does not execute because it was disabled as part of 0's execution.
+  advanceMsAndLoop(5);
+  // Verify that timer 1 was skipped.
+  EXPECT_EQ("p02", output_);
+}
+
+// Capture behavior of timers which are rescheduled without being disabled first.
+TEST_F(SimulatedTimeSystemTest, TimerOrderAndRescheduleTimer) {
+  trackPrepareCalls();
+
+  // Reschedule timers 1, 2 and 4 without disabling first.
+  addCustomTask(0, '0', [this]() {
+    timers_[1]->enableTimer(std::chrono::milliseconds(0));
+    timers_[2]->enableTimer(std::chrono::milliseconds(100));
+    timers_[4]->enableTimer(std::chrono::milliseconds(0));
+  });
+  addTask(1, '1');
+  addTask(2, '2');
+  addTask(3, '3');
+  addTask(10000, '4', false);
+  EXPECT_EQ(5, timers_.size());
+
+  // Rescheduling timers that are already scheduled to run in the current event loop iteration has
+  // no effect if the time delta is 0. Expect timers 0, 1 and 3 to execute in the original order.
+  // Timer 4 runs as part of the first wakeup since its new schedule time has a delta of 0. Timer 2
+  // is delayed since it is rescheduled with a non-zero delta.
+  advanceMsAndLoop(5);
+  EXPECT_EQ("p0134", output_);
+
+  advanceMsAndLoop(100);
+  EXPECT_EQ("p0134p2", output_);
+}
+
+// Disable and re-enable timers that is already pending execution and verify that execution is
+// delayed.
+TEST_F(SimulatedTimeSystemTest, TimerOrderDisableAndRescheduleTimer) {
+  trackPrepareCalls();
+
+  // Disable and reschedule timers 1, 2 and 4 when timer 0 triggers.
+  addCustomTask(0, '0', [this]() {
+    timers_[1]->disableTimer();
+    timers_[1]->enableTimer(std::chrono::milliseconds(0));
+    timers_[2]->disableTimer();
+    timers_[2]->enableTimer(std::chrono::milliseconds(100));
+    timers_[4]->disableTimer();
+    timers_[4]->enableTimer(std::chrono::milliseconds(0));
+  });
+  addTask(1, '1');
+  addTask(2, '2');
+  addTask(3, '3');
+  addTask(10000, '4', false);
+  EXPECT_EQ(5, timers_.size());
+
+  // timer 0 is expected to run first and reschedule timers 1 and 2. Timer 3 should fire before
+  // timer 1 since timer 3's registration is unaffected. timer 1 runs in the same iteration
+  // because it is scheduled with zero delay. Timer 2 executes in a later iteration because it is
+  // re-enabled with a non-zero timeout.
+  advanceMsAndLoop(5);
+  EXPECT_EQ("p0314", output_);
+
+  advanceMsAndLoop(100);
+  EXPECT_EQ("p0314p2", output_);
 }
 
 TEST_F(SimulatedTimeSystemTest, AdvanceTimeWait) {
