@@ -49,7 +49,7 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers,
     context_extensions = maybe_merged_per_route_config.value().takeContextExtensions();
   }
 
-  // If metadata_context_namespaces is specified, pass matching metadata to the ext_authz service
+  // If metadata_context_namespaces is specified, pass matching metadata to the ext_authz service.
   envoy::config::core::v3::Metadata metadata_context;
   const auto& request_metadata = callbacks_->streamInfo().dynamicMetadata().filter_metadata();
   for (const auto& context_key : config_->metadataContextNamespaces()) {
@@ -221,19 +221,19 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       config_->httpContext().codeStats().chargeResponseStat(info);
     }
 
+    const auto& headers = response->headers_to_add;
     callbacks_->sendLocalReply(
         response->status_code, response->body,
-        [& headers = response->headers_to_add,
-         &callbacks = *callbacks_](Http::HeaderMap& response_headers) -> void {
+        [headers, &callbacks = *callbacks_](Http::HeaderMap& response_headers) -> void {
           ENVOY_STREAM_LOG(trace,
                            "ext_authz filter added header(s) to the local response:", callbacks);
-          // First remove all headers requested by the ext_authz filter,
-          // to ensure that they will override existing headers
+          // Firstly, remove all headers requested by the ext_authz filter, to ensure that they will
+          // override existing headers.
           for (const auto& header : headers) {
             response_headers.remove(header.first);
           }
-          // Then set all of the requested headers, allowing the
-          // same header to be set multiple times, e.g. `Set-Cookie`
+          // Then set all of the requested headers, allowing the same header to be set multiple
+          // times, e.g. `Set-Cookie`.
           for (const auto& header : headers) {
             ENVOY_STREAM_LOG(trace, " '{}':'{}'", callbacks, header.first.get(), header.second);
             response_headers.addCopy(header.first, header.second);
