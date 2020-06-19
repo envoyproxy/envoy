@@ -527,49 +527,46 @@ TEST_P(AdminInstanceTest, ConfigDumpWithEndpointFiltersByResource) {
 
   Buffer::OwnedImpl response;
   Http::TestResponseHeaderMapImpl header_map;
-  EXPECT_EQ(Http::Code::OK, getCallback("/config_dump?includeEds?resource=static_endpoints", header_map, response));
+  EXPECT_EQ(Http::Code::OK, getCallback("/config_dump?includeEds&resource=static_endpoint_configs",
+                                        header_map, response));
   std::string output = response.toString();
   const std::string expected_json = R"EOF({
  "configs": [
   {
-   "@type": "type.googleapis.com/envoy.admin.v3.EndpointsConfigDump",
-   "static_endpoint_configs": [
-    {
-     "endpoint_config": {
-      "@type": "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment",
-      "cluster_name": "fake_cluster",
-      "endpoints": [
+   "@type": "type.googleapis.com/envoy.admin.v3.EndpointsConfigDump.StaticEndpointConfig",
+   "endpoint_config": {
+    "@type": "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment",
+    "cluster_name": "fake_cluster",
+    "endpoints": [
+     {
+      "locality": {},
+      "lb_endpoints": [
        {
-        "locality": {},
-        "lb_endpoints": [
-         {
-          "endpoint": {
-           "address": {
-            "socket_address": {
-             "address": "1.2.3.4",
-             "port_value": 80
-            }
-           },
-           "health_check_config": {
-            "port_value": 90,
-            "hostname": "test_hostname_healthcheck"
-           },
-           "hostname": "foo.com"
-          },
-          "health_status": "HEALTHY",
-          "metadata": {},
-          "load_balancing_weight": 5
-         }
-        ],
-        "priority": 6
+        "endpoint": {
+         "address": {
+          "socket_address": {
+           "address": "1.2.3.4",
+           "port_value": 80
+          }
+         },
+         "health_check_config": {
+          "port_value": 90,
+          "hostname": "test_hostname_healthcheck"
+         },
+         "hostname": "foo.com"
+        },
+        "health_status": "HEALTHY",
+        "metadata": {},
+        "load_balancing_weight": 5
        }
       ],
-      "policy": {
-       "overprovisioning_factor": 140
-      }
+      "priority": 6
      }
+    ],
+    "policy": {
+     "overprovisioning_factor": 140
     }
-   ]
+   }
   }
  ]
 }
