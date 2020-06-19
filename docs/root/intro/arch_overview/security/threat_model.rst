@@ -1,4 +1,4 @@
-'0;256;0c.. _arch_overview_threat_model:
+.. _arch_overview_threat_model:
 
 Threat model
 ============
