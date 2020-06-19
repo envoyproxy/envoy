@@ -49,8 +49,8 @@ class RateLimitGrpcClientTest : public testing::Test {
 public:
   RateLimitGrpcClientTest()
       : async_client_(new Grpc::MockAsyncClient()),
-        client_(Grpc::RawAsyncClientPtr{async_client_},
-                absl::optional<std::chrono::milliseconds>()) {}
+        client_(Grpc::RawAsyncClientPtr{async_client_}, absl::optional<std::chrono::milliseconds>(),
+                envoy::config::core::v3::ApiVersion::AUTO) {}
 
   Grpc::MockAsyncClient* async_client_;
   Grpc::MockAsyncRequest async_request_;
