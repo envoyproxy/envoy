@@ -10,53 +10,36 @@ namespace HttpFilters {
 namespace Cache {
 namespace {
 
-struct IsCacheableRequestParams {
-  Http::TestRequestHeaderMapImpl request_headers;
-  bool is_cacheable;
+Http::TestRequestHeaderMapImpl non_cacheable_request_headers[] = {
+    {},
+    {{":path", "/"}},
+    {{":path", "/"}, {":method", "GET"}},
+    {{":path", "/"}, {":method", "GET"}, {"x-forwarded-proto", "https"}}, 
+    {{":path", "/"}, {":method", "POST"}, {"x-forwarded-proto", "https"}, {":authority", "test.com"}},
+    {{":path", "/"}, {":method", "GET"}, {"x-forwarded-proto", "ftp"}, {":authority", "test.com"}},
+    {{":path", "/"}, {":method", "GET"}, {"x-forwarded-proto", "http"}, {":authority", "test.com"}, {"authorization", "basic YWxhZGRpbjpvcGVuc2VzYW1l"}},
 };
 
-IsCacheableRequestParams params[] = {
-    {{}, false},
-    {{{":path", "/"}}, false},
-    {{{":path", "/"}, {":method", "GET"}}, false},
-    {{{":path", "/"}, {":method", "GET"}, {"x-forwarded-proto", "https"}}, false},
-    {{{":path", "/"},
-      {":method", "GET"},
-      {"x-forwarded-proto", "https"},
-      {":authority", "test.com"}},
-     true},
-    {{{":path", "/"},
-      {":method", "POST"},
-      {"x-forwarded-proto", "https"},
-      {":authority", "test.com"}},
-     false},
-    {{{":path", "/"},
-      {":method", "GET"},
-      {"x-forwarded-proto", "http"},
-      {":authority", "test.com"}},
-     true},
-    {{{":path", "/"},
-      {":method", "GET"},
-      {"x-forwarded-proto", "http"},
-      {":authority", "test.com"}},
-     true},
-    {{{":path", "/"}, {":method", "GET"}, {"x-forwarded-proto", "ftp"}, {":authority", "test.com"}},
-     false},
-    {{{":path", "/"},
-      {":method", "GET"},
-      {"x-forwarded-proto", "http"},
-      {":authority", "test.com"},
-      {"authorization", "basic YWxhZGRpbjpvcGVuc2VzYW1l"}},
-     false},
+Http::TestRequestHeaderMapImpl cacheable_request_headers[] = {
+    {{":path", "/"}, {":method", "GET"}, {"x-forwarded-proto", "https"}, {":authority", "test.com"}},
+    {{":path", "/"}, {":method", "GET"}, {"x-forwarded-proto", "http"}, {":authority", "test.com"}},
+    {{":path", "/"}, {":method", "GET"}, {"x-forwarded-proto", "http"}, {":authority", "test.com"}},
 };
 
-class IsCacheableRequestTest : public testing::TestWithParam<IsCacheableRequestParams> {};
+class NonCacheableRequestsTest : public testing::TestWithParam<Http::TestRequestHeaderMapImpl> {};
+class CacheableRequestsTest : public testing::TestWithParam<Http::TestRequestHeaderMapImpl> {};
 
-INSTANTIATE_TEST_SUITE_P(IsCacheableRequestTest, IsCacheableRequestTest, testing::ValuesIn(params));
 
-TEST_P(IsCacheableRequestTest, IsCacheableRequestTest) {
-  EXPECT_EQ(CacheFilterUtils::isCacheableRequest(GetParam().request_headers),
-            GetParam().is_cacheable);
+INSTANTIATE_TEST_SUITE_P(NonCacheableRequestsTest, NonCacheableRequestsTest, testing::ValuesIn(non_cacheable_request_headers));
+INSTANTIATE_TEST_SUITE_P(CacheableRequestsTest, CacheableRequestsTest, testing::ValuesIn(cacheable_request_headers));
+
+
+TEST_P(NonCacheableRequestsTest, NonCacheableRequests) {
+  EXPECT_FALSE(CacheFilterUtils::isCacheableRequest(GetParam()));
+}
+
+TEST_P(CacheableRequestsTest, CacheableRequests) {
+  EXPECT_TRUE(CacheFilterUtils::isCacheableRequest(GetParam()));
 }
 
 } // namespace
