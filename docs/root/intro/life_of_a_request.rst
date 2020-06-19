@@ -17,16 +17,17 @@ Envoy uses the following terms through its codebase and documentation:
 * *Cluster*: a logical service with a set of endpoints that Envoy forwards requests to.
 * *Downstream*: an entity connecting to Envoy. This may be a local application (in a sidecar model) or
   a network node. In non-sidecar models, this is a remote client.
-* *Endpoints*:  nodes that implement a logical service. They are grouped into clusters.
+* *Endpoints*: network nodes that implement a logical service. They are grouped into clusters.
+  Endpoints in a cluster are *upstream* of an Envoy proxy.
 * *Filter*: a module in the connection or request processing pipeline providing some aspect of
   request handling. An analogy from Unix is the composition of small utilities (filters) with Unix
   pipes (filter chains).
 * *Filter chain*: a series of filters.
 * *Listeners*: Envoy module responsible for binding to an IP/port, accepting new TCP connections (or
   UDP datagrams) and orchestrating the downstream facing aspects of request processing.
-* *Upstream*: an endpoint that Envoy connects to when forwarding requests for a service. This may be a
-  local application (in a sidecar model) or a network node. In non-sidecar models, this corresponds
-  with a remote backend.
+* *Upstream*: an endpoint (network node) that Envoy connects to when forwarding requests for a
+  service. This may be a local application (in a sidecar model) or a network node. In non-sidecar
+  models, this corresponds with a remote backend.
 
 Network topology
 ----------------
@@ -45,8 +46,8 @@ Requests arrive at an Envoy via either ingress or egress listeners:
 * Ingress listeners take requests from other nodes in the service mesh and forward them to the
   local application. Responses from the local application flow back through Envoy to the downstream.
 * Egress listeners take requests from the local application and forward them to other nodes in the
-  network. These nodes will also be typically running Envoy and accepting the request via their
-  ingress listeners.
+  network. These receiving nodes will also be typically running Envoy and accepting the request via
+  their ingress listeners.
 
 .. image:: /_static/lor-topology-service-mesh.svg
    :width: 80%
@@ -105,12 +106,15 @@ paths, depending on:
 
 It's helpful to focus on one at a time, so this example covers the following:
 
-* An HTTP/2 request with TLS over a TCP connection for both downstream and upstream.
-* The HTTP connection manager as the only network filter.
-* A hypothetical CustomFilter and the router filter as the HTTP filter chain.
-* Filesystem access logging.
-* Statsd sink.
-* A single cluster with static endpoints.
+* An HTTP/2 request with :ref:`TLS <arch_overview_ssl>` over a TCP connection for both downstream
+  and upstream.
+* The :ref:`HTTP connection manager <arch_overview_http_conn_man>` as the only :ref:`network filter
+  <arch_overview_network_filters>`.
+* A hypothetical CustomFilter and the `router <arch_overview_http_routing>` filter as the :ref:`HTTP
+  filter <arch_overview_http_filters>` chain.
+* :ref:`Filesystem access logging <arch_overview_access_logs_sinks>`.
+* :ref:`Statsd sink <envoy_v3_api_msg_config.metrics.v3.StatsSink>`.
+* A single :ref:`cluster <arch_overview_cluster_manager>` with static endpoints.
 
 We assume a static bootstrap configuration file for simplicity:
 
@@ -125,6 +129,10 @@ We assume a static bootstrap configuration file for simplicity:
           protocol: TCP
           address: 0.0.0.0
           port_value: 443
+      # A single listener filter exists for TLS inspector.
+      listener_filters:
+      - name: "envoy.filters.listener.tls_inspector"
+        typed_config: {}
       # On the listener, there is a single filter chain that matches SNI for acme.com.
       filter_chains:
       - filter_chain_match:
@@ -170,7 +178,7 @@ We assume a static bootstrap configuration file for simplicity:
             - name: some.customer.filter
             - name: envoy.filters.http.router
     clusters:
-      name: some_service
+    - name: some_service
       connect_timeout: 5s
       # Upstream TLS configuration.
       transport_socket:
@@ -194,11 +202,14 @@ We assume a static bootstrap configuration file for simplicity:
                   port_value: 10002
       http2_protocol_options:
         max_concurrent_streams: 100
+    - name: some_statsd_sink
+      connect_timeout: 5s
+      # .. rest of configuration for statsd sink cluster
   # statsd sink.
   stats_sinks:
      - name: envoy.stat_sinks.statsd
        typed_config:
-         "@type": type.googleapis.com/envoy.config.metrics.v2.StatsdSink
+         "@type": type.googleapis.com/envoy.config.metrics.v3.StatsdSink
          tcp_cluster_name: some_statsd_cluster
 
 High level architecture
@@ -260,32 +271,32 @@ A brief outline of the life cycle of a request and response using the example co
    destination IP CIDR range, SNI, ALPN, source ports, etc. A transport socket, in our case the TLS
    transport socket, is associated with this filter chain.
 3. On network reads, the :ref:`TLS <arch_overview_ssl>` transport socket decrypts the data read from
-   the TCP connection to plain text for further processing.
+   the TCP connection to a decrypted data stream for further processing.
 4. The :ref:`network filter <arch_overview_network_filters>` chain is created and runs. The most
    important filter for HTTP is the HTTP connection manager, which is the last network filter in the
    chain.
-5. The HTTP/2 codec in :ref:`HTTP connection manager <arch_overview_http_conn_man>` demultiplexes
-   the plain text TCP connection to a number of independent HTTP streams. Each HTTP stream handles a
-   single request and response.
+5. The HTTP/2 codec in :ref:`HTTP connection manager <arch_overview_http_conn_man>` deframes and
+   demultiplexes the decrypted data stream from the TLS connection to a number of independent HTTP
+   streams. Each HTTP stream handles a single request and response.
 6. For each HTTP stream, an :ref:`HTTP filter <arch_overview_http_filters>` chain is created and
    runs. The request first passes through CustomFilter which may read and modify the request. The
-   most important filter for HTTP is the router filter which sits at the end of the filter chain.
+   most important HTTP filter is the router filter which sits at the end of the HTTP filter chain.
    When `decodeHeaders` is invoked on the router filter, the route is selected and a cluster is
-   picked. The request headers on the stream are forwarded to an upstream end point in that cluster.
-   The :ref:`router <arch_overview_http_routing>` filter requests an HTTP :ref:`connection pool
+   picked. The request headers on the stream are forwarded to an upstream endpoint in that cluster.
+   The :ref:`router <arch_overview_http_routing>` filter obtains an HTTP :ref:`connection pool
    <arch_overview_conn_pool>` from the cluster manager for the matched cluster to do this.
 7. Cluster specific :ref:`load balancing <arch_overview_load_balancing>` is performed to find an
    endpoint. The cluster’s circuit breakers are checked to determine if a new stream is allowed. A
    new connection to the endpoint is created if the endpoint's connection pool is empty or lacks
    capacity.
-8. The upstream endpoint connection's HTTP/2 codec multiplexes the request’s stream with any other
-   streams going to that upstream over a single TCP connection.
+8. The upstream endpoint connection's HTTP/2 codec multiplexes and frames the request’s stream with
+   any other streams going to that upstream over a single TCP connection.
 9. The upstream endpoint connection's TLS transport socket encrypts these bytes and writes them to a
    TCP socket for the upstream connection.
 10. The request, consisting of headers, and optional body and trailers, is proxied upstream, and the
-    response is proxied downstream. The response passes through the HTTP filters in the opposite
-    order from the request, starting at the router filter and passing through CustomFilter, before
-    being sent downstream.
+    response is proxied downstream. The response passes through the HTTP filters in the
+    :ref:`opposite order <arch_overview_http_filters_ordering>` from the request, starting at the
+    router filter and passing through CustomFilter, before being sent downstream.
 11. When the response is complete, the stream is destroyed. Post-request processing will update
     stats, write to the access log and finalize trace spans.
 
@@ -325,9 +336,10 @@ filter for each connection or stream.
 In the case of our TLS listener configuration, the listener filter chain consists of the :ref:`TLS
 inspector <config_listener_filters_tls_inspector>` filter
 (``envoy.filters.listener.tls_inspector``). This filter examines the initial TLS handshake and
-extracts the server name (SNI). The SNI is then made available for filter chain matching. The TLS
-inspector does not appear explicitly in the listener filter chain configuration, instead Envoy
-inserts this automatically whenever there is a need for SNI (or ALPN) in a listener’s filter chain.
+extracts the server name (SNI). The SNI is then made available for filter chain matching. While the
+TLS inspector appears explicitly in the listener filter chain configuration, Envoy is also capable
+of inserting this automatically whenever there is a need for SNI (or ALPN) in a listener’s filter
+chain.
 
 .. image:: /_static/lor-listener-filters.svg
    :width: 80%
@@ -374,7 +386,7 @@ read/write into network buffers. Some key methods that transport sockets must im
 When data is available on a TCP connection, ``Network::ConnectionImpl::onReadReady()`` invokes the
 :ref:`TLS <arch_overview_ssl>` transport socket via ``SslSocket::doRead()``. The transport socket
 then performs a TLS handshake on the TCP connection. When the handshake completes,
-``SslSocket::doRead()`` provides a decrypted plain text byte stream to an instance of
+``SslSocket::doRead()`` provides a decrypted byte stream to an instance of
 ``Network::FilterManagerImpl``, responsible for managing the network filter chain.
 
 .. image:: /_static/lor-transport-socket.svg
@@ -421,7 +433,7 @@ chain. For example, if a rate limiting service needs to be queried, a rate limit
 would return ``Network::FilterStatus::StopIteration`` from ``onData()`` and later invoke
 ``continueReading()`` when the query completes.
 
-The last network filter for an HTTP listener is :ref:`HTTP connection manager
+The last network filter for a listener dealing with HTTP is :ref:`HTTP connection manager
 <arch_overview_http_conn_man>` (HCM). This is responsible for creating the HTTP/2 codec and managing
 the HTTP filter chain. In our example, this is the only network filter. An example network filter
 chain making use of multiple network filters would look like:
@@ -441,24 +453,24 @@ On the response path, the network filter chain is executed in the reverse order 
 5. HTTP/2 codec decoding
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-The HTTP/2 codec in Envoy is based on `nghttp2 <https://nghttp2.org/>`_. It is invoked by HCM with
-plaintext bytes from the TCP connection (after network filter chain transformation). The codec
+The HTTP/2 codec in Envoy is based on `nghttp2 <https://nghttp2.org/>`_. It is invoked by the HCM
+with plaintext bytes from the TCP connection (after network filter chain transformation). The codec
 decodes the byte stream as a series of HTTP/2 frames and demultiplexes the connection into a number
 of independent HTTP streams. Stream multiplexing is a key feature in HTTP/2, providing significant
 performance advantages over HTTP/1. Each HTTP stream handles a single request and response.
 
 The codec is also responsible for handling HTTP/2 setting frames and both stream and connection
-level flow control.
+level :repo:`flow control <source/docs/flow_control.md>`.
 
 The codecs are responsible for abstracting the specifics of the HTTP connection, presenting a
-standard view to the HTTP connection manager and filter chain of a connection split into streams,
-each with request/response headers/body/trailers. This is true regardless of whether the protocol is
-HTTP/1, HTTP/2 or HTTP/3.
+standard view to the HTTP connection manager and HTTP filter chain of a connection split into
+streams, each with request/response headers/body/trailers. This is true regardless of whether the
+protocol is HTTP/1, HTTP/2 or HTTP/3.
 
 6. HTTP filter chain processing
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-For each HTTP stream, HCM instanties an :ref:`HTTP filter <arch_overview_http_filters>` chain,
+For each HTTP stream, the HCM instantiates an :ref:`HTTP filter <arch_overview_http_filters>` chain,
 following the pattern established above for listener and network filter chains.
 
 .. image:: /_static/lor-http-filters.svg
@@ -486,12 +498,12 @@ returned ``FilterStatus`` provides, as with network and listener filters, the ab
 chain control flow.
 
 When the HTTP/2 codec makes available the HTTP requests headers, these are first passed to
-``decodeHeaders()`` in CustomFilter. If this ``FilterHeadersStatus`` is ``Continue``, HCM then
-passes the headers (possibly mutated by CustomFilter) to the router filter.
+``decodeHeaders()`` in CustomFilter. If the returned ``FilterHeadersStatus`` is ``Continue``, HCM
+then passes the headers (possibly mutated by CustomFilter) to the router filter.
 
 Decoder and encoder-decoder filters are executed on the request path. Encoder and encoder-decoder
-filters are executed on the response path, in reverse direction. In both paths, the same filter
-chain ordering is used. Consider the following example filter chain:
+filters are executed on the response path, in :ref:`reverse direction
+<arch_overview_http_filters_ordering>`. Consider the following example filter chain:
 
 .. image:: /_static/lor-http.svg
    :width: 80%
@@ -510,7 +522,7 @@ While the response path will look like:
    :align: center
 
 When ``decodeHeaders()`` is invoked on the :ref:`router <arch_overview_http_routing>` filter, the
-route selection is finalized and a cluster is picked. HCM selects a route from its
+route selection is finalized and a cluster is picked. The HCM selects a route from its
 ``RouteConfiguration`` at the start of HTTP filter chain execution. This is referred to as the
 *cached route*. Filters may modify headers and cause a new route to be selected, by asking HCM to
 clear the route cache and requesting HCM to reevaluate the route selection. When the router filter
@@ -565,7 +577,8 @@ decoding <life_of_a_request_http2_decoding>`.
 
 As with the downstream HTTP/2 codec, the upstream codec is responsible for taking Envoy’s standard
 abstraction of HTTP, i.e. multiple streams multiplexed on a single connection with request/response
-headers/body/trailers, and mapping this to the specifics of HTTP/2.
+headers/body/trailers, and mapping this to the specifics of HTTP/2 by generating a series of HTTP/2
+frames.
 
 9. TLS transport socket encryption
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -585,7 +598,7 @@ downstream transport socket extensions.
 
 The request, consisting of headers, and optional body and trailers, is proxied upstream, and the
 response is proxied downstream. The response passes through the HTTP and network filters in the
-opposite order from the request.
+:ref:`opposite order <arch_overview_http_filters_ordering>`. from the request.
 
 Various callbacks for decoder/encoder request lifecycle events will be invoked in HTTP filters, e.g.
 when response trailers are being forwarded or the request body is streamed. Similarly, read/write
@@ -609,7 +622,8 @@ It is possible for a request to terminate early. This may be due to (but not lim
 * No healthy endpoints.
 * DoS protection.
 * HTTP protocol violations.
-* Local reply from either HCM or an HTTP filter. E.g. a rate limit HTTP filter returning a 429 response.
+* Local reply from either the HCM or an HTTP filter. E.g. a rate limit HTTP filter returning a 429
+  response.
 
 If any of these occur, Envoy may either send an internally generated response, if upstream response
 headers have not yet been sent, or will reset the stream, if response headers have already been
@@ -621,12 +635,13 @@ interpreting these early stream terminations.
 
 Once a request completes, the stream is destroyed. The following also takes places:
 
-* :ref:`Statistics <arch_overview_statistics>` are updated (e.g. timing, active requests, upgrades,
-  health checks). Stats are not written to the stats :ref:`sink
+* The post-request :ref:`statistics <arch_overview_statistics>` are updated (e.g. timing, active
+  requests, upgrades, health checks). Some statistics are updated earlier however, during request
+  processing. Stats are not written to the stats :ref:`sink
   <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.stats_sinks>` at this point, they are batched
   and written by the main thread periodically. In our example this is a statsd sink.
 * :ref:`Access logs <arch_overview_access_logs>` are written to the access log :ref:`sinks
   <arch_overview_access_logs_sinks>`. In our example this is a file access log.
 * :ref:`Trace <arch_overview_tracing>` spans are finalized. If our example request was traced, a
-  trace span, describing the duration and details of the request would be created by HCM when
-  processing request headers and then finalized by HCM during post-request processing.
+  trace span, describing the duration and details of the request would be created by the HCM when
+  processing request headers and then finalized by the HCM during post-request processing.
