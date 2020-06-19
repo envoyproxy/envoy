@@ -172,7 +172,9 @@ static void priorityAndLocalityWeighted(benchmark::State& state) {
   }
 }
 
-BENCHMARK(priorityAndLocalityWeighted)->Ranges({{false, true}, {false, true}, {2000, 100000}});
+BENCHMARK(priorityAndLocalityWeighted)
+    ->Ranges({{false, true}, {false, true}, {2000, 100000}})
+    ->Unit(benchmark::kMillisecond);
 
 static void duplicateUpdate(benchmark::State& state) {
   Envoy::Thread::MutexBasicLockable lock;
@@ -185,7 +187,7 @@ static void duplicateUpdate(benchmark::State& state) {
   }
 }
 
-BENCHMARK(duplicateUpdate)->Range(2000, 100000);
+BENCHMARK(duplicateUpdate)->Range(2000, 100000)->Unit(benchmark::kMillisecond);
 
 static void healthOnlyUpdate(benchmark::State& state) {
   Envoy::Thread::MutexBasicLockable lock;
@@ -198,4 +200,4 @@ static void healthOnlyUpdate(benchmark::State& state) {
   }
 }
 
-BENCHMARK(healthOnlyUpdate)->Range(2000, 100000);
+BENCHMARK(healthOnlyUpdate)->Range(2000, 100000)->Unit(benchmark::kMillisecond);

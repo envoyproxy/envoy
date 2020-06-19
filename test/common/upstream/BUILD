@@ -127,6 +127,7 @@ envoy_cc_benchmark_binary(
 
 envoy_benchmark_test(
     name = "eds_speed_test_benchmark_test",
+    size = "large",
     benchmark_binary = "eds_speed_test",
 )
 
