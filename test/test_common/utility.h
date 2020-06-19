@@ -668,6 +668,30 @@ public:
                                                     use_alpha, service_namespace),
                         "/", method_name);
   }
+
+  /**
+   * Return all headers value of a given key.
+   *
+   * @param headers headers map.
+   * @param key the matching header key.
+   * @return std::vector<absl::string_view> all headers values of the matching key.
+   */
+  static std::vector<absl::string_view>
+  getAllHeadersValuesForKey(const Envoy::Http::HeaderMap& headers, const std::string& key) {
+    std::vector<absl::string_view> values;
+    std::pair<std::string, std::vector<absl::string_view>*> context = std::make_pair(key, &values);
+    Envoy::Http::HeaderMap::ConstIterateCb get_headers_cb =
+        [](const Envoy::Http::HeaderEntry& header, void* context) {
+          auto* typed_context =
+              static_cast<std::pair<std::string, std::vector<absl::string_view>*>*>(context);
+          if (header.key().getStringView() == typed_context->first) {
+            typed_context->second->push_back(header.value().getStringView());
+          }
+          return Envoy::Http::HeaderMap::Iterate::Continue;
+        };
+    headers.iterate(get_headers_cb, &context);
+    return values;
+  }
 };
 
 /**

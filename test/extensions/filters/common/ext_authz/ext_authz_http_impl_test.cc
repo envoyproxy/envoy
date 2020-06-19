@@ -73,10 +73,6 @@ public:
               value: "value"
             - key: "x-authz-header2"
               value: "value"
-            - key: "append-authz-header1"
-              value: "append-value1"
-            - key: "append-authz-header1"
-              value: "append-value2"
 
           authorization_response:
             allowed_upstream_headers:
@@ -160,7 +156,7 @@ TEST_F(ExtAuthzHttpClientTest, ClientConfig) {
   EXPECT_FALSE(config_->requestHeaderMatchers()->matches(Http::Headers::get().ContentLength.get()));
   EXPECT_TRUE(config_->requestHeaderMatchers()->matches(baz.get()));
 
-  // // Check allowed client headers.
+  // Check allowed client headers.
   EXPECT_TRUE(config_->clientHeaderMatchers()->matches(Http::Headers::get().Status.get()));
   EXPECT_TRUE(config_->clientHeaderMatchers()->matches(Http::Headers::get().ContentLength.get()));
   EXPECT_FALSE(config_->clientHeaderMatchers()->matches(Http::Headers::get().Path.get()));
@@ -169,13 +165,13 @@ TEST_F(ExtAuthzHttpClientTest, ClientConfig) {
   EXPECT_FALSE(config_->clientHeaderMatchers()->matches(Http::Headers::get().Origin.get()));
   EXPECT_TRUE(config_->clientHeaderMatchers()->matches(foo.get()));
 
-  // // Check allowed upstream headers.
+  // Check allowed upstream headers.
   EXPECT_TRUE(config_->upstreamHeaderMatchers()->matches(bar.get()));
 
-  // // Check allowed upstream headers to append.
+  // Check allowed upstream headers to append.
   EXPECT_TRUE(config_->upstreamHeaderToAppendMatchers()->matches(alice.get()));
 
-  // // Check other attributes.
+  // Check other attributes.
   EXPECT_EQ(config_->pathPrefix(), "/bar");
   EXPECT_EQ(config_->cluster(), "ext_authz");
   EXPECT_EQ(config_->tracingName(), "async ext_authz egress");
@@ -328,12 +324,8 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeaders) {
   // append property of header value option should always be false.
   const HeaderValuePair header1{"x-authz-header1", "value"};
   const HeaderValuePair header2{"x-authz-header2", "value"};
-  const HeaderValuePair header3{"append-authz-header1", "append-value1"};
-  const HeaderValuePair header4{"append-authz-header1", "append-value2"};
   EXPECT_CALL(async_client_,
-              send_(AllOf(ContainsPairAsHeader(header1), ContainsPairAsHeader(header2),
-                          ContainsPairAsHeader(header3), ContainsPairAsHeader(header4)),
-                    _, _));
+              send_(AllOf(ContainsPairAsHeader(header1), ContainsPairAsHeader(header2)), _, _));
   client_->check(request_callbacks_, request, active_span_, stream_info_);
 
   EXPECT_CALL(request_callbacks_,
