@@ -60,32 +60,26 @@ Filters::Common::ExtAuthz::MockClient* client_ = new Filters::Common::ExtAuthz::
   ON_CALL(filter_callbacks_.connection_, localAddress()).WillByDefault(ReturnRef(addr_));
 
   for (const auto& action : input.actions()) {
-    // ENVOY_LOG_MISC(trace, "action {}", action.DebugString());
 
     switch (action.action_selector_case()) {
 
       case envoy::extensions::filters::network::ext_authz::Action::kOnData: {
-        // std::cout<<"------[onData]--------\n";
-        //set check response
-
+        //Optional input to set default authorization check result for the following "onData()"
         if(action.on_data().has_result()){
           switch (action.on_data().result().result_selector_case()) {
           case envoy::extensions::filters::network::ext_authz::Result::kCheckStatusOk:
-            // request_callbacks_->onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::OK));
             ON_CALL(*client_, check(_, _, _, _)).WillByDefault(
                 WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
                 callbacks.onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::OK));
                 })));
             break;
           case envoy::extensions::filters::network::ext_authz::Result::kCheckStatusError:
-            // request_callbacks_->onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Error));
             ON_CALL(*client_, check(_, _, _, _)).WillByDefault(
                 WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
                 callbacks.onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Error));
                 })));
             break;       
           case envoy::extensions::filters::network::ext_authz::Result::kCheckStatusDenied:
-            // request_callbacks_->onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Denied));
             ON_CALL(*client_, check(_, _, _, _)).WillByDefault(
                 WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
                 callbacks.onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Denied));
@@ -93,7 +87,7 @@ Filters::Common::ExtAuthz::MockClient* client_ = new Filters::Common::ExtAuthz::
             break; 
           default:
             // Unhandled status
-            PANIC("A status handle is missing");
+            PANIC("A check status handle is missing");
           }
 
         }
@@ -103,7 +97,6 @@ Filters::Common::ExtAuthz::MockClient* client_ = new Filters::Common::ExtAuthz::
       }
 
       case envoy::extensions::filters::network::ext_authz::Action::kOnNewConnection: {
-        // std::cout<<"------[onNewConnection]--------\n";
         filter_->onNewConnection();
         break;
       }
