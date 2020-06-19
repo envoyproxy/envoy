@@ -53,13 +53,13 @@
   __pragma(pack(push, 1)) definition, ##__VA_ARGS__;                                               \
   __pragma(pack(pop))
 
-using ssize_t = ptrdiff_t;
+typedef ptrdiff_t ssize_t;
 
 // This is needed so the OsSysCalls interface compiles on Windows,
 // shmOpen takes mode_t as an argument.
-using mode_t = uint32_t;
+typedef uint32_t mode_t;
 
-using os_fd_t = SOCKET;
+typedef SOCKET os_fd_t;
 
 typedef unsigned int sa_family_t;
 
@@ -188,7 +188,7 @@ struct msghdr {
 #define IP6T_SO_ORIGINAL_DST 80
 #endif
 
-using os_fd_t = int;
+typedef int os_fd_t;
 
 #define INVALID_SOCKET -1
 #define SOCKET_VALID(sock) ((sock) >= 0)
