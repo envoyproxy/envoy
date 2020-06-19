@@ -52,10 +52,10 @@ struct Response {
   // A set of HTTP headers returned by the authorization server, that will be optionally appended
   // to the request to the upstream server.
   Http::HeaderVector headers_to_append;
-  // A set of HTTP headers returned by the authorization server, optionally will be optionally set
+  // A set of HTTP headers returned by the authorization server, will be optionally set
   // (using "setCopy") to the request to the upstream server.
   Http::HeaderVector headers_to_set;
-  // A set of HTTP headers returned by the authorization server, optionally will be optionally added
+  // A set of HTTP headers returned by the authorization server, will be optionally added
   // (using "addCopy") to the request to the upstream server.
   Http::HeaderVector headers_to_add;
   // Optional http body used only on denied response.

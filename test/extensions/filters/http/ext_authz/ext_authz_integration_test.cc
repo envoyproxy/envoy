@@ -252,6 +252,8 @@ public:
         {"x-case-sensitive-header", case_sensitive_header_value_},
         {"baz", "foo"},
         {"bat", "foo"},
+        {"x-append-bat", "append-foo"},
+        {"x-append-bat", "append-bar"},
     });
   }
 
@@ -324,6 +326,11 @@ public:
     EXPECT_TRUE(std::is_permutation(baz_values.begin(), baz_values.end(),
                                     (std::vector<absl::string_view>{"foo", "bar"}).begin()));
 
+    const auto& x_success_values =
+        TestUtility::getAllHeadersValuesForKey(upstream_request_->headers(), "x-append-bat");
+    EXPECT_TRUE(std::is_permutation(x_success_values.begin(), x_success_values.end(),
+                                    (std::vector<absl::string_view>{"append-foo", "append-bar"}).begin()));
+
     response_->waitForEndStream();
     EXPECT_TRUE(response_->complete());
 
@@ -357,6 +364,7 @@ public:
       allowed_upstream_headers_to_append:
         patterns:
         - exact: bat
+        - prefix: x-append
 
   failure_mode_allow: true
   )EOF";
