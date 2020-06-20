@@ -263,6 +263,7 @@ public:
     RELEASE_ASSERT(result, result.message());
 
     // Send back authorization response with "baz" and "bat" headers.
+    // Also add multiple values "append-foo" and "append-bar" for key "x-append-bat".
     Http::TestResponseHeaderMapImpl response_headers{
         {":status", "200"},
         {"baz", "baz"},
