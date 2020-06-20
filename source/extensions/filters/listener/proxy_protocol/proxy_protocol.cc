@@ -33,13 +33,14 @@ Config::Config(
     const envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol& proto_config)
     : stats_{ALL_PROXY_PROTOCOL_STATS(POOL_COUNTER(scope))} {
   for (const auto& rule : proto_config.rules()) {
-    tlv_types_[0xFF & rule.tlv_type()] = KeyValuePair(rule.on_tlv_present());
+    tlv_types_[0xFF & rule.tlv_type()] = rule.on_tlv_present();
   }
 }
 
 const KeyValuePair* Config::isTlvTypeNeeded(uint8_t type) const {
-  if (tlv_types_.end() != tlv_types_.find(type)) {
-    return &tlv_types_.at(type);
+  auto tlv_type = tlv_types_.find(type);
+  if (tlv_types_.end() != tlv_type) {
+    return &tlv_type->second;
   }
 
   return nullptr;
@@ -266,14 +267,14 @@ bool Filter::parseExtensions(os_fd_t fd, uint8_t* buf, size_t buf_size, size_t* 
     }
     bytes_avail = std::min(size_t(bytes_avail), buf_size);
     bytes_avail = std::min(size_t(bytes_avail), proxy_protocol_header_.value().extensions_length_);
-    buf += buf_off ? *buf_off : 0;
+    buf += (nullptr != buf_off) ? *buf_off : 0;
     const Api::SysCallSizeResult recv_result = os_syscalls.recv(fd, buf, bytes_avail, 0);
     if (recv_result.rc_ != bytes_avail) {
       throw EnvoyException("failed to read proxy protocol extension");
     }
     proxy_protocol_header_.value().extensions_length_ -= recv_result.rc_;
 
-    if (buf_off) {
+    if (nullptr != buf_off) {
       *buf_off += recv_result.rc_;
     }
   }
@@ -282,13 +283,13 @@ bool Filter::parseExtensions(os_fd_t fd, uint8_t* buf, size_t buf_size, size_t* 
 }
 
 /**
- * @note  A TLV is arranged in the following format: @n
- *        struct pp2_tlv {      @n
-            uint8_t type;       @n
-            uint8_t length_hi;  @n
-            uint8_t length_lo;  @n
-            uint8_t value[0];   @n
-          };                    @n
+ * @note  A TLV is arranged in the following format:
+ *        struct pp2_tlv {
+ *          uint8_t type;
+ *          uint8_t length_hi;
+ *          uint8_t length_lo;
+ *          uint8_t value[0];
+ *        };
  *        See https://www.haproxy.org/download/2.1/doc/proxy-protocol.txt for details
  */
 void Filter::parseTlvs(const std::vector<uint8_t>& tlvs) {
@@ -321,9 +322,9 @@ void Filter::parseTlvs(const std::vector<uint8_t>& tlvs) {
     // Only save to dynamic metadata if this type of TLV is needed.
     auto key_value_pair = config_->isTlvTypeNeeded(tlv_type);
     if (nullptr != key_value_pair) {
-      std::string tlv_value(reinterpret_cast<char const*>(tlvs.data() + idx), tlv_value_length);
-      auto metadata_value = ProtobufWkt::Value();
-      metadata_value.set_string_value(std::move(tlv_value));
+      ProtobufWkt::Value metadata_value;
+      metadata_value.set_string_value(reinterpret_cast<char const*>(tlvs.data() + idx),
+                                      tlv_value_length);
 
       std::string metadata_key = key_value_pair->metadata_namespace().empty()
                                      ? ListenerFilterNames::get().ProxyProtocol
@@ -334,7 +335,7 @@ void Filter::parseTlvs(const std::vector<uint8_t>& tlvs) {
       metadata.mutable_fields()->insert({key_value_pair->key(), metadata_value});
       cb_->setDynamicMetadata(metadata_key, metadata);
     } else {
-      ENVOY_LOG(debug, "proxy_protocol: Skip TLV of type {} since it's not needed", tlv_type);
+      ENVOY_LOG(trace, "proxy_protocol: Skip TLV of type {} since it's not needed", tlv_type);
     }
 
     idx += tlv_value_length;
@@ -346,7 +347,7 @@ bool Filter::readExtensions(os_fd_t fd) {
   // Parse and discard the extensions if this is a local command or there's no TLV needs to be saved
   // to metadata.
   if (proxy_protocol_header_.value().local_command_ || 0 == config_->numberOfNeededTlvTypes()) {
-    // buf_ is no longer in use so we re-use it to read/discard
+    // buf_ is no longer in use so we re-use it to read/discard.
     return parseExtensions(fd, reinterpret_cast<uint8_t*>(buf_), sizeof(buf_), nullptr);
   }
 

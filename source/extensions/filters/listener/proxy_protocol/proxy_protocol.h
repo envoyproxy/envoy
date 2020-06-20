@@ -1,7 +1,5 @@
 #pragma once
 
-#include <memory>
-
 #include "envoy/event/file_event.h"
 #include "envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.pb.h"
 #include "envoy/network/filter.h"
@@ -49,12 +47,12 @@ public:
 
   /**
    * Return null if the type of TLV is not needed otherwise a pointer to the KeyValuePair for
-   * emitting to dynamic metadata
+   * emitting to dynamic metadata.
    */
   const KeyValuePair* isTlvTypeNeeded(uint8_t type) const;
 
   /**
-   * Number of TLV types that need to be parsed and saved to dynamic metadata
+   * Number of TLV types that need to be parsed and saved to dynamic metadata.
    */
   size_t numberOfNeededTlvTypes() const;
 

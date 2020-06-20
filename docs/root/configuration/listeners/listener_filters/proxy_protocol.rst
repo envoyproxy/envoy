@@ -12,7 +12,7 @@ Envoy then extracts these and uses them as the remote address.
 
 In Proxy Protocol v2 there exists the concept of extensions (TLV)
 tags that are optional. If the type of the TLV is added to the filter's configuration,
-the TLV will be emitted as dynamic metadata.
+the TLV will be emitted as dynamic metadata with user-specified key.
 
 This implementation supports both version 1 and version 2, it
 automatically determines on a per-connection basis which of the two
@@ -36,15 +36,3 @@ This filter emits the following statistics:
   :widths: 1, 1, 2
 
   downstream_cx_proxy_proto_error, Counter, Total proxy protocol errors
-
-Dynamic Metadata
-----------------
-
-The Proxy Protocol filter emits the following dynamic metadata.
-
-.. csv-table::
-  :header: Name, Type, Description
-  :widths: 1, 1, 2
-
-  key, string, The TLV extension type.
-  value, string, The TLV extension value.

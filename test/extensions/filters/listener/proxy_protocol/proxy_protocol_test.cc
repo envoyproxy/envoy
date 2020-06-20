@@ -48,8 +48,6 @@ namespace ListenerFilters {
 namespace ProxyProtocol {
 namespace {
 
-using Rule = envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::Rule;
-
 // Build again on the basis of the connection_handler_test.cc
 
 class ProxyProtocolTest : public testing::TestWithParam<Network::Address::IpVersion>,
@@ -115,9 +113,9 @@ public:
     EXPECT_CALL(factory_, createListenerFilterChain(_))
         .WillOnce(Invoke([&](Network::ListenerFilterManager& filter_manager) -> bool {
           filter_manager.addAcceptFilter(
-              nullptr,
-              std::make_unique<Filter>(std::make_shared<Config>(
-                  listenerScope(), proto_config ? *proto_config
+              nullptr, std::make_unique<Filter>(std::make_shared<Config>(
+                           listenerScope(), (nullptr != proto_config)
+                                                ? *proto_config
                                                 : envoy::extensions::filters::listener::
                                                       proxy_protocol::v3::ProxyProtocol())));
           maybeExitDispatcher();
@@ -939,7 +937,7 @@ TEST_P(ProxyProtocolTest, V2ExtractTlvOfInterestAndEmitWithSpecifiedMetadataName
   auto rule = proto_config.add_rules();
   rule->set_tlv_type(0x02);
   rule->mutable_on_tlv_present()->set_key("PP2 type authority");
-  rule->mutable_on_tlv_present()->set_metadata_namespace("We need a different metadta namespace");
+  rule->mutable_on_tlv_present()->set_metadata_namespace("We need a different metadata namespace");
 
   connect(true, &proto_config);
   write(buffer, sizeof(buffer));
@@ -954,9 +952,9 @@ TEST_P(ProxyProtocolTest, V2ExtractTlvOfInterestAndEmitWithSpecifiedMetadataName
 
   auto metadata = server_connection_->streamInfo().dynamicMetadata().filter_metadata();
   EXPECT_EQ(1, metadata.size());
-  EXPECT_EQ(1, metadata.count("We need a different metadta namespace"));
+  EXPECT_EQ(1, metadata.count("We need a different metadata namespace"));
 
-  auto fields = metadata.at("We need a different metadta namespace").fields();
+  auto fields = metadata.at("We need a different metadata namespace").fields();
   EXPECT_EQ(1, fields.size());
   EXPECT_EQ(1, fields.count("PP2 type authority"));
 
