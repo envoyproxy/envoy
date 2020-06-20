@@ -33,6 +33,7 @@ Debugging
   :maxdepth: 2
 
   debugging/why_is_envoy_sending_internal_responses
+  debugging/why_is_envoy_404ing_connect_requests
   debugging/why_is_envoy_sending_413s
   debugging/why_is_my_route_not_found
 
@@ -71,3 +72,11 @@ Load balancing
   load_balancing/disable_circuit_breaking
   load_balancing/transient_failures
   load_balancing/region_failover
+
+Extensions
+----------
+
+.. toctree::
+  :maxdepth: 2
+
+  extensions/contract

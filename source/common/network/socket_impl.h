@@ -46,12 +46,13 @@ public:
   Api::SysCallIntResult setSocketOption(int level, int optname, const void* optval,
                                         socklen_t optlen) override;
   Api::SysCallIntResult getSocketOption(int level, int optname, void* optval,
-                                        socklen_t* optlen) override;
+                                        socklen_t* optlen) const override;
   Api::SysCallIntResult setBlockingForTest(bool blocking) override;
 
   const OptionsSharedPtr& options() const override { return options_; }
   Socket::Type socketType() const override { return sock_type_; }
   Address::Type addressType() const override { return addr_type_; }
+  absl::optional<Address::IpVersion> ipVersion() const override;
 
 protected:
   SocketImpl(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& local_address);

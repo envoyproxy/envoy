@@ -295,6 +295,7 @@ STL
 STRLEN
 STS
 SVG
+Symbolizer
 TBD
 TCLAP
 TCP
@@ -566,6 +567,7 @@ epoll
 errno
 etag
 etags
+evaluator
 evbuffer
 evbuffers
 evconnlistener
@@ -643,6 +645,7 @@ hoc
 hostname
 hostnames
 hostset
+hotrestart
 hrefs
 huffman
 hystrix
@@ -861,6 +864,7 @@ preorder
 prepend
 prepended
 prev
+probabilistically
 proc
 profiler
 programmatically

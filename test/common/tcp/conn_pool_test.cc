@@ -3,7 +3,7 @@
 
 #include "common/event/dispatcher_impl.h"
 #include "common/network/utility.h"
-#include "common/tcp/conn_pool.h"
+#include "common/tcp/original_conn_pool.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "test/common/upstream/utility.h"
@@ -65,13 +65,14 @@ struct ConnPoolCallbacks : public Tcp::ConnectionPool::Callbacks {
 };
 
 /**
- * A test version of ConnPoolImpl that allows for mocking.
+ * A test version of OriginalConnPoolImpl that allows for mocking.
  */
-class ConnPoolImplForTest : public ConnPoolImpl {
+class ConnPoolImplForTest : public OriginalConnPoolImpl {
 public:
   ConnPoolImplForTest(Event::MockDispatcher& dispatcher, Upstream::HostSharedPtr host,
                       NiceMock<Event::MockTimer>* upstream_ready_timer)
-      : ConnPoolImpl(dispatcher, host, Upstream::ResourcePriority::Default, nullptr, nullptr),
+      : OriginalConnPoolImpl(dispatcher, host, Upstream::ResourcePriority::Default, nullptr,
+                             nullptr),
         mock_dispatcher_(dispatcher), mock_upstream_ready_timer_(upstream_ready_timer) {}
 
   ~ConnPoolImplForTest() override {
@@ -120,7 +121,7 @@ public:
   std::vector<TestConnection> test_conns_;
 
 protected:
-  void onConnReleased(ConnPoolImpl::ActiveConn& conn) override {
+  void onConnReleased(OriginalConnPoolImpl::ActiveConn& conn) override {
     for (auto& test_conn : test_conns_) {
       if (conn.conn_.get() == test_conn.connection_) {
         onConnReleasedForTest();
@@ -128,10 +129,10 @@ protected:
       }
     }
 
-    ConnPoolImpl::onConnReleased(conn);
+    OriginalConnPoolImpl::onConnReleased(conn);
   }
 
-  void onConnDestroyed(ConnPoolImpl::ActiveConn& conn) override {
+  void onConnDestroyed(OriginalConnPoolImpl::ActiveConn& conn) override {
     for (auto i = test_conns_.begin(); i != test_conns_.end(); i++) {
       if (conn.conn_.get() == i->connection_) {
         onConnDestroyedForTest();
@@ -140,7 +141,7 @@ protected:
       }
     }
 
-    ConnPoolImpl::onConnDestroyed(conn);
+    OriginalConnPoolImpl::onConnDestroyed(conn);
   }
 };
 
@@ -173,9 +174,9 @@ class TcpConnPoolImplDestructorTest : public testing::Test {
 public:
   TcpConnPoolImplDestructorTest()
       : upstream_ready_timer_(new NiceMock<Event::MockTimer>(&dispatcher_)),
-        conn_pool_{new ConnPoolImpl(dispatcher_,
-                                    Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000"),
-                                    Upstream::ResourcePriority::Default, nullptr, nullptr)} {}
+        conn_pool_{new OriginalConnPoolImpl(
+            dispatcher_, Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000"),
+            Upstream::ResourcePriority::Default, nullptr, nullptr)} {}
 
   ~TcpConnPoolImplDestructorTest() override = default;
 
@@ -199,7 +200,7 @@ public:
   NiceMock<Event::MockTimer>* upstream_ready_timer_;
   NiceMock<Event::MockTimer>* connect_timer_;
   NiceMock<Network::MockClientConnection>* connection_;
-  std::unique_ptr<ConnPoolImpl> conn_pool_;
+  std::unique_ptr<OriginalConnPoolImpl> conn_pool_;
   std::unique_ptr<ConnPoolCallbacks> callbacks_;
 };
 

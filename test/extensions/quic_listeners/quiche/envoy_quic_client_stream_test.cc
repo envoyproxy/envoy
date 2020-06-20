@@ -25,7 +25,9 @@ public:
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")),
         connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
+          SetQuicReloadableFlag(quic_enable_version_draft_28, GetParam());
           SetQuicReloadableFlag(quic_enable_version_draft_27, GetParam());
+          SetQuicReloadableFlag(quic_enable_version_draft_25_v3, GetParam());
           return quic::CurrentSupportedVersions()[0];
         }()),
         peer_addr_(Network::Utility::getAddressWithPort(*Network::Utility::getIpv6LoopbackAddress(),
@@ -40,7 +42,8 @@ public:
                       quic_config_.GetInitialStreamFlowControlWindowToSend() * 2),
         stream_id_(quic::VersionUsesHttp3(quic_version_.transport_version) ? 4u : 5u),
         quic_stream_(new EnvoyQuicClientStream(stream_id_, &quic_session_, quic::BIDIRECTIONAL)),
-        request_headers_{{":authority", host_}, {":method", "POST"}, {":path", "/"}} {
+        request_headers_{{":authority", host_}, {":method", "POST"}, {":path", "/"}},
+        request_trailers_{{"trailer-key", "trailer-value"}} {
     quic_stream_->setResponseDecoder(stream_decoder_);
     quic_stream_->addCallbacks(stream_callbacks_);
     quic_session_.ActivateStream(std::unique_ptr<EnvoyQuicClientStream>(quic_stream_));
@@ -103,6 +106,7 @@ protected:
   Http::MockStreamCallbacks stream_callbacks_;
   std::string host_{"www.abc.com"};
   Http::TestRequestHeaderMapImpl request_headers_;
+  Http::TestRequestTrailerMapImpl request_trailers_;
   quic::QuicHeaderList response_headers_;
   quic::QuicHeaderList trailers_;
   Buffer::OwnedImpl request_body_{"Hello world"};
@@ -115,7 +119,8 @@ INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientStreamTests, EnvoyQuicClientStreamTest,
 TEST_P(EnvoyQuicClientStreamTest, PostRequestAndResponse) {
   EXPECT_EQ(absl::nullopt, quic_stream_->http1StreamEncoderOptions());
   quic_stream_->encodeHeaders(request_headers_, false);
-  quic_stream_->encodeData(request_body_, true);
+  quic_stream_->encodeData(request_body_, false);
+  quic_stream_->encodeTrailers(request_trailers_);
 
   EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
       .WillOnce(Invoke([](const Http::ResponseHeaderMapPtr& headers, bool) {
