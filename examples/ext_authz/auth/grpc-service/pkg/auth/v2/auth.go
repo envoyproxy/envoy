@@ -14,12 +14,6 @@ import (
 	"github.com/envoyproxy/envoy/examples/ext_authz/auth/grpc-service/pkg/auth"
 )
 
-var tokens = map[string]string{
-	"token1": "user1",
-	"token2": "user2",
-	"token3": "user3",
-}
-
 type server struct {
 	users auth.Users
 }
@@ -71,12 +65,4 @@ func (s *server) Check(
 			Code: int32(code.Code_PERMISSION_DENIED),
 		},
 	}, nil
-}
-
-func checkToken(token string) (bool, string) {
-	value, ok := tokens[token]
-	if !ok {
-		return false, ""
-	}
-	return ok, value
 }
