@@ -91,13 +91,8 @@ public:
     NiceMock<MockRouteEntry> route_entry;
     NiceMock<Upstream::MockClusterManager> cm;
     EXPECT_CALL(cm, tcpConnPoolForCluster(_, _, _)).WillOnce(Return(&mock_pool_));
-<<<<<<< HEAD
-    EXPECT_TRUE(conn_pool_.initialize(
-        cm, route_entry, [](const auto&) { return Http::Protocol::Http11; }, nullptr));
-=======
     conn_pool_ = std::make_unique<TcpConnPool>(cm, route_entry, Http::Protocol::Http11, nullptr);
     EXPECT_TRUE(conn_pool_->valid());
->>>>>>> envoy/master
   }
 
   std::unique_ptr<TcpConnPool> conn_pool_;
