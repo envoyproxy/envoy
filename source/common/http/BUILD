@@ -427,3 +427,16 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "url_utility_lib",
+    srcs = ["url_utility.cc"],
+    hdrs = ["url_utility.h"],
+    external_deps = [
+        "googleurl",
+    ],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:empty_string",
+    ],
+)
