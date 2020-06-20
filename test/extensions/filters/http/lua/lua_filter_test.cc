@@ -2073,8 +2073,8 @@ TEST_F(LuaHttpFilterTest, LuaFilterGetSourceCodeFromRouteDirectly) {
   EXPECT_EQ("Script in route", request_headers.get_("script_info"));
 }
 
-// Test whether the inline Lua code in the route can work normally in the request phase and the
-// response phase.
+// Test whether the inline Lua code in the route can work normally in the request path and the
+// response path.
 TEST_F(LuaHttpFilterTest, LuaFilterWithInlineCodeInBothHooks) {
   const std::string SCRIPT_IN_ROUTE_DIRECTLY{R"EOF(
     function envoy_on_request(request_handle)

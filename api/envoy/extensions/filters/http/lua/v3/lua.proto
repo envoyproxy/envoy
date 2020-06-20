@@ -27,9 +27,23 @@ message Lua {
   // strings so complex scripts can be easily expressed inline in the configuration.
   string inline_code = 1 [(validate.rules).string = {min_bytes: 1}];
 
-  // The Lua source codes that Envoy will execute based on name. Key is Lua source code name, e.g.
-  // ``foo.lua``, this name can be referenced by
-  // :ref:`LuaPerRoute.name <envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.name>`.
+  // Map of named Lua source codes that can be referenced in :ref:` LuaPerRoute
+  // <envoy_v3_api_msg_extensions.filters.http.lua.v3.LuaPerRoute>`. The Lua source codes can be
+  // loaded from inline string or local files.
+  //
+  // Example:
+  //
+  // .. code-block:: yaml
+  //
+  //   source_codes:
+  //     hello.lua:
+  //       inline_string: |
+  //         function envoy_on_response(response_handle)
+  //           -- Do something.
+  //         end
+  //     world.lua:
+  //       filename: /etc/lua/world.lua
+  //
   map<string, config.core.v3.DataSource> source_codes = 2;
 }
 
@@ -41,11 +55,11 @@ message LuaPerRoute {
     // multiple per-filter-configs, the most specific one will be used.
     bool disabled = 1 [(validate.rules).bool = {const: true}];
 
-    // The name of a Lua source code defined in
+    // A name of a Lua source code stored in
     // :ref:`Lua.source_codes <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.source_codes>`.
     string name = 2 [(validate.rules).string = {min_bytes: 1}];
 
-    // Configured Lua source code from RDS or provided inline.
+    // A configured per-route Lua source code that can be served by RDS or provided inline.
     config.core.v3.DataSource code = 3;
   }
 }

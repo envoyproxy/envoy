@@ -382,27 +382,18 @@ namespace {
 
 PerLuaCodeSetup* getPerLuaCodeSetup(const FilterConfig* filter_config,
                                     const FilterConfigPerRoute* config_per_route) {
-  // 'filter_config' will never be null.
-  ASSERT(filter_config);
-  if (!filter_config) {
-    // Although this position will never be executed, we still add a check to ensure that the
-    // function is absolutely safe.
-    return nullptr;
-  }
-  if (!config_per_route) {
-    // There is no per route config and 'GLOBAL' will be used to get the default Lua code.
-    return filter_config->perLuaCodeSetup(GLOBAL_SCRIPT_NAME);
-  } else if (config_per_route->disabled()) {
-    // Filter is disabled by route config.
-    return nullptr;
-  } else if (!config_per_route->name().empty()) {
-    // Get the Lua code referenced by 'name'.
-    return filter_config->perLuaCodeSetup(config_per_route->name());
-  } else {
-    // Get the inline Lua code in the route.
+  if (config_per_route != nullptr) {
+    if (config_per_route->disabled()) {
+      return nullptr;
+    }
+    if (!config_per_route->name().empty()) {
+      ASSERT(filter_config);
+      return filter_config->perLuaCodeSetup(config_per_route->name());
+    }
     return config_per_route->perLuaCodeSetup();
   }
-  return nullptr;
+  ASSERT(filter_config);
+  return filter_config->perLuaCodeSetup(GLOBAL_SCRIPT_NAME);
 }
 
 } // namespace
