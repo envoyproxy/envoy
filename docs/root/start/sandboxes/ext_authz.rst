@@ -38,9 +38,9 @@ To build this sandbox example and start the example services, run the following 
 
                    Name                             Command               State                             Ports
     ---------------------------------------------------------------------------------------------------------------------------------------
-    ext_authz_ext_authz-grpc-service_1   /app/server -users /etc/us ...   Up
-    ext_authz_ext_authz-http-service_1   docker-entrypoint.sh node  ...   Up
-    ext_authz_front-envoy_1              /docker-entrypoint.sh /bin ...   Up      10000/tcp, 0.0.0.0:8000->8000/tcp, 0.0.0.0:8001->8001/tcp
+    ext_authz_ext_authz-grpc-service_1   /app/server -users /etc/us       Up
+    ext_authz_ext_authz-http-service_1   docker-entrypoint.sh node        Up
+    ext_authz_front-envoy_1              /docker-entrypoint.sh /bin       Up      10000/tcp, 0.0.0.0:8000->8000/tcp, 0.0.0.0:8001->8001/tcp
     ext_authz_upstream-service_1         python3 /app/service/server.py   Up
 
 .. note::
