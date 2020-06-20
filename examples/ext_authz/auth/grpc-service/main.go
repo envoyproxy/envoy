@@ -31,6 +31,8 @@ func main() {
 		log.Fatalf("failed to load user data:%s %v", *data, err)
 	}
 	gs := grpc.NewServer()
+
+	// Serve v3 and v2.
 	envoy_service_auth_v3.RegisterAuthorizationServer(gs, auth_v3.New(users))
 	envoy_service_auth_v2.RegisterAuthorizationServer(gs, auth_v2.New(users))
 

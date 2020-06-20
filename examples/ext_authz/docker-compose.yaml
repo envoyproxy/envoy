@@ -6,7 +6,7 @@ services:
       context: ../
       dockerfile: front-proxy/Dockerfile-frontenvoy
     volumes:
-      - ./front-envoy.yaml:/etc/front-envoy.yaml
+      - ./${FRONT_ENVOY_YAML}:/etc/front-envoy.yaml
     networks:
       - envoymesh
     expose:

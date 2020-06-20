@@ -5,12 +5,16 @@ const tokens = require(process.env.USERS ||
   path.join(__dirname, "..", "users.json"));
 
 const server = new Http.Server((req, res) => {
+  console.log(req.headers);
   const authorization = req.headers["authorization"] || "";
   const extracted = authorization.split(" ");
   if (extracted.length === 2 && extracted[0] === "Bearer") {
     const user = checkToken(extracted[1]);
+    console.log(user);
     if (user !== undefined) {
-      res.writeHead(200);
+      // The authorization server returns a response with "x-current-user" header for a successful
+      // request.
+      res.writeHead(200, { "x-current-user": user });
       return res.end();
     }
   }
@@ -18,7 +22,9 @@ const server = new Http.Server((req, res) => {
   res.end();
 });
 
-server.listen(process.env.PORT || 8080);
+const port = process.env.PORT || 9002;
+server.listen(port);
+console.log(`starting HTTP server on: ${port}`);
 
 function checkToken(token) {
   return tokens[token];

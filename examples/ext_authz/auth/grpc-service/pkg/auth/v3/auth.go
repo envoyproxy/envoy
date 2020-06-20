@@ -44,6 +44,8 @@ func (s *server) Check(
 							{
 								Append: &wrappers.BoolValue{Value: false},
 								Header: &envoy_api_v3_core.HeaderValue{
+									// For a succesful request, the authorization server sets the
+									// x-current-user value.
 									Key:   "x-current-user",
 									Value: user,
 								},
