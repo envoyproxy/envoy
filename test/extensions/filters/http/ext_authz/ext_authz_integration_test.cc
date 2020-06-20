@@ -250,8 +250,6 @@ public:
         {"x-case-sensitive-header", case_sensitive_header_value_},
         {"baz", "foo"},
         {"bat", "foo"},
-        {"x-append-bat", "append-foo"},
-        {"x-append-bat", "append-bar"},
     });
   }
 
@@ -266,7 +264,12 @@ public:
 
     // Send back authorization response with "baz" and "bat" headers.
     Http::TestResponseHeaderMapImpl response_headers{
-        {":status", "200"}, {"baz", "baz"}, {"bat", "bar"}};
+        {":status", "200"},
+        {"baz", "baz"},
+        {"bat", "bar"},
+        {"x-append-bat", "append-foo"},
+        {"x-append-bat", "append-bar"},
+    };
     ext_authz_request_->encodeHeaders(response_headers, true);
   }
 
