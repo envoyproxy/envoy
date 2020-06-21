@@ -64,7 +64,7 @@ bool Url::initializeForConnect(GURL&& url) {
 
   const auto& parsed = url.parsed_for_possibly_invalid_spec();
   // The parsed.scheme contains the URL's hostname (stored by GURL). While host and port have -1
-  // length.
+  // as its length.
   if (parsed.scheme.len <= 0 || parsed.host.len > 0 || parsed.port.len > 0) {
     return false;
   }
