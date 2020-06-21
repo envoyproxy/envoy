@@ -419,8 +419,12 @@ DEPENDENCY_REPOSITORIES = dict(
     ),
     com_googlesource_googleurl = dict(
         # Static snapshot of https://quiche.googlesource.com/quiche/+archive/googleurl_dbf5ad147f60afc125e99db7549402af49a5eae8.tar.gz
-        sha256 = "b40cd22cadba577b7281a76db66f6a66dd744edbad8cc2c861c2c976ef721e4d",
-        urls = ["https://storage.googleapis.com/quiche-envoy-integration/googleurl_dbf5ad147f60afc125e99db7549402af49a5eae8.tar.gz"],
+        # with one difference: the top-level BUILD file is renamed to BUILD.bazel (according to
+        # https://docs.bazel.build/versions/master/build-ref.html#packages it should not introduce
+        # problem. Tracked in: https://github.com/envoyproxy/envoy/issues/11671).
+        sha256 = "5bdbecce22d522f03ac86c6a694d5ff76780a16d6d682910e87ac156b0a25b21",
+        strip_prefix = "googleurl-dbf5ad1",
+        urls = ["https://github.com/dio/googleurl/archive/dbf5ad1.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),
