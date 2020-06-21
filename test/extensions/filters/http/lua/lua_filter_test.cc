@@ -2060,7 +2060,7 @@ TEST_F(LuaHttpFilterTest, LuaFilterGetSourceCodeFromRouteDirectly) {
   proto_config.mutable_source_codes()->insert({"route_one.lua", source1});
 
   envoy::extensions::filters::http::lua::v3::LuaPerRoute per_route_proto_config;
-  per_route_proto_config.mutable_code()->set_inline_string(SCRIPT_IN_ROUTE_DIRECTLY);
+  per_route_proto_config.mutable_source_code()->set_inline_string(SCRIPT_IN_ROUTE_DIRECTLY);
 
   setupConfig(proto_config, per_route_proto_config);
   setupFilter();
@@ -2089,7 +2089,7 @@ TEST_F(LuaHttpFilterTest, LuaFilterWithInlineCodeInBothHooks) {
   proto_config.set_inline_code(ADD_HEADERS_SCRIPT);
 
   envoy::extensions::filters::http::lua::v3::LuaPerRoute per_route_proto_config;
-  per_route_proto_config.mutable_code()->set_inline_string(SCRIPT_IN_ROUTE_DIRECTLY);
+  per_route_proto_config.mutable_source_code()->set_inline_string(SCRIPT_IN_ROUTE_DIRECTLY);
 
   setupConfig(proto_config, per_route_proto_config);
   setupFilter();

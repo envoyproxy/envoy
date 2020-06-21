@@ -627,11 +627,12 @@ FilterConfigPerRoute::FilterConfigPerRoute(
     ThreadLocal::SlotAllocator& tls, Api::Api& api)
     : disabled_(config.disabled()), name_(config.name()) {
   if (disabled_ || !name_.empty() ||
-      config.override_case() != envoy::extensions::filters::http::lua::v3::LuaPerRoute::kCode) {
+      config.override_case() !=
+          envoy::extensions::filters::http::lua::v3::LuaPerRoute::kSourceCode) {
     return;
   }
   // Read and parse the inline Lua code defined in the route configuration.
-  const std::string code_str = Config::DataSource::read(config.code(), true, api);
+  const std::string code_str = Config::DataSource::read(config.source_code(), true, api);
   per_lua_code_setup_ptr_ = std::make_unique<PerLuaCodeSetup>(code_str, tls);
 }
 

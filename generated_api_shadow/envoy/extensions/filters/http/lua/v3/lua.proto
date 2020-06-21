@@ -60,6 +60,6 @@ message LuaPerRoute {
     string name = 2 [(validate.rules).string = {min_bytes: 1}];
 
     // A configured per-route Lua source code that can be served by RDS or provided inline.
-    config.core.v3.DataSource code = 3;
+    config.core.v3.DataSource source_code = 3;
   }
 }

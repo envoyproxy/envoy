@@ -92,10 +92,10 @@ LuaPerRoute provides two ways of overriding the `GLOBAL` Lua script:
 * By providing a name reference to the defined :ref:`named Lua source codes map 
   <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.source_codes>`.
 * By providing inline :ref:`source code 
-  <envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.code>` (This allows the code to 
-  be sent through RDS).
+  <envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.source_code>` (This allows the 
+  code to be sent through RDS).
 
-As an concrete example, given the following Lua filter configuration:
+As a concrete example, given the following Lua filter configuration:
 
 .. code-block:: yaml
 
@@ -148,7 +148,7 @@ Lua script as follow example configuration:
 
   per_filter_config:
     envoy.filters.http.lua:
-      code:
+      source_code:
         inline_string: |
           function envoy_on_response(response_handle)
             response_handle:logInfo("Go Go C Plus Plus.")
