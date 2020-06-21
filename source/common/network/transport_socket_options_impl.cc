@@ -88,8 +88,8 @@ TransportSocketOptionsUtility::fromFilterState(const StreamInfo::FilterState& fi
 
   if (needs_transport_socket_options) {
     return std::make_shared<Network::TransportSocketOptionsImpl>(
-        server_name, std::move(subject_alt_names), std::move(application_protocols),
-        absl::nullopt, proxy_protocol_options);
+        server_name, std::move(subject_alt_names), std::move(application_protocols), absl::nullopt,
+        proxy_protocol_options);
   } else {
     return nullptr;
   }
