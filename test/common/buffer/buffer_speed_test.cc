@@ -25,8 +25,7 @@ BENCHMARK(bufferCreateEmpty);
 
 // Test the creation of an OwnedImpl with varying amounts of content.
 static void bufferCreate(benchmark::State& state) {
-  const std::string data(state.range(0), 'a');
-  const absl::string_view input(data);
+  const absl::string_view input(state.range(0), 'a');
   uint64_t length = 0;
   for (auto _ : state) {
     Buffer::OwnedImpl buffer(input);
@@ -38,8 +37,7 @@ BENCHMARK(bufferCreate)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
 
 // Grow an OwnedImpl in very small amounts.
 static void bufferAddSmallIncrement(benchmark::State& state) {
-  const std::string data("a");
-  const absl::string_view input(data);
+  const absl::string_view input("a");
   Buffer::OwnedImpl buffer;
   for (auto _ : state) {
     buffer.add(input);
@@ -155,8 +153,7 @@ BENCHMARK(bufferDrain)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
 
 // Drain an OwnedImpl in very small amounts.
 static void bufferDrainSmallIncrement(benchmark::State& state) {
-  const std::string data(1024 * 1024, 'a');
-  const absl::string_view input(data);
+  const absl::string_view input(1024 * 1024, 'a');
   Buffer::OwnedImpl buffer(input);
   for (auto _ : state) {
     buffer.drain(state.range(0));
@@ -170,8 +167,7 @@ BENCHMARK(bufferDrainSmallIncrement)->Arg(1)->Arg(2)->Arg(3)->Arg(4)->Arg(5);
 
 // Test the moving of content from one OwnedImpl to another.
 static void bufferMove(benchmark::State& state) {
-  const std::string data(state.range(0), 'a');
-  const absl::string_view input(data);
+  const absl::string_view input(state.range(0), 'a');
   Buffer::OwnedImpl buffer1(input);
   Buffer::OwnedImpl buffer2(input);
   for (auto _ : state) {
@@ -187,8 +183,7 @@ BENCHMARK(bufferMove)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
 // exercise the (likely inefficient) code path in the implementation that handles
 // partial moves.
 static void bufferMovePartial(benchmark::State& state) {
-  const std::string data(state.range(0), 'a');
-  const absl::string_view input(data);
+  const absl::string_view input(state.range(0), 'a');
   Buffer::OwnedImpl buffer1(input);
   Buffer::OwnedImpl buffer2(input);
   for (auto _ : state) {
@@ -246,8 +241,7 @@ BENCHMARK(bufferReserveCommitPartial)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536)
 
 // Test the linearization of a buffer in the best case where the data is in one slice.
 static void bufferLinearizeSimple(benchmark::State& state) {
-  const std::string data(state.range(0), 'a');
-  const absl::string_view input(data);
+  const absl::string_view input(state.range(0), 'a');
   Buffer::OwnedImpl buffer;
   for (auto _ : state) {
     buffer.drain(buffer.length());

@@ -64,14 +64,14 @@ TEST(Base64Test, Decode) {
   }
 
   {
-    const std::string test_string = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    absl::string_view test_string = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     std::string decoded = Base64::decode(test_string);
     Buffer::OwnedImpl buffer(decoded);
     EXPECT_EQ(test_string, Base64::encode(buffer, decoded.length()));
   }
 
   {
-    const char* test_string = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    absl::string_view test_string = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     std::string decoded = Base64::decode(test_string);
     EXPECT_EQ(test_string, Base64::encode(decoded.c_str(), decoded.length()));
   }
