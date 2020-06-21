@@ -315,7 +315,7 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
     const auto& scoped_route =
         dynamic_cast<const envoy::config::route::v3::ScopedRouteConfiguration&>(
             resource.get().resource());
-    const std::string scope_name = scoped_route.name();
+    const std::string& scope_name = scoped_route.name();
     auto scope_config_inserted = scoped_routes.try_emplace(scope_name, std::move(scoped_route));
     if (!scope_config_inserted.second) {
       throw EnvoyException(

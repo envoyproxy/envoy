@@ -98,7 +98,7 @@ public:
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason,
                             const EnvoyException*) override {}
 
-  const absl::optional<test::common::config::DummyConfig>& config_proto() const {
+  const absl::optional<test::common::config::DummyConfig>& configProto() const {
     return config_proto_;
   }
 
@@ -120,10 +120,10 @@ public:
 
   // Envoy::Config::ConfigProvider
   const Protobuf::Message* getConfigProto() const override {
-    if (!subscription_->config_proto().has_value()) {
+    if (!subscription_->configProto().has_value()) {
       return nullptr;
     }
-    return &subscription_->config_proto().value();
+    return &subscription_->configProto().value();
   }
   std::string getConfigVersion() const override { return ""; }
 
@@ -150,7 +150,7 @@ public:
         auto* dynamic_config = config_dump->mutable_dynamic_dummy_configs()->Add();
         dynamic_config->set_version_info(subscription->configInfo().value().last_config_version_);
         dynamic_config->mutable_dummy_config()->MergeFrom(
-            static_cast<DummyConfigSubscription*>(subscription.get())->config_proto().value());
+            static_cast<DummyConfigSubscription*>(subscription.get())->configProto().value());
         TimestampUtil::systemClockToTimestamp(subscription->lastUpdated(),
                                               *dynamic_config->mutable_last_updated());
       }

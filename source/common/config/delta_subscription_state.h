@@ -22,7 +22,7 @@ namespace Config {
 // being multiplexed together by ADS.
 class DeltaSubscriptionState : public Logger::Loggable<Logger::Id::config> {
 public:
-  DeltaSubscriptionState(std::string type_url, UntypedConfigUpdateCallbacks& watch_map_,
+  DeltaSubscriptionState(std::string type_url, UntypedConfigUpdateCallbacks& watch_map,
                          const LocalInfo::LocalInfo& local_info);
 
   // Update which resources we're interested in subscribing to.
