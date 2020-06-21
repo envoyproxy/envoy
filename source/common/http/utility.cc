@@ -1,7 +1,5 @@
 #include "common/http/utility.h"
 
-#include <http_parser.h>
-
 #include <cstdint>
 #include <string>
 #include <vector>

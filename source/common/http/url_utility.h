@@ -19,7 +19,7 @@ public:
    * Initializes a URL object from a URL string.
    * @param absolute_url URL string to be parsed.
    * @param is_connect whether to parse the absolute_url as CONNECT request URL or not.
-   * @return bool if the initializion is successful.
+   * @return bool if the initialization is successful.
    */
   bool initialize(absl::string_view absolute_url, bool is_connect);
 
