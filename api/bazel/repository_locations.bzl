@@ -13,8 +13,10 @@ GOOGLEAPIS_SHA = "a45019af4d3290f02eaeb1ce10990166978c807cb33a9692141a076ba46d14
 PROMETHEUS_GIT_SHA = "99fa1f4be8e564e8a6b613da7fa6f46c9edafc6c"  # Nov 17, 2017
 PROMETHEUS_SHA = "783bdaf8ee0464b35ec0c8704871e1e72afa0005c3f3587f65d9d6694bf3911b"
 
-UDPA_GIT_SHA = "9f54a527e3bf4d1f4a6527f93d329fb1cc4516ac"  # May 8, 2020
-UDPA_SHA256 = "7edae88586a84360203e5a4c724080c740b7b6002d5d56f5e806f27c912895cd"
+UDPA_GIT_SHA = "54ff491c3169db0ee73efc6736cf98039105b42d"  # June 21, 2020
+# TODO(htuch): DO NOT COMMIT until https://github.com/cncf/udpa/pull/29 merges and this
+# change is removed.
+UDPA_SHA256 = "83caf3d24918d380f44d90271f1795dc1a07c77832619e062ed30342abf45584"
 
 ZIPKINAPI_RELEASE = "0.2.2"  # Aug 23, 2019
 ZIPKINAPI_SHA256 = "688c4fe170821dd589f36ec45aaadc03a618a40283bc1f97da8fa11686fc816b"
@@ -41,7 +43,9 @@ REPOSITORY_LOCATIONS = dict(
     com_github_cncf_udpa = dict(
         sha256 = UDPA_SHA256,
         strip_prefix = "udpa-" + UDPA_GIT_SHA,
-        urls = ["https://github.com/cncf/udpa/archive/" + UDPA_GIT_SHA + ".tar.gz"],
+        # TODO(htuch): DO NOT COMMIT until https://github.com/cncf/udpa/pull/29 merges and this
+        # change is removed.
+        urls = ["https://github.com/htuch/udpa/archive/" + UDPA_GIT_SHA + ".tar.gz"],
     ),
     prometheus_metrics_model = dict(
         sha256 = PROMETHEUS_SHA,
