@@ -438,5 +438,6 @@ envoy_cc_library(
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
+        "//source/common/common:utility_lib",
     ],
 )
