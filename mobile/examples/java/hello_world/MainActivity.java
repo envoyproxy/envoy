@@ -19,6 +19,7 @@ import io.envoyproxy.envoymobile.shared.ResponseRecyclerViewAdapter;
 import io.envoyproxy.envoymobile.shared.Success;
 import kotlin.Unit;
 
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -101,7 +102,7 @@ public class MainActivity extends Activity {
           recyclerView.post(() -> viewAdapter.add(new Failure(msg)));
           return Unit.INSTANCE;
         })
-        .start(Runnable::run)
+        .start(Executors.newSingleThreadExecutor())
         .sendHeaders(requestHeaders, true);
   }
 }
