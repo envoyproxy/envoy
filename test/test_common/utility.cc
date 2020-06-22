@@ -143,7 +143,7 @@ Stats::GaugeSharedPtr TestUtility::findGauge(Stats::Store& store, absl::string_v
 }
 
 Stats::TextReadoutSharedPtr TestUtility::findTextReadout(Stats::Store& store,
-                                                         const std::string& name) {
+                                                         absl::string_view name) {
   return findByName(store.textReadouts(), name);
 }
 
@@ -154,14 +154,14 @@ void TestUtility::waitForCounterEq(Stats::Store& store, absl::string_view name, 
   }
 }
 
-void TestUtility::waitForCounterGe(Stats::Store& store, const std::string& name, uint64_t value,
+void TestUtility::waitForCounterGe(Stats::Store& store, absl::string_view name, uint64_t value,
                                    Event::TestTimeSystem& time_system) {
   while (findCounter(store, name) == nullptr || findCounter(store, name)->value() < value) {
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
   }
 }
 
-void TestUtility::waitForGaugeGe(Stats::Store& store, const std::string& name, uint64_t value,
+void TestUtility::waitForGaugeGe(Stats::Store& store, absl::string_view name, uint64_t value,
                                  Event::TestTimeSystem& time_system) {
   while (findGauge(store, name) == nullptr || findGauge(store, name)->value() < value) {
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
