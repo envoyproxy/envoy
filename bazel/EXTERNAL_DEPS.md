@@ -25,8 +25,8 @@ This is the preferred style of adding dependencies that use CMake for their buil
 
 1. Define a the source Bazel repository in [`bazel/repositories.bzl`](repositories.bzl), in the
    `envoy_dependencies()` function.
-2. Add a `cmake_external` rule to [`bazel/foreign_cc/BUILD`](bazel/foreign_cc/BUILD). This will
-   reference the source repository in step 1.
+2. Add a `cmake_external` rule to [`bazel/foreign_cc/BUILD`](foreign_cc/BUILD). This will reference
+   the source repository in step 1.
 3. Reference your new external dependency in some `envoy_cc_library` via the name bound in step 1
    `external_deps` attribute.
 4. `bazel test //test/...`
