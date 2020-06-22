@@ -27,6 +27,7 @@ envoy_cc_test(
         "//include/envoy/upstream:resource_manager_interface",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/api:api_lib",
+        "//source/common/singleton:manager_impl_lib",
         "//source/common/stats:stats_lib",
         "//source/extensions/transport_sockets/tls:context_lib",
         "//source/server/config_validation:cluster_manager_lib",
