@@ -5,8 +5,6 @@
 #include "benchmark/benchmark.h"
 
 // Boilerplate main(), which discovers benchmarks and runs them.
-
-
 int main(int argc, char** argv) {
   Envoy::TestEnvironment::initializeTestMain(argv[0]);
 

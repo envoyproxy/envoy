@@ -171,16 +171,10 @@ public:
    * @param v the vector of stats.
    * @return the stat
    */
-<<<<<<< HEAD
-  template <typename T>
-   static T findByName(const std::vector<T>& v,absl::string_view name) {
-    auto pos = std::find_if(v.begin(), v.end(),
-    [name](const T& stat) -> bool { return stat->name() == name;});
-=======
+
   template <typename T> static T findByName(const std::vector<T>& v,absl::string_view name) {
     auto pos = std::find_if(v.begin(), v.end(),
-                            [name](const T& stat) -> bool { return stat->name() == name; });
->>>>>>> std::string changed
+    [name](const T& stat) -> bool { return stat->name() == name; });
     if (pos == v.end()) {
       return nullptr;
     }

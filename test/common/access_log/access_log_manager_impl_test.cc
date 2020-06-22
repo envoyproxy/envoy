@@ -43,11 +43,7 @@ protected:
     TestUtility::waitForCounterEq(store_, name, value, time_system_);
   }
 
-<<<<<<< HEAD
-  void waitForGaugeEq(absl::string_view name, uint64_t value) {
-=======
   void waitForGaugeEq( absl::string_view name, uint64_t value) {
->>>>>>> std::string changed
     TestUtility::waitForGaugeEq(store_, name, value, time_system_);
   }
 
