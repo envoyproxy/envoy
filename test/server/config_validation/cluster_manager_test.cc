@@ -3,6 +3,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/api/api_impl.h"
+#include "common/grpc/context_impl.h"
 #include "common/http/context_impl.h"
 #include "common/singleton/manager_impl.h"
 
