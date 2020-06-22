@@ -147,7 +147,7 @@ public:
    * return true if the platform supports udp_gro
    */
   virtual bool supportsUdpGro() const PURE;
-  
+
   /**
    * Bind to address. The handle should have been created with a call to socket()
    * @param address address to bind to.

@@ -374,7 +374,7 @@ bool IoSocketHandleImpl::supportsMmsg() const {
 bool IoSocketHandleImpl::supportsUdpGro() const {
   return Api::OsSysCallsSingleton::get().supportsUdpGro();
 }
-  
+
 Api::SysCallIntResult IoSocketHandleImpl::bind(const sockaddr* address, socklen_t addrlen) {
   return Api::OsSysCallsSingleton::get().bind(fd_, address, addrlen);
 }
