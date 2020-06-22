@@ -15,16 +15,34 @@ highest priority concerns. Availability, in particular in areas relating to DoS 
 exhaustion, is also a serious security concern for Envoy operators, in particular those utilizing
 Envoy in edge deployments.
 
-The Envoy availability stance around CPU and memory DoS, as well as Query-of-Death (QoD), is still
-evolving. We will continue to iterate and fix well known resource issues in the open, e.g. overload
-manager and watermark improvements. We will activate the security process for disclosures that
-appear to present a risk profile that is significantly greater than the current Envoy availability
-hardening status quo. Examples of disclosures that would elicit this response:
+We will activate the security release process for disclosures that meet the following criteria:
 
-* QoD; where a single query from a client can bring down an Envoy server.
+* All issues that lead to loss of data confidentiality or integrity trigger the security release process.
+* An availability issue, such as Query-of-Death (QoD) or resource exhaustion needs to meet all of the
+  following criteria to trigger the security release process:
+  
+  - A component tagged as hardened is affected (see `Core and extensions`_ for the list of hardened components).
+    
+  - The type of traffic (upstream or downstream) that exhibits the issue matches the component's hardening tag.
+    I.e. component tagged as “hardened to untrusted downstream” is affected by downstream request.
+    
+  - A resource exhaustion issue needs to meet these additional criteria:
+    
+    + Not covered by an existing timeout or where applying short timeout values is impractical and either
+      
+      + Memory exhaustion, including out of memory conditions, where per-request memory use 100x or more above
+	the configured header or high watermark limit. I.e. 10 KiB client request leading to 1 MiB bytes of
+	memory consumed by Envoy;
+      
+      + Highly asymmetric CPU utilization where Envoy uses 100x or more CPU compared to client.
 
-* Highly asymmetric resource exhaustion attacks, where very little traffic can cause resource exhaustion,
-  e.g. that delivered by a single client.
+
+The Envoy availability stance around CPU and memory DoS is still evolving, especially for brute force
+attacks. We acknowledge that brute force (i.e. these with amplification factor less than 100) attacks are
+likely for Envoy deployments as part of cloud infrastructure or with the use of botnets. We will continue
+to iterate and fix well known resource issues in the open, e.g. overload manager and watermark improvements.
+We will activate the security process for brute force disclosures that appear to present a risk to
+existing Envoy deployments.
 
 Note that we do not currently consider the default settings for Envoy to be safe from an availability
 perspective. It is necessary for operators to explicitly :ref:`configure <best_practices_edge>`
