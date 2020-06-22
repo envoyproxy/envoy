@@ -70,9 +70,6 @@ public:
   // Get a thread-local reference to the value for the given action key.
   virtual const OverloadActionState& getState(const std::string& action) PURE;
 
-  // Sets the thread-local value for the given action key to the given state.
-  virtual void setState(const std::string& action, OverloadActionState state) PURE;
-
   // Returns a factory for creating timers whose duration might be altered by
   // the overload manager.
   virtual OverloadTimerFactory getTimerFactory() PURE;

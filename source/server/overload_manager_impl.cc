@@ -113,7 +113,7 @@ public:
     return it->second;
   }
 
-  void setState(const std::string& action, OverloadActionState state) override {
+  void setState(const std::string& action, OverloadActionState state) {
     auto insert = actions_.emplace(action, state);
     if (!insert.second) {
       insert.first->second = state;
