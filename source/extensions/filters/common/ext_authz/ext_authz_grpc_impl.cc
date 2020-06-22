@@ -95,7 +95,7 @@ void GrpcClientImpl::toAuthzResponseHeader(
       response->headers_to_append.emplace_back(Http::LowerCaseString(header.header().key()),
                                                header.header().value());
     } else {
-      response->headers_to_add.emplace_back(Http::LowerCaseString(header.header().key()),
+      response->headers_to_set.emplace_back(Http::LowerCaseString(header.header().key()),
                                             header.header().value());
     }
   }

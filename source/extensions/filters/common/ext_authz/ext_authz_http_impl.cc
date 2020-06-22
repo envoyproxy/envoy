@@ -33,19 +33,30 @@ const Http::HeaderMap& lengthZeroHeader() {
 const Response& errorResponse() {
   CONSTRUCT_ON_FIRST_USE(Response,
                          Response{CheckStatus::Error, Http::HeaderVector{}, Http::HeaderVector{},
-                                  EMPTY_STRING, Http::Code::Forbidden});
+                                  Http::HeaderVector{}, EMPTY_STRING, Http::Code::Forbidden});
 }
 
 // SuccessResponse used for creating either DENIED or OK authorization responses.
 struct SuccessResponse {
   SuccessResponse(const Http::HeaderMap& headers, const MatcherSharedPtr& matchers,
-                  Response&& response)
-      : headers_(headers), matchers_(matchers), response_(std::make_unique<Response>(response)) {
+                  const MatcherSharedPtr& append_matchers, Response&& response)
+      : headers_(headers), matchers_(matchers), append_matchers_(append_matchers),
+        response_(std::make_unique<Response>(response)) {
     headers_.iterate(
         [](const Http::HeaderEntry& header, void* ctx) -> Http::HeaderMap::Iterate {
           auto* context = static_cast<SuccessResponse*>(ctx);
           // UpstreamHeaderMatcher
           if (context->matchers_->matches(header.key().getStringView())) {
+            context->response_->headers_to_set.emplace_back(
+                Http::LowerCaseString{std::string(header.key().getStringView())},
+                std::string(header.value().getStringView()));
+          }
+          if (context->append_matchers_->matches(header.key().getStringView())) {
+            // If there is an existing matching key in the current headers, the new entry will be
+            // appended with the same key. For example, given {"key": "value1"} headers, if there is
+            // a matching "key" from the authorization response headers {"key": "value2"}, the
+            // request to upstream server will have two entries for "key": {"key": "value1", "key":
+            // "value2"}.
             context->response_->headers_to_add.emplace_back(
                 Http::LowerCaseString{std::string(header.key().getStringView())},
                 std::string(header.value().getStringView()));
@@ -57,6 +68,7 @@ struct SuccessResponse {
 
   const Http::HeaderMap& headers_;
   const MatcherSharedPtr& matchers_;
+  const MatcherSharedPtr& append_matchers_;
   ResponsePtr response_;
 };
 
@@ -127,6 +139,9 @@ ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3
                            enable_case_sensitive_string_matcher_)),
       upstream_header_matchers_(toUpstreamMatchers(
           config.http_service().authorization_response().allowed_upstream_headers(),
+          enable_case_sensitive_string_matcher_)),
+      upstream_header_to_append_matchers_(toUpstreamMatchers(
+          config.http_service().authorization_response().allowed_upstream_headers_to_append(),
           enable_case_sensitive_string_matcher_)),
       cluster_name_(config.http_service().server_uri().cluster()), timeout_(timeout),
       path_prefix_(path_prefix),
@@ -316,16 +331,19 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
   // Create an Ok authorization response.
   if (status_code == enumToInt(Http::Code::OK)) {
     SuccessResponse ok{message->headers(), config_->upstreamHeaderMatchers(),
+                       config_->upstreamHeaderToAppendMatchers(),
                        Response{CheckStatus::OK, Http::HeaderVector{}, Http::HeaderVector{},
-                                EMPTY_STRING, Http::Code::OK}};
+                                Http::HeaderVector{}, EMPTY_STRING, Http::Code::OK}};
     span_->setTag(TracingConstants::get().TraceStatus, TracingConstants::get().TraceOk);
     return std::move(ok.response_);
   }
 
   // Create a Denied authorization response.
   SuccessResponse denied{message->headers(), config_->clientHeaderMatchers(),
+                         config_->upstreamHeaderToAppendMatchers(),
                          Response{CheckStatus::Denied, Http::HeaderVector{}, Http::HeaderVector{},
-                                  message->bodyAsString(), static_cast<Http::Code>(status_code)}};
+                                  Http::HeaderVector{}, message->bodyAsString(),
+                                  static_cast<Http::Code>(status_code)}};
   span_->setTag(TracingConstants::get().TraceStatus, TracingConstants::get().TraceUnauthz);
   return std::move(denied.response_);
 }

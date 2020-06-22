@@ -87,6 +87,10 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
         patterns:
         - exact: baz
         - prefix: x-fail
+      allowed_upstream_headers_to_append:
+        patterns:
+        - exact: baz-append
+        - prefix: x-append
 
     path_prefix: /extauth
 

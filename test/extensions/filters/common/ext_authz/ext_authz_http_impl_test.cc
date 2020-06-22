@@ -81,6 +81,12 @@ public:
                 ignore_case: true
               - prefix: "X-"
                 ignore_case: true
+            allowed_upstream_headers_to_append:
+              patterns:
+              - exact: Alice
+                ignore_case: true
+              - prefix: "Append-"
+                ignore_case: true
             allowed_client_headers:
               patterns:
               - exact: Foo
@@ -141,6 +147,7 @@ TEST_F(ExtAuthzHttpClientTest, ClientConfig) {
   const Http::LowerCaseString foo{"foo"};
   const Http::LowerCaseString baz{"baz"};
   const Http::LowerCaseString bar{"bar"};
+  const Http::LowerCaseString alice{"alice"};
 
   // Check allowed request headers.
   EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Method.get()));
@@ -149,7 +156,7 @@ TEST_F(ExtAuthzHttpClientTest, ClientConfig) {
   EXPECT_FALSE(config_->requestHeaderMatchers()->matches(Http::Headers::get().ContentLength.get()));
   EXPECT_TRUE(config_->requestHeaderMatchers()->matches(baz.get()));
 
-  // // Check allowed client headers.
+  // Check allowed client headers.
   EXPECT_TRUE(config_->clientHeaderMatchers()->matches(Http::Headers::get().Status.get()));
   EXPECT_TRUE(config_->clientHeaderMatchers()->matches(Http::Headers::get().ContentLength.get()));
   EXPECT_FALSE(config_->clientHeaderMatchers()->matches(Http::Headers::get().Path.get()));
@@ -158,10 +165,13 @@ TEST_F(ExtAuthzHttpClientTest, ClientConfig) {
   EXPECT_FALSE(config_->clientHeaderMatchers()->matches(Http::Headers::get().Origin.get()));
   EXPECT_TRUE(config_->clientHeaderMatchers()->matches(foo.get()));
 
-  // // Check allowed upstream headers.
+  // Check allowed upstream headers.
   EXPECT_TRUE(config_->upstreamHeaderMatchers()->matches(bar.get()));
 
-  // // Check other attributes.
+  // Check allowed upstream headers to append.
+  EXPECT_TRUE(config_->upstreamHeaderToAppendMatchers()->matches(alice.get()));
+
+  // Check other attributes.
   EXPECT_EQ(config_->pathPrefix(), "/bar");
   EXPECT_EQ(config_->cluster(), "ext_authz");
   EXPECT_EQ(config_->tracingName(), "async ext_authz egress");

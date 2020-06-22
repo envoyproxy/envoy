@@ -65,7 +65,7 @@ Response TestCommon::makeAuthzResponse(CheckStatus status, Http::Code status_cod
         authz_response.headers_to_append.emplace_back(Http::LowerCaseString(header.header().key()),
                                                       header.header().value());
       } else {
-        authz_response.headers_to_add.emplace_back(Http::LowerCaseString(header.header().key()),
+        authz_response.headers_to_set.emplace_back(Http::LowerCaseString(header.header().key()),
                                                    header.header().value());
       }
     }

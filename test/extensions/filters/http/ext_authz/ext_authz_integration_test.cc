@@ -248,6 +248,8 @@ public:
         {":scheme", "http"},
         {":authority", "host"},
         {"x-case-sensitive-header", case_sensitive_header_value_},
+        {"baz", "foo"},
+        {"bat", "foo"},
     });
   }
 
@@ -259,6 +261,17 @@ public:
     RELEASE_ASSERT(result, result.message());
     result = ext_authz_request_->waitForEndStream(*dispatcher_);
     RELEASE_ASSERT(result, result.message());
+
+    // Send back authorization response with "baz" and "bat" headers.
+    // Also add multiple values "append-foo" and "append-bar" for key "x-append-bat".
+    Http::TestResponseHeaderMapImpl response_headers{
+        {":status", "200"},
+        {"baz", "baz"},
+        {"bat", "bar"},
+        {"x-append-bat", "append-foo"},
+        {"x-append-bat", "append-bar"},
+    };
+    ext_authz_request_->encodeHeaders(response_headers, true);
   }
 
   void cleanup() {
@@ -294,6 +307,34 @@ public:
     initiateClientConnection();
     waitForExtAuthzRequest();
 
+    AssertionResult result =
+        fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
+    RELEASE_ASSERT(result, result.message());
+    result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
+    RELEASE_ASSERT(result, result.message());
+    result = upstream_request_->waitForEndStream(*dispatcher_);
+    RELEASE_ASSERT(result, result.message());
+
+    // The original client request header value of "baz" is "foo". Since we configure to "override"
+    // the value of "baz", we expect the request headers to be sent to upstream contain only one
+    // "baz" with value "baz" (set by the authorization server).
+    EXPECT_THAT(upstream_request_->headers(), Http::HeaderValueOf("baz", "baz"));
+
+    // The original client request header value of "bat" is "foo". Since we configure to "append"
+    // the value of "bat", we expect the request headers to be sent to upstream contain two "bat"s,
+    // with values: "foo" and "bar" (the "bat: bar" header is appended by the authorization server).
+    const auto& request_existed_headers =
+        Http::TestRequestHeaderMapImpl{{"bat", "foo"}, {"bat", "bar"}};
+    EXPECT_THAT(request_existed_headers, Http::IsSubsetOfHeaders(upstream_request_->headers()));
+
+    // The original client request header does not contain x-append-bat. Since we configure to
+    // "append" the value of "x-append-bat", we expect the headers to be sent to upstream contain
+    // two "x-append-bat"s, instead of replacing the first with the last one, with values:
+    // "append-foo" and "append-bar"
+    const auto& request_nonexisted_headers = Http::TestRequestHeaderMapImpl{
+        {"x-append-bat", "append-foo"}, {"x-append-bat", "append-bar"}};
+    EXPECT_THAT(request_nonexisted_headers, Http::IsSubsetOfHeaders(upstream_request_->headers()));
+
     response_->waitForEndStream();
     EXPECT_TRUE(response_->complete());
 
@@ -312,10 +353,23 @@ public:
       uri: "ext_authz:9000"
       cluster: "ext_authz"
       timeout: 0.25s
+
     authorization_request:
       allowed_headers:
         patterns:
         - exact: X-Case-Sensitive-Header
+
+    authorization_response:
+      allowed_upstream_headers:
+        patterns:
+        - exact: baz
+        - prefix: x-success
+
+      allowed_upstream_headers_to_append:
+        patterns:
+        - exact: bat
+        - prefix: x-append
+
   failure_mode_allow: true
   )EOF";
 };
@@ -355,7 +409,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ExtAuthzHttpIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-// Verifies that by default HTTP service uses the case sensitive string matcher.
+// Verifies that by default HTTP service uses the case-sensitive string matcher.
 TEST_P(ExtAuthzHttpIntegrationTest, DefaultCaseSensitiveStringMatcher) {
   setupWithDisabledCaseSensitiveStringMatcher(false);
   const auto* header_entry = ext_authz_request_->headers().get(case_sensitive_header_name_);
@@ -364,7 +418,7 @@ TEST_P(ExtAuthzHttpIntegrationTest, DefaultCaseSensitiveStringMatcher) {
 
 // Verifies that by setting "false" to
 // envoy.reloadable_features.ext_authz_http_service_enable_case_sensitive_string_matcher, the string
-// matcher used by HTTP service will case insensitive.
+// matcher used by HTTP service will be case-insensitive.
 TEST_P(ExtAuthzHttpIntegrationTest, DisableCaseSensitiveStringMatcher) {
   setupWithDisabledCaseSensitiveStringMatcher(true);
   const auto* header_entry = ext_authz_request_->headers().get(case_sensitive_header_name_);
