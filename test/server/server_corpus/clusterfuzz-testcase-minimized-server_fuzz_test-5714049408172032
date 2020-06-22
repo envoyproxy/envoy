@@ -1,0 +1,18 @@
+cluster_manager {
+  load_stats_config {
+    api_type: GRPC
+    grpc_services {
+      google_grpc {
+        target_uri: "18446744073709551617"
+        stat_prefix: "2147483649"
+        channel_args {
+          args {
+            key: "\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000"
+            value {
+            }
+          }
+        }
+      }
+    }
+  }
+}

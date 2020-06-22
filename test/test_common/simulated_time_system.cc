@@ -71,9 +71,9 @@ public:
     return armed_ || base_timer_->enabled();
   }
 
-  void disableTimerLockHeld() EXCLUSIVE_LOCKS_REQUIRED(time_system_.mutex_);
+  void disableTimerLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(time_system_.mutex_);
 
-  void setTimeLockHeld(MonotonicTime time) EXCLUSIVE_LOCKS_REQUIRED(time_system_.mutex_) {
+  void setTimeLockHeld(MonotonicTime time) ABSL_EXCLUSIVE_LOCKS_REQUIRED(time_system_.mutex_) {
     time_ = time;
   }
 
@@ -82,7 +82,7 @@ public:
    * typically via Dispatcher::run().
    */
   void activateLockHeld(const ScopeTrackedObject* scope = nullptr)
-      EXCLUSIVE_LOCKS_REQUIRED(time_system_.mutex_) {
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(time_system_.mutex_) {
     ASSERT(armed_);
     armed_ = false;
     if (pending_) {
@@ -101,7 +101,7 @@ public:
     base_timer_->enableTimer(duration, scope);
   }
 
-  MonotonicTime time() const EXCLUSIVE_LOCKS_REQUIRED(time_system_.mutex_) {
+  MonotonicTime time() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(time_system_.mutex_) {
     ASSERT(armed_);
     return time_;
   }
@@ -125,16 +125,16 @@ private:
 
   TimerPtr base_timer_;
   SimulatedTimeSystemHelper& time_system_;
-  MonotonicTime time_ GUARDED_BY(time_system_.mutex_);
+  MonotonicTime time_ ABSL_GUARDED_BY(time_system_.mutex_);
   const uint64_t index_;
-  bool armed_ GUARDED_BY(time_system_.mutex_);
-  bool pending_ GUARDED_BY(time_system_.mutex_);
+  bool armed_ ABSL_GUARDED_BY(time_system_.mutex_);
+  bool pending_ ABSL_GUARDED_BY(time_system_.mutex_);
 };
 
 // Compare two alarms, based on wakeup time and insertion order. Returns true if
 // a comes before b.
 bool SimulatedTimeSystemHelper::CompareAlarms::operator()(const Alarm* a, const Alarm* b) const
-    EXCLUSIVE_LOCKS_REQUIRED(a->time_system_.mutex_, b->time_system_.mutex_) {
+    ABSL_EXCLUSIVE_LOCKS_REQUIRED(a->time_system_.mutex_, b->time_system_.mutex_) {
   if (a != b) {
     if (a->time() < b->time()) {
       return true;
@@ -170,6 +170,7 @@ SimulatedTimeSystemHelper::Alarm::Alarm::~Alarm() {
 }
 
 void SimulatedTimeSystemHelper::Alarm::Alarm::disableTimer() {
+  base_timer_->disableTimer();
   absl::MutexLock lock(&time_system_.mutex_);
   disableTimerLockHeld();
 }
@@ -179,12 +180,26 @@ void SimulatedTimeSystemHelper::Alarm::Alarm::disableTimerLockHeld() {
     time_system_.removeAlarmLockHeld(this);
     armed_ = false;
   }
+  if (pending_) {
+    pending_ = false;
+    time_system_.decPendingLockHeld();
+  }
 }
 
 void SimulatedTimeSystemHelper::Alarm::Alarm::enableHRTimer(
     const std::chrono::microseconds& duration, const ScopeTrackedObject* scope) {
+  if (duration.count() != 0) {
+    disableTimer();
+  }
   absl::MutexLock lock(&time_system_.mutex_);
-  disableTimerLockHeld();
+  if (pending_) {
+    // Calling enableTimer on a timer that is already pending is a no-op. Timer will still fire
+    // based on the original time it was scheduled.
+    return;
+  } else if (armed_) {
+    disableTimerLockHeld();
+  }
+
   armed_ = true;
   if (duration.count() == 0) {
     activateLockHeld(scope);
@@ -241,15 +256,17 @@ void SimulatedTimeSystemHelper::advanceTimeWait(const Duration& duration) {
   waitForNoPendingLockHeld();
 }
 
-void SimulatedTimeSystemHelper::waitForNoPendingLockHeld() const EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
+void SimulatedTimeSystemHelper::waitForNoPendingLockHeld() const
+    ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
   mutex_.Await(absl::Condition(
       +[](const uint32_t* pending_alarms) -> bool { return *pending_alarms == 0; },
       &pending_alarms_));
 }
 
-Thread::CondVar::WaitStatus SimulatedTimeSystemHelper::waitFor(
-    Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
-    const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) {
+Thread::CondVar::WaitStatus SimulatedTimeSystemHelper::waitFor(Thread::MutexBasicLockable& mutex,
+                                                               Thread::CondVar& condvar,
+                                                               const Duration& duration) noexcept
+    ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) {
   only_one_thread_.checkOneThread();
 
   // TODO(#10568): This real-time polling delay should not be necessary. Without
@@ -295,14 +312,15 @@ Thread::CondVar::WaitStatus SimulatedTimeSystemHelper::waitFor(
   return Thread::CondVar::WaitStatus::Timeout;
 }
 
-MonotonicTime SimulatedTimeSystemHelper::alarmTimeLockHeld(Alarm* alarm) NO_THREAD_SAFETY_ANALYSIS {
+MonotonicTime
+SimulatedTimeSystemHelper::alarmTimeLockHeld(Alarm* alarm) ABSL_NO_THREAD_SAFETY_ANALYSIS {
   // We disable thread-safety analysis as the compiler can't detect that
   // alarm_->timeSystem() == this, so we must be holding the right mutex.
   ASSERT(&(alarm->timeSystem()) == this);
   return alarm->time();
 }
 
-void SimulatedTimeSystemHelper::alarmActivateLockHeld(Alarm* alarm) NO_THREAD_SAFETY_ANALYSIS {
+void SimulatedTimeSystemHelper::alarmActivateLockHeld(Alarm* alarm) ABSL_NO_THREAD_SAFETY_ANALYSIS {
   // We disable thread-safety analysis as the compiler can't detect that
   // alarm_->timeSystem() == this, so we must be holding the right mutex.
   ASSERT(&(alarm->timeSystem()) == this);
@@ -315,7 +333,7 @@ int64_t SimulatedTimeSystemHelper::nextIndex() {
 }
 
 void SimulatedTimeSystemHelper::addAlarmLockHeld(
-    Alarm* alarm, const std::chrono::microseconds& duration) NO_THREAD_SAFETY_ANALYSIS {
+    Alarm* alarm, const std::chrono::microseconds& duration) ABSL_NO_THREAD_SAFETY_ANALYSIS {
   ASSERT(&(alarm->timeSystem()) == this);
   alarm->setTimeLockHeld(monotonic_time_ + duration);
   alarms_.insert(alarm);

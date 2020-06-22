@@ -87,7 +87,7 @@ STD_REGEX_WHITELIST = (
 # Only one C++ file should instantiate grpc_init
 GRPC_INIT_WHITELIST = ("./source/common/grpc/google_grpc_context.cc")
 
-CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-9")
+CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-10")
 BUILDIFIER_PATH = paths.getBuildifier()
 BUILDOZER_PATH = paths.getBuildozer()
 ENVOY_BUILD_FIXER_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])),
@@ -245,13 +245,13 @@ def checkTools():
                             "users".format(CLANG_FORMAT_PATH))
   else:
     error_messages.append(
-        "Command {} not found. If you have clang-format in version 9.x.x "
+        "Command {} not found. If you have clang-format in version 10.x.x "
         "installed, but the binary name is different or it's not available in "
         "PATH, please use CLANG_FORMAT environment variable to specify the path. "
         "Examples:\n"
-        "    export CLANG_FORMAT=clang-format-9.0.0\n"
-        "    export CLANG_FORMAT=/opt/bin/clang-format-9\n"
-        "    export CLANG_FORMAT=/usr/local/opt/llvm@9/bin/clang-format".format(CLANG_FORMAT_PATH))
+        "    export CLANG_FORMAT=clang-format-10.0.0\n"
+        "    export CLANG_FORMAT=/opt/bin/clang-format-10\n"
+        "    export CLANG_FORMAT=/usr/local/opt/llvm@10/bin/clang-format".format(CLANG_FORMAT_PATH))
 
   def checkBazelTool(name, path, var):
     bazel_tool_abs_path = lookPath(path)

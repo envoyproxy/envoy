@@ -187,6 +187,7 @@ public:
   MOCK_METHOD(void, dec, ());
   MOCK_METHOD(void, inc, ());
   MOCK_METHOD(void, set, (uint64_t value));
+  MOCK_METHOD(void, setParentValue, (uint64_t parent_value));
   MOCK_METHOD(void, sub, (uint64_t amount));
   MOCK_METHOD(void, mergeImportMode, (ImportMode));
   MOCK_METHOD(bool, used, (), (const));

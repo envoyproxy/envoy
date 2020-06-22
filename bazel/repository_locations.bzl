@@ -67,10 +67,10 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["build"],
     ),
     envoy_build_tools = dict(
-        sha256 = "78e794ae1c1197f59b7ecbf8bd62c053ecb1625daaccdbe287581ee6f12ec0fb",
-        strip_prefix = "envoy-build-tools-b47394aa94c45e15c479d18eab18ffd43ec62d89",
-        # 2020-05-14
-        urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/b47394aa94c45e15c479d18eab18ffd43ec62d89.tar.gz"],
+        sha256 = "b0efe70a1d122fffb89570771f4ec3b912aa0a8a0ce56218223918d7737d01e2",
+        strip_prefix = "envoy-build-tools-3cbc1d66b9e9ead42daf69e01597cacf4fb52151",
+        # 2020-05-15
+        urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/3cbc1d66b9e9ead42daf69e01597cacf4fb52151.tar.gz"],
         use_category = ["build"],
     ),
     boringssl = dict(
@@ -278,10 +278,10 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "N/A",
     ),
     com_github_google_jwt_verify = dict(
-        sha256 = "118f955620509f1634cbd918c63234d2048dce56b1815caf348d78e3c3dc899c",
-        strip_prefix = "jwt_verify_lib-44291b2ee4c19631e5a0a0bf4f965436a9364ca7",
-        # 2020-05-21
-        urls = ["https://github.com/google/jwt_verify_lib/archive/44291b2ee4c19631e5a0a0bf4f965436a9364ca7.tar.gz"],
+        sha256 = "d2e28897c297bd04429e43a1b485f7350acc23cbfee6365b8a3634c17840b2f6",
+        strip_prefix = "jwt_verify_lib-f44cf49d185ad0694b472da78071b4d67313fb86",
+        # 2020-06-03
+        urls = ["https://github.com/google/jwt_verify_lib/archive/f44cf49d185ad0694b472da78071b4d67313fb86.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),
@@ -443,10 +443,10 @@ DEPENDENCY_REPOSITORIES = dict(
     # provided as part of the compiler-rt source distribution. We can't use the
     # Clang variant as we are not a Clang-LLVM only shop today.
     org_llvm_releases_compiler_rt = dict(
-        sha256 = "56e4cd96dd1d8c346b07b4d6b255f976570c6f2389697347a6c3dcb9e820d10e",
+        sha256 = "6a7da64d3a0a7320577b68b9ca4933bdcab676e898b759850e827333c3282c75",
         # Only allow peeking at fuzzer related files for now.
-        strip_prefix = "compiler-rt-9.0.0.src/lib",
-        urls = ["http://releases.llvm.org/9.0.0/compiler-rt-9.0.0.src.tar.xz"],
+        strip_prefix = "compiler-rt-10.0.0.src/include",
+        urls = ["https://github.com/llvm/llvm-project/releases/download/llvmorg-10.0.0/compiler-rt-10.0.0.src.tar.xz"],
         use_category = ["test"],
     ),
     upb = dict(
