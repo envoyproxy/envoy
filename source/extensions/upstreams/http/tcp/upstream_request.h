@@ -22,7 +22,7 @@ namespace Tcp {
 class TcpConnPool : public Router::GenericConnPool, public Envoy::Tcp::ConnectionPool::Callbacks {
 public:
   TcpConnPool(Upstream::ClusterManager& cm, bool is_connect, const Router::RouteEntry& route_entry,
-              Envoy::Http::Protocol, Upstream::LoadBalancerContext* ctx) {
+              absl::optional<Envoy::Http::Protocol>, Upstream::LoadBalancerContext* ctx) {
     ASSERT(is_connect);
     conn_pool_ = cm.tcpConnPoolForCluster(route_entry.clusterName(),
                                           Upstream::ResourcePriority::Default, ctx);

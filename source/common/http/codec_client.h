@@ -76,7 +76,7 @@ public:
   /**
    * @return the underlying connection ID.
    */
-  uint64_t id() { return connection_->id(); }
+  uint64_t id() const { return connection_->id(); }
 
   /**
    * @return the underlying codec protocol.

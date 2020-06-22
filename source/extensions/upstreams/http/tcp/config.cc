@@ -10,8 +10,9 @@ namespace Tcp {
 
 Router::GenericConnPoolPtr TcpGenericConnPoolFactory::createGenericConnPool(
     Upstream::ClusterManager& cm, bool is_connect, const Router::RouteEntry& route_entry,
-    Envoy::Http::Protocol protocol, Upstream::LoadBalancerContext* ctx) const {
-  auto ret = std::make_unique<TcpConnPool>(cm, is_connect, route_entry, protocol, ctx);
+    absl::optional<Envoy::Http::Protocol> downstream_protocol,
+    Upstream::LoadBalancerContext* ctx) const {
+  auto ret = std::make_unique<TcpConnPool>(cm, is_connect, route_entry, downstream_protocol, ctx);
   return (ret->valid() ? std::move(ret) : nullptr);
 }
 
