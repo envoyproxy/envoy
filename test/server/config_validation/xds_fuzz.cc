@@ -22,14 +22,14 @@ XdsFuzzTest::buildClusterLoadAssignment(const std::string& name) {
 
 envoy::config::listener::v3::Listener XdsFuzzTest::buildListener(uint32_t listener_num,
                                                                  uint32_t route_num) {
-  std::string name = absl::StrCat("listener_", listener_num % NUM_LISTENERS);
-  std::string route = absl::StrCat("route_config_", route_num % NUM_ROUTES);
+  std::string name = absl::StrCat("listener_", listener_num % num_listeners_);
+  std::string route = absl::StrCat("route_config_", route_num % num_routes_);
   return ConfigHelper::buildListener(
       name, route, Network::Test::getLoopbackAddressString(ip_version_), "ads_test", api_version_);
 }
 
 envoy::config::route::v3::RouteConfiguration XdsFuzzTest::buildRouteConfig(uint32_t route_num) {
-  std::string route = absl::StrCat("route_config_", route_num % NUM_ROUTES);
+  std::string route = absl::StrCat("route_config_", route_num % num_routes_);
   return ConfigHelper::buildRouteConfig(route, "cluster_0", api_version_);
 }
 
@@ -142,7 +142,7 @@ void XdsFuzzTest::close() {
  * @return the listener as an optional so that it can be used in a delta request
  */
 absl::optional<std::string> XdsFuzzTest::removeListener(uint32_t listener_num) {
-  std::string match = absl::StrCat("listener_", listener_num % NUM_LISTENERS);
+  std::string match = absl::StrCat("listener_", listener_num % num_listeners_);
 
   for (auto it = listeners_.begin(); it != listeners_.end(); ++it) {
     if (it->name() == match) {
@@ -160,7 +160,7 @@ absl::optional<std::string> XdsFuzzTest::removeListener(uint32_t listener_num) {
  * @return the route as an optional so that it can be used in a delta request
  */
 absl::optional<std::string> XdsFuzzTest::removeRoute(uint32_t route_num) {
-  std::string match = absl::StrCat("route_config_", route_num % NUM_ROUTES);
+  std::string match = absl::StrCat("route_config_", route_num % num_routes_);
   for (auto it = routes_.begin(); it != routes_.end(); ++it) {
     if (it->name() == match) {
       std::string name = it->name();

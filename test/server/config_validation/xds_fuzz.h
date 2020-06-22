@@ -65,8 +65,8 @@ private:
   uint64_t version_;
   envoy::config::core::v3::ApiVersion api_version_;
 
-  const size_t NUM_LISTENERS = 3;
-  const size_t NUM_ROUTES = 5;
+  const size_t num_listeners_ = 3;
+  const size_t num_routes_ = 5;
 };
 
 } // namespace Envoy
