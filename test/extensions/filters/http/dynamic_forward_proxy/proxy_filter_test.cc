@@ -16,6 +16,7 @@ using testing::AtLeast;
 using testing::Eq;
 using testing::InSequence;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -57,29 +58,30 @@ public:
     return dns_cache_manager_;
   }
 
-  void setupFilterConfig(bool enable_dns_cache_manager) {
-    if (enable_dns_cache_manager) {
-      setupDnsCacheResourceManager();
-    }
+  void setupFilterConfig(bool set_value = false) {
+    setupDnsCacheResourceManager(set_value);
     envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig proto_config;
     filter_config_ = std::make_shared<ProxyFilterConfig>(proto_config, *this, cm_);
     filter_ = std::make_unique<ProxyFilter>(filter_config_);
     filter_->setDecoderFilterCallbacks(callbacks_);
   }
 
-  void setupDnsCacheResourceManager() {
+  void setupDnsCacheResourceManager(bool set_value) {
     envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheCircuitBreakers cb_config;
-    std::string config_yaml = R"EOF(
-      max_pending_requests: 1
-    )EOF";
+    if (set_value) {
+      std::string config_yaml = R"EOF(
+        max_pending_requests: 1
+      )EOF";
 
-    TestUtility::loadFromYaml(config_yaml, cb_config);
+      TestUtility::loadFromYaml(config_yaml, cb_config);
+    }
+
     dns_cache_resource_manager_ =
         std::make_unique<Extensions::Common::DynamicForwardProxy::DnsCacheResourceManagerImpl>(
             *scope_, loader_, config_name_, cb_config);
 
     ON_CALL(*dns_cache_manager_->dns_cache_, dnsCacheResourceManager())
-        .WillByDefault(Return(std::ref(*dns_cache_resource_manager_)));
+        .WillByDefault(ReturnRef(*dns_cache_resource_manager_));
   }
 
   std::shared_ptr<Extensions::Common::DynamicForwardProxy::MockDnsCacheManager> dns_cache_manager_{
@@ -97,12 +99,13 @@ public:
   NiceMock<Runtime::MockLoader> loader_;
   Http::TestRequestHeaderMapImpl request_headers_{{":authority", "foo"}};
   Extensions::Common::DynamicForwardProxy::DnsCacheStats dns_cache_stats_;
-  Extensions::Common::DynamicForwardProxy::DnsCacheResourceManagerPtr dns_cache_resource_manager_;
+  std::unique_ptr<Extensions::Common::DynamicForwardProxy::DnsCacheResourceManager>
+      dns_cache_resource_manager_;
 };
 
 // Default port 80 if upstream TLS not configured.
 TEST_F(ProxyFilterTest, HttpDefaultPort) {
-  setupFilterConfig(false);
+  setupFilterConfig();
   InSequence s;
 
   EXPECT_CALL(callbacks_, route());
@@ -121,7 +124,7 @@ TEST_F(ProxyFilterTest, HttpDefaultPort) {
 
 // Default port 443 if upstream TLS is configured.
 TEST_F(ProxyFilterTest, HttpsDefaultPort) {
-  setupFilterConfig(false);
+  setupFilterConfig();
   InSequence s;
 
   EXPECT_CALL(callbacks_, route());
@@ -140,7 +143,7 @@ TEST_F(ProxyFilterTest, HttpsDefaultPort) {
 
 // Cache overflow.
 TEST_F(ProxyFilterTest, CacheOverflow) {
-  setupFilterConfig(false);
+  setupFilterConfig();
   InSequence s;
 
   EXPECT_CALL(callbacks_, route());
@@ -160,7 +163,12 @@ TEST_F(ProxyFilterTest, CacheOverflow) {
 
 // Circuit breaker overflow
 TEST_F(ProxyFilterTest, CircuitBreakerOverflow) {
-  setupFilterConfig(false);
+  TestScopedRuntime scoped_runtime;
+  // Disable dns cache circuit breakers because which we expect to be used cluster circuit breakers.
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.enable_dns_cache_circuit_breakers", "false"}});
+
+  setupFilterConfig();
   InSequence s;
 
   EXPECT_CALL(callbacks_, route());
@@ -196,11 +204,6 @@ TEST_F(ProxyFilterTest, CircuitBreakerOverflow) {
 // Circuit breaker overflow with DNS Cache resource manager
 TEST_F(ProxyFilterTest, CircuitBreakerOverflowWithDnsCacheResourceManager) {
   setupFilterConfig(true);
-
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.enable_dns_cache_circuit_breakers", "true"}});
-
   InSequence s;
 
   EXPECT_CALL(callbacks_, route());
@@ -237,7 +240,7 @@ TEST_F(ProxyFilterTest, CircuitBreakerOverflowWithDnsCacheResourceManager) {
 
 // No route handling.
 TEST_F(ProxyFilterTest, NoRoute) {
-  setupFilterConfig(false);
+  setupFilterConfig();
   InSequence s;
 
   EXPECT_CALL(callbacks_, route()).WillOnce(Return(nullptr));
@@ -246,7 +249,7 @@ TEST_F(ProxyFilterTest, NoRoute) {
 
 // No cluster handling.
 TEST_F(ProxyFilterTest, NoCluster) {
-  setupFilterConfig(false);
+  setupFilterConfig();
   InSequence s;
 
   EXPECT_CALL(callbacks_, route());
@@ -255,7 +258,7 @@ TEST_F(ProxyFilterTest, NoCluster) {
 }
 
 TEST_F(ProxyFilterTest, HostRewrite) {
-  setupFilterConfig(false);
+  setupFilterConfig();
   InSequence s;
 
   envoy::extensions::filters::http::dynamic_forward_proxy::v3::PerRouteConfig proto_config;
@@ -280,7 +283,7 @@ TEST_F(ProxyFilterTest, HostRewrite) {
 }
 
 TEST_F(ProxyFilterTest, HostRewriteViaHeader) {
-  setupFilterConfig(false);
+  setupFilterConfig();
   InSequence s;
 
   envoy::extensions::filters::http::dynamic_forward_proxy::v3::PerRouteConfig proto_config;

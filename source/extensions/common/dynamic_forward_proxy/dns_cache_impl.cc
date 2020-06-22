@@ -23,6 +23,11 @@ DnsCacheImpl::DnsCacheImpl(
       resolver_(main_thread_dispatcher.createDnsResolver({}, false)), tls_slot_(tls.allocateSlot()),
       scope_(root_scope.createScope(fmt::format("dns_cache.{}.", config.name()))),
       stats_(generateDnsCacheStats(*scope_)),
+      resource_manager_(
+          *scope_, loader, config.name(),
+          config.has_dns_cache_circuit_breaker()
+              ? config.dns_cache_circuit_breaker()
+              : envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheCircuitBreakers()),
       refresh_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_refresh_rate, 60000)),
       failure_backoff_strategy_(
           Config::Utility::prepareDnsRefreshStrategy<
@@ -30,10 +35,6 @@ DnsCacheImpl::DnsCacheImpl(
               config, refresh_interval_.count(), random)),
       host_ttl_(PROTOBUF_GET_MS_OR_DEFAULT(config, host_ttl, 300000)),
       max_hosts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_hosts, 1024)) {
-  if (config.has_dns_cache_circuit_breaker()) {
-    resource_manager_ = std::make_unique<DnsCacheResourceManagerImpl>(
-        *scope_, loader, config.name(), std::move(config.dns_cache_circuit_breaker()));
-  }
   tls_slot_->set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalHostInfo>(); });
   updateTlsHostsMap();
 }
@@ -92,13 +93,6 @@ absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> DnsCacheImpl::hosts() {
 }
 
 void DnsCacheImpl::dnsCacheStatsOverflowInc() { stats_.dns_rq_pending_overflow_.inc(); }
-
-DnsCacheResourceManagerOptRef DnsCacheImpl::dnsCacheResourceManager() {
-  if (resource_manager_) {
-    return std::ref(*resource_manager_);
-  }
-  return absl::nullopt;
-}
 
 DnsCacheImpl::AddUpdateCallbacksHandlePtr
 DnsCacheImpl::addUpdateCallbacks(UpdateCallbacks& callbacks) {
@@ -299,20 +293,16 @@ DnsCacheImpl::PrimaryHostInfo::~PrimaryHostInfo() {
 }
 
 DnsCacheCircuitBreakersHandler::DnsCacheCircuitBreakersHandler(DnsCache& dns_cache)
-    : dns_cache_(dns_cache) {
-  const auto& dns_cache_resource_manager = dns_cache_.dnsCacheResourceManager();
-  should_use_dns_cache_circuit_breakers_ =
-      Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.enable_dns_cache_circuit_breakers") &&
-      dns_cache_resource_manager.has_value();
-}
+    : should_use_dns_cache_circuit_breakers_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.enable_dns_cache_circuit_breakers")),
+      dns_cache_(dns_cache) {}
 
 bool DnsCacheCircuitBreakersHandler::handleRequest(const Router::RouteEntry* route_entry,
                                                    Upstream::ClusterInfoConstSharedPtr cluster_info,
                                                    DnsCacheOverflowHandler handle_overflow) {
   ResourceLimit& pending_requests =
       should_use_dns_cache_circuit_breakers_
-          ? dns_cache_.dnsCacheResourceManager()->get().pendingRequests()
+          ? dns_cache_.dnsCacheResourceManager().pendingRequests()
           : cluster_info->resourceManager(route_entry->priority()).pendingRequests();
   if (!pending_requests.canCreate()) {
     if (!should_use_dns_cache_circuit_breakers_) {

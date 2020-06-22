@@ -70,10 +70,6 @@ public:
   virtual DnsCacheCircuitBreakersStats& stats() PURE;
 };
 
-using DnsCacheResourceManagerPtr = std::unique_ptr<DnsCacheResourceManager>;
-using DnsCacheResourceManagerOptRef =
-    absl::optional<std::reference_wrapper<DnsCacheResourceManager>>;
-
 /**
  * A cache of DNS hosts. Hosts will re-resolve their addresses or be automatically purged
  * depending on configured policy.
@@ -188,7 +184,7 @@ public:
   /**
    * @return A optional reference to resource manager for dns cache.
    */
-  virtual DnsCacheResourceManagerOptRef dnsCacheResourceManager() PURE;
+  virtual DnsCacheResourceManager& dnsCacheResourceManager() PURE;
 };
 
 using DnsCacheSharedPtr = std::shared_ptr<DnsCache>;
