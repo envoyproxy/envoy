@@ -3,6 +3,7 @@
 #include <chrono>
 
 #include "common/common/assert.h"
+#include "common/runtime/runtime_features.h"
 
 #include "event2/event.h"
 
@@ -10,7 +11,9 @@ namespace Envoy {
 namespace Event {
 
 TimerImpl::TimerImpl(Libevent::BasePtr& libevent, TimerCb cb, Dispatcher& dispatcher)
-    : cb_(cb), dispatcher_(dispatcher) {
+    : cb_(cb), dispatcher_(dispatcher),
+      activate_timers_next_event_loop_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.activate_timers_next_event_loop")) {
   ASSERT(cb_);
   evtimer_assign(
       &raw_event_, libevent.get(),
@@ -44,7 +47,8 @@ void TimerImpl::enableHRTimer(const std::chrono::microseconds& d,
 
 void TimerImpl::internalEnableTimer(const timeval& tv, const ScopeTrackedObject* object) {
   object_ = object;
-  if (tv.tv_sec == 0 && tv.tv_usec == 0) {
+
+  if (!activate_timers_next_event_loop_ && tv.tv_sec == 0 && tv.tv_usec == 0) {
     event_active(&raw_event_, EV_TIMEOUT, 0);
   } else {
     event_add(&raw_event_, &tv);

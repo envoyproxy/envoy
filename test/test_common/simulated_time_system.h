@@ -80,6 +80,13 @@ private:
   void setMonotonicTimeLockHeld(const MonotonicTime& monotonic_time)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
+  /**
+   * Schedule expired alarms so they execute in their event loops.
+   */
+  void scheduleReadyAlarms();
+  void scheduleReadyAlarmsLockHeld(MonotonicTime start_monotonic_time)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+
   MonotonicTime alarmTimeLockHeld(Alarm* alarm) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
   void alarmActivateLockHeld(Alarm* alarm) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
@@ -88,7 +95,8 @@ private:
   int64_t nextIndex();
 
   // Adds/removes an alarm.
-  void addAlarmLockHeld(Alarm*, const std::chrono::microseconds& duration)
+  void addAlarmLockHeld(Alarm*, const std::chrono::microseconds& duration,
+                        SimulatedScheduler& simulated_scheduler)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
   void removeAlarmLockHeld(Alarm*) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 

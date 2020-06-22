@@ -6,6 +6,7 @@
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "event2/event.h"
@@ -16,12 +17,18 @@ namespace Event {
 namespace Test {
 namespace {
 
-class SimulatedTimeSystemTest : public testing::Test {
+class SimulatedTimeSystemTest : public testing::TestWithParam<bool> {
 protected:
   SimulatedTimeSystemTest()
       : scheduler_(time_system_.createScheduler(base_scheduler_, base_scheduler_)),
         start_monotonic_time_(time_system_.monotonicTime()),
-        start_system_time_(time_system_.systemTime()) {}
+        start_system_time_(time_system_.systemTime()) {
+    Runtime::LoaderSingleton::getExisting()->mergeValues(
+        {{"envoy.reloadable_features.activate_timers_next_event_loop",
+          activateTimersNextEventLoop() ? "true" : "false"}});
+  }
+
+  bool activateTimersNextEventLoop() { return GetParam(); }
 
   void trackPrepareCalls() {
     base_scheduler_.registerOnPrepareCallback([this]() { output_.append(1, 'p'); });
@@ -58,6 +65,7 @@ protected:
     base_scheduler_.run(Dispatcher::RunType::NonBlock);
   }
 
+  TestScopedRuntime scoped_runtime_;
   Event::MockDispatcher dispatcher_;
   LibeventScheduler base_scheduler_;
   SimulatedTimeSystem time_system_;
@@ -68,7 +76,9 @@ protected:
   SystemTime start_system_time_;
 };
 
-TEST_F(SimulatedTimeSystemTest, AdvanceTimeAsync) {
+INSTANTIATE_TEST_SUITE_P(DelayTimerActivation, SimulatedTimeSystemTest, testing::Bool());
+
+TEST_P(SimulatedTimeSystemTest, AdvanceTimeAsync) {
   EXPECT_EQ(start_monotonic_time_, time_system_.monotonicTime());
   EXPECT_EQ(start_system_time_, time_system_.systemTime());
   advanceMsAndLoop(5);
@@ -76,7 +86,7 @@ TEST_F(SimulatedTimeSystemTest, AdvanceTimeAsync) {
   EXPECT_EQ(start_system_time_ + std::chrono::milliseconds(5), time_system_.systemTime());
 }
 
-TEST_F(SimulatedTimeSystemTest, TimerOrdering) {
+TEST_P(SimulatedTimeSystemTest, TimerOrdering) {
   trackPrepareCalls();
 
   addTask(0, '0');
@@ -91,7 +101,7 @@ TEST_F(SimulatedTimeSystemTest, TimerOrdering) {
 }
 
 // Timers that are scheduled to execute and but are disabled first do not trigger.
-TEST_F(SimulatedTimeSystemTest, TimerOrderAndDisableTimer) {
+TEST_P(SimulatedTimeSystemTest, TimerOrderAndDisableTimer) {
   trackPrepareCalls();
 
   // Create 3 timers. The first timer should disable the second, so it doesn't trigger.
@@ -108,7 +118,7 @@ TEST_F(SimulatedTimeSystemTest, TimerOrderAndDisableTimer) {
 }
 
 // Capture behavior of timers which are rescheduled without being disabled first.
-TEST_F(SimulatedTimeSystemTest, TimerOrderAndRescheduleTimer) {
+TEST_P(SimulatedTimeSystemTest, TimerOrderAndRescheduleTimer) {
   trackPrepareCalls();
 
   // Reschedule timers 1, 2 and 4 without disabling first.
@@ -128,15 +138,23 @@ TEST_F(SimulatedTimeSystemTest, TimerOrderAndRescheduleTimer) {
   // Timer 4 runs as part of the first wakeup since its new schedule time has a delta of 0. Timer 2
   // is delayed since it is rescheduled with a non-zero delta.
   advanceMsAndLoop(5);
-  EXPECT_EQ("p0134", output_);
+  if (activateTimersNextEventLoop()) {
+    EXPECT_EQ("p013p4", output_);
+  } else {
+    EXPECT_EQ("p0134", output_);
+  }
 
   advanceMsAndLoop(100);
-  EXPECT_EQ("p0134p2", output_);
+  if (activateTimersNextEventLoop()) {
+    EXPECT_EQ("p013p4p2", output_);
+  } else {
+    EXPECT_EQ("p0134p2", output_);
+  }
 }
 
 // Disable and re-enable timers that is already pending execution and verify that execution is
 // delayed.
-TEST_F(SimulatedTimeSystemTest, TimerOrderDisableAndRescheduleTimer) {
+TEST_P(SimulatedTimeSystemTest, TimerOrderDisableAndRescheduleTimer) {
   trackPrepareCalls();
 
   // Disable and reschedule timers 1, 2 and 4 when timer 0 triggers.
@@ -159,13 +177,21 @@ TEST_F(SimulatedTimeSystemTest, TimerOrderDisableAndRescheduleTimer) {
   // because it is scheduled with zero delay. Timer 2 executes in a later iteration because it is
   // re-enabled with a non-zero timeout.
   advanceMsAndLoop(5);
-  EXPECT_EQ("p0314", output_);
+  if (activateTimersNextEventLoop()) {
+    EXPECT_EQ("p03p14", output_);
+  } else {
+    EXPECT_EQ("p0314", output_);
+  }
 
   advanceMsAndLoop(100);
-  EXPECT_EQ("p0314p2", output_);
+  if (activateTimersNextEventLoop()) {
+    EXPECT_EQ("p03p14p2", output_);
+  } else {
+    EXPECT_EQ("p0314p2", output_);
+  }
 }
 
-TEST_F(SimulatedTimeSystemTest, AdvanceTimeWait) {
+TEST_P(SimulatedTimeSystemTest, AdvanceTimeWait) {
   EXPECT_EQ(start_monotonic_time_, time_system_.monotonicTime());
   EXPECT_EQ(start_system_time_, time_system_.systemTime());
 
@@ -187,7 +213,7 @@ TEST_F(SimulatedTimeSystemTest, AdvanceTimeWait) {
   EXPECT_EQ(start_system_time_ + std::chrono::milliseconds(5), time_system_.systemTime());
 }
 
-TEST_F(SimulatedTimeSystemTest, WaitFor) {
+TEST_P(SimulatedTimeSystemTest, WaitFor) {
   EXPECT_EQ(start_monotonic_time_, time_system_.monotonicTime());
   EXPECT_EQ(start_system_time_, time_system_.systemTime());
 
@@ -248,7 +274,7 @@ TEST_F(SimulatedTimeSystemTest, WaitFor) {
   thread->join();
 }
 
-TEST_F(SimulatedTimeSystemTest, Monotonic) {
+TEST_P(SimulatedTimeSystemTest, Monotonic) {
   // Setting time forward works.
   time_system_.setMonotonicTime(start_monotonic_time_ + std::chrono::milliseconds(5));
   EXPECT_EQ(start_monotonic_time_ + std::chrono::milliseconds(5), time_system_.monotonicTime());
@@ -258,7 +284,7 @@ TEST_F(SimulatedTimeSystemTest, Monotonic) {
   EXPECT_EQ(start_monotonic_time_ + std::chrono::milliseconds(5), time_system_.monotonicTime());
 }
 
-TEST_F(SimulatedTimeSystemTest, System) {
+TEST_P(SimulatedTimeSystemTest, System) {
   // Setting time forward works.
   time_system_.setSystemTime(start_system_time_ + std::chrono::milliseconds(5));
   EXPECT_EQ(start_system_time_ + std::chrono::milliseconds(5), time_system_.systemTime());
@@ -268,7 +294,7 @@ TEST_F(SimulatedTimeSystemTest, System) {
   EXPECT_EQ(start_system_time_ + std::chrono::milliseconds(3), time_system_.systemTime());
 }
 
-TEST_F(SimulatedTimeSystemTest, Ordering) {
+TEST_P(SimulatedTimeSystemTest, Ordering) {
   addTask(5, '5');
   addTask(3, '3');
   addTask(6, '6');
@@ -279,7 +305,7 @@ TEST_F(SimulatedTimeSystemTest, Ordering) {
   EXPECT_EQ("356", output_);
 }
 
-TEST_F(SimulatedTimeSystemTest, SystemTimeOrdering) {
+TEST_P(SimulatedTimeSystemTest, SystemTimeOrdering) {
   addTask(5, '5');
   addTask(3, '3');
   addTask(6, '6');
@@ -293,7 +319,7 @@ TEST_F(SimulatedTimeSystemTest, SystemTimeOrdering) {
   EXPECT_EQ("356", output_); // callbacks don't get replayed.
 }
 
-TEST_F(SimulatedTimeSystemTest, DisableTimer) {
+TEST_P(SimulatedTimeSystemTest, DisableTimer) {
   addTask(5, '5');
   addTask(3, '3');
   addTask(6, '6');
@@ -305,7 +331,7 @@ TEST_F(SimulatedTimeSystemTest, DisableTimer) {
   EXPECT_EQ("36", output_);
 }
 
-TEST_F(SimulatedTimeSystemTest, IgnoreRedundantDisable) {
+TEST_P(SimulatedTimeSystemTest, IgnoreRedundantDisable) {
   addTask(5, '5');
   timers_[0]->disableTimer();
   timers_[0]->disableTimer();
@@ -313,7 +339,7 @@ TEST_F(SimulatedTimeSystemTest, IgnoreRedundantDisable) {
   EXPECT_EQ("", output_);
 }
 
-TEST_F(SimulatedTimeSystemTest, OverrideEnable) {
+TEST_P(SimulatedTimeSystemTest, OverrideEnable) {
   addTask(5, '5');
   timers_[0]->enableTimer(std::chrono::milliseconds(6));
   advanceMsAndLoop(5);
@@ -322,7 +348,7 @@ TEST_F(SimulatedTimeSystemTest, OverrideEnable) {
   EXPECT_EQ("5", output_);
 }
 
-TEST_F(SimulatedTimeSystemTest, DeleteTime) {
+TEST_P(SimulatedTimeSystemTest, DeleteTime) {
   addTask(5, '5');
   addTask(3, '3');
   addTask(6, '6');
@@ -335,7 +361,7 @@ TEST_F(SimulatedTimeSystemTest, DeleteTime) {
 }
 
 // Regression test for issues documented in https://github.com/envoyproxy/envoy/pull/6956
-TEST_F(SimulatedTimeSystemTest, DuplicateTimer) {
+TEST_P(SimulatedTimeSystemTest, DuplicateTimer) {
   // Set one alarm two times to test that pending does not get duplicated..
   std::chrono::milliseconds delay(0);
   TimerPtr zero_timer = scheduler_->createTimer([this]() { output_.append(1, '2'); }, dispatcher_);
@@ -371,7 +397,7 @@ TEST_F(SimulatedTimeSystemTest, DuplicateTimer) {
   thread->join();
 }
 
-TEST_F(SimulatedTimeSystemTest, Enabled) {
+TEST_P(SimulatedTimeSystemTest, Enabled) {
   TimerPtr timer = scheduler_->createTimer({}, dispatcher_);
   timer->enableTimer(std::chrono::milliseconds(0));
   EXPECT_TRUE(timer->enabled());
