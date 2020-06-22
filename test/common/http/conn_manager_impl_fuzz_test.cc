@@ -284,11 +284,16 @@ public:
           return Http::okStatus();
         }));
     ON_CALL(*decoder_filter_, decodeHeaders(_, _))
-        .WillByDefault(
-            InvokeWithoutArgs([this, decode_header_status]() -> Http::FilterHeadersStatus {
-              header_status_ = fromHeaderStatus(decode_header_status);
-              return *header_status_;
-            }));
+        .WillByDefault(InvokeWithoutArgs([this, decode_header_status,
+                                          end_stream]() -> Http::FilterHeadersStatus {
+          header_status_ = fromHeaderStatus(decode_header_status);
+          // When a filter should not return ContinueAndEndStream when send with end_stream set
+          // (see https://github.com/envoyproxy/envoy/pull/4885#discussion_r232176826)
+          if (end_stream && (*header_status_ == Http::FilterHeadersStatus::ContinueAndEndStream)) {
+            *header_status_ = Http::FilterHeadersStatus::Continue;
+          }
+          return *header_status_;
+        }));
     fakeOnData();
     FUZZ_ASSERT(testing::Mock::VerifyAndClearExpectations(config_.codec_));
   }
