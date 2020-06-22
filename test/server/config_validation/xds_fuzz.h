@@ -16,10 +16,6 @@
 
 #include "absl/types/optional.h"
 
-// TODO(samflattery): add these to fuzz config instead?
-#define NUM_LISTENERS 3
-#define NUM_ROUTES 5
-
 namespace Envoy {
 
 class XdsFuzzTest : public HttpIntegrationTest {
@@ -51,7 +47,6 @@ public:
 
 private:
   void parseConfig(const test::server::config_validation::XdsTestCase& input);
-  void initializePools();
 
   absl::optional<std::string> removeListener(uint32_t listener_num);
   absl::optional<std::string> removeRoute(uint32_t route_num);
@@ -69,6 +64,9 @@ private:
 
   uint64_t version_;
   envoy::config::core::v3::ApiVersion api_version_;
+
+  static const int NUM_LISTENERS = 3;
+  static const int NUM_ROUTES = 5;
 };
 
 } // namespace Envoy

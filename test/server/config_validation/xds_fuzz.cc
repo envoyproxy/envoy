@@ -6,9 +6,6 @@
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
 
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
-
 namespace Envoy {
 
 // helper functions to build API responses
@@ -25,14 +22,14 @@ XdsFuzzTest::buildClusterLoadAssignment(const std::string& name) {
 
 envoy::config::listener::v3::Listener XdsFuzzTest::buildListener(uint32_t listener_num,
                                                                  uint32_t route_num) {
-  std::string name = fmt::format("{}{}", "listener_", listener_num % NUM_LISTENERS);
-  std::string route = fmt::format("{}{}", "route_config_", route_num % NUM_ROUTES);
+  std::string name = absl::StrCat("listener_", listener_num % NUM_LISTENERS);
+  std::string route = absl::StrCat("route_config_", route_num % NUM_ROUTES);
   return ConfigHelper::buildListener(
       name, route, Network::Test::getLoopbackAddressString(ip_version_), "ads_test", api_version_);
 }
 
 envoy::config::route::v3::RouteConfiguration XdsFuzzTest::buildRouteConfig(uint32_t route_num) {
-  std::string route = fmt::format("{}{}", "route_config_", route_num % NUM_ROUTES);
+  std::string route = absl::StrCat("route_config_", route_num % NUM_ROUTES);
   return ConfigHelper::buildRouteConfig(route, "cluster_0", api_version_);
 }
 
@@ -145,7 +142,7 @@ void XdsFuzzTest::close() {
  * @return the listener as an optional so that it can be used in a delta request
  */
 absl::optional<std::string> XdsFuzzTest::removeListener(uint32_t listener_num) {
-  std::string match = fmt::format("{}{}", "listener_", listener_num % NUM_LISTENERS);
+  std::string match = absl::StrCat("listener_", listener_num % NUM_LISTENERS);
 
   for (auto it = listeners_.begin(); it != listeners_.end(); ++it) {
     if (it->name() == match) {
@@ -163,7 +160,7 @@ absl::optional<std::string> XdsFuzzTest::removeListener(uint32_t listener_num) {
  * @return the route as an optional so that it can be used in a delta request
  */
 absl::optional<std::string> XdsFuzzTest::removeRoute(uint32_t route_num) {
-  std::string match = fmt::format("{}{}", "route_config_", route_num % NUM_ROUTES);
+  std::string match = absl::StrCat("route_config_", route_num % NUM_ROUTES);
   for (auto it = routes_.begin(); it != routes_.end(); ++it) {
     if (it->name() == match) {
       std::string name = it->name();
@@ -181,17 +178,15 @@ void XdsFuzzTest::replay() {
   initialize();
 
   // set up cluster
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
+  /* EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true)); */
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
                                                              {buildCluster("cluster_0")},
-                                                             {buildCluster("cluster_0")}, {}, "1");
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",
-                                      {"cluster_0"}, {"cluster_0"}, {}));
+                                                             {buildCluster("cluster_0")}, {}, "0");
+  /* EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "", */
+  /*                                     {"cluster_0"}, {"cluster_0"}, {})); */
   sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
       Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")},
-      {buildClusterLoadAssignment("cluster_0")}, {}, "1");
-
-  version_++;
+      {buildClusterLoadAssignment("cluster_0")}, {}, "0");
 
   for (const auto& action : actions_) {
     switch (action.action_selector_case()) {
@@ -210,17 +205,18 @@ void XdsFuzzTest::replay() {
 
       if (removed) {
         updateListener(listeners_, {}, {*removed});
-      } else {
-        updateListener(listeners_, {}, {});
       }
 
       break;
     }
     case test::server::config_validation::Action::kAddRoute: {
-      removeRoute(action.add_route().route_num());
+      auto removed = removeRoute(action.add_route().route_num());
       auto route = buildRouteConfig(action.add_route().route_num());
       routes_.push_back(route);
-      updateRoute(routes_, {route}, {});
+      if (!removed) {
+        // if the route was already in routes_, don't send another request
+        updateRoute(routes_, {route}, {});
+      }
       break;
     }
     case test::server::config_validation::Action::kRemoveRoute: {
@@ -232,8 +228,6 @@ void XdsFuzzTest::replay() {
       auto removed = removeRoute(action.remove_route().route_num());
       if (removed) {
         updateRoute(routes_, {}, {*removed});
-      } else {
-        updateRoute(routes_, {}, {});
       }
       break;
     }

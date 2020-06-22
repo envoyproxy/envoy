@@ -110,7 +110,6 @@ envoy_cc_fuzz_test(
 envoy_proto_library(
     name = "xds_fuzz_proto",
     srcs = ["xds_fuzz.proto"],
-    deps = [],
 )
 
 envoy_cc_test_library(
@@ -120,7 +119,6 @@ envoy_cc_test_library(
     deps = [
         "//test/integration:http_integration_lib",
         ":xds_fuzz_proto_cc_proto",
-        "//test/integration:integration_lib",
     ] + select({
         "//bazel:windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),
         "//bazel:linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
