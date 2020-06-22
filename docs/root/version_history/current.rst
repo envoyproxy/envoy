@@ -96,8 +96,8 @@ New Features
 * network filters: added a :ref:`postgres proxy filter <config_network_filters_postgres_proxy>`.
 * network filters: added a :ref:`rocketmq proxy filter <config_network_filters_rocketmq_proxy>`.
 * prometheus stats: fix the sort order of output lines to comply with the standard.
-* redis fault injection: added :ref:`fault injection for redis proxy <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.faults>`, described further in :ref:`configuration documentation <config_network_filters_redis_proxy>`.
 * ratelimit: added :ref:`API version <envoy_v3_api_field_config.ratelimit.v3.RateLimitServiceConfig.transport_api_version>` to explicitly set the version of gRPC service endpoint and message to be used.
+* redis fault injection: added :ref:`fault injection for redis proxy <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.faults>`, described further in :ref:`configuration documentation <config_network_filters_redis_proxy>`.
 * request_id: added to :ref:`always_set_request_id_in_response setting <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.always_set_request_id_in_response>`
   to set :ref:`x-request-id <config_http_conn_man_headers_x-request-id>` header in response even if
   tracing is not forced.
