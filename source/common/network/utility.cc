@@ -582,7 +582,7 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
 
     // Get gso_size
     if (output.msg_[0].gso_size_ == 0u) {
-      // Skip gso segmentation and proceed as if a single recvmsg syscall
+      // Skip gso segmentation and proceed as a single payload.
       ENVOY_LOG_MISC(warn, "Unspecified or zero gso_size received.");
       passPayloadToProcessor(
           result.rc_, slice, std::move(buffer), std::move(output.msg_[0].peer_address_),
@@ -594,7 +594,7 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
     buffer->commit(&slice, 1);
     const uint64_t gso_size = output.msg_[0].gso_size_;
 
-    // Segment the read slice into gso_sized buffers
+    // Segment the payload read by the recvmsg syscall into gso_sized sub payloads.
     for (uint64_t bytes_to_skip = 0; bytes_to_skip < slice.len_; bytes_to_skip += gso_size) {
 
       const uint64_t bytes_to_copy = std::min(slice.len_ - bytes_to_skip, gso_size);

@@ -471,7 +471,7 @@ TEST_P(UdpListenerImplTest, UdpGroBasic) {
   EXPECT_CALL(os_sys_calls, supportsMmsg).Times(0);
 
   // Mock the recvmsg syscall to mimic kernel behavior for packet concatenation
-  // with udp gro
+  // based on udp_gro
   EXPECT_CALL(os_sys_calls, recvmsg(_, _, _))
       .WillOnce(Invoke([&](os_fd_t, msghdr* msg, int) {
         // Set msg_name and name-len
