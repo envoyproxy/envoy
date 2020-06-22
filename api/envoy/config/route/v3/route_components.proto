@@ -767,8 +767,9 @@ message RouteAction {
       //
       //   Internally, Envoy always uses the HTTP/2 *:authority* header to represent the HTTP/1
       //   *Host* header. Thus, if attempting to match on *Host*, match on *:authority* instead.
-      string cluster_header = 2
-          [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+      string cluster_header = 2 [
+        (validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}
+      ];
 
       // Multiple upstream clusters can be specified for a given route. The
       // request is routed to one of the upstream clusters based on weights
