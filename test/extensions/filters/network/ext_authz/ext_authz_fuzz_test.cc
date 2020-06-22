@@ -30,6 +30,30 @@ makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus status) {
   return response;
 }
 
+Filters::Common::ExtAuthz::CheckStatus resultCaseToCheckStatus(
+    envoy::extensions::filters::network::ext_authz::Result::ResultSelectorCase result_case) {
+  Filters::Common::ExtAuthz::CheckStatus check_status;
+  switch (result_case) {
+  case envoy::extensions::filters::network::ext_authz::Result::kCheckStatusOk: {
+    check_status = Filters::Common::ExtAuthz::CheckStatus::OK;
+    break;
+  }
+  case envoy::extensions::filters::network::ext_authz::Result::kCheckStatusError: {
+    check_status = Filters::Common::ExtAuthz::CheckStatus::Error;
+    break;
+  }
+  case envoy::extensions::filters::network::ext_authz::Result::kCheckStatusDenied: {
+    check_status = Filters::Common::ExtAuthz::CheckStatus::Denied;
+    break;
+  }
+  default: {
+    // Unhandled status
+    PANIC("A check status handle is missing");
+  }
+  }
+  return check_status;
+}
+
 DEFINE_PROTO_FUZZER(const envoy::extensions::filters::network::ext_authz::ExtAuthzTestCase& input) {
   try {
     TestUtility::validate(input);
@@ -62,39 +86,12 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::network::ext_authz::ExtAut
     case envoy::extensions::filters::network::ext_authz::Action::kOnData: {
       // Optional input field to set default authorization check result for the following "onData()"
       if (action.on_data().has_result()) {
-        switch (action.on_data().result().result_selector_case()) {
-        case envoy::extensions::filters::network::ext_authz::Result::kCheckStatusOk: {
-          ON_CALL(*client, check(_, _, _, _))
-              .WillByDefault(WithArgs<0>(
-                  Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
-                    callbacks.onComplete(
-                        makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::OK));
-                  })));
-          break;
-        }
-        case envoy::extensions::filters::network::ext_authz::Result::kCheckStatusError: {
-          ON_CALL(*client, check(_, _, _, _))
-              .WillByDefault(WithArgs<0>(
-                  Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
-                    callbacks.onComplete(
-                        makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Error));
-                  })));
-          break;
-        }
-        case envoy::extensions::filters::network::ext_authz::Result::kCheckStatusDenied: {
-          ON_CALL(*client, check(_, _, _, _))
-              .WillByDefault(WithArgs<0>(
-                  Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
-                    callbacks.onComplete(
-                        makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Denied));
-                  })));
-          break;
-        }
-        default: {
-          // Unhandled status
-          PANIC("A check status handle is missing");
-        }
-        }
+        ON_CALL(*client, check(_, _, _, _))
+            .WillByDefault(WithArgs<0>(
+                Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+                  callbacks.onComplete(makeAuthzResponse(
+                      resultCaseToCheckStatus(action.on_data().result().result_selector_case())));
+                })));
       }
       Buffer::OwnedImpl buffer(action.on_data().data());
       filter->onData(buffer, action.on_data().end_stream());
