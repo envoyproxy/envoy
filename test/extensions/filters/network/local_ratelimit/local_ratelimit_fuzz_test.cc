@@ -50,22 +50,22 @@ DEFINE_PROTO_FUZZER(
     ENVOY_LOG_MISC(debug, "In fill_interval, nanos should not be negative!");
     return;
   }
-  static NiceMock<Event::MockDispatcher> dispatcher_;
-  Stats::IsolatedStoreImpl stats_store_;
-  static NiceMock<Runtime::MockLoader> runtime_;
-  Event::MockTimer* fill_timer_ = new Event::MockTimer(&dispatcher_);
+  static NiceMock<Event::MockDispatcher> dispatcher;
+  Stats::IsolatedStoreImpl stats_store;
+  static NiceMock<Runtime::MockLoader> runtime;
+  Event::MockTimer* fill_timer = new Event::MockTimer(&dispatcher);
   envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit proto_config =
       input.config();
-  ConfigSharedPtr config_ = nullptr;
+  ConfigSharedPtr config = nullptr;
   try {
-    config_ = std::make_shared<Config>(proto_config, dispatcher_, stats_store_, runtime_);
+    config = std::make_shared<Config>(proto_config, dispatcher, stats_store, runtime);
   } catch (EnvoyException e) {
     ENVOY_LOG_MISC(debug, "EnvoyException in config's constructor: {}", e.what());
     return;
   }
 
-  ActiveFilter active_filter(config_);
-  std::chrono::milliseconds fill_interval_(
+  ActiveFilter active_filter(config);
+  std::chrono::milliseconds fill_interval(
       PROTOBUF_GET_MS_REQUIRED(proto_config.token_bucket(), fill_interval));
 
   for (const auto& action : input.actions()) {
@@ -82,8 +82,8 @@ DEFINE_PROTO_FUZZER(
       break;
     }
     case envoy::extensions::filters::network::local_ratelimit::Action::kRefill: {
-      EXPECT_CALL(*fill_timer_, enableTimer(fill_interval_, nullptr));
-      fill_timer_->invokeCallback();
+      EXPECT_CALL(*fill_timer, enableTimer(fill_interval, nullptr));
+      fill_timer->invokeCallback();
       break;
     }
     default:
@@ -91,9 +91,8 @@ DEFINE_PROTO_FUZZER(
       PANIC("A case is missing for an action");
     }
   }
-
 } // NOLINT
-  // Silence clang-tidy here because it thinks there is a memory leak for "fill_timer_"
+  // Silence clang-tidy here because it thinks there is a memory leak for "fill_timer"
   // However, ownership of each MockTimer instance is transferred to the (caller of) dispatcher's
   // createTimer_(), so to avoid destructing it twice, the MockTimer must have been dynamically
   // allocated and must not be deleted by it's creator. See test/mocks/event/mocks.cc for detail.
