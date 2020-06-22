@@ -30,6 +30,20 @@ namespace Utility {
 // TODO(#10878): Remove this.
 Http::Status exceptionToStatus(std::function<Http::Status(Buffer::Instance&)> dispatch,
                                Buffer::Instance& data);
+
+/**
+ * Well-known HTTP ALPN values.
+ */
+class AlpnNameValues {
+public:
+  const std::string Http10 = "http/1.0";
+  const std::string Http11 = "http/1.1";
+  const std::string Http2 = "h2";
+  const std::string Http2c = "h2c";
+};
+
+using AlpnNames = ConstSingleton<AlpnNameValues>;
+
 } // namespace Utility
 } // namespace Http
 
@@ -128,12 +142,15 @@ private:
 class PercentEncoding {
 public:
   /**
-   * Encodes string view to its percent encoded representation.
+   * Encodes string view to its percent encoded representation. Non-visible ASCII is always escaped,
+   * in addition to a given list of reserved chars.
+   *
    * @param value supplies string to be encoded.
-   * @return std::string percent-encoded string based on
-   * https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#responses.
+   * @param reserved_chars list of reserved chars to escape. By default the escaped chars in
+   *        https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#responses are used.
+   * @return std::string percent-encoded string.
    */
-  static std::string encode(absl::string_view value);
+  static std::string encode(absl::string_view value, absl::string_view reserved_chars = "%");
 
   /**
    * Decodes string view from its percent encoded representation.
@@ -144,7 +161,8 @@ public:
 
 private:
   // Encodes string view to its percent encoded representation, with start index.
-  static std::string encode(absl::string_view value, const size_t index);
+  static std::string encode(absl::string_view value, const size_t index,
+                            const absl::flat_hash_set<char>& reserved_char_set);
 };
 
 /**

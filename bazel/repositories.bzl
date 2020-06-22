@@ -739,6 +739,16 @@ def _com_github_grpc_grpc():
         actual = "@com_github_grpc_grpc//test/core/tsi/alts/fake_handshaker:fake_handshaker_lib",
     )
 
+    native.bind(
+        name = "grpc_alts_handshaker_proto",
+        actual = "@com_github_grpc_grpc//test/core/tsi/alts/fake_handshaker:handshaker_proto",
+    )
+
+    native.bind(
+        name = "grpc_alts_transport_security_common_proto",
+        actual = "@com_github_grpc_grpc//test/core/tsi/alts/fake_handshaker:transport_security_common_proto",
+    )
+
 def _upb():
     _repository_impl(
         name = "upb",
