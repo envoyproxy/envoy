@@ -60,7 +60,7 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::network::ext_authz::ExtAut
   for (const auto& action : input.actions()) {
     switch (action.action_selector_case()) {
     case envoy::extensions::filters::network::ext_authz::Action::kOnData: {
-      // Optional input to set default authorization check result for the following "onData()"
+      // Optional input field to set default authorization check result for the following "onData()"
       if (action.on_data().has_result()) {
         switch (action.on_data().result().result_selector_case()) {
         case envoy::extensions::filters::network::ext_authz::Result::kCheckStatusOk: {
@@ -68,7 +68,7 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::network::ext_authz::ExtAut
               .WillByDefault(WithArgs<0>(
                   Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
                     callbacks.onComplete(
-                        makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Error));
+                        makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::OK));
                   })));
           break;
         }
