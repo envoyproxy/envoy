@@ -79,11 +79,13 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
     const auto& upstream_resolvers = client_config.upstream_resolvers();
     resolvers_.reserve(upstream_resolvers.size());
     for (const auto& resolver : upstream_resolvers) {
-      auto ipaddr = Network::Utility::parseInternetAddress(resolver, 0 /* port */);
-      resolvers_.push_back(std::move(ipaddr));
+      auto ipaddr = Network::Utility::protobufAddressToAddress(resolver);
+      resolvers_.emplace_back(std::move(ipaddr));
     }
     resolver_timeout_ = std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(
         client_config, resolver_timeout, DEFAULT_RESOLVER_TIMEOUT.count()));
+
+    max_pending_lookups_ = client_config.max_pending_lookups();
   }
 }
 
@@ -116,16 +118,66 @@ bool DnsFilterEnvoyConfig::loadServerConfig(
   return data_source_loaded;
 }
 
+DnsFilter::DnsFilter(Network::UdpReadFilterCallbacks& callbacks,
+                     const DnsFilterEnvoyConfigSharedPtr& config)
+    : UdpListenerReadFilter(callbacks), config_(config), listener_(callbacks.udpListener()),
+      cluster_manager_(config_->clusterManager()),
+      message_parser_(config->forwardQueries(), listener_.dispatcher().timeSource(),
+                      config->retryCount(), config->random(),
+                      config_->stats().downstream_rx_query_latency_) {
+  // This callback is executed when the dns resolution completes. At that time of a response by the
+  // resolver, we build an answer record from each IP returned then send a response to the client
+  resolver_callback_ = [this](DnsQueryContextPtr context, const DnsQueryRecord* query,
+                              AddressConstPtrVec& iplist) -> void {
+    if (context->resolution_status_ != Network::DnsResolver::ResolutionStatus::Success &&
+        context->retry_ > 0) {
+      --context->retry_;
+      ENVOY_LOG(debug, "resolving name [{}] via external resolvers [retry {}]", query->name_,
+                context->retry_);
+      resolver_->resolveExternalQuery(std::move(context), query);
+      return;
+    }
+
+    config_->stats().externally_resolved_queries_.inc();
+    if (iplist.empty()) {
+      config_->stats().unanswered_queries_.inc();
+    }
+
+    incrementExternalQueryTypeCount(query->type_);
+    for (const auto& ip : iplist) {
+      incrementExternalQueryTypeAnswerCount(query->type_);
+      const std::chrono::seconds ttl = getDomainTTL(query->name_);
+      message_parser_.buildDnsAnswerRecord(context, *query, ttl, std::move(ip));
+    }
+    sendDnsResponse(std::move(context));
+  };
+
+  resolver_ = std::make_unique<DnsFilterResolver>(resolver_callback_, config->resolvers(),
+                                                  config->resolverTimeout(), listener_.dispatcher(),
+                                                  config->maxPendingLookups());
+}
+
 void DnsFilter::onData(Network::UdpRecvData& client_request) {
+  config_->stats().downstream_rx_bytes_.recordValue(client_request.buffer_->length());
+  config_->stats().downstream_rx_queries_.inc();
+
+  // Setup counters for the parser
+  DnsParserCounters parser_counters(config_->stats().query_buffer_underflow_,
+                                    config_->stats().record_name_overflow_,
+                                    config_->stats().query_parsing_failure_);
+
   // Parse the query, if it fails return an response to the client
-  DnsQueryContextPtr query_context = message_parser_.createQueryContext(client_request);
+  DnsQueryContextPtr query_context =
+      message_parser_.createQueryContext(client_request, parser_counters);
+  incrementQueryTypeCount(query_context->queries_);
   if (!query_context->parse_status_) {
+    config_->stats().downstream_rx_invalid_queries_.inc();
     sendDnsResponse(std::move(query_context));
     return;
   }
 
   // Resolve the requested name
-  const auto response = getResponseForQuery(query_context);
+  auto response = getResponseForQuery(query_context);
 
   // We were not able to satisfy the request locally. Return an empty response to the client
   if (response == DnsLookupResponseCode::Failure) {
@@ -133,7 +185,11 @@ void DnsFilter::onData(Network::UdpRecvData& client_request) {
     return;
   }
 
-  // TODO(abaptiste): external resolution
+  // Externally resolved. We'll respond to the client when the external DNS resolution callback
+  // is executed
+  if (response == DnsLookupResponseCode::External) {
+    return;
+  }
 
   // We have an answer. Send it to the client
   sendDnsResponse(std::move(query_context));
@@ -145,6 +201,8 @@ void DnsFilter::sendDnsResponse(DnsQueryContextPtr query_context) {
   // Serializes the generated response to the parsed query from the client. If there is a
   // parsing error or the incoming query is invalid, we will still generate a valid DNS response
   message_parser_.buildResponseBuffer(query_context, response);
+  config_->stats().downstream_tx_responses_.inc();
+  config_->stats().downstream_tx_bytes_.recordValue(response.length());
   Network::UdpSendData response_data{query_context->local_->ip(), *(query_context->peer_),
                                      response};
   listener_.send(response_data);
@@ -174,10 +232,15 @@ DnsLookupResponseCode DnsFilter::getResponseForQuery(DnsQueryContextPtr& context
         continue;
       }
     }
-    // TODO(abaptiste): resolve the query externally
+
+    ENVOY_LOG(debug, "resolving name [{}] via external resolvers", query->name_);
+    resolver_->resolveExternalQuery(std::move(context), query.get());
+
+    return DnsLookupResponseCode::External;
   }
 
   if (context->answers_.empty()) {
+    config_->stats().unanswered_queries_.inc();
     return DnsLookupResponseCode::Failure;
   }
   return DnsLookupResponseCode::Success;
@@ -206,6 +269,7 @@ bool DnsFilter::isKnownDomain(const absl::string_view domain_name) {
   // TODO(abaptiste): Use a trie to find a match instead of iterating through the list
   for (auto& suffix : known_suffixes) {
     if (suffix->match(domain_name)) {
+      config_->stats().known_domain_queries_.inc();
       return true;
     }
   }
@@ -264,6 +328,7 @@ bool DnsFilter::resolveViaClusters(DnsQueryContextPtr& context, const DnsQueryRe
       ++discovered_endpoints;
       ENVOY_LOG(debug, "using cluster host address {} for domain [{}]",
                 host->address()->ip()->addressAsString(), lookup_name);
+      incrementClusterQueryTypeAnswerCount(query.type_);
       message_parser_.buildDnsAnswerRecord(context, query, ttl, host->address());
     }
   }
@@ -287,6 +352,7 @@ bool DnsFilter::resolveViaConfiguredHosts(DnsQueryContextPtr& context,
   uint64_t hosts_found = 0;
   for (const auto& configured_address : *configured_address_list) {
     ASSERT(configured_address != nullptr);
+    incrementLocalQueryTypeAnswerCount(query.type_);
     ENVOY_LOG(debug, "using local address {} for domain [{}]",
               configured_address->ip()->addressAsString(), query.name_);
     ++hosts_found;
@@ -297,6 +363,7 @@ bool DnsFilter::resolveViaConfiguredHosts(DnsQueryContextPtr& context,
 }
 
 void DnsFilter::onReceiveError(Api::IoError::IoErrorCode error_code) {
+  config_->stats().downstream_rx_errors_.inc();
   UNREFERENCED_PARAMETER(error_code);
 }
 

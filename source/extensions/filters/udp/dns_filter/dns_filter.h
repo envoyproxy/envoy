@@ -2,6 +2,7 @@
 
 #include "envoy/event/file_event.h"
 #include "envoy/extensions/filters/udp/dns_filter/v3alpha/dns_filter.pb.h"
+#include "envoy/network/dns.h"
 #include "envoy/network/filter.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -9,6 +10,7 @@
 #include "common/config/config_provider_impl.h"
 #include "common/network/utility.h"
 
+#include "extensions/filters/udp/dns_filter/dns_filter_resolver.h"
 #include "extensions/filters/udp/dns_filter/dns_parser.h"
 
 #include "absl/container/flat_hash_set.h"
@@ -20,21 +22,42 @@ namespace DnsFilter {
 
 /**
  * All DNS Filter stats. @see stats_macros.h
- * Track the number of answered and un-answered queries for A and AAAA records
  */
-#define ALL_DNS_FILTER_STATS(COUNTER)                                                              \
-  COUNTER(queries_a_record)                                                                        \
-  COUNTER(noanswers_a_record)                                                                      \
-  COUNTER(answers_a_record)                                                                        \
-  COUNTER(queries_aaaa_record)                                                                     \
-  COUNTER(noanswers_aaaa_record)                                                                   \
-  COUNTER(answers_aaaa_record)
+#define ALL_DNS_FILTER_STATS(COUNTER, HISTOGRAM)                                                   \
+  COUNTER(a_record_queries)                                                                        \
+  COUNTER(aaaa_record_queries)                                                                     \
+  COUNTER(cluster_a_record_answers)                                                                \
+  COUNTER(cluster_aaaa_record_answers)                                                             \
+  COUNTER(cluster_unsupported_answers)                                                             \
+  COUNTER(downstream_rx_errors)                                                                    \
+  COUNTER(downstream_rx_invalid_queries)                                                           \
+  COUNTER(downstream_rx_queries)                                                                   \
+  COUNTER(external_a_record_queries)                                                               \
+  COUNTER(external_a_record_answers)                                                               \
+  COUNTER(external_aaaa_record_answers)                                                            \
+  COUNTER(external_aaaa_record_queries)                                                            \
+  COUNTER(external_unsupported_answers)                                                            \
+  COUNTER(external_unsupported_queries)                                                            \
+  COUNTER(externally_resolved_queries)                                                             \
+  COUNTER(known_domain_queries)                                                                    \
+  COUNTER(local_a_record_answers)                                                                  \
+  COUNTER(local_aaaa_record_answers)                                                               \
+  COUNTER(local_unsupported_answers)                                                               \
+  COUNTER(unanswered_queries)                                                                      \
+  COUNTER(unsupported_queries)                                                                     \
+  COUNTER(downstream_tx_responses)                                                                 \
+  COUNTER(query_buffer_underflow)                                                                  \
+  COUNTER(query_parsing_failure)                                                                   \
+  COUNTER(record_name_overflow)                                                                    \
+  HISTOGRAM(downstream_rx_bytes, Bytes)                                                            \
+  HISTOGRAM(downstream_rx_query_latency, Milliseconds)                                             \
+  HISTOGRAM(downstream_tx_bytes, Bytes)
 
 /**
  * Struct definition for all DNS Filter stats. @see stats_macros.h
  */
 struct DnsFilterStats {
-  ALL_DNS_FILTER_STATS(GENERATE_COUNTER_STRUCT)
+  ALL_DNS_FILTER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_HISTOGRAM_STRUCT)
 };
 
 struct DnsEndpointConfig {
@@ -65,11 +88,13 @@ public:
   Upstream::ClusterManager& clusterManager() const { return cluster_manager_; }
   uint64_t retryCount() const { return retry_count_; }
   Runtime::RandomGenerator& random() const { return random_; }
+  uint64_t maxPendingLookups() const { return max_pending_lookups_; }
 
 private:
   static DnsFilterStats generateStats(const std::string& stat_prefix, Stats::Scope& scope) {
     const auto final_prefix = absl::StrCat("dns_filter.", stat_prefix);
-    return {ALL_DNS_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+    return {ALL_DNS_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
+                                 POOL_HISTOGRAM_PREFIX(scope, final_prefix))};
   }
 
   bool loadServerConfig(const envoy::extensions::filters::udp::dns_filter::v3alpha::
@@ -78,6 +103,7 @@ private:
 
   Stats::Scope& root_scope_;
   Upstream::ClusterManager& cluster_manager_;
+  Network::DnsResolverSharedPtr resolver_;
   Api::Api& api_;
 
   mutable DnsFilterStats stats_;
@@ -89,6 +115,7 @@ private:
   AddressConstPtrVec resolvers_;
   std::chrono::milliseconds resolver_timeout_;
   Runtime::RandomGenerator& random_;
+  uint64_t max_pending_lookups_;
 };
 
 using DnsFilterEnvoyConfigSharedPtr = std::shared_ptr<const DnsFilterEnvoyConfig>;
@@ -102,10 +129,8 @@ enum class DnsLookupResponseCode { Success, Failure, External };
  */
 class DnsFilter : public Network::UdpListenerReadFilter, Logger::Loggable<Logger::Id::filter> {
 public:
-  DnsFilter(Network::UdpReadFilterCallbacks& callbacks, const DnsFilterEnvoyConfigSharedPtr& config)
-      : UdpListenerReadFilter(callbacks), config_(config), listener_(callbacks.udpListener()),
-        cluster_manager_(config_->clusterManager()),
-        message_parser_(config->forwardQueries(), config->retryCount(), config->random()) {}
+  DnsFilter(Network::UdpReadFilterCallbacks& callbacks,
+            const DnsFilterEnvoyConfigSharedPtr& config);
 
   // Network::UdpListenerReadFilter callbacks
   void onData(Network::UdpRecvData& client_request) override;
@@ -133,7 +158,8 @@ private:
   DnsLookupResponseCode getResponseForQuery(DnsQueryContextPtr& context);
 
   /**
-   * @return uint32_t retrieves the configured per domain TTL to be inserted into answer records
+   * @return std::chrono::seconds retrieves the configured per domain TTL to be inserted into answer
+   * records
    */
   std::chrono::seconds getDomainTTL(const absl::string_view domain);
 
@@ -157,6 +183,114 @@ private:
   bool resolveViaConfiguredHosts(DnsQueryContextPtr& context, const DnsQueryRecord& query);
 
   /**
+   * @brief Increment the counter for the given query type for external queries
+   *
+   * @param query_type indicate the type of record being resolved (A, AAAA, or other).
+   */
+  void incrementExternalQueryTypeCount(const uint16_t query_type) {
+    switch (query_type) {
+    case DNS_RECORD_TYPE_A:
+      config_->stats().external_a_record_queries_.inc();
+      break;
+    case DNS_RECORD_TYPE_AAAA:
+      config_->stats().external_aaaa_record_queries_.inc();
+      break;
+    default:
+      config_->stats().external_unsupported_queries_.inc();
+      break;
+    }
+  }
+
+  /**
+   * @brief Increment the counter for the parsed query type
+   *
+   * @param queries a vector of all the incoming queries received from a client
+   */
+  void incrementQueryTypeCount(const DnsQueryPtrVec& queries) {
+    for (const auto& query : queries) {
+      incrementQueryTypeCount(query->type_);
+    }
+  }
+
+  /**
+   * @brief Increment the counter for the given query type.
+   *
+   * @param query_type indicate the type of record being resolved (A, AAAA, or other).
+   */
+  void incrementQueryTypeCount(const uint16_t query_type) {
+    switch (query_type) {
+    case DNS_RECORD_TYPE_A:
+      config_->stats().a_record_queries_.inc();
+      break;
+    case DNS_RECORD_TYPE_AAAA:
+      config_->stats().aaaa_record_queries_.inc();
+      break;
+    default:
+      config_->stats().unsupported_queries_.inc();
+      break;
+    }
+  }
+
+  /**
+   * @brief Increment the counter for answers for the given query type resolved via cluster names
+   *
+   * @param query_type indicate the type of answer record returned to the client
+   */
+  void incrementClusterQueryTypeAnswerCount(const uint16_t query_type) {
+    switch (query_type) {
+    case DNS_RECORD_TYPE_A:
+      config_->stats().cluster_a_record_answers_.inc();
+      break;
+    case DNS_RECORD_TYPE_AAAA:
+      config_->stats().cluster_aaaa_record_answers_.inc();
+      break;
+    default:
+      config_->stats().cluster_unsupported_answers_.inc();
+      break;
+    }
+  }
+
+  /**
+   * @brief Increment the counter for answers for the given query type resolved from the local
+   * configuration.
+   *
+   * @param query_type indicate the type of answer record returned to the client
+   */
+  void incrementLocalQueryTypeAnswerCount(const uint16_t query_type) {
+    switch (query_type) {
+    case DNS_RECORD_TYPE_A:
+      config_->stats().local_a_record_answers_.inc();
+      break;
+    case DNS_RECORD_TYPE_AAAA:
+      config_->stats().local_aaaa_record_answers_.inc();
+      break;
+    default:
+      config_->stats().local_unsupported_answers_.inc();
+      break;
+    }
+  }
+
+  /**
+   * @brief Increment the counter for answers for the given query type resolved via an external
+   * resolver
+   *
+   * @param query_type indicate the type of answer record returned to the client
+   */
+  void incrementExternalQueryTypeAnswerCount(const uint16_t query_type) {
+    switch (query_type) {
+    case DNS_RECORD_TYPE_A:
+      config_->stats().external_a_record_answers_.inc();
+      break;
+    case DNS_RECORD_TYPE_AAAA:
+      config_->stats().external_aaaa_record_answers_.inc();
+      break;
+    default:
+      config_->stats().external_unsupported_answers_.inc();
+      break;
+    }
+  }
+
+  /**
    * @brief Helper function to retrieve the Endpoint configuration for a requested domain
    */
   const DnsEndpointConfig* getEndpointConfigForDomain(const absl::string_view domain);
@@ -175,9 +309,10 @@ private:
   Network::UdpListener& listener_;
   Upstream::ClusterManager& cluster_manager_;
   DnsMessageParser message_parser_;
+  DnsFilterResolverPtr resolver_;
   Network::Address::InstanceConstSharedPtr local_;
   Network::Address::InstanceConstSharedPtr peer_;
-  AnswerCallback answer_callback_;
+  DnsFilterResolverCallback resolver_callback_;
 };
 
 } // namespace DnsFilter
