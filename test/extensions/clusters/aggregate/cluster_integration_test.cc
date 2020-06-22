@@ -135,10 +135,10 @@ public:
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_,
                                                   timeSystem(), enable_half_close_));
     fake_upstreams_[SecondUpstreamIndex]->set_allow_unexpected_disconnects(false);
-    cluster1_ = ConfigHelper::buildCluster(
+    cluster1_ = ConfigHelper::buildStaticCluster(
         FirstClusterName, fake_upstreams_[FirstUpstreamIndex]->localAddress()->ip()->port(),
         Network::Test::getLoopbackAddressString(GetParam()));
-    cluster2_ = ConfigHelper::buildCluster(
+    cluster2_ = ConfigHelper::buildStaticCluster(
         SecondClusterName, fake_upstreams_[SecondUpstreamIndex]->localAddress()->ip()->port(),
         Network::Test::getLoopbackAddressString(GetParam()));
 
