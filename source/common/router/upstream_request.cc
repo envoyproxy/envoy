@@ -192,7 +192,8 @@ void UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream) {
     if (!buffered_request_body_) {
       buffered_request_body_ = std::make_unique<Buffer::WatermarkBuffer>(
           [this]() -> void { this->enableDataFromDownstreamForFlowControl(); },
-          [this]() -> void { this->disableDataFromDownstreamForFlowControl(); });
+          [this]() -> void { this->disableDataFromDownstreamForFlowControl(); },
+          []() -> void { /* TODO(adisuissa): Handle overflow watermark */ });
       buffered_request_body_->setWatermarks(parent_.callbacks()->decoderBufferLimit());
     }
 
@@ -380,8 +381,8 @@ void UpstreamRequest::onPoolReady(
 
   // Make sure that when we are forwarding CONNECT payload we do not do so until
   // the upstream has accepted the CONNECT request.
-  if (conn_pool_->protocol().has_value() && headers->Method() &&
-      headers->Method()->value().getStringView() == Http::Headers::get().MethodValues.Connect) {
+  if (conn_pool_->protocol().has_value() &&
+      headers->getMethodValue() == Http::Headers::get().MethodValues.Connect) {
     paused_for_connect_ = true;
   }
 
@@ -522,7 +523,7 @@ void HttpConnPool::newStream(GenericConnectionPoolCallbacks* callbacks) {
   // might get deleted inline as well. Only write the returned handle out if it is not nullptr to
   // deal with this case.
   Http::ConnectionPool::Cancellable* handle =
-      conn_pool_.newStream(*callbacks->upstreamRequest(), *this);
+      conn_pool_->newStream(*callbacks->upstreamRequest(), *this);
   if (handle) {
     conn_pool_stream_handle_ = handle;
   }
@@ -540,14 +541,14 @@ void TcpConnPool::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data
 
 bool HttpConnPool::cancelAnyPendingRequest() {
   if (conn_pool_stream_handle_) {
-    conn_pool_stream_handle_->cancel();
+    conn_pool_stream_handle_->cancel(Tcp::ConnectionPool::CancelPolicy::Default);
     conn_pool_stream_handle_ = nullptr;
     return true;
   }
   return false;
 }
 
-absl::optional<Http::Protocol> HttpConnPool::protocol() const { return conn_pool_.protocol(); }
+absl::optional<Http::Protocol> HttpConnPool::protocol() const { return conn_pool_->protocol(); }
 
 void HttpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason,
                                  absl::string_view transport_failure_reason,

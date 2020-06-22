@@ -130,7 +130,7 @@ TEST_P(CorsFilterIntegrationTest, DEPRECATED_FEATURE_TEST(TestVHostConfigSuccess
                                     "CorsPolicy.hidden_envoy_deprecated_enabled",
                                     "true");
   testPreflight(
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":method", "OPTIONS"},
           {":path", "/cors-vhost-config/test"},
           {":scheme", "http"},
@@ -138,7 +138,7 @@ TEST_P(CorsFilterIntegrationTest, DEPRECATED_FEATURE_TEST(TestVHostConfigSuccess
           {"access-control-request-method", "GET"},
           {"origin", "test-origin"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestResponseHeaderMapImpl{
           {"access-control-allow-origin", "test-origin"},
           {"access-control-allow-methods", "GET,POST"},
           {"access-control-allow-headers", "content-type,x-grpc-web"},
@@ -150,7 +150,7 @@ TEST_P(CorsFilterIntegrationTest, DEPRECATED_FEATURE_TEST(TestVHostConfigSuccess
 
 TEST_P(CorsFilterIntegrationTest, DEPRECATED_FEATURE_TEST(TestRouteConfigSuccess)) {
   testPreflight(
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":method", "OPTIONS"},
           {":path", "/cors-route-config/test"},
           {":scheme", "http"},
@@ -158,7 +158,7 @@ TEST_P(CorsFilterIntegrationTest, DEPRECATED_FEATURE_TEST(TestRouteConfigSuccess
           {"access-control-request-method", "GET"},
           {"origin", "test-origin-1"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestResponseHeaderMapImpl{
           {"access-control-allow-origin", "test-origin-1"},
           {"access-control-allow-methods", "POST"},
           {"access-control-allow-headers", "content-type"},
@@ -174,7 +174,7 @@ TEST_P(CorsFilterIntegrationTest, DEPRECATED_FEATURE_TEST(TestRouteConfigBadOrig
                                     "CorsPolicy.hidden_envoy_deprecated_enabled",
                                     "true");
   testNormalRequest(
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":method", "OPTIONS"},
           {":path", "/cors-route-config/test"},
           {":scheme", "http"},
@@ -182,7 +182,7 @@ TEST_P(CorsFilterIntegrationTest, DEPRECATED_FEATURE_TEST(TestRouteConfigBadOrig
           {"access-control-request-method", "GET"},
           {"origin", "test-origin"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
           {"content-length", "0"},
           {":status", "200"},
@@ -191,7 +191,7 @@ TEST_P(CorsFilterIntegrationTest, DEPRECATED_FEATURE_TEST(TestRouteConfigBadOrig
 
 TEST_P(CorsFilterIntegrationTest, DEPRECATED_FEATURE_TEST(TestCorsDisabled)) {
   testNormalRequest(
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":method", "OPTIONS"},
           {":path", "/no-cors/test"},
           {":scheme", "http"},
@@ -199,7 +199,7 @@ TEST_P(CorsFilterIntegrationTest, DEPRECATED_FEATURE_TEST(TestCorsDisabled)) {
           {"access-control-request-method", "GET"},
           {"origin", "test-origin"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
           {"content-length", "0"},
           {":status", "200"},
@@ -225,7 +225,7 @@ TEST_P(CorsFilterIntegrationTest, DEPRECATED_FEATURE_TEST(TestLegacyCorsDisabled
             ->set_value(false);
       });
   testNormalRequest(
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":method", "OPTIONS"},
           {":path", "/legacy-no-cors/test"},
           {":scheme", "http"},
@@ -233,7 +233,7 @@ TEST_P(CorsFilterIntegrationTest, DEPRECATED_FEATURE_TEST(TestLegacyCorsDisabled
           {"access-control-request-method", "GET"},
           {"origin", "test-origin"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
           {"content-length", "0"},
           {":status", "200"},
@@ -242,14 +242,14 @@ TEST_P(CorsFilterIntegrationTest, DEPRECATED_FEATURE_TEST(TestLegacyCorsDisabled
 
 TEST_P(CorsFilterIntegrationTest, DEPRECATED_FEATURE_TEST(TestEncodeHeaders)) {
   testNormalRequest(
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
           {":path", "/cors-vhost-config/test"},
           {":scheme", "http"},
           {":authority", "test-host"},
           {"origin", "test-origin"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestResponseHeaderMapImpl{
           {"access-control-allow-origin", "test-origin"},
           {"server", "envoy"},
           {"content-length", "0"},
@@ -259,14 +259,14 @@ TEST_P(CorsFilterIntegrationTest, DEPRECATED_FEATURE_TEST(TestEncodeHeaders)) {
 
 TEST_P(CorsFilterIntegrationTest, DEPRECATED_FEATURE_TEST(TestEncodeHeadersCredentialsAllowed)) {
   testNormalRequest(
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
           {":path", "/cors-credentials-allowed/test"},
           {":scheme", "http"},
           {":authority", "test-host"},
           {"origin", "test-origin"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestResponseHeaderMapImpl{
           {"access-control-allow-origin", "test-origin"},
           {"access-control-allow-credentials", "true"},
           {"server", "envoy"},
@@ -277,14 +277,14 @@ TEST_P(CorsFilterIntegrationTest, DEPRECATED_FEATURE_TEST(TestEncodeHeadersCrede
 
 TEST_P(CorsFilterIntegrationTest, DEPRECATED_FEATURE_TEST(TestAllowedOriginRegex)) {
   testNormalRequest(
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
           {":path", "/cors-allow-origin-regex/test"},
           {":scheme", "http"},
           {":authority", "test-host"},
           {"origin", "www.envoyproxy.io"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestResponseHeaderMapImpl{
           {"access-control-allow-origin", "www.envoyproxy.io"},
           {"access-control-allow-credentials", "true"},
           {"server", "envoy"},
@@ -295,14 +295,14 @@ TEST_P(CorsFilterIntegrationTest, DEPRECATED_FEATURE_TEST(TestAllowedOriginRegex
 
 TEST_P(CorsFilterIntegrationTest, DEPRECATED_FEATURE_TEST(TestExposeHeaders)) {
   testNormalRequest(
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
           {":path", "/cors-expose-headers/test"},
           {":scheme", "http"},
           {":authority", "test-host"},
           {"origin", "test-origin-1"},
       },
-      Http::TestHeaderMapImpl{
+      Http::TestResponseHeaderMapImpl{
           {"access-control-allow-origin", "test-origin-1"},
           {"access-control-expose-headers", "custom-header-1,custom-header-2"},
           {"server", "envoy"},

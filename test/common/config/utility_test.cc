@@ -524,58 +524,33 @@ TEST(UtilityTest, EmptyToEmptyConfig) {
 TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, GrpcClusterTestAcrossTypes) {
   envoy::config::core::v3::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
-  Upstream::ClusterManager::ClusterInfoMap cluster_map;
+  Upstream::ClusterManager::ClusterSet primary_clusters;
 
   // API of type GRPC
   api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
 
   // GRPC cluster without GRPC services.
   EXPECT_THROW_WITH_REGEX(
-      Utility::checkApiConfigSourceSubscriptionBackingCluster(cluster_map, *api_config_source),
+      Utility::checkApiConfigSourceSubscriptionBackingCluster(primary_clusters, *api_config_source),
       EnvoyException, "API configs must have either a gRPC service or a cluster name defined:");
 
   // Non-existent cluster.
   api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("foo_cluster");
   EXPECT_THROW_WITH_MESSAGE(
-      Utility::checkApiConfigSourceSubscriptionBackingCluster(cluster_map, *api_config_source),
-      EnvoyException,
-      fmt::format("{} must have a statically defined non-EDS cluster: "
-                  "'foo_cluster' does not exist, was added via api, or is an EDS cluster",
-                  api_config_source->GetTypeName()));
-
-  // Dynamic Cluster.
-  Upstream::MockClusterMockPrioritySet cluster;
-  cluster_map.emplace("foo_cluster", cluster);
-  EXPECT_CALL(cluster, info());
-  EXPECT_CALL(*cluster.info_, addedViaApi()).WillOnce(Return(true));
-  EXPECT_THROW_WITH_MESSAGE(
-      Utility::checkApiConfigSourceSubscriptionBackingCluster(cluster_map, *api_config_source),
-      EnvoyException,
-      fmt ::format("{} must have a statically defined non-EDS cluster: "
-                   "'foo_cluster' does not exist, was added via api, or is an EDS cluster",
-                   api_config_source->GetTypeName()));
-
-  // EDS Cluster backing EDS Cluster.
-  EXPECT_CALL(cluster, info()).Times(2);
-  EXPECT_CALL(*cluster.info_, addedViaApi());
-  EXPECT_CALL(*cluster.info_, type()).WillOnce(Return(envoy::config::cluster::v3::Cluster::EDS));
-  EXPECT_THROW_WITH_MESSAGE(
-      Utility::checkApiConfigSourceSubscriptionBackingCluster(cluster_map, *api_config_source),
+      Utility::checkApiConfigSourceSubscriptionBackingCluster(primary_clusters, *api_config_source),
       EnvoyException,
       fmt::format("{} must have a statically defined non-EDS cluster: "
                   "'foo_cluster' does not exist, was added via api, or is an EDS cluster",
                   api_config_source->GetTypeName()));
 
   // All ok.
-  EXPECT_CALL(cluster, info()).Times(2);
-  EXPECT_CALL(*cluster.info_, addedViaApi());
-  EXPECT_CALL(*cluster.info_, type());
-  Utility::checkApiConfigSourceSubscriptionBackingCluster(cluster_map, *api_config_source);
+  primary_clusters.insert("foo_cluster");
+  Utility::checkApiConfigSourceSubscriptionBackingCluster(primary_clusters, *api_config_source);
 
   // API with cluster_names set should be rejected.
   api_config_source->add_cluster_names("foo_cluster");
   EXPECT_THROW_WITH_REGEX(
-      Utility::checkApiConfigSourceSubscriptionBackingCluster(cluster_map, *api_config_source),
+      Utility::checkApiConfigSourceSubscriptionBackingCluster(primary_clusters, *api_config_source),
       EnvoyException,
       fmt::format("{}::.DELTA_.GRPC must not have a cluster name "
                   "specified:",
@@ -585,46 +560,21 @@ TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, GrpcClusterTestAcrossTy
 TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, RestClusterTestAcrossTypes) {
   envoy::config::core::v3::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
-  Upstream::ClusterManager::ClusterInfoMap cluster_map;
+  Upstream::ClusterManager::ClusterSet primary_clusters;
   api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::REST);
 
   // Non-existent cluster.
   api_config_source->add_cluster_names("foo_cluster");
   EXPECT_THROW_WITH_MESSAGE(
-      Utility::checkApiConfigSourceSubscriptionBackingCluster(cluster_map, *api_config_source),
-      EnvoyException,
-      fmt::format("{} must have a statically defined non-EDS cluster: "
-                  "'foo_cluster' does not exist, was added via api, or is an EDS cluster",
-                  api_config_source->GetTypeName()));
-
-  // Dynamic Cluster.
-  Upstream::MockClusterMockPrioritySet cluster;
-  cluster_map.emplace("foo_cluster", cluster);
-  EXPECT_CALL(cluster, info());
-  EXPECT_CALL(*cluster.info_, addedViaApi()).WillOnce(Return(true));
-  EXPECT_THROW_WITH_MESSAGE(
-      Utility::checkApiConfigSourceSubscriptionBackingCluster(cluster_map, *api_config_source),
-      EnvoyException,
-      fmt::format("{} must have a statically defined non-EDS cluster: "
-                  "'foo_cluster' does not exist, was added via api, or is an EDS cluster",
-                  api_config_source->GetTypeName()));
-
-  // EDS Cluster backing EDS Cluster.
-  EXPECT_CALL(cluster, info()).Times(2);
-  EXPECT_CALL(*cluster.info_, addedViaApi());
-  EXPECT_CALL(*cluster.info_, type()).WillOnce(Return(envoy::config::cluster::v3::Cluster::EDS));
-  EXPECT_THROW_WITH_MESSAGE(
-      Utility::checkApiConfigSourceSubscriptionBackingCluster(cluster_map, *api_config_source),
+      Utility::checkApiConfigSourceSubscriptionBackingCluster(primary_clusters, *api_config_source),
       EnvoyException,
       fmt::format("{} must have a statically defined non-EDS cluster: "
                   "'foo_cluster' does not exist, was added via api, or is an EDS cluster",
                   api_config_source->GetTypeName()));
 
   // All ok.
-  EXPECT_CALL(cluster, info()).Times(2);
-  EXPECT_CALL(*cluster.info_, addedViaApi());
-  EXPECT_CALL(*cluster.info_, type());
-  Utility::checkApiConfigSourceSubscriptionBackingCluster(cluster_map, *api_config_source);
+  primary_clusters.insert("foo_cluster");
+  Utility::checkApiConfigSourceSubscriptionBackingCluster(primary_clusters, *api_config_source);
 }
 
 // Validates CheckCluster functionality.

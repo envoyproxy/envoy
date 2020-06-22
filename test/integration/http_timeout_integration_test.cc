@@ -44,7 +44,7 @@ TEST_P(HttpTimeoutIntegrationTest, GlobalTimeout) {
   EXPECT_EQ(0U, upstream_request_->bodyLength());
 
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("504", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("504", response->headers().getStatusValue());
 }
 
 // Testing that `x-envoy-expected-timeout-ms` header, set by egress envoy, is respected by ingress
@@ -85,7 +85,7 @@ TEST_P(HttpTimeoutIntegrationTest, UseTimeoutSetByEgressEnvoy) {
   EXPECT_EQ(0U, upstream_request_->bodyLength());
 
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("504", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("504", response->headers().getStatusValue());
 }
 
 // Testing that ingress envoy derives new timeout value and sets `x-envoy-expected-timeout-ms`
@@ -126,7 +126,7 @@ TEST_P(HttpTimeoutIntegrationTest, DeriveTimeoutInIngressEnvoy) {
   EXPECT_EQ(0U, upstream_request_->bodyLength());
 
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("504", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("504", response->headers().getStatusValue());
 }
 
 // Testing that `x-envoy-expected-timeout-ms` header, set by egress envoy, is ignored by ingress
@@ -168,7 +168,7 @@ TEST_P(HttpTimeoutIntegrationTest, IgnoreTimeoutSetByEgressEnvoy) {
   EXPECT_EQ(0U, upstream_request_->bodyLength());
 
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("504", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("504", response->headers().getStatusValue());
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/7154 in which
@@ -202,7 +202,7 @@ TEST_P(HttpTimeoutIntegrationTest, GlobalTimeoutAfterHeadersBeforeBodyResetsUpst
   upstream_request_->encodeHeaders(response_headers, false);
 
   response->waitForHeaders();
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 
   // Trigger global timeout.
   timeSystem().advanceTimeWait(std::chrono::milliseconds(200));
@@ -261,7 +261,7 @@ TEST_P(HttpTimeoutIntegrationTest, PerTryTimeout) {
   EXPECT_EQ(0U, upstream_request_->bodyLength());
 
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("504", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("504", response->headers().getStatusValue());
 }
 
 // Sends a request with a per try timeout specified but no global timeout.
@@ -299,7 +299,7 @@ TEST_P(HttpTimeoutIntegrationTest, PerTryTimeoutWithoutGlobalTimeout) {
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
   // Encode 200 response headers for the first (timed out) request.
-  Http::TestHeaderMapImpl response_headers{{":status", "200"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   upstream_request_->encodeHeaders(response_headers, true);
 
   response->waitForHeaders();
@@ -309,7 +309,7 @@ TEST_P(HttpTimeoutIntegrationTest, PerTryTimeoutWithoutGlobalTimeout) {
   EXPECT_EQ(0U, upstream_request_->bodyLength());
 
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 // With hedge_on_per_try_timeout enabled via config, sends a request with a
@@ -368,7 +368,7 @@ TEST_P(HttpTimeoutIntegrationTest, HedgedPerTryTimeout) {
   EXPECT_EQ(0U, upstream_request_->bodyLength());
 
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 TEST_P(HttpTimeoutIntegrationTest, HedgedPerTryTimeoutWithBodyNoBufferFirstRequestWins) {
@@ -490,7 +490,7 @@ void HttpTimeoutIntegrationTest::testRouterRequestAndResponseWithHedgedPerTryTim
   }
 
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 } // namespace Envoy

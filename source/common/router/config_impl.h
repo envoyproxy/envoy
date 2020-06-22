@@ -602,7 +602,7 @@ private:
       return parent_->maxGrpcTimeout();
     }
     absl::optional<std::chrono::milliseconds> grpcTimeoutOffset() const override {
-      return parent_->maxGrpcTimeout();
+      return parent_->grpcTimeoutOffset();
     }
     const MetadataMatchCriteria* metadataMatchCriteria() const override {
       return parent_->metadataMatchCriteria();

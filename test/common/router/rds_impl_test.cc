@@ -158,7 +158,7 @@ TEST_F(RdsImplTest, Basic) {
   setup();
 
   // Make sure the initial empty route table works.
-  EXPECT_EQ(nullptr, route(Http::TestHeaderMapImpl{{":authority", "foo"}}));
+  EXPECT_EQ(nullptr, route(Http::TestRequestHeaderMapImpl{{":authority", "foo"}}));
 
   // Initial request.
   const std::string response1_json = R"EOF(
@@ -178,11 +178,11 @@ TEST_F(RdsImplTest, Basic) {
 
   EXPECT_CALL(init_watcher_, ready());
   rds_callbacks_->onConfigUpdate(response1.resources(), response1.version_info());
-  EXPECT_EQ(nullptr, route(Http::TestHeaderMapImpl{{":authority", "foo"}}));
+  EXPECT_EQ(nullptr, route(Http::TestRequestHeaderMapImpl{{":authority", "foo"}}));
 
   // 2nd request with same response. Based on hash should not reload config.
   rds_callbacks_->onConfigUpdate(response1.resources(), response1.version_info());
-  EXPECT_EQ(nullptr, route(Http::TestHeaderMapImpl{{":authority", "foo"}}));
+  EXPECT_EQ(nullptr, route(Http::TestRequestHeaderMapImpl{{":authority", "foo"}}));
 
   // Load the config and verified shared count.
   ConfigConstSharedPtr config = rds_->config();
@@ -224,7 +224,7 @@ TEST_F(RdsImplTest, Basic) {
   // Make sure we don't lookup/verify clusters.
   EXPECT_CALL(server_factory_context_.cluster_manager_, get(Eq("bar"))).Times(0);
   rds_callbacks_->onConfigUpdate(response2.resources(), response2.version_info());
-  EXPECT_EQ("foo", route(Http::TestHeaderMapImpl{{":authority", "foo"}, {":path", "/foo"}})
+  EXPECT_EQ("foo", route(Http::TestRequestHeaderMapImpl{{":authority", "foo"}, {":path", "/foo"}})
                        ->routeEntry()
                        ->clusterName());
 

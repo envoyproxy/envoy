@@ -196,6 +196,7 @@ TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigDeletingFilterChain)
 TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigAddingFilterChain) {
   setUpstreamCount(2);
   initialize();
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
 
   std::string response_0;
   auto client_conn_0 = createConnectionAndWrite("alpn0", "hello", response_0);
@@ -321,9 +322,9 @@ public:
 
     response->waitForEndStream();
     EXPECT_TRUE(response->complete());
-    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+    EXPECT_EQ("200", response->headers().getStatusValue());
     if (expect_close) {
-      EXPECT_EQ("close", response->headers().Connection()->value().getStringView());
+      EXPECT_EQ("close", response->headers().getConnectionValue());
 
     } else {
       EXPECT_EQ(nullptr, response->headers().Connection());
@@ -368,6 +369,7 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigDeletingFilterChain) {
 // chain 2.
 TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigAddingFilterChain) {
   initialize();
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
 
   auto codec_client_0 = createHttpCodec("alpn0");
   Cleanup cleanup0([c0 = codec_client_0.get()]() { c0->close(); });

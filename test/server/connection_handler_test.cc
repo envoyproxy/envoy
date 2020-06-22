@@ -50,8 +50,7 @@ public:
     TestListener(
         ConnectionHandlerTest& parent, uint64_t tag, bool bind_to_port,
         bool hand_off_restored_destination_connections, const std::string& name,
-        Network::Address::SocketType socket_type,
-        std::chrono::milliseconds listener_filters_timeout,
+        Network::Socket::Type socket_type, std::chrono::milliseconds listener_filters_timeout,
         bool continue_on_listener_filters_timeout,
         Network::ListenSocketFactorySharedPtr socket_factory,
         std::shared_ptr<NiceMock<Network::MockFilterChainManager>> filter_chain_manager = nullptr)
@@ -126,7 +125,7 @@ public:
       Network::ListenerCallbacks** listener_callbacks = nullptr,
       Network::MockConnectionBalancer* connection_balancer = nullptr,
       Network::BalancedConnectionHandler** balanced_connection_handler = nullptr,
-      Network::Address::SocketType socket_type = Network::Address::SocketType::Stream,
+      Network::Socket::Type socket_type = Network::Socket::Type::Stream,
       std::chrono::milliseconds listener_filters_timeout = std::chrono::milliseconds(15000),
       bool continue_on_listener_filters_timeout = false,
       std::shared_ptr<NiceMock<Network::MockFilterChainManager>> overridden_filter_chain_manager =
@@ -142,7 +141,7 @@ public:
       return listeners_.back().get();
     }
     EXPECT_CALL(*socket_factory_, getListenSocket()).WillOnce(Return(listeners_.back()->socket_));
-    if (socket_type == Network::Address::SocketType::Stream) {
+    if (socket_type == Network::Socket::Type::Stream) {
       EXPECT_CALL(dispatcher_, createListener_(_, _, _))
           .WillOnce(Invoke([listener, listener_callbacks](Network::SocketSharedPtr&&,
                                                           Network::ListenerCallbacks& cb,
@@ -649,7 +648,7 @@ TEST_F(ConnectionHandlerTest, ContinueOnListenerFilterTimeout) {
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(1, true, false, "test_listener", listener, &listener_callbacks, nullptr, nullptr,
-                  Network::Address::SocketType::Stream, std::chrono::milliseconds(15000), true);
+                  Network::Socket::Type::Stream, std::chrono::milliseconds(15000), true);
   EXPECT_CALL(*socket_factory_, localAddress()).WillRepeatedly(ReturnRef(local_address_));
   handler_->addListener(absl::nullopt, *test_listener);
 
@@ -733,7 +732,7 @@ TEST_F(ConnectionHandlerTest, ListenerFilterDisabledTimeout) {
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(1, true, false, "test_listener", listener, &listener_callbacks, nullptr, nullptr,
-                  Network::Address::SocketType::Stream, std::chrono::milliseconds());
+                  Network::Socket::Type::Stream, std::chrono::milliseconds());
   EXPECT_CALL(*socket_factory_, localAddress()).WillRepeatedly(ReturnRef(local_address_));
   handler_->addListener(absl::nullopt, *test_listener);
 
@@ -803,7 +802,7 @@ TEST_F(ConnectionHandlerTest, UdpListenerNoFilterThrowsException) {
   auto listener = new NiceMock<Network::MockUdpListener>();
   TestListener* test_listener =
       addListener(1, true, false, "test_listener", listener, nullptr, nullptr, nullptr,
-                  Network::Address::SocketType::Datagram, std::chrono::milliseconds());
+                  Network::Socket::Type::Datagram, std::chrono::milliseconds());
   EXPECT_CALL(factory_, createUdpListenerFilterChain(_, _))
       .WillOnce(Invoke([&](Network::UdpListenerFilterManager&,
                            Network::UdpReadFilterCallbacks&) -> bool { return true; }));
@@ -838,7 +837,7 @@ TEST_F(ConnectionHandlerTest, TcpListenerInplaceUpdate) {
       std::make_shared<NiceMock<Network::MockFilterChainManager>>();
   TestListener* new_test_listener =
       addListener(new_listener_tag, true, false, "test_listener", /* Network::Listener */ nullptr,
-                  &new_listener_callbacks, nullptr, nullptr, Network::Address::SocketType::Stream,
+                  &new_listener_callbacks, nullptr, nullptr, Network::Socket::Type::Stream,
                   std::chrono::milliseconds(15000), false, overridden_filter_chain_manager);
   handler_->addListener(old_listener_tag, *new_test_listener);
   ASSERT_EQ(new_listener_callbacks, nullptr)

@@ -105,5 +105,10 @@ void EnvoyQuicServerSession::SetDefaultEncryptionLevel(quic::EncryptionLevel lev
 
 bool EnvoyQuicServerSession::hasDataToWrite() { return HasDataToWrite(); }
 
+void EnvoyQuicServerSession::OnOneRttKeysAvailable() {
+  quic::QuicServerSessionBase::OnOneRttKeysAvailable();
+  raiseConnectionEvent(Network::ConnectionEvent::Connected);
+}
+
 } // namespace Quic
 } // namespace Envoy

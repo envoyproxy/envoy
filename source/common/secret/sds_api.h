@@ -118,7 +118,7 @@ public:
         sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
         secret_provider_context.dispatcher().timeSource(),
         secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
-        *secret_provider_context.initManager(), destructor_cb, secret_provider_context.dispatcher(),
+        secret_provider_context.initManager(), destructor_cb, secret_provider_context.dispatcher(),
         secret_provider_context.api());
   }
 
@@ -179,7 +179,7 @@ public:
         sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
         secret_provider_context.dispatcher().timeSource(),
         secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
-        *secret_provider_context.initManager(), destructor_cb, secret_provider_context.dispatcher(),
+        secret_provider_context.initManager(), destructor_cb, secret_provider_context.dispatcher(),
         secret_provider_context.api());
   }
   CertificateValidationContextSdsApi(const envoy::config::core::v3::ConfigSource& sds_config,
@@ -250,7 +250,7 @@ public:
         sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
         secret_provider_context.dispatcher().timeSource(),
         secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
-        *secret_provider_context.initManager(), destructor_cb, secret_provider_context.dispatcher(),
+        secret_provider_context.initManager(), destructor_cb, secret_provider_context.dispatcher(),
         secret_provider_context.api());
   }
 
@@ -321,7 +321,7 @@ public:
         sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
         secret_provider_context.dispatcher().timeSource(),
         secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
-        *secret_provider_context.initManager(), destructor_cb, secret_provider_context.dispatcher(),
+        secret_provider_context.initManager(), destructor_cb, secret_provider_context.dispatcher(),
         secret_provider_context.api());
   }
 

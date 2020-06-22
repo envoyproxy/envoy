@@ -1,14 +1,14 @@
-licenses(["notice"])  # Apache 2
-
-# L7 HTTP Tap filter
-# Public docs: docs/root/configuration/http_filters/tap_filter.rst
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
+
+# L7 HTTP Tap filter
+# Public docs: docs/root/configuration/http_filters/tap_filter.rst
 
 envoy_package()
 

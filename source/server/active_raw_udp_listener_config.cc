@@ -15,7 +15,7 @@ Network::ConnectionHandler::ActiveListenerPtr
 ActiveRawUdpListenerFactory::createActiveUdpListener(Network::ConnectionHandler& parent,
                                                      Event::Dispatcher& dispatcher,
                                                      Network::ListenerConfig& config) {
-  return std::make_unique<ActiveUdpListener>(parent, dispatcher, config);
+  return std::make_unique<ActiveRawUdpListener>(parent, dispatcher, config);
 }
 
 ProtobufTypes::MessagePtr ActiveRawUdpListenerConfigFactory::createEmptyConfigProto() {

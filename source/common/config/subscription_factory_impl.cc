@@ -45,7 +45,8 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
   }
   case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kApiConfigSource: {
     const envoy::config::core::v3::ApiConfigSource& api_config_source = config.api_config_source();
-    Utility::checkApiConfigSourceSubscriptionBackingCluster(cm_.clusters(), api_config_source);
+    Utility::checkApiConfigSourceSubscriptionBackingCluster(cm_.primaryClusters(),
+                                                            api_config_source);
 
     switch (api_config_source.api_type()) {
     case envoy::config::core::v3::ApiConfigSource::hidden_envoy_deprecated_UNSUPPORTED_REST_LEGACY:

@@ -130,6 +130,15 @@ public:
    */
   virtual ClusterInfoMap clusters() PURE;
 
+  using ClusterSet = std::unordered_set<std::string>;
+
+  /**
+   * @return const ClusterSet& providing the cluster names that are eligible as
+   *         xDS API config sources. These must be static (i.e. in the
+   *         bootstrap) and non-EDS.
+   */
+  virtual const ClusterSet& primaryClusters() PURE;
+
   /**
    * @return ThreadLocalCluster* the thread local cluster with the given name or nullptr if it
    * does not exist. This is thread safe.

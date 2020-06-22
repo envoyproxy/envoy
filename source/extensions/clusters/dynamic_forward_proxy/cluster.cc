@@ -171,7 +171,7 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
 
   absl::string_view host;
   if (context->downstreamHeaders()) {
-    host = context->downstreamHeaders()->Host()->value().getStringView();
+    host = context->downstreamHeaders()->getHostValue();
   } else if (context->downstreamConnection()) {
     host = context->downstreamConnection()->requestedServerName();
   }

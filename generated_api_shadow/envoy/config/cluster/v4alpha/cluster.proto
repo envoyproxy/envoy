@@ -8,6 +8,7 @@ import "envoy/config/cluster/v4alpha/outlier_detection.proto";
 import "envoy/config/core/v4alpha/address.proto";
 import "envoy/config/core/v4alpha/base.proto";
 import "envoy/config/core/v4alpha/config_source.proto";
+import "envoy/config/core/v4alpha/extension.proto";
 import "envoy/config/core/v4alpha/health_check.proto";
 import "envoy/config/core/v4alpha/protocol.proto";
 import "envoy/config/endpoint/v3/endpoint.proto";
@@ -19,6 +20,7 @@ import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
 import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -31,7 +33,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // [#protodoc-title: Cluster configuration]
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 48]
+// [#next-free-field: 49]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.cluster.v3.Cluster";
 
@@ -585,11 +587,13 @@ message Cluster {
 
   // Soft limit on size of the cluster’s connections read and write buffers. If
   // unspecified, an implementation defined default is applied (1MiB).
-  google.protobuf.UInt32Value per_connection_buffer_limit_bytes = 5;
+  google.protobuf.UInt32Value per_connection_buffer_limit_bytes = 5
+      [(udpa.annotations.security).configure_for_untrusted_upstream = true];
 
   // The :ref:`load balancer type <arch_overview_load_balancing_types>` to use
   // when picking a host in the cluster.
-  LbPolicy lb_policy = 6 [(validate.rules).enum = {defined_only: true}];
+  // [#comment:TODO: Remove enum constraint :ref:`LOAD_BALANCING_POLICY_CONFIG<envoy_api_enum_value_config.cluster.v4alpha.Cluster.LbPolicy.LOAD_BALANCING_POLICY_CONFIG>` when implemented.]
+  LbPolicy lb_policy = 6 [(validate.rules).enum = {defined_only: true not_in: 7}];
 
   // Setting this is required for specifying members of
   // :ref:`STATIC<envoy_api_enum_value_config.cluster.v4alpha.Cluster.DiscoveryType.STATIC>`,
@@ -636,7 +640,8 @@ message Cluster {
   // supports prior knowledge for upstream connections. Even if TLS is used
   // with ALPN, `http2_protocol_options` must be specified. As an aside this allows HTTP/2
   // connections to happen over plain text.
-  core.v4alpha.Http2ProtocolOptions http2_protocol_options = 14;
+  core.v4alpha.Http2ProtocolOptions http2_protocol_options = 14
+      [(udpa.annotations.security).configure_for_untrusted_upstream = true];
 
   // The extension_protocol_options field is used to provide extension-specific protocol options
   // for upstream connections. The key should match the extension filter name, such as
@@ -813,6 +818,26 @@ message Cluster {
   // of 0 would indicate that none of the timeout was used or that the timeout was infinite. A value
   // of 100 would indicate that the request took the entirety of the timeout given to it.
   bool track_timeout_budgets = 47;
+
+  // [#not-implemented-hide:]
+  // Optional customization and configuration of upstream connection pool, and upstream type.
+  //
+  // Currently this field only applies for HTTP traffic but is designed for eventual use for custom
+  // TCP upstreams.
+  //
+  // For HTTP traffic, Envoy will generally take downstream HTTP and send it upstream as upstream
+  // HTTP, using the http connection pool and the codec from `http2_protocol_options`
+  //
+  // For routes where CONNECT termination is configured, Envoy will take downstream CONNECT
+  // requests and forward the CONNECT payload upstream over raw TCP using the tcp connection pool.
+  //
+  // The default pool used is the generic connection pool which creates the HTTP upstream for most
+  // HTTP requests, and the TCP upstream if CONNECT termination is configured.
+  //
+  // If users desire custom connection pool or upstream behavior, for example terminating
+  // CONNECT only if a custom filter indicates it is appropriate, the custom factories
+  // can be registered and configured here.
+  core.v4alpha.TypedExtensionConfig upstream_config = 48;
 }
 
 // [#not-implemented-hide:] Extensible load balancing policy configuration.

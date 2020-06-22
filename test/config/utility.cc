@@ -31,16 +31,16 @@
 namespace Envoy {
 
 std::string ConfigHelper::baseConfig() {
-  return R"EOF(
+  return fmt::format(R"EOF(
 admin:
-  access_log_path: /dev/null
+  access_log_path: {}
   address:
     socket_address:
       address: 127.0.0.1
       port_value: 0
 dynamic_resources:
   lds_config:
-    path: /dev/null
+    path: {}
 static_resources:
   secrets:
   - name: "secret_static_0"
@@ -68,13 +68,14 @@ static_resources:
       socket_address:
         address: 127.0.0.1
         port_value: 0
-)EOF";
+)EOF",
+                     TestEnvironment::nullDevicePath(), TestEnvironment::nullDevicePath());
 }
 
 std::string ConfigHelper::baseUdpListenerConfig() {
-  return R"EOF(
+  return fmt::format(R"EOF(
 admin:
-  access_log_path: /dev/null
+  access_log_path: {}
   address:
     socket_address:
       address: 127.0.0.1
@@ -98,7 +99,8 @@ static_resources:
         address: 0.0.0.0
         port_value: 0
         protocol: udp
-)EOF";
+)EOF",
+                     TestEnvironment::nullDevicePath());
 }
 
 std::string ConfigHelper::tcpProxyConfig() {
@@ -121,7 +123,7 @@ typed_config:
 }
 
 std::string ConfigHelper::httpProxyConfig() {
-  return absl::StrCat(baseConfig(), R"EOF(
+  return absl::StrCat(baseConfig(), fmt::format(R"EOF(
     filter_chains:
       filters:
         name: http
@@ -136,10 +138,10 @@ std::string ConfigHelper::httpProxyConfig() {
           access_log:
             name: accesslog
             filter:
-              not_health_check_filter:  {}
+              not_health_check_filter:  {{}}
             typed_config:
               "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
-              path: /dev/null
+              path: {}
           route_config:
             virtual_hosts:
               name: integration
@@ -150,14 +152,15 @@ std::string ConfigHelper::httpProxyConfig() {
                   prefix: "/"
               domains: "*"
             name: route_config_0
-)EOF");
+)EOF",
+                                                TestEnvironment::nullDevicePath()));
 }
 
 // TODO(danzh): For better compatibility with HTTP integration test framework,
 // it's better to combine with HTTP_PROXY_CONFIG, and use config modifiers to
 // specify quic specific things.
 std::string ConfigHelper::quicHttpProxyConfig() {
-  return absl::StrCat(baseUdpListenerConfig(), R"EOF(
+  return absl::StrCat(baseUdpListenerConfig(), fmt::format(R"EOF(
     filter_chains:
       transport_socket:
         name: envoy.transport_sockets.quic
@@ -172,10 +175,10 @@ std::string ConfigHelper::quicHttpProxyConfig() {
           access_log:
             name: file_access_log
             filter:
-              not_health_check_filter:  {}
+              not_health_check_filter:  {{}}
             typed_config:
               "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
-              path: /dev/null
+              path: {}
           route_config:
             virtual_hosts:
               name: integration
@@ -188,7 +191,8 @@ std::string ConfigHelper::quicHttpProxyConfig() {
             name: route_config_0
     udp_listener_config:
       udp_listener_name: "quiche_quic_listener"
-)EOF");
+)EOF",
+                                                           TestEnvironment::nullDevicePath()));
 }
 
 std::string ConfigHelper::defaultBufferFilter() {
@@ -248,7 +252,7 @@ std::string ConfigHelper::discoveredClustersBootstrap(const std::string& api_typ
   return fmt::format(
       R"EOF(
 admin:
-  access_log_path: /dev/null
+  access_log_path: {}
   address:
     socket_address:
       address: 127.0.0.1
@@ -305,20 +309,23 @@ static_resources:
                   prefix: "/cluster2"
               domains: "*"
 )EOF",
-      api_type);
+      TestEnvironment::nullDevicePath(), api_type);
 }
 
 // TODO(#6327) cleaner approach to testing with static config.
-std::string ConfigHelper::adsBootstrap(const std::string& api_type) {
-  return fmt::format(
-      R"EOF(
+std::string ConfigHelper::adsBootstrap(const std::string& api_type,
+                                       envoy::config::core::v3::ApiVersion api_version) {
+  return fmt::format(R"EOF(
 dynamic_resources:
   lds_config:
+    resource_api_version: {1}
     ads: {{}}
   cds_config:
+    resource_api_version: {1}
     ads: {{}}
   ads_config:
-    api_type: {}
+    transport_api_version: {1}
+    api_type: {0}
 static_resources:
   clusters:
     name: dummy_cluster
@@ -337,17 +344,19 @@ static_resources:
     lb_policy: ROUND_ROBIN
     http2_protocol_options: {{}}
 admin:
-  access_log_path: /dev/null
+  access_log_path: {2}
   address:
     socket_address:
       address: 127.0.0.1
       port_value: 0
 )EOF",
-      api_type);
+                     api_type, api_version == envoy::config::core::v3::ApiVersion::V2 ? "V2" : "V3",
+                     TestEnvironment::nullDevicePath());
 }
 
-envoy::config::cluster::v3::Cluster ConfigHelper::buildCluster(const std::string& name, int port,
-                                                               const std::string& ip_version) {
+// TODO(samflattery): bundle this up with buildCluster
+envoy::config::cluster::v3::Cluster
+ConfigHelper::buildStaticCluster(const std::string& name, int port, const std::string& address) {
   return TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(fmt::format(R"EOF(
       name: {}
       connect_timeout: 5s
@@ -365,7 +374,108 @@ envoy::config::cluster::v3::Cluster ConfigHelper::buildCluster(const std::string
       http2_protocol_options: {{}}
     )EOF",
                                                                                  name, name,
-                                                                                 ip_version, port));
+                                                                                 address, port));
+}
+
+envoy::config::cluster::v3::Cluster
+ConfigHelper::buildCluster(const std::string& name, const std::string& lb_policy,
+                           envoy::config::core::v3::ApiVersion api_version) {
+  API_NO_BOOST(envoy::config::cluster::v3::Cluster) cluster;
+  TestUtility::loadFromYaml(fmt::format(R"EOF(
+      name: {}
+      connect_timeout: 5s
+      type: EDS
+      eds_cluster_config:
+        eds_config:
+          resource_api_version: {}
+          ads: {{}}
+      lb_policy: {}
+      http2_protocol_options: {{}}
+    )EOF",
+                                        name, apiVersionStr(api_version), lb_policy),
+                            cluster, shouldBoost(api_version));
+  return cluster;
+}
+
+envoy::config::endpoint::v3::ClusterLoadAssignment
+ConfigHelper::buildClusterLoadAssignment(const std::string& name, const std::string& address,
+                                         uint32_t port,
+                                         envoy::config::core::v3::ApiVersion api_version) {
+  API_NO_BOOST(envoy::config::endpoint::v3::ClusterLoadAssignment) cluster_load_assignment;
+  TestUtility::loadFromYaml(fmt::format(R"EOF(
+      cluster_name: {}
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: {}
+                port_value: {}
+    )EOF",
+                                        name, address, port),
+                            cluster_load_assignment, shouldBoost(api_version));
+  return cluster_load_assignment;
+}
+
+envoy::config::listener::v3::Listener
+ConfigHelper::buildBaseListener(const std::string& name, const std::string& address,
+                                const std::string& filter_chains,
+                                envoy::config::core::v3::ApiVersion api_version) {
+  API_NO_BOOST(envoy::config::listener::v3::Listener) listener;
+  TestUtility::loadFromYaml(fmt::format(
+                                R"EOF(
+      name: {}
+      address:
+        socket_address:
+          address: {}
+          port_value: 0
+      filter_chains:
+      {}
+    )EOF",
+                                name, address, filter_chains),
+                            listener, shouldBoost(api_version));
+  return listener;
+}
+
+envoy::config::listener::v3::Listener
+ConfigHelper::buildListener(const std::string& name, const std::string& route_config,
+                            const std::string& address, const std::string& stat_prefix,
+                            envoy::config::core::v3::ApiVersion api_version) {
+  std::string hcm = fmt::format(
+      R"EOF(
+        filters:
+        - name: http
+          typed_config:
+            "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+            stat_prefix: {}
+            codec_type: HTTP2
+            rds:
+              route_config_name: {}
+              config_source:
+                resource_api_version: {}
+                ads: {{}}
+            http_filters: [{{ name: envoy.filters.http.router }}]
+    )EOF",
+      stat_prefix, route_config, apiVersionStr(api_version));
+  return buildBaseListener(name, address, hcm, api_version);
+}
+
+envoy::config::route::v3::RouteConfiguration
+ConfigHelper::buildRouteConfig(const std::string& name, const std::string& cluster,
+                               envoy::config::core::v3::ApiVersion api_version) {
+  API_NO_BOOST(envoy::config::route::v3::RouteConfiguration) route;
+  TestUtility::loadFromYaml(fmt::format(R"EOF(
+      name: {}
+      virtual_hosts:
+      - name: integration
+        domains: ["*"]
+        routes:
+        - match: {{ prefix: "/" }}
+          route: {{ cluster: {} }}
+    )EOF",
+                                        name, cluster),
+                            route, shouldBoost(api_version));
+  return route;
 }
 
 envoy::config::endpoint::v3::Endpoint ConfigHelper::buildEndpoint(const std::string& address) {
@@ -762,7 +872,7 @@ bool ConfigHelper::setAccessLog(const std::string& filename, absl::string_view f
   if (getFilterFromListener("http") == nullptr) {
     return false;
   }
-  // Replace /dev/null with a real path for the file access log.
+  // Replace null device with a real path for the file access log.
   envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
       hcm_config;
   loadHttpConnectionManager(hcm_config);
@@ -797,8 +907,8 @@ bool ConfigHelper::setListenerAccessLog(const std::string& filename, absl::strin
 void ConfigHelper::initializeTls(
     const ServerSslOptions& options,
     envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
-  common_tls_context.add_alpn_protocols("h2");
-  common_tls_context.add_alpn_protocols("http/1.1");
+  common_tls_context.add_alpn_protocols(Http::Utility::AlpnNames::get().Http2);
+  common_tls_context.add_alpn_protocols(Http::Utility::AlpnNames::get().Http11);
 
   auto* validation_context = common_tls_context.mutable_validation_context();
   validation_context->mutable_trusted_ca()->set_filename(
@@ -999,6 +1109,8 @@ void EdsHelper::setEds(const std::vector<envoy::config::endpoint::v3::ClusterLoa
 void EdsHelper::setEdsAndWait(
     const std::vector<envoy::config::endpoint::v3::ClusterLoadAssignment>& cluster_load_assignments,
     IntegrationTestServerStats& server_stats) {
+  // Make sure the last version has been accepted before setting a new one.
+  server_stats.waitForCounterGe("cluster.cluster_0.update_success", update_successes_);
   setEds(cluster_load_assignments);
   // Make sure Envoy has consumed the update now that it is running.
   ++update_successes_;

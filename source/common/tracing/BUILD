@@ -1,10 +1,10 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -23,12 +23,12 @@ envoy_cc_library(
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/tracing:http_tracer_interface",
         "//include/envoy/upstream:cluster_manager_interface",
-        "//source/common/access_log:access_log_formatter_lib",
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/common:base64_lib",
         "//source/common/common:macros",
         "//source/common/common:utility_lib",
         "//source/common/config:metadata_lib",
+        "//source/common/formatter:substitution_formatter_lib",
         "//source/common/grpc:common_lib",
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",

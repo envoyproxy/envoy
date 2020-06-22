@@ -237,14 +237,16 @@ TEST_F(ConnectionManagerUtilityTest, DetermineNextProtocol) {
     Network::MockConnection connection;
     EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return(""));
     Buffer::OwnedImpl data("PRI * HTTP/2.0\r\n");
-    EXPECT_EQ("h2", ConnectionManagerUtility::determineNextProtocol(connection, data));
+    EXPECT_EQ(Utility::AlpnNames::get().Http2,
+              ConnectionManagerUtility::determineNextProtocol(connection, data));
   }
 
   {
     Network::MockConnection connection;
     EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return(""));
     Buffer::OwnedImpl data("PRI * HTTP/2");
-    EXPECT_EQ("h2", ConnectionManagerUtility::determineNextProtocol(connection, data));
+    EXPECT_EQ(Utility::AlpnNames::get().Http2,
+              ConnectionManagerUtility::determineNextProtocol(connection, data));
   }
 
   {
@@ -298,7 +300,7 @@ TEST_F(ConnectionManagerUtilityTest, SkipXffAppendPassThruUseRemoteAddress) {
 
   EXPECT_EQ((MutateRequestRet{"12.12.12.12:0", false}),
             callMutateRequestHeaders(headers, Protocol::Http2));
-  EXPECT_EQ("198.51.100.1", headers.ForwardedFor()->value().getStringView());
+  EXPECT_EQ("198.51.100.1", headers.getForwardedForValue());
 }
 
 TEST_F(ConnectionManagerUtilityTest, PreserveForwardedProtoWhenInternal) {
@@ -312,7 +314,7 @@ TEST_F(ConnectionManagerUtilityTest, PreserveForwardedProtoWhenInternal) {
   TestRequestHeaderMapImpl headers{{"x-forwarded-proto", "https"}};
 
   callMutateRequestHeaders(headers, Protocol::Http2);
-  EXPECT_EQ("https", headers.ForwardedProto()->value().getStringView());
+  EXPECT_EQ("https", headers.getForwardedProtoValue());
 }
 
 TEST_F(ConnectionManagerUtilityTest, OverwriteForwardedProtoWhenExternal) {
@@ -324,7 +326,7 @@ TEST_F(ConnectionManagerUtilityTest, OverwriteForwardedProtoWhenExternal) {
   ON_CALL(config_, localAddress()).WillByDefault(ReturnRef(local_address));
 
   callMutateRequestHeaders(headers, Protocol::Http2);
-  EXPECT_EQ("http", headers.ForwardedProto()->value().getStringView());
+  EXPECT_EQ("http", headers.getForwardedProtoValue());
 }
 
 // Verify internal request and XFF is set when we are using remote address and the address is
@@ -1464,7 +1466,7 @@ TEST_F(ConnectionManagerUtilityTest, SanitizePathRelativePAth) {
 
   TestRequestHeaderMapImpl header_map(original_headers);
   ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
-  EXPECT_EQ(header_map.Path()->value().getStringView(), "/abc");
+  EXPECT_EQ(header_map.getPathValue(), "/abc");
 }
 
 // maybeNormalizePath() does not touch adjacent slashes by default.
@@ -1476,7 +1478,7 @@ TEST_F(ConnectionManagerUtilityTest, MergeSlashesDefaultOff) {
 
   TestRequestHeaderMapImpl header_map(original_headers);
   ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
-  EXPECT_EQ(header_map.Path()->value().getStringView(), "/xyz///abc");
+  EXPECT_EQ(header_map.getPathValue(), "/xyz///abc");
 }
 
 // maybeNormalizePath() merges adjacent slashes.
@@ -1488,7 +1490,7 @@ TEST_F(ConnectionManagerUtilityTest, MergeSlashes) {
 
   TestRequestHeaderMapImpl header_map(original_headers);
   ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
-  EXPECT_EQ(header_map.Path()->value().getStringView(), "/xyz/abc");
+  EXPECT_EQ(header_map.getPathValue(), "/xyz/abc");
 }
 
 // maybeNormalizePath() merges adjacent slashes if normalization if off.
@@ -1500,7 +1502,7 @@ TEST_F(ConnectionManagerUtilityTest, MergeSlashesWithoutNormalization) {
 
   TestRequestHeaderMapImpl header_map(original_headers);
   ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
-  EXPECT_EQ(header_map.Path()->value().getStringView(), "/xyz/../abc");
+  EXPECT_EQ(header_map.getPathValue(), "/xyz/../abc");
 }
 
 // maybeNormalizeHost() removes port part from host header.
@@ -1511,7 +1513,7 @@ TEST_F(ConnectionManagerUtilityTest, RemovePort) {
 
   TestRequestHeaderMapImpl header_map(original_headers);
   ConnectionManagerUtility::maybeNormalizeHost(header_map, config_, 443);
-  EXPECT_EQ(header_map.Host()->value().getStringView(), "host");
+  EXPECT_EQ(header_map.getHostValue(), "host");
 }
 
 // test preserve_external_request_id true does not reset the passed requestId if passed

@@ -13,4 +13,14 @@ if [ "$1" = 'envoy' ]; then
 	fi
 fi
 
-exec "$@"
+if [ "$ENVOY_UID" != "0" ]; then
+    if [ -n "$ENVOY_UID" ]; then
+	usermod -u "$ENVOY_UID" envoy
+    fi
+    if [ -n "$ENVOY_GID" ]; then
+	groupmod -g "$ENVOY_GID" envoy
+    fi
+    su-exec envoy "${@}"
+else
+    exec "${@}"
+fi

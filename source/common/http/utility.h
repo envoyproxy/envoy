@@ -30,6 +30,20 @@ namespace Utility {
 // TODO(#10878): Remove this.
 Http::Status exceptionToStatus(std::function<Http::Status(Buffer::Instance&)> dispatch,
                                Buffer::Instance& data);
+
+/**
+ * Well-known HTTP ALPN values.
+ */
+class AlpnNameValues {
+public:
+  const std::string Http10 = "http/1.0";
+  const std::string Http11 = "http/1.1";
+  const std::string Http2 = "h2";
+  const std::string Http2c = "h2c";
+};
+
+using AlpnNames = ConstSingleton<AlpnNameValues>;
+
 } // namespace Utility
 } // namespace Http
 
