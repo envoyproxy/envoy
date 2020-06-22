@@ -134,7 +134,7 @@ absl::optional<std::string> maskParam(const Http::Utility::QueryParams& params) 
 
 // Helper method to get the eds parameter.
 bool edsParam(const Http::Utility::QueryParams& params) {
-  return Utility::queryParam(params, "includeEds") != absl::nullopt;
+  return Utility::queryParam(params, "include_eds") != absl::nullopt;
 }
 
 // Helper method that ensures that we've setting flags based on all the health flag values on the

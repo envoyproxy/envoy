@@ -358,7 +358,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   config_dump.configs(5).UnpackTo(&secret_config_dump);
   EXPECT_EQ("secret_static_0", secret_config_dump.static_secrets(0).name());
 
-  EXPECT_EQ("200", request("admin", "GET", "/config_dump?includeEds", response));
+  EXPECT_EQ("200", request("admin", "GET", "/config_dump?include_eds", response));
   EXPECT_EQ("application/json", ContentType(response));
   json = Json::Factory::loadFromString(response->body());
   size_t index_eds = 0;

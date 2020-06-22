@@ -222,7 +222,7 @@ TEST_P(AdminInstanceTest, ConfigDumpMaintainsOrder) {
   }
 }
 
-// Test that using ?includeEds parameter adds EDS to the config dump.
+// Test that using ?include_eds parameter adds EDS to the config dump.
 TEST_P(AdminInstanceTest, ConfigDumpWithEndpoint) {
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   ON_CALL(server_.cluster_manager_, clusters()).WillByDefault(ReturnPointee(&cluster_map));
@@ -261,7 +261,7 @@ TEST_P(AdminInstanceTest, ConfigDumpWithEndpoint) {
 
   Buffer::OwnedImpl response;
   Http::TestResponseHeaderMapImpl header_map;
-  EXPECT_EQ(Http::Code::OK, getCallback("/config_dump?includeEds", header_map, response));
+  EXPECT_EQ(Http::Code::OK, getCallback("/config_dump?include_eds", header_map, response));
   std::string output = response.toString();
   const std::string expected_json = R"EOF({
  "configs": [
@@ -387,7 +387,7 @@ TEST_P(AdminInstanceTest, ConfigDumpWithLocalityEndpoint) {
 
   Buffer::OwnedImpl response;
   Http::TestResponseHeaderMapImpl header_map;
-  EXPECT_EQ(Http::Code::OK, getCallback("/config_dump?includeEds", header_map, response));
+  EXPECT_EQ(Http::Code::OK, getCallback("/config_dump?include_eds", header_map, response));
   std::string output = response.toString();
   const std::string expected_json = R"EOF({
  "configs": [
@@ -527,7 +527,7 @@ TEST_P(AdminInstanceTest, ConfigDumpWithEndpointFiltersByResource) {
 
   Buffer::OwnedImpl response;
   Http::TestResponseHeaderMapImpl header_map;
-  EXPECT_EQ(Http::Code::OK, getCallback("/config_dump?includeEds&resource=static_endpoint_configs",
+  EXPECT_EQ(Http::Code::OK, getCallback("/config_dump?include_eds&resource=static_endpoint_configs",
                                         header_map, response));
   std::string output = response.toString();
   const std::string expected_json = R"EOF({
