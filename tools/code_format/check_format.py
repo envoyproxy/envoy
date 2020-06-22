@@ -216,6 +216,8 @@ NON_TYPE_ALIAS_ALLOWED_TYPES = {
 }
 # yapf: enable
 
+NON_TYPE_ALIAS_ALLOWED_TYPE = re.compile(fr"(.*\[\]$|^std::vector<.*|{'|'.join(NON_TYPE_ALIAS_ALLOWED_TYPES)}$)")
+
 
 # Map a line transformation function across each line of a file,
 # writing the result lines as requested.
@@ -399,7 +401,7 @@ def whitelistedForUnpackTo(file_path):
   ]
 
 def whitelistedForNonTypeAlias(name):
-  return re.match(r".*\[\]$", name) or re.match("^std::vector<.*", name) or re.match(f"^({'|'.join(NON_TYPE_ALIAS_ALLOWED_TYPES)})$", name)
+  return NON_TYPE_ALIAS_ALLOWED_TYPE.match(name)
 
 
 def findSubstringAndReturnError(pattern, file_path, error_message):
