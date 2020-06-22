@@ -401,7 +401,7 @@ TEST_F(OverloadManagerImplTest, DuplicateOverloadAction) {
                           "Duplicate overload action .*");
 }
 
-TEST_F(OverloadManagerImplTest, RangeTriggerInvalidMax) {
+TEST_F(OverloadManagerImplTest, RangeTriggerMaxLessThanMin) {
   const std::string config = R"EOF(
     resource_monitors {
       name: "envoy.resource_monitors.fake_resource1"
@@ -414,6 +414,29 @@ TEST_F(OverloadManagerImplTest, RangeTriggerInvalidMax) {
           min_value: 0.9
           max_value {
             value: 0.8
+          }
+        }
+      }
+    }
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException, "min_value.*max_value.*");
+}
+
+
+TEST_F(OverloadManagerImplTest, RangeTriggerMaxEqualsMin) {
+  const std::string config = R"EOF(
+    resource_monitors {
+      name: "envoy.resource_monitors.fake_resource1"
+    }
+    actions {
+      name: "envoy.overload_actions.dummy_action"
+      triggers {
+        name: "envoy.resource_monitors.fake_resource1"
+        range {
+          min_value: 0.9
+          max_value {
+            value: 0.9
           }
         }
       }

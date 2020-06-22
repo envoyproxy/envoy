@@ -45,8 +45,8 @@ public:
   RangeTriggerImpl(const envoy::config::overload::v3::RangeTrigger& config)
       : minimum_(config.min_value()),
         maximum_(config.has_max_value() ? config.max_value().value() : 1.0) {
-    if (minimum_ > maximum_) {
-      throw EnvoyException("min_value must be less than or equal to max_value");
+    if (minimum_ >= maximum_) {
+      throw EnvoyException("min_value must be less than max_value");
     }
   }
 
