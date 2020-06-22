@@ -1,5 +1,3 @@
-#include <set>
-
 #include "common/http/utility.h"
 
 #include "test/common/http/utility_fuzz.pb.validate.h"
@@ -81,16 +79,11 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
   }
   case test::common::http::UtilityTestCase::kInitializeAndValidate: {
     const auto& options = input.initialize_and_validate();
-    // if there are duplicates, abort the test
-    std::set<int> uniques;
-    for (auto& setting : options.custom_settings_parameters()) {
-      uniques.insert(setting.identifier().value());
+    try {
+      Http2::Utility::initializeAndValidateOptions(options);
+    } catch (EnvoyException& e) {
+      ENVOY_LOG_MISC(trace, "Caught exception {} in initializeAndValidateOptions test", e.what());
     }
-    // protobuf repeated's size is a signed integer
-    if (uniques.size() != static_cast<uint32_t>(options.custom_settings_parameters().size())) {
-      break;
-    }
-    Http2::Utility::initializeAndValidateOptions(options);
     break;
   }
 
