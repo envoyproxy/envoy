@@ -3,6 +3,7 @@
 #include "envoy/common/resource.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
+#include "envoy/router/router.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/thread_local/thread_local.h"
 
@@ -177,9 +178,13 @@ public:
   virtual absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> hosts() PURE;
 
   /**
-   * increment overflow counter.
+   * Handle dns request
+   * @param route_entry resolved route entry.
+   * @param cluster_info destination cluster info.
+   * @return Resource limit which describes about pending requests.
    */
-  virtual void dnsCacheStatsOverflowInc() PURE;
+  virtual ResourceLimit& onDnsRequest(const Router::RouteEntry* route_entry,
+                                      Upstream::ClusterInfoConstSharedPtr cluster_info) PURE;
 
   /**
    * @return A optional reference to resource manager for dns cache.

@@ -7,7 +7,6 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/cleanup.h"
-#include "common/runtime/runtime_features.h"
 
 #include "extensions/common/dynamic_forward_proxy/dns_cache.h"
 #include "extensions/common/dynamic_forward_proxy/dns_cache_resource_manager.h"
@@ -53,7 +52,8 @@ public:
                                             LoadDnsCacheEntryCallbacks& callbacks) override;
   AddUpdateCallbacksHandlePtr addUpdateCallbacks(UpdateCallbacks& callbacks) override;
   absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> hosts() override;
-  void dnsCacheStatsOverflowInc() override;
+  ResourceLimit& onDnsRequest(const Router::RouteEntry* route_entry,
+                     Upstream::ClusterInfoConstSharedPtr cluster_info) override;
   DnsCacheResourceManager& dnsCacheResourceManager() override { return resource_manager_; }
 
 private:
@@ -151,29 +151,6 @@ private:
   const std::chrono::milliseconds host_ttl_;
   const uint32_t max_hosts_;
 };
-
-using DnsCacheOverflowHandler = std::function<void()>;
-
-class DnsCacheCircuitBreakersHandler {
-public:
-  DnsCacheCircuitBreakersHandler(DnsCache& dns_cache);
-  ~DnsCacheCircuitBreakersHandler() {
-    // Make sure that circuit breaker RAII completed.
-    circuit_breaker_.reset();
-  }
-  bool handleRequest(const Router::RouteEntry* route_entry,
-                     Upstream::ClusterInfoConstSharedPtr cluster_info,
-                     DnsCacheOverflowHandler handle_overflow);
-  void handleRequestFinished() { circuit_breaker_.reset(); }
-  bool isPending() { return circuit_breaker_ != nullptr; }
-
-private:
-  bool should_use_dns_cache_circuit_breakers_{false};
-  DnsCache& dns_cache_;
-  Upstream::ResourceAutoIncDecPtr circuit_breaker_;
-};
-
-using DnsCacheCircuitBreakersHandlerPtr = std::unique_ptr<DnsCacheCircuitBreakersHandler>;
 
 } // namespace DynamicForwardProxy
 } // namespace Common

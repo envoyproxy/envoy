@@ -11,6 +11,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 using testing::InSequence;
@@ -642,6 +643,42 @@ TEST_F(DnsCacheImplTest, MaxHostOverflow) {
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Overflow, result.status_);
   EXPECT_EQ(result.handle_, nullptr);
   EXPECT_EQ(1, TestUtility::findCounter(store_, "dns_cache.foo.host_overflow")->value());
+}
+
+TEST_F(DnsCacheImplTest, CircuitBreakersNotInvoked) {
+  initialize();
+  Upstream::MockClusterManager cm;
+  Router::MockRouteEntry route_entry;
+
+  dns_cache_->onDnsRequest(&route_entry, cm.thread_local_cluster_.cluster_.info_);
+  EXPECT_EQ(0,
+            cm.thread_local_cluster_.cluster_.info_->stats_.upstream_rq_pending_overflow_.value());
+}
+
+TEST_F(DnsCacheImplTest, ClusterCircuitBreakersOverflow) {
+  TestScopedRuntime scoped_runtime;
+  // Disable dns cache circuit breakers because which we expect to be used cluster circuit breakers.
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.enable_dns_cache_circuit_breakers", "false"}});
+  Upstream::MockClusterManager cm;
+  Router::MockRouteEntry route_entry;
+  cm.thread_local_cluster_.cluster_.info_->resetResourceManager(0, 0, 0, 0, 0);
+
+  initialize();
+  EXPECT_CALL(route_entry, priority());
+  dns_cache_->onDnsRequest(&route_entry, cm.thread_local_cluster_.cluster_.info_);
+  EXPECT_EQ(1,
+            cm.thread_local_cluster_.cluster_.info_->stats_.upstream_rq_pending_overflow_.value());
+}
+
+TEST_F(DnsCacheImplTest, DnsCacheCircuitBreakersOverflow) {
+  Upstream::MockClusterManager cm;
+  Router::MockRouteEntry route_entry;
+  config_.mutable_dns_cache_circuit_breaker()->mutable_max_pending_requests()->set_value(0);
+
+  initialize();
+  dns_cache_->onDnsRequest(&route_entry, cm.thread_local_cluster_.cluster_.info_);
+  EXPECT_EQ(1, TestUtility::findCounter(store_, "dns_cache.foo.dns_rq_pending_overflow")->value());
 }
 
 // DNS cache manager config tests.

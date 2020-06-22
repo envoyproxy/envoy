@@ -4,6 +4,8 @@
 
 #include "extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
 
+#include "test/mocks/upstream/mocks.h"
+
 #include "gmock/gmock.h"
 
 using testing::NiceMock;
@@ -20,6 +22,8 @@ public:
 
   MOCK_METHOD(ResourceLimit&, pendingRequests, ());
   MOCK_METHOD(DnsCacheCircuitBreakersStats&, stats, ());
+
+  NiceMock<Upstream::MockBasicResourceLimit> pending_requests_;
 };
 
 class MockDnsCache : public DnsCache {
@@ -48,7 +52,9 @@ public:
               (UpdateCallbacks & callbacks));
 
   MOCK_METHOD((absl::flat_hash_map<std::string, DnsHostInfoSharedPtr>), hosts, ());
-  MOCK_METHOD(void, dnsCacheStatsOverflowInc, ());
+  MOCK_METHOD(ResourceLimit&, onDnsRequest,
+              (const Router::RouteEntry* route_entry,
+               Upstream::ClusterInfoConstSharedPtr cluster_info));
   MOCK_METHOD(DnsCacheResourceManager&, dnsCacheResourceManager, ());
 
   NiceMock<MockDnsCacheResourceManager> dns_cache_resource_manager_;

@@ -2,6 +2,7 @@
 
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 
+#include "common/runtime/runtime_features.h"
 #include "common/config/utility.h"
 #include "common/http/utility.h"
 #include "common/network/utility.h"
@@ -81,6 +82,24 @@ DnsCacheImpl::loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
   }
 }
 
+ResourceLimit& DnsCacheImpl::onDnsRequest(const Router::RouteEntry* route_entry,
+                     Upstream::ClusterInfoConstSharedPtr cluster_info) {
+  const bool should_use_dns_cache_circuit_breakers = Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.enable_dns_cache_circuit_breakers");
+  ResourceLimit& pending_requests =
+      should_use_dns_cache_circuit_breakers
+          ? resource_manager_.pendingRequests()
+          : cluster_info->resourceManager(route_entry->priority()).pendingRequests();
+  if (!pending_requests.canCreate()) {
+    if (!should_use_dns_cache_circuit_breakers) {
+      cluster_info->stats().upstream_rq_pending_overflow_.inc();
+    } else {
+      stats_.dns_rq_pending_overflow_.inc();
+    }
+  }
+  return pending_requests;
+}
+
 absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> DnsCacheImpl::hosts() {
   absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> ret;
   for (const auto& host : primary_hosts_) {
@@ -91,8 +110,6 @@ absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> DnsCacheImpl::hosts() {
   }
   return ret;
 }
-
-void DnsCacheImpl::dnsCacheStatsOverflowInc() { stats_.dns_rq_pending_overflow_.inc(); }
 
 DnsCacheImpl::AddUpdateCallbacksHandlePtr
 DnsCacheImpl::addUpdateCallbacks(UpdateCallbacks& callbacks) {
@@ -290,31 +307,6 @@ DnsCacheImpl::PrimaryHostInfo::PrimaryHostInfo(DnsCacheImpl& parent,
 DnsCacheImpl::PrimaryHostInfo::~PrimaryHostInfo() {
   parent_.stats_.host_removed_.inc();
   parent_.stats_.num_hosts_.dec();
-}
-
-DnsCacheCircuitBreakersHandler::DnsCacheCircuitBreakersHandler(DnsCache& dns_cache)
-    : should_use_dns_cache_circuit_breakers_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.enable_dns_cache_circuit_breakers")),
-      dns_cache_(dns_cache) {}
-
-bool DnsCacheCircuitBreakersHandler::handleRequest(const Router::RouteEntry* route_entry,
-                                                   Upstream::ClusterInfoConstSharedPtr cluster_info,
-                                                   DnsCacheOverflowHandler handle_overflow) {
-  ResourceLimit& pending_requests =
-      should_use_dns_cache_circuit_breakers_
-          ? dns_cache_.dnsCacheResourceManager().pendingRequests()
-          : cluster_info->resourceManager(route_entry->priority()).pendingRequests();
-  if (!pending_requests.canCreate()) {
-    if (!should_use_dns_cache_circuit_breakers_) {
-      cluster_info->stats().upstream_rq_pending_overflow_.inc();
-    } else {
-      dns_cache_.dnsCacheStatsOverflowInc();
-    }
-    handle_overflow();
-    return false;
-  }
-  circuit_breaker_ = std::make_unique<Upstream::ResourceAutoIncDec>(pending_requests);
-  return true;
 }
 
 } // namespace DynamicForwardProxy

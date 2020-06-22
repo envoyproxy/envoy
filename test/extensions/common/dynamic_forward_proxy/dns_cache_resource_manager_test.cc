@@ -38,7 +38,7 @@ public:
     }
   }
 
-  DnsCacheResourceManagerPtr resource_manager_;
+  std::unique_ptr<DnsCacheResourceManager> resource_manager_;
   NiceMock<Stats::MockStore> store_;
   NiceMock<Stats::MockGauge> gauge_;
   NiceMock<Runtime::MockLoader> loader_;

@@ -126,6 +126,7 @@ namespace.
   host_added, Counter, Number of hosts that have been added to the cache.
   host_removed, Counter, Number of hosts that have been removed from the cache.
   num_hosts, Gauge, Number of hosts that are currently in the cache.
+  dns_rq_pending_overflow, Counter, Number of dns pending connection overflow.
 
 The dynamic forward proxy DNS cache circuit breakers outputs statistics in the dns_cache.<dns_cache_name>.circuit_breakers*
 namespace.

@@ -37,7 +37,7 @@ void ProxyFilter::onDestroy() {
   // Make sure we destroy any active cache load handle in case we are getting reset and deferred
   // deleted.
   cache_load_handle_.reset();
-  cb_handler_.reset();
+    circuit_breaker_.reset();
 }
 
 Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
@@ -53,13 +53,14 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   }
   cluster_info_ = cluster->info();
 
-  const auto handle_status = cb_handler_->handleRequest(route_entry, cluster_info_, [this]() {
+  auto& pending_requests = config_->cache().onDnsRequest(route_entry, cluster_info_);
+  if (pending_requests.canCreate()) {
+    circuit_breaker_ = std::make_unique<Upstream::ResourceAutoIncDec>(pending_requests);
+  } else {
     ENVOY_STREAM_LOG(debug, "pending request overflow", *this->decoder_callbacks_);
     this->decoder_callbacks_->sendLocalReply(
         Http::Code::ServiceUnavailable, ResponseStrings::get().PendingRequestOverflow, nullptr,
         absl::nullopt, ResponseStrings::get().PendingRequestOverflow);
-  });
-  if (!handle_status) {
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -98,7 +99,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
                                                    default_port, *this);
   cache_load_handle_ = std::move(result.handle_);
   if (cache_load_handle_ == nullptr) {
-    cb_handler_->handleRequestFinished();
+      circuit_breaker_.reset();
   }
 
   switch (result.status_) {
@@ -127,8 +128,8 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
 void ProxyFilter::onLoadDnsCacheComplete() {
   ENVOY_STREAM_LOG(debug, "load DNS cache complete, continuing", *decoder_callbacks_);
-  ASSERT(cb_handler_->isPending());
-  cb_handler_->handleRequestFinished();
+  ASSERT(  circuit_breaker_ != nullptr);
+    circuit_breaker_.reset();
   decoder_callbacks_->continueDecoding();
 }
 
