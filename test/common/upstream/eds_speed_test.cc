@@ -195,7 +195,6 @@ static void duplicateUpdate(benchmark::State& state) {
 // Range(2000, 100000) is a reasonable starting point.
 BENCHMARK(duplicateUpdate)->Arg(100)->Unit(benchmark::kMillisecond);
 
-
 static void healthOnlyUpdate(benchmark::State& state) {
   Envoy::Thread::MutexBasicLockable lock;
   Envoy::Logger::Context logging_state(spdlog::level::warn,
