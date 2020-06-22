@@ -5,6 +5,8 @@
 #include "test/fuzz/utility.h"
 #include "test/test_common/utility.h"
 
+#include <set>
+
 namespace Envoy {
 namespace Fuzz {
 namespace {
@@ -79,6 +81,13 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
   }
   case test::common::http::UtilityTestCase::kInitializeAndValidate: {
     const auto& options = input.initialize_and_validate();
+    std::set<int> uniques;
+    for (auto& setting : options.custom_settings_parameters()) {
+      uniques.insert(setting.identifier().value());
+    }
+    if (uniques.size() != options.custom_settings_parameters().size()) {
+      break;
+    }
     Http2::Utility::initializeAndValidateOptions(options);
     break;
   }
