@@ -297,7 +297,7 @@ TEST_F(OverloadManagerImplTest, RangeTrigger) {
 
   factory3_.monitor_->setPressure(0.5);
   timer_cb_();
-  
+
   EXPECT_EQ(action_state, OverloadActionState::inactive());
 
   factory3_.monitor_->setPressure(0.65);

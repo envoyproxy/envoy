@@ -141,9 +141,9 @@ void WorkerImpl::threadRoutine(GuardDog& guard_dog) {
 }
 
 void WorkerImpl::stopAcceptingConnectionsCb(OverloadActionState state) {
-if (state == OverloadActionState::saturated()) {
+  if (state == OverloadActionState::saturated()) {
     handler_->disableListeners();
-} else {
+  } else {
     handler_->enableListeners();
   }
 }

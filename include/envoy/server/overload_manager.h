@@ -7,8 +7,6 @@
 #include "envoy/event/timer.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "absl/types/variant.h"
-
 #include "common/common/macros.h"
 #include "common/singleton/const_singleton.h"
 
@@ -32,10 +30,8 @@ struct OverloadActionState {
   static OverloadActionState saturated() { return OverloadActionState(1.0); }
 
   explicit constexpr OverloadActionState(double value)
-      : action_value(value < 0   ? 0
-                     : value > 1 ? 1
-                                 : value) {}
-                                 
+      : action_value(value < 0 ? 0 : value > 1 ? 1 : value) {}
+
 #define CMP_OPERATOR(OP)                                                                           \
   bool operator OP(const OverloadActionState& other) const {                                       \
     return action_value OP other.action_value;                                                     \

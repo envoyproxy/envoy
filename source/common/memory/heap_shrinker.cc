@@ -15,10 +15,10 @@ HeapShrinker::HeapShrinker(Event::Dispatcher& dispatcher, Server::OverloadManage
                            Stats::Scope& stats)
     : active_(false) {
   const auto action_name = Server::OverloadActionNames::get().ShrinkHeap;
-  if (overload_manager.registerForAction(action_name, dispatcher,
-                                         [this](Server::OverloadActionState state) {
-                                           active_ = (state == Server::OverloadActionState::saturated());
-                                         })) {
+  if (overload_manager.registerForAction(
+          action_name, dispatcher, [this](Server::OverloadActionState state) {
+            active_ = (state == Server::OverloadActionState::saturated());
+          })) {
     Envoy::Stats::StatNameManagedStorage stat_name(
         absl::StrCat("overload.", action_name, ".shrink_count"), stats.symbolTable());
     shrink_counter_ = &stats.counterFromStatName(stat_name.statName());
