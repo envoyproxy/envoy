@@ -17,7 +17,7 @@ namespace Http1 {
  *       address. Higher layer code should handle resolving DNS on error and creating a new pool
  *       bound to a different IP address.
  */
-class ConnPoolImpl : public ConnPoolImplBase {
+class ConnPoolImpl : public Envoy::Http::ConnPoolImplBase {
 public:
   ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                Upstream::ResourcePriority priority,
@@ -33,7 +33,7 @@ public:
   ActiveClientPtr instantiateActiveClient() override;
 
 protected:
-  struct ActiveClient;
+  class ActiveClient;
 
   struct StreamWrapper : public RequestEncoderWrapper,
                          public ResponseDecoderWrapper,
@@ -64,7 +64,8 @@ protected:
 
   using StreamWrapperPtr = std::unique_ptr<StreamWrapper>;
 
-  struct ActiveClient : public ConnPoolImplBase::ActiveClient {
+  class ActiveClient : public Envoy::Http::ActiveClient {
+  public:
     ActiveClient(ConnPoolImpl& parent);
 
     ConnPoolImpl& parent() { return static_cast<ConnPoolImpl&>(parent_); }

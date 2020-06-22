@@ -37,9 +37,8 @@ ValidationClusterManager::ValidationClusterManager(
                          grpc_context),
       async_client_(api, time_system) {}
 
-Http::ConnectionPool::Instance*
-ValidationClusterManager::httpConnPoolForCluster(const std::string&, ResourcePriority,
-                                                 Http::Protocol, LoadBalancerContext*) {
+Http::ConnectionPool::Instance* ValidationClusterManager::httpConnPoolForCluster(
+    const std::string&, ResourcePriority, absl::optional<Http::Protocol>, LoadBalancerContext*) {
   return nullptr;
 }
 
