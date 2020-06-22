@@ -124,7 +124,6 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildReusePortOptions() {
   return options;
 }
 
-// TODO(yugant)
 std::unique_ptr<Socket::Options> SocketOptionFactory::buildUdpGroOptions() {
   std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
   options->push_back(std::make_shared<SocketOptionImpl>(

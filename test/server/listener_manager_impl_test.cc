@@ -3722,9 +3722,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, ReusePortListenerDisabled) {
   // IpPacketInfo and RxQueueOverFlow are always set if supported
   expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
 #ifdef SO_RXQ_OVFL
-                           /* expected_num_options */ 2,
+                           /* expected_num_options */ 3,
 #else
-                           /* expected_num_options */ 1,
+                           /* expected_num_options */ 2,
 #endif
                            /* expected_creation_params */ {true, false});
 
@@ -3740,6 +3740,11 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, ReusePortListenerDisabled) {
                    /* expected_value */ 1,
                    /* expected_num_calls */ 1);
 #endif
+  expectSetsockopt(os_sys_calls_,
+                   /* expected_sockopt_level */ SOL_UDP,
+                   /* expected_sockopt_name */ GRO_UDP,
+                   /* expected_value */ 1,
+                   /* expected_num_calls */ 1);
 
   server_.options_.concurrency_ = 2;
   manager_->addOrUpdateListener(listener, "", true);

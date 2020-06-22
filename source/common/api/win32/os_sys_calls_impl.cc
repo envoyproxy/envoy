@@ -170,7 +170,6 @@ bool OsSysCallsImpl::supportsMmsg() const {
   return false;
 }
 
-// TODO(yugant)
 bool OsSysCallsImpl::supportsUdpGro() const {
   // Windows doesn't support it.
   return false;

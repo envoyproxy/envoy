@@ -46,7 +46,7 @@ public:
                                    RecvMsgOutput& output) override;
 
   bool supportsMmsg() const override;
-  bool supportsUdpGro() const override; // TODO(yugant)
+  bool supportsUdpGro() const override;
 
 private:
   // Converts a SysCallSizeResult to IoCallUint64Result.
@@ -69,11 +69,9 @@ private:
 
   os_fd_t fd_;
 
-  // The minimum cmsg buffer size to filled in destination address and packets dropped when
-  // receiving a packet. It is possible for a received packet to contain both IPv4 and IPv6
-  // addresses.
-
-  // TODO(yugant): Should add gso_size sizeof(int)
+  // The minimum cmsg buffer size to filled in destination address, packets dropped and gso
+  // size when receiving a packet. It is possible for a received packet to contain both IPv4
+  // and IPV6 addresses.
   const size_t cmsg_space_{CMSG_SPACE(sizeof(int)) + CMSG_SPACE(sizeof(struct in_pktinfo)) +
                            CMSG_SPACE(sizeof(struct in6_pktinfo)) + CMSG_SPACE(sizeof(int))};
 };

@@ -74,7 +74,6 @@ bool OsSysCallsImpl::supportsMmsg() const {
 #endif
 }
 
-// TODO(yugant)
 bool OsSysCallsImpl::supportsUdpGro() const {
 #if ENVOY_UDP_GRO_MORE
   return true;

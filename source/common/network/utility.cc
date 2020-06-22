@@ -565,7 +565,6 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
     Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
     Buffer::RawSlice slice;
 
-    // TODO(yugant): See if you can find a place for this constant
     const uint64_t maxPacketSizeWithGro = 65535;
     const uint64_t num_slices = buffer->reserve(maxPacketSizeWithGro, &slice, 1);
     ASSERT(num_slices == 1u);

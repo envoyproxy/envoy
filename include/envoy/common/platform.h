@@ -166,7 +166,6 @@ struct msghdr {
 #include <linux/netfilter_ipv4.h>
 #endif
 
-// TODO(yugant), maybe define it better here.
 #ifdef UDP_GRO
 #define GRO_UDP UDP_GRO
 #else
@@ -215,7 +214,6 @@ struct mmsghdr {
 };
 #endif
 
-// TODO(yugant) Check for a better way to check linux version
 #if defined(__linux__)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0)
 #define ENVOY_UDP_GRO_MORE 1
