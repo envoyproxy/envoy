@@ -323,14 +323,13 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
     }
     field_extractor_ = [this, pattern](const Envoy::StreamInfo::StreamInfo& stream_info) {
       const auto& formatters = start_time_formatters_.at(pattern);
-      static const Http::RequestHeaderMapImpl empty_request_headers;
-      static const Http::ResponseHeaderMapImpl empty_response_headers;
-      static const Http::ResponseTrailerMapImpl empty_response_trailers;
       std::string formatted;
       for (const auto& formatter : formatters) {
-        absl::StrAppend(&formatted, formatter->format(empty_request_headers, empty_response_headers,
-                                                      empty_response_trailers, stream_info,
-                                                      absl::string_view()));
+        absl::StrAppend(&formatted,
+                        formatter->format(*Http::StaticEmptyHeaders::get().request_headers,
+                                          *Http::StaticEmptyHeaders::get().response_headers,
+                                          *Http::StaticEmptyHeaders::get().response_trailers,
+                                          stream_info, absl::string_view()));
       }
       return formatted;
     };

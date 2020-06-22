@@ -469,6 +469,11 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
     if (!body_text.empty() && !local_reply_data.is_head_request_) {
       // TODO(dio): Probably it is worth to consider caching the encoded message based on gRPC
       // status.
+      // JsonFormatter adds a '\n' at the end. For header value, it should be removed.
+      // https://github.com/envoyproxy/envoy/blob/master/source/common/formatter/substitution_formatter.cc#L129
+      if (body_text[body_text.length() - 1] == '\n') {
+        body_text = body_text.substr(0, body_text.length() - 1);
+      }
       response_headers->setGrpcMessage(PercentEncoding::encode(body_text));
     }
     encode_functions.encode_headers_(std::move(response_headers), true); // Trailers only response

@@ -68,6 +68,8 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/common/aws @lavignes @mattklein123
 # adaptive concurrency limit extension.
 /*/extensions/filters/http/adaptive_concurrency @tonya11en @mattklein123
+# admission control extension.
+/*/extensions/filters/http/admission_control @tonya11en @mattklein123
 # http inspector
 /*/extensions/filters/listener/http_inspector @yxue @PiotrSikora @lizan
 # attribute context

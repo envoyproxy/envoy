@@ -1,6 +1,8 @@
 #pragma once
 
 #include "envoy/common/pure.h"
+#include "envoy/event/deferred_deletable.h"
+#include "envoy/upstream/upstream.h"
 
 namespace Envoy {
 namespace ConnectionPool {
@@ -32,6 +34,40 @@ public:
    * @param cancel_policy a CancelPolicy that controls the behavior of this cancellation.
    */
   virtual void cancel(CancelPolicy cancel_policy) PURE;
+};
+
+/*
+ * An instance of a generic connection pool.
+ */
+class Instance : public Event::DeferredDeletable {
+public:
+  ~Instance() override = default;
+
+  /**
+   * Called when a connection pool has been drained of pending requests, busy connections, and
+   * ready connections.
+   */
+  using DrainedCb = std::function<void()>;
+
+  /**
+   * Register a callback that gets called when the connection pool is fully drained. No actual
+   * draining is done. The owner of the connection pool is responsible for not creating any
+   * new streams.
+   */
+  virtual void addDrainedCallback(DrainedCb cb) PURE;
+
+  /**
+   * Actively drain all existing connection pool connections. This method can be used in cases
+   * where the connection pool is not being destroyed, but the caller wishes to make sure that
+   * all new streams take place on a new connection. For example, when a health check failure
+   * occurs.
+   */
+  virtual void drainConnections() PURE;
+
+  /**
+   * @return Upstream::HostDescriptionConstSharedPtr the host for which connections are pooled.
+   */
+  virtual Upstream::HostDescriptionConstSharedPtr host() const PURE;
 };
 
 enum class PoolFailureReason {

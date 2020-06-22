@@ -372,7 +372,7 @@ void BaseIntegrationTest::createEnvoy() {
                  MessageUtil::getYamlStringFromMessage(bootstrap));
 
   const std::string bootstrap_path = TestEnvironment::writeStringToFileForTest(
-      "bootstrap.json", MessageUtil::getJsonStringFromMessage(bootstrap));
+      "bootstrap.pb", TestUtility::getProtobufBinaryStringFromMessage(bootstrap));
 
   std::vector<std::string> named_ports;
   const auto& static_resources = config_helper_.bootstrap().static_resources();
