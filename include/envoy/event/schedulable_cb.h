@@ -13,17 +13,18 @@ namespace Event {
  */
 class SchedulableCallback {
 public:
-  SchedulableCallback() = default;
   virtual ~SchedulableCallback() = default;
 
   /**
    * Schedule the callback so it runs in the current iteration of the event loop.
    */
   virtual void scheduleCallback() PURE;
+
   /**
    * Cancel pending execution of the callback.
    */
   virtual void cancel() PURE;
+
   /**
    * Return true whether the SchedulableCallback is scheduled for execution.
    */

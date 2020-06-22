@@ -177,6 +177,7 @@ private:
 class MockSchedulableCallback : public SchedulableCallback {
 public:
   MockSchedulableCallback(MockDispatcher* dispatcher);
+  ~MockSchedulableCallback() override;
 
   void invokeCallback() {
     EXPECT_TRUE(enabled_);

@@ -50,6 +50,8 @@ MockTimer::MockTimer(MockDispatcher* dispatcher) : MockTimer() {
 
 MockTimer::~MockTimer() = default;
 
+MockSchedulableCallback::~MockSchedulableCallback() = default;
+
 MockSchedulableCallback::MockSchedulableCallback(MockDispatcher* dispatcher)
     : dispatcher_(dispatcher) {
   EXPECT_CALL(*dispatcher, createSchedulableCallback_(_))

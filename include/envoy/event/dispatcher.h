@@ -167,8 +167,8 @@ public:
   /**
    * Allocates a schedulable callback. @see SchedulableCallback for docs on how to use the wrapped
    * callback.
-   * @param cb supplies the callback to invoke when the SchedulableCallback is triggered the event
-   * loop.
+   * @param cb supplies the callback to invoke when the SchedulableCallback is triggered on the
+   * event loop.
    */
   virtual Event::SchedulableCallbackPtr createSchedulableCallback(std::function<void()> cb) PURE;
 
