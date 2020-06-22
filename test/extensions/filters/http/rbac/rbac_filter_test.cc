@@ -133,6 +133,14 @@ TEST_F(RoleBasedAccessControlFilterTest, Path) {
       {":authority", "host"},
   };
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers, false));
+
+  headers = Http::TestRequestHeaderMapImpl{
+    {":method", "GET"},
+    {":path", "prefix/suffix/next"},
+    {":scheme", "http"},
+    {":authority", "host"},
+  };
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));
 }
 
 TEST_F(RoleBasedAccessControlFilterTest, Denied) {
@@ -177,10 +185,9 @@ TEST_F(RoleBasedAccessControlFilterTest, RouteLocalOverride) {
 //Log Tests
 TEST_F(RoleBasedAccessControlFilterTest, ShouldLog) {
   setDestinationPort(123);
+  setMetadata();
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, log_filter_.decodeHeaders(headers_, false));
-  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
-  EXPECT_EQ(Http::FilterMetadataStatus::Continue, log_filter_.decodeMetadata(metadata_map));
   EXPECT_EQ(1U, log_config_->stats().allowed_.value());
   EXPECT_EQ(0U, log_config_->stats().shadow_denied_.value());
 
@@ -188,15 +195,15 @@ TEST_F(RoleBasedAccessControlFilterTest, ShouldLog) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, log_filter_.decodeData(data, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, log_filter_.decodeTrailers(trailers_));
 
-  EXPECT_EQ("yes", req_info_.filterState()->getDataMutable<RBACShouldLogState>("kRbacShouldLog").value());
+  auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at(HttpFilterNames::get().Rbac);
+  EXPECT_EQ("yes", filter_meta.fields().at("envoy.log").string_value());
 }
 
 TEST_F(RoleBasedAccessControlFilterTest, ShouldNotLog) {
   setDestinationPort(456);
+  setMetadata();
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, log_filter_.decodeHeaders(headers_, false));
-  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
-  EXPECT_EQ(Http::FilterMetadataStatus::Continue, log_filter_.decodeMetadata(metadata_map));
   EXPECT_EQ(1U, log_config_->stats().allowed_.value());
   EXPECT_EQ(0U, log_config_->stats().shadow_denied_.value());
 
@@ -204,7 +211,8 @@ TEST_F(RoleBasedAccessControlFilterTest, ShouldNotLog) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, log_filter_.decodeData(data, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, log_filter_.decodeTrailers(trailers_));
 
-  EXPECT_EQ("no", req_info_.filterState()->getDataMutable<RBACShouldLogState>("kRbacShouldLog").value());
+  auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at(HttpFilterNames::get().Rbac);
+  EXPECT_EQ("no", filter_meta.fields().at("envoy.log").string_value());
 }
 
 } // namespace
