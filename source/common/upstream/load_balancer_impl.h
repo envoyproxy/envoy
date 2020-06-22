@@ -440,7 +440,8 @@ private:
  *    The benefit of the Maglev table is at the expense of resolution, memory usage is capped.
  *    Additionally, the Maglev table can be shared amongst all threads.
  */
-class LeastRequestLoadBalancer : public EdfLoadBalancerBase {
+class LeastRequestLoadBalancer : public EdfLoadBalancerBase,
+                                 Logger::Loggable<Logger::Id::upstream> {
 public:
   LeastRequestLoadBalancer(
       const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
@@ -454,19 +455,24 @@ public:
             least_request_config.has_value()
                 ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(least_request_config.value(), choice_count, 2)
                 : 2),
-        active_requests_exponent_runtime_(
-            least_request_config.has_value() && least_request_config->has_active_requests_exponent()
+        active_request_bias_runtime_(
+            least_request_config.has_value() && least_request_config->has_active_request_bias()
                 ? absl::optional<Runtime::Double>(
-                      Runtime::Double(least_request_config->active_requests_exponent(), runtime))
+                      Runtime::Double(least_request_config->active_request_bias(), runtime))
                 : absl::nullopt) {
     initialize();
   }
 
 protected:
   void refresh(uint32_t priority) override {
-    active_requests_exponent_ = active_requests_exponent_runtime_.has_value()
-                                    ? active_requests_exponent_runtime_->value()
-                                    : 1.0;
+    active_request_bias_ =
+        active_request_bias_runtime_.has_value() ? active_request_bias_runtime_->value() : 1.0;
+
+    if (active_request_bias_ < 0.0) {
+      ENVOY_LOG(warn, "upstream: invalid active request bias supplied (runtime key {}), using 1.0",
+                active_request_bias_runtime_->runtime_key());
+      active_request_bias_ = 1.0;
+    }
 
     EdfLoadBalancerBase::refresh(priority);
   }
@@ -477,30 +483,30 @@ private:
     // This method is called to calculate the dynamic weight as following when all load balancing
     // weights are not equal:
     //
-    // `weight = load_balancing_weight / (active_requests + 1)^active_requests_exponent`
+    // `weight = load_balancing_weight / (active_requests + 1)^active_request_bias`
     //
-    // `active_requests_exponent` can be configured via runtime and its value is cached in
-    // `active_requests_exponent_` to avoid having to do a runtime lookup each time a host weight is
+    // `active_request_bias` can be configured via runtime and its value is cached in
+    // `active_request_bias_` to avoid having to do a runtime lookup each time a host weight is
     // calculated.
     //
-    // When `active_requests_exponent == 0.0` we behave like `RoundRobinLoadBalancer` and return the
+    // When `active_request_bias == 0.0` we behave like `RoundRobinLoadBalancer` and return the
     // host weight without considering the number of active requests at the time we do the pick.
     //
-    // When `active_requests_exponent > 0.0` we scale the host weight by the number of active
+    // When `active_request_bias > 0.0` we scale the host weight by the number of active
     // requests at the time we do the pick. We always add 1 to avoid division by 0.
     //
     // It might be possible to do better by picking two hosts off of the schedule, and selecting the
     // one with fewer active requests at the time of selection.
-    if (active_requests_exponent_ == 0.0) {
+    if (active_request_bias_ == 0.0) {
       return host.weight();
     }
 
-    if (active_requests_exponent_ == 1.0) {
+    if (active_request_bias_ == 1.0) {
       return static_cast<double>(host.weight()) / (host.stats().rq_active_.value() + 1);
     }
 
     return static_cast<double>(host.weight()) /
-           std::pow(host.stats().rq_active_.value() + 1, active_requests_exponent_);
+           std::pow(host.stats().rq_active_.value() + 1, active_request_bias_);
   }
   HostConstSharedPtr unweightedHostPick(const HostVector& hosts_to_use,
                                         const HostsSource& source) override;
@@ -510,9 +516,9 @@ private:
   // The exponent used to calculate host weights can be configured via runtime. We cache it for
   // performance reasons and refresh it in `LeastRequestLoadBalancer::refresh(uint32_t priority)`
   // whenever a `HostSet` is updated.
-  double active_requests_exponent_;
+  double active_request_bias_;
 
-  const absl::optional<Runtime::Double> active_requests_exponent_runtime_;
+  const absl::optional<Runtime::Double> active_request_bias_runtime_;
 };
 
 /**
