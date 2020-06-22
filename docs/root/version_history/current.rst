@@ -14,6 +14,7 @@ Minor Behavior Changes
 
 * access loggers: applied existing buffer limits to access logs, as well as :ref:`stats <config_access_log_stats>` for logged / dropped logs. This can be reverted temporarily by setting runtime feature `envoy.reloadable_features.disallow_unbounded_access_logs` to false.
 * build: run as non-root inside Docker containers. Existing behaviour can be restored by setting the environment variable `ENVOY_UID` to `0`. `ENVOY_UID` and `ENVOY_GID` can be used to set the envoy user's `uid` and `gid` respectively.
+* health check: in the health check filter the :ref:`percentage of healthy servers in upstream clusters <envoy_api_field_config.filter.http.health_check.v2.HealthCheck.cluster_min_healthy_percentages>` is now interpreted as an integer.
 * hot restart: added the option :option:`--use-dynamic-base-id` to select an unused base ID at startup and the option :option:`--base-id-path` to write the base id to a file (for reuse with later hot restarts).
 * http: fixed several bugs with applying correct connection close behavior across the http connection manager, health checker, and connection pool. This behavior may be temporarily reverted by setting runtime feature `envoy.reloadable_features.fix_connection_close` to false.
 * http: fixed a bug where the upgrade header was not cleared on responses to non-upgrade requests.
@@ -61,6 +62,7 @@ New Features
 * config: added :ref:`version_text <config_cluster_manager_cds>` stat that reflects xDS version.
 * decompressor: generic :ref:`decompressor <config_http_filters_decompressor>` filter exposed to users.
 * dynamic forward proxy: added :ref:`SNI based dynamic forward proxy <config_network_filters_sni_dynamic_forward_proxy>` support.
+* dynamic forward proxy: added :ref:`allow_insecure_cluster_options<envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig.allow_insecure_cluster_options>` to allow disabling of auto_san_validation and auto_sni.
 * ext_authz filter: added :ref:`v2 deny_at_disable <envoy_api_field_config.filter.http.ext_authz.v2.ExtAuthz.deny_at_disable>`, :ref:`v3 deny_at_disable <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.deny_at_disable>`. This allows to force deny for protected path while filter gets disabled, by setting this key to true.
 * ext_authz filter: added API version field for both :ref:`HTTP <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.transport_api_version>`
   and :ref:`Network <envoy_v3_api_field_extensions.filters.network.ext_authz.v3.ExtAuthz.transport_api_version>` filters to explicitly set the version of gRPC service endpoint and message to be used.
