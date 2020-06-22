@@ -130,7 +130,7 @@ void QuicFilterManagerConnectionImpl::rawWrite(Buffer::Instance& /*data*/, bool 
 }
 
 void QuicFilterManagerConnectionImpl::adjustBytesToSend(int64_t delta) {
-  size_t bytes_to_send_old = bytes_to_send_;
+  const size_t bytes_to_send_old = bytes_to_send_;
   bytes_to_send_ += delta;
   if (delta < 0) {
     ASSERT(bytes_to_send_old > bytes_to_send_);
