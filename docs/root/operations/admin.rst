@@ -259,7 +259,9 @@ modify different aspects of the server:
    is inbound or outbound.
 
    .. http:post:: /drain_listeners?graceful
-   :ref:When draining listeners, enter a graceful drain period prior to closing listeners. This behaviour and duration is determined by server options for the drain manager, and includes sending H1 connection-close, H2 GOAWAYs, and terminating connections on request complete.
+   :ref:When draining listeners, enter a graceful drain period prior to closing listeners. 
+   This behaviour and duration is determined by server options for the drain manager, and 
+   includes sending H1 connection-close, H2 GOAWAYs, and terminating connections on request complete.
 
 .. attention::
 
