@@ -12,50 +12,7 @@
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
 
-// TODO(fredlas) set_node_on_first_message_only was true; the delta+SotW unification
-//               work restores it here.
 namespace Envoy {
-static std::string adsIntegrationConfig(const std::string& api_type,
-                                        const std::string& api_version = "V2") {
-  // Note: do not use CONSTRUCT_ON_FIRST_USE here!
-  return fmt::format(R"EOF(
-dynamic_resources:
-  lds_config:
-    resource_api_version: {1}
-    ads: {{}}
-  cds_config:
-    resource_api_version: {1}
-    ads: {{}}
-  ads_config:
-    transport_api_version: {1}
-    api_type: {0}
-    set_node_on_first_message_only: false
-static_resources:
-  clusters:
-    name: dummy_cluster
-    connect_timeout:
-      seconds: 5
-    type: STATIC
-    load_assignment:
-      cluster_name: dummy_cluster
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: 127.0.0.1
-                port_value: 0
-    lb_policy: ROUND_ROBIN
-    http2_protocol_options: {{}}
-admin:
-  access_log_path: /dev/null
-  address:
-    socket_address:
-      address: 127.0.0.1
-      port_value: 0
-)EOF",
-                     api_type, api_version);
-}
 
 class AdsIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest, public HttpIntegrationTest {
 public:
@@ -93,8 +50,6 @@ public:
   envoy::admin::v3::RoutesConfigDump getRoutesConfigDump();
 
   envoy::config::core::v3::ApiVersion api_version_;
-
-  bool shouldBoost();
 };
 
 } // namespace Envoy
