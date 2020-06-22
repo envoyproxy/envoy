@@ -1,7 +1,5 @@
 #include "common/network/utility.h"
 
-#include <bits/stdint-uintn.h>
-
 #include <cstdint>
 #include <list>
 #include <memory>
