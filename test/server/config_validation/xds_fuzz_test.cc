@@ -7,13 +7,13 @@
 namespace Envoy {
 
 DEFINE_PROTO_FUZZER(const test::server::config_validation::XdsTestCase& input) {
-  /* RELEASE_ASSERT(!TestEnvironment::getIpVersionsForTest().empty(), ""); */
-  /* try { */
-  /*   TestUtility::validate(input); */
-  /* } catch (const ProtoValidationException& e) { */
-  /*   ENVOY_LOG_MISC(debug, "ProtoValidationException: {}", e.what()); */
-  /*   return; */
-  /* } */
+  RELEASE_ASSERT(!TestEnvironment::getIpVersionsForTest().empty(), "");
+  try {
+    TestUtility::validate(input);
+  } catch (const ProtoValidationException& e) {
+    ENVOY_LOG_MISC(debug, "ProtoValidationException: {}", e.what());
+    return;
+  }
   XdsFuzzTest test(input, envoy::config::core::v3::ApiVersion::V3);
   test.replay();
 }

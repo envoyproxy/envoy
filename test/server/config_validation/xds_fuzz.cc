@@ -216,6 +216,8 @@ void XdsFuzzTest::replay() {
       if (!removed) {
         // if the route was already in routes_, don't send another request
         updateRoute(routes_, {route}, {});
+      } else {
+        updateRoute(routes_, {}, {});
       }
       break;
     }
