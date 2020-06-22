@@ -15,10 +15,6 @@
 namespace Envoy {
 namespace Network {
 
-Address::InstanceConstSharedPtr BaseListenerImpl::getLocalAddress(os_fd_t fd) {
-  return SocketInterfaceSingleton::get().addressFromFd(fd);
-}
-
 BaseListenerImpl::BaseListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket)
     : local_address_(nullptr), dispatcher_(dispatcher), socket_(std::move(socket)) {
   const auto ip = socket_->localAddress()->ip();

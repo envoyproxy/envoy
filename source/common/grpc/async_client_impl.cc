@@ -100,7 +100,7 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
 void AsyncStreamImpl::onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
   const auto http_response_status = Http::Utility::getResponseStatus(*headers);
   const auto grpc_status = Common::getGrpcStatus(*headers);
-  callbacks_.onReceiveInitialMetadata(end_stream ? std::make_unique<Http::ResponseHeaderMapImpl>()
+  callbacks_.onReceiveInitialMetadata(end_stream ? Http::ResponseHeaderMapImpl::create()
                                                  : std::move(headers));
   if (http_response_status != enumToInt(Http::Code::OK)) {
     // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md requires that
@@ -108,6 +108,10 @@ void AsyncStreamImpl::onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_s
     if (end_stream && grpc_status) {
       // Due to headers/trailers type differences we need to copy here. This is an uncommon case but
       // we can potentially optimize in the future.
+
+      // TODO(mattklein123): clang-tidy is showing a use after move when passing to
+      // onReceiveInitialMetadata() above. This looks like an actual bug that I will fix in a
+      // follow up.
       onTrailers(Http::createHeaderMap<Http::ResponseTrailerMapImpl>(*headers));
       return;
     }
@@ -163,7 +167,7 @@ void AsyncStreamImpl::onTrailers(Http::ResponseTrailerMapPtr&& trailers) {
 }
 
 void AsyncStreamImpl::streamError(Status::GrpcStatus grpc_status, const std::string& message) {
-  callbacks_.onReceiveTrailingMetadata(std::make_unique<Http::ResponseTrailerMapImpl>());
+  callbacks_.onReceiveTrailingMetadata(Http::ResponseTrailerMapImpl::create());
   callbacks_.onRemoteClose(grpc_status, message);
   resetStream();
 }

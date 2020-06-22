@@ -27,7 +27,7 @@ ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSha
                            const Network::ConnectionSocket::OptionsSharedPtr& options,
                            const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
     : ConnPoolImplBase(std::move(host), std::move(priority), dispatcher, options,
-                       transport_socket_options),
+                       transport_socket_options, Protocol::Http11),
       upstream_ready_timer_(dispatcher_.createTimer([this]() {
         upstream_ready_enabled_ = false;
         onUpstreamReady();

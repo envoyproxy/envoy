@@ -313,16 +313,19 @@ static_resources:
 }
 
 // TODO(#6327) cleaner approach to testing with static config.
-std::string ConfigHelper::adsBootstrap(const std::string& api_type) {
-  return fmt::format(
-      R"EOF(
+std::string ConfigHelper::adsBootstrap(const std::string& api_type,
+                                       envoy::config::core::v3::ApiVersion api_version) {
+  return fmt::format(R"EOF(
 dynamic_resources:
   lds_config:
+    resource_api_version: {1}
     ads: {{}}
   cds_config:
+    resource_api_version: {1}
     ads: {{}}
   ads_config:
-    api_type: {}
+    transport_api_version: {1}
+    api_type: {0}
 static_resources:
   clusters:
     name: dummy_cluster
@@ -341,17 +344,19 @@ static_resources:
     lb_policy: ROUND_ROBIN
     http2_protocol_options: {{}}
 admin:
-  access_log_path: {}
+  access_log_path: {2}
   address:
     socket_address:
       address: 127.0.0.1
       port_value: 0
 )EOF",
-      TestEnvironment::nullDevicePath(), api_type);
+                     api_type, api_version == envoy::config::core::v3::ApiVersion::V2 ? "V2" : "V3",
+                     TestEnvironment::nullDevicePath());
 }
 
-envoy::config::cluster::v3::Cluster ConfigHelper::buildCluster(const std::string& name, int port,
-                                                               const std::string& ip_version) {
+// TODO(samflattery): bundle this up with buildCluster
+envoy::config::cluster::v3::Cluster
+ConfigHelper::buildStaticCluster(const std::string& name, int port, const std::string& address) {
   return TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(fmt::format(R"EOF(
       name: {}
       connect_timeout: 5s
@@ -369,7 +374,108 @@ envoy::config::cluster::v3::Cluster ConfigHelper::buildCluster(const std::string
       http2_protocol_options: {{}}
     )EOF",
                                                                                  name, name,
-                                                                                 ip_version, port));
+                                                                                 address, port));
+}
+
+envoy::config::cluster::v3::Cluster
+ConfigHelper::buildCluster(const std::string& name, const std::string& lb_policy,
+                           envoy::config::core::v3::ApiVersion api_version) {
+  API_NO_BOOST(envoy::config::cluster::v3::Cluster) cluster;
+  TestUtility::loadFromYaml(fmt::format(R"EOF(
+      name: {}
+      connect_timeout: 5s
+      type: EDS
+      eds_cluster_config:
+        eds_config:
+          resource_api_version: {}
+          ads: {{}}
+      lb_policy: {}
+      http2_protocol_options: {{}}
+    )EOF",
+                                        name, apiVersionStr(api_version), lb_policy),
+                            cluster, shouldBoost(api_version));
+  return cluster;
+}
+
+envoy::config::endpoint::v3::ClusterLoadAssignment
+ConfigHelper::buildClusterLoadAssignment(const std::string& name, const std::string& address,
+                                         uint32_t port,
+                                         envoy::config::core::v3::ApiVersion api_version) {
+  API_NO_BOOST(envoy::config::endpoint::v3::ClusterLoadAssignment) cluster_load_assignment;
+  TestUtility::loadFromYaml(fmt::format(R"EOF(
+      cluster_name: {}
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: {}
+                port_value: {}
+    )EOF",
+                                        name, address, port),
+                            cluster_load_assignment, shouldBoost(api_version));
+  return cluster_load_assignment;
+}
+
+envoy::config::listener::v3::Listener
+ConfigHelper::buildBaseListener(const std::string& name, const std::string& address,
+                                const std::string& filter_chains,
+                                envoy::config::core::v3::ApiVersion api_version) {
+  API_NO_BOOST(envoy::config::listener::v3::Listener) listener;
+  TestUtility::loadFromYaml(fmt::format(
+                                R"EOF(
+      name: {}
+      address:
+        socket_address:
+          address: {}
+          port_value: 0
+      filter_chains:
+      {}
+    )EOF",
+                                name, address, filter_chains),
+                            listener, shouldBoost(api_version));
+  return listener;
+}
+
+envoy::config::listener::v3::Listener
+ConfigHelper::buildListener(const std::string& name, const std::string& route_config,
+                            const std::string& address, const std::string& stat_prefix,
+                            envoy::config::core::v3::ApiVersion api_version) {
+  std::string hcm = fmt::format(
+      R"EOF(
+        filters:
+        - name: http
+          typed_config:
+            "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+            stat_prefix: {}
+            codec_type: HTTP2
+            rds:
+              route_config_name: {}
+              config_source:
+                resource_api_version: {}
+                ads: {{}}
+            http_filters: [{{ name: envoy.filters.http.router }}]
+    )EOF",
+      stat_prefix, route_config, apiVersionStr(api_version));
+  return buildBaseListener(name, address, hcm, api_version);
+}
+
+envoy::config::route::v3::RouteConfiguration
+ConfigHelper::buildRouteConfig(const std::string& name, const std::string& cluster,
+                               envoy::config::core::v3::ApiVersion api_version) {
+  API_NO_BOOST(envoy::config::route::v3::RouteConfiguration) route;
+  TestUtility::loadFromYaml(fmt::format(R"EOF(
+      name: {}
+      virtual_hosts:
+      - name: integration
+        domains: ["*"]
+        routes:
+        - match: {{ prefix: "/" }}
+          route: {{ cluster: {} }}
+    )EOF",
+                                        name, cluster),
+                            route, shouldBoost(api_version));
+  return route;
 }
 
 envoy::config::endpoint::v3::Endpoint ConfigHelper::buildEndpoint(const std::string& address) {
@@ -801,8 +907,8 @@ bool ConfigHelper::setListenerAccessLog(const std::string& filename, absl::strin
 void ConfigHelper::initializeTls(
     const ServerSslOptions& options,
     envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
-  common_tls_context.add_alpn_protocols("h2");
-  common_tls_context.add_alpn_protocols("http/1.1");
+  common_tls_context.add_alpn_protocols(Http::Utility::AlpnNames::get().Http2);
+  common_tls_context.add_alpn_protocols(Http::Utility::AlpnNames::get().Http11);
 
   auto* validation_context = common_tls_context.mutable_validation_context();
   validation_context->mutable_trusted_ca()->set_filename(

@@ -790,6 +790,13 @@ public:
   lbOriginalDstConfig() const PURE;
 
   /**
+   * @return const absl::optional<envoy::config::core::v3::TypedExtensionConfig>& the configuration
+   *         for the upstream, if a custom upstream is configured.
+   */
+  virtual const absl::optional<envoy::config::core::v3::TypedExtensionConfig>&
+  upstreamConfig() const PURE;
+
+  /**
    * @return Whether the cluster is currently in maintenance mode and should not be routed to.
    *         Different filters may handle this situation in different ways. The implementation
    *         of this routine is typically based on randomness and may not return the same answer

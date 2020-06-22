@@ -1,16 +1,54 @@
 #include "common/http/conn_pool_base.h"
 
+#include "common/common/assert.h"
+#include "common/http/utility.h"
+#include "common/network/transport_socket_options_impl.h"
+#include "common/runtime/runtime_features.h"
 #include "common/stats/timespan_impl.h"
 #include "common/upstream/upstream_impl.h"
 
 namespace Envoy {
 namespace Http {
+Network::TransportSocketOptionsSharedPtr
+wrapTransportSocketOptions(Network::TransportSocketOptionsSharedPtr transport_socket_options,
+                           Protocol protocol) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http_default_alpn")) {
+    return transport_socket_options;
+  }
+
+  // If configured to do so, we override the ALPN to use for the upstream connection to match the
+  // selected protocol.
+  std::string alpn;
+  switch (protocol) {
+  case Http::Protocol::Http10:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  case Http::Protocol::Http11:
+    alpn = Http::Utility::AlpnNames::get().Http11;
+    break;
+  case Http::Protocol::Http2:
+    alpn = Http::Utility::AlpnNames::get().Http2;
+    break;
+  case Http::Protocol::Http3:
+    // TODO(snowp): Add once HTTP/3 upstream support is added.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    break;
+  }
+
+  if (transport_socket_options) {
+    return std::make_shared<Network::AlpnDecoratingTransportSocketOptions>(
+        std::move(alpn), transport_socket_options);
+  } else {
+    return std::make_shared<Network::TransportSocketOptionsImpl>(
+        "", std::vector<std::string>{}, std::vector<std::string>{}, std::move(alpn));
+  }
+}
+
 ConnPoolImplBase::ConnPoolImplBase(
     Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
-    const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
+    const Network::TransportSocketOptionsSharedPtr& transport_socket_options, Protocol protocol)
     : host_(host), priority_(priority), dispatcher_(dispatcher), socket_options_(options),
-      transport_socket_options_(transport_socket_options) {}
+      transport_socket_options_(wrapTransportSocketOptions(transport_socket_options, protocol)) {}
 
 ConnPoolImplBase::~ConnPoolImplBase() {
   ASSERT(ready_clients_.empty());

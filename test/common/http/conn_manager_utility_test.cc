@@ -237,14 +237,16 @@ TEST_F(ConnectionManagerUtilityTest, DetermineNextProtocol) {
     Network::MockConnection connection;
     EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return(""));
     Buffer::OwnedImpl data("PRI * HTTP/2.0\r\n");
-    EXPECT_EQ("h2", ConnectionManagerUtility::determineNextProtocol(connection, data));
+    EXPECT_EQ(Utility::AlpnNames::get().Http2,
+              ConnectionManagerUtility::determineNextProtocol(connection, data));
   }
 
   {
     Network::MockConnection connection;
     EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return(""));
     Buffer::OwnedImpl data("PRI * HTTP/2");
-    EXPECT_EQ("h2", ConnectionManagerUtility::determineNextProtocol(connection, data));
+    EXPECT_EQ(Utility::AlpnNames::get().Http2,
+              ConnectionManagerUtility::determineNextProtocol(connection, data));
   }
 
   {
