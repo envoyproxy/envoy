@@ -13,8 +13,8 @@ bool CacheFilterUtils::isCacheableRequest(const Http::RequestHeaderMap& headers)
   const Http::HeaderValues& header_values = Http::Headers::get();
   // TODO(toddmgreer): Also serve HEAD requests from cache.
   // TODO(toddmgreer): Check all the other cache-related headers.
-  return headers.Path() && headers.Host() && !headers.Authorization() && !method.empty() &&
-         method == header_values.MethodValues.Get && !forwarded_proto.empty() &&
+  return headers.Path() && headers.Host() && !headers.Authorization() &&
+         (method == header_values.MethodValues.Get) &&
          (forwarded_proto == header_values.SchemeValues.Http ||
           forwarded_proto == header_values.SchemeValues.Https);
 }
