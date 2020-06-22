@@ -361,7 +361,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_EQ("200", request("admin", "GET", "/config_dump?include_eds", response));
   EXPECT_EQ("application/json", ContentType(response));
   json = Json::Factory::loadFromString(response->body());
-  size_t index_eds = 0;
+  index = 0;
   const std::string expected_types_eds[] = {
       "type.googleapis.com/envoy.admin.v3.BootstrapConfigDump",
       "type.googleapis.com/envoy.admin.v3.ClustersConfigDump",
@@ -372,8 +372,8 @@ TEST_P(IntegrationAdminTest, Admin) {
       "type.googleapis.com/envoy.admin.v3.SecretsConfigDump"};
 
   for (const Json::ObjectSharedPtr& obj_ptr : json->getObjectArray("configs")) {
-    EXPECT_TRUE(expected_types_eds[index_eds].compare(obj_ptr->getString("@type")) == 0);
-    index_eds++;
+    EXPECT_TRUE(expected_types_eds[index].compare(obj_ptr->getString("@type")) == 0);
+    index++;
   }
 
   // Validate we can parse as proto.

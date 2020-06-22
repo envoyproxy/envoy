@@ -458,7 +458,7 @@ Http::Code AdminImpl::handlerClusters(absl::string_view url,
 void AdminImpl::addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
                                    const absl::optional<std::string>& mask,
                                    const bool include_eds) const {
-  Envoy::Server::ConfigTracker::CbsMap callbacks_map = std::move(config_tracker_.getCallbacksMap());
+  Envoy::Server::ConfigTracker::CbsMap callbacks_map = config_tracker_.getCallbacksMap();
   if (include_eds) {
     if (!server_.clusterManager().clusters().empty()) {
       callbacks_map.emplace("endpoint", [this] { return dumpEndpointConfigs(); });
@@ -486,7 +486,7 @@ absl::optional<std::pair<Http::Code, std::string>>
 AdminImpl::addResourceToDump(envoy::admin::v3::ConfigDump& dump,
                              const absl::optional<std::string>& mask, const std::string& resource,
                              const bool include_eds) const {
-  Envoy::Server::ConfigTracker::CbsMap callbacks_map = std::move(config_tracker_.getCallbacksMap());
+  Envoy::Server::ConfigTracker::CbsMap callbacks_map = config_tracker_.getCallbacksMap();
   if (include_eds) {
     if (!server_.clusterManager().clusters().empty()) {
       callbacks_map.emplace("endpoint", [this] { return dumpEndpointConfigs(); });
