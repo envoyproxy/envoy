@@ -1432,7 +1432,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
   // loop.
   auto erase_from =
       std::remove_if(current_priority_hosts.begin(), current_priority_hosts.end(),
-                     [&existing_hosts_for_current_priority](const HostSharedPtr& p) mutable {
+                     [&existing_hosts_for_current_priority](const HostSharedPtr& p) {
                        auto existing_itr =
                            existing_hosts_for_current_priority.find(p->address()->asString());
 
@@ -1461,22 +1461,22 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
   const bool dont_remove_healthy_hosts =
       health_checker_ != nullptr && !info()->drainConnectionsOnHostRemoval();
   if (!current_priority_hosts.empty() && dont_remove_healthy_hosts) {
-    erase_from = std::remove_if(
-        current_priority_hosts.begin(), current_priority_hosts.end(),
-        [&updated_hosts, &final_hosts, &max_host_weight](const HostSharedPtr& p) mutable {
-          if (!(p->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC) ||
-                p->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH))) {
-            if (p->weight() > max_host_weight) {
-              max_host_weight = p->weight();
-            }
+    erase_from =
+        std::remove_if(current_priority_hosts.begin(), current_priority_hosts.end(),
+                       [&updated_hosts, &final_hosts, &max_host_weight](const HostSharedPtr& p) {
+                         if (!(p->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC) ||
+                               p->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH))) {
+                           if (p->weight() > max_host_weight) {
+                             max_host_weight = p->weight();
+                           }
 
-            final_hosts.push_back(p);
-            updated_hosts[p->address()->asString()] = p;
-            p->healthFlagSet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL);
-            return true;
-          }
-          return false;
-        });
+                           final_hosts.push_back(p);
+                           updated_hosts[p->address()->asString()] = p;
+                           p->healthFlagSet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL);
+                           return true;
+                         }
+                         return false;
+                       });
     current_priority_hosts.erase(erase_from, current_priority_hosts.end());
   }
 

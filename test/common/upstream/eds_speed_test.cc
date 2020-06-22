@@ -172,8 +172,11 @@ static void priorityAndLocalityWeighted(benchmark::State& state) {
   }
 }
 
+// The endpoint count (1, 2) is intentionally very low to save on test runtime
+// if you're not actually interested in this benchmark; (1000, 100000) has been
+// used for measuring impactful changes.
 BENCHMARK(priorityAndLocalityWeighted)
-    ->Ranges({{false, true}, {false, true}, {2000, 100000}})
+    ->Ranges({{false, true}, {false, true}, {1, 2}})
     ->Unit(benchmark::kMillisecond);
 
 static void duplicateUpdate(benchmark::State& state) {
@@ -187,7 +190,11 @@ static void duplicateUpdate(benchmark::State& state) {
   }
 }
 
-BENCHMARK(duplicateUpdate)->Range(2000, 100000)->Unit(benchmark::kMillisecond);
+// The endpoint count (100) here and elsewhere is intentionally low to save on
+// resources in continous testing, if you're trying to quantify new changes,
+// Range(2000, 100000) is a reasonable starting point.
+BENCHMARK(duplicateUpdate)->Arg(100)->Unit(benchmark::kMillisecond);
+
 
 static void healthOnlyUpdate(benchmark::State& state) {
   Envoy::Thread::MutexBasicLockable lock;
@@ -200,4 +207,4 @@ static void healthOnlyUpdate(benchmark::State& state) {
   }
 }
 
-BENCHMARK(healthOnlyUpdate)->Range(2000, 100000)->Unit(benchmark::kMillisecond);
+BENCHMARK(healthOnlyUpdate)->Arg(100)->Unit(benchmark::kMillisecond);
