@@ -71,7 +71,8 @@ struct ConnPoolCallbacks : public Tcp::ConnectionPool::Callbacks {
 class ConnPoolBase : public Tcp::ConnectionPool::Instance {
 public:
   ConnPoolBase(Event::MockDispatcher& dispatcher, Upstream::HostSharedPtr host,
-               NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb, bool test_new_connection_pool);
+               NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb,
+               bool test_new_connection_pool);
 
   void addDrainedCallback(DrainedCb cb) override { conn_pool_->addDrainedCallback(cb); }
   void drainConnections() override { conn_pool_->drainConnections(); }
