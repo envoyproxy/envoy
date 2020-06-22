@@ -762,7 +762,7 @@ message HttpFilter {
   // basis, and apply to new streams while the active streams continue using
   // the older filter configurations. If the initial delivery of the filter
   // configuration fails, due to a timeout for example, the optional default
-  // configuration is applied.  Without a default configuration, the filter is
+  // configuration is applied. Without a default configuration, the filter is
   // disabled, and the HTTP listener responds with 500 immediately. After the
   // failure, the listener continues subscribing to the subsequent filter
   // configurations.
