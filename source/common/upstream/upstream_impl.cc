@@ -338,6 +338,9 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
   } else {
     connection_options = options;
   }
+  if (address->ip() && address->ip()->addressAsString() == "127.0.0.255") {
+    return dispatcher.createUserspacePipe(address);
+  }
   Network::ClientConnectionPtr connection = dispatcher.createClientConnection(
       address, cluster.sourceAddress(),
       socket_factory.createTransportSocket(std::move(transport_socket_options)),

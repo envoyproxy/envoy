@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "common/common/macros.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/common/time.h"
 #include "envoy/event/file_event.h"
@@ -107,6 +108,12 @@ public:
                          Network::Address::InstanceConstSharedPtr source_address,
                          Network::TransportSocketPtr&& transport_socket,
                          const Network::ConnectionSocket::OptionsSharedPtr& options) PURE;
+
+  virtual Network::ClientConnectionPtr
+  createUserspacePipe(Network::Address::InstanceConstSharedPtr address) {
+    UNREFERENCED_PARAMETER(address);
+    return nullptr;
+  }
 
   /**
    * Creates an async DNS resolver. The resolver should only be used on the thread that runs this

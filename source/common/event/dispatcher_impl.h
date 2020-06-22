@@ -4,6 +4,7 @@
 #include <functional>
 #include <list>
 #include <memory>
+#include <unordered_map>
 #include <vector>
 
 #include "envoy/api/api.h"
@@ -35,6 +36,8 @@ public:
                  Event::TimeSystem& time_system);
   ~DispatcherImpl() override;
 
+  using PipeFactory = std::function<Network::ClientConnectionPtr(const std::string& pipe_address)>;
+
   /**
    * @return event_base& the libevent base.
    */
@@ -53,6 +56,13 @@ public:
                          Network::Address::InstanceConstSharedPtr source_address,
                          Network::TransportSocketPtr&& transport_socket,
                          const Network::ConnectionSocket::OptionsSharedPtr& options) override;
+
+  void registerPipeFactory(const std::string& pipe_listener, PipeFactory pipe_callback);
+
+  // TODO(lambdai): Pass connection attributes including dest address.
+  Network::ClientConnectionPtr
+  createUserspacePipe(Network::Address::InstanceConstSharedPtr address) override;
+
   Network::DnsResolverSharedPtr
   createDnsResolver(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
                     const bool use_tcp_for_dns_lookups) override;
@@ -119,6 +129,7 @@ private:
   const ScopeTrackedObject* current_object_{};
   bool deferred_deleting_{};
   MonotonicTime approximate_monotonic_time_;
+  std::unordered_map<std::string, PipeFactory> pipe_listeners_;
 };
 
 } // namespace Event

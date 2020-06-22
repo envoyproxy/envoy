@@ -1,5 +1,6 @@
 #include "common/network/listener_impl.h"
 
+#include "common/common/macros.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
@@ -12,6 +13,7 @@
 #include "common/network/address_impl.h"
 #include "common/network/io_socket_handle_impl.h"
 
+#include "envoy/network/connection.h"
 #include "event2/listener.h"
 
 namespace Envoy {
@@ -46,6 +48,16 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
       std::make_unique<AcceptedSocketImpl>(std::move(io_handle), local_address, remote_address));
 }
 
+void ListenerImpl::setupPipeListener(Event::DispatcherImpl& dispatcher,
+                                     const std::string& pipe_listener) {
+  dispatcher.registerPipeFactory(
+      pipe_listener, [this](const std::string& pipe_address) -> Network::ClientConnectionPtr {
+        UNREFERENCED_PARAMETER(this);
+        UNREFERENCED_PARAMETER(pipe_address);
+        return nullptr;
+      });
+}
+
 void ListenerImpl::setupServerSocket(Event::DispatcherImpl& dispatcher, Socket& socket) {
   listener_.reset(
       evconnlistener_new(&dispatcher.base(), listenCallback, this, 0, -1, socket.ioHandle().fd()));
@@ -69,6 +81,7 @@ ListenerImpl::ListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr so
     : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), listener_(nullptr) {
   if (bind_to_port) {
     setupServerSocket(dispatcher, *socket_);
+    setupPipeListener(dispatcher, socket->localAddress()->asString());
   }
 }
 

@@ -122,6 +122,28 @@ DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr 
                                                          std::move(transport_socket), options);
 }
 
+Network::ClientConnectionPtr
+DispatcherImpl::createUserspacePipe(Network::Address::InstanceConstSharedPtr address) {
+  ASSERT(isThreadSafe());
+  if (address == nullptr) {
+    return nullptr;
+  }
+  // Find the listener callback.
+  auto iter = pipe_listeners_.find(address->asString());
+  if (iter == pipe_listeners_.end()) {
+    return nullptr;
+  }
+
+  // create server connection with that callback
+  // wrap to ClientPipeImpl
+  return (iter->second)(address->asString());
+}
+
+void DispatcherImpl::registerPipeFactory(const std::string& pipe_listener,
+                                         DispatcherImpl::PipeFactory pipe_factory) {
+  pipe_listeners_[pipe_listener] = pipe_factory;
+}
+
 Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
     const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
     const bool use_tcp_for_dns_lookups) {
