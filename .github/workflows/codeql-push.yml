@@ -1,8 +1,6 @@
 on:
   push:
   pull_request:
-  schedule:
-    - cron: '0 12 * * 4'
 
 jobs:
   CodeQL-Build:
@@ -37,17 +35,17 @@ jobs:
       shell: bash
       run: |
        sudo apt-get update && sudo apt-get install libtool cmake automake autoconf make ninja-build curl unzip virtualenv openjdk-11-jdk build-essential libc++1
-       mkdir -p bin/clang9
-       cd bin/clang9
-       wget https://releases.llvm.org/9.0.0/clang+llvm-9.0.0-x86_64-linux-gnu-ubuntu-18.04.tar.xz
-       tar -xf clang+llvm-9.0.0-x86_64-linux-gnu-ubuntu-18.04.tar.xz --strip-components 1
-       export PATH=bin/clang9/bin:$PATH
+       mkdir -p bin/clang10
+       cd bin/clang10
+       wget https://github.com/llvm/llvm-project/releases/download/llvmorg-10.0.0/clang+llvm-10.0.0-x86_64-linux-gnu-ubuntu-18.04.tar.xz
+       tar -xf clang+llvm-10.0.0-x86_64-linux-gnu-ubuntu-18.04.tar.xz --strip-components 1
+       export PATH=bin/clang10/bin:$PATH
 
     - name: Build
       run: |
-       bazel/setup_clang.sh bin/clang9
+       bazel/setup_clang.sh bin/clang10
        bazelisk shutdown
-       bazelisk build -c fastbuild --spawn_strategy=local --discard_analysis_cache --nouse_action_cache --config clang --config libc++ //source/common/http/... 
+       bazelisk build -c fastbuild --spawn_strategy=local --discard_analysis_cache --nouse_action_cache --config clang --config libc++ //source/common/http/http1:codec_impl_lib //source/common/http/http2:codec_impl_lib
 
     - name: Clean Artifacts
       run: |
