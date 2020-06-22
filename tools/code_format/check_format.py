@@ -559,6 +559,7 @@ def isInSubdir(filename, *subdirs):
       return True
   return False
 
+
 # Determines if given token exists in line without leading or trailing token characters
 # e.g. will return True for a line containing foo() but not foo_bar() or baz_foo
 def tokenInLine(token, line):
@@ -568,7 +569,8 @@ def tokenInLine(token, line):
     if index < 1:
       break
     if index == 0 or not (line[index - 1].isalnum() or line[index - 1] == '_'):
-      if index + len(token) >= len(line) or not (line[index + len(token)].isalnum() or line[index + len(token)] == '_'):
+      if index + len(token) >= len(line) or not (line[index + len(token)].isalnum() or
+                                                 line[index + len(token)] == '_'):
         return True
     index = index + 1
   return False
