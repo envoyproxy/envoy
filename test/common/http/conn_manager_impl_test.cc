@@ -6061,13 +6061,14 @@ TEST_F(HttpConnectionManagerImplTest, UpstreamHeadersSize) {
   }));
 
   setupFilterChain(1, 0);
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
 
-  std::shared_ptr<Upstream::MockClusterInfo> cluster_info{
-      new NiceMock<Upstream::MockClusterInfo>()};
+  ON_CALL(*decoder_callbacks_.cluster_info_, statsScope()).WillByDefault(ReturnRef(stats_store_));
 
-  EXPECT_CALL(*decoder_filters_[0]->callbacks_, clusterInfo())
-      .WillByDefault(ReturnRef(cluster_info));
-  EXPECT_CALL(cluster_info->stats_store_,
+  decoder_filters_[0]->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  EXPECT_CALL(stats_store_,
               deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_headers_size"),
                                       _)); // TODO: put exact headers size value
 
