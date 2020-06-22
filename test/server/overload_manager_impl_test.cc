@@ -423,7 +423,6 @@ TEST_F(OverloadManagerImplTest, RangeTriggerMaxLessThanMin) {
   EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException, "min_value.*max_value.*");
 }
 
-
 TEST_F(OverloadManagerImplTest, RangeTriggerMaxEqualsMin) {
   const std::string config = R"EOF(
     resource_monitors {
