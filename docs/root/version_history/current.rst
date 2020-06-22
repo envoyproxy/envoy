@@ -79,6 +79,7 @@ New Features
 * grpc-json: send a `x-envoy-original-method` header to grpc services.
 * gzip filter: added option to set zlib's next output buffer size.
 * hds: updated to allow to explicitly set the API version of gRPC service endpoint and message to be used.
+* header to metadata: added support for regex substitutions on header values.
 * health checks: allow configuring health check transport sockets by specifying :ref:`transport socket match criteria <envoy_v3_api_field_config.core.v3.HealthCheck.transport_socket_match_criteria>`.
 * http: added :ref:`local_reply config <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.local_reply_config>` to http_connection_manager to customize :ref:`local reply <config_http_conn_man_local_reply>`.
 * http: added :ref:`stripping port from host header <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.strip_matching_host_port>` support.

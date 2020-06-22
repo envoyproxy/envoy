@@ -3,6 +3,7 @@
 #include "envoy/extensions/filters/http/header_to_metadata/v3/header_to_metadata.pb.h"
 
 #include "common/common/base64.h"
+#include "common/common/regex.h"
 #include "common/config/well_known_names.h"
 #include "common/http/utility.h"
 #include "common/protobuf/protobuf.h"
@@ -16,6 +17,17 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace HeaderToMetadataFilter {
+
+Rule::Rule(const std::string& header, const ProtoRule& rule) : header_(header), rule_(rule) {
+  if (rule.has_on_header_present()) {
+    const auto& on_present = rule.on_header_present();
+    if (on_present.has_regex_value_rewrite()) {
+      auto rewrite_spec = on_present.regex_value_rewrite();
+      regex_rewrite_ = Regex::Utility::parseRegex(rewrite_spec.pattern());
+      regex_rewrite_substitution_ = rewrite_spec.substitution();
+    }
+  }
+}
 
 Config::Config(const envoy::extensions::filters::http::header_to_metadata::v3::Config config,
                const bool per_route) {
@@ -40,8 +52,6 @@ bool Config::configToVector(const ProtobufRepeatedRule& proto_rules,
   }
 
   for (const auto& entry : proto_rules) {
-    std::pair<Http::LowerCaseString, Rule> rule = {Http::LowerCaseString(entry.header()), entry};
-
     // Rule must have at least one of the `on_header_*` fields set.
     if (!entry.has_on_header_present() && !entry.has_on_header_missing()) {
       const auto& error = fmt::format("header to metadata filter: rule for header '{}' has neither "
@@ -50,7 +60,15 @@ bool Config::configToVector(const ProtobufRepeatedRule& proto_rules,
       throw EnvoyException(error);
     }
 
-    vector.push_back(rule);
+    // Ensure value and regex_value_rewrite are not mixed.
+    if (entry.has_on_header_present()) {
+      auto& on_header_present = entry.on_header_present();
+      if (!on_header_present.value().empty() && on_header_present.has_regex_value_rewrite()) {
+        throw EnvoyException("Cannot specificy both value and regex_value_rewrite");
+      }
+    }
+
+    vector.push_back(Rule(entry.header(), entry));
   }
 
   return true;
@@ -164,15 +182,30 @@ void HeaderToMetadataFilter::writeHeaderToMetadata(Http::HeaderMap& headers,
                                                    Http::StreamFilterCallbacks& callbacks) {
   StructMap structs_by_namespace;
 
-  for (const auto& rulePair : rules) {
-    const auto& header = rulePair.first;
-    const auto& rule = rulePair.second;
+  for (const auto& rule : rules) {
+    const auto& header = rule.header();
+    const auto& proto_rule = rule.rule();
     const Http::HeaderEntry* header_entry = headers.get(header);
 
-    if (header_entry != nullptr && rule.has_on_header_present()) {
-      const auto& keyval = rule.on_header_present();
-      absl::string_view value = keyval.value().empty() ? header_entry->value().getStringView()
-                                                       : absl::string_view(keyval.value());
+    if (header_entry != nullptr && proto_rule.has_on_header_present()) {
+      const auto& keyval = proto_rule.on_header_present();
+      std::string rewritten_value;
+      absl::string_view value = header_entry->value().getStringView();
+
+      if (!keyval.value().empty()) {
+        value = absl::string_view(keyval.value());
+      } else {
+        const auto& matcher = rule.regexRewrite();
+        if (matcher != nullptr) {
+          rewritten_value = matcher->replaceAll(value, rule.regexSubstitution());
+          // If there was no replacement, don't add the metadata.
+          if (rewritten_value == value) {
+            value = "";
+          } else {
+            value = rewritten_value;
+          }
+        }
+      }
 
       if (!value.empty()) {
         const auto& nspace = decideNamespace(keyval.metadata_namespace());
@@ -182,12 +215,12 @@ void HeaderToMetadataFilter::writeHeaderToMetadata(Http::HeaderMap& headers,
         ENVOY_LOG(debug, "value is empty, not adding metadata");
       }
 
-      if (rule.remove()) {
+      if (proto_rule.remove()) {
         headers.remove(header);
       }
-    } else if (rule.has_on_header_missing()) {
+    } else if (proto_rule.has_on_header_missing()) {
       // Add metadata for the header missing case.
-      const auto& keyval = rule.on_header_missing();
+      const auto& keyval = proto_rule.on_header_missing();
 
       if (!keyval.value().empty()) {
         const auto& nspace = decideNamespace(keyval.metadata_namespace());

@@ -1,17 +1,17 @@
 syntax = "proto3";
 
-package envoy.extensions.filters.http.header_to_metadata.v3;
+package envoy.extensions.filters.http.header_to_metadata.v4alpha;
 
-import "envoy/type/matcher/v3/regex.proto";
+import "envoy/type/matcher/v4alpha/regex.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.filters.http.header_to_metadata.v3";
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.header_to_metadata.v4alpha";
 option java_outer_classname = "HeaderToMetadataProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
 
 // [#protodoc-title: Header-To-Metadata Filter]
 //
@@ -23,7 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 message Config {
   option (udpa.annotations.versioning).previous_message_type =
-      "envoy.config.filter.http.header_to_metadata.v2.Config";
+      "envoy.extensions.filters.http.header_to_metadata.v3.Config";
 
   enum ValueType {
     STRING = 0;
@@ -49,7 +49,7 @@ message Config {
   // [#next-free-field: 7]
   message KeyValuePair {
     option (udpa.annotations.versioning).previous_message_type =
-        "envoy.config.filter.http.header_to_metadata.v2.Config.KeyValuePair";
+        "envoy.extensions.filters.http.header_to_metadata.v3.Config.KeyValuePair";
 
     // The namespace — if this is empty, the filter's namespace will be used.
     string metadata_namespace = 1;
@@ -80,13 +80,13 @@ message Config {
     // if a match with the header's value happened.
     //
     // Note: if the `value` field is non-empty this field should be empty.
-    type.matcher.v3.RegexMatchAndSubstitute regex_value_rewrite = 6;
+    type.matcher.v4alpha.RegexMatchAndSubstitute regex_value_rewrite = 6;
   }
 
   // A Rule defines what metadata to apply when a header is present or missing.
   message Rule {
     option (udpa.annotations.versioning).previous_message_type =
-        "envoy.config.filter.http.header_to_metadata.v2.Config.Rule";
+        "envoy.extensions.filters.http.header_to_metadata.v3.Config.Rule";
 
     // The header that triggers this rule — required.
     string header = 1
