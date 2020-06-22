@@ -12,6 +12,8 @@ various events. Draining occurs at the following times:
 * The server is being :ref:`hot restarted <arch_overview_hot_restart>`.
 * Individual listeners are being modified or removed via :ref:`LDS
   <arch_overview_dynamic_config_lds>`.
+* The server begins shutdown sequence via the :ref:`drain_listeners?graceful
+  <operations_admin_interface_drain>` admin endpoint.
 
 Each :ref:`configured listener <arch_overview_listeners>` has a :ref:`drain_type
 <envoy_v3_api_enum_config.listener.v3.Listener.DrainType>` setting which controls when draining takes place. The currently
