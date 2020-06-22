@@ -65,8 +65,8 @@ index 7a06170..7c86a5f 100644
      deps = [
 diff --git a/build_config.bzl b/build_config.bzl
 index d5fca65..fc0d7e5 100644
---- a/build_config.bzl
-+++ b/build_config.bzl
+--- a/build_config/build_config.bzl
++++ b/build_config/build_config.bzl
 @@ -1,8 +1,25 @@
 -_default_copts = [
 -    "-std=c++14",
