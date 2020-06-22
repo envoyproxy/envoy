@@ -23,6 +23,7 @@ Minor Behavior Changes
 * http: stopped adding a synthetic path to CONNECT requests, meaning unconfigured CONNECT requests will now return 404 instead of 403. This behavior can be temporarily reverted by setting `envoy.reloadable_features.stop_faking_paths` to false.
 * http: stopped allowing upstream 1xx or 204 responses with Transfer-Encoding or non-zero Content-Length headers. Content-Length of 0 is allowed, but stripped. This behavior can be temporarily reverted by setting `envoy.reloadable_features.strict_1xx_and_204_response_headers` to false.
 * http: upstream connections will now automatically set ALPN when this value is not explicitly set elsewhere (e.g. on the upstream TLS config). This behavior may be temporarily reverted by setting runtime feature `envoy.reloadable_features.http_default_alpn` to false.
+* listener: fixed a bug where when a static listener fails to be added to a worker, the listener was not removed from the active listener list.
 * router: allow retries of streaming or incomplete requests. This removes stat `rq_retry_skipped_request_not_complete`.
 * router: allow retries by default when upstream responds with :ref:`x-envoy-overloaded <config_http_filters_router_x-envoy-overloaded_set>`.
 
