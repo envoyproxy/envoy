@@ -158,11 +158,13 @@ public:
    *
    * Can return nullptr if there is no host available in the cluster or if the cluster does not
    * exist.
+   *
+   * To resolve the protocol to use, we provide the downstream protocol (if one exists).
    */
-  virtual Http::ConnectionPool::Instance* httpConnPoolForCluster(const std::string& cluster,
-                                                                 ResourcePriority priority,
-                                                                 Http::Protocol protocol,
-                                                                 LoadBalancerContext* context) PURE;
+  virtual Http::ConnectionPool::Instance*
+  httpConnPoolForCluster(const std::string& cluster, ResourcePriority priority,
+                         absl::optional<Http::Protocol> downstream_protocol,
+                         LoadBalancerContext* context) PURE;
 
   /**
    * Allocate a load balanced TCP connection pool for a cluster. This is *per-thread* so that

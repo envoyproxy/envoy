@@ -165,10 +165,11 @@ private:
 class HttpConnPool : public GenericConnPool, public Http::ConnectionPool::Callbacks {
 public:
   // GenericConnPool
-  HttpConnPool(Upstream::ClusterManager& cm, const RouteEntry& route_entry, Http::Protocol protocol,
+  HttpConnPool(Upstream::ClusterManager& cm, const RouteEntry& route_entry,
+               absl::optional<Http::Protocol> downstream_protocol,
                Upstream::LoadBalancerContext* ctx) {
-    conn_pool_ =
-        cm.httpConnPoolForCluster(route_entry.clusterName(), route_entry.priority(), protocol, ctx);
+    conn_pool_ = cm.httpConnPoolForCluster(route_entry.clusterName(), route_entry.priority(),
+                                           downstream_protocol, ctx);
   }
   bool valid() const { return conn_pool_ != nullptr; }
 
@@ -194,8 +195,8 @@ private:
 
 class TcpConnPool : public GenericConnPool, public Tcp::ConnectionPool::Callbacks {
 public:
-  TcpConnPool(Upstream::ClusterManager& cm, const RouteEntry& route_entry, Http::Protocol,
-              Upstream::LoadBalancerContext* ctx) {
+  TcpConnPool(Upstream::ClusterManager& cm, const RouteEntry& route_entry,
+              absl::optional<Http::Protocol>, Upstream::LoadBalancerContext* ctx) {
     conn_pool_ = cm.tcpConnPoolForCluster(route_entry.clusterName(),
                                           Upstream::ResourcePriority::Default, ctx);
   }
