@@ -214,7 +214,7 @@ public:
    * @param value target value.
    * @param time_system the time system to use for waiting.
    */
-  static void waitForCounterGe(Stats::Store& store, const std::string& name, uint64_t value,
+  static void waitForCounterGe(Stats::Store& store, absl::string_view name, uint64_t value,
                                Event::TestTimeSystem& time_system);
 
   /**
@@ -224,7 +224,7 @@ public:
    * @param value target value.
    * @param time_system the time system to use for waiting.
    */
-  static void waitForGaugeGe(Stats::Store& store, const std::string& name, uint64_t value,
+  static void waitForGaugeGe(Stats::Store& store, absl::string_view name, uint64_t value,
                              Event::TestTimeSystem& time_system);
 
   /**
@@ -243,7 +243,7 @@ public:
    * @param name supplies the name to search for.
    * @return Stats::TextReadoutSharedPtr the readout or nullptr if there is none.
    */
-  static Stats::TextReadoutSharedPtr findTextReadout(Stats::Store& store, const std::string& name);
+  static Stats::TextReadoutSharedPtr findTextReadout(Stats::Store& store, absl::string_view name);
 
   /**
    * Convert a string list of IP addresses into a list of network addresses usable for DNS
@@ -442,7 +442,7 @@ public:
   //
   // Tests using this will be of the form IpVersions/SslSocketTest.HalfClose/IPv4
   // instead of IpVersions/SslSocketTest.HalfClose/1
-  static absl::string_view
+  static std::string
   ipTestParamsToString(const ::testing::TestParamInfo<Network::Address::IpVersion>& params) {
     return params.param == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6";
   }
