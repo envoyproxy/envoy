@@ -171,10 +171,16 @@ public:
    * @param v the vector of stats.
    * @return the stat
    */
+<<<<<<< HEAD
   template <typename T>
    static T findByName(const std::vector<T>& v,absl::string_view name) {
     auto pos = std::find_if(v.begin(), v.end(),
     [name](const T& stat) -> bool { return stat->name() == name;});
+=======
+  template <typename T> static T findByName(const std::vector<T>& v,absl::string_view name) {
+    auto pos = std::find_if(v.begin(), v.end(),
+                            [name](const T& stat) -> bool { return stat->name() == name; });
+>>>>>>> c74d41e3586a1235050d51c09e26d39460a527de
     if (pos == v.end()) {
       return nullptr;
     }
@@ -195,7 +201,7 @@ public:
    * @param name supplies the name to search for.
    * @return Stats::GaugeSharedPtr the gauge or nullptr if there is none.
    */
-  static Stats::GaugeSharedPtr findGauge(Stats::Store& store, const std::string& name);
+  static Stats::GaugeSharedPtr findGauge(Stats::Store& store, absl::string_view name);
 
   /**
    * Wait till Counter value is equal to the passed ion value.
@@ -234,7 +240,7 @@ public:
    * @param value target value.
    * @param time_system the time system to use for waiting.
    */
-  static void waitForGaugeEq(Stats::Store& store, const std::string& name, uint64_t value,
+  static void waitForGaugeEq(Stats::Store& store, absl::string_view name, uint64_t value,
                              Event::TestTimeSystem& time_system);
 
   /**
