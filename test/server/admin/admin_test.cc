@@ -489,6 +489,7 @@ TEST_P(AdminInstanceTest, ConfigDumpFiltersByResource) {
   EXPECT_EQ(expected_json, output);
 }
 
+// Test that using the resource query parameter filters the config dump including EDS.
 TEST_P(AdminInstanceTest, ConfigDumpWithEndpointFiltersByResource) {
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   ON_CALL(server_.cluster_manager_, clusters()).WillByDefault(ReturnPointee(&cluster_map));
