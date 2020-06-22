@@ -56,7 +56,7 @@ Api::SysCallIntResult SocketImpl::bind(Network::Address::InstanceConstSharedPtr 
       unlink(pipe_sa->sun_path);
     }
     // Not storing a reference to syscalls singleton because of unit test mocks
-    bind_result = io_handle_->bind(address->sockAddr(), address->sockAddrLen());
+    bind_result = io_handle_->bind(address);
     if (pipe->mode() != 0 && !abstract_namespace && bind_result.rc_ == 0) {
       auto set_permissions = Api::OsSysCallsSingleton::get().chmod(pipe_sa->sun_path, pipe->mode());
       if (set_permissions.rc_ != 0) {
@@ -68,7 +68,7 @@ Api::SysCallIntResult SocketImpl::bind(Network::Address::InstanceConstSharedPtr 
     return bind_result;
   }
 
-  bind_result = io_handle_->bind(address->sockAddr(), address->sockAddrLen());
+  bind_result = io_handle_->bind(address);
   if (bind_result.rc_ == 0 && address->ip()->port() == 0) {
     local_address_ = io_handle_->localAddress();
   }
@@ -78,7 +78,7 @@ Api::SysCallIntResult SocketImpl::bind(Network::Address::InstanceConstSharedPtr 
 Api::SysCallIntResult SocketImpl::listen(int backlog) { return io_handle_->listen(backlog); }
 
 Api::SysCallIntResult SocketImpl::connect(const Network::Address::InstanceConstSharedPtr address) {
-  auto result = io_handle_->connect(address->sockAddr(), address->sockAddrLen());
+  auto result = io_handle_->connect(address);
   if (address->type() == Address::Type::Ip) {
     local_address_ = io_handle_->localAddress();
   }
