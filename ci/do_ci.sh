@@ -24,7 +24,7 @@ function collect_build_profile() {
 
 function bazel_with_collection() {
   declare -r BAZEL_OUTPUT="${ENVOY_SRCDIR}"/bazel.output.txt
-  bazel $* | tee "${BAZEL_OUTPUT}"
+  bazel "$@" | tee "${BAZEL_OUTPUT}"
   declare BAZEL_STATUS="${PIPESTATUS[0]}"
   if [ "${BAZEL_STATUS}" != "0" ]
   then
@@ -117,7 +117,7 @@ if [[ "$CI_TARGET" == "bazel.release" ]]; then
   bazel_binary_build release
 
   echo "Testing ${TEST_TARGETS}"
-  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c opt ${TEST_TARGETS} --test_output=all --test_arg="-l info"
+  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c opt ${TEST_TARGETS} --test_output=all --test_arg=-l\ info
   exit 0
 elif [[ "$CI_TARGET" == "bazel.release.server_only" ]]; then
   setup_clang_toolchain
