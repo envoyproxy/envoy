@@ -435,7 +435,7 @@ request_rules:
 )EOF";
   auto expected = "header to metadata filter: rule for header 'x-something' has neither "
                   "`on_header_present` nor `on_header_missing` set";
-  EXPECT_THROW_WITH_MESSAGE(initializeFilter(config), Envoy::EnvoyException, expected);
+  EXPECT_THROW_WITH_MESSAGE(initializeFilter(config), EnvoyException, expected);
 }
 
 TEST_F(HeaderToMetadataTest, PerRouteEmtpyRules) {

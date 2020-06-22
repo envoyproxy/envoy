@@ -99,6 +99,31 @@ request_rules:
   EXPECT_FALSE(config->doResponse());
 }
 
+TEST(HeaderToMetadataFilterConfigTest, ValueAndRegex) {
+  const std::string yaml = R"EOF(
+request_rules:
+  - header: x-version
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: cluster
+      value: foo
+      regex_value_rewrite:
+        pattern:
+          google_re2: {}
+          regex: "^/(cluster[\\d\\w-]+)/?.*$"
+        substitution: "\\1"
+  )EOF";
+
+  HeaderToMetadataProtoConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  HeaderToMetadataConfig factory;
+
+  EXPECT_THROW(factory.createFilterFactoryFromProto(proto_config, "stats", context),
+               EnvoyException);
+}
+
 } // namespace HeaderToMetadataFilter
 } // namespace HttpFilters
 } // namespace Extensions
