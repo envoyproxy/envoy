@@ -122,8 +122,9 @@ Http::Code getPrematureResponseHttpCode(const Status& status);
 
 #define RETURN_IF_ERROR(expr)                                                                      \
   if (::Envoy::Http::Details::StatusAdapter adapter{(expr)}) {                                     \
-  } else                                                                                           \
-    return std::move(adapter.status_)
+  } else {                                                                                         \
+    return std::move(adapter.status_);                                                             \
+  }
 
 namespace Details {
 // Helper class to convert `Status` to `bool` so it can be used inside `if` statements.
