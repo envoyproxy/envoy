@@ -12,3 +12,12 @@ actions {
     data: "123"
   }
 }
+actions {
+  remote_close {
+  }
+}
+actions {
+  local_close {
+  }
+}
+
