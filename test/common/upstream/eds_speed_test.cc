@@ -174,7 +174,7 @@ static void priorityAndLocalityWeighted(benchmark::State& state) {
 
 // The endpoint count (1, 2) is intentionally very low to save on test runtime
 // if you're not actually interested in this benchmark; (1000, 100000) has been
-// used for measuring impactful changes.
+// used for measuring changes.
 BENCHMARK(priorityAndLocalityWeighted)
     ->Ranges({{false, true}, {false, true}, {1, 2}})
     ->Unit(benchmark::kMillisecond);
@@ -191,7 +191,7 @@ static void duplicateUpdate(benchmark::State& state) {
 }
 
 // The endpoint count (100) here and elsewhere is intentionally low to save on
-// resources in continous testing, if you're trying to quantify new changes,
+// resources in continuous testing, if you're trying to quantify new changes,
 // Range(2000, 100000) is a reasonable starting point.
 BENCHMARK(duplicateUpdate)->Arg(100)->Unit(benchmark::kMillisecond);
 
