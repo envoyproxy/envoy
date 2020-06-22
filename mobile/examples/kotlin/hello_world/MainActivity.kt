@@ -18,7 +18,7 @@ import io.envoyproxy.envoymobile.shared.Failure
 import io.envoyproxy.envoymobile.shared.ResponseRecyclerViewAdapter
 import io.envoyproxy.envoymobile.shared.Success
 import java.io.IOException
-import java.util.concurrent.Executor
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 private const val REQUEST_HANDLER_THREAD_NAME = "hello_envoy_kt"
@@ -107,7 +107,7 @@ class MainActivity : Activity() {
         Log.d("MainActivity", msg)
         recyclerView.post { viewAdapter.add(Failure(msg)) }
       }
-      .start(Executor { it.run() })
+      .start(Executors.newSingleThreadExecutor())
       .sendHeaders(requestHeaders, true)
   }
 }
