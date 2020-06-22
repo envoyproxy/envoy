@@ -112,11 +112,7 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta
                                          ValueType type, ValueEncode encode) const {
   ProtobufWkt::Value val;
 
-  if (value.empty()) {
-    // No value, skip. we could allow this though.
-    ENVOY_LOG(debug, "no metadata value provided");
-    return false;
-  }
+  ASSERT(!value.empty());
 
   if (value.size() >= MAX_HEADER_VALUE_LEN) {
     // Too long, go away.
@@ -156,8 +152,7 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta
     break;
   }
   default:
-    ENVOY_LOG(debug, "unknown value type");
-    return false;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   // Have we seen this namespace before?
@@ -222,13 +217,10 @@ void HeaderToMetadataFilter::writeHeaderToMetadata(Http::HeaderMap& headers,
       // Add metadata for the header missing case.
       const auto& keyval = proto_rule.on_header_missing();
 
-      if (!keyval.value().empty()) {
-        const auto& nspace = decideNamespace(keyval.metadata_namespace());
-        addMetadata(structs_by_namespace, nspace, keyval.key(), keyval.value(), keyval.type(),
-                    keyval.encode());
-      } else {
-        ENVOY_LOG(debug, "value is empty, not adding metadata");
-      }
+      ASSERT(!keyval.value().empty());
+      const auto& nspace = decideNamespace(keyval.metadata_namespace());
+      addMetadata(structs_by_namespace, nspace, keyval.key(), keyval.value(), keyval.type(),
+                  keyval.encode());
     }
   }
 
