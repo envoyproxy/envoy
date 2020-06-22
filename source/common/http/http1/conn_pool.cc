@@ -35,7 +35,7 @@ ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSha
 
 ConnPoolImpl::~ConnPoolImpl() { destructAllConnections(); }
 
-ActiveClientPtr ConnPoolImpl::instantiateActiveClient() {
+Envoy::ConnectionPool::ActiveClientPtr ConnPoolImpl::instantiateActiveClient() {
   return std::make_unique<ActiveClient>(*this);
 }
 
@@ -118,8 +118,6 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
       ) {
   parent.host_->cluster().stats().upstream_cx_http1_total_.inc();
 }
-
-bool ConnPoolImpl::ActiveClient::hasActiveRequests() const { return stream_wrapper_ != nullptr; }
 
 bool ConnPoolImpl::ActiveClient::closingWithIncompleteRequest() const {
   return (stream_wrapper_ != nullptr) && (!stream_wrapper_->decode_complete_);

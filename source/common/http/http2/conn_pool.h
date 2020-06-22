@@ -29,7 +29,7 @@ public:
   Http::Protocol protocol() const override { return Http::Protocol::Http2; }
 
   // ConnPoolImplBase
-  ActiveClientPtr instantiateActiveClient() override;
+  Envoy::ConnectionPool::ActiveClientPtr instantiateActiveClient() override;
 
 protected:
   class ActiveClient : public CodecClientCallbacks,
@@ -42,7 +42,6 @@ protected:
     ConnPoolImpl& parent() { return static_cast<ConnPoolImpl&>(parent_); }
 
     // ConnPoolImpl::ActiveClient
-    bool hasActiveRequests() const override;
     bool closingWithIncompleteRequest() const override;
     RequestEncoder& newStreamEncoder(ResponseDecoder& response_decoder) override;
 
