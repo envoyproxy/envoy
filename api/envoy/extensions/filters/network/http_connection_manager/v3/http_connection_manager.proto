@@ -758,14 +758,14 @@ message HttpFilter {
   // [#not-implemented-hide:] Configuration source specifier for the late-bound
   // filter configuration. The HTTP Listener is warmed until all the initial
   // filter configurations are received, unless the flag to apply the default
-  // configuration is set. Subsequent filter updates are atomic, and apply to
-  // new streams while the active streams continue using the older filter
+  // configuration is set. Subsequent filter updates are atomic on a per-worker
+  // basis, and apply to new streams while the active streams continue using
+  // the older filter configurations. If the initial delivery of the filter
+  // configuration fails, due to a timeout for example, the optional default
+  // configuration is applied.  Without a default configuration, the filter is
+  // disabled, and the HTTP listener responds with 500 immediately. After the
+  // failure, the listener continues subscribing to the subsequent filter
   // configurations.
-  // If the initial delivery of the filter configuration fails, due to a
-  // timeout for example, the optional default configuration is applied.
-  // Without a default configuration, the filter is disabled, and the HTTP
-  // listener responds with 500 immediately. After the failure, the listener
-  // continues subscribing to the subsequent filter configurations.
   message HttpFilterConfigSource {
     config.core.v3.ConfigSource config_source = 1;
 
