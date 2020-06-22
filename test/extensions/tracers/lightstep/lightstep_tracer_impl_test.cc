@@ -92,7 +92,8 @@ public:
     ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
         .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
 
-    EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.flush_interval_ms", _))
+    EXPECT_CALL(runtime_.snapshot_,
+                getInteger("tracing.lightstep.flush_interval_ms", testing::Matcher<uint64_t>(_)))
         .Times(AtLeast(1))
         .WillRepeatedly(Return(1000));
 
@@ -670,7 +671,8 @@ TEST_F(LightStepDriverTest, MultiplePropagationModes) {
   ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
       .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
 
-  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.flush_interval_ms", _))
+  EXPECT_CALL(runtime_.snapshot_,
+              getInteger("tracing.lightstep.flush_interval_ms", testing::Matcher<uint64_t>(_)))
       .Times(AtLeast(1))
       .WillRepeatedly(Return(1000));
 
