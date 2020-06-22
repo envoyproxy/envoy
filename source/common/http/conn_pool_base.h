@@ -102,7 +102,7 @@ public:
                    Event::Dispatcher& dispatcher,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
-  virtual ~ConnPoolImplBase();
+  ~ConnPoolImplBase() override;
 
   void addDrainedCallbackImpl(DrainedCb cb);
   void drainConnectionsImpl();
@@ -237,13 +237,13 @@ public:
 
   // Creates a new PendingRequest and enqueues it into the request queue.
   ConnectionPool::Cancellable* newPendingRequest(void* context) override;
-  virtual void onPoolFailure(const Upstream::HostDescriptionConstSharedPtr& host_description,
-                             absl::string_view failure_reason,
-                             ConnectionPool::PoolFailureReason reason, void* context) override {
+  void onPoolFailure(const Upstream::HostDescriptionConstSharedPtr& host_description,
+                     absl::string_view failure_reason, ConnectionPool::PoolFailureReason reason,
+                     void* context) override {
     auto* callbacks = reinterpret_cast<AttachContext*>(context)->second;
     callbacks->onPoolFailure(reason, failure_reason, host_description);
   }
-  virtual void onPoolReady(Envoy::ConnectionPool::ActiveClient& client, void* context) override;
+  void onPoolReady(Envoy::ConnectionPool::ActiveClient& client, void* context) override;
 
   virtual CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
 };
