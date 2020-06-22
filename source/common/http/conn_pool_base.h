@@ -96,7 +96,7 @@ using ActiveClientPtr = std::unique_ptr<ActiveClient>;
 
 // Base class that handles request queueing logic shared between connection pool implementations.
 class ConnPoolImplBase : protected Logger::Loggable<Logger::Id::pool>,
-                         public ConnectionPool::Instance {
+                         public virtual ConnectionPool::Instance {
 public:
   ConnPoolImplBase(Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                    Event::Dispatcher& dispatcher,
