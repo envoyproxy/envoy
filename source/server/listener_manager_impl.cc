@@ -665,8 +665,8 @@ void ListenerManagerImpl::addListenerToWorker(Worker& worker,
           // with addition. It's guaranteed that workers process remove after add so this should be
           // fine.
           //
-          // TODO(mattklein123): We should consider rewriting how listener sockets are added to 
-          // workers, especially in the case of reuse port. If we were to create all needed 
+          // TODO(mattklein123): We should consider rewriting how listener sockets are added to
+          // workers, especially in the case of reuse port. If we were to create all needed
           // listener sockets on the main thread (even in the case of reuse port) we could catch
           // almost all socket errors here. This would both greatly simplify the logic and allow
           // for xDS NACK in most cases.
