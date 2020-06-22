@@ -130,6 +130,14 @@ parseHealthCheckFromV3Yaml(const std::string& yaml_string) {
   return health_check;
 }
 
+// For DEPRECATED TEST CASES
+inline envoy::config::core::v3::HealthCheck
+parseHealthCheckFromV2Yaml(const std::string& yaml_string) {
+  envoy::config::core::v3::HealthCheck health_check;
+  TestUtility::loadFromYamlAndValidate(yaml_string, health_check);
+  return health_check;
+}
+
 inline PrioritySet::UpdateHostsParams
 updateHostsParams(HostVectorConstSharedPtr hosts, HostsPerLocalityConstSharedPtr hosts_per_locality,
                   HealthyHostVectorConstSharedPtr healthy_hosts,

@@ -39,7 +39,7 @@ TEST(HealthCheckerFactoryTest, DEPRECATED_FEATURE_TEST(CreateRedisDeprecated)) {
   EXPECT_NE(
       nullptr,
       dynamic_cast<CustomRedisHealthChecker*>(
-          factory.createCustomHealthChecker(Upstream::parseHealthCheckFromV3Yaml(yaml), context)
+          factory.createCustomHealthChecker(Upstream::parseHealthCheckFromV2Yaml(yaml), context)
               .get()));
 }
 
@@ -87,7 +87,7 @@ TEST(HealthCheckerFactoryTest, DEPRECATED_FEATURE_TEST(CreateRedisWithoutKeyDepr
   EXPECT_NE(
       nullptr,
       dynamic_cast<CustomRedisHealthChecker*>(
-          factory.createCustomHealthChecker(Upstream::parseHealthCheckFromV3Yaml(yaml), context)
+          factory.createCustomHealthChecker(Upstream::parseHealthCheckFromV2Yaml(yaml), context)
               .get()));
 }
 
