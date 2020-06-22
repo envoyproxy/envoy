@@ -53,7 +53,7 @@ public final class GRPCStream: NSObject {
 
     // Message length (4 bytes)
     var length = UInt32(messageData.count).bigEndian
-    prefixData.append(UnsafeBufferPointer(start: &length, count: 1))
+    prefixData.append(Data(bytes: &length, count: MemoryLayout<UInt32>.size))
 
     // Send prefix data followed by message data
     self.underlyingStream.sendData(prefixData)
