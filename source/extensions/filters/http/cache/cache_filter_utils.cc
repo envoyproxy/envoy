@@ -8,15 +8,15 @@ namespace HttpFilters {
 namespace Cache {
 
 bool CacheFilterUtils::isCacheableRequest(const Http::RequestHeaderMap& headers) {
-  const Http::HeaderEntry* method = headers.Method();
-  const Http::HeaderEntry* forwarded_proto = headers.ForwardedProto();
+  const absl::string_view method = headers.getMethodValue();
+  const absl::string_view forwarded_proto = headers.getForwardedProtoValue();
   const Http::HeaderValues& header_values = Http::Headers::get();
   // TODO(toddmgreer): Also serve HEAD requests from cache.
   // TODO(toddmgreer): Check all the other cache-related headers.
-  return method && forwarded_proto && !headers.Authorization() && headers.Path() &&
-         headers.Host() && (method->value() == header_values.MethodValues.Get) &&
-         (forwarded_proto->value() == header_values.SchemeValues.Http ||
-          forwarded_proto->value() == header_values.SchemeValues.Https);
+  return headers.Path() && headers.Host() && !headers.Authorization() && !method.empty() &&
+         method == header_values.MethodValues.Get && !forwarded_proto.empty() &&
+         (forwarded_proto == header_values.SchemeValues.Http ||
+          forwarded_proto == header_values.SchemeValues.Https);
 }
 
 bool CacheFilterUtils::isCacheableResponse(const Http::ResponseHeaderMap& headers) {
