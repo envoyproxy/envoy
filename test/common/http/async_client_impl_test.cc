@@ -277,7 +277,7 @@ TEST_F(AsyncClientImplTest, BasicHashPolicy) {
       }));
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
       .WillOnce(
-          Invoke([&](const std::string&, Upstream::ResourcePriority, Http::Protocol,
+          Invoke([&](const std::string&, Upstream::ResourcePriority, auto,
                      Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
             // this is the hash of :path header value "/"
             EXPECT_EQ(16761507700594825962UL, context->computeHashKey().value());

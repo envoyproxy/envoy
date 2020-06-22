@@ -608,9 +608,8 @@ std::unique_ptr<GenericConnPool> Filter::createConnPool() {
   const bool should_tcp_proxy =
       route_entry_->connectConfig().has_value() &&
       downstream_headers_->getMethodValue() == Http::Headers::get().MethodValues.Connect;
-  Http::Protocol protocol = cluster_->upstreamHttpProtocol(callbacks_->streamInfo().protocol());
-  return factory->createGenericConnPool(config_.cm_, should_tcp_proxy, *route_entry_, protocol,
-                                        this);
+  return factory->createGenericConnPool(config_.cm_, should_tcp_proxy, *route_entry_,
+                                        callbacks_->streamInfo().protocol(), this);
 }
 
 void Filter::sendNoHealthyUpstreamResponse() {

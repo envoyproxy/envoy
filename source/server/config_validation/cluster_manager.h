@@ -65,7 +65,7 @@ public:
                            Event::TimeSystem& time_system);
 
   Http::ConnectionPool::Instance* httpConnPoolForCluster(const std::string&, ResourcePriority,
-                                                         Http::Protocol,
+                                                         absl::optional<Http::Protocol>,
                                                          LoadBalancerContext*) override;
   Host::CreateConnectionData tcpConnForCluster(const std::string&, LoadBalancerContext*) override;
   Http::AsyncClient& httpAsyncClientForCluster(const std::string&) override;
