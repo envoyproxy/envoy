@@ -347,7 +347,7 @@ envoy_cc_library(
     name = "header_parser_lib",
     srcs = ["header_parser.cc"],
     hdrs = ["header_parser.h"],
-    external_deps = ["abseil_optional"],
+    external_deps = ["abseil_str_format"],
     deps = [
         ":header_formatter_lib",
         "//include/envoy/http:header_map_interface",
