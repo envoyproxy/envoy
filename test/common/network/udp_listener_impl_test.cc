@@ -452,7 +452,7 @@ TEST_P(UdpListenerImplTest, SendDataError) {
  */
 TEST_P(UdpListenerImplTest, UdpGroBasic) {
   // We send 4 packets (3 of equal length and 1 as a trail), which are concatenated together by
-  // kernel supporting udp gro. Verify the concatednated packet is transformed back into individual
+  // kernel supporting udp gro. Verify the concatenated packet is transformed back into individual
   // packets
   absl::FixedArray<std::string> client_data({"Equal!!!", "Length!!", "Messages", "trail"});
 
