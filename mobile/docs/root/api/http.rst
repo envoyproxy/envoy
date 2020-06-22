@@ -5,188 +5,251 @@ HTTP requests and streams
 
 Streams are first-class citizens in Envoy Mobile, and are supported out-of-the-box.
 
-In fact, unary (single request, single response) HTTP requests are actually written as simply
-convenience functions on top of streams.
+Unary requests (single request / single response) are also supported using the same interfaces.
 
 -----------
-``Request``
+Quick start
 -----------
 
-Creating a stream is done by initializing a ``Request`` via a ``RequestBuilder``, then passing it to
-a previously created :ref:`Envoy instance <api_starting_envoy>`.
+Below are some quick examples for getting started with HTTP streams. See the individual class references
+in the later sections of this page for in-depth information on how each type is used.
+
+Start and interact with an HTTP stream in **Kotlin**::
+
+  val streamClient = AndroidStreamClientBuilder(application).build()
+
+  val headers = RequestHeadersBuilder(method = RequestMethod.POST, scheme = "https",  authority = "api.envoyproxy.io", path = "/foo")
+    .build()
+  val stream = streamClient
+    .newStreamPrototype()
+    .setOnResponseHeaders { headers, endStream ->
+      Log.d("MainActivity", "[${headers.httpStatus}] Headers received: $headers, end stream: $endStream")
+    }
+    .setOnResponseData { data, endStream ->
+      Log.d("MainActivity", "Received data, end stream: $endStream")
+    }
+    .setOnResponseTrailers { trailers ->
+      Log.d("MainActivity", "Trailers received: $trailers")
+    }
+    .setOnError { ... }
+    .setOnCancel { ... }
+    .start(Executors.newSingleThreadExecutor())
+    .sendHeaders(...)
+    .sendData(...)
+
+  ...
+  stream.close(...)
+
+Start and interact with an HTTP stream in **Swift**::
+
+  let headers = RequestHeadersBuilder(method: .post, scheme: "https", authority: "api.envoyproxy.io", path: "/foo")
+    .build()
+
+  let streamClient = try StreamClientBuilder().build()
+  let stream = streamClient
+    .newStreamPrototype()
+    .setOnResponseHeaders { headers, endStream in
+      print("[\(headers.httpStatus)] Headers received: \(headers), end stream: \(endStream)")
+    }
+    .setOnResponseData { data, endStream in
+      print("Received data, end stream: \(endStream)")
+    }
+    .setOnResponseTrailers { trailers in
+      print("Trailers received: \(trailers)")
+    }
+    .setOnError { ... }
+    .setOnCancel { ... }
+    .start(queue: .main)
+    .sendHeaders()
+    .sendData(...)
+
+  ...
+  stream.close(...)
+
+------------------
+``RequestHeaders``
+------------------
+
+Creating a stream is done by initializing a ``RequestHeaders`` instance via a ``RequestHeadersBuilder``,
+then passing it to a previously created :ref:`StreamClient instance <api_starting_envoy>`.
 
 **Kotlin**::
 
-  val request = RequestBuilder(RequestMethod.POST, "https", "api.envoyproxy.io", "/foo")
+  val headers = RequestHeadersBuilder(RequestMethod.POST, "https", "api.envoyproxy.io", "/foo")
     .addRetryPolicy(RetryPolicy(...))
     .addUpstreamHttpProtocol(UpstreamRequestProtocol.HTTP2)
-    .addHeader("x-custom-header", "foobar")
+    .add("x-custom-header", "foobar")
     ...
     .build()
 
 **Swift**::
 
-  let request = RequestBuilder(method: .post, scheme: "https", authority: "api.envoyproxy.io", path: "/foo")
+  let headers = RequestHeadersBuilder(method: .post, scheme: "https", authority: "api.envoyproxy.io", path: "/foo")
     .addRetryPolicy(RetryPolicy(...))
     .addUpstreamHttpProtocol(.http2)
-    .addHeader(name: "x-custom-header", value: "foobar")
+    .add(name: "x-custom-header", value: "foobar")
     ...
     .build()
 
 -------------------
-``ResponseHandler``
+``StreamPrototype``
 -------------------
 
-In order to receive updates for a given request/stream, a ``ResponseHandler`` must be created.
-This class contains a set of callbacks that are called whenever an update occurs on the stream.
+A ``StreamPrototype`` is used to configure streams prior to starting them by assigning callbacks
+to be invoked when response data is received on the stream.
+
+To create a ``StreamPrototype``, use an instance of ``StreamClient``.
 
 **Kotlin**::
 
-  val handler = ResponseHandler(Executor {})
-    .onHeaders { headers, statusCode, _ ->
-      Log.d("MainActivity", "Received status: " + statusCode + " and headers: " + headers)
-      Unit
+  val prototype = streamClient
+    .newStreamPrototype()
+    .setOnResponseHeaders { headers, endStream ->
+      Log.d("MainActivity", "[${headers.httpStatus}] Headers received: $headers, end stream: $endStream")
     }
-    .onData { buffer, endStream ->
-      if (endStream) {
-        Log.d("MainActivity", "Finished receiving body data")
-      } else {
-        Log.d("MainActivity", "Received body data, more incoming")
-      }
-      Unit
+    .setOnResponseData { data, endStream ->
+      Log.d("MainActivity", "Received data, end stream: $endStream")
     }
-    .onError { error ->
-      Log.d("MainActivity", "Error received: " + error.message)
-      Unit
+    .setOnResponseTrailers { trailers ->
+      Log.d("MainActivity", "Trailers received: $trailers")
     }
-    ...
+    .setOnError { ... }
+    .setOnCancel { ... }
 
 **Swift**::
 
-  let handler = ResponseHandler()
-    .onHeaders { headers, statusCode, _ in
-      print("Received status: \(statusCode) and headers: \(headers)")
+  let prototype = streamClient
+    .newStreamPrototype()
+    .setOnResponseHeaders { headers, endStream in
+      print("[\(headers.httpStatus)] Headers received: \(headers), end stream: \(endStream)")
     }
-    .onData { buffer, endStream in
-      if endStream {
-        print("Finished receiving body data")
-      } else {
-        print("Received body data, more incoming")
-      }
+    .setOnResponseData { data, endStream in
+      print("Received data, end stream: \(endStream)")
     }
-    .onError { error in
-      print("Error received: \(error.message)")
+    .setOnResponseTrailers { trailers in
+      print("Trailers received: \(trailers)")
     }
-    ...
+    .setOnError { ... }
+    .setOnCancel { ... }
 
 ---------------
 ``RetryPolicy``
 ---------------
 
 The ``RetryPolicy`` type allows for customizing retry rules that should be applied to an outbound
-request. These rules are added by calling ``addRetryPolicy(...)`` on the ``RequestBuilder``, and
-are applied when the request is sent.
+request. These rules are added by calling ``addRetryPolicy(...)`` on the ``RequestHeadersBuilder``,
+and are applied when the request headers are sent.
 
 For full documentation of how these retry rules perform, see Envoy's documentation:
 
 - `Automatic retries <https://www.envoyproxy.io/learn/automatic-retries>`_
 - `Retry semantics <https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/http/http_routing.html?highlight=exponential#retry-semantics>`_
 
------------------
-``StreamEmitter``
------------------
+----------
+``Stream``
+----------
 
-Once a ``Request`` and ``ResponseHandler`` have been created, a stream can be opened using an
-:ref:`Envoy instance <api_starting_envoy>`.
+Streams are started by calling ``start()`` on a ``StreamPrototype``.
 
-Doing so returns a ``StreamEmitter`` which allows the sender to interact with the stream.
-
-**Kotlin**::
-
-  val envoy = AndroidEnvoyClientBuilder(...).build()
-
-  val request = RequestBuilder(...).build()
-  val responseHandler = ResponseHandler(...)
-  val emitter = envoy.start(request, responseHandler)
-    .sendData(...)
-    .sendData(...)
-
-  ...
-  emitter.close(...)
-
-**Swift**::
-
-  let envoy = try EnvoyClientBuilder(...).build()
-
-  let request = RequestBuilder(...).build()
-  let responseHandler = ResponseHandler(...)
-  let emitter = envoy.start(request, handler: responseHandler)
-    .sendData(...)
-    .sendData(...)
-
-  ...
-  emitter.close(...)
-
---------------
-Unary Requests
---------------
-
-As mentioned above, unary requests are made using the same types that perform streaming requests.
-
-Sending a unary request may be done by either closing the ``StreamEmitter`` after the
-set of headers/data has been written, or by using the helper function that returns a
-``CancelableStream`` type instead of a ``StreamEmitter``.
-
-The unary helper function allows for easily performing the following request types:
-
-- **Headers-only:** Send request headers then close the stream.
-
-  - Done by passing ``nil`` body and ``nil`` trailers.
-
-- **Close with data:** Send request headers and data, then close.
-
-  - Done by passing ``nil`` trailers.
-
-- **Close with trailers:** Send request headers and data, then close with trailers.
-
-  - Done by passing a body and trailers.
-
-The ``CancelableStream`` returned by the unary function does not expose options for sending additional data.
+Doing so returns a ``Stream`` which allows the sender to interact with the stream.
 
 **Kotlin**::
 
-  val envoy = AndroidEnvoyClientBuilder(...).build()
+  val streamClient = AndroidStreamClientBuilder()
+    ...
+    .build()
 
-  val request = RequestBuilder(...).build()
-  val responseHandler = ResponseHandler(...)
+  val requestHeaders = RequestHeadersBuilder()
+    ...
+    .build()
+  val prototype = streamClient
+    .newStreamPrototype()
+    ...
+  val stream = prototype
+    .start(Executors.newSingleThreadExecutor())
+    .sendHeaders(...)
+    .sendData(...)
 
-  // Headers-only
-  val cancelable = envoy.send(request, null, null, responseHandler)
-
-  // Close using data
-  val cancelable = envoy.send(request, body, null, responseHandler)
-
-  // Close using trailers
-  val cancelable = envoy.send(request, body, trailers, responseHandler)
-
-  // To cancel the request:
-  cancelable.cancel()
+  ...
+  stream.close(...)
 
 **Swift**::
 
-  let envoy = try EnvoyClientBuilder(...).build()
+  let streamClient = StreamClientBuilder()
+    ...
+    .build()
 
-  let request = RequestBuilder(...).build()
-  let responseHandler = ResponseHandler(...)
+  let requestHeaders = RequestHeadersBuilder()
+    ...
+    .build()
+  let prototype = streamClient
+    .newStreamPrototype()
+    ...
+  let stream = prototype
+    .start(queue: .main)
+    .sendHeaders(...)
+    .sendData(...)
+
+  ...
+  stream.close(...)
+
+--------------
+Unary requests
+--------------
+
+As mentioned above, unary requests are made using the same types that handle streams.
+
+Sending a unary request is done simply by closing the ``Stream`` after the
+set of headers/data/trailers has been written.
+
+For example:
+
+**Kotlin**::
+
+  val streamClient = AndroidStreamClientBuilder()
+    ...
+    .build()
+
+  val requestHeaders = RequestHeadersBuilder()
+    ...
+    .build()
+  val stream = streamClient
+    .newStreamPrototype()
+    .start(Executors.newSingleThreadExecutor())
 
   // Headers-only
-  let cancelable = envoy.send(request, nil, trailers: nil, handler: responseHandler)
+  stream.sendHeaders(requestHeaders, true)
 
-  // Close using data
-  let cancelable = envoy.send(request, body, trailers: nil, handler: responseHandler)
+  // Close with data
+  stream.close(ByteBuffer(...))
 
-  // Close using trailers
-  let cancelable = envoy.send(request, body, trailers: trailers, handler: responseHandler)
+  // Close with trailers
+  stream.close(RequestTrailersBuilder().build())
 
-  // To cancel the request:
-  cancelable.cancel()
+  // Cancel the stream
+  stream.cancel()
+
+**Swift**::
+
+  let streamClient = StreamClientBuilder()
+    ...
+    .build()
+
+  let requestHeaders = RequestHeadersBuilder()
+    ...
+    .build()
+  let stream = streamClient
+    .newStreamPrototype()
+    .start(queue: .main)
+
+  // Headers-only
+  stream.sendHeaders(requestHeaders, endStream: true)
+
+  // Close with data
+  stream.close(Data(...))
+
+  // Close with trailers
+  stream.close(RequestTrailersBuilder().build())
+
+  // Cancel the stream
+  stream.cancel()

@@ -3,37 +3,35 @@
 Starting Envoy
 ==============
 
----------------
-``EnvoyClient``
----------------
+----------------
+``StreamClient``
+----------------
 
-Starting an instance of Envoy Mobile for making requests is done by creating an ``EnvoyClient``,
-which conforms to the ``HTTPClient`` interface.
+Starting an instance of Envoy Mobile for performing requests is done by creating a ``StreamClient``.
 
-To do so, create an ``EnvoyClientBuilder`` and call ``build()`` (see below).
+To do so, create a ``StreamClientBuilder`` and call ``build()`` (see below).
 
-After the client is created, it should be stored and kept in memory in order to be used
-for issuing requests.
+After the client is created, it should be stored and used to start network requests/streams.
 
 **Kotlin example**::
 
-  val envoy = AndroidEnvoyClientBuilder(getApplication())
+  val streamClient = AndroidStreamClientBuilder(getApplication())
     .addLogLevel(LogLevel.WARN)
     ...
     .build()
 
 **Swift example**::
 
-  let envoy = try EnvoyClientBuilder()
+  let streamClient = try StreamClientBuilder()
     .addLogLevel(.warn)
     ...
     .build()
 
-----------------------
-``EnvoyClientBuilder``
-----------------------
+-----------------------
+``StreamClientBuilder``
+-----------------------
 
-This type is used to configure an instance of ``EnvoyClient`` before finally
+This type is used to configure an instance of ``StreamClient`` before finally
 creating the client using ``.build()``.
 
 Available builders are 1:1 between iOS/Android, and are documented below.
@@ -197,7 +195,7 @@ This may be done by initializing a builder with the contents of the YAML file yo
 
 **Kotlin example**::
 
-  val envoy = AndroidEnvoyClientBuilder(baseContext, Yaml(yamlFileString))
+  val streamClient = AndroidStreamClientBuilder(baseContext, Yaml(yamlFileString))
     .addLogLevel(LogLevel.WARN)
     .addStatsFlushSeconds(60)
     ...
@@ -205,12 +203,11 @@ This may be done by initializing a builder with the contents of the YAML file yo
 
 **Swift example**::
 
-  let envoy = try EnvoyClientBuilder(yaml: yamlFileString)
+  let streamClient = try StreamClientBuilder(yaml: yamlFileString)
     .addLogLevel(.warn)
     .addStatsFlushSeconds(60)
     ...
     .build()
-
 
 .. attention::
 
@@ -219,7 +216,7 @@ This may be done by initializing a builder with the contents of the YAML file yo
   options are supported by Envoy Mobile.
 
 ---------------
-Making Requests
+Making requests
 ---------------
 
 Now that you have an Envoy Mobile instance, you can start making requests:

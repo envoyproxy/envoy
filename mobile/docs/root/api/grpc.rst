@@ -16,103 +16,151 @@ Envoy Mobile implements the gRPC protocol, accepting and returning serialized pr
   In the future, Envoy Mobile will provide much more comprehensive integration with gRPC and protobuf,
   utilizing annotations for enhanced functionality.
 
+-----------
+Quick start
+-----------
+
+Below are some quick examples for getting started with gRPC streams. See the individual class references
+in the later sections of this page for in-depth information on how each type is used.
+
+Start and interact with a gRPC stream in **Kotlin**::
+
+  val headers = GRPCRequestHeadersBuilder(scheme = "https", authority = "envoyproxy.io", path = "/pb.api.v1.Foo/GetBar")
+    .build()
+
+  val streamClient = AndroidStreamClientBuilder(application).build()
+    GRPCClient(streamClient)
+      .newGRPCStreamPrototype()
+      .setOnResponseHeaders { headers, endStream ->
+        Log.d("MainActivity", "Headers received: $headers, end stream: $endStream")
+      }
+      .setOnResponseMessage { messageData in
+        Log.d("MainActivity", "Received gRPC message")
+      }
+      .setOnResponseTrailers { trailers in
+        Log.d("MainActivity", "Trailers received: $trailers")
+      }
+      .setOnError { ... }
+      .setOnCancel { ... }
+      .start(Executors.newSingleThreadExecutor())
+      .sendHeaders(headers, false)
+      .sendMessage(...)
+      ...
+      .close()
+
+Start and interact with a gRPC stream in **Swift**::
+
+  let headers = GRPCRequestHeadersBuilder(scheme: "https", authority: "envoyproxy.io", path: "/pb.api.v1.Foo/GetBar")
+    .build()
+
+  let streamClient = try StreamClientBuilder().build()
+  GRPCClient(streamClient: streamClient)
+    .newGRPCStreamPrototype()
+    .setOnResponseHeaders { headers, endStream in
+      print("Headers received: \(headers), end stream: \(endStream)")
+    }
+    .setOnResponseMessage { messageData in
+      print("Received gRPC message")
+    }
+    .setOnResponseTrailers { trailers in
+      print("Trailers received: \(trailers)")
+    }
+    .setOnError { ... }
+    .setOnCancel { ... }
+    .start(queue: .main)
+    .sendHeaders(headers, endStream: false)
+    .sendMessage(...)
+    ...
+    .close()
+
 --------------
 ``GRPCClient``
 --------------
 
 The ``GRPCClient`` type provides the ability to start gRPC streams, and is backed by Envoy Mobile's
-``HTTPClient`` type that is instantiated using the ``EnvoyClientBuilder``.
+``StreamClient`` interface (typically instantiated using a ``StreamClientBuilder``).
 
-To create a ``GRPCClient``, simply :ref:`create an HTTP client <api_starting_envoy>` and pass it to the initializer:
+To create a ``GRPCClient``, simply :ref:`create a stream client <api_starting_envoy>` and pass it to the initializer:
 
-``grpcClient = GRPCClient(httpClient)``
+``grpcClient = GRPCClient(streamClient)``
 
 This client can then be used with the types outlined below for starting gRPC streams.
 
 ----------------------
-``GRPCRequestBuilder``
+``GRPCRequestHeaders``
 ----------------------
 
-Envoy Mobile provides a ``GRPCRequestBuilder`` which acts very similarly to the ``RequestBuilder``
-type. Upon calling ``build()``, it returns a ``Request`` (the same type used for standard HTTP
-requests/streams) which is preconfigured for gRPC.
+Envoy Mobile provides a ``GRPCRequestHeadersBuilder`` which acts very similarly to the ``RequestHeadersBuilder``
+type. Upon calling ``build()``, it returns a ``GRPCRequestHeaders`` instance - a subclass of ``RequestHeaders``
+configured specifically for gRPC streams.
 
-To start a gRPC stream, create a ``Request`` using the ``GRPCRequestBuilder``.
+To start a gRPC stream, first create an instance of ``GRPCRequestHeaders`` using the ``GRPCRequestHeadersBuilder``.
 
 **Kotlin**::
 
-  val request = GRPCRequestBuilder("/pb.api.v1.Foo/GetBar", "api.envoyproxy.io", true)
-    .addHeader("x-custom-header", "foobar")
+  val headers = GRPCRequestHeadersBuilder("https", "envoyproxy.io", "/pb.api.v1.Foo/GetBar")
+    .add("x-foo", "123")
     ...
     .build()
 
 **Swift**::
 
-  let request = GRPCRequestBuilder(path: "/pb.api.v1.Foo/GetBar", authority: "api.envoyproxy.io", useHTTPS: true)
-    .addHeader(name: "x-custom-header", value: "foobar")
+  let headers = GRPCRequestHeadersBuilder(scheme: "https", authority: "envoyproxy.io", path: "/pb.api.v1.Foo/GetBar")
+    .add(name: "x-foo", value: "123")
     ...
     .build()
 
 -----------------------
-``GRPCResponseHandler``
+``GRPCStreamPrototype``
 -----------------------
 
-Very similarly to the HTTP ``ResponseHandler``, the ``GRPCResponseHandler`` allows for receiving
-updates to the gRPC stream and contains a set of callbacks that are called whenever an update
-occurs on the stream.
-
-This handler processes inbound gRPC responses, buffers data as necessary while chunks of
-protobuf messages are received, then finally passes fully formed protobuf data to the callbacks
-provided.
+A ``GRPCStreamPrototype`` is used to configure gRPC streams prior to starting them by assigning callbacks
+to be invoked when response data is received on the stream.
 
 Typically, consumers should listen to ``onMessage`` and use a protobuf library to deserialize
 the complete protobuf message data.
 
+To create a ``GRPCStreamPrototype``, use an instance of ``GRPCClient``.
+
 **Kotlin**::
 
-  val handler = GRPCResponseHandler(Executor { })
-    .onHeaders { headers, grpcStatus, _ ->
-      Log.d("MainActivity", "Received gRPC status: " + statusCode + " and headers: " + headers)
-      Unit
+  val prototype = grpcClient
+    .newGRPCStreamPrototype()
+    .setOnResponseHeaders { headers, endStream ->
+      Log.d("MainActivity", "Headers received: $headers, end stream: $endStream")
     }
-    .onMessage { messageData ->
-      // Deserialize message data here
+    .setOnResponseMessage { messageData ->
+      Log.d("MainActivity", "Received gRPC message")
     }
-    .onTrailers { trailers ->
-      Log.d("MainActivity", "Trailers received: " + trailers)
-      Unit
+    .setOnResponseTrailers { trailers ->
+      Log.d("MainActivity", "Trailers received: $trailers")
     }
-    .onError { error ->
-      Log.d("MainActivity", "Error received: " + error.message)
-      Unit
-    }
-    ...
+    .setOnError { ... }
+    .setOnCancel { ... }
 
 **Swift**::
 
-  let handler = GRPCResponseHandler()
-    .onHeaders { headers, grpcStatus, _ in
-      print("Received gRPC status: \(grpcStatus) and headers: \(headers)")
+  let prototype = grpcClient
+    .newGRPCStreamPrototype()
+    .setOnResponseHeaders { headers, endStream in
+      print("Headers received: \(headers), end stream: \(endStream)")
     }
-    .onMessage { messageData in
-      // Deserialize message data here
+    .setOnResponseMessage { messageData in
+      print("Received gRPC message")
     }
-    .onTrailers { trailers in
+    .setOnResponseTrailers { trailers in
       print("Trailers received: \(trailers)")
     }
-    .onError { error in
-      print("Error received: \(error.message)")
-    }
-    ...
+    .setOnError { ... }
+    .setOnCancel { ... }
 
+--------------
+``GRPCStream``
+--------------
 
----------------------
-``GRPCStreamEmitter``
----------------------
+gRPC streams are started by calling ``start()`` on a ``GRPCStreamPrototype``.
 
-Finally, a gRPC stream may be opened using a ``GRPCClient`` instance.
-
-Doing so returns a ``GRPCStreamEmitter`` which allows the sender to interact with the stream.
+Doing so returns a ``GRPCStream`` which allows the sender to interact with the stream.
 
 The ``sendMessage`` function should be invoked with the serialized data from a protobuf message.
 The emitter will then transform the provided data into the gRPC wire format and send it over the
@@ -120,28 +168,42 @@ stream.
 
 **Kotlin**::
 
-  val envoy = AndroidEnvoyClientBuilder(...).build()
-  val grpcClient = GRPCClient(envoy)
+  val streamClient = AndroidStreamClientBuilder()
+    ...
+    .build()
+  val grpcClient = GRPCClient(streamClient)
 
-  val request = GRPCRequestBuilder(...).build()
-  val responseHandler = GRPCResponseHandler(...)
-  val grpcEmitter = grpcClient.start(request, responseHandler)
-    .sendMessage(...)
+  val requestHeaders = GRPCRequestHeadersBuilder()
+    ...
+    .build()
+  val prototype = grpcClient
+    .newGRPCStreamPrototype()
+    ...
+  val stream = prototype
+    .start(Executors.newSingleThreadExecutor())
+    .sendHeaders(...)
     .sendMessage(...)
 
   ...
-  grpcEmitter.close(...)
+  stream.close(...)
 
 **Swift**::
 
-  let envoy = try EnvoyClientBuilder(...).build()
-  let grpcClient = GRPCClient(httpClient: envoy)
+  let streamClient = StreamClientBuilder()
+    ...
+    .build()
+  let grpcClient = GRPCClient(streamClient: streamClient)
 
-  let request = GRPCRequestBuilder(...).build()
-  let responseHandler = GRPCResponseHandler(...)
-  let grpcEmitter = grpcClient.start(request, handler: responseHandler)
-    .sendMessage(...)
+  let requestHeaders = GRPCRequestHeadersBuilder()
+    ...
+    .build()
+  let prototype = grpcClient
+    .newGRPCStreamPrototype()
+    ...
+  let stream = prototype
+    .start(queue: .main)
+    .sendHeaders(...)
     .sendMessage(...)
 
   ...
-  grpcEmitter.close(...)
+  stream.close(...)
