@@ -81,7 +81,6 @@ public:
   MOCK_METHOD(Stats::Scope&, getRootScope, ());
 
   testing::NiceMock<MockSnapshot> snapshot_;
-  // TODO(lisalu)
   testing::NiceMock<Stats::MockStore> store_;
 };
 
