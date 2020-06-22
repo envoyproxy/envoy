@@ -1931,6 +1931,7 @@ filter_chains:
   EXPECT_EQ(
       1UL,
       server_.stats_store_.counterFromString("listener_manager.listener_create_failure").value());
+  EXPECT_EQ(0, manager_->listeners().size());
 }
 
 TEST_F(ListenerManagerImplTest, StatsNameValidCharacterTest) {
