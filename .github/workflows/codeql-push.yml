@@ -1,5 +1,7 @@
 on:
   push:
+    paths:
+    - 'source/common/**'
   pull_request:
 
 jobs:
