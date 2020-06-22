@@ -73,8 +73,7 @@ udp_listener_config:
                    /* expected_value */ 1,
                    /* expected_num_calls */ 1);
 
-  expectSetsockopt(os_sys_calls_,
-                   /* expected_sockopt_level */ SOL_UDP,
+  expectSetsockopt(/* expected_sockopt_level */ SOL_UDP,
                    /* expected_sockopt_name */ GRO_UDP,
                    /* expected_value */ 1,
                    /* expected_num_calls */ 1);

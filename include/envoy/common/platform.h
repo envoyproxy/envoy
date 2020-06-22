@@ -142,7 +142,6 @@ struct msghdr {
 #include <sys/un.h>
 #include <sys/wait.h>
 #include <unistd.h>
-#include <linux/version.h> // to check linux version
 
 #ifdef __APPLE__
 #include <libkern/OSByteOrder.h>
@@ -164,6 +163,7 @@ struct msghdr {
 
 #if defined(__linux__)
 #include <linux/netfilter_ipv4.h>
+#include <linux/version.h> // to check linux version
 #endif
 
 #ifdef UDP_GRO
