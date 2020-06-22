@@ -302,9 +302,9 @@ public:
   virtual void startRtdsSubscriptions(ReadyCallback on_done) PURE;
 
   /**
-   * @return Stats::Store& the root store.
+   * @return Stats::Scope& the root scope.
    */
-  virtual Stats::Store& getStore() PURE;
+  virtual Stats::Scope& getRootScope() PURE;
 };
 
 using LoaderPtr = std::unique_ptr<Loader>;

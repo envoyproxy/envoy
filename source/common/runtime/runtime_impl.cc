@@ -623,7 +623,7 @@ void LoaderImpl::mergeValues(const std::unordered_map<std::string, std::string>&
   loadNewSnapshot();
 }
 
-Stats::Store& LoaderImpl::getStore() { return store_; }
+Stats::Scope& LoaderImpl::getRootScope() { return store_; }
 
 RuntimeStats LoaderImpl::generateStats(Stats::Store& store) {
   std::string prefix = "runtime.";

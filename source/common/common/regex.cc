@@ -44,7 +44,7 @@ private:
 class CompiledGoogleReMatcher : public CompiledMatcher {
 public:
   CompiledGoogleReMatcher(const envoy::type::matcher::v3::RegexMatcher& config)
-      : regex_(config.regex(), re2::RE2::Quiet), runtime_(Runtime::LoaderSingleton::getExisting()) {
+      : regex_(config.regex(), re2::RE2::Quiet) {
     if (!regex_.ok()) {
       throw EnvoyException(regex_.error());
     }
@@ -63,15 +63,22 @@ public:
       return;
     }
 
-    if (runtime_) {
-      Stats::Store& stats_store = runtime_->getStore();
-      Stats::StatNameManagedStorage program_size_stat_name("regex.program_size",
-                                                           stats_store.symbolTable());
-      Stats::Histogram& program_size_stat = stats_store.histogramFromStatName(
+    Runtime::Loader* runtime = Runtime::LoaderSingleton::getExisting();
+    if (runtime) {
+      Stats::Scope& root_scope = runtime->getRootScope();
+
+      Stats::StatNameManagedStorage program_size_stat_name("re2.max_program_size",
+                                                           root_scope.symbolTable());
+      Stats::Histogram& program_size_stat = root_scope.histogramFromStatName(
           program_size_stat_name.statName(), Stats::Histogram::Unit::Unspecified);
       program_size_stat.recordValue(regex_program_size);
+
+      Stats::StatNameManagedStorage warn_count_stat_name("re2.exceeded_warn_level",
+                                                         root_scope.symbolTable());
+      Stats::Counter& warn_count = root_scope.counterFromStatName(warn_count_stat_name.statName());
+
       const uint32_t max_program_size_error_level =
-          runtime_->snapshot().getInteger("regex.max_program_size_error_level", 100);
+          runtime->snapshot().getInteger("re2.max_program_size.error_level", 100);
       if (regex_program_size > max_program_size_error_level) {
         throw EnvoyException(fmt::format("regex '{}' RE2 program size of {} > max program size of "
                                          "{} set for the error level threshold. Increase "
@@ -79,9 +86,11 @@ public:
                                          config.regex(), regex_program_size,
                                          max_program_size_error_level));
       }
+
       const uint32_t max_program_size_warn_level =
-          runtime_->snapshot().getInteger("regex.max_program_size_warn_level", UINT32_MAX);
+          runtime->snapshot().getInteger("re2.max_program_size.warn_level", UINT32_MAX);
       if (regex_program_size > max_program_size_warn_level) {
+        warn_count.inc();
         ENVOY_LOG_MISC(
             warn,
             "regex '{}' RE2 program size of {} > max program size of {} set for the warn "
@@ -106,7 +115,6 @@ public:
 
 private:
   const re2::RE2 regex_;
-  Runtime::Loader* runtime_;
 };
 
 } // namespace
