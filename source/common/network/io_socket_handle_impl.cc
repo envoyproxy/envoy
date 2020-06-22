@@ -3,6 +3,7 @@
 #include "envoy/buffer/buffer.h"
 
 #include "common/api/os_sys_calls_impl.h"
+#include "common/common/utility.h"
 #include "common/network/address_impl.h"
 
 #include "absl/container/fixed_array.h"
