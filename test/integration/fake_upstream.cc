@@ -73,6 +73,10 @@ void FakeStream::decodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr) {
   }
 }
 
+void FakeStream::postToConnectionThread(std::function<void()> cb) {
+  parent_.connection().dispatcher().post(cb);
+}
+
 void FakeStream::encode100ContinueHeaders(const Http::ResponseHeaderMap& headers) {
   std::shared_ptr<Http::ResponseHeaderMap> headers_copy(
       Http::createHeaderMap<Http::ResponseHeaderMapImpl>(headers));

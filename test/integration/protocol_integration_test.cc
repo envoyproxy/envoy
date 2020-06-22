@@ -452,9 +452,12 @@ TEST_P(ProtocolIntegrationTest, RetryStreamingReset) {
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
 
   // Send back an upstream failure and end stream. Make sure an immediate reset
-  // doesn't cause problems.
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
-  upstream_request_->encodeResetStream();
+  // doesn't cause problems. Schedule via the upstream_request_ dispatcher to ensure that the stream
+  // still exists when encoding the reset stream.
+  upstream_request_->postToConnectionThread([this]() {
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
+    upstream_request_->encodeResetStream();
+  });
 
   // Make sure the fake stream is reset.
   if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
