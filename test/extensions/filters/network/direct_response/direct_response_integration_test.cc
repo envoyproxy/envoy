@@ -21,20 +21,9 @@ public:
       )EOF");
   }
 
-  /**
-   * Initializer for an individual test.
-   */
   void SetUp() override {
     useListenerAccessLog("%RESPONSE_CODE_DETAILS%");
     BaseIntegrationTest::initialize();
-  }
-
-  /**
-   *  Destructor for an individual test.
-   */
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
   }
 };
 

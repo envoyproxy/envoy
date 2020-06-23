@@ -490,17 +490,17 @@ message HttpConnectionManager {
   // true in the future. When not specified, this value may be overridden by the
   // runtime variable
   // :ref:`http_connection_manager.normalize_path<config_http_conn_man_runtime_normalize_path>`.
-  // See `Normalization and Comparison <https://tools.ietf.org/html/rfc3986#section-6>`
+  // See `Normalization and Comparison <https://tools.ietf.org/html/rfc3986#section-6>`_
   // for details of normalization.
   // Note that Envoy does not perform
-  // `case normalization <https://tools.ietf.org/html/rfc3986#section-6.2.2.1>`
+  // `case normalization <https://tools.ietf.org/html/rfc3986#section-6.2.2.1>`_
   google.protobuf.BoolValue normalize_path = 30;
 
   // Determines if adjacent slashes in the path are merged into one before any processing of
   // requests by HTTP filters or routing. This affects the upstream *:path* header as well. Without
   // setting this option, incoming requests with path `//dir///file` will not match against route
   // with `prefix` match set to `/dir`. Defaults to `false`. Note that slash merging is not part of
-  // `HTTP spec <https://tools.ietf.org/html/rfc3986>` and is provided for convenience.
+  // `HTTP spec <https://tools.ietf.org/html/rfc3986>`_ and is provided for convenience.
   bool merge_slashes = 33;
 
   // The configuration of the request ID extension. This includes operations such as
@@ -525,7 +525,7 @@ message HttpConnectionManager {
   // local port and request method is not CONNECT. This affects the upstream host header as well.
   // Without setting this option, incoming requests with host `example:443` will not match against
   // route with :ref:`domains<envoy_api_field_config.route.v3.VirtualHost.domains>` match set to `example`. Defaults to `false`. Note that port removal is not part
-  // of `HTTP spec <https://tools.ietf.org/html/rfc3986>` and is provided for convenience.
+  // of `HTTP spec <https://tools.ietf.org/html/rfc3986>`_ and is provided for convenience.
   bool strip_matching_host_port = 39;
 }
 

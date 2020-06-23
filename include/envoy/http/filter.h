@@ -34,6 +34,7 @@ enum class FilterHeadersStatus {
   StopIteration,
   // Continue iteration to remaining filters, but ignore any subsequent data or trailers. This
   // results in creating a header only request/response.
+  // This status MUST NOT be returned by decodeHeaders() when end_stream is set to true.
   ContinueAndEndStream,
   // Do not iterate for headers as well as data and trailers for the current filter and the filters
   // following, and buffer body data for later dispatching. ContinueDecoding() MUST
@@ -545,7 +546,7 @@ public:
    * should consider using StopAllIterationAndBuffer or StopAllIterationAndWatermark in
    * decodeHeaders() to prevent metadata passing to the following filters.
    *
-   * @param metadata supplies the decoded metadata.
+   * @param metadata_map supplies the decoded metadata.
    */
   virtual FilterMetadataStatus decodeMetadata(MetadataMap& /* metadata_map */) {
     return Http::FilterMetadataStatus::Continue;

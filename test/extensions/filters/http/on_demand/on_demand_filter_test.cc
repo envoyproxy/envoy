@@ -56,7 +56,7 @@ TEST_F(OnDemandFilterTest, TestDecodeHeadersWhenRouteConfigIsNotAvailable) {
 }
 
 TEST_F(OnDemandFilterTest, TestDecodeTrailers) {
-  Http::RequestTrailerMapImpl headers;
+  Http::TestRequestTrailerMapImpl headers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(headers));
 }
 

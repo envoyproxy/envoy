@@ -1896,6 +1896,44 @@ filter_chains:
       server_.stats_store_.counterFromString("listener_manager.listener_create_failure").value());
 }
 
+TEST_F(ListenerManagerImplTest, StaticListenerAddFailure) {
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_));
+  manager_->startWorkers(guard_dog_);
+
+  // Add foo listener into active.
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 0.0.0.0
+    port_value: 1234
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(false, false);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
+  EXPECT_CALL(*worker_, addListener(_, _, _));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", false));
+
+  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
+  worker_->callAddCompletion(false);
+
+  EXPECT_CALL(*worker_, removeListener(_, _));
+  listener_foo->drain_manager_->drain_sequence_completion_();
+
+  EXPECT_CALL(*listener_foo, onDestroy());
+  worker_->callRemovalCompletion();
+
+  EXPECT_EQ(
+      1UL,
+      server_.stats_store_.counterFromString("listener_manager.listener_create_failure").value());
+  EXPECT_EQ(0, manager_->listeners().size());
+}
+
 TEST_F(ListenerManagerImplTest, StatsNameValidCharacterTest) {
   const std::string yaml = R"EOF(
 address:
@@ -2192,7 +2230,10 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithApplicationP
   EXPECT_EQ(filter_chain, nullptr);
 
   // TLS client with "http/1.1" ALPN - using 1st filter chain.
-  filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {"h2", "http/1.1"}, "8.8.8.8", 111);
+  filter_chain = findFilterChain(
+      1234, "127.0.0.1", "", "tls",
+      {Http::Utility::AlpnNames::get().Http2, Http::Utility::AlpnNames::get().Http11}, "8.8.8.8",
+      111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
@@ -2235,8 +2276,10 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceTypeMa
   EXPECT_EQ(filter_chain, nullptr);
 
   // LOCAL IPv4 client with "http/1.1" ALPN - using 1st filter chain.
-  filter_chain =
-      findFilterChain(1234, "127.0.0.1", "", "tls", {"h2", "http/1.1"}, "127.0.0.1", 111);
+  filter_chain = findFilterChain(
+      1234, "127.0.0.1", "", "tls",
+      {Http::Utility::AlpnNames::get().Http2, Http::Utility::AlpnNames::get().Http11}, "127.0.0.1",
+      111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
@@ -2247,8 +2290,10 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceTypeMa
   EXPECT_EQ(server_names.front(), "server1.example.com");
 
   // LOCAL UDS client with "http/1.1" ALPN - using 1st filter chain.
-  filter_chain =
-      findFilterChain(0, "/tmp/test.sock", "", "tls", {"h2", "http/1.1"}, "/tmp/test.sock", 111);
+  filter_chain = findFilterChain(
+      0, "/tmp/test.sock", "", "tls",
+      {Http::Utility::AlpnNames::get().Http2, Http::Utility::AlpnNames::get().Http11},
+      "/tmp/test.sock", 111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
@@ -2292,8 +2337,10 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceIpMatc
   EXPECT_EQ(filter_chain, nullptr);
 
   // IPv4 client with source 10.0.0.10, Match.
-  filter_chain =
-      findFilterChain(1234, "127.0.0.1", "", "tls", {"h2", "http/1.1"}, "10.0.0.10", 111);
+  filter_chain = findFilterChain(
+      1234, "127.0.0.1", "", "tls",
+      {Http::Utility::AlpnNames::get().Http2, Http::Utility::AlpnNames::get().Http11}, "10.0.0.10",
+      111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
@@ -2309,8 +2356,10 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceIpMatc
   EXPECT_EQ(filter_chain, nullptr);
 
   // UDS client. No match.
-  filter_chain =
-      findFilterChain(0, "/tmp/test.sock", "", "tls", {"h2", "http/1.1"}, "/tmp/test.sock", 0);
+  filter_chain = findFilterChain(
+      0, "/tmp/test.sock", "", "tls",
+      {Http::Utility::AlpnNames::get().Http2, Http::Utility::AlpnNames::get().Http11},
+      "/tmp/test.sock", 0);
   ASSERT_EQ(filter_chain, nullptr);
 }
 
@@ -2394,7 +2443,10 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourcePortMa
   EXPECT_EQ(server_names.front(), "server1.example.com");
 
   // Client with source port 101. No match.
-  filter_chain = findFilterChain(1234, "8.8.8.8", "", "tls", {"h2", "http/1.1"}, "4.4.4.4", 101);
+  filter_chain = findFilterChain(
+      1234, "8.8.8.8", "", "tls",
+      {Http::Utility::AlpnNames::get().Http2, Http::Utility::AlpnNames::get().Http11}, "4.4.4.4",
+      101);
   ASSERT_EQ(filter_chain, nullptr);
 }
 
@@ -2447,8 +2499,10 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainWithSourceType
   EXPECT_EQ(1U, manager_->listeners().size());
 
   // LOCAL TLS client with "http/1.1" ALPN - no match.
-  auto filter_chain =
-      findFilterChain(1234, "127.0.0.1", "", "tls", {"h2", "http/1.1"}, "127.0.0.1", 111);
+  auto filter_chain = findFilterChain(
+      1234, "127.0.0.1", "", "tls",
+      {Http::Utility::AlpnNames::get().Http2, Http::Utility::AlpnNames::get().Http11}, "127.0.0.1",
+      111);
   EXPECT_EQ(filter_chain, nullptr);
 
   // LOCAL TLS client without "http/1.1" ALPN - using 1st filter chain.
@@ -2463,7 +2517,10 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainWithSourceType
   EXPECT_EQ(server_names.front(), "server1.example.com");
 
   // EXTERNAL TLS client with "http/1.1" ALPN - using 2nd filter chain.
-  filter_chain = findFilterChain(1234, "8.8.8.8", "", "tls", {"h2", "http/1.1"}, "4.4.4.4", 111);
+  filter_chain = findFilterChain(
+      1234, "8.8.8.8", "", "tls",
+      {Http::Utility::AlpnNames::get().Http2, Http::Utility::AlpnNames::get().Http11}, "4.4.4.4",
+      111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
@@ -2832,8 +2889,10 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithApplicati
   EXPECT_FALSE(filter_chain->transportSocketFactory().implementsSecureTransport());
 
   // TLS client with "h2,http/1.1" ALPN - using 2nd filter chain.
-  filter_chain =
-      findFilterChain(1234, "127.0.0.1", "", "tls", {"h2", "http/1.1"}, "127.0.0.1", 111);
+  filter_chain = findFilterChain(
+      1234, "127.0.0.1", "", "tls",
+      {Http::Utility::AlpnNames::get().Http2, Http::Utility::AlpnNames::get().Http11}, "127.0.0.1",
+      111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
@@ -2885,14 +2944,18 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithMultipleR
   EXPECT_EQ(filter_chain, nullptr);
 
   // TLS client with ALPN match but without SNI - using 1st filter chain.
-  filter_chain =
-      findFilterChain(1234, "127.0.0.1", "", "tls", {"h2", "http/1.1"}, "127.0.0.1", 111);
+  filter_chain = findFilterChain(
+      1234, "127.0.0.1", "", "tls",
+      {Http::Utility::AlpnNames::get().Http2, Http::Utility::AlpnNames::get().Http11}, "127.0.0.1",
+      111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_FALSE(filter_chain->transportSocketFactory().implementsSecureTransport());
 
   // TLS client with exact SNI match and ALPN match - using 2nd filter chain.
-  filter_chain = findFilterChain(1234, "127.0.0.1", "server1.example.com", "tls",
-                                 {"h2", "http/1.1"}, "127.0.0.1", 111);
+  filter_chain = findFilterChain(
+      1234, "127.0.0.1", "server1.example.com", "tls",
+      {Http::Utility::AlpnNames::get().Http2, Http::Utility::AlpnNames::get().Http11}, "127.0.0.1",
+      111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
@@ -3464,6 +3527,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
 
   Network::FilterChainFactory& filterChainFactory = listener.filterChainFactory();
   Network::MockListenerFilterManager manager;
+
+  // Return error when trying to retrieve the original dst on the invalid handle
+  EXPECT_CALL(os_sys_calls_, getsockopt_(_, _, _, _, _)).WillOnce(Return(-1));
 
   NiceMock<Network::MockListenerFilterCallbacks> callbacks;
   Network::AcceptedSocketImpl socket(std::make_unique<Network::IoSocketHandleImpl>(),
