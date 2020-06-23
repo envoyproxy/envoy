@@ -216,10 +216,10 @@ NON_TYPE_ALIAS_ALLOWED_TYPES = {
 }
 # yapf: enable
 
-USING_TYPE_ALIAS = re.compile("using .* = .*;")
-SMART_PTR = re.compile("std::(unique_ptr|shared_ptr)<(.*?)>")
-OPTIONAL_REF = re.compile("absl::optional<std::reference_wrapper<(.*?)>>")
-NON_TYPE_ALIAS_ALLOWED_TYPE = re.compile(fr"(.*\[\]$|^std::vector<.*|{'|'.join(NON_TYPE_ALIAS_ALLOWED_TYPES)}$)")
+USING_TYPE_ALIAS_REGEX = re.compile("using .* = .*;")
+SMART_PTR_REGEX = re.compile("std::(unique_ptr|shared_ptr)<(.*?)>")
+OPTIONAL_REF_REGEX = re.compile("absl::optional<std::reference_wrapper<(.*?)>>")
+NON_TYPE_ALIAS_ALLOWED_TYPE_REGEX = re.compile(fr"(.*\[\]$|^std::vector<.*|{'|'.join(NON_TYPE_ALIAS_ALLOWED_TYPES)}$)")
 
 
 # Map a line transformation function across each line of a file,
@@ -404,7 +404,7 @@ def whitelistedForUnpackTo(file_path):
   ]
 
 def whitelistedForNonTypeAlias(name):
-  return NON_TYPE_ALIAS_ALLOWED_TYPE.match(name)
+  return NON_TYPE_ALIAS_ALLOWED_TYPE_REGEX.match(name)
 
 
 def findSubstringAndReturnError(pattern, file_path, error_message):
@@ -750,16 +750,16 @@ def checkSourceLine(line, file_path, reportError):
         reportError("Don't call grpc_init() or grpc_shutdown() directly, instantiate " +
                     "Grpc::GoogleGrpcContext. See #8282")
 
-  if not USING_TYPE_ALIAS.search(line):
-    smart_ptr_m = SMART_PTR.finditer(line)
-    for m in smart_ptr_m:
-      if not whitelistedForNonTypeAlias(m.group(2)):
-        reportError(f"Use type alias for '{m.group(2)}' instead. See STYLE.md")
+  if not USING_TYPE_ALIAS_REGEX.search(line):
+    smart_ptrs = SMART_PTR_REGEX.finditer(line)
+    for smart_ptr in smart_ptrs:
+      if not whitelistedForNonTypeAlias(smart_ptr.group(2)):
+        reportError(f"Use type alias for '{smart_ptr.group(2)}' instead. See STYLE.md")
 
-    optional_m = OPTIONAL_REF.finditer(line)
-    for m in optional_m:
-      if not whitelistedForNonTypeAlias(m.group(1)):
-        reportError(f"Use type alias for '{m.group(1)}' instead. See STYLE.md")
+    optional_refs = OPTIONAL_REF_REGEX.finditer(line)
+    for optional_ref in optional_refs:
+      if not whitelistedForNonTypeAlias(optional_ref.group(1)):
+        reportError(f"Use type alias for '{optional_ref.group(1)}' instead. See STYLE.md")
 
 
 def checkBuildLine(line, file_path, reportError):

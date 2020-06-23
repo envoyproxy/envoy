@@ -219,7 +219,7 @@ def runChecks():
   errors += checkUnfixableError("non_type_alias_smart_ptr.cc",
                                 "Use type alias for 'Network::Connection' instead. See STYLE.md")
   errors += checkUnfixableError(
-      "non_type_alias_optional.cc",
+      "non_type_alias_optional_ref.cc",
       "Use type alias for 'ConnectionHandlerImpl::ActiveTcpListener' instead. See STYLE.md")
   errors += checkUnfixableError("clang_format_double_off.cc", "clang-format nested off")
   errors += checkUnfixableError("clang_format_trailing_off.cc", "clang-format remains off")
