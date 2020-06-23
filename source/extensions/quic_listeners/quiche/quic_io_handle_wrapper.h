@@ -64,12 +64,12 @@ public:
   }
   bool supportsMmsg() const override { return io_handle_.supportsMmsg(); }
   bool supportsUdpGro() const override { return io_handle_.supportsUdpGro(); }
-  Api::SysCallIntResult bind(const sockaddr* address, socklen_t addrlen) override {
-    return io_handle_.bind(address, addrlen);
+  Api::SysCallIntResult bind(Network::Address::InstanceConstSharedPtr address) override {
+    return io_handle_.bind(address);
   }
   Api::SysCallIntResult listen(int backlog) override { return io_handle_.listen(backlog); }
-  Api::SysCallIntResult connect(const sockaddr* address, socklen_t addrlen) override {
-    return io_handle_.connect(address, addrlen);
+  Api::SysCallIntResult connect(Network::Address::InstanceConstSharedPtr address) override {
+    return io_handle_.connect(address);
   }
   Api::SysCallIntResult setOption(int level, int optname, const void* optval,
                                   socklen_t optlen) override {
