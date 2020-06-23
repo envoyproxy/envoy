@@ -63,7 +63,7 @@ bool Config::configToVector(const ProtobufRepeatedRule& proto_rules,
       throw EnvoyException("Cannot specificy both value and regex_value_rewrite");
     }
 
-    vector.push_back(Rule(entry.header(), entry));
+    vector.emplace_back(entry.header(), entry);
   }
 
   return true;
