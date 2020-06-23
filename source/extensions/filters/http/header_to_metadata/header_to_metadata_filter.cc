@@ -58,11 +58,9 @@ bool Config::configToVector(const ProtobufRepeatedRule& proto_rules,
     }
 
     // Ensure value and regex_value_rewrite are not mixed.
-    if (entry.has_on_header_present()) {
-      auto& on_header_present = entry.on_header_present();
-      if (!on_header_present.value().empty() && on_header_present.has_regex_value_rewrite()) {
-        throw EnvoyException("Cannot specificy both value and regex_value_rewrite");
-      }
+    if (!entry.on_header_present().value().empty() &&
+        entry.on_header_present().has_regex_value_rewrite()) {
+      throw EnvoyException("Cannot specificy both value and regex_value_rewrite");
     }
 
     vector.push_back(Rule(entry.header(), entry));
