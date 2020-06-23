@@ -63,7 +63,7 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::network::ext_authz::ExtAut
   } catch (const ProtobufMessage::DeprecatedProtoFieldException& e) {
     ENVOY_LOG_MISC(debug, "DeprecatedProtoFieldException: {}", e.what());
     return;
-  }catch (const EnvoyException& e) {
+  } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException during validation: {}", e.what());
   }
 
