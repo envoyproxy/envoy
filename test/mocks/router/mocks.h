@@ -540,7 +540,7 @@ public:
                Upstream::HostDescriptionConstSharedPtr host,
                const Network::Address::InstanceConstSharedPtr& upstream_local_address,
                const StreamInfo::StreamInfo& info));
-  MOCK_METHOD(UpstreamRequest*, upstreamRequest, ());
+  MOCK_METHOD(UpstreamToDownstream*, upstreamRequest, ());
 };
 
 } // namespace Router
