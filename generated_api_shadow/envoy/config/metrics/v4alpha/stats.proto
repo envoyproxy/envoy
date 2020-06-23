@@ -330,6 +330,14 @@ message DogStatsdSink {
   // Optional custom metric name prefix. See :ref:`StatsdSink's prefix field
   // <envoy_api_field_config.metrics.v4alpha.StatsdSink.prefix>` for more details.
   string prefix = 3;
+
+  // Optional buffer size (in bytes) to use when sending UDP messages. By default
+  // Envoy will emit one metric per datagram. By specifying a buffer-size, Envoy
+  // will emit as many metrics that fit into the buffer. Metrics will be newline
+  // separated.
+  //
+  // Note that the buffer-size should not exceed your network's MTU.
+  int64 buffer_size = 4;
 }
 
 // Stats configuration proto schema for built-in *envoy.stat_sinks.hystrix* sink.

@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/buffer/buffer.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 #include "envoy/event/dispatcher.h"
@@ -11,6 +12,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/api/os_sys_calls_impl.h"
+#include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
@@ -38,32 +40,57 @@ void UdpStatsdSink::WriterImpl::write(const std::string& message) {
   Network::Utility::writeToSocket(*io_handle_, &slice, 1, nullptr, *parent_.server_address_);
 }
 
+void UdpStatsdSink::WriterImpl::write_buffer(Buffer::Instance* data) {
+  Network::Utility::writeToSocket(*io_handle_, *data, nullptr, *parent_.server_address_);
+}
+
 UdpStatsdSink::UdpStatsdSink(ThreadLocal::SlotAllocator& tls,
                              Network::Address::InstanceConstSharedPtr address, const bool use_tag,
-                             const std::string& prefix)
+                             const std::string& prefix, uint64_t buffer_size)
     : tls_(tls.allocateSlot()), server_address_(std::move(address)), use_tag_(use_tag),
-      prefix_(prefix.empty() ? Statsd::getDefaultPrefix() : prefix) {
+      prefix_(prefix.empty() ? Statsd::getDefaultPrefix() : prefix), buffer_size_(buffer_size) {
   tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<WriterImpl>(*this);
   });
 }
 
 void UdpStatsdSink::flush(Stats::MetricSnapshot& snapshot) {
-  Writer& writer = tls_->getTyped<Writer>();
+  auto buffer = Buffer::OwnedImpl();
   for (const auto& counter : snapshot.counters()) {
     if (counter.counter_.get().used()) {
-      writer.write(absl::StrCat(prefix_, ".", getName(counter.counter_.get()), ":", counter.delta_,
-                                "|c", buildTagStr(counter.counter_.get().tags())));
+      auto counterStr =
+          absl::StrCat(prefix_, ".", getName(counter.counter_.get()), ":", counter.delta_, "|c",
+                       buildTagStr(counter.counter_.get().tags()));
+      if (buffer.length() + counterStr.length() > buffer_size_) {
+        flushBuffer(buffer);
+      }
+      buffer.add(counterStr);
     }
   }
 
   for (const auto& gauge : snapshot.gauges()) {
     if (gauge.get().used()) {
-      writer.write(absl::StrCat(prefix_, ".", getName(gauge.get()), ":", gauge.get().value(), "|g",
-                                buildTagStr(gauge.get().tags())));
+      auto gaugeStr = absl::StrCat(prefix_, ".", getName(gauge.get()), ":", gauge.get().value(),
+                                   "|g", buildTagStr(gauge.get().tags()));
+      if (buffer.length() + gaugeStr.length() > buffer_size_) {
+        flushBuffer(buffer);
+      }
+      buffer.add(gaugeStr);
     }
   }
+
+  flushBuffer(buffer);
   // TODO(efimki): Add support of text readouts stats.
+}
+
+void UdpStatsdSink::flushBuffer(Buffer::OwnedImpl& buffer) const {
+  if (buffer.length() == 0) {
+    return;
+  }
+  Writer& writer = tls_->getTyped<Writer>();
+  writer.write_buffer(&buffer);
+  // TODO: write slices to writer
+  buffer.drain(buffer.length());
 }
 
 void UdpStatsdSink::onHistogramComplete(const Stats::Histogram& histogram, uint64_t value) {

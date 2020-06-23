@@ -34,6 +34,7 @@ TEST_P(DogStatsdConfigLoopbackTest, ValidUdpIp) {
   const std::string name = StatsSinkNames::get().DogStatsd;
 
   envoy::config::metrics::v3::DogStatsdSink sink_config;
+  sink_config.set_buffer_size(128);
   envoy::config::core::v3::Address& address = *sink_config.mutable_address();
   envoy::config::core::v3::SocketAddress& socket_address = *address.mutable_socket_address();
   socket_address.set_protocol(envoy::config::core::v3::SocketAddress::UDP);
@@ -55,6 +56,7 @@ TEST_P(DogStatsdConfigLoopbackTest, ValidUdpIp) {
   EXPECT_NE(udp_sink, nullptr);
   EXPECT_EQ(udp_sink->getUseTagForTest(), true);
   EXPECT_EQ(udp_sink->getPrefix(), Common::Statsd::getDefaultPrefix());
+  EXPECT_EQ(udp_sink->getBufferSizeForTest(), 128);
 }
 
 // Negative test for protoc-gen-validate constraints for dog_statsd.

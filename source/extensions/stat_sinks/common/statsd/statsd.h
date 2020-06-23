@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/buffer/buffer.h"
 #include "envoy/common/platform.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/connection.h"
@@ -34,15 +35,18 @@ public:
   class Writer : public ThreadLocal::ThreadLocalObject {
   public:
     virtual void write(const std::string& message) PURE;
+    virtual void write_buffer(Buffer::Instance* data) PURE;
   };
 
   UdpStatsdSink(ThreadLocal::SlotAllocator& tls, Network::Address::InstanceConstSharedPtr address,
-                const bool use_tag, const std::string& prefix = getDefaultPrefix());
+                const bool use_tag, const std::string& prefix = getDefaultPrefix(),
+                uint64_t buffer_size = 0);
   // For testing.
   UdpStatsdSink(ThreadLocal::SlotAllocator& tls, const std::shared_ptr<Writer>& writer,
-                const bool use_tag, const std::string& prefix = getDefaultPrefix())
+                const bool use_tag, const std::string& prefix = getDefaultPrefix(),
+                uint64_t buffer_size = 0)
       : tls_(tls.allocateSlot()), use_tag_(use_tag),
-        prefix_(prefix.empty() ? getDefaultPrefix() : prefix) {
+        prefix_(prefix.empty() ? getDefaultPrefix() : prefix), buffer_size_(buffer_size) {
     tls_->set(
         [writer](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr { return writer; });
   }
@@ -52,6 +56,7 @@ public:
   void onHistogramComplete(const Stats::Histogram& histogram, uint64_t value) override;
 
   bool getUseTagForTest() { return use_tag_; }
+  uint64_t getBufferSizeForTest() { return buffer_size_; }
   const std::string& getPrefix() { return prefix_; }
 
 private:
@@ -64,11 +69,14 @@ private:
 
     // Writer
     void write(const std::string& message) override;
+    void write_buffer(Buffer::Instance* data) override;
 
   private:
     UdpStatsdSink& parent_;
     const Network::IoHandlePtr io_handle_;
   };
+
+  void flushBuffer(Buffer::OwnedImpl& buffer) const;
 
   const std::string getName(const Stats::Metric& metric) const;
   const std::string buildTagStr(const std::vector<Stats::Tag>& tags) const;
@@ -78,6 +86,7 @@ private:
   const bool use_tag_;
   // Prefix for all flushed stats.
   const std::string prefix_;
+  const uint64_t buffer_size_;
 };
 
 /**
