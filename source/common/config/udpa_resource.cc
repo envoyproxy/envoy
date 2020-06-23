@@ -38,13 +38,13 @@ std::string UdpaResourceName::encodeUri(const udpa::core::v1::ResourceName& reso
   const std::string query_params =
       query_param_components.empty() ? "" : "?" + absl::StrJoin(query_param_components, "&");
   return absl::StrCat("udpa://", authority, "/", resource_name.qualified_type(),
-                      path.empty() && query_params.empty() ? "" : "/", path, query_params);
+                      path.empty() ? "" : "/", path, query_params);
 }
 
 udpa::core::v1::ResourceName UdpaResourceName::decodeUri(absl::string_view resource_uri) {
-  if (!absl::StartsWith(resource_uri, "udpa://")) {
+  if (!absl::StartsWith(resource_uri, "udpa:")) {
     throw UdpaResourceName::DecodeException(
-        fmt::format("{} does not have udpa:// scheme", resource_uri));
+        fmt::format("{} does not have an udpa scheme", resource_uri));
   }
   absl::string_view host, path;
   Http::Utility::extractHostPathFromUri(resource_uri, host, path);

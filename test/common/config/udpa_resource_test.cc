@@ -19,10 +19,12 @@ const std::string EscapedUriWithManyQueryParams =
 // TODO(htuch): write a fuzzer that validates this property as well.
 TEST(UdpaResourceNameTest, DecodeEncode) {
   const std::vector<std::string> uris = {
+      "udpa:///envoy.config.listener.v3.Listener",
       "udpa://foo/envoy.config.listener.v3.Listener",
       "udpa://foo/envoy.config.listener.v3.Listener/bar",
       "udpa://foo/envoy.config.listener.v3.Listener/bar/baz",
-      "udpa://foo/envoy.config.listener.v3.Listener/?ab=cde",
+      "udpa://foo/envoy.config.listener.v3.Listener/bar////baz",
+      "udpa://foo/envoy.config.listener.v3.Listener?ab=cde",
       "udpa://foo/envoy.config.listener.v3.Listener/bar?ab=cd",
       "udpa://foo/envoy.config.listener.v3.Listener/bar/baz?ab=cde",
       "udpa://foo/envoy.config.listener.v3.Listener/bar/baz?ab=",
@@ -53,12 +55,22 @@ TEST(UdpaResourceNameTest, DecodeSuccess) {
   EXPECT_EQ("%#&=", resource_name.context().params().at("foo"));
 }
 
+// Validate that the URI decoding behaves with a near-empty UDPA resource name.
+TEST(UdpaResourceNameTest, DecodeEmpty) {
+  const auto resource_name =
+      UdpaResourceName::decodeUri("udpa:///envoy.config.listener.v3.Listener");
+  EXPECT_TRUE(resource_name.authority().empty());
+  EXPECT_EQ("envoy.config.listener.v3.Listener", resource_name.qualified_type());
+  EXPECT_TRUE(resource_name.id().empty());
+  EXPECT_TRUE(resource_name.context().params().empty());
+}
+
 // Negative tests for URI decoding.
 TEST(UdpaResourceNameTest, DecodeFail) {
   {
     EXPECT_THROW_WITH_MESSAGE(UdpaResourceName::decodeUri("foo://"),
                               UdpaResourceName::DecodeException,
-                              "foo:// does not have udpa:// scheme");
+                              "foo:// does not have an udpa scheme");
   }
   {
     EXPECT_THROW_WITH_MESSAGE(UdpaResourceName::decodeUri("udpa://foo"),
