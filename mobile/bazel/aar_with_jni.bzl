@@ -270,6 +270,7 @@ def _create_sources_javadocs(name, android_library):
         java -jar $(location @kotlin_dokka//jar) \
             $$sources_dir \
             -format javadoc \
+            -noStdlibLink -noJdkLink \
             -output $$tmp_dir > /dev/null
         cd $$tmp_dir
         zip -r $$original_directory/$@ . > /dev/null
