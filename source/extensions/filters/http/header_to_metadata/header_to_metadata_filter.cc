@@ -179,8 +179,10 @@ void HeaderToMetadataFilter::writeHeaderToMetadata(Http::HeaderMap& headers,
 
     if (header_entry != nullptr && proto_rule.has_on_header_present()) {
       const auto& keyval = proto_rule.on_header_present();
-      std::string rewritten_value;
       absl::string_view value = header_entry->value().getStringView();
+      // This is used to hold the rewritten header value, so that it can
+      // be bound to value without going out of scope.
+      std::string rewritten_value;
 
       if (!keyval.value().empty()) {
         value = absl::string_view(keyval.value());
