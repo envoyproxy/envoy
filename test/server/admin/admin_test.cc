@@ -319,7 +319,7 @@ TEST_P(AdminInstanceTest, ConfigDumpWithEndpoint) {
   EXPECT_EQ(expected_json, output);
 }
 
-// Test EDS config dump while multiple locality, locality weights and priorities exist
+// Test EDS config dump while multiple localities and priorities exist
 TEST_P(AdminInstanceTest, ConfigDumpWithLocalityEndpoint) {
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   ON_CALL(server_.cluster_manager_, clusters()).WillByDefault(ReturnPointee(&cluster_map));
