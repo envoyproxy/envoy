@@ -86,14 +86,9 @@ void HttpSubscriptionImpl::parseResponse(const Http::ResponseMessage& response) 
     return;
   }
   try {
-    std::vector<DecodedResourceImplPtr> decoded_resources;
-    std::vector<DecodedResourceRef> resource_refs;
-    for (const auto& resource : message.resources()) {
-      decoded_resources.emplace_back(
-          new DecodedResourceImpl(resource_decoder_, resource, message.version_info()));
-      resource_refs.emplace_back(*decoded_resources.back());
-    }
-    callbacks_.onConfigUpdate(resource_refs, message.version_info());
+    const auto decoded_resources =
+        DecodedResourcesWrapper(resource_decoder_, message.resources(), message.version_info());
+    callbacks_.onConfigUpdate(decoded_resources.refvec_, message.version_info());
     request_.set_version_info(message.version_info());
     stats_.update_time_.set(DateUtil::nowToMilliseconds(dispatcher_.timeSource()));
     stats_.version_.set(HashUtil::xxHash64(request_.version_info()));

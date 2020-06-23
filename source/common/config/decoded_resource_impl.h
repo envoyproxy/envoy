@@ -58,5 +58,20 @@ private:
 
 using DecodedResourceImplPtr = std::unique_ptr<DecodedResourceImpl>;
 
+struct DecodedResourcesWrapper {
+  DecodedResourcesWrapper() = default;
+  DecodedResourcesWrapper(OpaqueResourceDecoder& resource_decoder,
+                          const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                          const std::string& version) {
+    for (const auto& resource : resources) {
+      owned_resources_.emplace_back(new DecodedResourceImpl(resource_decoder, resource, version));
+      refvec_.emplace_back(*owned_resources_.back());
+    }
+  }
+
+  std::vector<Config::DecodedResourcePtr> owned_resources_;
+  std::vector<Config::DecodedResourceRef> refvec_;
+};
+
 } // namespace Config
 } // namespace Envoy

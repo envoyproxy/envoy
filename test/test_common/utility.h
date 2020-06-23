@@ -616,15 +616,11 @@ public:
     return pb_binary_str;
   }
 
-  struct DecodedResources {
-    std::vector<Config::DecodedResourcePtr> owned_resources_;
-    std::vector<Config::DecodedResourceRef> refvec_;
-  };
-
   template <class MessageType>
-  static DecodedResources decodeResources(std::initializer_list<MessageType> resources,
-                                          const std::string& name_field = "name") {
-    DecodedResources decoded_resources;
+  static Config::DecodedResourcesWrapper
+  decodeResources(std::initializer_list<MessageType> resources,
+                  const std::string& name_field = "name") {
+    Config::DecodedResourcesWrapper decoded_resources;
     for (const auto& resource : resources) {
       auto owned_resource = std::make_unique<MessageType>(resource);
       decoded_resources.owned_resources_.emplace_back(new Config::DecodedResourceImpl(
@@ -635,21 +631,15 @@ public:
   }
 
   template <class MessageType>
-  static DecodedResources
+  static Config::DecodedResourcesWrapper
   decodeResources(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                   const std::string& version, const std::string& name_field = "name") {
-    DecodedResources decoded_resources;
     TestOpaqueResourceDecoderImpl<MessageType> resource_decoder(name_field);
-    for (const auto& resource : resources) {
-      decoded_resources.owned_resources_.emplace_back(
-          new Config::DecodedResourceImpl(resource_decoder, resource, version));
-      decoded_resources.refvec_.emplace_back(*decoded_resources.owned_resources_.back());
-    }
-    return decoded_resources;
+    return Config::DecodedResourcesWrapper(resource_decoder, resources, version);
   }
 
   template <class MessageType>
-  static DecodedResources
+  static Config::DecodedResourcesWrapper
   decodeResources(const envoy::service::discovery::v3::DiscoveryResponse& resources,
                   const std::string& name_field = "name") {
     return decodeResources<MessageType>(resources.resources(), resources.version_info(),
@@ -657,10 +647,10 @@ public:
   }
 
   template <class MessageType>
-  static DecodedResources decodeResources(
+  static Config::DecodedResourcesWrapper decodeResources(
       const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& resources,
       const std::string& name_field = "name") {
-    DecodedResources decoded_resources;
+    Config::DecodedResourcesWrapper decoded_resources;
     TestOpaqueResourceDecoderImpl<MessageType> resource_decoder(name_field);
     for (const auto& resource : resources) {
       decoded_resources.owned_resources_.emplace_back(
