@@ -22,7 +22,7 @@ Rule::Rule(const std::string& header, const ProtoRule& rule) : header_(header), 
   if (rule.has_on_header_present()) {
     const auto& on_present = rule.on_header_present();
     if (on_present.has_regex_value_rewrite()) {
-      auto rewrite_spec = on_present.regex_value_rewrite();
+      const auto& rewrite_spec = on_present.regex_value_rewrite();
       regex_rewrite_ = Regex::Utility::parseRegex(rewrite_spec.pattern());
       regex_rewrite_substitution_ = rewrite_spec.substitution();
     }
