@@ -93,13 +93,17 @@ private:
   }
 
   TimeSource& time_source_;
+
+  // Stores samples from oldest (front) to newest (back). Since there is no need to read/modify
+  // entries that are not the oldest or newest (front/back), we can get away with using a deque
+  // which allocates memory in chunks and keeps most elements contiguous and cache-friendly.
   std::deque<std::pair<MonotonicTime, RequestData>> historical_data_;
 
   // Request data aggregated for the whole look-back window.
   RequestData global_data_;
 
   // The rolling time window size.
-  std::chrono::seconds sampling_window_;
+  const std::chrono::seconds sampling_window_;
 };
 
 } // namespace AdmissionControl
