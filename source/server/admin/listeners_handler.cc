@@ -23,9 +23,13 @@ Http::Code ListenersHandler::handlerDrainListeners(absl::string_view url, Http::
 
   const bool graceful = params.find("graceful") != params.end();
   if (graceful) {
-    server_.drainManager().startDrainSequence([this, stop_listeners_type]() {
-      server_.listenerManager().stopListeners(stop_listeners_type);
-    });
+    if (server_.drainManager().drainClose()) {
+      // What to do here?
+    } else {
+      server_.drainManager().startDrainSequence([this, stop_listeners_type]() {
+        server_.listenerManager().stopListeners(stop_listeners_type);
+      });
+    }
   } else {
     server_.listenerManager().stopListeners(stop_listeners_type);
   }
