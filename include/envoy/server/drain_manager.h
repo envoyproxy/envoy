@@ -21,6 +21,8 @@ public:
    */
   virtual void startDrainSequence(std::function<void()> drain_complete_cb) PURE;
 
+  virtual bool draining() const PURE;
+
   /**
    * Invoked in the newly launched primary process to begin the parent shutdown sequence. At the end
    * of the sequence the previous primary process will be terminated.
