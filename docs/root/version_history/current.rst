@@ -39,6 +39,9 @@ Bug Fixes
 * http: fixed a bug where in some cases slash was moved from path to query string when :ref:`merging of adjacent slashes<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.merge_slashes>` is enabled.
 * http: fixed several bugs with applying correct connection close behavior across the http connection manager, health checker, and connection pool. This behavior may be temporarily reverted by setting runtime feature `envoy.reloadable_features.fix_connection_close` to false.
 * prometheus stats: fix the sort order of output lines to comply with the standard.
+* udp: the :ref:`reuse_port <envoy_api_field_Listener.reuse_port>` listener option must now be 
+  specified for UDP listeners if concurrency is > 1. This previously crashed so is considered a 
+  bug fix.
 * upstream: fixed a bug where Envoy would panic when receiving a GRPC SERVICE_UNKNOWN status on the health check.
 
 Removed Config or Runtime
@@ -58,6 +61,7 @@ New Features
 * aggregate cluster: make route :ref:`retry_priority <envoy_v3_api_field_config.route.v3.RetryPolicy.retry_priority>` predicates work with :ref:`this cluster type <envoy_v3_api_msg_extensions.clusters.aggregate.v3.ClusterConfig>`.
 * build: official released binary is now built on Ubuntu 18.04, requires glibc >= 2.27.
 * build: official released binary is now built with Clang 10.0.0.
+* cluster: added an extension point for configurable :ref:`upstreams <envoy_v3_api_field_config.cluster.v3.Cluster.upstream_config>`.
 * compressor: generic :ref:`compressor <config_http_filters_compressor>` filter exposed to users.
 * config: added :ref:`identifier <config_cluster_manager_cds>` stat that reflects control plane identifier.
 * config: added :ref:`version_text <config_cluster_manager_cds>` stat that reflects xDS version.

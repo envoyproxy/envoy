@@ -2,6 +2,8 @@
 
 #include "common/http/headers.h"
 
+#include "extensions/filters/http/cache/cache_filter_utils.h"
+
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -14,26 +16,6 @@ struct CacheResponseCodeDetailValues {
 };
 
 using CacheResponseCodeDetails = ConstSingleton<CacheResponseCodeDetailValues>;
-
-bool CacheFilter::isCacheableRequest(Http::RequestHeaderMap& headers) {
-  const Http::HeaderEntry* method = headers.Method();
-  const Http::HeaderEntry* forwarded_proto = headers.ForwardedProto();
-  const Http::HeaderValues& header_values = Http::Headers::get();
-  // TODO(toddmgreer): Also serve HEAD requests from cache.
-  // TODO(toddmgreer): Check all the other cache-related headers.
-  return method && forwarded_proto && headers.Path() && headers.Host() &&
-         (method->value() == header_values.MethodValues.Get) &&
-         (forwarded_proto->value() == header_values.SchemeValues.Http ||
-          forwarded_proto->value() == header_values.SchemeValues.Https);
-}
-
-bool CacheFilter::isCacheableResponse(Http::ResponseHeaderMap& headers) {
-  const absl::string_view cache_control = headers.getCacheControlValue();
-  // TODO(toddmgreer): fully check for cacheability. See for example
-  // https://github.com/apache/incubator-pagespeed-mod/blob/master/pagespeed/kernel/http/caching_headers.h.
-  return !StringUtil::caseFindToken(cache_control, ",",
-                                    Http::Headers::get().CacheControlValues.Private);
-}
 
 CacheFilter::CacheFilter(const envoy::extensions::filters::http::cache::v3alpha::CacheConfig&,
                          const std::string&, Stats::Scope&, TimeSource& time_source,
@@ -55,7 +37,7 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
         *decoder_callbacks_, headers);
     return Http::FilterHeadersStatus::Continue;
   }
-  if (!isCacheableRequest(headers)) {
+  if (!CacheFilterUtils::isCacheableRequest(headers)) {
     ENVOY_STREAM_LOG(debug, "CacheFilter::decodeHeaders ignoring uncacheable request: {}",
                      *decoder_callbacks_, headers);
     return Http::FilterHeadersStatus::Continue;
@@ -78,7 +60,7 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
 Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                      bool end_stream) {
-  if (lookup_ && isCacheableResponse(headers)) {
+  if (lookup_ && CacheFilterUtils::isCacheableResponse(headers)) {
     ENVOY_STREAM_LOG(debug, "CacheFilter::encodeHeaders inserting headers", *encoder_callbacks_);
     insert_ = cache_.makeInsertContext(std::move(lookup_));
     insert_->insertHeaders(headers, end_stream);
