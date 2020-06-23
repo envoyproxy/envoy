@@ -13,6 +13,7 @@
 #include "test/common/upstream/utility.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
@@ -1548,7 +1549,11 @@ TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceWithInvalidActiveRequestBias
                               makeTestHost(info_, "tcp://127.0.0.1:81", 2)};
 
   hostSet().hosts_ = hostSet().healthy_hosts_;
-  hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
+
+  // Trigger callbacks. The added/removed lists are not relevant.
+  EXPECT_LOG_CONTAINS(
+      "warn", "upstream: invalid active request bias supplied (runtime key ar_bias), using 1.0",
+      hostSet().runCallbacks({}, {}));
 
   EXPECT_CALL(random_, random()).WillRepeatedly(Return(0));
 
