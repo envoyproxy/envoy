@@ -261,8 +261,8 @@ modify different aspects of the server:
    .. http:post:: /drain_listeners?graceful
 
    When draining listeners, enter a graceful drain period prior to closing listeners. 
-   This behaviour and duration is determined by server options for the drain manager, and 
-   includes sending H1 connection-close, H2 GOAWAYs, and terminating connections on request complete.
+   This behaviour and duration is configurable via server options or CLI 
+   (:option:`--drain-time-s` and :option:`--drain-strategy`).
 
 .. attention::
 
