@@ -40,8 +40,8 @@ namespace PostgresProxy {
   COUNTER(transactions)                                                                            \
   COUNTER(transactions_commit)                                                                     \
   COUNTER(transactions_rollback)                                                                   \
-  COUNTER(queries_parsed)                                                                          \
-  COUNTER(queries_parse_error)                                                                     \
+  COUNTER(statements_parsed)                                                                       \
+  COUNTER(statements_parse_error)                                                                  \
   COUNTER(notices)                                                                                 \
   COUNTER(notices_notice)                                                                          \
   COUNTER(notices_warning)                                                                         \

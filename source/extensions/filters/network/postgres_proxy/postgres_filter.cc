@@ -171,13 +171,13 @@ void PostgresFilter::processQuery(const std::string& sql) {
     auto result = Common::SQLUtils::SQLUtils::setMetadata(sql, decoder_->getAttributes(), metadata);
 
     if (!result) {
-      config_->stats_.queries_parse_error_.inc();
+      config_->stats_.statements_parse_error_.inc();
       ENVOY_CONN_LOG(trace, "postgres_proxy: cannot parse SQL: {}", read_callbacks_->connection(),
                      sql.c_str());
       return;
     }
 
-    config_->stats_.queries_parsed_.inc();
+    config_->stats_.statements_parsed_.inc();
     ENVOY_CONN_LOG(trace, "postgres_proxy: query processed {}", read_callbacks_->connection(),
                    sql.c_str());
 

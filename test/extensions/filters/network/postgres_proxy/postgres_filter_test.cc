@@ -267,8 +267,8 @@ TEST_F(PostgresFilterTest, MetadataIncorrectSQL) {
   ASSERT_THAT(filter_->connection().streamInfo().dynamicMetadata().filter_metadata().contains(
                   NetworkFilterNames::get().PostgresProxy),
               false);
-  ASSERT_THAT(filter_->getStats().queries_parse_error_.value(), 1);
-  ASSERT_THAT(filter_->getStats().queries_parsed_.value(), 0);
+  ASSERT_THAT(filter_->getStats().statements_parse_error_.value(), 1);
+  ASSERT_THAT(filter_->getStats().statements_parsed_.value(), 0);
 }
 
 // Test verifies that Postgres metadata is created for correct SQL statement.
@@ -286,8 +286,8 @@ TEST_F(PostgresFilterTest, QueryMessageMetadata) {
   ASSERT_THAT(filter_->connection().streamInfo().dynamicMetadata().filter_metadata().contains(
                   NetworkFilterNames::get().PostgresProxy),
               false);
-  ASSERT_THAT(filter_->getStats().queries_parse_error_.value(), 0);
-  ASSERT_THAT(filter_->getStats().queries_parsed_.value(), 0);
+  ASSERT_THAT(filter_->getStats().statements_parse_error_.value(), 0);
+  ASSERT_THAT(filter_->getStats().statements_parsed_.value(), 0);
 
   // Now enable SQL parsing and creating metadata.
   filter_->getConfig()->enable_sql_parsing_ = true;
@@ -303,8 +303,8 @@ TEST_F(PostgresFilterTest, QueryMessageMetadata) {
   const auto& operations = fields.at("whatever").list_value();
   ASSERT_EQ("select", operations.values(0).string_value());
 
-  ASSERT_THAT(filter_->getStats().queries_parse_error_.value(), 0);
-  ASSERT_THAT(filter_->getStats().queries_parsed_.value(), 1);
+  ASSERT_THAT(filter_->getStats().statements_parse_error_.value(), 0);
+  ASSERT_THAT(filter_->getStats().statements_parsed_.value(), 1);
 }
 
 } // namespace PostgresProxy
