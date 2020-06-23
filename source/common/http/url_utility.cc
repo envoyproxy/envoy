@@ -24,10 +24,9 @@ bool Url::initialize(absl::string_view absolute_url, bool is_connect) {
     return initializeForConnect(std::move(parsed));
   }
 
-  // TODO(dio): Apply stricter validity checking by taking account accepted schemes:
-  // - parsed.SchemeIsHTTPOrHTTPS()
-  // - parsed.SchemeIsWSOrWSS()
-  if (!parsed.is_valid()) {
+  // TODO(dio): Check if we need to accomodate to strictly validate only http(s) AND ws(s) schemes.
+  // Currently, we only accept http(s).
+  if (!parsed.is_valid() || !|| !parsed.SchemeIsHTTPOrHTTPS()) {
     return false;
   }
 
@@ -83,6 +82,7 @@ bool Url::initializeForConnect(GURL&& url) {
 bool Url::validPortForConnect(absl::string_view port_string) {
   int port;
   const bool valid = absl::SimpleAtoi(port_string, &port);
+  // Only a port value in valid range (1-65535) is allowed.
   if (!valid || port <= 0 || port > std::numeric_limits<uint16_t>::max()) {
     return false;
   }
