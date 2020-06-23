@@ -40,3 +40,4 @@ The RBAC filter emits the following dynamic metadata.
 
   shadow_effective_policy_id, string, The effective shadow policy ID matching the action (if any).
   shadow_engine_result, string, The engine result for the shadow rules (i.e. either `allowed` or `denied`).
+  envoy.log, string, Whether the request should be logged (i.e. either `yes` or `no`).
