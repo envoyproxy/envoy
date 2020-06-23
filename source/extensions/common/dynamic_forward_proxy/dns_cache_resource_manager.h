@@ -29,7 +29,7 @@ public:
           cb_config);
 
   static DnsCacheCircuitBreakersStats generateDnsCacheCircuitBreakersStats(Stats::Scope& scope);
-  // Envoy::Upstream::ResourceManager
+  // Envoy::Upstream::DnsCacheResourceManager
   ResourceLimit& pendingRequests() override { return pending_requests_; }
   DnsCacheCircuitBreakersStats& stats() override { return cb_stats_; }
 

@@ -26,9 +26,7 @@ DnsCacheImpl::DnsCacheImpl(
       stats_(generateDnsCacheStats(*scope_)),
       resource_manager_(
           *scope_, loader, config.name(),
-          config.has_dns_cache_circuit_breaker()
-              ? config.dns_cache_circuit_breaker()
-              : envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheCircuitBreakers()),
+          config.dns_cache_circuit_breaker()),
       refresh_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_refresh_rate, 60000)),
       failure_backoff_strategy_(
           Config::Utility::prepareDnsRefreshStrategy<
