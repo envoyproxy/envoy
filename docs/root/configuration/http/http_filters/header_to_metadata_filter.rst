@@ -78,7 +78,7 @@ dynamic metadata, this filter support regex matching and substitution:
                 pattern:
                   google_re2: {}
                   regex: "^/(cluster[\\d\\w-]+)/?.*$"
-              substitution: "\\1"
+                substitution: "\\1"
 
 Note that this filter also supports per route configuration:
 
