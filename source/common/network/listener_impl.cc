@@ -1,19 +1,19 @@
 #include "common/network/listener_impl.h"
 
-#include "common/common/macros.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/network/connection.h"
 
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
+#include "common/common/macros.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/event/file_event_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/io_socket_handle_impl.h"
 
-#include "envoy/network/connection.h"
 #include "event2/listener.h"
 
 namespace Envoy {
@@ -52,9 +52,12 @@ void ListenerImpl::setupPipeListener(Event::DispatcherImpl& dispatcher,
                                      const std::string& pipe_listener) {
   dispatcher.registerPipeFactory(
       pipe_listener, [this](const std::string& pipe_address) -> Network::ClientConnectionPtr {
-        UNREFERENCED_PARAMETER(this);
+        // TODO(lambdai): create with HeapIoSocketHandle
+        Network::ConnectionSocketPtr socket; // = specialized ConnectionSocket;
+        // TODO(lambdai): add parameter to bypass all listener filters here.
+        cb_.onAccept(std::move(socket));
         UNREFERENCED_PARAMETER(pipe_address);
-        return nullptr;
+        return nullptr; // specialized  client connection
       });
 }
 

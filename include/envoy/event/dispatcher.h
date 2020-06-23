@@ -6,7 +6,6 @@
 #include <string>
 #include <vector>
 
-#include "common/common/macros.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/common/time.h"
 #include "envoy/event/file_event.h"
@@ -23,6 +22,8 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/thread/thread.h"
+
+#include "common/common/macros.h"
 
 namespace Envoy {
 namespace Event {

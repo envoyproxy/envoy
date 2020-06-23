@@ -27,8 +27,7 @@ private:
                              int remote_addr_len, void* arg);
   static void errorCallback(evconnlistener* listener, void* context);
 
-  void setupPipeListener(Event::DispatcherImpl& dispatcher,
-                                     const std::string& pipe_listener);
+  void setupPipeListener(Event::DispatcherImpl& dispatcher, const std::string& pipe_listener);
 
   Event::Libevent::ListenerPtr listener_;
 };
