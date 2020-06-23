@@ -91,7 +91,7 @@ DEFINE_PROTO_FUZZER(
       PANIC("A case is missing for an action");
     }
   }
-} // NOLINT
+} // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
   // Silence clang-tidy here because it thinks there is a memory leak for "fill_timer"
   // However, ownership of each MockTimer instance is transferred to the (caller of) dispatcher's
   // createTimer_(), so to avoid destructing it twice, the MockTimer must have been dynamically
