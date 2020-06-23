@@ -16,7 +16,8 @@ public:
   virtual ~SchedulableCallback() = default;
 
   /**
-   * Schedule the callback so it runs in the current iteration of the event loop.
+   * Schedule the callback so it runs in the current iteration of the event loop after all events
+   * scheduled in the current event loop have had a chance to execute.
    */
   virtual void scheduleCallbackCurrentIteration() PURE;
 
