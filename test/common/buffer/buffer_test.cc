@@ -236,7 +236,7 @@ TEST(SliceDequeTest, CreateDelete) {
     EXPECT_EQ(0, slices.size());
 
     // Append a view to the deque.
-    absl::string_view slice1 = "slice1";
+    const std::string slice1 = "slice1";
     slices.emplace_back(
         std::make_unique<DummySlice>(slice1, [&slice1_deleted]() { slice1_deleted = true; }));
     EXPECT_FALSE(slices.empty());
@@ -245,7 +245,7 @@ TEST(SliceDequeTest, CreateDelete) {
     EXPECT_TRUE(sliceMatches(slices.front(), slice1));
 
     // Append another view to the deque, and verify that both views are accessible.
-    absl::string_view slice2 = "slice2";
+    const std::string slice2 = "slice2";
     slices.emplace_back(
         std::make_unique<DummySlice>(slice2, [&slice2_deleted]() { slice2_deleted = true; }));
     EXPECT_FALSE(slices.empty());
@@ -256,7 +256,7 @@ TEST(SliceDequeTest, CreateDelete) {
     EXPECT_TRUE(sliceMatches(slices.back(), slice2));
 
     // Prepend a view to the deque, to exercise the ring buffer wraparound case.
-    absl::string_view slice3 = "slice3";
+    const std::string slice3 = "slice3";
     slices.emplace_front(
         std::make_unique<DummySlice>(slice3, [&slice3_deleted]() { slice3_deleted = true; }));
     EXPECT_FALSE(slices.empty());
