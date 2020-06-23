@@ -170,56 +170,20 @@ UNOWNED_EXTENSIONS = {
 }
 
 NON_TYPE_ALIAS_ALLOWED_TYPES = {
-  "void",
-  "bool",
-  "short",
-  "short int",
-  "signed short",
-  "signed short int",
-  "unsigned short",
-  "unsigned short int",
-  "int",
-  "signed",
-  "signed int",
-  "unsigned",
-  "unsigned int",
-  "long",
-  "long int",
-  "signed long",
-  "signed long int",
-  "unsigned long",
-  "unsigned long int",
-  "long long",
-  "long long int",
-  "signed long long",
-  "signed long long int",
-  "unsigned long long",
-  "unsigned long long int",
-  "int8_t",
-  "int16_t",
-  "int32_t",
-  "int64_t",
-  "uint8_t",
-  "uint16_t",
-  "uint32_t",
-  "uint64_t",
-  "signed char",
-  "unsigned char",
-  "char",
-  "wchar_t",
-  "char16_t",
-  "char32_t",
-  "std::string",
-  "float",
-  "double",
-  "long double",  
+  "^(?![A-Z].*).*$",
+  "^(.*::){,1}(StrictMock<|NiceMock<).*$",
+  "^(.*::){,1}(Test|Mock|Fake).*$",
+  "^Protobuf.*::.*$",
+  "^[A-Z]$",
+  "^.*, .*",
+  r"^.*\[\]$",
 }
 # yapf: enable
 
 USING_TYPE_ALIAS_REGEX = re.compile("using .* = .*;")
-SMART_PTR_REGEX = re.compile("std::(unique_ptr|shared_ptr)<(.*?)>")
-OPTIONAL_REF_REGEX = re.compile("absl::optional<std::reference_wrapper<(.*?)>>")
-NON_TYPE_ALIAS_ALLOWED_TYPE_REGEX = re.compile(fr"(.*\[\]$|^std::vector<.*|{'|'.join(NON_TYPE_ALIAS_ALLOWED_TYPES)}$)")
+SMART_PTR_REGEX = re.compile("std::(unique_ptr|shared_ptr)<(.*?)>(?!;)")
+OPTIONAL_REF_REGEX = re.compile("absl::optional<std::reference_wrapper<(.*?)>>(?!;)")
+NON_TYPE_ALIAS_ALLOWED_TYPE_REGEX = re.compile(fr"({'|'.join(NON_TYPE_ALIAS_ALLOWED_TYPES)})")
 
 
 # Map a line transformation function across each line of a file,
