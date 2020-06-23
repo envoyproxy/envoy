@@ -3,6 +3,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
+#include "envoy/network/exception.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/active_udp_listener_config.h"
 #include "envoy/server/transport_socket_config.h"
@@ -106,7 +107,7 @@ Network::SocketSharedPtr ListenSocketFactoryImpl::createListenSocketAndApplyOpti
         fmt::format("{}: Setting socket options {}", listener_name_, ok ? "succeeded" : "failed");
     if (!ok) {
       ENVOY_LOG(warn, "{}", message);
-      throw EnvoyException(message);
+      throw Network::CreateListenerException(message);
     } else {
       ENVOY_LOG(debug, "{}", message);
     }
@@ -333,6 +334,12 @@ void ListenerImpl::buildAccessLog() {
 void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
                                            uint32_t concurrency) {
   if (socket_type == Network::Socket::Type::Datagram) {
+    if (!config_.reuse_port() && concurrency > 1) {
+      throw EnvoyException("Listening on UDP when concurrency is > 1 without the SO_REUSEPORT "
+                           "socket option results in "
+                           "unstable packet proxying. Configure the reuse_port listener option or "
+                           "set concurrency = 1.");
+    }
     auto udp_config = config_.udp_listener_config();
     if (udp_config.udp_listener_name().empty()) {
       udp_config.set_udp_listener_name(UdpListenerNames::get().RawUdp);
@@ -343,10 +350,6 @@ void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
     ProtobufTypes::MessagePtr message =
         Config::Utility::translateToFactoryConfig(udp_config, validation_visitor_, config_factory);
     udp_listener_factory_ = config_factory.createActiveUdpListenerFactory(*message, concurrency);
-    if (!config_.reuse_port() && concurrency > 1) {
-      ENVOY_LOG(warn, "Listening on UDP without SO_REUSEPORT socket option may result to unstable "
-                      "packet proxying. Consider configuring the reuse_port listener option.");
-    }
   }
 }
 

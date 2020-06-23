@@ -53,6 +53,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "exception_interface",
+    hdrs = ["exception.h"],
+)
+
+envoy_cc_library(
     name = "filter_interface",
     hdrs = ["filter.h"],
     deps = [

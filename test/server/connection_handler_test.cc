@@ -1,5 +1,6 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/udp_listener_config.pb.h"
+#include "envoy/network/exception.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/active_udp_listener_config.h"
 #include "envoy/stats/scope.h"

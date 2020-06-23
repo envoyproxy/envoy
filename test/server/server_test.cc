@@ -1,6 +1,7 @@
 #include <memory>
 
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/network/exception.h"
 #include "envoy/server/bootstrap_extension_config.h"
 
 #include "common/common/assert.h"

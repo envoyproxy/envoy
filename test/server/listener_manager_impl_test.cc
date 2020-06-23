@@ -3779,40 +3779,18 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, ReusePortListenerEnabledForTcp) {
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, ReusePortListenerDisabled) {
-
   auto listener = createIPv4Listener("UdpListener");
   listener.mutable_address()->mutable_socket_address()->set_protocol(
       envoy::config::core::v3::SocketAddress::UDP);
-  // For UDP, reuse_port is set to true forcibly, even it's set to false explicitly in config
+  // For UDP, verify that we fail if reuse port is false and concurrency is > 1.
   listener.set_reuse_port(false);
-
-  // Port should be 0 for creating the shared socket, otherwise socket
-  // creation will happen worker thread.
-  listener.mutable_address()->mutable_socket_address()->set_port_value(0);
-
-  // IpPacketInfo and RxQueueOverFlow are always set if supported
-  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
-#ifdef SO_RXQ_OVFL
-                           /* expected_num_options */ 2,
-#else
-                           /* expected_num_options */ 1,
-#endif
-                           /* expected_creation_params */ {true, false});
-
-  expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
-                   /* expected_sockopt_name */ ENVOY_IP_PKTINFO,
-                   /* expected_value */ 1,
-                   /* expected_num_calls */ 1);
-#ifdef SO_RXQ_OVFL
-  expectSetsockopt(/* expected_sockopt_level */ SOL_SOCKET,
-                   /* expected_sockopt_name */ SO_RXQ_OVFL,
-                   /* expected_value */ 1,
-                   /* expected_num_calls */ 1);
-#endif
-
   server_.options_.concurrency_ = 2;
-  manager_->addOrUpdateListener(listener, "", true);
-  EXPECT_EQ(1U, manager_->listeners().size());
+
+  EXPECT_THROW_WITH_MESSAGE(
+      manager_->addOrUpdateListener(listener, "", true), EnvoyException,
+      "Listening on UDP when concurrency is > 1 without the SO_REUSEPORT socket option results in "
+      "unstable packet proxying. Configure the reuse_port listener option or set concurrency = 1.");
+  EXPECT_EQ(0, manager_->listeners().size());
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, LiteralSockoptListenerEnabled) {

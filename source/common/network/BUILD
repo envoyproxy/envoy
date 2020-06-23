@@ -197,6 +197,7 @@ envoy_cc_library(
     deps = [
         ":socket_lib",
         ":utility_lib",
+        "//include/envoy/network:exception_interface",
         "//include/envoy/network:listen_socket_interface",
         "//source/common/common:assert_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -220,6 +221,7 @@ envoy_cc_library(
         ":listen_socket_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:file_event_interface",
+        "//include/envoy/network:exception_interface",
         "//include/envoy/network:listener_interface",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/stats:stats_macros",
