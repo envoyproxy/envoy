@@ -61,9 +61,10 @@ message DnsFilterConfig {
     // number of retries multiplied by the resolver_timeout.
     google.protobuf.Duration resolver_timeout = 1 [(validate.rules).duration = {gte {seconds: 1}}];
 
-    // A list of DNS servers to which we can forward queries
-    repeated config.core.v4alpha.Address upstream_resolvers = 2
-        [(validate.rules).repeated = {min_items: 1}];
+    // A list of DNS servers to which we can forward queries. If not
+    // specified, Envoy will use the ambient DNS resolvers in the
+    // system.
+    repeated config.core.v4alpha.Address upstream_resolvers = 2;
 
     // Controls how many outstanding external lookup contexts the filter tracks.
     // The context structure allows the filter to respond to every query even if the external
