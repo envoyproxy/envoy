@@ -258,14 +258,13 @@ private:
 };
 
 /**
- * The following defines all request headers that Envoy allows direct access to inside of the
- * header map. In practice, these are all headers used during normal Envoy request flow
+ * The following defines all default request headers that Envoy allows direct access to inside of
+ * the header map. In practice, these are all headers used during normal Envoy request flow
  * processing. This allows O(1) access to these headers without even a hash lookup.
  */
 #define INLINE_REQ_HEADERS(HEADER_FUNC)                                                            \
   HEADER_FUNC(Accept)                                                                              \
   HEADER_FUNC(AcceptEncoding)                                                                      \
-  HEADER_FUNC(AccessControlRequestMethod)                                                          \
   HEADER_FUNC(Authorization)                                                                       \
   HEADER_FUNC(ClientTraceId)                                                                       \
   HEADER_FUNC(EnvoyDownstreamServiceCluster)                                                       \
@@ -305,15 +304,9 @@ private:
   HEADER_FUNC(UserAgent)
 
 /**
- * O(1) response headers.
+ * Default O(1) response headers.
  */
 #define INLINE_RESP_HEADERS(HEADER_FUNC)                                                           \
-  HEADER_FUNC(AccessControlAllowCredentials)                                                       \
-  HEADER_FUNC(AccessControlAllowHeaders)                                                           \
-  HEADER_FUNC(AccessControlAllowMethods)                                                           \
-  HEADER_FUNC(AccessControlAllowOrigin)                                                            \
-  HEADER_FUNC(AccessControlExposeHeaders)                                                          \
-  HEADER_FUNC(AccessControlMaxAge)                                                                 \
   HEADER_FUNC(Date)                                                                                \
   HEADER_FUNC(Etag)                                                                                \
   HEADER_FUNC(EnvoyDegraded)                                                                       \
@@ -328,7 +321,7 @@ private:
   HEADER_FUNC(Vary)
 
 /**
- * O(1) request and response headers.
+ * Default O(1) request and response headers.
  */
 #define INLINE_REQ_RESP_HEADERS(HEADER_FUNC)                                                       \
   HEADER_FUNC(CacheControl)                                                                        \
@@ -346,7 +339,7 @@ private:
   HEADER_FUNC(Via)
 
 /**
- * O(1) response headers and trailers.
+ * Default O(1) response headers and trailers.
  */
 #define INLINE_RESP_HEADERS_TRAILERS(HEADER_FUNC)                                                  \
   HEADER_FUNC(GrpcMessage)                                                                         \
@@ -374,12 +367,7 @@ private:
   virtual void set##name(absl::string_view value) PURE;                                            \
   virtual void set##name(uint64_t value) PURE;                                                     \
   virtual size_t remove##name() PURE;                                                              \
-  absl::string_view get##name##Value() const {                                                     \
-    if (name() != nullptr) {                                                                       \
-      return name()->value().getStringView();                                                      \
-    }                                                                                              \
-    return "";                                                                                     \
-  }
+  virtual absl::string_view get##name##Value() const PURE;
 
 /**
  * Wraps a set of HTTP headers.
@@ -626,41 +614,169 @@ public:
 using HeaderMapPtr = std::unique_ptr<HeaderMap>;
 
 /**
+ * Registry for custom headers. Headers can be registered multiple times in independent
+ * compilation units and will still point to the same slot. Headers are registered independently
+ * for each concrete header map type and do not overlap. Handles are strongly typed and do not
+ * allow mixing.
+ */
+class CustomInlineHeaderRegistry {
+public:
+  enum class Type { RequestHeaders, RequestTrailers, ResponseHeaders, ResponseTrailers };
+  using RegistrationMap = std::map<LowerCaseString, size_t>;
+
+  // A "phantom" type is used here to force the compiler to verify that handles are not mixed
+  // between concrete header map types.
+  template <Type type> struct Handle {
+    Handle(RegistrationMap::const_iterator it) : it_(it) {}
+
+    RegistrationMap::const_iterator it_;
+  };
+
+  /**
+   * Register an inline header and return a handle for use in inline header calls. Must be called
+   * prior to finalize().
+   */
+  template <Type type>
+  static Handle<type> registerInlineHeader(const LowerCaseString& header_name) {
+    static size_t inline_header_index = 0;
+
+    ASSERT(!mutableFinalized<type>());
+    auto& map = mutableRegistrationMap<type>();
+    auto entry = map.find(header_name);
+    if (entry == map.end()) {
+      map[header_name] = inline_header_index++;
+    }
+    return Handle<type>(map.find(header_name));
+  }
+
+  /**
+   * Fetch the handle for a registered inline header. May only be called after finalized().
+   */
+  template <Type type>
+  static absl::optional<Handle<type>> getInlineHeader(const LowerCaseString& header_name) {
+    ASSERT(mutableFinalized<type>());
+    auto& map = mutableRegistrationMap<type>();
+    auto entry = map.find(header_name);
+    if (entry != map.end()) {
+      return Handle<type>(entry);
+    }
+    return absl::nullopt;
+  }
+
+  /**
+   * Fetch all registered headers. May only be called after finalized().
+   */
+  template <Type type> static const RegistrationMap& headers() {
+    ASSERT(mutableFinalized<type>());
+    return mutableRegistrationMap<type>();
+  }
+
+  /**
+   * Finalize the custom header registrations. No further changes are allowed after this point.
+   * This guaranteed that all header maps created by the process have the same variable size and
+   * custom registrations.
+   */
+  template <Type type> static void finalize() {
+    ASSERT(!mutableFinalized<type>());
+    mutableFinalized<type>() = true;
+  }
+
+private:
+  template <Type type> static RegistrationMap& mutableRegistrationMap() {
+    MUTABLE_CONSTRUCT_ON_FIRST_USE(RegistrationMap);
+  }
+  template <Type type> static bool& mutableFinalized() { MUTABLE_CONSTRUCT_ON_FIRST_USE(bool); }
+};
+
+/**
+ * Static initializer to register a custom header in a compilation unit. This can be used by
+ * extensions to register custom headers.
+ */
+template <CustomInlineHeaderRegistry::Type type> class RegisterCustomInlineHeader {
+public:
+  RegisterCustomInlineHeader(const LowerCaseString& header)
+      : handle_(CustomInlineHeaderRegistry::registerInlineHeader<type>(header)) {}
+
+  typename CustomInlineHeaderRegistry::Handle<type> handle() { return handle_; }
+
+private:
+  const typename CustomInlineHeaderRegistry::Handle<type> handle_;
+};
+
+/**
+ * The following functions allow O(1) access for custom inline headers.
+ */
+template <CustomInlineHeaderRegistry::Type type> class CustomInlineHeaderBase {
+public:
+  virtual ~CustomInlineHeaderBase() = default;
+
+  static constexpr CustomInlineHeaderRegistry::Type header_map_type = type;
+  using Handle = CustomInlineHeaderRegistry::Handle<header_map_type>;
+
+  virtual const HeaderEntry* getInline(Handle handle) const PURE;
+  virtual void appendInline(Handle handle, absl::string_view data,
+                            absl::string_view delimiter) PURE;
+  virtual void setReferenceInline(Handle, absl::string_view value) PURE;
+  virtual void setInline(Handle, absl::string_view value) PURE;
+  virtual void setInline(Handle, uint64_t value) PURE;
+  virtual size_t removeInline(Handle handle) PURE;
+  absl::string_view getInlineValue(Handle handle) const {
+    const auto header = getInline(handle);
+    if (header != nullptr) {
+      return header->value().getStringView();
+    }
+    return {};
+  }
+};
+
+/**
  * Typed derived classes for all header map types.
  */
 
 // Base class for both request and response headers.
-class RequestOrResponseHeaderMap : public virtual HeaderMap {
+class RequestOrResponseHeaderMap : public HeaderMap {
 public:
   INLINE_REQ_RESP_HEADERS(DEFINE_INLINE_HEADER)
 };
 
 // Request headers.
-class RequestHeaderMap : public RequestOrResponseHeaderMap {
+class RequestHeaderMap
+    : public RequestOrResponseHeaderMap,
+      public CustomInlineHeaderBase<CustomInlineHeaderRegistry::Type::RequestHeaders> {
 public:
   INLINE_REQ_HEADERS(DEFINE_INLINE_HEADER)
 };
 using RequestHeaderMapPtr = std::unique_ptr<RequestHeaderMap>;
 
 // Request trailers.
-class RequestTrailerMap : public virtual HeaderMap {};
+class RequestTrailerMap
+    : public HeaderMap,
+      public CustomInlineHeaderBase<CustomInlineHeaderRegistry::Type::RequestTrailers> {};
 using RequestTrailerMapPtr = std::unique_ptr<RequestTrailerMap>;
 
 // Base class for both response headers and trailers.
-class ResponseHeaderOrTrailerMap : public virtual HeaderMap {
+class ResponseHeaderOrTrailerMap {
 public:
+  virtual ~ResponseHeaderOrTrailerMap() = default;
+
   INLINE_RESP_HEADERS_TRAILERS(DEFINE_INLINE_HEADER)
 };
 
 // Response headers.
-class ResponseHeaderMap : public RequestOrResponseHeaderMap, public ResponseHeaderOrTrailerMap {
+class ResponseHeaderMap
+    : public RequestOrResponseHeaderMap,
+      public ResponseHeaderOrTrailerMap,
+      public CustomInlineHeaderBase<CustomInlineHeaderRegistry::Type::ResponseHeaders> {
 public:
   INLINE_RESP_HEADERS(DEFINE_INLINE_HEADER)
 };
 using ResponseHeaderMapPtr = std::unique_ptr<ResponseHeaderMap>;
 
 // Response trailers.
-class ResponseTrailerMap : public virtual HeaderMap, public ResponseHeaderOrTrailerMap {};
+class ResponseTrailerMap
+    : public ResponseHeaderOrTrailerMap,
+      public HeaderMap,
+      public CustomInlineHeaderBase<CustomInlineHeaderRegistry::Type::ResponseTrailers> {};
 using ResponseTrailerMapPtr = std::unique_ptr<ResponseTrailerMap>;
 
 /**

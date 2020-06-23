@@ -299,7 +299,7 @@ TEST(ScopeKeyBuilderImplTest, Parse) {
   TestUtility::loadFromYaml(yaml_plain, config);
   ScopeKeyBuilderImpl key_builder(std::move(config));
 
-  std::unique_ptr<ScopeKey> key = key_builder.computeScopeKey(TestRequestHeaderMapImpl{
+  ScopeKeyPtr key = key_builder.computeScopeKey(TestRequestHeaderMapImpl{
       {"foo_header", "a=b,bar=bar_value,e=f"},
       {"bar_header", "a=b;bar=bar_value;index2"},
   });

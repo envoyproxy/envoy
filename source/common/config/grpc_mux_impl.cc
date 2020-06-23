@@ -102,6 +102,12 @@ void GrpcMuxImpl::pause(const std::string& type_url) {
   api_state.paused_ = true;
 }
 
+void GrpcMuxImpl::pause(const std::vector<std::string> type_urls) {
+  for (const auto& type_url : type_urls) {
+    pause(type_url);
+  }
+}
+
 void GrpcMuxImpl::resume(const std::string& type_url) {
   ENVOY_LOG(debug, "Resuming discovery requests for {}", type_url);
   ApiState& api_state = api_state_[type_url];
@@ -115,12 +121,27 @@ void GrpcMuxImpl::resume(const std::string& type_url) {
   }
 }
 
+void GrpcMuxImpl::resume(const std::vector<std::string> type_urls) {
+  for (const auto& type_url : type_urls) {
+    resume(type_url);
+  }
+}
+
 bool GrpcMuxImpl::paused(const std::string& type_url) const {
   auto entry = api_state_.find(type_url);
   if (entry == api_state_.end()) {
     return false;
   }
   return entry->second.paused_;
+}
+
+bool GrpcMuxImpl::paused(const std::vector<std::string> type_urls) const {
+  for (const auto& type_url : type_urls) {
+    if (paused(type_url)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 void GrpcMuxImpl::onDiscoveryResponse(

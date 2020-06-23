@@ -11,6 +11,7 @@
 #include "envoy/common/platform.h"
 #include "envoy/server/hot_restart.h"
 #include "envoy/server/options.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
 
@@ -56,6 +57,10 @@ protected:
 
   bool replyIsExpectedType(const envoy::HotRestartMessage* proto,
                            envoy::HotRestartMessage::Reply::ReplyCase oneof_type) const;
+
+  // Returns a Gauge that tracks hot-restart generation, where every successive
+  // child increments this number.
+  static Stats::Gauge& hotRestartGeneration(Stats::Scope& scope);
 
 private:
   void getPassedFdIfPresent(envoy::HotRestartMessage* out, msghdr* message);
