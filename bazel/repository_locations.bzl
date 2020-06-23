@@ -418,9 +418,9 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "N/A",
     ),
     com_googlesource_googleurl = dict(
-        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/googleurl_dbf5ad147f60afc125e99db7549402af49a5eae8.tar.gz
-        sha256 = "b40cd22cadba577b7281a76db66f6a66dd744edbad8cc2c861c2c976ef721e4d",
-        urls = ["https://storage.googleapis.com/quiche-envoy-integration/googleurl_dbf5ad147f60afc125e99db7549402af49a5eae8.tar.gz"],
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/googleurl_6dafefa72cba2ab2ba4922d17a30618e9617c7cf.tar.gz
+        sha256 = "f1ab73ddd1a7db4e08a9e4db6c2e98e5a0a7bbaca08f5fee0d73adb02c24e44a",
+        urls = ["https://storage.googleapis.com/quiche-envoy-integration/googleurl_6dafefa72cba2ab2ba4922d17a30618e9617c7cf.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),
@@ -432,10 +432,14 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["dataplane"],
         cpe = "N/A",
     ),
+    # TODO(shikugawa): replace this with release tag after released package which includes
+    # disable pthread when build with emscripten. We use hash temporary to enable our changes to
+    # build envoy-wasm library with emscripten. https://github.com/google/re2/pull/263
     com_googlesource_code_re2 = dict(
-        sha256 = "04ee2aaebaa5038554683329afc494e684c30f82f2a1e47eb62450e59338f84d",
-        strip_prefix = "re2-2020-03-03",
-        urls = ["https://github.com/google/re2/archive/2020-03-03.tar.gz"],
+        sha256 = "455bcacd2b94fca8897decd81172c5a93e5303ea0e5816b410877c51d6179ffb",
+        strip_prefix = "re2-2b25567a8ee3b6e97c3cd05d616f296756c52759",
+        # 2020-06-08
+        urls = ["https://github.com/google/re2/archive/2b25567a8ee3b6e97c3cd05d616f296756c52759.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),
