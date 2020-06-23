@@ -96,8 +96,8 @@ New Features
 * metrics service: added added :ref:`API version <envoy_v3_api_field_config.metrics.v3.MetricsServiceConfig.transport_api_version>` to explicitly set the version of gRPC service endpoint and message to be used.
 * network filters: added a :ref:`postgres proxy filter <config_network_filters_postgres_proxy>`.
 * network filters: added a :ref:`rocketmq proxy filter <config_network_filters_rocketmq_proxy>`.
-* regex: added support for enforcing max program size via runtime and stats to monitor program size for :ref:`Google RE2 <envoy_v3_api_field_type.matcher.v3.RegexMatcher.GoogleRE2.max_program_size>`.
 * ratelimit: added :ref:`API version <envoy_v3_api_field_config.ratelimit.v3.RateLimitServiceConfig.transport_api_version>` to explicitly set the version of gRPC service endpoint and message to be used.
+* regex: added support for enforcing max program size via runtime and stats to monitor program size for :ref:`Google RE2 <envoy_v3_api_field_type.matcher.v3.RegexMatcher.GoogleRE2.max_program_size>`.
 * request_id: added to :ref:`always_set_request_id_in_response setting <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.always_set_request_id_in_response>`
   to set :ref:`x-request-id <config_http_conn_man_headers_x-request-id>` header in response even if
   tracing is not forced.
