@@ -146,9 +146,8 @@ absl::optional<std::string> XdsFuzzTest::removeListener(uint32_t listener_num) {
 
   for (auto it = listeners_.begin(); it != listeners_.end(); ++it) {
     if (it->name() == match) {
-      std::string name = it->name();
       listeners_.erase(it);
-      return name;
+      return match;
     }
   }
   return {};
@@ -163,9 +162,8 @@ absl::optional<std::string> XdsFuzzTest::removeRoute(uint32_t route_num) {
   std::string match = absl::StrCat("route_config_", route_num % num_routes_);
   for (auto it = routes_.begin(); it != routes_.end(); ++it) {
     if (it->name() == match) {
-      std::string name = it->name();
       routes_.erase(it);
-      return name;
+      return match;
     }
   }
   return {};
@@ -178,12 +176,12 @@ void XdsFuzzTest::replay() {
   initialize();
 
   // set up cluster
-  /* EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true)); */
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
                                                              {buildCluster("cluster_0")},
                                                              {buildCluster("cluster_0")}, {}, "0");
-  /* EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "", */
-  /*                                     {"cluster_0"}, {"cluster_0"}, {})); */
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",
+                                      {"cluster_0"}, {"cluster_0"}, {}));
   sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
       Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")},
       {buildClusterLoadAssignment("cluster_0")}, {}, "0");
