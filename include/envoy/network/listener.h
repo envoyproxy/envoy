@@ -37,7 +37,7 @@ public:
   /**
    * @return the type of the socket getListenSocket() returns.
    */
-  virtual Address::SocketType socketType() const PURE;
+  virtual Socket::Type socketType() const PURE;
 
   /**
    * @return the listening address of the socket getListenSocket() returns. Before getListenSocket()
@@ -297,14 +297,6 @@ public:
 };
 
 using UdpListenerPtr = std::unique_ptr<UdpListener>;
-
-/**
- * Thrown when there is a runtime error creating/binding a listener.
- */
-class CreateListenerException : public EnvoyException {
-public:
-  CreateListenerException(const std::string& what) : EnvoyException(what) {}
-};
 
 } // namespace Network
 } // namespace Envoy

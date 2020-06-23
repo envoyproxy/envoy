@@ -73,6 +73,10 @@ void FakeStream::decodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr) {
   }
 }
 
+void FakeStream::postToConnectionThread(std::function<void()> cb) {
+  parent_.connection().dispatcher().post(cb);
+}
+
 void FakeStream::encode100ContinueHeaders(const Http::ResponseHeaderMap& headers) {
   std::shared_ptr<Http::ResponseHeaderMap> headers_copy(
       Http::createHeaderMap<Http::ResponseHeaderMapImpl>(headers));
@@ -217,8 +221,8 @@ void FakeStream::startGrpcStream() {
 }
 
 void FakeStream::finishGrpcStream(Grpc::Status::GrpcStatus status) {
-  encodeTrailers(
-      Http::TestHeaderMapImpl{{"grpc-status", std::to_string(static_cast<uint32_t>(status))}});
+  encodeTrailers(Http::TestResponseTrailerMapImpl{
+      {"grpc-status", std::to_string(static_cast<uint32_t>(status))}});
 }
 
 // The TestHttp1ServerConnectionImpl outlives its underlying Network::Connection

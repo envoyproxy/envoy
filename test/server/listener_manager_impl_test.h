@@ -53,6 +53,10 @@ protected:
   void SetUp() override {
     ON_CALL(server_, api()).WillByDefault(ReturnRef(*api_));
     EXPECT_CALL(worker_factory_, createWorker_()).WillOnce(Return(worker_));
+    ON_CALL(server_.validation_context_, staticValidationVisitor())
+        .WillByDefault(ReturnRef(validation_visitor));
+    ON_CALL(server_.validation_context_, dynamicValidationVisitor())
+        .WillByDefault(ReturnRef(validation_visitor));
     manager_ = std::make_unique<ListenerManagerImpl>(server_, listener_factory_, worker_factory_,
                                                      enable_dispatcher_stats_);
 
@@ -199,8 +203,7 @@ protected:
                            ListenSocketCreationParams expected_creation_params = {true, true}) {
     EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, expected_creation_params))
         .WillOnce(Invoke([this, expected_num_options, &expected_state](
-                             const Network::Address::InstanceConstSharedPtr&,
-                             Network::Address::SocketType,
+                             const Network::Address::InstanceConstSharedPtr&, Network::Socket::Type,
                              const Network::Socket::OptionsSharedPtr& options,
                              const ListenSocketCreationParams&) -> Network::SocketSharedPtr {
           EXPECT_NE(options.get(), nullptr);
@@ -276,6 +279,7 @@ protected:
   Api::OsSysCallsImpl os_sys_calls_actual_;
   NiceMock<MockInstance> server_;
   NiceMock<MockListenerComponentFactory> listener_factory_;
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
   MockWorker* worker_ = new MockWorker();
   NiceMock<MockWorkerFactory> worker_factory_;
   std::unique_ptr<ListenerManagerImpl> manager_;

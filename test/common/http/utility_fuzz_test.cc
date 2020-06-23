@@ -10,6 +10,12 @@ namespace Fuzz {
 namespace {
 
 DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
+  try {
+    TestUtility::validate(input);
+  } catch (ProtoValidationException& e) {
+    ENVOY_LOG_MISC(debug, "ProtoValidationException: {}", e.what());
+    return;
+  }
   switch (input.utility_selector_case()) {
   case test::common::http::UtilityTestCase::kParseQueryString: {
     Http::Utility::parseQueryString(input.parse_query_string());
@@ -17,22 +23,22 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
   }
   case test::common::http::UtilityTestCase::kParseCookieValue: {
     const auto& parse_cookie_value = input.parse_cookie_value();
-    // Use the production HeaderMapImpl to avoid timeouts from TestHeaderMapImpl asserts.
-    Http::HeaderMapImpl headers;
+    // Use the production RequestHeaderMapImpl to avoid timeouts from TestHeaderMapImpl asserts.
+    auto headers = Http::RequestHeaderMapImpl::create();
     for (const std::string& cookie : parse_cookie_value.cookies()) {
-      headers.addCopy(Http::LowerCaseString("cookie"), replaceInvalidCharacters(cookie));
+      headers->addCopy(Http::LowerCaseString("cookie"), replaceInvalidCharacters(cookie));
     }
-    Http::Utility::parseCookieValue(headers, parse_cookie_value.key());
+    Http::Utility::parseCookieValue(*headers, parse_cookie_value.key());
     break;
   }
   case test::common::http::UtilityTestCase::kGetLastAddressFromXff: {
     const auto& get_last_address_from_xff = input.get_last_address_from_xff();
-    // Use the production HeaderMapImpl to avoid timeouts from TestHeaderMapImpl asserts.
-    Http::RequestHeaderMapImpl headers;
-    headers.addCopy(Http::LowerCaseString("x-forwarded-for"),
-                    replaceInvalidCharacters(get_last_address_from_xff.xff()));
+    // Use the production RequestHeaderMapImpl to avoid timeouts from TestHeaderMapImpl asserts.
+    auto headers = Http::RequestHeaderMapImpl::create();
+    headers->addCopy(Http::LowerCaseString("x-forwarded-for"),
+                     replaceInvalidCharacters(get_last_address_from_xff.xff()));
     // Take num_to_skip modulo 32 to avoid wasting time in lala land.
-    Http::Utility::getLastAddressFromXFF(headers, get_last_address_from_xff.num_to_skip() % 32);
+    Http::Utility::getLastAddressFromXFF(*headers, get_last_address_from_xff.num_to_skip() % 32);
     break;
   }
   case test::common::http::UtilityTestCase::kExtractHostPathFromUri: {
@@ -64,6 +70,16 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
     std::chrono::seconds max_age(cookie_value.max_age());
     Http::Utility::makeSetCookieValue(cookie_value.key(), cookie_value.value(), cookie_value.path(),
                                       max_age, cookie_value.httponly());
+    break;
+  }
+  case test::common::http::UtilityTestCase::kParseAuthorityString: {
+    const auto& authority_string = input.parse_authority_string();
+    Http::Utility::parseAuthority(authority_string);
+    break;
+  }
+  case test::common::http::UtilityTestCase::kInitializeAndValidate: {
+    const auto& options = input.initialize_and_validate();
+    Http2::Utility::initializeAndValidateOptions(options);
     break;
   }
 

@@ -15,15 +15,6 @@ namespace Envoy {
 namespace Tcp {
 namespace ConnectionPool {
 
-class MockCancellable : public Cancellable {
-public:
-  MockCancellable();
-  ~MockCancellable() override;
-
-  // Tcp::ConnectionPool::Cancellable
-  MOCK_METHOD(void, cancel, (CancelPolicy cancel_policy));
-};
-
 class MockUpstreamCallbacks : public UpstreamCallbacks {
 public:
   MockUpstreamCallbacks();
@@ -62,17 +53,18 @@ public:
   // Tcp::ConnectionPool::Instance
   MOCK_METHOD(void, addDrainedCallback, (DrainedCb cb));
   MOCK_METHOD(void, drainConnections, ());
+  MOCK_METHOD(void, closeConnections, ());
   MOCK_METHOD(Cancellable*, newConnection, (Tcp::ConnectionPool::Callbacks & callbacks));
   MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, host, (), (const));
 
-  MockCancellable* newConnectionImpl(Callbacks& cb);
+  Envoy::ConnectionPool::MockCancellable* newConnectionImpl(Callbacks& cb);
   void poolFailure(PoolFailureReason reason);
   void poolReady(Network::MockClientConnection& conn);
 
   // Invoked when connection_data_, having been assigned via poolReady is released.
   MOCK_METHOD(void, released, (Network::MockClientConnection&));
 
-  std::list<NiceMock<MockCancellable>> handles_;
+  std::list<NiceMock<Envoy::ConnectionPool::MockCancellable>> handles_;
   std::list<Callbacks*> callbacks_;
 
   std::shared_ptr<NiceMock<Upstream::MockHostDescription>> host_{

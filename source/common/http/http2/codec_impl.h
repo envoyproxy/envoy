@@ -31,8 +31,6 @@ namespace Envoy {
 namespace Http {
 namespace Http2 {
 
-const std::string ALPN_STRING = "h2";
-
 // This is not the full client magic, but it's the smallest size that should be able to
 // differentiate between HTTP/1 and HTTP/2.
 const std::string CLIENT_MAGIC_PREFIX = "PRI * HTTP/2";
@@ -219,6 +217,7 @@ protected:
     virtual StreamDecoder& decoder() PURE;
     virtual HeaderMap& headers() PURE;
     virtual void allocTrailers() PURE;
+    virtual HeaderMapPtr cloneTrailers(const HeaderMap& trailers) PURE;
 
     // Http::StreamEncoder
     void encodeData(Buffer::Instance& data, bool end_stream) override;
@@ -311,7 +310,7 @@ protected:
     ClientStreamImpl(ConnectionImpl& parent, uint32_t buffer_limit,
                      ResponseDecoder& response_decoder)
         : StreamImpl(parent, buffer_limit), response_decoder_(response_decoder),
-          headers_or_trailers_(std::make_unique<ResponseHeaderMapImpl>()) {}
+          headers_or_trailers_(ResponseHeaderMapImpl::create()) {}
 
     // StreamImpl
     void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
@@ -330,12 +329,13 @@ protected:
       // If we are waiting for informational headers, make a new response header map, otherwise
       // we are about to receive trailers. The codec makes sure this is the only valid sequence.
       if (waiting_for_non_informational_headers_) {
-        headers_or_trailers_.emplace<ResponseHeaderMapPtr>(
-            std::make_unique<ResponseHeaderMapImpl>());
+        headers_or_trailers_.emplace<ResponseHeaderMapPtr>(ResponseHeaderMapImpl::create());
       } else {
-        headers_or_trailers_.emplace<ResponseTrailerMapPtr>(
-            std::make_unique<ResponseTrailerMapImpl>());
+        headers_or_trailers_.emplace<ResponseTrailerMapPtr>(ResponseTrailerMapImpl::create());
       }
+    }
+    HeaderMapPtr cloneTrailers(const HeaderMap& trailers) override {
+      return createHeaderMap<RequestTrailerMapImpl>(trailers);
     }
 
     // RequestEncoder
@@ -356,8 +356,7 @@ protected:
    */
   struct ServerStreamImpl : public StreamImpl, public ResponseEncoder {
     ServerStreamImpl(ConnectionImpl& parent, uint32_t buffer_limit)
-        : StreamImpl(parent, buffer_limit),
-          headers_or_trailers_(std::make_unique<RequestHeaderMapImpl>()) {}
+        : StreamImpl(parent, buffer_limit), headers_or_trailers_(RequestHeaderMapImpl::create()) {}
 
     // StreamImpl
     void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
@@ -373,7 +372,10 @@ protected:
       }
     }
     void allocTrailers() override {
-      headers_or_trailers_.emplace<RequestTrailerMapPtr>(std::make_unique<RequestTrailerMapImpl>());
+      headers_or_trailers_.emplace<RequestTrailerMapPtr>(RequestTrailerMapImpl::create());
+    }
+    HeaderMapPtr cloneTrailers(const HeaderMap& trailers) override {
+      return createHeaderMap<ResponseTrailerMapImpl>(trailers);
     }
 
     // ResponseEncoder

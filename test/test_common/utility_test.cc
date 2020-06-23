@@ -7,23 +7,24 @@
 namespace Envoy {
 
 TEST(HeaderMapEqualIgnoreOrder, ActuallyEqual) {
-  Http::TestHeaderMapImpl lhs{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
-  Http::TestHeaderMapImpl rhs{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  Http::TestRequestHeaderMapImpl lhs{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  Http::TestRequestHeaderMapImpl rhs{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
   EXPECT_TRUE(TestUtility::headerMapEqualIgnoreOrder(lhs, rhs));
   EXPECT_EQ(lhs, rhs);
 }
 
 TEST(HeaderMapEqualIgnoreOrder, IgnoreOrder) {
-  Http::TestHeaderMapImpl lhs{{":method", "GET"}, {":authority", "host"}, {":path", "/"}};
-  Http::TestHeaderMapImpl rhs{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  Http::TestRequestHeaderMapImpl lhs{{":method", "GET"}, {":authority", "host"}, {":path", "/"}};
+  Http::TestRequestHeaderMapImpl rhs{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
   EXPECT_TRUE(TestUtility::headerMapEqualIgnoreOrder(lhs, rhs));
   EXPECT_THAT(&lhs, HeaderMapEqualIgnoreOrder(&rhs));
   EXPECT_FALSE(lhs == rhs);
 }
 
 TEST(HeaderMapEqualIgnoreOrder, NotEqual) {
-  Http::TestHeaderMapImpl lhs{{":method", "GET"}, {":authority", "host"}, {":authority", "host"}};
-  Http::TestHeaderMapImpl rhs{{":method", "GET"}, {":authority", "host"}};
+  Http::TestRequestHeaderMapImpl lhs{
+      {":method", "GET"}, {":authority", "host"}, {":authority", "host"}};
+  Http::TestRequestHeaderMapImpl rhs{{":method", "GET"}, {":authority", "host"}};
   EXPECT_FALSE(TestUtility::headerMapEqualIgnoreOrder(lhs, rhs));
 }
 

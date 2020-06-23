@@ -5,6 +5,7 @@
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/network/address_impl.h"
+#include "common/network/socket_impl.h"
 #include "common/network/utility.h"
 
 #include "extensions/stat_sinks/common/statsd/statsd.h"
@@ -51,7 +52,7 @@ TEST(UdpOverUdsStatsdSinkTest, InitWithPipeAddress) {
   sink.flush(snapshot);
 
   // Start the server.
-  Network::SocketImpl sock(Network::Address::SocketType::Datagram, uds_address);
+  Network::SocketImpl sock(Network::Socket::Type::Datagram, uds_address);
   RELEASE_ASSERT(sock.setBlockingForTest(false).rc_ != -1, "");
   sock.bind(uds_address);
 

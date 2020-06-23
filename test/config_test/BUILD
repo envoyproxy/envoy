@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
@@ -8,6 +6,8 @@ load(
 )
 load("//source/extensions:all_extensions.bzl", "envoy_all_extensions")
 load("//bazel:repositories.bzl", "PPC_SKIP_TARGETS", "WINDOWS_SKIP_TARGETS")
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -49,4 +49,20 @@ envoy_cc_test_library(
         "//bazel:linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
         "//conditions:default": envoy_all_extensions(),
     }),
+)
+
+envoy_cc_test(
+    name = "deprecated_configs_test",
+    srcs = [
+        "deprecated_configs_test.cc",
+    ],
+    deps = [
+        ":config_test_lib",
+        "//source/common/config:api_version_lib",
+        "//test/test_common:environment_lib",
+        "//test/test_common:logging_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+    ],
 )

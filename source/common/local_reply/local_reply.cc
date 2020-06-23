@@ -12,16 +12,6 @@
 
 namespace Envoy {
 namespace LocalReply {
-namespace {
-
-struct EmptyHeaders {
-  Http::RequestHeaderMapImpl request_headers;
-  Http::ResponseTrailerMapImpl response_trailers;
-};
-
-using StaticEmptyHeaders = ConstSingleton<EmptyHeaders>;
-
-} // namespace
 
 class BodyFormatter {
 public:
@@ -137,14 +127,14 @@ public:
     stream_info.response_code_ = static_cast<uint32_t>(code);
 
     if (request_headers == nullptr) {
-      request_headers = &StaticEmptyHeaders::get().request_headers;
+      request_headers = Http::StaticEmptyHeaders::get().request_headers.get();
     }
 
     BodyFormatter* final_formatter{};
     for (const auto& mapper : mappers_) {
       if (mapper->matchAndRewrite(*request_headers, response_headers,
-                                  StaticEmptyHeaders::get().response_trailers, stream_info, code,
-                                  body, final_formatter)) {
+                                  *Http::StaticEmptyHeaders::get().response_trailers, stream_info,
+                                  code, body, final_formatter)) {
         break;
       }
     }
@@ -153,8 +143,8 @@ public:
       final_formatter = body_formatter_.get();
     }
     return final_formatter->format(*request_headers, response_headers,
-                                   StaticEmptyHeaders::get().response_trailers, stream_info, body,
-                                   content_type);
+                                   *Http::StaticEmptyHeaders::get().response_trailers, stream_info,
+                                   body, content_type);
   }
 
 private:

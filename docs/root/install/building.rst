@@ -43,8 +43,7 @@ be found in the following repositories:
 
 .. note::
 
-  In the above repositories, we do **not** tag a *latest* image. As we now do security/stable
-  releases, *latest* has no good meaning and users should pin to a specific tag.
+  In the above repositories, we tag a *vX.Y-latest* image for each security/stable release line.
 
 On every master commit we additionally create a set of development Docker images. These images can
 be found in the following repositories:

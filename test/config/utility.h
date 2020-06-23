@@ -16,6 +16,7 @@
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/http/codes.h"
 
+#include "common/config/api_version.h"
 #include "common/network/address_impl.h"
 #include "common/protobuf/protobuf.h"
 
@@ -98,10 +99,33 @@ public:
   // Configuration for L7 proxying, with clusters cluster_1 and cluster_2 meant to be added via CDS.
   // api_type should be REST, GRPC, or DELTA_GRPC.
   static std::string discoveredClustersBootstrap(const std::string& api_type);
-  static std::string adsBootstrap(const std::string& api_type);
+  static std::string adsBootstrap(const std::string& api_type,
+                                  envoy::config::core::v3::ApiVersion api_version);
   // Builds a standard Cluster config fragment, with a single endpoint (at address:port).
-  static envoy::config::cluster::v3::Cluster buildCluster(const std::string& name, int port,
-                                                          const std::string& address);
+  static envoy::config::cluster::v3::Cluster buildStaticCluster(const std::string& name, int port,
+                                                                const std::string& address);
+
+  // ADS configurations
+  static envoy::config::cluster::v3::Cluster buildCluster(
+      const std::string& name, const std::string& lb_policy = "ROUND_ROBIN",
+      envoy::config::core::v3::ApiVersion api_version = envoy::config::core::v3::ApiVersion::V3);
+
+  static envoy::config::endpoint::v3::ClusterLoadAssignment buildClusterLoadAssignment(
+      const std::string& name, const std::string& ip_version, uint32_t port,
+      envoy::config::core::v3::ApiVersion api_version = envoy::config::core::v3::ApiVersion::V3);
+
+  static envoy::config::listener::v3::Listener buildBaseListener(
+      const std::string& name, const std::string& address, const std::string& filter_chains = "",
+      envoy::config::core::v3::ApiVersion api_version = envoy::config::core::v3::ApiVersion::V3);
+
+  static envoy::config::listener::v3::Listener buildListener(
+      const std::string& name, const std::string& route_config, const std::string& address,
+      const std::string& stat_prefix,
+      envoy::config::core::v3::ApiVersion api_version = envoy::config::core::v3::ApiVersion::V3);
+
+  static envoy::config::route::v3::RouteConfiguration buildRouteConfig(
+      const std::string& name, const std::string& cluster,
+      envoy::config::core::v3::ApiVersion api_version = envoy::config::core::v3::ApiVersion::V3);
 
   // Builds a standard Endpoint suitable for population by finalize().
   static envoy::config::endpoint::v3::Endpoint buildEndpoint(const std::string& address);
@@ -206,6 +230,14 @@ public:
           config);
 
 private:
+  static bool shouldBoost(envoy::config::core::v3::ApiVersion api_version) {
+    return api_version == envoy::config::core::v3::ApiVersion::V2;
+  }
+
+  static std::string apiVersionStr(envoy::config::core::v3::ApiVersion api_version) {
+    return api_version == envoy::config::core::v3::ApiVersion::V2 ? "V2" : "V3";
+  }
+
   // Load the first HCM struct from the first listener into a parsed proto.
   bool loadHttpConnectionManager(HttpConnectionManager& hcm);
   // Take the contents of the provided HCM proto and stuff them into the first HCM
