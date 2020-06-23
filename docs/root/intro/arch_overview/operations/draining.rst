@@ -6,7 +6,7 @@ Draining
 In a few different scenarios, Envoy will attempt to gracefully shed connections. For instance,
 during server shutdown, existing requests can be discouraged and listeners set to stop accepting,
 to reduce the number of open connections when the server shuts down. Draining behaviour is defined
-by the server options in addition to individul listener configs.
+by the server options in addition to individual listener configs.
 
 Draining occurs at the following times:
 

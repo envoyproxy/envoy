@@ -146,13 +146,11 @@ TEST_P(DrainCloseIntegrationTest, RepeatedAdminGracefulDrain) {
   response->waitForEndStream();
 
   // Invoke /drain_listeners with graceful drain
-  std::cerr << "[AUNI] " << "first drain" << "\n";
   BufferingStreamDecoderPtr admin_response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "POST", "/drain_listeners?graceful", "", downstreamProtocol(), version_);
   EXPECT_EQ(admin_response->headers().Status()->value().getStringView(), "200");
   EXPECT_EQ(test_server_->counter("listener_manager.listener_stopped")->value(), 0);
 
-  std::cerr << "[AUNI] " << "second drain" << "\n";
   admin_response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "POST", "/drain_listeners?graceful", "", downstreamProtocol(), version_);
   EXPECT_EQ(admin_response->headers().Status()->value().getStringView(), "200");
@@ -163,6 +161,7 @@ TEST_P(DrainCloseIntegrationTest, RepeatedAdminGracefulDrain) {
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   admin_response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "POST", "/drain_listeners", "", downstreamProtocol(), version_);
