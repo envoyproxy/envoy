@@ -216,6 +216,9 @@ NON_TYPE_ALIAS_ALLOWED_TYPES = {
 }
 # yapf: enable
 
+USING_TYPE_ALIAS = re.compile("using .* = .*;")
+SMART_PTR = re.compile("std::(unique_ptr|shared_ptr)<(.*?)>")
+OPTIONAL_REF = re.compile("absl::optional<std::reference_wrapper<(.*?)>>")
 NON_TYPE_ALIAS_ALLOWED_TYPE = re.compile(fr"(.*\[\]$|^std::vector<.*|{'|'.join(NON_TYPE_ALIAS_ALLOWED_TYPES)}$)")
 
 
@@ -747,13 +750,13 @@ def checkSourceLine(line, file_path, reportError):
         reportError("Don't call grpc_init() or grpc_shutdown() directly, instantiate " +
                     "Grpc::GoogleGrpcContext. See #8282")
 
-  if not re.search("using .* = .*;", line):
-    smart_ptr_m = re.finditer("std::(unique_ptr|shared_ptr)<(.*?)>", line)
+  if not USING_TYPE_ALIAS.search(line):
+    smart_ptr_m = SMART_PTR.finditer(line)
     for m in smart_ptr_m:
       if not whitelistedForNonTypeAlias(m.group(2)):
         reportError(f"Use type alias for '{m.group(2)}' instead. See STYLE.md")
 
-    optional_m = re.finditer("absl::optional<std::reference_wrapper<(.*?)>>", line)
+    optional_m = OPTIONAL_REF.finditer(line)
     for m in optional_m:
       if not whitelistedForNonTypeAlias(m.group(1)):
         reportError(f"Use type alias for '{m.group(1)}' instead. See STYLE.md")
