@@ -166,12 +166,6 @@ struct msghdr {
 #include <linux/version.h> // to check linux version
 #endif
 
-#ifdef UDP_GRO
-#define GRO_UDP UDP_GRO
-#else
-#define GRO_UDP 104
-#endif
-
 #define PACKED_STRUCT(definition, ...) definition, ##__VA_ARGS__ __attribute__((packed))
 
 #ifndef IP6T_SO_ORIGINAL_DST

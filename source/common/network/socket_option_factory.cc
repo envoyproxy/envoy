@@ -126,8 +126,10 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildReusePortOptions() {
 
 std::unique_ptr<Socket::Options> SocketOptionFactory::buildUdpGroOptions() {
   std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
+#ifdef UDP_GRO
   options->push_back(std::make_shared<SocketOptionImpl>(
       envoy::config::core::v3::SocketOption::STATE_BOUND, ENVOY_SOCKET_UDP_GRO, 1));
+#endif
   return options;
 }
 

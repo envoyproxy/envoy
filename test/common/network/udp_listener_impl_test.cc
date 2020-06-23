@@ -178,6 +178,11 @@ TEST_P(UdpListenerImplTest, UseActualDstUdp) {
   const std::string second("second");
   client_.write(second, *send_to_addr_);
 
+  // In order to test recvmmsg, we mock to disable supportsUdpGro
+  MockSupportsUdpGro udp_gro_syscall;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&udp_gro_syscall);
+  EXPECT_CALL(udp_gro_syscall, supportsUdpGro).WillRepeatedly(Return(false));
+
   EXPECT_CALL(listener_callbacks_, onReadReady());
   EXPECT_CALL(listener_callbacks_, onData(_))
       .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
@@ -441,8 +446,12 @@ TEST_P(UdpListenerImplTest, SendDataError) {
 }
 
 /**
- * Tests that
- */
+ * Test that multiple stacked packets of the same size are properly segmented
+ * when UDP GRO is enabled on the platform.
+ *
+ * [Only run the following test if UDP_GRO is configured]
+ **/
+#ifdef UDP_GRO
 TEST_P(UdpListenerImplTest, UdpGroBasic) {
   // We send 4 packets (3 of equal length and 1 as a trail), which are concatenated together by
   // kernel supporting udp gro. Verify the concatenated packet is transformed back into individual
@@ -527,7 +536,7 @@ TEST_P(UdpListenerImplTest, UdpGroBasic) {
         // Specify the gso_size
         cmsg = CMSG_NXTHDR(msg, cmsg);
         cmsg->cmsg_level = SOL_UDP;
-        cmsg->cmsg_type = GRO_UDP;
+        cmsg->cmsg_type = UDP_GRO;
         cmsg->cmsg_len = CMSG_LEN(sizeof(uint16_t));
         const uint64_t gso_size = 8;
         *reinterpret_cast<uint16_t*>(CMSG_DATA(cmsg)) = gso_size;
@@ -564,6 +573,7 @@ TEST_P(UdpListenerImplTest, UdpGroBasic) {
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
+#endif
 
 } // namespace
 } // namespace Network
