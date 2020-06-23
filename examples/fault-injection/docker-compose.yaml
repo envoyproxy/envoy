@@ -13,6 +13,7 @@ services:
     ports:
       - 9211:9211
       - 9901:9901
+    # Run Envoy as root to grant access to /dev/stdout
     environment:
       ENVOY_UID: 0
   backend:
