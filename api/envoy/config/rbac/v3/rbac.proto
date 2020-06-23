@@ -78,14 +78,14 @@ message RBAC {
     LOG = 2;
   }
 
-  // The action to take if a policy matches. 
+  // The action to take if a policy matches.
   // The request is allowed if and only if:
   //
   //   * `action` is "ALLOW" and at least one policy matches
   //   * `action` is "DENY" and none of the policies match
   //   * `action` is "LOG"
   //
-  // If the action is "LOG" and at least one policy matches, or if the action is not "LOG", 
+  // If the action is "LOG" and at least one policy matches, or if the action is not "LOG",
   // the dynamic metadata key `envoy.log` is set to the value "yes".
   // Otherwise, it is set to "no".
   Action action = 1;

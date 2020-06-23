@@ -66,21 +66,28 @@ message RBAC {
 
   // Should we do safe-list or block-list style access control?
   enum Action {
-    // The policies grant access to principals. The rest is denied. This is safe-list style
+    // The policies grant access to principals. The rest are denied. This is safe-list style
     // access control. This is the default type.
     ALLOW = 0;
 
-    // The policies deny access to principals. The rest is allowed. This is block-list style
+    // The policies deny access to principals. The rest are allowed. This is block-list style
     // access control.
     DENY = 1;
 
+    // The policies set the "envoy.log" dynamic metadata key based on if requests match
     LOG = 2;
   }
 
-  // The action to take if a policy matches. The request is allowed if and only if:
+  // The action to take if a policy matches.
+  // The request is allowed if and only if:
   //
-  //   * `action` is "ALLOWED" and at least one policy matches
+  //   * `action` is "ALLOW" and at least one policy matches
   //   * `action` is "DENY" and none of the policies match
+  //   * `action` is "LOG"
+  //
+  // If the action is "LOG" and at least one policy matches, or if the action is not "LOG",
+  // the dynamic metadata key `envoy.log` is set to the value "yes".
+  // Otherwise, it is set to "no".
   Action action = 1;
 
   // Maps from policy name to policy. A match occurs when at least one policy matches the request.

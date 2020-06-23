@@ -74,26 +74,21 @@ message RBAC {
     // access control.
     DENY = 1;
 
-<<<<<<< HEAD
-=======
-    // The policies log requests from principals. The rest are not logged.
->>>>>>> ac6f801a2... Made proto changes. TODO: Update documentation
+    // The policies set the "envoy.log" dynamic metadata key based on if requests match
     LOG = 2;
   }
 
-  // The action to take if a policy matches. 
+  // The action to take if a policy matches.
   // The request is allowed if and only if:
   //
   //   * `action` is "ALLOW" and at least one policy matches
   //   * `action` is "DENY" and none of the policies match
   //   * `action` is "LOG"
-  // 
-  // The request is logged if and only if:
   //
-  //   * `action` is "ALLOW"
-  //   * `action` is "DENY"
-  //   * `action` is "LOG" and at least one policy matches
-  Action action = 1;  
+  // If the action is "LOG" and at least one policy matches, or if the action is not "LOG",
+  // the dynamic metadata key `envoy.log` is set to the value "yes".
+  // Otherwise, it is set to "no".
+  Action action = 1;
 
   // Maps from policy name to policy. A match occurs when at least one policy matches the request.
   map<string, Policy> policies = 2;
