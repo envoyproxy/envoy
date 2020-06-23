@@ -1,5 +1,4 @@
 #include "common/common/logger.h"
-#include "absl/container/flat_hash_map.h"
 #include <atomic>
 #include <memory>
 
@@ -19,7 +18,7 @@ int kSinkInit = 0;
 /**
  * Lock for the following global map (not for the corresponding loggers).
  */
-static absl::Mutex fancy_log_lock__;
+absl::Mutex fancy_log_lock__;
 
 /**
  * Global hash map <unit, log info>, where unit can be file, function or line.
@@ -79,6 +78,11 @@ spdlog::logger* createLogger(std::string key, level_enum level = level_enum::inf
  */
 void initFancyLogger(std::string key, std::atomic<spdlog::logger*>& logger) {
   absl::WriterMutexLock l(&fancy_log_lock__);
+  if (logger.load(std::memory_order_relaxed)) {
+      // Since if (logger) in fast path is not protected by lock, it's possible that
+      // the logger is modified by another thread that visited the same call site before
+      return;
+  }
   if (!kSinkInit) {
     initSink();
   }

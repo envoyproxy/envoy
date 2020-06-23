@@ -159,6 +159,10 @@ TEST(Fancy, Global) {
   NiceMock<Http::MockStreamDecoderFilterCallbacks> stream_;
   FANCY_CONN_LOG(warn, "Fake info {} of connection", connection_, 1);
   FANCY_STREAM_LOG(warn, "Fake warning {} of stream", stream_, 1);
+
+  // critical log and flush
+  FANCY_LOG(critical, "Critical message for later flush.");
+  FANCY_FLUSH_LOG();
 }
 
 TEST(Fancy, SetLevel) {

@@ -18,6 +18,8 @@
 #include "fmt/ostream.h"
 #include "spdlog/spdlog.h"
 
+#include "absl/container/flat_hash_map.h" // Addition by Jinhui Song
+
 namespace Envoy {
 namespace Logger {
 
@@ -363,6 +365,10 @@ protected:
  * Fancy logging macros by Jinhui Song
  */
 
+extern absl::Mutex fancy_log_lock__;
+
+extern absl::flat_hash_map<std::string, spdlog::logger*> fancy_log_map__;
+
 extern void setFancyLogger(std::string key, spdlog::level::level_enum log_level);
 
 extern void initFancyLogger(std::string key, std::atomic<spdlog::logger*>& logger);
@@ -382,11 +388,12 @@ extern spdlog::sink_ptr getSink();
 #define FANCY_LOG(LEVEL, ...)                                                                      \
   do {                                                                                             \
     static std::atomic<spdlog::logger*> flogger{0};                                                \
-    spdlog::logger* local_flogger = flogger.load();                                                \
+    spdlog::logger* local_flogger = flogger.load(std::memory_order_relaxed);                       \
     if (!local_flogger) {                                                                          \
       initFancyLogger(FANCY_KEY, flogger);                                                         \
-      flogger.load()->log(spdlog::source_loc{__FILE__, __LINE__, __func__},                        \
-                          ENVOY_SPDLOG_LEVEL(LEVEL), __VA_ARGS__);                                 \
+      flogger.load(std::memory_order_relaxed)                                                      \
+          ->log(spdlog::source_loc{__FILE__, __LINE__, __func__}, ENVOY_SPDLOG_LEVEL(LEVEL),       \
+                __VA_ARGS__);                                                                      \
     } else {                                                                                       \
       local_flogger->log(spdlog::source_loc{__FILE__, __LINE__, __func__},                         \
                          ENVOY_SPDLOG_LEVEL(LEVEL), __VA_ARGS__);                                  \
@@ -405,6 +412,16 @@ extern spdlog::sink_ptr getSink();
 #define FANCY_STREAM_LOG(LEVEL, FORMAT, STREAM, ...)                                               \
   FANCY_LOG(LEVEL, "[C{}][S{}] " FORMAT, (STREAM).connection() ? (STREAM).connection()->id() : 0,  \
             (STREAM).streamId(), ##__VA_ARGS__)
+
+/**
+ * Convenient macro for log flush.
+ */
+#define FANCY_FLUSH_LOG()                                                                          \
+  {                                                                                                \
+    fancy_log_lock__.ReaderLock();                                                                 \
+    fancy_log_map__.find(FANCY_KEY)->second->flush();                                              \
+    fancy_log_lock__.ReaderUnlock();                                                               \
+  }
 
 /**
  * End
