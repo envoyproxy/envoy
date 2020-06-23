@@ -63,6 +63,8 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::network::ext_authz::ExtAut
   } catch (const ProtobufMessage::DeprecatedProtoFieldException& e) {
     ENVOY_LOG_MISC(debug, "DeprecatedProtoFieldException: {}", e.what());
     return;
+  }catch (const EnvoyException& e) {
+    ENVOY_LOG_MISC(debug, "EnvoyException during validation: {}", e.what());
   }
 
   Stats::TestUtil::TestStore stats_store;
@@ -75,7 +77,7 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::network::ext_authz::ExtAut
 
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
   filter->initializeReadFilterCallbacks(filter_callbacks);
-  Network::Address::InstanceConstSharedPtr addr =
+  static Network::Address::InstanceConstSharedPtr addr =
       std::make_shared<Network::Address::PipeInstance>("/test/test.sock");
 
   ON_CALL(filter_callbacks.connection_, remoteAddress()).WillByDefault(ReturnRef(addr));

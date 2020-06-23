@@ -62,7 +62,6 @@ envoy_cc_fuzz_test(
         ":ext_authz_fuzz_proto_cc_proto",
         "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/network/ext_authz",
-        # "//test/fuzz:utility_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "@envoy_api//envoy/extensions/filters/network/ext_authz/v3:pkg_cc_proto",

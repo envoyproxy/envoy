@@ -16,7 +16,7 @@ message Result {
 }
 
 message OnData {
-  bytes data = 1 [(validate.rules).bytes = {min_len: 1}];
+  bytes data = 1;
   bool end_stream = 2;
   // optional: to set the default authorization check result for this and the following onData()
   Result result = 3;
