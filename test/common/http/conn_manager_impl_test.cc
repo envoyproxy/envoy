@@ -6060,22 +6060,17 @@ TEST_F(HttpConnectionManagerImplTest, UpstreamHeadersSize) {
     return Http::okStatus();
   }));
 
-  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
+  setupFilterChain(1, 0);
 
-  EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
-        callbacks.addStreamDecoderFilter(filter);
-      }));
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
 
-  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
-  NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
+  std::shared_ptr<NiceMock<Upstream::MockHostDescription>> host_{
+      new NiceMock<Upstream::MockHostDescription>()};
+  filter_callbacks_.upstreamHost(host_);
 
-  ON_CALL(*decoder_callbacks_.cluster_info_, statsScope()).WillByDefault(ReturnRef(stats_store_));
-
-  filter->setDecoderFilterCallbacks(decoder_callbacks_);
-  EXPECT_CALL(*filter, decodeComplete());
-
-  EXPECT_CALL(stats_store_,
+  EXPECT_CALL(host_->cluster_.stats_store_,
               deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_headers_size"),
                                       _)); // TODO: put exact headers size value
 
@@ -6083,7 +6078,7 @@ TEST_F(HttpConnectionManagerImplTest, UpstreamHeadersSize) {
   conn_manager_->onData(fake_input, false);
 
   EXPECT_EQ(Stats::Histogram::Unit::Bytes,
-            filter->callbacks_->clusterInfo()->stats().upstream_rq_headers_size_.unit());
+            host_->cluster().stats().upstream_rq_headers_size_.unit());
 }
 
 TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponseUsingHttp3) {
