@@ -8,8 +8,6 @@
 #include "config_tracker.h"
 #include "gmock/gmock.h"
 
-using testing::NiceMock;
-
 namespace Envoy {
 namespace Server {
 class MockAdmin : public Admin {
@@ -34,7 +32,7 @@ public:
                Http::ResponseHeaderMap& response_headers, std::string& body));
   MOCK_METHOD(void, addListenerToHandler, (Network::ConnectionHandler * handler));
 
-  NiceMock<MockConfigTracker> config_tracker_;
+  testing::NiceMock<MockConfigTracker> config_tracker_;
 };
 } // namespace Server
 

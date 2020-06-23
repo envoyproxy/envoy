@@ -5,11 +5,12 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Envoy {
+namespace Server {
+
 using testing::_;
 using testing::Invoke;
 
-namespace Envoy {
-namespace Server {
 MockConfigTracker::MockConfigTracker() {
   ON_CALL(*this, add_(_, _))
       .WillByDefault(Invoke([this](const std::string& key, Cb callback) -> EntryOwner* {
@@ -22,5 +23,4 @@ MockConfigTracker::MockConfigTracker() {
 MockConfigTracker::~MockConfigTracker() = default;
 
 } // namespace Server
-
 } // namespace Envoy
