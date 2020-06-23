@@ -1,5 +1,18 @@
 #pragma once
 
+#define HEADER_MAP_TYPE_ORIGINAL 1
+#define HEADER_MAP_TYPE_FLAT_HASH_MAP 2
+
+#ifndef HEADER_MAP_TYPE
+//#define HEADER_MAP_TYPE HEADER_MAP_TYPE_ORIGINAL
+#define HEADER_MAP_TYPE HEADER_MAP_TYPE_FLAT_HASH_MAP
+#endif
+
+#if (HEADER_MAP_TYPE != HEADER_MAP_TYPE_ORIGINAL) &&                                               \
+    (HEADER_MAP_TYPE != HEADER_MAP_TYPE_FLAT_HASH_MAP)
+#error Unsupported HEADER_MAP_TYPE set
+#endif
+
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
@@ -703,6 +716,7 @@ private:
   const typename CustomInlineHeaderRegistry::Handle<type> handle_;
 };
 
+#if HEADER_MAP_TYPE == HEADER_MAP_TYPE_ORIGINAL
 /**
  * The following functions allow O(1) access for custom inline headers.
  */
@@ -729,12 +743,55 @@ public:
   }
 };
 
+#elif HEADER_MAP_TYPE == HEADER_MAP_TYPE_FLAT_HASH_MAP
+/**
+ * The following functions allow O(1) access for custom inline headers.
+ * Note: the simple-map implementation doesn't support this, and so an exception
+ * is thrown in this case (Not EnvoyException because using it requires changing
+ * the BUILD file and allowing code_format see the change).
+ */
+template <CustomInlineHeaderRegistry::Type type> class CustomInlineHeaderBase {
+public:
+  virtual ~CustomInlineHeaderBase() = default;
+
+  static constexpr CustomInlineHeaderRegistry::Type header_map_type = type;
+  using Handle = CustomInlineHeaderRegistry::Handle<header_map_type>;
+
+  virtual const HeaderEntry* getInline(Handle) const {
+    throw std::runtime_error("CustomInlineHeader isn't supported as part of simple-map");
+  }
+  virtual void appendInline(Handle, absl::string_view, absl::string_view) {
+    throw std::runtime_error("CustomInlineHeader isn't supported as part of simple-map");
+  }
+  virtual void setReferenceInline(Handle, absl::string_view) {
+    throw std::runtime_error("CustomInlineHeader isn't supported as part of simple-map");
+  }
+  virtual void setInline(Handle, absl::string_view) {
+    throw std::runtime_error("CustomInlineHeader isn't supported as part of simple-map");
+  }
+  virtual void setInline(Handle, uint64_t) {
+    throw std::runtime_error("CustomInlineHeader isn't supported as part of simple-map");
+  }
+  virtual size_t removeInline(Handle) {
+    throw std::runtime_error("CustomInlineHeader isn't supported as part of simple-map");
+  }
+  absl::string_view getInlineValue(Handle) const {
+    throw std::runtime_error("CustomInlineHeader isn't supported as part of simple-map");
+  }
+};
+
+#endif // HEADER_MAP_TYPE == HEADER_MAP_TYPE_FLAT_HASH_MAP
+
 /**
  * Typed derived classes for all header map types.
  */
 
 // Base class for both request and response headers.
+#if HEADER_MAP_TYPE == HEADER_MAP_TYPE_ORIGINAL
 class RequestOrResponseHeaderMap : public HeaderMap {
+#elif HEADER_MAP_TYPE == HEADER_MAP_TYPE_FLAT_HASH_MAP
+class RequestOrResponseHeaderMap : public virtual HeaderMap {
+#endif // HEADER_MAP_TYPE == HEADER_MAP_TYPE_FLAT_HASH_MAP
 public:
   INLINE_REQ_RESP_HEADERS(DEFINE_INLINE_HEADER)
 };
@@ -750,8 +807,13 @@ using RequestHeaderMapPtr = std::unique_ptr<RequestHeaderMap>;
 
 // Request trailers.
 class RequestTrailerMap
+#if HEADER_MAP_TYPE == HEADER_MAP_TYPE_ORIGINAL
     : public HeaderMap,
-      public CustomInlineHeaderBase<CustomInlineHeaderRegistry::Type::RequestTrailers> {};
+#elif HEADER_MAP_TYPE == HEADER_MAP_TYPE_FLAT_HASH_MAP
+    : public virtual HeaderMap,
+#endif // HEADER_MAP_TYPE == HEADER_MAP_TYPE_FLAT_HASH_MAP
+      public CustomInlineHeaderBase<CustomInlineHeaderRegistry::Type::RequestTrailers> {
+};
 using RequestTrailerMapPtr = std::unique_ptr<RequestTrailerMap>;
 
 // Base class for both response headers and trailers.
@@ -775,8 +837,13 @@ using ResponseHeaderMapPtr = std::unique_ptr<ResponseHeaderMap>;
 // Response trailers.
 class ResponseTrailerMap
     : public ResponseHeaderOrTrailerMap,
+#if HEADER_MAP_TYPE == HEADER_MAP_TYPE_ORIGINAL
       public HeaderMap,
-      public CustomInlineHeaderBase<CustomInlineHeaderRegistry::Type::ResponseTrailers> {};
+#elif HEADER_MAP_TYPE == HEADER_MAP_TYPE_FLAT_HASH_MAP
+      public virtual HeaderMap,
+#endif // HEADER_MAP_TYPE == HEADER_MAP_TYPE_FLAT_HASH_MAP
+      public CustomInlineHeaderBase<CustomInlineHeaderRegistry::Type::ResponseTrailers> {
+};
 using ResponseTrailerMapPtr = std::unique_ptr<ResponseTrailerMap>;
 
 /**
