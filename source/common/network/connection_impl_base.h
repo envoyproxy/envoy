@@ -44,6 +44,7 @@ protected:
   };
   DelayedCloseState delayed_close_state_{DelayedCloseState::None};
 
+  static std::atomic<uint64_t> next_global_id_;
   Event::TimerPtr delayed_close_timer_;
   std::chrono::milliseconds delayed_close_timeout_{0};
   Event::Dispatcher& dispatcher_;

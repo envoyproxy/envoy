@@ -83,6 +83,7 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         ":address_lib",
+        ":buffer_source_socket_lib",
         ":connection_base_lib",
         ":raw_buffer_socket_lib",
         ":utility_lib",
@@ -237,6 +238,20 @@ envoy_cc_library(
     name = "raw_buffer_socket_lib",
     srcs = ["raw_buffer_socket.cc"],
     hdrs = ["raw_buffer_socket.h"],
+    deps = [
+        ":utility_lib",
+        "//include/envoy/network:connection_interface",
+        "//include/envoy/network:transport_socket_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:empty_string",
+        "//source/common/http:headers_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "buffer_source_socket_lib",
+    srcs = ["buffer_source_socket.cc"],
+    hdrs = ["buffer_source_socket.h"],
     deps = [
         ":utility_lib",
         "//include/envoy/network:connection_interface",

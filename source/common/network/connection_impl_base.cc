@@ -3,6 +3,8 @@
 namespace Envoy {
 namespace Network {
 
+std::atomic<uint64_t> ConnectionImplBase::next_global_id_{0};
+
 ConnectionImplBase::ConnectionImplBase(Event::Dispatcher& dispatcher, uint64_t id)
     : dispatcher_(dispatcher), id_(id) {}
 
