@@ -58,6 +58,7 @@ New Features
 * aggregate cluster: make route :ref:`retry_priority <envoy_v3_api_field_config.route.v3.RetryPolicy.retry_priority>` predicates work with :ref:`this cluster type <envoy_v3_api_msg_extensions.clusters.aggregate.v3.ClusterConfig>`.
 * build: official released binary is now built on Ubuntu 18.04, requires glibc >= 2.27.
 * build: official released binary is now built with Clang 10.0.0.
+* cluster: added an extension point for configurable :ref:`upstreams <envoy_v3_api_field_config.cluster.v3.Cluster.upstream_config>`.
 * compressor: generic :ref:`compressor <config_http_filters_compressor>` filter exposed to users.
 * config: added :ref:`identifier <config_cluster_manager_cds>` stat that reflects control plane identifier.
 * config: added :ref:`version_text <config_cluster_manager_cds>` stat that reflects xDS version.
