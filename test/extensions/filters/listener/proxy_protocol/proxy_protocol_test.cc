@@ -1401,8 +1401,7 @@ TEST(ProxyProtocolConfigFactoryTest, TestCreateFactory) {
             key: "PP2_TYPE_ALPN"
         - tlv_type: 0x1a
           on_tlv_present:
-            key: "PP2_TYPE_CUSTOMER_A"
-      
+            key: "PP2_TYPE_CUSTOMER_A"      
 )EOF";
 
   ProtobufTypes::MessagePtr proto_config = factory->createEmptyConfigProto();
