@@ -21,6 +21,9 @@ public:
    */
   virtual void startDrainSequence(std::function<void()> drain_complete_cb) PURE;
 
+  /**
+   * @return whether the drain sequence has started.
+   */
   virtual bool draining() const PURE;
 
   /**
