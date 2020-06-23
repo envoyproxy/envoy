@@ -18,7 +18,7 @@ public:
   /**
    * Schedule the callback so it runs in the current iteration of the event loop.
    */
-  virtual void scheduleCallback() PURE;
+  virtual void scheduleCallbackCurrentIteration() PURE;
 
   /**
    * Cancel pending execution of the callback.

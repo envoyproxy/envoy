@@ -18,7 +18,7 @@ public:
   SchedulableCallbackImpl(Libevent::BasePtr& libevent, std::function<void()> cb);
 
   // SchedulableCallback implementation.
-  void scheduleCallback() override;
+  void scheduleCallbackCurrentIteration() override;
   void cancel() override;
   bool enabled() override;
 

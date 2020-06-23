@@ -310,7 +310,7 @@ void OriginalConnPoolImpl::processIdleConnection(ActiveConn& conn, bool new_conn
 
   if (delay && !pending_requests_.empty() && !upstream_ready_enabled_) {
     upstream_ready_enabled_ = true;
-    upstream_ready_cb_->scheduleCallback();
+    upstream_ready_cb_->scheduleCallbackCurrentIteration();
   }
 
   checkForDrained();

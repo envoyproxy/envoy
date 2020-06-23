@@ -55,19 +55,19 @@ TEST_F(SchedulableCallbackImplTest, ScheduleAndCancel) {
   dispatcher_->run(Dispatcher::RunType::Block);
 
   // Callback is not invoked if cancelled before it executes.
-  cb->scheduleCallback();
+  cb->scheduleCallbackCurrentIteration();
   EXPECT_TRUE(cb->enabled());
   cb->cancel();
   EXPECT_FALSE(cb->enabled());
   dispatcher_->run(Dispatcher::RunType::Block);
 
   // Scheduled callback executes.
-  cb->scheduleCallback();
+  cb->scheduleCallbackCurrentIteration();
   EXPECT_CALL(watcher, ready());
   dispatcher_->run(Dispatcher::RunType::Block);
 
   // Callbacks implicitly cancelled if runner is deleted.
-  cb->scheduleCallback();
+  cb->scheduleCallbackCurrentIteration();
   cb.reset();
   dispatcher_->run(Dispatcher::RunType::Block);
 }
@@ -79,8 +79,8 @@ TEST_F(SchedulableCallbackImplTest, ScheduleOrder) {
   createCallback([&]() { watcher1.ready(); });
 
   // Callback run in the order they are scheduled.
-  callbacks_[0]->scheduleCallback();
-  callbacks_[1]->scheduleCallback();
+  callbacks_[0]->scheduleCallbackCurrentIteration();
+  callbacks_[1]->scheduleCallbackCurrentIteration();
   EXPECT_CALL(watcher0, ready());
   EXPECT_CALL(watcher1, ready());
   dispatcher_->run(Dispatcher::RunType::Block);
@@ -94,15 +94,15 @@ TEST_F(SchedulableCallbackImplTest, ScheduleChainingAndCancellation) {
   ReadyWatcher watcher0;
   createCallback([&]() {
     watcher0.ready();
-    callbacks_[1]->scheduleCallback();
+    callbacks_[1]->scheduleCallbackCurrentIteration();
   });
 
   ReadyWatcher watcher1;
   createCallback([&]() {
     watcher1.ready();
-    callbacks_[2]->scheduleCallback();
-    callbacks_[3]->scheduleCallback();
-    callbacks_[4]->scheduleCallback();
+    callbacks_[2]->scheduleCallbackCurrentIteration();
+    callbacks_[3]->scheduleCallbackCurrentIteration();
+    callbacks_[4]->scheduleCallbackCurrentIteration();
   });
 
   ReadyWatcher watcher2;
@@ -123,7 +123,7 @@ TEST_F(SchedulableCallbackImplTest, ScheduleChainingAndCancellation) {
   // Chained callbacks run in the same event loop iteration, as signaled by a single call to
   // prepare_watcher.ready(). watcher3 and watcher4 are not invoked because cb2 cancels
   // cb3 and deletes cb4 as part of its execution.
-  callbacks_[0]->scheduleCallback();
+  callbacks_[0]->scheduleCallbackCurrentIteration();
   EXPECT_CALL(prepare_watcher, ready());
   EXPECT_CALL(watcher0, ready());
   EXPECT_CALL(watcher1, ready());

@@ -147,7 +147,7 @@ protected:
     void expectEnableUpstreamReady(bool run) {
       if (!run) {
         EXPECT_FALSE(upstream_ready_enabled_);
-        EXPECT_CALL(*parent_.mock_upstream_ready_cb_, scheduleCallback())
+        EXPECT_CALL(*parent_.mock_upstream_ready_cb_, scheduleCallbackCurrentIteration())
             .Times(1)
             .RetiresOnSaturation();
       } else {
@@ -177,7 +177,9 @@ void ConnPoolBase::expectEnableUpstreamReady(bool run) {
     dynamic_cast<ConnPoolImplForTest*>(conn_pool_.get())->expectEnableUpstreamReady(run);
   } else {
     if (!run) {
-      EXPECT_CALL(*mock_upstream_ready_cb_, scheduleCallback()).Times(1).RetiresOnSaturation();
+      EXPECT_CALL(*mock_upstream_ready_cb_, scheduleCallbackCurrentIteration())
+          .Times(1)
+          .RetiresOnSaturation();
     } else {
       mock_upstream_ready_cb_->invokeCallback();
     }

@@ -95,7 +95,7 @@ public:
     // See class comment for UnlockGuard for details on saving
     // time_system_.mutex_ prior to running libevent, which may delete this.
     UnlockGuard unlocker(time_system_.mutex_);
-    cb_->scheduleCallback();
+    cb_->scheduleCallbackCurrentIteration();
   }
 
   MonotonicTime time() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(time_system_.mutex_) {

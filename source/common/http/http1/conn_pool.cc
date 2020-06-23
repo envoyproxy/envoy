@@ -59,7 +59,7 @@ void ConnPoolImpl::onResponseComplete(ActiveClient& client) {
 
     if (!pending_requests_.empty() && !upstream_ready_enabled_) {
       upstream_ready_enabled_ = true;
-      upstream_ready_cb_->scheduleCallback();
+      upstream_ready_cb_->scheduleCallbackCurrentIteration();
     }
 
     checkForDrained();

@@ -57,7 +57,7 @@ MockSchedulableCallback::MockSchedulableCallback(MockDispatcher* dispatcher)
   EXPECT_CALL(*dispatcher, createSchedulableCallback_(_))
       .WillOnce(DoAll(SaveArg<0>(&callback_), Return(this)))
       .RetiresOnSaturation();
-  ON_CALL(*this, scheduleCallback()).WillByDefault(Assign(&enabled_, true));
+  ON_CALL(*this, scheduleCallbackCurrentIteration()).WillByDefault(Assign(&enabled_, true));
   ON_CALL(*this, cancel()).WillByDefault(Assign(&enabled_, false));
   ON_CALL(*this, enabled()).WillByDefault(ReturnPointee(&enabled_));
 }
