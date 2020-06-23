@@ -142,8 +142,9 @@ public:
 
   DelayFaultRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
                     Event::Dispatcher& dispatcher, std::chrono::milliseconds delay)
-      : SplitRequestBase(command_stats, time_source, false), callbacks_(callbacks),
-        dispatcher_(dispatcher), delay_(delay) {}
+      : SplitRequestBase(command_stats, time_source, false), callbacks_(callbacks), delay_(delay) {
+    delay_timer_ = dispatcher.createTimer([this]() -> void { onDelayResponse(); });
+  }
 
   // SplitCallbacks
   bool connectionAllowed() override { return callbacks_.connectionAllowed(); }
@@ -159,7 +160,6 @@ private:
   void onDelayResponse();
 
   SplitCallbacks& callbacks_;
-  Event::Dispatcher& dispatcher_;
   std::chrono::milliseconds delay_;
   Event::TimerPtr delay_timer_;
   Common::Redis::RespValuePtr response_;

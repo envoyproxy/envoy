@@ -126,7 +126,6 @@ std::unique_ptr<DelayFaultRequest> DelayFaultRequest::create(SplitCallbacks& cal
 
 void DelayFaultRequest::onResponse(Common::Redis::RespValuePtr&& response) {
   response_ = std::move(response);
-  delay_timer_ = dispatcher_.createTimer([this]() -> void { onDelayResponse(); });
   delay_timer_->enableTimer(delay_);
 }
 
