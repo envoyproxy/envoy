@@ -771,12 +771,12 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
       .WillOnce(
           Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            EXPECT_EQ((Http::TestHeaderMapImpl{{":path", "/"},
-                                               {":method", "POST"},
-                                               {":authority", "foo"},
-                                               {"set-cookie", "flavor=chocolate; Path=/"},
-                                               {"set-cookie", "variant=chewy; Path=/"},
-                                               {"content-length", "11"}}),
+            EXPECT_EQ((Http::TestRequestHeaderMapImpl{{":path", "/"},
+                                                      {":method", "POST"},
+                                                      {":authority", "foo"},
+                                                      {"set-cookie", "flavor=chocolate; Path=/"},
+                                                      {"set-cookie", "variant=chewy; Path=/"},
+                                                      {"content-length", "11"}}),
                       message->headers());
             callbacks = &cb;
             return &request;
@@ -834,12 +834,12 @@ TEST_F(LuaHttpFilterTest, HttpCallAsyncFalse) {
       .WillOnce(
           Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            EXPECT_EQ((Http::TestHeaderMapImpl{{":path", "/"},
-                                               {":method", "POST"},
-                                               {":authority", "foo"},
-                                               {"set-cookie", "flavor=chocolate; Path=/"},
-                                               {"set-cookie", "variant=chewy; Path=/"},
-                                               {"content-length", "11"}}),
+            EXPECT_EQ((Http::TestRequestHeaderMapImpl{{":path", "/"},
+                                                      {":method", "POST"},
+                                                      {":authority", "foo"},
+                                                      {"set-cookie", "flavor=chocolate; Path=/"},
+                                                      {"set-cookie", "variant=chewy; Path=/"},
+                                                      {"content-length", "11"}}),
                       message->headers());
             callbacks = &cb;
             return &request;
@@ -893,12 +893,12 @@ TEST_F(LuaHttpFilterTest, HttpCallAsynchronous) {
       .WillOnce(
           Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            EXPECT_EQ((Http::TestHeaderMapImpl{{":path", "/"},
-                                               {":method", "POST"},
-                                               {":authority", "foo"},
-                                               {"set-cookie", "flavor=chocolate; Path=/"},
-                                               {"set-cookie", "variant=chewy; Path=/"},
-                                               {"content-length", "11"}}),
+            EXPECT_EQ((Http::TestRequestHeaderMapImpl{{":path", "/"},
+                                                      {":method", "POST"},
+                                                      {":authority", "foo"},
+                                                      {"set-cookie", "flavor=chocolate; Path=/"},
+                                                      {"set-cookie", "variant=chewy; Path=/"},
+                                                      {"content-length", "11"}}),
                       message->headers());
             callbacks = &cb;
             return &request;
@@ -961,10 +961,10 @@ TEST_F(LuaHttpFilterTest, DoubleHttpCall) {
       .WillOnce(
           Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            EXPECT_EQ((Http::TestHeaderMapImpl{{":path", "/"},
-                                               {":method", "POST"},
-                                               {":authority", "foo"},
-                                               {"content-length", "11"}}),
+            EXPECT_EQ((Http::TestRequestHeaderMapImpl{{":path", "/"},
+                                                      {":method", "POST"},
+                                                      {":authority", "foo"},
+                                                      {"content-length", "11"}}),
                       message->headers());
             callbacks = &cb;
             return &request;
@@ -984,7 +984,7 @@ TEST_F(LuaHttpFilterTest, DoubleHttpCall) {
       .WillOnce(
           Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            EXPECT_EQ((Http::TestHeaderMapImpl{
+            EXPECT_EQ((Http::TestRequestHeaderMapImpl{
                           {":path", "/bar"}, {":method", "GET"}, {":authority", "foo"}}),
                       message->headers());
             callbacks = &cb;
@@ -1040,7 +1040,7 @@ TEST_F(LuaHttpFilterTest, HttpCallNoBody) {
       .WillOnce(
           Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            EXPECT_EQ((Http::TestHeaderMapImpl{
+            EXPECT_EQ((Http::TestRequestHeaderMapImpl{
                           {":path", "/"}, {":method", "GET"}, {":authority", "foo"}}),
                       message->headers());
             callbacks = &cb;
@@ -1098,7 +1098,7 @@ TEST_F(LuaHttpFilterTest, HttpCallImmediateResponse) {
       .WillOnce(
           Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            EXPECT_EQ((Http::TestHeaderMapImpl{
+            EXPECT_EQ((Http::TestRequestHeaderMapImpl{
                           {":path", "/"}, {":method", "GET"}, {":authority", "foo"}}),
                       message->headers());
             callbacks = &cb;
@@ -1110,9 +1110,9 @@ TEST_F(LuaHttpFilterTest, HttpCallImmediateResponse) {
 
   Http::ResponseMessagePtr response_message(new Http::ResponseMessageImpl(
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-  Http::TestHeaderMapImpl expected_headers{{":status", "403"},
-                                           {"set-cookie", "flavor=chocolate; Path=/"},
-                                           {"set-cookie", "variant=chewy; Path=/"}};
+  Http::TestResponseHeaderMapImpl expected_headers{{":status", "403"},
+                                                   {"set-cookie", "flavor=chocolate; Path=/"},
+                                                   {"set-cookie", "variant=chewy; Path=/"}};
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
   callbacks->onSuccess(request, std::move(response_message));
 }
@@ -1422,7 +1422,7 @@ TEST_F(LuaHttpFilterTest, ImmediateResponse) {
 
   for (uint64_t i = 0; i < num_loops; i++) {
     Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
-    Http::TestHeaderMapImpl expected_headers{{":status", "503"}, {"content-length", "4"}};
+    Http::TestResponseHeaderMapImpl expected_headers{{":status", "503"}, {"content-length", "4"}};
     EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), false));
     EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
     EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,

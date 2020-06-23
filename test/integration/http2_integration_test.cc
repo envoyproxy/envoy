@@ -512,7 +512,7 @@ TEST_P(Http2MetadataIntegrationTest, RequestMetadataReachSizeLimit) {
   }
 
   // Verifies client connection will be closed.
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
   ASSERT_FALSE(response->complete());
 }
 

@@ -62,12 +62,8 @@ void FileEventImpl::assignEvents(uint32_t events, event_base* base) {
           events |= FileReadyType::Closed;
         }
 
-        // TODO(htuch): this should be ASSERT(events), but
-        // https://github.com/libevent/libevent/issues/984 seems to be producing unexpected
-        // behavior. The ASSERT should be restored once this issue is resolved.
-        if (events) {
-          event->cb_(events);
-        }
+        ASSERT(events != 0);
+        event->cb_(events);
       },
       this);
 }

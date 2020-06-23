@@ -18,7 +18,7 @@ public:
     listener_filters:
       name: udp_proxy
       typed_config:
-        '@type': type.googleapis.com/envoy.config.filter.udp.udp_proxy.v2alpha.UdpProxyConfig
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig
         stat_prefix: foo
         cluster: cluster_0
       )EOF");
@@ -44,14 +44,6 @@ public:
           });
     }
     BaseIntegrationTest::initialize();
-  }
-
-  /**
-   *  Destructor for an individual test.
-   */
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
   }
 
   void requestResponseWithListenerAddress(const Network::Address::Instance& listener_address) {

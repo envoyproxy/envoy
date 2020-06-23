@@ -141,7 +141,7 @@ public:
     return ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(filters, context);
   }
   Network::SocketSharedPtr createListenSocket(Network::Address::InstanceConstSharedPtr,
-                                              Network::Address::SocketType,
+                                              Network::Socket::Type,
                                               const Network::Socket::OptionsSharedPtr&,
                                               const ListenSocketCreationParams&) override {
     // Returned sockets are not currently used so we can return nothing here safely vs. a

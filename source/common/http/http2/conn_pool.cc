@@ -17,11 +17,11 @@ ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSha
                            const Network::ConnectionSocket::OptionsSharedPtr& options,
                            const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
     : ConnPoolImplBase(std::move(host), std::move(priority), dispatcher, options,
-                       transport_socket_options) {}
+                       transport_socket_options, Protocol::Http2) {}
 
 ConnPoolImpl::~ConnPoolImpl() { destructAllConnections(); }
 
-ConnPoolImplBase::ActiveClientPtr ConnPoolImpl::instantiateActiveClient() {
+ActiveClientPtr ConnPoolImpl::instantiateActiveClient() {
   return std::make_unique<ActiveClient>(*this);
 }
 void ConnPoolImpl::onGoAway(ActiveClient& client) {
@@ -65,7 +65,7 @@ uint64_t ConnPoolImpl::maxRequestsPerConnection() {
 }
 
 ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
-    : ConnPoolImplBase::ActiveClient(
+    : Envoy::Http::ActiveClient(
           parent, parent.maxRequestsPerConnection(),
           parent.host_->cluster().http2Options().max_concurrent_streams().value()) {
   codec_client_->setCodecClientCallbacks(*this);

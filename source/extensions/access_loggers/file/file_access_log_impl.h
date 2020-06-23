@@ -1,5 +1,7 @@
 #pragma once
 
+#include "common/formatter/substitution_formatter.h"
+
 #include "extensions/access_loggers/common/access_log_base.h"
 
 namespace Envoy {
@@ -13,7 +15,7 @@ namespace File {
 class FileAccessLog : public Common::ImplBase {
 public:
   FileAccessLog(const std::string& access_log_path, AccessLog::FilterPtr&& filter,
-                AccessLog::FormatterPtr&& formatter, AccessLog::AccessLogManager& log_manager);
+                Formatter::FormatterPtr&& formatter, AccessLog::AccessLogManager& log_manager);
 
 private:
   // Common::ImplBase
@@ -23,7 +25,7 @@ private:
                const StreamInfo::StreamInfo& stream_info) override;
 
   AccessLog::AccessLogFileSharedPtr log_file_;
-  AccessLog::FormatterPtr formatter_;
+  Formatter::FormatterPtr formatter_;
 };
 
 } // namespace File

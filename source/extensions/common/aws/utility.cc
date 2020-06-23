@@ -48,15 +48,14 @@ Utility::canonicalizeHeaders(const Http::RequestHeaderMap& headers) {
   // The AWS SDK has a quirk where it removes "default ports" (80, 443) from the host headers
   // Additionally, we canonicalize the :authority header as "host"
   // TODO(lavignes): This may need to be tweaked to canonicalize :authority for HTTP/2 requests
-  const auto* authority_header = headers.Host();
-  if (authority_header != nullptr && !authority_header->value().empty()) {
-    const auto& value = authority_header->value().getStringView();
-    const auto parts = StringUtil::splitToken(value, ":");
+  const absl::string_view authority_header = headers.getHostValue();
+  if (!authority_header.empty()) {
+    const auto parts = StringUtil::splitToken(authority_header, ":");
     if (parts.size() > 1 && (parts[1] == "80" || parts[1] == "443")) {
       // Has default port, so use only the host part
       out.emplace(Http::Headers::get().HostLegacy.get(), std::string(parts[0]));
     } else {
-      out.emplace(Http::Headers::get().HostLegacy.get(), std::string(value));
+      out.emplace(Http::Headers::get().HostLegacy.get(), std::string(authority_header));
     }
   }
   return out;

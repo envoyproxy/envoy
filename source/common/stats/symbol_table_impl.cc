@@ -162,7 +162,7 @@ std::vector<absl::string_view> SymbolTableImpl::decodeStrings(const SymbolTable:
   Encoding::decodeTokens(
       array, size,
       [this, &strings](Symbol symbol)
-          NO_THREAD_SAFETY_ANALYSIS { strings.push_back(fromSymbol(symbol)); },
+          ABSL_NO_THREAD_SAFETY_ANALYSIS { strings.push_back(fromSymbol(symbol)); },
       [&strings](absl::string_view str) { strings.push_back(str); });
   return strings;
 }
@@ -184,7 +184,7 @@ void SymbolTableImpl::Encoding::appendToMemBlock(StatName stat_name,
 }
 
 SymbolTableImpl::SymbolTableImpl()
-    // Have to be explicitly initialized, if we want to use the GUARDED_BY macro.
+    // Have to be explicitly initialized, if we want to use the ABSL_GUARDED_BY macro.
     : next_symbol_(FirstValidSymbol), monotonic_counter_(FirstValidSymbol) {}
 
 SymbolTableImpl::~SymbolTableImpl() {
@@ -294,7 +294,7 @@ uint64_t SymbolTableImpl::getRecentLookups(const RecentLookupsFn& iter) const {
     Thread::LockGuard lock(lock_);
     recent_lookups_.forEach(
         [&name_count_map](absl::string_view str, uint64_t count)
-            NO_THREAD_SAFETY_ANALYSIS { name_count_map[std::string(str)] += count; });
+            ABSL_NO_THREAD_SAFETY_ANALYSIS { name_count_map[std::string(str)] += count; });
     total += recent_lookups_.total();
   }
 
@@ -388,13 +388,13 @@ Symbol SymbolTableImpl::toSymbol(absl::string_view sv) {
 }
 
 absl::string_view SymbolTableImpl::fromSymbol(const Symbol symbol) const
-    EXCLUSIVE_LOCKS_REQUIRED(lock_) {
+    ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
   auto search = decode_map_.find(symbol);
   RELEASE_ASSERT(search != decode_map_.end(), "no such symbol");
   return search->second->toStringView();
 }
 
-void SymbolTableImpl::newSymbol() EXCLUSIVE_LOCKS_REQUIRED(lock_) {
+void SymbolTableImpl::newSymbol() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
   if (pool_.empty()) {
     next_symbol_ = ++monotonic_counter_;
   } else {

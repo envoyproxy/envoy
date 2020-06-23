@@ -191,6 +191,7 @@ def envoy_dependencies(skip_targets = []):
     _repository_impl("bazel_toolchains")
     _repository_impl("bazel_compdb")
     _repository_impl("envoy_build_tools")
+    _repository_impl("rules_cc")
 
     # Unconditional, since we use this only for compiler-agnostic fuzzing utils.
     _org_llvm_releases_compiler_rt()
@@ -736,6 +737,16 @@ def _com_github_grpc_grpc():
     native.bind(
         name = "grpc_alts_fake_handshaker_server",
         actual = "@com_github_grpc_grpc//test/core/tsi/alts/fake_handshaker:fake_handshaker_lib",
+    )
+
+    native.bind(
+        name = "grpc_alts_handshaker_proto",
+        actual = "@com_github_grpc_grpc//test/core/tsi/alts/fake_handshaker:handshaker_proto",
+    )
+
+    native.bind(
+        name = "grpc_alts_transport_security_common_proto",
+        actual = "@com_github_grpc_grpc//test/core/tsi/alts/fake_handshaker:transport_security_common_proto",
     )
 
 def _upb():
