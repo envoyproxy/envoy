@@ -72,7 +72,7 @@ public:
         // the thread exits after the call to set the name above, and before the
         // call to get the name, so we can only do the assert if that call
         // succeeded.
-        absl::string_view check_name;
+        std::string check_name;
         ASSERT(!getNameFromOS(check_name) || check_name == name_,
                absl::StrCat("configured name=", name_, " os name=", check_name));
       }
@@ -97,7 +97,7 @@ private:
   // Attempts to get the name from the operating system, returning true and
   // updating 'name' if successful. Note that during normal operation this
   // may fail, if the thread exits prior to the system call.
-  bool getNameFromOS(absl::string_view name) {
+  bool getNameFromOS(std::string& name) {
     // Verify that the name got written into the thread as expected.
     char buf[PTHREAD_MAX_THREADNAME_LEN_INCLUDING_NULL_BYTE];
     const int get_name_rc = pthread_getname_np(thread_handle_, buf, sizeof(buf));
