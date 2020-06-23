@@ -53,7 +53,7 @@ public:
   AddUpdateCallbacksHandlePtr addUpdateCallbacks(UpdateCallbacks& callbacks) override;
   absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> hosts() override;
   ResourceLimit& onDnsRequest(const Router::RouteEntry* route_entry,
-                     Upstream::ClusterInfoConstSharedPtr cluster_info) override;
+                              Upstream::ClusterInfoConstSharedPtr cluster_info) override;
   DnsCacheResourceManager& dnsCacheResourceManager() override { return resource_manager_; }
 
 private:

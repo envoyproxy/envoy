@@ -37,7 +37,7 @@ void ProxyFilter::onDestroy() {
   // Make sure we destroy any active cache load handle in case we are getting reset and deferred
   // deleted.
   cache_load_handle_.reset();
-    circuit_breaker_.reset();
+  circuit_breaker_.reset();
 }
 
 Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
@@ -99,7 +99,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
                                                    default_port, *this);
   cache_load_handle_ = std::move(result.handle_);
   if (cache_load_handle_ == nullptr) {
-      circuit_breaker_.reset();
+    circuit_breaker_.reset();
   }
 
   switch (result.status_) {
@@ -128,8 +128,8 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
 void ProxyFilter::onLoadDnsCacheComplete() {
   ENVOY_STREAM_LOG(debug, "load DNS cache complete, continuing", *decoder_callbacks_);
-  ASSERT(  circuit_breaker_ != nullptr);
-    circuit_breaker_.reset();
+  ASSERT(circuit_breaker_ != nullptr);
+  circuit_breaker_.reset();
   decoder_callbacks_->continueDecoding();
 }
 

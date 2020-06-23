@@ -2,10 +2,10 @@
 
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 
-#include "common/runtime/runtime_features.h"
 #include "common/config/utility.h"
 #include "common/http/utility.h"
 #include "common/network/utility.h"
+#include "common/runtime/runtime_features.h"
 
 // TODO(mattklein123): Move DNS family helpers to a smaller include.
 #include "common/upstream/upstream_impl.h"
@@ -83,9 +83,9 @@ DnsCacheImpl::loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
 }
 
 ResourceLimit& DnsCacheImpl::onDnsRequest(const Router::RouteEntry* route_entry,
-                     Upstream::ClusterInfoConstSharedPtr cluster_info) {
-  const bool should_use_dns_cache_circuit_breakers = Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.enable_dns_cache_circuit_breakers");
+                                          Upstream::ClusterInfoConstSharedPtr cluster_info) {
+  const bool should_use_dns_cache_circuit_breakers =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_dns_cache_circuit_breakers");
   ResourceLimit& pending_requests =
       should_use_dns_cache_circuit_breakers
           ? resource_manager_.pendingRequests()
