@@ -161,8 +161,7 @@ public:
   BaseIntegrationTest(const InstanceConstSharedPtrFn& upstream_address_fn,
                       Network::Address::IpVersion version,
                       const std::string& config = ConfigHelper::httpProxyConfig());
-
-  virtual ~BaseIntegrationTest();
+  virtual ~BaseIntegrationTest() = default;
 
   // TODO(jmarantz): Remove this once
   // https://github.com/envoyproxy/envoy-filter-example/pull/69 is reverted.

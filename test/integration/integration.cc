@@ -282,10 +282,6 @@ BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
           },
           version, config) {}
 
-BaseIntegrationTest::~BaseIntegrationTest() {
-  // fake_upstreams_.clear();
-}
-
 Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnection(uint32_t port) {
   return makeClientConnectionWithOptions(port, nullptr);
 }
