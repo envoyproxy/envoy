@@ -161,7 +161,8 @@ failure_percentage_threshold: 70
 }
 
 TEST_F(OutlierDetectorImplTest, DestroyWithActive) {
-  ON_CALL(runtime_.snapshot_, getInteger("outlier_detection.max_ejection_percent", _))
+  ON_CALL(runtime_.snapshot_,
+          getInteger("outlier_detection.max_ejection_percent", testing::Matcher<uint64_t>(_)))
       .WillByDefault(Return(100));
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"}, true);
@@ -1290,7 +1291,8 @@ TEST_F(OutlierDetectorImplTest, Overflow) {
       cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_, event_logger_));
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
-  ON_CALL(runtime_.snapshot_, getInteger("outlier_detection.max_ejection_percent", _))
+  ON_CALL(runtime_.snapshot_,
+          getInteger("outlier_detection.max_ejection_percent", testing::Matcher<uint64_t>(_)))
       .WillByDefault(Return(1));
 
   loadRq(hosts_[0], 4, 500);
