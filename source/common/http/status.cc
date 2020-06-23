@@ -13,10 +13,8 @@ constexpr absl::string_view EnvoyPayloadUrl = "Envoy";
 
 absl::string_view statusCodeToString(StatusCode code) {
   switch (code) {
-  case StatusCode::Ok: {
-    static const auto& ok_message = *new std::string(absl::OkStatus().ToString());
-    return ok_message;
-  }
+  case StatusCode::Ok:
+    return "OK";
   case StatusCode::CodecProtocolError:
     return "CodecProtocolError";
   case StatusCode::BufferFloodError:
