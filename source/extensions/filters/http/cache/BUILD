@@ -17,6 +17,7 @@ envoy_cc_library(
     srcs = ["cache_filter.cc"],
     hdrs = ["cache_filter.h"],
     deps = [
+        ":cache_filter_utils_lib",
         ":http_cache_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:macros",
@@ -24,6 +25,16 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "@envoy_api//envoy/extensions/filters/http/cache/v3alpha:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "cache_filter_utils_lib",
+    srcs = ["cache_filter_utils.cc"],
+    hdrs = ["cache_filter_utils.h"],
+    deps = [
+        "//source/common/common:utility_lib",
+        "//source/common/http:headers_lib",
     ],
 )
 

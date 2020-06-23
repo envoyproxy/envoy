@@ -18,7 +18,7 @@ namespace Cache {
 //
 // tchar           = "!" / "#" / "$" / "%" / "&" / "'" / "*" / "+"
 //                 / "-" / "." / "^" / "_" / "`" / "|" / "~" / DIGIT / ALPHA
-bool Utils::tchar(char c) {
+bool HttpCacheUtils::tchar(char c) {
   switch (c) {
   case '!':
   case '#':
@@ -44,7 +44,7 @@ bool Utils::tchar(char c) {
 // token was present.
 //
 // token           = 1*tchar
-bool Utils::eatToken(absl::string_view& s) {
+bool HttpCacheUtils::eatToken(absl::string_view& s) {
   const absl::string_view::iterator token_end = absl::c_find_if_not(s, &tchar);
   if (token_end == s.begin()) {
     return false;
@@ -65,7 +65,7 @@ bool Utils::eatToken(absl::string_view& s) {
 //
 // For example, the directive "my-extension=42" has an argument of "42", so an
 // input of "public, my-extension=42, max-age=999"
-void Utils::eatDirectiveArgument(absl::string_view& s) {
+void HttpCacheUtils::eatDirectiveArgument(absl::string_view& s) {
   if (s.empty()) {
     return;
   }
@@ -83,7 +83,7 @@ void Utils::eatDirectiveArgument(absl::string_view& s) {
 // If s is null or doesn't begin with digits, returns
 // SystemTime::duration::zero(). If parsing overflows, returns
 // SystemTime::duration::max().
-SystemTime::duration Utils::eatLeadingDuration(absl::string_view& s) {
+SystemTime::duration HttpCacheUtils::eatLeadingDuration(absl::string_view& s) {
   const absl::string_view::iterator digits_end = absl::c_find_if_not(s, &absl::ascii_isdigit);
   const size_t digits_length = digits_end - s.begin();
   if (digits_length == 0) {
@@ -101,7 +101,7 @@ SystemTime::duration Utils::eatLeadingDuration(absl::string_view& s) {
 //
 // TODO(#9833): Write a CacheControl class to fully parse the cache-control
 // header value. Consider sharing with the gzip filter.
-SystemTime::duration Utils::effectiveMaxAge(absl::string_view cache_control) {
+SystemTime::duration HttpCacheUtils::effectiveMaxAge(absl::string_view cache_control) {
   // The grammar for This Cache-Control header value should be:
   // Cache-Control   = 1#cache-directive
   // cache-directive = token [ "=" ( token / quoted-string ) ]
@@ -160,7 +160,7 @@ SystemTime::duration Utils::effectiveMaxAge(absl::string_view cache_control) {
   return max_age;
 }
 
-SystemTime Utils::httpTime(const Http::HeaderEntry* header_entry) {
+SystemTime HttpCacheUtils::httpTime(const Http::HeaderEntry* header_entry) {
   if (!header_entry) {
     return {};
   }
