@@ -263,8 +263,9 @@ TEST_P(AdminInstanceTest, ConfigDumpWithEndpoint) {
 
   envoy::config::core::v3::Locality locality;
   const std::string hostname_for_healthcheck = "test_hostname_healthcheck";
+  const std::string hostname = "foo.com";
 
-  addHostInfo(*host, "foo.com", "tcp://1.2.3.4:80", locality, hostname_for_healthcheck,
+  addHostInfo(*host, hostname, "tcp://1.2.3.4:80", locality, hostname_for_healthcheck,
               "tcp://1.2.3.5:90", 5, 6);
 
   Buffer::OwnedImpl response;
@@ -339,23 +340,26 @@ TEST_P(AdminInstanceTest, ConfigDumpWithLocalityEndpoint) {
   locality_1.set_sub_zone("world");
 
   const std::string hostname_for_healthcheck = "test_hostname_healthcheck";
+  const std::string hostname_1 = "foo.com";
 
-  addHostInfo(*host_1, "foo.com", "tcp://1.2.3.4:80", locality_1, hostname_for_healthcheck,
+  addHostInfo(*host_1, hostname_1, "tcp://1.2.3.4:80", locality_1, hostname_for_healthcheck,
               "tcp://1.2.3.5:90", 5, 6);
 
   auto host_2 = std::make_shared<NiceMock<Upstream::MockHost>>();
   host_set_1->hosts_.emplace_back(host_2);
   const std::string empty_hostname_for_healthcheck = "";
+  const std::string hostname_2 = "boo.com";
 
-  addHostInfo(*host_2, "boo.com", "tcp://1.2.3.7:8", locality_1, empty_hostname_for_healthcheck,
+  addHostInfo(*host_2, hostname_2, "tcp://1.2.3.7:8", locality_1, empty_hostname_for_healthcheck,
               "tcp://1.2.3.7:8", 3, 6);
 
   envoy::config::core::v3::Locality locality_2;
 
   auto host_3 = std::make_shared<NiceMock<Upstream::MockHost>>();
   host_set_1->hosts_.emplace_back(host_3);
+  const std::string hostname_3 = "coo.com";
 
-  addHostInfo(*host_3, "coo.com", "tcp://1.2.3.8:8", locality_2, empty_hostname_for_healthcheck,
+  addHostInfo(*host_3, hostname_3, "tcp://1.2.3.8:8", locality_2, empty_hostname_for_healthcheck,
               "tcp://1.2.3.8:8", 3, 4);
 
   std::vector<Upstream::HostVector> locality_hosts = {
@@ -370,8 +374,9 @@ TEST_P(AdminInstanceTest, ConfigDumpWithLocalityEndpoint) {
   Upstream::MockHostSet* host_set_2 = cluster.priority_set_.getMockHostSet(1);
   auto host_4 = std::make_shared<NiceMock<Upstream::MockHost>>();
   host_set_2->hosts_.emplace_back(host_4);
+  const std::string hostname_4 = "doo.com";
 
-  addHostInfo(*host_4, "doo.com", "tcp://1.2.3.9:8", locality_1, empty_hostname_for_healthcheck,
+  addHostInfo(*host_4, hostname_4, "tcp://1.2.3.9:8", locality_1, empty_hostname_for_healthcheck,
               "tcp://1.2.3.9:8", 3, 2);
 
   Buffer::OwnedImpl response;
@@ -543,8 +548,9 @@ TEST_P(AdminInstanceTest, ConfigDumpWithEndpointFiltersByResource) {
 
   envoy::config::core::v3::Locality locality;
   const std::string hostname_for_healthcheck = "test_hostname_healthcheck";
+  const std::string hostname_1 = "foo.com";
 
-  addHostInfo(*host_1, "foo.com", "tcp://1.2.3.4:80", locality, hostname_for_healthcheck,
+  addHostInfo(*host_1, hostname_1, "tcp://1.2.3.4:80", locality, hostname_for_healthcheck,
               "tcp://1.2.3.5:90", 5, 6);
 
   NiceMock<Upstream::MockClusterMockPrioritySet> cluster_2;
@@ -556,8 +562,9 @@ TEST_P(AdminInstanceTest, ConfigDumpWithEndpointFiltersByResource) {
   Upstream::MockHostSet* host_set_2 = cluster_2.priority_set_.getMockHostSet(0);
   auto host_2 = std::make_shared<NiceMock<Upstream::MockHost>>();
   host_set_2->hosts_.emplace_back(host_2);
+  const std::string hostname_2 = "boo.com";
 
-  addHostInfo(*host_2, "boo.com", "tcp://1.2.3.5:8", locality, hostname_for_healthcheck,
+  addHostInfo(*host_2, hostname_2, "tcp://1.2.3.5:8", locality, hostname_for_healthcheck,
               "tcp://1.2.3.4:1", 3, 4);
 
   Buffer::OwnedImpl response;
