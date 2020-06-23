@@ -4,6 +4,7 @@
 # are allowed for any otherwise correctly spelled word.
 ABI
 ACK
+ACL
 AES
 AFAICT
 ALPN
@@ -339,6 +340,7 @@ WASM
 WAVM
 WIP
 WKT
+WRONGPASS
 WRR
 WS
 WSA

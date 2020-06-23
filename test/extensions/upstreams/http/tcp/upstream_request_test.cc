@@ -4,8 +4,10 @@
 #include "common/router/upstream_request.h"
 
 #include "extensions/common/proxy_protocol/proxy_protocol_header.h"
+#include "extensions/upstreams/http/tcp/upstream_request.h"
 
 #include "test/common/http/common.h"
+#include "test/mocks/common.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/server/mocks.h"
@@ -15,6 +17,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using Envoy::Http::TestRequestHeaderMapImpl;
+using Envoy::Router::UpstreamRequest;
 using testing::_;
 using testing::AnyNumber;
 using testing::NiceMock;
@@ -43,28 +47,28 @@ public:
   }
 
   MOCK_METHOD(void, onUpstream100ContinueHeaders,
-              (Http::ResponseHeaderMapPtr && headers, UpstreamRequest& upstream_request));
+              (Envoy::Http::ResponseHeaderMapPtr && headers, UpstreamRequest& upstream_request));
   MOCK_METHOD(void, onUpstreamHeaders,
-              (uint64_t response_code, Http::ResponseHeaderMapPtr&& headers,
+              (uint64_t response_code, Envoy::Http::ResponseHeaderMapPtr&& headers,
                UpstreamRequest& upstream_request, bool end_stream));
   MOCK_METHOD(void, onUpstreamData,
               (Buffer::Instance & data, UpstreamRequest& upstream_request, bool end_stream));
   MOCK_METHOD(void, onUpstreamTrailers,
-              (Http::ResponseTrailerMapPtr && trailers, UpstreamRequest& upstream_request));
-  MOCK_METHOD(void, onUpstreamMetadata, (Http::MetadataMapPtr && metadata_map));
+              (Envoy::Http::ResponseTrailerMapPtr && trailers, UpstreamRequest& upstream_request));
+  MOCK_METHOD(void, onUpstreamMetadata, (Envoy::Http::MetadataMapPtr && metadata_map));
   MOCK_METHOD(void, onUpstreamReset,
-              (Http::StreamResetReason reset_reason, absl::string_view transport_failure,
+              (Envoy::Http::StreamResetReason reset_reason, absl::string_view transport_failure,
                UpstreamRequest& upstream_request));
   MOCK_METHOD(void, onUpstreamHostSelected, (Upstream::HostDescriptionConstSharedPtr host));
   MOCK_METHOD(void, onPerTryTimeout, (UpstreamRequest & upstream_request));
   MOCK_METHOD(void, onStreamMaxDurationReached, (UpstreamRequest & upstream_request));
 
-  MOCK_METHOD(Http::StreamDecoderFilterCallbacks*, callbacks, ());
+  MOCK_METHOD(Envoy::Http::StreamDecoderFilterCallbacks*, callbacks, ());
   MOCK_METHOD(Upstream::ClusterInfoConstSharedPtr, cluster, ());
   MOCK_METHOD(FilterConfig&, config, ());
   MOCK_METHOD(FilterUtility::TimeoutData, timeout, ());
-  MOCK_METHOD(Http::RequestHeaderMap*, downstreamHeaders, ());
-  MOCK_METHOD(Http::RequestTrailerMap*, downstreamTrailers, ());
+  MOCK_METHOD(Envoy::Http::RequestHeaderMap*, downstreamHeaders, ());
+  MOCK_METHOD(Envoy::Http::RequestTrailerMap*, downstreamTrailers, ());
   MOCK_METHOD(bool, downstreamResponseStarted, (), (const));
   MOCK_METHOD(bool, downstreamEndStream, (), (const));
   MOCK_METHOD(uint32_t, attemptCount, (), (const));
@@ -74,7 +78,7 @@ public:
   MOCK_METHOD(const UpstreamRequest*, finalUpstreamRequest, (), (const));
   MOCK_METHOD(TimeSource&, timeSource, ());
 
-  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
+  NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> callbacks_;
   NiceMock<MockRouteEntry> route_entry_;
   NiceMock<Network::MockConnection> client_connection_;
 
@@ -85,19 +89,29 @@ public:
   std::list<UpstreamRequestPtr> requests_;
 };
 
+} // namespace
+} // namespace Router
+} // namespace Envoy
+
+namespace Envoy {
+namespace Extensions {
+namespace Upstreams {
+namespace Http {
+namespace Tcp {
+
 class TcpConnPoolTest : public ::testing::Test {
 public:
   TcpConnPoolTest() : host_(std::make_shared<NiceMock<Upstream::MockHost>>()) {
-    NiceMock<MockRouteEntry> route_entry;
+    NiceMock<Router::MockRouteEntry> route_entry;
     NiceMock<Upstream::MockClusterManager> cm;
     EXPECT_CALL(cm, tcpConnPoolForCluster(_, _, _)).WillOnce(Return(&mock_pool_));
-    conn_pool_ = std::make_unique<TcpConnPool>(cm, route_entry, Http::Protocol::Http11, nullptr);
-    EXPECT_TRUE(conn_pool_->valid());
+    conn_pool_ = std::make_unique<TcpConnPool>(cm, true, route_entry, Envoy::Http::Protocol::Http11,
+                                               nullptr);
   }
 
   std::unique_ptr<TcpConnPool> conn_pool_;
-  Tcp::ConnectionPool::MockInstance mock_pool_;
-  MockGenericConnectionPoolCallbacks mock_generic_callbacks_;
+  Envoy::Tcp::ConnectionPool::MockInstance mock_pool_;
+  Router::MockGenericConnectionPoolCallbacks mock_generic_callbacks_;
   std::shared_ptr<NiceMock<Upstream::MockHost>> host_;
   NiceMock<Envoy::ConnectionPool::MockCancellable> cancellable_;
 };
@@ -110,7 +124,7 @@ TEST_F(TcpConnPoolTest, Basic) {
 
   EXPECT_CALL(mock_generic_callbacks_, upstreamRequest());
   EXPECT_CALL(mock_generic_callbacks_, onPoolReady(_, _, _, _));
-  auto data = std::make_unique<NiceMock<Tcp::ConnectionPool::MockConnectionData>>();
+  auto data = std::make_unique<NiceMock<Envoy::Tcp::ConnectionPool::MockConnectionData>>();
   EXPECT_CALL(*data, connection()).Times(AnyNumber()).WillRepeatedly(ReturnRef(connection));
   conn_pool_->onPoolReady(std::move(data), host_);
 }
@@ -120,7 +134,8 @@ TEST_F(TcpConnPoolTest, OnPoolFailure) {
   conn_pool_->newStream(&mock_generic_callbacks_);
 
   EXPECT_CALL(mock_generic_callbacks_, onPoolFailure(_, _, _));
-  conn_pool_->onPoolFailure(Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure, host_);
+  conn_pool_->onPoolFailure(Envoy::Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure,
+                            host_);
 
   // Make sure that the pool failure nulled out the pending request.
   EXPECT_FALSE(conn_pool_->cancelAnyPendingRequest());
@@ -144,8 +159,8 @@ class TcpUpstreamTest : public ::testing::Test {
 public:
   TcpUpstreamTest() {
     mock_router_filter_.requests_.push_back(std::make_unique<UpstreamRequest>(
-        mock_router_filter_, std::make_unique<NiceMock<MockGenericConnPool>>()));
-    auto data = std::make_unique<NiceMock<Tcp::ConnectionPool::MockConnectionData>>();
+        mock_router_filter_, std::make_unique<NiceMock<Router::MockGenericConnPool>>()));
+    auto data = std::make_unique<NiceMock<Envoy::Tcp::ConnectionPool::MockConnectionData>>();
     EXPECT_CALL(*data, connection()).Times(AnyNumber()).WillRepeatedly(ReturnRef(connection_));
     tcp_upstream_ =
         std::make_unique<TcpUpstream>(mock_router_filter_.requests_.front().get(), std::move(data));
@@ -154,14 +169,14 @@ public:
 
 protected:
   NiceMock<Network::MockClientConnection> connection_;
-  NiceMock<MockRouterFilterInterface> mock_router_filter_;
-  Tcp::ConnectionPool::MockConnectionData* mock_connection_data_;
+  NiceMock<Router::MockRouterFilterInterface> mock_router_filter_;
+  Envoy::Tcp::ConnectionPool::MockConnectionData* mock_connection_data_;
   std::unique_ptr<TcpUpstream> tcp_upstream_;
-  Http::TestRequestHeaderMapImpl request_{{":method", "CONNECT"},
-                                          {":path", "/"},
-                                          {":protocol", "bytestream"},
-                                          {":scheme", "https"},
-                                          {":authority", "host"}};
+  TestRequestHeaderMapImpl request_{{":method", "CONNECT"},
+                                    {":path", "/"},
+                                    {":protocol", "bytestream"},
+                                    {":scheme", "https"},
+                                    {":authority", "host"}};
 };
 
 TEST_F(TcpUpstreamTest, Basic) {
@@ -176,7 +191,7 @@ TEST_F(TcpUpstreamTest, Basic) {
   tcp_upstream_->encodeData(buffer, false);
 
   // Metadata is swallowed.
-  Http::MetadataMapVector metadata_map_vector;
+  Envoy::Http::MetadataMapVector metadata_map_vector;
   tcp_upstream_->encodeMetadata(metadata_map_vector);
 
   // Forward data.
@@ -241,7 +256,7 @@ TEST_F(TcpUpstreamTest, TrailersEndStream) {
   tcp_upstream_->encodeHeaders(request_, false);
 
   EXPECT_CALL(connection_, write(BufferStringEqual(""), true));
-  Http::TestRequestTrailerMapImpl trailers{{"foo", "bar"}};
+  Envoy::Http::TestRequestTrailerMapImpl trailers{{"foo", "bar"}};
   tcp_upstream_->encodeTrailers(trailers);
 }
 
@@ -266,7 +281,7 @@ TEST_F(TcpUpstreamTest, ReadDisable) {
 TEST_F(TcpUpstreamTest, UpstreamEvent) {
   // Make sure upstream disconnects result in stream reset.
   EXPECT_CALL(mock_router_filter_,
-              onUpstreamReset(Http::StreamResetReason::ConnectionTermination, "", _));
+              onUpstreamReset(Envoy::Http::StreamResetReason::ConnectionTermination, "", _));
   tcp_upstream_->onEvent(Network::ConnectionEvent::RemoteClose);
 }
 
@@ -279,6 +294,8 @@ TEST_F(TcpUpstreamTest, Watermarks) {
   tcp_upstream_->onBelowWriteBufferLowWatermark();
 }
 
-} // namespace
-} // namespace Router
+} // namespace Tcp
+} // namespace Http
+} // namespace Upstreams
+} // namespace Extensions
 } // namespace Envoy
