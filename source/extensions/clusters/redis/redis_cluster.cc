@@ -45,6 +45,8 @@ RedisCluster::RedisCluster(
               : Config::Utility::translateClusterHosts(cluster.hidden_envoy_deprecated_hosts())),
       local_info_(factory_context.localInfo()), random_(factory_context.random()),
       redis_discovery_session_(*this, redis_client_factory), lb_factory_(std::move(lb_factory)),
+      auth_username_(
+          NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl::authUsername(info(), api)),
       auth_password_(
           NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl::authPassword(info(), api)),
       cluster_name_(cluster.name()),
@@ -278,7 +280,8 @@ void RedisCluster::RedisDiscoverySession::startResolveRedis() {
     client = std::make_unique<RedisDiscoveryClient>(*this);
     client->host_ = current_host_address_;
     client->client_ = client_factory_.create(host, dispatcher_, *this, redis_command_stats_,
-                                             parent_.info()->statsScope(), parent_.auth_password_);
+                                             parent_.info()->statsScope(), parent_.auth_username_,
+                                             parent_.auth_password_);
     client->client_->addConnectionCallbacks(*client);
   }
 

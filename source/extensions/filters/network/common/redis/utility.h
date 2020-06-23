@@ -13,6 +13,7 @@ namespace Utility {
 
 class AuthRequest : public Redis::RespValue {
 public:
+  AuthRequest(const std::string& username, const std::string& password);
   AuthRequest(const std::string& password);
 };
 

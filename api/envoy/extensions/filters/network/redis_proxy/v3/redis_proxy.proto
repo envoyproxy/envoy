@@ -22,7 +22,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Redis Proxy :ref:`configuration overview <config_network_filters_redis_proxy>`.
 // [#extension: envoy.filters.network.redis_proxy]
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message RedisProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.redis_proxy.v2.RedisProxy";
@@ -234,6 +234,18 @@ message RedisProxy {
   // client. If an AUTH command is received when the password is not set, then an "ERR Client sent
   // AUTH, but no password is set" error will be returned.
   config.core.v3.DataSource downstream_auth_password = 6 [(udpa.annotations.sensitive) = true];
+
+  // If a username is provided an ACL style AUTH command will be required with a username and password.
+  // Authenticate Redis client connections locally by forcing downstream clients to issue a `Redis
+  // AUTH command <https://redis.io/commands/auth>`_ with this username and the *downstream_auth_password*
+  // before enabling any other command. If an AUTH command's username and password matches this username
+  // and the *downstream_auth_password* , an "OK" response will be returned to the client. If the AUTH
+  // command username or password does not match this username or the *downstream_auth_password*, then an
+  // "WRONGPASS invalid username-password pair" error will be returned. If any other command is received before AUTH when this
+  // password is set, then a "NOAUTH Authentication required." error response will be sent to the
+  // client. If an AUTH command is received when the password is not set, then an "ERR Client sent
+  // AUTH, but no ACL is set" error will be returned.
+  config.core.v3.DataSource downstream_auth_username = 7 [(udpa.annotations.sensitive) = true];
 }
 
 // RedisProtocolOptions specifies Redis upstream protocol options. This object is used in
@@ -246,4 +258,8 @@ message RedisProtocolOptions {
   // Upstream server password as defined by the `requirepass` directive
   // <https://redis.io/topics/config>`_ in the server's configuration file.
   config.core.v3.DataSource auth_password = 1 [(udpa.annotations.sensitive) = true];
+
+  // Upstream server username as defined by the `user` directive
+  // <https://redis.io/topics/acl>`_ in the server's configuration file.
+  config.core.v3.DataSource auth_username = 2 [(udpa.annotations.sensitive) = true];
 }

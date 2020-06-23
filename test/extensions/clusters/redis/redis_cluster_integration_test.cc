@@ -194,7 +194,7 @@ protected:
   void roundtripToUpstreamStep(FakeUpstreamPtr& upstream, const std::string& request,
                                const std::string& response, IntegrationTcpClientPtr& redis_client,
                                FakeRawConnectionPtr& fake_upstream_connection,
-                               const std::string& auth_password) {
+                               const std::string& auth_username, const std::string& auth_password) {
     std::string proxy_to_server;
     bool expect_auth_command = false;
     std::string ok = "+OK\r\n";
@@ -208,7 +208,10 @@ protected:
     }
 
     if (expect_auth_command) {
-      std::string auth_command = makeBulkStringArray({"auth", auth_password});
+      std::string auth_command = (auth_username.empty())
+                                     ? makeBulkStringArray({"auth", auth_password})
+                                     : makeBulkStringArray({"auth", auth_username, auth_password});
+
       EXPECT_TRUE(fake_upstream_connection->waitForData(auth_command.size() + request.size(),
                                                         &proxy_to_server));
       // The original request should be the same as the data received by the server.
@@ -239,13 +242,14 @@ protected:
     FakeRawConnectionPtr fake_upstream_connection;
 
     roundtripToUpstreamStep(fake_upstreams_[stream_index], request, response, redis_client,
-                            fake_upstream_connection, "");
+                            fake_upstream_connection, "", "");
 
     redis_client->close();
     EXPECT_TRUE(fake_upstream_connection->close());
   }
 
   void expectCallClusterSlot(int stream_index, std::string& response,
+                             const std::string& auth_username = "",
                              const std::string& auth_password = "") {
     std::string cluster_slot_request = makeBulkStringArray({"CLUSTER", "SLOTS"});
 
@@ -259,8 +263,16 @@ protected:
       EXPECT_TRUE(fake_upstream_connection_->waitForData(cluster_slot_request.size(),
                                                          &proxied_cluster_slot_request));
       EXPECT_EQ(cluster_slot_request, proxied_cluster_slot_request);
-    } else {
+    } else if (auth_username.empty()) {
       std::string auth_request = makeBulkStringArray({"auth", auth_password});
+      std::string ok = "+OK\r\n";
+
+      EXPECT_TRUE(fake_upstream_connection_->waitForData(
+          auth_request.size() + cluster_slot_request.size(), &proxied_cluster_slot_request));
+      EXPECT_EQ(auth_request + cluster_slot_request, proxied_cluster_slot_request);
+      EXPECT_TRUE(fake_upstream_connection_->write(ok));
+    } else {
+      std::string auth_request = makeBulkStringArray({"auth", auth_username, auth_password});
       std::string ok = "+OK\r\n";
 
       EXPECT_TRUE(fake_upstream_connection_->waitForData(
@@ -525,7 +537,7 @@ TEST_P(RedisClusterWithAuthIntegrationTest, SingleSlotMasterReplica) {
   on_server_init_function_ = [this]() {
     std::string cluster_slot_response = singleSlotMasterReplica(
         fake_upstreams_[0]->localAddress()->ip(), fake_upstreams_[1]->localAddress()->ip());
-    expectCallClusterSlot(0, cluster_slot_response, "somepassword");
+    expectCallClusterSlot(0, cluster_slot_response, "", "somepassword");
   };
 
   initialize();
@@ -534,7 +546,8 @@ TEST_P(RedisClusterWithAuthIntegrationTest, SingleSlotMasterReplica) {
   FakeRawConnectionPtr fake_upstream_connection;
 
   roundtripToUpstreamStep(fake_upstreams_[random_index_], makeBulkStringArray({"get", "foo"}),
-                          "$3\r\nbar\r\n", redis_client, fake_upstream_connection, "somepassword");
+                          "$3\r\nbar\r\n", redis_client, fake_upstream_connection, "",
+                          "somepassword");
 
   redis_client->close();
   EXPECT_TRUE(fake_upstream_connection->close());
