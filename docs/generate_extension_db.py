@@ -62,5 +62,4 @@ if __name__ == '__main__':
   extension_db['envoy.upstreams.http.generic'] = GetExtensionMetadata(
       '//source/extensions/upstreams/http/generic:config')
 
-
   pathlib.Path(output_path).write_text(json.dumps(extension_db))
