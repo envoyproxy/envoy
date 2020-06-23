@@ -1,6 +1,6 @@
 FROM envoyproxy/envoy-alpine-dev:latest
 
-RUN apk update && apk add python3 bash curl
+RUN apk update && apk add py3-pip bash curl
 RUN mkdir /code
 ADD ./start_service.sh /usr/local/bin/start_service.sh
 COPY . ./code
