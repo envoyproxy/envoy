@@ -85,8 +85,8 @@ first passing through an edge Envoy prior to passing through a second Envoy tier
    :width: 80%
    :align: center
 
-In all the above cases, a request will arrive at a specific Envoy via TCP, UDP or Unix Domain
-Sockets from downstream. Envoy will forward requests upstream via TCP, UDP or Unix domain sockets.
+In all the above cases, a request will arrive at a specific Envoy via TCP, UDP or Unix domain
+sockets from downstream. Envoy will forward requests upstream via TCP, UDP or Unix domain sockets.
 We focus on a single Envoy proxy below.
 
 Configuration
