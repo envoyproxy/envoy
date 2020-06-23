@@ -23,9 +23,9 @@ Http::Code ListenersHandler::handlerDrainListeners(absl::string_view url, Http::
 
   const bool graceful = params.find("graceful") != params.end();
   if (graceful) {
-    if (server_.drainManager().drainClose()) {
-      // What to do here?
-    } else {
+    // Ignore calls to /drain_listeners?graceful if the drain sequence has
+    // already started.
+    if (!server_.drainManager().draining()) {
       server_.drainManager().startDrainSequence([this, stop_listeners_type]() {
         server_.listenerManager().stopListeners(stop_listeners_type);
       });

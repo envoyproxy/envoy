@@ -133,7 +133,8 @@ TEST_P(DrainCloseIntegrationTest, AdminGracefulDrain) {
 }
 
 TEST_P(DrainCloseIntegrationTest, RepeatedAdminGracefulDrain) {
-  drain_strategy_ = Server::DrainStrategy::Immediate;
+  // Use the default gradual probabilistic DrainStrategy so drainClose()
+  // behaviour isn't conflated with whether the drain sequence has started.
   drain_time_ = std::chrono::seconds(999);
   initialize();
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
@@ -154,6 +155,7 @@ TEST_P(DrainCloseIntegrationTest, RepeatedAdminGracefulDrain) {
   admin_response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "POST", "/drain_listeners?graceful", "", downstreamProtocol(), version_);
   EXPECT_EQ(admin_response->headers().Status()->value().getStringView(), "200");
+  EXPECT_EQ(admin_response->headers().Status()->value().getStringView(), "200");
 
   response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest(0);
@@ -161,7 +163,6 @@ TEST_P(DrainCloseIntegrationTest, RepeatedAdminGracefulDrain) {
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
-  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   admin_response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "POST", "/drain_listeners", "", downstreamProtocol(), version_);
