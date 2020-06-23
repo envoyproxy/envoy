@@ -24,9 +24,7 @@ DnsCacheImpl::DnsCacheImpl(
       resolver_(main_thread_dispatcher.createDnsResolver({}, false)), tls_slot_(tls.allocateSlot()),
       scope_(root_scope.createScope(fmt::format("dns_cache.{}.", config.name()))),
       stats_(generateDnsCacheStats(*scope_)),
-      resource_manager_(
-          *scope_, loader, config.name(),
-          config.dns_cache_circuit_breaker()),
+      resource_manager_(*scope_, loader, config.name(), config.dns_cache_circuit_breaker()),
       refresh_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_refresh_rate, 60000)),
       failure_backoff_strategy_(
           Config::Utility::prepareDnsRefreshStrategy<

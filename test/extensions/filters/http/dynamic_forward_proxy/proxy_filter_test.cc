@@ -69,11 +69,7 @@ public:
   void setupDnsCacheResourceManager(bool set_value) {
     envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheCircuitBreakers cb_config;
     if (set_value) {
-      std::string config_yaml = R"EOF(
-        max_pending_requests: 1
-      )EOF";
-
-      TestUtility::loadFromYaml(config_yaml, cb_config);
+      cb_config.mutable_max_pending_requests()->set_value(1);
     }
 
     dns_cache_resource_manager_ =
