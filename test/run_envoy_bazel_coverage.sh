@@ -33,7 +33,11 @@ else
   BAZEL_BUILD_OPTIONS+=" --config=test-coverage --test_tag_filters=-nocoverage,-fuzz_target"
 fi
 
-bazel coverage ${BAZEL_BUILD_OPTIONS} --test_output=all ${COVERAGE_TARGETS}
+bazel coverage ${BAZEL_BUILD_OPTIONS} ${COVERAGE_TARGETS}
+
+# Collecting profile and testlogs
+[[ -z "${ENVOY_BUILD_PROFILE}" ]] || cp -f "$(bazel info output_base)/command.profile.gz" "${ENVOY_BUILD_PROFILE}/coverage.profile.gz" || true
+[[ -z "${ENVOY_BUILD_DIR}" ]] || find bazel-testlogs/ -name test.log | tar zcf "${ENVOY_BUILD_DIR}/testlogs.tar.gz" -T -
 
 COVERAGE_DIR="${SRCDIR}"/generated/coverage && [[ ${FUZZ_COVERAGE} == "true" ]] && COVERAGE_DIR="${SRCDIR}"/generated/fuzz_coverage
 
@@ -48,9 +52,9 @@ COVERAGE_VALUE=${COVERAGE_VALUE%?}
 
 if [ "$FUZZ_COVERAGE" == "true" ]
 then
-  [[ -z "${ENVOY_FUZZ_COVERAGE_DIR}" ]] || rsync -av "${COVERAGE_DIR}"/ "${ENVOY_FUZZ_COVERAGE_DIR}"
+  [[ -z "${ENVOY_FUZZ_COVERAGE_ARTIFACT}" ]] || tar zcf "${ENVOY_FUZZ_COVERAGE_ARTIFACT}" -C ${COVERAGE_DIR} --transform 's/^\./fuzz_coverage/' .
 else
-  [[ -z "${ENVOY_COVERAGE_DIR}" ]] || rsync -av "${COVERAGE_DIR}"/ "${ENVOY_COVERAGE_DIR}"
+  [[ -z "${ENVOY_COVERAGE_ARTIFACT}" ]] || tar zcf "${ENVOY_COVERAGE_ARTIFACT}" -C ${COVERAGE_DIR} --transform 's/^\./coverage/' .
 fi
 
 if [[ "$VALIDATE_COVERAGE" == "true" ]]; then
