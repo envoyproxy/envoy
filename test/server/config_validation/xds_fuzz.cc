@@ -199,7 +199,7 @@ void XdsFuzzTest::replay() {
       break;
     }
     case test::server::config_validation::Action::kRemoveListener: {
-      auto removed = removeListener(action.add_listener().listener_num());
+      auto removed = removeListener(action.remove_listener().listener_num());
 
       if (removed) {
         updateListener(listeners_, {}, {*removed});
