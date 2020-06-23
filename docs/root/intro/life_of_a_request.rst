@@ -86,7 +86,7 @@ first passing through an edge Envoy prior to passing through a second Envoy tier
    :align: center
 
 In all the above cases, a request will arrive at a specific Envoy via TCP, UDP or Unix Domain
-Sockets from downstream. Envoy will forward requests upstream via TCP, UDP or Unix Domain Sockets.
+Sockets from downstream. Envoy will forward requests upstream via TCP, UDP or Unix domain sockets.
 We focus on a single Envoy proxy below.
 
 Configuration
@@ -95,7 +95,7 @@ Configuration
 Envoy is a very extensible platform. This results in a combinatorial explosion of possible request
 paths, depending on:
 
-* L3/4 protocol, e.g. TCP, UDP, Unix Domain Sockets.
+* L3/4 protocol, e.g. TCP, UDP, Unix domain sockets.
 * L7 protocol, e.g. HTTP/1, HTTP/2, HTTP/3, gRPC, Thrift, Dubbo, Kafka, Redis and various databases.
 * Transport socket, e.g. plain text, TLS, ALTS.
 * Connection routing, e.g. PROXY protocol, original destination, dynamic forwarding.
@@ -122,7 +122,7 @@ We assume a static bootstrap configuration file for simplicity:
 
   static_resources:
     listeners:
-    # We have a single listener bound to port 443.
+    # There is a single listener bound to port 443.
     - name: listener_https
       address:
         socket_address:
@@ -148,7 +148,7 @@ We assume a static bootstrap configuration file for simplicity:
               - certificate_chain: { filename: "certs/servercert.pem" }
                 private_key: { filename: "certs/serverkey.pem" }
         filters:
-        # HTTP connection manager is the only network filter.
+        # The HTTP connection manager is the only network filter.
         - name: envoy.filters.network.http_connection_manager
           typed_config:
             "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
@@ -204,7 +204,7 @@ We assume a static bootstrap configuration file for simplicity:
         max_concurrent_streams: 100
     - name: some_statsd_sink
       connect_timeout: 5s
-      # .. rest of configuration for statsd sink cluster
+      # The rest of the configuration for statsd sink cluster.
   # statsd sink.
   stats_sinks:
      - name: envoy.stat_sinks.statsd
@@ -276,8 +276,8 @@ A brief outline of the life cycle of a request and response using the example co
    important filter for HTTP is the HTTP connection manager, which is the last network filter in the
    chain.
 5. The HTTP/2 codec in :ref:`HTTP connection manager <arch_overview_http_conn_man>` deframes and
-   demultiplexes the decrypted data stream from the TLS connection to a number of independent HTTP
-   streams. Each HTTP stream handles a single request and response.
+   demultiplexes the decrypted data stream from the TLS connection to a number of independent
+   streams. Each stream handles a single request and response.
 6. For each HTTP stream, an :ref:`HTTP filter <arch_overview_http_filters>` chain is created and
    runs. The request first passes through CustomFilter which may read and modify the request. The
    most important HTTP filter is the router filter which sits at the end of the HTTP filter chain.
@@ -548,21 +548,21 @@ and affinity.
 ^^^^^^^^^^^^^^^^^
 
 Each cluster has a :ref:`load balancer <arch_overview_load_balancing>` which picks an endpoint when
-a new request arrives. There are a variety of load balancing algorithms that Envoy supports, e.g.
-weighted round-robin, Maglev, least-loaded, random. Load balancers obtain their effective
-assignments from a combination of static bootstrap configuration, DNS, dynamic xDS (the CDS and EDS
-discovery services) and active/passive health checks. Further details on how load balancing works in
-Envoy are provided in the :ref:`load balancing documentation <arch_overview_load_balancing>`.
+a new request arrives. Envoy supports a variety of load balancing algorithms, e.g. weighted
+round-robin, Maglev, least-loaded, random. Load balancers obtain their effective assignments from a
+combination of static bootstrap configuration, DNS, dynamic xDS (the CDS and EDS discovery services)
+and active/passive health checks. Further details on how load balancing works in Envoy are provided
+in the :ref:`load balancing documentation <arch_overview_load_balancing>`.
 
-Once an endpoint is selected, the :ref:`connection pool <arch_overview_conn_pool>` for this endpoint is used to find a connection to
-forward the request on. If no connection to the host exists, or all connections are at their maximum
-concurrent stream limit, a new connection is established and placed in the connection pool, unless
-the circuit breaker for maximum connections for the cluster has tripped. If a maximum lifetime
-stream limit for a connection is configured and reached, a new connection is allocated in the pool
-and the affected HTTP/2 connection is drained. Other circuit breakers, e.g. maximum concurrent
-requests to a cluster are also checked. See :repo:`circuit breakers
-<arch_overview_circuit_breakers>` and :ref:`connection pools <arch_overview_conn_pool>` for further
-details.
+Once an endpoint is selected, the :ref:`connection pool <arch_overview_conn_pool>` for this endpoint
+is used to find a connection to forward the request on. If no connection to the host exists, or all
+connections are at their maximum concurrent stream limit, a new connection is established and placed
+in the connection pool, unless the circuit breaker for maximum connections for the cluster has
+tripped. If a maximum lifetime stream limit for a connection is configured and reached, a new
+connection is allocated in the pool and the affected HTTP/2 connection is drained. Other circuit
+breakers, e.g. maximum concurrent requests to a cluster are also checked. See :repo:`circuit
+breakers <arch_overview_circuit_breakers>` and :ref:`connection pools <arch_overview_conn_pool>` for
+further details.
 
 .. image:: /_static/lor-lb.svg
    :width: 80%
