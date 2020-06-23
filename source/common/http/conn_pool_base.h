@@ -210,16 +210,16 @@ public:
 
 // An implementation of Envoy::ConnectionPool::ConnPoolImplBase for shared code
 // between HTTP/1.1 and HTTP/2
-class ConnPoolImplBase : public Envoy::ConnectionPool::ConnPoolImplBase,
-                         public Http::ConnectionPool::Instance {
+class HttpConnPoolImplBase : public Envoy::ConnectionPool::ConnPoolImplBase,
+                             public Http::ConnectionPool::Instance {
 public:
   using AttachContext = std::pair<Http::ResponseDecoder*, Http::ConnectionPool::Callbacks*>;
 
-  ConnPoolImplBase(Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
-                   Event::Dispatcher& dispatcher,
-                   const Network::ConnectionSocket::OptionsSharedPtr& options,
-                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-                   Http::Protocol protocol);
+  HttpConnPoolImplBase(Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
+                       Event::Dispatcher& dispatcher,
+                       const Network::ConnectionSocket::OptionsSharedPtr& options,
+                       const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                       Http::Protocol protocol);
 
   // ConnectionPool::Instance
   void addDrainedCallback(DrainedCb cb) override { addDrainedCallbackImpl(cb); }
@@ -251,7 +251,7 @@ public:
 // An implementation of Envoy::ConnectionPool::ActiveClient for HTTP/1.1 and HTTP/2
 class ActiveClient : public Envoy::ConnectionPool::ActiveClient {
 public:
-  ActiveClient(ConnPoolImplBase& parent, uint64_t lifetime_request_limit,
+  ActiveClient(HttpConnPoolImplBase& parent, uint64_t lifetime_request_limit,
                uint64_t concurrent_request_limit)
       : Envoy::ConnectionPool::ActiveClient(parent, lifetime_request_limit,
                                             concurrent_request_limit) {

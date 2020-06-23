@@ -463,7 +463,7 @@ wrapTransportSocketOptions(Network::TransportSocketOptionsSharedPtr transport_so
   }
 }
 
-ConnPoolImplBase::ConnPoolImplBase(
+HttpConnPoolImplBase::HttpConnPoolImplBase(
     Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
@@ -473,17 +473,17 @@ ConnPoolImplBase::ConnPoolImplBase(
           wrapTransportSocketOptions(transport_socket_options, protocol)) {}
 
 ConnectionPool::Cancellable*
-ConnPoolImplBase::newStream(Http::ResponseDecoder& response_decoder,
-                            Http::ConnectionPool::Callbacks& callbacks) {
+HttpConnPoolImplBase::newStream(Http::ResponseDecoder& response_decoder,
+                                Http::ConnectionPool::Callbacks& callbacks) {
   AttachContext context = std::make_pair(&response_decoder, &callbacks);
   return Envoy::ConnectionPool::ConnPoolImplBase::newStream(reinterpret_cast<void*>(&context));
 }
 
-bool ConnPoolImplBase::hasActiveConnections() const {
+bool HttpConnPoolImplBase::hasActiveConnections() const {
   return (!pending_requests_.empty() || (num_active_requests_ > 0));
 }
 
-ConnectionPool::Cancellable* ConnPoolImplBase::newPendingRequest(void* context) {
+ConnectionPool::Cancellable* HttpConnPoolImplBase::newPendingRequest(void* context) {
   Http::ResponseDecoder& decoder = *reinterpret_cast<AttachContext*>(context)->first;
   Http::ConnectionPool::Callbacks& callbacks = *reinterpret_cast<AttachContext*>(context)->second;
   ENVOY_LOG(debug, "queueing request due to no available connections");
@@ -493,7 +493,7 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newPendingRequest(void* context) 
   return pending_requests_.front().get();
 }
 
-void ConnPoolImplBase::onPoolReady(Envoy::ConnectionPool::ActiveClient& client, void* context) {
+void HttpConnPoolImplBase::onPoolReady(Envoy::ConnectionPool::ActiveClient& client, void* context) {
   ActiveClient* http_client = reinterpret_cast<ActiveClient*>(&client);
   auto* pair = reinterpret_cast<AttachContext*>(context);
   Http::ResponseDecoder& response_decoder = *pair->first;

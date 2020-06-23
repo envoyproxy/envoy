@@ -16,7 +16,7 @@ namespace Http2 {
  * shifting to a new connection if we reach max streams on the primary. This is a base class
  * used for both the prod implementation as well as the testing one.
  */
-class ConnPoolImpl : public Envoy::Http::ConnPoolImplBase {
+class ConnPoolImpl : public Envoy::Http::HttpConnPoolImplBase {
 public:
   ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                Upstream::ResourcePriority priority,
