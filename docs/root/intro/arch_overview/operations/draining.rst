@@ -6,7 +6,7 @@ Draining
 In a few different scenarios, Envoy will attempt to gracefully shed connections. For instance,
 during server shutdown, existing requests can be discouraged and listeners set to stop accepting,
 to reduce the number of open connections when the server shuts down. Draining behaviour is defined
-by the server options in addition to indvidiaul listener configs.
+by the server options in addition to individul listener configs.
 
 Draining occurs at the following times:
 
@@ -19,7 +19,7 @@ Draining occurs at the following times:
 * Individual listeners are being modified or removed via :ref:`LDS
   <arch_overview_dynamic_config_lds>`.
 
-By default, the Envoy server will close listeners immediately on server shutdown. To close listeners
+By default, the Envoy server will close listeners immediately on server shutdown. To drain listeners
 for some duration of time prior to server shutdown, use :ref:`drain_listeners <operations_admin_interface_drain>`
 before shutting down the server. The listeners will be directly stopped without any graceful draining behaviour,
 and cease accepting new connections immediately.
@@ -31,9 +31,9 @@ The behaviour of request discouraging is determined by the drain manager.
 
 Note that although draining is a per-listener concept, it must be supported at the network filter
 level. Currently the only filters that support graceful draining are
-:ref:`Redis <config_network_filters_redis_proxy>`, and
-:ref:`Mongo <config_network_filters_mongo_proxy>`.
-:ref:`HTTP connection manager <config_http_conn_man>`,
+:ref:`Redis <config_network_filters_redis_proxy>`,
+:ref:`Mongo <config_network_filters_mongo_proxy>`,
+and :ref:`HTTP connection manager <config_http_conn_man>`.
 
 By default, the :ref:`HTTP connection manager <config_http_conn_man>` filter will
 add "Connection: close" to HTTP1 requests, send HTTP2 GOAWAY, and terminate connections
