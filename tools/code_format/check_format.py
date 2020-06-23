@@ -19,7 +19,7 @@ import paths
 EXCLUDED_PREFIXES = ("./generated/", "./thirdparty/", "./build", "./.git/", "./bazel-", "./.cache",
                      "./source/extensions/extensions_build_config.bzl",
                      "./bazel/toolchains/configs/", "./tools/testdata/check_format/",
-                     "./tools/pyformat/")
+                     "./tools/pyformat/", "./third_party/")
 SUFFIXES = ("BUILD", "WORKSPACE", ".bzl", ".cc", ".h", ".java", ".m", ".md", ".mm", ".proto",
             ".rst")
 DOCS_SUFFIX = (".md", ".rst")
@@ -44,6 +44,12 @@ REAL_TIME_WHITELIST = ("./source/common/common/utility.h",
                        "./test/test_common/utility.cc", "./test/test_common/utility.h",
                        "./test/integration/integration.h")
 
+# Tests in these paths may make use of the Registry::RegisterFactory constructor or the
+# REGISTER_FACTORY macro. Other locations should use the InjectFactory helper class to
+# perform temporary registrations.
+REGISTER_FACTORY_TEST_WHITELIST = ("./test/common/config/registry_test.cc",
+                                   "./test/integration/clusters/", "./test/integration/filters/")
+
 # Files in these paths can use MessageLite::SerializeAsString
 SERIALIZE_AS_STRING_WHITELIST = (
     "./source/common/config/version_converter.cc",
@@ -53,6 +59,7 @@ SERIALIZE_AS_STRING_WHITELIST = (
     "./test/common/config/version_converter_test.cc",
     "./test/common/grpc/codec_test.cc",
     "./test/common/grpc/codec_fuzz_test.cc",
+    "./test/extensions/filters/http/common/fuzz/uber_filter.h",
 )
 
 # Files in these paths can use Protobuf::util::JsonStringToMessage
@@ -66,17 +73,17 @@ HISTOGRAM_WITH_SI_SUFFIX_WHITELIST = ("downstream_cx_length_ms", "downstream_cx_
                                       "upstream_cx_length_ms")
 
 # Files in these paths can use std::regex
-STD_REGEX_WHITELIST = ("./source/common/common/utility.cc", "./source/common/common/regex.h",
-                       "./source/common/common/regex.cc",
-                       "./source/common/stats/tag_extractor_impl.h",
-                       "./source/common/stats/tag_extractor_impl.cc",
-                       "./source/common/access_log/access_log_formatter.cc",
-                       "./source/extensions/filters/http/squash/squash_filter.h",
-                       "./source/extensions/filters/http/squash/squash_filter.cc",
-                       "./source/server/http/admin.h", "./source/server/http/admin.cc",
-                       "./tools/clang_tools/api_booster/main.cc",
-                       "./tools/clang_tools/api_booster/proto_cxx_utils.cc",
-                       "./source/common/common/version.cc")
+STD_REGEX_WHITELIST = (
+    "./source/common/common/utility.cc", "./source/common/common/regex.h",
+    "./source/common/common/regex.cc", "./source/common/stats/tag_extractor_impl.h",
+    "./source/common/stats/tag_extractor_impl.cc",
+    "./source/common/formatter/substitution_formatter.cc",
+    "./source/extensions/filters/http/squash/squash_filter.h",
+    "./source/extensions/filters/http/squash/squash_filter.cc", "./source/server/admin/utils.h",
+    "./source/server/admin/utils.cc", "./source/server/admin/stats_handler.h",
+    "./source/server/admin/stats_handler.cc", "./source/server/admin/prometheus_stats.h",
+    "./source/server/admin/prometheus_stats.cc", "./tools/clang_tools/api_booster/main.cc",
+    "./tools/clang_tools/api_booster/proto_cxx_utils.cc", "./source/common/common/version.cc")
 
 # These triples (file1, file2, diff) represent two files, file1 and file2 that should maintain
 # the diff diff. This is meant to keep these two files in sync.
@@ -99,7 +106,7 @@ CODEC_DIFFS = (("./source/common/http/http1/codec_impl.h",
 # Only one C++ file should instantiate grpc_init
 GRPC_INIT_WHITELIST = ("./source/common/grpc/google_grpc_context.cc")
 
-CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-9")
+CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-10")
 BUILDIFIER_PATH = paths.getBuildifier()
 BUILDOZER_PATH = paths.getBuildozer()
 ENVOY_BUILD_FIXER_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])),
@@ -226,7 +233,7 @@ def readFile(path):
 # environment variable. If it cannot be found, empty string is returned.
 def lookPath(executable):
   for path_dir in os.environ["PATH"].split(os.pathsep):
-    executable_path = os.path.join(path_dir, executable)
+    executable_path = os.path.expanduser(os.path.join(path_dir, executable))
     if os.path.exists(executable_path):
       return executable_path
   return ""
@@ -257,13 +264,13 @@ def checkTools():
                             "users".format(CLANG_FORMAT_PATH))
   else:
     error_messages.append(
-        "Command {} not found. If you have clang-format in version 9.x.x "
+        "Command {} not found. If you have clang-format in version 10.x.x "
         "installed, but the binary name is different or it's not available in "
         "PATH, please use CLANG_FORMAT environment variable to specify the path. "
         "Examples:\n"
-        "    export CLANG_FORMAT=clang-format-9.0.0\n"
-        "    export CLANG_FORMAT=/opt/bin/clang-format-9\n"
-        "    export CLANG_FORMAT=/usr/local/opt/llvm@9/bin/clang-format".format(CLANG_FORMAT_PATH))
+        "    export CLANG_FORMAT=clang-format-10.0.0\n"
+        "    export CLANG_FORMAT=/opt/bin/clang-format-10\n"
+        "    export CLANG_FORMAT=/usr/local/opt/llvm@10/bin/clang-format".format(CLANG_FORMAT_PATH))
 
   def checkBazelTool(name, path, var):
     bazel_tool_abs_path = lookPath(path)
@@ -329,6 +336,13 @@ def whitelistedForRealTime(file_path):
   if file_path.endswith(".md"):
     return True
   return file_path in REAL_TIME_WHITELIST
+
+
+def whitelistedForRegisterFactory(file_path):
+  if not file_path.startswith("./test/"):
+    return True
+
+  return any(file_path.startswith(prefix) for prefix in REGISTER_FACTORY_TEST_WHITELIST)
 
 
 def whitelistedForSerializeAsString(file_path):
@@ -415,30 +429,53 @@ def hasInvalidAngleBracketDirectory(line):
   return subdir in SUBDIR_SET
 
 
-VERSION_HISTORY_NEW_LINE_REGEX = re.compile("\* ([a-z \-_]*): ([a-z:`]+)")
-VERSION_HISTORY_NEW_RELEASE_REGEX = re.compile("^====[=]+$")
+VERSION_HISTORY_NEW_LINE_REGEX = re.compile("\* ([a-z \-_]+): ([a-z:`]+)")
+VERSION_HISTORY_SECTION_NAME = re.compile("^[A-Z][A-Za-z ]*$")
+RELOADABLE_FLAG_REGEX = re.compile(".*(.)(envoy.reloadable_features.[^ ]*)\s.*")
+# Check for punctuation in a terminal ref clause, e.g.
+# :ref:`panic mode. <arch_overview_load_balancing_panic_threshold>`
+REF_WITH_PUNCTUATION_REGEX = re.compile(".*\. <[^<]*>`\s*")
 
 
 def checkCurrentReleaseNotes(file_path, error_messages):
-  in_current_release = False
-
   first_word_of_prior_line = ''
   next_word_to_check = ''  # first word after :
+  prior_line = ''
+
+  def endsWithPeriod(prior_line):
+    if not prior_line:
+      return True  # Don't punctuation-check empty lines.
+    if prior_line.endswith('.'):
+      return True  # Actually ends with .
+    if prior_line.endswith('`') and REF_WITH_PUNCTUATION_REGEX.match(prior_line):
+      return True  # The text in the :ref ends with a .
+    return False
+
   for line_number, line in enumerate(readLines(file_path)):
 
     def reportError(message):
       error_messages.append("%s:%d: %s" % (file_path, line_number + 1, message))
 
-    if VERSION_HISTORY_NEW_RELEASE_REGEX.match(line):
-      # If we were in the section for the current release this means we have passed it.
-      if in_current_release:
+    if VERSION_HISTORY_SECTION_NAME.match(line):
+      if line == "Deprecated":
+        # The deprecations section is last, and does not have enforced formatting.
         break
-      # If we see a version marker we are now in the section for the current release.
-      in_current_release = True
 
-    # Do basic alphabetization checks of the first word on the line and the
-    # first word after the :
-    if line.startswith("*"):
+      # Reset all parsing at the start of a section.
+      first_word_of_prior_line = ''
+      next_word_to_check = ''  # first word after :
+      prior_line = ''
+
+    # make sure flags are surrounded by ``s
+    flag_match = RELOADABLE_FLAG_REGEX.match(line)
+    if flag_match:
+      if not flag_match.groups()[0].startswith('`'):
+        reportError("Flag `%s` should be enclosed in back ticks" % flag_match.groups()[1])
+
+    if line.startswith("* "):
+      if not endsWithPeriod(prior_line):
+        reportError("The following release note does not end with a '.'\n %s" % prior_line)
+
       match = VERSION_HISTORY_NEW_LINE_REGEX.match(line)
       if not match:
         reportError("Version history line malformed. "
@@ -446,6 +483,8 @@ def checkCurrentReleaseNotes(file_path, error_messages):
       else:
         first_word = match.groups()[0]
         next_word = match.groups()[1]
+        # Do basic alphabetization checks of the first word on the line and the
+        # first word after the :
         if first_word_of_prior_line and first_word_of_prior_line > first_word:
           reportError(
               "Version history not in alphabetical order (%s vs %s): please check placement of line\n %s. "
@@ -457,11 +496,19 @@ def checkCurrentReleaseNotes(file_path, error_messages):
         first_word_of_prior_line = first_word
         next_word_to_check = next_word
 
+        prior_line = line
+    elif not line:
+      # If we hit the end of this release note block block, check the prior line.
+      if not endsWithPeriod(prior_line):
+        reportError("The following release note does not end with a '.'\n %s" % prior_line)
+    elif prior_line:
+      prior_line += line
+
 
 def checkFileContents(file_path, checker):
   error_messages = []
 
-  if file_path.endswith("version_history.rst"):
+  if file_path.endswith("version_history/current.rst"):
     # Version file checking has enough special cased logic to merit its own checks.
     # This only validates entries for the current release as very old release
     # notes have a different format.
@@ -605,6 +652,10 @@ def checkSourceLine(line, file_path, reportError):
        "std::chrono::system_clock::now" in line or "std::chrono::steady_clock::now" in line or \
        "std::this_thread::sleep_for" in line or hasCondVarWaitFor(line):
       reportError("Don't reference real-world time sources from production code; use injection")
+  if not whitelistedForRegisterFactory(file_path):
+    if "Registry::RegisterFactory<" in line or "REGISTER_FACTORY" in line:
+      reportError("Don't use Registry::RegisterFactory or REGISTER_FACTORY in tests, "
+                  "use Registry::InjectFactory instead.")
   if not whitelistedForUnpackTo(file_path):
     if "UnpackTo" in line:
       reportError("Don't use UnpackTo() directly, use MessageUtil::unpackTo() instead")
@@ -664,8 +715,9 @@ def checkSourceLine(line, file_path, reportError):
 
   if isInSubdir(file_path, 'source') and file_path.endswith('.cc') and \
      ('.counterFromString(' in line or '.gaugeFromString(' in line or \
-      '.histogramFromString(' in line or '->counterFromString(' in line or \
-      '->gaugeFromString(' in line or '->histogramFromString(' in line):
+      '.histogramFromString(' in line or '.textReadoutFromString(' in line or \
+      '->counterFromString(' in line or '->gaugeFromString(' in line or \
+      '->histogramFromString(' in line or '->textReadoutFromString(' in line):
     reportError("Don't lookup stats by name at runtime; use StatName saved during construction")
 
   if re.search("envoy::[a-z0-9_:]+::[A-Z][a-z]\w*_\w*_[A-Z]{2}", line):
@@ -695,7 +747,8 @@ def checkSourceLine(line, file_path, reportError):
 
 
 def checkBuildLine(line, file_path, reportError):
-  if "@bazel_tools" in line and not (isSkylarkFile(file_path) or file_path.startswith("./bazel/")):
+  if "@bazel_tools" in line and not (isSkylarkFile(file_path) or file_path.startswith("./bazel/") or
+                                     "python/runfiles" in line):
     reportError("unexpected @bazel_tools reference, please indirect via a definition in //bazel")
   if not whitelistedForProtobufDeps(file_path) and '"protobuf"' in line:
     reportError("unexpected direct external dependency on protobuf, use "
@@ -723,7 +776,7 @@ def fixBuildPath(file_path):
     if os.system("%s %s %s" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)) != 0:
       error_messages += ["envoy_build_fixer rewrite failed for file: %s" % file_path]
 
-  if os.system("%s -mode=fix %s" % (BUILDIFIER_PATH, file_path)) != 0:
+  if os.system("%s -lint=fix -mode=fix %s" % (BUILDIFIER_PATH, file_path)) != 0:
     error_messages += ["buildifier rewrite failed for file: %s" % file_path]
   return error_messages
 

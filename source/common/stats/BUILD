@@ -1,10 +1,10 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -48,6 +48,7 @@ envoy_cc_library(
         ":histogram_lib",
         ":null_counter_lib",
         ":null_gauge_lib",
+        ":null_text_readout_lib",
         ":scope_prefixer_lib",
         ":stats_lib",
         ":store_impl_lib",
@@ -93,6 +94,16 @@ envoy_cc_library(
 envoy_cc_library(
     name = "null_gauge_lib",
     hdrs = ["null_gauge.h"],
+    deps = [
+        ":metric_impl_lib",
+        ":symbol_table_lib",
+        "//include/envoy/stats:stats_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "null_text_readout_lib",
+    hdrs = ["null_text_readout.h"],
     deps = [
         ":metric_impl_lib",
         ":symbol_table_lib",
@@ -240,6 +251,7 @@ envoy_cc_library(
         ":allocator_lib",
         ":null_counter_lib",
         ":null_gauge_lib",
+        ":null_text_readout_lib",
         ":scope_prefixer_lib",
         ":stats_lib",
         ":stats_matcher_lib",

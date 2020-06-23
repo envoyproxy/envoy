@@ -3,23 +3,23 @@
 External Authorization
 ======================
 * External authorization :ref:`architecture overview <arch_overview_ext_authz>`
-* :ref:`HTTP filter v2 API reference <envoy_api_msg_config.filter.http.ext_authz.v2.ExtAuthz>`
+* :ref:`HTTP filter v3 API reference <envoy_v3_api_msg_extensions.filters.http.ext_authz.v3.ExtAuthz>`
 * This filter should be configured with the name *envoy.filters.http.ext_authz*.
 
 The external authorization filter calls an external gRPC or HTTP service to check whether an incoming
 HTTP request is authorized or not.
 If the request is deemed unauthorized, then the request will be denied normally with 403 (Forbidden) response.
 Note that sending additional custom metadata from the authorization service to the upstream, to the downstream or to the authorization service is
-also possible. This is explained in more details at :ref:`HTTP filter <envoy_api_msg_config.filter.http.ext_authz.v2.ExtAuthz>`.
+also possible. This is explained in more details at :ref:`HTTP filter <envoy_v3_api_msg_extensions.filters.network.ext_authz.v3.ExtAuthz>`.
 
 The content of the requests that are passed to an authorization service is specified by
-:ref:`CheckRequest <envoy_api_msg_service.auth.v2.CheckRequest>`.
+:ref:`CheckRequest <envoy_v3_api_msg_service.auth.v3.CheckRequest>`.
 
 .. _config_http_filters_ext_authz_http_configuration:
 
 The HTTP filter, using a gRPC/HTTP service, can be configured as follows. You can see all the
 configuration options at
-:ref:`HTTP filter <envoy_api_msg_config.filter.http.ext_authz.v2.ExtAuthz>`.
+:ref:`HTTP filter <envoy_v3_api_msg_extensions.filters.network.ext_authz.v3.ExtAuthz>`.
 
 Configuration Examples
 -----------------------------
@@ -31,7 +31,7 @@ A sample filter configuration for a gRPC authorization server:
   http_filters:
     - name: envoy.filters.http.ext_authz
       typed_config:
-        "@type": type.googleapis.com/envoy.config.filter.http.ext_authz.v2.ExtAuthz
+        "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz
         grpc_service:
           envoy_grpc:
             cluster_name: ext-authz
@@ -67,7 +67,7 @@ A sample filter configuration for a raw HTTP authorization server:
   http_filters:
     - name: envoy.filters.http.ext_authz
       typed_config:
-        "@type": type.googleapis.com/envoy.config.filter.http.ext_authz.v2.ExtAuthz
+        "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz
         http_service:
             server_uri:
               uri: 127.0.0.1:10003
@@ -106,16 +106,18 @@ In this example we add additional context on the virtual host, and disabled the 
     virtual_hosts:
     - name: local_service
       domains: ["*"]
-      per_filter_config:
+      typed_per_filter_config:
         envoy.filters.http.ext_authz:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthzPerRoute
           check_settings:
             context_extensions:
               virtual_host: local_service
       routes:
       - match: { prefix: "/static" }
         route: { cluster: some_service }
-        per_filter_config:
+        typed_per_filter_config:
           envoy.filters.http.ext_authz:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthzPerRoute
             disabled: true
       - match: { prefix: "/" }
         route: { cluster: some_service }
@@ -139,5 +141,5 @@ The HTTP filter outputs statistics in the *cluster.<route target cluster>.ext_au
 Runtime
 -------
 The fraction of requests for which the filter is enabled can be configured via the :ref:`runtime_key
-<envoy_api_field_core.RuntimeFractionalPercent.runtime_key>` value of the :ref:`filter_enabled
-<envoy_api_field_config.filter.http.ext_authz.v2.ExtAuthz.filter_enabled>` field.
+<envoy_v3_api_field_config.core.v3.RuntimeFractionalPercent.runtime_key>` value of the :ref:`filter_enabled
+<envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.filter_enabled>` field.

@@ -18,8 +18,9 @@ public:
   ValidationImpl(Thread::ThreadFactory& thread_factory, Stats::Store& stats_store,
                  Event::TimeSystem& time_system, Filesystem::Instance& file_system);
 
-  Event::DispatcherPtr allocateDispatcher() override;
-  Event::DispatcherPtr allocateDispatcher(Buffer::WatermarkFactoryPtr&& watermark_factory) override;
+  Event::DispatcherPtr allocateDispatcher(const std::string& name) override;
+  Event::DispatcherPtr allocateDispatcher(const std::string& name,
+                                          Buffer::WatermarkFactoryPtr&& watermark_factory) override;
 
 private:
   Event::TimeSystem& time_system_;

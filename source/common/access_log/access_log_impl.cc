@@ -11,7 +11,6 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/access_log/access_log_formatter.h"
 #include "common/common/assert.h"
 #include "common/common/utility.h"
 #include "common/config/utility.h"
@@ -32,7 +31,7 @@ ComparisonFilter::ComparisonFilter(const envoy::config::accesslog::v3::Compariso
                                    Runtime::Loader& runtime)
     : config_(config), runtime_(runtime) {}
 
-bool ComparisonFilter::compareAgainstValue(uint64_t lhs) {
+bool ComparisonFilter::compareAgainstValue(uint64_t lhs) const {
   uint64_t value = config_.value().default_value();
 
   if (!config_.value().runtime_key().empty()) {
@@ -92,14 +91,15 @@ FilterPtr FilterFactory::fromProto(const envoy::config::accesslog::v3::AccessLog
 bool TraceableRequestFilter::evaluate(const StreamInfo::StreamInfo& info,
                                       const Http::RequestHeaderMap& request_headers,
                                       const Http::ResponseHeaderMap&,
-                                      const Http::ResponseTrailerMap&) {
+                                      const Http::ResponseTrailerMap&) const {
   Tracing::Decision decision = Tracing::HttpTracerUtility::isTracing(info, request_headers);
 
   return decision.traced && decision.reason == Tracing::Reason::ServiceForced;
 }
 
 bool StatusCodeFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap&,
-                                const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&) {
+                                const Http::ResponseHeaderMap&,
+                                const Http::ResponseTrailerMap&) const {
   if (!info.responseCode()) {
     return compareAgainstValue(0ULL);
   }
@@ -108,7 +108,8 @@ bool StatusCodeFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::
 }
 
 bool DurationFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap&,
-                              const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&) {
+                              const Http::ResponseHeaderMap&,
+                              const Http::ResponseTrailerMap&) const {
   absl::optional<std::chrono::nanoseconds> final = info.requestComplete();
   ASSERT(final);
 
@@ -124,7 +125,8 @@ RuntimeFilter::RuntimeFilter(const envoy::config::accesslog::v3::RuntimeFilter& 
 
 bool RuntimeFilter::evaluate(const StreamInfo::StreamInfo& stream_info,
                              const Http::RequestHeaderMap& request_headers,
-                             const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&) {
+                             const Http::ResponseHeaderMap&,
+                             const Http::ResponseTrailerMap&) const {
   auto rid_extension = stream_info.getRequestIDExtension();
   uint64_t random_value;
   if (use_independent_randomness_ ||
@@ -161,7 +163,7 @@ AndFilter::AndFilter(const envoy::config::accesslog::v3::AndFilter& config,
 bool OrFilter::evaluate(const StreamInfo::StreamInfo& info,
                         const Http::RequestHeaderMap& request_headers,
                         const Http::ResponseHeaderMap& response_headers,
-                        const Http::ResponseTrailerMap& response_trailers) {
+                        const Http::ResponseTrailerMap& response_trailers) const {
   bool result = false;
   for (auto& filter : filters_) {
     result |= filter->evaluate(info, request_headers, response_headers, response_trailers);
@@ -177,7 +179,7 @@ bool OrFilter::evaluate(const StreamInfo::StreamInfo& info,
 bool AndFilter::evaluate(const StreamInfo::StreamInfo& info,
                          const Http::RequestHeaderMap& request_headers,
                          const Http::ResponseHeaderMap& response_headers,
-                         const Http::ResponseTrailerMap& response_trailers) {
+                         const Http::ResponseTrailerMap& response_trailers) const {
   bool result = true;
   for (auto& filter : filters_) {
     result &= filter->evaluate(info, request_headers, response_headers, response_trailers);
@@ -192,7 +194,7 @@ bool AndFilter::evaluate(const StreamInfo::StreamInfo& info,
 
 bool NotHealthCheckFilter::evaluate(const StreamInfo::StreamInfo& info,
                                     const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                    const Http::ResponseTrailerMap&) {
+                                    const Http::ResponseTrailerMap&) const {
   return !info.healthCheck();
 }
 
@@ -201,7 +203,7 @@ HeaderFilter::HeaderFilter(const envoy::config::accesslog::v3::HeaderFilter& con
 
 bool HeaderFilter::evaluate(const StreamInfo::StreamInfo&,
                             const Http::RequestHeaderMap& request_headers,
-                            const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&) {
+                            const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&) const {
   return Http::HeaderUtility::matchHeaders(request_headers, *header_data_);
 }
 
@@ -217,7 +219,8 @@ ResponseFlagFilter::ResponseFlagFilter(
 }
 
 bool ResponseFlagFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap&,
-                                  const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&) {
+                                  const Http::ResponseHeaderMap&,
+                                  const Http::ResponseTrailerMap&) const {
   if (configured_flags_ != 0) {
     return info.intersectResponseFlags(configured_flags_);
   }
@@ -234,7 +237,7 @@ GrpcStatusFilter::GrpcStatusFilter(const envoy::config::accesslog::v3::GrpcStatu
 
 bool GrpcStatusFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap&,
                                 const Http::ResponseHeaderMap& response_headers,
-                                const Http::ResponseTrailerMap& response_trailers) {
+                                const Http::ResponseTrailerMap& response_trailers) const {
 
   Grpc::Status::GrpcStatus status = Grpc::Status::WellKnownGrpcStatus::Unknown;
   const auto& optional_status =

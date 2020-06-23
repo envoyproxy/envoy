@@ -83,11 +83,10 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy,
 
   // Merge in the headers.
   if (request_headers.EnvoyRetryOn()) {
-    retry_on_ |= parseRetryOn(request_headers.EnvoyRetryOn()->value().getStringView()).first;
+    retry_on_ |= parseRetryOn(request_headers.getEnvoyRetryOnValue()).first;
   }
   if (request_headers.EnvoyRetryGrpcOn()) {
-    retry_on_ |=
-        parseRetryGrpcOn(request_headers.EnvoyRetryGrpcOn()->value().getStringView()).first;
+    retry_on_ |= parseRetryGrpcOn(request_headers.getEnvoyRetryGrpcOnValue()).first;
   }
 
   const auto& retriable_request_headers = route_policy.retriableRequestHeaders();
@@ -107,15 +106,15 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy,
   }
   if (retry_on_ != 0 && request_headers.EnvoyMaxRetries()) {
     uint64_t temp;
-    if (absl::SimpleAtoi(request_headers.EnvoyMaxRetries()->value().getStringView(), &temp)) {
+    if (absl::SimpleAtoi(request_headers.getEnvoyMaxRetriesValue(), &temp)) {
       // The max retries header takes precedence if set.
       retries_remaining_ = temp;
     }
   }
 
   if (request_headers.EnvoyRetriableStatusCodes()) {
-    for (const auto code : StringUtil::splitToken(
-             request_headers.EnvoyRetriableStatusCodes()->value().getStringView(), ",")) {
+    for (const auto code :
+         StringUtil::splitToken(request_headers.getEnvoyRetriableStatusCodesValue(), ",")) {
       unsigned int out;
       if (absl::SimpleAtoi(code, &out)) {
         retriable_status_codes_.emplace_back(out);
@@ -281,10 +280,6 @@ RetryStatus RetryStateImpl::shouldHedgeRetryPerTryTimeout(DoRetryCallback callba
 }
 
 bool RetryStateImpl::wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_headers) {
-  if (response_headers.EnvoyOverloaded() != nullptr) {
-    return false;
-  }
-
   // We never retry if the request is rate limited.
   if (response_headers.EnvoyRateLimited() != nullptr) {
     return false;

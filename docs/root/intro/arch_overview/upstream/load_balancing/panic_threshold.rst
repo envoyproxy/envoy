@@ -8,13 +8,13 @@ an upstream cluster. However, if the percentage of available hosts in the cluste
 Envoy will disregard health status and balance either amongst all hosts or no hosts. This is known
 as the *panic threshold*. The default panic threshold is 50%. This is
 :ref:`configurable <config_cluster_manager_cluster_runtime>` via runtime as well as in the
-:ref:`cluster configuration <envoy_api_field_Cluster.CommonLbConfig.healthy_panic_threshold>`.
+:ref:`cluster configuration <envoy_v3_api_field_config.cluster.v3.Cluster.CommonLbConfig.healthy_panic_threshold>`.
 The panic threshold is used to avoid a situation in which host failures cascade throughout the
 cluster as load increases.
 
 There are two modes Envoy can choose from when in a panic state: traffic will either be sent to all
 hosts, or will be sent to no hosts (and therefore will always fail). This is configured in the
-:ref:`cluster configuration <envoy_api_field_Cluster.CommonLbConfig.ZoneAwareLbConfig.fail_traffic_on_panic>`.
+:ref:`cluster configuration <envoy_v3_api_field_config.cluster.v3.Cluster.CommonLbConfig.ZoneAwareLbConfig.fail_traffic_on_panic>`.
 Choosing to fail traffic during panic scenarios can help avoid overwhelming potentially failing
 upstream services, as it will reduce the load on the upstream service before all hosts have been
 determined to be unhealthy. However, it eliminates the possibility of _some_ requests succeeding

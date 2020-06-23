@@ -30,7 +30,10 @@ message RegexMatcher {
     // compiled regex is to evaluate. A regex that has a program size greater than the configured
     // value will fail to compile. In this case, the configured max program size can be increased
     // or the regex can be simplified. If not specified, the default is 100.
-    google.protobuf.UInt32Value max_program_size = 1;
+    //
+    // This field is deprecated; regexp validation should be performed on the management server
+    // instead of being done by each individual client.
+    google.protobuf.UInt32Value max_program_size = 1 [deprecated = true];
   }
 
   oneof engine_type {
@@ -59,7 +62,7 @@ message RegexMatchAndSubstitute {
   // so as to replace just one occurrence of a pattern. Capture groups can be
   // used in the pattern to extract portions of the subject string, and then
   // referenced in the substitution string.
-  RegexMatcher pattern = 1;
+  RegexMatcher pattern = 1 [(validate.rules).message = {required: true}];
 
   // The string that should be substituted into matching portions of the
   // subject string during a substitution operation to produce a new string.

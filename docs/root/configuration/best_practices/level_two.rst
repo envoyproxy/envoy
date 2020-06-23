@@ -12,7 +12,7 @@ edge use case may need to be adjusted when using Envoy in a multi-level deployme
 **In summary, if you run level two Envoy version 1.11.1 or greater which terminates 
 HTTP/2, we strongly advise you to change the HTTP/2 configuration of your level 
 two Envoy, by setting its downstream**
-:ref:`validation of HTTP/2 messaging option <envoy_api_field_core.Http2ProtocolOptions.stream_error_on_invalid_http_messaging>`
+:ref:`validation of HTTP/2 messaging option <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.stream_error_on_invalid_http_messaging>`
 **to true.**
 
 If there is an invalid HTTP/2 request and this option is not set, the Envoy in 
@@ -30,7 +30,7 @@ user has insight into what traffic will bypass level one checks, they could spra
 traffic.
 
 Please note that the
-:ref:`validation of HTTP/2 messaging option <envoy_api_field_core.Http2ProtocolOptions.stream_error_on_invalid_http_messaging>`
+:ref:`validation of HTTP/2 messaging option <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.stream_error_on_invalid_http_messaging>`
 is planned to be deprecated and replaced with mandatory configuration in the HttpConnectionManager, to ensure
 that what is now an easily overlooked option would need to be configured, ideally
 appropriately for the given Envoy deployment. Please refer to the

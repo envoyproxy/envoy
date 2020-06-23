@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
@@ -8,6 +6,8 @@ load(
     "//test/extensions:extensions_build_system.bzl",
     "envoy_extension_cc_test",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -30,6 +30,7 @@ envoy_extension_cc_test(
         "//test/config/integration/certs",
     ],
     extension_name = "envoy.filters.http.router",
+    tags = ["fails_on_windows"],
     deps = [
         "//source/extensions/filters/http/router:config",
         "//test/integration:http_integration_lib",

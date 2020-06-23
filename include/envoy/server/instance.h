@@ -7,7 +7,7 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/api.h"
 #include "envoy/common/mutex_tracer.h"
-#include "envoy/config/trace/v3/trace.pb.h"
+#include "envoy/config/trace/v3/http_tracer.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/grpc/context.h"
 #include "envoy/http/context.h"

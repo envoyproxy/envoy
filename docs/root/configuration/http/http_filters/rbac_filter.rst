@@ -11,21 +11,21 @@ as well as the incoming request's HTTP headers. This filter also supports policy
 and shadow mode, shadow mode won't effect real users, it is used to test that a new set of policies
 work before rolling out to production.
 
-* :ref:`v2 API reference <envoy_api_msg_config.filter.http.rbac.v2.RBAC>`
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.rbac.v3.RBAC>`
 * This filter should be configured with the name *envoy.filters.http.rbac*.
 
 Per-Route Configuration
 -----------------------
 
 The RBAC filter configuration can be overridden or disabled on a per-route basis by providing a
-:ref:`RBACPerRoute <envoy_api_msg_config.filter.http.rbac.v2.RBACPerRoute>` configuration on
+:ref:`RBACPerRoute <envoy_v3_api_msg_extensions.filters.http.rbac.v3.RBACPerRoute>` configuration on
 the virtual host, route, or weighted cluster.
 
 Statistics
 ----------
 
 The RBAC filter outputs statistics in the *http.<stat_prefix>.rbac.* namespace. The :ref:`stat prefix
-<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.stat_prefix>` comes from the
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stat_prefix>` comes from the
 owning HTTP connection manager.
 
 .. csv-table::

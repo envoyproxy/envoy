@@ -1,6 +1,6 @@
-licenses(["notice"])  # Apache 2
-
 load("//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_package")
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -11,7 +11,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/server:admin_interface",
         "//source/common/common:assert_lib",
-        "//source/server/http:config_tracker_lib",
+        "//source/server/admin:config_tracker_lib",
     ],
 )
 
@@ -108,7 +108,7 @@ envoy_cc_library(
         "//source/common/thread_local:thread_local_lib",
         "//source/server:configuration_lib",
         "//source/server:server_lib",
-        "//source/server/http:admin_lib",
+        "//source/server/admin:admin_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",

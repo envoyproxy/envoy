@@ -25,7 +25,7 @@ Endpoint& Endpoint::operator=(const Endpoint& ep) {
   return *this;
 }
 
-const ProtobufWkt::Struct Endpoint::toStruct() const {
+const ProtobufWkt::Struct Endpoint::toStruct(Util::Replacements&) const {
   ProtobufWkt::Struct endpoint;
   auto* fields = endpoint.mutable_fields();
   if (!address_) {
@@ -66,14 +66,14 @@ void Annotation::changeEndpointServiceName(const std::string& service_name) {
   }
 }
 
-const ProtobufWkt::Struct Annotation::toStruct() const {
+const ProtobufWkt::Struct Annotation::toStruct(Util::Replacements& replacements) const {
   ProtobufWkt::Struct annotation;
   auto* fields = annotation.mutable_fields();
-  (*fields)[ANNOTATION_TIMESTAMP] = ValueUtil::numberValue(timestamp_);
+  (*fields)[ANNOTATION_TIMESTAMP] = Util::uint64Value(timestamp_, SPAN_TIMESTAMP, replacements);
   (*fields)[ANNOTATION_VALUE] = ValueUtil::stringValue(value_);
   if (endpoint_.has_value()) {
     (*fields)[ANNOTATION_ENDPOINT] =
-        ValueUtil::structValue(static_cast<Endpoint>(endpoint_.value()).toStruct());
+        ValueUtil::structValue(static_cast<Endpoint>(endpoint_.value()).toStruct(replacements));
   }
   return annotation;
 }
@@ -98,7 +98,7 @@ BinaryAnnotation& BinaryAnnotation::operator=(const BinaryAnnotation& ann) {
   return *this;
 }
 
-const ProtobufWkt::Struct BinaryAnnotation::toStruct() const {
+const ProtobufWkt::Struct BinaryAnnotation::toStruct(Util::Replacements& replacements) const {
   ProtobufWkt::Struct binary_annotation;
   auto* fields = binary_annotation.mutable_fields();
   (*fields)[BINARY_ANNOTATION_KEY] = ValueUtil::stringValue(key_);
@@ -106,7 +106,7 @@ const ProtobufWkt::Struct BinaryAnnotation::toStruct() const {
 
   if (endpoint_) {
     (*fields)[BINARY_ANNOTATION_ENDPOINT] =
-        ValueUtil::structValue(static_cast<Endpoint>(endpoint_.value()).toStruct());
+        ValueUtil::structValue(static_cast<Endpoint>(endpoint_.value()).toStruct(replacements));
   }
 
   return binary_annotation;
@@ -144,7 +144,7 @@ void Span::setServiceName(const std::string& service_name) {
   }
 }
 
-const ProtobufWkt::Struct Span::toStruct() const {
+const ProtobufWkt::Struct Span::toStruct(Util::Replacements& replacements) const {
   ProtobufWkt::Struct span;
   auto* fields = span.mutable_fields();
   (*fields)[SPAN_TRACE_ID] = ValueUtil::stringValue(traceIdAsHexString());
@@ -156,17 +156,22 @@ const ProtobufWkt::Struct Span::toStruct() const {
   }
 
   if (timestamp_.has_value()) {
-    (*fields)[SPAN_TIMESTAMP] = ValueUtil::numberValue(timestamp_.value());
+    // Usually we store number to a ProtobufWkt::Struct object via ValueUtil::numberValue.
+    // However, due to the possibility of rendering that to a number with scientific notation, we
+    // chose to store it as a string and keeping track the corresponding replacement.
+    (*fields)[SPAN_TIMESTAMP] = Util::uint64Value(timestamp_.value(), SPAN_TIMESTAMP, replacements);
   }
 
   if (duration_.has_value()) {
-    (*fields)[SPAN_DURATION] = ValueUtil::numberValue(duration_.value());
+    // Since SPAN_DURATION has the same data type with SPAN_TIMESTAMP, we use Util::uint64Value to
+    // store it.
+    (*fields)[SPAN_DURATION] = Util::uint64Value(duration_.value(), SPAN_DURATION, replacements);
   }
 
   if (!annotations_.empty()) {
     std::vector<ProtobufWkt::Value> annotation_list;
     for (auto& annotation : annotations_) {
-      annotation_list.push_back(ValueUtil::structValue(annotation.toStruct()));
+      annotation_list.push_back(ValueUtil::structValue(annotation.toStruct(replacements)));
     }
     (*fields)[SPAN_ANNOTATIONS] = ValueUtil::listValue(annotation_list);
   }
@@ -174,7 +179,8 @@ const ProtobufWkt::Struct Span::toStruct() const {
   if (!binary_annotations_.empty()) {
     std::vector<ProtobufWkt::Value> binary_annotation_list;
     for (auto& binary_annotation : binary_annotations_) {
-      binary_annotation_list.push_back(ValueUtil::structValue(binary_annotation.toStruct()));
+      binary_annotation_list.push_back(
+          ValueUtil::structValue(binary_annotation.toStruct(replacements)));
     }
     (*fields)[SPAN_BINARY_ANNOTATIONS] = ValueUtil::listValue(binary_annotation_list);
   }

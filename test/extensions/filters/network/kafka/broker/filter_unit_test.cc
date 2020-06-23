@@ -1,7 +1,7 @@
 #include "extensions/filters/network/kafka/broker/filter.h"
 #include "extensions/filters/network/kafka/external/requests.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/stats/mocks.h"
 
 #include "gmock/gmock.h"

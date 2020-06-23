@@ -5,10 +5,7 @@
 #include <functional>
 
 #include "envoy/config/listener/v3/listener.pb.h"
-#include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
-#include "envoy/runtime/runtime.h"
-#include "envoy/server/instance.h"
 
 #include "common/common/assert.h"
 
@@ -35,30 +32,35 @@ bool DrainManagerImpl::drainClose() const {
     return false;
   }
 
-  // We use the tick time as in increasing chance that we shutdown connections.
-  return static_cast<uint64_t>(drain_time_completed_.load()) >
+  if (server_.options().drainStrategy() == Server::DrainStrategy::Immediate) {
+    return true;
+  }
+  ASSERT(server_.options().drainStrategy() == Server::DrainStrategy::Gradual);
+
+  // P(return true) = elapsed time / drain timeout
+  // If the drain deadline is exceeded, skip the probability calculation.
+  const MonotonicTime current_time = server_.dispatcher().timeSource().monotonicTime();
+  if (current_time >= drain_deadline_) {
+    return true;
+  }
+
+  const auto remaining_time =
+      std::chrono::duration_cast<std::chrono::seconds>(drain_deadline_ - current_time);
+  ASSERT(server_.options().drainTime() >= remaining_time);
+  const auto elapsed_time = server_.options().drainTime() - remaining_time;
+  return static_cast<uint64_t>(elapsed_time.count()) >
          (server_.random().random() % server_.options().drainTime().count());
 }
 
-void DrainManagerImpl::drainSequenceTick() {
-  ENVOY_LOG(trace, "drain tick #{}", drain_time_completed_.load());
-  ASSERT(drain_time_completed_.load() < server_.options().drainTime().count());
-  ++drain_time_completed_;
-
-  if (drain_time_completed_.load() < server_.options().drainTime().count()) {
-    drain_tick_timer_->enableTimer(std::chrono::milliseconds(1000));
-  } else if (drain_sequence_completion_) {
-    drain_sequence_completion_();
-  }
-}
-
-void DrainManagerImpl::startDrainSequence(std::function<void()> completion) {
-  drain_sequence_completion_ = completion;
+void DrainManagerImpl::startDrainSequence(std::function<void()> drain_complete_cb) {
+  ASSERT(drain_complete_cb);
   ASSERT(!draining_);
   ASSERT(!drain_tick_timer_);
   draining_ = true;
-  drain_tick_timer_ = server_.dispatcher().createTimer([this]() -> void { drainSequenceTick(); });
-  drainSequenceTick();
+  drain_tick_timer_ = server_.dispatcher().createTimer(drain_complete_cb);
+  const std::chrono::seconds drain_delay(server_.options().drainTime());
+  drain_tick_timer_->enableTimer(drain_delay);
+  drain_deadline_ = server_.dispatcher().timeSource().monotonicTime() + drain_delay;
 }
 
 void DrainManagerImpl::startParentShutdownSequence() {

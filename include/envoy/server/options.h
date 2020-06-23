@@ -9,6 +9,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/network/address.h"
 
+#include "absl/types/optional.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -41,6 +42,24 @@ enum class Mode {
   // to be validated in a non-prod environment.
 };
 
+/**
+ * During the drain sequence, different components ask the DrainManager
+ * whether to drain via drainClose(). This enum dictates the behaviour of
+ * drainClose() calls.
+ */
+enum class DrainStrategy {
+  /**
+   * The probability of drainClose() returning true increases from 0 to 100%
+   * over the duration of the drain period.
+   */
+  Gradual,
+
+  /**
+   * drainClose() will return true as soon as the drain sequence is initiated.
+   */
+  Immediate,
+};
+
 using CommandLineOptionsPtr = std::unique_ptr<envoy::admin::v3::CommandLineOptions>;
 
 /**
@@ -59,14 +78,36 @@ public:
   virtual uint64_t baseId() const PURE;
 
   /**
+   * @return bool choose an unused base ID dynamically. The chosen base id can be written to a
+   *         a file using the baseIdPath option.
+   */
+  virtual bool useDynamicBaseId() const PURE;
+
+  /**
+   * @return const std::string& the dynamic base id output file.
+   */
+  virtual const std::string& baseIdPath() const PURE;
+
+  /**
    * @return the number of worker threads to run in the server.
    */
   virtual uint32_t concurrency() const PURE;
 
   /**
-   * @return the number of seconds that envoy will perform draining during a hot restart.
+   * @return the duration of the drain period in seconds.
    */
   virtual std::chrono::seconds drainTime() const PURE;
+
+  /**
+   * @return the strategy that defines behaviour of DrainManager::drainClose();
+   */
+  virtual DrainStrategy drainStrategy() const PURE;
+
+  /**
+   * @return the delay before shutting down the parent envoy in a hot restart,
+   *         generally longer than drainTime().
+   */
+  virtual std::chrono::seconds parentShutdownTime() const PURE;
 
   /**
    * @return const std::string& the path to the configuration file.
@@ -86,6 +127,11 @@ public:
   virtual const envoy::config::bootstrap::v3::Bootstrap& configProto() const PURE;
 
   /**
+   * @return const absl::optional<uint32_t>& the bootstrap version to use, if specified.
+   */
+  virtual const absl::optional<uint32_t>& bootstrapVersion() const PURE;
+
+  /**
    * @return bool allow unknown fields in the static configuration?
    */
   virtual bool allowUnknownStaticFields() const PURE;
@@ -94,6 +140,11 @@ public:
    * @return bool allow unknown fields in the dynamic configuration?
    */
   virtual bool rejectUnknownDynamicFields() const PURE;
+
+  /**
+   * @return bool ignore unknown fields in the dynamic configuration?
+   **/
+  virtual bool ignoreUnknownDynamicFields() const PURE;
 
   /**
    * @return const std::string& the admin address output file.
@@ -131,12 +182,6 @@ public:
    * @return const std::string& the log file path.
    */
   virtual const std::string& logPath() const PURE;
-
-  /**
-   * @return the number of seconds that envoy will wait before shutting down the parent envoy during
-   *         a host restart. Generally this will be longer than the drainTime() option.
-   */
-  virtual std::chrono::seconds parentShutdownTime() const PURE;
 
   /**
    * @return the restart epoch. 0 indicates the first server start, 1 the second, and so on.

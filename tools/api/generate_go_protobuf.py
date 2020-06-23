@@ -40,8 +40,8 @@ def generateProtobufs(output):
     # Example output directory:
     # go_out/envoy/config/bootstrap/v2
     rule_dir, proto = rule.decode()[len('@envoy_api//'):].rsplit(':', 1)
-    input_dir = os.path.join(bazel_bin, 'external', 'envoy_api', rule_dir, 'linux_amd64_stripped',
-                             proto + '%', IMPORT_BASE, rule_dir)
+    input_dir = os.path.join(bazel_bin, 'external', 'envoy_api', rule_dir, proto + '_', IMPORT_BASE,
+                             rule_dir)
     input_files = glob.glob(os.path.join(input_dir, '*.go'))
     output_dir = os.path.join(output, rule_dir)
 
@@ -80,7 +80,14 @@ def findLastSyncSHA(repo):
 
 def updatedSinceSHA(repo, last_sha):
   # Determine if there are changes to API since last SHA
-  return git(None, 'rev-list', '%s..HEAD' % last_sha, 'api/envoy').split()
+  return git(None, 'rev-list', '%s..HEAD' % last_sha).split()
+
+
+def writeRevisionInfo(repo, sha):
+  # Put a file in the generated code root containing the latest mirrored SHA
+  dst = os.path.join(repo, 'envoy', 'COMMIT')
+  with open(dst, 'w') as fh:
+    fh.write(sha)
 
 
 def syncGoProtobufs(output, repo):
@@ -90,6 +97,7 @@ def syncGoProtobufs(output, repo):
   git(repo, 'rm', '-r', 'envoy')
   # Copy subtree at envoy from output to repo
   shutil.copytree(os.path.join(output, 'envoy'), dst)
+  git(repo, 'add', 'envoy')
 
 
 def publishGoProtobufs(repo, sha):
@@ -101,15 +109,22 @@ def publishGoProtobufs(repo, sha):
   git(repo, 'push', 'origin', BRANCH)
 
 
+def updated(repo):
+  return len(
+      [f for f in git(repo, 'diff', 'HEAD', '--name-only').splitlines() if f != 'envoy/COMMIT']) > 0
+
+
 if __name__ == "__main__":
   workspace = check_output(['bazel', 'info', 'workspace']).decode().strip()
   output = os.path.join(workspace, OUTPUT_BASE)
   generateProtobufs(output)
   repo = os.path.join(workspace, REPO_BASE)
   cloneGoProtobufs(repo)
+  syncGoProtobufs(output, repo)
   last_sha = findLastSyncSHA(repo)
   changes = updatedSinceSHA(repo, last_sha)
-  if changes:
+  if updated(repo):
     print('Changes detected: %s' % changes)
-    syncGoProtobufs(output, repo)
-    publishGoProtobufs(repo, changes[0])
+    new_sha = changes[0]
+    writeRevisionInfo(repo, new_sha)
+    publishGoProtobufs(repo, new_sha)

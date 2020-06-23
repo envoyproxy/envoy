@@ -4,8 +4,8 @@ Local rate limit
 ================
 
 * Local rate limiting :ref:`architecture overview <arch_overview_local_rate_limit>`
-* :ref:`v2 API reference
-  <envoy_api_msg_config.filter.network.local_rate_limit.v2alpha.LocalRateLimit>`
+* :ref:`v3 API reference
+  <envoy_v3_api_msg_extensions.filters.network.local_ratelimit.v3.LocalRateLimit>`
 * This filter should be configured with the name *envoy.filters.network.local_ratelimit*.
 
 .. note::
@@ -16,7 +16,7 @@ Overview
 --------
 
 The local rate limit filter applies a :ref:`token bucket
-<envoy_api_field_config.filter.network.local_rate_limit.v2alpha.LocalRateLimit.token_bucket>` rate
+<envoy_v3_api_field_extensions.filters.network.local_ratelimit.v3.LocalRateLimit.token_bucket>` rate
 limit to incoming connections that are processed by the filter's filter chain. Each connection
 processed by the filter utilizes a single token, and if no tokens are available, the connection will
 be immediately closed without further filter iteration.
@@ -42,5 +42,5 @@ Runtime
 -------
 
 The local rate limit filter can be runtime feature flagged via the :ref:`enabled
-<envoy_api_field_config.filter.network.local_rate_limit.v2alpha.LocalRateLimit.runtime_enabled>`
+<envoy_v3_api_field_extensions.filters.network.local_ratelimit.v3.LocalRateLimit.runtime_enabled>`
 configuration field.

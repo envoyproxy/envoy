@@ -27,6 +27,7 @@
 #include "common/http/http3/well_known_names.h"
 #include "common/http/request_id_extension_impl.h"
 #include "common/http/utility.h"
+#include "common/local_reply/local_reply.h"
 #include "common/protobuf/utility.h"
 #include "common/router/rds_impl.h"
 #include "common/router/scoped_rds.h"
@@ -198,6 +199,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       drain_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, drain_timeout, 5000)),
       generate_request_id_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, generate_request_id, true)),
       preserve_external_request_id_(config.preserve_external_request_id()),
+      always_set_request_id_in_response_(config.always_set_request_id_in_response()),
       date_provider_(date_provider),
       listener_stats_(Http::ConnectionManagerImpl::generateListenerStats(stats_prefix_,
                                                                          context_.listenerScope())),
@@ -217,8 +219,10 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
                                                       0))),
 #endif
       merge_slashes_(config.merge_slashes()),
+      strip_matching_port_(config.strip_matching_host_port()),
       headers_with_underscores_action_(
-          config.common_http_protocol_options().headers_with_underscores_action()) {
+          config.common_http_protocol_options().headers_with_underscores_action()),
+      local_reply_(LocalReply::Factory::create(config.local_reply_config(), context)) {
   // If idle_timeout_ was not configured in common_http_protocol_options, use value in deprecated
   // idle_timeout field.
   // TODO(asraa): Remove when idle_timeout is removed.
@@ -475,9 +479,11 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
                                          Http::ServerConnectionCallbacks& callbacks) {
   switch (codec_type_) {
   case CodecType::HTTP1: {
+    Http::Http1::CodecStats& stats =
+        Http::Http1::CodecStats::atomicGet(http1_codec_stats_, context_.scope());
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")) {
       return std::make_unique<Http::Http1::ServerConnectionImpl>(
-          connection, context_.scope(), callbacks, http1_settings_, maxRequestHeadersKb(),
+          connection, stats, callbacks, http1_settings_, maxRequestHeadersKb(),
           maxRequestHeadersCount(), headersWithUnderscoresAction());
     } else {
       return std::make_unique<Http::Legacy::Http1::ServerConnectionImpl>(
@@ -486,13 +492,15 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
     }
   }
   case CodecType::HTTP2: {
+    Http::Http2::CodecStats& stats =
+        Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.scope());
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")) {
       return std::make_unique<Http::Http2::ServerConnectionImpl>(
-          connection, callbacks, context_.scope(), http2_options_, maxRequestHeadersKb(),
+          connection, callbacks, stats, http2_options_, maxRequestHeadersKb(),
           maxRequestHeadersCount(), headersWithUnderscoresAction());
     } else {
       return std::make_unique<Http::Legacy::Http2::ServerConnectionImpl>(
-          connection, callbacks, context_.scope(), http2_options_, maxRequestHeadersKb(),
+          connection, callbacks, stats, http2_options_, maxRequestHeadersKb(),
           maxRequestHeadersCount(), headersWithUnderscoresAction());
     }
   }
@@ -507,10 +515,10 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
             .createQuicServerConnection(connection, callbacks));
   case CodecType::AUTO:
     return Http::ConnectionManagerUtility::autoCreateCodec(
-        connection, data, callbacks, context_.scope(), http1_settings_, http2_options_,
-        maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
+        connection, data, callbacks, context_.scope(), http1_codec_stats_, http2_codec_stats_,
+        http1_settings_, http2_options_, maxRequestHeadersKb(), maxRequestHeadersCount(),
+        headersWithUnderscoresAction());
   }
-
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
@@ -563,11 +571,15 @@ const Network::Address::Instance& HttpConnectionManagerConfig::localAddress() {
  * "envoy.filters.network.http_connection_manager" filter instance.
  */
 const envoy::config::trace::v3::Tracing_Http* HttpConnectionManagerConfig::getPerFilterTracerConfig(
-    const envoy::extensions::filters::network::http_connection_manager::v3::
-        HttpConnectionManager&) {
-  // At the moment, it is not yet possible to define tracing provider as part of
-  // "envoy.filters.network.http_connection_manager" config.
-  // Therefore, we always fallback to using the default server-wide tracing provider.
+    const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+        config) {
+  // Give precedence to tracing provider configuration defined as part of
+  // "envoy.filters.network.http_connection_manager" filter config.
+  if (config.tracing().has_provider()) {
+    return &config.tracing().provider();
+  }
+  // Otherwise, for the sake of backwards compatibility, fallback to using tracing provider
+  // configuration defined in the bootstrap config.
   if (context_.httpContext().defaultTracingConfig().has_http()) {
     return &context_.httpContext().defaultTracingConfig().http();
   }

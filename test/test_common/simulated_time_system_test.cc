@@ -34,8 +34,8 @@ protected:
     timers_.push_back(std::move(timer));
   }
 
-  void sleepMsAndLoop(int64_t delay_ms) {
-    time_system_.sleep(std::chrono::milliseconds(delay_ms));
+  void advanceMsAndLoop(int64_t delay_ms) {
+    time_system_.advanceTimeAsync(std::chrono::milliseconds(delay_ms));
     base_scheduler_.run(Dispatcher::RunType::NonBlock);
   }
 
@@ -54,10 +54,32 @@ protected:
   SystemTime start_system_time_;
 };
 
-TEST_F(SimulatedTimeSystemTest, Sleep) {
+TEST_F(SimulatedTimeSystemTest, AdvanceTimeAsync) {
   EXPECT_EQ(start_monotonic_time_, time_system_.monotonicTime());
   EXPECT_EQ(start_system_time_, time_system_.systemTime());
-  sleepMsAndLoop(5);
+  advanceMsAndLoop(5);
+  EXPECT_EQ(start_monotonic_time_ + std::chrono::milliseconds(5), time_system_.monotonicTime());
+  EXPECT_EQ(start_system_time_ + std::chrono::milliseconds(5), time_system_.systemTime());
+}
+
+TEST_F(SimulatedTimeSystemTest, AdvanceTimeWait) {
+  EXPECT_EQ(start_monotonic_time_, time_system_.monotonicTime());
+  EXPECT_EQ(start_system_time_, time_system_.systemTime());
+
+  addTask(4, 'Z');
+  addTask(2, 'X');
+  addTask(3, 'Y');
+  addTask(6, 'A'); // This timer will never be run, so "A" will not be appended.
+  std::atomic<bool> done(false);
+  auto thread = Thread::threadFactoryForTest().createThread([this, &done]() {
+    while (!done) {
+      base_scheduler_.run(Dispatcher::RunType::Block);
+    }
+  });
+  time_system_.advanceTimeWait(std::chrono::milliseconds(5));
+  EXPECT_EQ("XYZ", output_);
+  done = true;
+  thread->join();
   EXPECT_EQ(start_monotonic_time_ + std::chrono::milliseconds(5), time_system_.monotonicTime());
   EXPECT_EQ(start_system_time_ + std::chrono::milliseconds(5), time_system_.systemTime());
 }
@@ -73,8 +95,8 @@ TEST_F(SimulatedTimeSystemTest, WaitFor) {
       base_scheduler_.run(Dispatcher::RunType::Block);
     }
   });
-  Thread::CondVar condvar;
   Thread::MutexBasicLockable mutex;
+  Thread::CondVar condvar;
   TimerPtr timer = scheduler_->createTimer(
       [&condvar, &mutex, &done]() {
         Thread::LockGuard lock(mutex);
@@ -99,19 +121,25 @@ TEST_F(SimulatedTimeSystemTest, WaitFor) {
   // and the event-loop thread will call the corresponding callback quickly.
   {
     Thread::LockGuard lock(mutex);
-    EXPECT_EQ(Thread::CondVar::WaitStatus::NoTimeout,
-              time_system_.waitFor(mutex, condvar, std::chrono::seconds(10)));
+    // We don't check for the return value of waitFor() as it can spuriously
+    // return timeout even if the condition is satisfied before entering into
+    // the waitFor().
+    //
+    // TODO(jmarantz): just drop the return value in the API.
+    time_system_.waitFor(mutex, condvar, std::chrono::seconds(10));
   }
   EXPECT_TRUE(done);
   EXPECT_EQ(MonotonicTime(std::chrono::seconds(60)), time_system_.monotonicTime());
 
   // Waiting a third time, with no pending timeouts, will just sleep out for
   // the max duration and return a timeout.
+  done = false;
   {
     Thread::LockGuard lock(mutex);
     EXPECT_EQ(Thread::CondVar::WaitStatus::Timeout,
               time_system_.waitFor(mutex, condvar, std::chrono::seconds(20)));
   }
+  EXPECT_FALSE(done);
   EXPECT_EQ(MonotonicTime(std::chrono::seconds(80)), time_system_.monotonicTime());
 
   thread->join();
@@ -142,9 +170,9 @@ TEST_F(SimulatedTimeSystemTest, Ordering) {
   addTask(3, '3');
   addTask(6, '6');
   EXPECT_EQ("", output_);
-  sleepMsAndLoop(5);
+  advanceMsAndLoop(5);
   EXPECT_EQ("35", output_);
-  sleepMsAndLoop(1);
+  advanceMsAndLoop(1);
   EXPECT_EQ("356", output_);
 }
 
@@ -168,9 +196,9 @@ TEST_F(SimulatedTimeSystemTest, DisableTimer) {
   addTask(6, '6');
   timers_[0]->disableTimer();
   EXPECT_EQ("", output_);
-  sleepMsAndLoop(5);
+  advanceMsAndLoop(5);
   EXPECT_EQ("3", output_);
-  sleepMsAndLoop(1);
+  advanceMsAndLoop(1);
   EXPECT_EQ("36", output_);
 }
 
@@ -178,16 +206,16 @@ TEST_F(SimulatedTimeSystemTest, IgnoreRedundantDisable) {
   addTask(5, '5');
   timers_[0]->disableTimer();
   timers_[0]->disableTimer();
-  sleepMsAndLoop(5);
+  advanceMsAndLoop(5);
   EXPECT_EQ("", output_);
 }
 
 TEST_F(SimulatedTimeSystemTest, OverrideEnable) {
   addTask(5, '5');
   timers_[0]->enableTimer(std::chrono::milliseconds(6));
-  sleepMsAndLoop(5);
+  advanceMsAndLoop(5);
   EXPECT_EQ("", output_); // Timer didn't wake up because we overrode to 6ms.
-  sleepMsAndLoop(1);
+  advanceMsAndLoop(1);
   EXPECT_EQ("5", output_);
 }
 
@@ -197,9 +225,9 @@ TEST_F(SimulatedTimeSystemTest, DeleteTime) {
   addTask(6, '6');
   timers_[0].reset();
   EXPECT_EQ("", output_);
-  sleepMsAndLoop(5);
+  advanceMsAndLoop(5);
   EXPECT_EQ("3", output_);
-  sleepMsAndLoop(1);
+  advanceMsAndLoop(1);
   EXPECT_EQ("36", output_);
 }
 
@@ -210,7 +238,7 @@ TEST_F(SimulatedTimeSystemTest, DuplicateTimer) {
   TimerPtr zero_timer = scheduler_->createTimer([this]() { output_.append(1, '2'); }, dispatcher_);
   zero_timer->enableTimer(delay);
   zero_timer->enableTimer(delay);
-  sleepMsAndLoop(1);
+  advanceMsAndLoop(1);
   EXPECT_EQ("2", output_);
 
   // Now set an alarm which requires 10ms of progress and make sure waitFor works.
@@ -220,8 +248,8 @@ TEST_F(SimulatedTimeSystemTest, DuplicateTimer) {
       base_scheduler_.run(Dispatcher::RunType::Block);
     }
   });
-  Thread::CondVar condvar;
   Thread::MutexBasicLockable mutex;
+  Thread::CondVar condvar;
   TimerPtr timer = scheduler_->createTimer(
       [&condvar, &mutex, &done]() {
         Thread::LockGuard lock(mutex);
@@ -233,8 +261,7 @@ TEST_F(SimulatedTimeSystemTest, DuplicateTimer) {
 
   {
     Thread::LockGuard lock(mutex);
-    EXPECT_EQ(Thread::CondVar::WaitStatus::NoTimeout,
-              time_system_.waitFor(mutex, condvar, std::chrono::seconds(10)));
+    time_system_.waitFor(mutex, condvar, std::chrono::seconds(10));
   }
   EXPECT_TRUE(done);
 

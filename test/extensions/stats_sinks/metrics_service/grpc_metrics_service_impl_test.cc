@@ -31,8 +31,9 @@ public:
     EXPECT_CALL(*factory_, create()).WillOnce(Invoke([this] {
       return Grpc::RawAsyncClientPtr{async_client_};
     }));
-    streamer_ = std::make_unique<GrpcMetricsStreamerImpl>(Grpc::AsyncClientFactoryPtr{factory_},
-                                                          local_info_);
+    streamer_ = std::make_unique<GrpcMetricsStreamerImpl>(
+        Grpc::AsyncClientFactoryPtr{factory_}, local_info_,
+        envoy::config::core::v3::ApiVersion::AUTO);
   }
 
   void expectStreamStart(MockMetricsStream& stream, MetricsServiceCallbacks** callbacks_to_set) {
@@ -90,35 +91,29 @@ public:
   MOCK_METHOD(void, send, (envoy::service::metrics::v3::StreamMetricsMessage & message));
 };
 
-class TestGrpcMetricsStreamer : public GrpcMetricsStreamer {
+class MetricsServiceSinkTest : public testing::Test {
 public:
-  int metric_count;
-  // GrpcMetricsStreamer
-  void send(envoy::service::metrics::v3::StreamMetricsMessage& message) override {
-    metric_count = message.envoy_metrics_size();
-  }
+  MetricsServiceSinkTest() = default;
+
+  NiceMock<Stats::MockMetricSnapshot> snapshot_;
+  Event::SimulatedTimeSystem time_system_;
+  std::shared_ptr<MockGrpcMetricsStreamer> streamer_{new MockGrpcMetricsStreamer()};
 };
 
-class MetricsServiceSinkTest : public testing::Test {};
-
-TEST(MetricsServiceSinkTest, CheckSendCall) {
-  NiceMock<Stats::MockMetricSnapshot> snapshot;
-  Event::SimulatedTimeSystem time_system;
-  std::shared_ptr<MockGrpcMetricsStreamer> streamer_{new MockGrpcMetricsStreamer()};
-
-  MetricsServiceSink sink(streamer_, time_system);
+TEST_F(MetricsServiceSinkTest, CheckSendCall) {
+  MetricsServiceSink sink(streamer_, time_system_, false);
 
   auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
   counter->name_ = "test_counter";
   counter->latch_ = 1;
   counter->used_ = true;
-  snapshot.counters_.push_back({1, *counter});
+  snapshot_.counters_.push_back({1, *counter});
 
   auto gauge = std::make_shared<NiceMock<Stats::MockGauge>>();
   gauge->name_ = "test_gauge";
   gauge->value_ = 1;
   gauge->used_ = true;
-  snapshot.gauges_.push_back(*gauge);
+  snapshot_.gauges_.push_back(*gauge);
 
   auto histogram = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
   histogram->name_ = "test_histogram";
@@ -126,35 +121,73 @@ TEST(MetricsServiceSinkTest, CheckSendCall) {
 
   EXPECT_CALL(*streamer_, send(_));
 
-  sink.flush(snapshot);
+  sink.flush(snapshot_);
 }
 
-TEST(MetricsServiceSinkTest, CheckStatsCount) {
-  NiceMock<Stats::MockMetricSnapshot> snapshot;
-  Event::SimulatedTimeSystem time_system;
-  std::shared_ptr<TestGrpcMetricsStreamer> streamer_{new TestGrpcMetricsStreamer()};
-
-  MetricsServiceSink sink(streamer_, time_system);
+TEST_F(MetricsServiceSinkTest, CheckStatsCount) {
+  MetricsServiceSink sink(streamer_, time_system_, false);
 
   auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
   counter->name_ = "test_counter";
-  counter->latch_ = 1;
+  counter->value_ = 100;
   counter->used_ = true;
-  snapshot.counters_.push_back({1, *counter});
+  snapshot_.counters_.push_back({1, *counter});
 
   auto gauge = std::make_shared<NiceMock<Stats::MockGauge>>();
   gauge->name_ = "test_gauge";
   gauge->value_ = 1;
   gauge->used_ = true;
-  snapshot.gauges_.push_back(*gauge);
+  snapshot_.gauges_.push_back(*gauge);
 
-  sink.flush(snapshot);
-  EXPECT_EQ(2, (*streamer_).metric_count);
+  EXPECT_CALL(*streamer_, send(_))
+      .WillOnce(Invoke([](envoy::service::metrics::v3::StreamMetricsMessage& message) {
+        EXPECT_EQ(2, message.envoy_metrics_size());
+      }));
+  sink.flush(snapshot_);
 
   // Verify only newly added metrics come after endFlush call.
   gauge->used_ = false;
-  sink.flush(snapshot);
-  EXPECT_EQ(1, (*streamer_).metric_count);
+  EXPECT_CALL(*streamer_, send(_))
+      .WillOnce(Invoke([](envoy::service::metrics::v3::StreamMetricsMessage& message) {
+        EXPECT_EQ(1, message.envoy_metrics_size());
+      }));
+  sink.flush(snapshot_);
+}
+
+// Test that verifies counters are correctly reported as current value when configured to do so.
+TEST_F(MetricsServiceSinkTest, ReportCountersValues) {
+  MetricsServiceSink sink(streamer_, time_system_, false);
+
+  auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
+  counter->name_ = "test_counter";
+  counter->value_ = 100;
+  counter->used_ = true;
+  snapshot_.counters_.push_back({1, *counter});
+
+  EXPECT_CALL(*streamer_, send(_))
+      .WillOnce(Invoke([](envoy::service::metrics::v3::StreamMetricsMessage& message) {
+        EXPECT_EQ(1, message.envoy_metrics_size());
+        EXPECT_EQ(100, message.envoy_metrics(0).metric(0).counter().value());
+      }));
+  sink.flush(snapshot_);
+}
+
+// Test that verifies counters are reported as the delta between flushes when configured to do so.
+TEST_F(MetricsServiceSinkTest, ReportCountersAsDeltas) {
+  MetricsServiceSink sink(streamer_, time_system_, true);
+
+  auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
+  counter->name_ = "test_counter";
+  counter->value_ = 100;
+  counter->used_ = true;
+  snapshot_.counters_.push_back({1, *counter});
+
+  EXPECT_CALL(*streamer_, send(_))
+      .WillOnce(Invoke([](envoy::service::metrics::v3::StreamMetricsMessage& message) {
+        EXPECT_EQ(1, message.envoy_metrics_size());
+        EXPECT_EQ(1, message.envoy_metrics(0).metric(0).counter().value());
+      }));
+  sink.flush(snapshot_);
 }
 
 } // namespace

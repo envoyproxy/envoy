@@ -17,6 +17,7 @@
 
 using testing::_;
 using testing::Eq;
+using testing::NiceMock;
 using testing::Return;
 
 namespace Envoy {
@@ -38,31 +39,34 @@ public:
 
 class MockStubFactory : public GoogleStubFactory {
 public:
-  std::shared_ptr<GoogleStub> createStub(std::shared_ptr<grpc::Channel> /*channel*/) override {
+  GoogleStubSharedPtr createStub(std::shared_ptr<grpc::Channel> /*channel*/) override {
     return shared_stub_;
   }
 
   MockGenericStub* stub_ = new MockGenericStub();
-  std::shared_ptr<GoogleStub> shared_stub_{stub_};
+  GoogleStubSharedPtr shared_stub_{stub_};
 };
 
 class EnvoyGoogleAsyncClientImplTest : public testing::Test {
 public:
   EnvoyGoogleAsyncClientImplTest()
       : stats_store_(new Stats::IsolatedStoreImpl), api_(Api::createApiForTest(*stats_store_)),
-        dispatcher_(api_->allocateDispatcher()), scope_(stats_store_),
+        dispatcher_(api_->allocateDispatcher("test_thread")), scope_(stats_store_),
         method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")),
         stat_names_(scope_->symbolTable()) {
 
-    envoy::config::core::v3::GrpcService config;
-    auto* google_grpc = config.mutable_google_grpc();
+    auto* google_grpc = config_.mutable_google_grpc();
     google_grpc->set_target_uri("fake_address");
     google_grpc->set_stat_prefix("test_cluster");
     tls_ = std::make_unique<GoogleAsyncClientThreadLocal>(*api_);
-    grpc_client_ = std::make_unique<GoogleAsyncClientImpl>(*dispatcher_, *tls_, stub_factory_,
-                                                           scope_, config, *api_, stat_names_);
   }
 
+  virtual void initialize() {
+    grpc_client_ = std::make_unique<GoogleAsyncClientImpl>(*dispatcher_, *tls_, stub_factory_,
+                                                           scope_, config_, *api_, stat_names_);
+  }
+
+  envoy::config::core::v3::GrpcService config_;
   DangerousDeprecatedTestTime test_time_;
   Stats::IsolatedStoreImpl* stats_store_; // Ownership transferred to scope_.
   Api::ApiPtr api_;
@@ -78,6 +82,8 @@ public:
 // Validate that a failure in gRPC stub call creation returns immediately with
 // status UNAVAILABLE.
 TEST_F(EnvoyGoogleAsyncClientImplTest, StreamHttpStartFail) {
+  initialize();
+
   EXPECT_CALL(*stub_factory_.stub_, PrepareCall_(_, _, _)).WillOnce(Return(nullptr));
   MockAsyncStreamCallbacks<helloworld::HelloReply> grpc_callbacks;
   EXPECT_CALL(grpc_callbacks, onCreateInitialMetadata(_));
@@ -91,6 +97,8 @@ TEST_F(EnvoyGoogleAsyncClientImplTest, StreamHttpStartFail) {
 // Validate that a failure in gRPC stub call creation returns immediately with
 // status UNAVAILABLE.
 TEST_F(EnvoyGoogleAsyncClientImplTest, RequestHttpStartFail) {
+  initialize();
+
   EXPECT_CALL(*stub_factory_.stub_, PrepareCall_(_, _, _)).WillOnce(Return(nullptr));
   MockAsyncRequestCallbacks<helloworld::HelloReply> grpc_callbacks;
   EXPECT_CALL(grpc_callbacks, onCreateInitialMetadata(_));
@@ -112,6 +120,39 @@ TEST_F(EnvoyGoogleAsyncClientImplTest, RequestHttpStartFail) {
   auto* grpc_request = grpc_client_->send(*method_descriptor_, request_msg, grpc_callbacks,
                                           active_span, Http::AsyncClient::RequestOptions());
   EXPECT_TRUE(grpc_request == nullptr);
+}
+
+class EnvoyGoogleLessMockedAsyncClientImplTest : public EnvoyGoogleAsyncClientImplTest {
+public:
+  void initialize() override {
+    grpc_client_ = std::make_unique<GoogleAsyncClientImpl>(*dispatcher_, *tls_, real_stub_factory_,
+                                                           scope_, config_, *api_, stat_names_);
+  }
+
+  GoogleGenericStubFactory real_stub_factory_;
+};
+
+TEST_F(EnvoyGoogleLessMockedAsyncClientImplTest, TestOverflow) {
+  // Set an (unreasonably) low byte limit.
+  auto* google_grpc = config_.mutable_google_grpc();
+  google_grpc->mutable_per_stream_buffer_limit_bytes()->set_value(1);
+  initialize();
+
+  NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
+  AsyncStream<helloworld::HelloRequest> grpc_stream =
+      grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::RequestOptions());
+  EXPECT_FALSE(grpc_stream == nullptr);
+  EXPECT_FALSE(grpc_stream->isAboveWriteBufferHighWatermark());
+
+  // With no data in the message, it won't back up.
+  helloworld::HelloRequest request_msg;
+  grpc_stream->sendMessage(request_msg, false);
+  EXPECT_FALSE(grpc_stream->isAboveWriteBufferHighWatermark());
+
+  // With actual data we pass the very small byte limit.
+  request_msg.set_name("bob");
+  grpc_stream->sendMessage(request_msg, false);
+  EXPECT_TRUE(grpc_stream->isAboveWriteBufferHighWatermark());
 }
 
 } // namespace

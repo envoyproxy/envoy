@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_fuzz_test",
@@ -8,6 +6,8 @@ load(
     "envoy_package",
     "envoy_select_google_grpc",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -161,6 +161,8 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "grpc_client_integration_test",
     srcs = ["grpc_client_integration_test.cc"],
+    # Fails on windows; Connection is terminated early testing BasicStream/IPv4_EnvoyGrpc
+    tags = ["fails_on_windows"],
     deps = [
         ":grpc_client_integration_test_harness_lib",
         "//source/common/grpc:async_client_lib",

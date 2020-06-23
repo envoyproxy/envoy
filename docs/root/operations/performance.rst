@@ -23,14 +23,14 @@ Envoy exposes two statistics to monitor performance of the event loops on all th
   running---but if this number elevates substantially above its normal observed baseline, it likely
   indicates kernel scheduler delays.
 
-These statistics can be enabled by setting :ref:`enable_dispatcher_stats <envoy_api_field_config.bootstrap.v2.Bootstrap.enable_dispatcher_stats>`
+These statistics can be enabled by setting :ref:`enable_dispatcher_stats <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.enable_dispatcher_stats>`
 to true.
 
 .. warning::
 
   Note that enabling dispatcher stats records a value for each iteration of the event loop on every
   thread. This should normally be minimal overhead, but when using
-  :ref:`statsd <envoy_api_msg_config.metrics.v2.StatsdSink>`, it will send each observed value over
+  :ref:`statsd <envoy_v3_api_msg_config.metrics.v3.StatsdSink>`, it will send each observed value over
   the wire individually because the statsd protocol doesn't have any way to represent a histogram
   summary. Be aware that this can be a very large volume of data.
 
@@ -56,7 +56,7 @@ Watchdog
 --------
 
 In addition to event loop statistics, Envoy also include a configurable
-:ref:`watchdog <envoy_api_field_config.bootstrap.v2.Bootstrap.watchdog>` system that can increment
+:ref:`watchdog <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.watchdog>` system that can increment
 statistics when Envoy is not responsive and optionally kill the server. The statistics are useful
 for understanding at a high level whether Envoy's event loop is not responsive either because it is
 doing too much work, blocking, or not being scheduled by the OS.

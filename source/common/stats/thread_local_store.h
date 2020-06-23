@@ -15,6 +15,7 @@
 #include "common/stats/histogram_impl.h"
 #include "common/stats/null_counter.h"
 #include "common/stats/null_gauge.h"
+#include "common/stats/null_text_readout.h"
 #include "common/stats/symbol_table_impl.h"
 #include "common/stats/utility.h"
 
@@ -114,7 +115,7 @@ public:
   uint32_t use_count() const override { return refcount_helper_.use_count(); }
 
 private:
-  bool usedLockHeld() const EXCLUSIVE_LOCKS_REQUIRED(merge_lock_);
+  bool usedLockHeld() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(merge_lock_);
 
   Histogram::Unit unit_;
   Store& parent_;
@@ -124,7 +125,7 @@ private:
   HistogramStatisticsImpl interval_statistics_;
   HistogramStatisticsImpl cumulative_statistics_;
   mutable Thread::MutexBasicLockable merge_lock_;
-  std::list<TlsHistogramSharedPtr> tls_histograms_ GUARDED_BY(merge_lock_);
+  std::list<TlsHistogramSharedPtr> tls_histograms_ ABSL_GUARDED_BY(merge_lock_);
   bool merged_;
   RefcountHelper refcount_helper_;
 };
@@ -184,6 +185,13 @@ public:
   Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) override {
     return default_scope_->histogramFromString(name, unit);
   }
+  TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
+                                               StatNameTagVectorOptConstRef tags) override {
+    return default_scope_->textReadoutFromStatNameWithTags(name, tags);
+  }
+  TextReadout& textReadoutFromString(const std::string& name) override {
+    return default_scope_->textReadoutFromString(name);
+  }
   NullGaugeImpl& nullGauge(const std::string&) override { return null_gauge_; }
   const SymbolTable& constSymbolTable() const override { return alloc_.constSymbolTable(); }
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
@@ -221,9 +229,22 @@ public:
     }
     return absl::nullopt;
   }
+  TextReadoutOptConstRef findTextReadout(StatName name) const override {
+    TextReadoutOptConstRef found_text_readout;
+    Thread::LockGuard lock(lock_);
+    for (ScopeImpl* scope : scopes_) {
+      found_text_readout = scope->findTextReadout(name);
+      if (found_text_readout.has_value()) {
+        return found_text_readout;
+      }
+    }
+    return absl::nullopt;
+  }
+
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override;
   std::vector<GaugeSharedPtr> gauges() const override;
+  std::vector<TextReadoutSharedPtr> textReadouts() const override;
   std::vector<ParentHistogramSharedPtr> histograms() const override;
 
   // Stats::StoreRoot
@@ -246,12 +267,13 @@ private:
   template <class Stat> using StatRefMap = StatNameHashMap<std::reference_wrapper<Stat>>;
 
   struct TlsCacheEntry {
-    // The counters and gauges in the TLS cache are stored by reference,
+    // The counters, gauges and text readouts in the TLS cache are stored by reference,
     // depending on the CentralCache for backing store. This avoids a potential
     // contention-storm when destructing a scope, as the counter/gauge ref-count
     // decrement in allocator_impl.cc needs to hold the single allocator mutex.
     StatRefMap<Counter> counters_;
     StatRefMap<Gauge> gauges_;
+    StatRefMap<TextReadout> text_readouts_;
 
     // The histogram objects are not shared with the central cache, and don't
     // require taking a lock when decrementing their ref-count.
@@ -274,6 +296,7 @@ private:
     StatNameHashMap<CounterSharedPtr> counters_;
     StatNameHashMap<GaugeSharedPtr> gauges_;
     StatNameHashMap<ParentHistogramImplSharedPtr> histograms_;
+    StatNameHashMap<TextReadoutSharedPtr> text_readouts_;
     StatNameStorageSet rejected_stats_;
     SymbolTable& symbol_table_;
   };
@@ -293,6 +316,8 @@ private:
                                              StatNameTagVectorOptConstRef tags,
                                              Histogram::Unit unit) override;
     Histogram& tlsHistogram(StatName name, ParentHistogramImpl& parent) override;
+    TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
+                                                 StatNameTagVectorOptConstRef tags) override;
     ScopePtr createScope(const std::string& name) override {
       return parent_.createScope(symbolTable().toString(prefix_.statName()) + "." + name);
     }
@@ -311,6 +336,10 @@ private:
       StatNameManagedStorage storage(name, symbolTable());
       return histogramFromStatName(storage.statName(), unit);
     }
+    TextReadout& textReadoutFromString(const std::string& name) override {
+      StatNameManagedStorage storage(name, symbolTable());
+      return textReadoutFromStatName(storage.statName());
+    }
 
     NullGaugeImpl& nullGauge(const std::string&) override { return parent_.null_gauge_; }
 
@@ -319,6 +348,7 @@ private:
     CounterOptConstRef findCounter(StatName name) const override;
     GaugeOptConstRef findGauge(StatName name) const override;
     HistogramOptConstRef findHistogram(StatName name) const override;
+    TextReadoutOptConstRef findTextReadout(StatName name) const override;
 
     template <class StatType>
     using MakeStatFn = std::function<RefcountPtr<StatType>(
@@ -394,7 +424,7 @@ private:
   Event::Dispatcher* main_thread_dispatcher_{};
   ThreadLocal::SlotPtr tls_;
   mutable Thread::MutexBasicLockable lock_;
-  absl::flat_hash_set<ScopeImpl*> scopes_ GUARDED_BY(lock_);
+  absl::flat_hash_set<ScopeImpl*> scopes_ ABSL_GUARDED_BY(lock_);
   ScopePtr default_scope_;
   std::list<std::reference_wrapper<Sink>> timer_sinks_;
   TagProducerPtr tag_producer_;
@@ -407,6 +437,7 @@ private:
   NullCounterImpl null_counter_;
   NullGaugeImpl null_gauge_;
   NullHistogramImpl null_histogram_;
+  NullTextReadoutImpl null_text_readout_;
 
   // Retain storage for deleted stats; these are no longer in maps because the
   // matcher-pattern was established after they were created. Since the stats
@@ -419,6 +450,7 @@ private:
   std::vector<CounterSharedPtr> deleted_counters_;
   std::vector<GaugeSharedPtr> deleted_gauges_;
   std::vector<HistogramSharedPtr> deleted_histograms_;
+  std::vector<TextReadoutSharedPtr> deleted_text_readouts_;
 
   Thread::ThreadSynchronizer sync_;
   std::atomic<uint64_t> next_scope_id_{};

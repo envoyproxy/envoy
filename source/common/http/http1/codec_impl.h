@@ -11,14 +11,16 @@
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
-#include "envoy/stats/scope.h"
 
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/assert.h"
+#include "common/common/statusor.h"
+#include "common/common/thread.h"
 #include "common/http/codec_helper.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/http1/header_formatter.h"
+#include "common/http/status.h"
 
 namespace Envoy {
 namespace Http {
@@ -37,6 +39,14 @@ namespace Http1 {
  * Wrapper struct for the HTTP/1 codec stats. @see stats_macros.h
  */
 struct CodecStats {
+  using AtomicPtr = Thread::AtomicPtr<CodecStats, Thread::AtomicPtrAllocMode::DeleteOnDestruct>;
+
+  static CodecStats& atomicGet(AtomicPtr& ptr, Stats::Scope& scope) {
+    return *ptr.get([&scope]() -> CodecStats* {
+      return new CodecStats{ALL_HTTP1_CODEC_STATS(POOL_COUNTER_PREFIX(scope, "http1."))};
+    });
+  }
+
   ALL_HTTP1_CODEC_STATS(GENERATE_COUNTER_STRUCT)
 };
 
@@ -51,6 +61,12 @@ class StreamEncoderImpl : public virtual StreamEncoder,
                           public StreamCallbackHelper,
                           public Http1StreamEncoderOptions {
 public:
+  ~StreamEncoderImpl() override {
+    // When the stream goes away, undo any read blocks to resume reading.
+    while (read_disable_calls_ != 0) {
+      StreamEncoderImpl::readDisable(false);
+    }
+  }
   // Http::StreamEncoder
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeMetadata(const MetadataMapVector&) override;
@@ -61,8 +77,8 @@ public:
   void disableChunkEncoding() override { disable_chunk_encoding_ = true; }
 
   // Http::Stream
-  void addCallbacks(StreamCallbacks& callbacks) override { addCallbacks_(callbacks); }
-  void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacks_(callbacks); }
+  void addCallbacks(StreamCallbacks& callbacks) override { addCallbacksHelper(callbacks); }
+  void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacksHelper(callbacks); }
   // After this is called, for the HTTP/1 codec, the connection should be closed, i.e. no further
   // progress may be made with the codec.
   void resetStream(StreamResetReason reason) override;
@@ -71,12 +87,16 @@ public:
   absl::string_view responseDetails() override { return details_; }
   const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override;
 
-  void isResponseToHeadRequest(bool value) { is_response_to_head_request_ = value; }
+  void setIsResponseToHeadRequest(bool value) { is_response_to_head_request_ = value; }
+  void setIsResponseToConnectRequest(bool value) { is_response_to_connect_request_ = value; }
   void setDetails(absl::string_view details) { details_ = details; }
+
+  void clearReadDisableCallsForTests() { read_disable_calls_ = 0; }
 
 protected:
   StreamEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter);
-  void setIsContentLengthAllowed(bool value) { is_content_length_allowed_ = value; }
+  void setIs1xx(bool value) { is_1xx_ = value; }
+  void setIs204(bool value) { is_204_ = value; }
   void encodeHeadersBase(const RequestOrResponseHeaderMap& headers, bool end_stream);
   void encodeTrailersBase(const HeaderMap& headers);
 
@@ -84,11 +104,14 @@ protected:
   static const std::string LAST_CHUNK;
 
   ConnectionImpl& connection_;
+  uint32_t read_disable_calls_{};
   bool disable_chunk_encoding_ : 1;
   bool chunk_encoding_ : 1;
   bool processing_100_continue_ : 1;
   bool is_response_to_head_request_ : 1;
-  bool is_content_length_allowed_ : 1;
+  bool is_response_to_connect_request_ : 1;
+  bool is_1xx_ : 1;
+  bool is_204_ : 1;
 
 private:
   /**
@@ -145,13 +168,17 @@ public:
   RequestEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter)
       : StreamEncoderImpl(connection, header_key_formatter) {}
   bool headRequest() { return head_request_; }
+  bool connectRequest() { return connect_request_; }
 
   // Http::RequestEncoder
   void encodeHeaders(const RequestHeaderMap& headers, bool end_stream) override;
   void encodeTrailers(const RequestTrailerMap& trailers) override { encodeTrailersBase(trailers); }
 
+  bool upgrade_request_{};
+
 private:
   bool head_request_{};
+  bool connect_request_{};
 };
 
 /**
@@ -190,16 +217,20 @@ public:
   uint64_t bufferRemainingSize();
   void copyToBuffer(const char* data, uint64_t length);
   void reserveBuffer(uint64_t size);
-  void readDisable(bool disable) { connection_.readDisable(disable); }
+  void readDisable(bool disable) {
+    if (connection_.state() == Network::Connection::State::Open) {
+      connection_.readDisable(disable);
+    }
+  }
   uint32_t bufferLimit() { return connection_.bufferLimit(); }
-  virtual bool supports_http_10() { return false; }
+  virtual bool supportsHttp10() { return false; }
   bool maybeDirectDispatch(Buffer::Instance& data);
   virtual void maybeAddSentinelBufferFragment(Buffer::WatermarkBuffer&) {}
   CodecStats& stats() { return stats_; }
   bool enableTrailers() const { return enable_trailers_; }
 
   // Http::Connection
-  void dispatch(Buffer::Instance& data) override;
+  Http::Status dispatch(Buffer::Instance& data) override;
   void goAway() override {} // Called during connection manager drain flow
   Protocol protocol() override { return protocol_; }
   void shutdownNotice() override {} // Called during connection manager drain flow
@@ -207,15 +238,17 @@ public:
   void onUnderlyingConnectionAboveWriteBufferHighWatermark() override { onAboveHighWatermark(); }
   void onUnderlyingConnectionBelowWriteBufferLowWatermark() override { onBelowLowWatermark(); }
 
+  bool strict1xxAnd204Headers() { return strict_1xx_and_204_headers_; }
+
 protected:
-  ConnectionImpl(Network::Connection& connection, Stats::Scope& stats, http_parser_type type,
+  ConnectionImpl(Network::Connection& connection, CodecStats& stats, http_parser_type type,
                  uint32_t max_headers_kb, const uint32_t max_headers_count,
                  HeaderKeyFormatterPtr&& header_key_formatter, bool enable_trailers);
 
   bool resetStreamCalled() { return reset_stream_called_; }
 
   Network::Connection& connection_;
-  CodecStats stats_;
+  CodecStats& stats_;
   http_parser parser_;
   Http::Code error_code_{Http::Code::BadRequest};
   const HeaderKeyFormatterPtr header_key_formatter_;
@@ -232,6 +265,7 @@ protected:
   const bool connection_header_sanitization_ : 1;
   const bool enable_trailers_ : 1;
   const bool reject_unsupported_transfer_encodings_ : 1;
+  const bool strict_1xx_and_204_headers_ : 1;
 
 private:
   enum class HeaderParsingState { Field, Value, Done };
@@ -257,6 +291,15 @@ private:
   virtual bool shouldDropHeaderWithUnderscoresInNames(absl::string_view /* header_name */) const {
     return false;
   }
+
+  /**
+   * An inner dispatch call that executes the dispatching logic. While exception removal is in
+   * migration (#10878), this function may either throw an exception or return an error status.
+   * Exceptions are caught and translated to their corresponding statuses in the outer level
+   * dispatch.
+   * TODO(#10878): Remove this when exception removal is complete.
+   */
+  Http::Status innerDispatch(Buffer::Instance& data);
 
   /**
    * Dispatch a memory span.
@@ -313,6 +356,11 @@ private:
    */
   int onHeadersCompleteBase();
   virtual int onHeadersComplete() PURE;
+
+  /**
+   * Called to see if upgrade transition is allowed.
+   */
+  virtual bool upgradeAllowed() const PURE;
 
   /**
    * Called with body data is available for processing when either:
@@ -383,15 +431,14 @@ private:
  */
 class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
 public:
-  ServerConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
+  ServerConnectionImpl(Network::Connection& connection, CodecStats& stats,
                        ServerConnectionCallbacks& callbacks, const Http1Settings& settings,
                        uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
                        envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
                            headers_with_underscores_action);
+  bool supportsHttp10() override { return codec_settings_.accept_http_10_; }
 
-  bool supports_http_10() override { return codec_settings_.accept_http_10_; }
-
-private:
+protected:
   /**
    * An active HTTP/1.1 request.
    */
@@ -404,7 +451,11 @@ private:
     ResponseEncoderImpl response_encoder_;
     bool remote_complete_{};
   };
+  absl::optional<ActiveRequest>& activeRequest() { return active_request_; }
+  // ConnectionImpl
+  void onMessageComplete() override;
 
+private:
   /**
    * Manipulate the request's first line, parsing the url and converting to a relative path if
    * necessary. Compute Host / :authority headers based on 7230#5.7 and 7230#6
@@ -420,8 +471,9 @@ private:
   void onMessageBegin() override;
   void onUrl(const char* data, size_t length) override;
   int onHeadersComplete() override;
+  // If upgrade behavior is not allowed, the HCM will have sanitized the headers out.
+  bool upgradeAllowed() const override { return true; }
   void onBody(Buffer::Instance& data) override;
-  void onMessageComplete() override;
   void onResetStream(StreamResetReason reason) override;
   void sendProtocolError(absl::string_view details) override;
   void onAboveHighWatermark() override;
@@ -438,12 +490,12 @@ private:
   }
   void allocHeaders() override {
     ASSERT(nullptr == absl::get<RequestHeaderMapPtr>(headers_or_trailers_));
-    headers_or_trailers_.emplace<RequestHeaderMapPtr>(std::make_unique<RequestHeaderMapImpl>());
+    headers_or_trailers_.emplace<RequestHeaderMapPtr>(RequestHeaderMapImpl::create());
   }
   void maybeAllocTrailers() override {
     ASSERT(processing_trailers_);
     if (!absl::holds_alternative<RequestTrailerMapPtr>(headers_or_trailers_)) {
-      headers_or_trailers_.emplace<RequestTrailerMapPtr>(std::make_unique<RequestTrailerMapImpl>());
+      headers_or_trailers_.emplace<RequestTrailerMapPtr>(RequestTrailerMapImpl::create());
     }
   }
 
@@ -478,7 +530,7 @@ private:
  */
 class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
-  ClientConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
+  ClientConnectionImpl(Network::Connection& connection, CodecStats& stats,
                        ConnectionCallbacks& callbacks, const Http1Settings& settings,
                        const uint32_t max_response_headers_count);
 
@@ -502,6 +554,7 @@ private:
   void onMessageBegin() override {}
   void onUrl(const char*, size_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   int onHeadersComplete() override;
+  bool upgradeAllowed() const override;
   void onBody(Buffer::Instance& data) override;
   void onMessageComplete() override;
   void onResetStream(StreamResetReason reason) override;
@@ -520,13 +573,12 @@ private:
   }
   void allocHeaders() override {
     ASSERT(nullptr == absl::get<ResponseHeaderMapPtr>(headers_or_trailers_));
-    headers_or_trailers_.emplace<ResponseHeaderMapPtr>(std::make_unique<ResponseHeaderMapImpl>());
+    headers_or_trailers_.emplace<ResponseHeaderMapPtr>(ResponseHeaderMapImpl::create());
   }
   void maybeAllocTrailers() override {
     ASSERT(processing_trailers_);
     if (!absl::holds_alternative<ResponseTrailerMapPtr>(headers_or_trailers_)) {
-      headers_or_trailers_.emplace<ResponseTrailerMapPtr>(
-          std::make_unique<ResponseTrailerMapImpl>());
+      headers_or_trailers_.emplace<ResponseTrailerMapPtr>(ResponseTrailerMapImpl::create());
     }
   }
 

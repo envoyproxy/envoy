@@ -35,7 +35,8 @@ HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
           PROTOBUF_GET_MS_OR_DEFAULT(config, unhealthy_edge_interval, unhealthy_interval_.count())),
       healthy_edge_interval_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, healthy_edge_interval, interval_.count())),
-      transport_socket_options_(initTransportSocketOptions(config)) {
+      transport_socket_options_(initTransportSocketOptions(config)),
+      transport_socket_match_metadata_(initTransportSocketMatchMetadata(config)) {
   cluster_.prioritySet().addMemberUpdateCb(
       [this](const HostVector& hosts_added, const HostVector& hosts_removed) -> void {
         onClusterMemberUpdate(hosts_added, hosts_removed);
@@ -55,6 +56,20 @@ HealthCheckerImplBase::initTransportSocketOptions(
   return std::make_shared<const Network::TransportSocketOptionsImpl>();
 }
 
+MetadataConstSharedPtr HealthCheckerImplBase::initTransportSocketMatchMetadata(
+    const envoy::config::core::v3::HealthCheck& config) {
+  if (config.has_transport_socket_match_criteria()) {
+    std::shared_ptr<envoy::config::core::v3::Metadata> metadata =
+        std::make_shared<envoy::config::core::v3::Metadata>();
+    (*metadata->mutable_filter_metadata())[Envoy::Config::MetadataFilters::get()
+                                               .ENVOY_TRANSPORT_SOCKET_MATCH] =
+        config.transport_socket_match_criteria();
+    return metadata;
+  }
+
+  return nullptr;
+}
+
 HealthCheckerImplBase::~HealthCheckerImplBase() {
   // ASSERTs inside the session destructor check to make sure we have been previously deferred
   // deleted. Unify that logic here before actual destruction happens.
@@ -63,17 +78,9 @@ HealthCheckerImplBase::~HealthCheckerImplBase() {
   }
 }
 
-void HealthCheckerImplBase::decHealthy() {
-  ASSERT(local_process_healthy_ > 0);
-  local_process_healthy_--;
-  refreshHealthyStat();
-}
+void HealthCheckerImplBase::decHealthy() { stats_.healthy_.sub(1); }
 
-void HealthCheckerImplBase::decDegraded() {
-  ASSERT(local_process_degraded_ > 0);
-  local_process_degraded_--;
-  refreshHealthyStat();
-}
+void HealthCheckerImplBase::decDegraded() { stats_.degraded_.sub(1); }
 
 HealthCheckerStats HealthCheckerImplBase::generateStats(Stats::Scope& scope) {
   std::string prefix("health_check.");
@@ -81,15 +88,9 @@ HealthCheckerStats HealthCheckerImplBase::generateStats(Stats::Scope& scope) {
                                    POOL_GAUGE_PREFIX(scope, prefix))};
 }
 
-void HealthCheckerImplBase::incHealthy() {
-  local_process_healthy_++;
-  refreshHealthyStat();
-}
+void HealthCheckerImplBase::incHealthy() { stats_.healthy_.add(1); }
 
-void HealthCheckerImplBase::incDegraded() {
-  local_process_degraded_++;
-  refreshHealthyStat();
-}
+void HealthCheckerImplBase::incDegraded() { stats_.degraded_.add(1); }
 
 std::chrono::milliseconds HealthCheckerImplBase::interval(HealthState state,
                                                           HealthTransition changed_state) const {
@@ -172,20 +173,7 @@ void HealthCheckerImplBase::onClusterMemberUpdate(const HostVector& hosts_added,
   }
 }
 
-void HealthCheckerImplBase::refreshHealthyStat() {
-  // Each hot restarted process health checks independently. To make the stats easier to read,
-  // we assume that both processes will converge and the last one that writes wins for the host.
-  stats_.healthy_.set(local_process_healthy_);
-  stats_.degraded_.set(local_process_degraded_);
-}
-
 void HealthCheckerImplBase::runCallbacks(HostSharedPtr host, HealthTransition changed_state) {
-  // When a parent process shuts down, it will kill all of the active health checking sessions,
-  // which will decrement the healthy count and the healthy stat in the parent. If the child is
-  // stable and does not update, the healthy stat will be wrong. This routine is called any time
-  // any HC happens against a host so just refresh the healthy stat here so that it is correct.
-  refreshHealthyStat();
-
   for (const HostStatusCb& cb : callbacks_) {
     cb(host, changed_state);
   }

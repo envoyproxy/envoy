@@ -85,6 +85,16 @@ public:
                                          uint64_t amount) PURE;
 
   /**
+   * Charge upstream stat to a cluster/service/method.
+   * @param cluster supplies the target cluster.
+   * @param request_names supplies the request names.
+   * @param duration supplies the duration of the upstream request.
+   */
+  virtual void chargeUpstreamStat(const Upstream::ClusterInfo& cluster,
+                                  const absl::optional<RequestStatNames>& request_names,
+                                  std::chrono::milliseconds duration) PURE;
+
+  /**
    * @return a struct containing StatNames for gRPC stat tokens.
    */
   virtual StatNames& statNames() PURE;

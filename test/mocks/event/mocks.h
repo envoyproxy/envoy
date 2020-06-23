@@ -30,9 +30,11 @@ namespace Event {
 class MockDispatcher : public Dispatcher {
 public:
   MockDispatcher();
+  MockDispatcher(const std::string& name);
   ~MockDispatcher() override;
 
   // Dispatcher
+  const std::string& name() override { return name_; }
   TimeSource& timeSource() override { return time_system_; }
   Network::ConnectionPtr createServerConnection(Network::ConnectionSocketPtr&& socket,
                                                 Network::TransportSocketPtr&& transport_socket,
@@ -87,7 +89,7 @@ public:
   }
 
   // Event::Dispatcher
-  MOCK_METHOD(void, initializeStats, (Stats::Scope&, const std::string&));
+  MOCK_METHOD(void, initializeStats, (Stats::Scope&, const absl::optional<std::string>&));
   MOCK_METHOD(void, clearDeferredDeleteList, ());
   MOCK_METHOD(Network::Connection*, createServerConnection_, ());
   MOCK_METHOD(Network::ClientConnection*, createClientConnection_,
@@ -122,6 +124,9 @@ public:
   GlobalTimeSystem time_system_;
   std::list<DeferredDeletablePtr> to_delete_;
   MockBufferFactory buffer_factory_;
+
+private:
+  const std::string name_;
 };
 
 class MockTimer : public Timer {

@@ -65,6 +65,9 @@ public:
   void sendMessageRaw(Buffer::InstancePtr&& request, bool end_stream) override;
   void closeStream() override;
   void resetStream() override;
+  bool isAboveWriteBufferHighWatermark() const override {
+    return stream_ && stream_->isAboveWriteBufferHighWatermark();
+  }
 
   bool hasResetStream() const { return http_reset_; }
 

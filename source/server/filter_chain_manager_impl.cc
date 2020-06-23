@@ -6,6 +6,7 @@
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
 #include "common/config/utility.h"
+#include "common/network/socket_interface_impl.h"
 #include "common/protobuf/utility.h"
 
 #include "server/configuration_impl.h"
@@ -360,11 +361,11 @@ std::pair<T, std::vector<Network::Address::CidrRange>> makeCidrListEntry(const s
                                                                          const T& data) {
   std::vector<Network::Address::CidrRange> subnets;
   if (cidr == EMPTY_STRING) {
-    if (Network::Address::ipFamilySupported(AF_INET)) {
+    if (Network::SocketInterfaceSingleton::get().ipFamilySupported(AF_INET)) {
       subnets.push_back(
           Network::Address::CidrRange::create(Network::Utility::getIpv4CidrCatchAllAddress()));
     }
-    if (Network::Address::ipFamilySupported(AF_INET6)) {
+    if (Network::SocketInterfaceSingleton::get().ipFamilySupported(AF_INET6)) {
       subnets.push_back(
           Network::Address::CidrRange::create(Network::Utility::getIpv6CidrCatchAllAddress()));
     }
@@ -592,7 +593,7 @@ void FilterChainManagerImpl::convertIPsToTries() {
   }
 }
 
-std::shared_ptr<Network::DrainableFilterChain> FilterChainManagerImpl::findExistingFilterChain(
+Network::DrainableFilterChainSharedPtr FilterChainManagerImpl::findExistingFilterChain(
     const envoy::config::listener::v3::FilterChain& filter_chain_message) {
   // Origin filter chain manager could be empty if the current is the ancestor.
   const auto* origin = getOriginFilterChainManager();
@@ -608,8 +609,7 @@ std::shared_ptr<Network::DrainableFilterChain> FilterChainManagerImpl::findExist
   return nullptr;
 }
 
-std::unique_ptr<Configuration::FilterChainFactoryContext>
-FilterChainManagerImpl::createFilterChainFactoryContext(
+Configuration::FilterChainFactoryContextPtr FilterChainManagerImpl::createFilterChainFactoryContext(
     const ::envoy::config::listener::v3::FilterChain* const filter_chain) {
   // TODO(lambdai): add stats
   UNREFERENCED_PARAMETER(filter_chain);

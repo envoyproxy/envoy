@@ -38,10 +38,12 @@ public:
   virtual void decNumConnections() PURE;
 
   /**
-   * Adds a listener to the handler.
+   * Adds a listener to the handler, optionally replacing the existing listener.
+   * @param overridden_listener tag of the existing listener. nullopt if no previous listener.
    * @param config listener configuration options.
    */
-  virtual void addListener(ListenerConfig& config) PURE;
+  virtual void addListener(absl::optional<uint64_t> overridden_listener,
+                           ListenerConfig& config) PURE;
 
   /**
    * Remove listeners using the listener tag as a key. All connections owned by the removed
@@ -49,6 +51,17 @@ public:
    * @param listener_tag supplies the tag passed to addListener().
    */
   virtual void removeListeners(uint64_t listener_tag) PURE;
+
+  /**
+   * Remove the filter chains and the connections in the listener. All connections owned
+   * by the filter chains will be closed. Once all the connections are destroyed(connections
+   * could be deferred deleted!), invoke the completion.
+   * @param listener_tag supplies the tag passed to addListener().
+   * @param filter_chains supplies the filter chains to be removed.
+   */
+  virtual void removeFilterChains(uint64_t listener_tag,
+                                  const std::list<const FilterChain*>& filter_chains,
+                                  std::function<void()> completion) PURE;
 
   /**
    * Stop listeners using the listener tag as a key. This will not close any connections and is used

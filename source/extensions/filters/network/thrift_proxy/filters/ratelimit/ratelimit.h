@@ -38,7 +38,6 @@ public:
   const std::string& domain() const { return domain_; }
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   uint32_t stage() const { return stage_; }
-  Stats::Scope& scope() { return scope_; }
   Runtime::Loader& runtime() { return runtime_; }
   Upstream::ClusterManager& cm() { return cm_; }
   bool failureModeAllow() const { return !failure_mode_deny_; };

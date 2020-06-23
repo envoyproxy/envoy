@@ -38,11 +38,14 @@ using ExtAuthzAsyncCallbacks = Grpc::AsyncRequestCallbacks<envoy::service::auth:
  * The gRPC client does not rewrite path. NOTE: We create gRPC client for each filter stack instead
  * of a client per thread. That is ok since this is unary RPC and the cost of doing this is minimal.
  */
-class GrpcClientImpl : public Client, public ExtAuthzAsyncCallbacks {
+class GrpcClientImpl : public Client,
+                       public ExtAuthzAsyncCallbacks,
+                       public Logger::Loggable<Logger::Id::ext_authz> {
 public:
   // TODO(gsagula): remove `use_alpha` param when V2Alpha gets deprecated.
   GrpcClientImpl(Grpc::RawAsyncClientPtr&& async_client,
-                 const absl::optional<std::chrono::milliseconds>& timeout, bool use_alpha);
+                 const absl::optional<std::chrono::milliseconds>& timeout,
+                 envoy::config::core::v3::ApiVersion transport_api_version, bool use_alpha);
   ~GrpcClientImpl() override;
 
   // ExtAuthz::Client
@@ -58,16 +61,16 @@ public:
                  Tracing::Span& span) override;
 
 private:
-  static const Protobuf::MethodDescriptor& getMethodDescriptor(bool use_alpha);
   void toAuthzResponseHeader(
       ResponsePtr& response,
       const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers);
-  const Protobuf::MethodDescriptor& service_method_;
   Grpc::AsyncClient<envoy::service::auth::v3::CheckRequest, envoy::service::auth::v3::CheckResponse>
       async_client_;
   Grpc::AsyncRequest* request_{};
   absl::optional<std::chrono::milliseconds> timeout_;
   RequestCallbacks* callbacks_{};
+  const Protobuf::MethodDescriptor& service_method_;
+  const envoy::config::core::v3::ApiVersion transport_api_version_;
 };
 
 } // namespace ExtAuthz

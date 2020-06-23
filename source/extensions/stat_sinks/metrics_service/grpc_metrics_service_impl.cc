@@ -16,37 +16,48 @@ namespace Extensions {
 namespace StatSinks {
 namespace MetricsService {
 
-GrpcMetricsStreamerImpl::GrpcMetricsStreamerImpl(Grpc::AsyncClientFactoryPtr&& factory,
-                                                 const LocalInfo::LocalInfo& local_info)
-    : client_(factory->create()), local_info_(local_info) {}
+GrpcMetricsStreamerImpl::GrpcMetricsStreamerImpl(
+    Grpc::AsyncClientFactoryPtr&& factory, const LocalInfo::LocalInfo& local_info,
+    envoy::config::core::v3::ApiVersion transport_api_version)
+    : client_(factory->create()), local_info_(local_info),
+      service_method_(
+          Grpc::VersionedMethods("envoy.service.metrics.v3.MetricsService.StreamMetrics",
+                                 "envoy.service.metrics.v2.MetricsService.StreamMetrics")
+              .getMethodDescriptorForVersion(transport_api_version)),
+      transport_api_version_(transport_api_version) {}
 
 void GrpcMetricsStreamerImpl::send(envoy::service::metrics::v3::StreamMetricsMessage& message) {
   if (stream_ == nullptr) {
-    stream_ = client_->start(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-                                 "envoy.service.metrics.v2.MetricsService.StreamMetrics"),
-                             *this, Http::AsyncClient::StreamOptions());
+    stream_ = client_->start(service_method_, *this, Http::AsyncClient::StreamOptions());
     auto* identifier = message.mutable_identifier();
     *identifier->mutable_node() = local_info_.node();
   }
   if (stream_ != nullptr) {
-    stream_->sendMessage(message, false);
+    stream_->sendMessage(message, transport_api_version_, false);
   }
 }
 
 MetricsServiceSink::MetricsServiceSink(const GrpcMetricsStreamerSharedPtr& grpc_metrics_streamer,
-                                       TimeSource& time_source)
-    : grpc_metrics_streamer_(grpc_metrics_streamer), time_source_(time_source) {}
+                                       TimeSource& time_source,
+                                       const bool report_counters_as_deltas)
+    : grpc_metrics_streamer_(grpc_metrics_streamer), time_source_(time_source),
+      report_counters_as_deltas_(report_counters_as_deltas) {}
 
-void MetricsServiceSink::flushCounter(const Stats::Counter& counter) {
+void MetricsServiceSink::flushCounter(
+    const Stats::MetricSnapshot::CounterSnapshot& counter_snapshot) {
   io::prometheus::client::MetricFamily* metrics_family = message_.add_envoy_metrics();
   metrics_family->set_type(io::prometheus::client::MetricType::COUNTER);
-  metrics_family->set_name(counter.name());
+  metrics_family->set_name(counter_snapshot.counter_.get().name());
   auto* metric = metrics_family->add_metric();
   metric->set_timestamp_ms(std::chrono::duration_cast<std::chrono::milliseconds>(
                                time_source_.systemTime().time_since_epoch())
                                .count());
   auto* counter_metric = metric->mutable_counter();
-  counter_metric->set_value(counter.value());
+  if (report_counters_as_deltas_) {
+    counter_metric->set_value(counter_snapshot.delta_);
+  } else {
+    counter_metric->set_value(counter_snapshot.counter_.get().value());
+  }
 }
 
 void MetricsServiceSink::flushGauge(const Stats::Gauge& gauge) {
@@ -110,7 +121,7 @@ void MetricsServiceSink::flush(Stats::MetricSnapshot& snapshot) {
                                             snapshot.histograms().size());
   for (const auto& counter : snapshot.counters()) {
     if (counter.counter_.get().used()) {
-      flushCounter(counter.counter_.get());
+      flushCounter(counter);
     }
   }
 

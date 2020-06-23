@@ -7,8 +7,8 @@ Aggregate cluster is used for failover between clusters with different configura
 upstream cluster to STRICT_DNS upstream cluster, from cluster using ROUND_ROBIN load balancing 
 policy to cluster using MAGLEV, from cluster with 0.1s connection timeout to cluster with 1s 
 connection timeout, etc. Aggregate cluster loosely couples multiple clusters by referencing their 
-name in the :ref:`configuration <envoy_api_msg_config.cluster.aggregate.v2alpha.ClusterConfig>`. The
-fallback priority is defined implicitly by the ordering in the :ref:`clusters list <envoy_api_field_config.cluster.aggregate.v2alpha.ClusterConfig.clusters>`.
+name in the :ref:`configuration <envoy_v3_api_msg_extensions.clusters.aggregate.v3.ClusterConfig>`. The
+fallback priority is defined implicitly by the ordering in the :ref:`clusters list <envoy_v3_api_field_extensions.clusters.aggregate.v3.ClusterConfig.clusters>`.
 Aggregate cluster uses tiered load balancing. The load balancer chooses cluster and priority first 
 and then delegates the load balancing to the load balancer of the selected cluster. The top level 
 load balancer reuses the existing load balancing algorithm by linearizing the priority set of 
@@ -54,14 +54,14 @@ A sample aggregate cluster configuration could be:
   cluster_type:
     name: envoy.clusters.aggregate
     typed_config:
-      "@type": type.googleapis.com/envoy.config.cluster.aggregate.v2alpha.ClusterConfig
+      "@type": type.googleapis.com/envoy.extensions.clusters.aggregate.v3.ClusterConfig
       clusters:
       # cluster primary, secondary and tertiary should be defined outside.
       - primary
       - secondary
       - tertiary
 
-Note: :ref:`PriorityLoad retry plugins <envoy_api_field_route.RetryPolicy.retry_priority>` won't 
+Note: :ref:`PriorityLoad retry plugins <envoy_v3_api_field_config.route.v3.RetryPolicy.retry_priority>` won't 
 work for aggregate cluster because the aggregate load balancer will override the *PriorityLoad* 
 during load balancing.
 

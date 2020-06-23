@@ -22,17 +22,23 @@ public:
 
   /**
    * Allocate a dispatcher.
+   * @param name the identity name for a dispatcher, e.g. "worker_2" or "main_thread".
+   *             This name will appear in per-handler/worker statistics, such as
+   *             "server.worker_2.watchdog_miss".
    * @return Event::DispatcherPtr which is owned by the caller.
    */
-  virtual Event::DispatcherPtr allocateDispatcher() PURE;
+  virtual Event::DispatcherPtr allocateDispatcher(const std::string& name) PURE;
 
   /**
    * Allocate a dispatcher.
+   * @param name the identity name for a dispatcher, e.g. "worker_2" or "main_thread".
+   *             This name will appear in per-handler/worker statistics, such as
+   *             "server.worker_2.watchdog_miss".
    * @param watermark_factory the watermark factory, ownership is transferred to the dispatcher.
    * @return Event::DispatcherPtr which is owned by the caller.
    */
   virtual Event::DispatcherPtr
-  allocateDispatcher(Buffer::WatermarkFactoryPtr&& watermark_factory) PURE;
+  allocateDispatcher(const std::string& name, Buffer::WatermarkFactoryPtr&& watermark_factory) PURE;
 
   /**
    * @return a reference to the ThreadFactory

@@ -28,7 +28,7 @@ ThreadLocalStoreImpl::ThreadLocalStoreImpl(Allocator& alloc)
       tag_producer_(std::make_unique<TagProducerImpl>()),
       stats_matcher_(std::make_unique<StatsMatcherImpl>()), heap_allocator_(alloc.symbolTable()),
       null_counter_(alloc.symbolTable()), null_gauge_(alloc.symbolTable()),
-      null_histogram_(alloc.symbolTable()) {}
+      null_histogram_(alloc.symbolTable()), null_text_readout_(alloc.symbolTable()) {}
 
 ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
   ASSERT(shutting_down_ || !threading_ever_initialized_);
@@ -51,12 +51,13 @@ void ThreadLocalStoreImpl::setStatsMatcher(StatsMatcherPtr&& stats_matcher) {
     removeRejectedStats(scope->central_cache_->counters_, deleted_counters_);
     removeRejectedStats(scope->central_cache_->gauges_, deleted_gauges_);
     removeRejectedStats(scope->central_cache_->histograms_, deleted_histograms_);
+    removeRejectedStats(scope->central_cache_->text_readouts_, deleted_text_readouts_);
   }
 }
 
 template <class StatMapClass, class StatListClass>
 void ThreadLocalStoreImpl::removeRejectedStats(StatMapClass& map, StatListClass& list) {
-  std::vector<StatName> remove_list;
+  StatNameVec remove_list;
   for (auto& stat : map) {
     if (rejects(stat.first)) {
       remove_list.push_back(stat.first);
@@ -71,11 +72,7 @@ void ThreadLocalStoreImpl::removeRejectedStats(StatMapClass& map, StatListClass&
 }
 
 bool ThreadLocalStoreImpl::rejects(StatName stat_name) const {
-  // Don't both elaborating the StatName there are no pattern-based
-  // exclusions;/inclusions.
-  if (stats_matcher_->acceptsAll()) {
-    return false;
-  }
+  ASSERT(!stats_matcher_->acceptsAll());
 
   // TODO(ambuc): If stats_matcher_ depends on regexes, this operation (on the
   // hot path) could become prohibitively expensive. Revisit this usage in the
@@ -122,6 +119,22 @@ std::vector<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
       if (gauge->importMode() != Gauge::ImportMode::Uninitialized &&
           names.insert(gauge_iter.first).second) {
         ret.push_back(gauge);
+      }
+    }
+  }
+
+  return ret;
+}
+
+std::vector<TextReadoutSharedPtr> ThreadLocalStoreImpl::textReadouts() const {
+  // Handle de-dup due to overlapping scopes.
+  std::vector<TextReadoutSharedPtr> ret;
+  StatNameHashSet names;
+  Thread::LockGuard lock(lock_);
+  for (ScopeImpl* scope : scopes_) {
+    for (auto& text_readout : scope->central_cache_->text_readouts_) {
+      if (names.insert(text_readout.first).second) {
+        ret.push_back(text_readout.second);
       }
     }
   }
@@ -538,6 +551,44 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
   return **central_ref;
 }
 
+TextReadout& ThreadLocalStoreImpl::ScopeImpl::textReadoutFromStatNameWithTags(
+    const StatName& name, StatNameTagVectorOptConstRef stat_name_tags) {
+  if (parent_.rejectsAll()) {
+    return parent_.null_text_readout_;
+  }
+
+  // Determine the final name based on the prefix and the passed name.
+  //
+  // Note that we can do map.find(final_name.c_str()), but we cannot do
+  // map[final_name.c_str()] as the char*-keyed maps would then save the pointer
+  // to a temporary, and address sanitization errors would follow. Instead we
+  // must do a find() first, using the value if it succeeds. If it fails, then
+  // after we construct the stat we can insert it into the required maps. This
+  // strategy costs an extra hash lookup for each miss, but saves time
+  // re-copying the string and significant memory overhead.
+  TagUtility::TagStatNameJoiner joiner(prefix_.statName(), name, stat_name_tags, symbolTable());
+  Stats::StatName final_stat_name = joiner.nameWithTags();
+
+  // We now find the TLS cache. This might remain null if we don't have TLS
+  // initialized currently.
+  StatRefMap<TextReadout>* tls_cache = nullptr;
+  StatNameHashSet* tls_rejected_stats = nullptr;
+  if (!parent_.shutting_down_ && parent_.tls_) {
+    TlsCacheEntry& entry = parent_.tls_->getTyped<TlsCache>().insertScope(this->scope_id_);
+    tls_cache = &entry.text_readouts_;
+    tls_rejected_stats = &entry.rejected_stats_;
+  }
+
+  return safeMakeStat<TextReadout>(
+      final_stat_name, joiner.tagExtractedName(), stat_name_tags, central_cache_->text_readouts_,
+      central_cache_->rejected_stats_,
+      [](Allocator& allocator, StatName name, StatName tag_extracted_name,
+         const StatNameTagVector& tags) -> TextReadoutSharedPtr {
+        return allocator.makeTextReadout(name, tag_extracted_name, tags);
+      },
+      tls_cache, tls_rejected_stats, parent_.null_text_readout_);
+}
+
 CounterOptConstRef ThreadLocalStoreImpl::ScopeImpl::findCounter(StatName name) const {
   return findStatLockHeld<Counter>(name, central_cache_->counters_);
 }
@@ -554,6 +605,10 @@ HistogramOptConstRef ThreadLocalStoreImpl::ScopeImpl::findHistogram(StatName nam
 
   RefcountPtr<Histogram> histogram_ref(iter->second);
   return std::cref(*histogram_ref);
+}
+
+TextReadoutOptConstRef ThreadLocalStoreImpl::ScopeImpl::findTextReadout(StatName name) const {
+  return findStatLockHeld<TextReadout>(name, central_cache_->text_readouts_);
 }
 
 Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(StatName name,

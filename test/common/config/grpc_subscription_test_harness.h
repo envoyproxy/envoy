@@ -11,7 +11,6 @@
 #include "common/config/api_version.h"
 #include "common/config/grpc_mux_impl.h"
 #include "common/config/grpc_subscription_impl.h"
-#include "common/config/resources.h"
 #include "common/config/version_converter.h"
 
 #include "test/common/config/subscription_test_harness.h"
@@ -20,6 +19,7 @@
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/resources.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -105,6 +105,7 @@ public:
     last_response_nonce_ = std::to_string(HashUtil::xxHash64(version));
     response->set_nonce(last_response_nonce_);
     response->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
+    response->mutable_control_plane()->set_identifier("ground_control_foo123");
     Protobuf::RepeatedPtrField<envoy::config::endpoint::v3::ClusterLoadAssignment> typed_resources;
     for (const auto& cluster : cluster_names) {
       if (std::find(last_cluster_names_.begin(), last_cluster_names_.end(), cluster) !=
@@ -125,7 +126,8 @@ public:
       expectSendMessage(last_cluster_names_, version_, false,
                         Grpc::Status::WellKnownGrpcStatus::Internal, "bad config");
     }
-    mux_->onDiscoveryResponse(std::move(response));
+    mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
+    EXPECT_EQ(control_plane_stats_.identifier_.value(), "ground_control_foo123");
     Mock::VerifyAndClearExpectations(&async_stream_);
   }
 

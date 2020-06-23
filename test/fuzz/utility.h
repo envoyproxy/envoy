@@ -12,6 +12,8 @@
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/utility.h"
 
+#include "nghttp2/nghttp2.h"
+
 // Strong assertion that applies across all compilation modes and doesn't rely
 // on gtest, which only provides soft fails that don't trip oss-fuzz failures.
 #define FUZZ_ASSERT(x) RELEASE_ASSERT(x, "")
@@ -50,12 +52,10 @@ inline std::string replaceInvalidHostCharacters(absl::string_view string) {
   std::string filtered;
   filtered.reserve(string.length());
   for (const char& c : string) {
-    switch (c) {
-    case ' ':
-      filtered.push_back('0');
-      break;
-    default:
+    if (nghttp2_check_authority(reinterpret_cast<const uint8_t*>(&c), 1)) {
       filtered.push_back(c);
+    } else {
+      filtered.push_back('0');
     }
   }
   return filtered;
@@ -83,14 +83,34 @@ replaceInvalidStringValues(const envoy::config::core::v3::Metadata& upstream_met
 template <class T>
 inline T fromHeaders(
     const test::fuzz::Headers& headers,
-    const std::unordered_set<std::string>& ignore_headers = std::unordered_set<std::string>()) {
+    const std::unordered_set<std::string>& ignore_headers = std::unordered_set<std::string>(),
+    std::unordered_set<std::string> include_headers = std::unordered_set<std::string>()) {
   T header_map;
   for (const auto& header : headers.headers()) {
     if (ignore_headers.find(absl::AsciiStrToLower(header.key())) == ignore_headers.end()) {
       header_map.addCopy(header.key(), header.value());
     }
+    include_headers.erase(absl::AsciiStrToLower(header.key()));
+  }
+  // Add dummy headers for non-present headers that must be included.
+  for (const auto& header : include_headers) {
+    header_map.addCopy(header, "dummy");
   }
   return header_map;
+}
+
+// Convert from test proto Metadata to MetadataMap
+inline Http::MetadataMapVector fromMetadata(const test::fuzz::Metadata& metadata) {
+  Http::MetadataMapVector metadata_map_vector;
+  if (!metadata.metadata().empty()) {
+    Http::MetadataMap metadata_map;
+    Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
+    for (const auto& pair : metadata.metadata()) {
+      metadata_map_ptr->insert(pair);
+    }
+    metadata_map_vector.push_back(std::move(metadata_map_ptr));
+  }
+  return metadata_map_vector;
 }
 
 // Convert from HeaderMap to test proto Headers.

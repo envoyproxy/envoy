@@ -19,12 +19,12 @@ mesh give a very detailed picture of each hop and overall network health. The st
 documented in detail in the operations guide.
 
 As of the v2 API, Envoy has the ability to support custom, pluggable sinks. :ref:`A
-few standard sink implementations<envoy_api_msg_config.metrics.v2.StatsSink>` are included in Envoy.
+few standard sink implementations<envoy_v3_api_msg_config.metrics.v3.StatsSink>` are included in Envoy.
 Some sinks also support emitting statistics with tags/dimensions.
 
 Within Envoy and throughout the documentation, statistics are identified by a canonical string
 representation. The dynamic portions of these strings are stripped to become tags. Users can
-configure this behavior via :ref:`the Tag Specifier configuration <envoy_api_msg_config.metrics.v2.TagSpecifier>`.
+configure this behavior via :ref:`the Tag Specifier configuration <envoy_v3_api_msg_config.metrics.v3.TagSpecifier>`.
 
 Envoy emits three types of values as statistics:
 
@@ -37,4 +37,4 @@ Internally, counters and gauges are batched and periodically flushed to improve 
 Histograms are written as they are received. Note: what were previously referred to as timers have
 become histograms as the only difference between the two representations was the units.
 
-* :ref:`v2 API reference <envoy_api_field_config.bootstrap.v2.Bootstrap.stats_sinks>`.
+* :ref:`v3 API reference <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.stats_sinks>`.

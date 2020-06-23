@@ -38,7 +38,7 @@ GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuratio
       watchdog_megamiss_counter_(stats_scope.counterFromStatName(
           Stats::StatNameManagedStorage("server.watchdog_mega_miss", stats_scope.symbolTable())
               .statName())),
-      dispatcher_(api.allocateDispatcher()),
+      dispatcher_(api.allocateDispatcher("guarddog_thread")),
       loop_timer_(dispatcher_->createTimer([this]() { step(); })), run_thread_(true) {
   start(api);
 }
@@ -142,8 +142,10 @@ void GuardDogImpl::stopWatching(WatchDogSharedPtr wd) {
 
 void GuardDogImpl::start(Api::Api& api) {
   Thread::LockGuard guard(mutex_);
+  // See comments in WorkerImpl::start for the naming convention.
+  Thread::Options options{absl::StrCat("dog:", dispatcher_->name())};
   thread_ = api.threadFactory().createThread(
-      [this]() -> void { dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit); });
+      [this]() -> void { dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit); }, options);
   loop_timer_->enableTimer(std::chrono::milliseconds(0));
 }
 

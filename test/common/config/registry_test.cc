@@ -176,6 +176,12 @@ TEST(RegistryTest, DEPRECATED_FEATURE_TEST(VersionedWithDeprecatedNamesFactory))
   EXPECT_THAT(deprecated_version.value(), ProtoEq(version.value()));
 }
 
+TEST(RegistryTest, TestDoubleRegistrationByName) {
+  EXPECT_THROW_WITH_MESSAGE((Registry::RegisterFactory<TestPublishedFactory, PublishedFactory>()),
+                            EnvoyException,
+                            "Double registration for name: 'testing.published.test'");
+}
+
 } // namespace
 } // namespace Config
 } // namespace Envoy

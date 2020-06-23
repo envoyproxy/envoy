@@ -53,6 +53,12 @@ public:
   virtual ~Dispatcher() = default;
 
   /**
+   * Returns the name that identifies this dispatcher, such as "worker_2" or "main_thread".
+   * @return const std::string& the name that identifies this dispatcher.
+   */
+  virtual const std::string& name() PURE;
+
+  /**
    * Returns a time-source to use with this dispatcher.
    */
   virtual TimeSource& timeSource() PURE;
@@ -62,9 +68,11 @@ public:
    * time, since the main and worker thread dispatchers are constructed before
    * ThreadLocalStoreImpl::initializeThreading.
    * @param scope the scope to contain the new per-dispatcher stats created here.
-   * @param prefix the stats prefix to identify this dispatcher.
+   * @param prefix the stats prefix to identify this dispatcher. If empty, the dispatcher will be
+   *               identified by its name.
    */
-  virtual void initializeStats(Stats::Scope& scope, const std::string& prefix) PURE;
+  virtual void initializeStats(Stats::Scope& scope,
+                               const absl::optional<std::string>& prefix = absl::nullopt) PURE;
 
   /**
    * Clears any items in the deferred deletion queue.

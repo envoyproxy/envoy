@@ -10,6 +10,7 @@
 
 #include "common/http/headers.h"
 #include "common/stats/symbol_table_impl.h"
+#include "common/stats/utility.h"
 
 namespace Envoy {
 namespace Http {
@@ -30,17 +31,14 @@ void UserAgent::completeConnectionLength(Stats::Timespan& span) {
 
 UserAgentStats::UserAgentStats(Stats::StatName prefix, Stats::StatName device, Stats::Scope& scope,
                                const UserAgentContext& context)
-    : downstream_cx_total_(scope.counterFromStatName(Stats::StatName(
-          context.symbol_table_.join({prefix, device, context.downstream_cx_total_}).get()))),
-      downstream_cx_destroy_remote_active_rq_(scope.counterFromStatName(Stats::StatName(
-          context.symbol_table_
-              .join({prefix, device, context.downstream_cx_destroy_remote_active_rq_})
-              .get()))),
-      downstream_rq_total_(scope.counterFromStatName(Stats::StatName(
-          context.symbol_table_.join({prefix, device, context.downstream_rq_total_}).get()))),
-      downstream_cx_length_ms_(scope.histogramFromStatName(
-          Stats::StatName(
-              context.symbol_table_.join({prefix, device, context.downstream_cx_length_ms_}).get()),
+    : downstream_cx_total_(Stats::Utility::counterFromElements(
+          scope, {prefix, device, context.downstream_cx_total_})),
+      downstream_cx_destroy_remote_active_rq_(Stats::Utility::counterFromElements(
+          scope, {prefix, device, context.downstream_cx_destroy_remote_active_rq_})),
+      downstream_rq_total_(Stats::Utility::counterFromElements(
+          scope, {prefix, device, context.downstream_rq_total_})),
+      downstream_cx_length_ms_(Stats::Utility::histogramFromElements(
+          scope, {prefix, device, context.downstream_cx_length_ms_},
           Stats::Histogram::Unit::Milliseconds)) {
   downstream_cx_total_.inc();
   downstream_rq_total_.inc();
@@ -52,11 +50,11 @@ void UserAgent::initializeFromHeaders(const RequestHeaderMap& headers, Stats::St
   if (stats_ == nullptr && !initialized_) {
     initialized_ = true;
 
-    const HeaderEntry* user_agent = headers.UserAgent();
-    if (user_agent != nullptr) {
-      if (user_agent->value().getStringView().find("iOS") != absl::string_view::npos) {
+    const absl::string_view user_agent = headers.getUserAgentValue();
+    if (!user_agent.empty()) {
+      if (user_agent.find("iOS") != absl::string_view::npos) {
         stats_ = std::make_unique<UserAgentStats>(prefix, context_.ios_, scope, context_);
-      } else if (user_agent->value().getStringView().find("android") != absl::string_view::npos) {
+      } else if (user_agent.find("android") != absl::string_view::npos) {
         stats_ = std::make_unique<UserAgentStats>(prefix, context_.android_, scope, context_);
       }
     }

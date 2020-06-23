@@ -117,7 +117,7 @@ void HttpUpstream::setRequestEncoder(Http::RequestEncoder& request_encoder, bool
       is_ssl ? Http::Headers::get().SchemeValues.Https : Http::Headers::get().SchemeValues.Http;
   auto headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(
       {{Http::Headers::get().Method, "CONNECT"},
-       {Http::Headers::get().Protocol, "bytestream"},
+       {Http::Headers::get().Protocol, Http::Headers::get().ProtocolValues.Bytestream},
        {Http::Headers::get().Scheme, scheme},
        {Http::Headers::get().Path, "/"},
        {Http::Headers::get().Host, hostname_}});

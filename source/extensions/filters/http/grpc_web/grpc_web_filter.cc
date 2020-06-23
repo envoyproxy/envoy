@@ -39,6 +39,9 @@ const absl::flat_hash_set<std::string>& GrpcWebFilter::gRpcWebContentTypes() con
 }
 
 bool GrpcWebFilter::isGrpcWebRequest(const Http::RequestHeaderMap& headers) {
+  if (!headers.Path()) {
+    return false;
+  }
   const Http::HeaderEntry* content_type = headers.ContentType();
   if (content_type != nullptr) {
     return gRpcWebContentTypes().count(content_type->value().getStringView()) > 0;
@@ -49,7 +52,6 @@ bool GrpcWebFilter::isGrpcWebRequest(const Http::RequestHeaderMap& headers) {
 // Implements StreamDecoderFilter.
 // TODO(fengli): Implements the subtypes of gRPC-Web content-type other than proto, like +json, etc.
 Http::FilterHeadersStatus GrpcWebFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
-  const Http::HeaderEntry* content_type = headers.ContentType();
   if (!isGrpcWebRequest(headers)) {
     return Http::FilterHeadersStatus::Continue;
   }
@@ -61,20 +63,17 @@ Http::FilterHeadersStatus GrpcWebFilter::decodeHeaders(Http::RequestHeaderMap& h
   headers.removeContentLength();
   setupStatTracking(headers);
 
-  if (content_type != nullptr && (Http::Headers::get().ContentTypeValues.GrpcWebText ==
-                                      content_type->value().getStringView() ||
-                                  Http::Headers::get().ContentTypeValues.GrpcWebTextProto ==
-                                      content_type->value().getStringView())) {
+  const absl::string_view content_type = headers.getContentTypeValue();
+  if (content_type == Http::Headers::get().ContentTypeValues.GrpcWebText ||
+      content_type == Http::Headers::get().ContentTypeValues.GrpcWebTextProto) {
     // Checks whether gRPC-Web client is sending base64 encoded request.
     is_text_request_ = true;
   }
   headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Grpc);
 
-  const Http::HeaderEntry* accept = headers.Accept();
-  if (accept != nullptr &&
-      (Http::Headers::get().ContentTypeValues.GrpcWebText == accept->value().getStringView() ||
-       Http::Headers::get().ContentTypeValues.GrpcWebTextProto ==
-           accept->value().getStringView())) {
+  const absl::string_view accept = headers.getAcceptValue();
+  if (accept == Http::Headers::get().ContentTypeValues.GrpcWebText ||
+      accept == Http::Headers::get().ContentTypeValues.GrpcWebTextProto) {
     // Checks whether gRPC-Web client is asking for base64 encoded response.
     is_text_response_ = true;
   }

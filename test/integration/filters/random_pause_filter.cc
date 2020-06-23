@@ -25,9 +25,9 @@ public:
     // Roughly every 5th encode (5 being arbitrary) swap the watermark state.
     if (random % 5 == 0) {
       if (connection()->aboveHighWatermark()) {
-        connection()->onLowWatermark();
+        connection()->onWriteBufferLowWatermark();
       } else {
-        connection()->onHighWatermark();
+        connection()->onWriteBufferHighWatermark();
       }
     }
     return Http::PassThroughFilter::encodeData(buf, end_stream);

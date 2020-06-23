@@ -1,7 +1,9 @@
 #pragma once
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/config/core/v3/proxy_protocol.pb.h"
 #include "envoy/network/address.h"
+#include "envoy/network/connection.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -41,11 +43,21 @@ constexpr uint32_t PROXY_PROTO_V2_ADDR_LEN_UNIX = 216;
 void generateV1Header(const std::string& src_addr, const std::string& dst_addr, uint32_t src_port,
                       uint32_t dst_port, Network::Address::IpVersion ip_version,
                       Buffer::Instance& out);
+void generateV1Header(const Network::Address::Ip& source_address,
+                      const Network::Address::Ip& dest_address, Buffer::Instance& out);
+
 // Generates the v2 PROXY protocol header and adds it to the specified buffer
 // TCP is assumed as the transport protocol
 void generateV2Header(const std::string& src_addr, const std::string& dst_addr, uint32_t src_port,
                       uint32_t dst_port, Network::Address::IpVersion ip_version,
                       Buffer::Instance& out);
+void generateV2Header(const Network::Address::Ip& source_address,
+                      const Network::Address::Ip& dest_address, Buffer::Instance& out);
+
+// Generates the appropriate proxy proto header and appends it to the supplied buffer.
+void generateProxyProtoHeader(const envoy::config::core::v3::ProxyProtocolConfig& config,
+                              const Network::Connection& connection, Buffer::Instance& out);
+
 // Generates the v2 PROXY protocol local command header and adds it to the specified buffer
 void generateV2LocalHeader(Buffer::Instance& out);
 

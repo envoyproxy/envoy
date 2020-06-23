@@ -4,7 +4,7 @@ Virtual Host Discovery Service (VHDS)
 =====================================
 
 The virtual host discovery service (VHDS) API is an optional API that Envoy will call to
-dynamically fetch :ref:`virtual hosts <envoy_api_msg_route.VirtualHost>`. A virtual host includes
+dynamically fetch :ref:`virtual hosts <envoy_v3_api_msg_config.route.v3.VirtualHost>`. A virtual host includes
 a name and set of domains that get routed to it based on the incoming request's host header.
 
 By default in RDS, all routes for a cluster are sent to every Envoy instance in the mesh. This
@@ -32,20 +32,20 @@ a route configuration name can.
 Subscribing to Resources
 ^^^^^^^^^^^^^^^^^^^^^^^^
 VHDS allows resources to be :ref:`subscribed <xds_protocol_delta_subscribe>` to using a
-:ref:`DeltaDiscoveryRequest <envoy_api_msg_DeltaDiscoveryRequest>` with the
-:ref:`type_url <envoy_api_field_DeltaDiscoveryRequest.type_url>` set to
-`type.googleapis.com/envoy.api.v2.route.VirtualHost`
-and :ref:`resource_names_subscribe <envoy_api_field_DeltaDiscoveryRequest.resource_names_subscribe>`
+:ref:`DeltaDiscoveryRequest <envoy_v3_api_msg_service.discovery.v3.DeltaDiscoveryRequest>` with the
+:ref:`type_url <envoy_v3_api_field_service.discovery.v3.DeltaDiscoveryRequest.type_url>` set to
+`type.googleapis.com/envoy.config.route.v3.VirtualHost`
+and :ref:`resource_names_subscribe <envoy_v3_api_field_service.discovery.v3.DeltaDiscoveryRequest.resource_names_subscribe>`
 set to a list of virtual host resource names for which it would like configuration.
 
 If a route for the contents of a host/authority header cannot be resolved, the active stream is
 paused while a
-:ref:`DeltaDiscoveryRequest <envoy_api_msg_DeltaDiscoveryRequest>` is sent.
-When a :ref:`DeltaDiscoveryResponse <envoy_api_msg_DeltaDiscoveryResponse>` is received where one of
-the :ref:`aliases <envoy_api_field_resource.aliases>` or the 
-:ref:`name <envoy_api_field_resource.name>` in the response exactly matches the
-:ref:`resource_names_subscribe <envoy_api_field_DeltaDiscoveryRequest.resource_names_subscribe>`
-entry from the :ref:`DeltaDiscoveryRequest <envoy_api_msg_DeltaDiscoveryRequest>`, the route
+:ref:`DeltaDiscoveryRequest <envoy_v3_api_msg_service.discovery.v3.DeltaDiscoveryRequest>` is sent.
+When a :ref:`DeltaDiscoveryResponse <envoy_v3_api_msg_service.discovery.v3.DeltaDiscoveryResponse>` is received where one of
+the :ref:`aliases <envoy_v3_api_field_service.discovery.v3.Resource.aliases>` or the 
+:ref:`name <envoy_v3_api_field_service.discovery.v3.Resource.name>` in the response exactly matches the
+:ref:`resource_names_subscribe <envoy_v3_api_field_service.discovery.v3.DeltaDiscoveryRequest.resource_names_subscribe>`
+entry from the :ref:`DeltaDiscoveryRequest <envoy_v3_api_msg_service.discovery.v3.DeltaDiscoveryRequest>`, the route
 configuration is updated, the stream is resumed, and processing of the filter chain continues.
 
 Updates to virtual hosts occur in two ways. If a virtual host was originally sent over RDS, then the
@@ -53,19 +53,19 @@ virtual host should be updated over RDS. If a virtual host was subscribed to ove
 will take place over VHDS.
 
 When a route configuration entry is updated, if the 
-:ref:`vhds field <envoy_api_field_RouteConfiguration.vhds>` has changed, the virtual host table for
+:ref:`vhds field <envoy_v3_api_field_config.route.v3.RouteConfiguration.vhds>` has changed, the virtual host table for
 that route configuration is cleared, which will require that all virtual hosts be sent again.
 
 Compatibility with Scoped RDS
 -----------------------------
 
 VHDS shouldn't present any compatibility issues with
-:ref:`scoped RDS <envoy_api_msg_ScopedRouteConfiguration>`.
+:ref:`scoped RDS <envoy_v3_api_msg_config.route.v3.ScopedRouteConfiguration>`.
 Route configuration names can still be used for virtual host matching, but with
 scoped RDS configured it would point to a scoped route configuration.
 
 However, it is important to note that using
-on-demand :ref:`scoped RDS <envoy_api_msg_ScopedRouteConfiguration>`
+on-demand :ref:`scoped RDS <envoy_v3_api_msg_config.route.v3.ScopedRouteConfiguration>`
 and VHDS together will require two on-demand subscriptions per routing scope.
 
 

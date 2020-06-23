@@ -1,9 +1,9 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/network/filter.h"
-#include "envoy/registry/registry.h"
 
 #include "test/config/utility.h"
 #include "test/integration/integration.h"
+#include "test/test_common/registry.h"
 
 #include "gtest/gtest.h"
 
@@ -73,15 +73,11 @@ public:
   std::string name() const override { return "envoy.upstream.polite"; }
 };
 
-// perform static registration
-REGISTER_FACTORY(PoliteFilterConfigFactory,
-                 Server::Configuration::NamedUpstreamNetworkFilterConfigFactory);
-
 class ClusterFilterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                      public BaseIntegrationTest {
 public:
   ClusterFilterIntegrationTest()
-      : BaseIntegrationTest(GetParam(), ConfigHelper::tcpProxyConfig()) {}
+      : BaseIntegrationTest(GetParam(), ConfigHelper::tcpProxyConfig()), registration_(factory_) {}
 
   void initialize() override {
     enable_half_close_ = true;
@@ -95,6 +91,10 @@ public:
     });
     BaseIntegrationTest::initialize();
   }
+
+  PoliteFilterConfigFactory factory_;
+  Registry::InjectFactory<Server::Configuration::NamedUpstreamNetworkFilterConfigFactory>
+      registration_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ClusterFilterIntegrationTest,

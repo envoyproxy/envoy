@@ -1,6 +1,6 @@
 #include "extensions/tracers/zipkin/span_buffer.h"
 
-#include "envoy/config/trace/v3/trace.pb.h"
+#include "envoy/config/trace/v3/zipkin.pb.h"
 
 #include "common/protobuf/utility.h"
 
@@ -9,6 +9,7 @@
 #include "extensions/tracers/zipkin/zipkin_json_field_names.h"
 
 #include "absl/strings/str_join.h"
+#include "absl/strings/str_replace.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -61,7 +62,7 @@ SerializerPtr SpanBuffer::makeSerializer(
 
 std::string JsonV1Serializer::serialize(const std::vector<Span>& zipkin_spans) {
   const std::string serialized_elements =
-      absl::StrJoin(zipkin_spans, ",", [](std::string* element, Span zipkin_span) {
+      absl::StrJoin(zipkin_spans, ",", [](std::string* element, const Span& zipkin_span) {
         absl::StrAppend(element, zipkin_span.toJson());
       });
   return absl::StrCat("[", serialized_elements, "]");
@@ -71,20 +72,46 @@ JsonV2Serializer::JsonV2Serializer(const bool shared_span_context)
     : shared_span_context_{shared_span_context} {}
 
 std::string JsonV2Serializer::serialize(const std::vector<Span>& zipkin_spans) {
-  const std::string serialized_elements =
-      absl::StrJoin(zipkin_spans, ",", [this](std::string* out, const Span& zipkin_span) {
+  Util::Replacements replacements;
+  const std::string serialized_elements = absl::StrJoin(
+      zipkin_spans, ",", [this, &replacements](std::string* out, const Span& zipkin_span) {
+        const auto& replacement_values = replacements;
         absl::StrAppend(
-            out, absl::StrJoin(toListOfSpans(zipkin_span), ",",
-                               [](std::string* element, const ProtobufWkt::Struct& span) {
-                                 absl::StrAppend(element, MessageUtil::getJsonStringFromMessage(
-                                                              span, false, true));
-                               }));
+            out, absl::StrJoin(
+                     toListOfSpans(zipkin_span, replacements), ",",
+                     [&replacement_values](std::string* element, const ProtobufWkt::Struct& span) {
+                       const std::string json = MessageUtil::getJsonStringFromMessage(
+                           span, /* pretty_print */ false,
+                           /* always_print_primitive_fields */ true);
+
+                       // The Zipkin API V2 specification mandates to store timestamp value as int64
+                       // https://github.com/openzipkin/zipkin-api/blob/228fabe660f1b5d1e28eac9df41f7d1deed4a1c2/zipkin2-api.yaml#L447-L463
+                       // (often translated as uint64 in some of the official implementations:
+                       // https://github.com/openzipkin/zipkin-go/blob/62dc8b26c05e0e8b88eb7536eff92498e65bbfc3/model/span.go#L114,
+                       // and see the discussion here:
+                       // https://github.com/openzipkin/zipkin-go/pull/161#issuecomment-598558072).
+                       // However, when the timestamp is stored as number value in a protobuf
+                       // struct, it is stored as a double. Because of how protobuf serializes
+                       // doubles, there is a possibility that the value will be rendered as a
+                       // number with scientific notation as reported in:
+                       // https://github.com/envoyproxy/envoy/issues/9341#issuecomment-566912973. To
+                       // deal with that issue, here we do a workaround by storing the timestamp as
+                       // string and keeping track of that with the corresponding integer
+                       // replacements, and do the replacement here so we can meet the Zipkin API V2
+                       // requirements.
+                       //
+                       // TODO(dio): The right fix for this is to introduce additional knob when
+                       // serializing double in protobuf DoubleToBuffer function, and make it
+                       // available to be controlled at caller site.
+                       // https://github.com/envoyproxy/envoy/issues/10411).
+                       absl::StrAppend(element, absl::StrReplaceAll(json, replacement_values));
+                     }));
       });
   return absl::StrCat("[", serialized_elements, "]");
 }
 
 const std::vector<ProtobufWkt::Struct>
-JsonV2Serializer::toListOfSpans(const Span& zipkin_span) const {
+JsonV2Serializer::toListOfSpans(const Span& zipkin_span, Util::Replacements& replacements) const {
   std::vector<ProtobufWkt::Struct> spans;
   spans.reserve(zipkin_span.annotations().size());
   for (const auto& annotation : zipkin_span.annotations()) {
@@ -103,7 +130,15 @@ JsonV2Serializer::toListOfSpans(const Span& zipkin_span) const {
     }
 
     if (annotation.isSetEndpoint()) {
-      (*fields)[SPAN_TIMESTAMP] = ValueUtil::numberValue(annotation.timestamp());
+      // Usually we store number to a ProtobufWkt::Struct object via ValueUtil::numberValue.
+      // However, due to the possibility of rendering that to a number with scientific notation, we
+      // chose to store it as a string and keeping track the corresponding replacement. For example,
+      // we have 1584324295476870 if we stored it as a double value, MessageToJsonString gives
+      // us 1.58432429547687e+15. Instead we store it as the string of 1584324295476870 (when it is
+      // serialized: "1584324295476870"), and replace it post MessageToJsonString serialization with
+      // integer (1584324295476870 without `"`), see: JsonV2Serializer::serialize.
+      (*fields)[SPAN_TIMESTAMP] =
+          Util::uint64Value(annotation.timestamp(), SPAN_TIMESTAMP, replacements);
       (*fields)[SPAN_LOCAL_ENDPOINT] =
           ValueUtil::structValue(toProtoEndpoint(annotation.endpoint()));
     }
@@ -121,7 +156,10 @@ JsonV2Serializer::toListOfSpans(const Span& zipkin_span) const {
     }
 
     if (zipkin_span.isSetDuration()) {
-      (*fields)[SPAN_DURATION] = ValueUtil::numberValue(zipkin_span.duration());
+      // Since SPAN_DURATION has the same data type with SPAN_TIMESTAMP, we use Util::uint64Value to
+      // store it.
+      (*fields)[SPAN_DURATION] =
+          Util::uint64Value(zipkin_span.duration(), SPAN_DURATION, replacements);
     }
 
     const auto& binary_annotations = zipkin_span.binaryAnnotations();

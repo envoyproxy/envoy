@@ -26,6 +26,13 @@ Http::FilterFactoryCb HeaderToMetadataConfig::createFilterFactoryFromProtoTyped(
   };
 }
 
+Router::RouteSpecificFilterConfigConstSharedPtr
+HeaderToMetadataConfig::createRouteSpecificFilterConfigTyped(
+    const envoy::extensions::filters::http::header_to_metadata::v3::Config& config,
+    Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
+  return std::make_shared<const Config>(config, true);
+}
+
 /**
  * Static registration for the header-to-metadata filter. @see RegisterFactory.
  */

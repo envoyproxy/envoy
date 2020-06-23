@@ -47,8 +47,8 @@ control plane, where it :ref:`fetches configuration from management server(s)
 *gRPC services*.
 
 When specifying gRPC services, it's necessary to specify the use of either the
-:ref:`Envoy gRPC client <envoy_api_field_core.GrpcService.envoy_grpc>` or the
-:ref:`Google C++ gRPC client <envoy_api_field_core.GrpcSErvice.google_grpc>`. We
+:ref:`Envoy gRPC client <envoy_v3_api_field_config.core.v3.GrpcService.envoy_grpc>` or the
+:ref:`Google C++ gRPC client <envoy_v3_api_field_config.core.v3.GrpcService.google_grpc>`. We
 discuss the tradeoffs in this choice below.
 
 The Envoy gRPC client is a minimal custom implementation of gRPC that makes use

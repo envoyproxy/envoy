@@ -78,44 +78,50 @@ message JwtProvider {
   //
   repeated string audiences = 2;
 
-  // JWKS can be fetched from remote server via HTTP/HTTPS. This field specifies the remote HTTP
-  // URI and how the fetched JWKS should be cached.
-  //
-  // Example:
-  //
-  // .. code-block:: yaml
-  //
-  //    remote_jwks:
-  //      http_uri:
-  //        uri: https://www.googleapis.com/oauth2/v1/certs
-  //        cluster: jwt.www.googleapis.com|443
-  //      cache_duration:
-  //        seconds: 300
-  //
-  bool forward = 5;
+  // `JSON Web Key Set (JWKS) <https://tools.ietf.org/html/rfc7517#appendix-A>`_ is needed to
+  // validate signature of a JWT. This field specifies where to fetch JWKS.
+  oneof jwks_source_specifier {
+    option (validate.required) = true;
 
-  // JWKS is in local data source. It could be either in a local file or embedded in the
-  // inline_string.
-  //
-  // Example: local file
-  //
-  // .. code-block:: yaml
-  //
-  //    local_jwks:
-  //      filename: /etc/envoy/jwks/jwks1.txt
-  //
-  // Example: inline_string
-  //
-  // .. code-block:: yaml
-  //
-  //    local_jwks:
-  //      inline_string: ACADADADADA
-  //
-  repeated JwtHeader from_headers = 6;
+    // JWKS can be fetched from remote server via HTTP/HTTPS. This field specifies the remote HTTP
+    // URI and how the fetched JWKS should be cached.
+    //
+    // Example:
+    //
+    // .. code-block:: yaml
+    //
+    //    remote_jwks:
+    //      http_uri:
+    //        uri: https://www.googleapis.com/oauth2/v1/certs
+    //        cluster: jwt.www.googleapis.com|443
+    //      cache_duration:
+    //        seconds: 300
+    //
+    RemoteJwks remote_jwks = 3;
+
+    // JWKS is in local data source. It could be either in a local file or embedded in the
+    // inline_string.
+    //
+    // Example: local file
+    //
+    // .. code-block:: yaml
+    //
+    //    local_jwks:
+    //      filename: /etc/envoy/jwks/jwks1.txt
+    //
+    // Example: inline_string
+    //
+    // .. code-block:: yaml
+    //
+    //    local_jwks:
+    //      inline_string: ACADADADADA
+    //
+    config.core.v3.DataSource local_jwks = 4;
+  }
 
   // If false, the JWT is removed in the request after a success verification. If true, the JWT is
   // not removed in the request. Default value is false.
-  repeated string from_params = 7;
+  bool forward = 5;
 
   // Two fields below define where to extract the JWT from an HTTP request.
   //
@@ -142,7 +148,7 @@ message JwtProvider {
   //
   //   ``x-goog-iap-jwt-assertion: <JWT>``.
   //
-  string forward_payload_header = 8;
+  repeated JwtHeader from_headers = 6;
 
   // JWT is sent in a query parameter. `jwt_params` represents the query parameter names.
   //
@@ -157,39 +163,34 @@ message JwtProvider {
   //
   //    /path?jwt_token=<JWT>
   //
+  repeated string from_params = 7;
+
+  // This field specifies the header name to forward a successfully verified JWT payload to the
+  // backend. The forwarded data is::
+  //
+  //    base64url_encoded(jwt_payload_in_JSON)
+  //
+  // If it is not specified, the payload will not be forwarded.
+  string forward_payload_header = 8
+      [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
+
+  // If non empty, successfully verified JWT payloads will be written to StreamInfo DynamicMetadata
+  // in the format as: *namespace* is the jwt_authn filter name as **envoy.filters.http.jwt_authn**
+  // The value is the *protobuf::Struct*. The value of this field will be the key for its *fields*
+  // and the value is the *protobuf::Struct* converted from JWT JSON payload.
+  //
+  // For example, if payload_in_metadata is *my_payload*:
+  //
+  // .. code-block:: yaml
+  //
+  //   envoy.filters.http.jwt_authn:
+  //     my_payload:
+  //       iss: https://example.com
+  //       sub: test@example.com
+  //       aud: https://example.com
+  //       exp: 1501281058
+  //
   string payload_in_metadata = 9;
-
-  // `JSON Web Key Set (JWKS) <https://tools.ietf.org/html/rfc7517#appendix-A>`_ is needed to
-  // validate signature of a JWT. This field specifies where to fetch JWKS.
-  oneof jwks_source_specifier {
-    option (validate.required) = true;
-
-    // This field specifies the header name to forward a successfully verified JWT payload to the
-    // backend. The forwarded data is::
-    //
-    //    base64url_encoded(jwt_payload_in_JSON)
-    //
-    // If it is not specified, the payload will not be forwarded.
-    RemoteJwks remote_jwks = 3;
-
-    // If non empty, successfully verified JWT payloads will be written to StreamInfo DynamicMetadata
-    // in the format as: *namespace* is the jwt_authn filter name as **envoy.filters.http.jwt_authn**
-    // The value is the *protobuf::Struct*. The value of this field will be the key for its *fields*
-    // and the value is the *protobuf::Struct* converted from JWT JSON payload.
-    //
-    // For example, if payload_in_metadata is *my_payload*:
-    //
-    // .. code-block:: yaml
-    //
-    //   envoy.filters.http.jwt_authn:
-    //     my_payload:
-    //       iss: https://example.com
-    //       sub: test@example.com
-    //       aud: https://example.com
-    //       exp: 1501281058
-    //
-    config.core.v3.DataSource local_jwks = 4;
-  }
 }
 
 // This message specifies how to fetch JWKS from remote and how to cache it.
@@ -218,12 +219,14 @@ message JwtHeader {
       "envoy.config.filter.http.jwt_authn.v2alpha.JwtHeader";
 
   // The HTTP header name.
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string name = 1
+      [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
 
   // The value prefix. The value format is "value_prefix<token>"
   // For example, for "Authorization: Bearer <token>", value_prefix="Bearer " with a space at the
   // end.
-  string value_prefix = 2;
+  string value_prefix = 2
+      [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 }
 
 // Specify a required provider with audiences.

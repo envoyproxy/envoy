@@ -20,7 +20,9 @@ const uint64_t TEST_TIME_MILLIS = 42000;
  */
 class SubscriptionTestHarness : public Event::TestUsingSimulatedTime {
 public:
-  SubscriptionTestHarness() : stats_(Utility::generateStats(stats_store_)) {
+  SubscriptionTestHarness()
+      : stats_(Utility::generateStats(stats_store_)),
+        control_plane_stats_(Utility::generateControlPlaneStats(stats_store_)) {
     simTime().setSystemTime(SystemTime(std::chrono::milliseconds(TEST_TIME_MILLIS)));
   }
   virtual ~SubscriptionTestHarness() = default;
@@ -57,7 +59,8 @@ public:
 
   virtual testing::AssertionResult statsAre(uint32_t attempt, uint32_t success, uint32_t rejected,
                                             uint32_t failure, uint32_t init_fetch_timeout,
-                                            uint64_t update_time, uint64_t version) {
+                                            uint64_t update_time, uint64_t version,
+                                            absl::string_view version_text) {
     // TODO(fredlas) rework update_success_ to make sense across all xDS carriers. Its value in
     // statsAre() calls in many tests will probably have to be changed.
     UNREFERENCED_PARAMETER(attempt);
@@ -85,14 +88,15 @@ public:
       return testing::AssertionFailure()
              << "version: expected " << version << ", got " << stats_.version_.value();
     }
+    if (version_text != stats_.version_text_.value()) {
+      return testing::AssertionFailure()
+             << "version_text: expected " << version << ", got " << stats_.version_text_.value();
+    }
     return testing::AssertionSuccess();
   }
 
   virtual void verifyControlPlaneStats(uint32_t connected_state) {
-    EXPECT_EQ(
-        connected_state,
-        stats_store_.gauge("control_plane.connected_state", Stats::Gauge::ImportMode::NeverImport)
-            .value());
+    EXPECT_EQ(connected_state, control_plane_stats_.connected_state_.value());
   }
 
   virtual void expectConfigUpdateFailed() PURE;
@@ -107,6 +111,7 @@ public:
 
   Stats::TestUtil::TestStore stats_store_;
   SubscriptionStats stats_;
+  ControlPlaneStats control_plane_stats_;
 };
 
 ACTION_P(ThrowOnRejectedConfig, accept) {

@@ -19,7 +19,7 @@ Envoy::Thread::ThreadPtr ContentionGenerator::launchThread(MutexTracerImpl& trac
 }
 
 void ContentionGenerator::holdUntilContention(MutexTracerImpl& tracer) {
-  Event::DispatcherPtr dispatcher = api_.allocateDispatcher();
+  Event::DispatcherPtr dispatcher = api_.allocateDispatcher("test_thread");
   Event::TimerPtr timer = dispatcher->createTimer([&dispatcher]() { dispatcher->exit(); });
   auto sleep_ms = [&timer, &dispatcher](int num_ms) {
     timer->enableTimer(std::chrono::milliseconds(num_ms));

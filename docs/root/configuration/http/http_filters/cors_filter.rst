@@ -8,7 +8,7 @@ For the meaning of the headers please refer to the pages below.
 
 * https://developer.mozilla.org/en-US/docs/Web/HTTP/Access_control_CORS
 * https://www.w3.org/TR/cors/
-* :ref:`v2 API reference <envoy_api_msg_route.CorsPolicy>`
+* :ref:`v2 API reference <envoy_v3_api_msg_config.route.v3.CorsPolicy>`
 * This filter should be configured with the name *envoy.filters.http.cors*.
 
 .. _cors-runtime:
@@ -16,12 +16,12 @@ For the meaning of the headers please refer to the pages below.
 Runtime
 -------
 The fraction of requests for which the filter is enabled can be configured via the :ref:`runtime_key
-<envoy_api_field_core.RuntimeFractionalPercent.runtime_key>` value of the :ref:`filter_enabled
-<envoy_api_field_route.CorsPolicy.filter_enabled>` field.
+<envoy_v3_api_field_config.core.v3.RuntimeFractionalPercent.runtime_key>` value of the :ref:`filter_enabled
+<envoy_v3_api_field_config.route.v3.CorsPolicy.filter_enabled>` field.
 
 The fraction of requests for which the filter is enabled in shadow-only mode can be configured via
-the :ref:`runtime_key <envoy_api_field_core.RuntimeFractionalPercent.runtime_key>` value of the
-:ref:`shadow_enabled <envoy_api_field_route.CorsPolicy.shadow_enabled>` field. When enabled in
+the :ref:`runtime_key <envoy_v3_api_field_config.core.v3.RuntimeFractionalPercent.runtime_key>` value of the
+:ref:`shadow_enabled <envoy_v3_api_field_config.route.v3.CorsPolicy.shadow_enabled>` field. When enabled in
 shadow-only mode, the filter will evaluate the request's *Origin* to determine if it's valid but
 will not enforce any policies.
 

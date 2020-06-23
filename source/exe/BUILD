@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_binary",
@@ -9,12 +7,10 @@ load(
     "envoy_cc_win32_library",
     "envoy_package",
 )
-load(
-    "//source/extensions:all_extensions.bzl",
-    "envoy_all_extensions",
-    "envoy_windows_extensions",
-)
-load("//bazel:repositories.bzl", "PPC_SKIP_TARGETS")
+load("//source/extensions:all_extensions.bzl", "envoy_all_extensions")
+load("//bazel:repositories.bzl", "PPC_SKIP_TARGETS", "WINDOWS_SKIP_TARGETS")
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -41,7 +37,7 @@ envoy_cc_library(
         "//source/server:server_lib",
         "//source/server:listener_hooks_lib",
     ] + select({
-        "//bazel:windows_x86_64": envoy_windows_extensions(),
+        "//bazel:windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),
         "//bazel:linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
         "//conditions:default": envoy_all_extensions(),
     }),

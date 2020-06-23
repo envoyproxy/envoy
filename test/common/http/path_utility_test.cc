@@ -1,8 +1,9 @@
 #include <utility>
 #include <vector>
 
-#include "common/http/header_map_impl.h"
 #include "common/http/path_utility.h"
+
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -18,7 +19,11 @@ public:
     headers_.setPath(path_value);
     return *headers_.Path();
   }
-  RequestHeaderMapImpl headers_;
+  const HeaderEntry& hostHeaderEntry(const std::string& host_value) {
+    headers_.setHost(host_value);
+    return *headers_.Host();
+  }
+  TestRequestHeaderMapImpl headers_;
 };
 
 // Already normalized path don't change.
@@ -105,6 +110,7 @@ TEST_F(PathUtilityTest, MergeSlashes) {
   EXPECT_EQ("/a/b/c", mergeSlashes("/a////b/c"));         // quadruple / in the middle
   EXPECT_EQ("/a/b?a=///c", mergeSlashes("/a//b?a=///c")); // slashes in the query are ignored
   EXPECT_EQ("/a/b?", mergeSlashes("/a//b?"));             // empty query
+  EXPECT_EQ("/a/?b", mergeSlashes("//a/?b"));             // ends with slash + query
 }
 
 TEST_F(PathUtilityTest, RemoveQueryAndFragment) {

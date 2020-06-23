@@ -56,7 +56,7 @@ TEST_F(ZipkinTracerTest, SpanCreation) {
   // Test the creation of a root span --> CS
   // ==============
   ON_CALL(random_generator, random()).WillByDefault(Return(1000));
-  time_system_.sleep(std::chrono::milliseconds(1));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(1));
   SpanPtr root_span = tracer.startSpan(config, "my_span", timestamp);
 
   EXPECT_EQ("my_span", root_span->name());
@@ -184,7 +184,7 @@ TEST_F(ZipkinTracerTest, SpanCreation) {
 
   ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Ingress));
   TestRandomGenerator generator;
-  const uint generated_parent_id = generator.random();
+  const uint64_t generated_parent_id = generator.random();
   SpanContext modified_root_span_context(root_span_context.trace_id_high(),
                                          root_span_context.trace_id(), root_span_context.id(),
                                          generated_parent_id, root_span_context.sampled());

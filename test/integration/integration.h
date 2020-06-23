@@ -162,7 +162,7 @@ public:
                       Network::Address::IpVersion version,
                       const std::string& config = ConfigHelper::httpProxyConfig());
 
-  virtual ~BaseIntegrationTest() = default;
+  virtual ~BaseIntegrationTest();
 
   // TODO(jmarantz): Remove this once
   // https://github.com/envoyproxy/envoy-filter-example/pull/69 is reverted.
@@ -207,11 +207,11 @@ public:
   void createTestServer(const std::string& json_path, const std::vector<std::string>& port_names);
   void createGeneratedApiTestServer(const std::string& bootstrap_path,
                                     const std::vector<std::string>& port_names,
-                                    bool allow_unknown_static_fields,
-                                    bool reject_unknown_dynamic_fields, bool allow_lds_rejection);
+                                    Server::FieldValidationConfig validator_config,
+                                    bool allow_lds_rejection);
   void createApiTestServer(const ApiFilesystemConfig& api_filesystem_config,
                            const std::vector<std::string>& port_names,
-                           bool allow_unknown_static_fields, bool reject_unknown_dynamic_fields,
+                           Server::FieldValidationConfig validator_config,
                            bool allow_lds_rejection);
 
   Event::TestTimeSystem& timeSystem() { return time_system_; }
@@ -223,8 +223,8 @@ public:
 
   // Enable the listener access log
   void useListenerAccessLog(absl::string_view format = "");
-  // Waits for the first access log entry.
-  std::string waitForAccessLog(const std::string& filename);
+  // Waits for the nth access log entry, defaulting to log entry 0.
+  std::string waitForAccessLog(const std::string& filename, uint32_t entry = 0);
 
   std::string listener_access_log_name_;
 
@@ -249,11 +249,12 @@ public:
   template <class T>
   void sendDiscoveryResponse(const std::string& type_url, const std::vector<T>& state_of_the_world,
                              const std::vector<T>& added_or_updated,
-                             const std::vector<std::string>& removed, const std::string& version) {
+                             const std::vector<std::string>& removed, const std::string& version,
+                             const bool api_downgrade = true) {
     if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
-      sendSotwDiscoveryResponse(type_url, state_of_the_world, version);
+      sendSotwDiscoveryResponse(type_url, state_of_the_world, version, api_downgrade);
     } else {
-      sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version);
+      sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, api_downgrade);
     }
   }
 
@@ -285,12 +286,16 @@ public:
 
   template <class T>
   void sendSotwDiscoveryResponse(const std::string& type_url, const std::vector<T>& messages,
-                                 const std::string& version) {
+                                 const std::string& version, const bool api_downgrade = true) {
     API_NO_BOOST(envoy::api::v2::DiscoveryResponse) discovery_response;
     discovery_response.set_version_info(version);
     discovery_response.set_type_url(type_url);
     for (const auto& message : messages) {
-      discovery_response.add_resources()->PackFrom(API_DOWNGRADE(message));
+      if (api_downgrade) {
+        discovery_response.add_resources()->PackFrom(API_DOWNGRADE(message));
+      } else {
+        discovery_response.add_resources()->PackFrom(message);
+      }
     }
     static int next_nonce_counter = 0;
     discovery_response.set_nonce(absl::StrCat("nonce", next_nonce_counter++));
@@ -298,18 +303,21 @@ public:
   }
 
   template <class T>
-  void
-  sendDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
-                             const std::vector<std::string>& removed, const std::string& version) {
-    sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, xds_stream_);
+  void sendDeltaDiscoveryResponse(const std::string& type_url,
+                                  const std::vector<T>& added_or_updated,
+                                  const std::vector<std::string>& removed,
+                                  const std::string& version, const bool api_downgrade = true) {
+    sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, xds_stream_, {},
+                               api_downgrade);
   }
   template <class T>
   void
   sendDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
                              const std::vector<std::string>& removed, const std::string& version,
-                             FakeStreamPtr& stream, const std::vector<std::string>& aliases = {}) {
-    auto response =
-        createDeltaDiscoveryResponse<T>(type_url, added_or_updated, removed, version, aliases);
+                             FakeStreamPtr& stream, const std::vector<std::string>& aliases = {},
+                             const bool api_downgrade = true) {
+    auto response = createDeltaDiscoveryResponse<T>(type_url, added_or_updated, removed, version,
+                                                    aliases, api_downgrade);
     stream->sendGrpcMessage(response);
   }
 
@@ -317,7 +325,8 @@ public:
   envoy::api::v2::DeltaDiscoveryResponse
   createDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
                                const std::vector<std::string>& removed, const std::string& version,
-                               const std::vector<std::string>& aliases) {
+                               const std::vector<std::string>& aliases,
+                               const bool api_downgrade = true) {
 
     API_NO_BOOST(envoy::api::v2::DeltaDiscoveryResponse) response;
     response.set_system_version_info("system_version_info_this_is_a_test");
@@ -325,10 +334,15 @@ public:
     for (const auto& message : added_or_updated) {
       auto* resource = response.add_resources();
       ProtobufWkt::Any temp_any;
-      temp_any.PackFrom(API_DOWNGRADE(message));
+      if (api_downgrade) {
+        temp_any.PackFrom(API_DOWNGRADE(message));
+        resource->mutable_resource()->PackFrom(API_DOWNGRADE(message));
+      } else {
+        temp_any.PackFrom(message);
+        resource->mutable_resource()->PackFrom(message);
+      }
       resource->set_name(TestUtility::xdsResourceName(temp_any));
       resource->set_version(version);
-      resource->mutable_resource()->PackFrom(API_DOWNGRADE(message));
       for (const auto& alias : aliases) {
         resource->add_aliases(alias);
       }
@@ -358,6 +372,21 @@ public:
    **/
   void sendRawHttpAndWaitForResponse(int port, const char* raw_http, std::string* response,
                                      bool disconnect_after_headers_complete = false);
+
+  /**
+   * Helper to create ConnectionDriver.
+   *
+   * @param port the port to connect to.
+   * @param initial_data the data to send.
+   * @param data_callback the callback on the received data.
+   **/
+  std::unique_ptr<RawConnectionDriver> createConnectionDriver(
+      uint32_t port, const std::string& initial_data,
+      std::function<void(Network::ClientConnection&, const Buffer::Instance&)>&& data_callback) {
+    Buffer::OwnedImpl buffer(initial_data);
+    return std::make_unique<RawConnectionDriver>(port, buffer, data_callback, version_,
+                                                 *dispatcher_);
+  }
 
 protected:
   // Create the envoy server in another thread and start it.
@@ -419,6 +448,13 @@ protected:
   // The number of worker threads that the test server uses.
   uint32_t concurrency_{1};
 
+  // The duration of the drain manager graceful drain period.
+  std::chrono::seconds drain_time_{1};
+
+  // The DrainStrategy that dictates the behaviour of
+  // DrainManagerImpl::drainClose().
+  Server::DrainStrategy drain_strategy_{Server::DrainStrategy::Gradual};
+
   // Member variables for xDS testing.
   FakeUpstream* xds_upstream_{};
   FakeHttpConnectionPtr xds_connection_;
@@ -429,6 +465,10 @@ protected:
   bool tls_xds_upstream_{false};
   bool use_lds_{true}; // Use the integration framework's LDS set up.
   Grpc::SotwOrDelta sotw_or_delta_{Grpc::SotwOrDelta::Sotw};
+
+  // By default the test server will use custom stats to notify on increment.
+  // This override exists for tests measuring stats memory.
+  bool use_real_stats_{};
 
 private:
   // The type for the Envoy-to-backend connection

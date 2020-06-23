@@ -7,6 +7,7 @@
 
 #include "envoy/common/pure.h"
 
+#include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -20,7 +21,7 @@ namespace Stats {
  * declaration for StatName is in source/common/stats/symbol_table_impl.h
  */
 class StatName;
-using StatNameVec = std::vector<StatName>;
+using StatNameVec = absl::InlinedVector<StatName, 8>;
 
 class StatNameList;
 class StatNameSet;

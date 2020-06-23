@@ -24,6 +24,15 @@
 namespace Envoy {
 namespace Server {
 
+class ListenerMessageUtil {
+public:
+  /**
+   * @return true if listener message lhs and rhs are the same if ignoring filter_chains field.
+   */
+  static bool filterChainOnlyChange(const envoy::config::listener::v3::Listener& lhs,
+                                    const envoy::config::listener::v3::Listener& rhs);
+};
+
 class ListenerManagerImpl;
 
 class ListenSocketFactoryImpl : public Network::ListenSocketFactory,
@@ -31,12 +40,12 @@ class ListenSocketFactoryImpl : public Network::ListenSocketFactory,
 public:
   ListenSocketFactoryImpl(ListenerComponentFactory& factory,
                           Network::Address::InstanceConstSharedPtr address,
-                          Network::Address::SocketType socket_type,
+                          Network::Socket::Type socket_type,
                           const Network::Socket::OptionsSharedPtr& options, bool bind_to_port,
                           const std::string& listener_name, bool reuse_port);
 
   // Network::ListenSocketFactory
-  Network::Address::SocketType socketType() const override { return socket_type_; }
+  Network::Socket::Type socketType() const override { return socket_type_; }
   const Network::Address::InstanceConstSharedPtr& localAddress() const override {
     return local_address_;
   }
@@ -64,7 +73,7 @@ private:
   // Initially, its port number might be 0. Once a socket is created, its port
   // will be set to the binding port.
   Network::Address::InstanceConstSharedPtr local_address_;
-  Network::Address::SocketType socket_type_;
+  Network::Socket::Type socket_type_;
   const Network::Socket::OptionsSharedPtr options_;
   bool bind_to_port_;
   const std::string& listener_name_;
@@ -211,12 +220,34 @@ public:
    * @param workers_started supplies whether the listener is being added before or after workers
    *        have been started. This controls various behavior related to init management.
    * @param hash supplies the hash to use for duplicate checking.
-   * @param validation_visitor message validation visitor instance.
+   * @param concurrency is the number of listeners instances to be created.
    */
   ListenerImpl(const envoy::config::listener::v3::Listener& config, const std::string& version_info,
                ListenerManagerImpl& parent, const std::string& name, bool added_via_api,
                bool workers_started, uint64_t hash, uint32_t concurrency);
   ~ListenerImpl() override;
+
+  // TODO(lambdai): Explore using the same ListenerImpl object to execute in place filter chain
+  // update.
+  /**
+   * Execute in place filter chain update. The filter chain update is less expensive than full
+   * listener update because connections may not need to be drained.
+   */
+  std::unique_ptr<ListenerImpl>
+  newListenerWithFilterChain(const envoy::config::listener::v3::Listener& config,
+                             bool workers_started, uint64_t hash);
+  /**
+   * Determine if in place filter chain update could be executed at this moment.
+   */
+  bool supportUpdateFilterChain(const envoy::config::listener::v3::Listener& config,
+                                bool worker_started);
+
+  /**
+   * Run the callback on each filter chain that exists in this listener but not in the passed
+   * listener config.
+   */
+  void diffFilterChain(const ListenerImpl& another_listener,
+                       std::function<void(Network::DrainableFilterChain&)> callback);
 
   /**
    * Helper functions to determine whether a listener is blocked for update or remove.
@@ -296,10 +327,26 @@ public:
   SystemTime last_updated_;
 
 private:
-  void addListenSocketOption(const Network::Socket::OptionConstSharedPtr& option) {
-    ensureSocketOptions();
-    listen_socket_options_->emplace_back(std::move(option));
-  }
+  /**
+   * Create a new listener from an existing listener and the new config message if the in place
+   * filter chain update is decided. Should be called only by newListenerWithFilterChain().
+   */
+  ListenerImpl(const ListenerImpl& origin, const envoy::config::listener::v3::Listener& config,
+               const std::string& version_info, ListenerManagerImpl& parent,
+               const std::string& name, bool added_via_api, bool workers_started, uint64_t hash,
+               uint32_t concurrency);
+  // Helpers for constructor.
+  void buildAccessLog();
+  void buildUdpListenerFactory(Network::Socket::Type socket_type, uint32_t concurrency);
+  void buildListenSocketOptions(Network::Socket::Type socket_type);
+  void createListenerFilterFactories(Network::Socket::Type socket_type);
+  void validateFilterChains(Network::Socket::Type socket_type);
+  void buildFilterChains();
+  void buildSocketOptions();
+  void buildOriginalDstListenerFilter();
+  void buildProxyProtocolListenerFilter();
+  void buildTlsInspectorListenerFilter();
+
   void addListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) {
     ensureSocketOptions();
     Network::Socket::appendOptions(listen_socket_options_, options);

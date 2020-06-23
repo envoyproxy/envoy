@@ -1,10 +1,10 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -14,6 +14,7 @@ envoy_cc_test(
     data = [
         "//test/extensions/transport_sockets/tls/test_data:certs",
     ],
+    tags = ["fails_on_windows"],
     deps = [
         "//source/common/secret:sds_api_lib",
         "//source/common/secret:secret_manager_impl_lib",

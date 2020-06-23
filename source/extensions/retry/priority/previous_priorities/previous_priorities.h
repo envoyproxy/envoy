@@ -13,15 +13,16 @@ class PreviousPrioritiesRetryPriority : public Upstream::RetryPriority {
 public:
   PreviousPrioritiesRetryPriority(uint32_t update_frequency, uint32_t max_retries)
       : update_frequency_(update_frequency) {
-    attempted_priorities_.reserve(max_retries);
+    attempted_hosts_.reserve(max_retries);
   }
 
   const Upstream::HealthyAndDegradedLoad&
   determinePriorityLoad(const Upstream::PrioritySet& priority_set,
-                        const Upstream::HealthyAndDegradedLoad& original_priority_load) override;
+                        const Upstream::HealthyAndDegradedLoad& original_priority_load,
+                        const PriorityMappingFunc& priority_mapping_func) override;
 
   void onHostAttempted(Upstream::HostDescriptionConstSharedPtr attempted_host) override {
-    attempted_priorities_.emplace_back(attempted_host->priority());
+    attempted_hosts_.emplace_back(attempted_host);
   }
 
 private:
@@ -41,7 +42,7 @@ private:
   bool adjustForAttemptedPriorities(const Upstream::PrioritySet& priority_set);
 
   const uint32_t update_frequency_;
-  std::vector<uint32_t> attempted_priorities_;
+  std::vector<Upstream::HostDescriptionConstSharedPtr> attempted_hosts_;
   std::vector<bool> excluded_priorities_;
   Upstream::HealthyAndDegradedLoad per_priority_load_;
   Upstream::HealthyAvailability per_priority_health_;

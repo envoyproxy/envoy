@@ -1,0 +1,7 @@
+1.12.1 (November 8, 2019)
+=========================
+
+Changes
+-------
+
+* listener: fixed CVE-2019-18836 by clearing accept filters before connection creation.

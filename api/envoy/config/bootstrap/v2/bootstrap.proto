@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.config.bootstrap.v2;
 
-import "envoy/api/v2/auth/cert.proto";
+import "envoy/api/v2/auth/secret.proto";
 import "envoy/api/v2/cluster.proto";
 import "envoy/api/v2/core/address.proto";
 import "envoy/api/v2/core/base.proto";
@@ -12,7 +12,7 @@ import "envoy/api/v2/core/socket_option.proto";
 import "envoy/api/v2/listener.proto";
 import "envoy/config/metrics/v2/stats.proto";
 import "envoy/config/overload/v2alpha/overload.proto";
-import "envoy/config/trace/v2/trace.proto";
+import "envoy/config/trace/v2/http_tracer.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
@@ -117,8 +117,11 @@ message Bootstrap {
   // Optional watchdog configuration.
   Watchdog watchdog = 8;
 
-  // Configuration for an external tracing provider. If not specified, no
-  // tracing will be performed.
+  // Configuration for an external tracing provider.
+  //
+  // .. attention::
+  //  This field has been deprecated in favor of :ref:`HttpConnectionManager.Tracing.provider
+  //  <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.Tracing.provider>`.
   trace.v2.Tracing tracing = 9;
 
   // Configuration for the runtime configuration provider (deprecated). If not

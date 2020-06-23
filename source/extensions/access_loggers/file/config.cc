@@ -8,8 +8,9 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/access_log/access_log_formatter.h"
 #include "common/common/logger.h"
+#include "common/formatter/substitution_format_string.h"
+#include "common/formatter/substitution_formatter.h"
 #include "common/protobuf/protobuf.h"
 
 #include "extensions/access_loggers/file/file_access_log_impl.h"
@@ -27,32 +28,36 @@ FileAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
   const auto& fal_config = MessageUtil::downcastAndValidate<
       const envoy::extensions::access_loggers::file::v3::FileAccessLog&>(
       config, context.messageValidationVisitor());
-  AccessLog::FormatterPtr formatter;
+  Formatter::FormatterPtr formatter;
 
-  if (fal_config.access_log_format_case() == envoy::extensions::access_loggers::file::v3::
-                                                 FileAccessLog::AccessLogFormatCase::kFormat ||
-      fal_config.access_log_format_case() ==
-          envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::
-              ACCESS_LOG_FORMAT_NOT_SET) {
+  switch (fal_config.access_log_format_case()) {
+  case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::kFormat:
     if (fal_config.format().empty()) {
-      formatter = AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter();
+      formatter = Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter();
     } else {
-      formatter = std::make_unique<AccessLog::FormatterImpl>(fal_config.format());
+      envoy::config::core::v3::SubstitutionFormatString sff_config;
+      sff_config.set_text_format(fal_config.format());
+      formatter = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(sff_config);
     }
-  } else if (fal_config.access_log_format_case() ==
-             envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::
-                 kJsonFormat) {
-    auto json_format_map = this->convertJsonFormatToMap(fal_config.json_format());
-    formatter = std::make_unique<AccessLog::JsonFormatterImpl>(json_format_map, false);
-  } else if (fal_config.access_log_format_case() ==
-             envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::
-                 kTypedJsonFormat) {
-    auto json_format_map = this->convertJsonFormatToMap(fal_config.typed_json_format());
-    formatter = std::make_unique<AccessLog::JsonFormatterImpl>(json_format_map, true);
-  } else {
-    throw EnvoyException(
-        "Invalid access_log format provided. Only 'format', 'json_format', or 'typed_json_format' "
-        "are supported.");
+    break;
+  case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::kJsonFormat:
+    formatter = Formatter::SubstitutionFormatStringUtils::createJsonFormatter(
+        fal_config.json_format(), false);
+    break;
+  case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::
+      kTypedJsonFormat: {
+    envoy::config::core::v3::SubstitutionFormatString sff_config;
+    *sff_config.mutable_json_format() = fal_config.typed_json_format();
+    formatter = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(sff_config);
+    break;
+  }
+  case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::kLogFormat:
+    formatter = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(fal_config.log_format());
+    break;
+  case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::
+      ACCESS_LOG_FORMAT_NOT_SET:
+    formatter = Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter();
+    break;
   }
 
   return std::make_shared<FileAccessLog>(fal_config.path(), std::move(filter), std::move(formatter),
@@ -65,18 +70,6 @@ ProtobufTypes::MessagePtr FileAccessLogFactory::createEmptyConfigProto() {
 }
 
 std::string FileAccessLogFactory::name() const { return AccessLogNames::get().File; }
-
-std::unordered_map<std::string, std::string>
-FileAccessLogFactory::convertJsonFormatToMap(ProtobufWkt::Struct json_format) {
-  std::unordered_map<std::string, std::string> output;
-  for (const auto& pair : json_format.fields()) {
-    if (pair.second.kind_case() != ProtobufWkt::Value::kStringValue) {
-      throw EnvoyException("Only string values are supported in the JSON access log format.");
-    }
-    output.emplace(pair.first, pair.second.string_value());
-  }
-  return output;
-}
 
 /**
  * Static registration for the file access log. @see RegisterFactory.

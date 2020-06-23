@@ -23,6 +23,8 @@ public:
                                    Gauge::ImportMode import_mode) override;
   Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                            Histogram::Unit unit) override;
+  TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
+                                               StatNameTagVectorOptConstRef tags) override;
   void deliverHistogramToSinks(const Histogram& histograms, uint64_t val) override;
 
   Counter& counterFromString(const std::string& name) override {
@@ -37,10 +39,15 @@ public:
     StatNameManagedStorage storage(name, symbolTable());
     return Scope::histogramFromStatName(storage.statName(), unit);
   }
+  TextReadout& textReadoutFromString(const std::string& name) override {
+    StatNameManagedStorage storage(name, symbolTable());
+    return Scope::textReadoutFromStatName(storage.statName());
+  }
 
   CounterOptConstRef findCounter(StatName name) const override;
   GaugeOptConstRef findGauge(StatName name) const override;
   HistogramOptConstRef findHistogram(StatName name) const override;
+  TextReadoutOptConstRef findTextReadout(StatName name) const override;
 
   const SymbolTable& constSymbolTable() const override { return scope_.constSymbolTable(); }
   SymbolTable& symbolTable() override { return scope_.symbolTable(); }

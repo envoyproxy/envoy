@@ -1,14 +1,14 @@
-licenses(["notice"])  # Apache 2
-
-# AWS DynamoDB L7 HTTP filter (observability): https://aws.amazon.com/dynamodb/
-# Public docs: docs/root/configuration/http_filters/dynamodb_filter.rst
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
+
+# AWS DynamoDB L7 HTTP filter (observability): https://aws.amazon.com/dynamodb/
+# Public docs: docs/root/configuration/http_filters/dynamodb_filter.rst
 
 envoy_package()
 
@@ -61,5 +61,6 @@ envoy_cc_library(
         ":dynamo_request_parser_lib",
         "//include/envoy/stats:stats_interface",
         "//source/common/stats:symbol_table_lib",
+        "//source/common/stats:utility_lib",
     ],
 )

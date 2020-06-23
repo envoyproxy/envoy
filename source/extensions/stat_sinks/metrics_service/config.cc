@@ -25,15 +25,18 @@ Stats::SinkPtr MetricsServiceSinkFactory::createStatsSink(const Protobuf::Messag
       MessageUtil::downcastAndValidate<const envoy::config::metrics::v3::MetricsServiceConfig&>(
           config, server.messageValidationContext().staticValidationVisitor());
   const auto& grpc_service = sink_config.grpc_service();
+  const auto& transport_api_version = sink_config.transport_api_version();
   ENVOY_LOG(debug, "Metrics Service gRPC service configuration: {}", grpc_service.DebugString());
 
   std::shared_ptr<GrpcMetricsStreamer> grpc_metrics_streamer =
       std::make_shared<GrpcMetricsStreamerImpl>(
           server.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
               grpc_service, server.stats(), false),
-          server.localInfo());
+          server.localInfo(), transport_api_version);
 
-  return std::make_unique<MetricsServiceSink>(grpc_metrics_streamer, server.timeSource());
+  return std::make_unique<MetricsServiceSink>(
+      grpc_metrics_streamer, server.timeSource(),
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, report_counters_as_deltas, false));
 }
 
 ProtobufTypes::MessagePtr MetricsServiceSinkFactory::createEmptyConfigProto() {

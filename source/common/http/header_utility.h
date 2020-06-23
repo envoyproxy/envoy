@@ -5,6 +5,7 @@
 #include "envoy/common/regex.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/http/header_map.h"
+#include "envoy/http/protocol.h"
 #include "envoy/json/json_object.h"
 #include "envoy/type/v3/range.pb.h"
 
@@ -112,6 +113,17 @@ public:
   static bool authorityIsValid(const absl::string_view authority_value);
 
   /**
+   * @brief a helper function to determine if the headers represent a CONNECT request.
+   */
+  static bool isConnect(const RequestHeaderMap& headers);
+
+  /**
+   * @brief a helper function to determine if the headers represent an accepted CONNECT response.
+   */
+  static bool isConnectResponse(const RequestHeaderMapPtr& request_headers,
+                                const ResponseHeaderMap& response_headers);
+
+  /**
    * Add headers from one HeaderMap to another
    * @param headers target where headers will be added
    * @param headers_to_add supplies the headers to be added
@@ -130,6 +142,21 @@ public:
    */
   static absl::optional<std::reference_wrapper<const absl::string_view>>
   requestHeadersValid(const RequestHeaderMap& headers);
+
+  /**
+   * Determines if the response should be framed by Connection: Close based on protocol
+   * and headers.
+   * @param protocol the protocol of the request
+   * @param headers the request or response headers
+   * @return if the response should be framed by Connection: Close
+   */
+  static bool shouldCloseConnection(Http::Protocol protocol,
+                                    const RequestOrResponseHeaderMap& headers);
+
+  /**
+   * @brief Remove the port part from host/authority header if it is equal to provided port
+   */
+  static void stripPortFromHost(RequestHeaderMap& headers, uint32_t listener_port);
 };
 } // namespace Http
 } // namespace Envoy

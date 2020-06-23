@@ -11,5 +11,5 @@ annotated in the API proto itself and explained in detail in the
 For the first 3 months following deprecation, use of deprecated fields will result in a logged
 warning and incrementing the :ref:`deprecated_feature_use <runtime_stats>` counter.
 After that point, the field will be annotated as fatal-by-default and further use of the field
-will will be treated as invalid configuration unless
+will be treated as invalid configuration unless
 :ref:`runtime overrides <config_runtime_deprecation>` are employed to re-enable use.

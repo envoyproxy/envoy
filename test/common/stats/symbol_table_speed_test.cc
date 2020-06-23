@@ -5,13 +5,17 @@
 
 #include "common/common/logger.h"
 #include "common/common/thread.h"
+#include "common/stats/isolated_store_impl.h"
 #include "common/stats/symbol_table_impl.h"
+#include "common/stats/utility.h"
 
+#include "test/common/stats/make_elements_helper.h"
 #include "test/test_common/utility.h"
 
 #include "absl/synchronization/blocking_counter.h"
 #include "benchmark/benchmark.h"
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_CreateRace(benchmark::State& state) {
   Envoy::Thread::ThreadFactory& thread_factory = Envoy::Thread::threadFactoryForTest();
 
@@ -53,6 +57,38 @@ static void BM_CreateRace(benchmark::State& state) {
   initial.free(table);
 }
 BENCHMARK(BM_CreateRace);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_JoinStatNames(benchmark::State& state) {
+  Envoy::Stats::SymbolTableImpl symbol_table;
+  Envoy::Stats::IsolatedStoreImpl store(symbol_table);
+  Envoy::Stats::StatNamePool pool(symbol_table);
+  Envoy::Stats::StatName a = pool.add("a");
+  Envoy::Stats::StatName b = pool.add("b");
+  Envoy::Stats::StatName c = pool.add("c");
+  Envoy::Stats::StatName d = pool.add("d");
+  Envoy::Stats::StatName e = pool.add("e");
+  for (auto _ : state) {
+    Envoy::Stats::Utility::counterFromStatNames(store, Envoy::Stats::makeStatNames(a, b, c, d, e));
+  }
+}
+BENCHMARK(BM_JoinStatNames);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_JoinElements(benchmark::State& state) {
+  Envoy::Stats::SymbolTableImpl symbol_table;
+  Envoy::Stats::IsolatedStoreImpl store(symbol_table);
+  Envoy::Stats::StatNamePool pool(symbol_table);
+  Envoy::Stats::StatName a = pool.add("a");
+  Envoy::Stats::StatName b = pool.add("b");
+  Envoy::Stats::StatName c = pool.add("c");
+  Envoy::Stats::StatName e = pool.add("e");
+  for (auto _ : state) {
+    Envoy::Stats::Utility::counterFromElements(
+        store, Envoy::Stats::makeElements(a, b, c, Envoy::Stats::DynamicName("d"), e));
+  }
+}
+BENCHMARK(BM_JoinElements);
 
 int main(int argc, char** argv) {
   Envoy::Thread::MutexBasicLockable lock;

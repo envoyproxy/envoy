@@ -150,6 +150,12 @@ public:
      * Reset the stream.
      */
     virtual void reset() PURE;
+
+    /***
+     * @returns if the stream has enough buffered outbound data to be over the configured buffer
+     * limits
+     */
+    virtual bool isAboveWriteBufferHighWatermark() const PURE;
   };
 
   virtual ~AsyncClient() = default;

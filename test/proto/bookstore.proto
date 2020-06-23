@@ -91,6 +91,11 @@ service Bookstore {
       get: "/index"
     };
   }
+  rpc GetIndexStream(google.protobuf.Empty) returns (stream google.api.HttpBody) {
+    option (google.api.http) = {
+      get: "/indexStream"
+    };
+  }
   rpc PostBody(EchoBodyRequest) returns (google.protobuf.Empty) {
     option (google.api.http) = {
       post: "/postBody"
@@ -113,6 +118,14 @@ service Bookstore {
     option (google.api.http) = {
       post: "/echoStruct"
       body: "content"
+    };
+  }
+  // To test grpc transcoding with an unknown field.
+  // This could happen when the grpc server is using a updated proto with a new field,
+  // but Envoy transcoding config is still using the old version.
+  rpc GetBigBook(google.protobuf.Empty) returns (OldBigBook) {
+    option (google.api.http) = {
+      get: "/bigbook"
     };
   }
 }
@@ -246,4 +259,18 @@ message DeepNestedBody {
     Nested nested = 1000000;
   }
   Nested nested = 1;
+}
+
+// gRPC server is using BigBook, but envoy transcoder filter is using
+// OldBigBook with missing `field1`.
+message BigBook {
+  string field1 = 1;
+  string field2 = 2;
+  string field3 = 3;
+}
+
+// The BigBook message with missing `field1`.
+message OldBigBook {
+  string field2 = 2;
+  string field3 = 3;
 }

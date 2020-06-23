@@ -4,7 +4,7 @@ Secret discovery service (SDS)
 ==============================
 
 TLS certificates, the secrets, can be specified in the bootstrap.static_resource
-:ref:`secrets <envoy_api_field_config.bootstrap.v2.Bootstrap.StaticResources.secrets>`.
+:ref:`secrets <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.StaticResources.secrets>`.
 But they can also be fetched remotely by secret discovery service (SDS).
 
 The most important benefit of SDS is to simplify the certificate management. Without this feature, in k8s deployment, certificates must be created as secrets and mounted into the proxy containers. If certificates are expired, the secrets need to be updated and the proxy containers need to be re-deployed. With SDS, a central SDS server will push certificates to all Envoy instances. If certificates are expired, the server just pushes new certificates to Envoy instances, Envoy will use the new ones right away without re-deployment.
@@ -23,15 +23,15 @@ The connection between Envoy proxy and SDS server has to be secure. One option i
 SDS server
 ----------
 
-A SDS server needs to implement the gRPC service :repo:`SecretDiscoveryService <api/envoy/service/discovery/v2/sds.proto>`.
+A SDS server needs to implement the gRPC service :repo:`SecretDiscoveryService <api/envoy/service/secret/v3/sds.proto>`.
 It follows the same protocol as other :ref:`xDS <xds_protocol>`.
 
 SDS Configuration
 -----------------
 
-:ref:`SdsSecretConfig <envoy_api_msg_auth.SdsSecretConfig>` is used to specify the secret. Its field *name* is a required field. If its *sds_config* field is empty, the *name* field specifies the secret in the bootstrap static_resource :ref:`secrets <envoy_api_field_config.bootstrap.v2.Bootstrap.StaticResources.secrets>`. Otherwise, it specifies the SDS server as :ref:`ConfigSource <envoy_api_msg_core.ConfigSource>`. Only gRPC is supported for the SDS service so its *api_config_source* must specify a **grpc_service**.
+:ref:`SdsSecretConfig <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.SdsSecretConfig>` is used to specify the secret. Its field *name* is a required field. If its *sds_config* field is empty, the *name* field specifies the secret in the bootstrap static_resource :ref:`secrets <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.StaticResources.secrets>`. Otherwise, it specifies the SDS server as :ref:`ConfigSource <envoy_v3_api_msg_config.core.v3.ConfigSource>`. Only gRPC is supported for the SDS service so its *api_config_source* must specify a **grpc_service**.
 
-*SdsSecretConfig* is used in two fields in :ref:`CommonTlsContext <envoy_api_msg_auth.CommonTlsContext>`. The first field is *tls_certificate_sds_secret_configs* to use SDS to get :ref:`TlsCertificate <envoy_api_msg_auth.TlsCertificate>`. The second field is *validation_context_sds_secret_config* to use SDS to get :ref:`CertificateValidationContext <envoy_api_msg_auth.CertificateValidationContext>`.
+*SdsSecretConfig* is used in two fields in :ref:`CommonTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CommonTlsContext>`. The first field is *tls_certificate_sds_secret_configs* to use SDS to get :ref:`TlsCertificate <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.TlsCertificate>`. The second field is *validation_context_sds_secret_config* to use SDS to get :ref:`CertificateValidationContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CertificateValidationContext>`.
 
 Example one: static_resource
 -----------------------------
@@ -68,7 +68,7 @@ This example show how to configure secrets in the static_resource:
           transport_socket:
             name: envoy.transport_sockets.tls
             typed_config:
-              "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
+              "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
               common_tls_context:
                 tls_certificate_sds_secret_configs:
                 - name: client_cert
@@ -78,7 +78,7 @@ This example show how to configure secrets in the static_resource:
         transport_socket:
           name: envoy.transport_sockets.tls
           typed_config:
-            "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+            "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
             common_tls_context:
               tls_certificate_sds_secret_configs:
               - name: server_cert
@@ -112,7 +112,7 @@ This example shows how to configure secrets fetched from remote SDS servers:
         transport_socket:
           name: envoy.transport_sockets.tls
           typed_config:
-            "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
+            "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
             common_tls_context:
             - tls_certificate:
               certificate_chain:
@@ -137,7 +137,7 @@ This example shows how to configure secrets fetched from remote SDS servers:
           transport_socket:
           name: envoy.transport_sockets.tls
           typed_config:
-            "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
+            "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
               common_tls_context:
                 tls_certificate_sds_secret_configs:
                 - name: client_cert
@@ -153,7 +153,7 @@ This example shows how to configure secrets fetched from remote SDS servers:
       - transport_socket:
           name: envoy.transport_sockets.tls
           typed_config:
-            "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+            "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
             common_tls_context:
               tls_certificate_sds_secret_configs:
               - name: server_cert
@@ -205,7 +205,7 @@ In contrast, :ref:`sds_server_example` requires a restart to reload xDS certific
       transport_socket:
         name: "envoy.transport_sockets.tls"
         typed_config:
-          "@type": "type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext"
+          "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext"
           common_tls_context:
             tls_certificate_sds_secret_configs:
               sds_config:
@@ -219,7 +219,7 @@ Paths to client certificate, including client's certificate chain and private ke
 .. code-block:: yaml
 
     resources:
-      - "@type": "type.googleapis.com/envoy.api.v2.auth.Secret"
+      - "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret"
         tls_certificate:
           certificate_chain:
             filename: /certs/sds_cert.pem
@@ -231,7 +231,7 @@ Path to CA certificate bundle for validating the xDS server certificate is given
 .. code-block:: yaml
 
     resources:
-      - "@type": "type.googleapis.com/envoy.api.v2.auth.Secret"
+      - "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret"
         validation_context:
           trusted_ca:
             filename: /certs/cacert.pem

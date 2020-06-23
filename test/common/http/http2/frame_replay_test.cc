@@ -60,14 +60,14 @@ TEST_F(RequestFrameCommentTest, SimpleExampleHuffman) {
       codec.server_connection_, codec.server_callbacks_, codec.stats_store_, codec.options_,
       Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
       envoy::config::core::v3::HttpProtocolOptions::ALLOW);
-  codec.write(WellKnownFrames::clientConnectionPrefaceFrame(), connection);
-  codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
-  codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection);
+  EXPECT_TRUE(codec.write(WellKnownFrames::clientConnectionPrefaceFrame(), connection).ok());
+  EXPECT_TRUE(codec.write(WellKnownFrames::defaultSettingsFrame(), connection).ok());
+  EXPECT_TRUE(codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection).ok());
   TestRequestHeaderMapImpl expected_headers;
   HttpTestUtility::addDefaultHeaders(expected_headers);
   expected_headers.addCopy("foo", "barbaz");
   EXPECT_CALL(codec.request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
-  codec.write(header.frame(), connection);
+  EXPECT_TRUE(codec.write(header.frame(), connection).ok());
 }
 
 // Validate that a simple Huffman encoded response HEADERS frame can be decoded.
@@ -91,16 +91,17 @@ TEST_F(ResponseFrameCommentTest, SimpleExampleHuffman) {
   ClientCodecFrameInjector codec;
   TestClientConnectionImpl connection(
       codec.client_connection_, codec.client_callbacks_, codec.stats_store_, codec.options_,
-      Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT);
+      Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
+      ProdNghttp2SessionFactory::get());
   setupStream(codec, connection);
 
-  codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
-  codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection);
-  TestHeaderMapImpl expected_headers;
+  EXPECT_TRUE(codec.write(WellKnownFrames::defaultSettingsFrame(), connection).ok());
+  EXPECT_TRUE(codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection).ok());
+  TestResponseHeaderMapImpl expected_headers;
   expected_headers.addCopy(":status", "200");
   expected_headers.addCopy("compression", "test");
   EXPECT_CALL(codec.response_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
-  codec.write(header.frame(), connection);
+  EXPECT_TRUE(codec.write(header.frame(), connection).ok());
 }
 
 // Validate that a simple non-Huffman request HEADERS frame with no static table user either can be
@@ -137,14 +138,14 @@ TEST_F(RequestFrameCommentTest, SimpleExamplePlain) {
       codec.server_connection_, codec.server_callbacks_, codec.stats_store_, codec.options_,
       Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
       envoy::config::core::v3::HttpProtocolOptions::ALLOW);
-  codec.write(WellKnownFrames::clientConnectionPrefaceFrame(), connection);
-  codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
-  codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection);
+  EXPECT_TRUE(codec.write(WellKnownFrames::clientConnectionPrefaceFrame(), connection).ok());
+  EXPECT_TRUE(codec.write(WellKnownFrames::defaultSettingsFrame(), connection).ok());
+  EXPECT_TRUE(codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection).ok());
   TestRequestHeaderMapImpl expected_headers;
   HttpTestUtility::addDefaultHeaders(expected_headers);
   expected_headers.addCopy("foo", "barbaz");
   EXPECT_CALL(codec.request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
-  codec.write(header.frame(), connection);
+  EXPECT_TRUE(codec.write(header.frame(), connection).ok());
 }
 
 // Validate that a simple non-Huffman response HEADERS frame with no static table user either can be
@@ -170,16 +171,17 @@ TEST_F(ResponseFrameCommentTest, SimpleExamplePlain) {
   ClientCodecFrameInjector codec;
   TestClientConnectionImpl connection(
       codec.client_connection_, codec.client_callbacks_, codec.stats_store_, codec.options_,
-      Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT);
+      Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
+      ProdNghttp2SessionFactory::get());
   setupStream(codec, connection);
 
-  codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
-  codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection);
-  TestHeaderMapImpl expected_headers;
+  EXPECT_TRUE(codec.write(WellKnownFrames::defaultSettingsFrame(), connection).ok());
+  EXPECT_TRUE(codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection).ok());
+  TestResponseHeaderMapImpl expected_headers;
   expected_headers.addCopy(":status", "200");
   expected_headers.addCopy("compression", "test");
   EXPECT_CALL(codec.response_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
-  codec.write(header.frame(), connection);
+  EXPECT_TRUE(codec.write(header.frame(), connection).ok());
 }
 
 // Validate that corrupting any single byte with {NUL, CR, LF} in a HEADERS frame doesn't crash or
@@ -201,15 +203,14 @@ TEST_F(RequestFrameCommentTest, SingleByteNulCrLfInHeaderFrame) {
           codec.server_connection_, codec.server_callbacks_, codec.stats_store_, codec.options_,
           Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
           envoy::config::core::v3::HttpProtocolOptions::ALLOW);
-      codec.write(WellKnownFrames::clientConnectionPrefaceFrame(), connection);
-      codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
-      codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection);
-      try {
-        EXPECT_CALL(codec.request_decoder_, decodeHeaders_(_, _)).Times(AnyNumber());
-        EXPECT_CALL(codec.server_stream_callbacks_, onResetStream(_, _)).Times(AnyNumber());
-        codec.write(header.frame(), connection);
-      } catch (const CodecProtocolException& e) {
-        ENVOY_LOG_MISC(trace, "CodecProtocolException: {}", e.what());
+      EXPECT_TRUE(codec.write(WellKnownFrames::clientConnectionPrefaceFrame(), connection).ok());
+      EXPECT_TRUE(codec.write(WellKnownFrames::defaultSettingsFrame(), connection).ok());
+      EXPECT_TRUE(codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection).ok());
+      EXPECT_CALL(codec.request_decoder_, decodeHeaders_(_, _)).Times(AnyNumber());
+      EXPECT_CALL(codec.server_stream_callbacks_, onResetStream(_, _)).Times(AnyNumber());
+      auto status = codec.write(header.frame(), connection);
+      if (isCodecProtocolError(status)) {
+        ENVOY_LOG_MISC(trace, "CodecProtocolError: {}", status.message());
       }
       header.frame()[offset] = original;
     }
@@ -233,17 +234,17 @@ TEST_F(ResponseFrameCommentTest, SingleByteNulCrLfInHeaderFrame) {
       ClientCodecFrameInjector codec;
       TestClientConnectionImpl connection(
           codec.client_connection_, codec.client_callbacks_, codec.stats_store_, codec.options_,
-          Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT);
+          Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
+          ProdNghttp2SessionFactory::get());
       setupStream(codec, connection);
 
-      codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
-      codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection);
-      try {
-        EXPECT_CALL(codec.response_decoder_, decodeHeaders_(_, _)).Times(AnyNumber());
-        EXPECT_CALL(codec.client_stream_callbacks_, onResetStream(_, _)).Times(AnyNumber());
-        codec.write(header.frame(), connection);
-      } catch (const CodecProtocolException& e) {
-        ENVOY_LOG_MISC(trace, "CodecProtocolException: {}", e.what());
+      EXPECT_TRUE(codec.write(WellKnownFrames::defaultSettingsFrame(), connection).ok());
+      EXPECT_TRUE(codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection).ok());
+      EXPECT_CALL(codec.response_decoder_, decodeHeaders_(_, _)).Times(AnyNumber());
+      EXPECT_CALL(codec.client_stream_callbacks_, onResetStream(_, _)).Times(AnyNumber());
+      auto status = codec.write(header.frame(), connection);
+      if (isCodecProtocolError(status)) {
+        ENVOY_LOG_MISC(trace, "CodecProtocolError: {}", status.message());
       }
       header.frame()[offset] = original;
     }
@@ -270,17 +271,16 @@ TEST_F(RequestFrameCommentTest, SingleByteNulCrLfInHeaderField) {
           codec.server_connection_, codec.server_callbacks_, codec.stats_store_, codec.options_,
           Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
           envoy::config::core::v3::HttpProtocolOptions::ALLOW);
-      codec.write(WellKnownFrames::clientConnectionPrefaceFrame(), connection);
-      codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
-      codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection);
+      EXPECT_TRUE(codec.write(WellKnownFrames::clientConnectionPrefaceFrame(), connection).ok());
+      EXPECT_TRUE(codec.write(WellKnownFrames::defaultSettingsFrame(), connection).ok());
+      EXPECT_TRUE(codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection).ok());
       bool stream_reset = false;
       EXPECT_CALL(codec.request_decoder_, decodeHeaders_(_, _)).Times(0);
       EXPECT_CALL(codec.server_stream_callbacks_, onResetStream(_, _))
           .WillRepeatedly(InvokeWithoutArgs([&stream_reset] { stream_reset = true; }));
       bool codec_exception = false;
-      try {
-        codec.write(header.frame(), connection);
-      } catch (const CodecProtocolException& e) {
+      auto status = codec.write(header.frame(), connection);
+      if (isCodecProtocolError(status)) {
         codec_exception = true;
       }
       EXPECT_TRUE(stream_reset || codec_exception);
@@ -307,19 +307,19 @@ TEST_F(ResponseFrameCommentTest, SingleByteNulCrLfInHeaderField) {
       ClientCodecFrameInjector codec;
       TestClientConnectionImpl connection(
           codec.client_connection_, codec.client_callbacks_, codec.stats_store_, codec.options_,
-          Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT);
+          Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
+          ProdNghttp2SessionFactory::get());
       setupStream(codec, connection);
 
-      codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
-      codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection);
+      EXPECT_TRUE(codec.write(WellKnownFrames::defaultSettingsFrame(), connection).ok());
+      EXPECT_TRUE(codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection).ok());
       bool stream_reset = false;
       EXPECT_CALL(codec.response_decoder_, decodeHeaders_(_, _)).Times(0);
       EXPECT_CALL(codec.client_stream_callbacks_, onResetStream(_, _))
           .WillRepeatedly(InvokeWithoutArgs([&stream_reset] { stream_reset = true; }));
       bool codec_exception = false;
-      try {
-        codec.write(header.frame(), connection);
-      } catch (const CodecProtocolException& e) {
+      auto status = codec.write(header.frame(), connection);
+      if (isCodecProtocolError(status)) {
         codec_exception = true;
       }
       EXPECT_TRUE(stream_reset || codec_exception);

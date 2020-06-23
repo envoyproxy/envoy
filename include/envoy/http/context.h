@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "envoy/config/trace/v3/trace.pb.h"
+#include "envoy/config/trace/v3/http_tracer.pb.h"
 #include "envoy/http/codes.h"
 
 namespace Envoy {

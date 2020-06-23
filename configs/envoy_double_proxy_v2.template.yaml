@@ -60,6 +60,12 @@
           typed_config: {}
         tracing:
           operation_name: INGRESS
+          provider:
+            name: envoy.tracers.lightstep
+            typed_config:
+              "@type": type.googleapis.com/envoy.config.trace.v2.LightstepConfig
+              access_token_file: "/etc/envoy/lightstep_access_token"
+              collector_cluster: lightstep_saas
         common_http_protocol_options:
           idle_timeout: 840s
         access_log:
@@ -177,13 +183,6 @@ stats_sinks:
   typed_config:
     "@type": type.googleapis.com/envoy.config.metrics.v2.StatsdSink
     tcp_cluster_name: statsd
-tracing:
-  http:
-    name: envoy.tracers.lightstep
-    typed_config:
-      "@type": type.googleapis.com/envoy.config.trace.v2.LightstepConfig
-      access_token_file: "/etc/envoy/lightstep_access_token"
-      collector_cluster: lightstep_saas
 layered_runtime:
   layers:
     - name: root

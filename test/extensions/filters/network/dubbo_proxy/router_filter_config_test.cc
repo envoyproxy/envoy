@@ -39,15 +39,6 @@ TEST(DubboProxyRouterFilterConfigTest, RouterFilterWithEmptyProtoConfig) {
   cb(filter_callback);
 }
 
-TEST(DubboProxyRouterFilterConfigTest, DoubleRegistrationTest) {
-  EXPECT_THROW_WITH_MESSAGE(
-      (Registry::RegisterFactory<RouterFilterConfig,
-                                 DubboFilters::NamedDubboFilterConfigFactory>()),
-      EnvoyException,
-      fmt::format("Double registration for name: '{}'",
-                  DubboFilters::DubboFilterNames::get().ROUTER));
-}
-
 } // namespace Router
 } // namespace DubboProxy
 } // namespace NetworkFilters

@@ -90,7 +90,7 @@ TEST_P(RBACIntegrationTest, Allowed) {
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 TEST_P(RBACIntegrationTest, Denied) {
@@ -110,7 +110,7 @@ TEST_P(RBACIntegrationTest, Denied) {
       1024);
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("403", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("403", response->headers().getStatusValue());
 }
 
 TEST_P(RBACIntegrationTest, DeniedWithPrefixRule) {
@@ -136,7 +136,7 @@ TEST_P(RBACIntegrationTest, DeniedWithPrefixRule) {
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 TEST_P(RBACIntegrationTest, RbacPrefixRuleUseNormalizePath) {
@@ -160,7 +160,7 @@ TEST_P(RBACIntegrationTest, RbacPrefixRuleUseNormalizePath) {
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("403", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("403", response->headers().getStatusValue());
 }
 
 TEST_P(RBACIntegrationTest, DeniedHeadReply) {
@@ -180,9 +180,9 @@ TEST_P(RBACIntegrationTest, DeniedHeadReply) {
       1024);
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("403", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("403", response->headers().getStatusValue());
   ASSERT_TRUE(response->headers().ContentLength());
-  EXPECT_NE("0", response->headers().ContentLength()->value().getStringView());
+  EXPECT_NE("0", response->headers().getContentLengthValue());
   EXPECT_THAT(response->body(), ::testing::IsEmpty());
 }
 
@@ -220,7 +220,7 @@ TEST_P(RBACIntegrationTest, RouteOverride) {
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 TEST_P(RBACIntegrationTest, PathWithQueryAndFragment) {
@@ -246,7 +246,7 @@ TEST_P(RBACIntegrationTest, PathWithQueryAndFragment) {
 
     response->waitForEndStream();
     ASSERT_TRUE(response->complete());
-    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+    EXPECT_EQ("200", response->headers().getStatusValue());
   }
 }
 
@@ -273,7 +273,7 @@ TEST_P(RBACIntegrationTest, PathIgnoreCase) {
 
     response->waitForEndStream();
     ASSERT_TRUE(response->complete());
-    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+    EXPECT_EQ("200", response->headers().getStatusValue());
   }
 }
 

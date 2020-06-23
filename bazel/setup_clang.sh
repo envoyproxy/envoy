@@ -1,6 +1,6 @@
 #!/bin/bash
 
-BAZELRC_FILE="$(bazel info workspace)/clang.bazelrc"
+BAZELRC_FILE="${BAZELRC_FILE:-$(bazel info workspace)/clang.bazelrc}"
 
 LLVM_PREFIX=$1
 
@@ -28,6 +28,5 @@ build:clang-asan --linkopt=-fsanitize=vptr,function
 build:clang-asan --linkopt=-L${RT_LIBRARY_PATH}
 build:clang-asan --linkopt=-l:libclang_rt.ubsan_standalone-x86_64.a
 build:clang-asan --linkopt=-l:libclang_rt.ubsan_standalone_cxx-x86_64.a
-
 " > ${BAZELRC_FILE}
 

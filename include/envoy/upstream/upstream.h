@@ -107,9 +107,10 @@ public:
    * connection.
    * @return the connection data.
    */
-  virtual CreateConnectionData createHealthCheckConnection(
-      Event::Dispatcher& dispatcher,
-      Network::TransportSocketOptionsSharedPtr transport_socket_options) const PURE;
+  virtual CreateConnectionData
+  createHealthCheckConnection(Event::Dispatcher& dispatcher,
+                              Network::TransportSocketOptionsSharedPtr transport_socket_options,
+                              const envoy::config::core::v3::Metadata* metadata) const PURE;
 
   /**
    * @return host specific gauges.
@@ -570,6 +571,7 @@ public:
   COUNTER(upstream_rq_cancelled)                                                                   \
   COUNTER(upstream_rq_completed)                                                                   \
   COUNTER(upstream_rq_maintenance_mode)                                                            \
+  COUNTER(upstream_rq_max_duration_reached)                                                        \
   COUNTER(upstream_rq_pending_failure_eject)                                                       \
   COUNTER(upstream_rq_pending_overflow)                                                            \
   COUNTER(upstream_rq_pending_total)                                                               \
@@ -728,6 +730,12 @@ public:
   virtual const envoy::config::core::v3::Http2ProtocolOptions& http2Options() const PURE;
 
   /**
+   * @return const envoy::config::core::v3::HttpProtocolOptions for all of HTTP versions.
+   */
+  virtual const envoy::config::core::v3::HttpProtocolOptions&
+  commonHttpProtocolOptions() const PURE;
+
+  /**
    * @param name std::string containing the well-known name of the extension for which protocol
    *        options are desired
    * @return std::shared_ptr<const Derived> where Derived is a subclass of ProtocolOptionsConfig
@@ -780,6 +788,13 @@ public:
    */
   virtual const absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>&
   lbOriginalDstConfig() const PURE;
+
+  /**
+   * @return const absl::optional<envoy::config::core::v3::TypedExtensionConfig>& the configuration
+   *         for the upstream, if a custom upstream is configured.
+   */
+  virtual const absl::optional<envoy::config::core::v3::TypedExtensionConfig>&
+  upstreamConfig() const PURE;
 
   /**
    * @return Whether the cluster is currently in maintenance mode and should not be routed to.
@@ -902,6 +917,16 @@ public:
    */
   virtual const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>&
   upstreamHttpProtocolOptions() const PURE;
+
+  /**
+   * @return the Http1 Codec Stats.
+   */
+  virtual Http::Http1::CodecStats& http1CodecStats() const PURE;
+
+  /**
+   * @return the Http2 Codec Stats.
+   */
+  virtual Http::Http2::CodecStats& http2CodecStats() const PURE;
 
 protected:
   /**

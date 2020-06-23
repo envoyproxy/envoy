@@ -258,19 +258,28 @@ public:
   std::shared_ptr<Router::MockRoute> route_;
 };
 
-class MockFilterConfigFactory : public ThriftFilters::FactoryBase<ProtobufWkt::Struct> {
+class MockFilterConfigFactory : public NamedThriftFilterConfigFactory {
 public:
   MockFilterConfigFactory();
   ~MockFilterConfigFactory() override;
 
-  ThriftFilters::FilterFactoryCb
-  createFilterFactoryFromProtoTyped(const ProtobufWkt::Struct& proto_config,
-                                    const std::string& stat_prefix,
-                                    Server::Configuration::FactoryContext& context) override;
+  FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
+                               const std::string& stats_prefix,
+                               Server::Configuration::FactoryContext& context) override;
 
-  std::shared_ptr<MockDecoderFilter> mock_filter_;
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::Struct>();
+  }
+
+  std::string name() const override { return name_; }
+
   ProtobufWkt::Struct config_struct_;
   std::string config_stat_prefix_;
+
+private:
+  std::shared_ptr<MockDecoderFilter> mock_filter_;
+  const std::string name_;
 };
 
 } // namespace ThriftFilters

@@ -15,7 +15,9 @@ using testing::SaveArg;
 namespace Envoy {
 namespace Event {
 
-MockDispatcher::MockDispatcher() {
+MockDispatcher::MockDispatcher() : MockDispatcher("test_thread") {}
+
+MockDispatcher::MockDispatcher(const std::string& name) : name_(name) {
   ON_CALL(*this, initializeStats(_, _)).WillByDefault(Return());
   ON_CALL(*this, clearDeferredDeleteList()).WillByDefault(Invoke([this]() -> void {
     to_delete_.clear();

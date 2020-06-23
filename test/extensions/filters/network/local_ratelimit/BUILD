@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
@@ -8,6 +6,8 @@ load(
     "//test/extensions:extensions_build_system.bzl",
     "envoy_extension_cc_test",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -28,6 +28,7 @@ envoy_extension_cc_test(
     name = "local_ratelimit_integration_test",
     srcs = ["local_ratelimit_integration_test.cc"],
     extension_name = "envoy.filters.network.local_ratelimit",
+    tags = ["fails_on_windows"],
     deps = [
         "//source/extensions/filters/network/local_ratelimit:config",
         "//source/extensions/filters/network/tcp_proxy:config",

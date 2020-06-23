@@ -6,7 +6,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/http/http2/codec_impl.h"
-#include "common/http/http2/conn_pool_legacy.h"
+#include "common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Http {
@@ -17,7 +17,7 @@ ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSha
                            const Network::ConnectionSocket::OptionsSharedPtr& options,
                            const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
     : ConnPoolImplBase(std::move(host), std::move(priority), dispatcher, options,
-                       transport_socket_options) {}
+                       transport_socket_options, Protocol::Http2) {}
 
 ConnPoolImpl::~ConnPoolImpl() { destructAllConnections(); }
 
@@ -97,14 +97,8 @@ allocateConnPool(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr hos
                  Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
                  const Network::TransportSocketOptionsSharedPtr& transport_socket_options) {
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.new_http2_connection_pool_behavior")) {
-    return std::make_unique<Http::Http2::ProdConnPoolImpl>(dispatcher, host, priority, options,
-                                                           transport_socket_options);
-  } else {
-    return std::make_unique<Http::Legacy::Http2::ProdConnPoolImpl>(
-        dispatcher, host, priority, options, transport_socket_options);
-  }
+  return std::make_unique<Http::Http2::ProdConnPoolImpl>(dispatcher, host, priority, options,
+                                                         transport_socket_options);
 }
 
 } // namespace Http2

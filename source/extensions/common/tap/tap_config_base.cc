@@ -55,9 +55,9 @@ TapConfigBaseImpl::TapConfigBaseImpl(envoy::config::tap::v3::TapConfig&& proto_c
   sink_format_ = proto_config.output_config().sinks()[0].format();
   switch (proto_config.output_config().sinks()[0].output_sink_type_case()) {
   case envoy::config::tap::v3::OutputSink::OutputSinkTypeCase::kStreamingAdmin:
+    ASSERT(admin_streamer != nullptr, "admin output must be configured via admin");
     // TODO(mattklein123): Graceful failure, error message, and test if someone specifies an
-    // admin stream output without configuring via /tap or the wrong format.
-    RELEASE_ASSERT(admin_streamer != nullptr, "admin output must be configured via admin");
+    // admin stream output with the wrong format.
     RELEASE_ASSERT(sink_format_ == envoy::config::tap::v3::OutputSink::JSON_BODY_AS_BYTES ||
                        sink_format_ == envoy::config::tap::v3::OutputSink::JSON_BODY_AS_STRING,
                    "admin output only supports JSON formats");

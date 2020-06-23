@@ -25,11 +25,15 @@ MockOptions::MockOptions(const std::string& config_path) : config_path_(config_p
   ON_CALL(*this, configPath()).WillByDefault(ReturnRef(config_path_));
   ON_CALL(*this, configProto()).WillByDefault(ReturnRef(config_proto_));
   ON_CALL(*this, configYaml()).WillByDefault(ReturnRef(config_yaml_));
+  ON_CALL(*this, bootstrapVersion()).WillByDefault(ReturnRef(bootstrap_version_));
   ON_CALL(*this, allowUnknownStaticFields()).WillByDefault(Invoke([this] {
     return allow_unknown_static_fields_;
   }));
   ON_CALL(*this, rejectUnknownDynamicFields()).WillByDefault(Invoke([this] {
     return reject_unknown_dynamic_fields_;
+  }));
+  ON_CALL(*this, ignoreUnknownDynamicFields()).WillByDefault(Invoke([this] {
+    return ignore_unknown_dynamic_fields_;
   }));
   ON_CALL(*this, adminAddressPath()).WillByDefault(ReturnRef(admin_address_path_));
   ON_CALL(*this, serviceClusterName()).WillByDefault(ReturnRef(service_cluster_name_));
@@ -95,8 +99,7 @@ MockOverloadManager::~MockOverloadManager() = default;
 MockListenerComponentFactory::MockListenerComponentFactory()
     : socket_(std::make_shared<NiceMock<Network::MockListenSocket>>()) {
   ON_CALL(*this, createListenSocket(_, _, _, _))
-      .WillByDefault(Invoke([&](Network::Address::InstanceConstSharedPtr,
-                                Network::Address::SocketType,
+      .WillByDefault(Invoke([&](Network::Address::InstanceConstSharedPtr, Network::Socket::Type,
                                 const Network::Socket::OptionsSharedPtr& options,
                                 const ListenSocketCreationParams&) -> Network::SocketSharedPtr {
         if (!Network::Socket::applyOptions(options, *socket_,
@@ -118,9 +121,11 @@ MockWorkerFactory::MockWorkerFactory() = default;
 MockWorkerFactory::~MockWorkerFactory() = default;
 
 MockWorker::MockWorker() {
-  ON_CALL(*this, addListener(_, _))
+  ON_CALL(*this, addListener(_, _, _))
       .WillByDefault(
-          Invoke([this](Network::ListenerConfig& config, AddListenerCompletion completion) -> void {
+          Invoke([this](absl::optional<uint64_t> overridden_listener,
+                        Network::ListenerConfig& config, AddListenerCompletion completion) -> void {
+            UNREFERENCED_PARAMETER(overridden_listener);
             config.listenSocketFactory().getListenSocket();
             EXPECT_EQ(nullptr, add_listener_completion_);
             add_listener_completion_ = completion;
@@ -138,6 +143,13 @@ MockWorker::MockWorker() {
         if (completion != nullptr) {
           completion();
         }
+      }));
+
+  ON_CALL(*this, removeFilterChains(_, _, _))
+      .WillByDefault(Invoke([this](uint64_t, const std::list<const Network::FilterChain*>&,
+                                   std::function<void()> completion) -> void {
+        EXPECT_EQ(nullptr, remove_filter_chains_completion_);
+        remove_filter_chains_completion_ = completion;
       }));
 }
 MockWorker::~MockWorker() = default;
@@ -276,6 +288,13 @@ MockHealthCheckerFactoryContext::~MockHealthCheckerFactoryContext() = default;
 MockFilterChainFactoryContext::MockFilterChainFactoryContext() = default;
 MockFilterChainFactoryContext::~MockFilterChainFactoryContext() = default;
 
+MockTracerFactory::MockTracerFactory(const std::string& name) : name_(name) {
+  ON_CALL(*this, createEmptyConfigProto()).WillByDefault(Invoke([] {
+    return std::make_unique<ProtobufWkt::Struct>();
+  }));
+}
+MockTracerFactory::~MockTracerFactory() = default;
+
 MockTracerFactoryContext::MockTracerFactoryContext() {
   ON_CALL(*this, serverFactoryContext()).WillByDefault(ReturnRef(server_factory_context_));
   ON_CALL(*this, messageValidationVisitor())
@@ -283,6 +302,9 @@ MockTracerFactoryContext::MockTracerFactoryContext() {
 }
 
 MockTracerFactoryContext::~MockTracerFactoryContext() = default;
+
+MockBootstrapExtensionFactory::MockBootstrapExtensionFactory() = default;
+MockBootstrapExtensionFactory::~MockBootstrapExtensionFactory() = default;
 } // namespace Configuration
 } // namespace Server
 } // namespace Envoy

@@ -1,0 +1,69 @@
+1.4.0 (August 24, 2017)
+=======================
+
+Changes
+-------
+
+* macOS is :repo:`now supported </bazel#quick-start-bazel-build-for-developers>`. (A few features
+  are missing such as hot restart and original destination routing).
+* YAML is now directly supported for config files.
+* Added /routes admin endpoint.
+* End-to-end flow control is now supported for TCP proxy, HTTP/1, and HTTP/2. HTTP flow control
+  that includes filter buffering is incomplete and will be implemented in 1.5.0.
+* Log verbosity :repo:`compile time flag </bazel#log-verbosity>` added.
+* Hot restart :repo:`compile time flag </bazel#hot-restart>` added.
+* Original destination :ref:`cluster <arch_overview_service_discovery_types_original_destination>`
+  and :ref:`load balancer <arch_overview_load_balancing_types_original_destination>` added.
+* :ref:`WebSocket <arch_overview_upgrades>` is now supported.
+* Virtual cluster priorities have been hard removed without deprecation as we are reasonably sure
+  no one is using this feature.
+* Route `validate_clusters` option added.
+* :ref:`x-envoy-downstream-service-node <config_http_conn_man_headers_downstream-service-node>`
+  header added.
+* :ref:`x-forwarded-client-cert <config_http_conn_man_headers_x-forwarded-client-cert>` header
+  added.
+* Initial HTTP/1 forward proxy support for absolute URLs has been added.
+* HTTP/2 codec settings are now configurable.
+* gRPC/JSON transcoder :ref:`filter <config_http_filters_grpc_json_transcoder>` added.
+* gRPC web :ref:`filter <config_http_filters_grpc_web>` added.
+* Configurable timeout for the rate limit service call in the :ref:`network
+  <config_network_filters_rate_limit>` and :ref:`HTTP <config_http_filters_rate_limit>` rate limit
+  filters.
+* :ref:`x-envoy-retry-grpc-on <config_http_filters_router_x-envoy-retry-grpc-on>` header added.
+* :ref:`LDS API <arch_overview_dynamic_config_lds>` added.
+* TLS :`require_client_certificate` option added.
+* :ref:`Configuration check tool <install_tools_config_load_check_tool>` added.
+* :ref:`JSON schema check tool <install_tools_schema_validator_check_tool>` added.
+* Config validation mode added via the :option:`--mode` option.
+* :option:`--local-address-ip-version` option added.
+* IPv6 support is now complete.
+* UDP `statsd_ip_address` option added.
+* Per-cluster DNS resolvers added.
+* :ref:`Fault filter <config_http_filters_fault_injection>` enhancements and fixes.
+* Several features are :ref:`deprecated as of the 1.4.0 release <deprecated>`. They
+  will be removed at the beginning of the 1.5.0 release cycle. We explicitly call out that the
+  `HttpFilterConfigFactory` filter API has been deprecated in favor of
+  `NamedHttpFilterConfigFactory`.
+* Many small bug fixes and performance improvements not listed.
+
+Deprecated
+----------
+
+* Config option `statsd_local_udp_port` has been deprecated and has been replaced with
+  `statsd_udp_ip_address`.
+* `HttpFilterConfigFactory` filter API has been deprecated in favor of `NamedHttpFilterConfigFactory`.
+* Config option `http_codec_options` has been deprecated and has been replaced with `http2_settings`.
+* The following log macros have been deprecated: `log_trace`, `log_debug`, `conn_log`,
+  `conn_log_info`, `conn_log_debug`, `conn_log_trace`, `stream_log`, `stream_log_info`,
+  `stream_log_debug`, `stream_log_trace`. For replacements, please see
+  `logger.h <https://github.com/envoyproxy/envoy/blob/master/source/common/common/logger.h>`_.
+* The connectionId() and ssl() callbacks of StreamFilterCallbacks have been deprecated and
+  replaced with a more general connection() callback, which, when not returning a nullptr, can be
+  used to get the connection id and SSL connection from the returned Connection object pointer.
+* The protobuf stub gRPC support via `Grpc::RpcChannelImpl` is now replaced with `Grpc::AsyncClientImpl`.
+  This no longer uses `protoc` generated stubs but instead utilizes C++ template generation of the
+  RPC stubs. `Grpc::AsyncClientImpl` supports streaming, in addition to the previous unary, RPCs.
+* The direction of network and HTTP filters in the configuration will be ignored from 1.4.0 and
+  later removed from the configuration in the v2 APIs. Filter direction is now implied at the C++ type
+  level. The `type()` methods on the `NamedNetworkFilterConfigFactory` and
+  `NamedHttpFilterConfigFactory` interfaces have been removed to reflect this.

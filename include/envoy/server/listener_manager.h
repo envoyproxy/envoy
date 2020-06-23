@@ -71,7 +71,7 @@ public:
    */
   virtual Network::SocketSharedPtr
   createListenSocket(Network::Address::InstanceConstSharedPtr address,
-                     Network::Address::SocketType socket_type,
+                     Network::Socket::Type socket_type,
                      const Network::Socket::OptionsSharedPtr& options,
                      const ListenSocketCreationParams& params) PURE;
 

@@ -5,6 +5,7 @@ syntax = "proto3";
 package source.extensions.tracers.xray.daemon;
 
 import "validate/validate.proto";
+import "google/protobuf/struct.proto";
 
 // see https://docs.aws.amazon.com/xray/latest/devguide/xray-api-segmentdocuments.html
 message Segment {
@@ -14,12 +15,12 @@ message Segment {
   double start_time = 4 [(validate.rules).double = {gt: 0}];
   double end_time = 5 [(validate.rules).double = {gt: 0}];
   string parent_id = 6;
-  map<string, string> annotations = 7;
-  http_annotations http = 8;
+  http_annotations http = 7;
   message http_annotations {
-    map<string, string> request = 1;
-    map<string, string> response = 2;
+    google.protobuf.Struct request = 1;
+    google.protobuf.Struct response = 2;
   }
+  map<string, string> annotations = 8;
 }
 
 message Header {

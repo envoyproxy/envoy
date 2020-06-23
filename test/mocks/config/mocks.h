@@ -9,9 +9,9 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/config/config_provider_impl.h"
-#include "common/config/resources.h"
 #include "common/protobuf/utility.h"
 
+#include "test/test_common/resources.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -96,7 +96,8 @@ public:
   MOCK_METHOD(void, onStreamEstablished, ());
   MOCK_METHOD(void, onEstablishmentFailure, ());
   MOCK_METHOD(void, onDiscoveryResponse,
-              (std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse> && message));
+              (std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse> && message,
+               ControlPlaneStats& control_plane_stats));
   MOCK_METHOD(void, onWriteable, ());
 };
 

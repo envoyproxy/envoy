@@ -7,13 +7,13 @@
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener.pb.validate.h"
+#include "envoy/config/route/v3/route.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
 #include "common/common/cleanup.h"
 #include "common/config/api_version.h"
-#include "common/config/resources.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 
@@ -41,11 +41,13 @@ void LdsApiImpl::onConfigUpdate(
     const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& system_version_info) {
-  std::unique_ptr<Cleanup> maybe_eds_resume;
+  std::unique_ptr<Cleanup> maybe_rds_resume;
   if (cm_.adsMux()) {
-    cm_.adsMux()->pause(Config::TypeUrl::get().RouteConfiguration);
-    maybe_eds_resume = std::make_unique<Cleanup>(
-        [this] { cm_.adsMux()->resume(Config::TypeUrl::get().RouteConfiguration); });
+    const auto type_urls =
+        Config::getAllVersionTypeUrls<envoy::config::route::v3::RouteConfiguration>();
+    cm_.adsMux()->pause(type_urls);
+    maybe_rds_resume =
+        std::make_unique<Cleanup>([this, type_urls] { cm_.adsMux()->resume(type_urls); });
   }
 
   bool any_applied = false;

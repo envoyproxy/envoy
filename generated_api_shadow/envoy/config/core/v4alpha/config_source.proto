@@ -19,7 +19,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 
 // [#protodoc-title: Configuration sources]
 
-// xDS API version. This is used to describe both resource and transport
+// xDS API and non-xDS services version. This is used to describe both resource and transport
 // protocol versions (in distinct configuration fields).
 enum ApiVersion {
   // When not specified, we assume v2, to ease migration to Envoy's stable API
@@ -59,10 +59,6 @@ message ApiConfigSource {
     // Using the delta xDS gRPC service, i.e. DeltaDiscovery{Request,Response}
     // rather than Discovery{Request,Response}. Rather than sending Envoy the entire state
     // with every update, the xDS server only sends what has changed since the last update.
-    //
-    // DELTA_GRPC is not yet entirely implemented! Initially, only CDS is available.
-    // Do not use for other xDSes.
-    // [#comment:TODO(fredlas) update/remove this warning when appropriate.]
     DELTA_GRPC = 3;
   }
 

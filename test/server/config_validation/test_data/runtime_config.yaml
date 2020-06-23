@@ -1,0 +1,27 @@
+---
+node:
+  id: "test"
+layered_runtime:
+  layers:
+    - name: static-layer
+      static_layer:
+        "test.runtime.loaded": true
+static_resources:
+  listeners:
+    - name: "test.listener"
+      address:
+        socket_address:
+          protocol: TCP
+          address: 0.0.0.0
+          port_value: 0
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.test
+              typed_config:
+                "@type": type.googleapis.com/google.protobuf.Struct
+admin:
+  access_log_path: "/dev/null"
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 9000

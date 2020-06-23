@@ -1,5 +1,6 @@
-#include "envoy/config/trace/v3/trace.pb.h"
-#include "envoy/config/trace/v3/trace.pb.validate.h"
+#include "envoy/config/trace/v3/http_tracer.pb.h"
+#include "envoy/config/trace/v3/zipkin.pb.h"
+#include "envoy/config/trace/v3/zipkin.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "extensions/tracers/zipkin/config.h"
@@ -69,12 +70,6 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracerWithTypedConfig) {
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
   Tracing::HttpTracerSharedPtr zipkin_tracer = factory.createHttpTracer(*message, context);
   EXPECT_NE(nullptr, zipkin_tracer);
-}
-
-TEST(ZipkinTracerConfigTest, DoubleRegistrationTest) {
-  EXPECT_THROW_WITH_MESSAGE(
-      (Registry::RegisterFactory<ZipkinTracerFactory, Server::Configuration::TracerFactory>()),
-      EnvoyException, "Double registration for name: 'envoy.tracers.zipkin'");
 }
 
 // Test that the deprecated extension name still functions.

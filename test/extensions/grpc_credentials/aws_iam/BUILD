@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
@@ -7,12 +5,15 @@ load(
     "envoy_select_google_grpc",
 )
 
+licenses(["notice"])  # Apache 2
+
 envoy_package()
 
 envoy_cc_test(
     name = "aws_iam_grpc_credentials_test",
     srcs = envoy_select_google_grpc(["aws_iam_grpc_credentials_test.cc"]),
     data = ["//test/config/integration/certs"],
+    tags = ["fails_on_windows"],
     deps = [
         "//source/extensions/grpc_credentials:well_known_names",
         "//source/extensions/grpc_credentials/aws_iam:config",

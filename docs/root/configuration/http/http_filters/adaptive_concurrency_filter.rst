@@ -9,7 +9,7 @@ Adaptive Concurrency
 
 This filter should be configured with the name `envoy.filters.http.adaptive_concurrency`.
 
-See the :ref:`v2 API reference <envoy_api_msg_config.filter.http.adaptive_concurrency.v2alpha.AdaptiveConcurrency>` for details on each configuration parameter.
+See the :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.adaptive_concurrency.v3.AdaptiveConcurrency>` for details on each configuration parameter.
 
 Overview
 --------
@@ -28,7 +28,7 @@ Gradient Controller
 The gradient controller makes forwarding decisions based on a periodically measured ideal round-trip
 time (minRTT) for an upstream.
 
-:ref:`v2 API reference <envoy_api_msg_config.filter.http.adaptive_concurrency.v2alpha.GradientControllerConfig>`
+:ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig>`
 
 Calculating the minRTT
 ^^^^^^^^^^^^^^^^^^^^^^
@@ -73,7 +73,7 @@ Notice that *B*, the buffer value added to the minRTT, allows for normal varianc
 latencies by requiring the sampled latencies the exceed the minRTT by some configurable threshold
 before decreasing the gradient value.
 
-The buffer will be a percentage of the measured minRTT value whose value is modified via the buffer field in the :ref:`minRTT calculation parameters <envoy_api_msg_config.filter.http.adaptive_concurrency.v2alpha.GradientControllerConfig.MinimumRTTCalculationParams>`. The buffer is calculated as follows:
+The buffer will be a percentage of the measured minRTT value whose value is modified via the buffer field in the :ref:`minRTT calculation parameters <envoy_v3_api_msg_extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig.MinimumRTTCalculationParams>`. The buffer is calculated as follows:
 
 .. math::
 
@@ -118,7 +118,7 @@ fields can be overridden via runtime settings.
 
   name: envoy.filters.http.adaptive_concurrency
   typed_config:
-    "@type": type.googleapis.com/envoy.config.filter.http.adaptive_concurrency.v2alpha.AdaptiveConcurrency
+    "@type": type.googleapis.com/envoy.extensions.filters.http.adaptive_concurrency.v3.AdaptiveConcurrency
     gradient_controller_config:
       sample_aggregate_percentile:
         value: 90
@@ -191,7 +191,7 @@ Statistics
 ----------
 The adaptive concurrency filter outputs statistics in the
 *http.<stat_prefix>.adaptive_concurrency.* namespace. The :ref:`stat prefix
-<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.stat_prefix>`
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stat_prefix>`
 comes from the owning HTTP connection manager. Statistics are specific to the concurrency
 controllers.
 

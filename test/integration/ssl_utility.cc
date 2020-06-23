@@ -2,6 +2,7 @@
 
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
+#include "common/http/utility.h"
 #include "common/json/json_loader.h"
 #include "common/network/utility.h"
 
@@ -54,8 +55,8 @@ createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
   auto* common_context = tls_context.mutable_common_tls_context();
 
   if (options.alpn_) {
-    common_context->add_alpn_protocols("h2");
-    common_context->add_alpn_protocols("http/1.1");
+    common_context->add_alpn_protocols(Http::Utility::AlpnNames::get().Http2);
+    common_context->add_alpn_protocols(Http::Utility::AlpnNames::get().Http11);
   }
   if (options.san_) {
     common_context->mutable_validation_context()
@@ -63,6 +64,9 @@ createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
   }
   for (const std::string& cipher_suite : options.cipher_suites_) {
     common_context->mutable_tls_params()->add_cipher_suites(cipher_suite);
+  }
+  if (!options.sni_.empty()) {
+    tls_context.set_sni(options.sni_);
   }
 
   common_context->mutable_tls_params()->set_tls_minimum_protocol_version(options.tls_version_);
@@ -93,6 +97,24 @@ Network::TransportSocketFactoryPtr createUpstreamSslContext(ContextManager& cont
       std::move(cfg), context_manager, *upstream_stats_store, std::vector<std::string>{});
 }
 
+Network::TransportSocketFactoryPtr createFakeUpstreamSslContext(
+    const std::string& upstream_cert_name, ContextManager& context_manager,
+    Server::Configuration::TransportSocketFactoryContext& factory_context) {
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  auto* common_tls_context = tls_context.mutable_common_tls_context();
+  auto* tls_cert = common_tls_context->add_tls_certificates();
+  tls_cert->mutable_certificate_chain()->set_filename(TestEnvironment::runfilesPath(
+      fmt::format("test/config/integration/certs/{}cert.pem", upstream_cert_name)));
+  tls_cert->mutable_private_key()->set_filename(TestEnvironment::runfilesPath(
+      fmt::format("test/config/integration/certs/{}key.pem", upstream_cert_name)));
+
+  auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
+      tls_context, factory_context);
+
+  static Stats::Scope* upstream_stats_store = new Stats::IsolatedStoreImpl();
+  return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
+      std::move(cfg), context_manager, *upstream_stats_store, std::vector<std::string>{});
+}
 Network::Address::InstanceConstSharedPtr getSslAddress(const Network::Address::IpVersion& version,
                                                        int port) {
   std::string url =

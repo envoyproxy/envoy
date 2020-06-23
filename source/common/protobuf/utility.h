@@ -216,13 +216,16 @@ public:
   static std::size_t hash(const Protobuf::Message& message);
 
   static void loadFromJson(const std::string& json, Protobuf::Message& message,
-                           ProtobufMessage::ValidationVisitor& validation_visitor);
+                           ProtobufMessage::ValidationVisitor& validation_visitor,
+                           bool do_boosting = true);
   static void loadFromJson(const std::string& json, ProtobufWkt::Struct& message);
   static void loadFromYaml(const std::string& yaml, Protobuf::Message& message,
-                           ProtobufMessage::ValidationVisitor& validation_visitor);
+                           ProtobufMessage::ValidationVisitor& validation_visitor,
+                           bool do_boosting = true);
   static void loadFromYaml(const std::string& yaml, ProtobufWkt::Struct& message);
   static void loadFromFile(const std::string& path, Protobuf::Message& message,
-                           ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
+                           ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
+                           bool do_boosting = true);
 
   /**
    * Checks for use of deprecated fields in message and all sub-messages.
@@ -247,7 +250,9 @@ public:
   static void validate(const MessageType& message,
                        ProtobufMessage::ValidationVisitor& validation_visitor) {
     // Log warnings or throw errors if deprecated fields or unknown fields are in use.
-    checkForUnexpectedFields(message, validation_visitor);
+    if (!validation_visitor.skipValidation()) {
+      checkForUnexpectedFields(message, validation_visitor);
+    }
 
     std::string err;
     if (!Validate(message, &err)) {

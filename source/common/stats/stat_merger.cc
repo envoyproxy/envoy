@@ -7,6 +7,18 @@ namespace Stats {
 
 StatMerger::StatMerger(Store& target_store) : temp_scope_(target_store.createScope("")) {}
 
+StatMerger::~StatMerger() {
+  // By the time a parent exits, all its contributions to accumulated gauges
+  // should be zero. But depending on the timing of the stat-merger
+  // communication shutdown and other shutdown activities on the parent, the
+  // gauges may not all be zero yet. So simply erase all the parent
+  // contributions.
+  for (StatName stat_name : parent_gauges_) {
+    Gauge& gauge = temp_scope_->gaugeFromStatName(stat_name, Gauge::ImportMode::Uninitialized);
+    gauge.setParentValue(0);
+  }
+}
+
 StatName StatMerger::DynamicContext::makeDynamicStatName(const std::string& name,
                                                          const DynamicsMap& map) {
   auto iter = map.find(name);
@@ -20,7 +32,7 @@ StatName StatMerger::DynamicContext::makeDynamicStatName(const std::string& name
 
   // Name has embedded dynamic segments; we'll need to join together the
   // static/dynamic StatName segments.
-  std::vector<StatName> segments;
+  StatNameVec segments;
   uint32_t segment_index = 0;
   std::vector<absl::string_view> dynamic_segments;
 
@@ -124,16 +136,14 @@ void StatMerger::mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges,
       continue;
     }
 
-    uint64_t& parent_value_ref = parent_gauge_values_[gauge_ref.statName()];
-    uint64_t old_parent_value = parent_value_ref;
-    uint64_t new_parent_value = gauge.second;
-    parent_value_ref = new_parent_value;
-
-    // Note that new_parent_value may be less than old_parent_value, in which
-    // case 2s complement does its magic (-1 == 0xffffffffffffffff) and adding
-    // that to the gauge's current value works the same as subtraction.
-    gauge_ref.add(new_parent_value - old_parent_value);
+    const uint64_t new_parent_value = gauge.second;
+    parent_gauges_.insert(gauge_ref.statName());
+    gauge_ref.setParentValue(new_parent_value);
   }
+}
+
+void StatMerger::retainParentGaugeValue(Stats::StatName gauge_name) {
+  parent_gauges_.erase(gauge_name);
 }
 
 void StatMerger::mergeStats(const Protobuf::Map<std::string, uint64_t>& counter_deltas,

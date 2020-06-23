@@ -1,10 +1,10 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -121,5 +121,14 @@ envoy_cc_library(
         ":libevent_lib",
         "//include/envoy/event:timer_interface",
         "//source/common/common:scope_tracker",
+    ],
+)
+
+envoy_cc_library(
+    name = "deferred_task",
+    hdrs = ["deferred_task.h"],
+    deps = [
+        "//include/envoy/event:deferred_deletable",
+        "//include/envoy/event:dispatcher_interface",
     ],
 )

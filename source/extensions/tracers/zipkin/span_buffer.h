@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/config/trace/v3/trace.pb.h"
+#include "envoy/config/trace/v3/zipkin.pb.h"
 
 #include "common/protobuf/protobuf.h"
 
@@ -123,7 +123,8 @@ public:
   std::string serialize(const std::vector<Span>& pending_spans) override;
 
 private:
-  const std::vector<ProtobufWkt::Struct> toListOfSpans(const Span& zipkin_span) const;
+  const std::vector<ProtobufWkt::Struct> toListOfSpans(const Span& zipkin_span,
+                                                       Util::Replacements& replacements) const;
   const ProtobufWkt::Struct toProtoEndpoint(const Endpoint& zipkin_endpoint) const;
 
   const bool shared_span_context_;

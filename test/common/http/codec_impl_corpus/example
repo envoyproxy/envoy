@@ -93,6 +93,32 @@ actions {
   stream_action {
     stream_id: 1
     response {
+      metadata {
+        metadata {
+	  key: "a"
+	  value: "a"
+	}
+      }	       
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1
+    response {
+      metadata {
+        metadata {
+	  key: "a"
+	  value: "a"
+	}
+      }	       
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1
+    response {
       headers {
         headers {
           key: ":status"

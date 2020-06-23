@@ -5,7 +5,7 @@
 set -e
 
 # This is the hash on https://github.com/envoyproxy/envoy-filter-example.git we pin to.
-ENVOY_FILTER_EXAMPLE_GITSHA="c6c986cca7ad676cc1c33f2df7515cbbd2e02502"
+ENVOY_FILTER_EXAMPLE_GITSHA="777342f20d93b3a50b641556749ad41502a63d09"
 ENVOY_FILTER_EXAMPLE_SRCDIR="${BUILD_DIR}/envoy-filter-example"
 
 export ENVOY_FILTER_EXAMPLE_TESTS="//:echo2_integration_test //http-filter-example:http_filter_integration_test //:envoy_binary_test"

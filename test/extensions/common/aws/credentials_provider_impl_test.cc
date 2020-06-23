@@ -174,7 +174,7 @@ TEST_F(InstanceProfileCredentialsProviderTest, CredentialExpiration) {
   EXPECT_EQ("akid", credentials.accessKeyId().value());
   EXPECT_EQ("secret", credentials.secretAccessKey().value());
   EXPECT_EQ("token", credentials.sessionToken().value());
-  time_system_.sleep(std::chrono::hours(2));
+  time_system_.advanceTimeWait(std::chrono::hours(2));
   expectCredentialListing("doc1");
   expectDocument(R"EOF(
 {
@@ -280,7 +280,7 @@ TEST_F(TaskRoleCredentialsProviderTest, NormalCredentialExpiration) {
   EXPECT_EQ("akid", credentials.accessKeyId().value());
   EXPECT_EQ("secret", credentials.secretAccessKey().value());
   EXPECT_EQ("token", credentials.sessionToken().value());
-  time_system_.sleep(std::chrono::hours(2));
+  time_system_.advanceTimeWait(std::chrono::hours(2));
   expectDocument(R"EOF(
 {
   "AccessKeyId": "new_akid",

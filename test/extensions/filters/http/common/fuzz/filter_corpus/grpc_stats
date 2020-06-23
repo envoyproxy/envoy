@@ -1,0 +1,47 @@
+config {
+  name: "envoy.filters.http.grpc_stats"
+  typed_config: {}
+}
+data {
+  headers {
+    headers {
+      key: ":method"
+      value: "POST"
+    }
+    headers {
+      key: ":path"
+      value: "/bookstore.Bookstore/CreateShelfWithPackageServiceAndMethod"
+    }
+    headers {
+      key: "content-type"
+      value: "application/grpc"
+    }
+  }
+}
+upstream_data {
+  headers {
+    headers {
+      key: ":status"
+      value: "200"
+    }
+    headers {
+      key: "content-type"
+      value: "application/grpc"
+    }
+  }
+  proto_body {
+    message {
+      [type.googleapis.com/bookstore.Book] {
+        id: 16
+        title: "Hardy Boys"
+      }
+    }
+    chunk_size: 4
+  }
+  trailers {
+    headers {
+      key: "grpc-status"
+      value: "0"
+    }
+  }
+}

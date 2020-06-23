@@ -32,36 +32,6 @@
 
 namespace Envoy {
 namespace Runtime {
-namespace {
-
-bool isRuntimeFeature(absl::string_view feature) {
-  return RuntimeFeaturesDefaults::get().enabledByDefault(feature) ||
-         RuntimeFeaturesDefaults::get().existsButDisabled(feature);
-}
-
-} // namespace
-
-bool runtimeFeatureEnabled(absl::string_view feature) {
-  ASSERT(isRuntimeFeature(feature));
-  if (Runtime::LoaderSingleton::getExisting()) {
-    return Runtime::LoaderSingleton::getExisting()->threadsafeSnapshot()->runtimeFeatureEnabled(
-        feature);
-  }
-  ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::runtime), warn,
-                      "Unable to use runtime singleton for feature {}", feature);
-  return RuntimeFeaturesDefaults::get().enabledByDefault(feature);
-}
-
-uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
-  ASSERT(absl::StartsWith(feature, "envoy."));
-  if (Runtime::LoaderSingleton::getExisting()) {
-    return Runtime::LoaderSingleton::getExisting()->threadsafeSnapshot()->getInteger(
-        std::string(feature), default_value);
-  }
-  ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::runtime), warn,
-                      "Unable to use runtime singleton for feature {}", feature);
-  return default_value;
-}
 
 const size_t RandomGeneratorImpl::UUID_LENGTH = 36;
 
@@ -187,6 +157,12 @@ std::string RandomGeneratorImpl::uuid() {
   return std::string(uuid, UUID_LENGTH);
 }
 
+void SnapshotImpl::countDeprecatedFeatureUse() const {
+  stats_.deprecated_feature_use_.inc();
+  // Similar to the above, but a gauge that isn't imported during a hot restart.
+  stats_.deprecated_feature_seen_since_process_start_.inc();
+}
+
 bool SnapshotImpl::deprecatedFeatureEnabled(absl::string_view key, bool default_value) const {
   // If the value is not explicitly set as a runtime boolean, trust the proto annotations passed as
   // default_value.
@@ -197,7 +173,8 @@ bool SnapshotImpl::deprecatedFeatureEnabled(absl::string_view key, bool default_
 
   // The feature is allowed. It is assumed this check is called when the feature
   // is about to be used, so increment the feature use stat.
-  stats_.deprecated_feature_use_.inc();
+  countDeprecatedFeatureUse();
+
 #ifdef ENVOY_DISABLE_DEPRECATED_FEATURES
   return false;
 #endif
@@ -495,11 +472,12 @@ void ProtoLayer::walkProtoValue(const ProtobufWkt::Value& v, const std::string& 
 
 LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
                        const envoy::config::bootstrap::v3::LayeredRuntime& config,
-                       const LocalInfo::LocalInfo& local_info, Init::Manager& init_manager,
-                       Stats::Store& store, RandomGenerator& generator,
+                       const LocalInfo::LocalInfo& local_info, Stats::Store& store,
+                       RandomGenerator& generator,
                        ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
     : generator_(generator), stats_(generateStats(store)), tls_(tls.allocateSlot()),
-      config_(config), service_cluster_(local_info.clusterName()), api_(api) {
+      config_(config), service_cluster_(local_info.clusterName()), api_(api),
+      init_watcher_("RDTS", [this]() { onRdtsReady(); }) {
   std::unordered_set<std::string> layer_names;
   for (const auto& layer : config_.layers()) {
     auto ret = layer_names.insert(layer.name());
@@ -527,7 +505,7 @@ LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator
     case envoy::config::bootstrap::v3::RuntimeLayer::LayerSpecifierCase::kRtdsLayer:
       subscriptions_.emplace_back(
           std::make_unique<RtdsSubscription>(*this, layer.rtds_layer(), store, validation_visitor));
-      init_manager.add(subscriptions_.back()->init_target_);
+      init_manager_.add(subscriptions_.back()->init_target_);
       break;
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
@@ -538,6 +516,16 @@ LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator
 }
 
 void LoaderImpl::initialize(Upstream::ClusterManager& cm) { cm_ = &cm; }
+
+void LoaderImpl::startRtdsSubscriptions(ReadyCallback on_done) {
+  on_rtds_initialized_ = on_done;
+  init_manager_.initialize(init_watcher_);
+}
+
+void LoaderImpl::onRdtsReady() {
+  ENVOY_LOG(info, "RTDS has finished initialization");
+  on_rtds_initialized_();
+}
 
 RtdsSubscription::RtdsSubscription(
     LoaderImpl& parent, const envoy::config::bootstrap::v3::RuntimeLayer::RtdsLayer& rtds_layer,
@@ -616,7 +604,7 @@ const Snapshot& LoaderImpl::snapshot() {
   return tls_->getTyped<Snapshot>();
 }
 
-std::shared_ptr<const Snapshot> LoaderImpl::threadsafeSnapshot() {
+SnapshotConstSharedPtr LoaderImpl::threadsafeSnapshot() {
   if (tls_->currentThreadRegistered()) {
     return std::dynamic_pointer_cast<const Snapshot>(tls_->get());
   }
@@ -642,7 +630,7 @@ RuntimeStats LoaderImpl::generateStats(Stats::Store& store) {
   return stats;
 }
 
-std::unique_ptr<SnapshotImpl> LoaderImpl::createNewSnapshot() {
+SnapshotImplPtr LoaderImpl::createNewSnapshot() {
   std::vector<Snapshot::OverrideLayerConstPtr> layers;
   uint32_t disk_layers = 0;
   uint32_t error_layers = 0;

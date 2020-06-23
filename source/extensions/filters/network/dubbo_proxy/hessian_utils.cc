@@ -29,7 +29,7 @@ typename std::enable_if<std::is_signed<T>::value, T>::type leftShift(T left, uin
 inline void addByte(Buffer::Instance& buffer, const uint8_t value) { buffer.add(&value, 1); }
 
 void addSeq(Buffer::Instance& buffer, const std::initializer_list<uint8_t>& values) {
-  for (const int8_t& value : values) {
+  for (const uint8_t& value : values) {
     buffer.add(&value, 1);
   }
 }

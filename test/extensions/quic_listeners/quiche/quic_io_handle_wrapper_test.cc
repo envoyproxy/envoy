@@ -1,7 +1,7 @@
-#include <sys/socket.h>
-
 #include <cstddef>
 #include <memory>
+
+#include "envoy/common/platform.h"
 
 #include "common/network/address_impl.h"
 
@@ -56,6 +56,26 @@ TEST_F(QuicIoHandleWrapperTest, DelegateIoHandleCalls) {
   Network::Address::InstanceConstSharedPtr addr(new Network::Address::Ipv4Instance(12345));
   EXPECT_CALL(os_sys_calls_, sendmsg(fd, _, 0)).WillOnce(Return(Api::SysCallSizeResult{5u, 0}));
   wrapper_->sendmsg(&slice, 1, 0, /*self_ip=*/nullptr, *addr);
+
+  EXPECT_CALL(os_sys_calls_, getsockname(_, _, _)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
+  wrapper_->domain();
+
+  EXPECT_CALL(os_sys_calls_, getsockopt_(_, _, _, _, _)).WillOnce(Return(0));
+  EXPECT_CALL(os_sys_calls_, getsockname(_, _, _))
+      .WillOnce(Invoke([](os_fd_t, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallIntResult {
+        addr->sa_family = AF_INET6;
+        *addrlen = sizeof(sockaddr_in6);
+        return Api::SysCallIntResult{0, 0};
+      }));
+  addr = wrapper_->localAddress();
+
+  EXPECT_CALL(os_sys_calls_, getpeername(_, _, _))
+      .WillOnce(Invoke([](os_fd_t, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallIntResult {
+        addr->sa_family = AF_INET6;
+        *addrlen = sizeof(sockaddr_in6);
+        return Api::SysCallIntResult{0, 0};
+      }));
+  addr = wrapper_->peerAddress();
 
   Network::IoHandle::RecvMsgOutput output(1, nullptr);
   EXPECT_CALL(os_sys_calls_, recvmsg(fd, _, 0)).WillOnce(Invoke([](os_fd_t, msghdr* msg, int) {

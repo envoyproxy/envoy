@@ -90,6 +90,7 @@ public:
   const LowerCaseString EnvoyMaxRetries{absl::StrCat(prefix(), "-max-retries")};
   const LowerCaseString EnvoyNotForwarded{absl::StrCat(prefix(), "-not-forwarded")};
   const LowerCaseString EnvoyOriginalDstHost{absl::StrCat(prefix(), "-original-dst-host")};
+  const LowerCaseString EnvoyOriginalMethod{absl::StrCat(prefix(), "-original-method")};
   const LowerCaseString EnvoyOriginalPath{absl::StrCat(prefix(), "-original-path")};
   const LowerCaseString EnvoyOverloaded{absl::StrCat(prefix(), "-overloaded")};
   const LowerCaseString EnvoyRateLimited{absl::StrCat(prefix(), "-ratelimited")};
@@ -238,6 +239,11 @@ public:
     const std::string Put{"PUT"};
     const std::string Trace{"TRACE"};
   } MethodValues;
+
+  struct {
+    // per https://tools.ietf.org/html/draft-kinnear-httpbis-http2-transport-02
+    const std::string Bytestream{"bytestream"};
+  } ProtocolValues;
 
   struct {
     const std::string Http{"http"};

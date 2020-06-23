@@ -6,11 +6,10 @@
 #include "envoy/config/endpoint/v3/load_report.pb.h"
 #include "envoy/service/load_stats/v3/lrs.pb.h"
 
-#include "common/config/resources.h"
-
 #include "test/config/utility.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/resources.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -18,10 +17,10 @@
 namespace Envoy {
 namespace {
 
-class LoadStatsIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+class LoadStatsIntegrationTest : public Grpc::VersionedGrpcClientIntegrationParamTest,
                                  public HttpIntegrationTest {
 public:
-  LoadStatsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {
+  LoadStatsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {
     // We rely on some fairly specific load balancing picks in this test, so
     // determinize the schedule.
     setDeterministic();
@@ -113,6 +112,7 @@ public:
       auto* loadstats_config = bootstrap.mutable_cluster_manager()->mutable_load_stats_config();
       loadstats_config->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
       loadstats_config->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("load_report");
+      loadstats_config->set_transport_api_version(apiVersion());
       auto* load_report_cluster = bootstrap.mutable_static_resources()->add_clusters();
       load_report_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       load_report_cluster->mutable_circuit_breakers()->Clear();
@@ -159,11 +159,20 @@ public:
     RELEASE_ASSERT(result, result.message());
   }
 
-  void
-  mergeLoadStats(envoy::service::load_stats::v3::LoadStatsRequest& loadstats_request,
-                 const envoy::service::load_stats::v3::LoadStatsRequest& local_loadstats_request) {
-    ASSERT(loadstats_request.cluster_stats_size() <= 1);
-    ASSERT(local_loadstats_request.cluster_stats_size() <= 1);
+  void mergeLoadStats(envoy::service::load_stats::v3::LoadStatsRequest& loadstats_request,
+                      envoy::service::load_stats::v3::LoadStatsRequest& local_loadstats_request) {
+    // Strip out "load_report" cluster, so that it doesn't interfere with the test.
+    for (auto it = local_loadstats_request.mutable_cluster_stats()->begin();
+         it != local_loadstats_request.mutable_cluster_stats()->end(); ++it) {
+      if (it->cluster_name() == "load_report") {
+        local_loadstats_request.mutable_cluster_stats()->erase(it);
+        break;
+      }
+    }
+
+    ASSERT_LE(loadstats_request.cluster_stats_size(), 1) << loadstats_request.DebugString();
+    ASSERT_LE(local_loadstats_request.cluster_stats_size(), 1)
+        << local_loadstats_request.DebugString();
 
     if (local_loadstats_request.cluster_stats_size() == 0) {
       return;
@@ -255,6 +264,11 @@ public:
       AssertionResult result =
           loadstats_stream_->waitForGrpcMessage(*dispatcher_, local_loadstats_request);
       RELEASE_ASSERT(result, result.message());
+      // Check that "envoy.lrs.supports_send_all_clusters" client feature is set.
+      if (local_loadstats_request.has_node()) {
+        EXPECT_THAT(local_loadstats_request.node().client_features(),
+                    ::testing::ElementsAre("envoy.lrs.supports_send_all_clusters"));
+      }
       // Sanity check and clear the measured load report interval.
       for (auto& cluster_stats : *local_loadstats_request.mutable_cluster_stats()) {
         const uint32_t actual_load_report_interval_ms =
@@ -268,11 +282,12 @@ public:
       }
       mergeLoadStats(loadstats_request, local_loadstats_request);
 
-      EXPECT_EQ("POST", loadstats_stream_->headers().Method()->value().getStringView());
-      EXPECT_EQ("/envoy.service.load_stats.v2.LoadReportingService/StreamLoadStats",
-                loadstats_stream_->headers().Path()->value().getStringView());
-      EXPECT_EQ("application/grpc",
-                loadstats_stream_->headers().ContentType()->value().getStringView());
+      EXPECT_EQ("POST", loadstats_stream_->headers().getMethodValue());
+      EXPECT_EQ(
+          TestUtility::getVersionedMethodPath("envoy.service.load_stats.{}.LoadReportingService",
+                                              "StreamLoadStats", apiVersion()),
+          loadstats_stream_->headers().getPathValue());
+      EXPECT_EQ("application/grpc", loadstats_stream_->headers().getContentTypeValue());
     } while (!TestUtility::assertRepeatedPtrFieldEqual(expected_cluster_stats,
                                                        loadstats_request.cluster_stats(), true));
   }
@@ -295,17 +310,20 @@ public:
     EXPECT_EQ(request_size_, upstream_request_->bodyLength());
 
     ASSERT_TRUE(response_->complete());
-    EXPECT_EQ(std::to_string(response_code),
-              response_->headers().Status()->value().getStringView());
+    EXPECT_EQ(std::to_string(response_code), response_->headers().getStatusValue());
     EXPECT_EQ(response_size_, response_->body().size());
   }
 
-  void requestLoadStatsResponse(const std::vector<std::string>& clusters) {
+  void requestLoadStatsResponse(const std::vector<std::string>& clusters,
+                                bool send_all_clusters = false) {
     envoy::service::load_stats::v3::LoadStatsResponse loadstats_response;
     loadstats_response.mutable_load_reporting_interval()->MergeFrom(
         Protobuf::util::TimeUtil::MillisecondsToDuration(load_report_interval_ms_));
     for (const auto& cluster : clusters) {
       loadstats_response.add_clusters(cluster);
+    }
+    if (send_all_clusters) {
+      loadstats_response.set_send_all_clusters(true);
     }
     loadstats_stream_->sendGrpcMessage(loadstats_response);
     // Wait until the request has been received by Envoy.
@@ -361,9 +379,8 @@ public:
   const uint32_t load_report_interval_ms_ = 500;
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, LoadStatsIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, LoadStatsIntegrationTest,
+                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Validate the load reports for successful requests as cluster membership
 // changes.
@@ -395,7 +412,8 @@ TEST_P(LoadStatsIntegrationTest, Success) {
 
   // 33%/67% split between dragon/winter primary localities.
   updateClusterLoadAssignment({{0}}, {{1, 2}}, {}, {{4}});
-  requestLoadStatsResponse({"cluster_0"});
+  // Verify that send_all_clusters works.
+  requestLoadStatsResponse({}, true);
 
   for (uint32_t i = 0; i < 6; ++i) {
     sendAndReceiveUpstream((4 + i) % 3);
@@ -609,7 +627,7 @@ TEST_P(LoadStatsIntegrationTest, Dropped) {
   initiateClientConnection();
   response_->waitForEndStream();
   ASSERT_TRUE(response_->complete());
-  EXPECT_EQ("503", response_->headers().Status()->value().getStringView());
+  EXPECT_EQ("503", response_->headers().getStatusValue());
   cleanupUpstreamAndDownstream();
 
   waitForLoadStatsRequest({}, 1);

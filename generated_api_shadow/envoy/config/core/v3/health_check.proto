@@ -54,7 +54,7 @@ enum HealthStatus {
   DEGRADED = 5;
 }
 
-// [#next-free-field: 23]
+// [#next-free-field: 24]
 message HealthCheck {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.HealthCheck";
 
@@ -83,11 +83,13 @@ message HealthCheck {
     // left empty (default value), the name of the cluster this health check is associated
     // with will be used. The host header can be customized for a specific endpoint by setting the
     // :ref:`hostname <envoy_api_field_config.endpoint.v3.Endpoint.HealthCheckConfig.hostname>` field.
-    string host = 1;
+    string host = 1 [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
     // Specifies the HTTP path that will be requested during health checking. For example
     // */healthcheck*.
-    string path = 2 [(validate.rules).string = {min_bytes: 1}];
+    string path = 2 [
+      (validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_VALUE strict: false}
+    ];
 
     // [#not-implemented-hide:] HTTP specific payload.
     Payload send = 3;
@@ -104,7 +106,9 @@ message HealthCheck {
 
     // Specifies a list of HTTP headers that should be removed from each request that is sent to the
     // health checked cluster.
-    repeated string request_headers_to_remove = 8;
+    repeated string request_headers_to_remove = 8 [(validate.rules).repeated = {
+      items {string {well_known_regex: HTTP_HEADER_NAME strict: false}}
+    }];
 
     // Specifies a list of HTTP response statuses considered healthy. If provided, replaces default
     // 200-only policy - 200 must be included explicitly as needed. Ranges follow half-open
@@ -170,7 +174,8 @@ message HealthCheck {
     // left empty (default value), the name of the cluster this health check is associated
     // with will be used. The authority header can be customized for a specific endpoint by setting
     // the :ref:`hostname <envoy_api_field_config.endpoint.v3.Endpoint.HealthCheckConfig.hostname>` field.
-    string authority = 2;
+    string authority = 2
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
   }
 
   // Custom health check.
@@ -253,17 +258,21 @@ message HealthCheck {
   // Reuse health check connection between health checks. Default is true.
   google.protobuf.BoolValue reuse_connection = 7;
 
-  // HTTP health check.
-  google.protobuf.Duration no_traffic_interval = 12 [(validate.rules).duration = {gt {}}];
+  oneof health_checker {
+    option (validate.required) = true;
 
-  // TCP health check.
-  google.protobuf.Duration unhealthy_interval = 14 [(validate.rules).duration = {gt {}}];
+    // HTTP health check.
+    HttpHealthCheck http_health_check = 8;
 
-  // gRPC health check.
-  google.protobuf.Duration unhealthy_edge_interval = 15 [(validate.rules).duration = {gt {}}];
+    // TCP health check.
+    TcpHealthCheck tcp_health_check = 9;
 
-  // Custom health check.
-  google.protobuf.Duration healthy_edge_interval = 16 [(validate.rules).duration = {gt {}}];
+    // gRPC health check.
+    GrpcHealthCheck grpc_health_check = 11;
+
+    // Custom health check.
+    CustomHealthCheck custom_health_check = 13;
+  }
 
   // The "no traffic interval" is a special health check interval that is used when a cluster has
   // never had traffic routed to it. This lower interval allows cluster information to be kept up to
@@ -273,14 +282,14 @@ message HealthCheck {
   // any other.
   //
   // The default value for "no traffic interval" is 60 seconds.
-  string event_log_path = 17;
+  google.protobuf.Duration no_traffic_interval = 12 [(validate.rules).duration = {gt {}}];
 
   // The "unhealthy interval" is a health check interval that is used for hosts that are marked as
   // unhealthy. As soon as the host is marked as healthy, Envoy will shift back to using the
   // standard health check interval that is defined.
   //
   // The default value for "unhealthy interval" is the same as "interval".
-  EventServiceConfig event_service = 22;
+  google.protobuf.Duration unhealthy_interval = 14 [(validate.rules).duration = {gt {}}];
 
   // The "unhealthy edge interval" is a special health check interval that is used for the first
   // health check right after a host is marked as unhealthy. For subsequent health checks
@@ -288,33 +297,61 @@ message HealthCheck {
   // check interval that is defined.
   //
   // The default value for "unhealthy edge interval" is the same as "unhealthy interval".
-  bool always_log_health_check_failures = 19;
+  google.protobuf.Duration unhealthy_edge_interval = 15 [(validate.rules).duration = {gt {}}];
 
   // The "healthy edge interval" is a special health check interval that is used for the first
   // health check right after a host is marked as healthy. For subsequent health checks
   // Envoy will shift back to using the standard health check interval that is defined.
   //
   // The default value for "healthy edge interval" is the same as the default interval.
+  google.protobuf.Duration healthy_edge_interval = 16 [(validate.rules).duration = {gt {}}];
+
+  // Specifies the path to the :ref:`health check event log <arch_overview_health_check_logging>`.
+  // If empty, no event log will be written.
+  string event_log_path = 17;
+
+  // [#not-implemented-hide:]
+  // The gRPC service for the health check event service.
+  // If empty, health check events won't be sent to a remote endpoint.
+  EventServiceConfig event_service = 22;
+
+  // If set to true, health check failure events will always be logged. If set to false, only the
+  // initial health check failure event will be logged.
+  // The default value is false.
+  bool always_log_health_check_failures = 19;
+
+  // This allows overriding the cluster TLS settings, just for health check connections.
   TlsOptions tls_options = 21;
 
-  oneof health_checker {
-    option (validate.required) = true;
-
-    // Specifies the path to the :ref:`health check event log <arch_overview_health_check_logging>`.
-    // If empty, no event log will be written.
-    HttpHealthCheck http_health_check = 8;
-
-    // [#not-implemented-hide:]
-    // The gRPC service for the health check event service.
-    // If empty, health check events won't be sent to a remote endpoint.
-    TcpHealthCheck tcp_health_check = 9;
-
-    // If set to true, health check failure events will always be logged. If set to false, only the
-    // initial health check failure event will be logged.
-    // The default value is false.
-    GrpcHealthCheck grpc_health_check = 11;
-
-    // This allows overriding the cluster TLS settings, just for health check connections.
-    CustomHealthCheck custom_health_check = 13;
-  }
+  // Optional key/value pairs that will be used to match a transport socket from those specified in the cluster's
+  // :ref:`tranport socket matches <envoy_api_field_config.cluster.v3.Cluster.transport_socket_matches>`.
+  // For example, the following match criteria
+  //
+  // .. code-block:: yaml
+  //
+  //  transport_socket_match_criteria:
+  //    useMTLS: true
+  //
+  // Will match the following :ref:`cluster socket match <envoy_api_msg_config.cluster.v3.Cluster.TransportSocketMatch>`
+  //
+  // .. code-block:: yaml
+  //
+  //  transport_socket_matches:
+  //  - name: "useMTLS"
+  //    match:
+  //      useMTLS: true
+  //    transport_socket:
+  //      name: envoy.transport_sockets.tls
+  //      config: { ... } # tls socket configuration
+  //
+  // If this field is set, then for health checks it will supersede an entry of *envoy.transport_socket* in the
+  // :ref:`LbEndpoint.Metadata <envoy_api_field_config.endpoint.v3.LbEndpoint.metadata>`.
+  // This allows using different transport socket capabilities for health checking versus proxying to the
+  // endpoint.
+  //
+  // If the key/values pairs specified do not match any
+  // :ref:`transport socket matches <envoy_api_field_config.cluster.v3.Cluster.transport_socket_matches>`,
+  // the cluster's :ref:`transport socket <envoy_api_field_config.cluster.v3.Cluster.transport_socket>`
+  // will be used for health check socket configuration.
+  google.protobuf.Struct transport_socket_match_criteria = 23;
 }

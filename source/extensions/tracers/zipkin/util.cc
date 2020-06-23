@@ -7,6 +7,7 @@
 #include "common/common/hex.h"
 #include "common/common/utility.h"
 
+#include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 
 namespace Envoy {
@@ -20,6 +21,14 @@ uint64_t Util::generateRandom64(TimeSource& time_source) {
                       .count();
   std::mt19937_64 rand_64(seed);
   return rand_64();
+}
+
+ProtobufWkt::Value Util::uint64Value(uint64_t value, absl::string_view name,
+                                     Replacements& replacements) {
+  const std::string string_value = std::to_string(value);
+  replacements.push_back({absl::StrCat("\"", name, "\":\"", string_value, "\""),
+                          absl::StrCat("\"", name, "\":", string_value)});
+  return ValueUtil::stringValue(string_value);
 }
 
 } // namespace Zipkin

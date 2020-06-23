@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_benchmark_test",
@@ -10,6 +8,8 @@ load(
     "envoy_package",
     "envoy_proto_library",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -23,6 +23,7 @@ envoy_cc_test(
         "//source/common/http:context_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
+        "//source/extensions/upstreams/http/generic:config",
         "//test/mocks:common_lib",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/http:http_mocks",
@@ -49,6 +50,8 @@ envoy_cc_test(
 envoy_cc_test(
     name = "codec_client_test",
     srcs = ["codec_client_test.cc"],
+    # IpVersions/CodecNetworkTest.SendData/IPv4: Test times out on Windows.
+    tags = ["fails_on_windows"],
     deps = [
         ":common_lib",
         "//source/common/buffer:buffer_lib",
@@ -152,6 +155,7 @@ envoy_proto_library(
     srcs = ["conn_manager_impl_fuzz.proto"],
     deps = [
         "//test/fuzz:common_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg",
     ],
 )
 
@@ -195,11 +199,11 @@ envoy_cc_test(
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/http:request_id_extension_interface",
         "//include/envoy/tracing:http_tracer_interface",
-        "//source/common/access_log:access_log_formatter_lib",
         "//source/common/access_log:access_log_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:macros",
         "//source/common/event:dispatcher_lib",
+        "//source/common/formatter:substitution_formatter_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:context_lib",
         "//source/common/http:date_provider_lib",
@@ -226,6 +230,7 @@ envoy_cc_test(
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:logging_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:test_time_lib",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/tracing/v3:pkg_cc_proto",
@@ -273,6 +278,7 @@ envoy_cc_test(
     name = "header_map_impl_test",
     srcs = ["header_map_impl_test.cc"],
     deps = [
+        "//source/common/http:header_list_view_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:header_utility_lib",
         "//test/test_common:utility_lib",
@@ -336,6 +342,7 @@ envoy_cc_test(
 envoy_proto_library(
     name = "utility_fuzz_proto",
     srcs = ["utility_fuzz.proto"],
+    deps = ["@envoy_api//envoy/config/core/v3:pkg"],
 )
 
 envoy_cc_fuzz_test(
@@ -382,5 +389,13 @@ envoy_cc_test(
         "//source/common/runtime:runtime_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "status_test",
+    srcs = ["status_test.cc"],
+    deps = [
+        "//source/common/http:status_lib",
     ],
 )

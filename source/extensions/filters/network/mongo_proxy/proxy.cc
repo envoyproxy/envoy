@@ -152,17 +152,16 @@ void ProxyFilter::decodeQuery(QueryMessagePtr&& message) {
   } else {
     // Normal query, get stats on a per collection basis first.
     QueryMessageInfo::QueryType query_type = active_query->query_info_.type();
-    Stats::StatNameVec names;
+    Stats::ElementVec names;
     names.reserve(6); // 2 entries are added by chargeQueryStats().
     names.push_back(mongo_stats_->collection_);
-    Stats::StatNameDynamicPool dynamic(mongo_stats_->symbolTable());
-    names.push_back(dynamic.add(active_query->query_info_.collection()));
+    names.push_back(Stats::DynamicName(active_query->query_info_.collection()));
     chargeQueryStats(names, query_type);
 
     // Callsite stats if we have it.
     if (!active_query->query_info_.callsite().empty()) {
       names.push_back(mongo_stats_->callsite_);
-      names.push_back(dynamic.add(active_query->query_info_.callsite()));
+      names.push_back(Stats::DynamicName(active_query->query_info_.callsite()));
       chargeQueryStats(names, query_type);
     }
 
@@ -180,7 +179,7 @@ void ProxyFilter::decodeQuery(QueryMessagePtr&& message) {
   active_query_list_.emplace_back(std::move(active_query));
 }
 
-void ProxyFilter::chargeQueryStats(Stats::StatNameVec& names,
+void ProxyFilter::chargeQueryStats(Stats::ElementVec& names,
                                    QueryMessageInfo::QueryType query_type) {
   // names come in containing {"collection", collection}. Report stats for 1 or
   // 2 variations on this array, and then return with the array in the same
@@ -224,16 +223,15 @@ void ProxyFilter::decodeReply(ReplyMessagePtr&& message) {
     }
 
     if (!active_query.query_info_.command().empty()) {
-      Stats::StatNameVec names{mongo_stats_->cmd_,
-                               mongo_stats_->getBuiltin(active_query.query_info_.command(),
-                                                        mongo_stats_->unknown_command_)};
+      Stats::ElementVec names{mongo_stats_->cmd_,
+                              mongo_stats_->getBuiltin(active_query.query_info_.command(),
+                                                       mongo_stats_->unknown_command_)};
       chargeReplyStats(active_query, names, *message);
     } else {
       // Collection stats first.
-      Stats::StatNameDynamicPool dynamic(mongo_stats_->symbolTable());
-      Stats::StatNameVec names{mongo_stats_->collection_,
-                               dynamic.add(active_query.query_info_.collection()),
-                               mongo_stats_->query_};
+      Stats::ElementVec names{mongo_stats_->collection_,
+                              Stats::DynamicName(active_query.query_info_.collection()),
+                              mongo_stats_->query_};
       chargeReplyStats(active_query, names, *message);
 
       // Callsite stats if we have it.
@@ -242,7 +240,7 @@ void ProxyFilter::decodeReply(ReplyMessagePtr&& message) {
         // to mutate the array to {"collection", collection, "callsite", callsite, "query"}.
         ASSERT(names.size() == 3);
         names.back() = mongo_stats_->callsite_; // Replaces "query".
-        names.push_back(dynamic.add(active_query.query_info_.callsite()));
+        names.push_back(Stats::DynamicName(active_query.query_info_.callsite()));
         names.push_back(mongo_stats_->query_);
         chargeReplyStats(active_query, names, *message);
       }
@@ -292,7 +290,7 @@ void ProxyFilter::onDrainClose() {
   read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
 }
 
-void ProxyFilter::chargeReplyStats(ActiveQuery& active_query, Stats::StatNameVec& names,
+void ProxyFilter::chargeReplyStats(ActiveQuery& active_query, Stats::ElementVec& names,
                                    const ReplyMessage& message) {
   uint64_t reply_documents_byte_size = 0;
   for (const Bson::DocumentSharedPtr& document : message.documents()) {
@@ -401,8 +399,10 @@ absl::optional<std::chrono::milliseconds> ProxyFilter::delayDuration() {
     return result;
   }
 
+  // Use a default percentage
+  const auto percentage = fault_config_->percentage(nullptr);
   if (!runtime_.snapshot().featureEnabled(MongoRuntimeConfig::get().FixedDelayPercent,
-                                          fault_config_->percentage())) {
+                                          percentage)) {
     return result;
   }
 

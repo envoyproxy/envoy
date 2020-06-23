@@ -3,7 +3,9 @@
 #include <string>
 #include <vector>
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/network/address_impl.h"
+#include "common/network/socket_impl.h"
 #include "common/network/utility.h"
 
 #include "extensions/stat_sinks/common/statsd/statsd.h"
@@ -50,18 +52,14 @@ TEST(UdpOverUdsStatsdSinkTest, InitWithPipeAddress) {
   sink.flush(snapshot);
 
   // Start the server.
-  // TODO(mattklein123): Right now all sockets are non-blocking. Move this non-blocking
-  // modification back to the abstraction layer so it will work for multiple platforms. Additionally
-  // this uses low level networking calls because our abstractions in this area only work for IP
-  // sockets. Revisit this also.
-  auto io_handle = uds_address->socket(Network::Address::SocketType::Datagram);
-  RELEASE_ASSERT(fcntl(io_handle->fd(), F_SETFL, 0) != -1, "");
-  uds_address->bind(io_handle->fd());
+  Network::SocketImpl sock(Network::Socket::Type::Datagram, uds_address);
+  RELEASE_ASSERT(sock.setBlockingForTest(false).rc_ != -1, "");
+  sock.bind(uds_address);
 
   // Do the flush which should have somewhere to write now.
   sink.flush(snapshot);
   Buffer::OwnedImpl receive_buffer;
-  receive_buffer.read(*io_handle, 32);
+  receive_buffer.read(sock.ioHandle(), 32);
   EXPECT_EQ("envoy.test_counter:1|c", receive_buffer.toString());
 }
 

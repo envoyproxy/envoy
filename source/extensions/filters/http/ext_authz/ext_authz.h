@@ -58,19 +58,22 @@ struct ExtAuthzFilterStats {
 class FilterConfig {
 public:
   FilterConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
-               const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-               Runtime::Loader& runtime, Http::Context& http_context,
-               const std::string& stats_prefix)
+               const LocalInfo::LocalInfo&, Stats::Scope& scope, Runtime::Loader& runtime,
+               Http::Context& http_context, const std::string& stats_prefix)
       : allow_partial_message_(config.with_request_body().allow_partial_message()),
         failure_mode_allow_(config.failure_mode_allow()),
         clear_route_cache_(config.clear_route_cache()),
         max_request_bytes_(config.with_request_body().max_request_bytes()),
-        status_on_error_(toErrorCode(config.status_on_error().code())), local_info_(local_info),
-        scope_(scope), runtime_(runtime), http_context_(http_context),
+        status_on_error_(toErrorCode(config.status_on_error().code())), scope_(scope),
+        runtime_(runtime), http_context_(http_context),
         filter_enabled_(config.has_filter_enabled()
                             ? absl::optional<Runtime::FractionalPercent>(
                                   Runtime::FractionalPercent(config.filter_enabled(), runtime_))
                             : absl::nullopt),
+        deny_at_disable_(config.has_deny_at_disable()
+                             ? absl::optional<Runtime::FeatureFlag>(
+                                   Runtime::FeatureFlag(config.deny_at_disable(), runtime_))
+                             : absl::nullopt),
         pool_(scope_.symbolTable()),
         metadata_context_namespaces_(config.metadata_context_namespaces().begin(),
                                      config.metadata_context_namespaces().end()),
@@ -90,13 +93,13 @@ public:
 
   uint32_t maxRequestBytes() const { return max_request_bytes_; }
 
-  const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
-
   Http::Code statusOnError() const { return status_on_error_; }
 
   bool filterEnabled() { return filter_enabled_.has_value() ? filter_enabled_->enabled() : true; }
 
-  Runtime::Loader& runtime() { return runtime_; }
+  bool denyAtDisable() {
+    return deny_at_disable_.has_value() ? deny_at_disable_->enabled() : false;
+  }
 
   Stats::Scope& scope() { return scope_; }
 
@@ -133,12 +136,12 @@ private:
   const bool clear_route_cache_;
   const uint32_t max_request_bytes_;
   const Http::Code status_on_error_;
-  const LocalInfo::LocalInfo& local_info_;
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
   Http::Context& http_context_;
 
   const absl::optional<Runtime::FractionalPercent> filter_enabled_;
+  const absl::optional<Runtime::FeatureFlag> deny_at_disable_;
 
   // TODO(nezdolik): stop using pool as part of deprecating cluster scope stats.
   Stats::StatNamePool pool_;

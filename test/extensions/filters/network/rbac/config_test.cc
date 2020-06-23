@@ -68,9 +68,8 @@ TEST_F(RoleBasedAccessControlNetworkFilterConfigFactoryTest, ValidProto) {
 
 TEST_F(RoleBasedAccessControlNetworkFilterConfigFactoryTest, EmptyProto) {
   RoleBasedAccessControlNetworkFilterConfigFactory factory;
-  auto* config = dynamic_cast<envoy::extensions::filters::network::rbac::v3::RBAC*>(
-      factory.createEmptyConfigProto().get());
-  EXPECT_NE(nullptr, config);
+  EXPECT_NE(nullptr, dynamic_cast<envoy::extensions::filters::network::rbac::v3::RBAC*>(
+                         factory.createEmptyConfigProto().get()));
 }
 
 TEST_F(RoleBasedAccessControlNetworkFilterConfigFactoryTest, InvalidPermission) {

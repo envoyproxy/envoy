@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
@@ -8,6 +6,8 @@ load(
     "//test/extensions:extensions_build_system.bzl",
     "envoy_extension_cc_test",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -53,18 +53,20 @@ envoy_extension_cc_test(
     name = "cluster_integration_test",
     srcs = ["cluster_integration_test.cc"],
     extension_name = "envoy.clusters.aggregate",
+    tags = ["fails_on_windows"],
     deps = [
         "//source/common/config:protobuf_link_hacks",
-        "//source/common/config:resources_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/clusters/aggregate:cluster",
         "//source/extensions/filters/network/tcp_proxy:config",
+        "//source/extensions/retry/priority/previous_priorities:config",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/integration:http_integration_lib",
         "//test/integration:integration_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:network_utility_lib",
+        "//test/test_common:resources_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],

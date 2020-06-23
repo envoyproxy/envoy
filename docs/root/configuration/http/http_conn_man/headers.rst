@@ -15,7 +15,7 @@ user-agent
 ----------
 
 The *user-agent* header may be set by the connection manager during decoding if the :ref:`add_user_agent
-<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.add_user_agent>` option is
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.add_user_agent>` option is
 enabled. The header is only modified if it is not already set. If the connection manager does set the header, the value
 is determined by the :option:`--service-cluster` command line option.
 
@@ -25,7 +25,7 @@ server
 ------
 
 The *server* header will be set during encoding to the value in the :ref:`server_name
-<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.server_name>` option.
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.server_name>` option.
 
 .. _config_http_conn_man_headers_x-client-trace-id:
 
@@ -49,7 +49,7 @@ that in the current implementation, this should be considered a hint as it is se
 could be easily spoofed by any internal entity. In the future Envoy will support a mutual
 authentication TLS mesh which will make this header fully secure. Like *user-agent*, the value
 is determined by the :option:`--service-cluster` command line option. In order to enable this
-feature you need to set the :ref:`user_agent <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.add_user_agent>` option to true.
+feature you need to set the :ref:`user_agent <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.add_user_agent>` option to true.
 
 .. _config_http_conn_man_headers_downstream-service-node:
 
@@ -108,7 +108,7 @@ The header used to override destination address when using the
 load balancing policy.
 
 It is ignored, unless the use of it is enabled via
-:ref:`use_http_header <envoy_api_field_Cluster.OriginalDstLbConfig.use_http_header>`.
+:ref:`use_http_header <envoy_v3_api_field_config.cluster.v3.Cluster.OriginalDstLbConfig.use_http_header>`.
 
 .. _config_http_conn_man_headers_x-forwarded-client-cert:
 
@@ -149,9 +149,9 @@ Some examples of the XFCC header are:
 3. For one client certificate with both URI type and DNS type Subject Alternative Name: ``x-forwarded-client-cert: By=http://frontend.lyft.com;Hash=468ed33be74eee6556d90c0149c1309e9ba61d6425303443c0748a02dd8de688;Subject="/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=Test Client";URI=http://testclient.lyft.com;DNS=lyft.com;DNS=www.lyft.com``
 
 How Envoy processes XFCC is specified by the
-:ref:`forward_client_cert_details<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.forward_client_cert_details>`
+:ref:`forward_client_cert_details<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.forward_client_cert_details>`
 and the
-:ref:`set_current_client_cert_details<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.set_current_client_cert_details>`
+:ref:`set_current_client_cert_details<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.set_current_client_cert_details>`
 HTTP connection manager options. If *forward_client_cert_details* is unset, the XFCC header will be sanitized by
 default.
 
@@ -169,9 +169,9 @@ address of the nearest client to the XFF list before proxying the request. Some 
 3. ``x-forwarded-for: 50.0.0.1, 10.0.0.1`` (internal proxy hop)
 
 Envoy will only append to XFF if the :ref:`use_remote_address
-<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.use_remote_address>`
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.use_remote_address>`
 HTTP connection manager option is set to true and the :ref:`skip_xff_append
-<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.skip_xff_append>`
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.skip_xff_append>`
 is set false. This means that if *use_remote_address* is false (which is the default) or
 *skip_xff_append* is true, the connection manager operates in a transparent mode where it does not
 modify XFF.
@@ -318,7 +318,7 @@ A few very important notes about XFF:
 
    * **NOTE**: If an internal service proxies an external request to another internal service, and
      includes the original XFF header, Envoy will append to it on egress if
-     :ref:`use_remote_address <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.use_remote_address>` is set. This will cause
+     :ref:`use_remote_address <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.use_remote_address>` is set. This will cause
      the other side to think the request is external. Generally, this is what is intended if XFF is
      being forwarded. If it is not intended, do not forward XFF, and forward
      :ref:`config_http_conn_man_headers_x-envoy-internal` instead.
@@ -352,7 +352,7 @@ is out of scope for this documentation. If *x-request-id* is propagated across a
 following features are available:
 
 * Stable :ref:`access logging <config_access_log>` via the
-  :ref:`v2 API runtime filter<envoy_api_field_config.filter.accesslog.v2.AccessLogFilter.runtime_filter>`.
+  :ref:`v3 API runtime filter<envoy_v3_api_field_config.accesslog.v3.AccessLogFilter.runtime_filter>`.
 * Stable tracing when performing random sampling via the :ref:`tracing.random_sampling
   <config_http_conn_man_runtime_random_sampling>` runtime setting or via forced tracing using the
   :ref:`config_http_conn_man_headers_x-envoy-force-trace` and
@@ -378,7 +378,7 @@ x-b3-traceid
 The *x-b3-traceid* HTTP header is used by the Zipkin tracer in Envoy.
 The TraceId is 64-bit in length and indicates the overall ID of the
 trace. Every span in a trace shares this ID. See more on zipkin tracing
-`here <https://github.com/openzipkin/b3-propagation>`.
+`here <https://github.com/openzipkin/b3-propagation>`__.
 
 .. _config_http_conn_man_headers_x-b3-spanid:
 
@@ -389,7 +389,7 @@ The *x-b3-spanid* HTTP header is used by the Zipkin tracer in Envoy.
 The SpanId is 64-bit in length and indicates the position of the current
 operation in the trace tree. The value should not be interpreted: it may or
 may not be derived from the value of the TraceId. See more on zipkin tracing
-`here <https://github.com/openzipkin/b3-propagation>`.
+`here <https://github.com/openzipkin/b3-propagation>`__.
 
 .. _config_http_conn_man_headers_x-b3-parentspanid:
 
@@ -400,7 +400,7 @@ The *x-b3-parentspanid* HTTP header is used by the Zipkin tracer in Envoy.
 The ParentSpanId is 64-bit in length and indicates the position of the
 parent operation in the trace tree. When the span is the root of the trace
 tree, the ParentSpanId is absent. See more on zipkin tracing
-`here <https://github.com/openzipkin/b3-propagation>`.
+`here <https://github.com/openzipkin/b3-propagation>`__.
 
 .. _config_http_conn_man_headers_x-b3-sampled:
 
@@ -411,7 +411,7 @@ The *x-b3-sampled* HTTP header is used by the Zipkin tracer in Envoy.
 When the Sampled flag is either not specified or set to 1, the span will be reported to the tracing
 system. Once Sampled is set to 0 or 1, the same
 value should be consistently sent downstream. See more on zipkin tracing
-`here <https://github.com/openzipkin/b3-propagation>`.
+`here <https://github.com/openzipkin/b3-propagation>`__.
 
 .. _config_http_conn_man_headers_x-b3-flags:
 
@@ -421,7 +421,7 @@ x-b3-flags
 The *x-b3-flags* HTTP header is used by the Zipkin tracer in Envoy.
 The encode one or more options. For example, Debug is encoded as
 ``X-B3-Flags: 1``. See more on zipkin tracing
-`here <https://github.com/openzipkin/b3-propagation>`.
+`here <https://github.com/openzipkin/b3-propagation>`__.
 
 .. _config_http_conn_man_headers_b3:
 
@@ -430,7 +430,7 @@ b3
 
 The *b3* HTTP header is used by the Zipkin tracer in Envoy.
 Is a more compressed header format. See more on zipkin tracing
-`here <https://github.com/openzipkin/b3-propagation#single-header>`.
+`here <https://github.com/openzipkin/b3-propagation#single-header>`__.
 
 .. _config_http_conn_man_headers_x-datadog-trace-id:
 
@@ -467,13 +467,13 @@ Custom request/response headers
 
 Custom request/response headers can be added to a request/response at the weighted cluster,
 route, virtual host, and/or global route configuration level. See the
-:ref:`v2 <envoy_api_msg_RouteConfiguration>` API documentation.
+:ref:`v3 <envoy_v3_api_msg_config.route.v3.RouteConfiguration>` API documentation.
 
 No *:-prefixed* pseudo-header may be modified via this mechanism. The *:path*
 and *:authority* headers may instead be modified via mechanisms such as
-:ref:`prefix_rewrite <envoy_api_field_route.RouteAction.prefix_rewrite>`,
-:ref:`regex_rewrite <envoy_api_field_route.RouteAction.regex_rewrite>`, and
-:ref:`host_rewrite <envoy_api_field_route.RouteAction.host_rewrite>`.
+:ref:`prefix_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.prefix_rewrite>`,
+:ref:`regex_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.regex_rewrite>`, and
+:ref:`host_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_literal>`.
 
 Headers are appended to requests/responses in the following order: weighted cluster level headers,
 route level headers, virtual host level headers and finally global level headers.
@@ -496,7 +496,7 @@ Supported variable names are:
     .. note::
 
       This may not be the physical remote address of the peer if the address has been inferred from
-      :ref:`proxy proto <envoy_api_field_listener.FilterChain.use_proxy_proto>` or :ref:`x-forwarded-for
+      :ref:`proxy proto <envoy_v3_api_field_config.listener.v3.FilterChain.use_proxy_proto>` or :ref:`x-forwarded-for
       <config_http_conn_man_headers_x-forwarded-for>`.
 
 %DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%
@@ -603,7 +603,7 @@ Supported variable names are:
     :ref:`x-forwarded-proto <config_http_conn_man_headers_x-forwarded-proto>` request header.
 
 %UPSTREAM_METADATA(["namespace", "key", ...])%
-    Populates the header with :ref:`EDS endpoint metadata <envoy_api_field_endpoint.LbEndpoint.metadata>` from the
+    Populates the header with :ref:`EDS endpoint metadata <envoy_v3_api_field_config.endpoint.v3.LbEndpoint.metadata>` from the
     upstream host selected by the router. Metadata may be selected from any namespace. In general,
     metadata values may be strings, numbers, booleans, lists, nested structures, or null. Upstream
     metadata values may be selected from nested structs by specifying multiple keys. Otherwise,
@@ -644,3 +644,11 @@ Supported variable names are:
             key: "x-request-start"
             value: "%START_TIME(%s.%3f)%"
           append: true
+
+%RESPONSE_FLAGS%
+    Additional details about the response or connection, if any. Possible values and their meanings
+    are listed in the access log formatter :ref:`documentation<config_access_log_format_response_flags>`.
+
+%RESPONSE_CODE_DETAILS%
+    Response code details provides additional information about the HTTP response code, such as
+    who set it (the upstream or envoy) and why.

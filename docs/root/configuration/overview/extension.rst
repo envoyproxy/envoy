@@ -15,7 +15,7 @@ filter configuration snippet is permitted:
 
   name: front-http-proxy
   typed_config:
-    "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+    "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
     stat_prefix: ingress_http
     codec_type: AUTO
     rds:
@@ -29,7 +29,7 @@ filter configuration snippet is permitted:
     http_filters:
     - name: front-router
       typed_config:
-        "@type": type.googleapis.com/envoy.config.filter.http.router.v2.Router
+        "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
         dynamic_stats: true
 
 In case the control plane lacks the schema definitions for an extension,
@@ -43,7 +43,7 @@ follows:
   name: front-http-proxy
   typed_config:
     "@type": type.googleapis.com/udpa.type.v1.TypedStruct
-    type_url: type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+    type_url: type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
     value:
       stat_prefix: ingress_http
       codec_type: AUTO
@@ -59,5 +59,5 @@ follows:
       - name: front-router
         typed_config:
           "@type": type.googleapis.com/udpa.type.v1.TypedStruct
-          type_url: type.googleapis.com/envoy.config.filter.http.router.v2.Router
+          type_url: type.googleapis.com/envoy.extensions.filters.http.router.v3Router
 

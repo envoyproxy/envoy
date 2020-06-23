@@ -10,7 +10,7 @@ Route table check tool
   file.
 
 The following specifies input to the route table check tool. The route table check tool checks if
-the route returned by a :ref:`router <envoy_api_msg_RouteConfiguration>` matches what is expected.
+the route returned by a :ref:`router <envoy_v3_api_msg_config.route.v3.RouteConfiguration>` matches what is expected.
 The tool can be used to check cluster name, virtual cluster name,
 virtual host name, manual path rewrite, manual host rewrite, path redirect, and
 header field matches. Extensions for other test cases can be added. Details about installing the tool

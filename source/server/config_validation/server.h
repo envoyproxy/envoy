@@ -20,11 +20,11 @@
 #include "common/secret/secret_manager_impl.h"
 #include "common/thread_local/thread_local_impl.h"
 
+#include "server/admin/admin.h"
 #include "server/config_validation/admin.h"
 #include "server/config_validation/api.h"
 #include "server/config_validation/cluster_manager.h"
 #include "server/config_validation/dns.h"
-#include "server/http/admin.h"
 #include "server/listener_manager_impl.h"
 #include "server/server.h"
 
@@ -85,7 +85,7 @@ public:
   ListenerManager& listenerManager() override { return *listener_manager_; }
   Secret::SecretManager& secretManager() override { return *secret_manager_; }
   Runtime::RandomGenerator& random() override { return random_generator_; }
-  Runtime::Loader& runtime() override { return *runtime_loader_; }
+  Runtime::Loader& runtime() override { return Runtime::LoaderSingleton::get(); }
   void shutdown() override;
   bool isShutdown() override { return false; }
   void shutdownAdmin() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
@@ -141,7 +141,7 @@ public:
     return ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(filters, context);
   }
   Network::SocketSharedPtr createListenSocket(Network::Address::InstanceConstSharedPtr,
-                                              Network::Address::SocketType,
+                                              Network::Socket::Type,
                                               const Network::Socket::OptionsSharedPtr&,
                                               const ListenSocketCreationParams&) override {
     // Returned sockets are not currently used so we can return nothing here safely vs. a
@@ -192,7 +192,7 @@ private:
   Event::DispatcherPtr dispatcher_;
   Server::ValidationAdmin admin_;
   Singleton::ManagerPtr singleton_manager_;
-  Runtime::LoaderPtr runtime_loader_;
+  std::unique_ptr<Runtime::ScopedLoaderSingleton> runtime_singleton_;
   Runtime::RandomGeneratorImpl random_generator_;
   std::unique_ptr<Ssl::ContextManager> ssl_context_manager_;
   Configuration::MainImpl config_;

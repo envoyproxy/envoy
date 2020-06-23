@@ -1,4 +1,4 @@
-/docs/root/intro/version_history.rst merge=union
+/docs/root/version_history/current.rst merge=union
 *.generated.pb_text linguist-generated=true
 *.generated.pb_text -diff -merge
 /generated_api_shadow/envoy/** linguist-generated=true

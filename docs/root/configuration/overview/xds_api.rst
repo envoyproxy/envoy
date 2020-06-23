@@ -5,8 +5,8 @@ xDS API endpoints
 
 An xDS management server will implement the below endpoints as required for
 gRPC and/or REST serving. In both streaming gRPC and
-REST-JSON cases, a :ref:`DiscoveryRequest <envoy_api_msg_DiscoveryRequest>` is sent and a
-:ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>` received following the
+REST-JSON cases, a :ref:`DiscoveryRequest <envoy_v3_api_msg_service.discovery.v3.DiscoveryRequest>` is sent and a
+:ref:`DiscoveryResponse <envoy_v3_api_msg_service.discovery.v3.DiscoveryResponse>` received following the
 :ref:`xDS protocol <xds_protocol>`.
 
 Below we describe endpoints for the v2 and v3 transport API versions.
@@ -19,7 +19,7 @@ gRPC streaming endpoints
 .. http:post:: /envoy.api.v2.ClusterDiscoveryService/StreamClusters
 .. http:post:: /envoy.service.cluster.v3.ClusterDiscoveryService/StreamClusters
 
-See :repo:`cds.proto <api/envoy/api/v2/cds.proto>` for the service definition. This is used by Envoy
+See :repo:`cds.proto <api/service/cluster/v3/cds.proto>` for the service definition. This is used by Envoy
 as a client when
 
 .. code-block:: yaml
@@ -33,14 +33,14 @@ as a client when
             cluster_name: some_xds_cluster
 
 is set in the :ref:`dynamic_resources
-<envoy_api_field_config.bootstrap.v2.Bootstrap.dynamic_resources>` of the :ref:`Bootstrap
-<envoy_api_msg_config.bootstrap.v2.Bootstrap>` config.
+<envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>` of the :ref:`Bootstrap
+<envoy_v3_api_msg_config.bootstrap.v3.Bootstrap>` config.
 
 .. http:post:: /envoy.api.v2.EndpointDiscoveryService/StreamEndpoints
 .. http:post:: /envoy.service.endpoint.v3.EndpointDiscoveryService/StreamEndpoints
 
 See :repo:`eds.proto
-<api/envoy/api/v2/eds.proto>`
+<api/envoy/service/endpoint/v3/eds.proto>`
 for the service definition. This is used by Envoy as a client when
 
 .. code-block:: yaml
@@ -54,14 +54,14 @@ for the service definition. This is used by Envoy as a client when
             cluster_name: some_xds_cluster
 
 is set in the :ref:`eds_cluster_config
-<envoy_api_field_Cluster.eds_cluster_config>` field of the :ref:`Cluster
-<envoy_api_msg_Cluster>` config.
+<envoy_v3_api_field_config.cluster.v3.Cluster.eds_cluster_config>` field of the :ref:`Cluster
+<envoy_v3_api_msg_config.cluster.v3.Cluster>` config.
 
 .. http:post:: /envoy.api.v2.ListenerDiscoveryService/StreamListeners
 .. http:post:: /envoy.service.listener.v3.ListenerDiscoveryService/StreamListeners
 
 See :repo:`lds.proto
-<api/envoy/api/v2/lds.proto>`
+<api/envoy/service/listener/v3/lds.proto>`
 for the service definition. This is used by Envoy as a client when
 
 .. code-block:: yaml
@@ -75,14 +75,14 @@ for the service definition. This is used by Envoy as a client when
             cluster_name: some_xds_cluster
 
 is set in the :ref:`dynamic_resources
-<envoy_api_field_config.bootstrap.v2.Bootstrap.dynamic_resources>` of the :ref:`Bootstrap
-<envoy_api_msg_config.bootstrap.v2.Bootstrap>` config.
+<envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>` of the :ref:`Bootstrap
+<envoy_v3_api_msg_config.bootstrap.v3.Bootstrap>` config.
 
 .. http:post:: /envoy.api.v2.RouteDiscoveryService/StreamRoutes
 .. http:post:: /envoy.service.route.v3.RouteDiscoveryService/StreamRoutes
 
 See :repo:`rds.proto
-<api/envoy/api/v2/rds.proto>`
+<api/envoy/service/route/v3/rds.proto>`
 for the service definition. This is used by Envoy as a client when
 
 .. code-block:: yaml
@@ -97,15 +97,15 @@ for the service definition. This is used by Envoy as a client when
             cluster_name: some_xds_cluster
 
 is set in the :ref:`rds
-<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.rds>` field
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.rds>` field
 of the :ref:`HttpConnectionManager
-<envoy_api_msg_config.filter.network.http_connection_manager.v2.HttpConnectionManager>` config.
+<envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager>` config.
 
 .. http:post:: /envoy.api.v2.ScopedRoutesDiscoveryService/StreamScopedRoutes
 .. http:post:: /envoy.service.route.v3.ScopedRoutesDiscoveryService/StreamScopedRoutes
 
 See :repo:`srds.proto
-<api/envoy/api/v2/srds.proto>`
+<api/envoy/service/route/v3/srds.proto>`
 for the service definition. This is used by Envoy as a client when
 
 .. code-block:: yaml
@@ -121,15 +121,15 @@ for the service definition. This is used by Envoy as a client when
               cluster_name: some_xds_cluster
 
 is set in the :ref:`scoped_routes
-<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.scoped_routes>`
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.scoped_routes>`
 field of the :ref:`HttpConnectionManager
-<envoy_api_msg_config.filter.network.http_connection_manager.v2.HttpConnectionManager>` config.
+<envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager>` config.
 
 .. http:post:: /envoy.service.discovery.v2.SecretDiscoveryService/StreamSecrets
 .. http:post:: /envoy.service.secret.v3.SecretDiscoveryService/StreamSecrets
 
 See :repo:`sds.proto
-<api/envoy/service/discovery/v2/srds.proto>`
+<api/envoy/service/secret/v3/sds.proto>`
 for the service definition. This is used by Envoy as a client when
 
 .. code-block:: yaml
@@ -143,14 +143,14 @@ for the service definition. This is used by Envoy as a client when
           envoy_grpc:
             cluster_name: some_xds_cluster
 
-is set inside a :ref:`SdsSecretConfig <envoy_api_msg_auth.SdsSecretConfig>` message. This message
-is used in various places such as the :ref:`CommonTlsContext <envoy_api_msg_auth.CommonTlsContext>`.
+is set inside a :ref:`SdsSecretConfig <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.SdsSecretConfig>` message. This message
+is used in various places such as the :ref:`CommonTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CommonTlsContext>`.
 
 .. http:post:: /envoy.service.discovery.v2.RuntimeDiscoveryService/StreamRuntime
 .. http:post:: /envoy.service.runtime.v3.RuntimeDiscoveryService/StreamRuntime
 
 See :repo:`rtds.proto
-<api/envoy/service/discovery/v2/rtds.proto>`
+<api/envoy/service/runtime/v3/rtds.proto>`
 for the service definition. This is used by Envoy as a client when
 
 .. code-block:: yaml
@@ -164,7 +164,7 @@ for the service definition. This is used by Envoy as a client when
           envoy_grpc:
             cluster_name: some_xds_cluster
 
-is set inside the :ref:`rtds_layer <envoy_api_field_config.bootstrap.v2.RuntimeLayer.rtds_layer>`
+is set inside the :ref:`rtds_layer <envoy_v3_api_field_config.bootstrap.v3.RuntimeLayer.rtds_layer>`
 field.
 
 REST endpoints
@@ -174,7 +174,7 @@ REST endpoints
 .. http:post:: /v3/discovery:clusters
 
 See :repo:`cds.proto
-<api/envoy/api/v2/cds.proto>`
+<api/envoy/service/cluster/v3/cds.proto>`
 for the service definition. This is used by Envoy as a client when
 
 .. code-block:: yaml
@@ -186,14 +186,14 @@ for the service definition. This is used by Envoy as a client when
         cluster_names: [some_xds_cluster]
 
 is set in the :ref:`dynamic_resources
-<envoy_api_field_config.bootstrap.v2.Bootstrap.dynamic_resources>` of the :ref:`Bootstrap
-<envoy_api_msg_config.bootstrap.v2.Bootstrap>` config.
+<envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>` of the :ref:`Bootstrap
+<envoy_v3_api_msg_config.bootstrap.v3.Bootstrap>` config.
 
 .. http:post:: /v2/discovery:endpoints
 .. http:post:: /v3/discovery:endpoints
 
 See :repo:`eds.proto
-<api/envoy/api/v2/eds.proto>`
+<api/envoy/service/endpoint/v3/eds.proto>`
 for the service definition. This is used by Envoy as a client when
 
 .. code-block:: yaml
@@ -205,14 +205,14 @@ for the service definition. This is used by Envoy as a client when
         cluster_names: [some_xds_cluster]
 
 is set in the :ref:`eds_cluster_config
-<envoy_api_field_Cluster.eds_cluster_config>` field of the :ref:`Cluster
-<envoy_api_msg_Cluster>` config.
+<envoy_v3_api_field_config.cluster.v3.Cluster.eds_cluster_config>` field of the :ref:`Cluster
+<envoy_v3_api_msg_config.cluster.v3.Cluster>` config.
 
 .. http:post:: /v2/discovery:listeners
 .. http:post:: /v3/discovery:listeners
 
 See :repo:`lds.proto
-<api/envoy/api/v2/lds.proto>`
+<api/envoy/service/listener/v3/lds.proto>`
 for the service definition. This is used by Envoy as a client when
 
 .. code-block:: yaml
@@ -224,14 +224,14 @@ for the service definition. This is used by Envoy as a client when
         cluster_names: [some_xds_cluster]
 
 is set in the :ref:`dynamic_resources
-<envoy_api_field_config.bootstrap.v2.Bootstrap.dynamic_resources>` of the :ref:`Bootstrap
-<envoy_api_msg_config.bootstrap.v2.Bootstrap>` config.
+<envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>` of the :ref:`Bootstrap
+<envoy_v3_api_msg_config.bootstrap.v3.Bootstrap>` config.
 
 .. http:post:: /v2/discovery:routes
 .. http:post:: /v3/discovery:routes
 
 See :repo:`rds.proto
-<api/envoy/api/v2/rds.proto>`
+<api/envoy/service/route/v3/rds.proto>`
 for the service definition. This is used by Envoy as a client when
 
 .. code-block:: yaml
@@ -244,8 +244,8 @@ for the service definition. This is used by Envoy as a client when
         cluster_names: [some_xds_cluster]
 
 is set in the :ref:`rds
-<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.rds>` field of the :ref:`HttpConnectionManager
-<envoy_api_msg_config.filter.network.http_connection_manager.v2.HttpConnectionManager>` config.
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.rds>` field of the :ref:`HttpConnectionManager
+<envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager>` config.
 
 .. note::
 
@@ -288,7 +288,7 @@ document. The gRPC endpoint is:
 .. http:post:: /envoy.service.discovery.v3.AggregatedDiscoveryService/StreamAggregatedResources
 
 See :repo:`discovery.proto
-<api/envoy/api/v2/discovery.proto>`
+<api/envoy/service/discovery/v3/discovery.proto>`
 for the service definition. This is used by Envoy as a client when
 
 .. code-block:: yaml
@@ -301,8 +301,8 @@ for the service definition. This is used by Envoy as a client when
           cluster_name: some_ads_cluster
 
 is set in the :ref:`dynamic_resources
-<envoy_api_field_config.bootstrap.v2.Bootstrap.dynamic_resources>` of the :ref:`Bootstrap
-<envoy_api_msg_config.bootstrap.v2.Bootstrap>` config.
+<envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>` of the :ref:`Bootstrap
+<envoy_v3_api_msg_config.bootstrap.v3.Bootstrap>` config.
 
 When this is set, any of the configuration sources :ref:`above <v2_grpc_streaming_endpoints>` can
 be set to use the ADS channel. For example, a LDS config could be changed from
@@ -336,7 +336,7 @@ churn, these state-of-the-world updates can be cumbersome.
 As of 1.12.0, Envoy supports a "delta" variant of xDS (including ADS), where updates only contain
 resources added/changed/removed. Delta xDS is a gRPC (only) protocol. Delta uses different
 request/response protos than SotW (DeltaDiscovery{Request,Response}); see
-:repo:`discovery.proto <api/envoy/api/v2/discovery.proto>`. Conceptually, delta should be viewed as
+:repo:`discovery.proto <api/envoy/service/discovery/v3/discovery.proto>`. Conceptually, delta should be viewed as
 a new xDS transport type: there is static, filesystem, REST, gRPC-SotW, and now gRPC-delta.
 (Envoy's implementation of the gRPC-SotW/delta client happens to share most of its code between the
 two, and something similar is likely possible on the server side. However, they are in fact
@@ -344,7 +344,7 @@ incompatible protocols.
 :ref:`The specification of the delta xDS protocol's behavior is here <xds_protocol_delta>`.)
 
 To use delta, simply set the api_type field of your
-:ref:`ApiConfigSource <envoy_api_msg_core.ApiConfigSource>` proto(s) to DELTA_GRPC.
+:ref:`ApiConfigSource <envoy_v3_api_msg_config.core.v3.ApiConfigSource>` proto(s) to DELTA_GRPC.
 That works for both xDS and ADS; for ADS, it's the api_type field of
-:ref:`DynamicResources.ads_config <envoy_api_field_config.bootstrap.v2.Bootstrap.dynamic_resources>`,
+:ref:`DynamicResources.ads_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>`,
 as described in the previous section.

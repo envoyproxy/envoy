@@ -9,4 +9,4 @@ can be used, for example, as a terminal filter in filter chains to collect
 telemetry for blocked traffic. This filter should be configured with the name
 *envoy.filters.network.direct_response*.
 
-* :ref:`v2 API reference <envoy_api_field_listener.Filter.name>`
+* :ref:`v3 API reference <envoy_v3_api_field_config.listener.v3.Filter.name>`

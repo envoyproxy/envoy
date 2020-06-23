@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
@@ -9,6 +7,8 @@ load(
     "envoy_extension_cc_test",
 )
 
+licenses(["notice"])  # Apache 2
+
 envoy_package()
 
 envoy_extension_cc_test(
@@ -17,6 +17,8 @@ envoy_extension_cc_test(
         "datadog_tracer_impl_test.cc",
     ],
     extension_name = "envoy.tracers.datadog",
+    # TODO(wrowe): envoy_extension_ rules don't currently exclude windows extensions
+    tags = ["skip_on_windows"],
     deps = [
         "//source/common/common:base64_lib",
         "//source/common/http:header_map_lib",
@@ -40,6 +42,8 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_name = "envoy.tracers.datadog",
+    # TODO(wrowe): envoy_extension_ rules don't currently exclude windows extensions
+    tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/tracers/datadog:config",
         "//test/mocks/server:server_mocks",

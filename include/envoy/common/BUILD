@@ -1,11 +1,11 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_basic_cc_library",
     "envoy_cc_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -20,8 +20,22 @@ envoy_basic_cc_library(
 )
 
 envoy_cc_library(
+    name = "conn_pool_interface",
+    hdrs = ["conn_pool.h"],
+    deps = [
+        "//include/envoy/event:deferred_deletable",
+        "//include/envoy/upstream:upstream_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "mutex_tracer",
     hdrs = ["mutex_tracer.h"],
+)
+
+envoy_cc_library(
+    name = "resource_interface",
+    hdrs = ["resource.h"],
 )
 
 envoy_cc_library(

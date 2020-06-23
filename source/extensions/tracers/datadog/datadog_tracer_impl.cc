@@ -1,10 +1,11 @@
 #include "extensions/tracers/datadog/datadog_tracer_impl.h"
 
-#include "envoy/config/trace/v3/trace.pb.h"
+#include "envoy/config/trace/v3/datadog.pb.h"
 
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
+#include "common/common/version.h"
 #include "common/config/utility.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
@@ -23,17 +24,18 @@ Driver::TlsTracer::TlsTracer(const std::shared_ptr<opentracing::Tracer>& tracer,
 
 Driver::Driver(const envoy::config::trace::v3::DatadogConfig& datadog_config,
                Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
-               ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime)
+               ThreadLocal::SlotAllocator& tls, Runtime::Loader&)
     : OpenTracingDriver{scope},
       cm_(cluster_manager), tracer_stats_{DATADOG_TRACER_STATS(
                                 POOL_COUNTER_PREFIX(scope, "tracing.datadog."))},
-      tls_(tls.allocateSlot()), runtime_(runtime) {
+      tls_(tls.allocateSlot()) {
 
   Config::Utility::checkCluster(TracerNames::get().Datadog, datadog_config.collector_cluster(), cm_,
                                 /* allow_added_via_api */ true);
   cluster_ = datadog_config.collector_cluster();
 
   // Default tracer options.
+  tracer_options_.version = absl::StrCat("envoy ", Envoy::VersionInfo::version());
   tracer_options_.operation_name_override = "envoy.proxy";
   tracer_options_.service = "envoy";
   tracer_options_.inject = std::set<datadog::opentracing::PropagationStyle>{

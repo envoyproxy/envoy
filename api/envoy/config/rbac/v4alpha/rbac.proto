@@ -4,9 +4,9 @@ package envoy.config.rbac.v4alpha;
 
 import "envoy/config/core/v4alpha/address.proto";
 import "envoy/config/route/v4alpha/route_components.proto";
-import "envoy/type/matcher/v3/metadata.proto";
-import "envoy/type/matcher/v3/path.proto";
-import "envoy/type/matcher/v3/string.proto";
+import "envoy/type/matcher/v4alpha/metadata.proto";
+import "envoy/type/matcher/v4alpha/path.proto";
+import "envoy/type/matcher/v4alpha/string.proto";
 
 import "google/api/expr/v1alpha1/syntax.proto";
 
@@ -140,7 +140,7 @@ message Permission {
     route.v4alpha.HeaderMatcher header = 4;
 
     // A URL path on the incoming HTTP request. Only available for HTTP.
-    type.matcher.v3.PathMatcher url_path = 10;
+    type.matcher.v4alpha.PathMatcher url_path = 10;
 
     // A CIDR block that describes the destination IP.
     core.v4alpha.CidrRange destination_ip = 5;
@@ -149,7 +149,7 @@ message Permission {
     uint32 destination_port = 6 [(validate.rules).uint32 = {lte: 65535}];
 
     // Metadata that describes additional information about the action.
-    type.matcher.v3.MetadataMatcher metadata = 7;
+    type.matcher.v4alpha.MetadataMatcher metadata = 7;
 
     // Negates matching the provided permission. For instance, if the value of `not_rule` would
     // match, this permission would not match. Conversely, if the value of `not_rule` would not
@@ -166,7 +166,7 @@ message Permission {
     //
     //   * If the :ref:`TLS Inspector <config_listener_filters_tls_inspector>`
     //     filter is not added, and if a `FilterChainMatch` is not defined for
-    //     the :ref:`server name <envoy_api_field_config.listener.v3.FilterChainMatch.server_names>`,
+    //     the :ref:`server name <envoy_api_field_config.listener.v4alpha.FilterChainMatch.server_names>`,
     //     a TLS connection's requested SNI server name will be treated as if it
     //     wasn't present.
     //
@@ -175,7 +175,7 @@ message Permission {
     //
     // Please refer to :ref:`this FAQ entry <faq_how_to_setup_sni>` to learn to
     // setup SNI.
-    type.matcher.v3.StringMatcher requested_server_name = 9;
+    type.matcher.v4alpha.StringMatcher requested_server_name = 9;
   }
 }
 
@@ -203,7 +203,7 @@ message Principal {
     // The name of the principal. If set, The URI SAN or DNS SAN in that order is used from the
     // certificate, otherwise the subject field is used. If unset, it applies to any user that is
     // authenticated.
-    type.matcher.v3.StringMatcher principal_name = 2;
+    type.matcher.v4alpha.StringMatcher principal_name = 2;
   }
 
   reserved 5;
@@ -245,10 +245,10 @@ message Principal {
     route.v4alpha.HeaderMatcher header = 6;
 
     // A URL path on the incoming HTTP request. Only available for HTTP.
-    type.matcher.v3.PathMatcher url_path = 9;
+    type.matcher.v4alpha.PathMatcher url_path = 9;
 
     // Metadata that describes additional information about the principal.
-    type.matcher.v3.MetadataMatcher metadata = 7;
+    type.matcher.v4alpha.MetadataMatcher metadata = 7;
 
     // Negates matching the provided principal. For instance, if the value of `not_id` would match,
     // this principal would not match. Conversely, if the value of `not_id` would not match, this

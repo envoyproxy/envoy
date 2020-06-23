@@ -46,7 +46,7 @@ private:
     Request(TestFilter& parent, Buffer::Instance& data) : parent_(parent) { data_.move(data); }
 
     // Tcp::ConnectionPool::Callbacks
-    void onPoolFailure(Tcp::ConnectionPool::PoolFailureReason,
+    void onPoolFailure(ConnectionPool::PoolFailureReason,
                        Upstream::HostDescriptionConstSharedPtr) override {
       ASSERT(false);
     }
@@ -123,12 +123,6 @@ public:
 
   // Initializer for individual tests.
   void SetUp() override { BaseIntegrationTest::initialize(); }
-
-  // Destructor for individual tests.
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
 
 private:
   TestFilterConfigFactory config_factory_;

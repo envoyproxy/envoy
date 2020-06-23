@@ -95,9 +95,9 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
   }
 
   if (!should_trace.has_value()) {
-    const SamplingRequest request{std::string{request_headers.Host()->value().getStringView()},
-                                  std::string{request_headers.Method()->value().getStringView()},
-                                  std::string{request_headers.Path()->value().getStringView()}};
+    const SamplingRequest request{std::string{request_headers.getHostValue()},
+                                  std::string{request_headers.getMethodValue()},
+                                  std::string{request_headers.getPathValue()}};
 
     should_trace = sampling_strategy_->shouldTrace(request);
   }

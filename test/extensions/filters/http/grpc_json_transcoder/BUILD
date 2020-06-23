@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
@@ -8,6 +6,8 @@ load(
     "//test/extensions:extensions_build_system.bzl",
     "envoy_extension_cc_test",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -61,6 +61,7 @@ envoy_extension_cc_test(
         "//test/proto:bookstore_proto_descriptor",
     ],
     extension_name = "envoy.filters.http.grpc_json_transcoder",
+    tags = ["fails_on_windows"],
     deps = [
         "//source/common/grpc:codec_lib",
         "//source/common/http:header_map_lib",

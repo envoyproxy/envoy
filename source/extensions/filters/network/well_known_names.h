@@ -18,6 +18,8 @@ public:
   const std::string Echo = "envoy.filters.network.echo";
   // Direct response filter
   const std::string DirectResponse = "envoy.filters.network.direct_response";
+  // RocketMQ proxy filter
+  const std::string RocketmqProxy = "envoy.filters.network.rocketmq_proxy";
   // Dubbo proxy filter
   const std::string DubboProxy = "envoy.filters.network.dubbo_proxy";
   // HTTP connection manager filter
@@ -28,6 +30,8 @@ public:
   const std::string MongoProxy = "envoy.filters.network.mongo_proxy";
   // MySQL proxy filter
   const std::string MySQLProxy = "envoy.filters.network.mysql_proxy";
+  // Postgres proxy filter
+  const std::string Postgres = "envoy.filters.network.postgres_proxy";
   // Rate limit filter
   const std::string RateLimit = "envoy.filters.network.ratelimit";
   // Redis proxy filter
@@ -44,6 +48,8 @@ public:
   const std::string Rbac = "envoy.filters.network.rbac";
   // SNI Cluster filter
   const std::string SniCluster = "envoy.filters.network.sni_cluster";
+  // SNI Dynamic forward proxy filter
+  const std::string SniDynamicForwardProxy = "envoy.filters.network.sni_dynamic_forward_proxy";
   // ZooKeeper proxy filter
   const std::string ZooKeeperProxy = "envoy.filters.network.zookeeper_proxy";
 };

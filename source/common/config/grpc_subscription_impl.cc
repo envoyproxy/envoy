@@ -64,6 +64,7 @@ void GrpcSubscriptionImpl::onConfigUpdate(
   stats_.update_attempt_.inc();
   stats_.update_time_.set(DateUtil::nowToMilliseconds(dispatcher_.timeSource()));
   stats_.version_.set(HashUtil::xxHash64(version_info));
+  stats_.version_text_.set(version_info);
   ENVOY_LOG(debug, "gRPC config for {} accepted with {} resources with version {}", type_url_,
             resources.size(), version_info);
 }
@@ -78,6 +79,7 @@ void GrpcSubscriptionImpl::onConfigUpdate(
   stats_.update_success_.inc();
   stats_.update_time_.set(DateUtil::nowToMilliseconds(dispatcher_.timeSource()));
   stats_.version_.set(HashUtil::xxHash64(system_version_info));
+  stats_.version_text_.set(system_version_info);
 }
 
 void GrpcSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason reason,

@@ -11,7 +11,7 @@
 #include "common/protobuf/protobuf.h"
 #include "common/router/rds_impl.h"
 
-#include "server/http/admin.h"
+#include "server/admin/admin.h"
 
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/init/mocks.h"

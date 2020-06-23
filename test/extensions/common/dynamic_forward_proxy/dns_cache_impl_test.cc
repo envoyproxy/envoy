@@ -265,7 +265,7 @@ TEST_F(DnsCacheImplTest, TTL) {
              1 /* added */, 0 /* removed */, 1 /* num hosts */);
 
   // Re-resolve with ~60s passed. TTL should still be OK at default of 5 minutes.
-  simTime().sleep(std::chrono::milliseconds(60001));
+  simTime().advanceTimeWait(std::chrono::milliseconds(60001));
   EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
   resolve_timer->invokeCallback();
@@ -280,7 +280,7 @@ TEST_F(DnsCacheImplTest, TTL) {
 
   // Re-resolve with ~5m passed. This is not realistic as we would have re-resolved many times
   // during this period but it's good enough for the test.
-  simTime().sleep(std::chrono::milliseconds(300000));
+  simTime().advanceTimeWait(std::chrono::milliseconds(300000));
   EXPECT_CALL(update_callbacks_, onDnsHostRemove("foo.com"));
   resolve_timer->invokeCallback();
   checkStats(2 /* attempt */, 2 /* success */, 0 /* failure */, 1 /* address changed */,
@@ -321,7 +321,7 @@ TEST_F(DnsCacheImplTest, TTLWithCustomParameters) {
              TestUtility::makeDnsResponse({"10.0.0.1"}, std::chrono::seconds(0)));
 
   // Re-resolve with ~30s passed. TTL should still be OK at 60s.
-  simTime().sleep(std::chrono::milliseconds(30001));
+  simTime().advanceTimeWait(std::chrono::milliseconds(30001));
   EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
   resolve_timer->invokeCallback();
@@ -330,7 +330,7 @@ TEST_F(DnsCacheImplTest, TTLWithCustomParameters) {
              TestUtility::makeDnsResponse({"10.0.0.1"}));
 
   // Re-resolve with ~30s passed. TTL should expire.
-  simTime().sleep(std::chrono::milliseconds(30001));
+  simTime().advanceTimeWait(std::chrono::milliseconds(30001));
   EXPECT_CALL(update_callbacks_, onDnsHostRemove("foo.com"));
   resolve_timer->invokeCallback();
 }
@@ -392,7 +392,7 @@ TEST_F(DnsCacheImplTest, ResolveFailure) {
 
   // Re-resolve with ~5m passed. This is not realistic as we would have re-resolved many times
   // during this period but it's good enough for the test.
-  simTime().sleep(std::chrono::milliseconds(300001));
+  simTime().advanceTimeWait(std::chrono::milliseconds(300001));
   // Because resolution failed for the host, onDnsHostAddOrUpdate was not called.
   // Therefore, onDnsHostRemove should not be called either.
   EXPECT_CALL(update_callbacks_, onDnsHostRemove(_)).Times(0);
@@ -435,7 +435,7 @@ TEST_F(DnsCacheImplTest, ResolveFailureWithFailureRefreshRate) {
 
   // Re-resolve with ~5m passed. This is not realistic as we would have re-resolved many times
   // during this period but it's good enough for the test.
-  simTime().sleep(std::chrono::milliseconds(300001));
+  simTime().advanceTimeWait(std::chrono::milliseconds(300001));
   // Because resolution failed for the host, onDnsHostAddOrUpdate was not called.
   // Therefore, onDnsHostRemove should not be called either.
   EXPECT_CALL(update_callbacks_, onDnsHostRemove(_)).Times(0);
@@ -474,7 +474,7 @@ TEST_F(DnsCacheImplTest, ResolveSuccessWithEmptyResult) {
 
   // Re-resolve with ~5m passed. This is not realistic as we would have re-resolved many times
   // during this period but it's good enough for the test.
-  simTime().sleep(std::chrono::milliseconds(300001));
+  simTime().advanceTimeWait(std::chrono::milliseconds(300001));
   // Because resolution failed for the host, onDnsHostAddOrUpdate was not called.
   // Therefore, onDnsHostRemove should not be called either.
   EXPECT_CALL(update_callbacks_, onDnsHostRemove(_)).Times(0);

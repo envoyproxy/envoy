@@ -87,7 +87,7 @@ public:
         {":method", "POST"}, {":path", "/tap"}, {":scheme", "http"}, {":authority", "host"}};
     admin_response_ = admin_client_->makeRequestWithBody(admin_request_headers, admin_request_yaml);
     admin_response_->waitForHeaders();
-    EXPECT_EQ("200", admin_response_->headers().Status()->value().getStringView());
+    EXPECT_EQ("200", admin_response_->headers().getStatusValue());
     EXPECT_FALSE(admin_response_->complete());
   }
 
@@ -308,6 +308,7 @@ tap_config:
 
   admin_client_->close();
   EXPECT_EQ(3UL, test_server_->counter("http.config_test.tap.rq_tapped")->value());
+  test_server_->waitForGaugeEq("http.admin.downstream_rq_active", 0);
 }
 
 // Verify both request and response trailer matching works.

@@ -67,7 +67,7 @@ public:
   virtual bool evaluate(const StreamInfo::StreamInfo& info,
                         const Http::RequestHeaderMap& request_headers,
                         const Http::ResponseHeaderMap& response_headers,
-                        const Http::ResponseTrailerMap& response_trailers) PURE;
+                        const Http::ResponseTrailerMap& response_trailers) const PURE;
 };
 
 using FilterPtr = std::unique_ptr<Filter>;
@@ -94,67 +94,6 @@ public:
 };
 
 using InstanceSharedPtr = std::shared_ptr<Instance>;
-
-/**
- * Interface for access log formatter.
- * Formatters provide a complete access log output line for the given headers/trailers/stream.
- */
-class Formatter {
-public:
-  virtual ~Formatter() = default;
-
-  /**
-   * Return a formatted access log line.
-   * @param request_headers supplies the request headers.
-   * @param response_headers supplies the response headers.
-   * @param response_trailers supplies the response trailers.
-   * @param stream_info supplies the stream info.
-   * @return std::string string containing the complete formatted access log line.
-   */
-  virtual std::string format(const Http::RequestHeaderMap& request_headers,
-                             const Http::ResponseHeaderMap& response_headers,
-                             const Http::ResponseTrailerMap& response_trailers,
-                             const StreamInfo::StreamInfo& stream_info) const PURE;
-};
-
-using FormatterPtr = std::unique_ptr<Formatter>;
-
-/**
- * Interface for access log provider.
- * FormatterProviders extract information from the given headers/trailers/stream.
- */
-class FormatterProvider {
-public:
-  virtual ~FormatterProvider() = default;
-
-  /**
-   * Extract a value from the provided headers/trailers/stream.
-   * @param request_headers supplies the request headers.
-   * @param response_headers supplies the response headers.
-   * @param response_trailers supplies the response trailers.
-   * @param stream_info supplies the stream info.
-   * @return std::string containing a single value extracted from the given headers/trailers/stream.
-   */
-  virtual std::string format(const Http::RequestHeaderMap& request_headers,
-                             const Http::ResponseHeaderMap& response_headers,
-                             const Http::ResponseTrailerMap& response_trailers,
-                             const StreamInfo::StreamInfo& stream_info) const PURE;
-  /**
-   * Extract a value from the provided headers/trailers/stream, preserving the value's type.
-   * @param request_headers supplies the request headers.
-   * @param response_headers supplies the response headers.
-   * @param response_trailers supplies the response trailers.
-   * @param stream_info supplies the stream info.
-   * @return ProtobufWkt::Value containing a single value extracted from the given
-   *         headers/trailers/stream.
-   */
-  virtual ProtobufWkt::Value formatValue(const Http::RequestHeaderMap& request_headers,
-                                         const Http::ResponseHeaderMap& response_headers,
-                                         const Http::ResponseTrailerMap& response_trailers,
-                                         const StreamInfo::StreamInfo& stream_info) const PURE;
-};
-
-using FormatterProviderPtr = std::unique_ptr<FormatterProvider>;
 
 } // namespace AccessLog
 } // namespace Envoy

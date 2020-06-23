@@ -6,6 +6,7 @@
 #include "envoy/api/api.h"
 #include "envoy/event/timer.h"
 #include "envoy/filesystem/filesystem.h"
+#include "envoy/network/socket.h"
 #include "envoy/thread/thread.h"
 
 namespace Envoy {
@@ -21,8 +22,9 @@ public:
        const ProcessContextOptRef& process_context = absl::nullopt);
 
   // Api::Api
-  Event::DispatcherPtr allocateDispatcher() override;
-  Event::DispatcherPtr allocateDispatcher(Buffer::WatermarkFactoryPtr&& watermark_factory) override;
+  Event::DispatcherPtr allocateDispatcher(const std::string& name) override;
+  Event::DispatcherPtr allocateDispatcher(const std::string& name,
+                                          Buffer::WatermarkFactoryPtr&& watermark_factory) override;
   Thread::ThreadFactory& threadFactory() override { return thread_factory_; }
   Filesystem::Instance& fileSystem() override { return file_system_; }
   TimeSource& timeSource() override { return time_system_; }

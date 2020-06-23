@@ -4,7 +4,6 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/http/filter.h"
-#include "envoy/registry/registry.h"
 #include "envoy/secret/secret_provider.h"
 
 #include "common/config/datasource.h"
@@ -13,6 +12,7 @@
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/utility.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -84,15 +84,11 @@ private:
   envoy::config::core::v3::ConfigSource config_source_;
 };
 
-static Registry::RegisterFactory<SdsGenericSecretTestFilterConfig,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
-    register_;
-
 class SdsGenericSecretIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
                                         public HttpIntegrationTest {
 public:
   SdsGenericSecretIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()), registration_(factory_) {}
 
   void initialize() override {
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -108,11 +104,7 @@ public:
     HttpIntegrationTest::initialize();
   }
 
-  void TearDown() override {
-    cleanUpXdsConnection();
-    cleanupUpstreamAndDownstream();
-    codec_client_.reset();
-  }
+  void TearDown() override { cleanUpXdsConnection(); }
 
   void createSdsStream() {
     createXdsConnection();
@@ -132,6 +124,9 @@ public:
     discovery_response.add_resources()->PackFrom(API_DOWNGRADE(secret));
     xds_stream_->sendGrpcMessage(discovery_response);
   }
+
+  SdsGenericSecretTestFilterConfig factory_;
+  Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registration_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, SdsGenericSecretIntegrationTest,

@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_fuzz_test",
@@ -9,6 +7,8 @@ load(
     "//test/extensions:extensions_build_system.bzl",
     "envoy_extension_cc_test",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -31,6 +31,8 @@ envoy_extension_cc_test(
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/tracing:tracing_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:network_utility_lib",
         "//test/test_common:simulated_time_system_lib",
     ],
 )

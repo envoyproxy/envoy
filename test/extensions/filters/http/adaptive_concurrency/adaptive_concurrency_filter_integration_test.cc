@@ -56,7 +56,7 @@ void AdaptiveConcurrencyIntegrationTest::respondToAllRequests(uint32_t forwarded
                                                               std::chrono::milliseconds latency) {
   ASSERT_GE(responses_.size(), static_cast<size_t>(forwarded_count));
 
-  timeSystem().sleep(latency);
+  timeSystem().advanceTimeWait(latency);
 
   for (uint32_t idx = 0; idx < forwarded_count; ++idx) {
     respondToRequest(true);

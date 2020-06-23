@@ -33,7 +33,7 @@ public:
             [&](Http::RequestMessagePtr& inner_message, Http::AsyncClient::Callbacks& callbacks,
                 const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
               EXPECT_EQ(message, inner_message);
-              EXPECT_EQ(shadowed_host, message->headers().Host()->value().getStringView());
+              EXPECT_EQ(shadowed_host, message->headers().getHostValue());
               callback_ = &callbacks;
               return &request_;
             }));

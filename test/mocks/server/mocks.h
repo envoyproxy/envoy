@@ -13,6 +13,7 @@
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/server/admin.h"
+#include "envoy/server/bootstrap_extension_config.h"
 #include "envoy/server/configuration.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/filter_config.h"
@@ -70,22 +71,27 @@ public:
   ~MockOptions() override;
 
   MOCK_METHOD(uint64_t, baseId, (), (const));
+  MOCK_METHOD(bool, useDynamicBaseId, (), (const));
+  MOCK_METHOD(const std::string&, baseIdPath, (), (const));
   MOCK_METHOD(uint32_t, concurrency, (), (const));
   MOCK_METHOD(const std::string&, configPath, (), (const));
   MOCK_METHOD(const envoy::config::bootstrap::v3::Bootstrap&, configProto, (), (const));
   MOCK_METHOD(const std::string&, configYaml, (), (const));
+  MOCK_METHOD(const absl::optional<uint32_t>&, bootstrapVersion, (), (const));
   MOCK_METHOD(bool, allowUnknownStaticFields, (), (const));
   MOCK_METHOD(bool, rejectUnknownDynamicFields, (), (const));
+  MOCK_METHOD(bool, ignoreUnknownDynamicFields, (), (const));
   MOCK_METHOD(const std::string&, adminAddressPath, (), (const));
   MOCK_METHOD(Network::Address::IpVersion, localAddressIpVersion, (), (const));
   MOCK_METHOD(std::chrono::seconds, drainTime, (), (const));
+  MOCK_METHOD(std::chrono::seconds, parentShutdownTime, (), (const));
+  MOCK_METHOD(Server::DrainStrategy, drainStrategy, (), (const));
   MOCK_METHOD(spdlog::level::level_enum, logLevel, (), (const));
   MOCK_METHOD((const std::vector<std::pair<std::string, spdlog::level::level_enum>>&),
               componentLogLevels, (), (const));
   MOCK_METHOD(const std::string&, logFormat, (), (const));
   MOCK_METHOD(bool, logFormatEscaped, (), (const));
   MOCK_METHOD(const std::string&, logPath, (), (const));
-  MOCK_METHOD(std::chrono::seconds, parentShutdownTime, (), (const));
   MOCK_METHOD(uint64_t, restartEpoch, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, fileFlushIntervalMsec, (), (const));
   MOCK_METHOD(Mode, mode, (), (const));
@@ -103,8 +109,10 @@ public:
   std::string config_path_;
   envoy::config::bootstrap::v3::Bootstrap config_proto_;
   std::string config_yaml_;
+  absl::optional<uint32_t> bootstrap_version_;
   bool allow_unknown_static_fields_{};
   bool reject_unknown_dynamic_fields_{};
+  bool ignore_unknown_dynamic_fields_{};
   std::string admin_address_path_;
   std::string service_cluster_name_;
   std::string service_node_name_;
@@ -229,6 +237,7 @@ public:
   MOCK_METHOD(void, sendParentTerminateRequest, ());
   MOCK_METHOD(ServerStatsFromParent, mergeParentStatsIfAny, (Stats::StoreRoot & stats_store));
   MOCK_METHOD(void, shutdown, ());
+  MOCK_METHOD(uint32_t, baseId, ());
   MOCK_METHOD(std::string, version, ());
   MOCK_METHOD(Thread::BasicLockable&, logLock, ());
   MOCK_METHOD(Thread::BasicLockable&, accessLogLock, ());
@@ -265,8 +274,7 @@ public:
               (const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&,
                Configuration::ListenerFactoryContext& context));
   MOCK_METHOD(Network::SocketSharedPtr, createListenSocket,
-              (Network::Address::InstanceConstSharedPtr address,
-               Network::Address::SocketType socket_type,
+              (Network::Address::InstanceConstSharedPtr address, Network::Socket::Type socket_type,
                const Network::Socket::OptionsSharedPtr& options,
                const ListenSocketCreationParams& params));
   MOCK_METHOD(DrainManager*, createDrainManager_,
@@ -336,20 +344,31 @@ public:
     remove_listener_completion_ = nullptr;
   }
 
+  void callDrainFilterChainsComplete() {
+    EXPECT_NE(nullptr, remove_filter_chains_completion_);
+    remove_filter_chains_completion_();
+    remove_filter_chains_completion_ = nullptr;
+  }
+
   // Server::Worker
   MOCK_METHOD(void, addListener,
-              (Network::ListenerConfig & listener, AddListenerCompletion completion));
+              (absl::optional<uint64_t> overridden_listener, Network::ListenerConfig& listener,
+               AddListenerCompletion completion));
   MOCK_METHOD(uint64_t, numConnections, (), (const));
   MOCK_METHOD(void, removeListener,
               (Network::ListenerConfig & listener, std::function<void()> completion));
   MOCK_METHOD(void, start, (GuardDog & guard_dog));
-  MOCK_METHOD(void, initializeStats, (Stats::Scope & scope, const std::string& prefix));
+  MOCK_METHOD(void, initializeStats, (Stats::Scope & scope));
   MOCK_METHOD(void, stop, ());
   MOCK_METHOD(void, stopListener,
               (Network::ListenerConfig & listener, std::function<void()> completion));
+  MOCK_METHOD(void, removeFilterChains,
+              (uint64_t listener_tag, const std::list<const Network::FilterChain*>& filter_chains,
+               std::function<void()> completion));
 
   AddListenerCompletion add_listener_completion_;
   std::function<void()> remove_listener_completion_;
+  std::function<void()> remove_filter_chains_completion_;
 };
 
 class MockOverloadManager : public OverloadManager {
@@ -419,8 +438,8 @@ public:
 
   TimeSource& timeSource() override { return time_system_; }
 
-  testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
+  testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   std::shared_ptr<testing::NiceMock<Network::MockDnsResolver>> dns_resolver_{
       new testing::NiceMock<Network::MockDnsResolver>()};
   testing::NiceMock<Api::MockApi> api_;
@@ -496,6 +515,8 @@ public:
   MOCK_METHOD(Api::Api&, api, ());
   Grpc::Context& grpcContext() override { return grpc_context_; }
   MOCK_METHOD(Server::DrainManager&, drainManager, ());
+  MOCK_METHOD(Init::Manager&, initManager, ());
+  MOCK_METHOD(ServerLifecycleNotifier&, lifecycleNotifier, ());
 
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
@@ -585,7 +606,7 @@ public:
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(Envoy::Runtime::RandomGenerator&, random, ());
   MOCK_METHOD(Stats::Store&, stats, ());
-  MOCK_METHOD(Init::Manager*, initManager, ());
+  MOCK_METHOD(Init::Manager&, initManager, ());
   MOCK_METHOD(Singleton::Manager&, singletonManager, ());
   MOCK_METHOD(ThreadLocal::SlotAllocator&, threadLocal, ());
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
@@ -638,6 +659,21 @@ public:
   ~MockFilterChainFactoryContext() override;
 };
 
+class MockTracerFactory : public TracerFactory {
+public:
+  explicit MockTracerFactory(const std::string& name);
+  ~MockTracerFactory() override;
+
+  std::string name() const override { return name_; }
+
+  MOCK_METHOD(ProtobufTypes::MessagePtr, createEmptyConfigProto, ());
+  MOCK_METHOD(Tracing::HttpTracerSharedPtr, createHttpTracer,
+              (const Protobuf::Message& config, TracerFactoryContext& context));
+
+private:
+  std::string name_;
+};
+
 class MockTracerFactoryContext : public TracerFactoryContext {
 public:
   MockTracerFactoryContext();
@@ -647,6 +683,17 @@ public:
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
 
   testing::NiceMock<Configuration::MockServerFactoryContext> server_factory_context_;
+};
+
+class MockBootstrapExtensionFactory : public BootstrapExtensionFactory {
+public:
+  MockBootstrapExtensionFactory();
+  ~MockBootstrapExtensionFactory() override;
+
+  MOCK_METHOD(BootstrapExtensionPtr, createBootstrapExtension,
+              (const Protobuf::Message&, Configuration::ServerFactoryContext&), (override));
+  MOCK_METHOD(ProtobufTypes::MessagePtr, createEmptyConfigProto, (), (override));
+  MOCK_METHOD(std::string, name, (), (const, override));
 };
 
 } // namespace Configuration

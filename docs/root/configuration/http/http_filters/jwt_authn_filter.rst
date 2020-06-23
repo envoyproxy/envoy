@@ -8,14 +8,14 @@ This HTTP filter can be used to verify JSON Web Token (JWT). It will verify its 
 JWKS is needed to verify JWT signatures. They can be specified in the filter config or can be fetched remotely from a JWKS server.
 
 .. attention::
-   ES256, ES384, ES512, HS256, HS384, HS512, RS256, RS384 and RS512 are supported for the JWT alg.
+   EdDSA, ES256, ES384, ES512, HS256, HS384, HS512, RS256, RS384 and RS512 are supported for the JWT alg.
 
 Configuration
 -------------
 
 This filter should be configured with the name *envoy.filters.http.jwt_authn*.
 
-This HTTP :ref:`filter config <envoy_api_msg_config.filter.http.jwt_authn.v2alpha.JwtAuthentication>` has two fields:
+This HTTP :ref:`filter config <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JwtAuthentication>` has two fields:
 
 * Field *providers* specifies how a JWT should be verified, such as where to extract the token, where to fetch the public key (JWKS) and where to output its payload.
 * Field *rules* specifies matching rules and their requirements. If a request matches a rule, its requirement applies. The requirement specifies which JWT providers should be used.
@@ -23,7 +23,7 @@ This HTTP :ref:`filter config <envoy_api_msg_config.filter.http.jwt_authn.v2alph
 JwtProvider
 ~~~~~~~~~~~
 
-:ref:`JwtProvider <envoy_api_msg_config.filter.http.jwt_authn.v2alpha.JwtProvider>` specifies how a JWT should be verified. It has the following fields:
+:ref:`JwtProvider <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JwtProvider>` specifies how a JWT should be verified. It has the following fields:
 
 * *issuer*: the principal that issued the JWT, usually a URL or an email address.
 * *audiences*: a list of JWT audiences allowed to access. A JWT containing any of these audiences will be accepted.
@@ -46,7 +46,7 @@ If fails to extract a JWT from above header, then check query parameter key *acc
 
   /path?access_token=<JWT>
 
-In the :ref:`filter config <envoy_api_msg_config.filter.http.jwt_authn.v2alpha.JwtAuthentication>`, *providers* is a map, to map *provider_name* to a :ref:`JwtProvider <envoy_api_msg_config.filter.http.jwt_authn.v2alpha.JwtProvider>`. The *provider_name* must be unique, it is referred in the `JwtRequirement <envoy_api_msg_config.filter.http.jwt_authn.v2alpha.JwtRequirement>` in its *provider_name* field.
+In the :ref:`filter config <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JwtAuthentication>`, *providers* is a map, to map *provider_name* to a :ref:`JwtProvider <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JwtProvider>`. The *provider_name* must be unique, it is referred in the `JwtRequirement <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JwtRequirement>` in its *provider_name* field.
 
 .. important::
    For *remote_jwks*, a **jwks_cluster** cluster is required.
@@ -119,7 +119,7 @@ JWT payload will be added to the request header as following format::
 RequirementRule
 ~~~~~~~~~~~~~~~
 
-:ref:`RequirementRule <envoy_api_msg_config.filter.http.jwt_authn.v2alpha.RequirementRule>` has two fields:
+:ref:`RequirementRule <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.RequirementRule>` has two fields:
 
 * Field *match* specifies how a request can be matched; e.g. by HTTP headers, or by query parameters, or by path prefixes.
 * Field *requires* specifies the JWT requirement, e.g. which provider is required.

@@ -8,7 +8,7 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/metrics/v3/stats.pb.h"
-#include "envoy/config/trace/v3/trace.pb.h"
+#include "envoy/config/trace/v3/http_tracer.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/instance.h"
