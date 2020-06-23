@@ -80,6 +80,12 @@ def _impl(ctx):
                             "-D__TIME__=\"redacted\"",
                             "-no-canonical-prefixes",
                             "-fno-canonical-system-headers",
+                            # GCC uses unsigned char by default for all non-x86
+                            # architectures which breaks opentracing-cpp and
+                            # lightstep-tracer-cpp builds, as they are using
+                            # signed characters. Using signed char by default
+                            # fixes that.
+                            "-fsigned-char",
                         ],
                     ),
                 ],
