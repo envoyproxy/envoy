@@ -1138,7 +1138,7 @@ public:
 };
 
 /**
- * An API for the interactions the upstrema stream needs to hve with the downstream stream
+ * An API for the interactions the upstream stream needs to have with the downstream stream
  * and/or router components
  */
 class UpstreamToDownstream : public Http::ResponseDecoder, public Http::StreamCallbacks {
