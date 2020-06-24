@@ -1449,7 +1449,7 @@ message RateLimit {
       string descriptor_key = 1 [(validate.rules).string = {min_bytes: 1}];
 
       // Metadata struct that defines the key and path to retrieve the value.
-      type.metadata.v3.MetadataKey metadata_key = 2;
+      type.metadata.v3.MetadataKey metadata_key = 2 [(validate.rules).message = {required: true}];
     }
 
     oneof action_specifier {
@@ -1473,6 +1473,7 @@ message RateLimit {
       // Rate limit on the existence of request headers.
       HeaderValueMatch header_value_match = 6;
 
+      // Rate limit on dynamic metadata.
       DynamicMetaData dynamic_metadata = 7;
     }
   }

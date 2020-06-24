@@ -103,6 +103,7 @@ New Features
   tracing is not forced.
 * router: add support for RESPONSE_FLAGS and RESPONSE_CODE_DETAILS :ref:`header formatters
   <config_http_conn_man_headers_custom_request_headers>`.
+* router: add support for use of dynamic metadata :ref:`dynamic_metadata <envoy_v3_api_field_config.route.v3.RateLimit.Action.dynamic_metadata>` as a ratelimit action.
 * router: allow Rate Limiting Service to be called in case of missing request header for a descriptor if the :ref:`skip_if_absent <envoy_v3_api_field_config.route.v3.RateLimit.Action.RequestHeaders.skip_if_absent>` field is set to true.
 * router: more fine grained internal redirect configs are added to the :ref:`internal_redirect_policy
   <envoy_v3_api_field_config.route.v3.RouteAction.internal_redirect_policy>` field.
