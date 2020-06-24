@@ -131,9 +131,9 @@ protected:
               Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher);
 
   // Http::ConnectionCallbacks
-  void onGoAway() override {
+  void onGoAway(GoAwayErrorCode error_code) override {
     if (codec_callbacks_) {
-      codec_callbacks_->onGoAway();
+      codec_callbacks_->onGoAway(error_code);
     }
   }
 

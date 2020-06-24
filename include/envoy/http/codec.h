@@ -37,6 +37,14 @@ const char MaxResponseHeadersCountOverrideKey[] =
 class Stream;
 
 /**
+ * Error codes used to convey the reason for a GOAWAY.
+ */
+enum class GoAwayErrorCode {
+  NoError,
+  Other,
+};
+
+/**
  * Stream encoder options specific to HTTP/1.
  */
 class Http1StreamEncoderOptions {
@@ -324,7 +332,7 @@ public:
   /**
    * Fires when the remote indicates "go away." No new streams should be created.
    */
-  virtual void onGoAway() PURE;
+  virtual void onGoAway(GoAwayErrorCode error_code) PURE;
 };
 
 /**

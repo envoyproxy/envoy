@@ -69,6 +69,10 @@ Http::StreamResetReason quicRstErrorToEnvoyResetReason(quic::QuicRstStreamErrorC
 // Called when underlying QUIC connection is closed either locally or by peer.
 Http::StreamResetReason quicErrorCodeToEnvoyResetReason(quic::QuicErrorCode error);
 
+// Called when a GOAWAY frame is received.
+ABSL_MUST_USE_RESULT
+Http::GoAwayErrorCode quicErrorCodeToEnvoyErrorCode(quic::QuicErrorCode error) noexcept;
+
 // Create a connection socket instance and apply given socket options to the
 // socket. IP_PKTINFO and SO_RXQ_OVFL is always set if supported.
 Network::ConnectionSocketPtr

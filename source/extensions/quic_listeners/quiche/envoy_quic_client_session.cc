@@ -1,5 +1,7 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_client_session.h"
 
+#include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
+
 namespace Envoy {
 namespace Quic {
 
@@ -58,7 +60,7 @@ void EnvoyQuicClientSession::OnGoAway(const quic::QuicGoAwayFrame& frame) {
                  quic::QuicErrorCodeToString(frame.error_code), frame.reason_phrase);
   quic::QuicSpdyClientSession::OnGoAway(frame);
   if (http_connection_callbacks_ != nullptr) {
-    http_connection_callbacks_->onGoAway();
+    http_connection_callbacks_->onGoAway(quicErrorCodeToEnvoyErrorCode(frame.error_code));
   }
 }
 

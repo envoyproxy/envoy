@@ -563,6 +563,16 @@ int ConnectionImpl::onBeforeFrameReceived(const nghttp2_frame_hd* hd) {
   return 0;
 }
 
+ABSL_MUST_USE_RESULT
+enum GoAwayErrorCode ngHttp2ErrorCodeToErrorCode(uint32_t code) noexcept {
+  switch (code) {
+  case NGHTTP2_NO_ERROR:
+    return GoAwayErrorCode::NoError;
+  default:
+    return GoAwayErrorCode::Other;
+  }
+}
+
 int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
   ENVOY_CONN_LOG(trace, "recv frame type={}", connection_, static_cast<uint64_t>(frame->hd.type));
 
@@ -579,10 +589,11 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
 
   // Only raise GOAWAY once, since we don't currently expose stream information. Shutdown
   // notifications are the same as a normal GOAWAY.
+  // TODO: handle multiple GOAWAY frames.
   if (frame->hd.type == NGHTTP2_GOAWAY && !raised_goaway_) {
     ASSERT(frame->hd.stream_id == 0);
     raised_goaway_ = true;
-    callbacks().onGoAway();
+    callbacks().onGoAway(ngHttp2ErrorCodeToErrorCode(frame->goaway.error_code));
     return 0;
   }
 

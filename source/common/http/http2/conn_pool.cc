@@ -24,7 +24,7 @@ ConnPoolImpl::~ConnPoolImpl() { destructAllConnections(); }
 ActiveClientPtr ConnPoolImpl::instantiateActiveClient() {
   return std::make_unique<ActiveClient>(*this);
 }
-void ConnPoolImpl::onGoAway(ActiveClient& client) {
+void ConnPoolImpl::onGoAway(ActiveClient& client, Http::GoAwayErrorCode) {
   ENVOY_CONN_LOG(debug, "remote goaway", *client.codec_client_);
   host_->cluster().stats().upstream_cx_close_notify_.inc();
   if (client.state_ != ActiveClient::State::DRAINING) {
