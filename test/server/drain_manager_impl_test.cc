@@ -126,7 +126,10 @@ TEST_P(DrainManagerImplTest, DrainDeadlineProbability) {
   EXPECT_TRUE(drain_manager.drainClose());
   EXPECT_CALL(server_, healthCheckFailed()).WillRepeatedly(Return(false));
   EXPECT_FALSE(drain_manager.drainClose());
+  EXPECT_FALSE(drain_manager.draining());
+
   drain_manager.startDrainSequence([] {});
+  EXPECT_TRUE(drain_manager.draining());
 
   if (drain_gradually) {
     // random() should be called when elapsed time < drain timeout
