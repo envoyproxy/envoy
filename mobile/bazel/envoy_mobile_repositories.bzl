@@ -56,25 +56,18 @@ def upstream_envoy_overrides():
     )
 
 def swift_repos():
-    http_file(
-        name = "xctestrunner",
-        executable = 1,
-        sha256 = "0338c71977106f1304a8056739db6f462a76f386a299052c1ed7f8fd463d01a8",
-        urls = ["https://github.com/google/xctestrunner/releases/download/0.2.11/ios_test_runner.par"],
-    )
-
     http_archive(
         name = "build_bazel_rules_apple",
-        sha256 = "ee9e6073aeb5a65c100cb9c44b0017c937706a4ae03176e14a7e78620a198079",
-        strip_prefix = "rules_apple-5131f3d46794bf227d296c82f30c2499c9de3c5b",
-        url = "https://github.com/bazelbuild/rules_apple/archive/5131f3d46794bf227d296c82f30c2499c9de3c5b.tar.gz",
+        sha256 = "4300f45136dbe2edfa1ad38995760170a64006a5a14adfbe13c401668ec4c7da",
+        strip_prefix = "rules_apple-d9c827bf407793b37aa0e205a0730005c76ef7e8",
+        url = "https://github.com/bazelbuild/rules_apple/archive/d9c827bf407793b37aa0e205a0730005c76ef7e8.tar.gz",
     )
 
     http_archive(
         name = "build_bazel_rules_swift",
-        sha256 = "d0833bc6dad817a367936a5f902a0c11318160b5e80a20ece35fb85a5675c886",
-        strip_prefix = "rules_swift-3eeeb53cebda55b349d64c9fc144e18c5f7c0eb8",
-        url = "https://github.com/bazelbuild/rules_swift/archive/3eeeb53cebda55b349d64c9fc144e18c5f7c0eb8.tar.gz",
+        sha256 = "655bff6cd7ab989cceaa08b22956d775744c39aebaa3caa651a556590acec96c",
+        strip_prefix = "rules_swift-15d2b18ac7a71796984c4064fc0b570260969ac3",
+        url = "https://github.com/bazelbuild/rules_swift/archive/15d2b18ac7a71796984c4064fc0b570260969ac3.tar.gz",
     )
 
 def kotlin_repos():
