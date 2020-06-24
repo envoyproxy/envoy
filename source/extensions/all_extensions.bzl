@@ -21,7 +21,6 @@ _core_extensions = [
     "envoy.filters.http.router",
     "envoy.filters.http.health_check",
     "envoy.filters.network.http_connection_manager",
-    "envoy.filters.network.redis_proxy",
     "envoy.stat_sinks.statsd",
     "envoy.transport_sockets.raw_buffer",
 ]
