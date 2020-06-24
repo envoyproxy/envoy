@@ -1096,7 +1096,6 @@ public:
 using ConfigConstSharedPtr = std::shared_ptr<const Config>;
 
 class GenericConnectionPoolCallbacks;
-class UpstreamRequest;
 class GenericUpstream;
 
 /**
@@ -1139,6 +1138,22 @@ public:
 };
 
 /**
+ * An API for the interactions the upstream stream needs to have with the downstream stream
+ * and/or router components
+ */
+class UpstreamToDownstream : public Http::ResponseDecoder, public Http::StreamCallbacks {
+public:
+  /**
+   * @return return the routeEntry for the downstream stream.
+   */
+  virtual const RouteEntry& routeEntry() const PURE;
+  /**
+   * @return return the connection for the downstream stream.
+   */
+  virtual const Network::Connection& connection() const PURE;
+};
+
+/**
  * An API for wrapping callbacks from either an HTTP or a TCP connection pool.
  *
  * Just like the connection pool callbacks, the GenericConnectionPoolCallbacks
@@ -1174,10 +1189,12 @@ public:
                            const Network::Address::InstanceConstSharedPtr& upstream_local_address,
                            const StreamInfo::StreamInfo& info) PURE;
 
-  // TODO(alyssawilk) This exists because the Connection Pool creates the GenericUpstream, and the
-  // GenericUpstream needs a handle back to the upstream request to pass on events, as upstream
-  // data flows in. Do interface clean up in a follow-up PR.
-  virtual UpstreamRequest* upstreamRequest() PURE;
+  // @return the UpstreamToDownstream interface for this stream.
+  //
+  // This is the interface for all interactions the upstream stream needs to have with the
+  // downstream stream. It is in the GenericConnectionPoolCallbacks as the GenericConnectionPool
+  // creates the GenericUpstream, and the GenericUpstream will need this interface.
+  virtual UpstreamToDownstream& upstreamToDownstream() PURE;
 };
 
 /**

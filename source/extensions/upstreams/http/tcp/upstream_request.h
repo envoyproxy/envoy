@@ -64,7 +64,7 @@ private:
 class TcpUpstream : public Router::GenericUpstream,
                     public Envoy::Tcp::ConnectionPool::UpstreamCallbacks {
 public:
-  TcpUpstream(Router::UpstreamRequest* upstream_request,
+  TcpUpstream(Router::UpstreamToDownstream* upstream_request,
               Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& upstream);
 
   // GenericUpstream
@@ -82,7 +82,7 @@ public:
   void onBelowWriteBufferLowWatermark() override;
 
 private:
-  Router::UpstreamRequest* upstream_request_;
+  Router::UpstreamToDownstream* upstream_request_;
   Envoy::Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
 };
 
