@@ -122,6 +122,8 @@ private:
 
     // Network::ListenerCallbacks
     void onAccept(Network::ConnectionSocketPtr&& socket) override;
+    void setupNewConnection(Network::ConnectionPtr server_conn, Network::ConnectionSocketPtr socket) override;
+
 
     // ActiveListenerImplBase
     Network::Listener* listener() override { return listener_.get(); }

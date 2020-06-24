@@ -36,7 +36,7 @@ public:
                  Event::TimeSystem& time_system);
   ~DispatcherImpl() override;
 
-  using PipeFactory = std::function<Network::ClientConnectionPtr(const std::string& pipe_address)>;
+  using PipeFactory = std::function<void(const std::string& pipe_address, Network::ConnectionPtr server_conn)>;
 
   /**
    * @return event_base& the libevent base.

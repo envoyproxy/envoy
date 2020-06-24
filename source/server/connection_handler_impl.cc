@@ -13,9 +13,18 @@
 
 #include "extensions/transport_sockets/well_known_names.h"
 
+#include "common/network/buffer_source_socket.h"
 namespace Envoy {
 namespace Server {
 
+namespace {
+void emitLogs(Network::ListenerConfig& config, StreamInfo::StreamInfo& stream_info) {
+  stream_info.onRequestComplete();
+  for (const auto& access_log : config.accessLogs()) {
+    access_log->log(nullptr, nullptr, nullptr, stream_info);
+  }
+}
+} // namespace
 ConnectionHandlerImpl::ConnectionHandlerImpl(Event::Dispatcher& dispatcher)
     : dispatcher_(dispatcher), per_handler_stat_prefix_(dispatcher.name() + "."),
       disable_listeners_(false) {}
@@ -324,6 +333,49 @@ void ConnectionHandlerImpl::ActiveTcpSocket::newConnection() {
 void ConnectionHandlerImpl::ActiveTcpListener::onAccept(Network::ConnectionSocketPtr&& socket) {
   onAcceptWorker(std::move(socket), config_->handOffRestoredDestinationConnections(), false);
 }
+// Copied from newConnection()
+void ConnectionHandlerImpl::ActiveTcpListener::setupNewConnection(
+    Network::ConnectionPtr server_conn, Network::ConnectionSocketPtr socket) {
+  auto stream_info = std::make_unique<StreamInfo::StreamInfoImpl>(parent_.dispatcher_.timeSource());
+  stream_info->setDownstreamLocalAddress(socket->localAddress());
+  stream_info->setDownstreamRemoteAddress(socket->remoteAddress());
+  stream_info->setDownstreamDirectRemoteAddress(socket->directRemoteAddress());
+
+  // Find matching filter chain.
+  const auto filter_chain = config_->filterChainManager().findFilterChain(*socket);
+  if (filter_chain == nullptr) {
+    ENVOY_LOG(debug, "closing connection: no matching filter chain found");
+    stats_.no_filter_chain_match_.inc();
+    stream_info->setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
+    stream_info->setResponseCodeDetails(StreamInfo::ResponseCodeDetails::get().FilterChainNotFound);
+    emitLogs(*config_, *stream_info);
+    socket->close();
+    return;
+  }
+
+  auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
+  stream_info->setDownstreamSslConnection(transport_socket->ssl());
+  auto& active_connections = getOrCreateActiveConnections(*filter_chain);
+  // TODO(lambdai): set stream_info
+  ActiveTcpConnectionPtr active_connection(
+      new ActiveTcpConnection(active_connections, std::move(server_conn),
+                              parent_.dispatcher_.timeSource(), std::move(stream_info)));
+  active_connection->connection_->setBufferLimits(config_->perConnectionBufferLimitBytes());
+
+  const bool empty_filter_chain = !config_->filterChainFactory().createNetworkFilterChain(
+      *active_connection->connection_, filter_chain->networkFilterFactories());
+  if (empty_filter_chain) {
+    ENVOY_CONN_LOG(debug, "closing connection: no filters", *active_connection->connection_);
+    active_connection->connection_->close(Network::ConnectionCloseType::NoFlush);
+  }
+
+  // If the connection is already closed, we can just let this connection immediately die.
+  if (active_connection->connection_->state() != Network::Connection::State::Closed) {
+    ENVOY_CONN_LOG(debug, "new connection", *active_connection->connection_);
+    active_connection->connection_->addConnectionCallbacks(*active_connection);
+    active_connection->moveIntoList(std::move(active_connection), active_connections.connections_);
+  }
+}
 
 void ConnectionHandlerImpl::ActiveTcpListener::onAcceptWorker(
     Network::ConnectionSocketPtr&& socket, bool hand_off_restored_destination_connections,
@@ -352,15 +404,6 @@ void ConnectionHandlerImpl::ActiveTcpListener::onAcceptWorker(
   }
 }
 
-namespace {
-void emitLogs(Network::ListenerConfig& config, StreamInfo::StreamInfo& stream_info) {
-  stream_info.onRequestComplete();
-  for (const auto& access_log : config.accessLogs()) {
-    access_log->log(nullptr, nullptr, nullptr, stream_info);
-  }
-}
-} // namespace
-
 void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     Network::ConnectionSocketPtr&& socket) {
   auto stream_info = std::make_unique<StreamInfo::StreamInfoImpl>(parent_.dispatcher_.timeSource());
@@ -383,8 +426,10 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   stream_info->setDownstreamSslConnection(transport_socket->ssl());
   auto& active_connections = getOrCreateActiveConnections(*filter_chain);
-  auto server_conn_ptr = parent_.dispatcher_.createServerConnection(
+  Network::ConnectionPtr server_conn_ptr;
+  server_conn_ptr = parent_.dispatcher_.createServerConnection(
       std::move(socket), std::move(transport_socket), *stream_info);
+
   ActiveTcpConnectionPtr active_connection(
       new ActiveTcpConnection(active_connections, std::move(server_conn_ptr),
                               parent_.dispatcher_.timeSource(), std::move(stream_info)));

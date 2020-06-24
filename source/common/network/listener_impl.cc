@@ -49,15 +49,18 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
 }
 
 void ListenerImpl::setupPipeListener(Event::DispatcherImpl& dispatcher,
-                                     const std::string& pipe_listener) {
+                                     const std::string& pipe_listener_id) {
   dispatcher.registerPipeFactory(
-      pipe_listener, [this](const std::string& pipe_address) -> Network::ClientConnectionPtr {
+      pipe_listener_id,
+      [this](const std::string& pipe_address, Network::ConnectionPtr server_conn){
         // TODO(lambdai): create with HeapIoSocketHandle
-        Network::ConnectionSocketPtr socket; // = specialized ConnectionSocket;
-        // TODO(lambdai): add parameter to bypass all listener filters here.
-        cb_.onAccept(std::move(socket));
-        UNREFERENCED_PARAMETER(pipe_address);
-        return nullptr; // specialized  client connection
+        Network::ConnectionSocketPtr socket = std::make_unique<Network::ConnectionSocketImpl>(
+            nullptr,
+            // Local
+            std::make_shared<Network::Address::Ipv4Instance>(pipe_address),
+            // Remote
+            std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"));
+        cb_.setupNewConnection(std::move(server_conn), std::move(socket));
       });
 }
 

@@ -23,6 +23,8 @@
 #include "common/network/listener_impl.h"
 #include "common/network/udp_listener_impl.h"
 
+#include "common/network/buffer_source_socket.h"
+
 #include "event2/event.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
@@ -128,15 +130,19 @@ DispatcherImpl::createUserspacePipe(Network::Address::InstanceConstSharedPtr add
   if (address == nullptr) {
     return nullptr;
   }
-  // Find the listener callback.
+  // Find the listener callback. The listener is supposed to setup the server connection.
   auto iter = pipe_listeners_.find(address->asString());
   if (iter == pipe_listeners_.end()) {
     return nullptr;
   }
-
-  // create server connection with that callback
-  // wrap to ClientPipeImpl
-  return (iter->second)(address->asString());
+  auto client_conn = std::make_unique<Network::ClientPipeImpl>(
+      *this, std::make_unique<Network::BufferSourceSocket>(), nullptr);
+  auto server_conn = std::make_unique<Network::ServerPipeImpl>(
+      *this, std::make_unique<Network::BufferSourceSocket>(), nullptr);
+  server_conn->setPeer(client_conn.get());
+  client_conn->setPeer(server_conn.get());    
+  (iter->second)(iter->first, std::move(server_conn));
+  return client_conn;
 }
 
 void DispatcherImpl::registerPipeFactory(const std::string& pipe_listener,

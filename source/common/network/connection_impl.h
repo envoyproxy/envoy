@@ -214,14 +214,24 @@ private:
   StreamInfo::StreamInfoImpl stream_info_;
 };
 
+class PeeringPipe {
+public:
+  virtual ~PeeringPipe() = default;
+  void setPeer(PeeringPipe* peer) { peer_ = peer; }
+  virtual void onReadReady() PURE;   
+protected:
+  PeeringPipe* peer_;
+};
+
 class ClientPipeImpl : public ConnectionImplBase,
                        public TransportSocketCallbacks,
-                       virtual public ClientConnection {
+                       virtual public ClientConnection,
+                       public PeeringPipe {
 public:
   ClientPipeImpl(Event::Dispatcher& dispatcher,
                  //  const Address::InstanceConstSharedPtr& remote_address,
                  //  const Address::InstanceConstSharedPtr& source_address,
-                 Network::TransportSocketPtr transport_socket, StreamInfo::StreamInfo& stream_info,
+                 Network::TransportSocketPtr transport_socket,
                  const Network::ConnectionSocket::OptionsSharedPtr& options);
 
   ~ClientPipeImpl() override;
@@ -315,7 +325,7 @@ protected:
   void onWriteBufferHighWatermark();
 
   TransportSocketPtr transport_socket_;
-  StreamInfo::StreamInfo& stream_info_;
+  StreamInfo::StreamInfoImpl stream_info_;
   FilterManagerImpl filter_manager_;
 
   // Ensure that if the consumer of the data from this connection isn't
@@ -330,6 +340,8 @@ protected:
   bool connecting_{false};
   ConnectionEvent immediate_error_event_{ConnectionEvent::Connected};
 
+  void onReadReady() override;
+
   // Network::ClientConnection
   void connect() override;
 
@@ -339,7 +351,6 @@ private:
   void onFileEvent();
   void onFileEvent(uint32_t events);
   void onRead(uint64_t read_buffer_size);
-  void onReadReady();
   void onWriteReady();
   void updateReadBufferStats(uint64_t num_read, uint64_t new_size);
   void updateWriteBufferStats(uint64_t num_written, uint64_t new_size);
@@ -377,14 +388,12 @@ private:
   uint32_t events_{0};
 };
 
-
-class ServerPipeImpl : public ConnectionImplBase,
-                       public TransportSocketCallbacks {
+class ServerPipeImpl : public ConnectionImplBase, public TransportSocketCallbacks, public PeeringPipe {
 public:
   ServerPipeImpl(Event::Dispatcher& dispatcher,
                  //  const Address::InstanceConstSharedPtr& remote_address,
                  //  const Address::InstanceConstSharedPtr& source_address,
-                 Network::TransportSocketPtr transport_socket, StreamInfo::StreamInfo& stream_info,
+                 Network::TransportSocketPtr transport_socket,
                  const Network::ConnectionSocket::OptionsSharedPtr& options);
 
   ~ServerPipeImpl() override;
@@ -419,8 +428,8 @@ public:
   bool aboveHighWatermark() const override { return write_buffer_above_high_watermark_; }
   const ConnectionSocket::OptionsSharedPtr& socketOptions() const override { return options_; }
   absl::string_view requestedServerName() const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
-  const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
+  StreamInfo::StreamInfo& streamInfo() override { return *stream_info_; }
+  const StreamInfo::StreamInfo& streamInfo() const override { return *stream_info_; }
   absl::string_view transportFailureReason() const override;
 
   // Network::FilterManagerConnection
@@ -457,6 +466,9 @@ public:
   // Obtain global next connection ID. This should only be used in tests.
   static uint64_t nextGlobalIdForTest() { return next_global_id_; }
 
+  void setStreamInfo(StreamInfo::StreamInfo* stream_info) { stream_info_ = stream_info; }
+  void onReadReady() override;
+
 protected:
   // A convenience function which returns true if
   // 1) The read disable count is zero or
@@ -478,7 +490,7 @@ protected:
   void onWriteBufferHighWatermark();
 
   TransportSocketPtr transport_socket_;
-  StreamInfo::StreamInfo& stream_info_;
+  StreamInfo::StreamInfo* stream_info_{};
   FilterManagerImpl filter_manager_;
 
   // Ensure that if the consumer of the data from this connection isn't
@@ -492,14 +504,12 @@ protected:
   uint32_t read_buffer_limit_ = 0;
   ConnectionEvent immediate_error_event_{ConnectionEvent::Connected};
 
-
 private:
   friend class Envoy::RandomPauseFilter;
   friend class Envoy::TestPauseFilter;
   void onFileEvent();
   void onFileEvent(uint32_t events);
   void onRead(uint64_t read_buffer_size);
-  void onReadReady();
   void onWriteReady();
   void updateReadBufferStats(uint64_t num_read, uint64_t new_size);
   void updateWriteBufferStats(uint64_t num_written, uint64_t new_size);
@@ -536,7 +546,6 @@ private:
   Event::TimerPtr io_timer_;
   uint32_t events_{0};
 };
-
 
 } // namespace Network
 } // namespace Envoy

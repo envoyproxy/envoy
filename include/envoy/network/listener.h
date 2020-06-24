@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 
+#include "common/common/macros.h"
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/io_error.h"
 #include "envoy/common/exception.h"
@@ -162,6 +163,11 @@ public:
    * @param socket supplies the socket that is moved into the callee.
    */
   virtual void onAccept(ConnectionSocketPtr&& socket) PURE;
+
+  virtual void setupNewConnection(ConnectionPtr server_conn, ConnectionSocketPtr socket) {
+    UNREFERENCED_PARAMETER(server_conn);
+    UNREFERENCED_PARAMETER(socket);
+  }
 };
 
 /**

@@ -770,10 +770,9 @@ void ClientConnectionImpl::connect() {
 }
 
 ClientPipeImpl::ClientPipeImpl(Event::Dispatcher& dispatcher, TransportSocketPtr transport_socket,
-                               StreamInfo::StreamInfo& stream_info,
                                const Network::ConnectionSocket::OptionsSharedPtr&)
     : ConnectionImplBase(dispatcher, next_global_id_++),
-      transport_socket_(std::move(transport_socket)), stream_info_(stream_info),
+      transport_socket_(std::move(transport_socket)), stream_info_(dispatcher.timeSource()),
       filter_manager_(*this),
       read_buffer_([this]() -> void { this->onReadBufferLowWatermark(); },
                    [this]() -> void { this->onReadBufferHighWatermark(); },
@@ -1366,10 +1365,9 @@ void ClientPipeImpl::connect() {
 
 
 ServerPipeImpl::ServerPipeImpl(Event::Dispatcher& dispatcher, TransportSocketPtr transport_socket,
-                               StreamInfo::StreamInfo& stream_info,
                                const Network::ConnectionSocket::OptionsSharedPtr&)
     : ConnectionImplBase(dispatcher, next_global_id_++),
-      transport_socket_(std::move(transport_socket)), stream_info_(stream_info),
+      transport_socket_(std::move(transport_socket)),
       filter_manager_(*this),
       read_buffer_([this]() -> void { this->onReadBufferLowWatermark(); },
                    [this]() -> void { this->onReadBufferHighWatermark(); },
@@ -1755,6 +1753,9 @@ void ServerPipeImpl::onWriteReady() {
 
   IoResult result = transport_socket_->doWrite(*write_buffer_, write_end_stream_);
   ASSERT(!result.end_stream_read_); // The interface guarantees that only read operations set this.
+  if (result.bytes_processed_ > 0) {
+    peer_->onReadReady();
+  }
   uint64_t new_buffer_size = write_buffer_->length();
   updateWriteBufferStats(result.bytes_processed_, new_buffer_size);
 
