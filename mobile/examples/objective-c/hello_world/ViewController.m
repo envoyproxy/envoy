@@ -14,7 +14,6 @@ NSString *_REQUEST_SCHEME = @"https";
 
 @interface ViewController ()
 @property (nonatomic, strong) id<StreamClient> client;
-@property (nonatomic, assign) int requestCount;
 @property (nonatomic, strong) NSMutableArray<Result *> *results;
 @property (nonatomic, weak) NSTimer *requestTimer;
 @end
@@ -34,14 +33,14 @@ NSString *_REQUEST_SCHEME = @"https";
 }
 
 - (void)startEnvoy {
-  NSLog(@"Starting Envoy...");
+  NSLog(@"starting Envoy...");
   NSError *error;
   StreamClientBuilder *builder = [[StreamClientBuilder alloc] init];
   self.client = [builder buildAndReturnError:&error];
   if (error) {
-    NSLog(@"Starting Envoy failed: %@", error);
+    NSLog(@"starting Envoy failed: %@", error);
   } else {
-    NSLog(@"Started Envoy, beginning requests...");
+    NSLog(@"started Envoy, beginning requests...");
     [self startRequests];
   }
 }
@@ -62,13 +61,11 @@ NSString *_REQUEST_SCHEME = @"https";
 }
 
 - (void)performRequest {
-  self.requestCount++;
-  NSLog(@"Starting request to '%@'", _REQUEST_PATH);
+  NSLog(@"starting request to '%@'", _REQUEST_PATH);
 
   // Note: this request will use an http/1.1 stream for the upstream request.
   // The Swift example uses h2. This is done on purpose to test both paths in end-to-end tests
   // in CI.
-  int requestID = self.requestCount;
   RequestHeadersBuilder *builder = [[RequestHeadersBuilder alloc] initWithMethod:RequestMethodGet
                                                                           scheme:_REQUEST_SCHEME
                                                                        authority:_REQUEST_AUTHORITY
@@ -80,32 +77,29 @@ NSString *_REQUEST_SCHEME = @"https";
   StreamPrototype *prototype = [self.client newStreamPrototype];
   [prototype setOnResponseHeadersWithClosure:^(ResponseHeaders *headers, BOOL endStream) {
     int statusCode = [[[headers valueForName:@":status"] firstObject] intValue];
-    NSLog(@"Response status (%i): %i\n%@", requestID, statusCode, headers);
-    NSString *body = [NSString stringWithFormat:@"Status: %i", statusCode];
-    [weakSelf addResponseBody:body
-                 serverHeader:[[headers valueForName:@"server"] firstObject]
-                   identifier:requestID
-                        error:nil];
-  }];
-  [prototype setOnResponseDataWithClosure:^(NSData *data, BOOL endStream) {
-    NSLog(@"Response data (%i): %ld bytes", requestID, data.length);
+    NSString *message = [NSString stringWithFormat:@"received headers with status %i", statusCode];
+    NSLog(@"%@", message);
+    [weakSelf addResponseMessage:message
+                    serverHeader:[[headers valueForName:@"server"] firstObject]
+                           error:nil];
   }];
   [prototype setOnErrorWithClosure:^(EnvoyError *error) {
     // TODO: expose attemptCount. https://github.com/lyft/envoy-mobile/issues/823
-    NSLog(@"Error (%i): Request failed: %@", requestID, error.message);
+    NSString *message =
+        [NSString stringWithFormat:@"failed within Envoy library %@", error.message];
+    NSLog(@"%@", message);
+    [weakSelf addResponseMessage:message serverHeader:nil error:message];
   }];
 
   Stream *stream = [prototype startWithQueue:dispatch_get_main_queue()];
   [stream sendHeaders:headers endStream:YES];
 }
 
-- (void)addResponseBody:(NSString *)body
-           serverHeader:(NSString *)serverHeader
-             identifier:(int)identifier
-                  error:(NSString *)error {
+- (void)addResponseMessage:(NSString *)message
+              serverHeader:(NSString *)serverHeader
+                     error:(NSString *)error {
   Result *result = [Result new];
-  result.identifier = identifier;
-  result.body = body;
+  result.message = message;
   result.serverHeader = serverHeader;
   result.error = error;
 
@@ -133,16 +127,16 @@ NSString *_REQUEST_SCHEME = @"https";
 
   Result *result = self.results[indexPath.row];
   if (result.error == nil) {
-    cell.textLabel.text = [NSString stringWithFormat:@"[%d] %@", result.identifier, result.body];
+    cell.textLabel.text = result.message;
     cell.detailTextLabel.text =
-        [NSString stringWithFormat:@"'Server' header: %@", result.serverHeader];
+        [NSString stringWithFormat:@"'server' header: %@", result.serverHeader];
 
     cell.textLabel.textColor = [UIColor blackColor];
     cell.detailTextLabel.textColor = [UIColor blackColor];
     cell.contentView.backgroundColor = [UIColor whiteColor];
   } else {
-    cell.textLabel.text = [NSString stringWithFormat:@"[%d]", result.identifier];
-    cell.detailTextLabel.text = result.error;
+    cell.textLabel.text = result.error;
+    cell.detailTextLabel.text = nil;
 
     cell.textLabel.textColor = [UIColor whiteColor];
     cell.detailTextLabel.textColor = [UIColor whiteColor];

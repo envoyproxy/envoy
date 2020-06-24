@@ -57,7 +57,7 @@ jobs:
         run: 'cat /tmp/envoy.log'
       # Check for the sentinel value that shows the app is alive and well.
       - name: 'Check liveliness'
-        run: 'cat /tmp/envoy.log | grep "Response status (1): 200"'
+        run: 'cat /tmp/envoy.log | grep "received headers with status 200"'
   macobjc:
     name: mac_objc_helloworld
     needs: macdist
@@ -89,7 +89,7 @@ jobs:
         run: 'cat /tmp/envoy.log'
       # Check for the sentinel value that shows the app is alive and well.
       - name: 'Check liveliness'
-        run: 'cat /tmp/envoy.log | grep "Response status (1): 200"'
+        run: 'cat /tmp/envoy.log | grep "received headers with status 200"'
   swifttests:
     name: swift_tests
     runs-on: macOS-latest
