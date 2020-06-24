@@ -1,0 +1,53 @@
+version: "3.7"
+services:
+
+  front-envoy:
+    build:
+      context: ../
+      dockerfile: front-proxy/Dockerfile-frontenvoy
+    volumes:
+      - ./${FRONT_ENVOY_YAML}:/etc/front-envoy.yaml
+    networks:
+      - envoymesh
+    expose:
+      - "8000"
+      - "8001"
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+
+  ext_authz-http-service:
+    build:
+      context: ./auth
+      dockerfile: http-service/Dockerfile
+    volumes:
+      - ./users.json:/etc/users.json
+    environment:
+      - USERS=/etc/users.json
+    networks:
+      envoymesh:
+        aliases:
+          - ext_authz-http-service
+
+  ext_authz-grpc-service:
+    build:
+      context: ./auth
+      dockerfile: grpc-service/Dockerfile
+    volumes:
+      - ./users.json:/etc/users.json
+    networks:
+      envoymesh:
+        aliases:
+          - ext_authz-grpc-service
+
+  upstream-service:
+    build:
+      context: ./upstream
+      dockerfile: service/Dockerfile
+    networks:
+      envoymesh:
+        aliases:
+          - upstream-service
+
+networks:
+  envoymesh: {}
