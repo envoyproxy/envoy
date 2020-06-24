@@ -551,6 +551,7 @@ def fixSourceLine(line, line_number):
 
 
 def codecDiffHelper(file1, file2, diff):
+  print(os.listdir('.'))
   f1 = readLines(file1)
   f2 = readLines(file2)
 
