@@ -20,6 +20,17 @@ namespace HeaderToMetadataFilter {
 using HeaderToMetadataProtoConfig =
     envoy::extensions::filters::http::header_to_metadata::v3::Config;
 
+void testForbiddenConfig(const std::string& yaml) {
+  HeaderToMetadataProtoConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  HeaderToMetadataConfig factory;
+
+  EXPECT_THROW(factory.createFilterFactoryFromProto(proto_config, "stats", context),
+               EnvoyException);
+}
+
 TEST(HeaderToMetadataFilterConfigTest, InvalidEmptyHeader) {
   const std::string yaml = R"EOF(
 request_rules:
@@ -114,14 +125,20 @@ request_rules:
         substitution: "\\1"
   )EOF";
 
-  HeaderToMetadataProtoConfig proto_config;
-  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+  testForbiddenConfig(yaml);
+}
 
-  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
-  HeaderToMetadataConfig factory;
+TEST(HeaderToMetadataFilterConfigTest, OnHeaderMissingEmptyValue) {
+  const std::string yaml = R"EOF(
+request_rules:
+  - header: x-version
+    on_header_missing:
+      metadata_namespace: envoy.lb
+      key: "foo"
+      type: STRING
+  )EOF";
 
-  EXPECT_THROW(factory.createFilterFactoryFromProto(proto_config, "stats", context),
-               EnvoyException);
+  testForbiddenConfig(yaml);
 }
 
 } // namespace HeaderToMetadataFilter

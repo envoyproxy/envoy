@@ -64,6 +64,10 @@ bool Config::configToVector(const ProtobufRepeatedRule& proto_rules,
       throw EnvoyException("Cannot specificy both value and regex_value_rewrite");
     }
 
+    if (entry.has_on_header_missing() && entry.on_header_missing().value().empty()) {
+      throw EnvoyException("Cannot specificy on_header_missing rule with an empty value");
+    }
+
     vector.emplace_back(entry.header(), entry);
   }
 
