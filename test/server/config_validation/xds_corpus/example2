@@ -26,7 +26,5 @@ actions {
   }
 }
 config {
-  ip_version : IPv6
-  client_type : ENVOY_GRPC
   sotw_or_delta : SOTW
 }
