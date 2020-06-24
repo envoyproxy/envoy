@@ -16,20 +16,24 @@ namespace Extensions {
 namespace StatSinks {
 namespace MetricsService {
 
-GrpcMetricsStreamerImpl::GrpcMetricsStreamerImpl(Grpc::AsyncClientFactoryPtr&& factory,
-                                                 const LocalInfo::LocalInfo& local_info)
-    : client_(factory->create()), local_info_(local_info) {}
+GrpcMetricsStreamerImpl::GrpcMetricsStreamerImpl(
+    Grpc::AsyncClientFactoryPtr&& factory, const LocalInfo::LocalInfo& local_info,
+    envoy::config::core::v3::ApiVersion transport_api_version)
+    : client_(factory->create()), local_info_(local_info),
+      service_method_(
+          Grpc::VersionedMethods("envoy.service.metrics.v3.MetricsService.StreamMetrics",
+                                 "envoy.service.metrics.v2.MetricsService.StreamMetrics")
+              .getMethodDescriptorForVersion(transport_api_version)),
+      transport_api_version_(transport_api_version) {}
 
 void GrpcMetricsStreamerImpl::send(envoy::service::metrics::v3::StreamMetricsMessage& message) {
   if (stream_ == nullptr) {
-    stream_ = client_->start(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-                                 "envoy.service.metrics.v2.MetricsService.StreamMetrics"),
-                             *this, Http::AsyncClient::StreamOptions());
+    stream_ = client_->start(service_method_, *this, Http::AsyncClient::StreamOptions());
     auto* identifier = message.mutable_identifier();
     *identifier->mutable_node() = local_info_.node();
   }
   if (stream_ != nullptr) {
-    stream_->sendMessage(message, false);
+    stream_->sendMessage(message, transport_api_version_, false);
   }
 }
 

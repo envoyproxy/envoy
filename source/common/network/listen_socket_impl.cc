@@ -7,6 +7,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/network/exception.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
@@ -32,7 +33,7 @@ Api::SysCallIntResult ListenSocketImpl::bind(Network::Address::InstanceConstShar
 void ListenSocketImpl::setListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) {
   if (!Network::Socket::applyOptions(options, *this,
                                      envoy::config::core::v3::SocketOption::STATE_PREBIND)) {
-    throw EnvoyException("ListenSocket: Setting socket options failed");
+    throw CreateListenerException("ListenSocket: Setting socket options failed");
   }
 }
 
