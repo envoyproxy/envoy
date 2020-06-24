@@ -5,8 +5,10 @@
 #include "envoy/api/io_error.h"
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
+#include "envoy/network/address.h"
 
 #include "absl/container/fixed_array.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Buffer {
@@ -16,12 +18,6 @@ struct RawSlice;
 using RawSliceArrays = absl::FixedArray<absl::FixedArray<Buffer::RawSlice>>;
 
 namespace Network {
-namespace Address {
-class Instance;
-class Ip;
-
-using InstanceConstSharedPtr = std::shared_ptr<const Instance>;
-} // namespace Address
 
 /**
  * IoHandle: an abstract interface for all I/O operations
@@ -144,6 +140,73 @@ public:
    * return true if the platform supports recvmmsg() and sendmmsg().
    */
   virtual bool supportsMmsg() const PURE;
+
+  /**
+   * Bind to address. The handle should have been created with a call to socket()
+   * @param address address to bind to.
+   * @param addrlen address length
+   * @return a Api::SysCallIntResult with rc_ = 0 for success and rc_ = -1 for failure. If the call
+   *   is successful, errno_ shouldn't be used.
+   */
+  virtual Api::SysCallIntResult bind(Address::InstanceConstSharedPtr address) PURE;
+
+  /**
+   * Listen on bound handle.
+   * @param backlog maximum number of pending connections for listener
+   * @return a Api::SysCallIntResult with rc_ = 0 for success and rc_ = -1 for failure. If the call
+   *   is successful, errno_ shouldn't be used.
+   */
+  virtual Api::SysCallIntResult listen(int backlog) PURE;
+
+  /**
+   * Connect to address. The handle should have been created with a call to socket()
+   * on this object.
+   * @param address remote address to connect to.
+   * @param addrlen remote address length
+   * @return a Api::SysCallIntResult with rc_ = 0 for success and rc_ = -1 for failure. If the call
+   *   is successful, errno_ shouldn't be used.
+   */
+  virtual Api::SysCallIntResult connect(Address::InstanceConstSharedPtr address) PURE;
+
+  /**
+   * Set option (see man 2 setsockopt)
+   */
+  virtual Api::SysCallIntResult setOption(int level, int optname, const void* optval,
+                                          socklen_t optlen) PURE;
+
+  /**
+   * Get option (see man 2 getsockopt)
+   */
+  virtual Api::SysCallIntResult getOption(int level, int optname, void* optval,
+                                          socklen_t* optlen) PURE;
+
+  /**
+   * Toggle blocking behavior
+   * @param blocking flag to set/unset blocking state
+   * @return a Api::SysCallIntResult with rc_ = 0 for success and rc_ = -1 for failure. If the call
+   * is successful, errno_ shouldn't be used.
+   */
+  virtual Api::SysCallIntResult setBlocking(bool blocking) PURE;
+
+  /**
+   * Get domain used by underlying socket (see man 2 socket)
+   * @param domain updated to the underlying socket's domain if call is successful
+   * @return a Api::SysCallIntResult with rc_ = 0 for success and rc_ = -1 for failure. If the call
+   * is successful, errno_ shouldn't be used.
+   */
+  virtual absl::optional<int> domain() PURE;
+
+  /**
+   * Get local address (ip:port pair)
+   * @return local address as @ref Address::InstanceConstSharedPtr
+   */
+  virtual Address::InstanceConstSharedPtr localAddress() PURE;
+
+  /**
+   * Get peer's address (ip:port pair)
+   * @return peer's address as @ref Address::InstanceConstSharedPtr
+   */
+  virtual Address::InstanceConstSharedPtr peerAddress() PURE;
 };
 
 using IoHandlePtr = std::unique_ptr<IoHandle>;

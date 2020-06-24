@@ -186,7 +186,7 @@ message AccessLogCommon {
 }
 
 // Flags indicating occurrences during request/response processing.
-// [#next-free-field: 21]
+// [#next-free-field: 22]
 message ResponseFlags {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.data.accesslog.v2.ResponseFlags";
@@ -266,6 +266,9 @@ message ResponseFlags {
 
   // Indicates there was a max stream duration reached on the upstream request.
   bool upstream_max_stream_duration_reached = 20;
+
+  // Indicates the response was served from a cache filter.
+  bool response_from_cache_filter = 21;
 }
 
 // Properties of a negotiated TLS connection.

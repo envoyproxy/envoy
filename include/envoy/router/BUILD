@@ -1,10 +1,10 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -53,13 +53,17 @@ envoy_cc_library(
     hdrs = ["router.h"],
     external_deps = ["abseil_optional"],
     deps = [
+        ":internal_redirect_interface",
         "//include/envoy/access_log:access_log_interface",
+        "//include/envoy/common:conn_pool_interface",
         "//include/envoy/common:matchers_interface",
         "//include/envoy/config:typed_metadata_interface",
         "//include/envoy/http:codec_interface",
         "//include/envoy/http:codes_interface",
+        "//include/envoy/http:conn_pool_interface",
         "//include/envoy/http:hash_policy_interface",
         "//include/envoy/http:header_map_interface",
+        "//include/envoy/tcp:conn_pool_interface",
         "//include/envoy/tracing:http_tracer_interface",
         "//include/envoy/upstream:resource_manager_interface",
         "//include/envoy/upstream:retry_interface",
@@ -106,5 +110,15 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         "//include/envoy/stream_info:filter_state_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "internal_redirect_interface",
+    hdrs = ["internal_redirect.h"],
+    deps = [
+        "//include/envoy/config:typed_config_interface",
+        "//include/envoy/stream_info:filter_state_interface",
+        "//source/common/common:minimal_logger_lib",
     ],
 )

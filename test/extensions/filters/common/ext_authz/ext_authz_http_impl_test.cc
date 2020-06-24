@@ -81,6 +81,12 @@ public:
                 ignore_case: true
               - prefix: "X-"
                 ignore_case: true
+            allowed_upstream_headers_to_append:
+              patterns:
+              - exact: Alice
+                ignore_case: true
+              - prefix: "Append-"
+                ignore_case: true
             allowed_client_headers:
               patterns:
               - exact: Foo
@@ -141,6 +147,7 @@ TEST_F(ExtAuthzHttpClientTest, ClientConfig) {
   const Http::LowerCaseString foo{"foo"};
   const Http::LowerCaseString baz{"baz"};
   const Http::LowerCaseString bar{"bar"};
+  const Http::LowerCaseString alice{"alice"};
 
   // Check allowed request headers.
   EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Method.get()));
@@ -149,7 +156,7 @@ TEST_F(ExtAuthzHttpClientTest, ClientConfig) {
   EXPECT_FALSE(config_->requestHeaderMatchers()->matches(Http::Headers::get().ContentLength.get()));
   EXPECT_TRUE(config_->requestHeaderMatchers()->matches(baz.get()));
 
-  // // Check allowed client headers.
+  // Check allowed client headers.
   EXPECT_TRUE(config_->clientHeaderMatchers()->matches(Http::Headers::get().Status.get()));
   EXPECT_TRUE(config_->clientHeaderMatchers()->matches(Http::Headers::get().ContentLength.get()));
   EXPECT_FALSE(config_->clientHeaderMatchers()->matches(Http::Headers::get().Path.get()));
@@ -158,10 +165,13 @@ TEST_F(ExtAuthzHttpClientTest, ClientConfig) {
   EXPECT_FALSE(config_->clientHeaderMatchers()->matches(Http::Headers::get().Origin.get()));
   EXPECT_TRUE(config_->clientHeaderMatchers()->matches(foo.get()));
 
-  // // Check allowed upstream headers.
+  // Check allowed upstream headers.
   EXPECT_TRUE(config_->upstreamHeaderMatchers()->matches(bar.get()));
 
-  // // Check other attributes.
+  // Check allowed upstream headers to append.
+  EXPECT_TRUE(config_->upstreamHeaderToAppendMatchers()->matches(alice.get()));
+
+  // Check other attributes.
   EXPECT_EQ(config_->pathPrefix(), "/bar");
   EXPECT_EQ(config_->cluster(), "ext_authz");
   EXPECT_EQ(config_->tracingName(), "async ext_authz egress");
@@ -201,9 +211,7 @@ TEST_F(ExtAuthzHttpClientTest, TestDefaultAllowedHeaders) {
 TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithPathRewrite) {
   Http::RequestMessagePtr message_ptr = sendRequest({{":path", "/foo"}, {"foo", "bar"}});
 
-  const auto* path = message_ptr->headers().get(Http::Headers::get().Path);
-  ASSERT_NE(path, nullptr);
-  EXPECT_EQ(path->value().getStringView(), "/bar/foo");
+  EXPECT_EQ(message_ptr->headers().getPathValue(), "/bar/foo");
 }
 
 // Test the client when a request contains Content-Length greater than 0.
@@ -212,13 +220,8 @@ TEST_F(ExtAuthzHttpClientTest, ContentLengthEqualZero) {
       sendRequest({{Http::Headers::get().ContentLength.get(), std::string{"47"}},
                    {Http::Headers::get().Method.get(), std::string{"POST"}}});
 
-  const auto* content_length = message_ptr->headers().get(Http::Headers::get().ContentLength);
-  ASSERT_NE(content_length, nullptr);
-  EXPECT_EQ(content_length->value().getStringView(), "0");
-
-  const auto* method = message_ptr->headers().get(Http::Headers::get().Method);
-  ASSERT_NE(method, nullptr);
-  EXPECT_EQ(method->value().getStringView(), "POST");
+  EXPECT_EQ(message_ptr->headers().getContentLengthValue(), "0");
+  EXPECT_EQ(message_ptr->headers().getMethodValue(), "POST");
 }
 
 // Test the client when a request contains Content-Length greater than 0.
@@ -244,13 +247,8 @@ TEST_F(ExtAuthzHttpClientTest, ContentLengthEqualZeroWithAllowedHeaders) {
       sendRequest({{Http::Headers::get().ContentLength.get(), std::string{"47"}},
                    {Http::Headers::get().Method.get(), std::string{"POST"}}});
 
-  const auto* content_length = message_ptr->headers().get(Http::Headers::get().ContentLength);
-  ASSERT_NE(content_length, nullptr);
-  EXPECT_EQ(content_length->value().getStringView(), "0");
-
-  const auto* method = message_ptr->headers().get(Http::Headers::get().Method);
-  ASSERT_NE(method, nullptr);
-  EXPECT_EQ(method->value().getStringView(), "POST");
+  EXPECT_EQ(message_ptr->headers().getContentLengthValue(), "0");
+  EXPECT_EQ(message_ptr->headers().getMethodValue(), "POST");
 }
 
 // Test the client when a request contains headers in the prefix matchers.
@@ -369,7 +367,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeadersFromStreamInf
   const HeaderValuePair expected_header{"x-authz-header1", "123"};
   EXPECT_CALL(async_client_, send_(ContainsPairAsHeader(expected_header), _, _));
 
-  Http::RequestHeaderMapImpl request_headers;
+  Http::TestRequestHeaderMapImpl request_headers;
   request_headers.addCopy(Http::LowerCaseString(std::string("x-request-id")),
                           expected_header.second);
 

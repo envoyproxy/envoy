@@ -328,6 +328,7 @@ TEST_F(StatMergerDynamicTest, DynamicsWithFakeSymbolTable) {
   EXPECT_EQ(0, dynamicEncodeDecodeTest("hello..D:world"));
   EXPECT_EQ(0, dynamicEncodeDecodeTest("D:hello..D:world"));
   EXPECT_EQ(0, dynamicEncodeDecodeTest("D:hello.D:.D:world"));
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("aV.D:,b"));
 
   // TODO(#10008): these tests fail because fake/real symbol tables
   // deal with empty components differently.
@@ -399,9 +400,10 @@ TEST_F(StatMergerThreadLocalTest, RetainImportModeAfterMerge) {
     Protobuf::Map<std::string, uint64_t> gauges;
     gauges["mygauge"] = 789;
     stat_merger.mergeStats(counter_deltas, gauges);
+    EXPECT_EQ(789 + 42, gauge.value());
   }
+  EXPECT_EQ(42, gauge.value());
   EXPECT_EQ(Gauge::ImportMode::Accumulate, gauge.importMode());
-  EXPECT_EQ(789 + 42, gauge.value());
 }
 
 // Verify that if we create a never import stat in the child process which then gets merged

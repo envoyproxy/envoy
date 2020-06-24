@@ -24,6 +24,7 @@
 #include "common/common/logger.h"
 #include "common/common/thread.h"
 #include "common/config/subscription_base.h"
+#include "common/init/manager_impl.h"
 #include "common/init/target_impl.h"
 #include "common/singleton/threadsafe_singleton.h"
 
@@ -79,6 +80,7 @@ public:
                std::vector<OverrideLayerConstPtr>&& layers);
 
   // Runtime::Snapshot
+  void countDeprecatedFeatureUse() const override;
   bool deprecatedFeatureEnabled(absl::string_view key, bool default_value) const override;
   bool runtimeFeatureEnabled(absl::string_view key) const override;
   bool featureEnabled(absl::string_view key, uint64_t default_value, uint64_t random_value,
@@ -127,6 +129,8 @@ private:
   RandomGenerator& generator_;
   RuntimeStats& stats_;
 };
+
+using SnapshotImplPtr = std::unique_ptr<SnapshotImpl>;
 
 /**
  * Base implementation of OverrideLayer that by itself provides an empty values map.
@@ -243,24 +247,26 @@ class LoaderImpl : public Loader, Logger::Loggable<Logger::Id::runtime> {
 public:
   LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
              const envoy::config::bootstrap::v3::LayeredRuntime& config,
-             const LocalInfo::LocalInfo& local_info, Init::Manager& init_manager,
-             Stats::Store& store, RandomGenerator& generator,
-             ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
+             const LocalInfo::LocalInfo& local_info, Stats::Store& store,
+             RandomGenerator& generator, ProtobufMessage::ValidationVisitor& validation_visitor,
+             Api::Api& api);
 
   // Runtime::Loader
   void initialize(Upstream::ClusterManager& cm) override;
   const Snapshot& snapshot() override;
-  std::shared_ptr<const Snapshot> threadsafeSnapshot() override;
+  SnapshotConstSharedPtr threadsafeSnapshot() override;
   void mergeValues(const std::unordered_map<std::string, std::string>& values) override;
+  void startRtdsSubscriptions(ReadyCallback on_done) override;
 
 private:
   friend RtdsSubscription;
 
   // Create a new Snapshot
-  virtual std::unique_ptr<SnapshotImpl> createNewSnapshot();
+  virtual SnapshotImplPtr createNewSnapshot();
   // Load a new Snapshot into TLS
   void loadNewSnapshot();
   RuntimeStats generateStats(Stats::Store& store);
+  void onRdtsReady();
 
   RandomGenerator& generator_;
   RuntimeStats stats_;
@@ -270,11 +276,14 @@ private:
   const std::string service_cluster_;
   Filesystem::WatcherPtr watcher_;
   Api::Api& api_;
+  ReadyCallback on_rtds_initialized_;
+  Init::WatcherImpl init_watcher_;
+  Init::ManagerImpl init_manager_{"RTDS"};
   std::vector<RtdsSubscriptionPtr> subscriptions_;
   Upstream::ClusterManager* cm_{};
 
   absl::Mutex snapshot_mutex_;
-  std::shared_ptr<const Snapshot> thread_safe_snapshot_ ABSL_GUARDED_BY(snapshot_mutex_);
+  SnapshotConstSharedPtr thread_safe_snapshot_ ABSL_GUARDED_BY(snapshot_mutex_);
 };
 
 } // namespace Runtime

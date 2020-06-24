@@ -70,7 +70,7 @@ to relevant parts of the documentation. Thank you! Please write in N/A if there 
 ### <a name="runtime_guard"></a>Runtime guard
 
 If this PR has a user-visible behavioral change, or otherwise falls under the
-guidelines for runtime guarding in the [contributing doc](CONTRIBUTING.md.md)
+guidelines for runtime guarding in the [contributing doc](CONTRIBUTING.md)
 it should have a runtime guard, which should be documented both in the release
 notes and here in the PR description.
 

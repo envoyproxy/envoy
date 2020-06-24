@@ -4,11 +4,11 @@
 
 #include "envoy/router/string_accessor.h"
 
-#include "common/access_log/access_log_formatter.h"
 #include "common/common/fmt.h"
 #include "common/common/logger.h"
 #include "common/common/utility.h"
 #include "common/config/metadata.h"
+#include "common/formatter/substitution_formatter.h"
 #include "common/http/header_map_impl.h"
 #include "common/json/json_loader.h"
 #include "common/stream_info/utility.h"
@@ -222,7 +222,7 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
     : append_(append) {
   if (field_name == "PROTOCOL") {
     field_extractor_ = [](const Envoy::StreamInfo::StreamInfo& stream_info) {
-      return Envoy::AccessLog::AccessLogFormatUtils::protocolToString(stream_info.protocol());
+      return Envoy::Formatter::SubstitutionFormatUtils::protocolToString(stream_info.protocol());
     };
   } else if (field_name == "DOWNSTREAM_REMOTE_ADDRESS") {
     field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
@@ -319,17 +319,17 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
     const std::string pattern = fmt::format("%{}%", field_name);
     if (start_time_formatters_.find(pattern) == start_time_formatters_.end()) {
       start_time_formatters_.emplace(
-          std::make_pair(pattern, AccessLog::AccessLogFormatParser::parse(pattern)));
+          std::make_pair(pattern, Formatter::SubstitutionFormatParser::parse(pattern)));
     }
     field_extractor_ = [this, pattern](const Envoy::StreamInfo::StreamInfo& stream_info) {
       const auto& formatters = start_time_formatters_.at(pattern);
-      static const Http::RequestHeaderMapImpl empty_request_headers;
-      static const Http::ResponseHeaderMapImpl empty_response_headers;
-      static const Http::ResponseTrailerMapImpl empty_response_trailers;
       std::string formatted;
       for (const auto& formatter : formatters) {
-        absl::StrAppend(&formatted, formatter->format(empty_request_headers, empty_response_headers,
-                                                      empty_response_trailers, stream_info));
+        absl::StrAppend(&formatted,
+                        formatter->format(*Http::StaticEmptyHeaders::get().request_headers,
+                                          *Http::StaticEmptyHeaders::get().response_headers,
+                                          *Http::StaticEmptyHeaders::get().response_trailers,
+                                          stream_info, absl::string_view()));
       }
       return formatted;
     };
@@ -342,8 +342,19 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
   } else if (absl::StartsWith(field_name, "REQ")) {
     field_extractor_ = parseRequestHeader(field_name.substr(STATIC_STRLEN("REQ")));
   } else if (field_name == "HOSTNAME") {
-    std::string hostname = Envoy::AccessLog::AccessLogFormatUtils::getHostname();
+    std::string hostname = Envoy::Formatter::SubstitutionFormatUtils::getHostname();
     field_extractor_ = [hostname](const StreamInfo::StreamInfo&) { return hostname; };
+  } else if (field_name == "RESPONSE_FLAGS") {
+    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
+      return StreamInfo::ResponseFlagUtils::toShortString(stream_info);
+    };
+  } else if (field_name == "RESPONSE_CODE_DETAILS") {
+    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) -> std::string {
+      if (stream_info.responseCodeDetails().has_value()) {
+        return stream_info.responseCodeDetails().value();
+      }
+      return "";
+    };
   } else {
     throw EnvoyException(fmt::format("field '{}' not supported as custom header", field_name));
   }

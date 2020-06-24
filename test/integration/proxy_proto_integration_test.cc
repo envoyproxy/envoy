@@ -116,7 +116,7 @@ TEST_P(ProxyProtoIntegrationTest, AccessLog) {
 
   ASSERT_EQ(2, tokens.size());
   EXPECT_EQ(tokens[0], Network::Test::getLoopbackAddressString(GetParam()));
-  EXPECT_EQ(tokens[1], "1.2.3.4:12345");
+  EXPECT_EQ(tokens[1], "1.2.3.4:12345\n");
 }
 
 TEST_P(ProxyProtoIntegrationTest, DEPRECATED_FEATURE_TEST(OriginalDst)) {

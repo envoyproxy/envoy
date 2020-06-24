@@ -89,7 +89,10 @@ versioning guidelines:
   open it.
 * Any PR that changes user-facing behavior **must** have associated documentation in [docs](docs) as
   well as [release notes](docs/root/version_history/current.rst). API changes should be documented
-  inline with protos as per the [API contribution guidelines](api/CONTRIBUTING.md).
+  inline with protos as per the [API contribution guidelines](api/CONTRIBUTING.md). If a change applies
+  to multiple sections of the release notes, it should be noted in the first (most important) section
+  that applies. For instance, a bug fix that introduces incompatible behavior should be noted in
+  `Incompatible Behavior Changes` but not in `Bug Fixes`.
 * All code comments and documentation are expected to have proper English grammar and punctuation.
   If you are not a fluent English speaker (or a bad writer ;-)) please let us know and we will try
   to find some help but there are no guarantees.
@@ -97,10 +100,15 @@ versioning guidelines:
   colon. Examples:
   * "docs: fix grammar error"
   * "http conn man: add new feature"
-* Your PR commit message will be used as the commit message when your PR is merged. You should 
+* Your PR commit message will be used as the commit message when your PR is merged. You should
   update this field if your PR diverges during review.
 * Your PR description should have details on what the PR does. If it fixes an existing issue it
   should end with "Fixes #XXX".
+* If your PR is co-authored or based on an earlier PR from another contributor,
+  please attribute them with `Co-authored-by: name <name@example.com>`. See
+  GitHub's [multiple author
+  guidance](https://help.github.com/en/github/committing-changes-to-your-project/creating-a-commit-with-multiple-authors)
+  for further details.
 * When all of the tests are passing and all other conditions described herein are satisfied, a
   maintainer will be assigned to review and merge the PR.
 * Once you submit a PR, *please do not rebase it*. It's much easier to review if subsequent commits
@@ -206,6 +214,26 @@ and false.
   while preserving the PR author's final DCO sign-off.
 * If a PR includes a deprecation/breaking change, notification should be sent to the
   [envoy-announce](https://groups.google.com/forum/#!forum/envoy-announce) email list.
+
+# Adding new extensions
+
+For developers adding a new extension, one can take an existing extension as the starting point.
+
+Extension configuration should be located in a directory structure like
+`api/envoy/extensions/area/plugin/`, for example `api/envoy/extensions/access_loggers/file/`
+
+The code for the extension should be located under the equivalent
+`source/extensions/area/plugin`, and include an *envoy_cc_extension* with the
+configuration and tagged with the appropriate security posture, and an
+*envoy_cc_library* with the code. More details on how to add a new extension
+API can be found [here](api/STYLE.md#adding-an-extension-configuration-to-the-api):
+
+Other changes will likely include
+
+  * Editing [source/extensions/extensions_build_config.bzl](source/extensions/extensions_build_config.bzl) to include the new extensions
+  * Editing [docs/root/api-v3/config/config.rst](docs/root/api-v3/config/config.rst) to add area/area
+  * Adding `docs/root/api-v3/config/area/area.rst` to add a table of contents for the API docs
+  * Adding `source/extensions/area/well_known_names.h` for registered plugins
 
 # DCO: Sign your work
 

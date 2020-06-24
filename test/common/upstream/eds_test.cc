@@ -228,6 +228,24 @@ TEST_F(EdsTest, ValidateFail) {
   EXPECT_FALSE(initialized_);
 }
 
+// Validate that onConfigUpdate() can ignore unknown fields.
+// this doesn't test the actual functionality, as the ValidationVisitor is mocked out,
+// however it is functionally tested in dynamic_validation_integration_test.
+TEST_F(EdsTest, ValidateIgnored) {
+  validation_visitor_.setSkipValidation(true);
+  initialize();
+  envoy::config::endpoint::v3::ClusterLoadAssignment resource;
+  resource.set_cluster_name("fare");
+  auto* unknown = resource.GetReflection()->MutableUnknownFields(&resource);
+  // add a field that doesn't exist in the proto definition:
+  unknown->AddFixed32(1000, 1);
+
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
+  resources.Add()->PackFrom(resource);
+  doOnConfigUpdateVerifyNoThrow(resource);
+  EXPECT_TRUE(initialized_);
+}
+
 // Validate that onConfigUpdate() with unexpected cluster names rejects config.
 TEST_F(EdsTest, OnConfigUpdateWrongName) {
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
@@ -1853,6 +1871,34 @@ TEST_F(EdsAssignmentTimeoutTest, AssignmentLeaseExpired) {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_EQ(hosts.size(), 0);
   }
+}
+
+// Validate that onConfigUpdate() verifies that no deprecated fields are used.
+TEST_F(EdsTest, DeprecatedFieldsError) {
+  // This test is only valid in API-v3, and should be updated for API-v4, as
+  // the deprecated fields of API-v2 will be removed.
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment =
+      TestUtility::parseYaml<envoy::config::endpoint::v3::ClusterLoadAssignment>(R"EOF(
+      cluster_name: fare
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 1.2.3.4
+                port_value: 80
+      policy:
+        overprovisioning_factor: 100
+        hidden_envoy_deprecated_disable_overprovisioning: true
+    )EOF");
+
+  initialize();
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
+  resources.Add()->PackFrom(cluster_load_assignment);
+  EXPECT_THROW_WITH_REGEX(eds_callbacks_->onConfigUpdate(resources, ""), ProtoValidationException,
+                          "Illegal use of hidden_envoy_deprecated_ V2 field "
+                          "'envoy.config.endpoint.v3.ClusterLoadAssignment.Policy.hidden_envoy_"
+                          "deprecated_disable_overprovisioning'");
 }
 
 } // namespace

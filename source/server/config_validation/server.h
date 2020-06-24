@@ -20,11 +20,11 @@
 #include "common/secret/secret_manager_impl.h"
 #include "common/thread_local/thread_local_impl.h"
 
+#include "server/admin/admin.h"
 #include "server/config_validation/admin.h"
 #include "server/config_validation/api.h"
 #include "server/config_validation/cluster_manager.h"
 #include "server/config_validation/dns.h"
-#include "server/http/admin.h"
 #include "server/listener_manager_impl.h"
 #include "server/server.h"
 
@@ -141,7 +141,7 @@ public:
     return ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(filters, context);
   }
   Network::SocketSharedPtr createListenSocket(Network::Address::InstanceConstSharedPtr,
-                                              Network::Address::SocketType,
+                                              Network::Socket::Type,
                                               const Network::Socket::OptionsSharedPtr&,
                                               const ListenSocketCreationParams&) override {
     // Returned sockets are not currently used so we can return nothing here safely vs. a

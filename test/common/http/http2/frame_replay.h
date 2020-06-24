@@ -53,7 +53,7 @@ public:
   CodecFrameInjector(const std::string& injector_name);
 
   // Writes the data using the Http::Connection's nghttp2 session.
-  void write(const Frame& frame, Http::Connection& connection);
+  Http::Status write(const Frame& frame, Http::Connection& connection);
 
   envoy::config::core::v3::Http2ProtocolOptions options_;
   Stats::IsolatedStoreImpl stats_store_;

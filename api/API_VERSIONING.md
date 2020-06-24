@@ -95,8 +95,9 @@ Envoy will support at most three major versions of any API package at all times:
 * The previous stable major version, e.g. v2. This is needed to ensure that we provide at least 1
   year for a supported major version to sunset. By supporting two stable major versions
   simultaneously, this makes it easier to coordinate control plane and Envoy
-  rollouts as well. This previous stable major version will be supported for 1
-  year after the introduction of the new current stable major version.
+  rollouts as well. This previous stable major version will be supported for exactly 1
+  year after the introduction of the new current stable major version, after which it will be
+  removed from the Envoy implementation.
 * Optionally, the next experimental alpha major version, e.g. v4alpha. This is a release candidate
   for the next stable major version. This is only generated when the current stable major version
   requires a breaking change at the next cycle, e.g. a deprecation or field rename. This release
@@ -113,7 +114,8 @@ major version and support for `envoy.config.bootstrap.v2` will be dropped from t
 implementation. Note that some transitively referenced package, e.g.
 `envoy.config.filter.network.foo.v2` may remain at version 2 during this release, if no changes were
 made to the referenced package. If no major version is justified at this point, the decision to cut
-v4 might occur at some point in 2021 or beyond.
+v4 might occur at some point in 2021 or beyond, however v2 support will still be removed at the end
+of 2020.
 
 The implication of this API lifecycle and clock is that any deprecated feature in the Envoy API will
 retain implementation support for at least 1-2 years.

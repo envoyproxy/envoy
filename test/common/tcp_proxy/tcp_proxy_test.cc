@@ -802,7 +802,7 @@ TEST(ConfigTest, AccessLogConfig) {
   {
     envoy::extensions::access_loggers::file::v3::FileAccessLog file_access_log;
     file_access_log.set_path("some_path");
-    file_access_log.set_format("the format specifier");
+    file_access_log.mutable_log_format()->set_text_format("the format specifier");
     log->mutable_typed_config()->PackFrom(file_access_log);
   }
 
@@ -859,7 +859,7 @@ public:
     access_log->set_name(Extensions::AccessLoggers::AccessLogNames::get().File);
     envoy::extensions::access_loggers::file::v3::FileAccessLog file_access_log;
     file_access_log.set_path("unused");
-    file_access_log.set_format(access_log_format);
+    file_access_log.mutable_log_format()->set_text_format(access_log_format);
     access_log->mutable_typed_config()->PackFrom(file_access_log);
     return config;
   }
@@ -877,7 +877,7 @@ public:
           .WillByDefault(ReturnRef(*upstream_connections_.back()));
       upstream_hosts_.push_back(std::make_shared<NiceMock<Upstream::MockHost>>());
       conn_pool_handles_.push_back(
-          std::make_unique<NiceMock<Tcp::ConnectionPool::MockCancellable>>());
+          std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>());
 
       ON_CALL(*upstream_hosts_.at(i), cluster())
           .WillByDefault(ReturnPointee(
@@ -969,7 +969,7 @@ public:
   std::vector<std::unique_ptr<NiceMock<Tcp::ConnectionPool::MockConnectionData>>>
       upstream_connection_data_{};
   std::vector<Tcp::ConnectionPool::Callbacks*> conn_pool_callbacks_;
-  std::vector<std::unique_ptr<NiceMock<Tcp::ConnectionPool::MockCancellable>>> conn_pool_handles_;
+  std::vector<std::unique_ptr<NiceMock<Envoy::ConnectionPool::MockCancellable>>> conn_pool_handles_;
   NiceMock<Tcp::ConnectionPool::MockInstance> conn_pool_;
   Tcp::ConnectionPool::UpstreamCallbacks* upstream_callbacks_;
   StringViewSaver access_log_data_;

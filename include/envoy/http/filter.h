@@ -34,6 +34,7 @@ enum class FilterHeadersStatus {
   StopIteration,
   // Continue iteration to remaining filters, but ignore any subsequent data or trailers. This
   // results in creating a header only request/response.
+  // This status MUST NOT be returned by decodeHeaders() when end_stream is set to true.
   ContinueAndEndStream,
   // Do not iterate for headers as well as data and trailers for the current filter and the filters
   // following, and buffer body data for later dispatching. ContinueDecoding() MUST
@@ -147,9 +148,27 @@ public:
    * caching where applicable to avoid multiple lookups. If a filter has modified the headers in
    * a way that affects routing, clearRouteCache() must be called to clear the cache.
    *
-   * NOTE: In the future we may want to allow the filter to override the route entry.
+   * NOTE: In the future we want to split route() into 2 methods, one that just
+   * returns current route and another that actually resolve the route.
    */
   virtual Router::RouteConstSharedPtr route() PURE;
+
+  /**
+   * Invokes callback with a matched route, callback can choose to accept this route by returning
+   * Router::RouteMatchStatus::Accept or continue route match from last matched route by returning
+   * Router::RouteMatchStatus::Continue, if there are more routes available.
+   *
+   * Returns route accepted by the callback or nullptr if no match found or none of route is
+   * accepted by the callback.
+   *
+   * NOTE: clearRouteCache() must be called before invoking this method otherwise cached route will
+   * be returned directly to the caller and the callback will not be invoked.
+   *
+   * Currently a route callback's decision is overridden by clearRouteCache() / route() call in the
+   * subsequent filters. We may want to persist callbacks so they always participate in later route
+   * resolution or make it an independent entity like filters that gets called on route resolution.
+   */
+  virtual Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) PURE;
 
   /**
    * Returns the clusterInfo for the cached route.
@@ -527,7 +546,7 @@ public:
    * should consider using StopAllIterationAndBuffer or StopAllIterationAndWatermark in
    * decodeHeaders() to prevent metadata passing to the following filters.
    *
-   * @param metadata supplies the decoded metadata.
+   * @param metadata_map supplies the decoded metadata.
    */
   virtual FilterMetadataStatus decodeMetadata(MetadataMap& /* metadata_map */) {
     return Http::FilterMetadataStatus::Continue;

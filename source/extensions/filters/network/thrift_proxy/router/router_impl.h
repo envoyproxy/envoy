@@ -127,8 +127,6 @@ public:
   MethodNameRouteEntryImpl(
       const envoy::extensions::filters::network::thrift_proxy::v3::Route& route);
 
-  const std::string& methodName() const { return method_name_; }
-
   // RouteEntryImplBase
   RouteConstSharedPtr matches(const MessageMetadata& metadata,
                               uint64_t random_value) const override;
@@ -142,8 +140,6 @@ class ServiceNameRouteEntryImpl : public RouteEntryImplBase {
 public:
   ServiceNameRouteEntryImpl(
       const envoy::extensions::filters::network::thrift_proxy::v3::Route& route);
-
-  const std::string& serviceName() const { return service_name_; }
 
   // RouteEntryImplBase
   RouteConstSharedPtr matches(const MessageMetadata& metadata,

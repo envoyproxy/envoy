@@ -11,8 +11,9 @@ namespace Envoy {
 namespace Stats {
 
 HistogramStatisticsImpl::HistogramStatisticsImpl(const histogram_t* histogram_ptr)
-    : computed_quantiles_(supportedQuantiles().size(), 0.0) {
-  hist_approx_quantile(histogram_ptr, supportedQuantiles().data(), supportedQuantiles().size(),
+    : computed_quantiles_(HistogramStatisticsImpl::supportedQuantiles().size(), 0.0) {
+  hist_approx_quantile(histogram_ptr, supportedQuantiles().data(),
+                       HistogramStatisticsImpl::supportedQuantiles().size(),
                        computed_quantiles_.data());
 
   sample_count_ = hist_sample_count(histogram_ptr);
@@ -26,16 +27,14 @@ HistogramStatisticsImpl::HistogramStatisticsImpl(const histogram_t* histogram_pt
 }
 
 const std::vector<double>& HistogramStatisticsImpl::supportedQuantiles() const {
-  static const std::vector<double> supported_quantiles = {0,    0.25, 0.5,   0.75,  0.90,
-                                                          0.95, 0.99, 0.995, 0.999, 1};
-  return supported_quantiles;
+  CONSTRUCT_ON_FIRST_USE(std::vector<double>,
+                         {0, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 0.995, 0.999, 1});
 }
 
 const std::vector<double>& HistogramStatisticsImpl::supportedBuckets() const {
-  static const std::vector<double> supported_buckets = {
-      0.5,  1,    5,     10,    25,    50,     100,    250,     500,    1000,
-      2500, 5000, 10000, 30000, 60000, 300000, 600000, 1800000, 3600000};
-  return supported_buckets;
+  CONSTRUCT_ON_FIRST_USE(std::vector<double>,
+                         {0.5, 1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000,
+                          60000, 300000, 600000, 1800000, 3600000});
 }
 
 std::string HistogramStatisticsImpl::quantileSummary() const {

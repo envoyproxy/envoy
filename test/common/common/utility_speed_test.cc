@@ -62,6 +62,34 @@ static void BM_DateTimeFormatterWithSubseconds(benchmark::State& state) {
 }
 BENCHMARK(BM_DateTimeFormatterWithSubseconds);
 
+// This benchmark is basically similar with the above BM_DateTimeFormatterWithSubseconds, the
+// differences are: 1. the format string input is long with duplicated subseconds. 2. The purpose
+// is to test DateFormatter.parse() which is called in constructor.
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_DateTimeFormatterWithLongSubsecondsString(benchmark::State& state) {
+  int outputBytes = 0;
+
+  Envoy::SystemTime time(std::chrono::seconds(1522796769));
+  std::mt19937 prng(1);
+  std::uniform_int_distribution<long> distribution(-10, 20);
+  std::string input;
+  int num_duplicates = 400;
+  std::string duplicate_input = "%%1f %1f, %2f, %3f, %4f, ";
+  for (int i = 0; i < num_duplicates; i++) {
+    absl::StrAppend(&input, duplicate_input, "(");
+  }
+  absl::StrAppend(&input, duplicate_input);
+
+  for (auto _ : state) {
+    Envoy::DateFormatter date_formatter(input);
+    time += std::chrono::milliseconds(static_cast<int>(distribution(prng)));
+    outputBytes += date_formatter.fromTime(time).length();
+  }
+  benchmark::DoNotOptimize(outputBytes);
+}
+BENCHMARK(BM_DateTimeFormatterWithLongSubsecondsString);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_DateTimeFormatterWithoutSubseconds(benchmark::State& state) {
   int outputBytes = 0;
 

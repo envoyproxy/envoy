@@ -41,6 +41,7 @@ private:
   const static std::string INVALID_ENVOY_REQUEST_HEADERS;
   const static std::string DOWNSTREAM_PROTOCOL_ERROR;
   const static std::string UPSTREAM_MAX_STREAM_DURATION_REACHED;
+  const static std::string RESPONSE_FROM_CACHE_FILTER;
 };
 
 /**

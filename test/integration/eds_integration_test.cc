@@ -390,7 +390,7 @@ TEST_P(EdsIntegrationTest, StatsReadyFilter) {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "GET", "/cluster1", "", downstream_protocol_, version_, "foo.com");
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("500", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("500", response->headers().getStatusValue());
   EXPECT_EQ("EDS not ready", response->body());
 
   cleanupUpstreamAndDownstream();
@@ -401,7 +401,7 @@ TEST_P(EdsIntegrationTest, StatsReadyFilter) {
   response = IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/cluster1", "",
                                                 downstream_protocol_, version_, "foo.com");
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ("EDS is ready", response->body());
 
   cleanupUpstreamAndDownstream();

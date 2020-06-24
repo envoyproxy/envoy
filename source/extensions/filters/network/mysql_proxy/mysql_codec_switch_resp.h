@@ -14,7 +14,6 @@ public:
   int parseMessage(Buffer::Instance& buffer, uint32_t len) override;
   std::string encode() override;
 
-  const std::string& getAuthPluginResp() const { return auth_plugin_resp_; }
   void setAuthPluginResp(std::string& auth_swith_resp);
 
 private:

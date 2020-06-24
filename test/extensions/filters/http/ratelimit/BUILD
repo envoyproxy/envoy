@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
@@ -8,6 +6,8 @@ load(
     "//test/extensions:extensions_build_system.bzl",
     "envoy_extension_cc_test",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -43,5 +43,25 @@ envoy_extension_cc_test(
         "//test/mocks/server:server_mocks",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/ratelimit/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "ratelimit_integration_test",
+    srcs = ["ratelimit_integration_test.cc"],
+    extension_name = "envoy.filters.http.ratelimit",
+    tags = ["fails_on_windows"],
+    deps = [
+        "//source/common/buffer:zero_copy_input_stream_lib",
+        "//source/common/grpc:codec_lib",
+        "//source/common/grpc:common_lib",
+        "//source/extensions/filters/http/ratelimit:config",
+        "//test/common/grpc:grpc_client_integration_lib",
+        "//test/integration:http_integration_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/ratelimit/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/ratelimit/v3:pkg_cc_proto",
     ],
 )

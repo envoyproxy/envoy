@@ -7,20 +7,24 @@ namespace Priority {
 
 const Upstream::HealthyAndDegradedLoad& PreviousPrioritiesRetryPriority::determinePriorityLoad(
     const Upstream::PrioritySet& priority_set,
-    const Upstream::HealthyAndDegradedLoad& original_priority_load) {
+    const Upstream::HealthyAndDegradedLoad& original_priority_load,
+    const PriorityMappingFunc& priority_mapping_func) {
   // If we've not seen enough retries to modify the priority load, just
   // return the original.
   // If this retry should trigger an update, recalculate the priority load by excluding attempted
   // priorities.
-  if (attempted_priorities_.size() < update_frequency_) {
+  if (attempted_hosts_.size() < update_frequency_) {
     return original_priority_load;
-  } else if (attempted_priorities_.size() % update_frequency_ == 0) {
+  } else if (attempted_hosts_.size() % update_frequency_ == 0) {
     if (excluded_priorities_.size() < priority_set.hostSetsPerPriority().size()) {
       excluded_priorities_.resize(priority_set.hostSetsPerPriority().size());
     }
 
-    for (const auto priority : attempted_priorities_) {
-      excluded_priorities_[priority] = true;
+    for (const auto& host : attempted_hosts_) {
+      absl::optional<uint32_t> mapped_host_priority = priority_mapping_func(*host);
+      if (mapped_host_priority.has_value()) {
+        excluded_priorities_[mapped_host_priority.value()] = true;
+      }
     }
 
     if (!adjustForAttemptedPriorities(priority_set)) {
@@ -50,7 +54,7 @@ bool PreviousPrioritiesRetryPriority::adjustForAttemptedPriorities(
     for (auto&& excluded_priority : excluded_priorities_) {
       excluded_priority = false;
     }
-    attempted_priorities_.clear();
+    attempted_hosts_.clear();
     total_availability =
         adjustedAvailability(adjusted_per_priority_health, adjusted_per_priority_degraded);
   }

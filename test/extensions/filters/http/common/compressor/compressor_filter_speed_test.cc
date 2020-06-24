@@ -1,7 +1,6 @@
 #include "envoy/extensions/filters/http/compressor/v3/compressor.pb.h"
 
-#include "common/compressor/zlib_compressor_impl.h"
-
+#include "extensions/compression/gzip/compressor/zlib_compressor_impl.h"
 #include "extensions/filters/http/common/compressor/compressor.h"
 
 #include "test/mocks/http/mocks.h"
@@ -25,29 +24,30 @@ public:
       const envoy::extensions::filters::http::compressor::v3::Compressor& compressor,
       const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
       const std::string& compressor_name,
-      Envoy::Compressor::ZlibCompressorImpl::CompressionLevel level,
-      Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy strategy, int64_t window_bits,
-      uint64_t memory_level)
+      Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel level,
+      Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy strategy,
+      int64_t window_bits, uint64_t memory_level)
       : CompressorFilterConfig(compressor, stats_prefix + compressor_name + ".", scope, runtime,
                                compressor_name),
         level_(level), strategy_(strategy), window_bits_(window_bits), memory_level_(memory_level) {
   }
 
-  std::unique_ptr<Compressor::Compressor> makeCompressor() override {
-    auto compressor = std::make_unique<Compressor::ZlibCompressorImpl>();
+  Envoy::Compression::Compressor::CompressorPtr makeCompressor() override {
+    auto compressor = std::make_unique<Compression::Gzip::Compressor::ZlibCompressorImpl>();
     compressor->init(level_, strategy_, window_bits_, memory_level_);
     return compressor;
   }
 
-  const Envoy::Compressor::ZlibCompressorImpl::CompressionLevel level_;
-  const Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy strategy_;
+  const Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel level_;
+  const Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy strategy_;
   const int64_t window_bits_;
   const uint64_t memory_level_;
 };
 
 using CompressionParams =
-    std::tuple<Envoy::Compressor::ZlibCompressorImpl::CompressionLevel,
-               Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy, int64_t, uint64_t>;
+    std::tuple<Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel,
+               Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy, int64_t,
+               uint64_t>;
 
 static constexpr uint64_t TestDataSize = 122880;
 
@@ -191,40 +191,40 @@ compressChunks8192/5/manual_time        15.9 ms         16.1 ms           45
 
 static std::vector<CompressionParams> compression_params = {
     // Speed + Standard + Small Window + Low mem level
-    {Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Speed,
-     Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard, 9, 1},
+    {Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel::Speed,
+     Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard, 9, 1},
 
     // Speed + Standard + Med window + Med mem level
-    {Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Speed,
-     Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard, 12, 5},
+    {Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel::Speed,
+     Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard, 12, 5},
 
     // Speed + Standard + Big window + High mem level
-    {Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Speed,
-     Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard, 15, 9},
+    {Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel::Speed,
+     Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard, 15, 9},
 
     // Standard + Standard + Small window + Low mem level
-    {Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Standard,
-     Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard, 9, 1},
+    {Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel::Standard,
+     Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard, 9, 1},
 
     // Standard + Standard + Med window + Med mem level
-    {Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Standard,
-     Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard, 12, 5},
+    {Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel::Standard,
+     Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard, 12, 5},
 
     // Standard + Standard + High window + High mem level
-    {Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Standard,
-     Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard, 15, 9},
+    {Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel::Standard,
+     Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard, 15, 9},
 
     // Best + Standard + Small window + Low mem level
-    {Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Best,
-     Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard, 9, 1},
+    {Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel::Best,
+     Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard, 9, 1},
 
     // Best + Standard + Med window + Med mem level
-    {Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Best,
-     Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard, 12, 5},
+    {Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel::Best,
+     Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard, 12, 5},
 
     // Best + Standard + High window + High mem level
-    {Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Best,
-     Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard, 15, 9}};
+    {Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel::Best,
+     Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard, 15, 9}};
 
 static void compressFull(benchmark::State& state) {
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;

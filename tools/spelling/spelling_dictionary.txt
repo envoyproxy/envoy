@@ -4,6 +4,7 @@
 # are allowed for any otherwise correctly spelled word.
 ABI
 ACK
+ACL
 AES
 AFAICT
 ALPN
@@ -17,6 +18,7 @@ ASCII
 ASSERTs
 AST
 AWS
+Allowlisted
 BACKTRACE
 BSON
 BPF
@@ -147,6 +149,7 @@ IPV
 IPs
 IPv
 ITOA
+Injectable
 Isode
 Iters
 JSON
@@ -170,6 +173,7 @@ LHS
 LLVM
 LPT
 LRS
+Loggable
 MB
 MD
 MERCHANTABILITY
@@ -292,6 +296,7 @@ STL
 STRLEN
 STS
 SVG
+Symbolizer
 TBD
 TCLAP
 TCP
@@ -333,6 +338,7 @@ WASM
 WAVM
 WIP
 WKT
+WRONGPASS
 WRR
 WS
 WSA
@@ -362,6 +368,7 @@ alloc
 alloca
 allocator
 allowlist
+allowlisted
 alls
 alphanumerics
 amongst
@@ -423,6 +430,7 @@ builtins
 bulkstrings
 bursty
 bytecode
+bytestream
 cacheability
 callee
 callsite
@@ -477,6 +485,7 @@ coroutines
 cors
 cout
 coverity
+cplusplus
 cpuset
 creds
 crypto
@@ -502,6 +511,7 @@ dechunked
 decl
 decls
 decompressor
+decompressors
 decrement
 decrypt
 dedup
@@ -559,6 +569,7 @@ epoll
 errno
 etag
 etags
+evaluator
 evbuffer
 evbuffers
 evconnlistener
@@ -636,6 +647,7 @@ hoc
 hostname
 hostnames
 hostset
+hotrestart
 hrefs
 huffman
 hystrix
@@ -795,6 +807,7 @@ openssl
 opentracing
 optimizations
 optname
+optval
 ostream
 outlier
 outliers
@@ -853,6 +866,7 @@ preorder
 prepend
 prepended
 prev
+probabilistically
 proc
 profiler
 programmatically
@@ -940,6 +954,7 @@ retriable
 retriggers
 rmdir
 rocketmq
+rewriter
 rollout
 roundtrip
 rpcs
@@ -980,6 +995,7 @@ snapshotted
 sockaddr
 socketpair
 sockfd
+socklen
 sockopt
 sockopts
 somestring

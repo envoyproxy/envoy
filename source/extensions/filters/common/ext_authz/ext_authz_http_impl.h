@@ -99,9 +99,13 @@ public:
   const MatcherSharedPtr& upstreamHeaderMatchers() const { return upstream_header_matchers_; }
 
   /**
-   * Returns a list of headers that will be add to the authorization request.
+   * Returns a list of matchers used for selecting the authorization response headers that
+   * should be sent to the upstream server. The same header keys will be appended, instead of
+   * be replaced.
    */
-  const Http::LowerCaseStrPairVector& headersToAdd() const { return authorization_headers_to_add_; }
+  const MatcherSharedPtr& upstreamHeaderToAppendMatchers() const {
+    return upstream_header_to_append_matchers_;
+  }
 
   /**
    * Returns the name used for tracing.
@@ -128,6 +132,7 @@ private:
   const MatcherSharedPtr request_header_matchers_;
   const MatcherSharedPtr client_header_matchers_;
   const MatcherSharedPtr upstream_header_matchers_;
+  const MatcherSharedPtr upstream_header_to_append_matchers_;
   const Http::LowerCaseStrPairVector authorization_headers_to_add_;
   const std::string cluster_name_;
   const std::chrono::milliseconds timeout_;

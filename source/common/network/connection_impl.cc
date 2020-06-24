@@ -10,7 +10,6 @@
 #include "envoy/event/timer.h"
 #include "envoy/network/filter.h"
 
-#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
@@ -48,9 +47,13 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
     : ConnectionImplBase(dispatcher, next_global_id_++),
       transport_socket_(std::move(transport_socket)), socket_(std::move(socket)),
       stream_info_(stream_info), filter_manager_(*this),
+      read_buffer_([this]() -> void { this->onReadBufferLowWatermark(); },
+                   [this]() -> void { this->onReadBufferHighWatermark(); },
+                   []() -> void { /* TODO(adisuissa): Handle overflow watermark */ }),
       write_buffer_(dispatcher.getWatermarkFactory().create(
           [this]() -> void { this->onWriteBufferLowWatermark(); },
-          [this]() -> void { this->onWriteBufferHighWatermark(); })),
+          [this]() -> void { this->onWriteBufferHighWatermark(); },
+          []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
       write_buffer_above_high_watermark_(false), detect_early_close_(true),
       enable_half_close_(false), read_end_stream_raised_(false), read_end_stream_(false),
       write_end_stream_(false), current_write_end_stream_(false), dispatch_buffered_data_(false) {
@@ -186,8 +189,13 @@ Connection::State ConnectionImpl::state() const {
 
 void ConnectionImpl::closeConnectionImmediately() { closeSocket(ConnectionEvent::LocalClose); }
 
+bool ConnectionImpl::consumerWantsToRead() {
+  return read_disable_count_ == 0 ||
+         (read_disable_count_ == 1 && read_buffer_.highWatermarkTriggered());
+}
+
 void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
-  if (!ioHandle().isOpen()) {
+  if (!ConnectionImpl::ioHandle().isOpen()) {
     return;
   }
 
@@ -216,7 +224,8 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
 
   socket_->close();
 
-  raiseEvent(close_type);
+  // Call the base class directly as close() is called in the destructor.
+  ConnectionImpl::raiseEvent(close_type);
 }
 
 void ConnectionImpl::noDelay(bool enable) {
@@ -232,23 +241,14 @@ void ConnectionImpl::noDelay(bool enable) {
   }
 
   // Don't set NODELAY for unix domain sockets
-  sockaddr_storage addr;
-  socklen_t len = sizeof(addr);
-
-  auto os_sys_calls = Api::OsSysCallsSingleton::get();
-  Api::SysCallIntResult result =
-      os_sys_calls.getsockname(ioHandle().fd(), reinterpret_cast<struct sockaddr*>(&addr), &len);
-
-  RELEASE_ASSERT(result.rc_ == 0, "");
-
-  if (addr.ss_family == AF_UNIX) {
+  if (socket_->addressType() == Address::Type::Pipe) {
     return;
   }
 
   // Set NODELAY
   int new_value = enable;
-  result = os_sys_calls.setsockopt(ioHandle().fd(), IPPROTO_TCP, TCP_NODELAY, &new_value,
-                                   sizeof(new_value));
+  Api::SysCallIntResult result =
+      socket_->setSocketOption(IPPROTO_TCP, TCP_NODELAY, &new_value, sizeof(new_value));
 #if defined(__APPLE__)
   if (SOCKET_FAILURE(result.rc_) && result.errno_ == EINVAL) {
     // Sometimes occurs when the connection is not yet fully formed. Empirically, TCP_NODELAY is
@@ -268,7 +268,7 @@ void ConnectionImpl::noDelay(bool enable) {
 }
 
 void ConnectionImpl::onRead(uint64_t read_buffer_size) {
-  if (read_disable_count_ != 0 || inDelayedClose()) {
+  if (inDelayedClose() || !consumerWantsToRead()) {
     return;
   }
   ASSERT(ioHandle().isOpen());
@@ -311,8 +311,8 @@ void ConnectionImpl::readDisable(bool disable) {
   ASSERT(state() == State::Open);
   ASSERT(file_event_ != nullptr);
 
-  ENVOY_CONN_LOG(trace, "readDisable: enabled={} disable_count={} state={}", *this,
-                 read_disable_count_, disable, static_cast<int>(state()));
+  ENVOY_CONN_LOG(trace, "readDisable: disable={} disable_count={} state={} buffer_length={}", *this,
+                 disable, read_disable_count_, static_cast<int>(state()), read_buffer_.length());
 
   // When we disable reads, we still allow for early close notifications (the equivalent of
   // EPOLLRDHUP for an epoll backend). For backends that support it, this allows us to apply
@@ -341,25 +341,26 @@ void ConnectionImpl::readDisable(bool disable) {
       file_event_->setEnabled(Event::FileReadyType::Write);
     }
   } else {
+    ASSERT(read_disable_count_ != 0);
     --read_disable_count_;
-    if (read_disable_count_ != 0) {
-      // The socket should stay disabled.
-      return;
-    }
     if (state() != State::Open || file_event_ == nullptr) {
       // If readDisable is called on a closed connection, do not crash.
       return;
     }
 
-    // We never ask for both early close and read at the same time. If we are reading, we want to
-    // consume all available data.
-    file_event_->setEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write);
-    // If the connection has data buffered there's no guarantee there's also data in the kernel
-    // which will kick off the filter chain. Instead fake an event to make sure the buffered data
-    // gets processed regardless and ensure that we dispatch it via onRead.
-    if (read_buffer_.length() > 0) {
+    if (read_disable_count_ == 0) {
+      // We never ask for both early close and read at the same time. If we are reading, we want to
+      // consume all available data.
+      file_event_->setEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write);
+    }
+
+    if (consumerWantsToRead() && read_buffer_.length() > 0) {
+      // If the connection has data buffered there's no guarantee there's also data in the kernel
+      // which will kick off the filter chain. Alternately if the read buffer has data the fd could
+      // be read disabled. To handle these cases, fake an event to make sure the buffered data gets
+      // processed regardless and ensure that we dispatch it via onRead.
       dispatch_buffered_data_ = true;
-      file_event_->activate(Event::FileReadyType::Read);
+      setReadBufferReady();
     }
   }
 }
@@ -465,6 +466,21 @@ void ConnectionImpl::setBufferLimits(uint32_t limit) {
   // would result in respecting the exact buffer limit.
   if (limit > 0) {
     static_cast<Buffer::WatermarkBuffer*>(write_buffer_.get())->setWatermarks(limit + 1);
+    read_buffer_.setWatermarks(limit + 1);
+  }
+}
+
+void ConnectionImpl::onReadBufferLowWatermark() {
+  ENVOY_CONN_LOG(debug, "onBelowReadBufferLowWatermark", *this);
+  if (state() == State::Open) {
+    readDisable(false);
+  }
+}
+
+void ConnectionImpl::onReadBufferHighWatermark() {
+  ENVOY_CONN_LOG(debug, "onAboveReadBufferHighWatermark", *this);
+  if (state() == State::Open) {
+    readDisable(true);
   }
 }
 
@@ -525,9 +541,23 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
 }
 
 void ConnectionImpl::onReadReady() {
-  ENVOY_CONN_LOG(trace, "read ready", *this);
+  ENVOY_CONN_LOG(trace, "read ready. dispatch_buffered_data={}", *this, dispatch_buffered_data_);
+  const bool latched_dispatch_buffered_data = dispatch_buffered_data_;
+  dispatch_buffered_data_ = false;
 
   ASSERT(!connecting_);
+
+  // We get here while read disabled in two ways.
+  // 1) There was a call to setReadBufferReady(), for example if a raw buffer socket ceded due to
+  //    shouldDrainReadBuffer(). In this case we defer the event until the socket is read enabled.
+  // 2) The consumer of connection data called readDisable(true), and instead of reading from the
+  //    socket we simply need to dispatch already read data.
+  if (read_disable_count_ != 0) {
+    if (latched_dispatch_buffered_data && consumerWantsToRead()) {
+      onRead(read_buffer_.length());
+    }
+    return;
+  }
 
   IoResult result = transport_socket_->doRead(read_buffer_);
   uint64_t new_buffer_size = read_buffer_.length();
@@ -542,13 +572,12 @@ void ConnectionImpl::onReadReady() {
 
   read_end_stream_ |= result.end_stream_read_;
   if (result.bytes_processed_ != 0 || result.end_stream_read_ ||
-      (dispatch_buffered_data_ && read_buffer_.length() > 0)) {
+      (latched_dispatch_buffered_data && read_buffer_.length() > 0)) {
     // Skip onRead if no bytes were processed unless we explicitly want to force onRead for
     // buffered data. For instance, skip onRead if the connection was closed without producing
     // more data.
     onRead(new_buffer_size);
   }
-  dispatch_buffered_data_ = false;
 
   // The read callback may have already closed the connection.
   if (result.action_ == PostIoAction::Close || bothSidesHalfClosed()) {
@@ -565,7 +594,7 @@ ConnectionImpl::unixSocketPeerCredentials() const {
 #else
   struct ucred ucred;
   socklen_t ucred_size = sizeof(ucred);
-  int rc = getsockopt(ioHandle().fd(), SOL_SOCKET, SO_PEERCRED, &ucred, &ucred_size);
+  int rc = socket_->getSocketOption(SOL_SOCKET, SO_PEERCRED, &ucred, &ucred_size).rc_;
   if (rc == -1) {
     return absl::nullopt;
   }
@@ -580,9 +609,7 @@ void ConnectionImpl::onWriteReady() {
   if (connecting_) {
     int error;
     socklen_t error_size = sizeof(error);
-    RELEASE_ASSERT(Api::OsSysCallsSingleton::get()
-                           .getsockopt(ioHandle().fd(), SOL_SOCKET, SO_ERROR, &error, &error_size)
-                           .rc_ == 0,
+    RELEASE_ASSERT(socket_->getSocketOption(SOL_SOCKET, SO_ERROR, &error, &error_size).rc_ == 0,
                    "");
 
     if (error == 0) {
@@ -697,16 +724,18 @@ ClientConnectionImpl::ClientConnectionImpl(
       file_event_->activate(Event::FileReadyType::Write);
       return;
     }
-    const Network::Address::Instance* source_to_use = source_address.get();
+
+    const Network::Address::InstanceConstSharedPtr* source = &source_address;
+
     if (socket_->localAddress()) {
-      source_to_use = socket_->localAddress().get();
+      source = &socket_->localAddress();
     }
 
-    if (source_to_use != nullptr) {
-      const Api::SysCallIntResult result = source_to_use->bind(ioHandle().fd());
+    if (*source != nullptr) {
+      Api::SysCallIntResult result = socket_->bind(*source);
       if (result.rc_ < 0) {
         // TODO(lizan): consider add this error into transportFailureReason.
-        ENVOY_LOG_MISC(debug, "Bind failure. Failed to bind to {}: {}", source_to_use->asString(),
+        ENVOY_LOG_MISC(debug, "Bind failure. Failed to bind to {}: {}", source->get()->asString(),
                        strerror(result.errno_));
         bind_error_ = true;
         // Set a special error state to ensure asynchronous close to give the owner of the
@@ -722,7 +751,7 @@ ClientConnectionImpl::ClientConnectionImpl(
 
 void ClientConnectionImpl::connect() {
   ENVOY_CONN_LOG(debug, "connecting to {}", *this, socket_->remoteAddress()->asString());
-  const Api::SysCallIntResult result = socket_->remoteAddress()->connect(ioHandle().fd());
+  const Api::SysCallIntResult result = socket_->connect(socket_->remoteAddress());
   if (result.rc_ == 0) {
     // write will become ready.
     ASSERT(connecting_);
@@ -739,12 +768,6 @@ void ClientConnectionImpl::connect() {
       // Trigger a write event. This is needed on macOS and seems harmless on Linux.
       file_event_->activate(Event::FileReadyType::Write);
     }
-  }
-
-  // The local address can only be retrieved for IP connections. Other
-  // types, such as UDS, don't have a notion of a local address.
-  if (socket_->remoteAddress()->type() == Address::Type::Ip) {
-    socket_->setLocalAddress(Address::addressFromFd(ioHandle().fd()));
   }
 }
 } // namespace Network

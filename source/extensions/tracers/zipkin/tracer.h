@@ -96,26 +96,11 @@ public:
   void reportSpan(Span&& span) override;
 
   /**
-   * @return the service-name attribute associated with the Tracer.
-   */
-  const std::string& serviceName() const { return service_name_; }
-
-  /**
-   * @return the pointer to the address object associated with the Tracer.
-   */
-  const Network::Address::InstanceConstSharedPtr address() const { return address_; }
-
-  /**
    * Associates a Reporter object with this Tracer.
    *
    * @param The span reporter.
    */
   void setReporter(ReporterPtr reporter);
-
-  /**
-   * @return the random-number generator associated with the Tracer.
-   */
-  Runtime::RandomGenerator& randomGenerator() { return random_generator_; }
 
 private:
   const std::string service_name_;

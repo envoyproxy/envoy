@@ -56,6 +56,11 @@ public:
   NiceMock<Tracing::MockHttpTracerManager> http_tracer_manager_;
   std::shared_ptr<NiceMock<Tracing::MockHttpTracer>> http_tracer_{
       std::make_shared<NiceMock<Tracing::MockHttpTracer>>()};
+  void createHttpConnectionManagerConfig(const std::string& yaml) {
+    HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml), context_,
+                                date_provider_, route_config_provider_manager_,
+                                scoped_routes_config_provider_manager_, http_tracer_manager_);
+  }
 };
 
 TEST_F(HttpConnectionManagerConfigTest, ValidateFail) {
@@ -84,11 +89,8 @@ http_filters:
 - name: foo
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
-      HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
-                                  date_provider_, route_config_provider_manager_,
-                                  scoped_routes_config_provider_manager_, http_tracer_manager_),
-      EnvoyException, "Didn't find a registered implementation for name: 'foo'");
+  EXPECT_THROW_WITH_MESSAGE(createHttpConnectionManagerConfig(yaml_string), EnvoyException,
+                            "Didn't find a registered implementation for name: 'foo'");
 }
 
 TEST_F(HttpConnectionManagerConfigTest, RouterInverted) {
@@ -115,10 +117,7 @@ http_filters:
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
-      HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
-                                  date_provider_, route_config_provider_manager_,
-                                  scoped_routes_config_provider_manager_, http_tracer_manager_),
-      EnvoyException,
+      createHttpConnectionManagerConfig(yaml_string), EnvoyException,
       "Error: terminal filter named envoy.filters.http.router of type envoy.filters.http.router "
       "must be the last filter in a http filter chain.");
 }
@@ -145,14 +144,10 @@ http_filters:
     pass_through_mode: false
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
-      HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
-                                  date_provider_, route_config_provider_manager_,
-                                  scoped_routes_config_provider_manager_, http_tracer_manager_),
-      EnvoyException,
-      "Error: non-terminal filter named health_check of type "
-      "envoy.filters.http.health_check is the last filter in a http filter "
-      "chain.");
+  EXPECT_THROW_WITH_MESSAGE(createHttpConnectionManagerConfig(yaml_string), EnvoyException,
+                            "Error: non-terminal filter named health_check of type "
+                            "envoy.filters.http.health_check is the last filter in a http filter "
+                            "chain.");
 }
 
 TEST_F(HttpConnectionManagerConfigTest, MiscConfig) {
@@ -978,6 +973,56 @@ TEST_F(HttpConnectionManagerConfigTest, MergeSlashesFalse) {
   EXPECT_FALSE(config.shouldMergeSlashes());
 }
 
+// Validated that by default we don't remove port.
+TEST_F(HttpConnectionManagerConfigTest, RemovePortDefault) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_);
+  EXPECT_FALSE(config.shouldStripMatchingPort());
+}
+
+// Validated that when configured, we remove port.
+TEST_F(HttpConnectionManagerConfigTest, RemovePortTrue) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  strip_matching_host_port: true
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_);
+  EXPECT_TRUE(config.shouldStripMatchingPort());
+}
+
+// Validated that when explicitly set false, we don't remove port.
+TEST_F(HttpConnectionManagerConfigTest, RemovePortFalse) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  strip_matching_host_port: false
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_);
+  EXPECT_FALSE(config.shouldStripMatchingPort());
+}
+
 // Validated that by default we allow requests with header names containing underscores.
 TEST_F(HttpConnectionManagerConfigTest, HeadersWithUnderscoresAllowedByDefault) {
   const std::string yaml_string = R"EOF(
@@ -1252,9 +1297,7 @@ http2_protocol_options:
   custom_settings_parameters: { identifier: 3, value: 2048 }
   )EOF";
   // This will throw when Http2ProtocolOptions validation fails.
-  HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
-                              date_provider_, route_config_provider_manager_,
-                              scoped_routes_config_provider_manager_, http_tracer_manager_);
+  createHttpConnectionManagerConfig(yaml_string);
 }
 
 // Validates that named and user defined parameter collisions will trigger a config validation
@@ -1286,10 +1329,7 @@ http2_protocol_options:
     - { identifier: 3, value: 1024 }
   )EOF";
   EXPECT_THROW_WITH_REGEX(
-      HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
-                                  date_provider_, route_config_provider_manager_,
-                                  scoped_routes_config_provider_manager_, http_tracer_manager_),
-      EnvoyException,
+      createHttpConnectionManagerConfig(yaml_string), EnvoyException,
       R"(the \{hpack_table_size,max_concurrent_streams\} HTTP/2 SETTINGS parameter\(s\) can not be)"
       " configured");
 }
@@ -1320,10 +1360,7 @@ http2_protocol_options:
     - { identifier: 8, value: 0 }
   )EOF";
   EXPECT_THROW_WITH_REGEX(
-      HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
-                                  date_provider_, route_config_provider_manager_,
-                                  scoped_routes_config_provider_manager_, http_tracer_manager_),
-      EnvoyException,
+      createHttpConnectionManagerConfig(yaml_string), EnvoyException,
       "the \"allow_connect\" SETTINGS parameter must only be configured through the named field");
 
   const std::string yaml_string2 = R"EOF(
@@ -1345,9 +1382,7 @@ http_filters:
 http2_protocol_options:
   allow_connect: true
   )EOF";
-  HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string2), context_,
-                              date_provider_, route_config_provider_manager_,
-                              scoped_routes_config_provider_manager_, http_tracer_manager_);
+  createHttpConnectionManagerConfig(yaml_string2);
 }
 
 // Validates that setting the server push parameter via user defined parameters is disallowed.
@@ -1373,10 +1408,7 @@ http2_protocol_options:
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(
-      HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
-                                  date_provider_, route_config_provider_manager_,
-                                  scoped_routes_config_provider_manager_, http_tracer_manager_),
-      EnvoyException,
+      createHttpConnectionManagerConfig(yaml_string), EnvoyException,
       "server push is not supported by Envoy and can not be enabled via a SETTINGS parameter.");
 
   // Specify both the server push parameter and colliding named and user defined parameters.
@@ -1407,10 +1439,7 @@ http2_protocol_options:
 
   // The server push exception is thrown first.
   EXPECT_THROW_WITH_REGEX(
-      HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
-                                  date_provider_, route_config_provider_manager_,
-                                  scoped_routes_config_provider_manager_, http_tracer_manager_),
-      EnvoyException,
+      createHttpConnectionManagerConfig(yaml_string), EnvoyException,
       "server push is not supported by Envoy and can not be enabled via a SETTINGS parameter.");
 }
 
@@ -1441,10 +1470,7 @@ http2_protocol_options:
     - { identifier: 12, value: 10 }
   )EOF";
   EXPECT_THROW_WITH_REGEX(
-      HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
-                                  date_provider_, route_config_provider_manager_,
-                                  scoped_routes_config_provider_manager_, http_tracer_manager_),
-      EnvoyException,
+      createHttpConnectionManagerConfig(yaml_string), EnvoyException,
       R"(inconsistent HTTP/2 custom SETTINGS parameter\(s\) detected; identifiers = \{0x0a\})");
 }
 
@@ -1569,11 +1595,8 @@ TEST_F(HttpConnectionManagerConfigTest, UnknownRequestIDExtension) {
   - name: envoy.filters.http.router
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(
-      HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
-                                  date_provider_, route_config_provider_manager_,
-                                  scoped_routes_config_provider_manager_, http_tracer_manager_),
-      EnvoyException, "Didn't find a registered implementation for type");
+  EXPECT_THROW_WITH_REGEX(createHttpConnectionManagerConfig(yaml_string), EnvoyException,
+                          "Didn't find a registered implementation for type");
 }
 
 TEST_F(HttpConnectionManagerConfigTest, DefaultRequestIDExtension) {

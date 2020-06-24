@@ -67,11 +67,11 @@ protected:
   void respondToRequest(bool expect_forwarded);
 
   void verifyResponseForwarded(IntegrationStreamDecoderPtr response) {
-    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+    EXPECT_EQ("200", response->headers().getStatusValue());
   }
 
   void verifyResponseBlocked(IntegrationStreamDecoderPtr response) {
-    EXPECT_EQ("503", response->headers().Status()->value().getStringView());
+    EXPECT_EQ("503", response->headers().getStatusValue());
   }
 
   std::deque<IntegrationStreamDecoderPtr> responses_;

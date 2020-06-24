@@ -134,3 +134,6 @@ generate_config(SCRIPT_DIR,
 
 for google_ext in ['v2.yaml']:
   shutil.copy(os.path.join(SCRIPT_DIR, 'google_com_proxy.%s' % google_ext), OUT_DIR)
+
+shutil.copy(os.path.join(SCRIPT_DIR, 'encapsulate_in_connect.v3.yaml'), OUT_DIR)
+shutil.copy(os.path.join(SCRIPT_DIR, 'terminate_connect.v3.yaml'), OUT_DIR)

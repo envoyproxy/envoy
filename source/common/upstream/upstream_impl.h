@@ -38,8 +38,11 @@
 #include "common/common/callback_impl.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/logger.h"
+#include "common/common/thread.h"
 #include "common/config/metadata.h"
 #include "common/config/well_known_names.h"
+#include "common/http/http1/codec_impl.h"
+#include "common/http/http2/codec_impl.h"
 #include "common/init/manager_impl.h"
 #include "common/network/utility.h"
 #include "common/shared_pool/shared_pool.h"
@@ -170,7 +173,7 @@ public:
                             priority),
         used_(true) {
     setEdsHealthFlag(health_status);
-    weight(initial_weight);
+    HostImpl::weight(initial_weight);
   }
 
   // Upstream::Host
@@ -562,6 +565,10 @@ public:
   lbOriginalDstConfig() const override {
     return lb_original_dst_config_;
   }
+  const absl::optional<envoy::config::core::v3::TypedExtensionConfig>&
+  upstreamConfig() const override {
+    return upstream_config_;
+  }
   bool maintenanceMode() const override;
   uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
   uint32_t maxResponseHeadersCount() const override { return max_response_headers_count_; }
@@ -597,6 +604,9 @@ public:
   void createNetworkFilterChain(Network::Connection&) const override;
   Http::Protocol
   upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const override;
+
+  Http::Http1::CodecStats& http1CodecStats() const override;
+  Http::Http2::CodecStats& http2CodecStats() const override;
 
 private:
   struct ResourceManagers {
@@ -639,6 +649,7 @@ private:
       lb_least_request_config_;
   absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig> lb_ring_hash_config_;
   absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig> lb_original_dst_config_;
+  absl::optional<envoy::config::core::v3::TypedExtensionConfig> upstream_config_;
   const bool added_via_api_;
   LoadBalancerSubsetInfoImpl lb_subset_;
   const envoy::config::core::v3::Metadata metadata_;
@@ -653,6 +664,8 @@ private:
   const absl::optional<envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type_;
   const std::unique_ptr<Server::Configuration::CommonFactoryContext> factory_context_;
   std::vector<Network::FilterFactoryCb> filter_factories_;
+  mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
+  mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
 };
 
 /**
@@ -707,7 +720,6 @@ public:
   static std::tuple<HostsPerLocalityConstSharedPtr, HostsPerLocalityConstSharedPtr,
                     HostsPerLocalityConstSharedPtr>
   partitionHostsPerLocality(const HostsPerLocality& hosts);
-  Stats::SymbolTable& symbolTable() { return symbol_table_; }
   Config::ConstMetadataSharedPoolSharedPtr constMetadataSharedPool() {
     return const_metadata_shared_pool_;
   }
@@ -815,9 +827,6 @@ public:
                            const absl::optional<HostVector>& hosts_removed,
                            const absl::optional<Upstream::Host::HealthFlag> health_checker_flag,
                            absl::optional<uint32_t> overprovisioning_factor = absl::nullopt);
-
-  // Returns the size of the current cluster priority state.
-  size_t size() const { return priority_state_.size(); }
 
   // Returns the saved priority state.
   PriorityState& priorityState() { return priority_state_; }

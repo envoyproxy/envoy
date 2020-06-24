@@ -2,12 +2,15 @@ syntax = "proto3";
 
 package envoy.extensions.transport_sockets.tls.v3;
 
+import "envoy/config/core/v3/extension.proto";
 import "envoy/extensions/transport_sockets/tls/v3/common.proto";
 import "envoy/extensions/transport_sockets/tls/v3/secret.proto";
 
+import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -96,9 +99,29 @@ message DownstreamTlsContext {
 }
 
 // TLS context shared by both client and server TLS contexts.
-// [#next-free-field: 9]
+// [#next-free-field: 11]
 message CommonTlsContext {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.CommonTlsContext";
+
+  // Config for Certificate provider to get certificates. This provider should allow certificates to be
+  // fetched/refreshed over the network asynchronously with respect to the TLS handshake.
+  message CertificateProvider {
+    // opaque name used to specify certificate instances or types. For example, "ROOTCA" to specify
+    // a root-certificate (validation context) or "TLS" to specify a new tls-certificate.
+    string name = 1 [(validate.rules).string = {min_bytes: 1}];
+
+    // Provider specific config.
+    // Note: an implementation is expected to dedup multiple instances of the same config
+    // to maintain a single certificate-provider instance. The sharing can happen, for
+    // example, among multiple clusters or between the tls_certificate and validation_context
+    // certificate providers of a cluster.
+    // This config could be supplied inline or (in future) a named xDS resource.
+    oneof config {
+      option (validate.required) = true;
+
+      config.core.v3.TypedExtensionConfig typed_config = 2;
+    }
+  }
 
   message CombinedCertificateValidationContext {
     option (udpa.annotations.versioning).previous_message_type =
@@ -108,9 +131,19 @@ message CommonTlsContext {
     CertificateValidationContext default_validation_context = 1
         [(validate.rules).message = {required: true}];
 
-    // Config for fetching validation context via SDS API.
-    SdsSecretConfig validation_context_sds_secret_config = 2
-        [(validate.rules).message = {required: true}];
+    // Config for fetching validation context via SDS API. Note SDS API allows certificates to be
+    // fetched/refreshed over the network asynchronously with respect to the TLS handshake.
+    // Only to be used when validation_context_certificate_provider is not used.
+    SdsSecretConfig validation_context_sds_secret_config = 2 [
+      (validate.rules).message = {required: true},
+      (udpa.annotations.field_migrate).oneof_promotion = "dynamic_validation_context"
+    ];
+
+    // Certificate provider for fetching validation context - only to be used when
+    // validation_context_sds_secret_config is not used.
+    // [#not-implemented-hide:]
+    CertificateProvider validation_context_certificate_provider = 3
+        [(udpa.annotations.field_migrate).oneof_promotion = "dynamic_validation_context"];
   }
 
   reserved 5;
@@ -126,15 +159,21 @@ message CommonTlsContext {
   // used for clients that support ECDSA.
   repeated TlsCertificate tls_certificates = 2;
 
-  // Configs for fetching TLS certificates via SDS API.
+  // Configs for fetching TLS certificates via SDS API. Note SDS API allows certificates to be
+  // fetched/refreshed over the network asynchronously with respect to the TLS handshake.
   repeated SdsSecretConfig tls_certificate_sds_secret_configs = 6
       [(validate.rules).repeated = {max_items: 1}];
+
+  // Certificate provider for fetching TLS certificates.
+  // [#not-implemented-hide:]
+  CertificateProvider tls_certificate_certificate_provider = 9;
 
   oneof validation_context_type {
     // How to validate peer certificates.
     CertificateValidationContext validation_context = 3;
 
-    // Config for fetching validation context via SDS API.
+    // Config for fetching validation context via SDS API. Note SDS API allows certificates to be
+    // fetched/refreshed over the network asynchronously with respect to the TLS handshake.
     SdsSecretConfig validation_context_sds_secret_config = 7;
 
     // Combined certificate validation context holds a default CertificateValidationContext
@@ -145,6 +184,10 @@ message CommonTlsContext {
     // CertificateValidationContext, and concatenates repeated fields to default
     // CertificateValidationContext, and logical OR is applied to boolean fields.
     CombinedCertificateValidationContext combined_validation_context = 8;
+
+    // Certificate provider for fetching validation context.
+    // [#not-implemented-hide:]
+    CertificateProvider validation_context_certificate_provider = 10;
   }
 
   // Supplies the list of ALPN protocols that the listener should expose. In

@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
@@ -7,6 +5,8 @@ load(
     "envoy_package",
     "envoy_select_google_grpc",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -33,6 +33,7 @@ envoy_cc_library(
         ":typed_async_client_lib",
         "//include/envoy/grpc:async_client_interface",
         "//source/common/buffer:zero_copy_input_stream_lib",
+        "//source/common/config:version_converter_lib",
         "//source/common/http:async_client_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],

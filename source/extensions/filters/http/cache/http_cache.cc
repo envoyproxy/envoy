@@ -38,10 +38,7 @@ std::ostream& operator<<(std::ostream& os, const AdjustedByteRange& range) {
 }
 
 LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, SystemTime timestamp)
-    : timestamp_(timestamp),
-      request_cache_control_(request_headers.CacheControl() == nullptr
-                                 ? ""
-                                 : request_headers.CacheControl()->value().getStringView()) {
+    : timestamp_(timestamp), request_cache_control_(request_headers.getCacheControlValue()) {
   // These ASSERTs check prerequisites. A request without these headers can't be looked up in cache;
   // CacheFilter doesn't create LookupRequests for such requests.
   ASSERT(request_headers.Path(), "Can't form cache lookup key for malformed Http::RequestHeaderMap "
@@ -60,8 +57,8 @@ LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, Syst
   // TODO(toddmgreer): Parse Range header into request_range_spec_, and handle the resultant
   // vector<AdjustedByteRange> in CacheFilter::onOkHeaders.
   key_.set_cluster_name("cluster_name_goes_here");
-  key_.set_host(std::string(request_headers.Host()->value().getStringView()));
-  key_.set_path(std::string(request_headers.Path()->value().getStringView()));
+  key_.set_host(std::string(request_headers.getHostValue()));
+  key_.set_path(std::string(request_headers.getPathValue()));
   key_.set_clear_http(forwarded_proto == scheme_values.Http);
 }
 
@@ -79,12 +76,12 @@ bool LookupRequest::isFresh(const Http::ResponseHeaderMap& response_headers) con
   const Http::HeaderEntry* cache_control_header = response_headers.CacheControl();
   if (cache_control_header) {
     const SystemTime::duration effective_max_age =
-        Utils::effectiveMaxAge(cache_control_header->value().getStringView());
-    return timestamp_ - Utils::httpTime(response_headers.Date()) < effective_max_age;
+        HttpCacheUtils::effectiveMaxAge(cache_control_header->value().getStringView());
+    return timestamp_ - HttpCacheUtils::httpTime(response_headers.Date()) < effective_max_age;
   }
   // We didn't find a cache-control header with enough info to determine
   // freshness, so fall back to the expires header.
-  return timestamp_ <= Utils::httpTime(response_headers.get(Http::Headers::get().Expires));
+  return timestamp_ <= HttpCacheUtils::httpTime(response_headers.get(Http::Headers::get().Expires));
 }
 
 LookupResult LookupRequest::makeLookupResult(Http::ResponseHeaderMapPtr&& response_headers,

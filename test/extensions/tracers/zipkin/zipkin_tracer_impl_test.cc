@@ -90,9 +90,9 @@ public:
                        const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
               callback = &callbacks;
 
-              EXPECT_EQ("/api/v1/spans", message->headers().Path()->value().getStringView());
-              EXPECT_EQ("fake_cluster", message->headers().Host()->value().getStringView());
-              EXPECT_EQ(content_type, message->headers().ContentType()->value().getStringView());
+              EXPECT_EQ("/api/v1/spans", message->headers().getPathValue());
+              EXPECT_EQ("fake_cluster", message->headers().getHostValue());
+              EXPECT_EQ(content_type, message->headers().getContentTypeValue());
 
               return &request;
             }));
@@ -235,10 +235,9 @@ TEST_F(ZipkinDriverTest, FlushOneSpanReportFailure) {
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
             callback = &callbacks;
 
-            EXPECT_EQ("/api/v1/spans", message->headers().Path()->value().getStringView());
-            EXPECT_EQ("fake_cluster", message->headers().Host()->value().getStringView());
-            EXPECT_EQ("application/json",
-                      message->headers().ContentType()->value().getStringView());
+            EXPECT_EQ("/api/v1/spans", message->headers().getPathValue());
+            EXPECT_EQ("fake_cluster", message->headers().getHostValue());
+            EXPECT_EQ("application/json", message->headers().getContentTypeValue());
 
             return &request;
           }));

@@ -124,12 +124,6 @@ public:
   // Initializer for individual tests.
   void SetUp() override { BaseIntegrationTest::initialize(); }
 
-  // Destructor for individual tests.
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
-
 private:
   TestFilterConfigFactory config_factory_;
   Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory> filter_resolver_;

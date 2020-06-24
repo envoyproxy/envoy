@@ -121,7 +121,8 @@ Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMa
 Http::FilterDataStatus CompressorFilter::encodeData(Buffer::Instance& data, bool end_stream) {
   if (!skip_compression_) {
     config_->stats().total_uncompressed_bytes_.add(data.length());
-    compressor_->compress(data, end_stream ? Compressor::State::Finish : Compressor::State::Flush);
+    compressor_->compress(data, end_stream ? Envoy::Compression::Compressor::State::Finish
+                                           : Envoy::Compression::Compressor::State::Flush);
     config_->stats().total_compressed_bytes_.add(data.length());
   }
   return Http::FilterDataStatus::Continue;
@@ -130,7 +131,7 @@ Http::FilterDataStatus CompressorFilter::encodeData(Buffer::Instance& data, bool
 Http::FilterTrailersStatus CompressorFilter::encodeTrailers(Http::ResponseTrailerMap&) {
   if (!skip_compression_) {
     Buffer::OwnedImpl empty_buffer;
-    compressor_->compress(empty_buffer, Compressor::State::Finish);
+    compressor_->compress(empty_buffer, Envoy::Compression::Compressor::State::Finish);
     config_->stats().total_compressed_bytes_.add(empty_buffer.length());
     encoder_callbacks_->addEncodedData(empty_buffer, true);
   }
@@ -370,10 +371,8 @@ bool CompressorFilter::isMinimumContentLength(Http::ResponseHeaderMap& headers) 
     return is_minimum_content_length;
   }
 
-  const Http::HeaderEntry* transfer_encoding = headers.TransferEncoding();
-  return (transfer_encoding &&
-          StringUtil::caseFindToken(transfer_encoding->value().getStringView(), ",",
-                                    Http::Headers::get().TransferEncodingValues.Chunked));
+  return StringUtil::caseFindToken(headers.getTransferEncodingValue(), ",",
+                                   Http::Headers::get().TransferEncodingValues.Chunked);
 }
 
 bool CompressorFilter::isTransferEncodingAllowed(Http::ResponseHeaderMap& headers) const {

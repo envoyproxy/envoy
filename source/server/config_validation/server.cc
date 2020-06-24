@@ -42,7 +42,8 @@ ValidationInstance::ValidationInstance(
     Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
     Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system)
     : options_(options), validation_context_(options_.allowUnknownStaticFields(),
-                                             !options.rejectUnknownDynamicFields()),
+                                             !options.rejectUnknownDynamicFields(),
+                                             !options.ignoreUnknownDynamicFields()),
       stats_store_(store),
       api_(new Api::ValidationImpl(thread_factory, store, time_system, file_system)),
       dispatcher_(api_->allocateDispatcher("main_thread")),

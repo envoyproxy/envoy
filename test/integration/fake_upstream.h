@@ -26,6 +26,8 @@
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
 #include "common/http/exception.h"
+#include "common/http/http1/codec_impl.h"
+#include "common/http/http2/codec_impl.h"
 #include "common/network/connection_balancer_impl.h"
 #include "common/network/filter_impl.h"
 #include "common/network/listen_socket_impl.h"
@@ -38,7 +40,9 @@
 #include "test/test_common/utility.h"
 
 namespace Envoy {
+
 class FakeHttpConnection;
+class FakeUpstream;
 
 /**
  * Provides a fake HTTP stream for integration testing.
@@ -56,6 +60,11 @@ public:
     Thread::LockGuard lock(lock_);
     return end_stream_;
   }
+
+  // Execute a callback using the dispatcher associated with the FakeStream's connection. This
+  // allows execution of non-interrupted sequences of operations on the fake stream which may run
+  // into trouble if client-side events are interleaved.
+  void postToConnectionThread(std::function<void()> cb);
   void encode100ContinueHeaders(const Http::ResponseHeaderMap& headers);
   void encodeHeaders(const Http::HeaderMap& headers, bool end_stream);
   void encodeData(uint64_t size, bool end_stream);
@@ -420,8 +429,8 @@ class FakeHttpConnection : public Http::ServerConnectionCallbacks, public FakeCo
 public:
   enum class Type { HTTP1, HTTP2 };
 
-  FakeHttpConnection(SharedConnectionWrapper& shared_connection, Stats::Store& store, Type type,
-                     Event::TestTimeSystem& time_system, uint32_t max_request_headers_kb,
+  FakeHttpConnection(FakeUpstream& fake_upstream, SharedConnectionWrapper& shared_connection,
+                     Type type, Event::TestTimeSystem& time_system, uint32_t max_request_headers_kb,
                      uint32_t max_request_headers_count,
                      envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
                          headers_with_underscores_action);
@@ -446,10 +455,10 @@ private:
 
     // Network::ReadFilter
     Network::FilterStatus onData(Buffer::Instance& data, bool) override {
-      try {
-        parent_.codec_->dispatch(data);
-      } catch (const Http::CodecProtocolException& e) {
-        ENVOY_LOG(debug, "FakeUpstream dispatch error: {}", e.what());
+      Http::Status status = parent_.codec_->dispatch(data);
+
+      if (Http::isCodecProtocolError(status)) {
+        ENVOY_LOG(debug, "FakeUpstream dispatch error: {}", status.message());
         // We don't do a full stream shutdown like HCM, but just shutdown the
         // connection for now.
         read_filter_callbacks_->connection().close(
@@ -617,6 +626,14 @@ public:
   // Stops the dispatcher loop and joins the listening thread.
   void cleanUp();
 
+  Http::Http1::CodecStats& http1CodecStats() {
+    return Http::Http1::CodecStats::atomicGet(http1_codec_stats_, stats_store_);
+  }
+
+  Http::Http2::CodecStats& http2CodecStats() {
+    return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, stats_store_);
+  }
+
 protected:
   Stats::IsolatedStoreImpl stats_store_;
   const FakeHttpConnection::Type http_type_;
@@ -631,7 +648,7 @@ private:
     FakeListenSocketFactory(Network::SocketSharedPtr socket) : socket_(socket) {}
 
     // Network::ListenSocketFactory
-    Network::Address::SocketType socketType() const override { return socket_->socketType(); }
+    Network::Socket::Type socketType() const override { return socket_->socketType(); }
 
     const Network::Address::InstanceConstSharedPtr& localAddress() const override {
       return socket_->localAddress();
@@ -723,6 +740,8 @@ private:
   FakeListener listener_;
   const Network::FilterChainSharedPtr filter_chain_;
   std::list<Network::UdpRecvData> received_datagrams_ ABSL_GUARDED_BY(lock_);
+  Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
+  Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
 };
 
 using FakeUpstreamPtr = std::unique_ptr<FakeUpstream>;

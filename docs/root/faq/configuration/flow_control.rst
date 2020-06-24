@@ -1,3 +1,5 @@
+.. _faq_flow_control:
+
 How do I configure flow control?
 ================================
 

@@ -52,9 +52,7 @@ public:
   // Getters to return the DatadogDriver's key members.
   Upstream::ClusterManager& clusterManager() { return cm_; }
   const std::string& cluster() { return cluster_; }
-  Runtime::Loader& runtime() { return runtime_; }
   DatadogTracerStats& tracerStats() { return tracer_stats_; }
-  const datadog::opentracing::TracerOptions& tracerOptions() { return tracer_options_; }
 
   // Tracer::OpenTracingDriver
   opentracing::Tracer& tracer() override;
@@ -80,7 +78,6 @@ private:
   DatadogTracerStats tracer_stats_;
   datadog::opentracing::TracerOptions tracer_options_;
   ThreadLocal::SlotPtr tls_;
-  Runtime::Loader& runtime_;
 };
 
 /**

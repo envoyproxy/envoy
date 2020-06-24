@@ -9,6 +9,18 @@ namespace Envoy {
 namespace Http {
 namespace Http2 {
 
+class TestCodecStatsProvider {
+public:
+  TestCodecStatsProvider(Stats::Scope& scope) : scope_(scope) {}
+
+  Http::Http2::CodecStats& http2CodecStats() {
+    return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, scope_);
+  }
+
+  Stats::Scope& scope_;
+  Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
+};
+
 class TestCodecSettingsProvider {
 public:
   // Returns the value of the SETTINGS parameter keyed by |identifier| sent by the remote endpoint.
@@ -45,7 +57,9 @@ private:
   std::unordered_map<int32_t, uint32_t> settings_;
 };
 
-class TestServerConnectionImpl : public ServerConnectionImpl, public TestCodecSettingsProvider {
+class TestServerConnectionImpl : public TestCodecStatsProvider,
+                                 public ServerConnectionImpl,
+                                 public TestCodecSettingsProvider {
 public:
   TestServerConnectionImpl(
       Network::Connection& connection, ServerConnectionCallbacks& callbacks, Stats::Scope& scope,
@@ -53,8 +67,10 @@ public:
       uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
       envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
           headers_with_underscores_action)
-      : ServerConnectionImpl(connection, callbacks, scope, http2_options, max_request_headers_kb,
-                             max_request_headers_count, headers_with_underscores_action) {}
+      : TestCodecStatsProvider(scope),
+        ServerConnectionImpl(connection, callbacks, http2CodecStats(), http2_options,
+                             max_request_headers_kb, max_request_headers_count,
+                             headers_with_underscores_action) {}
   nghttp2_session* session() { return session_; }
   using ServerConnectionImpl::getStream;
 
@@ -63,15 +79,19 @@ protected:
   void onSettingsForTest(const nghttp2_settings& settings) override { onSettingsFrame(settings); }
 };
 
-class TestClientConnectionImpl : public ClientConnectionImpl, public TestCodecSettingsProvider {
+class TestClientConnectionImpl : public TestCodecStatsProvider,
+                                 public ClientConnectionImpl,
+                                 public TestCodecSettingsProvider {
 public:
   TestClientConnectionImpl(Network::Connection& connection, Http::ConnectionCallbacks& callbacks,
                            Stats::Scope& scope,
                            const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                            uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
                            Nghttp2SessionFactory& http2_session_factory)
-      : ClientConnectionImpl(connection, callbacks, scope, http2_options, max_request_headers_kb,
-                             max_request_headers_count, http2_session_factory) {}
+      : TestCodecStatsProvider(scope),
+        ClientConnectionImpl(connection, callbacks, http2CodecStats(), http2_options,
+                             max_request_headers_kb, max_request_headers_count,
+                             http2_session_factory) {}
 
   nghttp2_session* session() { return session_; }
 

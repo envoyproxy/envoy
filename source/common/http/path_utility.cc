@@ -30,7 +30,7 @@ absl::optional<std::string> canonicalizePath(absl::string_view original_path) {
 /* static */
 bool PathUtil::canonicalPath(RequestHeaderMap& headers) {
   ASSERT(headers.Path());
-  const auto original_path = headers.Path()->value().getStringView();
+  const auto original_path = headers.getPathValue();
   // canonicalPath is supposed to apply on path component in URL instead of :path header
   const auto query_pos = original_path.find('?');
   auto normalized_path_opt = canonicalizePath(
@@ -56,7 +56,7 @@ bool PathUtil::canonicalPath(RequestHeaderMap& headers) {
 
 void PathUtil::mergeSlashes(RequestHeaderMap& headers) {
   ASSERT(headers.Path());
-  const auto original_path = headers.Path()->value().getStringView();
+  const auto original_path = headers.getPathValue();
   // Only operate on path component in URL.
   const absl::string_view::size_type query_start = original_path.find('?');
   const absl::string_view path = original_path.substr(0, query_start);

@@ -3,7 +3,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/overload/v3/overload.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
-#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+#include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 
 #include "test/config/utility.h"
 #include "test/integration/http_integration.h"
@@ -28,6 +28,7 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_alarm_factory.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_packet_writer.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
+#include "test/extensions/quic_listeners/quiche/test_utils.h"
 
 namespace Envoy {
 namespace Quic {
@@ -43,13 +44,21 @@ public:
   Http::StreamResetReason last_stream_reset_reason_{Http::StreamResetReason::LocalReset};
 };
 
-class QuicHttpIntegrationTest : public HttpIntegrationTest,
-                                public testing::TestWithParam<Network::Address::IpVersion> {
+class QuicHttpIntegrationTest : public HttpIntegrationTest, public QuicMultiVersionTest {
 public:
   QuicHttpIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP3, GetParam(),
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP3, GetParam().first,
                             ConfigHelper::quicHttpProxyConfig()),
-        supported_versions_(quic::CurrentSupportedVersions()),
+        supported_versions_([]() {
+          if (GetParam().second == QuicVersionType::GquicQuicCrypto) {
+            return quic::CurrentSupportedVersionsWithQuicCrypto();
+          }
+          bool use_http3 = GetParam().second == QuicVersionType::Iquic;
+          SetQuicReloadableFlag(quic_enable_version_draft_28, use_http3);
+          SetQuicReloadableFlag(quic_enable_version_draft_27, use_http3);
+          SetQuicReloadableFlag(quic_enable_version_draft_25_v3, use_http3);
+          return quic::CurrentSupportedVersions();
+        }()),
         crypto_config_(std::make_unique<EnvoyQuicFakeProofVerifier>()), conn_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *conn_helper_.GetClock()),
         injected_resource_filename_(TestEnvironment::temporaryPath("injected_resource")),
@@ -107,12 +116,15 @@ public:
 
   void initialize() override {
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-      ConfigHelper::initializeTls({}, *tls_context.mutable_common_tls_context());
+      envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport
+          quic_transport_socket_config;
+      auto tls_context = quic_transport_socket_config.mutable_downstream_tls_context();
+      ConfigHelper::initializeTls(ConfigHelper::ServerSslOptions().setRsaCert(true).setTlsV13(true),
+                                  *tls_context->mutable_common_tls_context());
       auto* filter_chain =
           bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
       auto* transport_socket = filter_chain->mutable_transport_socket();
-      transport_socket->mutable_typed_config()->PackFrom(tls_context);
+      transport_socket->mutable_typed_config()->PackFrom(quic_transport_socket_config);
 
       bootstrap.mutable_static_resources()->mutable_listeners(0)->set_reuse_port(set_reuse_port_);
 
@@ -176,9 +188,8 @@ protected:
   AtomicFileUpdater file_updater_;
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, QuicHttpIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(QuicHttpIntegrationTests, QuicHttpIntegrationTest,
+                         testing::ValuesIn(generateTestParam()), testParamsToString);
 
 TEST_P(QuicHttpIntegrationTest, GetRequestAndEmptyResponse) {
   testRouterHeaderOnlyRequestAndResponse();
@@ -285,13 +296,13 @@ TEST_P(QuicHttpIntegrationTest, MultipleQuicListenersWithBPF) {
     cached->add_server_designated_connection_id(quic::test::TestConnectionId(i << 32));
     codec_clients.push_back(makeHttpConnection(lookupPort("http")));
   }
-  if (GetParam() == Network::Address::IpVersion::v4) {
+  if (GetParam().first == Network::Address::IpVersion::v4) {
     test_server_->waitForCounterEq("listener.0.0.0.0_0.downstream_cx_total", 8u);
   } else {
     test_server_->waitForCounterEq("listener.[__]_0.downstream_cx_total", 8u);
   }
   for (size_t i = 0; i < concurrency_; ++i) {
-    if (GetParam() == Network::Address::IpVersion::v4) {
+    if (GetParam().first == Network::Address::IpVersion::v4) {
       test_server_->waitForGaugeEq(
           fmt::format("listener.0.0.0.0_0.worker_{}.downstream_cx_active", i), 1u);
       test_server_->waitForCounterEq(
@@ -328,7 +339,7 @@ TEST_P(QuicHttpIntegrationTest, MultipleQuicListenersNoBPF) {
     cached->add_server_designated_connection_id(quic::test::TestConnectionId(i << 32));
     codec_clients.push_back(makeHttpConnection(lookupPort("http")));
   }
-  if (GetParam() == Network::Address::IpVersion::v4) {
+  if (GetParam().first == Network::Address::IpVersion::v4) {
     test_server_->waitForCounterEq("listener.0.0.0.0_0.downstream_cx_total", 8u);
   } else {
     test_server_->waitForCounterEq("listener.[__]_0.downstream_cx_total", 8u);
@@ -336,7 +347,7 @@ TEST_P(QuicHttpIntegrationTest, MultipleQuicListenersNoBPF) {
   // Even without BPF support, these connections should more or less distributed
   // across different workers.
   for (size_t i = 0; i < concurrency_; ++i) {
-    if (GetParam() == Network::Address::IpVersion::v4) {
+    if (GetParam().first == Network::Address::IpVersion::v4) {
       EXPECT_LT(
           test_server_->gauge(fmt::format("listener.0.0.0.0_0.worker_{}.downstream_cx_active", i))
               ->value(),
@@ -432,12 +443,12 @@ TEST_P(QuicHttpIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
   upstream_request_->encodeData(10, true);
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 
   // New request should be rejected.
   auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   response2->waitForEndStream();
-  EXPECT_EQ("503", response2->headers().Status()->value().getStringView());
+  EXPECT_EQ("503", response2->headers().getStatusValue());
   EXPECT_EQ("envoy overloaded", response2->body());
   codec_client_->close();
 
