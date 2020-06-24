@@ -569,14 +569,6 @@ ProtobufTypes::MessagePtr AdminImpl::dumpEndpointConfigs() const {
     Upstream::ClusterInfoConstSharedPtr cluster_info = cluster.info();
     envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
 
-    if (!cluster_info->addedViaApi()) {
-      auto& static_endpoint = *endpoint_config_dump->mutable_static_endpoint_configs()->Add();
-      static_endpoint.mutable_endpoint_config()->PackFrom(cluster_load_assignment);
-    } else {
-      auto& dynamic_endpoint = *endpoint_config_dump->mutable_dynamic_endpoint_configs()->Add();
-      dynamic_endpoint.mutable_endpoint_config()->PackFrom(cluster_load_assignment);
-    }
-
     if (cluster_info->eds_service_name().has_value()) {
       cluster_load_assignment.set_cluster_name(cluster_info->eds_service_name().value());
     } else {
@@ -614,6 +606,14 @@ ProtobufTypes::MessagePtr AdminImpl::dumpEndpointConfigs() const {
           addLbEndpoint(host, locality_lb_endpoint);
         }
       }
+    }
+
+    if (!cluster_info->addedViaApi()) {
+      auto& static_endpoint = *endpoint_config_dump->mutable_static_endpoint_configs()->Add();
+      static_endpoint.mutable_endpoint_config()->PackFrom(cluster_load_assignment);
+    } else {
+      auto& dynamic_endpoint = *endpoint_config_dump->mutable_dynamic_endpoint_configs()->Add();
+      dynamic_endpoint.mutable_endpoint_config()->PackFrom(cluster_load_assignment);
     }
   }
   return endpoint_config_dump;
