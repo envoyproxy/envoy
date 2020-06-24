@@ -466,7 +466,8 @@ private:
    * hasher and comparator.
    */
   absl::string_view dataAsStringView() const {
-    return {reinterpret_cast<const char*>(data()), dataSize()};
+    return {reinterpret_cast<const char*>(data()),
+            static_cast<absl::string_view::size_type>(dataSize())};
   }
 
   const uint8_t* size_and_data_{nullptr};
