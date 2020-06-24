@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "envoy/event/deferred_deletable.h"
+#include "envoy/event/schedulable_cb.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
@@ -159,7 +160,7 @@ protected:
   std::list<PendingRequestPtr> pending_requests_;
   std::list<DrainedCb> drained_callbacks_;
   Stats::TimespanPtr conn_connect_ms_;
-  Event::TimerPtr upstream_ready_timer_;
+  Event::SchedulableCallbackPtr upstream_ready_cb_;
   bool upstream_ready_enabled_{false};
 };
 

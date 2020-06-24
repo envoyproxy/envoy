@@ -5,6 +5,7 @@
 #include <memory>
 
 #include "envoy/event/dispatcher.h"
+#include "envoy/event/schedulable_cb.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
@@ -28,7 +29,7 @@ ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSha
                            const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
     : ConnPoolImplBase(std::move(host), std::move(priority), dispatcher, options,
                        transport_socket_options, Protocol::Http11),
-      upstream_ready_timer_(dispatcher_.createTimer([this]() {
+      upstream_ready_cb_(dispatcher_.createSchedulableCallback([this]() {
         upstream_ready_enabled_ = false;
         onUpstreamReady();
       })) {}
@@ -58,7 +59,7 @@ void ConnPoolImpl::onResponseComplete(ActiveClient& client) {
 
     if (!pending_requests_.empty() && !upstream_ready_enabled_) {
       upstream_ready_enabled_ = true;
-      upstream_ready_timer_->enableTimer(std::chrono::milliseconds(0));
+      upstream_ready_cb_->scheduleCallbackCurrentIteration();
     }
 
     checkForDrained();

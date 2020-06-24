@@ -23,7 +23,7 @@ public:
   ~SimulatedTimeSystemHelper() override;
 
   // TimeSystem
-  SchedulerPtr createScheduler(Scheduler& base_scheduler) override;
+  SchedulerPtr createScheduler(Scheduler& base_scheduler, CallbackScheduler& cb_scheduler) override;
 
   // TestTimeSystem
   void advanceTimeWait(const Duration& duration) override;

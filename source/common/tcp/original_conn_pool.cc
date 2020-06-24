@@ -18,7 +18,7 @@ OriginalConnPoolImpl::OriginalConnPoolImpl(
     Network::TransportSocketOptionsSharedPtr transport_socket_options)
     : dispatcher_(dispatcher), host_(host), priority_(priority), socket_options_(options),
       transport_socket_options_(transport_socket_options),
-      upstream_ready_timer_(dispatcher_.createTimer([this]() { onUpstreamReady(); })) {}
+      upstream_ready_cb_(dispatcher_.createSchedulableCallback([this]() { onUpstreamReady(); })) {}
 
 OriginalConnPoolImpl::~OriginalConnPoolImpl() {
   while (!ready_conns_.empty()) {
@@ -310,7 +310,7 @@ void OriginalConnPoolImpl::processIdleConnection(ActiveConn& conn, bool new_conn
 
   if (delay && !pending_requests_.empty() && !upstream_ready_enabled_) {
     upstream_ready_enabled_ = true;
-    upstream_ready_timer_->enableTimer(std::chrono::milliseconds(0));
+    upstream_ready_cb_->scheduleCallbackCurrentIteration();
   }
 
   checkForDrained();

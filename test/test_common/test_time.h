@@ -19,8 +19,9 @@ public:
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) override;
 
   // Event::TimeSystem
-  Event::SchedulerPtr createScheduler(Scheduler& base_scheduler) override {
-    return real_time_system_.createScheduler(base_scheduler);
+  Event::SchedulerPtr createScheduler(Scheduler& base_scheduler,
+                                      CallbackScheduler& cb_scheduler) override {
+    return real_time_system_.createScheduler(base_scheduler, cb_scheduler);
   }
 
   // TimeSource
