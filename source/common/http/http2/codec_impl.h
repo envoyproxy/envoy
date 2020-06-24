@@ -517,6 +517,7 @@ private:
   void releaseOutboundControlFrame(const Buffer::OwnedBufferFragmentImpl* fragment);
 
   bool dispatching_ : 1;
+  bool raised_goaway_ : 1;
   bool pending_deferred_reset_ : 1;
 };
 
