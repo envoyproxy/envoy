@@ -608,12 +608,12 @@ ProtobufTypes::MessagePtr AdminImpl::dumpEndpointConfigs() const {
       }
     }
 
-    if (!cluster_info->addedViaApi()) {
-      auto& static_endpoint = *endpoint_config_dump->mutable_static_endpoint_configs()->Add();
-      static_endpoint.mutable_endpoint_config()->PackFrom(cluster_load_assignment);
-    } else {
+    if (cluster_info->addedViaApi()) {
       auto& dynamic_endpoint = *endpoint_config_dump->mutable_dynamic_endpoint_configs()->Add();
       dynamic_endpoint.mutable_endpoint_config()->PackFrom(cluster_load_assignment);
+    } else {
+      auto& static_endpoint = *endpoint_config_dump->mutable_static_endpoint_configs()->Add();
+      static_endpoint.mutable_endpoint_config()->PackFrom(cluster_load_assignment);
     }
   }
   return endpoint_config_dump;
