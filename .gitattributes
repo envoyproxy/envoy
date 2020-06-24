@@ -1,6 +1,8 @@
 /docs/root/version_history/current.rst merge=union
 *.generated.pb_text linguist-generated=true
 *.generated.pb_text -diff -merge
+/api/envoy/**/v4alpha/* linguist-generated=true
+/api/envoy/**/v4alpha/* -diff -merge
 /generated_api_shadow/envoy/** linguist-generated=true
 /generated_api_shadow/envoy/** -diff -merge
 /generated_api_shadow/bazel/** linguist-generated=true
