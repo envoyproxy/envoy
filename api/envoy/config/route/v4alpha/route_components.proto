@@ -1064,7 +1064,7 @@ message RetryPolicy {
   // Specifies the allowed number of retries. This parameter is optional and
   // defaults to 1. These are the same conditions documented for
   // :ref:`config_http_filters_router_x-envoy-max-retries`.
-  google.protobuf.UInt32Value num_retries = 2;
+  google.protobuf.UInt32Value max_retries = 2;
 
   // Specifies a non-zero upstream timeout per retry attempt. This parameter is optional. The
   // same conditions documented for

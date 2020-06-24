@@ -332,7 +332,7 @@ message RetryPolicy {
 
   // Specifies the allowed number of retries. This parameter is optional and
   // defaults to 1.
-  google.protobuf.UInt32Value num_retries = 2;
+  google.protobuf.UInt32Value max_retries = 2;
 }
 
 // The message specifies how to fetch data from remote and how to verify it.
