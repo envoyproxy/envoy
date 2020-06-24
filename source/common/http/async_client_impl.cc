@@ -240,7 +240,6 @@ AsyncRequestImpl::AsyncRequestImpl(RequestMessagePtr&& request, AsyncClientImpl&
                                    AsyncClient::Callbacks& callbacks,
                                    const AsyncClient::RequestOptions& options)
     : AsyncStreamImpl(parent, *this, options), request_(std::move(request)), callbacks_(callbacks) {
-
   if (nullptr != options.parent_span_) {
     const std::string child_span_name =
         options.child_span_name_.empty()
@@ -266,7 +265,7 @@ void AsyncRequestImpl::initialize() {
 }
 
 void AsyncRequestImpl::onComplete() {
-  callbacks_.onBeforeFinalizeUpstreamSpan(*child_span_);
+  callbacks_.onBeforeFinalizeUpstreamSpan(*child_span_, &response_->headers(), /*success=*/true);
 
   Tracing::HttpTracerUtility::finalizeUpstreamSpan(*child_span_, &response_->headers(),
                                                    response_->trailers(), streamInfo(),
@@ -300,7 +299,8 @@ void AsyncRequestImpl::onReset() {
     child_span_->setTag(Tracing::Tags::get().ErrorReason, "Reset");
   }
 
-  callbacks_.onBeforeFinalizeUpstreamSpan(*child_span_);
+  callbacks_.onBeforeFinalizeUpstreamSpan(
+      *child_span_, remoteClosed() ? &response_->headers() : nullptr, /*success=*/false);
 
   // Finalize the span based on whether we received a response or not
   Tracing::HttpTracerUtility::finalizeUpstreamSpan(

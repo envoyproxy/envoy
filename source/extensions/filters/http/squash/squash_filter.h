@@ -68,6 +68,8 @@ public:
   void onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason f) override {
     on_fail_(f);
   }
+  void onBeforeFinalizeUpstreamSpan(Tracing::Span&, const Http::ResponseHeaderMap*, bool) override {
+  }
 
 private:
   const std::function<void(Http::ResponseMessagePtr&&)> on_success_;

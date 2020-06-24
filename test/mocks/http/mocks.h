@@ -346,7 +346,8 @@ public:
   MOCK_METHOD(void, onSuccess_, (const Http::AsyncClient::Request&, ResponseMessage*));
   MOCK_METHOD(void, onFailure,
               (const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason));
-  MOCK_METHOD(void, onBeforeFinalizeUpstreamSpan, (Envoy::Tracing::Span&));
+  MOCK_METHOD(void, onBeforeFinalizeUpstreamSpan,
+              (Envoy::Tracing::Span&, const Http::ResponseHeaderMap*, bool));
 };
 
 class MockAsyncClientStreamCallbacks : public AsyncClient::StreamCallbacks {

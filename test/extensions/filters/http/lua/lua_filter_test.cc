@@ -54,6 +54,7 @@ public:
           decoder_callbacks_.buffer_->move(data);
         }));
 
+    EXPECT_CALL(decoder_callbacks_, activeSpan()).Times(AtLeast(0));
     EXPECT_CALL(decoder_callbacks_, decodingBuffer()).Times(AtLeast(0));
     EXPECT_CALL(decoder_callbacks_, route()).Times(AtLeast(0));
 
@@ -65,6 +66,7 @@ public:
           }
           encoder_callbacks_.buffer_->move(data);
         }));
+    EXPECT_CALL(encoder_callbacks_, activeSpan()).Times(AtLeast(0));
     EXPECT_CALL(encoder_callbacks_, encodingBuffer()).Times(AtLeast(0));
   }
 
@@ -103,6 +105,7 @@ public:
   std::shared_ptr<NiceMock<Envoy::Ssl::MockConnectionInfo>> ssl_;
   NiceMock<Envoy::Network::MockConnection> connection_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
+  Tracing::MockSpan child_span_;
 
   const std::string HEADER_ONLY_SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
@@ -794,9 +797,12 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
   Http::ResponseMessagePtr response_message(new Http::ResponseMessageImpl(
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
   response_message->body() = std::make_unique<Buffer::OwnedImpl>("response");
+  EXPECT_CALL(child_span_, setTag(Eq("lua_http_call_http_status"), Eq("OK")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(":status 200")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("response")));
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
+
+  callbacks->onBeforeFinalizeUpstreamSpan(child_span_, &response_message->headers(), true);
   callbacks->onSuccess(request, std::move(response_message));
 }
 
@@ -994,9 +1000,11 @@ TEST_F(LuaHttpFilterTest, DoubleHttpCall) {
 
   response_message = std::make_unique<Http::ResponseMessageImpl>(
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "403"}}});
+  EXPECT_CALL(child_span_, setTag(Eq("lua_http_call_http_status"), Eq("Forbidden")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(":status 403")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("no body")));
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  callbacks->onBeforeFinalizeUpstreamSpan(child_span_, &response_message->headers(), true);
   callbacks->onSuccess(request, std::move(response_message));
 
   Buffer::OwnedImpl data("hello");

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/http/filter.h"
+#include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/crypto/utility.h"
@@ -69,6 +70,11 @@ public:
    * @return const Network::Connection* the current network connection handle.
    */
   virtual const Network::Connection* connection() const PURE;
+
+  /**
+   * @return const Tracing::Span& the current tracing active span.
+   */
+  virtual Tracing::Span& activeSpan() PURE;
 };
 
 class Filter;
@@ -236,8 +242,8 @@ private:
    */
   DECLARE_LUA_CLOSURE(StreamHandleWrapper, luaBodyIterator);
 
-  int luaHttpCallSynchronous(lua_State* state);
-  int luaHttpCallAsynchronous(lua_State* state);
+  int doSynchronousHttpCall(lua_State* state, Tracing::Span& span);
+  int doAsynchronousHttpCall(lua_State* state, Tracing::Span& span);
 
   // Filters::Common::Lua::BaseLuaObject
   void onMarkDead() override {
@@ -255,6 +261,7 @@ private:
   // Http::AsyncClient::Callbacks
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&&) override;
   void onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason) override;
+  void onBeforeFinalizeUpstreamSpan(Tracing::Span&, const Http::ResponseHeaderMap*, bool) override;
 
   Filters::Common::Lua::Coroutine& coroutine_;
   Http::HeaderMap& headers_;
@@ -285,6 +292,8 @@ public:
   // Http::AsyncClient::Callbacks
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&&) override {}
   void onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason) override {}
+  void onBeforeFinalizeUpstreamSpan(Tracing::Span&, const Http::ResponseHeaderMap*, bool) override {
+  }
 };
 
 /**
@@ -381,6 +390,7 @@ private:
     const ProtobufWkt::Struct& metadata() const override;
     StreamInfo::StreamInfo& streamInfo() override { return callbacks_->streamInfo(); }
     const Network::Connection* connection() const override { return callbacks_->connection(); }
+    Tracing::Span& activeSpan() override { return callbacks_->activeSpan(); }
 
     Filter& parent_;
     Http::StreamDecoderFilterCallbacks* callbacks_{};
@@ -402,6 +412,7 @@ private:
     const ProtobufWkt::Struct& metadata() const override;
     StreamInfo::StreamInfo& streamInfo() override { return callbacks_->streamInfo(); }
     const Network::Connection* connection() const override { return callbacks_->connection(); }
+    Tracing::Span& activeSpan() override { return callbacks_->activeSpan(); }
 
     Filter& parent_;
     Http::StreamEncoderFilterCallbacks* callbacks_{};
