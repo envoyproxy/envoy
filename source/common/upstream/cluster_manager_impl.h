@@ -238,6 +238,9 @@ public:
   Http::AsyncClient& httpAsyncClientForCluster(const std::string& cluster) override;
   bool removeCluster(const std::string& cluster) override;
   void shutdown() override {
+    if (resume_cds_ != nullptr) {
+      resume_cds_->cancel();
+    }
     // Make sure we destroy all potential outgoing connections before this returns.
     cds_api_.reset();
     ads_mux_.reset();
@@ -490,8 +493,6 @@ protected:
   ClusterMap active_clusters_;
 
 private:
-  // Temporarily saved resume cds callback from updateClusterCounts invocation.
-  Config::ScopedResume resume_cds_;
   ClusterMap warming_clusters_;
   envoy::config::core::v3::BindConfig bind_config_;
   Outlier::EventLoggerSharedPtr outlier_event_logger_;
@@ -500,6 +501,8 @@ private:
   ClusterManagerStats cm_stats_;
   ClusterManagerInitHelper init_helper_;
   Config::GrpcMuxSharedPtr ads_mux_;
+  // Temporarily saved resume cds callback from updateClusterCounts invocation.
+  Config::ScopedResume resume_cds_;
   LoadStatsReporterPtr load_stats_reporter_;
   // The name of the local cluster of this Envoy instance if defined.
   absl::optional<std::string> local_cluster_name_;
