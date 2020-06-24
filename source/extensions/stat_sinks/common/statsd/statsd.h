@@ -35,7 +35,7 @@ public:
   class Writer : public ThreadLocal::ThreadLocalObject {
   public:
     virtual void write(const std::string& message) PURE;
-    virtual void write_buffer(Buffer::Instance* data) PURE;
+    virtual void writeBuffer(Buffer::Instance* data) PURE;
   };
 
   UdpStatsdSink(ThreadLocal::SlotAllocator& tls, Network::Address::InstanceConstSharedPtr address,
@@ -69,7 +69,7 @@ private:
 
     // Writer
     void write(const std::string& message) override;
-    void write_buffer(Buffer::Instance* data) override;
+    void writeBuffer(Buffer::Instance* data) override;
 
   private:
     UdpStatsdSink& parent_;

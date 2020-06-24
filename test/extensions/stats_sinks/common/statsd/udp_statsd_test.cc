@@ -32,10 +32,10 @@ namespace {
 class MockWriter : public UdpStatsdSink::Writer {
 public:
   MOCK_METHOD(void, write, (const std::string& message));
-  MOCK_METHOD(void, write_buffer, (Buffer::Instance * buffer));
+  MOCK_METHOD(void, writeBuffer, (Buffer::Instance * buffer));
 
   void delegateBufferFake() {
-    ON_CALL(*this, write_buffer).WillByDefault([this](Buffer::Instance* buffer) {
+    ON_CALL(*this, writeBuffer).WillByDefault([this](Buffer::Instance* buffer) {
       this->buffer_contents = "";
       if (buffer != nullptr) {
         this->buffer_contents = buffer->toString();
@@ -174,7 +174,7 @@ TEST(UdpStatsdSinkTest, CheckActualStats) {
   counter.latch_ = 1;
   snapshot.counters_.push_back({1, counter});
 
-  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr), write_buffer(_))
+  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr), writeBuffer(_))
       .Times(1);
   sink.flush(snapshot);
   EXPECT_EQ(writer_ptr->buffer_contents, "envoy.test_counter:1|c");
@@ -186,7 +186,7 @@ TEST(UdpStatsdSinkTest, CheckActualStats) {
   gauge.used_ = true;
   snapshot.gauges_.push_back(gauge);
 
-  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr), write_buffer(_));
+  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr), writeBuffer(_));
   sink.flush(snapshot);
   EXPECT_EQ(writer_ptr->buffer_contents, "envoy.test_gauge:1|g");
 
@@ -212,7 +212,7 @@ TEST(UdpStatsdSinkTest, CheckActualStatsWithCustomPrefix) {
   counter.latch_ = 1;
   snapshot.counters_.push_back({1, counter});
 
-  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr), write_buffer(_));
+  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr), writeBuffer(_));
   sink.flush(snapshot);
   EXPECT_EQ(writer_ptr->buffer_contents, "test_prefix.test_counter:1|c");
   counter.used_ = false;
@@ -276,7 +276,7 @@ TEST(UdpStatsdSinkWithTagsTest, CheckActualStats) {
   counter.setTags(tags);
   snapshot.counters_.push_back({1, counter});
 
-  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr), write_buffer(_));
+  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr), writeBuffer(_));
   sink.flush(snapshot);
   EXPECT_EQ(writer_ptr->buffer_contents, "envoy.test_counter:1|c|#key1:value1,key2:value2");
   counter.used_ = false;
@@ -288,7 +288,7 @@ TEST(UdpStatsdSinkWithTagsTest, CheckActualStats) {
   gauge.setTags(tags);
   snapshot.gauges_.push_back(gauge);
 
-  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr), write_buffer(_));
+  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr), writeBuffer(_));
   sink.flush(snapshot);
   EXPECT_EQ(writer_ptr->buffer_contents, "envoy.test_gauge:1|g|#key1:value1,key2:value2");
 

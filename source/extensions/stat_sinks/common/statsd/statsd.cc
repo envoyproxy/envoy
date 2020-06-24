@@ -40,7 +40,7 @@ void UdpStatsdSink::WriterImpl::write(const std::string& message) {
   Network::Utility::writeToSocket(*io_handle_, &slice, 1, nullptr, *parent_.server_address_);
 }
 
-void UdpStatsdSink::WriterImpl::write_buffer(Buffer::Instance* data) {
+void UdpStatsdSink::WriterImpl::writeBuffer(Buffer::Instance* data) {
   Network::Utility::writeToSocket(*io_handle_, *data, nullptr, *parent_.server_address_);
 }
 
@@ -88,8 +88,7 @@ void UdpStatsdSink::flushBuffer(Buffer::OwnedImpl& buffer) const {
     return;
   }
   Writer& writer = tls_->getTyped<Writer>();
-  writer.write_buffer(&buffer);
-  // TODO: write slices to writer
+  writer.writeBuffer(&buffer);
   buffer.drain(buffer.length());
 }
 
