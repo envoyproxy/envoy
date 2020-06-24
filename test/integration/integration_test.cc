@@ -720,6 +720,12 @@ TEST_P(IntegrationTest, PipelineWithTrailers) {
 // an inline sendLocalReply to make sure the "kick" works under the call stack
 // of dispatch as well as when a response is proxied from upstream.
 TEST_P(IntegrationTest, PipelineInline) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.mutable_stream_error_on_invalid_http_message()->set_value(true);
+      });
+
   autonomous_upstream_ = true;
   initialize();
   std::string response;
@@ -1226,6 +1232,11 @@ TEST_P(UpstreamEndpointIntegrationTest, TestUpstreamEndpointAddress) {
 // Send continuous pipelined requests while not reading responses, to check
 // HTTP/1.1 response flood protection.
 TEST_P(IntegrationTest, TestFlood) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.mutable_stream_error_on_invalid_http_message()->set_value(true);
+      });
   initialize();
 
   // Set up a raw connection to easily send requests without reading responses.
@@ -1303,6 +1314,11 @@ TEST_P(IntegrationTest, TestFloodUpstreamErrors) {
 
 // Make sure flood protection doesn't kick in with many requests sent serially.
 TEST_P(IntegrationTest, TestManyBadRequests) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.mutable_stream_error_on_invalid_http_message()->set_value(true);
+      });
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));

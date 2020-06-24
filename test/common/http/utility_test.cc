@@ -305,6 +305,60 @@ initial_connection_window_size: 65535
   }
 }
 
+TEST(HttpUtility, ValidateStreamErrors) {
+  // Both false, the result should be false.
+  envoy::config::core::v3::Http2ProtocolOptions http2_options;
+  EXPECT_FALSE(Envoy::Http2::Utility::initializeAndValidateOptions(http2_options)
+                   .stream_error_on_invalid_http_message()
+                   .value());
+
+  // If the new value is not present, the legacy value is respected.
+  http2_options.set_stream_error_on_invalid_http_messaging(true);
+  EXPECT_TRUE(Envoy::Http2::Utility::initializeAndValidateOptions(http2_options)
+                  .stream_error_on_invalid_http_message()
+                  .value());
+
+  // If the new value is present, it is used.
+  http2_options.mutable_stream_error_on_invalid_http_message()->set_value(true);
+  http2_options.set_stream_error_on_invalid_http_messaging(false);
+  EXPECT_TRUE(Envoy::Http2::Utility::initializeAndValidateOptions(http2_options)
+                  .stream_error_on_invalid_http_message()
+                  .value());
+
+  // Invert values - the new value should still be used.
+  http2_options.mutable_stream_error_on_invalid_http_message()->set_value(false);
+  http2_options.set_stream_error_on_invalid_http_messaging(true);
+  EXPECT_FALSE(Envoy::Http2::Utility::initializeAndValidateOptions(http2_options)
+                   .stream_error_on_invalid_http_message()
+                   .value());
+}
+
+TEST(HttpUtility, ValidateStreamErrorsWithHcm) {
+  envoy::config::core::v3::Http2ProtocolOptions http2_options;
+  http2_options.set_stream_error_on_invalid_http_messaging(true);
+  EXPECT_TRUE(Envoy::Http2::Utility::initializeAndValidateOptions(http2_options)
+                  .stream_error_on_invalid_http_message()
+                  .value());
+
+  // If the HCM value is present it will take precedence over the old value.
+  Protobuf::BoolValue hcm_value;
+  hcm_value.set_value(false);
+  EXPECT_FALSE(Envoy::Http2::Utility::initializeAndValidateOptions(http2_options, true, hcm_value)
+                   .stream_error_on_invalid_http_message()
+                   .value());
+  // The HCM value will be ignored if initializeAndValidateOptions is told it is not present.
+  EXPECT_TRUE(Envoy::Http2::Utility::initializeAndValidateOptions(http2_options, false, hcm_value)
+                  .stream_error_on_invalid_http_message()
+                  .value());
+
+  // The HTTP/1 stream_error_on_invalid_http_message takes precedence over the
+  // global one.
+  http2_options.mutable_stream_error_on_invalid_http_message()->set_value(true);
+  EXPECT_TRUE(Envoy::Http2::Utility::initializeAndValidateOptions(http2_options, true, hcm_value)
+                  .stream_error_on_invalid_http_message()
+                  .value());
+}
+
 TEST(HttpUtility, getLastAddressFromXFF) {
   {
     const std::string first_address = "192.0.2.10";

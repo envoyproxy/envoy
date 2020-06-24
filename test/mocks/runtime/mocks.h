@@ -78,6 +78,7 @@ public:
   MOCK_METHOD(void, startRtdsSubscriptions, (ReadyCallback));
 
   testing::NiceMock<MockSnapshot> snapshot_;
+  SnapshotConstSharedPtr snapshot_ptr_;
 };
 
 class MockOverrideLayer : public Snapshot::OverrideLayer {
