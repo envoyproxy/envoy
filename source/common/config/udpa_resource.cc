@@ -37,7 +37,7 @@ std::string UdpaResourceName::encodeUri(const udpa::core::v1::ResourceName& reso
   }
   const std::string query_params =
       query_param_components.empty() ? "" : "?" + absl::StrJoin(query_param_components, "&");
-  return absl::StrCat("udpa://", authority, "/", resource_name.qualified_type(),
+  return absl::StrCat("udpa://", authority, "/", resource_name.resource_type(),
                       path.empty() ? "" : "/", path, query_params);
 }
 
@@ -64,8 +64,8 @@ udpa::core::v1::ResourceName UdpaResourceName::decodeUri(absl::string_view resou
   // This is guaranteed by Http::Utility::extractHostPathFromUri.
   ASSERT(absl::StartsWith(path, "/"));
   const std::vector<absl::string_view> path_components = absl::StrSplit(path.substr(1), '/');
-  decoded_resource_name.set_qualified_type(std::string(path_components[0]));
-  if (decoded_resource_name.qualified_type().empty()) {
+  decoded_resource_name.set_resource_type(std::string(path_components[0]));
+  if (decoded_resource_name.resource_type().empty()) {
     throw UdpaResourceName::DecodeException(
         fmt::format("Qualified type missing from {}", resource_uri));
   }

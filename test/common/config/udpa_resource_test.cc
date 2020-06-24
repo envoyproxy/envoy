@@ -44,7 +44,7 @@ TEST(UdpaResourceNameTest, DecodeEncode) {
 TEST(UdpaResourceNameTest, DecodeSuccess) {
   const auto resource_name = UdpaResourceName::decodeUri(EscapedUriWithManyQueryParams);
   EXPECT_EQ("f123%/#?&=o", resource_name.authority());
-  EXPECT_EQ("envoy.config.listener.v3.Listener", resource_name.qualified_type());
+  EXPECT_EQ("envoy.config.listener.v3.Listener", resource_name.resource_type());
   EXPECT_EQ(3, resource_name.id().size());
   EXPECT_EQ("b%/#?&=ar", resource_name.id()[0]);
   EXPECT_EQ("", resource_name.id()[1]);
@@ -60,7 +60,7 @@ TEST(UdpaResourceNameTest, DecodeEmpty) {
   const auto resource_name =
       UdpaResourceName::decodeUri("udpa:///envoy.config.listener.v3.Listener");
   EXPECT_TRUE(resource_name.authority().empty());
-  EXPECT_EQ("envoy.config.listener.v3.Listener", resource_name.qualified_type());
+  EXPECT_EQ("envoy.config.listener.v3.Listener", resource_name.resource_type());
   EXPECT_TRUE(resource_name.id().empty());
   EXPECT_TRUE(resource_name.context().params().empty());
 }
