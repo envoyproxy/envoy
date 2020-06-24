@@ -622,7 +622,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
 
     // Now that we're execute all the init callbacks we can resume RDS
     // as we've subscribed to all the statically defined RDS resources.
-    // This is done by tearing down the maybe_resume_rds cleaup object.
+    // This is done by tearing down the maybe_resume_rds Cleanup object.
   });
 }
 

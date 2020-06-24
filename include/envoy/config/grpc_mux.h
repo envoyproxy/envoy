@@ -5,8 +5,8 @@
 #include "envoy/config/subscription.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/protobuf/protobuf.h"
 #include "common/common/cleanup.h"
+#include "common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Config {
