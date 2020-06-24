@@ -369,13 +369,10 @@ public:
 
   bool disabled() const { return disabled_; }
   const std::string& name() const { return name_; }
-  PerLuaCodeSetup* perLuaCodeSetup() const { return per_lua_code_setup_ptr_.get(); }
 
 private:
   const bool disabled_;
   const std::string name_;
-
-  PerLuaCodeSetupPtr per_lua_code_setup_ptr_{};
 };
 
 namespace {
@@ -385,12 +382,12 @@ PerLuaCodeSetup* getPerLuaCodeSetup(const FilterConfig* filter_config,
   if (config_per_route != nullptr) {
     if (config_per_route->disabled()) {
       return nullptr;
-    }
-    if (!config_per_route->name().empty()) {
+    } else if (!config_per_route->name().empty()) {
       ASSERT(filter_config);
       return filter_config->perLuaCodeSetup(config_per_route->name());
+    } else {
+      return nullptr;
     }
-    return config_per_route->perLuaCodeSetup();
   }
   ASSERT(filter_config);
   return filter_config->perLuaCodeSetup(GLOBAL_SCRIPT_NAME);

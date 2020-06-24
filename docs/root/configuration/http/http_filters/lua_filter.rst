@@ -85,15 +85,7 @@ Per-Route Configuration
 
 The Lua HTTP filter also can be disabled or overridden on a per-route basis by providing a 
 :ref:`LuaPerRoute <envoy_v3_api_msg_extensions.filters.http.lua.v3.LuaPerRoute>` configuration 
-on the virtual host, route, or weighted cluster. 
-
-LuaPerRoute provides two ways of overriding the `GLOBAL` Lua script:
-
-* By providing a name reference to the defined :ref:`named Lua source codes map 
-  <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.source_codes>`.
-* By providing inline :ref:`source code 
-  <envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.source_code>` (This allows the 
-  code to be sent through RDS).
+on the virtual host, route, or weighted cluster.
 
 As a concrete example, given the following Lua filter configuration:
 
@@ -139,21 +131,7 @@ The `GLOBAL` Lua script will be overridden by the referenced script:
 .. attention::
 
   The name `GLOBAL` is reserved for :ref:`Lua.inline_code 
-  <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.inline_code>`, so don't use it easily.
-
-Or We can define new Lua script in the LuaPerRoute configuration directly to override `GLOBAL`  
-Lua script as follow example configuration:
-
-.. code-block:: yaml
-
-  per_filter_config:
-    envoy.filters.http.lua:
-      source_code:
-        inline_string: |
-          function envoy_on_response(response_handle)
-            response_handle:logInfo("Go Go C Plus Plus.")
-          end
-
+  <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.inline_code>`, so don't use it otherwise.
     
 
 Script examples
