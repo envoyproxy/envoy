@@ -1,0 +1,23 @@
+config {
+  virtual_hosts {
+    name: "q"
+    domains: ""
+    routes {
+      match {
+        path: ""
+      }
+      route {
+        cluster: "."
+        internal_redirect_policy {
+          predicates {
+            name: ":"
+            typed_config {
+              value: "-"
+            }
+          }
+        }
+      }
+    }
+  }
+}
+random_value: 1
