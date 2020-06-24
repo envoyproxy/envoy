@@ -8,7 +8,7 @@
 #include "common/http/headers.h"
 #include "common/protobuf/utility.h"
 
-#include "extensions/filters/http/cache/http_cache_utils.h"
+#include "extensions/filters/http/cache/cache_headers_utils.h"
 
 #include "absl/time/time.h"
 
@@ -69,19 +69,22 @@ size_t stableHashKey(const Key& key) { return MessageUtil::hash(key); }
 size_t localHashKey(const Key& key) { return stableHashKey(key); }
 
 // Returns true if response_headers is fresh.
+// TODO: update to use ResponseCacheControl
 bool LookupRequest::isFresh(const Http::ResponseHeaderMap& response_headers) const {
   if (!response_headers.Date()) {
     return false;
   }
-  const Http::HeaderEntry* cache_control_header = response_headers.CacheControl();
-  if (cache_control_header) {
-    const SystemTime::duration effective_max_age =
-        HttpCacheUtils::effectiveMaxAge(cache_control_header->value().getStringView());
-    return timestamp_ - HttpCacheUtils::httpTime(response_headers.Date()) < effective_max_age;
-  }
+  // const Http::HeaderEntry* cache_control_header = response_headers.CacheControl();
+  // if (cache_control_header) {
+  //   const SystemTime::duration effective_max_age =
+  //       CacheHeadersUtils::effectiveMaxAge(cache_control_header->value().getStringView());
+  //   return timestamp_ - CacheHeadersUtils::httpTime(response_headers.Date()) <
+  //   effective_max_age;
+  // }
   // We didn't find a cache-control header with enough info to determine
   // freshness, so fall back to the expires header.
-  return timestamp_ <= HttpCacheUtils::httpTime(response_headers.get(Http::Headers::get().Expires));
+  return timestamp_ <=
+         CacheHeadersUtils::httpTime(response_headers.get(Http::Headers::get().Expires));
 }
 
 LookupResult LookupRequest::makeLookupResult(Http::ResponseHeaderMapPtr&& response_headers,

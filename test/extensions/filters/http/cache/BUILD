@@ -9,13 +9,13 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_extension_cc_test(
-    name = "http_cache_utils_test",
-    srcs = ["http_cache_utils_test.cc"],
+    name = "cache_headers_utils_test",
+    srcs = ["cache_headers_utils_test.cc"],
     extension_name = "envoy.filters.http.cache",
     deps = [
         "//include/envoy/http:header_map_interface",
         "//source/common/http:header_map_lib",
-        "//source/extensions/filters/http/cache:http_cache_utils_lib",
+        "//source/extensions/filters/http/cache:cache_headers_utils_lib",
         "//test/test_common:utility_lib",
     ],
 )

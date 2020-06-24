@@ -48,7 +48,7 @@ envoy_cc_library(
     srcs = ["http_cache.cc"],
     hdrs = ["http_cache.h"],
     deps = [
-        ":http_cache_utils_lib",
+        ":cache_headers_utils_lib",
         ":key_cc_proto",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/common:time_interface",
@@ -63,9 +63,9 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "http_cache_utils_lib",
-    srcs = ["http_cache_utils.cc"],
-    hdrs = ["http_cache_utils.h"],
+    name = "cache_headers_utils_lib",
+    srcs = ["cache_headers_utils.cc"],
+    hdrs = ["cache_headers_utils.h"],
     deps = [
         "//include/envoy/common:time_interface",
         "//include/envoy/http:header_map_interface",
