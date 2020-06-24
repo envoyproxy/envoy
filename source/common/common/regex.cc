@@ -67,7 +67,9 @@ public:
     if (runtime) {
       Stats::Scope& root_scope = runtime->getRootScope();
 
-      Stats::StatNameManagedStorage program_size_stat_name("re2.max_program_size",
+      // TODO(perf): It would be more efficient to create the stats (program size histogram, warning
+      // counter) on startup and not with each regex match.
+      Stats::StatNameManagedStorage program_size_stat_name("re2.program_size",
                                                            root_scope.symbolTable());
       Stats::Histogram& program_size_stat = root_scope.histogramFromStatName(
           program_size_stat_name.statName(), Stats::Histogram::Unit::Unspecified);
