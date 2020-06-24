@@ -24,6 +24,7 @@ public:
    */
   CallbackHandle* add(Callback callback) {
     callbacks_.emplace_back(*this, callback);
+    callbacks_.back().it_ = (--callbacks_.end());
     return &callbacks_.back();
   }
 
@@ -50,6 +51,7 @@ private:
 
     CallbackManager& parent_;
     Callback cb_;
+    typename std::list<CallbackHolder>::iterator it_;
   };
 
   /**
@@ -61,8 +63,8 @@ private:
                         [handle](const CallbackHolder& holder) -> bool {
                           return handle == &holder;
                         }) != callbacks_.end());
-    callbacks_.remove_if(
-        [handle](const CallbackHolder& holder) -> bool { return handle == &holder; });
+    auto it = static_cast<CallbackHolder*>(handle)->it_;
+    callbacks_.erase(it);
   }
 
   std::list<CallbackHolder> callbacks_;
