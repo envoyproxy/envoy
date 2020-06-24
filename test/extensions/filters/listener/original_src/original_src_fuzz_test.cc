@@ -29,8 +29,7 @@ DEFINE_PROTO_FUZZER(
     return;
   }
 
-  envoy::extensions::filters::listener::original_src::v3::OriginalSrc proto_config =
-      input.config();
+  envoy::extensions::filters::listener::original_src::v3::OriginalSrc proto_config = input.config();
   Config config(proto_config);
   auto filter = std::make_unique<OriginalSrcFilter>(config);
 
