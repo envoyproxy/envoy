@@ -578,7 +578,8 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
       return result;
     }
 
-    slice.len_ = std::min(slice.len_, static_cast<size_t>(result.rc_));
+    // Commit the buffer and extract the gso_size
+    slice.len_ = result.rc_;
     buffer->commit(&slice, 1);
     const uint64_t gso_size = output.msg_[0].gso_size_;
 
@@ -591,6 +592,7 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
       Buffer::RawSlice sub_slice;
       const uint64_t num_slices = sub_buffer->reserve(bytes_to_copy, &sub_slice, 1);
       ASSERT(num_slices == 1u);
+      // TODO(yugant): Eliminate this copy
       buffer->copyOut(bytes_to_skip, bytes_to_copy, sub_slice.mem_);
 
       passPayloadToProcessor(bytes_to_copy, sub_slice, std::move(sub_buffer),

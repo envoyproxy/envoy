@@ -74,10 +74,14 @@ bool OsSysCallsImpl::supportsMmsg() const {
 }
 
 bool OsSysCallsImpl::supportsUdpGro() const {
-#if ENVOY_UDP_GRO_MORE
-  return true;
-#else
+#if !defined(__linux__)
   return false;
+#else
+#ifndef UDP_GRO
+  return false;
+#else
+  return true;
+#endif
 #endif
 }
 

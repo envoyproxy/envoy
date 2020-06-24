@@ -163,7 +163,6 @@ struct msghdr {
 
 #if defined(__linux__)
 #include <linux/netfilter_ipv4.h>
-#include <linux/version.h> // to check linux version
 #endif
 
 #define PACKED_STRUCT(definition, ...) definition, ##__VA_ARGS__ __attribute__((packed))
@@ -206,14 +205,4 @@ struct mmsghdr {
   struct msghdr msg_hdr;
   unsigned int msg_len;
 };
-#endif
-
-#if defined(__linux__)
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0)
-#define ENVOY_UDP_GRO_MORE 1
-#else
-#define ENVOY_UDP_GRO_MORE 0
-#endif
-#else
-#define ENVOY_UDP_GRO_MORE 0
 #endif
