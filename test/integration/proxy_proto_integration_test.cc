@@ -36,10 +36,7 @@ TEST_P(ProxyProtoIntegrationTest, CaptureTlvToMetadata) {
   testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
   cleanupUpstreamAndDownstream();
   const std::string log_line = waitForAccessLog(listener_access_log_name_);
-  const std::vector<absl::string_view> tokens = StringUtil::splitToken(log_line, " ");
-
-  ASSERT_EQ(1, tokens.size());
-  EXPECT_EQ(tokens[0], "\"foo.com\"");
+  EXPECT_EQ(log_line, "\"foo.com\"");
 }
 
 TEST_P(ProxyProtoIntegrationTest, V1RouterRequestAndResponseWithBodyNoBuffer) {
