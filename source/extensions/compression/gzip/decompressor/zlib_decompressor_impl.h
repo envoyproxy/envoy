@@ -1,6 +1,8 @@
 #pragma once
 
 #include "envoy/compression/decompressor/decompressor.h"
+#include "envoy/stats/stats_macros.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/logger.h"
 
@@ -15,13 +17,26 @@ namespace Gzip {
 namespace Decompressor {
 
 /**
+ * All zlib decompressor stats. @see stats_macros.h
+ */
+#define ALL_ZLIB_DECOMPRESSOR_STATS(COUNTER)                                                       \
+  COUNTER(decompression_error)
+
+/**
+ * Struct definition for zlib decompressor stats. @see stats_macros.h
+ */
+struct ZlibDecompressorStats {
+  ALL_ZLIB_DECOMPRESSOR_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+/**
  * Implementation of decompressor's interface.
  */
 class ZlibDecompressorImpl : public Zlib::Base,
                              public Envoy::Compression::Decompressor::Decompressor,
                              public Logger::Loggable<Logger::Id::decompression> {
 public:
-  ZlibDecompressorImpl();
+  ZlibDecompressorImpl(Stats::Scope& scope);
 
   /**
    * Constructor that allows setting the size of decompressor's output buffer. It
@@ -31,7 +46,7 @@ public:
    * 256K bytes. @see http://zlib.net/zlib_how.html
    * @param chunk_size amount of memory reserved for the decompressor output.
    */
-  ZlibDecompressorImpl(uint64_t chunk_size);
+  ZlibDecompressorImpl(Stats::Scope& scope, uint64_t chunk_size);
 
   /**
    * Init must be called in order to initialize the decompressor. Once decompressor is initialized,
@@ -49,7 +64,13 @@ public:
   int decompression_error_{0};
 
 private:
+    static ZlibDecompressorStats generateStats(const std::string& prefix, Stats::Scope& scope) {
+      return ZlibDecompressorStats{ALL_ZLIB_DECOMPRESSOR_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
+    }
+
   bool inflateNext();
+
+  const ZlibDecompressorStats stats_;
 };
 
 } // namespace Decompressor

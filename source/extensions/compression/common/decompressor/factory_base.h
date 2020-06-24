@@ -31,7 +31,7 @@ protected:
 
 private:
   virtual Envoy::Compression::Decompressor::DecompressorFactoryPtr
-  createDecompressorFactoryFromProtoTyped(const ConfigProto&) PURE;
+  createDecompressorFactoryFromProtoTyped(const ConfigProto&, Server::Configuration::FactoryContext& context) PURE;
 
   const std::string name_;
 };
