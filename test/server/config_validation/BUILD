@@ -117,13 +117,15 @@ envoy_cc_test_library(
     srcs = ["xds_fuzz.cc"],
     hdrs = ["xds_fuzz.h"],
     deps = [
-        "//test/integration:http_integration_lib",
         ":xds_fuzz_proto_cc_proto",
-    ] + select({
-        "//bazel:windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),
-        "//bazel:linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
-        "//conditions:default": envoy_all_extensions(),
-    }),
+        "//test/integration:http_integration_lib",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+    ],
 )
 
 envoy_cc_fuzz_test(

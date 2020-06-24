@@ -5,20 +5,25 @@ package test.server.config_validation;
 import "validate/validate.proto";
 
 message AddListener {
-  uint32 listener_num = 1 [(validate.rules).uint32.gt = 0];
-  uint32 route_num = 2 [(validate.rules).uint32.gt = 0];
+  // generates a new listener listener_x
+  uint32 listener_num = 1;
+  // listener_x references route_y
+  uint32 route_num = 2;
 }
 
 message AddRoute {
-  uint32 route_num = 1 [(validate.rules).uint32.gt = 0];
+  // generates a new route route_x
+  uint32 route_num = 1;
 }
 
 message RemoveListener {
-  uint32 listener_num = 1 [(validate.rules).uint32.gt = 0];
+  // removes listener_x
+  uint32 listener_num = 1;
 }
 
 message RemoveRoute {
-  uint32 route_num = 1 [(validate.rules).uint32.gt = 0];
+  // removes route_y
+  uint32 route_num = 1;
 }
 
 message Action {
@@ -33,21 +38,11 @@ message Action {
 }
 
 message Config {
-  enum IpVersion {
-    IPv4 = 0;
-    IPv6 = 1;
-  }
-  enum ClientType {
-    ENVOY_GRPC = 0;
-    GOOGLE_GRPC = 1;
-  }
   enum SotwOrDelta {
     SOTW = 0;
     // DELTA = 1;
   }
-  IpVersion ip_version = 1;
-  ClientType client_type = 2;
-  SotwOrDelta sotw_or_delta = 3;
+  SotwOrDelta sotw_or_delta = 1;
 }
 
 message XdsTestCase {

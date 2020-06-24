@@ -46,8 +46,6 @@ public:
   void close();
 
 private:
-  void parseConfig(const test::server::config_validation::XdsTestCase& input);
-
   absl::optional<std::string> removeListener(uint32_t listener_num);
   absl::optional<std::string> removeRoute(uint32_t route_num);
 
@@ -55,15 +53,11 @@ private:
   std::vector<envoy::config::route::v3::RouteConfiguration> routes_;
   std::vector<envoy::config::listener::v3::Listener> listeners_;
 
-  std::vector<envoy::config::listener::v3::Listener> listener_pool_;
-  std::vector<envoy::config::route::v3::RouteConfiguration> route_pool_;
-
-  Network::Address::IpVersion ip_version_;
-  Grpc::ClientType client_type_;
-  Grpc::SotwOrDelta sotw_or_delta_;
-
   uint64_t version_;
   envoy::config::core::v3::ApiVersion api_version_;
+
+  Network::Address::IpVersion ip_version_;
+  Grpc::SotwOrDelta sotw_or_delta_;
 
   const size_t num_listeners_ = 3;
   const size_t num_routes_ = 5;
