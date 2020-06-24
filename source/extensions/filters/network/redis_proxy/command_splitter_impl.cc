@@ -135,9 +135,7 @@ void DelayFaultRequest::onDelayResponse() {
   callbacks_.onResponse(std::move(response_));
 }
 
-void DelayFaultRequest::cancel() {
-  delay_timer_->disableTimer();
-}
+void DelayFaultRequest::cancel() { delay_timer_->disableTimer(); }
 
 SplitRequestPtr SimpleRequest::create(Router& router,
                                       Common::Redis::RespValuePtr&& incoming_request,

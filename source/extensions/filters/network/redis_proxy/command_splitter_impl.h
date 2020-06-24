@@ -149,6 +149,9 @@ public:
   // SplitCallbacks
   bool connectionAllowed() override { return callbacks_.connectionAllowed(); }
   void onAuth(const std::string& password) override { callbacks_.onAuth(password); }
+  void onAuth(const std::string& username, const std::string& password) override {
+    callbacks_.onAuth(username, password);
+  }
   void onResponse(Common::Redis::RespValuePtr&& response) override;
 
   // RedisProxy::CommandSplitter::SplitRequest
