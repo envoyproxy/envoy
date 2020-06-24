@@ -48,6 +48,7 @@ private:
   std::unordered_map<std::string, TriggerPtr> triggers_;
   OverloadActionState state_;
   Stats::Gauge& active_gauge_;
+  Stats::Gauge& scaling_gauge_;
 };
 
 class OverloadManagerImpl : Logger::Loggable<Logger::Id::main>, public OverloadManager {

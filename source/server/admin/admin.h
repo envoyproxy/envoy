@@ -247,7 +247,8 @@ private:
   };
 
   /**
-   * Implementation of OverloadManager that is never overloaded.
+   * Implementation of OverloadManager that is never overloaded. Using this instead of the real
+   * OverloadManager keeps the admin interface accessible even when the proxy is overloaded.
    */
   struct NullOverloadManager : public OverloadManager {
     struct NullThreadOverloadState : public ThreadLocalOverloadState {

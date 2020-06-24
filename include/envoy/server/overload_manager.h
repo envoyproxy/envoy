@@ -54,6 +54,9 @@ using OverloadActionCb = std::function<void(OverloadActionState)>;
 
 /**
  * Factory function exposed by the overload manager for creating timers.
+ * @param class The type of timer being created. This can be used by overload actions that affect
+ * all timers of the same class.
+ * @param callback The callback to invoke when the timer is triggered.
  */
 using OverloadTimerFactory = std::function<Event::TimerPtr(absl::string_view, Event::TimerCb)>;
 
