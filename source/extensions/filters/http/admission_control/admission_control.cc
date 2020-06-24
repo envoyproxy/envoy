@@ -31,7 +31,7 @@ using GrpcStatus = Grpc::Status::GrpcStatus;
 static constexpr double defaultAggression = 2.0;
 
 AdmissionControlFilterConfig::AdmissionControlFilterConfig(
-    const AdmissionControlProto& proto_config, Runtime::Loader& runtime, TimeSource&,
+    const AdmissionControlProto& proto_config, Runtime::Loader& runtime,
     Runtime::RandomGenerator& random, Stats::Scope& scope, ThreadLocal::SlotPtr&& tls,
     std::shared_ptr<ResponseEvaluator> response_evaluator)
     : random_(random), scope_(scope), tls_(std::move(tls)),
@@ -122,8 +122,9 @@ AdmissionControlFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
 }
 
 bool AdmissionControlFilter::shouldRejectRequest() const {
-  const double total = config_->getController().requestTotalCount();
-  const double success = config_->getController().requestSuccessCount();
+  const auto request_counts = config_->getController().requestCounts();
+  const double total = request_counts.requests;
+  const double success = request_counts.successes;
   const double probability = (total - config_->aggression() * success) / (total + 1);
 
   // Choosing an accuracy of 4 significant figures for the probability.
