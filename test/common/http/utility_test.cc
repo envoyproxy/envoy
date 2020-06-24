@@ -1194,5 +1194,11 @@ TEST(PercentEncoding, Trailing) {
   EXPECT_EQ(Utility::PercentEncoding::decode("too%20large%"), "too large%");
 }
 
+TEST(PercentEncoding, Encoding) {
+  EXPECT_EQ(Utility::PercentEncoding::encode("too%large"), "too%25large");
+  EXPECT_EQ(Utility::PercentEncoding::encode("too%!large/"), "too%25!large/");
+  EXPECT_EQ(Utility::PercentEncoding::encode("too%!large/", "%!/"), "too%25%21large%2F");
+}
+
 } // namespace Http
 } // namespace Envoy

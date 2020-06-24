@@ -276,6 +276,7 @@ private:
   Upstream::HostVector hosts_;
   Upstream::HostMap all_hosts_;
 
+  const std::string auth_username_;
   const std::string auth_password_;
   const std::string cluster_name_;
   const Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager_;
