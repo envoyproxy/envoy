@@ -183,7 +183,7 @@ void ConnPoolImplBase::transitionActiveClientState(ActiveClient& client,
   }
 }
 
-void ConnPoolImplBase::addDrainedCallbackImpl(DrainedCb cb) {
+void ConnPoolImplBase::addDrainedCallbackImpl(Instance::DrainedCb cb) {
   drained_callbacks_.push_back(cb);
   checkForDrained();
 }
@@ -237,7 +237,7 @@ void ConnPoolImplBase::checkForDrained() {
   if (pending_requests_.empty() && ready_clients_.empty() && busy_clients_.empty() &&
       connecting_clients_.empty()) {
     ENVOY_LOG(debug, "invoking drained callbacks");
-    for (const DrainedCb& cb : drained_callbacks_) {
+    for (const Instance::DrainedCb& cb : drained_callbacks_) {
       cb();
     }
   }

@@ -95,16 +95,15 @@ using PendingRequestPtr = std::unique_ptr<PendingRequest>;
 using ActiveClientPtr = std::unique_ptr<ActiveClient>;
 
 // Base class that handles request queueing logic shared between connection pool implementations.
-class ConnPoolImplBase : protected Logger::Loggable<Logger::Id::pool>,
-                         public virtual ConnectionPool::Instance {
+class ConnPoolImplBase : protected Logger::Loggable<Logger::Id::pool> {
 public:
   ConnPoolImplBase(Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                    Event::Dispatcher& dispatcher,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
-  ~ConnPoolImplBase() override;
+  virtual ~ConnPoolImplBase();
 
-  void addDrainedCallbackImpl(DrainedCb cb);
+  void addDrainedCallbackImpl(Instance::DrainedCb cb);
   void drainConnectionsImpl();
 
   // Closes and destroys all connections. This must be called in the destructor of
@@ -165,7 +164,7 @@ public:
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
   const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
 
-  std::list<DrainedCb> drained_callbacks_;
+  std::list<Instance::DrainedCb> drained_callbacks_;
   std::list<PendingRequestPtr> pending_requests_;
 
   // When calling purgePendingRequests, this list will be used to hold the requests we are about
