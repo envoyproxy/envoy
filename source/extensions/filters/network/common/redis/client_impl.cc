@@ -285,8 +285,12 @@ void ClientImpl::PendingRequest::cancel() {
   canceled_ = true;
 }
 
-void ClientImpl::initialize(const std::string& auth_password) {
-  if (!auth_password.empty()) {
+void ClientImpl::initialize(const std::string& auth_username, const std::string& auth_password) {
+  if (!auth_username.empty()) {
+    // Send an AUTH command to the upstream server with username and password.
+    Utility::AuthRequest auth_request(auth_username, auth_password);
+    makeRequest(auth_request, null_pool_callbacks);
+  } else if (!auth_password.empty()) {
     // Send an AUTH command to the upstream server.
     Utility::AuthRequest auth_request(auth_password);
     makeRequest(auth_request, null_pool_callbacks);
@@ -304,10 +308,11 @@ ClientFactoryImpl ClientFactoryImpl::instance_;
 ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
                                     Event::Dispatcher& dispatcher, const Config& config,
                                     const RedisCommandStatsSharedPtr& redis_command_stats,
-                                    Stats::Scope& scope, const std::string& auth_password) {
+                                    Stats::Scope& scope, const std::string& auth_username,
+                                    const std::string& auth_password) {
   ClientPtr client = ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl()},
                                         decoder_factory_, config, redis_command_stats, scope);
-  client->initialize(auth_password);
+  client->initialize(auth_username, auth_password);
   return client;
 }
 
