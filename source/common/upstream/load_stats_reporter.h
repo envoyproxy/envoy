@@ -6,6 +6,7 @@
 
 #include "common/common/logger.h"
 #include "common/grpc/async_client_impl.h"
+#include "common/grpc/typed_async_client.h"
 
 namespace Envoy {
 namespace Upstream {

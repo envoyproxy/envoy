@@ -66,6 +66,7 @@ envoy_cc_library(
         "//include/envoy/event:timer_interface",
         "//include/envoy/network:connection_handler_interface",
         "//include/envoy/network:connection_interface",
+        "//include/envoy/network:exception_interface",
         "//include/envoy/network:filter_interface",
         "//include/envoy/network:listen_socket_interface",
         "//include/envoy/network:listener_interface",
@@ -140,10 +141,12 @@ envoy_cc_library(
         "//include/envoy/server:hot_restart_interface",
         "//include/envoy/server:instance_interface",
         "//include/envoy/server:options_interface",
+        "//include/envoy/stats:stats_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
         "//source/common/network:utility_lib",
+        "//source/common/stats:utility_lib",
     ],
 )
 
@@ -167,6 +170,7 @@ envoy_cc_library(
         "//source/common/memory:stats_lib",
         "//source/common/stats:stat_merger_lib",
         "//source/common/stats:symbol_table_lib",
+        "//source/common/stats:utility_lib",
     ],
 )
 
@@ -324,6 +328,9 @@ envoy_cc_library(
         "//source/extensions/filters/listener:well_known_names",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/transport_sockets:well_known_names",
+        "//source/extensions/upstreams/http/generic:config",
+        "//source/extensions/upstreams/http/http:config",
+        "//source/extensions/upstreams/http/tcp:config",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/api/v2/listener:pkg_cc_proto",
@@ -476,6 +483,7 @@ envoy_cc_library(
         "//include/envoy/api:api_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",
+        "//include/envoy/network:exception_interface",
         "//include/envoy/server:configuration_interface",
         "//include/envoy/server:guarddog_interface",
         "//include/envoy/server:listener_manager_interface",

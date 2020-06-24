@@ -365,16 +365,16 @@ bool IoSocketHandleImpl::supportsMmsg() const {
   return Api::OsSysCallsSingleton::get().supportsMmsg();
 }
 
-Api::SysCallIntResult IoSocketHandleImpl::bind(const sockaddr* address, socklen_t addrlen) {
-  return Api::OsSysCallsSingleton::get().bind(fd_, address, addrlen);
+Api::SysCallIntResult IoSocketHandleImpl::bind(Address::InstanceConstSharedPtr address) {
+  return Api::OsSysCallsSingleton::get().bind(fd_, address->sockAddr(), address->sockAddrLen());
 }
 
 Api::SysCallIntResult IoSocketHandleImpl::listen(int backlog) {
   return Api::OsSysCallsSingleton::get().listen(fd_, backlog);
 }
 
-Api::SysCallIntResult IoSocketHandleImpl::connect(const sockaddr* address, socklen_t addrlen) {
-  return Api::OsSysCallsSingleton::get().connect(fd_, address, addrlen);
+Api::SysCallIntResult IoSocketHandleImpl::connect(Address::InstanceConstSharedPtr address) {
+  return Api::OsSysCallsSingleton::get().connect(fd_, address->sockAddr(), address->sockAddrLen());
 }
 
 Api::SysCallIntResult IoSocketHandleImpl::setOption(int level, int optname, const void* optval,
@@ -387,12 +387,82 @@ Api::SysCallIntResult IoSocketHandleImpl::getOption(int level, int optname, void
   return Api::OsSysCallsSingleton::get().getsockopt(fd_, level, optname, optval, optlen);
 }
 
-Api::SysCallIntResult IoSocketHandleImpl::getLocalAddress(sockaddr* address, socklen_t* addrlen) {
-  return Api::OsSysCallsSingleton::get().getsockname(fd_, address, addrlen);
-}
-
 Api::SysCallIntResult IoSocketHandleImpl::setBlocking(bool blocking) {
   return Api::OsSysCallsSingleton::get().setsocketblocking(fd_, blocking);
+}
+
+absl::optional<int> IoSocketHandleImpl::domain() {
+  sockaddr_storage addr;
+  socklen_t len = sizeof(addr);
+  Api::SysCallIntResult result;
+
+  result = Api::OsSysCallsSingleton::get().getsockname(
+      fd_, reinterpret_cast<struct sockaddr*>(&addr), &len);
+
+  if (result.rc_ == 0) {
+    return {addr.ss_family};
+  }
+
+  return absl::nullopt;
+}
+
+Address::InstanceConstSharedPtr IoSocketHandleImpl::localAddress() {
+  sockaddr_storage ss;
+  socklen_t ss_len = sizeof(ss);
+  auto& os_sys_calls = Api::OsSysCallsSingleton::get();
+  Api::SysCallIntResult result =
+      os_sys_calls.getsockname(fd_, reinterpret_cast<sockaddr*>(&ss), &ss_len);
+  if (result.rc_ != 0) {
+    throw EnvoyException(fmt::format("getsockname failed for '{}': ({}) {}", fd_, result.errno_,
+                                     strerror(result.errno_)));
+  }
+  int socket_v6only = 0;
+  if (ss.ss_family == AF_INET6) {
+    socklen_t size_int = sizeof(socket_v6only);
+    result = os_sys_calls.getsockopt(fd_, IPPROTO_IPV6, IPV6_V6ONLY, &socket_v6only, &size_int);
+#ifdef WIN32
+    // On Windows, it is possible for this getsockopt() call to fail.
+    // This can happen if the address we are trying to connect to has nothing
+    // listening. So we can't use RELEASE_ASSERT and instead must throw an
+    // exception
+    if (SOCKET_FAILURE(result.rc_)) {
+      throw EnvoyException(fmt::format("getsockopt failed for '{}': ({}) {}", fd_, result.errno_,
+                                       strerror(result.errno_)));
+    }
+#else
+    RELEASE_ASSERT(result.rc_ == 0, "");
+#endif
+  }
+  return Address::addressFromSockAddr(ss, ss_len, socket_v6only);
+}
+
+Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
+  sockaddr_storage ss;
+  socklen_t ss_len = sizeof ss;
+  auto& os_sys_calls = Api::OsSysCallsSingleton::get();
+  Api::SysCallIntResult result =
+      os_sys_calls.getpeername(fd_, reinterpret_cast<sockaddr*>(&ss), &ss_len);
+  if (result.rc_ != 0) {
+    throw EnvoyException(
+        fmt::format("getpeername failed for '{}': {}", fd_, strerror(result.errno_)));
+  }
+#ifdef __APPLE__
+  if (ss_len == sizeof(sockaddr) && ss.ss_family == AF_UNIX)
+#else
+  if (ss_len == sizeof(sa_family_t) && ss.ss_family == AF_UNIX)
+#endif
+  {
+    // For Unix domain sockets, can't find out the peer name, but it should match our own
+    // name for the socket (i.e. the path should match, barring any namespace or other
+    // mechanisms to hide things, of which there are many).
+    ss_len = sizeof ss;
+    result = os_sys_calls.getsockname(fd_, reinterpret_cast<sockaddr*>(&ss), &ss_len);
+    if (result.rc_ != 0) {
+      throw EnvoyException(
+          fmt::format("getsockname failed for '{}': {}", fd_, strerror(result.errno_)));
+    }
+  }
+  return Address::addressFromSockAddr(ss, ss_len);
 }
 
 } // namespace Network

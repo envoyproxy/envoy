@@ -103,7 +103,9 @@ public:
       : api_(Api::createApiForTest(time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")), connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
+          SetQuicReloadableFlag(quic_enable_version_draft_28, GetParam());
           SetQuicReloadableFlag(quic_enable_version_draft_27, GetParam());
+          SetQuicReloadableFlag(quic_enable_version_draft_25_v3, GetParam());
           return quic::ParsedVersionOfIndex(quic::CurrentSupportedVersions(), 0);
         }()),
         listener_stats_({ALL_LISTENER_STATS(POOL_COUNTER(listener_config_.listenerScope()),
@@ -958,6 +960,116 @@ TEST_P(EnvoyQuicServerSessionTest, SendBufferWatermark) {
 
   EXPECT_TRUE(stream1->write_side_closed());
   EXPECT_TRUE(stream2->write_side_closed());
+}
+
+TEST_P(EnvoyQuicServerSessionTest, HeadersContributeToWatermarkGquic) {
+  if (quic::VersionUsesHttp3(quic_version_[0].transport_version)) {
+    installReadFilter();
+    return;
+  }
+  // Switch to a encryption forward secure crypto stream.
+  quic::test::QuicServerSessionBasePeer::SetCryptoStream(&envoy_quic_session_, nullptr);
+  quic::test::QuicServerSessionBasePeer::SetCryptoStream(
+      &envoy_quic_session_,
+      new TestQuicCryptoServerStream(&crypto_config_, &compressed_certs_cache_,
+                                     &envoy_quic_session_, &crypto_stream_helper_));
+  quic_connection_->SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
+  quic_connection_->SetEncrypter(
+      quic::ENCRYPTION_FORWARD_SECURE,
+      std::make_unique<quic::NullEncrypter>(quic::Perspective::IS_SERVER));
+  // Drive congestion control manually.
+  auto send_algorithm = new testing::NiceMock<quic::test::MockSendAlgorithm>;
+  quic::test::QuicConnectionPeer::SetSendAlgorithm(quic_connection_, send_algorithm);
+  EXPECT_CALL(*send_algorithm, PacingRate(_)).WillRepeatedly(Return(quic::QuicBandwidth::Zero()));
+  EXPECT_CALL(*send_algorithm, BandwidthEstimate())
+      .WillRepeatedly(Return(quic::QuicBandwidth::Zero()));
+  EXPECT_CALL(*quic_connection_, SendControlFrame(_)).Times(AnyNumber());
+
+  // Bump connection flow control window large enough not to interfere
+  // stream writing.
+  envoy_quic_session_.flow_controller()->UpdateSendWindowOffset(
+      10 * quic::kDefaultFlowControlSendWindow);
+  installReadFilter();
+  Http::MockRequestDecoder request_decoder;
+  Http::MockStreamCallbacks stream_callbacks;
+  EXPECT_CALL(http_connection_callbacks_, newStream(_, false))
+      .WillOnce(Invoke([&request_decoder, &stream_callbacks](Http::ResponseEncoder& encoder,
+                                                             bool) -> Http::RequestDecoder& {
+        encoder.getStream().addCallbacks(stream_callbacks);
+        return request_decoder;
+      }));
+  quic::QuicStreamId stream_id =
+      quic::VersionUsesHttp3(quic_version_[0].transport_version) ? 4u : 5u;
+  auto stream1 =
+      dynamic_cast<EnvoyQuicServerStream*>(envoy_quic_session_.GetOrCreateStream(stream_id));
+
+  // Receive a GET request on created stream.
+  quic::QuicHeaderList request_headers;
+  request_headers.OnHeaderBlockStart();
+  std::string host("www.abc.com");
+  request_headers.OnHeader(":authority", host);
+  request_headers.OnHeader(":method", "GET");
+  request_headers.OnHeader(":path", "/");
+  request_headers.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0, /*compressed_header_bytes=*/0);
+  // Request headers should be propagated to decoder.
+  EXPECT_CALL(request_decoder, decodeHeaders_(_, /*end_stream=*/true))
+      .WillOnce(Invoke([&host](const Http::RequestHeaderMapPtr& decoded_headers, bool) {
+        EXPECT_EQ(host, decoded_headers->getHostValue());
+        EXPECT_EQ("/", decoded_headers->getPathValue());
+        EXPECT_EQ(Http::Headers::get().MethodValues.Get, decoded_headers->getMethodValue());
+      }));
+  stream1->OnStreamHeaderList(/*fin=*/true, request_headers.uncompressed_header_bytes(),
+                              request_headers);
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  // Make connection congestion control blocked so headers are buffered.
+  EXPECT_CALL(*send_algorithm, CanSend(_)).WillRepeatedly(Return(false));
+  stream1->encodeHeaders(response_headers, false);
+  // Buffer a response slightly smaller than connection level watermark, but
+  // with the previously buffered headers, this write should reach high
+  // watermark.
+  std::string response(24 * 1024 - 1, 'a');
+  Buffer::OwnedImpl buffer(response);
+  // Triggered twice, once by stream, the other time by connection.
+  EXPECT_CALL(stream_callbacks, onAboveWriteBufferHighWatermark()).Times(2);
+  EXPECT_CALL(network_connection_callbacks_, onAboveWriteBufferHighWatermark)
+      .WillOnce(Invoke(
+          [this]() { http_connection_->onUnderlyingConnectionAboveWriteBufferHighWatermark(); }));
+  stream1->encodeData(buffer, false);
+  EXPECT_FALSE(envoy_quic_session_.IsConnectionFlowControlBlocked());
+
+  // Write the buffered data out till stream is flow control blocked. Both
+  // stream and connection level buffers should drop below watermark.
+  EXPECT_CALL(*send_algorithm, CanSend(_)).WillRepeatedly(Return(true));
+  EXPECT_CALL(*send_algorithm, GetCongestionWindow()).WillRepeatedly(Return(quic::kDefaultTCPMSS));
+  EXPECT_CALL(network_connection_callbacks_, onBelowWriteBufferLowWatermark)
+      .WillOnce(Invoke(
+          [this]() { http_connection_->onUnderlyingConnectionBelowWriteBufferLowWatermark(); }));
+  EXPECT_CALL(stream_callbacks, onBelowWriteBufferLowWatermark()).Times(2);
+  envoy_quic_session_.OnCanWrite();
+  EXPECT_TRUE(stream1->flow_controller()->IsBlocked());
+
+  // Buffer more response because of flow control. The buffered bytes become just below connection
+  // level high watermark.
+  std::string response1(16 * 1024 - 20, 'a');
+  Buffer::OwnedImpl buffer1(response1);
+  EXPECT_CALL(stream_callbacks, onAboveWriteBufferHighWatermark());
+  stream1->encodeData(buffer1, false);
+
+  // Make connection congestion control blocked again.
+  EXPECT_CALL(*send_algorithm, CanSend(_)).WillRepeatedly(Return(false));
+  // Buffering the trailers will cause connection to reach high watermark.
+  EXPECT_CALL(network_connection_callbacks_, onAboveWriteBufferHighWatermark)
+      .WillOnce(Invoke(
+          [this]() { http_connection_->onUnderlyingConnectionAboveWriteBufferHighWatermark(); }));
+  Http::TestResponseTrailerMapImpl response_trailers{{"trailer-key", "trailer-value"}};
+  stream1->encodeTrailers(response_trailers);
+
+  EXPECT_CALL(network_connection_callbacks_, onBelowWriteBufferLowWatermark)
+      .WillOnce(Invoke(
+          [this]() { http_connection_->onUnderlyingConnectionBelowWriteBufferLowWatermark(); }));
+  EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::LocalReset, _));
+  stream1->resetStream(Http::StreamResetReason::LocalReset);
 }
 
 } // namespace Quic

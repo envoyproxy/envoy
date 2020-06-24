@@ -265,6 +265,12 @@ modify different aspects of the server:
    :ref:`Listener <envoy_v3_api_msg_config.listener.v3.Listener>` is used to determine whether a listener 
    is inbound or outbound.
 
+   .. http:post:: /drain_listeners?graceful
+
+   When draining listeners, enter a graceful drain period prior to closing listeners. 
+   This behaviour and duration is configurable via server options or CLI 
+   (:option:`--drain-time-s` and :option:`--drain-strategy`).
+
 .. attention::
 
    This operation directly stops the matched listeners on workers. Once listeners in a given

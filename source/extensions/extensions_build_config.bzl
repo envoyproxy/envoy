@@ -41,6 +41,9 @@ EXTENSIONS = {
     #
 
     "envoy.filters.http.adaptive_concurrency":          "//source/extensions/filters/http/adaptive_concurrency:config",
+    # NOTE: The admission control filter does not have a proper filter
+    #       implemented right now. We are just referencing the filter lib here.
+    "envoy.filters.http.admission_control":             "//source/extensions/filters/http/admission_control:admission_control_filter_lib",
     "envoy.filters.http.aws_lambda":                    "//source/extensions/filters/http/aws_lambda:config",
     "envoy.filters.http.aws_request_signing":           "//source/extensions/filters/http/aws_request_signing:config",
     "envoy.filters.http.buffer":                        "//source/extensions/filters/http/buffer:config",
@@ -191,6 +194,7 @@ EXTENSIONS = {
     "envoy.internal_redirect_predicates.safe_cross_scheme":   "//source/extensions/internal_redirect/safe_cross_scheme:config",
 
     # Http Upstreams
+    # TODO(alyssawilk) these are linked in the default build and shouldn't be here: fix tooling and remove.
 
     "envoy.upstreams.http.generic":                     "//source/extensions/upstreams/http/generic:config",
     "envoy.upstreams.http.http":                     "//source/extensions/upstreams/http/http:config",

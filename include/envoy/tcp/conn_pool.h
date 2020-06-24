@@ -126,30 +126,14 @@ public:
 /**
  * An instance of a generic connection pool.
  */
-class Instance : public Event::DeferredDeletable {
+class Instance : public Envoy::ConnectionPool::Instance {
 public:
-  ~Instance() override = default;
-
   /**
-   * Called when a connection pool has been drained of pending requests, busy connections, and
-   * ready connections.
+   * Immediately close all existing connection pool connections. This method can be used in cases
+   * where the connection pool is not being destroyed, but the caller wishes to terminate all
+   * existing connections. For example, when a health check failure occurs.
    */
-  using DrainedCb = std::function<void()>;
-
-  /**
-   * Register a callback that gets called when the connection pool is fully drained. No actual
-   * draining is done. The owner of the connection pool is responsible for not creating any
-   * new connections.
-   */
-  virtual void addDrainedCallback(DrainedCb cb) PURE;
-
-  /**
-   * Actively drain all existing connection pool connections. This method can be used in cases
-   * where the connection pool is not being destroyed, but the caller wishes to make sure that
-   * all new requests take place on a new connection. For example, when a health check failure
-   * occurs.
-   */
-  virtual void drainConnections() PURE;
+  virtual void closeConnections() PURE;
 
   /**
    * Create a new connection on the pool.
@@ -163,11 +147,6 @@ public:
    *                      should be done by resetting the connection.
    */
   virtual Cancellable* newConnection(Callbacks& callbacks) PURE;
-
-  /**
-   * @return the description of the host this connection pool is for.
-   */
-  virtual Upstream::HostDescriptionConstSharedPtr host() const PURE;
 };
 
 using InstancePtr = std::unique_ptr<Instance>;

@@ -22,25 +22,24 @@ SocketImpl::SocketImpl(IoHandlePtr&& io_handle,
                        const Address::InstanceConstSharedPtr& local_address)
     : io_handle_(std::move(io_handle)), local_address_(local_address) {
 
+  if (local_address_ != nullptr) {
+    addr_type_ = local_address_->type();
+    return;
+  }
+
   // Should not happen but some tests inject -1 fds
   if (SOCKET_INVALID(io_handle_->fd())) {
-    addr_type_ = local_address != nullptr ? local_address->type() : Address::Type::Ip;
     return;
   }
 
-  sockaddr_storage addr;
-  socklen_t len = sizeof(addr);
-  Api::SysCallIntResult result;
-
-  result = io_handle_->getLocalAddress(reinterpret_cast<struct sockaddr*>(&addr), &len);
+  auto domain = io_handle_->domain();
 
   // This should never happen in practice but too many tests inject fake fds ...
-  if (result.rc_ < 0) {
-    addr_type_ = local_address != nullptr ? local_address->type() : Address::Type::Ip;
+  if (!domain.has_value()) {
     return;
   }
 
-  addr_type_ = addr.ss_family == AF_UNIX ? Address::Type::Pipe : Address::Type::Ip;
+  addr_type_ = *domain == AF_UNIX ? Address::Type::Pipe : Address::Type::Ip;
 }
 
 Api::SysCallIntResult SocketImpl::bind(Network::Address::InstanceConstSharedPtr address) {
@@ -57,7 +56,7 @@ Api::SysCallIntResult SocketImpl::bind(Network::Address::InstanceConstSharedPtr 
       unlink(pipe_sa->sun_path);
     }
     // Not storing a reference to syscalls singleton because of unit test mocks
-    bind_result = io_handle_->bind(address->sockAddr(), address->sockAddrLen());
+    bind_result = io_handle_->bind(address);
     if (pipe->mode() != 0 && !abstract_namespace && bind_result.rc_ == 0) {
       auto set_permissions = Api::OsSysCallsSingleton::get().chmod(pipe_sa->sun_path, pipe->mode());
       if (set_permissions.rc_ != 0) {
@@ -69,9 +68,9 @@ Api::SysCallIntResult SocketImpl::bind(Network::Address::InstanceConstSharedPtr 
     return bind_result;
   }
 
-  bind_result = io_handle_->bind(address->sockAddr(), address->sockAddrLen());
+  bind_result = io_handle_->bind(address);
   if (bind_result.rc_ == 0 && address->ip()->port() == 0) {
-    local_address_ = SocketInterfaceSingleton::get().addressFromFd(io_handle_->fd());
+    local_address_ = io_handle_->localAddress();
   }
   return bind_result;
 }
@@ -79,9 +78,9 @@ Api::SysCallIntResult SocketImpl::bind(Network::Address::InstanceConstSharedPtr 
 Api::SysCallIntResult SocketImpl::listen(int backlog) { return io_handle_->listen(backlog); }
 
 Api::SysCallIntResult SocketImpl::connect(const Network::Address::InstanceConstSharedPtr address) {
-  auto result = io_handle_->connect(address->sockAddr(), address->sockAddrLen());
+  auto result = io_handle_->connect(address);
   if (address->type() == Address::Type::Ip) {
-    local_address_ = SocketInterfaceSingleton::get().addressFromFd(io_handle_->fd());
+    local_address_ = io_handle_->localAddress();
   }
   return result;
 }
@@ -106,21 +105,17 @@ absl::optional<Address::IpVersion> SocketImpl::ipVersion() const {
     if (local_address_ != nullptr) {
       return local_address_->ip()->version();
     } else {
-#ifdef SOL_IP
-      int socket_domain;
-      socklen_t domain_len = sizeof(socket_domain);
-      auto result = getSocketOption(SOL_SOCKET, SO_DOMAIN, &socket_domain, &domain_len);
-      if (result.rc_ != 0) {
+      auto domain = io_handle_->domain();
+      if (!domain.has_value()) {
         return absl::nullopt;
       }
-      if (socket_domain == AF_INET) {
+      if (*domain == AF_INET) {
         return Address::IpVersion::v4;
-      } else if (socket_domain == AF_INET6) {
+      } else if (*domain == AF_INET6) {
         return Address::IpVersion::v6;
       } else {
         return absl::nullopt;
       }
-#endif
     }
   }
   return absl::nullopt;

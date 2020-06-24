@@ -53,6 +53,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "exception_interface",
+    hdrs = ["exception.h"],
+)
+
+envoy_cc_library(
     name = "filter_interface",
     hdrs = ["filter.h"],
     deps = [
@@ -75,6 +80,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "io_handle_interface",
     hdrs = ["io_handle.h"],
+    external_deps = ["abseil_optional"],
     deps = [
         ":address_interface",
         "//include/envoy/api:io_error_interface",

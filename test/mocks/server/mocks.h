@@ -192,6 +192,7 @@ public:
 
   // Server::DrainManager
   MOCK_METHOD(bool, drainClose, (), (const));
+  MOCK_METHOD(bool, draining, (), (const));
   MOCK_METHOD(void, startDrainSequence, (std::function<void()> completion));
   MOCK_METHOD(void, startParentShutdownSequence, ());
 
