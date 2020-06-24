@@ -85,7 +85,7 @@ jobs:
           adb install -r --no-incremental bazel-bin/examples/java/hello_world/hello_envoy.apk
           adb shell am start -n io.envoyproxy.envoymobile.helloenvoy/.MainActivity
         name: 'Start java app'
-      - run: 'adb logcat -e "successful response" -m 1'
+      - run: 'adb logcat -e "received headers with status 200" -m 1'
         name: 'Check liveliness'
   mackotlin:
     name: mac_kotlin_helloworld
@@ -118,7 +118,7 @@ jobs:
           adb install -r --no-incremental bazel-bin/examples/kotlin/hello_world/hello_envoy_kt.apk
           adb shell am start -n io.envoyproxy.envoymobile.helloenvoykotlin/.MainActivity
         name: 'Start kotlin app'
-      - run: 'adb logcat -e "successful response" -m 1'
+      - run: 'adb logcat -e "received headers with status 200" -m 1'
         name: 'Check liveliness'
   kotlintests:
     name: kotlin_tests

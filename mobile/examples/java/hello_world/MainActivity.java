@@ -21,7 +21,6 @@ import kotlin.Unit;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 
 public class MainActivity extends Activity {
   private static final String REQUEST_HANDLER_THREAD_NAME = "hello_envoy_java";
@@ -77,29 +76,24 @@ public class MainActivity extends Activity {
     RequestHeaders requestHeaders = new RequestHeadersBuilder(RequestMethod.GET, REQUEST_SCHEME,
                                                               REQUEST_AUTHORITY, REQUEST_PATH)
                                         .build();
-    AtomicReference<ResponseHeaders> responseHeaders = new AtomicReference<ResponseHeaders>();
     streamClient.newStreamPrototype()
-        .setOnResponseHeaders((headers, endStream) -> {
-          responseHeaders.set(headers);
-          Log.d("MainActivity", "successful response!");
-          return Unit.INSTANCE;
-        })
-        .setOnResponseData((buffer, endStream) -> {
-          Integer status = responseHeaders.get().getHttpStatus();
-          if (status == 200 && buffer.hasArray()) {
-            String serverHeaderField = responseHeaders.get().value(ENVOY_SERVER_HEADER).get(0);
-            String body = new String(buffer.array());
-            recyclerView.post(() -> viewAdapter.add(new Success(body, serverHeaderField)));
+        .setOnResponseHeaders((responseHeaders, endStream) -> {
+          Integer status = responseHeaders.getHttpStatus();
+          String message = "received headers with status " + status;
+          Log.d("MainActivity", message);
+          if (status == 200) {
+            String serverHeaderField = responseHeaders.value(ENVOY_SERVER_HEADER).get(0);
+            recyclerView.post(() -> viewAdapter.add(new Success(message, serverHeaderField)));
           } else {
-            recyclerView.post(() -> viewAdapter.add(new Failure("failed with status " + status)));
+            recyclerView.post(() -> viewAdapter.add(new Failure(message)));
           }
           return Unit.INSTANCE;
         })
         .setOnError((error) -> {
-          String msg = "failed with error after " + error.getAttemptCount() +
-                       " attempts: " + error.getMessage();
-          Log.d("MainActivity", msg);
-          recyclerView.post(() -> viewAdapter.add(new Failure(msg)));
+          String message = "failed with error after " + error.getAttemptCount() +
+                           " attempts: " + error.getMessage();
+          Log.d("MainActivity", message);
+          recyclerView.post(() -> viewAdapter.add(new Failure(message)));
           return Unit.INSTANCE;
         })
         .start(Executors.newSingleThreadExecutor())
