@@ -1,4 +1,5 @@
-Checks:           '-clang-analyzer-optin.cplusplus.UninitializedObject,
+Checks:           '-clang-analyzer-core.NonNullParamChecker,
+                   -clang-analyzer-optin.cplusplus.UninitializedObject,
                    abseil-duration-*,
                    abseil-faster-strsplit-delimiter,
                    abseil-no-namespace,

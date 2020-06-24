@@ -76,7 +76,7 @@ public:
 
 private:
   mutable absl::Mutex mu_;
-  std::vector<SpanData> spans_ GUARDED_BY(mu_);
+  std::vector<SpanData> spans_ ABSL_GUARDED_BY(mu_);
 };
 
 // Use a Singleton SpanCatcher.

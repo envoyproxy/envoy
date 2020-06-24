@@ -301,10 +301,9 @@ TEST_F(SubscriptionFactoryTest, LogWarningOnDeprecatedApi) {
   EXPECT_CALL(snapshot, runtimeFeatureEnabled(_)).WillOnce(Return(true));
   EXPECT_CALL(snapshot, countDeprecatedFeatureUse());
 
-  Upstream::ClusterManager::ClusterInfoMap cluster_map;
-  NiceMock<Upstream::MockClusterMockPrioritySet> cluster;
-  cluster_map.emplace("static_cluster", cluster);
-  EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
+  Upstream::ClusterManager::ClusterSet primary_clusters;
+  primary_clusters.insert("static_cluster");
+  EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
 
   EXPECT_LOG_CONTAINS(
       "warn", "xDS of version v2 has been deprecated", try {

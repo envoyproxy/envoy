@@ -99,8 +99,7 @@ MockOverloadManager::~MockOverloadManager() = default;
 MockListenerComponentFactory::MockListenerComponentFactory()
     : socket_(std::make_shared<NiceMock<Network::MockListenSocket>>()) {
   ON_CALL(*this, createListenSocket(_, _, _, _))
-      .WillByDefault(Invoke([&](Network::Address::InstanceConstSharedPtr,
-                                Network::Address::SocketType,
+      .WillByDefault(Invoke([&](Network::Address::InstanceConstSharedPtr, Network::Socket::Type,
                                 const Network::Socket::OptionsSharedPtr& options,
                                 const ListenSocketCreationParams&) -> Network::SocketSharedPtr {
         if (!Network::Socket::applyOptions(options, *socket_,
@@ -303,6 +302,9 @@ MockTracerFactoryContext::MockTracerFactoryContext() {
 }
 
 MockTracerFactoryContext::~MockTracerFactoryContext() = default;
+
+MockBootstrapExtensionFactory::MockBootstrapExtensionFactory() = default;
+MockBootstrapExtensionFactory::~MockBootstrapExtensionFactory() = default;
 } // namespace Configuration
 } // namespace Server
 } // namespace Envoy

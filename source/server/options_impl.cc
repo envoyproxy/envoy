@@ -59,6 +59,13 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   TCLAP::ValueArg<uint32_t> base_id(
       "", "base-id", "base ID so that multiple envoys can run on the same host if needed", false, 0,
       "uint32_t", cmd);
+  TCLAP::SwitchArg use_dynamic_base_id(
+      "", "use-dynamic-base-id",
+      "the server chooses a base ID dynamically. Supersedes a static base ID. May not be used "
+      "when the restart epoch is non-zero.",
+      cmd, false);
+  TCLAP::ValueArg<std::string> base_id_path(
+      "", "base-id-path", "path to which the base ID is written", false, "", "string", cmd);
   TCLAP::ValueArg<uint32_t> concurrency("", "concurrency", "# of worker threads to run", false,
                                         std::thread::hardware_concurrency(), "uint32_t", cmd);
   TCLAP::ValueArg<std::string> config_path("c", "config-path", "Path to configuration file", false,
@@ -124,6 +131,10 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   TCLAP::ValueArg<uint32_t> drain_time_s("", "drain-time-s",
                                          "Hot restart and LDS removal drain time in seconds", false,
                                          600, "uint32_t", cmd);
+  TCLAP::ValueArg<std::string> drain_strategy(
+      "", "drain-strategy",
+      "Hot restart drain sequence behaviour, one of 'gradual' (default) or 'immediate'.", false,
+      "gradual", "string", cmd);
   TCLAP::ValueArg<uint32_t> parent_shutdown_time_s("", "parent-shutdown-time-s",
                                                    "Hot restart parent shutdown time in seconds",
                                                    false, 900, "uint32_t", cmd);
@@ -209,9 +220,16 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
         fmt::format("error: unknown IP address version '{}'", local_address_ip_version.getValue());
     throw MalformedArgvException(message);
   }
+  base_id_ = base_id.getValue();
+  use_dynamic_base_id_ = use_dynamic_base_id.getValue();
+  base_id_path_ = base_id_path.getValue();
+  restart_epoch_ = restart_epoch.getValue();
 
-  // For base ID, scale what the user inputs by 10 so that we have spread for domain sockets.
-  base_id_ = base_id.getValue() * 10;
+  if (use_dynamic_base_id_ && restart_epoch_ > 0) {
+    const std::string message = fmt::format(
+        "error: cannot use --restart-epoch={} with --use-dynamic-base-id", restart_epoch_);
+    throw MalformedArgvException(message);
+  }
 
   if (!concurrency.isSet() && cpuset_threads_) {
     // The 'concurrency' command line option wasn't set but the 'cpuset-threads'
@@ -241,13 +259,21 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   ignore_unknown_dynamic_fields_ = ignore_unknown_dynamic_fields.getValue();
   admin_address_path_ = admin_address_path.getValue();
   log_path_ = log_path.getValue();
-  restart_epoch_ = restart_epoch.getValue();
   service_cluster_ = service_cluster.getValue();
   service_node_ = service_node.getValue();
   service_zone_ = service_zone.getValue();
   file_flush_interval_msec_ = std::chrono::milliseconds(file_flush_interval_msec.getValue());
   drain_time_ = std::chrono::seconds(drain_time_s.getValue());
   parent_shutdown_time_ = std::chrono::seconds(parent_shutdown_time_s.getValue());
+
+  if (drain_strategy.getValue() == "immediate") {
+    drain_strategy_ = Server::DrainStrategy::Immediate;
+  } else if (drain_strategy.getValue() == "gradual") {
+    drain_strategy_ = Server::DrainStrategy::Gradual;
+  } else {
+    throw MalformedArgvException(
+        fmt::format("error: unknown drain-strategy '{}'", mode.getValue()));
+  }
 
   if (hot_restart_version_option.getValue()) {
     std::cerr << hot_restart_version_cb(!hot_restart_disabled_);
@@ -320,6 +346,8 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
   Server::CommandLineOptionsPtr command_line_options =
       std::make_unique<envoy::admin::v3::CommandLineOptions>();
   command_line_options->set_base_id(baseId());
+  command_line_options->set_use_dynamic_base_id(useDynamicBaseId());
+  command_line_options->set_base_id_path(baseIdPath());
   command_line_options->set_concurrency(concurrency());
   command_line_options->set_config_path(configPath());
   command_line_options->set_config_yaml(configYaml());
@@ -350,10 +378,15 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
   }
   command_line_options->mutable_file_flush_interval()->MergeFrom(
       Protobuf::util::TimeUtil::MillisecondsToDuration(fileFlushIntervalMsec().count()));
-  command_line_options->mutable_parent_shutdown_time()->MergeFrom(
-      Protobuf::util::TimeUtil::SecondsToDuration(parentShutdownTime().count()));
+
   command_line_options->mutable_drain_time()->MergeFrom(
       Protobuf::util::TimeUtil::SecondsToDuration(drainTime().count()));
+  command_line_options->set_drain_strategy(drainStrategy() == Server::DrainStrategy::Immediate
+                                               ? envoy::admin::v3::CommandLineOptions::Immediate
+                                               : envoy::admin::v3::CommandLineOptions::Gradual);
+  command_line_options->mutable_parent_shutdown_time()->MergeFrom(
+      Protobuf::util::TimeUtil::SecondsToDuration(parentShutdownTime().count()));
+
   command_line_options->set_disable_hot_restart(hotRestartDisabled());
   command_line_options->set_enable_mutex_tracing(mutexTracingEnabled());
   command_line_options->set_cpuset_threads(cpusetThreadsEnabled());
@@ -366,14 +399,15 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
 
 OptionsImpl::OptionsImpl(const std::string& service_cluster, const std::string& service_node,
                          const std::string& service_zone, spdlog::level::level_enum log_level)
-    : base_id_(0u), concurrency_(1u), config_path_(""), config_yaml_(""),
+    : base_id_(0u), use_dynamic_base_id_(false), base_id_path_(""), concurrency_(1u),
+      config_path_(""), config_yaml_(""),
       local_address_ip_version_(Network::Address::IpVersion::v4), log_level_(log_level),
       log_format_(Logger::Logger::DEFAULT_LOG_FORMAT), log_format_escaped_(false),
       restart_epoch_(0u), service_cluster_(service_cluster), service_node_(service_node),
       service_zone_(service_zone), file_flush_interval_msec_(10000), drain_time_(600),
-      parent_shutdown_time_(900), mode_(Server::Mode::Serve), hot_restart_disabled_(false),
-      signal_handling_enabled_(true), mutex_tracing_enabled_(false), cpuset_threads_(false),
-      fake_symbol_table_enabled_(false) {}
+      parent_shutdown_time_(900), drain_strategy_(Server::DrainStrategy::Gradual),
+      mode_(Server::Mode::Serve), hot_restart_disabled_(false), signal_handling_enabled_(true),
+      mutex_tracing_enabled_(false), cpuset_threads_(false), fake_symbol_table_enabled_(false) {}
 
 void OptionsImpl::disableExtensions(const std::vector<std::string>& names) {
   for (const auto& name : names) {

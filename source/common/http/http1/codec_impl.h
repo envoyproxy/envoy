@@ -95,7 +95,8 @@ public:
 
 protected:
   StreamEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter);
-  void setIsContentLengthAllowed(bool value) { is_content_length_allowed_ = value; }
+  void setIs1xx(bool value) { is_1xx_ = value; }
+  void setIs204(bool value) { is_204_ = value; }
   void encodeHeadersBase(const RequestOrResponseHeaderMap& headers, bool end_stream);
   void encodeTrailersBase(const HeaderMap& headers);
 
@@ -109,7 +110,8 @@ protected:
   bool processing_100_continue_ : 1;
   bool is_response_to_head_request_ : 1;
   bool is_response_to_connect_request_ : 1;
-  bool is_content_length_allowed_ : 1;
+  bool is_1xx_ : 1;
+  bool is_204_ : 1;
 
 private:
   /**
@@ -236,6 +238,8 @@ public:
   void onUnderlyingConnectionAboveWriteBufferHighWatermark() override { onAboveHighWatermark(); }
   void onUnderlyingConnectionBelowWriteBufferLowWatermark() override { onBelowLowWatermark(); }
 
+  bool strict1xxAnd204Headers() { return strict_1xx_and_204_headers_; }
+
 protected:
   ConnectionImpl(Network::Connection& connection, CodecStats& stats, http_parser_type type,
                  uint32_t max_headers_kb, const uint32_t max_headers_count,
@@ -261,6 +265,7 @@ protected:
   const bool connection_header_sanitization_ : 1;
   const bool enable_trailers_ : 1;
   const bool reject_unsupported_transfer_encodings_ : 1;
+  const bool strict_1xx_and_204_headers_ : 1;
 
 private:
   enum class HeaderParsingState { Field, Value, Done };
@@ -485,12 +490,12 @@ private:
   }
   void allocHeaders() override {
     ASSERT(nullptr == absl::get<RequestHeaderMapPtr>(headers_or_trailers_));
-    headers_or_trailers_.emplace<RequestHeaderMapPtr>(std::make_unique<RequestHeaderMapImpl>());
+    headers_or_trailers_.emplace<RequestHeaderMapPtr>(RequestHeaderMapImpl::create());
   }
   void maybeAllocTrailers() override {
     ASSERT(processing_trailers_);
     if (!absl::holds_alternative<RequestTrailerMapPtr>(headers_or_trailers_)) {
-      headers_or_trailers_.emplace<RequestTrailerMapPtr>(std::make_unique<RequestTrailerMapImpl>());
+      headers_or_trailers_.emplace<RequestTrailerMapPtr>(RequestTrailerMapImpl::create());
     }
   }
 
@@ -568,13 +573,12 @@ private:
   }
   void allocHeaders() override {
     ASSERT(nullptr == absl::get<ResponseHeaderMapPtr>(headers_or_trailers_));
-    headers_or_trailers_.emplace<ResponseHeaderMapPtr>(std::make_unique<ResponseHeaderMapImpl>());
+    headers_or_trailers_.emplace<ResponseHeaderMapPtr>(ResponseHeaderMapImpl::create());
   }
   void maybeAllocTrailers() override {
     ASSERT(processing_trailers_);
     if (!absl::holds_alternative<ResponseTrailerMapPtr>(headers_or_trailers_)) {
-      headers_or_trailers_.emplace<ResponseTrailerMapPtr>(
-          std::make_unique<ResponseTrailerMapImpl>());
+      headers_or_trailers_.emplace<ResponseTrailerMapPtr>(ResponseTrailerMapImpl::create());
     }
   }
 

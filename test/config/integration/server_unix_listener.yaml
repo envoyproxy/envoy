@@ -39,7 +39,7 @@ static_resources:
 cluster_manager: {}
 watchdog: {}
 admin:
-  access_log_path: "/dev/null"
+  access_log_path: "{{ null_device_path }}"
   address:
     socket_address:
       address: "{{ ip_loopback_address }}"

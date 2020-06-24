@@ -154,10 +154,11 @@ IntegrationTcpClient::IntegrationTcpClient(Event::Dispatcher& dispatcher,
                                            bool enable_half_close)
     : payload_reader_(new WaitForPayloadReader(dispatcher)),
       callbacks_(new ConnectionCallbacks(*this)) {
-  EXPECT_CALL(factory, create_(_, _))
-      .WillOnce(Invoke([&](std::function<void()> below_low,
-                           std::function<void()> above_high) -> Buffer::Instance* {
-        client_write_buffer_ = new NiceMock<MockWatermarkBuffer>(below_low, above_high);
+  EXPECT_CALL(factory, create_(_, _, _))
+      .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
+                           std::function<void()> above_overflow) -> Buffer::Instance* {
+        client_write_buffer_ =
+            new NiceMock<MockWatermarkBuffer>(below_low, above_high, above_overflow);
         return client_write_buffer_;
       }));
 
@@ -264,10 +265,10 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
   // complex test hooks to the server and/or spin waiting on stats, neither of which I think are
   // necessary right now.
   timeSystem().advanceTimeWait(std::chrono::milliseconds(10));
-  ON_CALL(*mock_buffer_factory_, create_(_, _))
-      .WillByDefault(Invoke([](std::function<void()> below_low,
-                               std::function<void()> above_high) -> Buffer::Instance* {
-        return new Buffer::WatermarkBuffer(below_low, above_high);
+  ON_CALL(*mock_buffer_factory_, create_(_, _, _))
+      .WillByDefault(Invoke([](std::function<void()> below_low, std::function<void()> above_high,
+                               std::function<void()> above_overflow) -> Buffer::Instance* {
+        return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
       }));
   ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
 }
@@ -363,7 +364,7 @@ void BaseIntegrationTest::createEnvoy() {
                  MessageUtil::getYamlStringFromMessage(bootstrap));
 
   const std::string bootstrap_path = TestEnvironment::writeStringToFileForTest(
-      "bootstrap.json", MessageUtil::getJsonStringFromMessage(bootstrap));
+      "bootstrap.pb", TestUtility::getProtobufBinaryStringFromMessage(bootstrap));
 
   std::vector<std::string> named_ports;
   const auto& static_resources = config_helper_.bootstrap().static_resources();
@@ -453,10 +454,10 @@ std::string getListenerDetails(Envoy::Server::Instance& server) {
 void BaseIntegrationTest::createGeneratedApiTestServer(
     const std::string& bootstrap_path, const std::vector<std::string>& port_names,
     Server::FieldValidationConfig validator_config, bool allow_lds_rejection) {
-  test_server_ = IntegrationTestServer::create(bootstrap_path, version_, on_server_ready_function_,
-                                               on_server_init_function_, deterministic_,
-                                               timeSystem(), *api_, defer_listener_finalization_,
-                                               process_object_, validator_config, concurrency_);
+  test_server_ = IntegrationTestServer::create(
+      bootstrap_path, version_, on_server_ready_function_, on_server_init_function_, deterministic_,
+      timeSystem(), *api_, defer_listener_finalization_, process_object_, validator_config,
+      concurrency_, drain_time_, drain_strategy_, use_real_stats_);
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0 &&
       !defer_listener_finalization_) {
 
@@ -502,14 +503,6 @@ void BaseIntegrationTest::createApiTestServer(const ApiFilesystemConfig& api_fil
                                    {{"cds_json_path", cds_path}, {"lds_json_path", lds_path}},
                                    port_map_, version_),
                                port_names, validator_config, allow_lds_rejection);
-}
-
-void BaseIntegrationTest::createTestServer(const std::string& json_path,
-                                           const std::vector<std::string>& port_names) {
-  test_server_ = createIntegrationTestServer(
-      TestEnvironment::temporaryFileSubstitute(json_path, port_map_, version_), nullptr, nullptr,
-      timeSystem());
-  registerTestServerPorts(port_names);
 }
 
 void BaseIntegrationTest::sendRawHttpAndWaitForResponse(int port, const char* raw_http,
@@ -581,7 +574,7 @@ void BaseIntegrationTest::createXdsUpstream() {
   } else {
     envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
     auto* common_tls_context = tls_context.mutable_common_tls_context();
-    common_tls_context->add_alpn_protocols("h2");
+    common_tls_context->add_alpn_protocols(Http::Utility::AlpnNames::get().Http2);
     auto* tls_cert = common_tls_context->add_tls_certificates();
     tls_cert->mutable_certificate_chain()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"));

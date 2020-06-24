@@ -35,14 +35,7 @@ class MySQLIntegrationTest : public testing::TestWithParam<Network::Address::IpV
 public:
   MySQLIntegrationTest() : BaseIntegrationTest(GetParam(), mysqlConfig()){};
 
-  // Initializer for an individual integration test.
   void SetUp() override { BaseIntegrationTest::initialize(); }
-
-  // Destructor for an individual integration test.
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, MySQLIntegrationTest,

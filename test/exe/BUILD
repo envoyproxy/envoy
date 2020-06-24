@@ -1,11 +1,11 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
     "envoy_package",
     "envoy_sh_test",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -17,8 +17,9 @@ envoy_sh_test(
         "//bazel:raw_build_id.ldscript",
         "//source/exe:envoy-static",
     ],
-    # The sh_test helper from Bazel does not work as expected, see: https://github.com/bazelbuild/bazel/issues/10959
-    tags = ["fails_on_windows"],
+    # The Windows equivalent of a binaries' "link stamp" is a resource file descriptor of the
+    # executable. Our build revision API and output of --version flags are sufficient for now.
+    tags = ["skip_on_windows"],
 )
 
 envoy_sh_test(
@@ -26,13 +27,12 @@ envoy_sh_test(
     srcs = ["envoy_static_test.sh"],
     coverage = False,
     data = ["//source/exe:envoy-static"],
-    # For windows, we expect to use a .ps1 script that leverages dumpbin.exe, see:
+    # TODO(Windows): expect to test to leverage dumpbin.exe to confirm we avoid msvcrt, see
     #   https://github.com/envoyproxy/envoy/pull/8280#pullrequestreview-290187328
-    # The sh_test helper from Bazel does not work as expected, see: https://github.com/bazelbuild/bazel/issues/10959
     # Sanitizers doesn't like statically linked lib(std)c++ and libgcc, skip this test in that context.
     tags = [
-        "fails_on_windows",
         "no_san",
+        "skip_on_windows",
     ],
 )
 
@@ -57,8 +57,6 @@ envoy_sh_test(
         "//bazel:raw_build_id.ldscript",
         "//source/exe:envoy-static",
     ],
-    # The sh_test helper from Bazel does not work as expected, see: https://github.com/bazelbuild/bazel/issues/10959
-    tags = ["fails_on_windows"],
 )
 
 envoy_cc_test(
@@ -68,6 +66,7 @@ envoy_cc_test(
     deps = [
         "//source/common/api:api_lib",
         "//source/exe:envoy_main_common_lib",
+        "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:contention_lib",
         "//test/test_common:environment_lib",
     ],

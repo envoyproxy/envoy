@@ -45,6 +45,32 @@ namespace CommonUtility = ::Envoy::Http2::Utility;
 
 class Http2CodecImplTestFixture {
 public:
+  // The Http::Connection::dispatch method does not throw (any more). However unit tests in this
+  // file use codecs for sending test data through mock network connections to the codec under test.
+  // It is infeasible to plumb error codes returned by the dispatch() method of the codecs under
+  // test, through mock connections and sending codec. As a result error returned by the dispatch
+  // method of the codec under test invoked by the ConnectionWrapper is thrown as an exception. Note
+  // that exception goes only through the mock network connection and sending codec, i.e. it is
+  // thrown only through the test harness code. Specific exception types are to distinguish error
+  // codes returned when processing requests or responses.
+  // TODO(yanavlasov): modify the code to verify test expectations at the point of calling codec
+  //                   under test through the ON_CALL expectations in the
+  //                   setupDefaultConnectionMocks() method. This will make the exceptions below
+  //                   unnecessary.
+  struct ClientCodecError : public std::runtime_error {
+    ClientCodecError(Http::Status&& status)
+        : std::runtime_error(std::string(status.message())), status_(std::move(status)) {}
+    const char* what() const noexcept override { return status_.message().data(); }
+    const Http::Status status_;
+  };
+
+  struct ServerCodecError : public std::runtime_error {
+    ServerCodecError(Http::Status&& status)
+        : std::runtime_error(std::string(status.message())), status_(std::move(status)) {}
+    const char* what() const noexcept override { return status_.message().data(); }
+    const Http::Status status_;
+  };
+
   struct ConnectionWrapper {
     Http::Status dispatch(const Buffer::Instance& data, ConnectionImpl& connection) {
       Http::Status status = Http::okStatus();
@@ -61,26 +87,6 @@ public:
         }
       }
       return status;
-    }
-
-    // TODO(#10878): This test uses the innerDispatch which may throw exceptions while
-    // exception removal is in progress. Tests override MockConnection's write with this
-    // method. Connection::write can be called while dispatching data in a codec callback, or
-    // outside a dispatching context (for example, in RequestEncoder::encodeHeaders) where they are
-    // not caught like in Connection::dispatch. In practice, these would never be triggered since
-    // these inputs would fail parsing on ingress.
-    // This should be removed, and the throws that are expected outside of dispatching context
-    // should be replaced with error handling.
-    void innerDispatch(const Buffer::Instance& data, ConnectionImpl& connection) {
-      Http::Status status;
-      buffer_.add(data);
-      if (!dispatching_) {
-        while (buffer_.length() > 0) {
-          dispatching_ = true;
-          status = connection.innerDispatch(buffer_);
-          dispatching_ = false;
-        }
-      }
     }
 
     bool dispatching_{};
@@ -126,11 +132,17 @@ public:
           if (corrupt_metadata_frame_) {
             corruptMetadataFramePayload(data);
           }
-          server_wrapper_.innerDispatch(data, *server_);
+          auto status = server_wrapper_.dispatch(data, *server_);
+          if (!status.ok()) {
+            throw ServerCodecError(std::move(status));
+          }
         }));
     ON_CALL(server_connection_, write(_, _))
         .WillByDefault(Invoke([&](Buffer::Instance& data, bool) -> void {
-          client_wrapper_.innerDispatch(data, *client_);
+          auto status = client_wrapper_.dispatch(data, *client_);
+          if (!status.ok()) {
+            throw ClientCodecError(std::move(status));
+          }
         }));
   }
 
@@ -340,7 +352,7 @@ TEST_P(Http2CodecImplTest, InvalidContinueWithFin) {
   request_encoder_->encodeHeaders(request_headers, true);
 
   TestResponseHeaderMapImpl continue_headers{{":status", "100"}};
-  EXPECT_THROW(response_encoder_->encodeHeaders(continue_headers, true), CodecProtocolException);
+  EXPECT_THROW(response_encoder_->encodeHeaders(continue_headers, true), ClientCodecError);
   EXPECT_EQ(1, stats_store_.counter("http2.rx_messaging_error").value());
 }
 
@@ -386,7 +398,7 @@ TEST_P(Http2CodecImplTest, InvalidRepeatContinue) {
   EXPECT_CALL(response_decoder_, decode100ContinueHeaders_(_));
   response_encoder_->encode100ContinueHeaders(continue_headers);
 
-  EXPECT_THROW(response_encoder_->encodeHeaders(continue_headers, true), CodecProtocolException);
+  EXPECT_THROW(response_encoder_->encodeHeaders(continue_headers, true), ClientCodecError);
   EXPECT_EQ(1, stats_store_.counter("http2.rx_messaging_error").value());
 };
 
@@ -440,7 +452,7 @@ TEST_P(Http2CodecImplTest, Invalid103) {
   response_encoder_->encodeHeaders(early_hint_headers, false);
 
   EXPECT_THROW_WITH_MESSAGE(response_encoder_->encodeHeaders(early_hint_headers, false),
-                            CodecProtocolException, "Unexpected 'trailers' with no end stream.");
+                            ClientCodecError, "Unexpected 'trailers' with no end stream.");
   EXPECT_EQ(1, stats_store_.counter("http2.too_many_header_frames").value());
 }
 
@@ -461,7 +473,7 @@ TEST_P(Http2CodecImplTest, Invalid204WithContentLength) {
     response_headers.addCopy(std::to_string(i), std::to_string(i));
   }
 
-  EXPECT_THROW(response_encoder_->encodeHeaders(response_headers, false), CodecProtocolException);
+  EXPECT_THROW(response_encoder_->encodeHeaders(response_headers, false), ClientCodecError);
   EXPECT_EQ(1, stats_store_.counter("http2.rx_messaging_error").value());
 };
 
@@ -523,8 +535,7 @@ TEST_P(Http2CodecImplTest, RefusedStreamReset) {
 TEST_P(Http2CodecImplTest, InvalidHeadersFrame) {
   initialize();
 
-  EXPECT_THROW(request_encoder_->encodeHeaders(TestRequestHeaderMapImpl{}, true),
-               CodecProtocolException);
+  EXPECT_THROW(request_encoder_->encodeHeaders(TestRequestHeaderMapImpl{}, true), ServerCodecError);
   EXPECT_EQ(1, stats_store_.counter("http2.rx_messaging_error").value());
 }
 
@@ -681,7 +692,7 @@ TEST_P(Http2CodecImplTest, BadMetadataVecReceivedTest) {
   metadata_map_vector.push_back(std::move(metadata_map_ptr));
 
   corrupt_metadata_frame_ = true;
-  EXPECT_THROW_WITH_MESSAGE(request_encoder_->encodeMetadata(metadata_map_vector), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(request_encoder_->encodeMetadata(metadata_map_vector), ServerCodecError,
                             "The user callback function failed");
 }
 
@@ -843,7 +854,7 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   EXPECT_EQ(initial_stream_window + 1, client_->getStream(1)->pending_send_data_.length());
 
   // Now create a second stream on the connection.
-  MockStreamDecoder response_decoder2;
+  MockResponseDecoder response_decoder2;
   RequestEncoder* request_encoder2 = &client_->newStream(response_decoder_);
   StreamEncoder* response_encoder2;
   MockStreamCallbacks server_stream_callbacks2;
@@ -1540,7 +1551,7 @@ TEST_P(Http2CodecImplTest, PingFlood) {
         buffer.move(frame);
       }));
 
-  EXPECT_THROW(client_->sendPendingFrames(), FrameFloodException);
+  EXPECT_THROW(client_->sendPendingFrames(), ServerCodecError);
   EXPECT_EQ(ack_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES);
   EXPECT_EQ(1, stats_store_.counter("http2.outbound_control_flood").value());
 }
@@ -1606,7 +1617,7 @@ TEST_P(Http2CodecImplTest, PingFloodCounterReset) {
 
   // 1 more ping frame should overflow the outbound frame limit.
   EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
-  EXPECT_THROW(client_->sendPendingFrames(), FrameFloodException);
+  EXPECT_THROW(client_->sendPendingFrames(), ServerCodecError);
 }
 
 // Verify that codec detects flood of outbound HEADER frames
@@ -1633,7 +1644,7 @@ TEST_P(Http2CodecImplTest, ResponseHeadersFlood) {
   // Presently flood mitigation is done only when processing downstream data
   // So we need to send stream from downstream client to trigger mitigation
   EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
-  EXPECT_THROW(client_->sendPendingFrames(), FrameFloodException);
+  EXPECT_THROW(client_->sendPendingFrames(), ServerCodecError);
 
   EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
   EXPECT_EQ(1, stats_store_.counter("http2.outbound_flood").value());
@@ -1666,7 +1677,7 @@ TEST_P(Http2CodecImplTest, ResponseDataFlood) {
   // Presently flood mitigation is done only when processing downstream data
   // So we need to send stream from downstream client to trigger mitigation
   EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
-  EXPECT_THROW(client_->sendPendingFrames(), FrameFloodException);
+  EXPECT_THROW(client_->sendPendingFrames(), ServerCodecError);
 
   EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
   EXPECT_EQ(1, stats_store_.counter("http2.outbound_flood").value());
@@ -1740,7 +1751,7 @@ TEST_P(Http2CodecImplTest, ResponseDataFloodCounterReset) {
   // Presently flood mitigation is done only when processing downstream data
   // So we need to send a frame from downstream client to trigger mitigation
   EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
-  EXPECT_THROW(client_->sendPendingFrames(), FrameFloodException);
+  EXPECT_THROW(client_->sendPendingFrames(), ServerCodecError);
 }
 
 // Verify that control frames are added to the counter of outbound frames of all types.
@@ -1769,7 +1780,7 @@ TEST_P(Http2CodecImplTest, PingStacksWithDataFlood) {
   }
   // Send one PING frame above the outbound queue size limit
   EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
-  EXPECT_THROW(client_->sendPendingFrames(), FrameFloodException);
+  EXPECT_THROW(client_->sendPendingFrames(), ServerCodecError);
 
   EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES);
   EXPECT_EQ(1, stats_store_.counter("http2.outbound_flood").value());
@@ -1777,7 +1788,7 @@ TEST_P(Http2CodecImplTest, PingStacksWithDataFlood) {
 
 TEST_P(Http2CodecImplTest, PriorityFlood) {
   priorityFlood();
-  EXPECT_THROW(client_->sendPendingFrames(), FrameFloodException);
+  EXPECT_THROW(client_->sendPendingFrames(), ServerCodecError);
 }
 
 TEST_P(Http2CodecImplTest, PriorityFloodOverride) {
@@ -1789,7 +1800,7 @@ TEST_P(Http2CodecImplTest, PriorityFloodOverride) {
 
 TEST_P(Http2CodecImplTest, WindowUpdateFlood) {
   windowUpdateFlood();
-  EXPECT_THROW(client_->sendPendingFrames(), FrameFloodException);
+  EXPECT_THROW(client_->sendPendingFrames(), ServerCodecError);
 }
 
 TEST_P(Http2CodecImplTest, WindowUpdateFloodOverride) {
@@ -1802,7 +1813,9 @@ TEST_P(Http2CodecImplTest, EmptyDataFlood) {
   Buffer::OwnedImpl data;
   emptyDataFlood(data);
   EXPECT_CALL(request_decoder_, decodeData(_, false));
-  EXPECT_THROW(server_wrapper_.innerDispatch(data, *server_), FrameFloodException);
+  auto status = server_wrapper_.dispatch(data, *server_);
+  EXPECT_FALSE(status.ok());
+  EXPECT_TRUE(isBufferFloodError(status));
 }
 
 TEST_P(Http2CodecImplTest, EmptyDataFloodOverride) {
@@ -1933,11 +1946,11 @@ protected:
         max_request_headers_kb_, max_request_headers_count_, headers_with_underscores_action_);
     ON_CALL(client_connection_, write(_, _))
         .WillByDefault(Invoke([&](Buffer::Instance& data, bool) -> void {
-          server_wrapper_.innerDispatch(data, *server_);
+          ASSERT_TRUE(server_wrapper_.dispatch(data, *server_).ok());
         }));
     ON_CALL(server_connection_, write(_, _))
         .WillByDefault(Invoke([&](Buffer::Instance& data, bool) -> void {
-          client_wrapper_.innerDispatch(data, *client_);
+          ASSERT_TRUE(client_wrapper_.dispatch(data, *client_).ok());
         }));
   }
 

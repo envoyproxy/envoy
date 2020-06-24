@@ -197,7 +197,7 @@ private:
   };
 
   absl::Mutex mutex_;
-  SlotArraySharedPtr slot_array_ GUARDED_BY(mutex_);
+  SlotArraySharedPtr slot_array_ ABSL_GUARDED_BY(mutex_);
   ClusterSlotsSharedPtr current_cluster_slot_;
   ShardVectorSharedPtr shard_vector_;
   Runtime::RandomGenerator& random_;
