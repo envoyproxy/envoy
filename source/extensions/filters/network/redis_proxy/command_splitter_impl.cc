@@ -133,12 +133,10 @@ void DelayFaultRequest::onDelayResponse() {
   command_stats_.delay_fault_.inc();
   command_latency_->complete(); // Complete latency of the command stats of the wrapped request
   callbacks_.onResponse(std::move(response_));
-  delay_timer_ = nullptr;
 }
 
 void DelayFaultRequest::cancel() {
   delay_timer_->disableTimer();
-  delay_timer_ = nullptr;
 }
 
 SplitRequestPtr SimpleRequest::create(Router& router,
