@@ -5,6 +5,7 @@
 
 using testing::_;
 using testing::Assign;
+using testing::DoAll;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
