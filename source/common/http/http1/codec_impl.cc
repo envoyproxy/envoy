@@ -1009,7 +1009,7 @@ void ServerConnectionImpl::sendProtocolError(absl::string_view details) {
       is_grpc_request =
           Grpc::Common::isGrpcRequestHeaders(*absl::get<RequestHeaderMapPtr>(headers_or_trailers_));
     }
-    bool is_head_request = parser_.method == HTTP_HEAD;
+    const bool is_head_request = parser_.method == HTTP_HEAD;
     active_request_->request_decoder_->sendLocalReply(is_grpc_request, error_code_,
                                                       CodeUtility::toString(error_code_), nullptr,
                                                       is_head_request, absl::nullopt, details);
