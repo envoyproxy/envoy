@@ -61,7 +61,7 @@ endpoints with the corresponding version. Whereas requests with that header miss
 would be matched with the default endpoints.
 
 If the header's value needs to be transformed before it's added to the request as
-dynamic metadata, this filter support regex matching and substitution:
+dynamic metadata, this filter supports regex matching and substitution:
 
 .. code-block:: yaml
 
