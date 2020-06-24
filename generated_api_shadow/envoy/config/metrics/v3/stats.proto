@@ -335,7 +335,7 @@ message DogStatsdSink {
   // separated.
   //
   // Note that the buffer-size should not exceed your network's MTU.
-  int64 buffer_size = 4;
+  uint64 max_bytes_per_datagram = 4;
 }
 
 // Stats configuration proto schema for built-in *envoy.stat_sinks.hystrix* sink.
