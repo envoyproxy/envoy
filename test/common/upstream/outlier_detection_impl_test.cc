@@ -1362,7 +1362,8 @@ TEST_F(OutlierDetectorImplTest, EjectionActiveValueIsAccountedWithoutMetricStora
       cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_, event_logger_));
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
-  ON_CALL(runtime_.snapshot_, getInteger("outlier_detection.max_ejection_percent", testing::Matcher<uint64_t>(_)))
+  ON_CALL(runtime_.snapshot_,
+          getInteger("outlier_detection.max_ejection_percent", testing::Matcher<uint64_t>(_)))
       .WillByDefault(Return(1));
 
   loadRq(hosts_[0], 4, 500);
