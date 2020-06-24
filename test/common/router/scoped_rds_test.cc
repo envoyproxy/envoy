@@ -237,6 +237,8 @@ key:
 )EOF";
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
   parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml);
+  init_watcher_.expectReady().Times(1);
+  context_init_manager_.initialize(init_watcher_);
   EXPECT_THROW(srds_subscription_->onConfigUpdate(resources, "1"), ProtoValidationException);
   EXPECT_THROW_WITH_REGEX(
       srds_subscription_->onConfigUpdate(anyToResource(resources, "1"), {}, "1"), EnvoyException,
@@ -369,8 +371,8 @@ key:
   parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml2);
 
   // Delta API.
-  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(anyToResource(resources, "2"), {}, "1"));
   context_init_manager_.initialize(init_watcher_);
+  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(anyToResource(resources, "2"), {}, "1"));
   EXPECT_EQ(1UL,
             server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                 .value());
@@ -530,6 +532,8 @@ key:
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
   parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml1);
   parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml2);
+  init_watcher_.expectReady().Times(1);
+  context_init_manager_.initialize(init_watcher_);
   EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(resources, "1"));
   EXPECT_EQ(1UL,
             server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
@@ -543,8 +547,6 @@ key:
                   ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
                   ->name(),
               "");
-  init_watcher_.expectReady().Times(1);
-  context_init_manager_.initialize(init_watcher_);
   pushRdsConfig({"foo_routes", "bar_routes"}, "111");
   EXPECT_EQ(server_factory_context_.scope_.counter("foo.rds.foo_routes.config_reload").value(),
             1UL);

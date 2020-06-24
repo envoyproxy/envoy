@@ -490,6 +490,8 @@ protected:
   ClusterMap active_clusters_;
 
 private:
+  // Temporarily saved resume cds callback from updateClusterCounts invocation.
+  Config::ScopedResume resume_cds_;
   ClusterMap warming_clusters_;
   envoy::config::core::v3::BindConfig bind_config_;
   Outlier::EventLoggerSharedPtr outlier_event_logger_;
