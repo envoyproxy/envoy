@@ -103,3 +103,28 @@ If you use CocoaPods, you can add the following to your ``Podfile`` to use the l
 prebuilt Envoy Mobile framework.
 
 ``pod 'EnvoyMobile'``
+
+---------------------------------------------
+Building Envoy Mobile with private Extensions
+---------------------------------------------
+
+Similar to Envoy, Envoy Mobile has bazel targets that allows the library to be built as a git
+submodule in a consuming project. This setup enables creating private extensions, such as filters.
+
+~~~~~~~~~~
+Extensions
+~~~~~~~~~~
+
+The top-level `envoy_build_config` directory allows Envoy Mobile to tap into Envoy's already
+existing `selective extensions system <https://github.com/envoyproxy/envoy/blob/master/bazel/README.md#disabling-extensions>`_.
+Additionally, Envoy Mobile requires force registration
+of extensions in the extension_registry.cc/h files due to static linking.
+
+In order to override the extensions built into Envoy Mobile create an ``envoy_build_config`` directory
+and include the following in the WORKSPACE file::
+
+  local_repository(
+    name = "envoy_build_config",
+    # Relative paths are also supported.
+    path = "/somewhere/on/filesystem/envoy_build_config",
+  )
