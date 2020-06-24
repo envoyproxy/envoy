@@ -122,8 +122,9 @@ AdmissionControlFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
 }
 
 bool AdmissionControlFilter::shouldRejectRequest() const {
-  const double total = config_->getController().requestTotalCount();
-  const double success = config_->getController().requestSuccessCount();
+  const auto request_counts = config_->getController().requestCounts();
+  const double total = request_counts.requests;
+  const double success = request_counts.successes;
   const double probability = (total - config_->aggression() * success) / (total + 1);
 
   // Choosing an accuracy of 4 significant figures for the probability.

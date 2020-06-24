@@ -17,6 +17,8 @@ namespace HttpFilters {
 namespace AdmissionControl {
 namespace {
 
+using RequestData = ThreadLocalController::RequestData;
+
 class ThreadLocalControllerTest : public testing::Test {
 public:
   ThreadLocalControllerTest() : window_(5), tlc_(time_system_, window_) {}
@@ -46,16 +48,13 @@ protected:
 
 // Test the basic functionality of the admission controller.
 TEST_F(ThreadLocalControllerTest, BasicRecord) {
-  EXPECT_EQ(0, tlc_.requestTotalCount());
-  EXPECT_EQ(0, tlc_.requestSuccessCount());
+  EXPECT_EQ(RequestData(0, 0), tlc_.requestCounts());
 
   tlc_.recordFailure();
-  EXPECT_EQ(1, tlc_.requestTotalCount());
-  EXPECT_EQ(0, tlc_.requestSuccessCount());
+  EXPECT_EQ(RequestData(1, 0), tlc_.requestCounts());
 
   tlc_.recordSuccess();
-  EXPECT_EQ(2, tlc_.requestTotalCount());
-  EXPECT_EQ(1, tlc_.requestSuccessCount());
+  EXPECT_EQ(RequestData(2, 1), tlc_.requestCounts());
 }
 
 // Verify that stale historical samples are removed when they grow stale.
@@ -63,21 +62,18 @@ TEST_F(ThreadLocalControllerTest, RemoveStaleSamples) {
   fillHistorySlots();
 
   // We expect a single request counted in each second of the window.
-  EXPECT_EQ(window_.count(), tlc_.requestTotalCount());
-  EXPECT_EQ(window_.count(), tlc_.requestSuccessCount());
+  EXPECT_EQ(RequestData(window_.count(), window_.count()), tlc_.requestCounts());
 
   time_system_.advanceTimeWait(std::chrono::seconds(1));
 
   // Continuing to sample requests at 1 per second should maintain the same request counts. We'll
   // record failures here.
   fillHistorySlots(false);
-  EXPECT_EQ(window_.count(), tlc_.requestTotalCount());
-  EXPECT_EQ(0, tlc_.requestSuccessCount());
+  EXPECT_EQ(RequestData(window_.count(), 0), tlc_.requestCounts());
 
   // Expect the oldest entry to go stale.
   time_system_.advanceTimeWait(std::chrono::seconds(1));
-  EXPECT_EQ(window_.count() - 1, tlc_.requestTotalCount());
-  EXPECT_EQ(0, tlc_.requestSuccessCount());
+  EXPECT_EQ(RequestData(window_.count() - 1, 0), tlc_.requestCounts());
 }
 
 // Verify that stale historical samples are removed when they grow stale.
@@ -85,14 +81,12 @@ TEST_F(ThreadLocalControllerTest, RemoveStaleSamples2) {
   fillHistorySlots();
 
   // We expect a single request counted in each second of the window.
-  EXPECT_EQ(window_.count(), tlc_.requestTotalCount());
-  EXPECT_EQ(window_.count(), tlc_.requestSuccessCount());
+  EXPECT_EQ(RequestData(window_.count(), window_.count()), tlc_.requestCounts());
 
   // Let's just sit here for a full day. We expect all samples to become stale.
   time_system_.advanceTimeWait(std::chrono::hours(24));
 
-  EXPECT_EQ(0, tlc_.requestTotalCount());
-  EXPECT_EQ(0, tlc_.requestSuccessCount());
+  EXPECT_EQ(RequestData(0, 0), tlc_.requestCounts());
 }
 
 // Verify that historical samples are made only when there is data to record.
@@ -103,8 +97,7 @@ TEST_F(ThreadLocalControllerTest, VerifyMemoryUsage) {
   tlc_.recordSuccess();
   time_system_.advanceTimeWait(std::chrono::seconds(3));
   tlc_.recordSuccess();
-  EXPECT_EQ(3, tlc_.requestTotalCount());
-  EXPECT_EQ(3, tlc_.requestSuccessCount());
+  EXPECT_EQ(RequestData(3, 3), tlc_.requestCounts());
 }
 
 } // namespace

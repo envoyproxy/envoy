@@ -15,6 +15,19 @@ namespace AdmissionControl {
  */
 class ThreadLocalController {
 public:
+  struct RequestData {
+    RequestData(uint32_t request_count, uint32_t success_count)
+        : requests(request_count), successes(success_count) {}
+    RequestData() : requests(0), successes(0) {}
+
+    inline bool operator==(const RequestData& rhs) const {
+      return (requests == rhs.requests) && (successes == rhs.successes);
+    }
+
+    uint32_t requests;
+    uint32_t successes;
+  };
+
   virtual ~ThreadLocalController() = default;
 
   // Record success/failure of a request and update the internal state of the controller to reflect
@@ -22,11 +35,8 @@ public:
   virtual void recordSuccess() PURE;
   virtual void recordFailure() PURE;
 
-  // Returns the current number of recorded requests.
-  virtual uint32_t requestTotalCount() PURE;
-
-  // Returns the current number of recorded request successes.
-  virtual uint32_t requestSuccessCount() PURE;
+  // Returns the current number of requests and how many of them are successful.
+  virtual RequestData requestCounts() PURE;
 };
 
 /**
@@ -48,21 +58,12 @@ public:
   void recordSuccess() override { recordRequest(true); }
   void recordFailure() override { recordRequest(false); }
 
-  uint32_t requestTotalCount() override {
+  RequestData requestCounts() override {
     maybeUpdateHistoricalData();
-    return global_data_.requests;
-  }
-  uint32_t requestSuccessCount() override {
-    maybeUpdateHistoricalData();
-    return global_data_.successes;
+    return global_data_;
   }
 
 private:
-  struct RequestData {
-    uint32_t requests{0};
-    uint32_t successes{0};
-  };
-
   void recordRequest(bool success);
 
   // Potentially remove any stale samples and record sample aggregates to the historical data.
