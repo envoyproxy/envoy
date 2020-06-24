@@ -85,6 +85,14 @@ message AdmissionControl {
   // The coefficient dictates how aggressively the admission controller will throttle requests as
   // the success rate drops. Lower values will cause throttling to kick in at higher success rates
   // and result in more aggressive throttling. Any values less than 1.0, will be set to 1.0. If the
-  // message is unspecified, the coefficient is 2.0.
+  // message is unspecified, the coefficient is 2.0, resulting in load shedding starting at a ~50%
+  // request success rate and linearly increasing the probability of rejected request as the success
+  // rate drops.
+  //
+  // ..note::
+  //
+  //   To have load shedding start at a specific success rate, simply set the coefficient to the
+  //   inverse of the success rate. For instance, if one wants load shedding to start at a success
+  //   rate of 95%, set the coefficient to (1 / 0.95) or 1.05.
   config.core.v3.RuntimeDouble aggression_coefficient = 4;
 }
