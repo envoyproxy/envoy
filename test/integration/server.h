@@ -40,11 +40,13 @@ struct FieldValidationConfig {
 };
 
 // Create OptionsImpl structures suitable for tests. Disables hot restart.
-OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::string& config_yaml,
-                                  Network::Address::IpVersion ip_version,
-                                  FieldValidationConfig validation_config = FieldValidationConfig(),
-                                  uint32_t concurrency = 1,
-                                  std::chrono::seconds drain_time = std::chrono::seconds(1));
+OptionsImpl
+createTestOptionsImpl(const std::string& config_path, const std::string& config_yaml,
+                      Network::Address::IpVersion ip_version,
+                      FieldValidationConfig validation_config = FieldValidationConfig(),
+                      uint32_t concurrency = 1,
+                      std::chrono::seconds drain_time = std::chrono::seconds(1),
+                      Server::DrainStrategy drain_strategy = Server::DrainStrategy::Gradual);
 
 class TestComponentFactory : public ComponentFactory {
 public:
@@ -231,7 +233,7 @@ protected:
   }
 
   virtual Stats::Counter* getCounterLockHeld(const std::string& name)
-      EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
     auto it = counters_.find(name);
     if (it != counters_.end()) {
       return it->second;
@@ -369,6 +371,7 @@ public:
          ProcessObjectOptRef process_object = absl::nullopt,
          Server::FieldValidationConfig validation_config = Server::FieldValidationConfig(),
          uint32_t concurrency = 1, std::chrono::seconds drain_time = std::chrono::seconds(1),
+         Server::DrainStrategy drain_strategy = Server::DrainStrategy::Gradual,
          bool use_real_stats = false);
   // Note that the derived class is responsible for tearing down the server in its
   // destructor.
@@ -392,7 +395,7 @@ public:
              std::function<void()> on_server_init_function, bool deterministic,
              bool defer_listener_finalization, ProcessObjectOptRef process_object,
              Server::FieldValidationConfig validation_config, uint32_t concurrency,
-             std::chrono::seconds drain_time);
+             std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy);
 
   void waitForCounterEq(const std::string& name, uint64_t value) override {
     notifyingStatsAllocator().waitForCounterFromStringEq(name, value);
@@ -477,7 +480,7 @@ private:
   void threadRoutine(const Network::Address::IpVersion version, bool deterministic,
                      ProcessObjectOptRef process_object,
                      Server::FieldValidationConfig validation_config, uint32_t concurrency,
-                     std::chrono::seconds drain_time);
+                     std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy);
 
   Event::TestTimeSystem& time_system_;
   Api::Api& api_;

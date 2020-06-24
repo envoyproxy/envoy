@@ -253,7 +253,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "router_test",
     srcs = ["router_test.cc"],
-    tags = ["fails_on_windows"],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:context_lib",
@@ -263,6 +262,9 @@ envoy_cc_test(
         "//source/common/stream_info:uint32_accessor_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
+        "//source/extensions/upstreams/http/generic:config",
+        "//source/extensions/upstreams/http/http:config",
+        "//source/extensions/upstreams/http/tcp:config",
         "//test/common/http:common_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/local_info:local_info_mocks",
@@ -277,6 +279,8 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/upstreams/http/http/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/upstreams/http/tcp/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )
@@ -293,6 +297,7 @@ envoy_cc_test(
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
         "//source/extensions/access_loggers/file:config",
+        "//source/extensions/upstreams/http/generic:config",
         "//test/common/http:common_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/filesystem:filesystem_mocks",

@@ -162,7 +162,7 @@ public:
                       Network::Address::IpVersion version,
                       const std::string& config = ConfigHelper::httpProxyConfig());
 
-  virtual ~BaseIntegrationTest() = default;
+  virtual ~BaseIntegrationTest();
 
   // TODO(jmarantz): Remove this once
   // https://github.com/envoyproxy/envoy-filter-example/pull/69 is reverted.
@@ -435,6 +435,10 @@ protected:
 
   // The duration of the drain manager graceful drain period.
   std::chrono::seconds drain_time_{1};
+
+  // The DrainStrategy that dictates the behaviour of
+  // DrainManagerImpl::drainClose().
+  Server::DrainStrategy drain_strategy_{Server::DrainStrategy::Gradual};
 
   // Member variables for xDS testing.
   FakeUpstream* xds_upstream_{};

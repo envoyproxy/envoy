@@ -144,6 +144,7 @@ envoy_cc_library(
     hdrs = ["hash_policy.h"],
     deps = [
         "//include/envoy/network:hash_policy_interface",
+        "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],

@@ -345,25 +345,24 @@ Address::InstanceConstSharedPtr Utility::getAddressWithPort(const Address::Insta
 
 Address::InstanceConstSharedPtr Utility::getOriginalDst(Socket& sock) {
 #ifdef SOL_IP
-  sockaddr_storage orig_addr;
-  socklen_t addr_len = sizeof(sockaddr_storage);
-  int socket_domain;
-  socklen_t domain_len = sizeof(socket_domain);
-  // TODO(fcoras): improve once we store ip version in socket
-  const Api::SysCallIntResult result =
-      sock.getSocketOption(SOL_SOCKET, SO_DOMAIN, &socket_domain, &domain_len);
-  int status = result.rc_;
 
-  if (status != 0) {
+  if (sock.addressType() != Address::Type::Ip) {
     return nullptr;
   }
 
-  if (socket_domain == AF_INET) {
-    status = sock.getSocketOption(SOL_IP, SO_ORIGINAL_DST, &orig_addr, &addr_len).rc_;
-  } else if (socket_domain == AF_INET6) {
-    status = sock.getSocketOption(SOL_IPV6, IP6T_SO_ORIGINAL_DST, &orig_addr, &addr_len).rc_;
-  } else {
+  auto ipVersion = sock.ipVersion();
+  if (!ipVersion.has_value()) {
     return nullptr;
+  }
+
+  sockaddr_storage orig_addr;
+  socklen_t addr_len = sizeof(sockaddr_storage);
+  int status;
+
+  if (*ipVersion == Address::IpVersion::v4) {
+    status = sock.getSocketOption(SOL_IP, SO_ORIGINAL_DST, &orig_addr, &addr_len).rc_;
+  } else {
+    status = sock.getSocketOption(SOL_IPV6, IP6T_SO_ORIGINAL_DST, &orig_addr, &addr_len).rc_;
   }
 
   if (status != 0) {

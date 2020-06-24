@@ -30,7 +30,9 @@ public:
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")),
         connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
+          SetQuicReloadableFlag(quic_enable_version_draft_28, GetParam());
           SetQuicReloadableFlag(quic_enable_version_draft_27, GetParam());
+          SetQuicReloadableFlag(quic_enable_version_draft_25_v3, GetParam());
           return quic::CurrentSupportedVersions()[0];
         }()),
         listener_stats_({ALL_LISTENER_STATS(POOL_COUNTER(listener_config_.listenerScope()),
@@ -45,10 +47,12 @@ public:
                       quic_config_.GetInitialStreamFlowControlWindowToSend() * 2),
         stream_id_(VersionUsesHttp3(quic_version_.transport_version) ? 4u : 5u),
         quic_stream_(new EnvoyQuicServerStream(stream_id_, &quic_session_, quic::BIDIRECTIONAL)),
-        response_headers_{{":status", "200"}} {
+        response_headers_{{":status", "200"}}, response_trailers_{
+                                                   {"trailer-key", "trailer-value"}} {
     quic_stream_->setRequestDecoder(stream_decoder_);
     quic_stream_->addCallbacks(stream_callbacks_);
     quic_session_.ActivateStream(std::unique_ptr<EnvoyQuicServerStream>(quic_stream_));
+    EXPECT_CALL(quic_session_, ShouldYield(_)).WillRepeatedly(testing::Return(false));
     EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _))
         .WillRepeatedly(Invoke([](quic::QuicStreamId, size_t write_length, quic::QuicStreamOffset,
                                   quic::StreamSendingState state, bool,
@@ -64,6 +68,8 @@ public:
 
   void SetUp() override {
     quic_session_.Initialize();
+    setQuicConfigWithDefaultValues(quic_session_.config());
+    quic_session_.OnConfigNegotiated();
     request_headers_.OnHeaderBlockStart();
     request_headers_.OnHeader(":authority", host_);
     request_headers_.OnHeader(":method", "POST");
@@ -141,6 +147,7 @@ protected:
   Http::MockStreamCallbacks stream_callbacks_;
   quic::QuicHeaderList request_headers_;
   Http::TestResponseHeaderMapImpl response_headers_;
+  Http::TestResponseTrailerMapImpl response_trailers_;
   quic::QuicHeaderList trailers_;
   std::string host_{"www.abc.com"};
   std::string request_body_{"Hello world"};
@@ -173,7 +180,8 @@ TEST_P(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
 TEST_P(EnvoyQuicServerStreamTest, PostRequestAndResponse) {
   EXPECT_EQ(absl::nullopt, quic_stream_->http1StreamEncoderOptions());
   sendRequest(request_body_, true, request_body_.size() * 2);
-  quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/true);
+  quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/false);
+  quic_stream_->encodeTrailers(response_trailers_);
 }
 
 TEST_P(EnvoyQuicServerStreamTest, DecodeHeadersBodyAndTrailers) {

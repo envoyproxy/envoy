@@ -1659,6 +1659,31 @@ TEST_F(Http1ServerConnectionImplTest, UpgradeRequestWithNoBody) {
   EXPECT_TRUE(status.ok());
 }
 
+// Test that 101 upgrade responses do not contain content-length or transfer-encoding headers.
+TEST_F(Http1ServerConnectionImplTest, UpgradeRequestResponseHeaders) {
+  initialize();
+
+  NiceMock<MockRequestDecoder> decoder;
+  Http::ResponseEncoder* response_encoder = nullptr;
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder = &encoder;
+        return decoder;
+      }));
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nConnection: upgrade\r\nUpgrade: foo\r\n\r\n");
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
+  EXPECT_EQ(0U, buffer.length());
+
+  std::string output;
+  ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
+
+  TestResponseHeaderMapImpl headers{{":status", "101"}};
+  response_encoder->encodeHeaders(headers, false);
+  EXPECT_EQ("HTTP/1.1 101 Switching Protocols\r\n\r\n", output);
+}
+
 TEST_F(Http1ServerConnectionImplTest, ConnectRequestNoContentLength) {
   initialize();
 
@@ -1717,20 +1742,31 @@ TEST_F(Http1ServerConnectionImplTest, ConnectRequestWithTEChunked) {
   NiceMock<MockRequestDecoder> decoder;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
-  // Connect with body is technically illegal, but Envoy does not inspect the
-  // body to see if there is a non-zero byte chunk. It will instead pass it
-  // through.
-  // TODO(alyssawilk) track connect payload and block if this happens.
-  Buffer::OwnedImpl expected_data("12345abcd");
-  EXPECT_CALL(decoder, decodeHeaders_(_, false));
-  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false));
+  // Per https://tools.ietf.org/html/rfc7231#section-4.3.6 CONNECT with body has no defined
+  // semantics: Envoy will reject chunked CONNECT requests.
   Buffer::OwnedImpl buffer(
       "CONNECT host:80 HTTP/1.1\r\ntransfer-encoding: chunked\r\n\r\n12345abcd");
   auto status = codec_->dispatch(buffer);
-  EXPECT_TRUE(status.ok());
+  EXPECT_TRUE(isCodecProtocolError(status));
+  EXPECT_EQ(status.message(), "http/1.1 protocol error: unsupported transfer encoding");
 }
 
-TEST_F(Http1ServerConnectionImplTest, ConnectRequestWithContentLength) {
+TEST_F(Http1ServerConnectionImplTest, ConnectRequestWithNonZeroContentLength) {
+  initialize();
+
+  InSequence sequence;
+  NiceMock<MockRequestDecoder> decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  // Make sure we avoid the deferred_end_stream_headers_ optimization for
+  // requests-with-no-body.
+  Buffer::OwnedImpl buffer("CONNECT host:80 HTTP/1.1\r\ncontent-length: 1\r\n\r\nabcd");
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(isCodecProtocolError(status));
+  EXPECT_EQ(status.message(), "http/1.1 protocol error: unsupported content length");
+}
+
+TEST_F(Http1ServerConnectionImplTest, ConnectRequestWithZeroContentLength) {
   initialize();
 
   InSequence sequence;
@@ -1945,9 +1981,114 @@ TEST_F(Http1ClientConnectionImplTest, 204Response) {
   request_encoder.encodeHeaders(headers, true);
 
   EXPECT_CALL(response_decoder, decodeHeaders_(_, true));
-  Buffer::OwnedImpl response("HTTP/1.1 204 OK\r\nContent-Length: 20\r\n\r\n");
+  Buffer::OwnedImpl response("HTTP/1.1 204 OK\r\n\r\n");
   auto status = codec_->dispatch(response);
   EXPECT_TRUE(status.ok());
+}
+
+// 204 No Content with Content-Length is barred by RFC 7230, Section 3.3.2.
+TEST_F(Http1ClientConnectionImplTest, 204ResponseContentLengthNotAllowed) {
+  // By default, content-length is barred.
+  {
+    initialize();
+
+    NiceMock<MockResponseDecoder> response_decoder;
+    Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+    TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+    request_encoder.encodeHeaders(headers, true);
+
+    Buffer::OwnedImpl response("HTTP/1.1 204 OK\r\nContent-Length: 20\r\n\r\n");
+    auto status = codec_->dispatch(response);
+    EXPECT_FALSE(status.ok());
+  }
+
+  // Test with feature disabled: content-length allowed.
+  {
+    TestScopedRuntime scoped_runtime;
+    Runtime::LoaderSingleton::getExisting()->mergeValues(
+        {{"envoy.reloadable_features.strict_1xx_and_204_response_headers", "false"}});
+
+    initialize();
+
+    NiceMock<MockResponseDecoder> response_decoder;
+    Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+    TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+    request_encoder.encodeHeaders(headers, true);
+
+    Buffer::OwnedImpl response("HTTP/1.1 204 OK\r\nContent-Length: 20\r\n\r\n");
+    auto status = codec_->dispatch(response);
+    EXPECT_TRUE(status.ok());
+  }
+}
+
+// 204 No Content with Content-Length: 0 is technically barred by RFC 7230, Section 3.3.2, but we
+// allow it.
+TEST_F(Http1ClientConnectionImplTest, 204ResponseWithContentLength0) {
+  {
+    initialize();
+
+    NiceMock<MockResponseDecoder> response_decoder;
+    Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+    TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+    request_encoder.encodeHeaders(headers, true);
+
+    EXPECT_CALL(response_decoder, decodeHeaders_(_, true));
+    Buffer::OwnedImpl response("HTTP/1.1 204 OK\r\nContent-Length: 0\r\n\r\n");
+    auto status = codec_->dispatch(response);
+    EXPECT_TRUE(status.ok());
+  }
+
+  // Test with feature disabled: content-length allowed.
+  {
+    TestScopedRuntime scoped_runtime;
+    Runtime::LoaderSingleton::getExisting()->mergeValues(
+        {{"envoy.reloadable_features.strict_1xx_and_204_response_headers", "false"}});
+
+    NiceMock<MockResponseDecoder> response_decoder;
+    Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+    TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+    request_encoder.encodeHeaders(headers, true);
+
+    EXPECT_CALL(response_decoder, decodeHeaders_(_, true));
+    Buffer::OwnedImpl response("HTTP/1.1 204 OK\r\nContent-Length: 0\r\n\r\n");
+    auto status = codec_->dispatch(response);
+    EXPECT_TRUE(status.ok());
+  }
+}
+
+// 204 No Content with Transfer-Encoding headers is barred by RFC 7230, Section 3.3.1.
+TEST_F(Http1ClientConnectionImplTest, 204ResponseTransferEncodingNotAllowed) {
+  // By default, transfer-encoding is barred.
+  {
+    initialize();
+
+    NiceMock<MockResponseDecoder> response_decoder;
+    Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+    TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+    request_encoder.encodeHeaders(headers, true);
+
+    Buffer::OwnedImpl response("HTTP/1.1 204 OK\r\nTransfer-Encoding: chunked\r\n\r\n");
+    auto status = codec_->dispatch(response);
+    EXPECT_FALSE(status.ok());
+  }
+
+  // Test with feature disabled: transfer-encoding allowed.
+  {
+    TestScopedRuntime scoped_runtime;
+    Runtime::LoaderSingleton::getExisting()->mergeValues(
+        {{"envoy.reloadable_features.strict_1xx_and_204_response_headers", "false"}});
+
+    initialize();
+
+    NiceMock<MockResponseDecoder> response_decoder;
+    Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+    TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+    request_encoder.encodeHeaders(headers, true);
+
+    Buffer::OwnedImpl response("HTTP/1.1 204 OK\r\nTransfer-Encoding: chunked\r\n\r\n");
+    auto status = codec_->dispatch(response);
+    EXPECT_TRUE(status.ok());
+  }
 }
 
 TEST_F(Http1ClientConnectionImplTest, 100Response) {
@@ -1965,9 +2106,46 @@ TEST_F(Http1ClientConnectionImplTest, 100Response) {
 
   EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
   EXPECT_CALL(response_decoder, decodeData(_, _)).Times(0);
-  Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 20\r\n\r\n");
+  Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\n\r\n");
   status = codec_->dispatch(response);
   EXPECT_TRUE(status.ok());
+}
+
+// 101 Switching Protocol with Transfer-Encoding headers is barred by RFC 7230, Section 3.3.1.
+TEST_F(Http1ClientConnectionImplTest, 101ResponseTransferEncodingNotAllowed) {
+  // By default, transfer-encoding is barred.
+  {
+    initialize();
+
+    NiceMock<MockResponseDecoder> response_decoder;
+    Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+    TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+    request_encoder.encodeHeaders(headers, true);
+
+    Buffer::OwnedImpl response(
+        "HTTP/1.1 101 Switching Protocols\r\nTransfer-Encoding: chunked\r\n\r\n");
+    auto status = codec_->dispatch(response);
+    EXPECT_FALSE(status.ok());
+  }
+
+  // Test with feature disabled: transfer-encoding allowed.
+  {
+    TestScopedRuntime scoped_runtime;
+    Runtime::LoaderSingleton::getExisting()->mergeValues(
+        {{"envoy.reloadable_features.strict_1xx_and_204_response_headers", "false"}});
+
+    initialize();
+
+    NiceMock<MockResponseDecoder> response_decoder;
+    Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+    TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+    request_encoder.encodeHeaders(headers, true);
+
+    Buffer::OwnedImpl response(
+        "HTTP/1.1 101 Switching Protocols\r\nTransfer-Encoding: chunked\r\n\r\n");
+    auto status = codec_->dispatch(response);
+    EXPECT_TRUE(status.ok());
+  }
 }
 
 TEST_F(Http1ClientConnectionImplTest, BadEncodeParams) {

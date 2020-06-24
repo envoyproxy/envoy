@@ -12,9 +12,6 @@ namespace Envoy {
 namespace Tcp {
 namespace ConnectionPool {
 
-MockCancellable::MockCancellable() = default;
-MockCancellable::~MockCancellable() = default;
-
 MockUpstreamCallbacks::MockUpstreamCallbacks() = default;
 MockUpstreamCallbacks::~MockUpstreamCallbacks() = default;
 
@@ -33,7 +30,7 @@ MockInstance::MockInstance() {
 }
 MockInstance::~MockInstance() = default;
 
-MockCancellable* MockInstance::newConnectionImpl(Callbacks& cb) {
+Envoy::ConnectionPool::MockCancellable* MockInstance::newConnectionImpl(Callbacks& cb) {
   handles_.emplace_back();
   callbacks_.push_back(&cb);
   return &handles_.back();

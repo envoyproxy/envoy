@@ -143,11 +143,6 @@ public:
       : BaseIntegrationTest(GetParam(), config), num_upstreams_(num_upstreams),
         version_(GetParam()) {}
 
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
-
   void initialize() override {
     setUpstreamCount(num_upstreams_);
     setDeterministic();
