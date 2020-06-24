@@ -8,8 +8,8 @@
 namespace Envoy {
 namespace Server {
 
-using testing::_;
-using testing::Invoke;
+using ::testing::_;
+using ::testing::Invoke;
 
 MockConfigTracker::MockConfigTracker() {
   ON_CALL(*this, add_(_, _))

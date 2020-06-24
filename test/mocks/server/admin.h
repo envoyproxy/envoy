@@ -32,7 +32,7 @@ public:
                Http::ResponseHeaderMap& response_headers, std::string& body));
   MOCK_METHOD(void, addListenerToHandler, (Network::ConnectionHandler * handler));
 
-  testing::NiceMock<MockConfigTracker> config_tracker_;
+  ::testing::NiceMock<MockConfigTracker> config_tracker_;
 };
 } // namespace Server
 
