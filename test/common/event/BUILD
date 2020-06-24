@@ -37,3 +37,13 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "scaled_timer_test",
+    srcs = ["scaled_timer_test.cc"],
+    deps = [
+        "//source/common/event:scaled_timer_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/test_common:simulated_time_system_lib",
+    ]
+)
