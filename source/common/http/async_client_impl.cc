@@ -266,6 +266,8 @@ void AsyncRequestImpl::initialize() {
 }
 
 void AsyncRequestImpl::onComplete() {
+  callbacks_.onBeforeFinalizeUpstreamSpan(*child_span_);
+
   Tracing::HttpTracerUtility::finalizeUpstreamSpan(*child_span_, &response_->headers(),
                                                    response_->trailers(), streamInfo(),
                                                    Tracing::EgressConfig::get());
@@ -297,6 +299,8 @@ void AsyncRequestImpl::onReset() {
     child_span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
     child_span_->setTag(Tracing::Tags::get().ErrorReason, "Reset");
   }
+
+  callbacks_.onBeforeFinalizeUpstreamSpan(*child_span_);
 
   // Finalize the span based on whether we received a response or not
   Tracing::HttpTracerUtility::finalizeUpstreamSpan(

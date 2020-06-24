@@ -70,6 +70,12 @@ public:
      * @param reason  failure reason
      */
     virtual void onFailure(const Request& request, FailureReason reason) PURE;
+
+    /**
+     * Called before finalizing upstream span when the request is complete or reset.
+     * @param span a tracing span to fill with extra tags.
+     */
+    virtual void onBeforeFinalizeUpstreamSpan(Envoy::Tracing::Span& span) PURE;
   };
 
   /**
