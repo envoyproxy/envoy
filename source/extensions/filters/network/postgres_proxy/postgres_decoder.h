@@ -126,6 +126,7 @@ protected:
   void decodeFrontendTerminate();
   void decodeErrorNotice(MsgParserDict& types);
   void onQuery();
+  void onParse();
   void onStartup();
 
   void incMessagesUnknown() { callbacks_->incMessagesUnknown(); }

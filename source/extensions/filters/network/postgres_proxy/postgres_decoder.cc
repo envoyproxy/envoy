@@ -31,7 +31,7 @@ void DecoderImpl::initialize() {
   FE_known_msgs['F'] = MsgProcessor{"FunctionCall", {}};
   FE_known_msgs['p'] =
       MsgProcessor{"PasswordMessage/GSSResponse/SASLInitialResponse/SASLResponse", {}};
-  FE_known_msgs['P'] = MsgProcessor{"Parse", {}};
+  FE_known_msgs['P'] = MsgProcessor{"Parse", {&DecoderImpl::onParse}};
   FE_known_msgs['Q'] = MsgProcessor{"Query", {&DecoderImpl::onQuery}};
   FE_known_msgs['S'] = MsgProcessor{"Sync", {}};
   FE_known_msgs['X'] = MsgProcessor{"Terminate", {&DecoderImpl::decodeFrontendTerminate}};
@@ -327,6 +327,27 @@ void DecoderImpl::decodeBackendErrorResponse() { decodeErrorNotice(BE_errors_); 
 // Method parses N (Notice) message and looks for string
 // indicating its meaning. It can be warning, notice, info, debug or log.
 void DecoderImpl::decodeBackendNoticeResponse() { decodeErrorNotice(BE_notices_); }
+
+// Method parses Parse message of the following format:
+// String: The name of the destination prepared statement (an empty string selects the unnamed
+// prepared statement).
+//
+// String: The query string to be parsed.
+//
+// Int16: The number of parameter data
+// types specified (can be zero). Note that this is not an indication of the number of parameters
+// that might appear in the query string, only the number that the frontend wants to pre-specify
+// types for. Then, for each parameter, there is the following:
+//
+// Int32: Specifies the object ID of
+// the parameter data type. Placing a zero here is equivalent to leaving the type unspecified.
+void DecoderImpl::onParse() {
+  // The first two strings are separated by \0.
+  // The first string is optional. If no \0 is found it means
+  // that the message contains query string only.
+  std::vector<std::string> query_parts = absl::StrSplit(message_, absl::ByChar('\0'));
+  callbacks_->processQuery(query_parts[1]);
+}
 
 void DecoderImpl::onQuery() { callbacks_->processQuery(message_); }
 

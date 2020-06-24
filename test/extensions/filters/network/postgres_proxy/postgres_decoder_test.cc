@@ -272,6 +272,36 @@ TEST_F(PostgresProxyFrontendDecoderTest, QueryMessage) {
   decoder_->onData(data_, true);
 }
 
+// Parse message has optional Query name which may be in front of actual
+// query statement. This test verifies that both formats are processed
+// correctly.
+TEST_F(PostgresProxyFrontendDecoderTest, ParseMessage) {
+  std::string query = "SELECT * FROM whatever;";
+  std::string query_name, query_params;
+
+  // Should be called twice with the same query.
+  EXPECT_CALL(callbacks_, processQuery(query)).Times(2);
+
+  // Set params to be zero.
+  query_params.reserve(2);
+  query_params += '\0';
+  query_params += '\0';
+
+  // Message without optional query name.
+  query_name.reserve(1);
+  query_name += '\0';
+  createPostgresMsg(data_, "P", query_name + query + query_params);
+  decoder_->onData(data_, true);
+
+  // Message with optional name query_name
+  query_name.clear();
+  query_name.reserve(5);
+  query_name += "P0_8";
+  query_name += '\0';
+  createPostgresMsg(data_, "P", query_name + query + query_params);
+  decoder_->onData(data_, true);
+}
+
 // Test if each backend command calls incMessagesBackend()) method.
 TEST_P(PostgresProxyBackendDecoderTest, BackendInc) {
   EXPECT_CALL(callbacks_, incMessagesBackend()).Times(1);
