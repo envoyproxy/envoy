@@ -79,7 +79,28 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
   }
   case test::common::http::UtilityTestCase::kInitializeAndValidate: {
     const auto& options = input.initialize_and_validate();
-    Http2::Utility::initializeAndValidateOptions(options);
+    try {
+      Http2::Utility::initializeAndValidateOptions(options);
+    } catch (EnvoyException& e) {
+      absl::string_view msg = e.what();
+      // initializeAndValidateOptions throws exceptions for 4 different reasons due to malformed
+      // settings, so check for them and allow any other exceptions through
+      if (absl::StartsWith(
+              msg, "server push is not supported by Envoy and can not be enabled via a SETTINGS "
+                   "parameter.") ||
+          absl::StartsWith(
+              msg, "the \"allow_connect\" SETTINGS parameter must only be configured through the "
+                   "named field") ||
+          absl::StartsWith(
+              msg, "inconsistent HTTP/2 custom SETTINGS parameter(s) detected; identifiers =") ||
+          absl::EndsWith(
+              msg, "HTTP/2 SETTINGS parameter(s) can not be configured through both named and "
+                   "custom parameters")) {
+        ENVOY_LOG_MISC(trace, "Caught exception {} in initializeAndValidateOptions test", e.what());
+      } else {
+        throw EnvoyException(e.what());
+      }
+    }
     break;
   }
 
