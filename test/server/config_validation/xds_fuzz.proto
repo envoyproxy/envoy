@@ -40,7 +40,7 @@ message Action {
 message Config {
   enum SotwOrDelta {
     SOTW = 0;
-    // DELTA = 1;
+    DELTA = 1;
   }
   SotwOrDelta sotw_or_delta = 1;
 }

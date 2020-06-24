@@ -57,7 +57,6 @@ private:
   envoy::config::core::v3::ApiVersion api_version_;
 
   Network::Address::IpVersion ip_version_;
-  Grpc::SotwOrDelta sotw_or_delta_;
 
   const size_t num_listeners_ = 3;
   const size_t num_routes_ = 5;

@@ -26,5 +26,5 @@ actions {
   }
 }
 config {
-  sotw_or_delta : SOTW
+  sotw_or_delta : DELTA
 }
