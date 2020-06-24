@@ -17,8 +17,6 @@ namespace Extensions {
 namespace ListenerFilters {
 namespace OriginalSrc {
 
-using testing::_;
-
 DEFINE_PROTO_FUZZER(
     const envoy::extensions::filters::listener::original_src::OriginalSrcTestCase& input) {
 
@@ -29,10 +27,6 @@ DEFINE_PROTO_FUZZER(
     return;
   }
 
-  envoy::extensions::filters::listener::original_src::v3::OriginalSrc proto_config = input.config();
-  Config config(proto_config);
-  auto filter = std::make_unique<OriginalSrcFilter>(config);
-
   NiceMock<Network::MockListenerFilterCallbacks> callbacks_;
   try {
     callbacks_.socket_.remote_address_ = Network::Utility::resolveUrl(input.address());
@@ -40,6 +34,9 @@ DEFINE_PROTO_FUZZER(
     ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
     return;
   }
+
+  Config config(input.config());
+  auto filter = std::make_unique<OriginalSrcFilter>(config);
 
   filter->onAccept(callbacks_);
 }
