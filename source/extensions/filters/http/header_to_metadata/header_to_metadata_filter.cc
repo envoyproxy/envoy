@@ -58,6 +58,7 @@ bool Config::configToVector(const ProtobufRepeatedRule& proto_rules,
     }
 
     // Ensure value and regex_value_rewrite are not mixed.
+    // TODO(rgs1): remove this once we are on v4 and these fields are folded into a oneof.
     if (!entry.on_header_present().value().empty() &&
         entry.on_header_present().has_regex_value_rewrite()) {
       throw EnvoyException("Cannot specificy both value and regex_value_rewrite");
