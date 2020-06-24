@@ -28,7 +28,7 @@ following guidelines for all code, APIs, and documentation:
 
 * The following words and phrases are not allowed:
   * *Whitelist*: use allowlist instead.
-  * *Blacklist*: use denylist instead.
+  * *Blacklist*: use denylist or blocklist instead.
   * *Master*: use primary instead.
   * *Slave*: use secondary or replica instead.
 * Documentation should be written in an inclusive style. The [Google developer
