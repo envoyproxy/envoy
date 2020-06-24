@@ -1,4 +1,4 @@
-#include "common/tcp/conn_pool.h"
+#include "common/tcp/original_conn_pool.h"
 
 #include <memory>
 
@@ -12,15 +12,15 @@
 namespace Envoy {
 namespace Tcp {
 
-ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
-                           Upstream::ResourcePriority priority,
-                           const Network::ConnectionSocket::OptionsSharedPtr& options,
-                           Network::TransportSocketOptionsSharedPtr transport_socket_options)
+OriginalConnPoolImpl::OriginalConnPoolImpl(
+    Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
+    Upstream::ResourcePriority priority, const Network::ConnectionSocket::OptionsSharedPtr& options,
+    Network::TransportSocketOptionsSharedPtr transport_socket_options)
     : dispatcher_(dispatcher), host_(host), priority_(priority), socket_options_(options),
       transport_socket_options_(transport_socket_options),
       upstream_ready_timer_(dispatcher_.createTimer([this]() { onUpstreamReady(); })) {}
 
-ConnPoolImpl::~ConnPoolImpl() {
+OriginalConnPoolImpl::~OriginalConnPoolImpl() {
   while (!ready_conns_.empty()) {
     ready_conns_.front()->conn_->close(Network::ConnectionCloseType::NoFlush);
   }
@@ -37,7 +37,7 @@ ConnPoolImpl::~ConnPoolImpl() {
   dispatcher_.clearDeferredDeleteList();
 }
 
-void ConnPoolImpl::drainConnections() {
+void OriginalConnPoolImpl::drainConnections() {
   while (!ready_conns_.empty()) {
     ready_conns_.front()->conn_->close(Network::ConnectionCloseType::NoFlush);
   }
@@ -53,12 +53,27 @@ void ConnPoolImpl::drainConnections() {
   }
 }
 
-void ConnPoolImpl::addDrainedCallback(DrainedCb cb) {
+void OriginalConnPoolImpl::closeConnections() {
+  while (!ready_conns_.empty()) {
+    ready_conns_.front()->conn_->close(Network::ConnectionCloseType::NoFlush);
+  }
+
+  while (!busy_conns_.empty()) {
+    busy_conns_.front()->conn_->close(Network::ConnectionCloseType::NoFlush);
+  }
+
+  while (!pending_conns_.empty()) {
+    pending_conns_.front()->conn_->close(Network::ConnectionCloseType::NoFlush);
+  }
+}
+
+void OriginalConnPoolImpl::addDrainedCallback(DrainedCb cb) {
   drained_callbacks_.push_back(cb);
   checkForDrained();
 }
 
-void ConnPoolImpl::assignConnection(ActiveConn& conn, ConnectionPool::Callbacks& callbacks) {
+void OriginalConnPoolImpl::assignConnection(ActiveConn& conn,
+                                            ConnectionPool::Callbacks& callbacks) {
   ASSERT(conn.wrapper_ == nullptr);
   conn.wrapper_ = std::make_shared<ConnectionWrapper>(conn);
 
@@ -66,7 +81,7 @@ void ConnPoolImpl::assignConnection(ActiveConn& conn, ConnectionPool::Callbacks&
                         conn.real_host_description_);
 }
 
-void ConnPoolImpl::checkForDrained() {
+void OriginalConnPoolImpl::checkForDrained() {
   if (!drained_callbacks_.empty() && pending_requests_.empty() && busy_conns_.empty() &&
       pending_conns_.empty()) {
     while (!ready_conns_.empty()) {
@@ -79,13 +94,14 @@ void ConnPoolImpl::checkForDrained() {
   }
 }
 
-void ConnPoolImpl::createNewConnection() {
+void OriginalConnPoolImpl::createNewConnection() {
   ENVOY_LOG(debug, "creating a new connection");
   ActiveConnPtr conn(new ActiveConn(*this));
   conn->moveIntoList(std::move(conn), pending_conns_);
 }
 
-ConnectionPool::Cancellable* ConnPoolImpl::newConnection(ConnectionPool::Callbacks& callbacks) {
+ConnectionPool::Cancellable*
+OriginalConnPoolImpl::newConnection(ConnectionPool::Callbacks& callbacks) {
   if (!ready_conns_.empty()) {
     ready_conns_.front()->moveBetweenLists(ready_conns_, busy_conns_);
     ENVOY_CONN_LOG(debug, "using existing connection", *busy_conns_.front()->conn_);
@@ -118,7 +134,7 @@ ConnectionPool::Cancellable* ConnPoolImpl::newConnection(ConnectionPool::Callbac
   }
 }
 
-void ConnPoolImpl::onConnectionEvent(ActiveConn& conn, Network::ConnectionEvent event) {
+void OriginalConnPoolImpl::onConnectionEvent(ActiveConn& conn, Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
     ENVOY_CONN_LOG(debug, "client disconnected", *conn.conn_);
@@ -162,7 +178,8 @@ void ConnPoolImpl::onConnectionEvent(ActiveConn& conn, Network::ConnectionEvent 
         reason = ConnectionPool::PoolFailureReason::LocalConnectionFailure;
       }
 
-      std::list<PendingRequestPtr> pending_requests_to_purge(std::move(pending_requests_));
+      std::list<PendingRequestPtr> pending_requests_to_purge;
+      pending_requests_to_purge.swap(pending_requests_);
       while (!pending_requests_to_purge.empty()) {
         PendingRequestPtr request =
             pending_requests_to_purge.front()->removeFromList(pending_requests_to_purge);
@@ -201,8 +218,8 @@ void ConnPoolImpl::onConnectionEvent(ActiveConn& conn, Network::ConnectionEvent 
   }
 }
 
-void ConnPoolImpl::onPendingRequestCancel(PendingRequest& request,
-                                          ConnectionPool::CancelPolicy cancel_policy) {
+void OriginalConnPoolImpl::onPendingRequestCancel(PendingRequest& request,
+                                                  ConnectionPool::CancelPolicy cancel_policy) {
   ENVOY_LOG(debug, "canceling pending request");
   request.removeFromList(pending_requests_);
   host_->cluster().stats().upstream_rq_cancelled_.inc();
@@ -218,7 +235,7 @@ void ConnPoolImpl::onPendingRequestCancel(PendingRequest& request,
   checkForDrained();
 }
 
-void ConnPoolImpl::onConnReleased(ActiveConn& conn) {
+void OriginalConnPoolImpl::onConnReleased(ActiveConn& conn) {
   ENVOY_CONN_LOG(debug, "connection released", *conn.conn_);
 
   if (conn.remaining_requests_ > 0 && --conn.remaining_requests_ == 0) {
@@ -234,11 +251,11 @@ void ConnPoolImpl::onConnReleased(ActiveConn& conn) {
   }
 }
 
-void ConnPoolImpl::onConnDestroyed(ActiveConn& conn) {
+void OriginalConnPoolImpl::onConnDestroyed(ActiveConn& conn) {
   ENVOY_CONN_LOG(debug, "connection destroyed", *conn.conn_);
 }
 
-void ConnPoolImpl::onUpstreamReady() {
+void OriginalConnPoolImpl::onUpstreamReady() {
   upstream_ready_enabled_ = false;
   while (!pending_requests_.empty() && !ready_conns_.empty()) {
     ActiveConn& conn = *ready_conns_.front();
@@ -251,7 +268,8 @@ void ConnPoolImpl::onUpstreamReady() {
   }
 }
 
-void ConnPoolImpl::processIdleConnection(ActiveConn& conn, bool new_connection, bool delay) {
+void OriginalConnPoolImpl::processIdleConnection(ActiveConn& conn, bool new_connection,
+                                                 bool delay) {
   if (conn.wrapper_) {
     conn.wrapper_->invalidate();
     conn.wrapper_.reset();
@@ -298,24 +316,25 @@ void ConnPoolImpl::processIdleConnection(ActiveConn& conn, bool new_connection, 
   checkForDrained();
 }
 
-ConnPoolImpl::ConnectionWrapper::ConnectionWrapper(ActiveConn& parent) : parent_(parent) {
+OriginalConnPoolImpl::ConnectionWrapper::ConnectionWrapper(ActiveConn& parent) : parent_(parent) {
   parent_.parent_.host_->cluster().stats().upstream_rq_total_.inc();
   parent_.parent_.host_->cluster().stats().upstream_rq_active_.inc();
   parent_.parent_.host_->stats().rq_total_.inc();
   parent_.parent_.host_->stats().rq_active_.inc();
 }
 
-Network::ClientConnection& ConnPoolImpl::ConnectionWrapper::connection() {
+Network::ClientConnection& OriginalConnPoolImpl::ConnectionWrapper::connection() {
   ASSERT(conn_valid_);
   return *parent_.conn_;
 }
 
-void ConnPoolImpl::ConnectionWrapper::addUpstreamCallbacks(ConnectionPool::UpstreamCallbacks& cb) {
+void OriginalConnPoolImpl::ConnectionWrapper::addUpstreamCallbacks(
+    ConnectionPool::UpstreamCallbacks& cb) {
   ASSERT(!released_);
   callbacks_ = &cb;
 }
 
-void ConnPoolImpl::ConnectionWrapper::release(bool closed) {
+void OriginalConnPoolImpl::ConnectionWrapper::release(bool closed) {
   // Allow multiple calls: connection close and destruction of ConnectionDataImplPtr will both
   // result in this call.
   if (!released_) {
@@ -330,20 +349,20 @@ void ConnPoolImpl::ConnectionWrapper::release(bool closed) {
   }
 }
 
-ConnPoolImpl::PendingRequest::PendingRequest(ConnPoolImpl& parent,
-                                             ConnectionPool::Callbacks& callbacks)
+OriginalConnPoolImpl::PendingRequest::PendingRequest(OriginalConnPoolImpl& parent,
+                                                     ConnectionPool::Callbacks& callbacks)
     : parent_(parent), callbacks_(callbacks) {
   parent_.host_->cluster().stats().upstream_rq_pending_total_.inc();
   parent_.host_->cluster().stats().upstream_rq_pending_active_.inc();
   parent_.host_->cluster().resourceManager(parent_.priority_).pendingRequests().inc();
 }
 
-ConnPoolImpl::PendingRequest::~PendingRequest() {
+OriginalConnPoolImpl::PendingRequest::~PendingRequest() {
   parent_.host_->cluster().stats().upstream_rq_pending_active_.dec();
   parent_.host_->cluster().resourceManager(parent_.priority_).pendingRequests().dec();
 }
 
-ConnPoolImpl::ActiveConn::ActiveConn(ConnPoolImpl& parent)
+OriginalConnPoolImpl::ActiveConn::ActiveConn(OriginalConnPoolImpl& parent)
     : parent_(parent),
       connect_timer_(parent_.dispatcher_.createTimer([this]() -> void { onConnectTimeout(); })),
       remaining_requests_(parent_.host_->cluster().maxRequestsPerConnection()), timed_out_(false) {
@@ -384,7 +403,7 @@ ConnPoolImpl::ActiveConn::ActiveConn(ConnPoolImpl& parent)
   conn_->noDelay(true);
 }
 
-ConnPoolImpl::ActiveConn::~ActiveConn() {
+OriginalConnPoolImpl::ActiveConn::~ActiveConn() {
   if (wrapper_) {
     wrapper_->invalidate();
   }
@@ -397,7 +416,7 @@ ConnPoolImpl::ActiveConn::~ActiveConn() {
   parent_.onConnDestroyed(*this);
 }
 
-void ConnPoolImpl::ActiveConn::onConnectTimeout() {
+void OriginalConnPoolImpl::ActiveConn::onConnectTimeout() {
   // We just close the connection at this point. This will result in both a timeout and a connect
   // failure and will fold into all the normal connect failure logic.
   ENVOY_CONN_LOG(debug, "connect timeout", *conn_);
@@ -406,7 +425,7 @@ void ConnPoolImpl::ActiveConn::onConnectTimeout() {
   conn_->close(Network::ConnectionCloseType::NoFlush);
 }
 
-void ConnPoolImpl::ActiveConn::onUpstreamData(Buffer::Instance& data, bool end_stream) {
+void OriginalConnPoolImpl::ActiveConn::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   if (wrapper_ != nullptr && wrapper_->callbacks_ != nullptr) {
     // Delegate to the connection owner.
     wrapper_->callbacks_->onUpstreamData(data, end_stream);
@@ -417,7 +436,7 @@ void ConnPoolImpl::ActiveConn::onUpstreamData(Buffer::Instance& data, bool end_s
   }
 }
 
-void ConnPoolImpl::ActiveConn::onEvent(Network::ConnectionEvent event) {
+void OriginalConnPoolImpl::ActiveConn::onEvent(Network::ConnectionEvent event) {
   ConnectionPool::UpstreamCallbacks* cb = nullptr;
   if (wrapper_ != nullptr && wrapper_->callbacks_ != nullptr) {
     cb = wrapper_->callbacks_;
@@ -432,13 +451,13 @@ void ConnPoolImpl::ActiveConn::onEvent(Network::ConnectionEvent event) {
   }
 }
 
-void ConnPoolImpl::ActiveConn::onAboveWriteBufferHighWatermark() {
+void OriginalConnPoolImpl::ActiveConn::onAboveWriteBufferHighWatermark() {
   if (wrapper_ != nullptr && wrapper_->callbacks_ != nullptr) {
     wrapper_->callbacks_->onAboveWriteBufferHighWatermark();
   }
 }
 
-void ConnPoolImpl::ActiveConn::onBelowWriteBufferLowWatermark() {
+void OriginalConnPoolImpl::ActiveConn::onBelowWriteBufferLowWatermark() {
   if (wrapper_ != nullptr && wrapper_->callbacks_ != nullptr) {
     wrapper_->callbacks_->onBelowWriteBufferLowWatermark();
   }

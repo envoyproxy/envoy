@@ -203,7 +203,8 @@ void AccessLogFileImpl::write(absl::string_view data) {
 }
 
 void AccessLogFileImpl::createFlushStructures() {
-  flush_thread_ = thread_factory_.createThread([this]() -> void { flushThreadFunc(); });
+  flush_thread_ = thread_factory_.createThread([this]() -> void { flushThreadFunc(); },
+                                               Thread::Options{"AccessLogFlush"});
   flush_timer_->enableTimer(flush_interval_msec_);
 }
 

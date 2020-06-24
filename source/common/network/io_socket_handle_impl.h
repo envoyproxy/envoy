@@ -45,6 +45,17 @@ public:
 
   bool supportsMmsg() const override;
 
+  Api::SysCallIntResult bind(Address::InstanceConstSharedPtr address) override;
+  Api::SysCallIntResult listen(int backlog) override;
+  Api::SysCallIntResult connect(Address::InstanceConstSharedPtr address) override;
+  Api::SysCallIntResult setOption(int level, int optname, const void* optval,
+                                  socklen_t optlen) override;
+  Api::SysCallIntResult getOption(int level, int optname, void* optval, socklen_t* optlen) override;
+  Api::SysCallIntResult setBlocking(bool blocking) override;
+  absl::optional<int> domain() override;
+  Address::InstanceConstSharedPtr localAddress() override;
+  Address::InstanceConstSharedPtr peerAddress() override;
+
 private:
   // Converts a SysCallSizeResult to IoCallUint64Result.
   template <typename T>

@@ -7,6 +7,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/network/exception.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
@@ -32,7 +33,7 @@ Api::SysCallIntResult ListenSocketImpl::bind(Network::Address::InstanceConstShar
 void ListenSocketImpl::setListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) {
   if (!Network::Socket::applyOptions(options, *this,
                                      envoy::config::core::v3::SocketOption::STATE_PREBIND)) {
-    throw EnvoyException("ListenSocket: Setting socket options failed");
+    throw CreateListenerException("ListenSocket: Setting socket options failed");
   }
 }
 
@@ -46,8 +47,7 @@ void ListenSocketImpl::setupSocket(const Network::Socket::OptionsSharedPtr& opti
 }
 
 template <>
-void NetworkListenSocket<
-    NetworkSocketTrait<Address::SocketType::Stream>>::setPrebindSocketOptions() {
+void NetworkListenSocket<NetworkSocketTrait<Socket::Type::Stream>>::setPrebindSocketOptions() {
 // On Windows, SO_REUSEADDR does not restrict subsequent bind calls when there is a listener as on
 // Linux and later BSD socket stacks
 #ifndef WIN32
@@ -58,11 +58,10 @@ void NetworkListenSocket<
 }
 
 template <>
-void NetworkListenSocket<
-    NetworkSocketTrait<Address::SocketType::Datagram>>::setPrebindSocketOptions() {}
+void NetworkListenSocket<NetworkSocketTrait<Socket::Type::Datagram>>::setPrebindSocketOptions() {}
 
 UdsListenSocket::UdsListenSocket(const Address::InstanceConstSharedPtr& address)
-    : ListenSocketImpl(SocketInterfaceSingleton::get().socket(Address::SocketType::Stream, address),
+    : ListenSocketImpl(SocketInterfaceSingleton::get().socket(Socket::Type::Stream, address),
                        address) {
   RELEASE_ASSERT(io_handle_->fd() != -1, "");
   bind(local_address_);

@@ -84,13 +84,14 @@ public:
   MOCK_METHOD(const std::string&, adminAddressPath, (), (const));
   MOCK_METHOD(Network::Address::IpVersion, localAddressIpVersion, (), (const));
   MOCK_METHOD(std::chrono::seconds, drainTime, (), (const));
+  MOCK_METHOD(std::chrono::seconds, parentShutdownTime, (), (const));
+  MOCK_METHOD(Server::DrainStrategy, drainStrategy, (), (const));
   MOCK_METHOD(spdlog::level::level_enum, logLevel, (), (const));
   MOCK_METHOD((const std::vector<std::pair<std::string, spdlog::level::level_enum>>&),
               componentLogLevels, (), (const));
   MOCK_METHOD(const std::string&, logFormat, (), (const));
   MOCK_METHOD(bool, logFormatEscaped, (), (const));
   MOCK_METHOD(const std::string&, logPath, (), (const));
-  MOCK_METHOD(std::chrono::seconds, parentShutdownTime, (), (const));
   MOCK_METHOD(uint64_t, restartEpoch, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, fileFlushIntervalMsec, (), (const));
   MOCK_METHOD(Mode, mode, (), (const));
@@ -273,8 +274,7 @@ public:
               (const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&,
                Configuration::ListenerFactoryContext& context));
   MOCK_METHOD(Network::SocketSharedPtr, createListenSocket,
-              (Network::Address::InstanceConstSharedPtr address,
-               Network::Address::SocketType socket_type,
+              (Network::Address::InstanceConstSharedPtr address, Network::Socket::Type socket_type,
                const Network::Socket::OptionsSharedPtr& options,
                const ListenSocketCreationParams& params));
   MOCK_METHOD(DrainManager*, createDrainManager_,
@@ -515,6 +515,8 @@ public:
   MOCK_METHOD(Api::Api&, api, ());
   Grpc::Context& grpcContext() override { return grpc_context_; }
   MOCK_METHOD(Server::DrainManager&, drainManager, ());
+  MOCK_METHOD(Init::Manager&, initManager, ());
+  MOCK_METHOD(ServerLifecycleNotifier&, lifecycleNotifier, ());
 
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
@@ -604,7 +606,7 @@ public:
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(Envoy::Runtime::RandomGenerator&, random, ());
   MOCK_METHOD(Stats::Store&, stats, ());
-  MOCK_METHOD(Init::Manager*, initManager, ());
+  MOCK_METHOD(Init::Manager&, initManager, ());
   MOCK_METHOD(Singleton::Manager&, singletonManager, ());
   MOCK_METHOD(ThreadLocal::SlotAllocator&, threadLocal, ());
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());

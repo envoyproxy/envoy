@@ -3,6 +3,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/network/exception.h"
 
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
@@ -21,14 +22,13 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
                                   int remote_addr_len, void* arg) {
   ListenerImpl* listener = static_cast<ListenerImpl*>(arg);
 
-  // Create the IoSocketHandleImpl for the fd here.
-  IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(fd);
+  // Wrap raw socket fd in IoHandle.
+  IoHandlePtr io_handle = SocketInterfaceSingleton::get().socket(fd);
 
   // Get the local address from the new socket if the listener is listening on IP ANY
   // (e.g., 0.0.0.0 for IPv4) (local_address_ is nullptr in this case).
   const Address::InstanceConstSharedPtr& local_address =
-      listener->local_address_ ? listener->local_address_
-                               : listener->getLocalAddress(io_handle->fd());
+      listener->local_address_ ? listener->local_address_ : io_handle->localAddress();
 
   // The accept() call that filled in remote_addr doesn't fill in more than the sa_family field
   // for Unix domain sockets; apparently there isn't a mechanism in the kernel to get the
@@ -39,7 +39,7 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
   // IPv4 local_address was created from an IPv6 mapped IPv4 address.
   const Address::InstanceConstSharedPtr& remote_address =
       (remote_addr->sa_family == AF_UNIX)
-          ? SocketInterfaceSingleton::get().peerAddressFromFd(io_handle->fd())
+          ? io_handle->peerAddress()
           : Address::addressFromSockAddr(*reinterpret_cast<const sockaddr_storage*>(remote_addr),
                                          remote_addr_len,
                                          local_address->ip()->version() == Address::IpVersion::v6);
