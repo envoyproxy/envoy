@@ -36,8 +36,6 @@ using FaultMessages = ConstSingleton<FaultMessagesValues>;
  */
 class FaultManagerImpl : public FaultManager {
 public:
-  FaultManagerImpl(Runtime::RandomGenerator& random, Runtime::Loader& runtime)
-      : random_(random), runtime_(runtime){}; // For testing only
   FaultManagerImpl(
       Runtime::RandomGenerator& random, Runtime::Loader& runtime,
       const Protobuf::RepeatedPtrField<

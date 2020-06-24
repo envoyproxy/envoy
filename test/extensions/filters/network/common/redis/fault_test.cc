@@ -81,6 +81,14 @@ public:
   testing::NiceMock<Runtime::MockSnapshot> snapshot_;
 };
 
+TEST_F(FaultTest, MakeFaultForTestHelper) {
+  Common::Redis::FaultSharedPtr fault_ptr =
+      FaultManagerImpl::makeFaultForTest(FaultType::Error, std::chrono::milliseconds(10));
+
+  ASSERT_TRUE(fault_ptr->faultType() == FaultType::Error);
+  ASSERT_TRUE(fault_ptr->delayMs() == std::chrono::milliseconds(10));
+}
+
 TEST_F(FaultTest, NoFaults) {
   RedisProxy redis_config;
   auto* faults = redis_config.mutable_faults();
