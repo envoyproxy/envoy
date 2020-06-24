@@ -56,6 +56,7 @@ struct ResponseCacheControl {
 
 // std::ostream& operator<<(std::ostream& os, const ResponseCacheControl& response_cache_control);
 
+// Could be merged with CacheFilterUtils as a single CacheUtils class
 class CacheHeadersUtils {
 public:
   // Parses header_entry as an HTTP time. Returns SystemTime() if

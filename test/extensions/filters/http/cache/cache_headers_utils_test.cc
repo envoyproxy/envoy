@@ -48,8 +48,8 @@ struct RequestCacheControlTestCase {
   RequestCacheControl request_cache_control;
 };
 
-// RequestCacheControl = {bad_request, must_validate, no_store, no_transform, only_if_cached,
-//                        max_age, min_fresh, max_stale}
+// RequestCacheControl = {must_validate, no_store, no_transform, only_if_cached, max_age, min_fresh,
+// max_stale}
 constexpr RequestCacheControlTestCase request_test_cases[] = {
     // Valid cache-control headers
     {"max-age=3600, min-fresh=10, no-transform, only-if-cached, no-store",
@@ -77,6 +77,9 @@ constexpr RequestCacheControlTestCase request_test_cases[] = {
      {false, true, false, false, UNSET_DURATION, DURATION(30), UNSET_DURATION}},
     {"max-age=five, min-fresh=30s, max-stale=-2",
      {false, false, false, false, UNSET_DURATION, UNSET_DURATION, UNSET_DURATION}},
+    // Invalid parts of the header are ignored
+    {"no-cache, ,,,fjfwioen3298, max-age=20, min-fresh=30=40",
+     {true, false, false, false, DURATION(20), UNSET_DURATION, UNSET_DURATION}},
 };
 
 class RequestCacheControlTest : public testing::TestWithParam<RequestCacheControlTestCase> {};
@@ -122,7 +125,9 @@ constexpr ResponseCacheControlTestCase response_test_cases[] = {
     {"max-age=five", {false, false, false, UNSET_DURATION}},
     {"max-age=10s, private", {false, true, false, UNSET_DURATION}},
     {"s-maxage=\"50s\", max-age=\"zero\", no-cache", {true, false, false, UNSET_DURATION}},
-    {"s-maxage=five, max-age=10, no-transform", {false, false, true, DURATION(10)}}};
+    {"s-maxage=five, max-age=10, no-transform", {false, false, true, DURATION(10)}},
+    // Invalid parts of the header are ignored
+    {"no-cache, ,,,fjfwioen3298, max-age=20", {true, false, false, DURATION(20)}}};
 
 class ResponseCacheControlTest : public testing::TestWithParam<ResponseCacheControlTestCase> {};
 
