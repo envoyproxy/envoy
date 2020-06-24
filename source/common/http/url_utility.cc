@@ -24,7 +24,7 @@ bool Url::initialize(absl::string_view absolute_url, bool is_connect) {
     return initializeForConnect(std::move(parsed));
   }
 
-  // TODO(dio): Check if we need to accomodate to strictly validate only http(s) AND ws(s) schemes.
+  // TODO(dio): Check if we need to accommodate to strictly validate only http(s) AND ws(s) schemes.
   // Currently, we only accept http(s).
   if (!parsed.is_valid() || !parsed.SchemeIsHTTPOrHTTPS()) {
     return false;
