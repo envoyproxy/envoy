@@ -21,3 +21,5 @@ RUN apt-get -y update \
 
 ENV DEBIAN_FRONTEND=
 ENV PATH=/opt/llvm/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+ENV CLANG_FORMAT=/opt/llvm/bin/clang-format
