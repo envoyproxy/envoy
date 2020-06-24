@@ -18,14 +18,14 @@ public:
   struct RequestData {
     RequestData(uint32_t request_count, uint32_t success_count)
         : requests(request_count), successes(success_count) {}
-    RequestData() : requests(0), successes(0) {}
+    RequestData() = default;
 
     inline bool operator==(const RequestData& rhs) const {
       return (requests == rhs.requests) && (successes == rhs.successes);
     }
 
-    uint32_t requests;
-    uint32_t successes;
+    uint32_t requests{0};
+    uint32_t successes{0};
   };
 
   virtual ~ThreadLocalController() = default;
