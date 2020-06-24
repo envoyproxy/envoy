@@ -9,6 +9,7 @@
 
 #include "common/common/logger.h"
 
+#include "extensions/filters/http/cache/cache_headers_utils.h"
 #include "extensions/filters/http/cache/http_cache.h"
 #include "extensions/filters/http/common/pass_through_filter.h"
 
@@ -42,6 +43,7 @@ private:
   void onBody(Buffer::InstancePtr&& body);
   void onTrailers(Http::ResponseTrailerMapPtr&& trailers);
 
+  RequestCacheControl request_cache_control_;
   TimeSource& time_source_;
   HttpCache& cache_;
   LookupContextPtr lookup_;

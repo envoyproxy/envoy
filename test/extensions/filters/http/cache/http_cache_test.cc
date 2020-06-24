@@ -1,3 +1,4 @@
+#include "extensions/filters/http/cache/cache_headers_utils.h"
 #include "extensions/filters/http/cache/http_cache.h"
 
 #include "test/mocks/http/mocks.h"
@@ -68,6 +69,8 @@ protected:
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
   Http::TestRequestHeaderMapImpl request_headers_{
       {":path", "/"}, {"x-forwarded-proto", "https"}, {":authority", "example.com"}};
+  RequestCacheControl request_cache_control_ =
+      CacheHeadersUtils::requestCacheControl(request_headers_.getCacheControlValue());
 };
 
 LookupResult makeLookupResult(const LookupRequest& lookup_request,
@@ -78,7 +81,7 @@ LookupResult makeLookupResult(const LookupRequest& lookup_request,
 }
 
 TEST_F(LookupRequestTest, MakeLookupResultNoBody) {
-  const LookupRequest lookup_request(request_headers_, current_time_);
+  const LookupRequest lookup_request(request_headers_, current_time_, request_cache_control_);
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"date", formatter_.fromTime(current_time_)}, {"cache-control", "public, max-age=3600"}});
   const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
@@ -91,7 +94,7 @@ TEST_F(LookupRequestTest, MakeLookupResultNoBody) {
 }
 
 TEST_F(LookupRequestTest, MakeLookupResultBody) {
-  const LookupRequest lookup_request(request_headers_, current_time_);
+  const LookupRequest lookup_request(request_headers_, current_time_, request_cache_control_);
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"date", formatter_.fromTime(current_time_)}, {"cache-control", "public, max-age=3600"}});
   const uint64_t content_length = 5;
@@ -105,21 +108,8 @@ TEST_F(LookupRequestTest, MakeLookupResultBody) {
   EXPECT_FALSE(lookup_response.has_trailers_);
 }
 
-TEST_F(LookupRequestTest, MakeLookupResultNoDate) {
-  const LookupRequest lookup_request(request_headers_, current_time_);
-  const Http::TestResponseHeaderMapImpl response_headers(
-      {{"cache-control", "public, max-age=3600"}});
-  const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
-  EXPECT_EQ(CacheEntryStatus::RequiresValidation, lookup_response.cache_entry_status_);
-  ASSERT_TRUE(lookup_response.headers_);
-  EXPECT_THAT(*lookup_response.headers_, Http::IsSupersetOfHeaders(response_headers));
-  EXPECT_EQ(lookup_response.content_length_, 0);
-  EXPECT_TRUE(lookup_response.response_ranges_.empty());
-  EXPECT_FALSE(lookup_response.has_trailers_);
-}
-
 TEST_F(LookupRequestTest, PrivateResponse) {
-  const LookupRequest lookup_request(request_headers_, current_time_);
+  const LookupRequest lookup_request(request_headers_, current_time_, request_cache_control_);
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"age", "2"},
        {"cache-control", "private, max-age=3600"},
@@ -138,7 +128,7 @@ TEST_F(LookupRequestTest, PrivateResponse) {
 }
 
 TEST_F(LookupRequestTest, Expired) {
-  const LookupRequest lookup_request(request_headers_, current_time_);
+  const LookupRequest lookup_request(request_headers_, current_time_, request_cache_control_);
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"cache-control", "public, max-age=3600"}, {"date", "Thu, 01 Jan 2019 00:00:00 GMT"}});
   const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
@@ -152,7 +142,7 @@ TEST_F(LookupRequestTest, Expired) {
 }
 
 TEST_F(LookupRequestTest, ExpiredViaFallbackheader) {
-  const LookupRequest lookup_request(request_headers_, current_time_);
+  const LookupRequest lookup_request(request_headers_, current_time_, request_cache_control_);
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"expires", formatter_.fromTime(current_time_ - std::chrono::seconds(5))},
        {"date", formatter_.fromTime(current_time_)}});
@@ -162,7 +152,7 @@ TEST_F(LookupRequestTest, ExpiredViaFallbackheader) {
 }
 
 TEST_F(LookupRequestTest, NotExpiredViaFallbackheader) {
-  const LookupRequest lookup_request(request_headers_, current_time_);
+  const LookupRequest lookup_request(request_headers_, current_time_, request_cache_control_);
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"expires", formatter_.fromTime(current_time_ + std::chrono::seconds(5))},
        {"date", formatter_.fromTime(current_time_)}});
@@ -172,7 +162,7 @@ TEST_F(LookupRequestTest, NotExpiredViaFallbackheader) {
 
 TEST_F(LookupRequestTest, FullRange) {
   request_headers_.addCopy("Range", "0-99");
-  const LookupRequest lookup_request(request_headers_, current_time_);
+  const LookupRequest lookup_request(request_headers_, current_time_, request_cache_control_);
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"date", formatter_.fromTime(current_time_)},
        {"cache-control", "public, max-age=3600"},

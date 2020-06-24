@@ -51,6 +51,8 @@ struct RequestCacheControlTestCase {
 // RequestCacheControl = {must_validate, no_store, no_transform, only_if_cached, max_age, min_fresh,
 // max_stale}
 constexpr RequestCacheControlTestCase request_test_cases[] = {
+    // Empty header
+    {"", {false, false, false, false, UNSET_DURATION, UNSET_DURATION, UNSET_DURATION}},
     // Valid cache-control headers
     {"max-age=3600, min-fresh=10, no-transform, only-if-cached, no-store",
      {false, true, true, true, DURATION(3600), DURATION(10), UNSET_DURATION}},
@@ -101,6 +103,8 @@ struct ResponseCacheControlTestCase {
 
 // ResponseCacheControl = {must_validate, no_store, no_transform, max_age}
 constexpr ResponseCacheControlTestCase response_test_cases[] = {
+    // Empty header
+    {"", {false, false, false, UNSET_DURATION}},
     // Valid cache-control headers
     {"s-maxage=1000, max-age=2000, proxy-revalidate, no-store",
      {true, true, false, DURATION(1000)}},

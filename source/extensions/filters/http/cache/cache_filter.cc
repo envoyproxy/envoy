@@ -43,7 +43,10 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
     return Http::FilterHeadersStatus::Continue;
   }
   ASSERT(decoder_callbacks_);
-  lookup_ = cache_.makeLookupContext(LookupRequest(headers, time_source_.systemTime()));
+
+  request_cache_control_ = CacheHeadersUtils::requestCacheControl(headers.getCacheControlValue());
+  lookup_ = cache_.makeLookupContext(
+      LookupRequest(headers, time_source_.systemTime(), request_cache_control_));
   ASSERT(lookup_);
 
   ENVOY_STREAM_LOG(debug, "CacheFilter::decodeHeaders starting lookup", *decoder_callbacks_);
@@ -80,10 +83,13 @@ Http::FilterDataStatus CacheFilter::encodeData(Buffer::Instance& data, bool end_
 
 void CacheFilter::onHeaders(LookupResult&& result) {
   switch (result.cache_entry_status_) {
-  case CacheEntryStatus::RequiresValidation:
   case CacheEntryStatus::FoundNotModified:
   case CacheEntryStatus::UnsatisfiableRange:
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE; // We don't yet return or support these codes.
+  case CacheEntryStatus::RequiresValidation:
+    // Cache entries that require validation are treated as unusuable entries
+    // until validation is implemented
+    // TODO: Implement response validation
   case CacheEntryStatus::Unusable:
     if (state_ == GetHeadersState::FinishedGetHeadersCall) {
       // decodeHeader returned Http::FilterHeadersStatus::StopAllIterationAndWatermark--restart it

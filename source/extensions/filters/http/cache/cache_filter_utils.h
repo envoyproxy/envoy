@@ -9,10 +9,14 @@ namespace HttpFilters {
 namespace Cache {
 class CacheFilterUtils {
 public:
-  // Checks if a request can be served from cache
+  // Checks if a request can be served from cache,
+  // this does not depend on cache-control headers as
+  // request cache-control headers only decide whether
+  // validation is required and whether the response can be cached
   static bool isCacheableRequest(const Http::RequestHeaderMap& headers);
 
   // Checks if a response can be stored in cache
+  // Should follow RFC7234 Section 3 at https://httpwg.org/specs/rfc7234.html#response.cacheability
   static bool isCacheableResponse(const Http::ResponseHeaderMap& headers);
 };
 } // namespace Cache

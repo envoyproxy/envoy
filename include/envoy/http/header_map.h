@@ -315,6 +315,7 @@ private:
   HEADER_FUNC(EnvoyUpstreamCanary)                                                                 \
   HEADER_FUNC(EnvoyUpstreamHealthCheckedCluster)                                                   \
   HEADER_FUNC(EnvoyUpstreamServiceTime)                                                            \
+  HEADER_FUNC(Expires)                                                                             \
   HEADER_FUNC(Location)                                                                            \
   HEADER_FUNC(Server)                                                                              \
   HEADER_FUNC(Status)                                                                              \
