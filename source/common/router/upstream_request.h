@@ -64,7 +64,7 @@ public:
   void onAboveWriteBufferHighWatermark() override { disableDataFromDownstreamForFlowControl(); }
   void onBelowWriteBufferLowWatermark() override { enableDataFromDownstreamForFlowControl(); }
   // UpstreamToDownstream
-  const RouteEntry* routeEntry() const override;
+  const RouteEntry& routeEntry() const override;
   const Network::Connection& connection() const override;
 
   void disableDataFromDownstreamForFlowControl();
@@ -78,7 +78,7 @@ public:
                    Upstream::HostDescriptionConstSharedPtr host,
                    const Network::Address::InstanceConstSharedPtr& upstream_local_address,
                    const StreamInfo::StreamInfo& info) override;
-  UpstreamToDownstream* upstreamToDownstream() override { return this; }
+  UpstreamToDownstream& upstreamToDownstream() override { return *this; }
 
   void clearRequestEncoder();
   void onStreamMaxDurationReached();

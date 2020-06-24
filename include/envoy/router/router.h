@@ -1146,7 +1146,7 @@ public:
   /**
    * @return return the routeEntry for the downstream stream.
    */
-  virtual const RouteEntry* routeEntry() const PURE;
+  virtual const RouteEntry& routeEntry() const PURE;
   /**
    * @return return the connection for the downstream stream.
    */
@@ -1194,7 +1194,7 @@ public:
   // This is the interface for all interactions the upstream stream needs to have with the
   // downstream stream. It is in the GenericConnectionPoolCallbacks as the GenericConnectionPool
   // creates the GenericUpstream, and the GenericUpstream will need this interface.
-  virtual UpstreamToDownstream* upstreamToDownstream() PURE;
+  virtual UpstreamToDownstream& upstreamToDownstream() PURE;
 };
 
 /**
