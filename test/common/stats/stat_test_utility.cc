@@ -153,7 +153,7 @@ Counter& TestStore::counterFromStatNameWithTags(const StatName& stat_name,
     // Ensures StatNames with the same string representation are specified
     // consistently using symbolic/dynamic components on every access.
     ASSERT(counter_ref->statName() == stat_name, "Inconsistent dynamic vs symbolic "
-           "stat name specification");
+                                                 "stat name specification");
   }
   return *counter_ref;
 }
@@ -175,7 +175,7 @@ Gauge& TestStore::gaugeFromStatNameWithTags(const StatName& stat_name,
     gauge_ref = &IsolatedStoreImpl::gaugeFromStatNameWithTags(stat_name, tags, mode);
   } else {
     ASSERT(gauge_ref->statName() == stat_name, "Inconsistent dynamic vs symbolic "
-           "stat name specification");
+                                               "stat name specification");
   }
   return *gauge_ref;
 }
@@ -197,7 +197,7 @@ Histogram& TestStore::histogramFromStatNameWithTags(const StatName& stat_name,
     histogram_ref = &IsolatedStoreImpl::histogramFromStatNameWithTags(stat_name, tags, unit);
   } else {
     ASSERT(histogram_ref->statName() == stat_name, "Inconsistent dynamic vs symbolic "
-           "stat name specification");
+                                                   "stat name specification");
   }
   return *histogram_ref;
 }
