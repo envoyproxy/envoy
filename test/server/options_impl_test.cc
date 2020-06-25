@@ -271,7 +271,10 @@ TEST_F(OptionsImplTest, OptionsAreInSyncWithProto) {
   // 5. use-fake-symbol-table - short-term override for rollout of real symbol-table implementation.
   // 6. hot restart version - print the hot restart version and exit.
   // 7. log-format-prefix-with-location - short-term override for rollout of dynamic log format.
-  EXPECT_EQ(options->count() - 7, command_line_options->GetDescriptor()->field_count());
+  //
+  // The two deprecated options  "max_stats", "max_obj_name_len" need to be subtracted from
+  // the protobuf field count.
+  EXPECT_EQ(options->count() - 7, command_line_options->GetDescriptor()->field_count() - 2);
 }
 
 TEST_F(OptionsImplTest, OptionsFromArgv) {
