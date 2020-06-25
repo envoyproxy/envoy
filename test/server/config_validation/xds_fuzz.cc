@@ -140,6 +140,23 @@ absl::optional<std::string> XdsFuzzTest::removeRoute(uint32_t route_num) {
 }
 
 /**
+ * wait for a specific ACK, ignoring any other ACKs that are made in the meantime
+ * @param the expected API type url of the ack
+ * @param the expected version number
+ * @return AssertionSuccess() if the ack was received, else an AssertionError()
+ */
+AssertionResult XdsFuzzTest::waitForAck(const std::string& expected_type_url,
+                                        const std::string& expected_version) {
+  API_NO_BOOST(envoy::api::v2::DiscoveryRequest) discovery_request;
+  do {
+    VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
+  } while (expected_type_url != discovery_request.type_url() &&
+           expected_version != discovery_request.version_info());
+  version_++;
+  return AssertionSuccess();
+}
+
+/**
  * run the sequence of actions defined in the fuzzed protobuf
  */
 void XdsFuzzTest::replay() {
@@ -165,7 +182,7 @@ void XdsFuzzTest::replay() {
       listeners_.push_back(listener);
 
       updateListener(listeners_, {listener}, {});
-      // TODO(samflattery): compareDiscoveryResponse to check ACK/NACK?
+      EXPECT_TRUE(waitForAck(Config::TypeUrl::get().Listener, std::to_string(version_)));
       break;
     }
     case test::server::config_validation::Action::kRemoveListener: {
@@ -173,6 +190,7 @@ void XdsFuzzTest::replay() {
 
       if (removed) {
         updateListener(listeners_, {}, {*removed});
+        EXPECT_TRUE(waitForAck(Config::TypeUrl::get().Listener, std::to_string(version_)));
       }
 
       break;
@@ -182,12 +200,15 @@ void XdsFuzzTest::replay() {
       auto removed = removeRoute(route_num);
       auto route = buildRouteConfig(route_num);
       routes_.push_back(route);
+
       if (removed) {
         // if the route was already in routes_, don't send a duplicate add in delta request
         updateRoute(routes_, {}, {});
       } else {
         updateRoute(routes_, {route}, {});
       }
+
+      EXPECT_TRUE(waitForAck(Config::TypeUrl::get().RouteConfiguration, std::to_string(version_)));
       break;
     }
     case test::server::config_validation::Action::kRemoveRoute: {
@@ -199,14 +220,14 @@ void XdsFuzzTest::replay() {
       auto removed = removeRoute(action.remove_route().route_num());
       if (removed) {
         updateRoute(routes_, {}, {*removed});
+        EXPECT_TRUE(
+            waitForAck(Config::TypeUrl::get().RouteConfiguration, std::to_string(version_)));
       }
       break;
     }
     default:
       break;
     }
-    // TODO(samflattery): makeSingleRequest here?
-    version_++;
   }
 
   close();

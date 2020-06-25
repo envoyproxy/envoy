@@ -48,6 +48,8 @@ public:
 private:
   absl::optional<std::string> removeListener(uint32_t listener_num);
   absl::optional<std::string> removeRoute(uint32_t route_num);
+  AssertionResult XdsFuzzTest::waitForAck(const std::string& expected_type_url,
+                                          const std::string& expected_version);
 
   Protobuf::RepeatedPtrField<test::server::config_validation::Action> actions_;
   std::vector<envoy::config::route::v3::RouteConfiguration> routes_;
