@@ -14,16 +14,15 @@ tasks:
       - "--config=remote-clang-libc++"
       - "--config=remote-ci"
       - "--jobs=75"
+      - "--strategy=Genrule=sandboxed,local"
   coverage:
     name: "Coverage"
     platform: ubuntu1804
+    shell_commands:
+      - "bazel/setup_clang.sh /usr/lib/llvm-10"
     test_targets:
-      - "//test/integration/..."
+      - "//test/common/common/..."
       - "//test/exe/..."
     test_flags:
       - "--config=coverage"
-      - "--config=remote-clang-libc++"
-      - "--config=remote-ci"
-      - "--jobs=75"
-      - "--local_test_jobs=HOST_CPUS"
-      - "--test_env=PATH=/usr/lib/llvm-10/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+      - "--config=clang"
