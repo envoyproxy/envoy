@@ -467,25 +467,6 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationRequest5xxError) {
   client_->onSuccess(async_request_, std::move(check_response));
 }
 
-// Test the client when a call to authorization server returns a status code that cannot be parsed.
-TEST_F(ExtAuthzHttpClientTest, AuthorizationRequestErrorParsingStatusCode) {
-  Http::ResponseMessagePtr check_response(new Http::ResponseMessageImpl(
-      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "foo"}}}));
-  envoy::service::auth::v3::CheckRequest request;
-
-  client_->check(request_callbacks_, request, parent_span_, stream_info_);
-
-  EXPECT_CALL(child_span_, setTag(Eq("ext_authz_http_status"), Eq("Unknown")));
-  EXPECT_CALL(child_span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_unauthorized")));
-  client_->onBeforeFinalizeUpstreamSpan(child_span_, &check_response->headers());
-
-  EXPECT_CALL(request_callbacks_,
-              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
-  // This is actually not a realistic test, since there should be no calls to onSuccess when the
-  // response status is invalid.
-  client_->onSuccess(async_request_, std::move(check_response));
-}
-
 // Test the client when the request is canceled.
 TEST_F(ExtAuthzHttpClientTest, CancelledAuthorizationRequest) {
   envoy::service::auth::v3::CheckRequest request;

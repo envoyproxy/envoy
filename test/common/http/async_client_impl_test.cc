@@ -191,43 +191,6 @@ TEST_F(AsyncClientImplTest, Basic) {
                      .value());
 }
 
-TEST_F(AsyncClientImplTest, BasicInvalidResponseStatus) {
-  message_->body() = std::make_unique<Buffer::OwnedImpl>("test body");
-  Buffer::Instance& data = *message_->body();
-
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseDecoder& decoder,
-                           ConnectionPool::Callbacks& callbacks) -> ConnectionPool::Cancellable* {
-        callbacks.onPoolReady(stream_encoder_, cm_.conn_pool_.host_, stream_info_);
-        response_decoder_ = &decoder;
-        return nullptr;
-      }));
-
-  TestRequestHeaderMapImpl copy(message_->headers());
-  copy.addCopy("x-envoy-internal", "true");
-  copy.addCopy("x-forwarded-for", "127.0.0.1");
-  copy.addCopy(":scheme", "http");
-
-  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&copy), false));
-  EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data), true));
-
-  auto* request = client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions());
-  EXPECT_NE(request, nullptr);
-
-  EXPECT_CALL(callbacks_, onBeforeFinalizeUpstreamSpan(_, _)).Times(1);
-  EXPECT_CALL(callbacks_, onFailure(_, _))
-      .WillOnce(Invoke([sent_request = request](const AsyncClient::Request& request,
-                                                AsyncClient::FailureReason reason) {
-        EXPECT_EQ(&request, sent_request);
-        EXPECT_EQ(reason, AsyncClient::FailureReason::Reset);
-      }));
-
-  ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "INVALID"}});
-  EXPECT_THROW_WITH_MESSAGE(response_decoder_->decodeHeaders(std::move(response_headers), false),
-                            Http::CodecClientException,
-                            ":status must be specified and a valid unsigned long");
-}
-
 TEST_F(AsyncClientImplTracingTest, Basic) {
   Tracing::MockSpan* child_span{new Tracing::MockSpan()};
   message_->body() = std::make_unique<Buffer::OwnedImpl>("test body");
@@ -271,63 +234,6 @@ TEST_F(AsyncClientImplTracingTest, Basic) {
   ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder_->decodeHeaders(std::move(response_headers), false);
   response_decoder_->decodeData(data, true);
-}
-
-TEST_F(AsyncClientImplTracingTest, BasicInvalidResponseStatus) {
-  Tracing::MockSpan* child_span{new Tracing::MockSpan()};
-  message_->body() = std::make_unique<Buffer::OwnedImpl>("test body");
-
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseDecoder& decoder,
-                           ConnectionPool::Callbacks& callbacks) -> ConnectionPool::Cancellable* {
-        callbacks.onPoolReady(stream_encoder_, cm_.conn_pool_.host_, stream_info_);
-        response_decoder_ = &decoder;
-        return nullptr;
-      }));
-
-  TestRequestHeaderMapImpl copy(message_->headers());
-  copy.addCopy("x-envoy-internal", "true");
-  copy.addCopy("x-forwarded-for", "127.0.0.1");
-  copy.addCopy(":scheme", "http");
-
-  EXPECT_CALL(parent_span_, spawnChild_(_, "async fake_cluster egress", _))
-      .WillOnce(Return(child_span));
-
-  AsyncClient::RequestOptions options = AsyncClient::RequestOptions().setParentSpan(parent_span_);
-  EXPECT_CALL(*child_span, setSampled(true));
-  EXPECT_CALL(*child_span, injectContext(_));
-
-  auto* request = client_.send(std::move(message_), callbacks_, options);
-  EXPECT_NE(request, nullptr);
-
-  EXPECT_CALL(callbacks_, onBeforeFinalizeUpstreamSpan(_, _))
-      .WillOnce(Invoke([](Tracing::Span& span, const Http::ResponseHeaderMap* response_headers) {
-        span.setTag("onBeforeFinalizeUpstreamSpan", "called");
-        ASSERT_EQ(nullptr, response_headers);
-      }));
-  EXPECT_CALL(callbacks_, onFailure(_, _))
-      .WillOnce(Invoke([sent_request = request](const AsyncClient::Request& request,
-                                                AsyncClient::FailureReason reason) {
-        EXPECT_EQ(&request, sent_request);
-        EXPECT_EQ(reason, AsyncClient::FailureReason::Reset);
-      }));
-
-  EXPECT_CALL(*child_span, setTag(Eq("onBeforeFinalizeUpstreamSpan"), Eq("called")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ErrorReason), Eq("Reset")));
-  EXPECT_CALL(*child_span,
-              setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.1")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.1:443")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("0")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
-  EXPECT_CALL(*child_span, finishSpan());
-
-  ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "INVALID"}});
-  EXPECT_THROW_WITH_MESSAGE(response_decoder_->decodeHeaders(std::move(response_headers), false),
-                            Http::CodecClientException,
-                            ":status must be specified and a valid unsigned long");
 }
 
 TEST_F(AsyncClientImplTracingTest, BasicNamedChildSpan) {
