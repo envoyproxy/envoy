@@ -477,7 +477,7 @@ request_rules:
       type: STRING
 )EOF";
   initializeFilter(config);
-  Http::TestRequestHeaderMapImpl headers{{"x-version", ""}};
+  Http::TestRequestHeaderMapImpl headers{{"x-version", "19"}};
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
