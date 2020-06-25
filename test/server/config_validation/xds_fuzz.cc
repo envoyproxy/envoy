@@ -22,14 +22,14 @@ XdsFuzzTest::buildClusterLoadAssignment(const std::string& name) {
 
 envoy::config::listener::v3::Listener XdsFuzzTest::buildListener(uint32_t listener_num,
                                                                  uint32_t route_num) {
-  std::string name = absl::StrCat("listener_", listener_num % num_listeners_);
-  std::string route = absl::StrCat("route_config_", route_num % num_routes_);
+  std::string name = absl::StrCat("listener_", listener_num % ListenersMax);
+  std::string route = absl::StrCat("route_config_", route_num % RoutesMax);
   return ConfigHelper::buildListener(
       name, route, Network::Test::getLoopbackAddressString(ip_version_), "ads_test", api_version_);
 }
 
 envoy::config::route::v3::RouteConfiguration XdsFuzzTest::buildRouteConfig(uint32_t route_num) {
-  std::string route = absl::StrCat("route_config_", route_num % num_routes_);
+  std::string route = absl::StrCat("route_config_", route_num % RoutesMax);
   return ConfigHelper::buildRouteConfig(route, "cluster_0", api_version_);
 }
 
@@ -112,7 +112,7 @@ void XdsFuzzTest::close() {
  * @return the listener as an optional so that it can be used in a delta request
  */
 absl::optional<std::string> XdsFuzzTest::removeListener(uint32_t listener_num) {
-  std::string match = absl::StrCat("listener_", listener_num % num_listeners_);
+  std::string match = absl::StrCat("listener_", listener_num % ListenersMax);
 
   for (auto it = listeners_.begin(); it != listeners_.end(); ++it) {
     if (it->name() == match) {
@@ -129,7 +129,7 @@ absl::optional<std::string> XdsFuzzTest::removeListener(uint32_t listener_num) {
  * @return the route as an optional so that it can be used in a delta request
  */
 absl::optional<std::string> XdsFuzzTest::removeRoute(uint32_t route_num) {
-  std::string match = absl::StrCat("route_config_", route_num % num_routes_);
+  std::string match = absl::StrCat("route_config_", route_num % RoutesMax);
   for (auto it = routes_.begin(); it != routes_.end(); ++it) {
     if (it->name() == match) {
       routes_.erase(it);
@@ -147,11 +147,23 @@ absl::optional<std::string> XdsFuzzTest::removeRoute(uint32_t route_num) {
  */
 AssertionResult XdsFuzzTest::waitForAck(const std::string& expected_type_url,
                                         const std::string& expected_version) {
-  API_NO_BOOST(envoy::api::v2::DiscoveryRequest) discovery_request;
-  do {
-    VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
-  } while (expected_type_url != discovery_request.type_url() &&
-           expected_version != discovery_request.version_info());
+  if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
+    API_NO_BOOST(envoy::api::v2::DiscoveryRequest) discovery_request;
+    do {
+      VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
+    } while (expected_type_url != discovery_request.type_url() &&
+             expected_version != discovery_request.version_info());
+  } else {
+    API_NO_BOOST(envoy::api::v2::DeltaDiscoveryRequest) delta_discovery_request;
+    do {
+      VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, delta_discovery_request));
+    } while (expected_type_url != delta_discovery_request.type_url());
+             /* expected_version != delta_discovery_request.version_info()); */
+  }
+  /* do { */
+  /*   VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request)); */
+  /* } while (expected_type_url != discovery_request.type_url() && */
+  /*          expected_version != discovery_request.version_info()); */
   version_++;
   return AssertionSuccess();
 }
@@ -182,6 +194,9 @@ void XdsFuzzTest::replay() {
       listeners_.push_back(listener);
 
       updateListener(listeners_, {listener}, {});
+      // use waitForAck instead of compareDiscoveryRequest as the client makes
+      // additional discoveryRequests at launch that we might not want to
+      // respond to yet
       EXPECT_TRUE(waitForAck(Config::TypeUrl::get().Listener, std::to_string(version_)));
       break;
     }
