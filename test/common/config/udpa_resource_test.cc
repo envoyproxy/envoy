@@ -9,11 +9,11 @@ namespace Config {
 namespace {
 
 const std::string EscapedUri =
-    "udpa://f123%25%2F%23%3F%26%3Do/envoy.config.listener.v3.Listener/b%25%2F%23%3F%26%3Dar//"
-    "baz?%25%23%26%3Dab=cde%25%23%26%3Df";
+    "udpa://f123%25%2F%3F%23o/envoy.config.listener.v3.Listener/b%25%3A%2F%3F%23%5B%5Dar//"
+    "baz?%25%23%5B%5D%26%3Dab=cde%25%23%5B%5D%26%3Df";
 const std::string EscapedUriWithManyQueryParams =
-    "udpa://f123%25%2F%23%3F%26%3Do/envoy.config.listener.v3.Listener/b%25%2F%23%3F%26%3Dar//"
-    "baz?%25%23%26%3D=bar&%25%23%26%3Dab=cde%25%23%26%3Df&foo=%25%23%26%3D";
+    "udpa://f123%25%2F%3F%23o/envoy.config.listener.v3.Listener/b%25%3A%2F%3F%23%5B%5Dar//"
+    "baz?%25%23%5B%5D%26%3D=bar&%25%23%5B%5D%26%3Dab=cde%25%23%5B%5D%26%3Df&foo=%25%23%5B%5D%26%3D";
 
 // for all x. encodeUri(decodeUri(x)) = x where x comes from sample of valid udpa:// URIs.
 // TODO(htuch): write a fuzzer that validates this property as well.
@@ -43,16 +43,16 @@ TEST(UdpaResourceNameTest, DecodeEncode) {
 // Validate that URI decoding behaves as expected component-wise.
 TEST(UdpaResourceNameTest, DecodeSuccess) {
   const auto resource_name = UdpaResourceName::decodeUri(EscapedUriWithManyQueryParams);
-  EXPECT_EQ("f123%/#?&=o", resource_name.authority());
+  EXPECT_EQ("f123%/?#o", resource_name.authority());
   EXPECT_EQ("envoy.config.listener.v3.Listener", resource_name.resource_type());
   EXPECT_EQ(3, resource_name.id().size());
-  EXPECT_EQ("b%/#?&=ar", resource_name.id()[0]);
+  EXPECT_EQ("b%:/?#[]ar", resource_name.id()[0]);
   EXPECT_EQ("", resource_name.id()[1]);
   EXPECT_EQ("baz", resource_name.id()[2]);
   EXPECT_EQ(3, resource_name.context().params().size());
-  EXPECT_EQ("bar", resource_name.context().params().at("%#&="));
-  EXPECT_EQ("cde%#&=f", resource_name.context().params().at("%#&=ab"));
-  EXPECT_EQ("%#&=", resource_name.context().params().at("foo"));
+  EXPECT_EQ("bar", resource_name.context().params().at("%#[]&="));
+  EXPECT_EQ("cde%#[]&=f", resource_name.context().params().at("%#[]&=ab"));
+  EXPECT_EQ("%#[]&=", resource_name.context().params().at("foo"));
 }
 
 // Validate that the URI decoding behaves with a near-empty UDPA resource name.

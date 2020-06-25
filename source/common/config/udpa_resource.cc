@@ -20,17 +20,17 @@ std::string UdpaResourceName::encodeUri(const udpa::core::v1::ResourceName& reso
                                         const EncodeOptions& options) {
   // We need to percent-encode authority, id, path and query params. Qualified types should not have
   // reserved characters.
-  const std::string authority = PercentEncoding::encode(resource_name.authority(), "%/#?&=");
+  const std::string authority = PercentEncoding::encode(resource_name.authority(), "%/?#");
   std::vector<std::string> path_components;
   for (const auto& id_component : resource_name.id()) {
-    path_components.emplace_back(PercentEncoding::encode(id_component, "%/#?&="));
+    path_components.emplace_back(PercentEncoding::encode(id_component, "%:/?#[]"));
   }
   const std::string path = absl::StrJoin(path_components, "/");
   std::vector<std::string> query_param_components;
   for (const auto& context_param : resource_name.context().params()) {
     query_param_components.emplace_back(
-        absl::StrCat(PercentEncoding::encode(context_param.first, "%#&="), "=",
-                     PercentEncoding::encode(context_param.second, "%#&=")));
+        absl::StrCat(PercentEncoding::encode(context_param.first, "%#[]&="), "=",
+                     PercentEncoding::encode(context_param.second, "%#[]&=")));
   }
   if (options.sort_context_params_) {
     std::sort(query_param_components.begin(), query_param_components.end());
