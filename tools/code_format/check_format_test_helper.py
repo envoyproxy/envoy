@@ -19,6 +19,7 @@ curr_dir = os.path.dirname(os.path.realpath(__file__))
 tools = os.path.dirname(curr_dir)
 src = os.path.join(tools, 'testdata', 'check_format')
 check_format = sys.executable + " " + os.path.join(curr_dir, 'check_format.py')
+check_line_format = sys.executable + " " + os.path.join(curr_dir, 'check_line_format.py')
 errors = 0
 
 
@@ -30,6 +31,12 @@ def runCheckFormat(operation, filename):
   status, stdout, stderr = runCommand(command)
   return (command, status, stdout + stderr)
 
+
+def runCheckLineFormat(line):
+  command = f"{check_line_format} \"{line}\""
+  status, stdout, stderr = runCommand(command)
+  return (command, status, stdout + stderr)
+    
 
 def getInputFile(filename, extra_input_files=None):
   files_to_copy = [filename]
@@ -99,6 +106,19 @@ def expectError(filename, status, stdout, expected_substring):
   return 1
 
 
+def expectLineError(line, status, stdout, expected_error):
+  if status == 0:
+    logging.error(f"{line}: Expected failure `{expected_error}`, but succeeded")
+    return 1
+
+  for line in stdout:
+    if expected_error in line:
+      return 0
+
+  logging.error(f"{line}: Could not find '{expected_error}' in:\n")
+  emitStdoutAsError(stdout)
+  return 1
+
 def fixFileExpectingFailure(filename, expected_substring):
   command, infile, outfile, status, stdout = fixFileHelper(filename)
   return expectError(filename, status, stdout, expected_substring)
@@ -108,6 +128,11 @@ def checkFileExpectingError(filename, expected_substring, extra_input_files=None
   command, status, stdout = runCheckFormat(
       "check", getInputFile(filename, extra_input_files=extra_input_files))
   return expectError(filename, status, stdout, expected_substring)
+
+
+def checkLineExpectingError(line, expected_error):
+  command, status, stdout = runCheckLineFormat(line)
+  return expectLineError(line, status, stdout, expected_error)
 
 
 def checkAndFixError(filename, expected_substring, extra_input_files=None):
@@ -138,12 +163,25 @@ def checkUnfixableError(filename, expected_substring):
   return errors
 
 
+
+def checkUnfixableLineError(line, expected_error):
+  return checkLineExpectingError(line, expected_error)
+
 def checkFileExpectingOK(filename):
   command, status, stdout = runCheckFormat("check", getInputFile(filename))
   if status != 0:
     logging.error("Expected %s to have no errors; status=%d, output:\n" % (filename, status))
     emitStdoutAsError(stdout)
   return status + fixFileExpectingNoChange(filename)
+
+
+def checkLineExpectingOK(line):
+  command, status, stdout = runCheckLineFormat(line)
+  if status != 0:
+    logging.error(f"Expected '{line}' to have no errors; status={status}, output:\n")
+    emitStdoutAsError(stdout)
+
+  return status
 
 
 def runChecks():
@@ -216,11 +254,6 @@ def runChecks():
       "grpc_shutdown.cc",
       "Don't call grpc_init() or grpc_shutdown() directly, instantiate Grpc::GoogleGrpcContext. " +
       "See #8282")
-  errors += checkUnfixableError("non_type_alias_smart_ptr.cc",
-                                "Use type alias for 'Network::Connection' instead. See STYLE.md")
-  errors += checkUnfixableError(
-      "non_type_alias_optional_ref.cc",
-      "Use type alias for 'ConnectionHandlerImpl::ActiveTcpListener' instead. See STYLE.md")
   errors += checkUnfixableError("clang_format_double_off.cc", "clang-format nested off")
   errors += checkUnfixableError("clang_format_trailing_off.cc", "clang-format remains off")
   errors += checkUnfixableError("clang_format_double_on.cc", "clang-format nested on")
@@ -276,8 +309,7 @@ def runChecks():
   errors += checkFileExpectingOK("real_time_source_override.cc")
   errors += checkFileExpectingOK("time_system_wait_for.cc")
   errors += checkFileExpectingOK("clang_format_off.cc")
-  errors += checkFileExpectingOK("using_type_alias.cc")
-  errors += checkFileExpectingOK("non_type_alias_allowed_type.cc")
+
   return errors
 
 
