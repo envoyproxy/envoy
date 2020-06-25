@@ -84,7 +84,7 @@ public:
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
 
   // Http::ConnectionCallbacks
-  void onGoAway() override;
+  void onGoAway(GoAwayErrorCode error_code) override;
 
   // Http::ServerConnectionCallbacks
   RequestDecoder& newStream(ResponseEncoder& response_encoder,

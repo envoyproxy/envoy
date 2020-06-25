@@ -25,6 +25,112 @@ namespace Envoy {
 namespace Event {
 namespace {
 
+class SchedulableCallbackImplTest : public testing::Test {
+protected:
+  SchedulableCallbackImplTest()
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
+
+  void createCallback(std::function<void()> cb) {
+    callbacks_.emplace_back(dispatcher_->createSchedulableCallback(cb));
+  }
+
+  Api::ApiPtr api_;
+  DispatcherPtr dispatcher_;
+  std::vector<SchedulableCallbackPtr> callbacks_;
+
+  static void onWatcherReady(evwatch*, const evwatch_prepare_cb_info*, void* arg) {
+    // `arg` contains the ReadyWatcher passed in from evwatch_prepare_new.
+    auto watcher = static_cast<ReadyWatcher*>(arg);
+    watcher->ready();
+  }
+};
+
+TEST_F(SchedulableCallbackImplTest, ScheduleAndCancel) {
+  ReadyWatcher watcher;
+
+  auto cb = dispatcher_->createSchedulableCallback([&]() { watcher.ready(); });
+
+  // Cancel is a no-op if not scheduled.
+  cb->cancel();
+  dispatcher_->run(Dispatcher::RunType::Block);
+
+  // Callback is not invoked if cancelled before it executes.
+  cb->scheduleCallbackCurrentIteration();
+  EXPECT_TRUE(cb->enabled());
+  cb->cancel();
+  EXPECT_FALSE(cb->enabled());
+  dispatcher_->run(Dispatcher::RunType::Block);
+
+  // Scheduled callback executes.
+  cb->scheduleCallbackCurrentIteration();
+  EXPECT_CALL(watcher, ready());
+  dispatcher_->run(Dispatcher::RunType::Block);
+
+  // Callbacks implicitly cancelled if runner is deleted.
+  cb->scheduleCallbackCurrentIteration();
+  cb.reset();
+  dispatcher_->run(Dispatcher::RunType::Block);
+}
+
+TEST_F(SchedulableCallbackImplTest, ScheduleOrder) {
+  ReadyWatcher watcher0;
+  createCallback([&]() { watcher0.ready(); });
+  ReadyWatcher watcher1;
+  createCallback([&]() { watcher1.ready(); });
+
+  // Callback run in the order they are scheduled.
+  callbacks_[0]->scheduleCallbackCurrentIteration();
+  callbacks_[1]->scheduleCallbackCurrentIteration();
+  EXPECT_CALL(watcher0, ready());
+  EXPECT_CALL(watcher1, ready());
+  dispatcher_->run(Dispatcher::RunType::Block);
+}
+
+TEST_F(SchedulableCallbackImplTest, ScheduleChainingAndCancellation) {
+  DispatcherImpl* dispatcher_impl = static_cast<DispatcherImpl*>(dispatcher_.get());
+  ReadyWatcher prepare_watcher;
+  evwatch_prepare_new(&dispatcher_impl->base(), onWatcherReady, &prepare_watcher);
+
+  ReadyWatcher watcher0;
+  createCallback([&]() {
+    watcher0.ready();
+    callbacks_[1]->scheduleCallbackCurrentIteration();
+  });
+
+  ReadyWatcher watcher1;
+  createCallback([&]() {
+    watcher1.ready();
+    callbacks_[2]->scheduleCallbackCurrentIteration();
+    callbacks_[3]->scheduleCallbackCurrentIteration();
+    callbacks_[4]->scheduleCallbackCurrentIteration();
+  });
+
+  ReadyWatcher watcher2;
+  createCallback([&]() {
+    watcher2.ready();
+    EXPECT_TRUE(callbacks_[3]->enabled());
+    callbacks_[3]->cancel();
+    EXPECT_TRUE(callbacks_[4]->enabled());
+    callbacks_[4].reset();
+  });
+
+  ReadyWatcher watcher3;
+  createCallback([&]() { watcher3.ready(); });
+
+  ReadyWatcher watcher4;
+  createCallback([&]() { watcher4.ready(); });
+
+  // Chained callbacks run in the same event loop iteration, as signaled by a single call to
+  // prepare_watcher.ready(). watcher3 and watcher4 are not invoked because cb2 cancels
+  // cb3 and deletes cb4 as part of its execution.
+  callbacks_[0]->scheduleCallbackCurrentIteration();
+  EXPECT_CALL(prepare_watcher, ready());
+  EXPECT_CALL(watcher0, ready());
+  EXPECT_CALL(watcher1, ready());
+  EXPECT_CALL(watcher2, ready());
+  dispatcher_->run(Dispatcher::RunType::Block);
+}
+
 class TestDeferredDeletable : public DeferredDeletable {
 public:
   TestDeferredDeletable(std::function<void()> on_destroy) : on_destroy_(on_destroy) {}
