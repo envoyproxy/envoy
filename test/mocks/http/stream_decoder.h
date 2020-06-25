@@ -16,6 +16,11 @@ public:
   // Http::StreamDecoder
   MOCK_METHOD(void, decodeData, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(void, decodeMetadata_, (MetadataMapPtr & metadata_map));
+  MOCK_METHOD(void, sendLocalReply,
+              (bool is_grpc_request, Code code, absl::string_view body,
+               const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
+               bool is_head_request, const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+               absl::string_view details));
 
   void decodeHeaders(RequestHeaderMapPtr&& headers, bool end_stream) override {
     decodeHeaders_(headers, end_stream);
