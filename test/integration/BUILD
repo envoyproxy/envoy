@@ -254,7 +254,7 @@ envoy_cc_test_binary(
     ],
     stamped = True,
     deps = [
-        "//source/exe:envoy_main_common_lib",
+        "//source/exe:envoy_main_common_with_core_extensions_lib",
         "//source/exe:platform_impl_lib",
     ],
 )
@@ -278,7 +278,7 @@ envoy_sh_test(
 envoy_sh_test(
     name = "run_envoy_test",
     srcs = ["run_envoy_test.sh"],
-    cc_binary = ["//source/exe:envoy-static"],
+    cc_binary = [":hotrestart_main"],
     data = [
         "test_utility.sh",
         "//test/config/integration:server_config_files",
