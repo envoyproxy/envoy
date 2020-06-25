@@ -25,7 +25,7 @@ const std::string& gzipExtensionName() {
 
 class GzipDecompressorFactory : public Envoy::Compression::Decompressor::DecompressorFactory {
 public:
-  GzipDecompressorFactory(const envoy::extensions::compression::gzip::decompressor::v3::Gzip& gzip);
+  GzipDecompressorFactory(const envoy::extensions::compression::gzip::decompressor::v3::Gzip& gzip, Stats::Scope& scope);
 
   // Envoy::Compression::Decompressor::DecompressorFactory
   Envoy::Compression::Decompressor::DecompressorPtr createDecompressor() override;
@@ -35,6 +35,7 @@ public:
   }
 
 private:
+  Stats::Scope& scope_;
   const int32_t window_bits_;
   const uint32_t chunk_size_;
 };
@@ -47,7 +48,7 @@ public:
 
 private:
   Envoy::Compression::Decompressor::DecompressorFactoryPtr createDecompressorFactoryFromProtoTyped(
-      const envoy::extensions::compression::gzip::decompressor::v3::Gzip& config) override;
+      const envoy::extensions::compression::gzip::decompressor::v3::Gzip& proto_config, Server::Configuration::FactoryContext& context) override;
 };
 
 DECLARE_FACTORY(GzipDecompressorLibraryFactory);
