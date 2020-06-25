@@ -232,6 +232,7 @@ RedisCluster::RedisDiscoverySession::~RedisDiscoverySession() {
     current_request_->cancel();
     current_request_ = nullptr;
   }
+  // Disable timer for mock tests.
   if (resolve_timer_) {
     resolve_timer_->disableTimer();
   }
