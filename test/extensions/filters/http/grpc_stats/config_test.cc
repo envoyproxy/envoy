@@ -358,11 +358,9 @@ TEST_F(GrpcStatsFilterConfigTest, MessageCounts) {
                     .counterFromString(
                         "grpc.lyft.users.BadCompanions.GetBadCompanions.request_message_count")
                     .value());
-  EXPECT_EQ(0U, decoder_callbacks_.clusterInfo()
-                    ->statsScope()
-                    .counterFromString(
-                        "grpc.lyft.users.BadCompanions.GetBadCompanions.response_message_count")
-                    .value());
+  EXPECT_FALSE(stats_store_.findCounterByString(
+      "grpc.lyft.users.BadCompanions.GetBadCompanions.response_message_count"));
+
   const auto& data = stream_info_.filterState()->getDataReadOnly<GrpcStatsObject>(
       HttpFilterNames::get().GrpcStats);
   EXPECT_EQ(2U, data.request_message_count);
