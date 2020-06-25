@@ -522,24 +522,27 @@ Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, Buffer::RawSlic
 }
 
 void passPayloadToProcessor(uint64_t bytes_read, Buffer::RawSlice& slice,
-                            Buffer::InstancePtr buffer, Address::InstanceConstSharedPtr peer_addess,
+                            Buffer::InstancePtr buffer,
+                            Address::InstanceConstSharedPtr peer_address,
                             Address::InstanceConstSharedPtr local_address,
                             UdpPacketProcessor& udp_packet_processor, MonotonicTime receive_time) {
-  // Adjust used memory length.
-  slice.len_ = std::min(slice.len_, static_cast<size_t>(bytes_read));
-  buffer->commit(&slice, 1);
+  if (slice.mem_ != nullptr) {
+    // Adjust used memory length.
+    slice.len_ = std::min(slice.len_, static_cast<size_t>(bytes_read));
+    buffer->commit(&slice, 1);
+  }
 
   RELEASE_ASSERT(
-      peer_addess != nullptr,
+      peer_address != nullptr,
       fmt::format("Unable to get remote address on the socket bount to local address: {} ",
                   local_address->asString()));
 
   // Unix domain sockets are not supported
-  RELEASE_ASSERT(peer_addess->type() == Address::Type::Ip,
+  RELEASE_ASSERT(peer_address->type() == Address::Type::Ip,
                  fmt::format("Unsupported remote address: {} local address: {}, receive size: "
                              "{}",
-                             peer_addess->asString(), local_address->asString(), bytes_read));
-  udp_packet_processor.processPacket(std::move(local_address), std::move(peer_addess),
+                             peer_address->asString(), local_address->asString(), bytes_read));
+  udp_packet_processor.processPacket(std::move(local_address), std::move(peer_address),
                                      std::move(buffer), receive_time);
 }
 
@@ -553,6 +556,7 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
     Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
     Buffer::RawSlice slice;
 
+    // TODO(yugant): Avoid using 64k by getting memory from UdpPacketProcessor
     const uint64_t maxPacketSizeWithGro = 65535;
     const uint64_t num_slices = buffer->reserve(maxPacketSizeWithGro, &slice, 1);
     ASSERT(num_slices == 1u);
@@ -583,19 +587,14 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
     buffer->commit(&slice, 1);
     const uint64_t gso_size = output.msg_[0].gso_size_;
 
-    // Segment the payload read by the recvmsg syscall into gso_sized sub payloads.
+    // Segment the buffer read by the recvmsg syscall into gso_sized sub buffers.
     for (uint64_t bytes_to_skip = 0; bytes_to_skip < slice.len_; bytes_to_skip += gso_size) {
-
       const uint64_t bytes_to_copy = std::min(slice.len_ - bytes_to_skip, gso_size);
-
       Buffer::InstancePtr sub_buffer = std::make_unique<Buffer::OwnedImpl>();
-      Buffer::RawSlice sub_slice;
-      const uint64_t num_slices = sub_buffer->reserve(bytes_to_copy, &sub_slice, 1);
-      ASSERT(num_slices == 1u);
-      // TODO(yugant): Eliminate this copy
-      buffer->copyOut(bytes_to_skip, bytes_to_copy, sub_slice.mem_);
-
-      passPayloadToProcessor(bytes_to_copy, sub_slice, std::move(sub_buffer),
+      sub_buffer->move(*buffer, bytes_to_copy);
+      // slice with mem_ as nullptr
+      Buffer::RawSlice dummy_slice;
+      passPayloadToProcessor(bytes_to_copy, dummy_slice, std::move(sub_buffer),
                              output.msg_[0].peer_address_, output.msg_[0].local_address_,
                              udp_packet_processor, receive_time);
     }
