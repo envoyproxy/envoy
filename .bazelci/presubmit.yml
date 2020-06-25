@@ -14,7 +14,6 @@ tasks:
       - "--config=remote-clang-libc++"
       - "--config=remote-ci"
       - "--jobs=75"
-      - "--strategy=Genrule=sandboxed,local"
   coverage:
     name: "Coverage"
     platform: ubuntu1804
