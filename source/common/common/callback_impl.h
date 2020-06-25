@@ -52,7 +52,6 @@ private:
     CallbackManager& parent_;
     Callback cb_;
 
-
     // the iterator of this callback holder inside callbacks_ list
     // upon removal, use this iterator to delete callback holder in O(1)
     typename std::list<CallbackHolder>::iterator it_;
