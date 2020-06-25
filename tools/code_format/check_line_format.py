@@ -4,9 +4,37 @@ import argparse
 import re
 import sys
 
+NON_TYPE_ALIAS_ALLOWED_TYPES = {
+  "^(?![A-Z].*).*$",
+  "^(.*::){,1}(StrictMock<|NiceMock<).*$",
+  "^(.*::){,1}(Test|Mock|Fake).*$",
+  "^Protobuf.*::.*$",
+  "^[A-Z]$",
+  "^.*, .*",
+  r"^.*\[\]$",
+}
+
+USING_TYPE_ALIAS_REGEX = re.compile("using .* = .*;")
+SMART_PTR_REGEX = re.compile("std::(unique_ptr|shared_ptr)<(.*?)>(?!;)")
+OPTIONAL_REF_REGEX = re.compile("absl::optional<std::reference_wrapper<(.*?)>>(?!;)")
+NON_TYPE_ALIAS_ALLOWED_TYPE_REGEX = re.compile(fr"({'|'.join(NON_TYPE_ALIAS_ALLOWED_TYPES)})")
+
+
+def whitelistedForNonTypeAlias(name):
+  return NON_TYPE_ALIAS_ALLOWED_TYPE_REGEX.match(name)
+
 
 def checkSourceLine(line, reportError):
-  None
+  if not USING_TYPE_ALIAS_REGEX.search(line):
+    smart_ptrs = SMART_PTR_REGEX.finditer(line)
+    for smart_ptr in smart_ptrs:
+      if not whitelistedForNonTypeAlias(smart_ptr.group(2)):
+        reportError(f"Use type alias for '{smart_ptr.group(2)}' instead. See STYLE.md")
+
+    optional_refs = OPTIONAL_REF_REGEX.finditer(line)
+    for optional_ref in optional_refs:
+      if not whitelistedForNonTypeAlias(optional_ref.group(1)):
+        reportError(f"Use type alias for '{optional_ref.group(1)}' instead. See STYLE.md")
 
 
 def printError(error):

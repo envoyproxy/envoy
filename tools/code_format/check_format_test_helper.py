@@ -310,6 +310,26 @@ def runChecks():
   errors += checkFileExpectingOK("time_system_wait_for.cc")
   errors += checkFileExpectingOK("clang_format_off.cc")
 
+  errors += checkUnfixableLineError(
+      "std::unique_ptr<Network::Connection> a() { return nullptr; }", 
+      "Use type alias for 'Network::Connection' instead. See STYLE.md")
+  errors += checkUnfixableLineError(
+      ("absl::optional<std::reference_wrapper<ConnectionHandlerImpl::ActiveTcpListener>> a() {"
+      "    return nullptr;"
+      "}"), 
+      "Use type alias for 'ConnectionHandlerImpl::ActiveTcpListener' instead. See STYLE.md")
+
+  errors += checkLineExpectingOK(
+      ("using ConnectionPtr = std::unique_ptr<Connection>;"
+
+      "class A {"
+      "using ConnectionSharedPtr = std::shared_ptr<Connection>;"
+      "using ConnectionOptRef = absl::optional<std::reference_wrapper<Connection>>;"
+      "};"))
+  errors += checkLineExpectingOK(("void a(std::unique_ptr<int>, std::shared_ptr<std::string>,"
+       "absl::optional<std::reference_wrapper<char[]>>,"
+       "absl::optional<std::reference_wrapper<std::vector<int>>>) {}"))
+
   return errors
 
 
