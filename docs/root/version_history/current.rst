@@ -39,8 +39,8 @@ Bug Fixes
 * http: fixed a bug where in some cases slash was moved from path to query string when :ref:`merging of adjacent slashes<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.merge_slashes>` is enabled.
 * http: fixed several bugs with applying correct connection close behavior across the http connection manager, health checker, and connection pool. This behavior may be temporarily reverted by setting runtime feature `envoy.reloadable_features.fix_connection_close` to false.
 * prometheus stats: fix the sort order of output lines to comply with the standard.
-* udp: the :ref:`reuse_port <envoy_api_field_Listener.reuse_port>` listener option must now be 
-  specified for UDP listeners if concurrency is > 1. This previously crashed so is considered a 
+* udp: the :ref:`reuse_port <envoy_api_field_Listener.reuse_port>` listener option must now be
+  specified for UDP listeners if concurrency is > 1. This previously crashed so is considered a
   bug fix.
 * upstream: fixed a bug where Envoy would panic when receiving a GRPC SERVICE_UNKNOWN status on the health check.
 
@@ -97,6 +97,7 @@ New Features
   interested in; behavior is allowed based on new "envoy.lrs.supports_send_all_clusters" capability
   in :ref:`client_features<envoy_v3_api_field_config.core.v3.Node.client_features>` field.
 * lrs: updated to allow to explicitly set the API version of gRPC service endpoint and message to be used.
+* lua: added tracing to the ``httpCall()`` API.
 * metrics service: added added :ref:`API version <envoy_v3_api_field_config.metrics.v3.MetricsServiceConfig.transport_api_version>` to explicitly set the version of gRPC service endpoint and message to be used.
 * network filters: added a :ref:`postgres proxy filter <config_network_filters_postgres_proxy>`.
 * network filters: added a :ref:`rocketmq proxy filter <config_network_filters_rocketmq_proxy>`.
