@@ -68,7 +68,7 @@ public:
    * @return a ScopedResume object, which when destructed, resumes the paused discovery requests.
    * A discovery request will be sent if one would have been sent during the pause.
    */
-  virtual ScopedResume pause(const std::string& type_url) ABSL_MUST_USE_RESULT PURE;
+  ABSL_MUST_USE_RESULT virtual ScopedResume pause(const std::string& type_url) PURE;
 
   /**
    * Pause discovery requests for given API types. This is useful when we're processing an update
@@ -80,7 +80,7 @@ public:
    * @return a ScopedResume object, which when destructed, resumes the paused discovery requests.
    * A discovery request will be sent if one would have been sent during the pause.
    */
-  virtual ScopedResume pause(const std::vector<std::string> type_urls) ABSL_MUST_USE_RESULT PURE;
+  ABSL_MUST_USE_RESULT virtual ScopedResume pause(const std::vector<std::string> type_urls) PURE;
 
   /**
    * Retrieves the current pause state as set by pause()/resume().
