@@ -34,6 +34,8 @@ Triggers
 Triggers are evaluated on each resource pressure update, and convert a resource pressure value
 into one of three action states:
 
+.. _arch_overview_overload_manager-triggers-state:
+
 .. csv-table::
   :header: state, description
   :widths: 1, 2
