@@ -11,6 +11,7 @@
 
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
+#include "common/grpc/common.h"
 #include "common/http/exception.h"
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
@@ -964,7 +965,7 @@ void ServerConnectionImpl::onResetStream(StreamResetReason reason) {
   active_request_.reset();
 }
 
-void ServerConnectionImpl::sendProtocolError(absl::string_view details) {
+void ServerConnectionImpl::sendProtocolErrorOld(absl::string_view details) {
   if (active_request_.has_value()) {
     active_request_.value().response_encoder_.setDetails(details);
   }
@@ -979,6 +980,35 @@ void ServerConnectionImpl::sendProtocolError(absl::string_view details) {
                      "\r\ncontent-length: 0\r\nconnection: close\r\n\r\n"));
 
     connection_.write(bad_request_response, false);
+  }
+}
+
+void ServerConnectionImpl::sendProtocolError(absl::string_view details) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.early_errors_via_hcm")) {
+    sendProtocolErrorOld(details);
+    return;
+  }
+  // We do this here because we may get a protocol error before we have a logical stream.
+  if (!active_request_.has_value()) {
+    onMessageBeginBase();
+  }
+  ASSERT(active_request_.has_value());
+
+  active_request_.value().response_encoder_.setDetails(details);
+  if (!active_request_.value().response_encoder_.startedResponse()) {
+    // Note that the correctness of is_grpc_request and is_head_request is best-effort.
+    // If headers have not been fully parsed they may not be inferred correctly.
+    bool is_grpc_request = false;
+    if (absl::holds_alternative<RequestHeaderMapPtr>(headers_or_trailers_) &&
+        absl::get<RequestHeaderMapPtr>(headers_or_trailers_) != nullptr) {
+      is_grpc_request =
+          Grpc::Common::isGrpcRequestHeaders(*absl::get<RequestHeaderMapPtr>(headers_or_trailers_));
+    }
+    const bool is_head_request = parser_.method == HTTP_HEAD;
+    active_request_->request_decoder_->sendLocalReply(is_grpc_request, error_code_,
+                                                      CodeUtility::toString(error_code_), nullptr,
+                                                      is_head_request, absl::nullopt, details);
+    return;
   }
 }
 
