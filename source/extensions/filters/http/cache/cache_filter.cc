@@ -87,7 +87,7 @@ void CacheFilter::onHeaders(LookupResult&& result) {
   case CacheEntryStatus::UnsatisfiableRange:
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE; // We don't yet return or support these codes.
   case CacheEntryStatus::RequiresValidation:
-    // Cache entries that require validation are treated as unusuable entries
+    // Cache entries that require validation are treated as unusable entries
     // until validation is implemented
     // TODO: Implement response validation
   case CacheEntryStatus::Unusable:

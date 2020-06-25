@@ -124,15 +124,18 @@ CacheHeadersUtils::responseCacheControl(absl::string_view cache_control_header) 
     absl::string_view directive, argument;
     std::tie(directive, argument) = separateDirectiveAndArgument(full_directive);
 
-    if (directive == "no-cache" || directive == "must-revalidate" ||
-        directive == "proxy-revalidate") {
+    if (directive == "no-cache") {
       // If no-cache directive has arguments they are ignored - not handled
       response_cache_control.must_validate = true;
+    } else if (directive == "must-revalidate" || directive == "proxy-revalidate") {
+      response_cache_control.no_stale = true;
     } else if (directive == "no-store" || directive == "private") {
       // If private directive has arguments they are ignored - not handled
       response_cache_control.no_store = true;
     } else if (directive == "no-transform") {
       response_cache_control.no_transform = true;
+    } else if (directive == "public") {
+      response_cache_control._public = true;
     } else if (directive == "s-maxage") {
       response_cache_control.max_age = parseDuration(argument);
     } else if (!response_cache_control.max_age.has_value() && directive == "max-age") {

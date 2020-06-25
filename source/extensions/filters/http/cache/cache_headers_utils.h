@@ -14,9 +14,12 @@ namespace Cache {
 using OptionalDuration = absl::optional<SystemTime::duration>;
 
 struct RequestCacheControl {
+  // must_validate is true if 'no-cache' directive is present
   bool must_validate = false;
   bool no_store = false;
+  // 'no-transform' directive is not used now
   bool no_transform = false;
+  // 'only-if-cached' directive is not used now
   bool only_if_cached = false;
   OptionalDuration max_age;
   OptionalDuration min_fresh;
@@ -31,20 +34,18 @@ struct RequestCacheControl {
 
 // std::ostream& operator<<(std::ostream& os, const RequestCacheControl& request_cache_control);
 
-// 'public' directive is used to cache responses that are normally not cache-able
-// or cache requests/responses with authorization headers,
-// since both are not supported now, the 'public' header is ignored
 struct ResponseCacheControl {
-  // must_validate is true if any of 'must-revalidate', 'proxy-revalidate' or 'no-cache' directives
-  // is present. 'no-cache' arguments are ignored for now so it is equivalent to 'must-revalidate'
+  // must_validate is true if 'no-cache' directive is present; arguments are ignored for now
   bool must_validate = false;
-
   // no_store is true if any of 'no-store' or 'private' directives is present.
   // 'private' arguments are ignored for now so it is equivalent to 'no-store'
   bool no_store = false;
-
+  // 'no-transform' directive is not used now
   bool no_transform = false;
-
+  // no_stale is true if any of 'must-revalidate' or 'proxy-revalidate' directives is present
+  bool no_stale = false;
+  // 'public' directive is not used now
+  bool _public = false;
   // max_age is set if to 's-maxage' if present, if not it is set to 'max-age' if present.
   OptionalDuration max_age;
 

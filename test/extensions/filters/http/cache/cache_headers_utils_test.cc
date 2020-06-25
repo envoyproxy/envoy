@@ -101,37 +101,40 @@ struct ResponseCacheControlTestCase {
   ResponseCacheControl response_cache_control;
 };
 
-// ResponseCacheControl = {must_validate, no_store, no_transform, max_age}
+// ResponseCacheControl = {must_validate, no_store, no_transform, no_stale, _public, max_age}
 constexpr ResponseCacheControlTestCase response_test_cases[] = {
     // Empty header
-    {"", {false, false, false, UNSET_DURATION}},
+    {"", {false, false, false, false, false, UNSET_DURATION}},
     // Valid cache-control headers
     {"s-maxage=1000, max-age=2000, proxy-revalidate, no-store",
-     {true, true, false, DURATION(1000)}},
-    {"max-age=500, must-revalidate, no-cache, no-transform", {true, false, true, DURATION(500)}},
+     {false, true, false, true, false, DURATION(1000)}},
+    {"max-age=500, must-revalidate, no-cache, no-transform",
+     {true, false, true, true, false, DURATION(500)}},
     {"s-maxage=10, private=content-length, no-cache=content-encoding",
-     {true, true, false, DURATION(10)}},
-    {"private", {false, true, false, UNSET_DURATION}},
-    {"public, max-age=0", {false, false, false, DURATION(0)}},
+     {true, true, false, false, false, DURATION(10)}},
+    {"private", {false, true, false, false, false, UNSET_DURATION}},
+    {"public, max-age=0", {false, false, false, false, true, DURATION(0)}},
     // Quoted arguments are interpreted correctly
-    {"s-maxage=\"20\", max-age=\"10\", public", {false, false, false, DURATION(20)}},
-    {"max-age=\"50\", private", {false, true, false, DURATION(50)}},
-    {"s-maxage=\"0\"", {false, false, false, DURATION(0)}},
+    {"s-maxage=\"20\", max-age=\"10\", public", {false, false, false, false, true, DURATION(20)}},
+    {"max-age=\"50\", private", {false, true, false, false, false, DURATION(50)}},
+    {"s-maxage=\"0\"", {false, false, false, false, false, DURATION(0)}},
     // Unknown directives are ignored
-    {"private, no-cache, max-age=30, unknown-directive", {true, true, false, DURATION(30)}},
+    {"private, no-cache, max-age=30, unknown-directive",
+     {true, true, false, false, false, DURATION(30)}},
     {"private, no-cache, max-age=30, unknown-directive-with-arg=arg",
-     {true, true, false, DURATION(30)}},
+     {true, true, false, false, false, DURATION(30)}},
     {"private, no-cache, max-age=30, unknown-directive-with-quoted-arg=\"arg\"",
-     {true, true, false, DURATION(30)}},
+     {true, true, false, false, false, DURATION(30)}},
     {"private, no-cache, max-age=30, unknown-directive, unknown-directive-with-quoted-arg=\"arg\"",
-     {true, true, false, DURATION(30)}},
+     {true, true, false, false, false, DURATION(30)}},
     // Invalid durations are ignored
-    {"max-age=five", {false, false, false, UNSET_DURATION}},
-    {"max-age=10s, private", {false, true, false, UNSET_DURATION}},
-    {"s-maxage=\"50s\", max-age=\"zero\", no-cache", {true, false, false, UNSET_DURATION}},
-    {"s-maxage=five, max-age=10, no-transform", {false, false, true, DURATION(10)}},
+    {"max-age=five", {false, false, false, false, false, UNSET_DURATION}},
+    {"max-age=10s, private", {false, true, false, false, false, UNSET_DURATION}},
+    {"s-maxage=\"50s\", max-age=\"zero\", no-cache",
+     {true, false, false, false, false, UNSET_DURATION}},
+    {"s-maxage=five, max-age=10, no-transform", {false, false, true, false, false, DURATION(10)}},
     // Invalid parts of the header are ignored
-    {"no-cache, ,,,fjfwioen3298, max-age=20", {true, false, false, DURATION(20)}}};
+    {"no-cache, ,,,fjfwioen3298, max-age=20", {true, false, false, false, false, DURATION(20)}}};
 
 class ResponseCacheControlTest : public testing::TestWithParam<ResponseCacheControlTestCase> {};
 
