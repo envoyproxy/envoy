@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "envoy/common/pure.h"
+#include "envoy/event/dispatcher.h"
 
 #include "extensions/filters/network/common/redis/codec.h"
 

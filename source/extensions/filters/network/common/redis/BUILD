@@ -104,7 +104,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "fault_interface",
     hdrs = ["fault.h"],
-    deps = [],
+    deps = [
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
+    ],
 )
 
 envoy_cc_library(
