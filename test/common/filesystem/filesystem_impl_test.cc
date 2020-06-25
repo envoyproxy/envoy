@@ -103,7 +103,7 @@ TEST_F(FileSystemImplTest, FileReadToEndDoesNotExist) {
                EnvoyException);
 }
 
-TEST_F(FileSystemImplTest, FileReadToEndBlacklisted) {
+TEST_F(FileSystemImplTest, FileReadToEndDenylisted) {
   EXPECT_THROW(file_system_.fileReadToEnd("/dev/urandom"), EnvoyException);
   EXPECT_THROW(file_system_.fileReadToEnd("/proc/cpuinfo"), EnvoyException);
   EXPECT_THROW(file_system_.fileReadToEnd("/sys/block/sda/dev"), EnvoyException);

@@ -94,7 +94,7 @@ public:
   envoy::config::listener::v3::Listener createDefaultListener() {
     envoy::config::listener::v3::Listener listener_proto;
     Protobuf::TextFormat::ParseFromString(R"EOF(
-    name: "foo"  
+    name: "foo"
     address: {
       socket_address: {
         address: "127.0.0.1"
@@ -1619,7 +1619,7 @@ address:
   socket_address:
     address: 127.0.0.1
     port_value: 1234
-per_connection_buffer_limit_bytes: 999    
+per_connection_buffer_limit_bytes: 999
 filter_chains:
 - filters: []
   )EOF";
@@ -3484,7 +3484,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, Metadata) {
                 route: { cluster: service_foo }
     listener_filters:
     - name: "envoy.filters.listener.original_dst"
-      config: {}            
+      config: {}
   )EOF",
                                                        Network::Address::IpVersion::v4);
   Configuration::ListenerFactoryContext* listener_factory_context = nullptr;
@@ -4398,7 +4398,7 @@ filter_chains:
   EXPECT_CALL(*worker_, removeFilterChains(_, _, _));
   filter_chain_drain_timer->invokeCallback();
 
-  // Once worker clean up is done, it's safe for the master thread to remove the original listener.
+  // Once worker clean up is done, it's safe for the main thread to remove the original listener.
   EXPECT_CALL(*listener_foo, onDestroy());
   worker_->callDrainFilterChainsComplete();
   checkStats(__LINE__, 1, 1, 0, 0, 1, 0, 0);

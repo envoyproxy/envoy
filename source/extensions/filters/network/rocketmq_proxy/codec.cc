@@ -318,7 +318,8 @@ CommandCustomHeaderPtr Decoder::decodeResponseExtHeader(ResponseCode response_co
                                                         ProtobufWkt::Struct& header_struct,
                                                         RequestCode request_code) {
   // No need to decode a failed response.
-  if (response_code != ResponseCode::Success && response_code != ResponseCode::SlaveNotAvailable) {
+  if (response_code != ResponseCode::Success &&
+      response_code != ResponseCode::ReplicaNotAvailable) {
     return nullptr;
   }
   const auto& filed_value_pair = header_struct.fields();

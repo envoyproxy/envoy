@@ -489,7 +489,7 @@ private:
                !absl::StartsWith(proto_type_name, "envoy.test") &&
                !absl::StartsWith(proto_type_name, "envoy.tracers.xray.daemon")) {
       // Die hard if we don't have a useful proto type for something that looks
-      // like an API type(modulo a short whitelist).
+      // like an API type(modulo a short allowlist).
       std::cerr << "Unknown API type: " << proto_type_name << std::endl;
       // TODO(htuch): maybe there is a nicer way to terminate AST traversal?
       ::exit(1);

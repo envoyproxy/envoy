@@ -127,7 +127,7 @@ TEST(RoleBasedAccessControlEngineImpl, InvalidConfig) {
   }
 }
 
-TEST(RoleBasedAccessControlEngineImpl, AllowedWhitelist) {
+TEST(RoleBasedAccessControlEngineImpl, AllowedAllowlist) {
   envoy::config::rbac::v3::Policy policy;
   policy.add_permissions()->set_destination_port(123);
   policy.add_principals()->set_any(true);
@@ -150,7 +150,7 @@ TEST(RoleBasedAccessControlEngineImpl, AllowedWhitelist) {
   checkEngine(engine, false, conn, headers, info);
 }
 
-TEST(RoleBasedAccessControlEngineImpl, DeniedBlacklist) {
+TEST(RoleBasedAccessControlEngineImpl, DeniedDenylist) {
   envoy::config::rbac::v3::Policy policy;
   policy.add_permissions()->set_destination_port(123);
   policy.add_principals()->set_any(true);
