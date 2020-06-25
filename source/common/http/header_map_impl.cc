@@ -333,23 +333,13 @@ void HeaderMapImpl::insertByKey(HeaderString&& key, HeaderString&& value) {
 }
 
 void HeaderMapImpl::addViaMove(HeaderString&& key, HeaderString&& value) {
-  // If this is an inline header, we can't addViaMove, because we'll overwrite
-  // the existing value.
-  auto* entry = getExistingInline(key.getStringView());
-  if (entry != nullptr) {
-    const uint64_t added_size = appendToHeader(entry->value(), value.getStringView());
-    addSize(added_size);
-    key.clear();
-    value.clear();
-  } else {
-    insertByKey(std::move(key), std::move(value));
-  }
+  insertByKey(std::move(key), std::move(value));
 }
 
 void HeaderMapImpl::addReference(const LowerCaseString& key, absl::string_view value) {
   HeaderString ref_key(key);
   HeaderString ref_value(value);
-  addViaMove(std::move(ref_key), std::move(ref_value));
+  insertByKey(std::move(ref_key), std::move(ref_value));
 }
 
 void HeaderMapImpl::addReferenceKey(const LowerCaseString& key, uint64_t value) {
@@ -369,14 +359,6 @@ void HeaderMapImpl::addReferenceKey(const LowerCaseString& key, absl::string_vie
 }
 
 void HeaderMapImpl::addCopy(const LowerCaseString& key, uint64_t value) {
-  auto* entry = getExistingInline(key.get());
-  if (entry != nullptr) {
-    char buf[32];
-    StringUtil::itoa(buf, sizeof(buf), value);
-    const uint64_t added_size = appendToHeader(entry->value(), buf);
-    addSize(added_size);
-    return;
-  }
   HeaderString new_key;
   new_key.setCopy(key.get());
   HeaderString new_value;
@@ -387,12 +369,6 @@ void HeaderMapImpl::addCopy(const LowerCaseString& key, uint64_t value) {
 }
 
 void HeaderMapImpl::addCopy(const LowerCaseString& key, absl::string_view value) {
-  auto* entry = getExistingInline(key.get());
-  if (entry != nullptr) {
-    const uint64_t added_size = appendToHeader(entry->value(), value);
-    addSize(added_size);
-    return;
-  }
   HeaderString new_key;
   new_key.setCopy(key.get());
   HeaderString new_value;
@@ -454,16 +430,15 @@ void HeaderMapImpl::verifyByteSizeInternalForTest() const {
 }
 
 const HeaderEntry* HeaderMapImpl::get(const LowerCaseString& key) const {
-  for (const HeaderEntryImpl& header : headers_) {
-    if (header.key() == key.get().c_str()) {
-      return &header;
-    }
-  }
-
-  return nullptr;
+  return const_cast<HeaderMapImpl*>(this)->getExisting(key);
 }
 
 HeaderEntry* HeaderMapImpl::getExisting(const LowerCaseString& key) {
+  auto lookup = staticLookup(key.get());
+  if (lookup.has_value()) {
+    return *lookup.value().entry_;
+  }
+
   for (HeaderEntryImpl& header : headers_) {
     if (header.key() == key.get().c_str()) {
       return &header;
@@ -486,28 +461,6 @@ void HeaderMapImpl::iterateReverse(HeaderMap::ConstIterateCb cb, void* context) 
     if (cb(*it, context) == HeaderMap::Iterate::Break) {
       break;
     }
-  }
-}
-
-HeaderMap::Lookup HeaderMapImpl::lookup(const LowerCaseString& key,
-                                        const HeaderEntry** entry) const {
-  // The accessor callbacks for predefined inline headers take a HeaderMapImpl& as an argument;
-  // even though we don't make any modifications, we need to const_cast in order to use the
-  // accessor.
-  //
-  // Making this work without const_cast would require managing an additional const accessor
-  // callback for each predefined inline header and add to the complexity of the code.
-  auto lookup = const_cast<HeaderMapImpl*>(this)->staticLookup(key.get());
-  if (lookup.has_value()) {
-    *entry = *lookup.value().entry_;
-    if (*entry) {
-      return HeaderMap::Lookup::Found;
-    } else {
-      return HeaderMap::Lookup::NotFound;
-    }
-  } else {
-    *entry = nullptr;
-    return HeaderMap::Lookup::NotSupported;
   }
 }
 
@@ -599,14 +552,6 @@ HeaderMapImpl::HeaderEntryImpl& HeaderMapImpl::maybeCreateInline(HeaderEntryImpl
   i->entry_ = i;
   *entry = &(*i);
   return **entry;
-}
-
-HeaderMapImpl::HeaderEntryImpl* HeaderMapImpl::getExistingInline(absl::string_view key) {
-  auto lookup = staticLookup(key);
-  if (lookup.has_value()) {
-    return *lookup.value().entry_;
-  }
-  return nullptr;
 }
 
 size_t HeaderMapImpl::removeInline(HeaderEntryImpl** ptr_to_entry) {
