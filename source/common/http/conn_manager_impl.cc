@@ -464,7 +464,7 @@ void ConnectionManagerImpl::doConnectionClose(
   }
 }
 
-void ConnectionManagerImpl::onGoAway() {
+void ConnectionManagerImpl::onGoAway(GoAwayErrorCode) {
   // Currently we do nothing with remote go away frames. In the future we can decide to no longer
   // push resources if applicable.
 }
