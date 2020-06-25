@@ -95,9 +95,8 @@ public:
 
 protected:
   StreamEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter);
-  void setIs1xx(bool value) { is_1xx_ = value; }
-  void setIs204(bool value) { is_204_ = value; }
-  void encodeHeadersBase(const RequestOrResponseHeaderMap& headers, bool end_stream);
+  void encodeHeadersBase(const RequestOrResponseHeaderMap& headers, absl::optional<uint64_t> status,
+                         bool end_stream);
   void encodeTrailersBase(const HeaderMap& headers);
 
   static const std::string CRLF;
@@ -107,11 +106,8 @@ protected:
   uint32_t read_disable_calls_{};
   bool disable_chunk_encoding_ : 1;
   bool chunk_encoding_ : 1;
-  bool processing_100_continue_ : 1;
   bool is_response_to_head_request_ : 1;
   bool is_response_to_connect_request_ : 1;
-  bool is_1xx_ : 1;
-  bool is_204_ : 1;
 
 private:
   /**
@@ -167,16 +163,16 @@ class RequestEncoderImpl : public StreamEncoderImpl, public RequestEncoder {
 public:
   RequestEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter)
       : StreamEncoderImpl(connection, header_key_formatter) {}
-  bool headRequest() { return head_request_; }
-  bool connectRequest() { return connect_request_; }
+  bool upgradeRequest() const { return upgrade_request_; }
+  bool headRequest() const { return head_request_; }
+  bool connectRequest() const { return connect_request_; }
 
   // Http::RequestEncoder
   void encodeHeaders(const RequestHeaderMap& headers, bool end_stream) override;
   void encodeTrailers(const RequestTrailerMap& trailers) override { encodeTrailersBase(trailers); }
 
-  bool upgrade_request_{};
-
 private:
+  bool upgrade_request_{};
   bool head_request_{};
   bool connect_request_{};
 };
@@ -246,6 +242,7 @@ protected:
                  HeaderKeyFormatterPtr&& header_key_formatter, bool enable_trailers);
 
   bool resetStreamCalled() { return reset_stream_called_; }
+  void onMessageBeginBase();
 
   Network::Connection& connection_;
   CodecStats& stats_;
@@ -324,7 +321,6 @@ private:
    * Called when a request/response is beginning. A base routine happens first then a virtual
    * dispatch is invoked.
    */
-  void onMessageBeginBase();
   virtual void onMessageBegin() PURE;
 
   /**
@@ -498,6 +494,8 @@ private:
       headers_or_trailers_.emplace<RequestTrailerMapPtr>(RequestTrailerMapImpl::create());
     }
   }
+
+  void sendProtocolErrorOld(absl::string_view details);
 
   void releaseOutboundResponse(const Buffer::OwnedBufferFragmentImpl* fragment);
   void maybeAddSentinelBufferFragment(Buffer::WatermarkBuffer& output_buffer) override;
