@@ -19,26 +19,32 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
-// TODO: clean or remove
-// std::ostream& operator<<(std::ostream& os, const RequestCacheControl& request_cache_control) {
-//   return os << request_cache_control.must_validate << " " << request_cache_control.no_store << "
-//   " << request_cache_control.no_transform << " " << request_cache_control.only_if_cached << " "
-//   <<
-//                (request_cache_control.max_age.has_value() ?
-//                request_cache_control.max_age.value().count() : -1) << " " <<
-//                (request_cache_control.min_fresh.has_value() ?
-//                request_cache_control.min_fresh.value().count() : -1)  << " " <<
-//                (request_cache_control.max_stale.has_value() ?
-//                request_cache_control.max_stale.value().count() : -1);
-// }
+std::ostream& operator<<(std::ostream& os, const OptionalDuration& duration) {
+  return duration.has_value() ? os << duration.value().count() : os << " ";
+}
 
 // TODO: clean or remove
-// std::ostream& operator<<(std::ostream& os, const ResponseCacheControl& response_cache_control) {
-//   return os << response_cache_control.must_validate << " " << response_cache_control.no_store <<
-//   " " << response_cache_control.no_transform << " " <<
-//                (response_cache_control.max_age.has_value() ?
-//                response_cache_control.max_age.value().count() : -1);
-// }
+std::ostream& operator<<(std::ostream& os, const RequestCacheControl& request_cache_control) {
+  return os << "{"
+            << "must_validate: " << request_cache_control.must_validate << ", "
+            << "no_store: " << request_cache_control.no_store << ", "
+            << "no_transform: " << request_cache_control.no_transform << ", "
+            << "only_if_cached: " << request_cache_control.only_if_cached << ", "
+            << "max_age: " << request_cache_control.max_age << ", "
+            << "min_fresh: " << request_cache_control.min_fresh << ", "
+            << "max_stale: " << request_cache_control.max_stale << "}";
+}
+
+// TODO: clean or remove
+std::ostream& operator<<(std::ostream& os, const ResponseCacheControl& response_cache_control) {
+  return os << "{"
+            << "must_validate: " << response_cache_control.must_validate << ", "
+            << "no_store: " << response_cache_control.no_store << ", "
+            << "no_transform: " << response_cache_control.no_transform << ", "
+            << "no_stale: " << response_cache_control.no_stale << ", "
+            << "public: " << response_cache_control._public << ", "
+            << "max_age: " << response_cache_control.max_age << "}";
+}
 
 SystemTime CacheHeadersUtils::httpTime(const Http::HeaderEntry* header_entry) {
   if (!header_entry) {

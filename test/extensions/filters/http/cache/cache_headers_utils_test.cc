@@ -1,4 +1,5 @@
 #include <chrono>
+#include <string>
 #include <vector>
 
 #include "envoy/common/time.h"
@@ -85,7 +86,6 @@ constexpr RequestCacheControlTestCase request_test_cases[] = {
 };
 
 class RequestCacheControlTest : public testing::TestWithParam<RequestCacheControlTestCase> {};
-
 INSTANTIATE_TEST_SUITE_P(RequestCacheControlTest, RequestCacheControlTest,
                          testing::ValuesIn(request_test_cases));
 

@@ -32,8 +32,6 @@ struct RequestCacheControl {
   }
 };
 
-// std::ostream& operator<<(std::ostream& os, const RequestCacheControl& request_cache_control);
-
 struct ResponseCacheControl {
   // must_validate is true if 'no-cache' directive is present; arguments are ignored for now
   bool must_validate = false;
@@ -51,11 +49,14 @@ struct ResponseCacheControl {
 
   bool operator==(const ResponseCacheControl& rhs) const {
     return (must_validate == rhs.must_validate) && (no_store == rhs.no_store) &&
-           (no_transform == rhs.no_transform) && (max_age == rhs.max_age);
+           (no_transform == rhs.no_transform) && (no_stale == rhs.no_stale) &&
+           (_public == rhs._public) && (max_age == rhs.max_age);
   }
 };
 
-// std::ostream& operator<<(std::ostream& os, const ResponseCacheControl& response_cache_control);
+std::ostream& operator<<(std::ostream& os, const OptionalDuration& duration);
+std::ostream& operator<<(std::ostream& os, const RequestCacheControl& request_cache_control);
+std::ostream& operator<<(std::ostream& os, const ResponseCacheControl& response_cache_control);
 
 // Could be merged with CacheFilterUtils as a single CacheUtils class
 class CacheHeadersUtils {
