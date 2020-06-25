@@ -285,10 +285,6 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOk) {
   envoy::service::auth::v3::CheckRequest request;
   client_->check(request_callbacks_, request, parent_span_, stream_info_);
 
-  EXPECT_CALL(child_span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
-  EXPECT_CALL(child_span_, setTag(Eq("ext_authz_http_status"), Eq("OK")));
-  client_->onBeforeFinalizeUpstreamSpan(child_span_, &check_response->headers(), true);
-
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
   client_->onSuccess(async_request_, std::move(check_response));
@@ -384,22 +380,6 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAllowHeader) {
   client_->onSuccess(async_request_, std::move(message_response));
 }
 
-// Test the recorded span tags when the returned HTTP status is invalid.
-TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithInvalidStatus) {
-  const auto expected_headers = TestCommon::makeHeaderValueOption({{":status", "invalid", false}});
-  auto check_response = TestCommon::makeMessageResponse(expected_headers);
-  envoy::service::auth::v3::CheckRequest request;
-  client_->check(request_callbacks_, request, parent_span_, stream_info_);
-
-  EXPECT_CALL(child_span_, setTag(Eq("error"), Eq("true")));
-  EXPECT_CALL(child_span_, setTag(Eq("ext_authz_http_status"), Eq("Unknown")));
-  EXPECT_CALL(child_span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_unauthorized")));
-  client_->onBeforeFinalizeUpstreamSpan(child_span_, &check_response->headers(), true);
-
-  EXPECT_CALL(request_callbacks_, onComplete_(_));
-  client_->onSuccess(async_request_, std::move(check_response));
-}
-
 // Test the client when a denied response is received.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationDenied) {
   const auto expected_headers = TestCommon::makeHeaderValueOption({{":status", "403", false}});
@@ -409,10 +389,6 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationDenied) {
 
   envoy::service::auth::v3::CheckRequest request;
   client_->check(request_callbacks_, request, parent_span_, stream_info_);
-
-  EXPECT_CALL(child_span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_unauthorized")));
-  EXPECT_CALL(child_span_, setTag(Eq("ext_authz_http_status"), Eq("Forbidden")));
-  client_->onBeforeFinalizeUpstreamSpan(child_span_, &check_response->headers(), true);
 
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzDeniedResponse(authz_response))));

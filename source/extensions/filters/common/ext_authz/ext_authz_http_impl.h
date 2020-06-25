@@ -167,8 +167,7 @@ public:
   void onFailure(const Http::AsyncClient::Request&,
                  Http::AsyncClient::FailureReason reason) override;
   void onBeforeFinalizeUpstreamSpan(Tracing::Span& span,
-                                    const Http::ResponseHeaderMap* response_headers,
-                                    bool success) override;
+                                    const Http::ResponseHeaderMap* response_headers) override;
 
 private:
   ResponsePtr toResponse(Http::ResponseMessagePtr message);

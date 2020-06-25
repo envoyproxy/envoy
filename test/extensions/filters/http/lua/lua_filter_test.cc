@@ -802,7 +802,7 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("response")));
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
 
-  callbacks->onBeforeFinalizeUpstreamSpan(child_span_, &response_message->headers(), true);
+  callbacks->onBeforeFinalizeUpstreamSpan(child_span_, &response_message->headers());
   callbacks->onSuccess(request, std::move(response_message));
 }
 
@@ -1004,7 +1004,7 @@ TEST_F(LuaHttpFilterTest, DoubleHttpCall) {
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(":status 403")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("no body")));
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
-  callbacks->onBeforeFinalizeUpstreamSpan(child_span_, &response_message->headers(), true);
+  callbacks->onBeforeFinalizeUpstreamSpan(child_span_, &response_message->headers());
   callbacks->onSuccess(request, std::move(response_message));
 
   Buffer::OwnedImpl data("hello");

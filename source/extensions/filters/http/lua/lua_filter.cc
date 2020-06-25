@@ -383,8 +383,8 @@ int StreamHandleWrapper::luaHeaders(lua_State* state) {
 }
 
 void StreamHandleWrapper::onBeforeFinalizeUpstreamSpan(
-    Tracing::Span& span, const Http::ResponseHeaderMap* response_headers, bool success) {
-  if (success && response_headers != nullptr) {
+    Tracing::Span& span, const Http::ResponseHeaderMap* response_headers) {
+  if (response_headers != nullptr) {
     uint64_t status_code{};
     if (!absl::SimpleAtoi(response_headers->getStatusValue(), &status_code)) {
       span.setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
