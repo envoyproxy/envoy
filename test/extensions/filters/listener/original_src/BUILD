@@ -67,7 +67,7 @@ envoy_cc_fuzz_test(
     deps = [
         ":original_src_fuzz_test_proto_cc_proto",
         "//source/extensions/filters/listener/original_src:original_src_lib",
-        "//test/fuzz:utility_lib",
+        "//test/mocks/network:network_mocks",
         "@envoy_api//envoy/extensions/filters/listener/original_src/v3:pkg_cc_proto",
     ],
 )
