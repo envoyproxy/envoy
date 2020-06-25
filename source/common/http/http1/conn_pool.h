@@ -81,7 +81,7 @@ protected:
   void onDownstreamReset(ActiveClient& client);
   void onResponseComplete(ActiveClient& client);
 
-  Event::TimerPtr upstream_ready_timer_;
+  Event::SchedulableCallbackPtr upstream_ready_cb_;
   bool upstream_ready_enabled_{false};
 };
 

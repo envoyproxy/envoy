@@ -295,7 +295,7 @@ void RedisCluster::RedisDiscoverySession::onResponse(
   const uint32_t SlotRangeStart = 0;
   const uint32_t SlotRangeEnd = 1;
   const uint32_t SlotMaster = 2;
-  const uint32_t SlotSlaveStart = 3;
+  const uint32_t SlotReplicaStart = 3;
 
   // Do nothing if the cluster is empty.
   if (value->type() != NetworkFilters::Common::Redis::RespType::Array || value->asArray().empty()) {
@@ -333,8 +333,8 @@ void RedisCluster::RedisDiscoverySession::onResponse(
     slots->emplace_back(slot_range[SlotRangeStart].asInteger(),
                         slot_range[SlotRangeEnd].asInteger(), master_address);
 
-    for (auto replica = std::next(slot_range.begin(), SlotSlaveStart); replica != slot_range.end();
-         ++replica) {
+    for (auto replica = std::next(slot_range.begin(), SlotReplicaStart);
+         replica != slot_range.end(); ++replica) {
       auto replica_address = ProcessCluster(*replica);
       if (!replica_address) {
         onUnexpectedResponse(value);

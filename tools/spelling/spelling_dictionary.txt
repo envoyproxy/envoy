@@ -973,6 +973,7 @@ sanitizer
 satisfiable
 scalability
 sched
+schedulable
 schemas
 scopekey
 sendmsg
@@ -1155,8 +1156,6 @@ vptr
 wakeup
 wakeups
 websocket
-whitelist
-whitelisted
 whitespace
 whitespaces
 wildcard
