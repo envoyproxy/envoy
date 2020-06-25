@@ -58,8 +58,8 @@ private:
 
   Network::Address::IpVersion ip_version_;
 
-  const size_t num_listeners_ = 3;
-  const size_t num_routes_ = 5;
+  const size_t ListenerMax = 3;
+  const size_t RoutesMax = 5;
 };
 
 } // namespace Envoy

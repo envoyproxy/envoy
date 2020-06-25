@@ -182,11 +182,11 @@ void XdsFuzzTest::replay() {
       auto removed = removeRoute(route_num);
       auto route = buildRouteConfig(route_num);
       routes_.push_back(route);
-      if (!removed) {
-        // if the route was already in routes_, don't send another request
-        updateRoute(routes_, {route}, {});
-      } else {
+      if (removed) {
+        // if the route was already in routes_, don't send a duplicate add in delta request
         updateRoute(routes_, {}, {});
+      } else {
+        updateRoute(routes_, {route}, {});
       }
       break;
     }
