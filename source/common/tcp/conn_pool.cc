@@ -32,11 +32,23 @@ void ActiveTcpClient::clearCallbacks() {
     parent_.onConnReleased(*this);
   }
   callbacks_ = nullptr;
+  tcp_connection_data_ = nullptr;
   parent_.onRequestClosed(*this, true);
   parent_.checkForDrained();
 }
 
-ActiveTcpClient::~ActiveTcpClient() { parent_.onConnDestroyed(); }
+ActiveTcpClient::~ActiveTcpClient() {
+  // Handle the case where deferred delete results in the ActiveClient being destroyed before
+  // TcpConnectionData. Make sure the TcpConnectionData will not refer to this ActiveTcpClient
+  // and handle clean up normally done in clearCallbacks()
+  if (tcp_connection_data_) {
+    ASSERT(state_ == ActiveClient::State::CLOSED);
+    tcp_connection_data_->release();
+    parent_.onRequestClosed(*this, true);
+    parent_.checkForDrained();
+  }
+  parent_.onConnDestroyed();
+}
 
 void ActiveTcpClient::onEvent(Network::ConnectionEvent event) {
   Envoy::ConnectionPool::ActiveClient::onEvent(event);

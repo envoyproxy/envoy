@@ -48,25 +48,35 @@ public:
   class TcpConnectionData : public Envoy::Tcp::ConnectionPool::ConnectionData {
   public:
     TcpConnectionData(ActiveTcpClient& parent, Network::ClientConnection& connection)
-        : parent_(parent), connection_(connection) {}
-    ~TcpConnectionData() override { parent_.clearCallbacks(); }
+        : parent_(&parent), connection_(connection) {
+      parent_->tcp_connection_data_ = this;
+    }
+    ~TcpConnectionData() override {
+      // Generally it is the case that TcpConnectionData will be destroyed before the
+      // ActiveTcpClient. Because ordering on the deferred delete list is not guaranteed in the
+      // case of a disconnect, make sure parent_ is valid before doing clean-up.
+      if (parent_) {
+        parent_->clearCallbacks();
+      }
+    }
 
     Network::ClientConnection& connection() override { return connection_; }
     void setConnectionState(ConnectionPool::ConnectionStatePtr&& state) override {
-      parent_.connection_state_ = std::move(state);
+      parent_->connection_state_ = std::move(state);
     }
 
     void addUpstreamCallbacks(ConnectionPool::UpstreamCallbacks& callbacks) override {
-      parent_.callbacks_ = &callbacks;
+      parent_->callbacks_ = &callbacks;
     }
+    void release() { parent_ = nullptr; }
 
   protected:
     ConnectionPool::ConnectionState* connectionState() override {
-      return parent_.connection_state_.get();
+      return parent_->connection_state_.get();
     }
 
   private:
-    ActiveTcpClient& parent_;
+    ActiveTcpClient* parent_;
     Network::ClientConnection& connection_;
   };
 
@@ -97,6 +107,7 @@ public:
   ConnectionPool::UpstreamCallbacks* callbacks_{};
   Network::ClientConnectionPtr connection_;
   ConnectionPool::ConnectionStatePtr connection_state_;
+  TcpConnectionData* tcp_connection_data_{};
 };
 
 class ConnPoolImpl : public Envoy::ConnectionPool::ConnPoolImplBase,
