@@ -757,13 +757,6 @@ public:
     }
     header_map_->verifyByteSizeInternalForTest();
   }
-  TestHeaderMapImplBase(
-      const std::initializer_list<std::pair<Http::LowerCaseString, std::string>>& values) {
-    for (auto& value : values) {
-      header_map_->addCopy(value.first, value.second);
-    }
-    header_map_->verifyByteSizeInternalForTest();
-  }
   TestHeaderMapImplBase(const TestHeaderMapImplBase& rhs)
       : TestHeaderMapImplBase(*rhs.header_map_) {}
   TestHeaderMapImplBase(const HeaderMap& rhs) {
