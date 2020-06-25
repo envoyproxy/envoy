@@ -171,6 +171,7 @@ public:
 
 private:
   ResponsePtr toResponse(Http::ResponseMessagePtr message);
+
   Upstream::ClusterManager& cm_;
   ClientConfigSharedPtr config_;
   Http::AsyncClient::Request* request_{};

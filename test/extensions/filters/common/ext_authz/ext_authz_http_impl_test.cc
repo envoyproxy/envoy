@@ -309,6 +309,11 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeaders) {
               send_(AllOf(ContainsPairAsHeader(header1), ContainsPairAsHeader(header2)), _, _));
   client_->check(request_callbacks_, request, parent_span_, stream_info_);
 
+  // Check for child span tagging when the request is allowed.
+  EXPECT_CALL(child_span_, setTag(Eq("ext_authz_http_status"), Eq("OK")));
+  EXPECT_CALL(child_span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
+  client_->onBeforeFinalizeUpstreamSpan(child_span_, &check_response->headers());
+
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
   client_->onSuccess(async_request_, std::move(check_response));
@@ -389,6 +394,11 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationDenied) {
 
   envoy::service::auth::v3::CheckRequest request;
   client_->check(request_callbacks_, request, parent_span_, stream_info_);
+
+  // Check for child span tagging when the request is denied.
+  EXPECT_CALL(child_span_, setTag(Eq("ext_authz_http_status"), Eq("Forbidden")));
+  EXPECT_CALL(child_span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_unauthorized")));
+  client_->onBeforeFinalizeUpstreamSpan(child_span_, &check_response->headers());
 
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzDeniedResponse(authz_response))));

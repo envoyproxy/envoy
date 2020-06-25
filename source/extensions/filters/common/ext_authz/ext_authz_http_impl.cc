@@ -110,6 +110,15 @@ createStringMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
   return matchers;
 }
 
+static uint64_t getPossiblyInvalidResponseStatus(const Http::ResponseHeaderMap& headers) {
+  const Http::HeaderEntry* header = headers.Status();
+  uint64_t response_code = {};
+  if (!header || !absl::SimpleAtoi(headers.getStatusValue(), &response_code)) {
+    return 0ULL;
+  }
+  return response_code;
+}
+
 } // namespace
 
 // Matchers
@@ -293,12 +302,7 @@ void RawHttpClientImpl::onFailure(const Http::AsyncClient::Request&,
 void RawHttpClientImpl::onBeforeFinalizeUpstreamSpan(
     Tracing::Span& span, const Http::ResponseHeaderMap* response_headers) {
   if (response_headers != nullptr) {
-    span.setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
-  } else {
-    uint64_t status_code{};
-    if (!absl::SimpleAtoi(response_headers->getStatusValue(), &status_code)) {
-      span.setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
-    }
+    const uint64_t status_code = getPossiblyInvalidResponseStatus(*response_headers);
     span.setTag(TracingConstants::get().HttpStatus,
                 Http::CodeUtility::toString(static_cast<Http::Code>(status_code)));
     span.setTag(TracingConstants::get().TraceStatus, status_code == enumToInt(Http::Code::OK)
@@ -310,8 +314,8 @@ void RawHttpClientImpl::onBeforeFinalizeUpstreamSpan(
 ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
   // Set an error status if parsing status code fails. A Forbidden response is sent to the client
   // if the filter has not been configured with failure_mode_allow.
-  uint64_t status_code{};
-  if (!absl::SimpleAtoi(message->headers().getStatusValue(), &status_code)) {
+  const uint64_t status_code = getPossiblyInvalidResponseStatus(message->headers());
+  if (status_code == 0ULL) {
     ENVOY_LOG(warn, "ext_authz HTTP client failed to parse the HTTP status code.");
     return std::make_unique<Response>(errorResponse());
   }

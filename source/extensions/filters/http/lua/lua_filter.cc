@@ -382,20 +382,6 @@ int StreamHandleWrapper::luaHeaders(lua_State* state) {
   return 1;
 }
 
-void StreamHandleWrapper::onBeforeFinalizeUpstreamSpan(
-    Tracing::Span& span, const Http::ResponseHeaderMap* response_headers) {
-  if (response_headers != nullptr) {
-    uint64_t status_code{};
-    if (!absl::SimpleAtoi(response_headers->getStatusValue(), &status_code)) {
-      span.setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
-    }
-    span.setTag("lua_http_call_http_status",
-                Http::CodeUtility::toString(static_cast<Http::Code>(status_code)));
-  } else {
-    span.setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
-  }
-}
-
 int StreamHandleWrapper::luaBody(lua_State* state) {
   ASSERT(state_ == State::Running);
 
