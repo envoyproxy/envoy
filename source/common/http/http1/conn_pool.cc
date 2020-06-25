@@ -27,8 +27,8 @@ ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSha
                            Upstream::ResourcePriority priority,
                            const Network::ConnectionSocket::OptionsSharedPtr& options,
                            const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
-    : ConnPoolImplBase(std::move(host), std::move(priority), dispatcher, options,
-                       transport_socket_options, Protocol::Http11),
+    : HttpConnPoolImplBase(std::move(host), std::move(priority), dispatcher, options,
+                           transport_socket_options, Protocol::Http11),
       upstream_ready_cb_(dispatcher_.createSchedulableCallback([this]() {
         upstream_ready_enabled_ = false;
         onUpstreamReady();
@@ -36,7 +36,7 @@ ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSha
 
 ConnPoolImpl::~ConnPoolImpl() { destructAllConnections(); }
 
-ActiveClientPtr ConnPoolImpl::instantiateActiveClient() {
+Envoy::ConnectionPool::ActiveClientPtr ConnPoolImpl::instantiateActiveClient() {
   return std::make_unique<ActiveClient>(*this);
 }
 
@@ -119,8 +119,6 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
       ) {
   parent.host_->cluster().stats().upstream_cx_http1_total_.inc();
 }
-
-bool ConnPoolImpl::ActiveClient::hasActiveRequests() const { return stream_wrapper_ != nullptr; }
 
 bool ConnPoolImpl::ActiveClient::closingWithIncompleteRequest() const {
   return (stream_wrapper_ != nullptr) && (!stream_wrapper_->decode_complete_);

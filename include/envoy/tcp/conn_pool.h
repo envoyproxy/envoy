@@ -126,7 +126,7 @@ public:
 /**
  * An instance of a generic connection pool.
  */
-class Instance : public Envoy::ConnectionPool::Instance {
+class Instance : public Envoy::ConnectionPool::Instance, public Event::DeferredDeletable {
 public:
   /**
    * Immediately close all existing connection pool connections. This method can be used in cases
