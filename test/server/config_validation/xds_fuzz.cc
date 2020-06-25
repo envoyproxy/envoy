@@ -158,12 +158,7 @@ AssertionResult XdsFuzzTest::waitForAck(const std::string& expected_type_url,
     do {
       VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, delta_discovery_request));
     } while (expected_type_url != delta_discovery_request.type_url());
-             /* expected_version != delta_discovery_request.version_info()); */
   }
-  /* do { */
-  /*   VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request)); */
-  /* } while (expected_type_url != discovery_request.type_url() && */
-  /*          expected_version != discovery_request.version_info()); */
   version_++;
   return AssertionSuccess();
 }
