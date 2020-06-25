@@ -37,4 +37,3 @@ And some documents on components of Envoy architecture:
 - [Envoy flow control](https://github.com/envoyproxy/envoy/blob/master/source/docs/flow_control.md)
 
 - [Envoy's subset load balancer](https://github.com/envoyproxy/envoy/blob/master/source/docs/subset_load_balancer.md)
-

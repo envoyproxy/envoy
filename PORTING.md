@@ -124,5 +124,3 @@ input to CMake which is handled somewhat painlessly by rules_foreign_cc.
 Many tests rely on command line scripting or tool invocation. Bazel and Envoy rely heavily on bash scripts, executing
 on Windows via msys2. Inherent discrepancies between the msys2 execution environment and a typical bash shell can
 cause confusing errors. Be sure to use cmd.exe on Windows in any test scripts that intend to create symlinks.
-
-
