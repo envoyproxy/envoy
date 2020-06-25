@@ -71,6 +71,7 @@ size_t stableHashKey(const Key& key) { return MessageUtil::hash(key); }
 size_t localHashKey(const Key& key) { return stableHashKey(key); }
 
 bool LookupRequest::requiresValidation(const Http::ResponseHeaderMap& response_headers) const {
+  // TODO: Store parsed response cache-control in cache instead of parsing it on every lookup
   const ResponseCacheControl response_cache_control =
       CacheHeadersUtils::responseCacheControl(response_headers.getCacheControlValue());
 

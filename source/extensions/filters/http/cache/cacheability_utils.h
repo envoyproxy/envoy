@@ -3,6 +3,8 @@
 #include "common/common/utility.h"
 #include "common/http/headers.h"
 
+#include "extensions/filters/http/cache/cache_headers_utils.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -16,8 +18,12 @@ public:
   static bool isCacheableRequest(const Http::RequestHeaderMap& headers);
 
   // Checks if a response can be stored in cache
-  // Should follow RFC7234 Section 3 at https://httpwg.org/specs/rfc7234.html#response.cacheability
-  static bool isCacheableResponse(const Http::ResponseHeaderMap& headers);
+  // Note that if a request is not cache-able according to 'isCacheableRequest'
+  // then its response is also not cache-able
+  // Therefore, 'isCacheableRequest' & 'isCacheableResponse' together
+  // should cover https://httpwg.org/specs/rfc7234.html#response.cacheability
+  static bool isCacheableResponse(const Http::ResponseHeaderMap& headers,
+                                  const RequestCacheControl& request_cache_control);
 };
 } // namespace Cache
 } // namespace HttpFilters

@@ -182,7 +182,6 @@ public:
                                 uint64_t content_length) const;
 
 private:
-  bool isFresh(const Http::ResponseHeaderMap& response_headers) const;
   bool requiresValidation(const Http::ResponseHeaderMap& response_headers) const;
 
   Key key_;

@@ -34,6 +34,7 @@ envoy_cc_library(
     srcs = ["cacheability_utils.cc"],
     hdrs = ["cacheability_utils.h"],
     deps = [
+        ":cache_headers_utils_lib",
         "//source/common/common:utility_lib",
         "//source/common/http:headers_lib",
     ],

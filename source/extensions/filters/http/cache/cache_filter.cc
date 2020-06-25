@@ -63,7 +63,9 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
 Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                      bool end_stream) {
-  if (lookup_ && CacheabilityUtils::isCacheableResponse(headers)) {
+  // lookup_ is nullptr (false) if the request was non-cache-able,
+  // responses to non-cache-able requests are also non-cache-able
+  if (lookup_ && CacheabilityUtils::isCacheableResponse(headers, request_cache_control_)) {
     ENVOY_STREAM_LOG(debug, "CacheFilter::encodeHeaders inserting headers", *encoder_callbacks_);
     insert_ = cache_.makeInsertContext(std::move(lookup_));
     insert_->insertHeaders(headers, end_stream);
@@ -82,6 +84,7 @@ Http::FilterDataStatus CacheFilter::encodeData(Buffer::Instance& data, bool end_
 }
 
 void CacheFilter::onHeaders(LookupResult&& result) {
+  // TODO: Handle request only-if-cached directive
   switch (result.cache_entry_status_) {
   case CacheEntryStatus::FoundNotModified:
   case CacheEntryStatus::UnsatisfiableRange:
