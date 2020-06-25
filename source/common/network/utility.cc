@@ -523,7 +523,7 @@ Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, Buffer::RawSlic
 
 void passPayloadToProcessor(uint64_t bytes_read, Buffer::RawSlice& slice,
                             Buffer::InstancePtr buffer,
-                            Address::InstanceConstSharedPtr peer_address,
+                            Address::InstanceConstSharedPtr peer_addess,
                             Address::InstanceConstSharedPtr local_address,
                             UdpPacketProcessor& udp_packet_processor, MonotonicTime receive_time) {
   if (slice.mem_ != nullptr) {
@@ -533,16 +533,16 @@ void passPayloadToProcessor(uint64_t bytes_read, Buffer::RawSlice& slice,
   }
 
   RELEASE_ASSERT(
-      peer_address != nullptr,
+      peer_addess != nullptr,
       fmt::format("Unable to get remote address on the socket bount to local address: {} ",
                   local_address->asString()));
 
   // Unix domain sockets are not supported
-  RELEASE_ASSERT(peer_address->type() == Address::Type::Ip,
+  RELEASE_ASSERT(peer_addess->type() == Address::Type::Ip,
                  fmt::format("Unsupported remote address: {} local address: {}, receive size: "
                              "{}",
-                             peer_address->asString(), local_address->asString(), bytes_read));
-  udp_packet_processor.processPacket(std::move(local_address), std::move(peer_address),
+                             peer_addess->asString(), local_address->asString(), bytes_read));
+  udp_packet_processor.processPacket(std::move(local_address), std::move(peer_addess),
                                      std::move(buffer), receive_time);
 }
 

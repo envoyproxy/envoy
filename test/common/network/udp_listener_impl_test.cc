@@ -102,7 +102,7 @@ protected:
 
     size_t num_packet_per_recv = 1u;
     if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
-      // As in UdpGro Test, the 4 packes stacked together
+      // As in UdpGro Test, the 4 packets stacked together
       // get delivered in a single recvmsg syscall
       num_packet_per_recv = 4u;
     } else if (Api::OsSysCallsSingleton::get().supportsMmsg()) {
