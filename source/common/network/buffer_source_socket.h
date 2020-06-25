@@ -5,6 +5,7 @@
 #include "envoy/network/transport_socket.h"
 
 #include "common/common/logger.h"
+#include "common/buffer/watermark_buffer.h"
 
 namespace Envoy {
 namespace Network {
@@ -12,6 +13,7 @@ namespace Network {
 class BufferSourceSocket : public TransportSocket,
                            protected Logger::Loggable<Logger::Id::connection> {
 public:
+  BufferSourceSocket();
   // Network::TransportSocket
   void setTransportSocketCallbacks(TransportSocketCallbacks& callbacks) override;
   std::string protocol() const override;
@@ -23,10 +25,24 @@ public:
   IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
   Ssl::ConnectionInfoConstSharedPtr ssl() const override { return nullptr; }
 
+  void setReadSourceBuffer(Buffer::Instance* read_source_buf) {
+    ENVOY_LOG_MISC(debug, "lambdai: SHOULD NOT REACH C{} set read source buffer to {}",
+                   callbacks_->connection().id(), static_cast<void*>(read_source_buf));
+    // read_source_buf_ = read_source_buf;
+  }
+  void setWriteDestBuffer(Buffer::Instance* write_dest_buf) {
+    ENVOY_LOG_MISC(debug, "lambdai: C{} set write dst buffer to {}", callbacks_->connection().id(),
+                   static_cast<void*>(write_dest_buf));
+    write_dest_buf_ = write_dest_buf;
+  }
+
+  Buffer::WatermarkBuffer& getTransportSocketBuffer() { return read_buffer_; }
+
 private:
   TransportSocketCallbacks* callbacks_{};
   bool shutdown_{};
-  Buffer::Instance* read_source_buf_;
+  Buffer::WatermarkBuffer read_buffer_;
+  bool read_end_stream_{false};
   Buffer::Instance* write_dest_buf_;
 };
 

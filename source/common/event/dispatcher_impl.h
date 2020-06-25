@@ -36,7 +36,8 @@ public:
                  Event::TimeSystem& time_system);
   ~DispatcherImpl() override;
 
-  using PipeFactory = std::function<void(const std::string& pipe_address, Network::ConnectionPtr server_conn)>;
+  using PipeFactory = std::function<void(const Network::Address::InstanceConstSharedPtr& address,
+                                         Network::ConnectionPtr server_conn)>;
 
   /**
    * @return event_base& the libevent base.
@@ -57,11 +58,12 @@ public:
                          Network::TransportSocketPtr&& transport_socket,
                          const Network::ConnectionSocket::OptionsSharedPtr& options) override;
 
-  void registerPipeFactory(const std::string& pipe_listener, PipeFactory pipe_callback);
+  void registerPipeFactory(const std::string& pipe_listener_id, PipeFactory pipe_callback);
 
   // TODO(lambdai): Pass connection attributes including dest address.
-  Network::ClientConnectionPtr
-  createUserspacePipe(Network::Address::InstanceConstSharedPtr address) override;
+  Network::ClientConnectionPtr createUserspacePipe(
+      Network::Address::InstanceConstSharedPtr address,
+      Network::Address::InstanceConstSharedPtr local_address) override;
 
   Network::DnsResolverSharedPtr
   createDnsResolver(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,

@@ -769,7 +769,10 @@ void ClientConnectionImpl::connect() {
   }
 }
 
-ClientPipeImpl::ClientPipeImpl(Event::Dispatcher& dispatcher, TransportSocketPtr transport_socket,
+ClientPipeImpl::ClientPipeImpl(Event::Dispatcher& dispatcher,
+                               const Address::InstanceConstSharedPtr& remote_address,
+                               const Address::InstanceConstSharedPtr& source_address,
+                               TransportSocketPtr transport_socket,
                                const Network::ConnectionSocket::OptionsSharedPtr&)
     : ConnectionImplBase(dispatcher, next_global_id_++),
       transport_socket_(std::move(transport_socket)), stream_info_(dispatcher.timeSource()),
@@ -784,6 +787,7 @@ ClientPipeImpl::ClientPipeImpl(Event::Dispatcher& dispatcher, TransportSocketPtr
       write_buffer_above_high_watermark_(false), detect_early_close_(true),
       enable_half_close_(false), read_end_stream_raised_(false), read_end_stream_(false),
       write_end_stream_(false), current_write_end_stream_(false), dispatch_buffered_data_(false),
+      remote_address_(remote_address), source_address_(source_address),
       io_timer_(dispatcher.createTimer([this]() { onFileEvent(); })) {
 
   connecting_ = true;
@@ -929,6 +933,8 @@ void ClientPipeImpl::closeSocket(ConnectionEvent close_type) {
   write_buffer_->drain(write_buffer_->length());
 
   connection_stats_.reset();
+
+  is_open_ = false;
 
   // Call the base class directly as close() is called in the destructor.
   ClientPipeImpl::raiseEvent(close_type);
@@ -1102,7 +1108,7 @@ void ClientPipeImpl::write(Buffer::Instance& data, bool end_stream, bool through
     // we never change existing write_buffer_ chain elements between calls to SSL_write(). That code
     // might need to change if we ever copy here.
     write_buffer_->move(data);
-
+    onWriteReady();
     RELEASE_ASSERT(!connecting_, "Userspace pipe should not see connecting state.");
   }
 }
@@ -1166,7 +1172,11 @@ void ClientPipeImpl::onWriteBufferHighWatermark() {
   }
 }
 
-void ClientPipeImpl::onFileEvent() { onFileEvent(events_); }
+void ClientPipeImpl::onFileEvent() {
+  auto events = events_;
+  events_ = 0;
+  onFileEvent(events);
+}
 void ClientPipeImpl::onFileEvent(uint32_t events) {
   ENVOY_CONN_LOG(trace, "socket event: {}", *this, events);
 
@@ -1251,9 +1261,12 @@ void ClientPipeImpl::onWriteReady() {
   ENVOY_CONN_LOG(trace, "write ready", *this);
 
   if (connecting_) {
-    ENVOY_CONN_LOG(debug, "delayed connection error", *this);
-    closeSocket(ConnectionEvent::RemoteClose);
-    return;
+    connecting_ = false;
+    transport_socket_->onConnected();
+    if (state() != State::Open) {
+      ENVOY_CONN_LOG(debug, "close during connected callback", *this);
+      return;
+    }
   }
 
   IoResult result = transport_socket_->doWrite(*write_buffer_, write_end_stream_);
@@ -1285,6 +1298,8 @@ void ClientPipeImpl::onWriteReady() {
       delayed_close_timer_->enableTimer(delayed_close_timeout_);
     }
     if (result.bytes_processed_ > 0) {
+      ENVOY_LOG_MISC(debug, "lambdai: {} trigger peer read ready", connection().id());
+      peer_->onReadReady();
       for (BytesSentCb& cb : bytes_sent_callbacks_) {
         cb(result.bytes_processed_);
 
@@ -1334,41 +1349,19 @@ void ClientPipeImpl::flushWriteBuffer() {
 
 void ClientPipeImpl::connect() {
   ENVOY_CONN_LOG(debug, "connecting to {}", *this, remote_address_->asString());
-  events_ |= Event::FileReadyType::Write;
+  // Try read and write.
+  // TODO(lambdai): Verify that the timer could be cancelled if buffer is empty.
+  events_ |= (Event::FileReadyType::Write | Event::FileReadyType::Read);
   io_timer_->enableTimer(std::chrono::milliseconds(0));
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-ServerPipeImpl::ServerPipeImpl(Event::Dispatcher& dispatcher, TransportSocketPtr transport_socket,
+ServerPipeImpl::ServerPipeImpl(Event::Dispatcher& dispatcher,
+                               const Address::InstanceConstSharedPtr& remote_address,
+                               const Address::InstanceConstSharedPtr& source_address,
+                               TransportSocketPtr transport_socket,
                                const Network::ConnectionSocket::OptionsSharedPtr&)
     : ConnectionImplBase(dispatcher, next_global_id_++),
-      transport_socket_(std::move(transport_socket)),
-      filter_manager_(*this),
+      transport_socket_(std::move(transport_socket)), filter_manager_(*this),
       read_buffer_([this]() -> void { this->onReadBufferLowWatermark(); },
                    [this]() -> void { this->onReadBufferHighWatermark(); },
                    []() -> void { /* TODO(adisuissa): Handle overflow watermark */ }),
@@ -1379,6 +1372,7 @@ ServerPipeImpl::ServerPipeImpl(Event::Dispatcher& dispatcher, TransportSocketPtr
       write_buffer_above_high_watermark_(false), detect_early_close_(true),
       enable_half_close_(false), read_end_stream_raised_(false), read_end_stream_(false),
       write_end_stream_(false), current_write_end_stream_(false), dispatch_buffered_data_(false),
+      remote_address_(remote_address), source_address_(source_address),
       io_timer_(dispatcher.createTimer([this]() { onFileEvent(); })) {
 
   transport_socket_->setTransportSocketCallbacks(*this);
@@ -1437,7 +1431,7 @@ void ServerPipeImpl::closeSocket(ConnectionEvent close_type) {
   }
 
   ENVOY_CONN_LOG(debug, "closing socket: {}", *this, static_cast<uint32_t>(close_type));
-  //transport_socket_->closeSocket(close_type);  raw buffer TS does nothing 
+  // transport_socket_->closeSocket(close_type);  raw buffer TS does nothing
 
   // Drain input and output buffers.
   updateReadBufferStats(0, 0);
@@ -1450,6 +1444,8 @@ void ServerPipeImpl::closeSocket(ConnectionEvent close_type) {
   write_buffer_->drain(write_buffer_->length());
 
   connection_stats_.reset();
+
+  is_open_ = false;
 
   // Call the base class directly as close() is called in the destructor.
   ServerPipeImpl::raiseEvent(close_type);
@@ -1469,7 +1465,6 @@ void ServerPipeImpl::onRead(uint64_t read_buffer_size) {
   if (read_buffer_size == 0) {
     return;
   }
-
 
   filter_manager_.onRead();
 }
@@ -1607,6 +1602,7 @@ void ServerPipeImpl::write(Buffer::Instance& data, bool end_stream, bool through
     // we never change existing write_buffer_ chain elements between calls to SSL_write(). That code
     // might need to change if we ever copy here.
     write_buffer_->move(data);
+    onWriteReady();
   }
 }
 
@@ -1669,7 +1665,11 @@ void ServerPipeImpl::onWriteBufferHighWatermark() {
   }
 }
 
-void ServerPipeImpl::onFileEvent() { onFileEvent(events_); }
+void ServerPipeImpl::onFileEvent() {
+  auto events = events_;
+  events_ = 0;
+  onFileEvent(events);
+}
 void ServerPipeImpl::onFileEvent(uint32_t events) {
   ENVOY_CONN_LOG(trace, "socket event: {}", *this, events);
 
@@ -1783,6 +1783,7 @@ void ServerPipeImpl::onWriteReady() {
       delayed_close_timer_->enableTimer(delayed_close_timeout_);
     }
     if (result.bytes_processed_ > 0) {
+      ENVOY_LOG_MISC(debug, "lambdai: {} trigger peer read ready", connection().id());
       for (BytesSentCb& cb : bytes_sent_callbacks_) {
         cb(result.bytes_processed_);
 

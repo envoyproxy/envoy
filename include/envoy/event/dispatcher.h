@@ -111,8 +111,10 @@ public:
                          const Network::ConnectionSocket::OptionsSharedPtr& options) PURE;
 
   virtual Network::ClientConnectionPtr
-  createUserspacePipe(Network::Address::InstanceConstSharedPtr address) {
+  createUserspacePipe(Network::Address::InstanceConstSharedPtr address,
+                      Network::Address::InstanceConstSharedPtr local_address) {
     UNREFERENCED_PARAMETER(address);
+    UNREFERENCED_PARAMETER(local_address);
     return nullptr;
   }
 

@@ -52,12 +52,11 @@ void ListenerImpl::setupPipeListener(Event::DispatcherImpl& dispatcher,
                                      const std::string& pipe_listener_id) {
   dispatcher.registerPipeFactory(
       pipe_listener_id,
-      [this](const std::string& pipe_address, Network::ConnectionPtr server_conn){
-        // TODO(lambdai): create with HeapIoSocketHandle
+      [this](const Address::InstanceConstSharedPtr& address, Network::ConnectionPtr server_conn){
         Network::ConnectionSocketPtr socket = std::make_unique<Network::ConnectionSocketImpl>(
             nullptr,
             // Local
-            std::make_shared<Network::Address::Ipv4Instance>(pipe_address),
+            address,
             // Remote
             std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"));
         cb_.setupNewConnection(std::move(server_conn), std::move(socket));
@@ -87,7 +86,7 @@ ListenerImpl::ListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr so
     : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), listener_(nullptr) {
   if (bind_to_port) {
     setupServerSocket(dispatcher, *socket_);
-    setupPipeListener(dispatcher, socket->localAddress()->asString());
+    setupPipeListener(dispatcher, socket_->localAddress()->asString());
   }
 }
 

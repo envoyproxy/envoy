@@ -8,21 +8,24 @@
 
 namespace Envoy {
 namespace Network {
-
+BufferSourceSocket::BufferSourceSocket()
+    : read_buffer_([]() -> void {}, []() -> void {},
+                   []() -> void {}) {}
 void BufferSourceSocket::setTransportSocketCallbacks(TransportSocketCallbacks& callbacks) {
   ASSERT(!callbacks_);
   callbacks_ = &callbacks;
 }
 
 IoResult BufferSourceSocket::doRead(Buffer::Instance& buffer) {
-  if (read_source_buf_ == nullptr) {
-    ENVOY_CONN_LOG(trace, "read error: {}", callbacks_->connection(), "no buffer to read from, closing.");
+  if (read_end_stream_ && read_buffer_.length() == 0) {
+    ENVOY_CONN_LOG(trace, "read error: {}", callbacks_->connection(),
+                   "no buffer to read from, closing.");
     return {PostIoAction::Close, 0, true};
   }
   uint64_t bytes_read = 0;
-  if (read_source_buf_->length() > 0) {
-    bytes_read = read_source_buf_->length();
-    buffer.move(*read_source_buf_);
+  if (read_buffer_.length() > 0) {
+    bytes_read = read_buffer_.length();
+    buffer.move(read_buffer_);
   }
   ENVOY_CONN_LOG(trace, "read returns: {}", callbacks_->connection(), bytes_read);
   return {PostIoAction::KeepOpen, bytes_read, false};
@@ -31,7 +34,8 @@ IoResult BufferSourceSocket::doRead(Buffer::Instance& buffer) {
 IoResult BufferSourceSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
   ASSERT(!shutdown_ || buffer.length() == 0);
   if (write_dest_buf_ == nullptr) {
-    ENVOY_CONN_LOG(trace, "write error: {}", callbacks_->connection(), "no buffer to write to, closing.");
+    ENVOY_CONN_LOG(trace, "write error: {}", callbacks_->connection(),
+                   "no buffer to write to, closing.");
     return {PostIoAction::Close, 0, true};
   }
   uint64_t bytes_written = 0;

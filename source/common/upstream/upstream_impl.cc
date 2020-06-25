@@ -338,8 +338,11 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
   } else {
     connection_options = options;
   }
+  ENVOY_LOG_MISC(debug, "lambdai: create connection to ip {}",
+                 address->ip() ? address->ip()->addressAsString() : "invalid ip address");
   if (address->ip() && address->ip()->addressAsString() == "127.0.0.255") {
-    return dispatcher.createUserspacePipe(address);
+    return dispatcher.createUserspacePipe(
+        address, std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1));
   }
   Network::ClientConnectionPtr connection = dispatcher.createClientConnection(
       address, cluster.sourceAddress(),

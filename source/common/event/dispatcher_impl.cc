@@ -125,7 +125,8 @@ DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr 
 }
 
 Network::ClientConnectionPtr
-DispatcherImpl::createUserspacePipe(Network::Address::InstanceConstSharedPtr address) {
+DispatcherImpl::createUserspacePipe(Network::Address::InstanceConstSharedPtr address,
+                                    Network::Address::InstanceConstSharedPtr local_address) {
   ASSERT(isThreadSafe());
   if (address == nullptr) {
     return nullptr;
@@ -133,21 +134,34 @@ DispatcherImpl::createUserspacePipe(Network::Address::InstanceConstSharedPtr add
   // Find the listener callback. The listener is supposed to setup the server connection.
   auto iter = pipe_listeners_.find(address->asString());
   if (iter == pipe_listeners_.end()) {
+    ENVOY_LOG_MISC(debug, "lambdai: no valid pipe listener registered for address {}",
+                   address->asString());
     return nullptr;
   }
-  auto client_conn = std::make_unique<Network::ClientPipeImpl>(
-      *this, std::make_unique<Network::BufferSourceSocket>(), nullptr);
-  auto server_conn = std::make_unique<Network::ServerPipeImpl>(
-      *this, std::make_unique<Network::BufferSourceSocket>(), nullptr);
+  auto client_socket = std::make_unique<Network::BufferSourceSocket>();
+  auto server_socket = std::make_unique<Network::BufferSourceSocket>();
+  auto client_socket_raw = client_socket.get();
+  auto server_socket_raw = server_socket.get();
+  auto client_conn = std::make_unique<Network::ClientPipeImpl>(*this, address, local_address,
+                                                               std::move(client_socket), nullptr);
+  auto server_conn = std::make_unique<Network::ServerPipeImpl>(*this, local_address, address,
+                                                               std::move(server_socket), nullptr);
   server_conn->setPeer(client_conn.get());
-  client_conn->setPeer(server_conn.get());    
-  (iter->second)(iter->first, std::move(server_conn));
+  client_conn->setPeer(server_conn.get());
+  // TODO(lambdai): Retrieve buffer each time when supporting close.
+  // TODO(lambdai): Add to dest buffer to generic IoHandle, or TransportSocketCallback.
+  //client_socket_raw->setReadSourceBuffer(&server_conn->getWriteBuffer().buffer);
+  client_socket_raw->setWriteDestBuffer(&server_socket_raw->getTransportSocketBuffer());
+  //server_socket_raw->setReadSourceBuffer(&client_conn->getWriteBuffer().buffer);
+  server_socket_raw->setWriteDestBuffer(&client_socket_raw->getTransportSocketBuffer());
+  (iter->second)(address, std::move(server_conn));
   return client_conn;
 }
 
-void DispatcherImpl::registerPipeFactory(const std::string& pipe_listener,
+void DispatcherImpl::registerPipeFactory(const std::string& pipe_listener_id,
                                          DispatcherImpl::PipeFactory pipe_factory) {
-  pipe_listeners_[pipe_listener] = pipe_factory;
+  ENVOY_LOG_MISC(debug, "lambdai: register pipe factory on address {}", pipe_listener_id);
+  pipe_listeners_[pipe_listener_id] = pipe_factory;
 }
 
 Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(

@@ -340,6 +340,11 @@ void ConnectionHandlerImpl::ActiveTcpListener::setupNewConnection(
   stream_info->setDownstreamLocalAddress(socket->localAddress());
   stream_info->setDownstreamRemoteAddress(socket->remoteAddress());
   stream_info->setDownstreamDirectRemoteAddress(socket->directRemoteAddress());
+  
+  // TODO(lambdai): refactor
+  auto p = dynamic_cast<Network::ServerPipeImpl*>(server_conn.get());
+  ASSERT(p);
+  p->setStreamInfo(stream_info.get());
 
   // Find matching filter chain.
   const auto filter_chain = config_->filterChainManager().findFilterChain(*socket);

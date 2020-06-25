@@ -229,8 +229,8 @@ class ClientPipeImpl : public ConnectionImplBase,
                        public PeeringPipe {
 public:
   ClientPipeImpl(Event::Dispatcher& dispatcher,
-                 //  const Address::InstanceConstSharedPtr& remote_address,
-                 //  const Address::InstanceConstSharedPtr& source_address,
+                 const Address::InstanceConstSharedPtr& remote_address,
+                 const Address::InstanceConstSharedPtr& source_address,
                  Network::TransportSocketPtr transport_socket,
                  const Network::ConnectionSocket::OptionsSharedPtr& options);
 
@@ -379,7 +379,7 @@ private:
   bool current_write_end_stream_ : 1;
   bool dispatch_buffered_data_ : 1;
   // The flag of isOpen replacing the one in io handle.
-  bool is_open_ : 1;
+  bool is_open_ {true};
 
   const Address::InstanceConstSharedPtr remote_address_;
   const Address::InstanceConstSharedPtr source_address_;
@@ -391,8 +391,8 @@ private:
 class ServerPipeImpl : public ConnectionImplBase, public TransportSocketCallbacks, public PeeringPipe {
 public:
   ServerPipeImpl(Event::Dispatcher& dispatcher,
-                 //  const Address::InstanceConstSharedPtr& remote_address,
-                 //  const Address::InstanceConstSharedPtr& source_address,
+                 const Address::InstanceConstSharedPtr& remote_address,
+                 const Address::InstanceConstSharedPtr& source_address,
                  Network::TransportSocketPtr transport_socket,
                  const Network::ConnectionSocket::OptionsSharedPtr& options);
 
@@ -427,7 +427,9 @@ public:
   bool localAddressRestored() const override { return true; }
   bool aboveHighWatermark() const override { return write_buffer_above_high_watermark_; }
   const ConnectionSocket::OptionsSharedPtr& socketOptions() const override { return options_; }
-  absl::string_view requestedServerName() const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  absl::string_view requestedServerName() const override { 
+    // TODO(lambdai): requested server name is required by tcp proxy.
+    return ""; }
   StreamInfo::StreamInfo& streamInfo() override { return *stream_info_; }
   const StreamInfo::StreamInfo& streamInfo() const override { return *stream_info_; }
   absl::string_view transportFailureReason() const override;
@@ -538,7 +540,7 @@ private:
   bool current_write_end_stream_ : 1;
   bool dispatch_buffered_data_ : 1;
   // The flag of isOpen replacing the one in io handle.
-  bool is_open_ : 1;
+  bool is_open_ {true};
 
   const Address::InstanceConstSharedPtr remote_address_;
   const Address::InstanceConstSharedPtr source_address_;
