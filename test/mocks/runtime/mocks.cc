@@ -23,7 +23,10 @@ MockSnapshot::MockSnapshot() {
 
 MockSnapshot::~MockSnapshot() = default;
 
-MockLoader::MockLoader() { ON_CALL(*this, snapshot()).WillByDefault(ReturnRef(snapshot_)); }
+MockLoader::MockLoader() {
+  ON_CALL(*this, snapshot()).WillByDefault(ReturnRef(snapshot_));
+  ON_CALL(*this, getRootScope()).WillByDefault(ReturnRef(store_));
+}
 
 MockLoader::~MockLoader() = default;
 

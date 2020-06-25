@@ -239,6 +239,7 @@ envoy_cc_library(
         ":assert_lib",
         "//include/envoy/common:regex_interface",
         "//source/common/protobuf:utility_lib",
+        "//source/common/stats:symbol_table_lib",
         "@com_googlesource_code_re2//:re2",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],

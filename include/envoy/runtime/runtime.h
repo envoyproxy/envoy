@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/stats/store.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/common/assert.h"
@@ -301,6 +302,11 @@ public:
    * have either received and applied their responses or timed out.
    */
   virtual void startRtdsSubscriptions(ReadyCallback on_done) PURE;
+
+  /**
+   * @return Stats::Scope& the root scope.
+   */
+  virtual Stats::Scope& getRootScope() PURE;
 };
 
 using LoaderPtr = std::unique_ptr<Loader>;
