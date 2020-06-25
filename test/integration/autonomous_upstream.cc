@@ -60,7 +60,8 @@ void AutonomousStream::sendResponse() {
   HeaderToInt(RESPONSE_SIZE_BYTES, response_body_length, headers);
 
   encodeHeaders(upstream_.responseHeaders(), false);
-  encodeData(response_body_length, true);
+  encodeData(response_body_length, false);
+  encodeTrailers(upstream_.responseTrailers());
 }
 
 AutonomousHttpConnection::AutonomousHttpConnection(AutonomousUpstream& autonomous_upstream,
@@ -111,10 +112,22 @@ std::unique_ptr<Http::TestRequestHeaderMapImpl> AutonomousUpstream::lastRequestH
   return std::move(last_request_headers_);
 }
 
+void AutonomousUpstream::setResponseTrailers(
+    std::unique_ptr<Http::TestResponseTrailerMapImpl>&& response_trailers) {
+  Thread::LockGuard lock(headers_lock_);
+  response_trailers_ = std::move(response_trailers);
+}
+
 void AutonomousUpstream::setResponseHeaders(
     std::unique_ptr<Http::TestResponseHeaderMapImpl>&& response_headers) {
   Thread::LockGuard lock(headers_lock_);
   response_headers_ = std::move(response_headers);
+}
+
+Http::TestResponseTrailerMapImpl AutonomousUpstream::responseTrailers() {
+  Thread::LockGuard lock(headers_lock_);
+  Http::TestResponseTrailerMapImpl return_trailers = *response_trailers_;
+  return return_trailers;
 }
 
 Http::TestResponseHeaderMapImpl AutonomousUpstream::responseHeaders() {
