@@ -32,7 +32,7 @@ class UpstreamRequest;
 
 // The base request for Upstream.
 class UpstreamRequest : public Logger::Loggable<Logger::Id::router>,
-                        public Http::ResponseDecoder,
+                        public UpstreamToDownstream,
                         public LinkedObject<UpstreamRequest>,
                         public GenericConnectionPoolCallbacks {
 public:
@@ -54,12 +54,18 @@ public:
   void decodeData(Buffer::Instance& data, bool end_stream) override;
   void decodeMetadata(Http::MetadataMapPtr&& metadata_map) override;
 
-  // Http::ResponseDecoder
+  // UpstreamToDownstream (Http::ResponseDecoder)
   void decode100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers) override;
   void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
   void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override;
-
-  void onResetStream(Http::StreamResetReason reason, absl::string_view transport_failure_reason);
+  // UpstreamToDownstream (Http::StreamCallbacks)
+  void onResetStream(Http::StreamResetReason reason,
+                     absl::string_view transport_failure_reason) override;
+  void onAboveWriteBufferHighWatermark() override { disableDataFromDownstreamForFlowControl(); }
+  void onBelowWriteBufferLowWatermark() override { enableDataFromDownstreamForFlowControl(); }
+  // UpstreamToDownstream
+  const RouteEntry& routeEntry() const override;
+  const Network::Connection& connection() const override;
 
   void disableDataFromDownstreamForFlowControl();
   void enableDataFromDownstreamForFlowControl();
@@ -72,7 +78,7 @@ public:
                    Upstream::HostDescriptionConstSharedPtr host,
                    const Network::Address::InstanceConstSharedPtr& upstream_local_address,
                    const StreamInfo::StreamInfo& info) override;
-  UpstreamRequest* upstreamRequest() override { return this; }
+  UpstreamToDownstream& upstreamToDownstream() override { return *this; }
 
   void clearRequestEncoder();
   void onStreamMaxDurationReached();
