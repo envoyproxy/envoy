@@ -27,12 +27,12 @@ void TcpConnPool::onPoolReady(Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& co
   upstream_handle_ = nullptr;
   Network::Connection& latched_conn = conn_data->connection();
   auto upstream =
-      std::make_unique<TcpUpstream>(callbacks_->upstreamRequest(), std::move(conn_data));
+      std::make_unique<TcpUpstream>(&callbacks_->upstreamToDownstream(), std::move(conn_data));
   callbacks_->onPoolReady(std::move(upstream), host, latched_conn.localAddress(),
                           latched_conn.streamInfo());
 }
 
-TcpUpstream::TcpUpstream(Router::UpstreamRequest* upstream_request,
+TcpUpstream::TcpUpstream(Router::UpstreamToDownstream* upstream_request,
                          Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& upstream)
     : upstream_request_(upstream_request), upstream_conn_data_(std::move(upstream)) {
   upstream_conn_data_->connection().enableHalfClose(true);
@@ -46,13 +46,12 @@ void TcpUpstream::encodeData(Buffer::Instance& data, bool end_stream) {
 void TcpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderMap&, bool end_stream) {
   // Headers should only happen once, so use this opportunity to add the proxy
   // proto header, if configured.
-  ASSERT(upstream_request_->parent().routeEntry()->connectConfig().has_value());
+  ASSERT(upstream_request_->routeEntry().connectConfig().has_value());
   Buffer::OwnedImpl data;
-  auto& connect_config = upstream_request_->parent().routeEntry()->connectConfig().value();
+  auto& connect_config = upstream_request_->routeEntry().connectConfig().value();
   if (connect_config.has_proxy_protocol_config()) {
-    const Network::Connection& connection = *upstream_request_->parent().callbacks()->connection();
     Extensions::Common::ProxyProtocol::generateProxyProtoHeader(
-        connect_config.proxy_protocol_config(), connection, data);
+        connect_config.proxy_protocol_config(), upstream_request_->connection(), data);
   }
 
   if (data.length() != 0 || end_stream) {
@@ -96,13 +95,13 @@ void TcpUpstream::onEvent(Network::ConnectionEvent event) {
 
 void TcpUpstream::onAboveWriteBufferHighWatermark() {
   if (upstream_request_) {
-    upstream_request_->disableDataFromDownstreamForFlowControl();
+    upstream_request_->onAboveWriteBufferHighWatermark();
   }
 }
 
 void TcpUpstream::onBelowWriteBufferLowWatermark() {
   if (upstream_request_) {
-    upstream_request_->enableDataFromDownstreamForFlowControl();
+    upstream_request_->onBelowWriteBufferLowWatermark();
   }
 }
 

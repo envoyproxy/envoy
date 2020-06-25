@@ -53,6 +53,8 @@ protected:
   void sendTrailers(FilterType* filter, const test::fuzz::HttpData& data) = delete;
 
 private:
+  // This keeps track of when a filter will stop decoding due to direct responses.
+  bool enabled_ = true;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callback_;
   std::shared_ptr<Network::MockDnsResolver> resolver_{std::make_shared<Network::MockDnsResolver>()};
