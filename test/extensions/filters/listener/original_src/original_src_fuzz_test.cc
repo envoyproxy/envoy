@@ -1,4 +1,3 @@
-#include "envoy/common/exception.h"
 #include "envoy/extensions/filters/listener/original_src/v3/original_src.pb.h"
 
 #include "common/network/utility.h"
@@ -10,7 +9,6 @@
 #include "test/mocks/network/mocks.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {
