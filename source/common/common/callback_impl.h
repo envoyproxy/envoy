@@ -51,6 +51,8 @@ private:
 
     CallbackManager& parent_;
     Callback cb_;
+    // the iterator of this callback holder inside callbacks_ list
+    // upon removal, use this iterator to delete callback holder in O(1)
     typename std::list<CallbackHolder>::iterator it_;
   };
 
@@ -63,7 +65,7 @@ private:
                         [handle](const CallbackHolder& holder) -> bool {
                           return handle == &holder;
                         }) != callbacks_.end());
-    auto it = static_cast<CallbackHolder*>(handle)->it_;
+    auto it = dynamic_cast<CallbackHolder*>(handle)->it_;
     callbacks_.erase(it);
   }
 
