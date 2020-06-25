@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.listener.original_src;
+
+import "envoy/extensions/filters/listener/original_src/v3/original_src.proto";
+import "google/protobuf/empty.proto";
+import "validate/validate.proto";
+
+message OriginalSrcTestCase {
+  envoy.extensions.filters.listener.original_src.v3.OriginalSrc config = 1
+      [(validate.rules).message.required = true];
+  string address = 2;
+}
