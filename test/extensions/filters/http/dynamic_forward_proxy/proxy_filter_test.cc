@@ -1,7 +1,5 @@
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
 
-#include "common/stats/isolated_store_impl.h"
-
 #include "extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
 #include "extensions/filters/http/dynamic_forward_proxy/proxy_filter.h"
 #include "extensions/filters/http/well_known_names.h"
@@ -31,15 +29,17 @@ using MockLoadDnsCacheEntryResult =
 class ProxyFilterTest : public testing::Test,
                         public Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory {
 public:
-  ProxyFilterTest()
-      : scope_(store_.createScope(fmt::format("dns_cache.{}", config_name_))),
-        dns_cache_stats_(
-            Common::DynamicForwardProxy::DnsCacheImpl::generateDnsCacheStats(*scope_)) {
+  ProxyFilterTest() {
     transport_socket_match_ = new NiceMock<Upstream::MockTransportSocketMatcher>(
         Network::TransportSocketFactoryPtr(transport_socket_factory_));
     cm_.thread_local_cluster_.cluster_.info_->transport_socket_matcher_.reset(
         transport_socket_match_);
+
+    envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig proto_config;
     EXPECT_CALL(*dns_cache_manager_, getCache(_));
+    filter_config_ = std::make_shared<ProxyFilterConfig>(proto_config, *this, cm_);
+    filter_ = std::make_unique<ProxyFilter>(filter_config_);
+    filter_->setDecoderFilterCallbacks(callbacks_);
 
     // Allow for an otherwise strict mock.
     EXPECT_CALL(callbacks_, connection()).Times(AtLeast(0));
@@ -47,11 +47,6 @@ public:
 
     // Configure max pending to 1 so we can test circuit breaking.
     cm_.thread_local_cluster_.cluster_.info_->resetResourceManager(0, 1, 0, 0, 0);
-
-    envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig proto_config;
-    filter_config_ = std::make_shared<ProxyFilterConfig>(proto_config, *this, cm_);
-    filter_ = std::make_unique<ProxyFilter>(filter_config_);
-    filter_->setDecoderFilterCallbacks(callbacks_);
   }
 
   ~ProxyFilterTest() override {
@@ -72,12 +67,7 @@ public:
   ProxyFilterConfigSharedPtr filter_config_;
   std::unique_ptr<ProxyFilter> filter_;
   Http::MockStreamDecoderFilterCallbacks callbacks_;
-  std::string config_name_{"default"};
-  Stats::IsolatedStoreImpl store_;
-  Stats::ScopePtr scope_;
-  NiceMock<Runtime::MockLoader> loader_;
   Http::TestRequestHeaderMapImpl request_headers_{{":authority", "foo"}};
-  Extensions::Common::DynamicForwardProxy::DnsCacheStats dns_cache_stats_;
   NiceMock<Upstream::MockBasicResourceLimit> pending_requests_;
 };
 
@@ -150,10 +140,6 @@ TEST_F(ProxyFilterTest, CacheOverflow) {
 
 // Circuit breaker overflow
 TEST_F(ProxyFilterTest, CircuitBreakerOverflow) {
-  TestScopedRuntime scoped_runtime;
-  // Disable dns cache circuit breakers because which we expect to be used cluster circuit breakers.
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.enable_dns_cache_circuit_breakers", "false"}});
   Upstream::ResourceAutoIncDec* circuit_breakers_(
       new Upstream::ResourceAutoIncDec(pending_requests_));
   InSequence s;
