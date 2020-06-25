@@ -70,8 +70,7 @@ const std::string StreamEncoderImpl::LAST_CHUNK = "0\r\n";
 StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection,
                                      HeaderKeyFormatter* header_key_formatter)
     : connection_(connection), disable_chunk_encoding_(false), chunk_encoding_(true),
-      processing_100_continue_(false), is_response_to_head_request_(false),
-      is_response_to_connect_request_(false), is_1xx_(false), is_204_(false),
+      is_response_to_head_request_(false), is_response_to_connect_request_(false),
       header_key_formatter_(header_key_formatter) {
   if (connection_.connection().aboveHighWatermark()) {
     runHighWatermarkCallbacks();
@@ -103,13 +102,11 @@ void StreamEncoderImpl::encodeFormattedHeader(absl::string_view key, absl::strin
 
 void ResponseEncoderImpl::encode100ContinueHeaders(const ResponseHeaderMap& headers) {
   ASSERT(headers.Status()->value() == "100");
-  processing_100_continue_ = true;
   encodeHeaders(headers, false);
-  processing_100_continue_ = false;
 }
 
 void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& headers,
-                                          bool end_stream) {
+                                          absl::optional<uint64_t> status, bool end_stream) {
   bool saw_content_length = false;
   headers.iterate(
       [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
@@ -153,7 +150,7 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
   if (saw_content_length || disable_chunk_encoding_) {
     chunk_encoding_ = false;
   } else {
-    if (processing_100_continue_) {
+    if (status && *status == 100) {
       // Make sure we don't serialize chunk information with 100-Continue headers.
       chunk_encoding_ = false;
     } else if (end_stream && !is_response_to_head_request_) {
@@ -161,19 +158,23 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
       // response to a HEAD request.
       // For 204s and 1xx where content length is disallowed, don't append the content length but
       // also don't chunk encode.
-      if (!is_1xx_ && !is_204_) {
+      if (!status || (*status >= 200 && *status != 204)) {
         encodeFormattedHeader(Headers::get().ContentLength.get(), "0");
       }
       chunk_encoding_ = false;
     } else if (connection_.protocol() == Protocol::Http10) {
       chunk_encoding_ = false;
-    } else if (connection_.strict1xxAnd204Headers() && (is_1xx_ || is_204_)) {
+    } else if (status && (*status < 200 || *status == 204) &&
+               connection_.strict1xxAnd204Headers()) {
+      // TODO(zuercher): when the "envoy.reloadable_features.strict_1xx_and_204_response_headers"
+      // feature flag is removed, this block can be coalesced with the 100 Continue logic above.
+
       // For 1xx and 204 responses, do not send the chunked encoding header or enable chunked
       // encoding: https://tools.ietf.org/html/rfc7230#section-3.3.1
       chunk_encoding_ = false;
 
       // Assert 1xx (may have content) OR 204 and end stream.
-      ASSERT(is_1xx_ || end_stream);
+      ASSERT(*status < 200 || end_stream);
     } else {
       // For responses to connect requests, do not send the chunked encoding header:
       // https://tools.ietf.org/html/rfc7231#section-4.3.6.
@@ -361,18 +362,12 @@ void ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers, bool e
   connection_.addCharToBuffer('\r');
   connection_.addCharToBuffer('\n');
 
-  // Enabling handling of https://tools.ietf.org/html/rfc7230#section-3.3.1 and
-  // https://tools.ietf.org/html/rfc7230#section-3.3.2. Also resets these flags
-  // if a 100 Continue is followed by another status.
-  setIs1xx(numeric_status < 200);
-  setIs204(numeric_status == 204);
-
   if (numeric_status >= 300) {
     // Don't do special CONNECT logic if the CONNECT was rejected.
     is_response_to_connect_request_ = false;
   }
 
-  encodeHeadersBase(headers, end_stream);
+  encodeHeadersBase(headers, absl::make_optional<uint64_t>(numeric_status), end_stream);
 }
 
 static const char REQUEST_POSTFIX[] = " HTTP/1.1\r\n";
@@ -408,7 +403,7 @@ void RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool end
   }
   connection_.copyToBuffer(REQUEST_POSTFIX, sizeof(REQUEST_POSTFIX) - 1);
 
-  encodeHeadersBase(headers, end_stream);
+  encodeHeadersBase(headers, absl::nullopt, end_stream);
 }
 
 http_parser_settings ConnectionImpl::settings_{
@@ -1129,7 +1124,7 @@ int ClientConnectionImpl::onHeadersComplete() {
 
 bool ClientConnectionImpl::upgradeAllowed() const {
   if (pending_response_.has_value()) {
-    return pending_response_->encoder_.upgrade_request_;
+    return pending_response_->encoder_.upgradeRequest();
   }
   return false;
 }

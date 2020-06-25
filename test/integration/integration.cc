@@ -282,14 +282,6 @@ BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
           },
           version, config) {}
 
-BaseIntegrationTest::~BaseIntegrationTest() {
-  // Tear down the fake upstream before the test server.
-  // When the HTTP codecs do runtime checks, it is important to finish all
-  // runtime access before the server, and the runtime singleton, go away.
-  fake_upstreams_.clear();
-  test_server_.reset();
-}
-
 Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnection(uint32_t port) {
   return makeClientConnectionWithOptions(port, nullptr);
 }
@@ -511,14 +503,6 @@ void BaseIntegrationTest::createApiTestServer(const ApiFilesystemConfig& api_fil
                                    {{"cds_json_path", cds_path}, {"lds_json_path", lds_path}},
                                    port_map_, version_),
                                port_names, validator_config, allow_lds_rejection);
-}
-
-void BaseIntegrationTest::createTestServer(const std::string& json_path,
-                                           const std::vector<std::string>& port_names) {
-  test_server_ = createIntegrationTestServer(
-      TestEnvironment::temporaryFileSubstitute(json_path, port_map_, version_), nullptr, nullptr,
-      timeSystem());
-  registerTestServerPorts(port_names);
 }
 
 void BaseIntegrationTest::sendRawHttpAndWaitForResponse(int port, const char* raw_http,

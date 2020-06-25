@@ -55,8 +55,11 @@ if __name__ == '__main__':
   extension_db = {}
   for extension, target in extensions_build_config.EXTENSIONS.items():
     extension_db[extension] = GetExtensionMetadata(target)
-  # The TLS transport extension is not in source/extensions/extensions_build_config.bzl
+  # The TLS and generic upstream extensions are hard-coded into the build, so
+  # not in source/extensions/extensions_build_config.bzl
   extension_db['envoy.transport_sockets.tls'] = GetExtensionMetadata(
       '//source/extensions/transport_sockets/tls:config')
+  extension_db['envoy.upstreams.http.generic'] = GetExtensionMetadata(
+      '//source/extensions/upstreams/http/generic:config')
 
   pathlib.Path(output_path).write_text(json.dumps(extension_db))

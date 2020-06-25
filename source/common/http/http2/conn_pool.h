@@ -53,14 +53,16 @@ protected:
     }
 
     // Http::ConnectionCallbacks
-    void onGoAway() override { parent().onGoAway(*this); }
+    void onGoAway(Http::GoAwayErrorCode error_code) override {
+      parent().onGoAway(*this, error_code);
+    }
 
     bool closed_with_active_rq_{};
   };
 
   uint64_t maxRequestsPerConnection();
   void movePrimaryClientToDraining();
-  void onGoAway(ActiveClient& client);
+  void onGoAway(ActiveClient& client, Http::GoAwayErrorCode error_code);
   void onStreamDestroy(ActiveClient& client);
   void onStreamReset(ActiveClient& client, Http::StreamResetReason reason);
 
