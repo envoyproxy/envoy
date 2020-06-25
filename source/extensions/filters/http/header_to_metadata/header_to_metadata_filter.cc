@@ -61,11 +61,11 @@ bool Config::configToVector(const ProtobufRepeatedRule& proto_rules,
     // TODO(rgs1): remove this once we are on v4 and these fields are folded into a oneof.
     if (!entry.on_header_present().value().empty() &&
         entry.on_header_present().has_regex_value_rewrite()) {
-      throw EnvoyException("Cannot specificy both value and regex_value_rewrite");
+      throw EnvoyException("Cannot specify both value and regex_value_rewrite");
     }
 
     if (entry.has_on_header_missing() && entry.on_header_missing().value().empty()) {
-      throw EnvoyException("Cannot specificy on_header_missing rule with an empty value");
+      throw EnvoyException("Cannot specify on_header_missing rule with an empty value");
     }
 
     vector.emplace_back(entry.header(), entry);
