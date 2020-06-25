@@ -31,6 +31,7 @@ void testForbiddenConfig(const std::string& yaml) {
                EnvoyException);
 }
 
+// Tests that an empty header is rejected.
 TEST(HeaderToMetadataFilterConfigTest, InvalidEmptyHeader) {
   const std::string yaml = R"EOF(
 request_rules:
@@ -41,6 +42,7 @@ request_rules:
   EXPECT_THROW(TestUtility::loadFromYamlAndValidate(yaml, proto_config), ProtoValidationException);
 }
 
+// Tests that empty (metadata) keys are rejected.
 TEST(HeaderToMetadataFilterConfigTest, InvalidEmptyKey) {
   const std::string yaml = R"EOF(
 request_rules:
@@ -55,6 +57,7 @@ request_rules:
   EXPECT_THROW(TestUtility::loadFromYamlAndValidate(yaml, proto_config), ProtoValidationException);
 }
 
+// Tests that a valid config is properly consumed.
 TEST(HeaderToMetadataFilterConfigTest, SimpleConfig) {
   const std::string yaml = R"EOF(
 request_rules:
@@ -82,6 +85,7 @@ request_rules:
   cb(filter_callbacks);
 }
 
+// Tests that per route config properly overrides the global config.
 TEST(HeaderToMetadataFilterConfigTest, PerRouteConfig) {
   const std::string yaml = R"EOF(
 request_rules:
@@ -110,6 +114,7 @@ request_rules:
   EXPECT_FALSE(config->doResponse());
 }
 
+// Tests that configuration does not allow value and regex_value_rewrite in the same rule.
 TEST(HeaderToMetadataFilterConfigTest, ValueAndRegex) {
   const std::string yaml = R"EOF(
 request_rules:
@@ -128,6 +133,7 @@ request_rules:
   testForbiddenConfig(yaml);
 }
 
+// Tests that on_header_missing rules don't allow an empty value.
 TEST(HeaderToMetadataFilterConfigTest, OnHeaderMissingEmptyValue) {
   const std::string yaml = R"EOF(
 request_rules:
