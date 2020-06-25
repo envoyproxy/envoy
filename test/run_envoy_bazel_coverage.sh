@@ -23,7 +23,7 @@ else
 fi
 
 # For fuzz builds, filter out only libFuzzer linked targets.
-if [ "$FUZZ_COVERAGE" == "true" ]; then
+if [ "${FUZZ_COVERAGE}" == "true" ]; then
   COVERAGE_TARGETS="$(bazel query ${BAZEL_QUERY_OPTIONS} "attr('tags', 'fuzzer', ${COVERAGE_TARGETS})")"
 fi
 
@@ -50,7 +50,7 @@ cp bazel-out/_coverage/_coverage_report.dat "${COVERAGE_DATA}"
 COVERAGE_VALUE=$(genhtml --prefix ${PWD} --output "${COVERAGE_DIR}" "${COVERAGE_DATA}" | tee /dev/stderr | grep lines... | cut -d ' ' -f 4)
 COVERAGE_VALUE=${COVERAGE_VALUE%?}
 
-if [ "$FUZZ_COVERAGE" == "true" ]
+if [ "${FUZZ_COVERAGE}" == "true" ]
 then
   [[ -z "${ENVOY_FUZZ_COVERAGE_ARTIFACT}" ]] || tar zcf "${ENVOY_FUZZ_COVERAGE_ARTIFACT}" -C ${COVERAGE_DIR} --transform 's/^\./fuzz_coverage/' .
 else
@@ -74,7 +74,7 @@ fi
 
 # We want to allow per_file_coverage to fail without exiting this script.
 set +e
-if [[ "$VALIDATE_COVERAGE" == "true" ]]; then
+if [[ "$VALIDATE_COVERAGE" == "true" && "{FUZZ_COVERAGE} != "true"]]; then
   echo "Checking per-extension coverage"
   output=$(./test/per_file_coverage.sh)
 

@@ -67,7 +67,7 @@ The fuzz test will be executed in three environments:
    //test/common/common:base64_fuzz_test`.
    
 5. Run the `*_fuzz_test_with_libfuzzer` target against libFuzzer. E.g. `bazel run
-   //test/common/common:base64_fuzz_test --config asan-fuzzer`.
+   //test/common/common:base64_fuzz_test_with_libfuzzer --config asan-fuzzer`.
    
 ## Protobuf fuzz tests
 
