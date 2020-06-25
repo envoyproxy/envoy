@@ -5,7 +5,6 @@
 #include "common/config/utility.h"
 #include "common/http/utility.h"
 #include "common/network/utility.h"
-#include "common/runtime/runtime_features.h"
 
 // TODO(mattklein123): Move DNS family helpers to a smaller include.
 #include "common/upstream/upstream_impl.h"
@@ -78,22 +77,19 @@ DnsCacheImpl::loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
   }
 }
 
-ResourceLimit& DnsCacheImpl::onDnsRequest(const Router::RouteEntry* route_entry,
-                                          Upstream::ClusterInfoConstSharedPtr cluster_info) {
-  const bool should_use_dns_cache_circuit_breakers =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_dns_cache_circuit_breakers");
-  ResourceLimit& pending_requests =
-      should_use_dns_cache_circuit_breakers
-          ? resource_manager_.pendingRequests()
-          : cluster_info->resourceManager(route_entry->priority()).pendingRequests();
-  if (!pending_requests.canCreate()) {
-    if (!should_use_dns_cache_circuit_breakers) {
-      cluster_info->stats().upstream_rq_pending_overflow_.inc();
-    } else {
+Upstream::ResourceAutoIncDecPtr DnsCacheImpl::canCreateDnsRequest(
+    absl::optional<std::reference_wrapper<ResourceLimit>> pending_requests) {
+  auto use_cluster_cache_circuit_breaker = pending_requests.has_value();
+  auto& current_pending_requests = use_cluster_cache_circuit_breaker
+                                       ? pending_requests->get()
+                                       : resource_manager_.pendingRequests();
+  if (!current_pending_requests.canCreate()) {
+    if (!use_cluster_cache_circuit_breaker) {
       stats_.dns_rq_pending_overflow_.inc();
     }
+    return nullptr;
   }
-  return pending_requests;
+  return std::make_unique<Upstream::ResourceAutoIncDec>(current_pending_requests);
 }
 
 absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> DnsCacheImpl::hosts() {

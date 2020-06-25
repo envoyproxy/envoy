@@ -1,10 +1,10 @@
 #pragma once
 
-#include "envoy/common/resource.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/thread_local/thread_local.h"
+#include "envoy/upstream/resource_manager.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -182,13 +182,8 @@ public:
    * @param cluster_info destination cluster info.
    * @return Resource limit which describes about pending requests.
    */
-  virtual ResourceLimit& onDnsRequest(const Router::RouteEntry* route_entry,
-                                      Upstream::ClusterInfoConstSharedPtr cluster_info) PURE;
-
-  /**
-   * @return A optional reference to resource manager for dns cache.
-   */
-  virtual DnsCacheResourceManager& dnsCacheResourceManager() PURE;
+  virtual Upstream::ResourceAutoIncDecPtr
+  canCreateDnsRequest(absl::optional<std::reference_wrapper<ResourceLimit>> pending_request) PURE;
 };
 
 using DnsCacheSharedPtr = std::shared_ptr<DnsCache>;
