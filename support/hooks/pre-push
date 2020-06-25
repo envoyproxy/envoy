@@ -52,7 +52,7 @@ do
     # our `relpath` helper.
     SCRIPT_DIR="$(dirname "$(realpath "$0")")/../../tools"
 
-    git diff $RANGE | grep -v -E '^\+\+\+' | grep -E '^\+' | sed -e 's/^\+//g' | while IFS='' read -r line
+    git diff $RANGE -- '*.cc' '*.h' | grep -v -E '^\+\+\+' | grep -E '^\+' | sed -e 's/^\+//g' | while IFS='' read -r line
     do
       if [ -z "$line" ]
       then
