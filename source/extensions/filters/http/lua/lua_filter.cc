@@ -3,13 +3,13 @@
 #include <atomic>
 #include <memory>
 
+#include "envoy/http/codes.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
 #include "common/crypto/utility.h"
-#include "common/http/codes.h"
 #include "common/http/message_impl.h"
-#include "common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
 namespace Extensions {

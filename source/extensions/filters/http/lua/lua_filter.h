@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/http/filter.h"
-#include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/crypto/utility.h"
