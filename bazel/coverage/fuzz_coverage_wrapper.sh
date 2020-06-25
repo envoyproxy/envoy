@@ -12,6 +12,6 @@ mkdir -p fuzz_corpus/seed_corpus
 cp -r $@ fuzz_corpus/seed_corpus
 
 # TODO(asraa): When fuzz targets are stable, remove error suppression and run coverage while fuzzing.
-LLVM_PROFILE_FILE= ${TEST_BINARY} fuzz_corpus -seed=${FUZZ_CORPUS_SEED:-1} -max_total_time=${FUZZ_CORPUS_TIME:-60} -detect_leaks=1 -max_len=4096 || true
+LLVM_PROFILE_FILE= ${TEST_BINARY} fuzz_corpus -seed=${FUZZ_CORPUS_SEED:-1} -max_total_time=${FUZZ_CORPUS_TIME:-60} -max_len=4096 || true
 
 ${TEST_BINARY} fuzz_corpus -runs=0
