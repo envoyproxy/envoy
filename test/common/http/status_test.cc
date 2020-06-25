@@ -67,5 +67,37 @@ TEST(Status, CodecClientError) {
   EXPECT_TRUE(isCodecClientError(status));
 }
 
+TEST(Status, ReturnIfError) {
+
+  auto outer = [](Status (*inner)()) {
+    RETURN_IF_ERROR(inner());
+    return bufferFloodError("boom");
+  };
+
+  auto result = outer([]() { return okStatus(); });
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ("boom", result.message());
+  EXPECT_TRUE(isBufferFloodError(result));
+  result = outer([]() { return codecClientError("foobar"); });
+  EXPECT_FALSE(result.ok());
+  EXPECT_TRUE(isCodecClientError(result));
+  EXPECT_EQ("foobar", result.message());
+
+  // Check that passing a `Status` object directly into the RETURN_IF_ERROR works.
+  auto direct_status = [](const Status& status) {
+    RETURN_IF_ERROR(status);
+    return bufferFloodError("baz");
+  };
+  result = direct_status(codecClientError("foobar"));
+  EXPECT_FALSE(result.ok());
+  EXPECT_TRUE(isCodecClientError(result));
+  EXPECT_EQ("foobar", result.message());
+
+  result = direct_status(okStatus());
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ("baz", result.message());
+  EXPECT_TRUE(isBufferFloodError(result));
+}
+
 } // namespace Http
 } // namespace Envoy
