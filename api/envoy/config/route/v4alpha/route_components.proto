@@ -1448,7 +1448,8 @@ message RateLimit {
       // The key to use in the descriptor entry.
       string descriptor_key = 1 [(validate.rules).string = {min_bytes: 1}];
 
-      // Metadata struct that defines the key and path to retrieve the value.
+      // Metadata struct that defines the key and path to retrieve the string value. A match will
+      // only happen if the value in the dynamic metadata is of type string.
       type.metadata.v3.MetadataKey metadata_key = 2 [(validate.rules).message = {required: true}];
     }
 

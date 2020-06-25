@@ -97,13 +97,13 @@ New Features
 * metrics service: added added :ref:`API version <envoy_v3_api_field_config.metrics.v3.MetricsServiceConfig.transport_api_version>` to explicitly set the version of gRPC service endpoint and message to be used.
 * network filters: added a :ref:`postgres proxy filter <config_network_filters_postgres_proxy>`.
 * network filters: added a :ref:`rocketmq proxy filter <config_network_filters_rocketmq_proxy>`.
+* ratelimit: add support for use of dynamic metadata :ref:`dynamic_metadata <envoy_v3_api_field_config.route.v3.RateLimit.Action.dynamic_metadata>` as a ratelimit action.
 * ratelimit: added :ref:`API version <envoy_v3_api_field_config.ratelimit.v3.RateLimitServiceConfig.transport_api_version>` to explicitly set the version of gRPC service endpoint and message to be used.
 * request_id: added to :ref:`always_set_request_id_in_response setting <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.always_set_request_id_in_response>`
   to set :ref:`x-request-id <config_http_conn_man_headers_x-request-id>` header in response even if
   tracing is not forced.
 * router: add support for RESPONSE_FLAGS and RESPONSE_CODE_DETAILS :ref:`header formatters
   <config_http_conn_man_headers_custom_request_headers>`.
-* router: add support for use of dynamic metadata :ref:`dynamic_metadata <envoy_v3_api_field_config.route.v3.RateLimit.Action.dynamic_metadata>` as a ratelimit action.
 * router: allow Rate Limiting Service to be called in case of missing request header for a descriptor if the :ref:`skip_if_absent <envoy_v3_api_field_config.route.v3.RateLimit.Action.RequestHeaders.skip_if_absent>` field is set to true.
 * router: more fine grained internal redirect configs are added to the :ref:`internal_redirect_policy
   <envoy_v3_api_field_config.route.v3.RouteAction.internal_redirect_policy>` field.
