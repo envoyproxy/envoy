@@ -33,6 +33,8 @@ Listeners can also be fetched dynamically via the :ref:`listener discovery servi
 
 Listener :ref:`configuration <config_listeners>`.
 
+.. _arch_overview_listeners_udp:
+
 UDP
 ---
 

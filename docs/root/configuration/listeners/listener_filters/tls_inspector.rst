@@ -26,8 +26,8 @@ A sample filter configuration could be:
 .. code-block:: yaml
 
   listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
-      typed_config: {}
+  - name: "envoy.filters.listener.tls_inspector"
+    typed_config: {}
 
 Statistics
 ----------

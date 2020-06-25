@@ -59,6 +59,9 @@ If there are documentation changes, please include a brief description of what t
 changes may be in [docs/root](docs/root) and/or inline with the API protos. Please write in
 N/A if there were no documentation changes.
 
+Any PRs with structural changes to the dataplane should also update the [Life of a
+Request](docs/root/intro/life_of_a_request.md) documentation as appropriate.
+
 ### <a name="relnotes"></a>Release notes
 
 If this change is user impacting OR extension developer impacting (filter API, etc.) you **must**

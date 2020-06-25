@@ -26,6 +26,8 @@ Envoy supports several built-in
 :ref:`extension filters<envoy_v3_api_field_config.accesslog.v3.AccessLogFilter.extension_filter>`
 that are registered at runtime.
 
+.. _arch_overview_access_logs_sinks:
+
 Access logging sinks
 --------------------
 
