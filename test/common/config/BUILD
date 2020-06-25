@@ -416,6 +416,15 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "udpa_resource_test",
+    srcs = ["udpa_resource_test.cc"],
+    deps = [
+        "//source/common/config:udpa_resource_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
 envoy_proto_library(
     name = "version_converter_proto",
     srcs = ["version_converter.proto"],
