@@ -522,8 +522,7 @@ Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, Buffer::RawSlic
 }
 
 void passPayloadToProcessor(uint64_t bytes_read, Buffer::RawSlice& slice,
-                            Buffer::InstancePtr buffer,
-                            Address::InstanceConstSharedPtr peer_addess,
+                            Buffer::InstancePtr buffer, Address::InstanceConstSharedPtr peer_addess,
                             Address::InstanceConstSharedPtr local_address,
                             UdpPacketProcessor& udp_packet_processor, MonotonicTime receive_time) {
   if (slice.mem_ != nullptr) {
