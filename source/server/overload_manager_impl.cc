@@ -290,13 +290,20 @@ void OverloadManagerImpl::updateResourcePressure(const std::string& resource, do
         const std::string& action = entry.second;
         auto action_it = actions_.find(action);
         ASSERT(action_it != actions_.end());
+        const OverloadActionState old_state = action_it->second.getState();
         if (action_it->second.updateResourcePressure(resource, pressure)) {
           const auto state = action_it->second.getState();
-          ENVOY_LOG(info, "Overload action {} became {} ({})", action,
-                    (state == OverloadActionState::saturated()
-                         ? "saturated"
-                         : (state == OverloadActionState::inactive() ? "inactive" : "scaling")),
-                    state.action_value);
+
+          auto is_scaling = [](auto state) {
+            return state != OverloadActionState::inactive() &&
+                   state != OverloadActionState::saturated();
+          };
+          if (!(is_scaling(old_state) && is_scaling(state))) {
+            ENVOY_LOG(info, "Overload action {} became {}", action,
+                      (state == OverloadActionState::saturated()
+                           ? "saturated"
+                           : (state == OverloadActionState::inactive() ? "inactive" : "scaling")));
+          }
           tls_->runOnAllThreads([this, action, state] {
             tls_->getTyped<ThreadLocalOverloadStateImpl>().setState(action, state);
           });
