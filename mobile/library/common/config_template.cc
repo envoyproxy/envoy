@@ -50,6 +50,11 @@ static_resources:
                 name: basic
                 typed_config:
                   "@type": type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip
+                  # Maximum window bits to allow for any stream to be decompressed. Optimally this
+                  # would be set to 0. According to the zlib manual this would allow the decompressor
+                  # to use the window bits in the zlib header to perform the decompression.
+                  # Unfortunately, the proto field constraint makes this impossible currently.
+                  window_bits: 15
               request_direction_config:
                 common_config:
                   enabled:
