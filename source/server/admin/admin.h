@@ -292,7 +292,7 @@ private:
     AdminListenSocketFactory(Network::SocketSharedPtr socket) : socket_(socket) {}
 
     // Network::ListenSocketFactory
-    Network::Address::SocketType socketType() const override { return socket_->socketType(); }
+    Network::Socket::Type socketType() const override { return socket_->socketType(); }
 
     const Network::Address::InstanceConstSharedPtr& localAddress() const override {
       return socket_->localAddress();

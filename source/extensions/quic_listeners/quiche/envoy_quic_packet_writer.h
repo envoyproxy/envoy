@@ -34,9 +34,10 @@ public:
   // Currently this writer doesn't support pacing offload or batch writing.
   bool SupportsReleaseTime() const override { return false; }
   bool IsBatchMode() const override { return false; }
-  char* GetNextWriteLocation(const quic::QuicIpAddress& /*self_address*/,
-                             const quic::QuicSocketAddress& /*peer_address*/) override {
-    return nullptr;
+  quic::QuicPacketBuffer
+  GetNextWriteLocation(const quic::QuicIpAddress& /*self_address*/,
+                       const quic::QuicSocketAddress& /*peer_address*/) override {
+    return {nullptr, nullptr};
   }
   quic::WriteResult Flush() override { return {quic::WRITE_STATUS_OK, 0}; }
 

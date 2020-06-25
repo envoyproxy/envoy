@@ -437,8 +437,12 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
       upstream_ = std::make_unique<HttpUpstream>(*upstream_callbacks_,
                                                  config_->tunnelingConfig()->hostname());
       HttpUpstream* http_upstream = static_cast<HttpUpstream*>(upstream_.get());
-      upstream_handle_ = std::make_shared<HttpConnectionHandle>(
-          conn_pool->newStream(http_upstream->responseDecoder(), *this));
+      Http::ConnectionPool::Cancellable* cancellable =
+          conn_pool->newStream(http_upstream->responseDecoder(), *this);
+      if (cancellable) {
+        ASSERT(upstream_handle_.get() == nullptr);
+        upstream_handle_ = std::make_shared<HttpConnectionHandle>(cancellable);
+      }
       return Network::FilterStatus::StopIteration;
     }
   }

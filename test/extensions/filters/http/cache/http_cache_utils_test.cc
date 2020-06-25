@@ -30,10 +30,11 @@ INSTANTIATE_TEST_SUITE_P(Ok, HttpTimeTest, testing::ValuesIn(ok_times));
 TEST_P(HttpTimeTest, Ok) {
   Http::TestResponseHeaderMapImpl response_headers{{"date", GetParam()}};
   // Manually confirmed that 784111777 is 11/6/94, 8:46:37.
-  EXPECT_EQ(784111777, SystemTime::clock::to_time_t(Utils::httpTime(response_headers.Date())));
+  EXPECT_EQ(784111777,
+            SystemTime::clock::to_time_t(HttpCacheUtils::httpTime(response_headers.Date())));
 }
 
-TEST(HttpTime, Null) { EXPECT_EQ(Utils::httpTime(nullptr), SystemTime()); }
+TEST(HttpTime, Null) { EXPECT_EQ(HttpCacheUtils::httpTime(nullptr), SystemTime()); }
 
 struct EffectiveMaxAgeParams {
   absl::string_view cache_control;
@@ -70,7 +71,7 @@ class EffectiveMaxAgeTest : public testing::TestWithParam<EffectiveMaxAgeParams>
 INSTANTIATE_TEST_SUITE_P(EffectiveMaxAgeTest, EffectiveMaxAgeTest, testing::ValuesIn(params));
 
 TEST_P(EffectiveMaxAgeTest, EffectiveMaxAgeTest) {
-  EXPECT_EQ(Utils::effectiveMaxAge(GetParam().cache_control),
+  EXPECT_EQ(HttpCacheUtils::effectiveMaxAge(GetParam().cache_control),
             std::chrono::seconds(GetParam().effective_max_age_secs));
 }
 

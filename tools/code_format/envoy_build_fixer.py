@@ -19,6 +19,9 @@ import paths
 # Where does Buildozer live?
 BUILDOZER_PATH = paths.getBuildozer()
 
+# Where does Buildifier live?
+BUILDIFIER_PATH = paths.getBuildifier()
+
 # Canonical Envoy license.
 LICENSE_STRING = 'licenses(["notice"])  # Apache 2\n\n'
 
@@ -89,14 +92,15 @@ def FixPackageAndLicense(contents):
   return contents
 
 
-# Remove trailing blank lines, unnecessary double blank lines.
-def FixEmptyLines(contents):
-  return re.sub('\n\s*$', '\n', re.sub('\n\n\n', '\n\n', contents))
-
-
-# Misc. Buildozer cleanups.
-def FixBuildozerCleanups(contents):
-  return RunBuildozer([('fix unusedLoads', '__pkg__')], contents)
+# Run Buildifier commands on a string with lint mode.
+def BuildifierLint(contents):
+  r = subprocess.run([BUILDIFIER_PATH, '-lint=fix', '-mode=fix', '-type=build'],
+                     input=contents.encode(),
+                     stdout=subprocess.PIPE,
+                     stderr=subprocess.PIPE)
+  if r.returncode != 0:
+    raise EnvoyBuildFixerError('buildozer execution failed: %s' % r)
+  return r.stdout.decode('utf-8')
 
 
 # Find all the API headers in a C++ source file.
@@ -170,9 +174,8 @@ def FixBuild(path):
     contents = f.read()
   xforms = [
       FixPackageAndLicense,
-      FixEmptyLines,
       functools.partial(FixApiDeps, path),
-      FixBuildozerCleanups,
+      BuildifierLint,
   ]
   for xform in xforms:
     contents = xform(contents)

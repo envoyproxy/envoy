@@ -1,3 +1,6 @@
+load("@rules_python//python:defs.bzl", "py_binary")
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
+
 # DO NOT LOAD THIS FILE. Load envoy_build_system.bzl instead.
 # Envoy test targets. This includes both test library and test binary targets.
 load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
@@ -29,8 +32,7 @@ def _envoy_cc_test_infrastructure_library(
         **kargs):
     # Add implicit tcmalloc external dependency(if available) in order to enable CPU and heap profiling in tests.
     deps += tcmalloc_external_deps(repository)
-
-    native.cc_library(
+    cc_library(
         name = name,
         srcs = srcs,
         hdrs = hdrs,
@@ -105,7 +107,7 @@ def envoy_cc_fuzz_test(
         tags = tags,
         **kwargs
     )
-    native.cc_test(
+    cc_test(
         name = name,
         copts = fuzz_copts + envoy_copts("@envoy", test = True),
         linkopts = _envoy_test_linkopts(),
@@ -129,7 +131,7 @@ def envoy_cc_fuzz_test(
     # https://github.com/google/oss-fuzz/blob/master/projects/envoy/build.sh. It won't yield
     # anything useful on its own, as it expects to be run in an environment where the linker options
     # provide a path to FuzzingEngine.
-    native.cc_binary(
+    cc_binary(
         name = name + "_driverless",
         copts = fuzz_copts + envoy_copts("@envoy", test = True),
         linkopts = ["-lFuzzingEngine"] + _envoy_test_linkopts(),
@@ -138,8 +140,7 @@ def envoy_cc_fuzz_test(
         deps = [":" + test_lib_name],
         tags = ["manual"] + tags,
     )
-
-    native.cc_test(
+    cc_test(
         name = name + "_with_libfuzzer",
         copts = fuzz_copts + envoy_copts("@envoy", test = True),
         linkopts = ["-fsanitize=fuzzer"] + _envoy_test_linkopts(),
@@ -171,8 +172,7 @@ def envoy_cc_test(
         size = "medium",
         flaky = False):
     coverage_tags = tags + ([] if coverage else ["nocoverage"])
-
-    native.cc_test(
+    cc_test(
         name = name,
         srcs = srcs,
         data = data,
@@ -277,7 +277,7 @@ def envoy_py_test_binary(
         external_deps = [],
         deps = [],
         **kargs):
-    native.py_binary(
+    py_binary(
         name = name,
         deps = deps + [envoy_external_dep_path(dep) for dep in external_deps],
         **kargs
@@ -313,6 +313,7 @@ def envoy_sh_test(
             data = srcs + data + cc_binary,
             tags = tags,
             deps = ["//test/test_common:environment_lib"] + cc_binary,
+            **kargs
         )
 
     else:

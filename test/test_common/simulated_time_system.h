@@ -28,9 +28,9 @@ public:
   // TestTimeSystem
   void advanceTimeWait(const Duration& duration) override;
   void advanceTimeAsync(const Duration& duration) override;
-  Thread::CondVar::WaitStatus
-  waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
-          const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override;
+  Thread::CondVar::WaitStatus waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
+                                      const Duration& duration) noexcept
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) override;
 
   // TimeSource
   SystemTime systemTime() override;
@@ -78,10 +78,10 @@ private:
    * @param monotonic_time The desired new current time.
    */
   void setMonotonicTimeLockHeld(const MonotonicTime& monotonic_time)
-      EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
-  MonotonicTime alarmTimeLockHeld(Alarm* alarm) EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-  void alarmActivateLockHeld(Alarm* alarm) EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  MonotonicTime alarmTimeLockHeld(Alarm* alarm) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  void alarmActivateLockHeld(Alarm* alarm) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   // The simulation keeps a unique ID for each alarm to act as a deterministic
   // tie-breaker for alarm-ordering.
@@ -89,25 +89,26 @@ private:
 
   // Adds/removes an alarm.
   void addAlarmLockHeld(Alarm*, const std::chrono::microseconds& duration)
-      EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-  void removeAlarmLockHeld(Alarm*) EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  void removeAlarmLockHeld(Alarm*) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   // Keeps track of how many alarms have been activated but not yet called,
   // which helps waitFor() determine when to give up and declare a timeout.
-  void incPendingLockHeld() EXCLUSIVE_LOCKS_REQUIRED(mutex_) { ++pending_alarms_; }
+  void incPendingLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) { ++pending_alarms_; }
   void decPending() {
     absl::MutexLock lock(&mutex_);
-    --pending_alarms_;
+    decPendingLockHeld();
   }
-  void waitForNoPendingLockHeld() const EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  void decPendingLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) { --pending_alarms_; }
+  void waitForNoPendingLockHeld() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   RealTimeSource real_time_source_; // Used to initialize monotonic_time_ and system_time_;
-  MonotonicTime monotonic_time_ GUARDED_BY(mutex_);
-  SystemTime system_time_ GUARDED_BY(mutex_);
-  AlarmSet alarms_ GUARDED_BY(mutex_);
-  uint64_t index_ GUARDED_BY(mutex_);
+  MonotonicTime monotonic_time_ ABSL_GUARDED_BY(mutex_);
+  SystemTime system_time_ ABSL_GUARDED_BY(mutex_);
+  AlarmSet alarms_ ABSL_GUARDED_BY(mutex_);
+  uint64_t index_ ABSL_GUARDED_BY(mutex_);
   mutable absl::Mutex mutex_;
-  uint32_t pending_alarms_ GUARDED_BY(mutex_);
+  uint32_t pending_alarms_ ABSL_GUARDED_BY(mutex_);
   Thread::OnlyOneThread only_one_thread_;
 };
 

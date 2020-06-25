@@ -20,7 +20,9 @@ const uint64_t TEST_TIME_MILLIS = 42000;
  */
 class SubscriptionTestHarness : public Event::TestUsingSimulatedTime {
 public:
-  SubscriptionTestHarness() : stats_(Utility::generateStats(stats_store_)) {
+  SubscriptionTestHarness()
+      : stats_(Utility::generateStats(stats_store_)),
+        control_plane_stats_(Utility::generateControlPlaneStats(stats_store_)) {
     simTime().setSystemTime(SystemTime(std::chrono::milliseconds(TEST_TIME_MILLIS)));
   }
   virtual ~SubscriptionTestHarness() = default;
@@ -94,10 +96,7 @@ public:
   }
 
   virtual void verifyControlPlaneStats(uint32_t connected_state) {
-    EXPECT_EQ(
-        connected_state,
-        stats_store_.gauge("control_plane.connected_state", Stats::Gauge::ImportMode::NeverImport)
-            .value());
+    EXPECT_EQ(connected_state, control_plane_stats_.connected_state_.value());
   }
 
   virtual void expectConfigUpdateFailed() PURE;
@@ -112,6 +111,7 @@ public:
 
   Stats::TestUtil::TestStore stats_store_;
   SubscriptionStats stats_;
+  ControlPlaneStats control_plane_stats_;
 };
 
 ACTION_P(ThrowOnRejectedConfig, accept) {

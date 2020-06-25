@@ -25,31 +25,30 @@ public:
   // Return success if the certs chain is valid and signature is "Fake signature for {
   // [server_config] }". Otherwise failure.
   quic::QuicAsyncStatus
-  VerifyProof(const std::string& hostname, const uint16_t /*port*/,
-              const std::string& server_config, quic::QuicTransportVersion /*quic_version*/,
+  VerifyProof(const std::string& hostname, const uint16_t port,
+              const std::string& /*server_config*/, quic::QuicTransportVersion /*quic_version*/,
               absl::string_view /*chlo_hash*/, const std::vector<std::string>& certs,
-              const std::string& cert_sct, const std::string& signature,
+              const std::string& cert_sct, const std::string& /*signature*/,
               const quic::ProofVerifyContext* context, std::string* error_details,
               std::unique_ptr<quic::ProofVerifyDetails>* details,
               std::unique_ptr<quic::ProofVerifierCallback> callback) override {
-    if (VerifyCertChain(hostname, certs, "", cert_sct, context, error_details, details,
-                        std::move(callback)) == quic::QUIC_SUCCESS &&
-        signature == absl::StrCat("Fake signature for { ", server_config, " }")) {
+    if (VerifyCertChain(hostname, port, certs, "", cert_sct, context, error_details, details,
+                        std::move(callback)) == quic::QUIC_SUCCESS) {
       return quic::QUIC_SUCCESS;
     }
     return quic::QUIC_FAILURE;
   }
 
-  // Return success if the certs chain has only one fake certificate "Fake cert from [host_name]"
-  // and its SCT is "Fake timestamp". Otherwise failure.
+  // Return success upon one arbitrary cert content. Otherwise failure.
   quic::QuicAsyncStatus
-  VerifyCertChain(const std::string& /*hostname*/, const std::vector<std::string>& certs,
-                  const std::string& /*ocsp_response*/, const std::string& cert_sct,
-                  const quic::ProofVerifyContext* /*context*/, std::string* /*error_details*/,
+  VerifyCertChain(const std::string& /*hostname*/, const uint16_t /*port*/,
+                  const std::vector<std::string>& certs, const std::string& /*ocsp_response*/,
+                  const std::string& cert_sct, const quic::ProofVerifyContext* /*context*/,
+                  std::string* /*error_details*/,
                   std::unique_ptr<quic::ProofVerifyDetails>* /*details*/,
                   std::unique_ptr<quic::ProofVerifierCallback> /*callback*/) override {
     // Cert SCT support is not enabled for fake ProofSource.
-    if (cert_sct.empty() && certs.size() == 1 && certs[0] == "Fake cert") {
+    if (cert_sct.empty() && certs.size() == 1) {
       return quic::QUIC_SUCCESS;
     }
     return quic::QUIC_FAILURE;

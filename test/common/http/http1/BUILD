@@ -1,10 +1,10 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -19,7 +19,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "codec_impl_test",
     srcs = ["codec_impl_test.cc"],
-    tags = ["fails_on_windows"],
     deps = [
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/event:dispatcher_interface",
@@ -45,7 +44,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "conn_pool_test",
     srcs = ["conn_pool_test.cc"],
-    tags = ["fails_on_windows"],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_lib",

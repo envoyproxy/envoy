@@ -181,7 +181,7 @@ response_rules:
   initializeFilter(response_config_yaml);
   Http::TestResponseHeaderMapImpl incoming_headers{{"x-authenticated", "1"}};
   std::map<std::string, std::string> expected = {{"auth", "1"}};
-  Http::TestHeaderMapImpl empty_headers;
+  Http::TestResponseHeaderMapImpl empty_headers;
 
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_,
@@ -213,7 +213,7 @@ response_rules:
   initializeFilter(response_config_yaml);
   Http::TestResponseHeaderMapImpl incoming_headers{{"x-authenticated", "1"}};
   std::map<std::string, int> expected = {{"auth", 1}};
-  Http::TestHeaderMapImpl empty_headers;
+  Http::TestResponseHeaderMapImpl empty_headers;
 
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_,
@@ -238,7 +238,7 @@ response_rules:
   const auto encoded = Base64::encode(data.c_str(), data.size());
   Http::TestResponseHeaderMapImpl incoming_headers{{"x-authenticated", encoded}};
   std::map<std::string, std::string> expected = {{"auth", data}};
-  Http::TestHeaderMapImpl empty_headers;
+  Http::TestResponseHeaderMapImpl empty_headers;
 
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_,
@@ -416,7 +416,7 @@ response_rules:
   initializeFilter(response_config_yaml);
   Http::TestResponseHeaderMapImpl incoming_headers{{"x-something", "thing"}};
   std::map<std::string, std::string> expected = {{"something", "else"}};
-  Http::TestHeaderMapImpl empty_headers;
+  Http::TestResponseHeaderMapImpl empty_headers;
 
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_,

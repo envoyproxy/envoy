@@ -68,7 +68,7 @@ def _genrule_cc_deps(ctx):
 genrule_cc_deps = rule(
     attrs = {
         "deps": attr.label_list(
-            providers = [],  # CcSkylarkApiProvider
+            providers = [],  # CcStarlarkApiProvider
             mandatory = True,
             allow_empty = False,
         ),
@@ -115,7 +115,7 @@ def _genrule_environment(ctx):
     ld_flags = []
     ld_libs = []
     if ctx.var.get("ENVOY_CONFIG_COVERAGE"):
-        ld_libs += ["-lgcov"]
+        ld_libs.append("-lgcov")
     if ctx.var.get("ENVOY_CONFIG_ASAN"):
         cc_flags += asan_flags
         ld_flags += asan_flags
@@ -137,8 +137,8 @@ def _genrule_environment(ctx):
     lines.append("export ASAN_OPTIONS=detect_leaks=0")
 
     lines.append("")
-    out = ctx.new_file(ctx.attr.name + ".sh")
-    ctx.file_action(out, "\n".join(lines))
+    out = ctx.actions.declare_file(ctx.attr.name + ".sh")
+    ctx.actions.write(out, "\n".join(lines))
     return DefaultInfo(files = depset([out]))
 
 genrule_environment = rule(
