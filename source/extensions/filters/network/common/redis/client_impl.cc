@@ -240,7 +240,11 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
       }
     }
     if (!redirected) {
-      callbacks.onResponse(std::move(value));
+      if (err[0] == RedirectionResponse::get().CLUSTER_DOWN) {
+        callbacks.onFailure();
+      } else {
+        callbacks.onResponse(std::move(value));
+      }
     }
   } else {
     callbacks.onResponse(std::move(value));
