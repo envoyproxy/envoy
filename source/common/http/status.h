@@ -126,7 +126,7 @@ Http::Code getPrematureResponseHttpCode(const Status& status);
     } else {                                                                                       \
       return std::move(adapter.status_);                                                           \
     }                                                                                              \
-  } while(false)
+  } while (false)
 
 namespace Details {
 // Helper class to convert `Status` to `bool` so it can be used inside `if` statements.
