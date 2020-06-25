@@ -11,7 +11,7 @@ tasks:
     test_targets:
       - "//test/..."
     test_flags:
-      - "--config=remote-clang"
+      - "--config=remote-clang-libc++"
       - "--config=remote-ci"
       - "--jobs=75"
   coverage:
@@ -21,6 +21,9 @@ tasks:
       - "//test/integration/..."
       - "//test/exe/..."
     test_flags:
-      - "--action_env=CC=clang"
-      - "--action_env=CXX=clang++"
       - "--config=coverage"
+      - "--config=remote-clang-libc++"
+      - "--config=remote-ci"
+      - "--jobs=75"
+      - "--local_test_jobs=HOST_CPUS"
+      - "--test_env=PATH=/usr/lib/llvm-10/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
