@@ -3,6 +3,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/api/api_impl.h"
+#include "common/grpc/context_impl.h"
 #include "common/http/context_impl.h"
 #include "common/singleton/manager_impl.h"
 
@@ -18,7 +19,7 @@
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/secret/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/admin.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/simulated_time_system.h"

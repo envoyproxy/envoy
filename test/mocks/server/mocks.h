@@ -53,6 +53,8 @@
 #include "test/test_common/test_time_system.h"
 
 #include "absl/strings/string_view.h"
+#include "admin.h"
+#include "config_tracker.h"
 #include "gmock/gmock.h"
 #include "spdlog/spdlog.h"
 
@@ -126,49 +128,6 @@ public:
   bool mutex_tracing_enabled_{};
   bool cpuset_threads_enabled_{};
   std::vector<std::string> disabled_extensions_;
-};
-
-class MockConfigTracker : public ConfigTracker {
-public:
-  MockConfigTracker();
-  ~MockConfigTracker() override;
-
-  struct MockEntryOwner : public EntryOwner {};
-
-  MOCK_METHOD(EntryOwner*, add_, (std::string, Cb));
-
-  // Server::ConfigTracker
-  MOCK_METHOD(const CbsMap&, getCallbacksMap, (), (const));
-  EntryOwnerPtr add(const std::string& key, Cb callback) override {
-    return EntryOwnerPtr{add_(key, std::move(callback))};
-  }
-
-  std::unordered_map<std::string, Cb> config_tracker_callbacks_;
-};
-
-class MockAdmin : public Admin {
-public:
-  MockAdmin();
-  ~MockAdmin() override;
-
-  // Server::Admin
-  MOCK_METHOD(bool, addHandler,
-              (const std::string& prefix, const std::string& help_text, HandlerCb callback,
-               bool removable, bool mutates_server_state));
-  MOCK_METHOD(bool, removeHandler, (const std::string& prefix));
-  MOCK_METHOD(Network::Socket&, socket, ());
-  MOCK_METHOD(ConfigTracker&, getConfigTracker, ());
-  MOCK_METHOD(void, startHttpListener,
-              (const std::string& access_log_path, const std::string& address_out_path,
-               Network::Address::InstanceConstSharedPtr address,
-               const Network::Socket::OptionsSharedPtr& socket_options,
-               Stats::ScopePtr&& listener_scope));
-  MOCK_METHOD(Http::Code, request,
-              (absl::string_view path_and_query, absl::string_view method,
-               Http::ResponseHeaderMap& response_headers, std::string& body));
-  MOCK_METHOD(void, addListenerToHandler, (Network::ConnectionHandler * handler));
-
-  NiceMock<MockConfigTracker> config_tracker_;
 };
 
 class MockAdminStream : public AdminStream {

@@ -9,6 +9,25 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_mock(
+    name = "config_tracker_mocks",
+    srcs = ["config_tracker.cc"],
+    hdrs = ["config_tracker.h"],
+    deps = [
+        "//include/envoy/server:configuration_interface",
+    ],
+)
+
+envoy_cc_mock(
+    name = "admin_mocks",
+    srcs = ["admin.cc"],
+    hdrs = ["admin.h"],
+    deps = [
+        "//include/envoy/server:admin_interface",
+        "//test/mocks/server:config_tracker_mocks",
+    ],
+)
+
+envoy_cc_mock(
     name = "server_mocks",
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
@@ -44,6 +63,8 @@ envoy_cc_mock(
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
+        "//test/mocks/server:admin_mocks",
+        "//test/mocks/server:config_tracker_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:upstream_mocks",

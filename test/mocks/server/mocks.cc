@@ -53,21 +53,6 @@ MockOptions::MockOptions(const std::string& config_path) : config_path_(config_p
 }
 MockOptions::~MockOptions() = default;
 
-MockConfigTracker::MockConfigTracker() {
-  ON_CALL(*this, add_(_, _))
-      .WillByDefault(Invoke([this](const std::string& key, Cb callback) -> EntryOwner* {
-        EXPECT_TRUE(config_tracker_callbacks_.find(key) == config_tracker_callbacks_.end());
-        config_tracker_callbacks_[key] = callback;
-        return new MockEntryOwner();
-      }));
-}
-MockConfigTracker::~MockConfigTracker() = default;
-
-MockAdmin::MockAdmin() {
-  ON_CALL(*this, getConfigTracker()).WillByDefault(testing::ReturnRef(config_tracker_));
-}
-MockAdmin::~MockAdmin() = default;
-
 MockAdminStream::MockAdminStream() = default;
 MockAdminStream::~MockAdminStream() = default;
 
