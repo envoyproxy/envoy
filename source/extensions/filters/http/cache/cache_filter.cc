@@ -2,7 +2,7 @@
 
 #include "common/http/headers.h"
 
-#include "extensions/filters/http/cache/cache_filter_utils.h"
+#include "extensions/filters/http/cache/cacheability_utils.h"
 
 #include "absl/strings/string_view.h"
 
@@ -37,7 +37,7 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
         *decoder_callbacks_, headers);
     return Http::FilterHeadersStatus::Continue;
   }
-  if (!CacheFilterUtils::isCacheableRequest(headers)) {
+  if (!CacheabilityUtils::isCacheableRequest(headers)) {
     ENVOY_STREAM_LOG(debug, "CacheFilter::decodeHeaders ignoring uncacheable request: {}",
                      *decoder_callbacks_, headers);
     return Http::FilterHeadersStatus::Continue;
@@ -63,7 +63,7 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
 Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                      bool end_stream) {
-  if (lookup_ && CacheFilterUtils::isCacheableResponse(headers)) {
+  if (lookup_ && CacheabilityUtils::isCacheableResponse(headers)) {
     ENVOY_STREAM_LOG(debug, "CacheFilter::encodeHeaders inserting headers", *encoder_callbacks_);
     insert_ = cache_.makeInsertContext(std::move(lookup_));
     insert_->insertHeaders(headers, end_stream);

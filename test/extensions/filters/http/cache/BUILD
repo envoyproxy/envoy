@@ -47,11 +47,11 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
-    name = "cache_filter_utils_test",
-    srcs = ["cache_filter_utils_test.cc"],
+    name = "cacheability_utils_test",
+    srcs = ["cacheability_utils_test.cc"],
     extension_name = "envoy.filters.http.cache",
     deps = [
-        "//source/extensions/filters/http/cache:cache_filter_utils_lib",
+        "//source/extensions/filters/http/cache:cacheability_utils_lib",
         "//test/test_common:utility_lib",
     ],
 )

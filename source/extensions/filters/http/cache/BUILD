@@ -17,8 +17,8 @@ envoy_cc_library(
     srcs = ["cache_filter.cc"],
     hdrs = ["cache_filter.h"],
     deps = [
-        ":cache_filter_utils_lib",
         ":cache_headers_utils_lib",
+        ":cacheability_utils_lib",
         ":http_cache_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:macros",
@@ -30,9 +30,9 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "cache_filter_utils_lib",
-    srcs = ["cache_filter_utils.cc"],
-    hdrs = ["cache_filter_utils.h"],
+    name = "cacheability_utils_lib",
+    srcs = ["cacheability_utils.cc"],
+    hdrs = ["cacheability_utils.h"],
     deps = [
         "//source/common/common:utility_lib",
         "//source/common/http:headers_lib",

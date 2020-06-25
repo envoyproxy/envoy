@@ -7,7 +7,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
-class CacheFilterUtils {
+class CacheabilityUtils {
 public:
   // Checks if a request can be served from cache,
   // this does not depend on cache-control headers as

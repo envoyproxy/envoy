@@ -1,4 +1,4 @@
-#include "extensions/filters/http/cache/cache_filter_utils.h"
+#include "extensions/filters/http/cache/cacheability_utils.h"
 
 #include "common/common/utility.h"
 
@@ -7,7 +7,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
-bool CacheFilterUtils::isCacheableRequest(const Http::RequestHeaderMap& headers) {
+bool CacheabilityUtils::isCacheableRequest(const Http::RequestHeaderMap& headers) {
   const absl::string_view method = headers.getMethodValue();
   const absl::string_view forwarded_proto = headers.getForwardedProtoValue();
   const Http::HeaderValues& header_values = Http::Headers::get();
@@ -19,7 +19,7 @@ bool CacheFilterUtils::isCacheableRequest(const Http::RequestHeaderMap& headers)
           forwarded_proto == header_values.SchemeValues.Https);
 }
 
-bool CacheFilterUtils::isCacheableResponse(const Http::ResponseHeaderMap& headers) {
+bool CacheabilityUtils::isCacheableResponse(const Http::ResponseHeaderMap& headers) {
   const absl::string_view cache_control = headers.getCacheControlValue();
   // TODO(toddmgreer): fully check for cacheability. See for example
   // https://github.com/apache/incubator-pagespeed-mod/blob/master/pagespeed/kernel/http/caching_headers.h.
