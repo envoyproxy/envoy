@@ -103,9 +103,6 @@ InstanceImpl::ThreadLocalPool::~ThreadLocalPool() {
   if (host_set_member_update_cb_handle_ != nullptr) {
     host_set_member_update_cb_handle_->remove();
   }
-  if (drain_timer_) {
-    drain_timer_->disableTimer();
-  }
   while (!pending_requests_.empty()) {
     pending_requests_.pop_front();
   }

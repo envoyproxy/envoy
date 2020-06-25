@@ -151,6 +151,7 @@ RedisCluster::DnsDiscoveryResolveTarget::~DnsDiscoveryResolveTarget() {
   if (active_query_) {
     active_query_->cancel();
   }
+  // Disable timer for mock tests.
   if (resolve_timer_) {
     resolve_timer_->disableTimer();
   }
