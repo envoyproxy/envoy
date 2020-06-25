@@ -110,6 +110,10 @@ message AggregatedConfigSource {
 // specify that other data can be obtained from the same server.
 message SelfConfigSource {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.SelfConfigSource";
+
+  // API version for xDS transport protocol. This describes the xDS gRPC/REST
+  // endpoint and version of [Delta]DiscoveryRequest/Response used on the wire.
+  ApiVersion transport_api_version = 1 [(validate.rules).enum = {defined_only: true}];
 }
 
 // Rate Limit settings to be applied for discovery requests made by Envoy.
