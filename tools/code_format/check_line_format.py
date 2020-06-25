@@ -17,7 +17,7 @@ NON_TYPE_ALIAS_ALLOWED_TYPES = {
 USING_TYPE_ALIAS_REGEX = re.compile("using .* = .*;")
 SMART_PTR_REGEX = re.compile("std::(unique_ptr|shared_ptr)<(.*?)>(?!;)")
 OPTIONAL_REF_REGEX = re.compile("absl::optional<std::reference_wrapper<(.*?)>>(?!;)")
-NON_TYPE_ALIAS_ALLOWED_TYPE_REGEX = re.compile(fr"({'|'.join(NON_TYPE_ALIAS_ALLOWED_TYPES)})")
+NON_TYPE_ALIAS_ALLOWED_TYPE_REGEX = re.compile(f"({'|'.join(NON_TYPE_ALIAS_ALLOWED_TYPES)})")
 
 
 def whitelistedForNonTypeAlias(name):
