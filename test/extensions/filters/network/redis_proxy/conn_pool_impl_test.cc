@@ -84,6 +84,7 @@ public:
                                                       read_policy_),
         api_, std::move(store), redis_command_stats, cluster_refresh_manager_);
     // Set the authentication password for this connection pool.
+    conn_pool_impl->tls_->getTyped<InstanceImpl::ThreadLocalPool>().auth_username_ = auth_username_;
     conn_pool_impl->tls_->getTyped<InstanceImpl::ThreadLocalPool>().auth_password_ = auth_password_;
     conn_pool_ = std::move(conn_pool_impl);
     test_address_ = Network::Utility::resolveUrl("tcp://127.0.0.1:3000");
@@ -199,7 +200,9 @@ public:
   Common::Redis::Client::ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher&,
                                           const Common::Redis::Client::Config&,
                                           const Common::Redis::RedisCommandStatsSharedPtr&,
-                                          Stats::Scope&, const std::string& password) override {
+                                          Stats::Scope&, const std::string& username,
+                                          const std::string& password) override {
+    EXPECT_EQ(auth_username_, username);
     EXPECT_EQ(auth_password_, password);
     return Common::Redis::Client::ClientPtr{create_(host)};
   }
@@ -273,6 +276,7 @@ public:
   Upstream::ClusterUpdateCallbacks* update_callbacks_{};
   Common::Redis::Client::MockClient* client_{};
   Network::Address::InstanceConstSharedPtr test_address_;
+  std::string auth_username_;
   std::string auth_password_;
   NiceMock<Api::MockApi> api_;
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::ReadPolicy

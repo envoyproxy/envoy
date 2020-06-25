@@ -365,16 +365,16 @@ bool IoSocketHandleImpl::supportsMmsg() const {
   return Api::OsSysCallsSingleton::get().supportsMmsg();
 }
 
-Api::SysCallIntResult IoSocketHandleImpl::bind(const sockaddr* address, socklen_t addrlen) {
-  return Api::OsSysCallsSingleton::get().bind(fd_, address, addrlen);
+Api::SysCallIntResult IoSocketHandleImpl::bind(Address::InstanceConstSharedPtr address) {
+  return Api::OsSysCallsSingleton::get().bind(fd_, address->sockAddr(), address->sockAddrLen());
 }
 
 Api::SysCallIntResult IoSocketHandleImpl::listen(int backlog) {
   return Api::OsSysCallsSingleton::get().listen(fd_, backlog);
 }
 
-Api::SysCallIntResult IoSocketHandleImpl::connect(const sockaddr* address, socklen_t addrlen) {
-  return Api::OsSysCallsSingleton::get().connect(fd_, address, addrlen);
+Api::SysCallIntResult IoSocketHandleImpl::connect(Address::InstanceConstSharedPtr address) {
+  return Api::OsSysCallsSingleton::get().connect(fd_, address->sockAddr(), address->sockAddrLen());
 }
 
 Api::SysCallIntResult IoSocketHandleImpl::setOption(int level, int optname, const void* optval,
