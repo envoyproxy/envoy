@@ -68,10 +68,10 @@ message Config {
       // case, a non-empty value must be provided otherwise no metadata is added.
       string value = 3;
 
-      // If present, the header's value will be matched and substituted with this. If there is no match, no metadata is added.
+      // If present, the header's value will be matched and substituted with this. If there is no match or substitution, the header value
+      // is used as-is.
       //
-      // This is only used for :ref:`on_header_present <envoy_v3_api_field_extensions.filters.http.header_to_metadata.v3.Config.Rule.on_header_present>`,
-      // where substitutions will be applied if a match with the header's value happened.
+      // This is only used for :ref:`on_header_present <envoy_v3_api_field_extensions.filters.http.header_to_metadata.v3.Config.Rule.on_header_present>`.
       //
       // Note: if the `value` field is non-empty this field should be empty.
       type.matcher.v4alpha.RegexMatchAndSubstitute regex_value_rewrite = 6;

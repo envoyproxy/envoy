@@ -195,12 +195,7 @@ void HeaderToMetadataFilter::writeHeaderToMetadata(Http::HeaderMap& headers,
         const auto& matcher = rule.regexRewrite();
         if (matcher != nullptr) {
           rewritten_value = matcher->replaceAll(value, rule.regexSubstitution());
-          // If there was no replacement, don't add the metadata.
-          if (rewritten_value == value) {
-            value = "";
-          } else {
-            value = rewritten_value;
-          }
+          value = rewritten_value;
         }
       }
 

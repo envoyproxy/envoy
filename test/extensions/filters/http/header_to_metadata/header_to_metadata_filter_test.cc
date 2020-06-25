@@ -504,18 +504,20 @@ request_rules:
   // No match.
   {
     Http::TestRequestHeaderMapImpl headers{{":path", "/foo"}};
+    std::map<std::string, std::string> expected = {{"cluster", "/foo"}};
 
     EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
-    EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
+    EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
   }
 
   // No match with additional path elements.
   {
     Http::TestRequestHeaderMapImpl headers{{":path", "/foo/bar?x=2"}};
+    std::map<std::string, std::string> expected = {{"cluster", "/foo/bar?x=2"}};
 
     EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
-    EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
+    EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
   }
 }
