@@ -36,7 +36,7 @@ def runCheckLineFormat(line):
   command = f"{check_line_format} \"{line}\""
   status, stdout, stderr = runCommand(command)
   return (command, status, stdout + stderr)
-    
+
 
 def getInputFile(filename, extra_input_files=None):
   files_to_copy = [filename]
@@ -119,6 +119,7 @@ def expectLineError(line, status, stdout, expected_error):
   emitStdoutAsError(stdout)
   return 1
 
+
 def fixFileExpectingFailure(filename, expected_substring):
   command, infile, outfile, status, stdout = fixFileHelper(filename)
   return expectError(filename, status, stdout, expected_substring)
@@ -163,9 +164,9 @@ def checkUnfixableError(filename, expected_substring):
   return errors
 
 
-
 def checkUnfixableLineError(line, expected_error):
   return checkLineExpectingError(line, expected_error)
+
 
 def checkFileExpectingOK(filename):
   command, status, stdout = runCheckFormat("check", getInputFile(filename))
@@ -311,24 +312,22 @@ def runChecks():
   errors += checkFileExpectingOK("clang_format_off.cc")
 
   errors += checkUnfixableLineError(
-      "std::unique_ptr<Network::Connection> a() { return nullptr; }", 
+      "std::unique_ptr<Network::Connection> a() { return nullptr; }",
       "Use type alias for 'Network::Connection' instead. See STYLE.md")
   errors += checkUnfixableLineError(
       ("absl::optional<std::reference_wrapper<ConnectionHandlerImpl::ActiveTcpListener>> a() {"
-      "    return nullptr;"
-      "}"), 
-      "Use type alias for 'ConnectionHandlerImpl::ActiveTcpListener' instead. See STYLE.md")
+       "    return nullptr;"
+       "}"), "Use type alias for 'ConnectionHandlerImpl::ActiveTcpListener' instead. See STYLE.md")
 
   errors += checkLineExpectingOK(
       ("using ConnectionPtr = std::unique_ptr<Connection>;"
-
-      "class A {"
-      "using ConnectionSharedPtr = std::shared_ptr<Connection>;"
-      "using ConnectionOptRef = absl::optional<std::reference_wrapper<Connection>>;"
-      "};"))
+       "class A {"
+       "using ConnectionSharedPtr = std::shared_ptr<Connection>;"
+       "using ConnectionOptRef = absl::optional<std::reference_wrapper<Connection>>;"
+       "};"))
   errors += checkLineExpectingOK(("void a(std::unique_ptr<int>, std::shared_ptr<std::string>,"
-       "absl::optional<std::reference_wrapper<char[]>>,"
-       "absl::optional<std::reference_wrapper<std::vector<int>>>) {}"))
+                                  "absl::optional<std::reference_wrapper<char[]>>,"
+                                  "absl::optional<std::reference_wrapper<std::vector<int>>>) {}"))
 
   return errors
 

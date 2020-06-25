@@ -5,13 +5,13 @@ import re
 import sys
 
 NON_TYPE_ALIAS_ALLOWED_TYPES = {
-  "^(?![A-Z].*).*$",
-  "^(.*::){,1}(StrictMock<|NiceMock<).*$",
-  "^(.*::){,1}(Test|Mock|Fake).*$",
-  "^Protobuf.*::.*$",
-  "^[A-Z]$",
-  "^.*, .*",
-  r"^.*\[\]$",
+    "^(?![A-Z].*).*$",
+    "^(.*::){,1}(StrictMock<|NiceMock<).*$",
+    "^(.*::){,1}(Test|Mock|Fake).*$",
+    "^Protobuf.*::.*$",
+    "^[A-Z]$",
+    "^.*, .*",
+    r"^.*\[\]$",
 }
 
 USING_TYPE_ALIAS_REGEX = re.compile("using .* = .*;")
@@ -45,12 +45,12 @@ def checkFormat(line):
   error_messages = []
 
   def reportError(message):
-      error_messages.append(f"'{line}': {message}")
+    error_messages.append(f"'{line}': {message}")
 
   checkSourceLine(line, reportError)
 
   return error_messages
-  
+
 
 def checkErrors(errors):
   if errors:
@@ -63,11 +63,8 @@ def checkErrors(errors):
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description="Check line format.")
-  parser.add_argument(
-      "target_line",
-      type=str,
-      help="specify the line to check the format of")
-  
+  parser.add_argument("target_line", type=str, help="specify the line to check the format of")
+
   args = parser.parse_args()
 
   target_line = args.target_line
