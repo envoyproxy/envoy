@@ -258,6 +258,11 @@ public:
   MOCK_METHOD(FilterMetadataStatus, decodeMetadata, (Http::MetadataMap & metadata_map));
   MOCK_METHOD(void, setDecoderFilterCallbacks, (StreamDecoderFilterCallbacks & callbacks));
   MOCK_METHOD(void, decodeComplete, ());
+  MOCK_METHOD(void, sendLocalReply,
+              (bool is_grpc_request, Code code, absl::string_view body,
+               const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
+               bool is_head_request, const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+               absl::string_view details));
 
   Http::StreamDecoderFilterCallbacks* callbacks_{};
 };

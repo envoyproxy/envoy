@@ -1107,6 +1107,7 @@ typedef
 typeid
 typesafe
 ucontext
+udpa
 uint
 un-
 unacked
@@ -1158,8 +1159,6 @@ vptr
 wakeup
 wakeups
 websocket
-whitelist
-whitelisted
 whitespace
 whitespaces
 wildcard
