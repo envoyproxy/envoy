@@ -242,6 +242,7 @@ protected:
                  HeaderKeyFormatterPtr&& header_key_formatter, bool enable_trailers);
 
   bool resetStreamCalled() { return reset_stream_called_; }
+  void onMessageBeginBase();
 
   Network::Connection& connection_;
   CodecStats& stats_;
@@ -320,7 +321,6 @@ private:
    * Called when a request/response is beginning. A base routine happens first then a virtual
    * dispatch is invoked.
    */
-  void onMessageBeginBase();
   virtual void onMessageBegin() PURE;
 
   /**
@@ -494,6 +494,8 @@ private:
       headers_or_trailers_.emplace<RequestTrailerMapPtr>(RequestTrailerMapImpl::create());
     }
   }
+
+  void sendProtocolErrorOld(absl::string_view details);
 
   void releaseOutboundResponse(const Buffer::OwnedBufferFragmentImpl* fragment);
   void maybeAddSentinelBufferFragment(Buffer::WatermarkBuffer& output_buffer) override;
