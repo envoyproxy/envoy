@@ -87,13 +87,14 @@ bool LookupRequest::requiresValidation(const Http::ResponseHeaderMap& response_h
   }
 
   ASSERT((response_headers.Date() && response_cache_control.max_age.has_value()) ||
-             response_headers.Expires(),
+             response_headers.get(Http::Headers::get().Expires),
          "Cache entry does not have valid expiration data.");
 
-  SystemTime expiration_time = response_cache_control.max_age.has_value()
-                                   ? CacheHeadersUtils::httpTime(response_headers.Date()) +
-                                         response_cache_control.max_age.value()
-                                   : CacheHeadersUtils::httpTime(response_headers.Expires());
+  SystemTime expiration_time =
+      response_cache_control.max_age.has_value()
+          ? CacheHeadersUtils::httpTime(response_headers.Date()) +
+                response_cache_control.max_age.value()
+          : CacheHeadersUtils::httpTime(response_headers.get(Http::Headers::get().Expires));
 
   if (timestamp_ > expiration_time) {
     // Response is stale, return false unless max-stale value is higher than overdue expiration
