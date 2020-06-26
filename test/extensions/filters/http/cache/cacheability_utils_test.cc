@@ -73,56 +73,47 @@ TEST_F(IsCacheableRequestTest, AuthorizationHeader) {
 }
 
 TEST_F(IsCacheableResponseTest, CacheableResponse) {
-  EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(cacheable_response_headers, {}));
+  EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(cacheable_response_headers));
 }
 
 TEST_F(IsCacheableResponseTest, UncacheableStatusCode) {
   Http::TestResponseHeaderMapImpl response_headers = cacheable_response_headers;
-  EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers, {}));
+  EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers));
   response_headers.setStatus("700");
-  EXPECT_FALSE(CacheabilityUtils::isCacheableResponse(response_headers, {}));
+  EXPECT_FALSE(CacheabilityUtils::isCacheableResponse(response_headers));
   response_headers.removeStatus();
-  EXPECT_FALSE(CacheabilityUtils::isCacheableResponse(response_headers, {}));
+  EXPECT_FALSE(CacheabilityUtils::isCacheableResponse(response_headers));
 }
 
 TEST_F(IsCacheableResponseTest, ValidationData) {
   Http::TestResponseHeaderMapImpl response_headers = cacheable_response_headers;
-  EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers, {}));
+  EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers));
   response_headers.setCacheControl("s-maxage=1000");
-  EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers, {}));
+  EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers));
   response_headers.setCacheControl("public, no-transform");
-  EXPECT_FALSE(CacheabilityUtils::isCacheableResponse(response_headers, {}));
+  EXPECT_FALSE(CacheabilityUtils::isCacheableResponse(response_headers));
   response_headers.removeCacheControl();
-  EXPECT_FALSE(CacheabilityUtils::isCacheableResponse(response_headers, {}));
+  EXPECT_FALSE(CacheabilityUtils::isCacheableResponse(response_headers));
   response_headers.setCopy(Http::Headers::get().Expires, "Sun, 06 Nov 1994 09:49:37 GMT");
-  EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers, {}));
+  EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers));
 }
 
 TEST_F(IsCacheableResponseTest, ResponseNoStore) {
   Http::TestResponseHeaderMapImpl response_headers = cacheable_response_headers;
-  EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers, {}));
+  EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers));
   absl::string_view cache_control = response_headers.getCacheControlValue();
   cache_control = absl::StrCat(cache_control, ", no-store");
   response_headers.setCacheControl(cache_control);
-  EXPECT_FALSE(CacheabilityUtils::isCacheableResponse(response_headers, {}));
+  EXPECT_FALSE(CacheabilityUtils::isCacheableResponse(response_headers));
 }
 
 TEST_F(IsCacheableResponseTest, ResponsePrivate) {
   Http::TestResponseHeaderMapImpl response_headers = cacheable_response_headers;
-  EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers, {}));
+  EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers));
   absl::string_view cache_control = response_headers.getCacheControlValue();
   cache_control = absl::StrCat(cache_control, ", private");
   response_headers.setCacheControl(cache_control);
-  EXPECT_FALSE(CacheabilityUtils::isCacheableResponse(response_headers, {}));
-}
-
-TEST_F(IsCacheableResponseTest, RequestNoStore) {
-  RequestCacheControl request_cache_control = {};
-  EXPECT_TRUE(
-      CacheabilityUtils::isCacheableResponse(cacheable_response_headers, request_cache_control));
-  request_cache_control.no_store = true;
-  EXPECT_FALSE(
-      CacheabilityUtils::isCacheableResponse(cacheable_response_headers, request_cache_control));
+  EXPECT_FALSE(CacheabilityUtils::isCacheableResponse(response_headers));
 }
 
 } // namespace

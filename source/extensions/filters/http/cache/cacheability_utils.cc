@@ -19,8 +19,7 @@ bool CacheabilityUtils::isCacheableRequest(const Http::RequestHeaderMap& headers
           forwarded_proto == header_values.SchemeValues.Https);
 }
 
-bool CacheabilityUtils::isCacheableResponse(const Http::ResponseHeaderMap& headers,
-                                            const RequestCacheControl& request_cache_control) {
+bool CacheabilityUtils::isCacheableResponse(const Http::ResponseHeaderMap& headers) {
   // As defined by:
   // https://tools.ietf.org/html/rfc7231#section-6.1,
   // https://tools.ietf.org/html/rfc7538#section-3,
@@ -31,7 +30,6 @@ bool CacheabilityUtils::isCacheableResponse(const Http::ResponseHeaderMap& heade
 
   ResponseCacheControl response_cache_control =
       CacheHeadersUtils::responseCacheControl(headers.getCacheControlValue());
-  bool no_store = response_cache_control.no_store || request_cache_control.no_store;
   bool cacheable_status = cacheable_status_codes_.contains(headers.getStatusValue());
 
   // Only cache responses with explicit validation data, either:
@@ -41,7 +39,7 @@ bool CacheabilityUtils::isCacheableResponse(const Http::ResponseHeaderMap& heade
   bool has_validation_data = (headers.Date() && response_cache_control.max_age.has_value()) ||
                              headers.get(Http::Headers::get().Expires);
 
-  return !no_store && cacheable_status && has_validation_data;
+  return !response_cache_control.no_store && cacheable_status && has_validation_data;
 }
 
 } // namespace Cache

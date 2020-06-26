@@ -22,8 +22,7 @@ public:
   // then its response is also not cacheable
   // Therefore, 'isCacheableRequest' & 'isCacheableResponse' together
   // should cover https://httpwg.org/specs/rfc7234.html#response.cacheability
-  static bool isCacheableResponse(const Http::ResponseHeaderMap& headers,
-                                  const RequestCacheControl& request_cache_control);
+  static bool isCacheableResponse(const Http::ResponseHeaderMap& headers);
 };
 } // namespace Cache
 } // namespace HttpFilters
