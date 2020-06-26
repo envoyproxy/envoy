@@ -39,7 +39,7 @@ private:
   // Latched "envoy.reloadable_features.activate_fds_next_event_loop" runtime feature. If true, fd
   // events scheduled via activate are evaluated in the next iteration of the event loop after
   // polling and activating new fd events.
-  bool activate_fd_events_next_event_loop_;
+  const bool activate_fd_events_next_event_loop_;
 };
 
 } // namespace Event

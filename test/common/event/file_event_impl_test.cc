@@ -53,7 +53,7 @@ public:
   FileEventImplActivateTest() : os_sys_calls_(Api::OsSysCallsSingleton::get()) {
     Runtime::LoaderSingleton::getExisting()->mergeValues(
         {{"envoy.reloadable_features.activate_fds_next_event_loop",
-          activate_fds_next_event_loop() ? "true" : "false"}});
+          activateFdsNextEventLoop() ? "true" : "false"}});
   }
 
   static void onWatcherReady(evwatch*, const evwatch_prepare_cb_info*, void* arg) {
@@ -65,7 +65,7 @@ public:
   int domain() {
     return std::get<0>(GetParam()) == Network::Address::IpVersion::v4 ? AF_INET : AF_INET6;
   }
-  bool activate_fds_next_event_loop() { return std::get<1>(GetParam()); }
+  bool activateFdsNextEventLoop() { return std::get<1>(GetParam()); }
 
 protected:
   Api::OsSysCalls& os_sys_calls_;
