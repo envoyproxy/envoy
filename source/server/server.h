@@ -117,8 +117,8 @@ public:
    * Load a bootstrap config and perform validation.
    * @param bootstrap supplies the bootstrap to fill.
    * @param options supplies the server options.
-   * @param api reference to the Api object
    * @param validation_visitor message validation visitor instance.
+   * @param api reference to the Api object
    */
   static void loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                                   const Options& options,
@@ -171,19 +171,20 @@ public:
   Api::Api& api() override { return server_.api(); }
   Grpc::Context& grpcContext() override { return server_.grpcContext(); }
   Envoy::Server::DrainManager& drainManager() override { return server_.drainManager(); }
+  ServerLifecycleNotifier& lifecycleNotifier() override { return server_.lifecycleNotifier(); }
 
   // Configuration::TransportSocketFactoryContext
   Ssl::ContextManager& sslContextManager() override { return server_.sslContextManager(); }
   Secret::SecretManager& secretManager() override { return server_.secretManager(); }
   Stats::Store& stats() override { return server_.stats(); }
-  Init::Manager* initManager() override { return &server_.initManager(); }
+  Init::Manager& initManager() override { return server_.initManager(); }
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
     // Server has two message validation visitors, one for static and
     // other for dynamic configuration. Choose the dynamic validation
     // visitor if server's init manager indicates that the server is
     // in the Initialized state, as this state is engaged right after
     // the static configuration (e.g., bootstrap) has been completed.
-    return initManager()->state() == Init::Manager::State::Initialized
+    return initManager().state() == Init::Manager::State::Initialized
                ? server_.messageValidationContext().dynamicValidationVisitor()
                : server_.messageValidationContext().staticValidationVisitor();
   }

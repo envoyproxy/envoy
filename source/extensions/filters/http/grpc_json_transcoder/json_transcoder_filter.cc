@@ -567,27 +567,23 @@ void JsonTranscoderFilter::doTrailers(Http::ResponseHeaderOrTrailerMap& headers_
     return;
   }
 
-  if (method_->response_type_is_http_body_ && method_->descriptor_->server_streaming()) {
-    // Do not add empty json when HttpBody + streaming
-    // Also, headers already sent, just continue.
-    return;
-  }
-
-  Buffer::OwnedImpl data;
-  readToBuffer(*transcoder_->ResponseOutput(), data);
-
-  if (data.length()) {
-    encoder_callbacks_->addEncodedData(data, true);
-  }
-
-  if (method_->descriptor_->server_streaming()) {
-    // For streaming case, the headers are already sent, so just continue here.
-    return;
+  if (!method_->response_type_is_http_body_) {
+    Buffer::OwnedImpl data;
+    readToBuffer(*transcoder_->ResponseOutput(), data);
+    if (data.length()) {
+      encoder_callbacks_->addEncodedData(data, true);
+    }
   }
 
   // If there was no previous headers frame, this |trailers| map is our |response_headers_|,
   // so there is no need to copy headers from one to the other.
-  bool is_trailers_only_response = response_headers_ == &headers_or_trailers;
+  const bool is_trailers_only_response = response_headers_ == &headers_or_trailers;
+  const bool is_server_streaming = method_->descriptor_->server_streaming();
+
+  if (is_server_streaming && !is_trailers_only_response) {
+    // Continue if headers were sent already.
+    return;
+  }
 
   if (!grpc_status || grpc_status.value() == Grpc::Status::WellKnownGrpcStatus::InvalidCode) {
     response_headers_->setStatus(enumToInt(Http::Code::ServiceUnavailable));
@@ -611,8 +607,11 @@ void JsonTranscoderFilter::doTrailers(Http::ResponseHeaderOrTrailerMap& headers_
     response_headers_->remove(trailerHeader());
   }
 
-  response_headers_->setContentLength(
-      encoder_callbacks_->encodingBuffer() ? encoder_callbacks_->encodingBuffer()->length() : 0);
+  if (!method_->descriptor_->server_streaming()) {
+    // Set content-length for non-streaming responses.
+    response_headers_->setContentLength(
+        encoder_callbacks_->encodingBuffer() ? encoder_callbacks_->encodingBuffer()->length() : 0);
+  }
 }
 
 void JsonTranscoderFilter::setEncoderFilterCallbacks(
@@ -720,7 +719,10 @@ bool JsonTranscoderFilter::maybeConvertGrpcStatus(Grpc::Status::GrpcStatus grpc_
     return false;
   }
 
-  auto status_details = Grpc::Common::getGrpcStatusDetailsBin(trailers);
+  // TODO(mattklein123): The dynamic cast here is needed because ResponseHeaderOrTrailerMap is not
+  // a header map. This can likely be cleaned up.
+  auto status_details =
+      Grpc::Common::getGrpcStatusDetailsBin(dynamic_cast<Http::HeaderMap&>(trailers));
   if (!status_details) {
     // If no rpc.Status object was sent in the grpc-status-details-bin header,
     // construct it from the grpc-status and grpc-message headers.

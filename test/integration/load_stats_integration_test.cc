@@ -17,10 +17,10 @@
 namespace Envoy {
 namespace {
 
-class LoadStatsIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+class LoadStatsIntegrationTest : public Grpc::VersionedGrpcClientIntegrationParamTest,
                                  public HttpIntegrationTest {
 public:
-  LoadStatsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {
+  LoadStatsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {
     // We rely on some fairly specific load balancing picks in this test, so
     // determinize the schedule.
     setDeterministic();
@@ -112,6 +112,7 @@ public:
       auto* loadstats_config = bootstrap.mutable_cluster_manager()->mutable_load_stats_config();
       loadstats_config->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
       loadstats_config->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("load_report");
+      loadstats_config->set_transport_api_version(apiVersion());
       auto* load_report_cluster = bootstrap.mutable_static_resources()->add_clusters();
       load_report_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       load_report_cluster->mutable_circuit_breakers()->Clear();
@@ -282,8 +283,10 @@ public:
       mergeLoadStats(loadstats_request, local_loadstats_request);
 
       EXPECT_EQ("POST", loadstats_stream_->headers().getMethodValue());
-      EXPECT_EQ("/envoy.service.load_stats.v2.LoadReportingService/StreamLoadStats",
-                loadstats_stream_->headers().getPathValue());
+      EXPECT_EQ(
+          TestUtility::getVersionedMethodPath("envoy.service.load_stats.{}.LoadReportingService",
+                                              "StreamLoadStats", apiVersion()),
+          loadstats_stream_->headers().getPathValue());
       EXPECT_EQ("application/grpc", loadstats_stream_->headers().getContentTypeValue());
     } while (!TestUtility::assertRepeatedPtrFieldEqual(expected_cluster_stats,
                                                        loadstats_request.cluster_stats(), true));
@@ -376,9 +379,8 @@ public:
   const uint32_t load_report_interval_ms_ = 500;
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, LoadStatsIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, LoadStatsIntegrationTest,
+                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Validate the load reports for successful requests as cluster membership
 // changes.

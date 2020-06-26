@@ -390,6 +390,130 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect(true));
 }
 
+TEST_P(TcpProxyIntegrationTest, TestNoCloseOnHealthFailure) {
+  concurrency_ = 2;
+
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* static_resources = bootstrap.mutable_static_resources();
+    for (int i = 0; i < static_resources->clusters_size(); ++i) {
+      auto* cluster = static_resources->mutable_clusters(i);
+      cluster->set_close_connections_on_host_health_failure(false);
+      cluster->mutable_common_lb_config()->mutable_healthy_panic_threshold()->set_value(0);
+      cluster->add_health_checks()->mutable_timeout()->set_seconds(20);
+      cluster->mutable_health_checks(0)->mutable_reuse_connection()->set_value(true);
+      cluster->mutable_health_checks(0)->mutable_interval()->set_seconds(1);
+      cluster->mutable_health_checks(0)->mutable_no_traffic_interval()->set_seconds(1);
+      cluster->mutable_health_checks(0)->mutable_unhealthy_threshold()->set_value(1);
+      cluster->mutable_health_checks(0)->mutable_healthy_threshold()->set_value(1);
+      cluster->mutable_health_checks(0)->mutable_tcp_health_check();
+      cluster->mutable_health_checks(0)->mutable_tcp_health_check()->mutable_send()->set_text(
+          "50696E67");
+      cluster->mutable_health_checks(0)->mutable_tcp_health_check()->add_receive()->set_text(
+          "506F6E67");
+    }
+  });
+
+  FakeRawConnectionPtr fake_upstream_health_connection;
+  on_server_init_function_ = [&](void) -> void {
+    ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_health_connection));
+    ASSERT_TRUE(fake_upstream_health_connection->waitForData(
+        FakeRawConnection::waitForInexactMatch("Ping")));
+    ASSERT_TRUE(fake_upstream_health_connection->write("Pong"));
+  };
+
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  tcp_client->write("hello");
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+  ASSERT_TRUE(fake_upstream_connection->write("world"));
+  tcp_client->waitForData("world");
+  tcp_client->write("hello");
+  ASSERT_TRUE(fake_upstream_connection->waitForData(10));
+
+  ASSERT_TRUE(fake_upstream_health_connection->waitForData(8));
+  ASSERT_TRUE(fake_upstream_health_connection->close());
+  ASSERT_TRUE(fake_upstream_health_connection->waitForDisconnect(true));
+
+  // By waiting we know the previous health check attempt completed (with a failure since we closed
+  // the connection on it)
+  FakeRawConnectionPtr fake_upstream_health_connection_reconnect;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_health_connection_reconnect));
+  ASSERT_TRUE(fake_upstream_health_connection_reconnect->waitForData(
+      FakeRawConnection::waitForInexactMatch("Ping")));
+
+  tcp_client->write("still");
+  ASSERT_TRUE(fake_upstream_connection->waitForData(15));
+  ASSERT_TRUE(fake_upstream_connection->write("here"));
+  tcp_client->waitForData("here", false);
+
+  test_server_.reset();
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
+  ASSERT_TRUE(fake_upstream_connection->close());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect(true));
+  ASSERT_TRUE(fake_upstream_health_connection_reconnect->waitForHalfClose());
+  ASSERT_TRUE(fake_upstream_health_connection_reconnect->close());
+  ASSERT_TRUE(fake_upstream_health_connection_reconnect->waitForDisconnect(true));
+  tcp_client->waitForHalfClose();
+  tcp_client->close();
+}
+
+TEST_P(TcpProxyIntegrationTest, TestCloseOnHealthFailure) {
+  concurrency_ = 2;
+
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* static_resources = bootstrap.mutable_static_resources();
+    for (int i = 0; i < static_resources->clusters_size(); ++i) {
+      auto* cluster = static_resources->mutable_clusters(i);
+      cluster->set_close_connections_on_host_health_failure(true);
+      cluster->mutable_common_lb_config()->mutable_healthy_panic_threshold()->set_value(0);
+      cluster->add_health_checks()->mutable_timeout()->set_seconds(20);
+      cluster->mutable_health_checks(0)->mutable_reuse_connection()->set_value(true);
+      cluster->mutable_health_checks(0)->mutable_interval()->set_seconds(1);
+      cluster->mutable_health_checks(0)->mutable_no_traffic_interval()->set_seconds(1);
+      cluster->mutable_health_checks(0)->mutable_unhealthy_threshold()->set_value(1);
+      cluster->mutable_health_checks(0)->mutable_healthy_threshold()->set_value(1);
+      cluster->mutable_health_checks(0)->mutable_tcp_health_check();
+      cluster->mutable_health_checks(0)->mutable_tcp_health_check()->mutable_send()->set_text(
+          "50696E67");
+      ;
+      cluster->mutable_health_checks(0)->mutable_tcp_health_check()->add_receive()->set_text(
+          "506F6E67");
+    }
+  });
+
+  FakeRawConnectionPtr fake_upstream_health_connection;
+  on_server_init_function_ = [&](void) -> void {
+    ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_health_connection));
+    ASSERT_TRUE(fake_upstream_health_connection->waitForData(4));
+    ASSERT_TRUE(fake_upstream_health_connection->write("Pong"));
+  };
+
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  tcp_client->write("hello");
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+  ASSERT_TRUE(fake_upstream_connection->write("world"));
+  tcp_client->waitForData("world");
+  tcp_client->write("hello");
+  ASSERT_TRUE(fake_upstream_connection->waitForData(10));
+
+  ASSERT_TRUE(fake_upstream_health_connection->waitForData(8));
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+  ASSERT_TRUE(fake_upstream_health_connection->close());
+  ASSERT_TRUE(fake_upstream_health_connection->waitForDisconnect(true));
+
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
+  tcp_client->waitForHalfClose();
+
+  ASSERT_TRUE(fake_upstream_connection->close());
+  tcp_client->close();
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect(true));
+}
+
 class TcpProxyMetadataMatchIntegrationTest : public TcpProxyIntegrationTest {
 public:
   void initialize() override;
@@ -503,9 +627,9 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
   tcp_proxy_.set_stat_prefix("tcp_stats");
   tcp_proxy_.set_cluster("cluster_0");
   tcp_proxy_.mutable_metadata_match()->MergeFrom(
-      lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}}));
+      lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}}));
 
-  endpoint_metadata_ = lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}});
+  endpoint_metadata_ = lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}});
 
   initialize();
 
@@ -521,10 +645,13 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
   tcp_proxy_.mutable_hidden_envoy_deprecated_deprecated_v1()->add_routes()->set_cluster(
       "cluster_0");
   tcp_proxy_.mutable_metadata_match()->MergeFrom(
-      lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}}));
+      lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}}));
 
-  endpoint_metadata_ = lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}});
+  endpoint_metadata_ = lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}});
 
+  config_helper_.addRuntimeOverride("envoy.deprecated_features:envoy.extensions.filters.network."
+                                    "tcp_proxy.v3.TcpProxy.hidden_envoy_deprecated_deprecated_v1",
+                                    "true");
   initialize();
 
   expectEndpointToMatchRoute();
@@ -538,9 +665,9 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest, EndpointShouldMatchWeightedClusterW
   cluster_0->set_name("cluster_0");
   cluster_0->set_weight(1);
   cluster_0->mutable_metadata_match()->MergeFrom(
-      lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}}));
+      lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}}));
 
-  endpoint_metadata_ = lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}});
+  endpoint_metadata_ = lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}});
 
   initialize();
 
@@ -557,9 +684,9 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
   cluster_0->set_name("cluster_0");
   cluster_0->set_weight(1);
   cluster_0->mutable_metadata_match()->MergeFrom(lbMetadata(
-      {{"role", "master"}, {"stage", "prod"}})); // should override `stage` value at top-level
+      {{"role", "primary"}, {"stage", "prod"}})); // should override `stage` value at top-level
 
-  endpoint_metadata_ = lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}});
+  endpoint_metadata_ = lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}});
 
   initialize();
 
@@ -572,12 +699,12 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
        EndpointShouldMatchWeightedClusterWithTopLevelMetadataMatch) {
   tcp_proxy_.set_stat_prefix("tcp_stats");
   tcp_proxy_.mutable_metadata_match()->MergeFrom(
-      lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}}));
+      lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}}));
   auto* cluster_0 = tcp_proxy_.mutable_weighted_clusters()->add_clusters();
   cluster_0->set_name("cluster_0");
   cluster_0->set_weight(1);
 
-  endpoint_metadata_ = lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}});
+  endpoint_metadata_ = lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}});
 
   initialize();
 
@@ -591,7 +718,7 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
   tcp_proxy_.set_stat_prefix("tcp_stats");
   tcp_proxy_.set_cluster("cluster_0");
   tcp_proxy_.mutable_metadata_match()->MergeFrom(
-      lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}}));
+      lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}}));
 
   endpoint_metadata_ = lbMetadata({{"role", "replica"}, {"version", "v1"}, {"stage", "prod"}});
 
@@ -609,10 +736,13 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
   tcp_proxy_.mutable_hidden_envoy_deprecated_deprecated_v1()->add_routes()->set_cluster(
       "cluster_0");
   tcp_proxy_.mutable_metadata_match()->MergeFrom(
-      lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}}));
+      lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}}));
 
   endpoint_metadata_ = lbMetadata({{"role", "replica"}, {"version", "v1"}, {"stage", "prod"}});
 
+  config_helper_.addRuntimeOverride("envoy.deprecated_features:envoy.extensions.filters.network."
+                                    "tcp_proxy.v3.TcpProxy.hidden_envoy_deprecated_deprecated_v1",
+                                    "true");
   initialize();
 
   expectEndpointNotToMatchRoute();
@@ -627,7 +757,7 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
   cluster_0->set_name("cluster_0");
   cluster_0->set_weight(1);
   cluster_0->mutable_metadata_match()->MergeFrom(
-      lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}}));
+      lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}}));
 
   endpoint_metadata_ = lbMetadata({{"role", "replica"}, {"version", "v1"}, {"stage", "prod"}});
 
@@ -646,9 +776,9 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
   cluster_0->set_name("cluster_0");
   cluster_0->set_weight(1);
   cluster_0->mutable_metadata_match()->MergeFrom(lbMetadata(
-      {{"role", "master"}, {"stage", "prod"}})); // should override `stage` value at top-level
+      {{"role", "primary"}, {"stage", "prod"}})); // should override `stage` value at top-level
 
-  endpoint_metadata_ = lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "dev"}});
+  endpoint_metadata_ = lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "dev"}});
 
   initialize();
 
@@ -661,7 +791,7 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
        EndpointShouldNotMatchWeightedClusterWithTopLevelMetadataMatch) {
   tcp_proxy_.set_stat_prefix("tcp_stats");
   tcp_proxy_.mutable_metadata_match()->MergeFrom(
-      lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}}));
+      lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}}));
   auto* cluster_0 = tcp_proxy_.mutable_weighted_clusters()->add_clusters();
   cluster_0->set_name("cluster_0");
   cluster_0->set_weight(1);
@@ -712,7 +842,7 @@ void TcpProxySslIntegrationTest::setupConnections() {
       dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
                                           context_->createTransportSocket(nullptr), nullptr);
 
-  // Perform the SSL handshake. Loopback is whitelisted in tcp_proxy.json for the ssl_auth
+  // Perform the SSL handshake. Loopback is allowlisted in tcp_proxy.json for the ssl_auth
   // filter so there will be no pause waiting on auth data.
   ssl_client_->addConnectionCallbacks(connect_callbacks_);
   ssl_client_->enableHalfClose(true);

@@ -96,6 +96,13 @@ TEST_P(BufferIntegrationTest, RouterRequestPopulateContentLengthOnTrailers) {
 }
 
 TEST_P(BufferIntegrationTest, RouterRequestBufferLimitExceeded) {
+  // Make sure the connection isn't closed during request upload.
+  // Without a large drain-close it's possible that the local reply will be sent
+  // during request upload, and continued upload will result in TCP reset before
+  // the response is read.
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(2000 * 1000); });
   config_helper_.addFilter(ConfigHelper::smallBufferFilter());
   initialize();
 

@@ -102,6 +102,12 @@ void GrpcMuxImpl::pause(const std::string& type_url) {
   api_state.paused_ = true;
 }
 
+void GrpcMuxImpl::pause(const std::vector<std::string> type_urls) {
+  for (const auto& type_url : type_urls) {
+    pause(type_url);
+  }
+}
+
 void GrpcMuxImpl::resume(const std::string& type_url) {
   ENVOY_LOG(debug, "Resuming discovery requests for {}", type_url);
   ApiState& api_state = api_state_[type_url];
@@ -115,6 +121,12 @@ void GrpcMuxImpl::resume(const std::string& type_url) {
   }
 }
 
+void GrpcMuxImpl::resume(const std::vector<std::string> type_urls) {
+  for (const auto& type_url : type_urls) {
+    resume(type_url);
+  }
+}
+
 bool GrpcMuxImpl::paused(const std::string& type_url) const {
   auto entry = api_state_.find(type_url);
   if (entry == api_state_.end()) {
@@ -123,10 +135,23 @@ bool GrpcMuxImpl::paused(const std::string& type_url) const {
   return entry->second.paused_;
 }
 
+bool GrpcMuxImpl::paused(const std::vector<std::string> type_urls) const {
+  for (const auto& type_url : type_urls) {
+    if (paused(type_url)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 void GrpcMuxImpl::onDiscoveryResponse(
-    std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message) {
+    std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message,
+    ControlPlaneStats& control_plane_stats) {
   const std::string& type_url = message->type_url();
   ENVOY_LOG(debug, "Received gRPC message for {} at version {}", type_url, message->version_info());
+  if (message->has_control_plane()) {
+    control_plane_stats.identifier_.set(message->control_plane().identifier());
+  }
   if (api_state_.count(type_url) == 0) {
     ENVOY_LOG(warn, "Ignoring the message for type URL {} as it has no current subscribers.",
               type_url);

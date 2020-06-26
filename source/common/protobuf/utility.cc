@@ -165,7 +165,8 @@ void tryWithApiBoosting(MessageXformFn f, Protobuf::Message& message) {
 // otherwise fatal field. Throws a warning on use of a fatal by default field.
 void deprecatedFieldHelper(Runtime::Loader* runtime, bool proto_annotated_as_deprecated,
                            bool proto_annotated_as_disallowed, const std::string& feature_name,
-                           std::string error, const Protobuf::Message& message) {
+                           std::string error, const Protobuf::Message& message,
+                           ProtobufMessage::ValidationVisitor& validation_visitor) {
 // This option is for Envoy builds with --define deprecated_features=disabled
 // The build options CI then verifies that as Envoy developers deprecate fields,
 // that they update canonical configs and unit tests to not use those deprecated
@@ -196,14 +197,9 @@ void deprecatedFieldHelper(Runtime::Loader* runtime, bool proto_annotated_as_dep
   std::string with_overridden = fmt::format(
       error,
       (runtime_overridden ? "runtime overrides to continue using now fatal-by-default " : ""));
-  if (warn_only) {
-    ENVOY_LOG_MISC(warn, "{}", with_overridden);
-  } else {
-    const char fatal_error[] = " If continued use of this field is absolutely necessary, "
-                               "see " ENVOY_DOC_URL_RUNTIME_OVERRIDE_DEPRECATED " for how "
-                               "to apply a temporary and highly discouraged override.";
-    throw ProtoValidationException(with_overridden + fatal_error, message);
-  }
+
+  validation_visitor.onDeprecatedField("type " + message.GetTypeName() + " " + with_overridden,
+                                       warn_only);
 }
 
 } // namespace
@@ -347,13 +343,33 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
   // If the filename ends with .pb, attempt to parse it as a binary proto.
   if (absl::EndsWith(path, FileExtensions::get().ProtoBinary)) {
     // Attempt to parse the binary format.
-    if (message.ParseFromString(contents)) {
-      MessageUtil::checkForUnexpectedFields(message, validation_visitor);
-      return;
+    auto read_proto_binary = [&contents, &validation_visitor](Protobuf::Message& message,
+                                                              MessageVersion message_version) {
+      try {
+        if (message.ParseFromString(contents)) {
+          MessageUtil::checkForUnexpectedFields(message, validation_visitor);
+        }
+        return;
+      } catch (EnvoyException& ex) {
+        if (message_version == MessageVersion::LATEST_VERSION) {
+          // Failed reading the latest version - pass the same error upwards
+          throw ex;
+        }
+      }
+      throw ApiBoostRetryException(
+          "Failed to parse at earlier version, trying again at later version.");
+    };
+
+    if (do_boosting) {
+      // Attempts to read as the previous version and upgrade, and if it fails
+      // attempts to read as latest version.
+      tryWithApiBoosting(read_proto_binary, message);
+    } else {
+      read_proto_binary(message, MessageVersion::LATEST_VERSION);
     }
-    throw EnvoyException("Unable to parse file \"" + path + "\" as a binary protobuf (type " +
-                         message.GetTypeName() + ")");
+    return;
   }
+
   // If the filename ends with .pb_text, attempt to parse it as a text proto.
   if (absl::EndsWith(path, FileExtensions::get().ProtoText)) {
     auto read_proto_text = [&contents, &path](Protobuf::Message& message,
@@ -386,11 +402,10 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
 
 namespace {
 
-void checkForDeprecatedNonRepeatedEnumValue(const Protobuf::Message& message,
-                                            absl::string_view filename,
-                                            const Protobuf::FieldDescriptor* field,
-                                            const Protobuf::Reflection* reflection,
-                                            Runtime::Loader* runtime) {
+void checkForDeprecatedNonRepeatedEnumValue(
+    const Protobuf::Message& message, absl::string_view filename,
+    const Protobuf::FieldDescriptor* field, const Protobuf::Reflection* reflection,
+    Runtime::Loader* runtime, ProtobufMessage::ValidationVisitor& validation_visitor) {
   // Repeated fields will be handled by recursion in checkForUnexpectedFields.
   if (field->is_repeated() || field->cpp_type() != Protobuf::FieldDescriptor::CPPTYPE_ENUM) {
     return;
@@ -413,7 +428,7 @@ void checkForDeprecatedNonRepeatedEnumValue(const Protobuf::Message& message,
       runtime, true /*deprecated*/,
       enum_value_descriptor->options().GetExtension(envoy::annotations::disallowed_by_default_enum),
       absl::StrCat("envoy.deprecated_features:", enum_value_descriptor->full_name()), error,
-      message);
+      message, validation_visitor);
 }
 
 class UnexpectedFieldProtoVisitor : public ProtobufMessage::ConstProtoVisitor {
@@ -429,7 +444,8 @@ public:
 
     // Before we check to see if the field is in use, see if there's a
     // deprecated default enum value.
-    checkForDeprecatedNonRepeatedEnumValue(message, filename, &field, reflection, runtime_);
+    checkForDeprecatedNonRepeatedEnumValue(message, filename, &field, reflection, runtime_,
+                                           validation_visitor_);
 
     // If this field is not in use, continue.
     if ((field.is_repeated() && reflection->FieldSize(message, &field) == 0) ||
@@ -439,6 +455,21 @@ public:
 
     // If this field is deprecated, warn or throw an error.
     if (field.options().deprecated()) {
+      if (absl::StartsWith(field.name(), Config::VersionUtil::DeprecatedFieldShadowPrefix)) {
+        // The field was marked as hidden_envoy_deprecated and an error must be thrown,
+        // unless it is part of an explicit test that needs access to the deprecated field
+        // when we enable runtime deprecation override to allow point field overrides for tests.
+        if (!runtime_ ||
+            !runtime_->snapshot().deprecatedFeatureEnabled(
+                absl::StrCat("envoy.deprecated_features:", field.full_name()), false)) {
+          const std::string fatal_error = absl::StrCat(
+              "Illegal use of hidden_envoy_deprecated_ V2 field '", field.full_name(),
+              "' from file ", filename,
+              " while using the latest V3 configuration. This field has been removed from the "
+              "current Envoy API. Please see " ENVOY_DOC_URL_VERSION_HISTORY " for details.");
+          throw ProtoValidationException(fatal_error, message);
+        }
+      }
       const std::string warning =
           absl::StrCat("Using {}deprecated option '", field.full_name(), "' from file ", filename,
                        ". This configuration will be removed from "
@@ -447,7 +478,7 @@ public:
       deprecatedFieldHelper(runtime_, true /*deprecated*/,
                             field.options().GetExtension(envoy::annotations::disallowed_by_default),
                             absl::StrCat("envoy.deprecated_features:", field.full_name()), warning,
-                            message);
+                            message, validation_visitor_);
     }
     return nullptr;
   }

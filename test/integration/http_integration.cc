@@ -253,11 +253,7 @@ void HttpIntegrationTest::useAccessLog(absl::string_view format) {
   ASSERT_TRUE(config_helper_.setAccessLog(access_log_name_, format));
 }
 
-HttpIntegrationTest::~HttpIntegrationTest() {
-  cleanupUpstreamAndDownstream();
-  test_server_.reset();
-  fake_upstreams_.clear();
-}
+HttpIntegrationTest::~HttpIntegrationTest() { cleanupUpstreamAndDownstream(); }
 
 void HttpIntegrationTest::setDownstreamProtocol(Http::CodecClient::Type downstream_protocol) {
   downstream_protocol_ = downstream_protocol;
@@ -1292,7 +1288,7 @@ void HttpIntegrationTest::testMaxStreamDurationWithRetry(bool invoke_retry_upstr
 
     EXPECT_EQ("408", response->headers().getStatusValue());
   } else {
-    Http::TestHeaderMapImpl response_headers{{":status", "200"}};
+    Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
     upstream_request_->encodeHeaders(response_headers, true);
 
     response->waitForHeaders();

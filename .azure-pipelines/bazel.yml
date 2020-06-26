@@ -3,25 +3,22 @@ parameters:
     displayName: "CI target"
     type: string
     default: bazel.release
+  - name: artifactSuffix
+    displayName: "Suffix of artifact"
+    type: string
+    default: ""
   - name: rbe
     displayName: "Enable RBE"
-    type: string
-    default: "true"
-  - name: bazelBuildExtraOptions
-    type: string
-    # Use https://docs.bazel.build/versions/master/command-line-reference.html#flag--experimental_repository_cache_hardlinks
-    # to save disk space.
-    default: "--config=remote-ci --jobs=$(RbeJobs) --curses=no --experimental_repository_cache_hardlinks"
+    type: boolean
+    default: true
   - name: managedAgent
     type: boolean
     default: true
+  - name: bazelBuildExtraOptions
+    type: string
+    default: ""
 
 steps:
-  - bash: |
-      /usr/local/bin/set-instance-protection.sh on
-    displayName: "Set Instance Protection on Agent to prevent scale in"
-    condition:  eq(false, ${{ parameters.managedAgent }})
-
   - task: Cache@2
     inputs:
       key: '"${{ parameters.ciTarget }}" | ./WORKSPACE | **/*.bzl'
@@ -51,11 +48,17 @@ steps:
     workingDirectory: $(Build.SourcesDirectory)
     env:
       ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-      ENVOY_RBE: "${{ parameters.rbe }}"
-      BAZEL_BUILD_EXTRA_OPTIONS: "${{ parameters.bazelBuildExtraOptions }}"
-      BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
-      BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
-      GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+      ${{ if parameters.rbe }}:
+        ENVOY_RBE: "1"
+        # Use https://docs.bazel.build/versions/master/command-line-reference.html#flag--experimental_repository_cache_hardlinks
+        # to save disk space.
+        BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs) --curses=no --experimental_repository_cache_hardlinks ${{ parameters.bazelBuildExtraOptions }}"
+        BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+        BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+        GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+      ${{ if eq(parameters.rbe, false) }}:
+        BAZEL_BUILD_EXTRA_OPTIONS: "--curses=no --experimental_repository_cache_hardlinks ${{ parameters.bazelBuildExtraOptions }}"
+
     displayName: "Run CI script"
 
   - bash: |
@@ -74,17 +77,5 @@ steps:
   - task: PublishBuildArtifacts@1
     inputs:
       pathtoPublish: "$(Build.StagingDirectory)/envoy"
-      artifactName: ${{ parameters.ciTarget }}
+      artifactName: ${{ parameters.ciTarget }}${{ parameters.artifactSuffix }}
     condition: always()
-
-  # TODO(lizan): This is a workaround for self hosted azure agent can't clean up bazel local cache due to
-  # permission. Remove this once it is resolved.
-  - bash: |
-      chmod -R u+w $(Build.StagingDirectory)
-    displayName: "Self hosted agent clean up"
-    condition: eq(false, ${{ parameters.managedAgent }})
-
-  - bash: |
-      /usr/local/bin/set-instance-protection.sh off
-    displayName: "Set Instance Protection on Agent to prevent scale in"
-    condition:  eq(false, ${{ parameters.managedAgent }})
