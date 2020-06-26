@@ -186,6 +186,28 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "filter_config_discovery_lib",
+    srcs = ["filter_config_discovery_impl.cc"],
+    hdrs = ["filter_config_discovery_impl.h"],
+    deps = [
+        ":config_lib",
+        "//include/envoy/config:subscription_interface",
+        "//include/envoy/router:filter_config_provider_interface",
+        "//include/envoy/singleton:instance_interface",
+        "//include/envoy/thread_local:thread_local_interface",
+        "//source/common/config:subscription_base_interface",
+        "//source/common/config:subscription_factory_lib",
+        "//source/common/config:utility_lib",
+        "//source/common/grpc:common_lib",
+        "//source/common/init:manager_lib",
+        "//source/common/init:target_lib",
+        "//source/common/init:watcher_lib",
+        "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "scoped_config_lib",
     srcs = ["scoped_config_impl.cc"],
     hdrs = ["scoped_config_impl.h"],

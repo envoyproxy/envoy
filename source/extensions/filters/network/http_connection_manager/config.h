@@ -12,6 +12,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/request_id_extension.h"
+#include "envoy/router/filter_config_provider.h"
 #include "envoy/router/route_config_provider_manager.h"
 #include "envoy/tracing/http_tracer_manager.h"
 
@@ -88,11 +89,12 @@ public:
       Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
       Router::RouteConfigProviderManager& route_config_provider_manager,
       Config::ConfigProviderManager& scoped_routes_config_provider_manager,
-      Tracing::HttpTracerManager& http_tracer_manager);
+      Tracing::HttpTracerManager& http_tracer_manager,
+      Router::FilterConfigProviderManager& filter_config_provider_manager);
 
   // Http::FilterChainFactory
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
-  using FilterFactoriesList = std::list<Http::FilterFactoryCb>;
+  using FilterFactoriesList = std::list<Router::FilterConfigProviderPtr>;
   struct FilterConfig {
     std::unique_ptr<FilterFactoriesList> filter_factories;
     bool allow_upgrade;
@@ -175,6 +177,8 @@ private:
                     proto_config,
                 int i, absl::string_view prefix, FilterFactoriesList& filter_factories,
                 const char* filter_chain_type, bool last_filter_in_current_config);
+  void createFilterChainForFactories(Http::FilterChainFactoryCallbacks& callbacks,
+                                     const FilterFactoriesList& filter_factories);
 
   /**
    * Determines what tracing provider to use for a given
@@ -203,6 +207,7 @@ private:
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
   Router::RouteConfigProviderManager& route_config_provider_manager_;
   Config::ConfigProviderManager& scoped_routes_config_provider_manager_;
+  Router::FilterConfigProviderManager& filter_config_provider_manager_;
   CodecType codec_type_;
   envoy::config::core::v3::Http2ProtocolOptions http2_options_;
   const Http::Http1Settings http1_settings_;
@@ -264,6 +269,7 @@ public:
     std::shared_ptr<Router::ScopedRoutesConfigProviderManager>
         scoped_routes_config_provider_manager_;
     Tracing::HttpTracerManagerSharedPtr http_tracer_manager_;
+    std::shared_ptr<Router::FilterConfigProviderManager> filter_config_provider_manager_;
   };
 
   /**
@@ -290,7 +296,8 @@ public:
       Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
       Router::RouteConfigProviderManager& route_config_provider_manager,
       Config::ConfigProviderManager& scoped_routes_config_provider_manager,
-      Tracing::HttpTracerManager& http_tracer_manager);
+      Tracing::HttpTracerManager& http_tracer_manager,
+      Router::FilterConfigProviderManager& filter_config_provider_manager);
 };
 
 } // namespace HttpConnectionManager

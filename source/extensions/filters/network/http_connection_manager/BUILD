@@ -40,6 +40,7 @@ envoy_cc_extension(
         "//source/common/json:json_loader_lib",
         "//source/common/local_reply:local_reply_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/router:filter_config_discovery_lib",
         "//source/common/router:rds_lib",
         "//source/common/router:scoped_rds_lib",
         "//source/common/runtime:runtime_lib",
