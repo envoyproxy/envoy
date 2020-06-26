@@ -77,7 +77,7 @@ public:
   HostDescriptionImpl(
       ClusterInfoConstSharedPtr cluster, const std::string& hostname,
       Network::Address::InstanceConstSharedPtr dest_address, MetadataConstSharedPtr metadata,
-      const envoy::config::core::v3::Locality& locality, Stats::StatName locality_zone_stat_name,
+      const envoy::config::core::v3::Locality& locality,
       const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
       uint32_t priority);
 
@@ -130,7 +130,9 @@ public:
     return health_check_address_;
   }
   const envoy::config::core::v3::Locality& locality() const override { return locality_; }
-  Stats::StatName localityZoneStatName() const override { return locality_zone_stat_name_; }
+  Stats::StatName localityZoneStatName() const override {
+    return locality_zone_stat_name_.statName();
+  }
   uint32_t priority() const override { return priority_; }
   void priority(uint32_t priority) override { priority_ = priority; }
   Network::TransportSocketFactory&
@@ -147,7 +149,7 @@ protected:
   mutable absl::Mutex metadata_mutex_;
   MetadataConstSharedPtr metadata_ ABSL_GUARDED_BY(metadata_mutex_);
   const envoy::config::core::v3::Locality locality_;
-  Stats::StatName locality_zone_stat_name_;
+  Stats::StatNameDynamicStorage locality_zone_stat_name_;
   mutable HostStats stats_;
   Outlier::DetectorHostMonitorPtr outlier_detector_;
   HealthCheckHostMonitorPtr health_checker_;
@@ -165,11 +167,10 @@ public:
   HostImpl(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
            Network::Address::InstanceConstSharedPtr address, MetadataConstSharedPtr metadata,
            uint32_t initial_weight, const envoy::config::core::v3::Locality& locality,
-           Stats::StatName locality_zone_stat_name,
            const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
            uint32_t priority, const envoy::config::core::v3::HealthStatus health_status)
-      : HostDescriptionImpl(cluster, hostname, address, metadata, locality, locality_zone_stat_name,
-                            health_check_config, priority),
+      : HostDescriptionImpl(cluster, hostname, address, metadata, locality, health_check_config,
+                            priority),
         used_(true) {
     setEdsHealthFlag(health_status);
     HostImpl::weight(initial_weight);
