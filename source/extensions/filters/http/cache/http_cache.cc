@@ -39,8 +39,7 @@ std::ostream& operator<<(std::ostream& os, const AdjustedByteRange& range) {
 }
 
 LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, SystemTime timestamp)
-    : timestamp_(timestamp), request_cache_control_(CacheHeadersUtils::requestCacheControl(
-                                 request_headers.getCacheControlValue())) {
+    : timestamp_(timestamp), request_cache_control_(request_headers.getCacheControlValue()) {
   // These ASSERTs check prerequisites. A request without these headers can't be looked up in cache;
   // CacheFilter doesn't create LookupRequests for such requests.
   ASSERT(request_headers.Path(), "Can't form cache lookup key for malformed Http::RequestHeaderMap "
@@ -72,8 +71,7 @@ size_t localHashKey(const Key& key) { return stableHashKey(key); }
 
 bool LookupRequest::requiresValidation(const Http::ResponseHeaderMap& response_headers) const {
   // TODO: Store parsed response cache-control in cache instead of parsing it on every lookup
-  const ResponseCacheControl response_cache_control =
-      CacheHeadersUtils::responseCacheControl(response_headers.getCacheControlValue());
+  const ResponseCacheControl response_cache_control(response_headers.getCacheControlValue());
 
   SystemTime response_time = CacheHeadersUtils::httpTime(response_headers.Date());
   SystemTime::duration response_age = timestamp_ - response_time;

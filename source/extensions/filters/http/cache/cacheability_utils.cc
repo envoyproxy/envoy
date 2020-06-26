@@ -28,8 +28,7 @@ bool CacheabilityUtils::isCacheableRequest(const Http::RequestHeaderMap& headers
 }
 
 bool CacheabilityUtils::isCacheableResponse(const Http::ResponseHeaderMap& headers) {
-  ResponseCacheControl response_cache_control =
-      CacheHeadersUtils::responseCacheControl(headers.getCacheControlValue());
+  ResponseCacheControl response_cache_control(headers.getCacheControlValue());
   bool cacheable_status = cacheable_status_codes_.contains(headers.getStatusValue());
 
   // Only cache responses with explicit validation data, either:
