@@ -26,6 +26,8 @@ public:
   // Http::AsyncClient::Callbacks
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&&) override {}
   void onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason) override {}
+  void onBeforeFinalizeUpstreamSpan(Envoy::Tracing::Span&,
+                                    const Http::ResponseHeaderMap*) override {}
 
 private:
   Upstream::ClusterManager& cm_;

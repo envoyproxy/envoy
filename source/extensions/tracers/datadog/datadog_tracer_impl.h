@@ -109,6 +109,7 @@ public:
   // Http::AsyncClient::Callbacks.
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&&) override;
   void onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason) override;
+  void onBeforeFinalizeUpstreamSpan(Tracing::Span&, const Http::ResponseHeaderMap*) override {}
 
 private:
   /**

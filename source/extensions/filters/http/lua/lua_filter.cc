@@ -101,6 +101,7 @@ void buildHeadersFromTable(Http::HeaderMap& headers, lua_State* state, int table
 }
 
 Http::AsyncClient::Request* makeHttpCall(lua_State* state, Filter& filter,
+                                         Tracing::Span& parent_span,
                                          Http::AsyncClient::Callbacks& callbacks) {
   const std::string cluster = luaL_checkstring(state, 2);
   luaL_checktype(state, 3, LUA_TTABLE);
@@ -135,8 +136,9 @@ Http::AsyncClient::Request* makeHttpCall(lua_State* state, Filter& filter,
     timeout = std::chrono::milliseconds(timeout_ms);
   }
 
-  return filter.clusterManager().httpAsyncClientForCluster(cluster).send(
-      std::move(message), callbacks, Http::AsyncClient::RequestOptions().setTimeout(timeout));
+  auto options = Http::AsyncClient::RequestOptions().setTimeout(timeout).setParentSpan(parent_span);
+  return filter.clusterManager().httpAsyncClientForCluster(cluster).send(std::move(message),
+                                                                         callbacks, options);
 }
 } // namespace
 
@@ -270,14 +272,14 @@ int StreamHandleWrapper::luaHttpCall(lua_State* state) {
   }
 
   if (lua_toboolean(state, async_flag_index)) {
-    return luaHttpCallAsynchronous(state);
+    return doAsynchronousHttpCall(state, callbacks_.activeSpan());
   } else {
-    return luaHttpCallSynchronous(state);
+    return doSynchronousHttpCall(state, callbacks_.activeSpan());
   }
 }
 
-int StreamHandleWrapper::luaHttpCallSynchronous(lua_State* state) {
-  http_request_ = makeHttpCall(state, filter_, *this);
+int StreamHandleWrapper::doSynchronousHttpCall(lua_State* state, Tracing::Span& span) {
+  http_request_ = makeHttpCall(state, filter_, span, *this);
   if (http_request_) {
     state_ = State::HttpCall;
     return lua_yield(state, 0);
@@ -288,8 +290,8 @@ int StreamHandleWrapper::luaHttpCallSynchronous(lua_State* state) {
   }
 }
 
-int StreamHandleWrapper::luaHttpCallAsynchronous(lua_State* state) {
-  makeHttpCall(state, filter_, noopCallbacks());
+int StreamHandleWrapper::doAsynchronousHttpCall(lua_State* state, Tracing::Span& span) {
+  makeHttpCall(state, filter_, span, noopCallbacks());
   return 0;
 }
 

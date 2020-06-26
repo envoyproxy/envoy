@@ -201,6 +201,7 @@ public:
   // The callbacks below record Zipkin-span-related stats.
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&&) override;
   void onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason) override;
+  void onBeforeFinalizeUpstreamSpan(Tracing::Span&, const Http::ResponseHeaderMap*) override {}
 
   /**
    * Creates a heap-allocated ZipkinReporter.
