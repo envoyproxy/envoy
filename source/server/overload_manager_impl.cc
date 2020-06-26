@@ -19,33 +19,15 @@ namespace Server {
 
 namespace {
 
-Stats::Counter& makeCounter(Stats::Scope& scope, absl::string_view a, absl::string_view b) {
-  Stats::StatNameManagedStorage stat_name(absl::StrCat("overload.", a, ".", b),
-                                          scope.symbolTable());
-  return scope.counterFromStatName(stat_name.statName());
-}
-
-Stats::Gauge& makeGauge(Stats::Scope& scope, absl::string_view a, absl::string_view b,
-                        Stats::Gauge::ImportMode import_mode) {
-  Stats::StatNameManagedStorage stat_name(absl::StrCat("overload.", a, ".", b),
-                                          scope.symbolTable());
-  return scope.gaugeFromStatName(stat_name.statName(), import_mode);
-}
-
 class ThresholdTriggerImpl final : public OverloadAction::Trigger {
 public:
-  ThresholdTriggerImpl(const envoy::config::overload::v3::ThresholdTrigger& config,
-                       Stats::Scope& stats_scope, absl::string_view action_name)
-      : threshold_(config.value()), gauge_(makeGauge(stats_scope, action_name, "active",
-                                                     Stats::Gauge::ImportMode::Accumulate)) {
-    gauge_.set(0);
-  }
+  ThresholdTriggerImpl(const envoy::config::overload::v3::ThresholdTrigger& config)
+      : threshold_(config.value()) {}
 
   bool updateValue(double value) override {
     const OverloadActionState state = actionState();
     state_ =
         value >= threshold_ ? OverloadActionState::saturated() : OverloadActionState::inactive();
-    gauge_.set(state_->action_value);
     return state != actionState();
   }
 
@@ -56,25 +38,20 @@ public:
 private:
   const double threshold_;
   absl::optional<OverloadActionState> state_;
-  Stats::Gauge& gauge_;
 };
 
 class RangeTriggerImpl final : public OverloadAction::Trigger {
 public:
-  RangeTriggerImpl(const envoy::config::overload::v3::RangeTrigger& config,
-                   Stats::Scope& stats_scope, absl::string_view action_name)
+  RangeTriggerImpl(const envoy::config::overload::v3::RangeTrigger& config)
       : minimum_(config.min_value()),
-        maximum_(config.has_max_value() ? config.max_value().value() : 1.0),
-        gauge_(makeGauge(stats_scope, action_name, "scale_value",
-                         Stats::Gauge::ImportMode::Accumulate)) {
+        maximum_(config.has_max_value() ? config.max_value().value() : 1.0) {
     if (minimum_ >= maximum_) {
       throw EnvoyException("min_value must be less than max_value");
     }
-    gauge_.set(0);
   }
 
   bool updateValue(double value) override {
-    const OverloadActionState old_state = actionState();
+    const OverloadActionState state = actionState();
     if (value <= minimum_) {
       state_ = OverloadActionState::inactive();
     } else if (value >= maximum_) {
@@ -82,8 +59,7 @@ public:
     } else {
       state_ = OverloadActionState((value - minimum_) / (maximum_ - minimum_));
     }
-    gauge_.set(state_->action_value * 100); // convert to percent
-    return state_ != old_state;
+    return state_ != state;
   }
 
   OverloadActionState actionState() const override {
@@ -94,7 +70,6 @@ private:
   const double minimum_;
   const double maximum_;
   absl::optional<OverloadActionState> state_;
-  Stats::Gauge& gauge_;
 };
 
 /**
@@ -122,22 +97,37 @@ private:
   std::unordered_map<std::string, OverloadActionState> actions_;
 };
 
+Stats::Counter& makeCounter(Stats::Scope& scope, absl::string_view a, absl::string_view b) {
+  Stats::StatNameManagedStorage stat_name(absl::StrCat("overload.", a, ".", b),
+                                          scope.symbolTable());
+  return scope.counterFromStatName(stat_name.statName());
+}
+
+Stats::Gauge& makeGauge(Stats::Scope& scope, absl::string_view a, absl::string_view b,
+                        Stats::Gauge::ImportMode import_mode) {
+  Stats::StatNameManagedStorage stat_name(absl::StrCat("overload.", a, ".", b),
+                                          scope.symbolTable());
+  return scope.gaugeFromStatName(stat_name.statName(), import_mode);
+}
+
 } // namespace
 
 OverloadAction::OverloadAction(const envoy::config::overload::v3::OverloadAction& config,
                                Stats::Scope& stats_scope)
-    : state_(OverloadActionState::inactive()) {
+    : state_(OverloadActionState::inactive()),
+      active_gauge_(
+          makeGauge(stats_scope, config.name(), "active", Stats::Gauge::ImportMode::Accumulate)),
+      scaling_gauge_(
+          makeGauge(stats_scope, config.name(), "scaling", Stats::Gauge::ImportMode::Accumulate)) {
   for (const auto& trigger_config : config.triggers()) {
     TriggerPtr trigger;
 
     switch (trigger_config.trigger_oneof_case()) {
     case envoy::config::overload::v3::Trigger::TriggerOneofCase::kThreshold:
-      trigger = std::make_unique<ThresholdTriggerImpl>(trigger_config.threshold(), stats_scope,
-                                                       config.name());
+      trigger = std::make_unique<ThresholdTriggerImpl>(trigger_config.threshold());
       break;
     case envoy::config::overload::v3::Trigger::TriggerOneofCase::kRange:
-      trigger =
-          std::make_unique<RangeTriggerImpl>(trigger_config.range(), stats_scope, config.name());
+      trigger = std::make_unique<RangeTriggerImpl>(trigger_config.range());
       break;
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
@@ -148,6 +138,9 @@ OverloadAction::OverloadAction(const envoy::config::overload::v3::OverloadAction
           absl::StrCat("Duplicate trigger resource for overload action ", config.name()));
     }
   }
+
+  active_gauge_.set(0);
+  scaling_gauge_.set(0);
 }
 
 bool OverloadAction::updateResourcePressure(const std::string& name, double pressure) {
@@ -157,6 +150,17 @@ bool OverloadAction::updateResourcePressure(const std::string& name, double pres
   ASSERT(it != triggers_.end());
   if (!it->second->updateValue(pressure)) {
     return false;
+  }
+  const auto trigger_new_state = it->second->actionState();
+  if (trigger_new_state == OverloadActionState::inactive()) {
+    active_gauge_.set(0);
+    scaling_gauge_.set(0);
+  } else if (trigger_new_state == OverloadActionState::saturated()) {
+    active_gauge_.set(1);
+    scaling_gauge_.set(0);
+  } else {
+    active_gauge_.set(0);
+    scaling_gauge_.set(1);
   }
 
   {
