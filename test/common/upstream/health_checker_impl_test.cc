@@ -139,9 +139,9 @@ public:
       std::unordered_map<std::string,
                          const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig>;
 
-  void allocHealthChecker(const std::string& yaml) {
+  void allocHealthChecker(const std::string& yaml, bool avoid_boosting = false) {
     health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
-        *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
+        *cluster_, parseHealthCheckFromV3Yaml(yaml, avoid_boosting), dispatcher_, runtime_, random_,
         HealthCheckEventLoggerPtr(event_logger_storage_.release()));
   }
 
@@ -167,7 +167,7 @@ public:
       codec_client_type: Http2
     )EOF";
 
-    allocHealthChecker(yaml);
+    allocHealthChecker(yaml, true);
     addCompletionCallback();
   }
 
@@ -186,7 +186,7 @@ public:
       path: /healthcheck
     )EOF";
 
-    allocHealthChecker(yaml);
+    allocHealthChecker(yaml, true);
     addCompletionCallback();
   }
 
@@ -204,7 +204,7 @@ public:
       path: /healthcheck
     )EOF";
 
-    allocHealthChecker(yaml);
+    allocHealthChecker(yaml, true);
     addCompletionCallback();
   }
 
@@ -222,7 +222,7 @@ public:
       path: /healthcheck
     )EOF";
 
-    allocHealthChecker(yaml);
+    allocHealthChecker(yaml, true);
     addCompletionCallback();
   }
 
@@ -240,7 +240,7 @@ public:
       path: /healthcheck
     )EOF";
 
-    allocHealthChecker(yaml);
+    allocHealthChecker(yaml, true);
     addCompletionCallback();
   }
 
@@ -259,7 +259,7 @@ public:
     always_log_health_check_failures: true
     )EOF";
 
-    allocHealthChecker(yaml);
+    allocHealthChecker(yaml, true);
     addCompletionCallback();
   }
 
@@ -275,7 +275,7 @@ public:
       path: /healthcheck
     )EOF";
 
-    allocHealthChecker(yaml);
+    allocHealthChecker(yaml, true);
     addCompletionCallback();
   }
 
@@ -296,7 +296,7 @@ public:
       path: /healthcheck
     )EOF";
 
-    allocHealthChecker(yaml);
+    allocHealthChecker(yaml, true);
     addCompletionCallback();
   }
 
@@ -313,7 +313,7 @@ public:
       path: /healthcheck
     )EOF";
 
-    allocHealthChecker(yaml);
+    allocHealthChecker(yaml, true);
     addCompletionCallback();
   }
 
@@ -331,7 +331,7 @@ public:
     )EOF",
                                    prefix);
 
-    allocHealthChecker(yaml);
+    allocHealthChecker(yaml, true);
     addCompletionCallback();
   }
 
@@ -348,7 +348,7 @@ public:
       path: /healthcheck
     )EOF";
 
-    allocHealthChecker(yaml);
+    allocHealthChecker(yaml, true);
     addCompletionCallback();
   }
 
@@ -365,7 +365,7 @@ public:
       path: /healthcheck
     )EOF";
 
-    allocHealthChecker(yaml);
+    allocHealthChecker(yaml, true);
     addCompletionCallback();
   }
 
@@ -384,7 +384,7 @@ public:
       path: /healthcheck
     )EOF";
 
-    allocHealthChecker(yaml);
+    allocHealthChecker(yaml, true);
     addCompletionCallback();
   }
 
@@ -403,7 +403,7 @@ public:
     )EOF",
                                    host);
 
-    allocHealthChecker(yaml);
+    allocHealthChecker(yaml, true);
     addCompletionCallback();
   }
 
@@ -473,7 +473,7 @@ public:
             value: "%START_TIME(%s.%9f)%"
     )EOF";
 
-    allocHealthChecker(yaml);
+    allocHealthChecker(yaml, true);
     addCompletionCallback();
   }
 
@@ -493,7 +493,7 @@ public:
       request_headers_to_remove: ["user-agent"]
     )EOF";
 
-    allocHealthChecker(yaml);
+    allocHealthChecker(yaml, true);
     addCompletionCallback();
   }
 
@@ -964,7 +964,7 @@ TEST_F(HttpHealthCheckerImplTest, ZeroRetryInterval) {
       path: /healthcheck
     )EOF";
 
-  allocHealthChecker(yaml);
+  allocHealthChecker(yaml, true);
   addCompletionCallback();
 
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
@@ -1028,7 +1028,7 @@ TEST_F(HttpHealthCheckerImplTest, TlsOptions) {
 
   EXPECT_CALL(*socket_factory, createTransportSocket(ApplicationProtocolListEq("http1")));
 
-  allocHealthChecker(yaml);
+  allocHealthChecker(yaml, true);
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
   cluster_->info_->stats().upstream_cx_total_.inc();
@@ -2502,7 +2502,7 @@ TEST_F(HttpHealthCheckerImplTest, TransportSocketMatchCriteria) {
 
   cluster_->info_->transport_socket_matcher_ = std::move(transport_socket_match);
 
-  allocHealthChecker(yaml);
+  allocHealthChecker(yaml, true);
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
@@ -2543,7 +2543,7 @@ TEST_F(HttpHealthCheckerImplTest, NoTransportSocketMatchCriteria) {
 
   cluster_->info_->transport_socket_matcher_ = std::move(transport_socket_match);
 
-  allocHealthChecker(yaml);
+  allocHealthChecker(yaml, true);
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
@@ -2569,9 +2569,9 @@ public:
 
 class ProdHttpHealthCheckerTest : public testing::Test, public HealthCheckerTestBase {
 public:
-  void allocHealthChecker(const std::string& yaml) {
+  void allocHealthChecker(const std::string& yaml, bool avoid_boosting = false) {
     health_checker_ = std::make_shared<TestProdHttpHealthChecker>(
-        *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
+        *cluster_, parseHealthCheckFromV3Yaml(yaml, avoid_boosting), dispatcher_, runtime_, random_,
         HealthCheckEventLoggerPtr(event_logger_storage_.release()));
   }
 
@@ -2597,7 +2597,7 @@ public:
       codec_client_type: Http2
     )EOF";
 
-    allocHealthChecker(yaml);
+    allocHealthChecker(yaml, true);
     addCompletionCallback();
   }
 
@@ -2615,7 +2615,7 @@ public:
       path: /healthcheck
     )EOF";
 
-    allocHealthChecker(yaml);
+    allocHealthChecker(yaml, true);
     addCompletionCallback();
   }
 
@@ -2988,9 +2988,9 @@ TEST(TcpHealthCheckMatcher, match) {
 
 class TcpHealthCheckerImplTest : public testing::Test, public HealthCheckerTestBase {
 public:
-  void allocHealthChecker(const std::string& yaml) {
+  void allocHealthChecker(const std::string& yaml, bool avoid_boosting = false) {
     health_checker_ = std::make_shared<TcpHealthCheckerImpl>(
-        *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
+        *cluster_, parseHealthCheckFromV3Yaml(yaml, avoid_boosting), dispatcher_, runtime_, random_,
         HealthCheckEventLoggerPtr(event_logger_storage_.release()));
   }
 
