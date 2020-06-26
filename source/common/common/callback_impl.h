@@ -24,7 +24,7 @@ public:
    */
   CallbackHandle* add(Callback callback) {
     callbacks_.emplace_back(*this, callback);
-    callbacks_.back().it_ = (--callbacks_.end());
+    // callbacks_.back().it_ = (--callbacks_.end());
     return &callbacks_.back();
   }
 
@@ -54,7 +54,7 @@ private:
 
     // the iterator of this callback holder inside callbacks_ list
     // upon removal, use this iterator to delete callback holder in O(1)
-    typename std::list<CallbackHolder>::iterator it_;
+    // typename std::list<CallbackHolder>::iterator it_;
   };
 
   /**
