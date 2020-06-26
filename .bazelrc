@@ -256,7 +256,6 @@ build:msvc-cl --copt="/wd4068"
 build:msvc-cl --copt="/wd4834"
 # Allows inline functions to be undefined
 build:msvc-cl --copt="/wd4506"
-build:msvc-cl --cxxopt="/std:c++17"
 build:msvc-cl --copt="-D_SILENCE_EXPERIMENTAL_FILESYSTEM_DEPRECATION_WARNING"
 
 # Required to work around Windows clang-cl build defects
