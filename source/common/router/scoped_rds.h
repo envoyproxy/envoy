@@ -54,10 +54,10 @@ public:
   // Envoy::Config::ConfigProvider
   Envoy::Config::ConfigProvider::ConfigProtoVector getConfigProtos() const override {
     Envoy::Config::ConfigProvider::ConfigProtoVector out_protos;
-    out_protos.reserve(config_protos_.size());
-    for (const std::unique_ptr<const Protobuf::Message>& message : config_protos_) {
-      out_protos.push_back(message.get());
-    }
+    std::for_each(config_protos_.begin(), config_protos_.end(),
+                  [&out_protos](const std::unique_ptr<const Protobuf::Message>& message) {
+                    out_protos.push_back(message.get());
+                  });
     return out_protos;
   }
 
