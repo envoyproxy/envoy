@@ -35,7 +35,7 @@ public:
       : runtime_key_(double_proto.runtime_key()), default_value_(double_proto.default_value()),
         runtime_(runtime) {}
 
-  const std::string& runtime_key() const { return runtime_key_; }
+  const std::string& runtimeKey() const { return runtime_key_; }
 
   double value() const { return runtime_.snapshot().getDouble(runtime_key_, default_value_); }
 

@@ -470,7 +470,7 @@ protected:
 
     if (active_request_bias_ < 0.0) {
       ENVOY_LOG(warn, "upstream: invalid active request bias supplied (runtime key {}), using 1.0",
-                active_request_bias_runtime_->runtime_key());
+                active_request_bias_runtime_->runtimeKey());
       active_request_bias_ = 1.0;
     }
 
