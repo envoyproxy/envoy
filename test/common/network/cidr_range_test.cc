@@ -378,197 +378,109 @@ TEST(Ipv6CidrRange, BigRange) {
   EXPECT_FALSE(rng.isInRange(Ipv6Instance("2001:0db8:85a4::")));
 }
 
+Protobuf::RepeatedPtrField<envoy::config::core::v3::CidrRange>
+makeCidrRangeList(const std::vector<std::pair<std::string, uint32_t>>& ranges) {
+  Protobuf::RepeatedPtrField<envoy::config::core::v3::CidrRange> ret;
+  for (auto& range : ranges) {
+    auto new_element = ret.Add();
+    new_element->set_address_prefix(range.first);
+    new_element->mutable_prefix_len()->set_value(range.second);
+  }
+  return ret;
+}
+
 TEST(IpListTest, Errors) {
   {
-    std::string json = R"EOF(
-    {
-      "ip_white_list": ["foo"]
-    }
-    )EOF";
-
-    Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-    EXPECT_THROW({ IpList wl(*loader, "ip_white_list"); }, EnvoyException);
-  }
-
-  {
-    std::string json = R"EOF(
-    {
-      "ip_white_list": ["foo/bar"]
-    }
-    )EOF";
-
-    Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-    EXPECT_THROW({ IpList wl(*loader, "ip_white_list"); }, EnvoyException);
-  }
-
-  {
-    std::string json = R"EOF(
-    {
-      "ip_white_list": ["192.168.1.1/33"]
-    }
-    )EOF";
-
-    Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-    EXPECT_THROW({ IpList wl(*loader, "ip_white_list"); }, EnvoyException);
-  }
-
-  {
-    std::string json = R"EOF(
-    {
-      "ip_white_list": ["192.168.1.1"]
-    }
-    )EOF";
-
-    Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-    EXPECT_THROW({ IpList wl(*loader, "ip_white_list"); }, EnvoyException);
-  }
-
-  {
-    std::string json = R"EOF(
-    {
-      "ip_white_list": ["::/129"]
-    }
-    )EOF";
-
-    Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-    EXPECT_THROW({ IpList wl(*loader, "ip_white_list"); }, EnvoyException);
+    EXPECT_THROW({ IpList list(makeCidrRangeList({{"foo", 0}})); }, EnvoyException);
   }
 }
 
 TEST(IpListTest, SpecificAddressAllowed) {
-  std::string json = R"EOF(
-  {
-    "ip_white_list": ["192.168.1.1/24"]
-  }
-  )EOF";
+  IpList list(makeCidrRangeList({{"192.168.1.1", 24}}));
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  IpList wl(*loader, "ip_white_list");
-
-  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("192.168.1.0")));
-  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("192.168.1.3")));
-  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("192.168.1.255")));
-  EXPECT_FALSE(wl.contains(Address::Ipv4Instance("192.168.3.0")));
-  EXPECT_FALSE(wl.contains(Address::Ipv4Instance("192.168.0.0")));
+  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.168.1.0")));
+  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.168.1.3")));
+  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.168.1.255")));
+  EXPECT_FALSE(list.contains(Address::Ipv4Instance("192.168.3.0")));
+  EXPECT_FALSE(list.contains(Address::Ipv4Instance("192.168.0.0")));
 }
 
 TEST(IpListTest, Normal) {
-  std::string json = R"EOF(
-  {
-    "ip_white_list": [
-      "192.168.3.0/24",
-      "50.1.2.3/32",
-      "10.15.0.0/16"
-     ]
-  }
-  )EOF";
+  IpList list(makeCidrRangeList({{"192.168.3.0", 24}, {"50.1.2.3", 32}, {"10.15.0.0", 16}}));
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  IpList wl(*loader, "ip_white_list");
+  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.168.3.0")));
+  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.168.3.3")));
+  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.168.3.255")));
+  EXPECT_FALSE(list.contains(Address::Ipv4Instance("192.168.2.255")));
+  EXPECT_FALSE(list.contains(Address::Ipv4Instance("192.168.4.0")));
 
-  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("192.168.3.0")));
-  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("192.168.3.3")));
-  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("192.168.3.255")));
-  EXPECT_FALSE(wl.contains(Address::Ipv4Instance("192.168.2.255")));
-  EXPECT_FALSE(wl.contains(Address::Ipv4Instance("192.168.4.0")));
+  EXPECT_TRUE(list.contains(Address::Ipv4Instance("50.1.2.3")));
+  EXPECT_FALSE(list.contains(Address::Ipv4Instance("50.1.2.2")));
+  EXPECT_FALSE(list.contains(Address::Ipv4Instance("50.1.2.4")));
 
-  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("50.1.2.3")));
-  EXPECT_FALSE(wl.contains(Address::Ipv4Instance("50.1.2.2")));
-  EXPECT_FALSE(wl.contains(Address::Ipv4Instance("50.1.2.4")));
+  EXPECT_TRUE(list.contains(Address::Ipv4Instance("10.15.0.0")));
+  EXPECT_TRUE(list.contains(Address::Ipv4Instance("10.15.90.90")));
+  EXPECT_TRUE(list.contains(Address::Ipv4Instance("10.15.255.255")));
+  EXPECT_FALSE(list.contains(Address::Ipv4Instance("10.14.255.255")));
+  EXPECT_FALSE(list.contains(Address::Ipv4Instance("10.16.0.0")));
 
-  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("10.15.0.0")));
-  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("10.15.90.90")));
-  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("10.15.255.255")));
-  EXPECT_FALSE(wl.contains(Address::Ipv4Instance("10.14.255.255")));
-  EXPECT_FALSE(wl.contains(Address::Ipv4Instance("10.16.0.0")));
-
-  EXPECT_FALSE(wl.contains(Address::Ipv6Instance("::1")));
-  EXPECT_FALSE(wl.contains(Address::PipeInstance("foo")));
+  EXPECT_FALSE(list.contains(Address::Ipv6Instance("::1")));
+  EXPECT_FALSE(list.contains(Address::PipeInstance("foo")));
 }
 
 TEST(IpListTest, AddressVersionMix) {
-  std::string json = R"EOF(
-  {
-    "ip_white_list": [
-      "192.168.3.0/24",
-      "2001:db8:85a3::/64",
-      "::1/128"
-     ]
-  }
-  )EOF";
+  IpList list(makeCidrRangeList({{"192.168.3.0", 24}, {"2001:db8:85a3::", 64}, {"::1", 128}}));
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  IpList wl(*loader, "ip_white_list");
+  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.168.3.0")));
+  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.168.3.3")));
+  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.168.3.255")));
+  EXPECT_FALSE(list.contains(Address::Ipv4Instance("192.168.2.255")));
+  EXPECT_FALSE(list.contains(Address::Ipv4Instance("192.168.4.0")));
 
-  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("192.168.3.0")));
-  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("192.168.3.3")));
-  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("192.168.3.255")));
-  EXPECT_FALSE(wl.contains(Address::Ipv4Instance("192.168.2.255")));
-  EXPECT_FALSE(wl.contains(Address::Ipv4Instance("192.168.4.0")));
+  EXPECT_TRUE(list.contains(Address::Ipv6Instance("2001:db8:85a3::")));
+  EXPECT_TRUE(list.contains(Address::Ipv6Instance("2001:db8:85a3:0:1::")));
+  EXPECT_TRUE(list.contains(Address::Ipv6Instance("2001:db8:85a3::ffff:ffff:ffff:ffff")));
+  EXPECT_TRUE(list.contains(Address::Ipv6Instance("2001:db8:85a3::ffff")));
+  EXPECT_TRUE(list.contains(Address::Ipv6Instance("2001:db8:85a3::1")));
+  EXPECT_FALSE(list.contains(Address::Ipv6Instance("2001:db8:85a3:1::")));
+  EXPECT_FALSE(list.contains(Address::Ipv6Instance("2002:db8:85a3::")));
 
-  EXPECT_TRUE(wl.contains(Address::Ipv6Instance("2001:db8:85a3::")));
-  EXPECT_TRUE(wl.contains(Address::Ipv6Instance("2001:db8:85a3:0:1::")));
-  EXPECT_TRUE(wl.contains(Address::Ipv6Instance("2001:db8:85a3::ffff:ffff:ffff:ffff")));
-  EXPECT_TRUE(wl.contains(Address::Ipv6Instance("2001:db8:85a3::ffff")));
-  EXPECT_TRUE(wl.contains(Address::Ipv6Instance("2001:db8:85a3::1")));
-  EXPECT_FALSE(wl.contains(Address::Ipv6Instance("2001:db8:85a3:1::")));
-  EXPECT_FALSE(wl.contains(Address::Ipv6Instance("2002:db8:85a3::")));
+  EXPECT_TRUE(list.contains(Address::Ipv6Instance("::1")));
+  EXPECT_FALSE(list.contains(Address::Ipv6Instance("::")));
 
-  EXPECT_TRUE(wl.contains(Address::Ipv6Instance("::1")));
-  EXPECT_FALSE(wl.contains(Address::Ipv6Instance("::")));
-
-  EXPECT_FALSE(wl.contains(Address::PipeInstance("foo")));
+  EXPECT_FALSE(list.contains(Address::PipeInstance("foo")));
 }
 
 TEST(IpListTest, MatchAny) {
-  std::string json = R"EOF(
-  {
-    "ip_white_list": [
-      "0.0.0.0/0"
-     ]
-  }
-  )EOF";
+  IpList list(makeCidrRangeList({{"0.0.0.0", 0}}));
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  IpList wl(*loader, "ip_white_list");
+  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.168.3.3")));
+  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.168.3.0")));
+  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.168.3.255")));
+  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.168.0.0")));
+  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.0.0.0")));
+  EXPECT_TRUE(list.contains(Address::Ipv4Instance("1.1.1.1")));
 
-  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("192.168.3.3")));
-  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("192.168.3.0")));
-  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("192.168.3.255")));
-  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("192.168.0.0")));
-  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("192.0.0.0")));
-  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("1.1.1.1")));
-
-  EXPECT_FALSE(wl.contains(Address::Ipv6Instance("::1")));
-  EXPECT_FALSE(wl.contains(Address::PipeInstance("foo")));
+  EXPECT_FALSE(list.contains(Address::Ipv6Instance("::1")));
+  EXPECT_FALSE(list.contains(Address::PipeInstance("foo")));
 }
 
 TEST(IpListTest, MatchAnyAll) {
-  std::string json = R"EOF(
-  {
-    "ip_white_list": [
-      "0.0.0.0/0",
-      "::/0"
-     ]
-  }
-  )EOF";
+  IpList list(makeCidrRangeList({{"0.0.0.0", 0}, {"::", 0}}));
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  IpList wl(*loader, "ip_white_list");
+  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.168.3.3")));
+  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.168.3.0")));
+  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.168.3.255")));
+  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.168.0.0")));
+  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.0.0.0")));
+  EXPECT_TRUE(list.contains(Address::Ipv4Instance("1.1.1.1")));
 
-  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("192.168.3.3")));
-  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("192.168.3.0")));
-  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("192.168.3.255")));
-  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("192.168.0.0")));
-  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("192.0.0.0")));
-  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("1.1.1.1")));
+  EXPECT_TRUE(list.contains(Address::Ipv6Instance("::1")));
+  EXPECT_TRUE(list.contains(Address::Ipv6Instance("::")));
+  EXPECT_TRUE(list.contains(Address::Ipv6Instance("2001:db8:85a3::")));
+  EXPECT_TRUE(list.contains(Address::Ipv6Instance("ffee::")));
 
-  EXPECT_TRUE(wl.contains(Address::Ipv6Instance("::1")));
-  EXPECT_TRUE(wl.contains(Address::Ipv6Instance("::")));
-  EXPECT_TRUE(wl.contains(Address::Ipv6Instance("2001:db8:85a3::")));
-  EXPECT_TRUE(wl.contains(Address::Ipv6Instance("ffee::")));
-
-  EXPECT_FALSE(wl.contains(Address::PipeInstance("foo")));
+  EXPECT_FALSE(list.contains(Address::PipeInstance("foo")));
 }
 
 } // namespace

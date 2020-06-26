@@ -190,18 +190,6 @@ InstanceConstSharedPtr CidrRange::truncateIpAddressAndLength(InstanceConstShared
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-IpList::IpList(const std::vector<std::string>& subnets) {
-  for (const std::string& entry : subnets) {
-    CidrRange list_entry = CidrRange::create(entry);
-    if (list_entry.isValid()) {
-      ip_list_.push_back(list_entry);
-    } else {
-      throw EnvoyException(
-          fmt::format("invalid ip/mask combo '{}' (format is <ip>/<# mask bits>)", entry));
-    }
-  }
-}
-
 IpList::IpList(const Protobuf::RepeatedPtrField<envoy::config::core::v3::CidrRange>& cidrs) {
   for (const envoy::config::core::v3::CidrRange& entry : cidrs) {
     CidrRange list_entry = CidrRange::create(entry);
@@ -223,10 +211,6 @@ bool IpList::contains(const Instance& address) const {
   }
   return false;
 }
-
-IpList::IpList(const Json::Object& config, const std::string& member_name)
-    : IpList(config.hasObject(member_name) ? config.getStringArray(member_name)
-                                           : std::vector<std::string>()) {}
 
 } // namespace Address
 } // namespace Network

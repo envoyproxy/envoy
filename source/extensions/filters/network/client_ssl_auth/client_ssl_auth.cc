@@ -29,7 +29,7 @@ ClientSslAuthConfig::ClientSslAuthConfig(
           cm, config.auth_api_cluster(), dispatcher, random,
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, refresh_delay, 60000)),
           std::chrono::milliseconds(1000)),
-      tls_(tls.allocateSlot()), ip_white_list_(config.ip_white_list()),
+      tls_(tls.allocateSlot()), ip_allowlist_(config.ip_white_list()),
       stats_(generateStats(scope, config.stat_prefix())) {
 
   if (!cm.get(remote_cluster_name_)) {
@@ -111,8 +111,8 @@ void ClientSslAuthFilter::onEvent(Network::ConnectionEvent event) {
   }
 
   ASSERT(read_callbacks_->connection().ssl());
-  if (config_->ipWhiteList().contains(*read_callbacks_->connection().remoteAddress())) {
-    config_->stats().auth_ip_white_list_.inc();
+  if (config_->ipAllowlist().contains(*read_callbacks_->connection().remoteAddress())) {
+    config_->stats().auth_ip_allowlist_.inc();
     read_callbacks_->continueReading();
     return;
   }

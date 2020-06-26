@@ -41,6 +41,6 @@ message ClientSSLAuth {
 
   // An optional list of IP address and subnet masks that should be white
   // listed for access by the filter. If no list is provided, there is no
-  // IP white list.
+  // IP allowlist.
   repeated api.v2.core.CidrRange ip_white_list = 4;
 }
