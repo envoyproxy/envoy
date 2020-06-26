@@ -44,9 +44,10 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
   }
   ASSERT(decoder_callbacks_);
 
-  request_cache_control_ = CacheHeadersUtils::requestCacheControl(headers.getCacheControlValue());
-  lookup_ = cache_.makeLookupContext(
-      LookupRequest(headers, time_source_.systemTime(), request_cache_control_));
+  auto lookup_request = LookupRequest(headers, time_source_.systemTime());
+  request_allows_inserts_ = !lookup_request.requestCacheControl().no_store;
+  lookup_ = cache_.makeLookupContext(std::move(lookup_request));
+
   ASSERT(lookup_);
 
   ENVOY_STREAM_LOG(debug, "CacheFilter::decodeHeaders starting lookup", *decoder_callbacks_);
@@ -64,8 +65,7 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
 Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                      bool end_stream) {
   // If lookup_ is null, the request wasn't cacheable, so the response isn't either.
-  if (lookup_ && !request_cache_control_.no_store &&
-      CacheabilityUtils::isCacheableResponse(headers)) {
+  if (lookup_ && request_allows_inserts_ && CacheabilityUtils::isCacheableResponse(headers)) {
     ENVOY_STREAM_LOG(debug, "CacheFilter::encodeHeaders inserting headers", *encoder_callbacks_);
     insert_ = cache_.makeInsertContext(std::move(lookup_));
     insert_->insertHeaders(headers, end_stream);

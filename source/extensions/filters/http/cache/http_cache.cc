@@ -38,9 +38,9 @@ std::ostream& operator<<(std::ostream& os, const AdjustedByteRange& range) {
   return os << "[" << range.begin() << "," << range.end() << ")";
 }
 
-LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, SystemTime timestamp,
-                             const RequestCacheControl& request_cache_control)
-    : timestamp_(timestamp), request_cache_control_(request_cache_control) {
+LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, SystemTime timestamp)
+    : timestamp_(timestamp), request_cache_control_(CacheHeadersUtils::requestCacheControl(
+                                 request_headers.getCacheControlValue())) {
   // These ASSERTs check prerequisites. A request without these headers can't be looked up in cache;
   // CacheFilter doesn't create LookupRequests for such requests.
   ASSERT(request_headers.Path(), "Can't form cache lookup key for malformed Http::RequestHeaderMap "
@@ -75,38 +75,45 @@ bool LookupRequest::requiresValidation(const Http::ResponseHeaderMap& response_h
   const ResponseCacheControl response_cache_control =
       CacheHeadersUtils::responseCacheControl(response_headers.getCacheControlValue());
 
-  SystemTime::duration response_age =
-      timestamp_ - CacheHeadersUtils::httpTime(response_headers.Date());
+  SystemTime response_time = CacheHeadersUtils::httpTime(response_headers.Date());
+  SystemTime::duration response_age = timestamp_ - response_time;
 
+  ASSERT(response_age >= std::chrono::seconds(0), "Response time is in the future.");
+
+  bool request_max_age_exceeded = request_cache_control_.max_age.has_value() &&
+                                  request_cache_control_.max_age.value() < response_age;
   if (response_cache_control.must_validate || request_cache_control_.must_validate ||
-      (request_cache_control_.max_age.has_value() &&
-       request_cache_control_.max_age.value() > response_age)) {
+      request_max_age_exceeded) {
     // Either the request or response explicitly require validation or a request max-age requirement
     // is not satisfied
     return true;
   }
 
+  // When date metadata injection for responses with no date
+  // is implemented, this ASSERT will need to be updated
   ASSERT((response_headers.Date() && response_cache_control.max_age.has_value()) ||
              response_headers.get(Http::Headers::get().Expires),
          "Cache entry does not have valid expiration data.");
 
   SystemTime expiration_time =
       response_cache_control.max_age.has_value()
-          ? CacheHeadersUtils::httpTime(response_headers.Date()) +
-                response_cache_control.max_age.value()
+          ? response_time + response_cache_control.max_age.value()
           : CacheHeadersUtils::httpTime(response_headers.get(Http::Headers::get().Expires));
 
   if (timestamp_ > expiration_time) {
     // Response is stale, requires validation
-    // unless the response does not prevent being served stale
-    // and max-stale value is higher than overdue expiration
-    return response_cache_control.no_stale ||
-           !(request_cache_control_.max_stale.has_value() &&
-             request_cache_control_.max_stale.value() > timestamp_ - expiration_time);
+    // if the response does not allow being served stale
+    // or the request max-stale directive does not allow it
+    bool allowed_by_max_stale =
+        request_cache_control_.max_stale.has_value() &&
+        request_cache_control_.max_stale.value() > timestamp_ - expiration_time;
+    return response_cache_control.no_stale || !allowed_by_max_stale;
   } else {
     // Response is fresh, requires validation only if there is an unsatisfied min-fresh requirement
-    return request_cache_control_.min_fresh.has_value() &&
-           request_cache_control_.min_fresh.value() > expiration_time - timestamp_;
+    bool min_fresh_unsatisfied =
+        request_cache_control_.min_fresh.has_value() &&
+        request_cache_control_.min_fresh.value() > expiration_time - timestamp_;
+    return min_fresh_unsatisfied;
   }
 }
 

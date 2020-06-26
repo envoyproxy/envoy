@@ -43,7 +43,6 @@ private:
   void onBody(Buffer::InstancePtr&& body);
   void onTrailers(Http::ResponseTrailerMapPtr&& trailers);
 
-  RequestCacheControl request_cache_control_;
   TimeSource& time_source_;
   HttpCache& cache_;
   LookupContextPtr lookup_;
@@ -57,6 +56,8 @@ private:
   // True if the response has trailers.
   // TODO(toddmgreer): cache trailers.
   bool response_has_trailers_;
+
+  bool request_allows_inserts_;
 
   // Used for coordinating between decodeHeaders and onHeaders.
   enum class GetHeadersState { Initial, FinishedGetHeadersCall, GetHeadersResultUnusable };

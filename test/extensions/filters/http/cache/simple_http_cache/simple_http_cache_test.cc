@@ -64,9 +64,7 @@ protected:
 
   LookupRequest makeLookupRequest(absl::string_view request_path) {
     request_headers_.setPath(request_path);
-    return LookupRequest(
-        request_headers_, current_time_,
-        CacheHeadersUtils::requestCacheControl(request_headers_.getCacheControlValue()));
+    return LookupRequest(request_headers_, current_time_);
   }
 
   AssertionResult expectLookupSuccessWithBody(LookupContext* lookup_context,
