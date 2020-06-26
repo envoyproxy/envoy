@@ -9,8 +9,8 @@ _required_extensions = {
 }
 
 # Return all extensions to be compiled into Envoy.
-def envoy_all_extensions(blacklist = []):
+def envoy_all_extensions(denylist = []):
     all_extensions = dicts.add(_required_extensions, EXTENSIONS)
 
     # These extensions can be removed on a site specific basis.
-    return [v for k, v in all_extensions.items() if not k in blacklist]
+    return [v for k, v in all_extensions.items() if not k in denylist]

@@ -60,8 +60,8 @@ jobs:
         parameters:
           managedAgent: false
           ciTarget: bazel.release.server_only
-          rbe: ""
-          bazelBuildExtraOptions: "--curses=no"
+          rbe: false
+          artifactSuffix: ".arm64"
 
   - job: bazel
     displayName: "Linux-x64"
@@ -99,10 +99,11 @@ jobs:
         parameters:
           managedAgent: false
           ciTarget: bazel.coverage
-          rbe: ""
-          bazelBuildExtraOptions: "--test_env=ENVOY_IP_TEST_VERSIONS=v4only --curses=no"
+          rbe: false
+          # /tmp/sandbox_base is a tmpfs in CI environment to optimize large I/O for coverage traces
+          bazelBuildExtraOptions: "--test_env=ENVOY_IP_TEST_VERSIONS=v4only --sandbox_base=/tmp/sandbox_base"
 
-      - script: ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /build/envoy/generated/coverage coverage'
+      - script: ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /source/generated/coverage coverage'
         displayName: "Upload Report to GCS"
         env:
           ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)

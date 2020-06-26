@@ -665,10 +665,9 @@ TEST(HttpUtility, ResolveMostSpecificPerFilterConfigGeneric) {
   const std::string filter_name = "envoy.filter";
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
 
-  const Router::RouteSpecificFilterConfig* nullconfig = nullptr;
-  const Router::RouteSpecificFilterConfig* one = nullconfig + 1;
-  const Router::RouteSpecificFilterConfig* two = nullconfig + 2;
-  const Router::RouteSpecificFilterConfig* three = nullconfig + 3;
+  const Router::RouteSpecificFilterConfig one;
+  const Router::RouteSpecificFilterConfig two;
+  const Router::RouteSpecificFilterConfig three;
 
   // Test when there's nothing on the route
   EXPECT_EQ(nullptr, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
@@ -676,23 +675,23 @@ TEST(HttpUtility, ResolveMostSpecificPerFilterConfigGeneric) {
 
   // Testing in reverse order, so that the method always returns the last object.
   ON_CALL(filter_callbacks.route_->route_entry_.virtual_host_, perFilterConfig(filter_name))
-      .WillByDefault(Return(one));
-  EXPECT_EQ(one, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
-                                                                    filter_callbacks.route()));
+      .WillByDefault(Return(&one));
+  EXPECT_EQ(&one, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
+                                                                     filter_callbacks.route()));
 
-  ON_CALL(*filter_callbacks.route_, perFilterConfig(filter_name)).WillByDefault(Return(two));
-  EXPECT_EQ(two, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
-                                                                    filter_callbacks.route()));
+  ON_CALL(*filter_callbacks.route_, perFilterConfig(filter_name)).WillByDefault(Return(&two));
+  EXPECT_EQ(&two, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
+                                                                     filter_callbacks.route()));
 
   ON_CALL(filter_callbacks.route_->route_entry_, perFilterConfig(filter_name))
-      .WillByDefault(Return(three));
-  EXPECT_EQ(three, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
-                                                                      filter_callbacks.route()));
+      .WillByDefault(Return(&three));
+  EXPECT_EQ(&three, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
+                                                                       filter_callbacks.route()));
 
   // Cover the case of no route entry
   ON_CALL(*filter_callbacks.route_, routeEntry()).WillByDefault(Return(nullptr));
-  EXPECT_EQ(two, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
-                                                                    filter_callbacks.route()));
+  EXPECT_EQ(&two, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
+                                                                     filter_callbacks.route()));
 }
 
 // Verify that traversePerFilterConfigGeneric traverses in the order of specificity.
@@ -702,16 +701,16 @@ TEST(HttpUtility, TraversePerFilterConfigIteratesInOrder) {
 
   // Create configs to test; to ease of testing instead of using real objects
   // we will use pointers that are actually indexes.
-  const Router::RouteSpecificFilterConfig* nullconfig = nullptr;
+  const std::vector<Router::RouteSpecificFilterConfig> nullconfigs(5);
   size_t num_configs = 1;
   ON_CALL(filter_callbacks.route_->route_entry_.virtual_host_, perFilterConfig(filter_name))
-      .WillByDefault(Return(nullconfig + num_configs));
+      .WillByDefault(Return(&nullconfigs[num_configs]));
   num_configs++;
   ON_CALL(*filter_callbacks.route_, perFilterConfig(filter_name))
-      .WillByDefault(Return(nullconfig + num_configs));
+      .WillByDefault(Return(&nullconfigs[num_configs]));
   num_configs++;
   ON_CALL(filter_callbacks.route_->route_entry_, perFilterConfig(filter_name))
-      .WillByDefault(Return(nullconfig + num_configs));
+      .WillByDefault(Return(&nullconfigs[num_configs]));
 
   // a vector to save which configs are visited by the traversePerFilterConfigGeneric
   std::vector<size_t> visited_configs(num_configs, 0);
@@ -720,7 +719,7 @@ TEST(HttpUtility, TraversePerFilterConfigIteratesInOrder) {
   size_t index = 0;
   Utility::traversePerFilterConfigGeneric(filter_name, filter_callbacks.route(),
                                           [&](const Router::RouteSpecificFilterConfig& cfg) {
-                                            int cfg_index = &cfg - nullconfig;
+                                            int cfg_index = &cfg - nullconfigs.data();
                                             visited_configs[index] = cfg_index - 1;
                                             index++;
                                           });
@@ -1193,6 +1192,12 @@ TEST(PercentEncoding, Trailing) {
   EXPECT_EQ(Utility::PercentEncoding::decode("too%20lar%20"), "too lar ");
   EXPECT_EQ(Utility::PercentEncoding::decode("too%20larg%e"), "too larg%e");
   EXPECT_EQ(Utility::PercentEncoding::decode("too%20large%"), "too large%");
+}
+
+TEST(PercentEncoding, Encoding) {
+  EXPECT_EQ(Utility::PercentEncoding::encode("too%large"), "too%25large");
+  EXPECT_EQ(Utility::PercentEncoding::encode("too%!large/"), "too%25!large/");
+  EXPECT_EQ(Utility::PercentEncoding::encode("too%!large/", "%!/"), "too%25%21large%2F");
 }
 
 } // namespace Http

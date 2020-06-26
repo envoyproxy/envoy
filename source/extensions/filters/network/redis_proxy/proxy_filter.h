@@ -57,6 +57,7 @@ public:
   const std::string stat_prefix_;
   const std::string redis_drain_close_runtime_key_{"redis.drain_close_enabled"};
   ProxyStats stats_;
+  const std::string downstream_auth_username_;
   const std::string downstream_auth_password_;
 
 private:
@@ -100,6 +101,9 @@ private:
     // RedisProxy::CommandSplitter::SplitCallbacks
     bool connectionAllowed() override { return parent_.connectionAllowed(); }
     void onAuth(const std::string& password) override { parent_.onAuth(*this, password); }
+    void onAuth(const std::string& username, const std::string& password) override {
+      parent_.onAuth(*this, username, password);
+    }
     void onResponse(Common::Redis::RespValuePtr&& value) override {
       parent_.onResponse(*this, std::move(value));
     }
@@ -110,6 +114,7 @@ private:
   };
 
   void onAuth(PendingRequest& request, const std::string& password);
+  void onAuth(PendingRequest& request, const std::string& username, const std::string& password);
   void onResponse(PendingRequest& request, Common::Redis::RespValuePtr&& value);
 
   Common::Redis::DecoderPtr decoder_;
