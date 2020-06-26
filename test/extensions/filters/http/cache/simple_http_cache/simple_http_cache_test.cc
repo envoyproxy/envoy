@@ -3,6 +3,7 @@
 
 #include "common/buffer/buffer_impl.h"
 
+#include "extensions/filters/http/cache/cache_headers_utils.h"
 #include "extensions/filters/http/cache/simple_http_cache/simple_http_cache.h"
 
 #include "test/test_common/simulated_time_system.h"
@@ -63,7 +64,9 @@ protected:
 
   LookupRequest makeLookupRequest(absl::string_view request_path) {
     request_headers_.setPath(request_path);
-    return LookupRequest(request_headers_, current_time_);
+    return LookupRequest(
+        request_headers_, current_time_,
+        CacheHeadersUtils::requestCacheControl(request_headers_.getCacheControlValue()));
   }
 
   AssertionResult expectLookupSuccessWithBody(LookupContext* lookup_context,
