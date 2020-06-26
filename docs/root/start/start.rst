@@ -162,6 +162,7 @@ features. The following sandboxes are available:
 
     sandboxes/cors
     sandboxes/csrf
+    sandboxes/ext_authz
     sandboxes/fault_injection
     sandboxes/front_proxy
     sandboxes/grpc_bridge

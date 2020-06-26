@@ -175,7 +175,7 @@ Authentication filter
 
 Envoy provides a network filter that performs TLS client authentication via principals fetched from
 a REST VPN service. This filter matches the presented client certificate hash against the principal
-list to determine whether the connection should be allowed or not. Optional IP white listing can
+list to determine whether the connection should be allowed or not. Optional IP allowlisting can
 also be configured. This functionality can be used to build edge proxy VPN support for web
 infrastructure.
 

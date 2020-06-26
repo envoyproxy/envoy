@@ -79,6 +79,7 @@ public:
     test_client.codec_ = new NiceMock<Http::MockClientConnection>();
     test_client.connect_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
     test_client.client_dispatcher_ = api_->allocateDispatcher("test_thread");
+    EXPECT_CALL(*test_client.connect_timer_, enableTimer(_, _));
 
     return test_client;
   }
@@ -101,7 +102,6 @@ public:
         .WillOnce(Invoke([this](Upstream::Host::CreateConnectionData&) -> CodecClient* {
           return test_clients_.back().codec_client_;
         }));
-    EXPECT_CALL(*test_client.connect_timer_, enableTimer(_, _));
   }
 
   // Creates a new test client, expecting a new connection to be created and associated
@@ -1171,7 +1171,7 @@ TEST_F(Http2ConnPoolImplTest, GoAway) {
   r1.inner_decoder_->decodeHeaders(
       ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
 
-  test_clients_[0].codec_client_->raiseGoAway();
+  test_clients_[0].codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
 
   expectClientCreate();
   ActiveTestRequest r2(*this, 1, false);

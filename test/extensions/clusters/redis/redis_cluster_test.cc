@@ -65,7 +65,7 @@ public:
   create(Upstream::HostConstSharedPtr host, Event::Dispatcher&,
          const Extensions::NetworkFilters::Common::Redis::Client::Config&,
          const Extensions::NetworkFilters::Common::Redis::RedisCommandStatsSharedPtr&,
-         Stats::Scope&, const std::string&) override {
+         Stats::Scope&, const std::string&, const std::string&) override {
     EXPECT_EQ(22120, host->address()->ip()->port());
     return Extensions::NetworkFilters::Common::Redis::Client::ClientPtr{
         create_(host->address()->asString())};
@@ -160,6 +160,7 @@ protected:
 
   void expectRedisSessionCreated() {
     resolve_timer_ = new Event::MockTimer(&dispatcher_);
+    EXPECT_CALL(*resolve_timer_, disableTimer());
     ON_CALL(random_, random()).WillByDefault(Return(0));
   }
 
