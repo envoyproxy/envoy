@@ -272,7 +272,7 @@ for more details.
 ## Supported compiler versions
 
 We now require Clang >= 5.0 due to known issues with std::string thread safety and C++14 support. GCC >= 7 is also
-known to work. Currently the CI is running with Clang 9.
+known to work. Currently the CI is running with Clang 10.
 
 ## Clang STL debug symbols
 
@@ -730,7 +730,7 @@ also have 'buildifier' installed from the bazel distribution.
 Edit the paths shown here to reflect the installation locations on your system:
 
 ```shell
-export CLANG_FORMAT="$HOME/ext/clang+llvm-9.0.0-x86_64-linux-gnu-ubuntu-16.04/bin/clang-format"
+export CLANG_FORMAT="$HOME/ext/clang+llvm-10.0.0-x86_64-linux-gnu-ubuntu-18.04/bin/clang-format"
 export BUILDIFIER_BIN="/usr/bin/buildifier"
 ```
 

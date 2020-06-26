@@ -8,47 +8,14 @@
 #include "common/upstream/upstream_impl.h"
 
 namespace Envoy {
-namespace Http {
-Network::TransportSocketOptionsSharedPtr
-wrapTransportSocketOptions(Network::TransportSocketOptionsSharedPtr transport_socket_options,
-                           Protocol protocol) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http_default_alpn")) {
-    return transport_socket_options;
-  }
-
-  // If configured to do so, we override the ALPN to use for the upstream connection to match the
-  // selected protocol.
-  std::string alpn;
-  switch (protocol) {
-  case Http::Protocol::Http10:
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  case Http::Protocol::Http11:
-    alpn = Http::Utility::AlpnNames::get().Http11;
-    break;
-  case Http::Protocol::Http2:
-    alpn = Http::Utility::AlpnNames::get().Http2;
-    break;
-  case Http::Protocol::Http3:
-    // TODO(snowp): Add once HTTP/3 upstream support is added.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-    break;
-  }
-
-  if (transport_socket_options) {
-    return std::make_shared<Network::AlpnDecoratingTransportSocketOptions>(
-        std::move(alpn), transport_socket_options);
-  } else {
-    return std::make_shared<Network::TransportSocketOptionsImpl>(
-        "", std::vector<std::string>{}, std::vector<std::string>{}, std::move(alpn));
-  }
-}
+namespace ConnectionPool {
 
 ConnPoolImplBase::ConnPoolImplBase(
     Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
-    const Network::TransportSocketOptionsSharedPtr& transport_socket_options, Protocol protocol)
+    const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
     : host_(host), priority_(priority), dispatcher_(dispatcher), socket_options_(options),
-      transport_socket_options_(wrapTransportSocketOptions(transport_socket_options, protocol)) {}
+      transport_socket_options_(transport_socket_options) {}
 
 ConnPoolImplBase::~ConnPoolImplBase() {
   ASSERT(ready_clients_.empty());
@@ -94,27 +61,26 @@ void ConnPoolImplBase::tryCreateNewConnection() {
   }
 }
 
-void ConnPoolImplBase::attachRequestToClient(ActiveClient& client,
-                                             ResponseDecoder& response_decoder,
-                                             ConnectionPool::Callbacks& callbacks) {
-  ASSERT(client.state_ == ActiveClient::State::READY);
+void ConnPoolImplBase::attachRequestToClientImpl(Envoy::ConnectionPool::ActiveClient& client,
+                                                 void* context) {
+  ASSERT(client.state_ == Envoy::ConnectionPool::ActiveClient::State::READY);
 
   if (!host_->cluster().resourceManager(priority_).requests().canCreate()) {
     ENVOY_LOG(debug, "max requests overflow");
-    callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Overflow, absl::string_view(),
-                            nullptr);
+    onPoolFailure(client.real_host_description_, absl::string_view(),
+                  ConnectionPool::PoolFailureReason::Overflow, context);
     host_->cluster().stats().upstream_rq_pending_overflow_.inc();
   } else {
-    ENVOY_CONN_LOG(debug, "creating stream", *client.codec_client_);
-    RequestEncoder& new_encoder = client.newStreamEncoder(response_decoder);
+    ENVOY_CONN_LOG(debug, "creating stream", client);
 
     client.remaining_requests_--;
     if (client.remaining_requests_ == 0) {
-      ENVOY_CONN_LOG(debug, "maximum requests per connection, DRAINING", *client.codec_client_);
+      ENVOY_CONN_LOG(debug, "maximum requests per connection, DRAINING", client);
       host_->cluster().stats().upstream_cx_max_requests_.inc();
-      transitionActiveClientState(client, ActiveClient::State::DRAINING);
-    } else if (client.codec_client_->numActiveRequests() >= client.concurrent_request_limit_) {
-      transitionActiveClientState(client, ActiveClient::State::BUSY);
+      transitionActiveClientState(client, Envoy::ConnectionPool::ActiveClient::State::DRAINING);
+    } else if (client.numActiveRequests() + 1 >= client.concurrent_request_limit_) {
+      // As soon as the new request is created, the client will be maxed out.
+      transitionActiveClientState(client, Envoy::ConnectionPool::ActiveClient::State::BUSY);
     }
 
     num_active_requests_++;
@@ -123,26 +89,25 @@ void ConnPoolImplBase::attachRequestToClient(ActiveClient& client,
     host_->cluster().stats().upstream_rq_total_.inc();
     host_->cluster().stats().upstream_rq_active_.inc();
     host_->cluster().resourceManager(priority_).requests().inc();
-    callbacks.onPoolReady(new_encoder, client.real_host_description_,
-                          client.codec_client_->streamInfo());
+
+    onPoolReady(client, context);
   }
 }
 
-void ConnPoolImplBase::onRequestClosed(ActiveClient& client, bool delay_attaching_request) {
-  ENVOY_CONN_LOG(debug, "destroying stream: {} remaining", *client.codec_client_,
-                 client.codec_client_->numActiveRequests());
+void ConnPoolImplBase::onRequestClosed(Envoy::ConnectionPool::ActiveClient& client,
+                                       bool delay_attaching_request) {
+  ENVOY_CONN_LOG(debug, "destroying stream: {} remaining", client, client.numActiveRequests());
   ASSERT(num_active_requests_ > 0);
   num_active_requests_--;
   host_->stats().rq_active_.dec();
   host_->cluster().stats().upstream_rq_active_.dec();
   host_->cluster().resourceManager(priority_).requests().dec();
-  if (client.state_ == ActiveClient::State::DRAINING &&
-      client.codec_client_->numActiveRequests() == 0) {
+  if (client.state_ == ActiveClient::State::DRAINING && client.numActiveRequests() == 0) {
     // Close out the draining client if we no longer have active requests.
-    client.codec_client_->close();
+    client.close();
   } else if (client.state_ == ActiveClient::State::BUSY) {
     // A request was just ended, so we should be below the limit now.
-    ASSERT(client.codec_client_->numActiveRequests() < client.concurrent_request_limit_);
+    ASSERT(client.numActiveRequests() < client.concurrent_request_limit_);
 
     transitionActiveClientState(client, ActiveClient::State::READY);
     if (!delay_attaching_request) {
@@ -151,17 +116,16 @@ void ConnPoolImplBase::onRequestClosed(ActiveClient& client, bool delay_attachin
   }
 }
 
-ConnectionPool::Cancellable* ConnPoolImplBase::newStream(ResponseDecoder& response_decoder,
-                                                         ConnectionPool::Callbacks& callbacks) {
+ConnectionPool::Cancellable* ConnPoolImplBase::newStream(void* context) {
   if (!ready_clients_.empty()) {
     ActiveClient& client = *ready_clients_.front();
-    ENVOY_CONN_LOG(debug, "using existing connection", *client.codec_client_);
-    attachRequestToClient(client, response_decoder, callbacks);
+    ENVOY_CONN_LOG(debug, "using existing connection", client);
+    attachRequestToClientImpl(client, context);
     return nullptr;
   }
 
   if (host_->cluster().resourceManager(priority_).pendingRequests().canCreate()) {
-    ConnectionPool::Cancellable* pending = newPendingRequest(response_decoder, callbacks);
+    ConnectionPool::Cancellable* pending = newPendingRequest(context);
 
     // This must come after newPendingRequest() because this function uses the
     // length of pending_requests_ to determine if a new connection is needed.
@@ -170,8 +134,8 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStream(ResponseDecoder& respon
     return pending;
   } else {
     ENVOY_LOG(debug, "max pending requests overflow");
-    callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Overflow, absl::string_view(),
-                            nullptr);
+    onPoolFailure(nullptr, absl::string_view(), ConnectionPool::PoolFailureReason::Overflow,
+                  context);
     host_->cluster().stats().upstream_rq_pending_overflow_.inc();
     return nullptr;
   }
@@ -180,20 +144,14 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStream(ResponseDecoder& respon
 void ConnPoolImplBase::onUpstreamReady() {
   while (!pending_requests_.empty() && !ready_clients_.empty()) {
     ActiveClientPtr& client = ready_clients_.front();
-    ENVOY_CONN_LOG(debug, "attaching to next request", *client->codec_client_);
+    ENVOY_CONN_LOG(debug, "attaching to next request", *client);
     // Pending requests are pushed onto the front, so pull from the back.
-    attachRequestToClient(*client, pending_requests_.back()->decoder_,
-                          pending_requests_.back()->callbacks_);
+    attachRequestToClient(*client, *pending_requests_.back());
     pending_requests_.pop_back();
   }
 }
 
-bool ConnPoolImplBase::hasActiveConnections() const {
-  return (!pending_requests_.empty() || (num_active_requests_ > 0));
-}
-
-std::list<ConnPoolImplBase::ActiveClientPtr>&
-ConnPoolImplBase::owningList(ActiveClient::State state) {
+std::list<ActiveClientPtr>& ConnPoolImplBase::owningList(ActiveClient::State state) {
   switch (state) {
   case ActiveClient::State::CONNECTING:
     return connecting_clients_;
@@ -225,7 +183,7 @@ void ConnPoolImplBase::transitionActiveClientState(ActiveClient& client,
   }
 }
 
-void ConnPoolImplBase::addDrainedCallback(DrainedCb cb) {
+void ConnPoolImplBase::addDrainedCallbackImpl(Instance::DrainedCb cb) {
   drained_callbacks_.push_back(cb);
   checkForDrained();
 }
@@ -235,7 +193,7 @@ void ConnPoolImplBase::closeIdleConnections() {
   std::list<ActiveClient*> to_close;
 
   for (auto& client : ready_clients_) {
-    if (!client->hasActiveRequests()) {
+    if (client->numActiveRequests() == 0) {
       to_close.push_back(client.get());
     }
   }
@@ -251,7 +209,7 @@ void ConnPoolImplBase::closeIdleConnections() {
   }
 }
 
-void ConnPoolImplBase::drainConnections() {
+void ConnPoolImplBase::drainConnectionsImpl() {
   closeIdleConnections();
 
   // closeIdleConnections() closes all connections in ready_clients_ with no active requests,
@@ -279,13 +237,13 @@ void ConnPoolImplBase::checkForDrained() {
   if (pending_requests_.empty() && ready_clients_.empty() && busy_clients_.empty() &&
       connecting_clients_.empty()) {
     ENVOY_LOG(debug, "invoking drained callbacks");
-    for (const DrainedCb& cb : drained_callbacks_) {
+    for (const Instance::DrainedCb& cb : drained_callbacks_) {
       cb();
     }
   }
 }
 
-void ConnPoolImplBase::onConnectionEvent(ConnPoolImplBase::ActiveClient& client,
+void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view failure_reason,
                                          Network::ConnectionEvent event) {
   if (client.state_ == ActiveClient::State::CONNECTING) {
     ASSERT(connecting_request_capacity_ >= client.effectiveConcurrentRequestLimit());
@@ -295,8 +253,7 @@ void ConnPoolImplBase::onConnectionEvent(ConnPoolImplBase::ActiveClient& client,
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
     // The client died.
-    ENVOY_CONN_LOG(debug, "client disconnected, failure reason: {}", *client.codec_client_,
-                   client.codec_client_->connectionFailureReason());
+    ENVOY_CONN_LOG(debug, "client disconnected, failure reason: {}", client, failure_reason);
 
     Envoy::Upstream::reportUpstreamCxDestroy(host_, event);
     const bool incomplete_request = client.closingWithIncompleteRequest();
@@ -323,8 +280,7 @@ void ConnPoolImplBase::onConnectionEvent(ConnPoolImplBase::ActiveClient& client,
       // do with the request.
       // NOTE: We move the existing pending requests to a temporary list. This is done so that
       //       if retry logic submits a new request to the pool, we don't fail it inline.
-      purgePendingRequests(client.real_host_description_,
-                           client.codec_client_->connectionFailureReason(), reason);
+      purgePendingRequests(client.real_host_description_, failure_reason, reason);
     }
 
     // We need to release our resourceManager() resources before checking below for
@@ -361,26 +317,19 @@ void ConnPoolImplBase::onConnectionEvent(ConnPoolImplBase::ActiveClient& client,
   }
 }
 
-ConnPoolImplBase::PendingRequest::PendingRequest(ConnPoolImplBase& parent, ResponseDecoder& decoder,
-                                                 ConnectionPool::Callbacks& callbacks)
-    : parent_(parent), decoder_(decoder), callbacks_(callbacks) {
+PendingRequest::PendingRequest(ConnPoolImplBase& parent) : parent_(parent) {
   parent_.host_->cluster().stats().upstream_rq_pending_total_.inc();
   parent_.host_->cluster().stats().upstream_rq_pending_active_.inc();
   parent_.host_->cluster().resourceManager(parent_.priority_).pendingRequests().inc();
 }
 
-ConnPoolImplBase::PendingRequest::~PendingRequest() {
+PendingRequest::~PendingRequest() {
   parent_.host_->cluster().stats().upstream_rq_pending_active_.dec();
   parent_.host_->cluster().resourceManager(parent_.priority_).pendingRequests().dec();
 }
 
-ConnectionPool::Cancellable*
-ConnPoolImplBase::newPendingRequest(ResponseDecoder& decoder,
-                                    ConnectionPool::Callbacks& callbacks) {
-  ENVOY_LOG(debug, "queueing request due to no available connections");
-  PendingRequestPtr pending_request(new PendingRequest(*this, decoder, callbacks));
-  pending_request->moveIntoList(std::move(pending_request), pending_requests_);
-  return pending_requests_.front().get();
+void PendingRequest::cancel(Envoy::ConnectionPool::CancelPolicy policy) {
+  parent_.onPendingRequestCancel(*this, policy);
 }
 
 void ConnPoolImplBase::purgePendingRequests(
@@ -393,7 +342,7 @@ void ConnPoolImplBase::purgePendingRequests(
     PendingRequestPtr request =
         pending_requests_to_purge_.front()->removeFromList(pending_requests_to_purge_);
     host_->cluster().stats().upstream_rq_pending_failure_eject_.inc();
-    request->callbacks_.onPoolFailure(reason, failure_reason, host_description);
+    onPoolFailure(host_description, failure_reason, reason, request->context());
   }
 }
 
@@ -433,18 +382,11 @@ uint64_t translateZeroToUnlimited(uint64_t limit) {
 }
 } // namespace
 
-ConnPoolImplBase::ActiveClient::ActiveClient(ConnPoolImplBase& parent,
-                                             uint64_t lifetime_request_limit,
-                                             uint64_t concurrent_request_limit)
+ActiveClient::ActiveClient(ConnPoolImplBase& parent, uint64_t lifetime_request_limit,
+                           uint64_t concurrent_request_limit)
     : parent_(parent), remaining_requests_(translateZeroToUnlimited(lifetime_request_limit)),
       concurrent_request_limit_(translateZeroToUnlimited(concurrent_request_limit)),
       connect_timer_(parent_.dispatcher_.createTimer([this]() -> void { onConnectTimeout(); })) {
-  Upstream::Host::CreateConnectionData data = parent_.host_->createConnection(
-      parent_.dispatcher_, parent_.socket_options_, parent_.transport_socket_options_);
-  real_host_description_ = data.host_description_;
-  codec_client_ = parent_.createCodecClient(data);
-  codec_client_->addConnectionCallbacks(*this);
-
   conn_connect_ms_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       parent_.host_->cluster().stats().upstream_cx_connect_ms_, parent_.dispatcher_.timeSource());
   conn_length_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
@@ -456,18 +398,15 @@ ConnPoolImplBase::ActiveClient::ActiveClient(ConnPoolImplBase& parent,
   parent_.host_->cluster().stats().upstream_cx_total_.inc();
   parent_.host_->cluster().stats().upstream_cx_active_.inc();
   parent_.host_->cluster().resourceManager(parent_.priority_).connections().inc();
-
-  codec_client_->setConnectionStats(
-      {parent_.host_->cluster().stats().upstream_cx_rx_bytes_total_,
-       parent_.host_->cluster().stats().upstream_cx_rx_bytes_buffered_,
-       parent_.host_->cluster().stats().upstream_cx_tx_bytes_total_,
-       parent_.host_->cluster().stats().upstream_cx_tx_bytes_buffered_,
-       &parent_.host_->cluster().stats().bind_errors_, nullptr});
 }
 
-ConnPoolImplBase::ActiveClient::~ActiveClient() { releaseResources(); }
+ActiveClient::~ActiveClient() { releaseResources(); }
 
-void ConnPoolImplBase::ActiveClient::releaseResources() {
+void ActiveClient::onEvent(Network::ConnectionEvent event) {
+  parent_.onConnectionEvent(*this, "", event);
+}
+
+void ActiveClient::releaseResources() {
   if (!resources_released_) {
     resources_released_ = true;
 
@@ -479,11 +418,89 @@ void ConnPoolImplBase::ActiveClient::releaseResources() {
   }
 }
 
-void ConnPoolImplBase::ActiveClient::onConnectTimeout() {
-  ENVOY_CONN_LOG(debug, "connect timeout", *codec_client_);
+void ActiveClient::onConnectTimeout() {
+  ENVOY_CONN_LOG(debug, "connect timeout", *this);
   parent_.host_->cluster().stats().upstream_cx_connect_timeout_.inc();
   timed_out_ = true;
   close();
+}
+
+} // namespace ConnectionPool
+
+namespace Http {
+
+Network::TransportSocketOptionsSharedPtr
+wrapTransportSocketOptions(Network::TransportSocketOptionsSharedPtr transport_socket_options,
+                           Protocol protocol) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http_default_alpn")) {
+    return transport_socket_options;
+  }
+
+  // If configured to do so, we override the ALPN to use for the upstream connection to match the
+  // selected protocol.
+  std::string alpn;
+  switch (protocol) {
+  case Http::Protocol::Http10:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  case Http::Protocol::Http11:
+    alpn = Http::Utility::AlpnNames::get().Http11;
+    break;
+  case Http::Protocol::Http2:
+    alpn = Http::Utility::AlpnNames::get().Http2;
+    break;
+  case Http::Protocol::Http3:
+    // TODO(snowp): Add once HTTP/3 upstream support is added.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    break;
+  }
+
+  if (transport_socket_options) {
+    return std::make_shared<Network::AlpnDecoratingTransportSocketOptions>(
+        std::move(alpn), transport_socket_options);
+  } else {
+    return std::make_shared<Network::TransportSocketOptionsImpl>(
+        "", std::vector<std::string>{}, std::vector<std::string>{}, std::move(alpn));
+  }
+}
+
+HttpConnPoolImplBase::HttpConnPoolImplBase(
+    Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
+    Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
+    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+    Http::Protocol protocol)
+    : Envoy::ConnectionPool::ConnPoolImplBase(
+          host, priority, dispatcher, options,
+          wrapTransportSocketOptions(transport_socket_options, protocol)) {}
+
+ConnectionPool::Cancellable*
+HttpConnPoolImplBase::newStream(Http::ResponseDecoder& response_decoder,
+                                Http::ConnectionPool::Callbacks& callbacks) {
+  AttachContext context = std::make_pair(&response_decoder, &callbacks);
+  return Envoy::ConnectionPool::ConnPoolImplBase::newStream(reinterpret_cast<void*>(&context));
+}
+
+bool HttpConnPoolImplBase::hasActiveConnections() const {
+  return (!pending_requests_.empty() || (num_active_requests_ > 0));
+}
+
+ConnectionPool::Cancellable* HttpConnPoolImplBase::newPendingRequest(void* context) {
+  Http::ResponseDecoder& decoder = *reinterpret_cast<AttachContext*>(context)->first;
+  Http::ConnectionPool::Callbacks& callbacks = *reinterpret_cast<AttachContext*>(context)->second;
+  ENVOY_LOG(debug, "queueing request due to no available connections");
+  Envoy::ConnectionPool::PendingRequestPtr pending_request(
+      new HttpPendingRequest(*this, decoder, callbacks));
+  pending_request->moveIntoList(std::move(pending_request), pending_requests_);
+  return pending_requests_.front().get();
+}
+
+void HttpConnPoolImplBase::onPoolReady(Envoy::ConnectionPool::ActiveClient& client, void* context) {
+  ActiveClient* http_client = reinterpret_cast<ActiveClient*>(&client);
+  auto* pair = reinterpret_cast<AttachContext*>(context);
+  Http::ResponseDecoder& response_decoder = *pair->first;
+  Http::ConnectionPool::Callbacks& callbacks = *pair->second;
+  Http::RequestEncoder& new_encoder = http_client->newStreamEncoder(response_decoder);
+  callbacks.onPoolReady(new_encoder, client.real_host_description_,
+                        http_client->codec_client_->streamInfo());
 }
 
 } // namespace Http

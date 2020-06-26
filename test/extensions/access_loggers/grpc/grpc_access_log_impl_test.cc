@@ -44,7 +44,8 @@ public:
     EXPECT_CALL(*timer_, enableTimer(buffer_flush_interval_msec, _));
     logger_ = std::make_unique<GrpcAccessLoggerImpl>(
         Grpc::RawAsyncClientPtr{async_client_}, log_name_, buffer_flush_interval_msec,
-        buffer_size_bytes, dispatcher_, local_info_, stats_store_);
+        buffer_size_bytes, dispatcher_, local_info_, stats_store_,
+        envoy::config::core::v3::ApiVersion::AUTO);
   }
 
   void expectStreamStart(MockAccessLogStream& stream, AccessLogCallbacks** callbacks_to_set) {

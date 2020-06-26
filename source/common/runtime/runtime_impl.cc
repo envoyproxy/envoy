@@ -477,7 +477,7 @@ LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator
                        ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
     : generator_(generator), stats_(generateStats(store)), tls_(tls.allocateSlot()),
       config_(config), service_cluster_(local_info.clusterName()), api_(api),
-      init_watcher_("RDTS", [this]() { onRdtsReady(); }) {
+      init_watcher_("RDTS", [this]() { onRdtsReady(); }), store_(store) {
   std::unordered_set<std::string> layer_names;
   for (const auto& layer : config_.layers()) {
     auto ret = layer_names.insert(layer.name());
@@ -604,7 +604,7 @@ const Snapshot& LoaderImpl::snapshot() {
   return tls_->getTyped<Snapshot>();
 }
 
-std::shared_ptr<const Snapshot> LoaderImpl::threadsafeSnapshot() {
+SnapshotConstSharedPtr LoaderImpl::threadsafeSnapshot() {
   if (tls_->currentThreadRegistered()) {
     return std::dynamic_pointer_cast<const Snapshot>(tls_->get());
   }
@@ -623,6 +623,8 @@ void LoaderImpl::mergeValues(const std::unordered_map<std::string, std::string>&
   loadNewSnapshot();
 }
 
+Stats::Scope& LoaderImpl::getRootScope() { return store_; }
+
 RuntimeStats LoaderImpl::generateStats(Stats::Store& store) {
   std::string prefix = "runtime.";
   RuntimeStats stats{
@@ -630,7 +632,7 @@ RuntimeStats LoaderImpl::generateStats(Stats::Store& store) {
   return stats;
 }
 
-std::unique_ptr<SnapshotImpl> LoaderImpl::createNewSnapshot() {
+SnapshotImplPtr LoaderImpl::createNewSnapshot() {
   std::vector<Snapshot::OverrideLayerConstPtr> layers;
   uint32_t disk_layers = 0;
   uint32_t error_layers = 0;
