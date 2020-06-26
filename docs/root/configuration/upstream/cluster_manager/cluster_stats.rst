@@ -62,6 +62,8 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_cx_none_healthy, Counter, Total times connection not established due to no healthy hosts
   upstream_rq_total, Counter, Total requests
   upstream_rq_active, Gauge, Total active requests
+  upstream_rq_body_size, Histogram, Request body size in bytes
+  upstream_rs_body_size, Histogram, Response body size in bytes
   upstream_rq_pending_total, Counter, Total requests pending a connection pool connection
   upstream_rq_pending_overflow, Counter, Total requests that overflowed connection pool or requests (mainly for HTTP/2) circuit breaking and were failed
   upstream_rq_pending_failure_eject, Counter, Total requests that were failed due to a connection pool connection failure or remote connection termination 
