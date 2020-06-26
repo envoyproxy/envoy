@@ -95,7 +95,7 @@ TEST_P(AdmissionControlIntegrationTest, HttpTest) {
 
   // Drop the success rate to a very low value.
   ENVOY_LOG(info, "dropping success rate");
-  for (int i = 0; i < 1000; ++i) {
+  for (int i = 0; i < 300; ++i) {
     sendRequestWithReturnCode("500");
   }
 
@@ -103,7 +103,7 @@ TEST_P(AdmissionControlIntegrationTest, HttpTest) {
   double throttle_count = 0;
   double request_count = 0;
   ENVOY_LOG(info, "validating throttling rate");
-  for (int i = 0; i < 1000; ++i) {
+  for (int i = 0; i < 300; ++i) {
     auto response = sendRequestWithReturnCode("500");
     auto rc = response->headers().Status()->value().getStringView();
     if (rc == "503") {
@@ -133,14 +133,14 @@ TEST_P(AdmissionControlIntegrationTest, GrpcTest) {
   initialize();
 
   // Drop the success rate to a very low value.
-  for (int i = 0; i < 1000; ++i) {
+  for (int i = 0; i < 300; ++i) {
     sendGrpcRequestWithReturnCode(14);
   }
 
   // Measure throttling rate from the admission control filter.
   double throttle_count = 0;
   double request_count = 0;
-  for (int i = 0; i < 1000; ++i) {
+  for (int i = 0; i < 300; ++i) {
     auto response = sendGrpcRequestWithReturnCode(10);
 
     // When the filter is throttling, it returns an HTTP code 503 and the GRPC status is unset.
