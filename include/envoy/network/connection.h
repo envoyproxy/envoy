@@ -139,6 +139,19 @@ public:
    */
   virtual void noDelay(bool enable) PURE;
 
+#ifdef ENABLE_TCP_INFO
+  struct TCPInfo
+  {
+    uint32_t cwnd;      /* congestion window (packets) */
+    uint32_t in_flight; /* packets "in flight" */
+    uint32_t min_rtt;   /* minimum RTT in microsecond */
+    uint32_t rtt;       /* RTT in microsecond */
+    uint64_t delivery_rate;  /* bytes per second */
+  };
+
+  virtual absl::optional<TCPInfo> getTCPInfo() const PURE;
+#endif
+
   /**
    * Disable socket reads on the connection, applying external back pressure. When reads are
    * enabled again if there is data still in the input buffer it will be re-dispatched through

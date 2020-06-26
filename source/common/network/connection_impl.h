@@ -63,6 +63,9 @@ public:
   void close(ConnectionCloseType type) override;
   std::string nextProtocol() const override { return transport_socket_->protocol(); }
   void noDelay(bool enable) override;
+#ifdef ENABLE_TCP_INFO
+  absl::optional<Connection::TCPInfo> getTCPInfo() const override;
+#endif
   void readDisable(bool disable) override;
   void detectEarlyCloseWhenReadDisabled(bool value) override { detect_early_close_ = value; }
   bool readEnabled() const override;

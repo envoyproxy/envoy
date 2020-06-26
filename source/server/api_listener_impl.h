@@ -100,6 +100,9 @@ protected:
       uint64_t id() const override { return 12345; }
       std::string nextProtocol() const override { return EMPTY_STRING; }
       void noDelay(bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+#ifdef ENABLE_TCP_INFO
+      absl::optional<Connection::TCPInfo> getTCPInfo() const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+#endif
       void readDisable(bool) override {}
       void detectEarlyCloseWhenReadDisabled(bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
       bool readEnabled() const override { return true; }

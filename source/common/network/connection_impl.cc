@@ -267,6 +267,44 @@ void ConnectionImpl::noDelay(bool enable) {
   RELEASE_ASSERT(result.rc_ == 0, "");
 }
 
+#ifdef ENABLE_TCP_INFO
+absl::optional<Connection::TCPInfo> ConnectionImpl::getTCPInfo() const {
+  // There are cases where a connection to localhost can immediately fail (e.g., if the other end
+  // does not have enough fds, reaches a backlog limit, etc.). Because we run with deferred error
+  // events, the calling code may not yet know that the connection has failed. This is one call
+  // where we go outside of libevent and hit the fd directly and this case can fail if the fd is
+  // invalid. For this call instead of plumbing through logic that will immediately indicate that a
+  // connect failed, we will just ignore the noDelay() call if the socket is invalid since error is
+  // going to be raised shortly anyway and it makes the calling code simpler.
+  if (!ioHandle().isOpen()) {
+    return absl::nullopt;
+  }
+
+  // Check for unix socket
+  sockaddr addr;
+  socklen_t len = sizeof(addr);
+  int rc = getsockname(ioHandle().fd(), &addr, &len);
+  RELEASE_ASSERT(rc == 0, "");
+
+  if (addr.sa_family == AF_UNIX) {
+    return absl::nullopt;
+  }
+
+  /**
+   * tcpInfo struct is defined in include/envoy/network/connection.h
+   */
+  socklen_t tcp_info_length = sizeof(struct tcp_info);
+  tcp_info x;
+  void *ptr = static_cast<void*>(&x);
+  rc = getsockopt(ioHandle().fd(), IPPROTO_TCP, TCP_INFO, ptr, &tcp_info_length);
+  RELEASE_ASSERT(0 == rc, "");
+
+  uint32_t in_flight = x.tcpi_unacked - x.tcpi_sacked - x.tcpi_lost + x.tcpi_retrans;
+  return {{ x.tcpi_snd_cwnd, in_flight, x.tcpi_min_rtt, x.tcpi_rtt, x.tcpi_delivery_rate}};
+
+}
+#endif
+
 void ConnectionImpl::onRead(uint64_t read_buffer_size) {
   if (!read_enabled_ || inDelayedClose()) {
     return;

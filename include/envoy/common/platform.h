@@ -132,7 +132,11 @@ struct msghdr {
 #include <ifaddrs.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#ifdef ENABLE_TCP_INFO
+#include <linux/tcp.h>
+#else
 #include <netinet/tcp.h>
+#endif
 #include <sys/ioctl.h>
 #include <sys/mman.h> // for mode_t
 #include <sys/socket.h>
