@@ -19,10 +19,10 @@ build --action_env=BAZEL_LINKOPTS=-lm
 build --host_javabase=@bazel_tools//tools/jdk:remote_jdk11
 build --javabase=@bazel_tools//tools/jdk:remote_jdk11
 build --enable_platform_specific_config
-build --cxxopt=-std=c++17 
 
 # Enable position independent code, this option is not supported on Windows and default on on macOS.
 build:linux --copt=-fPIC
+build:linux --cxxopt=-std=c++17 
 
 # We already have absl in the build, define absl=1 to tell googletest to use absl for backtrace.
 build --define absl=1
@@ -38,10 +38,12 @@ build:sanitizer --define tcmalloc=disabled
 build:sanitizer --linkopt -ldl
 build:sanitizer --build_tag_filters=-no_san
 build:sanitizer --test_tag_filters=-no_san
+build:sanitizer --cxxopt=-std=c++17 
 
 # Common flags for Clang
 build:clang --action_env=BAZEL_COMPILER=clang
 build:clang --linkopt=-fuse-ld=lld
+build:clang --cxxopt=-std=c++17 
 
 # Basic ASAN/UBSAN that works for gcc
 build:asan --action_env=ENVOY_ASAN=1
@@ -60,6 +62,7 @@ build:asan --copt -D__SANITIZE_ADDRESS__
 build:asan --test_env=ASAN_OPTIONS=handle_abort=1:allow_addr2line=true:check_initialization_order=true:strict_init_order=true:detect_odr_violation=1
 build:asan --test_env=UBSAN_OPTIONS=halt_on_error=true:print_stacktrace=1
 build:asan --test_env=ASAN_SYMBOLIZER_PATH
+build:asan --cxxopt=-std=c++17
 
 # Clang ASAN/UBSAN
 build:clang-asan --config=asan
@@ -139,6 +142,7 @@ coverage:fuzz-coverage --run_under=@envoy//bazel/coverage:fuzz_coverage_wrapper.
 build:rbe-toolchain --host_platform=@envoy_build_tools//toolchains:rbe_ubuntu_clang_platform
 build:rbe-toolchain --platforms=@envoy_build_tools//toolchains:rbe_ubuntu_clang_platform
 build:rbe-toolchain --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
+build:rbe-toolchain --cxxopt=-std=c++17
 
 build:rbe-toolchain-clang --config=rbe-toolchain
 build:rbe-toolchain-clang --crosstool_top=@rbe_ubuntu_clang//cc:toolchain
@@ -192,6 +196,8 @@ build:docker-sandbox --strategy=Genrule=docker
 build:docker-sandbox --define=EXECUTOR=remote
 build:docker-sandbox --experimental_docker_verbose
 build:docker-sandbox --experimental_enable_docker_sandbox
+build:docker-sandbox --cxxopt=-std=c++17
+
 
 build:docker-clang --config=docker-sandbox
 build:docker-clang --config=rbe-toolchain-clang
@@ -209,6 +215,7 @@ build:docker-msan --config=rbe-toolchain-msan
 # CI configurations
 build:remote-ci --remote_cache=grpcs://remotebuildexecution.googleapis.com
 build:remote-ci --remote_executor=grpcs://remotebuildexecution.googleapis.com
+build:remote-ci --cxxopt=-std=c++17
 
 # Fuzz builds
 build:asan-fuzzer --config=clang-asan
@@ -223,6 +230,7 @@ build:asan-fuzzer --test_env=UBSAN_OPTIONS=print_stacktrace=1
 build:plain-fuzzer --define=FUZZING_ENGINE=libfuzzer
 build:plain-fuzzer --copt=-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
 build:plain-fuzzer --copt=-fsanitize=fuzzer-no-link
+build:plain-fuzzer --cxxopt=-std=c++17
 
 # Compile database generation config
 # We don't care about built binaries so always strip and use fastbuild.
@@ -230,6 +238,7 @@ build:compdb -c fastbuild
 build:compdb --strip=always
 build:compdb --build_tag_filters=-nocompdb
 build:compdb --define=ENVOY_CONFIG_COMPILATION_DATABASE=1
+build:compdb --cxxopt=-std=c++17
 
 # Windows build quirks
 build:windows --action_env=TMPDIR
@@ -244,6 +253,7 @@ build:windows --define manual_stamp=manual_stamp
 build:windows --copt="-DCARES_STATICLIB"
 build:windows --copt="-DNGHTTP2_STATICLIB"
 build:windows --copt="-DCURL_STATICLIB"
+build:windows --cxxopt="/std:c++17"
 
 # Required to work around build defects on Windows MSVC cl
 # Unguarded gcc pragmas in quiche are not recognized by MSVC
@@ -252,6 +262,7 @@ build:msvc-cl --copt="/wd4068"
 build:msvc-cl --copt="/wd4834"
 # Allows inline functions to be undefined
 build:msvc-cl --copt="/wd4506"
+build:msvc-cl --cxxopt="/std:c++17"
 build:msvc-cl --copt="-D_SILENCE_EXPERIMENTAL_FILESYSTEM_DEPRECATION_WARNING"
 
 # Required to work around Windows clang-cl build defects
@@ -260,6 +271,7 @@ build:msvc-cl --copt="-D_SILENCE_EXPERIMENTAL_FILESYSTEM_DEPRECATION_WARNING"
 build:clang-cl --copt="-Wno-macro-redefined"
 build:clang-cl --copt="-Wno-builtin-macro-redefined"
 build:clang-cl --action_env=USE_CLANG_CL=1
+build:clang-cl--cxxopt="/std:c++17"
 
 # Defaults to 'auto' - Off for windows, so override to linux behavior
 build:windows --enable_runfiles=yes
