@@ -98,6 +98,11 @@ INCLUDE_ANGLE = "#include <"
 INCLUDE_ANGLE_LEN = len(INCLUDE_ANGLE)
 PROTO_PACKAGE_REGEX = re.compile(r"^package (\S+);\n*", re.MULTILINE)
 X_ENVOY_USED_DIRECTLY_REGEX = re.compile(r'.*\"x-envoy-.*\".*')
+DESIGNATED_INITIALIZER_REGEX = re.compile(r"\{\s*\.\w+\s*\=")
+MANGLED_PROTOBUF_NAME_REGEX = re.compile(r"envoy::[a-z0-9_:]+::[A-Z][a-z]\w*_\w*_[A-Z]{2}")
+HISTOGRAM_SI_SUFFIX_REGEX = re.compile(r"(?<=HISTOGRAM\()[a-zA-Z0-9_]+_(b|kb|mb|ns|us|ms|s)(?=,)")
+TEST_NAME_STARTING_LOWER_CASE_REGEX = re.compile(r"TEST(_.\(.*,\s|\()[a-z].*\)\s\{")
+EXTENSIONS_CODEOWNERS_REGEX = re.compile(r'.*(extensions[^@]*\s+)(@.*)')
 
 # yapf: disable
 PROTOBUF_TYPE_ERRORS = {
@@ -637,7 +642,7 @@ def checkSourceLine(line, file_path, reportError):
     # can be used instead
     reportError("Don't use __attribute__((packed)), use the PACKED_STRUCT macro defined "
                 "in include/envoy/common/platform.h instead")
-  if re.search("\{\s*\.\w+\s*\=", line):
+  if DESIGNATED_INITIALIZER_REGEX.search(line):
     # Designated initializers are not part of the C++14 standard and are not supported
     # by MSVC
     reportError("Don't use designated initializers in struct initialization, "
@@ -649,7 +654,7 @@ def checkSourceLine(line, file_path, reportError):
     reportError("Don't use 'using testing::Test;, elaborate the type instead")
   if line.startswith("using testing::TestWithParams;"):
     reportError("Don't use 'using testing::Test;, elaborate the type instead")
-  if re.search("TEST(_.\(.*,\s|\()[a-z].*\)\s\{", line):
+  if TEST_NAME_STARTING_LOWER_CASE_REGEX.search(line):
     # Matches variants of TEST(), TEST_P(), TEST_F() etc. where the test name begins
     # with a lowercase letter.
     reportError("Test names should be CamelCase, starting with a capital letter")
@@ -671,10 +676,10 @@ def checkSourceLine(line, file_path, reportError):
       '->histogramFromString(' in line or '->textReadoutFromString(' in line):
     reportError("Don't lookup stats by name at runtime; use StatName saved during construction")
 
-  if re.search("envoy::[a-z0-9_:]+::[A-Z][a-z]\w*_\w*_[A-Z]{2}", line):
+  if MANGLED_PROTOBUF_NAME_REGEX.search(line):
     reportError("Don't use mangled Protobuf names for enum constants")
 
-  hist_m = re.search("(?<=HISTOGRAM\()[a-zA-Z0-9_]+_(b|kb|mb|ns|us|ms|s)(?=,)", line)
+  hist_m = HISTOGRAM_SI_SUFFIX_REGEX.search(line)
   if hist_m and not allowlistedForHistogramSiSuffix(hist_m.group(0)):
     reportError(
         "Don't suffix histogram names with the unit symbol, "
@@ -1009,7 +1014,7 @@ if __name__ == "__main__":
         for line in f:
           # If this line is of the form "extensions/... @owner1 @owner2" capture the directory
           # name and store it in the list of directories with documented owners.
-          m = re.search(r'.*(extensions[^@]*\s+)(@.*)', line)
+          m = EXTENSIONS_CODEOWNERS_REGEX.search(line)
           if m is not None and not line.startswith('#'):
             owned.append(m.group(1).strip())
             owners = re.findall('@\S+', m.group(2).strip())
