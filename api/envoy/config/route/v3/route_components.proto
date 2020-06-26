@@ -7,6 +7,7 @@ import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/proxy_protocol.proto";
 import "envoy/type/matcher/v3/regex.proto";
 import "envoy/type/matcher/v3/string.proto";
+import "envoy/type/metadata/v3/metadata.proto";
 import "envoy/type/tracing/v3/custom_tag.proto";
 import "envoy/type/v3/percent.proto";
 import "envoy/type/v3/range.proto";
@@ -1342,7 +1343,7 @@ message VirtualCluster {
 message RateLimit {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RateLimit";
 
-  // [#next-free-field: 7]
+  // [#next-free-field: 8]
   message Action {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RateLimit.Action";
@@ -1456,6 +1457,20 @@ message RateLimit {
       repeated HeaderMatcher headers = 3 [(validate.rules).repeated = {min_items: 1}];
     }
 
+    // The following descriptor entry is appended when the dynamic metadata contains a key value:
+    //
+    // .. code-block:: cpp
+    //
+    //   ("<descriptor_key>", "<value_queried_from_metadata>")
+    message DynamicMetaData {
+      // The key to use in the descriptor entry.
+      string descriptor_key = 1 [(validate.rules).string = {min_bytes: 1}];
+
+      // Metadata struct that defines the key and path to retrieve the string value. A match will
+      // only happen if the value in the dynamic metadata is of type string.
+      type.metadata.v3.MetadataKey metadata_key = 2 [(validate.rules).message = {required: true}];
+    }
+
     oneof action_specifier {
       option (validate.required) = true;
 
@@ -1476,6 +1491,9 @@ message RateLimit {
 
       // Rate limit on the existence of request headers.
       HeaderValueMatch header_value_match = 6;
+
+      // Rate limit on dynamic metadata.
+      DynamicMetaData dynamic_metadata = 7;
     }
   }
 
