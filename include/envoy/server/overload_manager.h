@@ -4,7 +4,6 @@
 #include <unordered_map>
 
 #include "envoy/common/pure.h"
-#include "envoy/event/timer.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/macros.h"
@@ -53,14 +52,6 @@ struct OverloadActionState {
 using OverloadActionCb = std::function<void(OverloadActionState)>;
 
 /**
- * Factory function exposed by the overload manager for creating timers.
- * @param class The type of timer being created. This can be used by overload actions that affect
- * all timers of the same class.
- * @param callback The callback to invoke when the timer is triggered.
- */
-using OverloadTimerFactory = std::function<Event::TimerPtr(absl::string_view, Event::TimerCb)>;
-
-/**
  * Thread-local copy of the state of each configured overload action.
  */
 class ThreadLocalOverloadState {
@@ -72,10 +63,6 @@ public:
 
   // Sets the thread-local value for the given action key to the given state.
   virtual void setState(const std::string& action, OverloadActionState state) PURE;
-
-  // Returns a factory for creating timers whose duration might be altered by
-  // the overload manager.
-  virtual OverloadTimerFactory getTimerFactory() PURE;
 };
 
 /**

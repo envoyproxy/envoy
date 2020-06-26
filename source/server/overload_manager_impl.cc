@@ -103,8 +103,6 @@ private:
 class ThreadLocalOverloadStateImpl : public ThreadLocalOverloadState,
                                      public ThreadLocal::ThreadLocalObject {
 public:
-  explicit ThreadLocalOverloadStateImpl(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
-
   const OverloadActionState& getState(const std::string& action) override {
     auto it = actions_.find(action);
     if (it == actions_.end()) {
@@ -120,14 +118,7 @@ public:
     }
   }
 
-  OverloadTimerFactory getTimerFactory() override {
-    return [this](absl::string_view /*unused*/, std::function<void()> callback) {
-      return dispatcher_.createTimer(callback);
-    };
-  }
-
 private:
-  Event::Dispatcher& dispatcher_;
   std::unordered_map<std::string, OverloadActionState> actions_;
 };
 
@@ -232,8 +223,8 @@ void OverloadManagerImpl::start() {
   ASSERT(!started_);
   started_ = true;
 
-  tls_->set([](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    return std::make_shared<ThreadLocalOverloadStateImpl>(dispatcher);
+  tls_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    return std::make_shared<ThreadLocalOverloadStateImpl>();
   });
 
   if (resources_.empty()) {

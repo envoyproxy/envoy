@@ -336,7 +336,6 @@ public:
   MockThreadLocalOverloadState();
   MOCK_METHOD(const OverloadActionState&, getState, (const std::string&), (override));
   MOCK_METHOD(void, setState, (const std::string&, OverloadActionState), (override));
-  MOCK_METHOD(OverloadTimerFactory, getTimerFactory, (), (override));
 
 private:
   const OverloadActionState disabled_state_;
