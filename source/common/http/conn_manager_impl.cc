@@ -158,6 +158,8 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
       {stats_.named_.downstream_cx_rx_bytes_total_, stats_.named_.downstream_cx_rx_bytes_buffered_,
        stats_.named_.downstream_cx_tx_bytes_total_, stats_.named_.downstream_cx_tx_bytes_buffered_,
        nullptr, &stats_.named_.downstream_cx_delayed_close_timeout_});
+
+  filter_state_ = read_callbacks_->connection().streamInfo().filterState();
 }
 
 ConnectionManagerImpl::~ConnectionManagerImpl() {
@@ -2468,6 +2470,9 @@ bool ConnectionManagerImpl::ActiveStreamDecoderFilter::recreateStream() {
   // We don't need to copy over the old parent FilterState from the old StreamInfo if it did not
   // store any objects with a LifeSpan at or above DownstreamRequest. This is to avoid unnecessary
   // heap allocation.
+  // TODO(snowp): In the case where connection level filter state has been set on the connection
+  // FilterState that we inherit, we'll end up copying this every time even though we could get
+  // away with just resetting it to the HCM filter_state_.
   if (parent_.stream_info_.filter_state_->hasDataAtOrAboveLifeSpan(
           StreamInfo::FilterState::LifeSpan::Request)) {
     (*parent_.connection_manager_.streams_.begin())->stream_info_.filter_state_ =
