@@ -64,7 +64,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
                 cluster_info_->resourceManager(route_entry->priority()).pendingRequests()))
           : absl::nullopt);
 
-  if (circuit_breaker_raii_ptr.get() != nullptr) {
+  if (circuit_breaker_raii_ptr != nullptr) {
     circuit_breaker_ = std::move(circuit_breaker_raii_ptr);
   } else {
     if (!should_use_dns_cache_circuit_breakers) {
