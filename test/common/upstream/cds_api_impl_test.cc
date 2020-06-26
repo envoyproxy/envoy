@@ -96,7 +96,7 @@ TEST_F(CdsApiImplTest, UpdateVersionOnClusterRemove) {
   const std::string response1_yaml = R"EOF(
 version_info: '0'
 resources:
-- "@type": type.googleapis.com/envoy.api.v2.Cluster
+- "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
   name: cluster1
   type: EDS
   eds_cluster_config:
@@ -268,13 +268,13 @@ TEST_F(CdsApiImplTest, Basic) {
   const std::string response1_yaml = R"EOF(
 version_info: '0'
 resources:
-- "@type": type.googleapis.com/envoy.api.v2.Cluster
+- "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
   name: cluster1
   type: EDS
   eds_cluster_config:
     eds_config:
       path: eds path
-- "@type": type.googleapis.com/envoy.api.v2.Cluster
+- "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
   name: cluster2
   type: EDS
   eds_cluster_config:
@@ -295,13 +295,13 @@ resources:
   const std::string response2_yaml = R"EOF(
 version_info: '1'
 resources:
-- "@type": type.googleapis.com/envoy.api.v2.Cluster
+- "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
   name: cluster1
   type: EDS
   eds_cluster_config:
     eds_config:
       path: eds path
-- "@type": type.googleapis.com/envoy.api.v2.Cluster
+- "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
   name: cluster3
   type: EDS
   eds_cluster_config:
@@ -329,13 +329,13 @@ TEST_F(CdsApiImplTest, FailureInvalidConfig) {
   const std::string response1_yaml = R"EOF(
 version_info: '0'
 resources:
-- "@type": type.googleapis.com/envoy.api.v2.Cluster
+- "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
   name: cluster1
   type: EDS
   eds_cluster_config:
     eds_config:
       path: eds path
-- "@type": type.googleapis.com/envoy.api.v2.Cluster
+- "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
   name: cluster1
   type: EDS
   eds_cluster_config:
