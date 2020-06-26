@@ -143,21 +143,6 @@ static void headerMapImplIterate(benchmark::State& state) {
 }
 BENCHMARK(headerMapImplIterate)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
 
-/** Measure the speed of the HeaderMapImpl lookup() method. */
-static void headerMapImplLookup(benchmark::State& state) {
-  const LowerCaseString key("connection");
-  const std::string value("01234567890123456789");
-  auto headers = Http::ResponseHeaderMapImpl::create();
-  addDummyHeaders(*headers, state.range(0));
-  headers->addReference(key, value);
-  for (auto _ : state) {
-    const HeaderEntry* entry = nullptr;
-    auto result = headers->lookup(key, &entry);
-    benchmark::DoNotOptimize(result);
-  }
-}
-BENCHMARK(headerMapImplLookup)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
-
 /**
  * Measure the speed of removing a header by key name.
  * @note The measured time for each iteration includes the time needed to add

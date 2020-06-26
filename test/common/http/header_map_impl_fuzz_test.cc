@@ -152,12 +152,6 @@ DEFINE_PROTO_FUZZER(const test::common::http::HeaderMapImplFuzzTestCase& input) 
       header_map = Http::createHeaderMap<Http::RequestHeaderMapImpl>(*header_map);
       break;
     }
-    case test::common::http::Action::kLookup: {
-      const Http::HeaderEntry* header_entry;
-      header_map->lookup(Http::LowerCaseString(replaceInvalidCharacters(action.lookup())),
-                         &header_entry);
-      break;
-    }
     case test::common::http::Action::kRemove: {
       header_map->remove(Http::LowerCaseString(replaceInvalidCharacters(action.remove())));
       break;
