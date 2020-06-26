@@ -68,6 +68,11 @@ public:
       // Invalid parts of the header are ignored
       {"no-cache, ,,,fjfwioen3298, max-age=20, min-fresh=30=40",
        {true, false, false, false, DURATION(20), UNSET_DURATION, UNSET_DURATION}},
+      // If a directive argument contains a comma by mistake
+      // the part before the comma will be interpreted as the argument
+      // and the part after it will be ignored
+      {"no-cache, max-age=10,0, no-store",
+       {true, true, false, false, DURATION(10), UNSET_DURATION, UNSET_DURATION}},
   };
 };
 
@@ -107,7 +112,12 @@ public:
        {true, false, false, false, false, UNSET_DURATION}},
       {"s-maxage=five, max-age=10, no-transform", {false, false, true, false, false, DURATION(10)}},
       // Invalid parts of the header are ignored
-      {"no-cache, ,,,fjfwioen3298, max-age=20", {true, false, false, false, false, DURATION(20)}}};
+      {"no-cache, ,,,fjfwioen3298, max-age=20", {true, false, false, false, false, DURATION(20)}},
+      // If a directive argument contains a comma by mistake
+      // the part before the comma will be interpreted as the argument
+      // and the part after it will be ignored
+      {"no-cache, max-age=10,0, no-store", {true, true, false, false, false, DURATION(10)}},
+  };
 };
 
 // TODO(#9872): More tests for httpTime

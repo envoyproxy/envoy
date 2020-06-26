@@ -98,11 +98,6 @@ CacheHeadersUtils::separateDirectiveAndArgument(absl::string_view full_directive
 
 RequestCacheControl CacheHeadersUtils::requestCacheControl(absl::string_view cache_control_header) {
   RequestCacheControl request_cache_control;
-  // If a directive argument contains , by mistake
-  // the part before the , will be parsed as the argument
-  // the part after it will be ignored
-  // e.g "cache-control: no-cache, max-stale=10,0, no-transform"
-  // max-stale will be parsed as 10, 0 will be ignored
   std::vector<absl::string_view> directives = absl::StrSplit(cache_control_header, ',');
 
   for (auto full_directive : directives) {
