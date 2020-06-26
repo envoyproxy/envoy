@@ -66,8 +66,10 @@ private:
                         [handle](const CallbackHolder& holder) -> bool {
                           return handle == &holder;
                         }) != callbacks_.end());
-    auto it = dynamic_cast<CallbackHolder*>(handle)->it_;
-    callbacks_.erase(it);
+    // auto it = dynamic_cast<CallbackHolder*>(handle)->it_;
+    // callbacks_.erase(it);
+    callbacks_.remove_if(
+        [handle](const CallbackHolder& holder) -> bool { return handle == &holder; });
   }
 
   std::list<CallbackHolder> callbacks_;
