@@ -7,6 +7,8 @@ Incompatible Behavior Changes
 *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 
 * build: official released binary is now built on Ubuntu 18.04, requires glibc >= 2.27.
+* client_ssl_auth: the `auth_ip_white_list` stat has been renamed to
+  :ref:`auth_ip_allowlist <config_network_filters_client_ssl_auth_stats>`.
 
 Minor Behavior Changes
 ----------------------
@@ -40,8 +42,8 @@ Bug Fixes
 * http: fixed a bug where in some cases slash was moved from path to query string when :ref:`merging of adjacent slashes<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.merge_slashes>` is enabled.
 * http: fixed several bugs with applying correct connection close behavior across the http connection manager, health checker, and connection pool. This behavior may be temporarily reverted by setting runtime feature `envoy.reloadable_features.fix_connection_close` to false.
 * prometheus stats: fix the sort order of output lines to comply with the standard.
-* udp: the :ref:`reuse_port <envoy_api_field_Listener.reuse_port>` listener option must now be 
-  specified for UDP listeners if concurrency is > 1. This previously crashed so is considered a 
+* udp: the :ref:`reuse_port <envoy_api_field_Listener.reuse_port>` listener option must now be
+  specified for UDP listeners if concurrency is > 1. This previously crashed so is considered a
   bug fix.
 * upstream: fixed a bug where Envoy would panic when receiving a GRPC SERVICE_UNKNOWN status on the health check.
 
@@ -99,10 +101,11 @@ New Features
   interested in; behavior is allowed based on new "envoy.lrs.supports_send_all_clusters" capability
   in :ref:`client_features<envoy_v3_api_field_config.core.v3.Node.client_features>` field.
 * lrs: updated to allow to explicitly set the API version of gRPC service endpoint and message to be used.
+* lua: added tracing to the ``httpCall()`` API.
 * metrics service: added added :ref:`API version <envoy_v3_api_field_config.metrics.v3.MetricsServiceConfig.transport_api_version>` to explicitly set the version of gRPC service endpoint and message to be used.
 * network filters: added a :ref:`postgres proxy filter <config_network_filters_postgres_proxy>`.
 * network filters: added a :ref:`rocketmq proxy filter <config_network_filters_rocketmq_proxy>`.
-* prometheus stats: fix the sort order of output lines to comply with the standard.
+* ratelimit: add support for use of dynamic metadata :ref:`dynamic_metadata <envoy_v3_api_field_config.route.v3.RateLimit.Action.dynamic_metadata>` as a ratelimit action.
 * ratelimit: added :ref:`API version <envoy_v3_api_field_config.ratelimit.v3.RateLimitServiceConfig.transport_api_version>` to explicitly set the version of gRPC service endpoint and message to be used.
 * redis: added acl support :ref:`downstream_auth_username <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.downstream_auth_username>` for downstream client ACL authentication, and :ref:`auth_username <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProtocolOptions.auth_username>` to configure authentication usernames for upstream Redis 6+ server clusters with ACL enabled.
 * redis: added fault injection support :ref:`fault injection for redis proxy <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.faults>`, described further in :ref:`configuration documentation <config_network_filters_redis_proxy>`.

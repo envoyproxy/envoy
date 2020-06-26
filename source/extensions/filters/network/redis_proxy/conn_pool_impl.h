@@ -24,6 +24,7 @@
 #include "source/extensions/clusters/redis/redis_cluster_lb.h"
 
 #include "extensions/common/redis/cluster_refresh_manager.h"
+#include "extensions/filters/network/common/redis/client.h"
 #include "extensions/filters/network/common/redis/client_impl.h"
 #include "extensions/filters/network/common/redis/codec_impl.h"
 #include "extensions/filters/network/common/redis/utility.h"
@@ -52,7 +53,7 @@ public:
   void onFailure() override{};
 };
 
-class InstanceImpl : public Instance {
+class InstanceImpl : public Instance, public std::enable_shared_from_this<InstanceImpl> {
 public:
   InstanceImpl(
       const std::string& cluster_name, Upstream::ClusterManager& cm,
@@ -79,9 +80,7 @@ public:
   makeRequestToHost(const std::string& host_address, const Common::Redis::RespValue& request,
                     Common::Redis::Client::ClientCallbacks& callbacks);
 
-  bool onRedirection() override { return refresh_manager_->onRedirection(cluster_name_); }
-  bool onFailure() { return refresh_manager_->onFailure(cluster_name_); }
-  bool onHostDegraded() { return refresh_manager_->onHostDegraded(cluster_name_); }
+  void init();
 
   // Allow the unit test to have access to private members.
   friend class RedisConnPoolImplTest;
@@ -127,7 +126,8 @@ private:
 
   struct ThreadLocalPool : public ThreadLocal::ThreadLocalObject,
                            public Upstream::ClusterUpdateCallbacks {
-    ThreadLocalPool(InstanceImpl& parent, Event::Dispatcher& dispatcher, std::string cluster_name);
+    ThreadLocalPool(std::shared_ptr<InstanceImpl> parent, Event::Dispatcher& dispatcher,
+                    std::string cluster_name);
     ~ThreadLocalPool() override;
     ThreadLocalActiveClientPtr& threadLocalActiveClient(Upstream::HostConstSharedPtr host);
     Common::Redis::Client::PoolRequest* makeRequest(const std::string& key, RespVariant&& request,
@@ -149,7 +149,7 @@ private:
 
     void onRequestCompleted();
 
-    InstanceImpl& parent_;
+    std::weak_ptr<InstanceImpl> parent_;
     Event::Dispatcher& dispatcher_;
     const std::string cluster_name_;
     Upstream::ClusterUpdateCallbacksHandlePtr cluster_update_handle_;
@@ -171,15 +171,21 @@ private:
      */
     Event::TimerPtr drain_timer_;
     bool is_redis_cluster_;
+    Common::Redis::Client::ClientFactory& client_factory_;
+    Common::Redis::Client::ConfigSharedPtr config_;
+    Stats::ScopeSharedPtr stats_scope_;
+    Common::Redis::RedisCommandStatsSharedPtr redis_command_stats_;
+    RedisClusterStats redis_cluster_stats_;
+    const Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager_;
   };
 
   const std::string cluster_name_;
   Upstream::ClusterManager& cm_;
   Common::Redis::Client::ClientFactory& client_factory_;
   ThreadLocal::SlotPtr tls_;
-  Common::Redis::Client::ConfigImpl config_;
+  Common::Redis::Client::ConfigSharedPtr config_;
   Api::Api& api_;
-  Stats::ScopePtr stats_scope_;
+  Stats::ScopeSharedPtr stats_scope_;
   Common::Redis::RedisCommandStatsSharedPtr redis_command_stats_;
   RedisClusterStats redis_cluster_stats_;
   const Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager_;
