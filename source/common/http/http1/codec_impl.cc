@@ -389,7 +389,7 @@ void RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool end
   // exceptions and this would cause abnormal process termination in error cases. This change
   // replaces abnormal process termination from unhandled exception with the RELEASE_ASSERT. Further
   // work will replace this RELEASE_ASSERT with proper error handling.
-  RELEASE_ASSERT(!method || (!path && !is_connect), ":method and :path must be specified");
+  RELEASE_ASSERT(method && (path || is_connect), ":method and :path must be specified");
 
   if (method->value() == Headers::get().MethodValues.Head) {
     head_request_ = true;
@@ -583,7 +583,6 @@ Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
         break;
       }
     }
-    ENVOY_LOG_MISC(info, "DISPATCIHNG BUFFERED BODY");
     dispatchBufferedBody();
   } else {
     auto result = dispatchSlice(nullptr, 0);
