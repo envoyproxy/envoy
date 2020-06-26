@@ -9,8 +9,6 @@
 #include "common/http/headers.h"
 #include "common/protobuf/utility.h"
 
-#include "extensions/filters/http/cache/cache_headers_utils.h"
-
 #include "absl/time/time.h"
 
 namespace Envoy {

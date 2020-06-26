@@ -3,8 +3,6 @@
 #include "envoy/common/time.h"
 #include "envoy/http/header_map.h"
 
-#include "extensions/filters/http/cache/cache_headers_utils.h"
-
 #include "absl/strings/string_view.h"
 #include "absl/time/time.h"
 
