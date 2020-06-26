@@ -5,7 +5,7 @@ Postgres proxy
 
 The Postgres proxy filter decodes the wire protocol between a Postgres client (downstream) and a Postgres server
 (upstream). The decoded information is used to produce Postgres level statistics like sessions,
-statements or transactions executed, among others. The Postgres proxy filter parses SQL queries carried in ``Query`` messages.
+statements or transactions executed, among others. The Postgres proxy filter parses SQL queries carried in ``Query`` and ``Parse`` messages.
 When SQL query has been parsed successfully, the :ref:`metadata <config_network_filters_postgres_proxy_dynamic_metadata>` is created, 
 which may be used by other filters like :ref:`RBAC <config_network_filters_rbac>`.
 When the Postgres filter detects that a session is encrypted, the messages are ignored and no decoding takes
@@ -80,11 +80,11 @@ Every configured Postgres proxy filter has statistics rooted at postgres.<stat_p
   statements_select, Counter, Number of SELECT statements
   statements_update, Counter, Number of UPDATE statements
   statements_other, Counter, "Number of statements other than DELETE, INSERT, SELECT or UPDATE"
+  statements_parsed, Counter, Number of SQL queries parsed successfully
+  statements_parse_error, Counter, Number of SQL queries not parsed successfully
   transactions, Counter, Total number of SQL transactions
   transactions_commit, Counter, Number of COMMIT transactions
   transactions_rollback, Counter, Number of ROLLBACK transactions
-  queries_parsed, Counter, Number of SQL queries parsed successfully
-  queries_parse_error, Counter, Number of SQL queries not parsed successfully
   notices, Counter, Total number of NOTICE messages
   notices_notice, Counter, Number of NOTICE messages with NOTICE subtype
   notices_log, Counter, Number of NOTICE messages with LOG subtype
@@ -99,7 +99,7 @@ Every configured Postgres proxy filter has statistics rooted at postgres.<stat_p
 Dynamic Metadata
 ----------------
 
-The Postgres filter emits dynamic metadata based on SQL statements carried in ``Query`` messages. ``queries_parsed`` statistics Counter tracks how many times
+The Postgres filter emits Dynamic Metadata based on SQL statements carried in ``Query`` and ``Parse`` messages. ``statements_parsed`` statistics Counter tracks how many times
 SQL statement was parsed successfully and metadata was created. The metadata is emitted in the following format:
 
 .. csv-table::
@@ -109,4 +109,10 @@ SQL statement was parsed successfully and metadata was created. The metadata is 
   <table.db>, string, The resource name in *table.db* format.
   [], list, A list of strings representing the operations executed on the resource. Operations can be one of insert/update/select/drop/delete/create/alter/show.
 
-Parsing SQL statements and emitting metadata can be disabled by setting :ref:`enable_sql_parsing<envoy_v3_api_field_extensions.filters.network.postgres_proxy.v3alpha.PostgresProxy.enable_sql_parsing>` to false.
+.. attention::
+
+   Currently used parser does not successfully parse all Postgres SQL statements and it cannot be assumed that all SQL queries will successfully produce Dynamic Metadata.
+   Creating Dynamic Metadata from SQL queries is on best-effort basis at the moment. If parsing of an SQL query fails, ``statements_parse_error`` counter is increased, log message is created, Dynamic Metadata is not
+   produced, but the Postgres message is still forwarded to upstream Postgres server.
+
+Parsing SQL statements and emitting Dynamic Metadata can be disabled by setting :ref:`enable_sql_parsing<envoy_v3_api_field_extensions.filters.network.postgres_proxy.v3alpha.PostgresProxy.enable_sql_parsing>` to false.
