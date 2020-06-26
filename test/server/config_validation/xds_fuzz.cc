@@ -151,12 +151,14 @@ AssertionResult XdsFuzzTest::waitForAck(const std::string& expected_type_url,
     API_NO_BOOST(envoy::api::v2::DiscoveryRequest) discovery_request;
     do {
       VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
+      ENVOY_LOG_MISC(info, "Received gRPC message with type {} and version {}", discovery_request.type_url(), expected_version);
     } while (expected_type_url != discovery_request.type_url() &&
              expected_version != discovery_request.version_info());
   } else {
     API_NO_BOOST(envoy::api::v2::DeltaDiscoveryRequest) delta_discovery_request;
     do {
       VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, delta_discovery_request));
+      ENVOY_LOG_MISC(info, "Received gRPC message with type {}", delta_discovery_request.type_url());
     } while (expected_type_url != delta_discovery_request.type_url());
   }
   version_++;
@@ -180,9 +182,15 @@ void XdsFuzzTest::replay() {
       Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")},
       {buildClusterLoadAssignment("cluster_0")}, {}, "0");
 
+  // the client will not subscribe to the RouteConfiguration type URL until it
+  // receives a listener, and the ACKS it sends back seem to be an empty type
+  // URL so just don't check them until a listener is added
+  bool sent_listener = false;
+
   for (const auto& action : actions_) {
     switch (action.action_selector_case()) {
     case test::server::config_validation::Action::kAddListener: {
+      sent_listener = true;
       uint32_t listener_num = action.add_listener().listener_num();
       removeListener(listener_num);
       auto listener = buildListener(listener_num, action.add_listener().route_num());
@@ -196,6 +204,7 @@ void XdsFuzzTest::replay() {
       break;
     }
     case test::server::config_validation::Action::kRemoveListener: {
+      /* sent_listener = true; */
       auto removed = removeListener(action.remove_listener().listener_num());
 
       if (removed) {
@@ -218,7 +227,9 @@ void XdsFuzzTest::replay() {
         updateRoute(routes_, {route}, {});
       }
 
-      EXPECT_TRUE(waitForAck(Config::TypeUrl::get().RouteConfiguration, std::to_string(version_)));
+      if (sent_listener) {
+        EXPECT_TRUE(waitForAck(Config::TypeUrl::get().RouteConfiguration, std::to_string(version_)));
+      }
       break;
     }
     case test::server::config_validation::Action::kRemoveRoute: {
