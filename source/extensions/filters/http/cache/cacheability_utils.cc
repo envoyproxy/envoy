@@ -25,7 +25,7 @@ bool CacheabilityUtils::isCacheableResponse(const Http::ResponseHeaderMap& heade
   // https://tools.ietf.org/html/rfc7231#section-6.1,
   // https://tools.ietf.org/html/rfc7538#section-3,
   // https://tools.ietf.org/html/rfc7725#section-3
-  // TODO: the list of cache-able status codes should be configurable
+  // TODO: the list of cacheable status codes should be configurable
   const absl::flat_hash_set<absl::string_view> cacheable_status_codes_ = {
       "200", "203", "204", "206", "300", "301", "308", "404", "405", "410", "414", "451", "501"};
 

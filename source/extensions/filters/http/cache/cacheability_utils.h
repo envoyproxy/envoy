@@ -18,8 +18,8 @@ public:
   static bool isCacheableRequest(const Http::RequestHeaderMap& headers);
 
   // Checks if a response can be stored in cache
-  // Note that if a request is not cache-able according to 'isCacheableRequest'
-  // then its response is also not cache-able
+  // Note that if a request is not cacheable according to 'isCacheableRequest'
+  // then its response is also not cacheable
   // Therefore, 'isCacheableRequest' & 'isCacheableResponse' together
   // should cover https://httpwg.org/specs/rfc7234.html#response.cacheability
   static bool isCacheableResponse(const Http::ResponseHeaderMap& headers,

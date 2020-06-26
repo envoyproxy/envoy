@@ -1,8 +1,5 @@
 #include "extensions/filters/http/cache/cache_headers_utils.h"
 
-#include <bits/stdint-intn.h>
-#include <bits/stdint-uintn.h>
-
 #include <array>
 #include <string>
 #include <tuple>
@@ -93,8 +90,25 @@ CacheHeadersUtils::separateDirectiveAndArgument(absl::string_view full_directive
   return std::make_tuple(directive, argument);
 }
 
+// The grammar for This Cache-Control header value should be:
+// Cache-Control   = 1#cache-directive
+// cache-directive = token [ "=" ( token / quoted-string ) ]
+// token           = 1*tchar
+// tchar           = "!" / "#" / "$" / "%" / "&" / "'" / "*" / "+"
+//                 / "-" / "." / "^" / "_" / "`" / "|" / "~" / DIGIT / ALPHA
+// quoted-string   = DQUOTE *( qdtext / quoted-pair ) DQUOTE
+// qdtext          = HTAB / SP /%x21 / %x23-5B / %x5D-7E / obs-text
+// obs-text        = %x80-FF
+// quoted-pair     = "\" ( HTAB / SP / VCHAR / obs-text )
+// VCHAR           =  %x21-7E  ; visible (printing) characters
+
 RequestCacheControl CacheHeadersUtils::requestCacheControl(absl::string_view cache_control_header) {
   RequestCacheControl request_cache_control;
+  // If a directive argument contains , by mistake
+  // the part before the , will be parsed as the argument
+  // the part after it will be ignored
+  // e.g "cache-control: no-cache, max-stale=10,0, no-transform"
+  // max-stale will be parsed as 10, 0 will be ignored
   std::vector<absl::string_view> directives = absl::StrSplit(cache_control_header, ',');
 
   for (auto full_directive : directives) {

@@ -67,19 +67,6 @@ public:
   // header_entry is null or malformed.
   static SystemTime httpTime(const Http::HeaderEntry* header_entry);
 
-  // TODO: Add asserts as necessary
-  // The grammar for This Cache-Control header value should be:
-  // Cache-Control   = 1#cache-directive
-  // cache-directive = token [ "=" ( token / quoted-string ) ]
-  // token           = 1*tchar
-  // tchar           = "!" / "#" / "$" / "%" / "&" / "'" / "*" / "+"
-  //                 / "-" / "." / "^" / "_" / "`" / "|" / "~" / DIGIT / ALPHA
-  // quoted-string   = DQUOTE *( qdtext / quoted-pair ) DQUOTE
-  // qdtext          = HTAB / SP /%x21 / %x23-5B / %x5D-7E / obs-text
-  // obs-text        = %x80-FF
-  // quoted-pair     = "\" ( HTAB / SP / VCHAR / obs-text )
-  // VCHAR           =  %x21-7E  ; visible (printing) characters
-
   // Parses the cache-control header of a request
   // A directive that should not have arguments will ignore any existing arguments
   // A directive that should have arguments will be ignored if no arguments are present
