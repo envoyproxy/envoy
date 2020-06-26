@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package test.extensions.filters.network;
+import "google/protobuf/empty.proto";
+import "validate/validate.proto";
+import "test/fuzz/common.proto";
+// import "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto";
+import "envoy/config/listener/v3/listener_components.proto";
+
+message OnData {
+  bytes data = 1;
+  bool end_stream = 2;
+}
+
+message Action {
+  oneof action_selector {
+    option (validate.required) = true;
+    // Call onNewConnection().
+    google.protobuf.Empty on_new_connection = 1;
+    // Call onData().
+    OnData on_data = 2;
+    // Connection close
+    // google.protobuf.Empty remote_close = 3;
+    // google.protobuf.Empty local_close = 4;
+  }
+}
+
+message FilterFuzzTestCase {
+  // envoy.extensions.filters.network.http_connection_manager.v3.HttpFilter config = 1;
+  envoy.config.listener.v3.Filter config = 1;
+  repeated Action actions = 2;
+}
