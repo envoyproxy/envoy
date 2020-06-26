@@ -355,7 +355,7 @@ bool HttpHealthCheckerImpl::HttpActiveHealthCheckSession::shouldClose() const {
 
   if (response_headers_->Connection()) {
     const bool close =
-        absl::EqualsIgnoreCase(response_headers_->Connection()->value().getStringView(),
+        absl::EqualsIgnoreCase(response_headers_.getConnectionValue(),
                                Http::Headers::get().ConnectionValues.Close);
     if (close) {
       return true;
@@ -364,7 +364,7 @@ bool HttpHealthCheckerImpl::HttpActiveHealthCheckSession::shouldClose() const {
 
   if (response_headers_->ProxyConnection() && protocol_ < Http::Protocol::Http2) {
     const bool close =
-        absl::EqualsIgnoreCase(response_headers_->ProxyConnection()->value().getStringView(),
+        absl::EqualsIgnoreCase(response_headers_.getProxyConnectionValue(),
                                Http::Headers::get().ConnectionValues.Close);
     if (close) {
       return true;

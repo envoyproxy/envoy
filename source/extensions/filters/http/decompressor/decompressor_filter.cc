@@ -63,7 +63,7 @@ Http::FilterHeadersStatus DecompressorFilter::decodeHeaders(Http::RequestHeaderM
     headers.appendAcceptEncoding(config_->contentEncoding(), ",");
     ENVOY_STREAM_LOG(debug,
                      "DecompressorFilter::decodeHeaders advertise Accept-Encoding with value '{}'",
-                     *decoder_callbacks_, headers.AcceptEncoding()->value().getStringView());
+                     *decoder_callbacks_, headers.getAcceptEncodingValue());
   }
 
   //   2. If request decompression is enabled, then decompress the request.
@@ -140,7 +140,7 @@ Http::FilterDataStatus DecompressorFilter::maybeDecompress(
 bool DecompressorFilter::hasCacheControlNoTransform(
     Http::RequestOrResponseHeaderMap& headers) const {
   return headers.CacheControl()
-             ? StringUtil::caseFindToken(headers.CacheControl()->value().getStringView(), ",",
+             ? StringUtil::caseFindToken(headers.getCacheControlValue(), ",",
                                          Http::Headers::get().CacheControlValues.NoTransform)
              : false;
 }
@@ -152,14 +152,14 @@ bool DecompressorFilter::hasCacheControlNoTransform(
 bool DecompressorFilter::contentEncodingMatches(Http::RequestOrResponseHeaderMap& headers) const {
   if (headers.ContentEncoding()) {
     absl::string_view coding = StringUtil::trim(
-        StringUtil::cropRight(headers.ContentEncoding()->value().getStringView(), ","));
+        StringUtil::cropRight(headers.getContentEncodingValue(), ","));
     return StringUtil::CaseInsensitiveCompare()(config_->contentEncoding(), coding);
   }
   return false;
 }
 
 void DecompressorFilter::modifyContentEncoding(Http::RequestOrResponseHeaderMap& headers) const {
-  const auto all_codings = StringUtil::trim(headers.ContentEncoding()->value().getStringView());
+  const auto all_codings = StringUtil::trim(headers.getContentEncodingValue());
   const auto remaining_codings = StringUtil::trim(StringUtil::cropLeft(all_codings, ","));
 
   if (remaining_codings != all_codings) {

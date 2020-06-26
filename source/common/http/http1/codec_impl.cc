@@ -1105,7 +1105,7 @@ int ClientConnectionImpl::onHeadersComplete() {
       // For responses to connect requests, do not accept the chunked
       // encoding header: https://tools.ietf.org/html/rfc7231#section-4.3.6
       if (headers->TransferEncoding() &&
-          absl::EqualsIgnoreCase(headers->TransferEncoding()->value().getStringView(),
+          absl::EqualsIgnoreCase(headers.getTransferEncodingValue(),
                                  Headers::get().TransferEncodingValues.Chunked)) {
         sendProtocolError(Http1ResponseCodeDetails::get().InvalidTransferEncoding);
         throw CodecProtocolException("http/1.1 protocol error: unsupported transfer encoding");
@@ -1121,7 +1121,7 @@ int ClientConnectionImpl::onHeadersComplete() {
 
       if (headers->ContentLength()) {
         // Report a protocol error for non-zero Content-Length, but paper over zero Content-Length.
-        if (headers->ContentLength()->value().getStringView() != "0") {
+        if (headers.getContentLengthValue() != "0") {
           sendProtocolError(Http1ResponseCodeDetails::get().ContentLengthNotAllowed);
           throw CodecProtocolException(
               "http/1.1 protocol error: content length not allowed in 1xx or 204");

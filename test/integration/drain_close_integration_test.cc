@@ -95,7 +95,7 @@ TEST_P(DrainCloseIntegrationTest, AdminGracefulDrain) {
   // Invoke /drain_listeners with graceful drain
   BufferingStreamDecoderPtr admin_response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "POST", "/drain_listeners?graceful", "", downstreamProtocol(), version_);
-  EXPECT_EQ(admin_response->headers().Status()->value().getStringView(), "200");
+  EXPECT_EQ(admin_response->headers().getStatusValue(), "200");
 
   // With a 999s graceful drain period, the listener should still be open.
   EXPECT_EQ(test_server_->counter("listener_manager.listener_stopped")->value(), 0);
@@ -123,7 +123,7 @@ TEST_P(DrainCloseIntegrationTest, AdminGracefulDrain) {
   second_codec_client_->rawConnection().close(Network::ConnectionCloseType::NoFlush);
   admin_response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "POST", "/drain_listeners", "", downstreamProtocol(), version_);
-  EXPECT_EQ(admin_response->headers().Status()->value().getStringView(), "200");
+  EXPECT_EQ(admin_response->headers().getStatusValue(), "200");
 
   test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
   EXPECT_NO_THROW(Network::TcpListenSocket(
@@ -149,13 +149,13 @@ TEST_P(DrainCloseIntegrationTest, RepeatedAdminGracefulDrain) {
   // Invoke /drain_listeners with graceful drain
   BufferingStreamDecoderPtr admin_response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "POST", "/drain_listeners?graceful", "", downstreamProtocol(), version_);
-  EXPECT_EQ(admin_response->headers().Status()->value().getStringView(), "200");
+  EXPECT_EQ(admin_response->headers().getStatusValue(), "200");
   EXPECT_EQ(test_server_->counter("listener_manager.listener_stopped")->value(), 0);
 
   admin_response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "POST", "/drain_listeners?graceful", "", downstreamProtocol(), version_);
-  EXPECT_EQ(admin_response->headers().Status()->value().getStringView(), "200");
-  EXPECT_EQ(admin_response->headers().Status()->value().getStringView(), "200");
+  EXPECT_EQ(admin_response->headers().getStatusValue(), "200");
+  EXPECT_EQ(admin_response->headers().getStatusValue(), "200");
 
   response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest(0);

@@ -236,13 +236,13 @@ bool HeaderUtility::shouldCloseConnection(Http::Protocol protocol,
   // Keep-Alive is present.
   if (protocol == Protocol::Http10 &&
       (!headers.Connection() ||
-       !Envoy::StringUtil::caseFindToken(headers.Connection()->value().getStringView(), ",",
+       !Envoy::StringUtil::caseFindToken(headers.getConnectionValue(), ",",
                                          Http::Headers::get().ConnectionValues.KeepAlive))) {
     return true;
   }
 
   if (protocol == Protocol::Http11 && headers.Connection() &&
-      Envoy::StringUtil::caseFindToken(headers.Connection()->value().getStringView(), ",",
+      Envoy::StringUtil::caseFindToken(headers.getConnectionValue(), ",",
                                        Http::Headers::get().ConnectionValues.Close)) {
     return true;
   }
@@ -251,7 +251,7 @@ bool HeaderUtility::shouldCloseConnection(Http::Protocol protocol,
   // since it is supported by http-parser the underlying parser for http
   // requests.
   if (protocol < Protocol::Http2 && headers.ProxyConnection() &&
-      Envoy::StringUtil::caseFindToken(headers.ProxyConnection()->value().getStringView(), ",",
+      Envoy::StringUtil::caseFindToken(headers.getProxyConnectionValue(), ",",
                                        Http::Headers::get().ConnectionValues.Close)) {
     return true;
   }

@@ -61,7 +61,7 @@ void SignerImpl::sign(Http::RequestHeaderMap& headers, const std::string& conten
   // Phase 1: Create a canonical request
   const auto canonical_headers = Utility::canonicalizeHeaders(headers);
   const auto canonical_request = Utility::createCanonicalRequest(
-      method_header->value().getStringView(), path_header->value().getStringView(),
+      headers().getMethodValue(), headers().getPathValue(),
       canonical_headers, content_hash);
   ENVOY_LOG(debug, "Canonical request:\n{}", canonical_request);
   // Phase 2: Create a string to sign

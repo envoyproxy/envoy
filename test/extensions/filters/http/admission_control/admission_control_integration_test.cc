@@ -46,7 +46,7 @@ protected:
   }
 
   void verifyHttpSuccess(IntegrationStreamDecoderPtr response) {
-    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+    EXPECT_EQ("200", response->headers().getStatusValue());
   }
 
   IntegrationStreamDecoderPtr sendGrpcRequestWithReturnCode(uint64_t code) {
@@ -105,7 +105,7 @@ TEST_P(AdmissionControlIntegrationTest, HttpTest) {
   ENVOY_LOG(info, "validating throttling rate");
   for (int i = 0; i < 1000; ++i) {
     auto response = sendRequestWithReturnCode("500");
-    auto rc = response->headers().Status()->value().getStringView();
+    auto rc = response->headers().getStatusValue();
     if (rc == "503") {
       ++throttle_count;
     } else {

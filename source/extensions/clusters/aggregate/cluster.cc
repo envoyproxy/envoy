@@ -109,7 +109,7 @@ void Cluster::onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) {
   }
 }
 
-void Cluster::onClusterRemoval(const std::string& cluster_name) {
+void Cluster::onClusterRemoval(absl::string_view cluster_name) {
   //  The onClusterRemoval callback is called before the thread local cluster is removed. There
   //  will be a dangling pointer to the thread local cluster if the deleted cluster is not skipped
   //  when we refresh the load balancer.
