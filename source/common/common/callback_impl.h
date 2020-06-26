@@ -24,7 +24,7 @@ public:
    */
   CallbackHandle* add(Callback callback) {
     callbacks_.emplace_back(*this, callback);
-    // callbacks_.back().it_ = (--callbacks_.end());
+    callbacks_.back().it_ = (--callbacks_.end());
     return &callbacks_.back();
   }
 
@@ -51,6 +51,10 @@ private:
 
     CallbackManager& parent_;
     Callback cb_;
+
+    // the iterator of this callback holder inside callbacks_ list
+    // upon removal, use this iterator to delete callback holder in O(1)
+    typename std::list<CallbackHolder>::iterator it_;
   };
 
   /**
@@ -58,17 +62,19 @@ private:
    * @param handle supplies the callback handle to remove.
    */
   void remove(CallbackHandle* handle) {
+    removed_.clear();
     ASSERT(std::find_if(callbacks_.begin(), callbacks_.end(),
                         [handle](const CallbackHolder& holder) -> bool {
                           return handle == &holder;
                         }) != callbacks_.end());
-    // auto it = dynamic_cast<CallbackHolder*>(handle)->it_;
-    // callbacks_.erase(it);
-    callbacks_.remove_if(
-        [handle](const CallbackHolder& holder) -> bool { return handle == &holder; });
+    auto it = dynamic_cast<CallbackHolder*>(handle)->it_;
+    // Transfer the ownership of this holder to removed_ list,
+    // which is cleared when the next callback holder call remove.
+    removed_.splice(removed_.begin(), callbacks_, it);
   }
 
   std::list<CallbackHolder> callbacks_;
+  std::list<CallbackHolder> removed_;
 };
 
 } // namespace Common
