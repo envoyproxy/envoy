@@ -20,6 +20,18 @@ namespace HeaderToMetadataFilter {
 using HeaderToMetadataProtoConfig =
     envoy::extensions::filters::http::header_to_metadata::v3::Config;
 
+void testForbiddenConfig(const std::string& yaml) {
+  HeaderToMetadataProtoConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  HeaderToMetadataConfig factory;
+
+  EXPECT_THROW(factory.createFilterFactoryFromProto(proto_config, "stats", context),
+               EnvoyException);
+}
+
+// Tests that an empty header is rejected.
 TEST(HeaderToMetadataFilterConfigTest, InvalidEmptyHeader) {
   const std::string yaml = R"EOF(
 request_rules:
@@ -30,6 +42,7 @@ request_rules:
   EXPECT_THROW(TestUtility::loadFromYamlAndValidate(yaml, proto_config), ProtoValidationException);
 }
 
+// Tests that empty (metadata) keys are rejected.
 TEST(HeaderToMetadataFilterConfigTest, InvalidEmptyKey) {
   const std::string yaml = R"EOF(
 request_rules:
@@ -44,6 +57,7 @@ request_rules:
   EXPECT_THROW(TestUtility::loadFromYamlAndValidate(yaml, proto_config), ProtoValidationException);
 }
 
+// Tests that a valid config is properly consumed.
 TEST(HeaderToMetadataFilterConfigTest, SimpleConfig) {
   const std::string yaml = R"EOF(
 request_rules:
@@ -71,6 +85,7 @@ request_rules:
   cb(filter_callbacks);
 }
 
+// Tests that per route config properly overrides the global config.
 TEST(HeaderToMetadataFilterConfigTest, PerRouteConfig) {
   const std::string yaml = R"EOF(
 request_rules:
@@ -97,6 +112,39 @@ request_rules:
   const auto* config = dynamic_cast<const Config*>(route_config.get());
   EXPECT_TRUE(config->doRequest());
   EXPECT_FALSE(config->doResponse());
+}
+
+// Tests that configuration does not allow value and regex_value_rewrite in the same rule.
+TEST(HeaderToMetadataFilterConfigTest, ValueAndRegex) {
+  const std::string yaml = R"EOF(
+request_rules:
+  - header: x-version
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: cluster
+      value: foo
+      regex_value_rewrite:
+        pattern:
+          google_re2: {}
+          regex: "^/(cluster[\\d\\w-]+)/?.*$"
+        substitution: "\\1"
+  )EOF";
+
+  testForbiddenConfig(yaml);
+}
+
+// Tests that on_header_missing rules don't allow an empty value.
+TEST(HeaderToMetadataFilterConfigTest, OnHeaderMissingEmptyValue) {
+  const std::string yaml = R"EOF(
+request_rules:
+  - header: x-version
+    on_header_missing:
+      metadata_namespace: envoy.lb
+      key: "foo"
+      type: STRING
+  )EOF";
+
+  testForbiddenConfig(yaml);
 }
 
 } // namespace HeaderToMetadataFilter

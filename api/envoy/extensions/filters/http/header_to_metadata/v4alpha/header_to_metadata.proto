@@ -1,18 +1,17 @@
 syntax = "proto3";
 
-package envoy.extensions.filters.http.header_to_metadata.v3;
+package envoy.extensions.filters.http.header_to_metadata.v4alpha;
 
-import "envoy/type/matcher/v3/regex.proto";
+import "envoy/type/matcher/v4alpha/regex.proto";
 
-import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.filters.http.header_to_metadata.v3";
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.header_to_metadata.v4alpha";
 option java_outer_classname = "HeaderToMetadataProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
 
 // [#protodoc-title: Header-To-Metadata Filter]
 //
@@ -24,7 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 message Config {
   option (udpa.annotations.versioning).previous_message_type =
-      "envoy.config.filter.http.header_to_metadata.v2.Config";
+      "envoy.extensions.filters.http.header_to_metadata.v3.Config";
 
   enum ValueType {
     STRING = 0;
@@ -50,7 +49,7 @@ message Config {
   // [#next-free-field: 7]
   message KeyValuePair {
     option (udpa.annotations.versioning).previous_message_type =
-        "envoy.config.filter.http.header_to_metadata.v2.Config.KeyValuePair";
+        "envoy.extensions.filters.http.header_to_metadata.v3.Config.KeyValuePair";
 
     // The namespace — if this is empty, the filter's namespace will be used.
     string metadata_namespace = 1;
@@ -58,24 +57,25 @@ message Config {
     // The key to use within the namespace.
     string key = 2 [(validate.rules).string = {min_bytes: 1}];
 
-    // The value to pair with the given key.
-    //
-    // When used for a
-    // :ref:`on_header_present <envoy_v3_api_field_extensions.filters.http.header_to_metadata.v3.Config.Rule.on_header_present>`
-    // case, if value is non-empty it'll be used instead of the header value. If both are empty, no metadata is added.
-    //
-    // When used for a :ref:`on_header_missing <envoy_v3_api_field_extensions.filters.http.header_to_metadata.v3.Config.Rule.on_header_missing>`
-    // case, a non-empty value must be provided otherwise no metadata is added.
-    string value = 3 [(udpa.annotations.field_migrate).oneof_promotion = "value_type"];
+    oneof value_type {
+      // The value to pair with the given key.
+      //
+      // When used for a
+      // :ref:`on_header_present <envoy_v3_api_field_extensions.filters.http.header_to_metadata.v3.Config.Rule.on_header_present>`
+      // case, if value is non-empty it'll be used instead of the header value. If both are empty, no metadata is added.
+      //
+      // When used for a :ref:`on_header_missing <envoy_v3_api_field_extensions.filters.http.header_to_metadata.v3.Config.Rule.on_header_missing>`
+      // case, a non-empty value must be provided otherwise no metadata is added.
+      string value = 3;
 
-    // If present, the header's value will be matched and substituted with this. If there is no match or substitution, the header value
-    // is used as-is.
-    //
-    // This is only used for :ref:`on_header_present <envoy_v3_api_field_extensions.filters.http.header_to_metadata.v3.Config.Rule.on_header_present>`.
-    //
-    // Note: if the `value` field is non-empty this field should be empty.
-    type.matcher.v3.RegexMatchAndSubstitute regex_value_rewrite = 6
-        [(udpa.annotations.field_migrate).oneof_promotion = "value_type"];
+      // If present, the header's value will be matched and substituted with this. If there is no match or substitution, the header value
+      // is used as-is.
+      //
+      // This is only used for :ref:`on_header_present <envoy_v3_api_field_extensions.filters.http.header_to_metadata.v3.Config.Rule.on_header_present>`.
+      //
+      // Note: if the `value` field is non-empty this field should be empty.
+      type.matcher.v4alpha.RegexMatchAndSubstitute regex_value_rewrite = 6;
+    }
 
     // The value's type — defaults to string.
     ValueType type = 4;
@@ -88,7 +88,7 @@ message Config {
   // A Rule defines what metadata to apply when a header is present or missing.
   message Rule {
     option (udpa.annotations.versioning).previous_message_type =
-        "envoy.config.filter.http.header_to_metadata.v2.Config.Rule";
+        "envoy.extensions.filters.http.header_to_metadata.v3.Config.Rule";
 
     // The header that triggers this rule — required.
     string header = 1
