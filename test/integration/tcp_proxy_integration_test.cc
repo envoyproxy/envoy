@@ -627,9 +627,9 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
   tcp_proxy_.set_stat_prefix("tcp_stats");
   tcp_proxy_.set_cluster("cluster_0");
   tcp_proxy_.mutable_metadata_match()->MergeFrom(
-      lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}}));
+      lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}}));
 
-  endpoint_metadata_ = lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}});
+  endpoint_metadata_ = lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}});
 
   initialize();
 
@@ -645,9 +645,9 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
   tcp_proxy_.mutable_hidden_envoy_deprecated_deprecated_v1()->add_routes()->set_cluster(
       "cluster_0");
   tcp_proxy_.mutable_metadata_match()->MergeFrom(
-      lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}}));
+      lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}}));
 
-  endpoint_metadata_ = lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}});
+  endpoint_metadata_ = lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}});
 
   config_helper_.addRuntimeOverride("envoy.deprecated_features:envoy.extensions.filters.network."
                                     "tcp_proxy.v3.TcpProxy.hidden_envoy_deprecated_deprecated_v1",
@@ -665,9 +665,9 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest, EndpointShouldMatchWeightedClusterW
   cluster_0->set_name("cluster_0");
   cluster_0->set_weight(1);
   cluster_0->mutable_metadata_match()->MergeFrom(
-      lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}}));
+      lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}}));
 
-  endpoint_metadata_ = lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}});
+  endpoint_metadata_ = lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}});
 
   initialize();
 
@@ -684,9 +684,9 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
   cluster_0->set_name("cluster_0");
   cluster_0->set_weight(1);
   cluster_0->mutable_metadata_match()->MergeFrom(lbMetadata(
-      {{"role", "master"}, {"stage", "prod"}})); // should override `stage` value at top-level
+      {{"role", "primary"}, {"stage", "prod"}})); // should override `stage` value at top-level
 
-  endpoint_metadata_ = lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}});
+  endpoint_metadata_ = lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}});
 
   initialize();
 
@@ -699,12 +699,12 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
        EndpointShouldMatchWeightedClusterWithTopLevelMetadataMatch) {
   tcp_proxy_.set_stat_prefix("tcp_stats");
   tcp_proxy_.mutable_metadata_match()->MergeFrom(
-      lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}}));
+      lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}}));
   auto* cluster_0 = tcp_proxy_.mutable_weighted_clusters()->add_clusters();
   cluster_0->set_name("cluster_0");
   cluster_0->set_weight(1);
 
-  endpoint_metadata_ = lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}});
+  endpoint_metadata_ = lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}});
 
   initialize();
 
@@ -718,7 +718,7 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
   tcp_proxy_.set_stat_prefix("tcp_stats");
   tcp_proxy_.set_cluster("cluster_0");
   tcp_proxy_.mutable_metadata_match()->MergeFrom(
-      lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}}));
+      lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}}));
 
   endpoint_metadata_ = lbMetadata({{"role", "replica"}, {"version", "v1"}, {"stage", "prod"}});
 
@@ -736,7 +736,7 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
   tcp_proxy_.mutable_hidden_envoy_deprecated_deprecated_v1()->add_routes()->set_cluster(
       "cluster_0");
   tcp_proxy_.mutable_metadata_match()->MergeFrom(
-      lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}}));
+      lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}}));
 
   endpoint_metadata_ = lbMetadata({{"role", "replica"}, {"version", "v1"}, {"stage", "prod"}});
 
@@ -757,7 +757,7 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
   cluster_0->set_name("cluster_0");
   cluster_0->set_weight(1);
   cluster_0->mutable_metadata_match()->MergeFrom(
-      lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}}));
+      lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}}));
 
   endpoint_metadata_ = lbMetadata({{"role", "replica"}, {"version", "v1"}, {"stage", "prod"}});
 
@@ -776,9 +776,9 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
   cluster_0->set_name("cluster_0");
   cluster_0->set_weight(1);
   cluster_0->mutable_metadata_match()->MergeFrom(lbMetadata(
-      {{"role", "master"}, {"stage", "prod"}})); // should override `stage` value at top-level
+      {{"role", "primary"}, {"stage", "prod"}})); // should override `stage` value at top-level
 
-  endpoint_metadata_ = lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "dev"}});
+  endpoint_metadata_ = lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "dev"}});
 
   initialize();
 
@@ -791,7 +791,7 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
        EndpointShouldNotMatchWeightedClusterWithTopLevelMetadataMatch) {
   tcp_proxy_.set_stat_prefix("tcp_stats");
   tcp_proxy_.mutable_metadata_match()->MergeFrom(
-      lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}}));
+      lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}}));
   auto* cluster_0 = tcp_proxy_.mutable_weighted_clusters()->add_clusters();
   cluster_0->set_name("cluster_0");
   cluster_0->set_weight(1);
@@ -842,7 +842,7 @@ void TcpProxySslIntegrationTest::setupConnections() {
       dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
                                           context_->createTransportSocket(nullptr), nullptr);
 
-  // Perform the SSL handshake. Loopback is whitelisted in tcp_proxy.json for the ssl_auth
+  // Perform the SSL handshake. Loopback is allowlisted in tcp_proxy.json for the ssl_auth
   // filter so there will be no pause waiting on auth data.
   ssl_client_->addConnectionCallbacks(connect_callbacks_);
   ssl_client_->enableHalfClose(true);

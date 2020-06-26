@@ -68,7 +68,7 @@ Changes
 * lua: extended to support :ref:`metadata object <config_http_filters_lua_metadata_wrapper>` API.
 * redis: added local `PING` support to the :ref:`Redis filter <arch_overview_redis>`.
 * redis: added `GEORADIUS_RO` and `GEORADIUSBYMEMBER_RO` to the :ref:`Redis command splitter
-  <arch_overview_redis>` whitelist.
+  <arch_overview_redis>` allowlist.
 * router: added DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT, DOWNSTREAM_LOCAL_ADDRESS,
   DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT, PROTOCOL, and UPSTREAM_METADATA :ref:`header
   formatters <config_http_conn_man_headers_custom_request_headers>`. The CLIENT_IP header formatter

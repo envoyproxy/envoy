@@ -137,6 +137,13 @@ modify different aspects of the server:
   The underlying proto is marked v2alpha and hence its contents, including the JSON representation,
   are not guaranteed to be stable.
 
+.. _operations_admin_interface_config_dump_include_eds:
+
+.. http:get:: /config_dump?include_eds
+
+  Dump currently loaded configuration including EDS. See the :ref:`response definition <envoy_v3_api_msg_admin.v3.EndpointsConfigDump>` for more
+  information.
+
 .. _operations_admin_interface_config_dump_by_mask:
 
 .. http:get:: /config_dump?mask={}

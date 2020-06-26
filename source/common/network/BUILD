@@ -48,7 +48,6 @@ envoy_cc_library(
     deps = [
         ":address_lib",
         ":utility_lib",
-        "//include/envoy/json:json_object_interface",
         "//include/envoy/network:address_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
