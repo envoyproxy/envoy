@@ -7,6 +7,8 @@
 #include "envoy/network/transport_socket.h"
 #include "envoy/upstream/host_description.h"
 
+#include "common/protobuf/protobuf.h"
+
 namespace Envoy {
 
 namespace Event {
@@ -269,6 +271,21 @@ public:
    * @param success boolean telling whether the filter execution was successful or not.
    */
   virtual void continueFilterChain(bool success) PURE;
+
+  /**
+   * @param name the namespace used in the metadata in reverse DNS format, for example:
+   * envoy.test.my_filter.
+   * @param value the struct to set on the namespace. A merge will be performed with new values for
+   * the same key overriding existing.
+   */
+  virtual void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) PURE;
+
+  /**
+   * @return const envoy::api::v2::core::Metadata& the dynamic metadata associated with this
+   * connection.
+   */
+  virtual envoy::config::core::v3::Metadata& dynamicMetadata() PURE;
+  virtual const envoy::config::core::v3::Metadata& dynamicMetadata() const PURE;
 };
 
 /**

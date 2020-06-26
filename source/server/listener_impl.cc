@@ -3,6 +3,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
+#include "envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.pb.h"
 #include "envoy/network/exception.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/active_udp_listener_config.h"
@@ -471,7 +472,7 @@ void ListenerImpl::buildProxyProtocolListenerFilter() {
         Config::Utility::getAndCheckFactoryByName<Configuration::NamedListenerFilterConfigFactory>(
             Extensions::ListenerFilters::ListenerFilterNames::get().ProxyProtocol);
     listener_filter_factories_.push_back(factory.createListenerFilterFactoryFromProto(
-        Envoy::ProtobufWkt::Empty(),
+        envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol(),
         /*listener_filter_matcher=*/nullptr, *listener_factory_context_));
   }
 }

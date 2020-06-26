@@ -310,6 +310,9 @@ public:
   MOCK_METHOD(ConnectionSocket&, socket, ());
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(void, continueFilterChain, (bool));
+  MOCK_METHOD(void, setDynamicMetadata, (const std::string&, const ProtobufWkt::Struct&));
+  MOCK_METHOD(envoy::config::core::v3::Metadata&, dynamicMetadata, ());
+  MOCK_METHOD(const envoy::config::core::v3::Metadata&, dynamicMetadata, (), (const));
 
   NiceMock<MockConnectionSocket> socket_;
 };
