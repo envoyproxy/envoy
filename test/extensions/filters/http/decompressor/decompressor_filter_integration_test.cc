@@ -93,12 +93,11 @@ TEST_P(DecompressorIntegrationTest, BidirectionalDecompression) {
   // Assert that the total bytes received upstream equal the sum of the uncompressed byte buffers
   // sent.
   EXPECT_TRUE(upstream_request_->complete());
-  TestUtility::headerMapEqualIgnoreOrder(
-      Http::TestRequestHeaderMapImpl{{":method", "POST"},
-                                     {":scheme", "http"},
-                                     {":path", "/test/long/url"},
-                                     {":authority", "host"}},
-      upstream_request_->headers());
+  TestUtility::headerMapEqualIgnoreOrder(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                        {":scheme", "http"},
+                                                                        {":path", "/test/long/url"},
+                                                                        {":authority", "host"}},
+                                         upstream_request_->headers());
   EXPECT_EQ(uncompressed_request_length, upstream_request_->bodyLength());
 
   // Verify stats
@@ -160,7 +159,7 @@ TEST_P(DecompressorIntegrationTest, BidirectionalDecompression) {
  * Exercises gzip decompression bidirectionally with default configuration.
  */
 TEST_P(DecompressorIntegrationTest, BidirectionalDecompressionError) {
-    const std::string bad_config{R"EOF(
+  const std::string bad_config{R"EOF(
       name: default_decompressor
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.filters.http.decompressor.v3.Decompressor
