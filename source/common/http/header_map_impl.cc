@@ -5,6 +5,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/http/header_map.h"
+
 #include "common/common/assert.h"
 #include "common/common/dump_state_utils.h"
 #include "common/common/empty_string.h"
@@ -26,22 +28,22 @@ void validateCapacity(uint64_t new_capacity) {
                  "Trying to allocate overly large headers.");
 }
 
-absl::string_view get_str_view(const VariantHeader& buffer) {
+absl::string_view getStrView(const VariantHeader& buffer) {
   return absl::get<absl::string_view>(buffer);
 }
 
-InlineHeaderVector& get_in_vec(VariantHeader& buffer) {
+InlineHeaderVector& getInVec(VariantHeader& buffer) {
   return absl::get<InlineHeaderVector>(buffer);
 }
 
-const InlineHeaderVector& get_in_vec(const VariantHeader& buffer) {
+const InlineHeaderVector& getInVec(const VariantHeader& buffer) {
   return absl::get<InlineHeaderVector>(buffer);
 }
 } // namespace
 
 // Initialize as a Type::Inline
 HeaderString::HeaderString() : buffer_(InlineHeaderVector()) {
-  ASSERT((get_in_vec(buffer_).capacity()) >= MaxIntegerLength);
+  ASSERT((getInVec(buffer_).capacity()) >= MaxIntegerLength);
   ASSERT(valid());
 }
 
@@ -72,19 +74,19 @@ void HeaderString::append(const char* data, uint32_t data_size) {
   case Type::Reference: {
     // Rather than be too clever and optimize this uncommon case, we switch to
     // Inline mode and copy.
-    const absl::string_view prev = get_str_view(buffer_);
+    const absl::string_view prev = getStrView(buffer_);
     buffer_ = InlineHeaderVector();
     // Assigning new_capacity to avoid resizing when appending the new data
-    get_in_vec(buffer_).reserve(new_capacity);
-    get_in_vec(buffer_).assign(prev.begin(), prev.end());
+    getInVec(buffer_).reserve(new_capacity);
+    getInVec(buffer_).assign(prev.begin(), prev.end());
     break;
   }
   case Type::Inline: {
-    get_in_vec(buffer_).reserve(new_capacity);
+    getInVec(buffer_).reserve(new_capacity);
     break;
   }
   }
-  get_in_vec(buffer_).insert(get_in_vec(buffer_).end(), data, data + data_size);
+  getInVec(buffer_).insert(getInVec(buffer_).end(), data, data + data_size);
 }
 
 void HeaderString::rtrim() {
@@ -92,21 +94,21 @@ void HeaderString::rtrim() {
   absl::string_view original = getStringView();
   absl::string_view rtrimmed = StringUtil::rtrim(original);
   if (original.size() != rtrimmed.size()) {
-    get_in_vec(buffer_).resize(rtrimmed.size());
+    getInVec(buffer_).resize(rtrimmed.size());
   }
 }
 
 absl::string_view HeaderString::getStringView() const {
   if (type() == Type::Reference) {
-    return get_str_view(buffer_);
+    return getStrView(buffer_);
   }
   ASSERT(type() == Type::Inline);
-  return {get_in_vec(buffer_).data(), get_in_vec(buffer_).size()};
+  return {getInVec(buffer_).data(), getInVec(buffer_).size()};
 }
 
 void HeaderString::clear() {
   if (type() == Type::Inline) {
-    get_in_vec(buffer_).clear();
+    getInVec(buffer_).clear();
   }
 }
 
@@ -118,8 +120,8 @@ void HeaderString::setCopy(const char* data, uint32_t size) {
     buffer_ = InlineHeaderVector();
   }
 
-  get_in_vec(buffer_).reserve(size);
-  get_in_vec(buffer_).assign(data, data + size);
+  getInVec(buffer_).reserve(size);
+  getInVec(buffer_).assign(data, data + size);
   ASSERT(valid());
 }
 
@@ -141,8 +143,8 @@ void HeaderString::setInteger(uint64_t value) {
     // Switching from Type::Reference to Type::Inline
     buffer_ = InlineHeaderVector();
   }
-  ASSERT((get_in_vec(buffer_).capacity()) > MaxIntegerLength);
-  get_in_vec(buffer_).assign(inner_buffer, inner_buffer + int_length);
+  ASSERT((getInVec(buffer_).capacity()) > MaxIntegerLength);
+  getInVec(buffer_).assign(inner_buffer, inner_buffer + int_length);
 }
 
 void HeaderString::setReference(absl::string_view ref_value) {
@@ -152,10 +154,10 @@ void HeaderString::setReference(absl::string_view ref_value) {
 
 uint32_t HeaderString::size() const {
   if (type() == Type::Reference) {
-    return get_str_view(buffer_).size();
+    return getStrView(buffer_).size();
   }
   ASSERT(type() == Type::Inline);
-  return get_in_vec(buffer_).size();
+  return getInVec(buffer_).size();
 }
 
 HeaderString::Type HeaderString::type() const {
@@ -192,30 +194,47 @@ void HeaderMapImpl::HeaderEntryImpl::value(const HeaderEntry& header) {
   value(header.value().getStringView());
 }
 
-#define INLINE_HEADER_STATIC_MAP_ENTRY(name)                                                       \
-  add(Headers::get().name.get().c_str(), [](HeaderMapType& h) -> StaticLookupResponse {            \
-    return {&h.inline_headers_.name##_, &Headers::get().name};                                     \
-  });
+template <> HeaderMapImpl::StaticLookupTable<RequestHeaderMap>::StaticLookupTable() {
+#define REGISTER_DEFAULT_REQUEST_HEADER(name)                                                      \
+  CustomInlineHeaderRegistry::registerInlineHeader<RequestHeaderMap::header_map_type>(             \
+      Headers::get().name);
+  INLINE_REQ_HEADERS(REGISTER_DEFAULT_REQUEST_HEADER)
+  INLINE_REQ_RESP_HEADERS(REGISTER_DEFAULT_REQUEST_HEADER)
 
-template <> HeaderMapImpl::StaticLookupTable<RequestHeaderMapImpl>::StaticLookupTable() {
-  INLINE_REQ_HEADERS(INLINE_HEADER_STATIC_MAP_ENTRY)
-  INLINE_REQ_RESP_HEADERS(INLINE_HEADER_STATIC_MAP_ENTRY)
+  finalizeTable();
 
   // Special case where we map a legacy host header to :authority.
-  add(Headers::get().HostLegacy.get().c_str(), [](HeaderMapType& h) -> StaticLookupResponse {
-    return {&h.inline_headers_.Host_, &Headers::get().Host};
+  const auto handle =
+      CustomInlineHeaderRegistry::getInlineHeader<RequestHeaderMap::header_map_type>(
+          Headers::get().Host);
+  add(Headers::get().HostLegacy.get().c_str(), [handle](HeaderMapImpl& h) -> StaticLookupResponse {
+    return {&h.inlineHeaders()[handle.value().it_->second], &handle.value().it_->first};
   });
 }
 
-template <> HeaderMapImpl::StaticLookupTable<ResponseHeaderMapImpl>::StaticLookupTable() {
-  INLINE_RESP_HEADERS(INLINE_HEADER_STATIC_MAP_ENTRY)
-  INLINE_REQ_RESP_HEADERS(INLINE_HEADER_STATIC_MAP_ENTRY)
-  INLINE_RESP_HEADERS_TRAILERS(INLINE_HEADER_STATIC_MAP_ENTRY)
+template <> HeaderMapImpl::StaticLookupTable<RequestTrailerMap>::StaticLookupTable() {
+  finalizeTable();
 }
 
-template <>
-HeaderMapImpl::StaticLookupTable<ResponseTrailerMapImpl>::StaticLookupTable(){
-    INLINE_RESP_HEADERS_TRAILERS(INLINE_HEADER_STATIC_MAP_ENTRY)}
+template <> HeaderMapImpl::StaticLookupTable<ResponseHeaderMap>::StaticLookupTable() {
+#define REGISTER_RESPONSE_HEADER(name)                                                             \
+  CustomInlineHeaderRegistry::registerInlineHeader<ResponseHeaderMap::header_map_type>(            \
+      Headers::get().name);
+  INLINE_RESP_HEADERS(REGISTER_RESPONSE_HEADER)
+  INLINE_REQ_RESP_HEADERS(REGISTER_RESPONSE_HEADER)
+  INLINE_RESP_HEADERS_TRAILERS(REGISTER_RESPONSE_HEADER)
+
+  finalizeTable();
+}
+
+template <> HeaderMapImpl::StaticLookupTable<ResponseTrailerMap>::StaticLookupTable() {
+#define REGISTER_RESPONSE_TRAILER(name)                                                            \
+  CustomInlineHeaderRegistry::registerInlineHeader<ResponseTrailerMap::header_map_type>(           \
+      Headers::get().name);
+  INLINE_RESP_HEADERS_TRAILERS(REGISTER_RESPONSE_TRAILER)
+
+  finalizeTable();
+}
 
 uint64_t HeaderMapImpl::appendToHeader(HeaderString& header, absl::string_view data,
                                        absl::string_view delimiter) {
@@ -314,23 +333,13 @@ void HeaderMapImpl::insertByKey(HeaderString&& key, HeaderString&& value) {
 }
 
 void HeaderMapImpl::addViaMove(HeaderString&& key, HeaderString&& value) {
-  // If this is an inline header, we can't addViaMove, because we'll overwrite
-  // the existing value.
-  auto* entry = getExistingInline(key.getStringView());
-  if (entry != nullptr) {
-    const uint64_t added_size = appendToHeader(entry->value(), value.getStringView());
-    addSize(added_size);
-    key.clear();
-    value.clear();
-  } else {
-    insertByKey(std::move(key), std::move(value));
-  }
+  insertByKey(std::move(key), std::move(value));
 }
 
 void HeaderMapImpl::addReference(const LowerCaseString& key, absl::string_view value) {
   HeaderString ref_key(key);
   HeaderString ref_value(value);
-  addViaMove(std::move(ref_key), std::move(ref_value));
+  insertByKey(std::move(ref_key), std::move(ref_value));
 }
 
 void HeaderMapImpl::addReferenceKey(const LowerCaseString& key, uint64_t value) {
@@ -350,14 +359,8 @@ void HeaderMapImpl::addReferenceKey(const LowerCaseString& key, absl::string_vie
 }
 
 void HeaderMapImpl::addCopy(const LowerCaseString& key, uint64_t value) {
-  auto* entry = getExistingInline(key.get());
-  if (entry != nullptr) {
-    char buf[32];
-    StringUtil::itoa(buf, sizeof(buf), value);
-    const uint64_t added_size = appendToHeader(entry->value(), buf);
-    addSize(added_size);
-    return;
-  }
+  // In the case that the header is appended, we will perform a needless copy of the key and value.
+  // This is done on purpose to keep the code simple and should be rare.
   HeaderString new_key;
   new_key.setCopy(key.get());
   HeaderString new_value;
@@ -368,12 +371,8 @@ void HeaderMapImpl::addCopy(const LowerCaseString& key, uint64_t value) {
 }
 
 void HeaderMapImpl::addCopy(const LowerCaseString& key, absl::string_view value) {
-  auto* entry = getExistingInline(key.get());
-  if (entry != nullptr) {
-    const uint64_t added_size = appendToHeader(entry->value(), value);
-    addSize(added_size);
-    return;
-  }
+  // In the case that the header is appended, we will perform a needless copy of the key and value.
+  // This is done on purpose to keep the code simple and should be rare.
   HeaderString new_key;
   new_key.setCopy(key.get());
   HeaderString new_value;
@@ -435,16 +434,25 @@ void HeaderMapImpl::verifyByteSizeInternalForTest() const {
 }
 
 const HeaderEntry* HeaderMapImpl::get(const LowerCaseString& key) const {
-  for (const HeaderEntryImpl& header : headers_) {
-    if (header.key() == key.get().c_str()) {
-      return &header;
-    }
-  }
-
-  return nullptr;
+  return const_cast<HeaderMapImpl*>(this)->getExisting(key);
 }
 
 HeaderEntry* HeaderMapImpl::getExisting(const LowerCaseString& key) {
+  // Attempt a trie lookup first to see if the user is requesting an O(1) header. This may be
+  // relatively common in certain header matching / routing patterns.
+  // TODO(mattklein123): Add inline handle support directly to the header matcher code to support
+  // this use case more directly.
+  auto lookup = staticLookup(key.get());
+  if (lookup.has_value()) {
+    return *lookup.value().entry_;
+  }
+
+  // If the requested header is not an O(1) header we do a full scan. Doing the trie lookup is
+  // wasteful in the miss case, but is present for code consistency with other functions that do
+  // similar things.
+  // TODO(mattklein123): The full scan here and in remove() are the biggest issues with this
+  // implementation for certain use cases. We can either replace this with a totally different
+  // implementation or potentially create a lazy map if the size of the map is above a threshold.
   for (HeaderEntryImpl& header : headers_) {
     if (header.key() == key.get().c_str()) {
       return &header;
@@ -454,7 +462,7 @@ HeaderEntry* HeaderMapImpl::getExisting(const LowerCaseString& key) {
   return nullptr;
 }
 
-void HeaderMapImpl::iterate(ConstIterateCb cb, void* context) const {
+void HeaderMapImpl::iterate(HeaderMap::ConstIterateCb cb, void* context) const {
   for (const HeaderEntryImpl& header : headers_) {
     if (cb(header, context) == HeaderMap::Iterate::Break) {
       break;
@@ -462,33 +470,11 @@ void HeaderMapImpl::iterate(ConstIterateCb cb, void* context) const {
   }
 }
 
-void HeaderMapImpl::iterateReverse(ConstIterateCb cb, void* context) const {
+void HeaderMapImpl::iterateReverse(HeaderMap::ConstIterateCb cb, void* context) const {
   for (auto it = headers_.rbegin(); it != headers_.rend(); it++) {
     if (cb(*it, context) == HeaderMap::Iterate::Break) {
       break;
     }
-  }
-}
-
-HeaderMap::Lookup HeaderMapImpl::lookup(const LowerCaseString& key,
-                                        const HeaderEntry** entry) const {
-  // The accessor callbacks for predefined inline headers take a HeaderMapImpl& as an argument;
-  // even though we don't make any modifications, we need to const_cast in order to use the
-  // accessor.
-  //
-  // Making this work without const_cast would require managing an additional const accessor
-  // callback for each predefined inline header and add to the complexity of the code.
-  auto lookup = const_cast<HeaderMapImpl*>(this)->staticLookup(key.get());
-  if (lookup.has_value()) {
-    *entry = *lookup.value().entry_;
-    if (*entry) {
-      return Lookup::Found;
-    } else {
-      return Lookup::NotFound;
-    }
-  } else {
-    *entry = nullptr;
-    return Lookup::NotSupported;
   }
 }
 
@@ -582,14 +568,6 @@ HeaderMapImpl::HeaderEntryImpl& HeaderMapImpl::maybeCreateInline(HeaderEntryImpl
   return **entry;
 }
 
-HeaderMapImpl::HeaderEntryImpl* HeaderMapImpl::getExistingInline(absl::string_view key) {
-  auto lookup = staticLookup(key);
-  if (lookup.has_value()) {
-    return *lookup.value().entry_;
-  }
-  return nullptr;
-}
-
 size_t HeaderMapImpl::removeInline(HeaderEntryImpl** ptr_to_entry) {
   if (!*ptr_to_entry) {
     return 0;
@@ -601,6 +579,33 @@ size_t HeaderMapImpl::removeInline(HeaderEntryImpl** ptr_to_entry) {
   *ptr_to_entry = nullptr;
   headers_.erase(entry->entry_);
   return 1;
+}
+
+namespace {
+template <class T>
+HeaderMapImplUtility::HeaderMapImplInfo makeHeaderMapImplInfo(absl::string_view name) {
+  // Constructing a header map implementation will force the custom headers and sizing to be
+  // finalized, so do that first.
+  auto header_map = T::create();
+
+  HeaderMapImplUtility::HeaderMapImplInfo info;
+  info.name_ = std::string(name);
+  info.size_ = T::inlineHeadersSize() + sizeof(T);
+  for (const auto& header : CustomInlineHeaderRegistry::headers<T::header_map_type>()) {
+    info.registered_headers_.push_back(header.first.get());
+  }
+  return info;
+}
+} // namespace
+
+std::vector<HeaderMapImplUtility::HeaderMapImplInfo>
+HeaderMapImplUtility::getAllHeaderMapImplInfo() {
+  std::vector<HeaderMapImplUtility::HeaderMapImplInfo> ret;
+  ret.push_back(makeHeaderMapImplInfo<RequestHeaderMapImpl>("request header map"));
+  ret.push_back(makeHeaderMapImplInfo<RequestTrailerMapImpl>("request trailer map"));
+  ret.push_back(makeHeaderMapImplInfo<ResponseHeaderMapImpl>("response header map"));
+  ret.push_back(makeHeaderMapImplInfo<ResponseTrailerMapImpl>("response trailer map"));
+  return ret;
 }
 
 } // namespace Http

@@ -1,4 +1,4 @@
-FROM gcr.io/envoy-ci/envoy-build:04f06115b6ee7cfea74930353fb47a41149cbec3
+FROM gcr.io/envoy-ci/envoy-build:12b3d2c2ffa582507e5d6dd34632b2b990f1b195
 
 ARG USERNAME=vscode
 ARG USER_UID=501
@@ -21,3 +21,5 @@ RUN apt-get -y update \
 
 ENV DEBIAN_FRONTEND=
 ENV PATH=/opt/llvm/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+ENV CLANG_FORMAT=/opt/llvm/bin/clang-format

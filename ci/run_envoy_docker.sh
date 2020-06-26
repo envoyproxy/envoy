@@ -17,7 +17,7 @@ USER_GROUP=root
 [[ -z "${ENVOY_DOCKER_BUILD_DIR}" ]] && ENVOY_DOCKER_BUILD_DIR=/tmp/envoy-docker-build
 
 [[ -t 1 ]] && ENVOY_DOCKER_OPTIONS+=" -it"
-[[ -f .git ]] && [[ ! -d .git ]] && ENVOY_DOCKER_OPTIONS+=" -v \"$(git rev-parse --git-common-dir):$(git rev-parse --git-common-dir)\""
+[[ -f .git ]] && [[ ! -d .git ]] && ENVOY_DOCKER_OPTIONS+=" -v $(git rev-parse --git-common-dir):$(git rev-parse --git-common-dir)"
 
 export ENVOY_BUILD_IMAGE="${IMAGE_NAME}:${IMAGE_ID}"
 
