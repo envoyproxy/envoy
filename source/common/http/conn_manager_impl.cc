@@ -609,15 +609,18 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
 
 ConnectionManagerImpl::ActiveStream::~ActiveStream() {
   stream_info_.onRequestComplete();
-  connection_manager_.read_callbacks_->upstreamHost()
-      ->cluster()
-      .stats()
-      .upstream_rq_body_size_.recordValue(stream_info_.bytesReceived());
 
-  connection_manager_.read_callbacks_->upstreamHost()
-      ->cluster()
-      .stats()
-      .upstream_rs_body_size_.recordValue(stream_info_.bytesSent());
+  if (connection_manager_.read_callbacks_->upstreamHost() != nullptr) {
+    connection_manager_.read_callbacks_->upstreamHost()
+        ->cluster()
+        .stats()
+        .upstream_rq_body_size_.recordValue(stream_info_.bytesReceived());
+
+    connection_manager_.read_callbacks_->upstreamHost()
+        ->cluster()
+        .stats()
+        .upstream_rs_body_size_.recordValue(stream_info_.bytesSent());
+  }
 
   // A downstream disconnect can be identified for HTTP requests when the upstream returns with a 0
   // response code and when no other response flags are set.
