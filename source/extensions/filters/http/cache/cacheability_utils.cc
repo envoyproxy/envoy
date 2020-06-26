@@ -7,6 +7,14 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
+// As defined by:
+// https://tools.ietf.org/html/rfc7231#section-6.1,
+// https://tools.ietf.org/html/rfc7538#section-3,
+// https://tools.ietf.org/html/rfc7725#section-3
+// TODO: the list of cacheable status codes should be configurable
+const absl::flat_hash_set<absl::string_view> CacheabilityUtils::cacheable_status_codes_ = {
+    "200", "203", "204", "206", "300", "301", "308", "404", "405", "410", "414", "451", "501"};
+
 bool CacheabilityUtils::isCacheableRequest(const Http::RequestHeaderMap& headers) {
   const absl::string_view method = headers.getMethodValue();
   const absl::string_view forwarded_proto = headers.getForwardedProtoValue();
@@ -20,14 +28,6 @@ bool CacheabilityUtils::isCacheableRequest(const Http::RequestHeaderMap& headers
 }
 
 bool CacheabilityUtils::isCacheableResponse(const Http::ResponseHeaderMap& headers) {
-  // As defined by:
-  // https://tools.ietf.org/html/rfc7231#section-6.1,
-  // https://tools.ietf.org/html/rfc7538#section-3,
-  // https://tools.ietf.org/html/rfc7725#section-3
-  // TODO: the list of cacheable status codes should be configurable
-  const absl::flat_hash_set<absl::string_view> cacheable_status_codes_ = {
-      "200", "203", "204", "206", "300", "301", "308", "404", "405", "410", "414", "451", "501"};
-
   ResponseCacheControl response_cache_control =
       CacheHeadersUtils::responseCacheControl(headers.getCacheControlValue());
   bool cacheable_status = cacheable_status_codes_.contains(headers.getStatusValue());
