@@ -94,7 +94,7 @@ TEST_F(IsCacheableResponseTest, ValidationData) {
   EXPECT_FALSE(CacheabilityUtils::isCacheableResponse(response_headers, {}));
   response_headers.removeCacheControl();
   EXPECT_FALSE(CacheabilityUtils::isCacheableResponse(response_headers, {}));
-  response_headers.setExpires("Sun, 06 Nov 1994 09:49:37 GMT");
+  response_headers.setCopy(Http::Headers::get().Expires, "Sun, 06 Nov 1994 09:49:37 GMT");
   EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers, {}));
 }
 
