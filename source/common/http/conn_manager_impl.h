@@ -802,7 +802,6 @@ private:
   // lookup in the hot path of processing each request.
   const Server::OverloadActionState& overload_stop_accepting_requests_ref_;
   const Server::OverloadActionState& overload_disable_keepalive_ref_;
-  Server::OverloadTimerFactory overload_timer_factory_;
   TimeSource& time_source_;
   std::shared_ptr<StreamInfo::FilterState> filter_state_;
 };

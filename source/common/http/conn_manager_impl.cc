@@ -78,13 +78,6 @@ void recordLatestDataFilter(const typename FilterList<T>::iterator current_filte
   }
 }
 
-constexpr absl::string_view kDrainTimerLabel = "envoy.http.drain_timer";
-constexpr absl::string_view kRequestTimerLabel = "envoy.http.request_timer";
-constexpr absl::string_view kStreamIdleTimerLabel = "envoy.http.stream_idle_timer";
-constexpr absl::string_view kConnectionIdleTimerLabel = "envoy.http.connection_idle_timer";
-constexpr absl::string_view kMaxStreamDurationTimerLabel = "envoy.http.max_stream_duration_timer";
-constexpr absl::string_view kConnectionDurationTimerLabel = "envoy.http.connection_duration_timer";
-
 } // namespace
 
 ConnectionManagerStats ConnectionManagerImpl::generateStats(const std::string& prefix,
@@ -124,7 +117,6 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
           Server::OverloadActionNames::get().StopAcceptingRequests)),
       overload_disable_keepalive_ref_(overload_manager.getThreadLocalOverloadState().getState(
           Server::OverloadActionNames::get().DisableHttpKeepAlive)),
-      overload_timer_factory_(overload_manager.getThreadLocalOverloadState().getTimerFactory()),
       time_source_(time_source) {}
 
 const ResponseHeaderMap& ConnectionManagerImpl::continueHeader() {
@@ -145,14 +137,14 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
   read_callbacks_->connection().addConnectionCallbacks(*this);
 
   if (config_.idleTimeout()) {
-    connection_idle_timer_ =
-        overload_timer_factory_(kConnectionIdleTimerLabel, [this]() -> void { onIdleTimeout(); });
+    connection_idle_timer_ = read_callbacks_->connection().dispatcher().createTimer(
+        [this]() -> void { onIdleTimeout(); });
     connection_idle_timer_->enableTimer(config_.idleTimeout().value());
   }
 
   if (config_.maxConnectionDuration()) {
-    connection_duration_timer_ = overload_timer_factory_(
-        kConnectionDurationTimerLabel, [this]() -> void { onConnectionDurationTimeout(); });
+    connection_duration_timer_ = read_callbacks_->connection().dispatcher().createTimer(
+        [this]() -> void { onConnectionDurationTimeout(); });
     connection_duration_timer_->enableTimer(config_.maxConnectionDuration().value());
   }
 
@@ -586,22 +578,23 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
 
   if (connection_manager_.config_.streamIdleTimeout().count()) {
     idle_timeout_ms_ = connection_manager_.config_.streamIdleTimeout();
-    stream_idle_timer_ = connection_manager_.overload_timer_factory_(
-        kStreamIdleTimerLabel, [this]() -> void { onIdleTimeout(); });
+    stream_idle_timer_ = connection_manager_.read_callbacks_->connection().dispatcher().createTimer(
+        [this]() -> void { onIdleTimeout(); });
     resetIdleTimer();
   }
 
   if (connection_manager_.config_.requestTimeout().count()) {
     std::chrono::milliseconds request_timeout_ms_ = connection_manager_.config_.requestTimeout();
-    request_timer_ = connection_manager_.overload_timer_factory_(
-        kRequestTimerLabel, [this]() -> void { onRequestTimeout(); });
+    request_timer_ = connection_manager.read_callbacks_->connection().dispatcher().createTimer(
+        [this]() -> void { onRequestTimeout(); });
     request_timer_->enableTimer(request_timeout_ms_, this);
   }
 
   const auto max_stream_duration = connection_manager_.config_.maxStreamDuration();
   if (max_stream_duration.has_value() && max_stream_duration.value().count()) {
-    max_stream_duration_timer_ = connection_manager_.overload_timer_factory_(
-        kMaxStreamDurationTimerLabel, [this]() -> void { onStreamMaxDurationReached(); });
+    max_stream_duration_timer_ =
+        connection_manager.read_callbacks_->connection().dispatcher().createTimer(
+            [this]() -> void { onStreamMaxDurationReached(); });
     max_stream_duration_timer_->enableTimer(connection_manager_.config_.maxStreamDuration().value(),
                                             this);
   }
@@ -977,8 +970,9 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
       if (idle_timeout_ms_.count()) {
         // If we have a route-level idle timeout but no global stream idle timeout, create a timer.
         if (stream_idle_timer_ == nullptr) {
-          stream_idle_timer_ = connection_manager_.overload_timer_factory_(
-              kStreamIdleTimerLabel, [this]() -> void { onIdleTimeout(); });
+          stream_idle_timer_ =
+              connection_manager_.read_callbacks_->connection().dispatcher().createTimer(
+                  [this]() -> void { onIdleTimeout(); });
         }
       } else if (stream_idle_timer_ != nullptr) {
         // If we had a global stream idle timeout but the route-level idle timeout is set to zero
@@ -1107,7 +1101,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
     if (!(*entry)->commonHandleAfterHeadersCallback(status, state_.decoding_headers_only_) &&
         std::next(entry) != decoder_filters_.end()) {
       // Stop iteration IFF this is not the last filter. If it is the last filter, continue with
-
       // processing since we need to handle the case where a terminal filter wants to buffer, but
       // a previous filter has added body.
       maybeContinueDecoding(continue_data_entry);
@@ -1423,7 +1416,8 @@ void ConnectionManagerImpl::startDrainSequence() {
   ASSERT(drain_state_ == DrainState::NotDraining);
   drain_state_ = DrainState::Draining;
   codec_->shutdownNotice();
-  drain_timer_ = overload_timer_factory_(kDrainTimerLabel, [this]() -> void { onDrainTimeout(); });
+  drain_timer_ = read_callbacks_->connection().dispatcher().createTimer(
+      [this]() -> void { onDrainTimeout(); });
   drain_timer_->enableTimer(config_.drainTimeout());
 }
 

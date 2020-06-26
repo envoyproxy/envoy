@@ -106,10 +106,6 @@ public:
     // response_encoder_ is not a NiceMock on purpose. This prevents complaining about this
     // method only.
     EXPECT_CALL(response_encoder_, getStream()).Times(AtLeast(0));
-    ON_CALL(overload_manager_.overload_state_, getTimerFactory())
-        .WillByDefault(Return([this](absl::string_view, Event::TimerCb cb) {
-          return filter_callbacks_.connection_.dispatcher_.createTimer(cb);
-        }));
   }
 
   ~HttpConnectionManagerImplTest() override {
