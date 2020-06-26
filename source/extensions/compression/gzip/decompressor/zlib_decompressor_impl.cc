@@ -14,13 +14,17 @@ namespace Compression {
 namespace Gzip {
 namespace Decompressor {
 
-ZlibDecompressorImpl::ZlibDecompressorImpl(Stats::Scope& scope) : ZlibDecompressorImpl(scope, 4096) {}
+ZlibDecompressorImpl::ZlibDecompressorImpl(Stats::Scope& scope, const std::string& stats_prefix)
+    : ZlibDecompressorImpl(scope, stats_prefix, 4096) {}
 
-ZlibDecompressorImpl::ZlibDecompressorImpl(Stats::Scope& scope, uint64_t chunk_size)
-    : Zlib::Base(chunk_size, [](z_stream* z) {
-        inflateEnd(z);
-        delete z;
-      }), stats_(generateStats("zlib_decompressor", scope)) {
+ZlibDecompressorImpl::ZlibDecompressorImpl(Stats::Scope& scope, const std::string& stats_prefix,
+                                           uint64_t chunk_size)
+    : Zlib::Base(chunk_size,
+                 [](z_stream* z) {
+                   inflateEnd(z);
+                   delete z;
+                 }),
+      stats_(generateStats(stats_prefix, scope)) {
   zstream_ptr_->zalloc = Z_NULL;
   zstream_ptr_->zfree = Z_NULL;
   zstream_ptr_->opaque = Z_NULL;
@@ -67,10 +71,10 @@ bool ZlibDecompressorImpl::inflateNext() {
 
   if (result < 0) {
     decompression_error_ = result;
-    ENVOY_LOG(
-        trace,
-        "zlib decompression error: {}, msg: {}. Error codes are defined in https://www.zlib.net/manual.html",
-        result, zstream_ptr_->msg);
+    ENVOY_LOG(trace,
+              "zlib decompression error: {}, msg: {}. Error codes are defined in "
+              "https://www.zlib.net/manual.html",
+              result, zstream_ptr_->msg);
     stats_.decompression_error_.inc();
     return false;
   }

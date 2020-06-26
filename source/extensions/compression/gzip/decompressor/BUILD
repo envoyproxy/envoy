@@ -16,12 +16,12 @@ envoy_cc_library(
     external_deps = ["zlib"],
     deps = [
         "//include/envoy/compression/decompressor:decompressor_interface",
+        "//include/envoy/stats:stats_interface",
+        "//include/envoy/stats:stats_macros",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/extensions/compression/gzip/common:zlib_base_lib",
-                "//include/envoy/stats:stats_macros",
-                "//include/envoy/stats:stats_interface",
     ],
 )
 

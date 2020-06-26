@@ -94,7 +94,7 @@ public:
       Compression::Decompressor::DecompressorFactoryPtr decompressor_factory);
 
   Compression::Decompressor::DecompressorPtr makeDecompressor() {
-    return decompressor_factory_->createDecompressor();
+    return decompressor_factory_->createDecompressor(stats_prefix_ + "decompressor_library");
   }
   const std::string& contentEncoding() { return decompressor_factory_->contentEncoding(); }
   const RequestDirectionConfig& requestDirectionConfig() { return request_direction_config_; }
