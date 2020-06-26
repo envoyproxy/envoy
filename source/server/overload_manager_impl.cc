@@ -72,31 +72,6 @@ private:
   absl::optional<OverloadActionState> state_;
 };
 
-/**
- * Thread-local copy of the state of each configured overload action.
- */
-class ThreadLocalOverloadStateImpl : public ThreadLocalOverloadState,
-                                     public ThreadLocal::ThreadLocalObject {
-public:
-  const OverloadActionState& getState(const std::string& action) override {
-    auto it = actions_.find(action);
-    if (it == actions_.end()) {
-      it = actions_.insert(std::make_pair(action, OverloadActionState::inactive())).first;
-    }
-    return it->second;
-  }
-
-  void setState(const std::string& action, OverloadActionState state) override {
-    auto insert = actions_.emplace(action, state);
-    if (!insert.second) {
-      insert.first->second = state;
-    }
-  }
-
-private:
-  std::unordered_map<std::string, OverloadActionState> actions_;
-};
-
 Stats::Counter& makeCounter(Stats::Scope& scope, absl::string_view a, absl::string_view b) {
   Stats::StatNameManagedStorage stat_name(absl::StrCat("overload.", a, ".", b),
                                           scope.symbolTable());
@@ -228,7 +203,7 @@ void OverloadManagerImpl::start() {
   started_ = true;
 
   tls_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    return std::make_shared<ThreadLocalOverloadStateImpl>();
+    return std::make_shared<ThreadLocalOverloadState>();
   });
 
   if (resources_.empty()) {
@@ -271,7 +246,7 @@ bool OverloadManagerImpl::registerForAction(const std::string& action,
 }
 
 ThreadLocalOverloadState& OverloadManagerImpl::getThreadLocalOverloadState() {
-  return tls_->getTyped<ThreadLocalOverloadStateImpl>();
+  return tls_->getTyped<ThreadLocalOverloadState>();
 }
 
 void OverloadManagerImpl::updateResourcePressure(const std::string& resource, double pressure) {
@@ -296,7 +271,7 @@ void OverloadManagerImpl::updateResourcePressure(const std::string& resource, do
                            : (state == OverloadActionState::inactive() ? "inactive" : "scaling")));
           }
           tls_->runOnAllThreads([this, action, state] {
-            tls_->getTyped<ThreadLocalOverloadStateImpl>().setState(action, state);
+            tls_->getTyped<ThreadLocalOverloadState>().setState(action, state);
           });
           auto callback_range = action_to_callbacks_.equal_range(action);
           std::for_each(callback_range.first, callback_range.second,
