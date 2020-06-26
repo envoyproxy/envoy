@@ -31,7 +31,7 @@ An example configuration of the filter may look like the following:
 .. code-block:: yaml
 
     http_filters:
-    - name: compressor
+    - name: envoy.filters.http.compressor
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor
         disable_on_etag_header: true
