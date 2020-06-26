@@ -20,8 +20,6 @@ static void fancySlowPath(benchmark::State& state) {
     }
   }
 }
-BENCHMARK(fancySlowPath)->Arg(2 << 10);
-BENCHMARK(fancySlowPath)->Arg(2 << 10)->Threads(4);
 
 #define FL FANCY_LOG(trace, "Default")
 #define FL_10                                                                                      \
@@ -48,45 +46,41 @@ BENCHMARK(fancySlowPath)->Arg(2 << 10)->Threads(4);
 static void fancyMediumPath(benchmark::State& state) {
   FANCY_LOG(info, "Medium path test begins.");
   for (auto _ : state) {
-    for (int i = 0; i < state.range(0); i++) {
+    for (int i = 0; i < state.range(0); i++) {      // to create different call sites
       FL_1000
     }
   }
 }
-BENCHMARK(fancyMediumPath)->Arg(1);
-// Seems medium path's concurrency test doesn't make sense (hard to do as well)
 
 /**
  * Benchmark for fast path, i.e. integration test of common scenario.
  */
 static void fancyFastPath(benchmark::State& state) {
 //   FANCY_LOG(info, "Fast path test begins.");
+  std::string msg(100 - strlen(__FILE__) + 4, '.');
   spdlog::level::level_enum lv = state.range(1)? spdlog::level::trace : spdlog::level::info;
   setFancyLogger(FANCY_KEY, lv);
   for (auto _ : state) {
     for (int i = 0; i < state.range(0); i++) {
-      FANCY_LOG(trace, "Fast path: {}", i);             // intended to disappear
+      FANCY_LOG(trace, "Fast path: {}", msg);             // intended to disappear
     }
   }
 }
-BENCHMARK(fancyFastPath)->Args({30, 0})->Args({30, 1});   // First no actual log, then log
-BENCHMARK(fancyFastPath)->Arg(1 << 8)->Threads(4);
 
 /**
  * Benchmark for ENVOY_LOG to compare.
  */
 static void envoyNormal(benchmark::State& state) {
     spdlog::level::level_enum lv = state.range(1)? spdlog::level::trace : spdlog::level::info;
+    std::string msg(100, '.');
     GET_MISC_LOGGER().set_level(lv);
     // ENVOY_LOG_MISC(info, "Envoy log begins.");
     for (auto _ : state) {
         for (int i = 0; i < state.range(0); i++) {
-            ENVOY_LOG_MISC(trace, "Fast path: {}", i);
+            ENVOY_LOG_MISC(trace, "Fast path: {}", msg);
         }
     }
 }
-BENCHMARK(envoyNormal)->Args({30, 0})->Args({30, 1});
-BENCHMARK(envoyNormal)->Arg(1 << 8)->Threads(4);
 
 /**
  * Benchmark for a large number of level setting.
@@ -99,7 +93,6 @@ static void fancyLevelSetting(benchmark::State& state) {
     }
   }
 }
-BENCHMARK(fancyLevelSetting)->Arg(30);
 
 /**
  * Comparison with Envoy's level setting.
@@ -112,6 +105,31 @@ static void envoyLevelSetting(benchmark::State& state) {
         }
     }
 }
+
+/**
+ * Benchmarks in detail starts.
+ */
+BENCHMARK(fancySlowPath)->Arg(1 << 10);
+BENCHMARK(fancySlowPath)->Arg(1 << 10)->Threads(20)->MeasureProcessCPUTime();
+BENCHMARK(fancySlowPath)->Arg(1 << 10)->Threads(200)->MeasureProcessCPUTime();
+
+BENCHMARK(fancyMediumPath)->Arg(1);
+// Seems medium path's concurrency test doesn't make sense (hard to do as well)
+
+BENCHMARK(fancyFastPath)->Args({30, 0})
+    ->Args({30, 1});   // First no actual log, then log
+BENCHMARK(fancyFastPath)->Args({1 << 8, 0})->Threads(20)->MeasureProcessCPUTime();
+BENCHMARK(fancyFastPath)->Args({1 << 8, 1})->Threads(20)->MeasureProcessCPUTime();
+BENCHMARK(fancyFastPath)->Args({1 << 8, 0})->Threads(200)->MeasureProcessCPUTime();
+BENCHMARK(fancyFastPath)->Args({1 << 8, 1})->Threads(200)->MeasureProcessCPUTime();
+
+BENCHMARK(envoyNormal)->Args({30, 0})->Args({30, 1});
+BENCHMARK(envoyNormal)->Args({1 << 8, 0})->Threads(20)->MeasureProcessCPUTime();
+BENCHMARK(envoyNormal)->Args({1 << 8, 1})->Threads(20)->MeasureProcessCPUTime();
+BENCHMARK(envoyNormal)->Args({1 << 8, 0})->Threads(200)->MeasureProcessCPUTime();
+BENCHMARK(envoyNormal)->Args({1 << 8, 1})->Threads(200)->MeasureProcessCPUTime();
+
+BENCHMARK(fancyLevelSetting)->Arg(30);
 BENCHMARK(envoyLevelSetting)->Arg(30);
 
 } // namespace Envoy
