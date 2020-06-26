@@ -273,7 +273,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // 2020/05/13  10531    44425       44600   Refactor resource manager
   // 2020/05/20  11223    44491       44600   Add primary clusters tracking to cluster manager.
   // 2020/06/10  11561    44491       44811   Make upstreams pluggable
-  // 2020/06/23  11559    47707       47771   stats: add histogram for request headers size per
+  // 2020/06/23  11559    47707       48000   stats: add histogram for request headers size per
   //                                          upstream
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
@@ -338,7 +338,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // 2020/05/13  10531    36537       36800   Refactor resource manager
   // 2020/05/20  11223    36603       36800   Add primary clusters tracking to cluster manager.
   // 2020/06/10  11561    36603       36923   Make upstreams pluggable
-  // 2020/06/23  11559    39739       39803   stats: add histogram for request headers size per
+  // 2020/06/23  11559    39739       40000   stats: add histogram for request headers size per
   //                                          upstream
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI

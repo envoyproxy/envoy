@@ -6070,9 +6070,9 @@ TEST_F(HttpConnectionManagerImplTest, UpstreamHeadersSize) {
       new NiceMock<Upstream::MockHostDescription>()};
   filter_callbacks_.upstreamHost(host_);
 
-  EXPECT_CALL(host_->cluster_.stats_store_,
-              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_headers_size"),
-                                      _)); // TODO: put exact headers size value
+  EXPECT_CALL(
+      host_->cluster_.stats_store_,
+      deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_headers_size"), 30));
 
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
