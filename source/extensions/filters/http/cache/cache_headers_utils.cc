@@ -2,7 +2,6 @@
 
 #include <array>
 #include <string>
-#include <tuple>
 
 #include "envoy/common/time.h"
 
@@ -80,14 +79,9 @@ OptionalDuration CacheHeadersUtils::parseDuration(absl::string_view s) {
   return duration;
 }
 
-std::tuple<absl::string_view, absl::string_view>
+std::pair<absl::string_view, absl::string_view>
 CacheHeadersUtils::separateDirectiveAndArgument(absl::string_view full_directive) {
-  std::vector<absl::string_view> directive_parts =
-      absl::StrSplit(full_directive, absl::MaxSplits('=', 1));
-  absl::string_view directive = absl::StripAsciiWhitespace(directive_parts[0]);
-  absl::string_view argument =
-      directive_parts.size() > 1 ? absl::StripAsciiWhitespace(directive_parts[1]) : "";
-  return std::make_tuple(directive, argument);
+  return absl::StrSplit(absl::StripAsciiWhitespace(full_directive), absl::MaxSplits('=', 1));
 }
 
 // The grammar for This Cache-Control header value should be:

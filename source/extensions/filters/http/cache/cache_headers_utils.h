@@ -85,7 +85,7 @@ private:
   static OptionalDuration parseDuration(absl::string_view s);
 
   // Separates a directive into the directive literal and an argument (if any)
-  static std::tuple<absl::string_view, absl::string_view>
+  static std::pair<absl::string_view, absl::string_view>
   separateDirectiveAndArgument(absl::string_view full_directive);
 };
 } // namespace Cache

@@ -97,11 +97,14 @@ bool LookupRequest::requiresValidation(const Http::ResponseHeaderMap& response_h
           : CacheHeadersUtils::httpTime(response_headers.get(Http::Headers::get().Expires));
 
   if (timestamp_ > expiration_time) {
-    // Response is stale, return false unless max-stale value is higher than overdue expiration
-    return !(!response_cache_control.no_stale && request_cache_control_.max_stale.has_value() &&
+    // Response is stale, requires validation
+    // unless the response does not prevent being served stale
+    // and max-stale value is higher than overdue expiration
+    return response_cache_control.no_stale ||
+           !(request_cache_control_.max_stale.has_value() &&
              request_cache_control_.max_stale.value() > timestamp_ - expiration_time);
   } else {
-    // Response is fresh, return false unless there is an unsatisfied min-fresh requirement
+    // Response is fresh, requires validation only if there is an unsatisfied min-fresh requirement
     return request_cache_control_.min_fresh.has_value() &&
            request_cache_control_.min_fresh.value() > expiration_time - timestamp_;
   }
