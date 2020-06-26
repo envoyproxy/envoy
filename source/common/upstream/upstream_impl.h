@@ -149,7 +149,7 @@ protected:
   mutable absl::Mutex metadata_mutex_;
   MetadataConstSharedPtr metadata_ ABSL_GUARDED_BY(metadata_mutex_);
   const envoy::config::core::v3::Locality locality_;
-  Stats::StatNameManagedStorage locality_zone_stat_name_;
+  Stats::StatNameDynamicStorage locality_zone_stat_name_;
   mutable HostStats stats_;
   Outlier::DetectorHostMonitorPtr outlier_detector_;
   HealthCheckHostMonitorPtr health_checker_;
