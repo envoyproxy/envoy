@@ -19,7 +19,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 
 // [#protodoc-title: Configuration sources]
 
-// xDS API version. This is used to describe both resource and transport
+// xDS API and non-xDS services version. This is used to describe both resource and transport
 // protocol versions (in distinct configuration fields).
 enum ApiVersion {
   // When not specified, we assume v2, to ease migration to Envoy's stable API
@@ -112,6 +112,10 @@ message AggregatedConfigSource {
 message SelfConfigSource {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.core.v3.SelfConfigSource";
+
+  // API version for xDS transport protocol. This describes the xDS gRPC/REST
+  // endpoint and version of [Delta]DiscoveryRequest/Response used on the wire.
+  ApiVersion transport_api_version = 1 [(validate.rules).enum = {defined_only: true}];
 }
 
 // Rate Limit settings to be applied for discovery requests made by Envoy.

@@ -6,7 +6,6 @@
 #include "envoy/http/header_map.h"
 
 #include "common/common/base64.h"
-#include "common/grpc/google_grpc_utils.h"
 
 #include "absl/strings/str_cat.h"
 #include "google/devtools/cloudtrace/v2/tracing.grpc.pb.h"
@@ -24,12 +23,18 @@
 #include "opencensus/trace/trace_config.h"
 #include "opencensus/trace/trace_params.h"
 
+#ifdef ENVOY_GOOGLE_GRPC
+#include "common/grpc/google_grpc_utils.h"
+#endif
+
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace OpenCensus {
 
+#ifdef ENVOY_GOOGLE_GRPC
 constexpr char GoogleStackdriverTraceAddress[] = "cloudtrace.googleapis.com";
+#endif
 
 namespace {
 
@@ -267,6 +272,7 @@ Driver::Driver(const envoy::config::trace::v3::OpenCensusConfig& oc_config,
       opts.trace_service_stub = ::google::devtools::cloudtrace::v2::TraceService::NewStub(channel);
     } else if (oc_config.has_stackdriver_grpc_service() &&
                oc_config.stackdriver_grpc_service().has_google_grpc()) {
+#ifdef ENVOY_GOOGLE_GRPC
       envoy::config::core::v3::GrpcService stackdriver_service =
           oc_config.stackdriver_grpc_service();
       if (stackdriver_service.google_grpc().target_uri().empty()) {
@@ -276,6 +282,10 @@ Driver::Driver(const envoy::config::trace::v3::OpenCensusConfig& oc_config,
       }
       auto channel = Envoy::Grpc::GoogleGrpcUtils::createChannel(stackdriver_service, api);
       opts.trace_service_stub = ::google::devtools::cloudtrace::v2::TraceService::NewStub(channel);
+#else
+      throw EnvoyException("Opencensus tracer: cannot handle stackdriver google grpc service, "
+                           "google grpc is not built in.");
+#endif
     }
     ::opencensus::exporters::trace::StackdriverExporter::Register(std::move(opts));
   }
@@ -290,11 +300,16 @@ Driver::Driver(const envoy::config::trace::v3::OpenCensusConfig& oc_config,
       opts.address = oc_config.ocagent_address();
     } else if (oc_config.has_ocagent_grpc_service() &&
                oc_config.ocagent_grpc_service().has_google_grpc()) {
+#ifdef ENVOY_GOOGLE_GRPC
       const envoy::config::core::v3::GrpcService& ocagent_service =
           oc_config.ocagent_grpc_service();
       auto channel = Envoy::Grpc::GoogleGrpcUtils::createChannel(ocagent_service, api);
       opts.trace_service_stub =
           ::opencensus::proto::agent::trace::v1::TraceService::NewStub(channel);
+#else
+      throw EnvoyException("Opencensus tracer: cannot handle ocagent google grpc service, google "
+                           "grpc is not built in.");
+#endif
     }
     opts.service_name = local_info_.clusterName();
     ::opencensus::exporters::trace::OcAgentExporter::Register(std::move(opts));

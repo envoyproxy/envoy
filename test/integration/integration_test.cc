@@ -54,6 +54,50 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, IntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+// Verify that we gracefully handle an invalid pre-bind socket option when using reuse port.
+TEST_P(IntegrationTest, BadPrebindSocketOptionWithReusePort) {
+  // Reserve a port that we can then use on the integration listener with reuse port.
+  auto addr_socket =
+      Network::Test::bindFreeLoopbackPort(version_, Network::Socket::Type::Stream, true);
+  // Do not wait for listeners to start as the listener will fail.
+  defer_listener_finalization_ = true;
+
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    listener->set_reuse_port(true);
+    listener->mutable_address()->mutable_socket_address()->set_port_value(
+        addr_socket.second->localAddress()->ip()->port());
+    auto socket_option = listener->add_socket_options();
+    socket_option->set_state(envoy::config::core::v3::SocketOption::STATE_PREBIND);
+    socket_option->set_level(10000);     // Invalid level.
+    socket_option->set_int_value(10000); // Invalid value.
+  });
+  initialize();
+  test_server_->waitForCounterGe("listener_manager.listener_create_failure", 1);
+}
+
+// Verify that we gracefully handle an invalid post-bind socket option when using reuse port.
+TEST_P(IntegrationTest, BadPostbindSocketOptionWithReusePort) {
+  // Reserve a port that we can then use on the integration listener with reuse port.
+  auto addr_socket =
+      Network::Test::bindFreeLoopbackPort(version_, Network::Socket::Type::Stream, true);
+  // Do not wait for listeners to start as the listener will fail.
+  defer_listener_finalization_ = true;
+
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    listener->set_reuse_port(true);
+    listener->mutable_address()->mutable_socket_address()->set_port_value(
+        addr_socket.second->localAddress()->ip()->port());
+    auto socket_option = listener->add_socket_options();
+    socket_option->set_state(envoy::config::core::v3::SocketOption::STATE_BOUND);
+    socket_option->set_level(10000);     // Invalid level.
+    socket_option->set_int_value(10000); // Invalid value.
+  });
+  initialize();
+  test_server_->waitForCounterGe("listener_manager.listener_create_failure", 1);
+}
+
 // Make sure we have correctly specified per-worker performance stats.
 TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
   concurrency_ = 2;
@@ -365,8 +409,7 @@ TEST_P(IntegrationTest, TestSmuggling) {
         "GET / HTTP/1.1\r\nHost: host\r\ncontent-length: 36\r\ntransfer-encoding: chunked\r\n\r\n" +
         smuggled_request;
     sendRawHttpAndWaitForResponse(lookupPort("http"), full_request.c_str(), &response, false);
-    EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
-              response);
+    EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
   }
   {
     std::string response;
@@ -374,8 +417,7 @@ TEST_P(IntegrationTest, TestSmuggling) {
                                 "\r\ncontent-length: 36\r\n\r\n" +
                                 smuggled_request;
     sendRawHttpAndWaitForResponse(lookupPort("http"), request.c_str(), &response, false);
-    EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
-              response);
+    EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
   }
   {
     std::string response;
@@ -383,8 +425,7 @@ TEST_P(IntegrationTest, TestSmuggling) {
                                 "identity,chunked \r\ncontent-length: 36\r\n\r\n" +
                                 smuggled_request;
     sendRawHttpAndWaitForResponse(lookupPort("http"), request.c_str(), &response, false);
-    EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
-              response);
+    EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
   }
 }
 
@@ -392,7 +433,7 @@ TEST_P(IntegrationTest, BadFirstline) {
   initialize();
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"), "hello", &response);
-  EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
+  EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
 }
 
 TEST_P(IntegrationTest, MissingDelimiter) {
@@ -401,7 +442,7 @@ TEST_P(IntegrationTest, MissingDelimiter) {
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"),
                                 "GET / HTTP/1.1\r\nHost: host\r\nfoo bar\r\n\r\n", &response);
-  EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
+  EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("http1.codec_error"));
 }
 
@@ -410,7 +451,7 @@ TEST_P(IntegrationTest, InvalidCharacterInFirstline) {
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GE(T / HTTP/1.1\r\nHost: host\r\n\r\n",
                                 &response);
-  EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
+  EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
 }
 
 TEST_P(IntegrationTest, InvalidVersion) {
@@ -418,7 +459,7 @@ TEST_P(IntegrationTest, InvalidVersion) {
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.01\r\nHost: host\r\n\r\n",
                                 &response);
-  EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
+  EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
 }
 
 // Expect that malformed trailers to break the connection
@@ -435,7 +476,7 @@ TEST_P(IntegrationTest, BadTrailer) {
                                 "badtrailer\r\n\r\n",
                                 &response);
 
-  EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
+  EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
 }
 
 // Expect malformed headers to break the connection
@@ -452,7 +493,7 @@ TEST_P(IntegrationTest, BadHeader) {
                                 "body\r\n0\r\n\r\n",
                                 &response);
 
-  EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
+  EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
 }
 
 TEST_P(IntegrationTest, Http10Disabled) {

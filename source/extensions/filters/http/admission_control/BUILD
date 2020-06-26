@@ -15,6 +15,7 @@ envoy_cc_extension(
     name = "admission_control_filter_lib",
     srcs = [
         "admission_control.cc",
+        "thread_local_controller.cc",
     ],
     hdrs = [
         "admission_control.h",
@@ -30,6 +31,23 @@ envoy_cc_extension(
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/admission_control/evaluators:response_evaluator_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "@envoy_api//envoy/extensions/filters/http/admission_control/v3alpha:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_extension(
+    name = "config",
+    srcs = ["config.cc"],
+    hdrs = ["config.h"],
+    security_posture = "unknown",
+    status = "alpha",
+    deps = [
+        "//include/envoy/registry",
+        "//source/common/common:enum_to_int",
+        "//source/extensions/filters/http:well_known_names",
+        "//source/extensions/filters/http/admission_control:admission_control_filter_lib",
+        "//source/extensions/filters/http/admission_control/evaluators:response_evaluator_lib",
+        "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/http/admission_control/v3alpha:pkg_cc_proto",
     ],
 )

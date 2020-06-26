@@ -91,7 +91,7 @@ TEST_P(RouteIpListConfigTest, DEPRECATED_FEATURE_TEST(TcpProxy)) {
   )EOF";
 
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy proto_config;
-  TestUtility::loadFromJson(json_string, proto_config);
+  TestUtility::loadFromJson(json_string, proto_config, true);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   ConfigFactory factory;
