@@ -27,14 +27,14 @@ using TypeUrlVersionMap = std::unordered_map<std::string, envoy::config::core::v
 using VersionedMethodMap = std::unordered_map<envoy::config::core::v3::ApiVersion, std::string>;
 
 ServiceToVersionedMap
-createServiceToVersionedMap(const std::string& service, envoy::config::core::v3::ApiVersion version,
+createServiceToVersionedMap(absl::string_view service, envoy::config::core::v3::ApiVersion version,
                             const std::array<std::string, 2>& versioned_services) {
-  return {
-      {service, VersionedMap{version,
-                             {
-                                 {envoy::config::core::v3::ApiVersion::V2, versioned_services[0]},
-                                 {envoy::config::core::v3::ApiVersion::V3, versioned_services[1]},
-                             }}}};
+  return {{static_cast<std::string>(service),
+           VersionedMap{version,
+                        {
+                            {envoy::config::core::v3::ApiVersion::V2, versioned_services[0]},
+                            {envoy::config::core::v3::ApiVersion::V3, versioned_services[1]},
+                        }}}};
 }
 
 struct VersionedDiscoveryType {
