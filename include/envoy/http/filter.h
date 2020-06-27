@@ -241,6 +241,12 @@ public:
   virtual void modifyDecodingBuffer(std::function<void(Buffer::Instance&)> callback) PURE;
 
   /**
+   * Allows modifying the decoding header. May only be called before any header has been continued
+   * past the calling filter.
+   */
+  virtual void modifyDecodingHeaders(std::function<void(Http::HeaderMap&)> callback) PURE;
+
+  /**
    * Add buffered body data. This method is used in advanced cases where returning
    * StopIterationAndBuffer from decodeData() is not sufficient.
    *
@@ -577,6 +583,12 @@ public:
    * past the calling filter.
    */
   virtual void modifyEncodingBuffer(std::function<void(Buffer::Instance&)> callback) PURE;
+
+  /**
+   * Allows modifying the encoding header. May only be called before any header has been continued
+   * past the calling filter.
+   */
+  virtual void modifyEncodingHeaders(std::function<void(Http::HeaderMap&)> callback) PURE;
 
   /**
    * Add buffered body data. This method is used in advanced cases where returning

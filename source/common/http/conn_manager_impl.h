@@ -278,6 +278,11 @@ private:
       callback(*parent_.buffered_request_data_.get());
     }
 
+    void modifyDecodingHeaders(std::function<void(Http::HeaderMap&)> callback) override {
+      ASSERT(parent_.state_.latest_data_decoding_filter_ == this);
+      callback(*parent_.request_headers_.get());
+    }
+
     void sendLocalReply(Code code, absl::string_view body,
                         std::function<void(ResponseHeaderMap& headers)> modify_headers,
                         const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
@@ -392,6 +397,10 @@ private:
     void modifyEncodingBuffer(std::function<void(Buffer::Instance&)> callback) override {
       ASSERT(parent_.state_.latest_data_encoding_filter_ == this);
       callback(*parent_.buffered_response_data_.get());
+    }
+    void modifyEncodingHeaders(std::function<void(Http::HeaderMap&)> callback) override {
+      ASSERT(parent_.state_.latest_data_encoding_filter_ == this);
+      callback(*parent_.response_headers_.get());
     }
     Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override {
       // TODO(mattklein123): At some point we might want to actually wrap this interface but for now
