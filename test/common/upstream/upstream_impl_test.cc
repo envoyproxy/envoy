@@ -2235,6 +2235,34 @@ TEST_F(ClusterInfoImplTest, OneofExtensionProtocolOptionsForUnknownFilter) {
                             "Only one of typed_extension_protocol_options or "
                             "extension_protocol_options can be specified");
 }
+
+TEST_F(ClusterInfoImplTest, TestTrackRequestResponseSizes) {
+  const std::string yaml_disabled = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+  )EOF";
+
+  auto cluster = makeCluster(yaml_disabled);
+  // By default, histograms tracking request/response sizes are not published.
+  EXPECT_FALSE(cluster->info()->requestResponseSizeStats().has_value());
+
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    track_request_response_sizes: true
+  )EOF";
+
+  cluster = makeCluster(yaml);
+  // The stats should be created.
+  EXPECT_TRUE(cluster->info()->requestResponseSizeStats().has_value());
+  EXPECT_EQ(Stats::Histogram::Unit::Bytes,
+            cluster->info()->requestResponseSizeStats()->upstream_rq_headers_size_.unit());
+}
+
 TEST_F(ClusterInfoImplTest, TestTrackRemainingResourcesGauges) {
   const std::string yaml = R"EOF(
     name: name

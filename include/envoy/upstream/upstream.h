@@ -597,8 +597,7 @@ public:
   GAUGE(upstream_rq_pending_active, Accumulate)                                                    \
   GAUGE(version, NeverImport)                                                                      \
   HISTOGRAM(upstream_cx_connect_ms, Milliseconds)                                                  \
-  HISTOGRAM(upstream_cx_length_ms, Milliseconds)                                                   \
-  HISTOGRAM(upstream_rq_headers_size, Bytes)
+  HISTOGRAM(upstream_cx_length_ms, Milliseconds)
 
 /**
  * All cluster load report stats. These are only use for EDS load reporting and not sent to the
@@ -622,6 +621,12 @@ public:
   REMAINING_GAUGE(remaining_pending, Accumulate)                                                   \
   REMAINING_GAUGE(remaining_retries, Accumulate)                                                   \
   REMAINING_GAUGE(remaining_rq, Accumulate)
+
+/**
+ * All stats tracking request/response headers and body sizes. Not used by default.
+ */
+#define ALL_CLUSTER_REQUEST_RESPONSE_SIZE_STATS(HISTOGRAM)                                         \
+  HISTOGRAM(upstream_rq_headers_size, Bytes)
 
 /**
  * All stats around timeout budgets. Not used by default.
@@ -649,6 +654,13 @@ struct ClusterLoadReportStats {
  */
 struct ClusterCircuitBreakersStats {
   ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(GENERATE_GAUGE_STRUCT, GENERATE_GAUGE_STRUCT)
+};
+
+/**
+ * Struct definition for cluster timeout budget stats. @see stats_macros.h
+ */
+struct ClusterRequestResponseSizeStats {
+  ALL_CLUSTER_REQUEST_RESPONSE_SIZE_STATS(GENERATE_HISTOGRAM_STRUCT)
 };
 
 /**
@@ -850,6 +862,13 @@ public:
    * @return ClusterLoadReportStats& strongly named load report stats for this cluster.
    */
   virtual ClusterLoadReportStats& loadReportStats() const PURE;
+
+  /**
+   * @return absl::optional<ClusterRequestResponseSizeStats>& stats to track headers/body sizes of
+   * request/response for this cluster.
+   */
+  virtual const absl::optional<ClusterRequestResponseSizeStats>&
+  requestResponseSizeStats() const PURE;
 
   /**
    * @return absl::optional<ClusterTimeoutBudgetStats>& stats on timeout budgets for this cluster.

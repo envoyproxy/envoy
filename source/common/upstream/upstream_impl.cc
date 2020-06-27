@@ -611,6 +611,11 @@ ClusterStats ClusterInfoImpl::generateStats(Stats::Scope& scope) {
   return {ALL_CLUSTER_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope), POOL_HISTOGRAM(scope))};
 }
 
+ClusterRequestResponseSizeStats
+ClusterInfoImpl::generateRequestResponseSizeStats(Stats::Scope& scope) {
+  return {ALL_CLUSTER_REQUEST_RESPONSE_SIZE_STATS(POOL_HISTOGRAM(scope))};
+}
+
 ClusterLoadReportStats ClusterInfoImpl::generateLoadReportStats(Stats::Scope& scope) {
   return {ALL_CLUSTER_LOAD_REPORT_STATS(POOL_COUNTER(scope))};
 }
@@ -679,6 +684,10 @@ ClusterInfoImpl::ClusterInfoImpl(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       socket_matcher_(std::move(socket_matcher)), stats_scope_(std::move(stats_scope)),
       stats_(generateStats(*stats_scope_)), load_report_stats_store_(stats_scope_->symbolTable()),
+      request_response_size_stats_(config.track_request_response_sizes()
+                                       ? absl::make_optional<ClusterRequestResponseSizeStats>(
+                                             generateRequestResponseSizeStats(*stats_scope_))
+                                       : absl::nullopt),
       load_report_stats_(generateLoadReportStats(load_report_stats_store_)),
       timeout_budget_stats_(config.track_timeout_budgets()
                                 ? absl::make_optional<ClusterTimeoutBudgetStats>(

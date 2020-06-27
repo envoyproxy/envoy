@@ -771,12 +771,13 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   ScopeTrackerScopeState scope(this,
                                connection_manager_.read_callbacks_->connection().dispatcher());
   request_headers_ = std::move(headers);
+  auto host_ = connection_manager_.read_callbacks_->upstreamHost();
 
-  if (connection_manager_.read_callbacks_->upstreamHost() != nullptr) {
-    connection_manager_.read_callbacks_->upstreamHost()
-        ->cluster()
-        .stats()
-        .upstream_rq_headers_size_.recordValue(request_headers_->byteSize());
+  if (host_ != nullptr) {
+    if (host_->cluster().requestResponseSizeStats().has_value()) {
+      host_->cluster().requestResponseSizeStats()->upstream_rq_headers_size_.recordValue(
+          request_headers_->byteSize());
+    }
   }
 
   // Both saw_connection_close_ and is_head_request_ affect local replies: set

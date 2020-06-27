@@ -34,7 +34,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Cluster configuration]
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 49]
+// [#next-free-field: 50]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster";
 
@@ -834,6 +834,11 @@ message Cluster {
   // CONNECT only if a custom filter indicates it is appropriate, the custom factories
   // can be registered and configured here.
   core.v3.TypedExtensionConfig upstream_config = 48;
+
+  // If track_request_response_sizes is true, then the :ref:`histograms
+  // <config_cluster_manager_cluster_stats_request_response_sizes>`  tracking header and body sizes
+  // of requests and responses will be published.
+  bool track_request_response_sizes = 49;
 
   repeated core.v3.Address hidden_envoy_deprecated_hosts = 7 [deprecated = true];
 

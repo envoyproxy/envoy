@@ -62,7 +62,6 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_cx_none_healthy, Counter, Total times connection not established due to no healthy hosts
   upstream_rq_total, Counter, Total requests
   upstream_rq_active, Gauge, Total active requests
-  upstream_rq_headers_size, Histogram, Request headers size in bytes per upstream
   upstream_rq_pending_total, Counter, Total requests pending a connection pool connection
   upstream_rq_pending_overflow, Counter, Total requests that overflowed connection pool or requests (mainly for HTTP/2) circuit breaking and were failed
   upstream_rq_pending_failure_eject, Counter, Total requests that were failed due to a connection pool connection failure or remote connection termination 
@@ -315,3 +314,17 @@ Statistics for monitoring effective host weights when using the
 
   min_entries_per_host, Gauge, Minimum number of entries for a single host
   max_entries_per_host, Gauge, Maximum number of entries for a single host
+
+.. _config_cluster_manager_cluster_stats_request_response_sizes:
+
+Request Response Size statistics
+--------------------------------
+
+If :ref:`request response size statistics are tracked <envoy_v3_api_field_config.cluster.v3.Cluster.track_request_response_sizes>` is, 
+statistics will be added to *cluster.<name>* and contain the following:
+
+.. csv-table::
+   :header: Name, Type, Description
+   :widths: 1, 1, 2
+
+   upstream_rq_headers_size, Histogram, Request headers size in bytes per upstream

@@ -6071,14 +6071,14 @@ TEST_F(HttpConnectionManagerImplTest, UpstreamHeadersSize) {
   filter_callbacks_.upstreamHost(host_);
 
   EXPECT_CALL(
-      host_->cluster_.stats_store_,
+      host_->cluster_.request_response_size_stats_store_,
       deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_headers_size"), 30));
 
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
 
   EXPECT_EQ(Stats::Histogram::Unit::Bytes,
-            host_->cluster().stats().upstream_rq_headers_size_.unit());
+            host_->cluster_.requestResponseSizeStats()->upstream_rq_headers_size_.unit());
 }
 
 TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponseUsingHttp3) {
