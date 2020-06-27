@@ -64,7 +64,6 @@ std::string getResourceTypeUrl(absl::string_view service_name) {
 }
 
 TypeUrlToVersionedServiceMap* buildTypeUrlToServiceMap() {
-  // auto* type_url_to_service_map = new TypeUrlToServiceMap();
   auto* type_url_to_versioned_service_map = new TypeUrlToVersionedServiceMap();
 
   // This happens once in the lifetime of Envoy. We build a reverse map from resource type URL to
