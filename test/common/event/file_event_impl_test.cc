@@ -168,7 +168,7 @@ TEST_P(FileEventImplActivateTest, ActivateChaining) {
   EXPECT_CALL(fd_event, ready());
   EXPECT_CALL(read_event, ready());
   EXPECT_CALL(write_event, ready());
-  if (activate_fds_next_event_loop()) {
+  if (activateFdsNextEventLoop()) {
     // Second loop iteration: handle write and close events scheduled while handling read.
     EXPECT_CALL(prepare_watcher, ready());
     EXPECT_CALL(fd_event, ready());
