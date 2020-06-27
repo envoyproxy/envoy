@@ -44,10 +44,10 @@ public:
 
 private:
   struct CallbackHolder : public CallbackHandle {
-    CallbackHolder(CallbackManager& parent, Callback cb) : parent_(parent), cb_(cb) {}
+    CallbackHolder(CallbackManager& parent, Callback cb) : parent_(parent), cb_(move(cb)) {}
 
     // CallbackHandle
-    void remove() override { parent_.remove(this); }
+    void remove() override { parent_.remove(it_); }
 
     CallbackManager& parent_;
     Callback cb_;
@@ -61,17 +61,9 @@ private:
    * Remove a member update callback added via add().
    * @param handle supplies the callback handle to remove.
    */
-  void remove(CallbackHandle* handle) {
-    ASSERT(std::find_if(callbacks_.begin(), callbacks_.end(),
-                        [handle](const CallbackHolder& holder) -> bool {
-                          return handle == &holder;
-                        }) != callbacks_.end());
-    auto it = dynamic_cast<CallbackHolder*>(handle)->it_;
-    callbacks_.erase(it);
-  }
+  void remove(typename std::list<CallbackHolder>::iterator& it) { callbacks_.erase(it); }
 
   std::list<CallbackHolder> callbacks_;
-  // std::list<CallbackHolder> removed_;
 };
 
 } // namespace Common
