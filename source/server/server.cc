@@ -34,6 +34,8 @@
 #include "common/local_info/local_info_impl.h"
 #include "common/memory/stats.h"
 #include "common/network/address_impl.h"
+#include "common/network/socket_interface_factory.h"
+#include "common/network/socket_interface_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/router/rds_impl.h"
 #include "common/runtime/runtime_impl.h"
@@ -287,6 +289,32 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
   MessageUtil::validate(bootstrap, validation_visitor);
 }
 
+static void loadSocketInterface(envoy::config::core::v3::TypedExtensionConfig sock_interface,
+                                ProtobufMessage::ValidationContext& validation_ctx) {
+  auto& factory =
+      Config::Utility::getAndCheckFactory<Network::SocketInterfaceFactory>(sock_interface);
+  auto config = Config::Utility::translateAnyToFactoryConfig(
+      sock_interface.typed_config(), validation_ctx.staticValidationVisitor(), factory);
+  Network::SocketInterfacesSingleton::get().emplace(
+      std::make_pair(sock_interface.name(), factory.createSocketInterface(*config)));
+}
+
+static void
+initializeSocketInterfaces(const envoy::config::core::v3::SocketInterfacesConfig& sock_interfaces,
+                           ProtobufMessage::ValidationContext& validation_ctx) {
+  Network::SocketInterfacesSingleton::initialize(new Network::SocketInterfacesMap());
+  for (const auto& sock_interface : sock_interfaces.custom_types()) {
+    loadSocketInterface(sock_interface, validation_ctx);
+  }
+  if (sock_interfaces.has_custom_default_type()) {
+    Network::SocketInterfaceSingleton::clear();
+    const auto& custom_sock = sock_interfaces.custom_default_type();
+    loadSocketInterface(custom_sock, validation_ctx);
+    auto sock = const_cast<Network::SocketInterface*>(Network::socketInterface(custom_sock.name()));
+    Network::SocketInterfaceSingleton::initialize(sock);
+  }
+}
+
 void InstanceImpl::initialize(const Options& options,
                               Network::Address::InstanceConstSharedPtr local_address,
                               ComponentFactory& component_factory, ListenerHooks& hooks) {
@@ -408,6 +436,12 @@ void InstanceImpl::initialize(const Options& options,
 
   heap_shrinker_ =
       std::make_unique<Memory::HeapShrinker>(*dispatcher_, *overload_manager_, stats_store_);
+
+  // Initialize all SocketInterface implementations, if any are configured.
+  if (bootstrap_.static_resources().has_socket_interfaces()) {
+    initializeSocketInterfaces(bootstrap_.static_resources().socket_interfaces(),
+                               messageValidationContext());
+  }
 
   // Workers get created first so they register for thread local updates.
   listener_manager_ = std::make_unique<ListenerManagerImpl>(

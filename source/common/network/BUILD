@@ -173,6 +173,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "socket_interface_factory_lib",
+    hdrs = ["socket_interface_factory.h"],
+    deps = [
+        "//include/envoy/config:typed_config_interface",
+        "//include/envoy/network:socket_interface",
+        "//include/envoy/registry",
+    ],
+)
+
+envoy_cc_library(
     name = "socket_lib",
     srcs = [
         "socket_impl.cc",
@@ -184,20 +194,10 @@ envoy_cc_library(
     ],
     deps = [
         ":address_lib",
+        ":socket_interface_factory_lib",
         "//include/envoy/network:socket_interface",
         "//source/common/common:assert_lib",
         "//source/common/singleton:threadsafe_singleton",
-    ],
-)
-
-envoy_cc_library(
-    name = "socket_interface_factory_lib",
-    srcs = ["socket_interface_factory.cc"],
-    hdrs = ["socket_interface_factory.h"],
-    deps = [
-        ":socket_lib",
-        "//include/envoy/server:bootstrap_extension_config_interface",
-        "//source/extensions/network/vcl:vcl_interface_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

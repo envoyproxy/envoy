@@ -8,6 +8,7 @@ import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/event_service_config.proto";
 import "envoy/config/core/v3/extension.proto";
+import "envoy/config/core/v3/socket_interfaces.proto";
 import "envoy/config/core/v3/socket_option.proto";
 import "envoy/config/listener/v3/listener.proto";
 import "envoy/config/metrics/v3/stats.proto";
@@ -60,6 +61,9 @@ message Bootstrap {
     // These static secrets can be used by :ref:`SdsSecretConfig
     // <envoy_api_msg_extensions.transport_sockets.tls.v3.SdsSecretConfig>`
     repeated envoy.extensions.transport_sockets.tls.v3.Secret secrets = 3;
+
+    // Allows loading of multiple socket interfaces and configuration of the default one
+    core.v3.SocketInterfacesConfig socket_interfaces = 4;
   }
 
   message DynamicResources {
