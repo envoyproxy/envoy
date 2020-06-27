@@ -32,6 +32,7 @@ envoy_cc_library(
         "//source/common/common:statusor_lib",
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
+        "//source/common/grpc:common_lib",
         "//source/common/http:codec_helper_lib",
         "//source/common/http:codes_lib",
         "//source/common/http:exception_lib",

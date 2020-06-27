@@ -27,6 +27,8 @@ API
   api/why_versioning
   api/incremental
 
+.. _faq_overview_debug:
+
 Debugging
 ---------
 .. toctree::
@@ -72,3 +74,11 @@ Load balancing
   load_balancing/disable_circuit_breaking
   load_balancing/transient_failures
   load_balancing/region_failover
+
+Extensions
+----------
+
+.. toctree::
+  :maxdepth: 2
+
+  extensions/contract
