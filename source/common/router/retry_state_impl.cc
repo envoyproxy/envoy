@@ -128,8 +128,8 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy,
     // to provide HeaderMatcher serialized into a string. To avoid this extra
     // complexity we only support name-only header matchers via request
     // header. Anything more sophisticated needs to be provided via config.
-    for (const auto header_name : StringUtil::splitToken(
-             request_headers.getEnvoyRetriableHeaderNamesValue(), ",")) {
+    for (const auto header_name :
+         StringUtil::splitToken(request_headers.getEnvoyRetriableHeaderNamesValue(), ",")) {
       envoy::config::route::v3::HeaderMatcher header_matcher;
       header_matcher.set_name(std::string(absl::StripAsciiWhitespace(header_name)));
       retriable_headers_.emplace_back(

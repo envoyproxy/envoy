@@ -151,8 +151,8 @@ bool DecompressorFilter::hasCacheControlNoTransform(
  */
 bool DecompressorFilter::contentEncodingMatches(Http::RequestOrResponseHeaderMap& headers) const {
   if (headers.ContentEncoding()) {
-    absl::string_view coding = StringUtil::trim(
-        StringUtil::cropRight(headers.getContentEncodingValue(), ","));
+    absl::string_view coding =
+        StringUtil::trim(StringUtil::cropRight(headers.getContentEncodingValue(), ","));
     return StringUtil::CaseInsensitiveCompare()(config_->contentEncoding(), coding);
   }
   return false;
