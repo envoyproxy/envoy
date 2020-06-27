@@ -60,6 +60,7 @@ envoy_extension_cc_test(
     name = "admission_control_integration_test",
     srcs = ["admission_control_integration_test.cc"],
     extension_name = "envoy.filters.http.admission_control",
+    tags = ["fails_on_windows"],
     deps = [
         "//source/extensions/filters/http/admission_control:config",
         "//test/integration:http_integration_lib",

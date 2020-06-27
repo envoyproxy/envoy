@@ -11,6 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "dispatcher_impl_test",
     srcs = ["dispatcher_impl_test.cc"],
+    tags = ["fails_on_windows"],
     deps = [
         "//source/common/api:api_lib",
         "//source/common/event:deferred_task",
