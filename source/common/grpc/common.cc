@@ -98,7 +98,10 @@ absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::ResponseTra
 
 std::string Common::getGrpcMessage(const Http::ResponseHeaderOrTrailerMap& trailers) {
   const auto entry = trailers.getGrpcMessageValue();
-  return entry ? std::string(entry) : EMPTY_STRING;
+  if(entry.size()!=0){
+    return std::string(entry);
+  }
+  return EMPTY_STRING;
 }
 
 absl::optional<google::rpc::Status>
