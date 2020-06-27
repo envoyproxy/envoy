@@ -44,7 +44,7 @@ public:
 
 private:
   struct CallbackHolder : public CallbackHandle {
-    CallbackHolder(CallbackManager& parent, Callback cb) : parent_(parent), cb_(move(cb)) {}
+    CallbackHolder(CallbackManager& parent, Callback cb) : parent_(parent), cb_(cb) {}
 
     // CallbackHandle
     void remove() override { parent_.remove(it_); }
