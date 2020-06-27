@@ -62,19 +62,16 @@ private:
    * @param handle supplies the callback handle to remove.
    */
   void remove(CallbackHandle* handle) {
-    removed_.clear();
     ASSERT(std::find_if(callbacks_.begin(), callbacks_.end(),
                         [handle](const CallbackHolder& holder) -> bool {
                           return handle == &holder;
                         }) != callbacks_.end());
     auto it = dynamic_cast<CallbackHolder*>(handle)->it_;
-    // Transfer the ownership of this holder to removed_ list,
-    // which is cleared when the next callback holder call remove.
-    removed_.splice(removed_.begin(), callbacks_, it);
+    callbacks_.erase(it);
   }
 
   std::list<CallbackHolder> callbacks_;
-  std::list<CallbackHolder> removed_;
+  // std::list<CallbackHolder> removed_;
 };
 
 } // namespace Common
