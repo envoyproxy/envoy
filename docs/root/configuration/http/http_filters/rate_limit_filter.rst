@@ -105,7 +105,12 @@ The following configuration
          path:
              - key: test
 
-Will lookup the value of the dynamic metadata, and if it contains the following structure:
+.. _config_http_filters_rate_limit_override_dynamic_metadata:
+
+Will lookup the value of the dynamic metadata. The value must be a structure with integer field
+"requests_per_unit" and a string field "unit" which is parseable to :ref:`RateLimitUnit enum
+<envoy_v3_api_enum_type.v3.RateLimitUnit>`. For example, with the following dynamic metadata
+the rate limit override of 42 requests per hour will be appended to the rate limit descriptor.
 
 .. code-block:: yaml
 
@@ -113,8 +118,6 @@ Will lookup the value of the dynamic metadata, and if it contains the following 
       test:
           requests_per_unit: 42
           unit: HOUR
-
-The rate limit override of 42 requests per hour will be appended to the rate limit descriptor.
 
 Statistics
 ----------
