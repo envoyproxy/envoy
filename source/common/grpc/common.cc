@@ -166,11 +166,10 @@ Buffer::InstancePtr Common::serializeMessage(const Protobuf::Message& message) {
 
 std::chrono::milliseconds Common::getGrpcTimeout(const Http::RequestHeaderMap& request_headers) {
   std::chrono::milliseconds timeout(0);
-  const Http::HeaderEntry* header_grpc_timeout_entry = request_headers.GrpcTimeout();
-  if (header_grpc_timeout_entry) {
+  const auto header_grpc_timeout_entry = request_headers.getGrpcTimeoutValue();
+  if (header_grpc_timeout_entry.size() != 0) {
     uint64_t grpc_timeout;
-    // TODO(dnoe): Migrate to pure string_view (#6580)
-    std::string grpc_timeout_string(header_grpc_timeout_entry->value().getStringView());
+    std::string grpc_timeout_string(header_grpc_timeout_entry);
     const char* unit = StringUtil::strtoull(grpc_timeout_string.c_str(), grpc_timeout);
     if (unit != nullptr && *unit != '\0') {
       switch (*unit) {
