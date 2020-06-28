@@ -14,8 +14,8 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/thread.h"
-#include "common/http/http1/codec_impl.h"
-#include "common/http/http2/codec_impl.h"
+#include "common/http/http1/codec_stats.h"
+#include "common/http/http2/codec_stats.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "test/mocks/runtime/mocks.h"

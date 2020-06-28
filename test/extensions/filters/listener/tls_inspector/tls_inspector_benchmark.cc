@@ -1,6 +1,7 @@
 #include <vector>
 
 #include "common/api/os_sys_calls_impl.h"
+#include "common/http/utility.h"
 #include "common/network/io_socket_handle_impl.h"
 #include "common/network/listen_socket_impl.h"
 
