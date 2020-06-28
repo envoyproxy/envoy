@@ -13,6 +13,7 @@ envoy_cc_test_library(
     srcs = ["main.cc"],
     external_deps = [
         "benchmark",
+        "tclap",
     ],
     deps = [
         "//test/test_common:environment_lib",

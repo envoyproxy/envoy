@@ -162,38 +162,40 @@ public:
 } // namespace Upstream
 } // namespace Envoy
 
+extern bool g_skip_expensive_benchmarks;
+
 static void priorityAndLocalityWeighted(benchmark::State& state) {
   Envoy::Thread::MutexBasicLockable lock;
   Envoy::Logger::Context logging_state(spdlog::level::warn,
                                        Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
   for (auto _ : state) {
     Envoy::Upstream::EdsSpeedTest speed_test(state, state.range(0));
-    speed_test.priorityAndLocalityWeightedHelper(state.range(1), state.range(2), true);
+    // if we've been instructed to skip tests, only run once no matter the argument:
+    uint32_t endpoints = g_skip_expensive_benchmarks ? 1 : state.range(2);
+
+    speed_test.priorityAndLocalityWeightedHelper(state.range(1), endpoints, true);
   }
 }
 
-// The endpoint count (1, 2) is intentionally very low to save on test runtime
-// if you're not actually interested in this benchmark; (1000, 100000) has been
-// used for measuring changes.
 BENCHMARK(priorityAndLocalityWeighted)
-    ->Ranges({{false, true}, {false, true}, {1, 2}})
+    ->Ranges({{false, true}, {false, true}, {1, 100000}})
     ->Unit(benchmark::kMillisecond);
 
 static void duplicateUpdate(benchmark::State& state) {
   Envoy::Thread::MutexBasicLockable lock;
   Envoy::Logger::Context logging_state(spdlog::level::warn,
                                        Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
+
   for (auto _ : state) {
     Envoy::Upstream::EdsSpeedTest speed_test(state, false);
-    speed_test.priorityAndLocalityWeightedHelper(true, state.range(0), true);
-    speed_test.priorityAndLocalityWeightedHelper(true, state.range(0), true);
+    uint32_t endpoints = g_skip_expensive_benchmarks ? 1 : state.range(0);
+
+    speed_test.priorityAndLocalityWeightedHelper(true, endpoints, true);
+    speed_test.priorityAndLocalityWeightedHelper(true, endpoints, true);
   }
 }
 
-// The endpoint count (100) here and elsewhere is intentionally low to save on
-// resources in continuous testing, if you're trying to quantify new changes,
-// Range(2000, 100000) is a reasonable starting point.
-BENCHMARK(duplicateUpdate)->Arg(100)->Unit(benchmark::kMillisecond);
+BENCHMARK(duplicateUpdate)->Range(1, 100000)->Unit(benchmark::kMillisecond);
 
 static void healthOnlyUpdate(benchmark::State& state) {
   Envoy::Thread::MutexBasicLockable lock;
@@ -201,9 +203,11 @@ static void healthOnlyUpdate(benchmark::State& state) {
                                        Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
   for (auto _ : state) {
     Envoy::Upstream::EdsSpeedTest speed_test(state, false);
-    speed_test.priorityAndLocalityWeightedHelper(true, state.range(0), true);
-    speed_test.priorityAndLocalityWeightedHelper(true, state.range(0), false);
+    uint32_t endpoints = g_skip_expensive_benchmarks ? 1 : state.range(0);
+
+    speed_test.priorityAndLocalityWeightedHelper(true, endpoints, true);
+    speed_test.priorityAndLocalityWeightedHelper(true, endpoints, false);
   }
 }
 
-BENCHMARK(healthOnlyUpdate)->Arg(100)->Unit(benchmark::kMillisecond);
+BENCHMARK(healthOnlyUpdate)->Range(1, 100000)->Unit(benchmark::kMillisecond);
