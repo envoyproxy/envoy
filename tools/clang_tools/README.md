@@ -14,7 +14,7 @@ framework for writing Clang tools in the style of `clang-format` and
 To build tools in this tree, a Clang binary install must be available. If you
 are building Envoy with `clang`, this should already be true of your system. You
 can find prebuilt binary releases of Clang at https://releases.llvm.org. You
-will need the Clang version used by Envoy in CI (currently clang-9.0).
+will need the Clang version used by Envoy in CI (currently clang-10.0).
 
 To build a tool, set the following environment variable:
 

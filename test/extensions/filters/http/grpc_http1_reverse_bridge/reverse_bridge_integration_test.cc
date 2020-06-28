@@ -14,7 +14,9 @@
 #include "gtest/gtest.h"
 
 using Envoy::Http::HeaderValueOf;
-using std::string_literals::operator""s;
+
+// for ::operator""s (which Windows compiler does not support):
+using namespace std::string_literals;
 
 namespace Envoy {
 namespace {
@@ -52,11 +54,7 @@ typed_config:
     HttpIntegrationTest::initialize();
   }
 
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstream_connection_.reset();
-    fake_upstreams_.clear();
-  }
+  void TearDown() override { fake_upstream_connection_.reset(); }
 
 protected:
   FakeHttpConnection::Type upstream_protocol_;

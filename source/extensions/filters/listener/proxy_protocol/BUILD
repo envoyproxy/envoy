@@ -1,13 +1,13 @@
-licenses(["notice"])  # Apache 2
-
-# Proxy protocol listener filter: https://www.haproxy.org/download/1.8/doc/proxy-protocol.txt
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
+
+# Proxy protocol listener filter: https://www.haproxy.org/download/1.8/doc/proxy-protocol.txt
 
 envoy_package()
 
@@ -29,6 +29,8 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
+        "//source/extensions/filters/listener:well_known_names",
+        "@envoy_api//envoy/extensions/filters/listener/proxy_protocol/v3:pkg_cc_proto",
     ],
 )
 

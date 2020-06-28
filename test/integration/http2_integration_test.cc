@@ -512,7 +512,7 @@ TEST_P(Http2MetadataIntegrationTest, RequestMetadataReachSizeLimit) {
   }
 
   // Verifies client connection will be closed.
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
   ASSERT_FALSE(response->complete());
 }
 
@@ -1562,8 +1562,7 @@ void Http2FloodMitigationTest::floodServer(const Http2Frame& frame, const std::s
 
   EXPECT_LE(total_bytes_sent, TransmitThreshold) << "Flood mitigation is broken.";
   EXPECT_EQ(1, test_server_->counter(flood_stat)->value());
-  EXPECT_EQ(1,
-            test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
+  test_server_->waitForCounterGe("http.config_test.downstream_cx_delayed_close_timeout", 1);
 }
 
 // Verify that the server detects the flood using specified request parameters.

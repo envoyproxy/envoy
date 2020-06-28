@@ -53,21 +53,6 @@ MockOptions::MockOptions(const std::string& config_path) : config_path_(config_p
 }
 MockOptions::~MockOptions() = default;
 
-MockConfigTracker::MockConfigTracker() {
-  ON_CALL(*this, add_(_, _))
-      .WillByDefault(Invoke([this](const std::string& key, Cb callback) -> EntryOwner* {
-        EXPECT_TRUE(config_tracker_callbacks_.find(key) == config_tracker_callbacks_.end());
-        config_tracker_callbacks_[key] = callback;
-        return new MockEntryOwner();
-      }));
-}
-MockConfigTracker::~MockConfigTracker() = default;
-
-MockAdmin::MockAdmin() {
-  ON_CALL(*this, getConfigTracker()).WillByDefault(testing::ReturnRef(config_tracker_));
-}
-MockAdmin::~MockAdmin() = default;
-
 MockAdminStream::MockAdminStream() = default;
 MockAdminStream::~MockAdminStream() = default;
 
@@ -99,8 +84,7 @@ MockOverloadManager::~MockOverloadManager() = default;
 MockListenerComponentFactory::MockListenerComponentFactory()
     : socket_(std::make_shared<NiceMock<Network::MockListenSocket>>()) {
   ON_CALL(*this, createListenSocket(_, _, _, _))
-      .WillByDefault(Invoke([&](Network::Address::InstanceConstSharedPtr,
-                                Network::Address::SocketType,
+      .WillByDefault(Invoke([&](Network::Address::InstanceConstSharedPtr, Network::Socket::Type,
                                 const Network::Socket::OptionsSharedPtr& options,
                                 const ListenSocketCreationParams&) -> Network::SocketSharedPtr {
         if (!Network::Socket::applyOptions(options, *socket_,
@@ -303,6 +287,9 @@ MockTracerFactoryContext::MockTracerFactoryContext() {
 }
 
 MockTracerFactoryContext::~MockTracerFactoryContext() = default;
+
+MockBootstrapExtensionFactory::MockBootstrapExtensionFactory() = default;
+MockBootstrapExtensionFactory::~MockBootstrapExtensionFactory() = default;
 } // namespace Configuration
 } // namespace Server
 } // namespace Envoy

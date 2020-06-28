@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
@@ -8,6 +6,8 @@ load(
     "//test/extensions:extensions_build_system.bzl",
     "envoy_extension_cc_test",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -36,6 +36,7 @@ envoy_extension_cc_test(
         "decompressor_filter_integration_test.cc",
     ],
     extension_name = "envoy.filters.http.decompressor",
+    tags = ["fails_on_windows"],
     deps = [
         "//source/extensions/compression/gzip/compressor:config",
         "//source/extensions/compression/gzip/decompressor:config",

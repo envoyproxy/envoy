@@ -13,6 +13,7 @@
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/server/admin.h"
+#include "envoy/server/bootstrap_extension_config.h"
 #include "envoy/server/configuration.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/filter_config.h"
@@ -52,6 +53,8 @@
 #include "test/test_common/test_time_system.h"
 
 #include "absl/strings/string_view.h"
+#include "admin.h"
+#include "config_tracker.h"
 #include "gmock/gmock.h"
 #include "spdlog/spdlog.h"
 
@@ -70,6 +73,8 @@ public:
   ~MockOptions() override;
 
   MOCK_METHOD(uint64_t, baseId, (), (const));
+  MOCK_METHOD(bool, useDynamicBaseId, (), (const));
+  MOCK_METHOD(const std::string&, baseIdPath, (), (const));
   MOCK_METHOD(uint32_t, concurrency, (), (const));
   MOCK_METHOD(const std::string&, configPath, (), (const));
   MOCK_METHOD(const envoy::config::bootstrap::v3::Bootstrap&, configProto, (), (const));
@@ -81,13 +86,14 @@ public:
   MOCK_METHOD(const std::string&, adminAddressPath, (), (const));
   MOCK_METHOD(Network::Address::IpVersion, localAddressIpVersion, (), (const));
   MOCK_METHOD(std::chrono::seconds, drainTime, (), (const));
+  MOCK_METHOD(std::chrono::seconds, parentShutdownTime, (), (const));
+  MOCK_METHOD(Server::DrainStrategy, drainStrategy, (), (const));
   MOCK_METHOD(spdlog::level::level_enum, logLevel, (), (const));
   MOCK_METHOD((const std::vector<std::pair<std::string, spdlog::level::level_enum>>&),
               componentLogLevels, (), (const));
   MOCK_METHOD(const std::string&, logFormat, (), (const));
   MOCK_METHOD(bool, logFormatEscaped, (), (const));
   MOCK_METHOD(const std::string&, logPath, (), (const));
-  MOCK_METHOD(std::chrono::seconds, parentShutdownTime, (), (const));
   MOCK_METHOD(uint64_t, restartEpoch, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, fileFlushIntervalMsec, (), (const));
   MOCK_METHOD(Mode, mode, (), (const));
@@ -124,49 +130,6 @@ public:
   std::vector<std::string> disabled_extensions_;
 };
 
-class MockConfigTracker : public ConfigTracker {
-public:
-  MockConfigTracker();
-  ~MockConfigTracker() override;
-
-  struct MockEntryOwner : public EntryOwner {};
-
-  MOCK_METHOD(EntryOwner*, add_, (std::string, Cb));
-
-  // Server::ConfigTracker
-  MOCK_METHOD(const CbsMap&, getCallbacksMap, (), (const));
-  EntryOwnerPtr add(const std::string& key, Cb callback) override {
-    return EntryOwnerPtr{add_(key, std::move(callback))};
-  }
-
-  std::unordered_map<std::string, Cb> config_tracker_callbacks_;
-};
-
-class MockAdmin : public Admin {
-public:
-  MockAdmin();
-  ~MockAdmin() override;
-
-  // Server::Admin
-  MOCK_METHOD(bool, addHandler,
-              (const std::string& prefix, const std::string& help_text, HandlerCb callback,
-               bool removable, bool mutates_server_state));
-  MOCK_METHOD(bool, removeHandler, (const std::string& prefix));
-  MOCK_METHOD(Network::Socket&, socket, ());
-  MOCK_METHOD(ConfigTracker&, getConfigTracker, ());
-  MOCK_METHOD(void, startHttpListener,
-              (const std::string& access_log_path, const std::string& address_out_path,
-               Network::Address::InstanceConstSharedPtr address,
-               const Network::Socket::OptionsSharedPtr& socket_options,
-               Stats::ScopePtr&& listener_scope));
-  MOCK_METHOD(Http::Code, request,
-              (absl::string_view path_and_query, absl::string_view method,
-               Http::ResponseHeaderMap& response_headers, std::string& body));
-  MOCK_METHOD(void, addListenerToHandler, (Network::ConnectionHandler * handler));
-
-  NiceMock<MockConfigTracker> config_tracker_;
-};
-
 class MockAdminStream : public AdminStream {
 public:
   MockAdminStream();
@@ -188,6 +151,7 @@ public:
 
   // Server::DrainManager
   MOCK_METHOD(bool, drainClose, (), (const));
+  MOCK_METHOD(bool, draining, (), (const));
   MOCK_METHOD(void, startDrainSequence, (std::function<void()> completion));
   MOCK_METHOD(void, startParentShutdownSequence, ());
 
@@ -233,6 +197,7 @@ public:
   MOCK_METHOD(void, sendParentTerminateRequest, ());
   MOCK_METHOD(ServerStatsFromParent, mergeParentStatsIfAny, (Stats::StoreRoot & stats_store));
   MOCK_METHOD(void, shutdown, ());
+  MOCK_METHOD(uint32_t, baseId, ());
   MOCK_METHOD(std::string, version, ());
   MOCK_METHOD(Thread::BasicLockable&, logLock, ());
   MOCK_METHOD(Thread::BasicLockable&, accessLogLock, ());
@@ -269,8 +234,7 @@ public:
               (const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&,
                Configuration::ListenerFactoryContext& context));
   MOCK_METHOD(Network::SocketSharedPtr, createListenSocket,
-              (Network::Address::InstanceConstSharedPtr address,
-               Network::Address::SocketType socket_type,
+              (Network::Address::InstanceConstSharedPtr address, Network::Socket::Type socket_type,
                const Network::Socket::OptionsSharedPtr& options,
                const ListenSocketCreationParams& params));
   MOCK_METHOD(DrainManager*, createDrainManager_,
@@ -511,6 +475,8 @@ public:
   MOCK_METHOD(Api::Api&, api, ());
   Grpc::Context& grpcContext() override { return grpc_context_; }
   MOCK_METHOD(Server::DrainManager&, drainManager, ());
+  MOCK_METHOD(Init::Manager&, initManager, ());
+  MOCK_METHOD(ServerLifecycleNotifier&, lifecycleNotifier, ());
 
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
@@ -600,7 +566,7 @@ public:
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(Envoy::Runtime::RandomGenerator&, random, ());
   MOCK_METHOD(Stats::Store&, stats, ());
-  MOCK_METHOD(Init::Manager*, initManager, ());
+  MOCK_METHOD(Init::Manager&, initManager, ());
   MOCK_METHOD(Singleton::Manager&, singletonManager, ());
   MOCK_METHOD(ThreadLocal::SlotAllocator&, threadLocal, ());
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
@@ -677,6 +643,17 @@ public:
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
 
   testing::NiceMock<Configuration::MockServerFactoryContext> server_factory_context_;
+};
+
+class MockBootstrapExtensionFactory : public BootstrapExtensionFactory {
+public:
+  MockBootstrapExtensionFactory();
+  ~MockBootstrapExtensionFactory() override;
+
+  MOCK_METHOD(BootstrapExtensionPtr, createBootstrapExtension,
+              (const Protobuf::Message&, Configuration::ServerFactoryContext&), (override));
+  MOCK_METHOD(ProtobufTypes::MessagePtr, createEmptyConfigProto, (), (override));
+  MOCK_METHOD(std::string, name, (), (const, override));
 };
 
 } // namespace Configuration

@@ -1,10 +1,10 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -19,6 +19,7 @@ envoy_cc_library(
     deps = [
         ":deferred_deletable",
         ":file_event_interface",
+        ":schedulable_cb_interface",
         ":signal_interface",
         "//include/envoy/common:scope_tracker_interface",
         "//include/envoy/common:time_interface",
@@ -40,6 +41,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "schedulable_cb_interface",
+    hdrs = ["schedulable_cb.h"],
+)
+
+envoy_cc_library(
     name = "signal_interface",
     hdrs = ["signal.h"],
 )
@@ -48,6 +54,7 @@ envoy_cc_library(
     name = "timer_interface",
     hdrs = ["timer.h"],
     deps = [
+        ":schedulable_cb_interface",
         "//include/envoy/common:time_interface",
     ],
 )

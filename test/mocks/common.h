@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "envoy/common/conn_pool.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/common/time.h"
 #include "envoy/common/token_bucket.h"
@@ -50,16 +51,17 @@ public:
   // where timer callbacks are triggered by the advancement of time. This implementation
   // matches recent behavior, where real-time timers were created directly in libevent
   // by dispatcher_impl.cc.
-  Event::SchedulerPtr createScheduler(Event::Scheduler& base_scheduler) override {
-    return real_time_.createScheduler(base_scheduler);
+  Event::SchedulerPtr createScheduler(Event::Scheduler& base_scheduler,
+                                      Event::CallbackScheduler& cb_scheduler) override {
+    return real_time_.createScheduler(base_scheduler, cb_scheduler);
   }
   void advanceTimeWait(const Duration& duration) override { real_time_.advanceTimeWait(duration); }
   void advanceTimeAsync(const Duration& duration) override {
     real_time_.advanceTimeAsync(duration);
   }
-  Thread::CondVar::WaitStatus
-  waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
-          const Duration& duration) noexcept ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
+  Thread::CondVar::WaitStatus waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
+                                      const Duration& duration) noexcept
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
     return real_time_.waitFor(mutex, condvar, duration); // NO_CHECK_FORMAT(real_time)
   }
   MOCK_METHOD(SystemTime, systemTime, ());
@@ -94,5 +96,17 @@ class MockScopedTrackedObject : public ScopeTrackedObject {
 public:
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
 };
+
+namespace ConnectionPool {
+
+class MockCancellable : public Cancellable {
+public:
+  MockCancellable();
+  ~MockCancellable() override;
+
+  // ConnectionPool::Cancellable
+  MOCK_METHOD(void, cancel, (CancelPolicy cancel_policy));
+};
+} // namespace ConnectionPool
 
 } // namespace Envoy

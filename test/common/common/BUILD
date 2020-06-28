@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_benchmark_test",
@@ -8,6 +6,8 @@ load(
     "envoy_cc_test",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -173,6 +173,8 @@ envoy_cc_test(
     srcs = ["regex_test.cc"],
     deps = [
         "//source/common/common:regex_lib",
+        "//test/test_common:logging_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],

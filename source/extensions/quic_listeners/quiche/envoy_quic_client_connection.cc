@@ -95,6 +95,10 @@ void EnvoyQuicClientConnection::setUpConnectionSocket() {
 void EnvoyQuicClientConnection::switchConnectionSocket(
     Network::ConnectionSocketPtr&& connection_socket) {
   auto writer = std::make_unique<EnvoyQuicPacketWriter>(*connection_socket);
+  // Destroy the old file_event before closing the old socket. Otherwise the socket might be picked
+  // up by another socket() call while file_event is still operating on it.
+  file_event_.reset();
+  // The old socket is closed in this call.
   setConnectionSocket(std::move(connection_socket));
   setUpConnectionSocket();
   SetQuicPacketWriter(writer.release(), true);

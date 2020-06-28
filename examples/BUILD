@@ -1,9 +1,9 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -14,6 +14,9 @@ filegroup(
         "cors/backend/service-envoy.yaml",
         "cors/frontend/front-envoy.yaml",
         "cors/frontend/service-envoy.yaml",
+        "ext_authz/config/grpc-service/v2.yaml",
+        "ext_authz/config/grpc-service/v3.yaml",
+        "ext_authz/config/http-service.yaml",
         "front-proxy/front-envoy.yaml",
         "front-proxy/service-envoy.yaml",
         "grpc-bridge/client/envoy-proxy.yaml",

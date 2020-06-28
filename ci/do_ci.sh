@@ -19,7 +19,7 @@ cd "${SRCDIR}"
 echo "building using ${NUM_CPUS} CPUs"
 
 function collect_build_profile() {
-  cp -f "$(bazel info output_base)/command.profile" "${ENVOY_BUILD_PROFILE}/$1.profile" || true
+  cp -f "$(bazel info output_base)/command.profile.gz" "${ENVOY_BUILD_PROFILE}/$1.profile.gz" || true
 }
 
 function bazel_with_collection() {

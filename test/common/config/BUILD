@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
@@ -7,6 +5,8 @@ load(
     "envoy_package",
     "envoy_proto_library",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -413,6 +413,15 @@ envoy_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "udpa_resource_test",
+    srcs = ["udpa_resource_test.cc"],
+    deps = [
+        "//source/common/config:udpa_resource_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 

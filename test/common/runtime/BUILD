@@ -1,11 +1,11 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -42,6 +42,8 @@ envoy_cc_test(
     name = "runtime_impl_test",
     srcs = ["runtime_impl_test.cc"],
     data = glob(["test_data/**"]) + ["filesystem_setup.sh"],
+    # Fails on windows with cr/lf yaml file checkouts
+    tags = ["fails_on_windows"],
     deps = [
         "//source/common/config:runtime_utility_lib",
         "//source/common/runtime:runtime_lib",

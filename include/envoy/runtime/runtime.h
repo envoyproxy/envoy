@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/stats/store.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/common/assert.h"
@@ -257,6 +258,8 @@ public:
   virtual const std::vector<OverrideLayerConstPtr>& getLayers() const PURE;
 };
 
+using SnapshotConstSharedPtr = std::shared_ptr<const Snapshot>;
+
 /**
  * Loads runtime snapshots from storage (local disk, etc.).
  */
@@ -285,7 +288,7 @@ public:
    * @return shared_ptr<const Snapshot> the current snapshot. This function may safely be called
    *         from non-worker threads.
    */
-  virtual std::shared_ptr<const Snapshot> threadsafeSnapshot() PURE;
+  virtual SnapshotConstSharedPtr threadsafeSnapshot() PURE;
 
   /**
    * Merge the given map of key-value pairs into the runtime's state. To remove a previous merge for
@@ -299,6 +302,11 @@ public:
    * have either received and applied their responses or timed out.
    */
   virtual void startRtdsSubscriptions(ReadyCallback on_done) PURE;
+
+  /**
+   * @return Stats::Scope& the root scope.
+   */
+  virtual Stats::Scope& getRootScope() PURE;
 };
 
 using LoaderPtr = std::unique_ptr<Loader>;
