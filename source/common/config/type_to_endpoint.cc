@@ -101,6 +101,8 @@ TypeUrlToVersionedServiceMap* buildTypeUrlToServiceMap() {
         ASSERT(service_desc != nullptr, fmt::format("{} missing", service_name));
         ASSERT(service_desc->options().HasExtension(envoy::annotations::resource));
 
+        // We populate the service methods that are known below, but it's possible that some
+        // services don't implement all, e.g. VHDS doesn't support SotW or REST.
         const auto current_type_url_version = registered_service.second.version_;
         for (int method_index = 0; method_index < service_desc->method_count(); ++method_index) {
           const auto& method_desc = *service_desc->method(method_index);
