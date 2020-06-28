@@ -60,6 +60,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.strict_authority_validation",
     "envoy.reloadable_features.reject_unsupported_transfer_encodings",
     // Begin alphabetically sorted section.
+    "envoy.reloadable_features.activate_fds_next_event_loop",
     "envoy.deprecated_features.allow_deprecated_extension_names",
     "envoy.reloadable_features.disallow_unbounded_access_logs",
     "envoy.reloadable_features.early_errors_via_hcm",

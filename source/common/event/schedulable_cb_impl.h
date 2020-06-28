@@ -19,6 +19,7 @@ public:
 
   // SchedulableCallback implementation.
   void scheduleCallbackCurrentIteration() override;
+  void scheduleCallbackNextIteration() override;
   void cancel() override;
   bool enabled() override;
 

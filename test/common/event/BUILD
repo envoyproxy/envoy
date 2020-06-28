@@ -35,6 +35,7 @@ envoy_cc_test(
         "//source/common/stats:isolated_store_lib",
         "//test/mocks:common_lib",
         "//test/test_common:environment_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )

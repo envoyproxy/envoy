@@ -8,6 +8,7 @@
 
 #include "test/mocks/common.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -46,22 +47,37 @@ protected:
   Api::OsSysCalls& os_sys_calls_;
 };
 
-class FileEventImplActivateTest : public testing::TestWithParam<Network::Address::IpVersion> {
+class FileEventImplActivateTest
+    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>> {
 public:
-  FileEventImplActivateTest() : os_sys_calls_(Api::OsSysCallsSingleton::get()) {}
+  FileEventImplActivateTest() : os_sys_calls_(Api::OsSysCallsSingleton::get()) {
+    Runtime::LoaderSingleton::getExisting()->mergeValues(
+        {{"envoy.reloadable_features.activate_fds_next_event_loop",
+          activateFdsNextEventLoop() ? "true" : "false"}});
+  }
+
+  static void onWatcherReady(evwatch*, const evwatch_prepare_cb_info*, void* arg) {
+    // `arg` contains the ReadyWatcher passed in from evwatch_prepare_new.
+    auto watcher = static_cast<ReadyWatcher*>(arg);
+    watcher->ready();
+  }
+
+  int domain() {
+    return std::get<0>(GetParam()) == Network::Address::IpVersion::v4 ? AF_INET : AF_INET6;
+  }
+  bool activateFdsNextEventLoop() { return std::get<1>(GetParam()); }
 
 protected:
   Api::OsSysCalls& os_sys_calls_;
+  TestScopedRuntime scoped_runtime_;
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, FileEventImplActivateTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, FileEventImplActivateTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()));
 
 TEST_P(FileEventImplActivateTest, Activate) {
-  os_fd_t fd;
-  int domain = GetParam() == Network::Address::IpVersion::v4 ? AF_INET : AF_INET6;
-  fd = os_sys_calls_.socket(domain, SOCK_STREAM, 0).rc_;
+  os_fd_t fd = os_sys_calls_.socket(domain(), SOCK_STREAM, 0).rc_;
   ASSERT_TRUE(SOCKET_VALID(fd));
 
   Api::ApiPtr api = Api::createApiForTest();
@@ -97,6 +113,149 @@ TEST_P(FileEventImplActivateTest, Activate) {
       trigger, FileReadyType::Read | FileReadyType::Write | FileReadyType::Closed);
 
   file_event->activate(FileReadyType::Read | FileReadyType::Write | FileReadyType::Closed);
+  dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+
+  os_sys_calls_.close(fd);
+}
+
+TEST_P(FileEventImplActivateTest, ActivateChaining) {
+  os_fd_t fd = os_sys_calls_.socket(domain(), SOCK_STREAM, 0).rc_;
+  ASSERT_TRUE(SOCKET_VALID(fd));
+
+  Api::ApiPtr api = Api::createApiForTest();
+  DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
+  ReadyWatcher fd_event;
+  ReadyWatcher read_event;
+  ReadyWatcher write_event;
+  ReadyWatcher closed_event;
+
+  ReadyWatcher prepare_watcher;
+  evwatch_prepare_new(&static_cast<DispatcherImpl*>(dispatcher.get())->base(), onWatcherReady,
+                      &prepare_watcher);
+
+#ifdef WIN32
+  const FileTriggerType trigger = FileTriggerType::Level;
+#else
+  const FileTriggerType trigger = FileTriggerType::Edge;
+#endif
+
+  Event::FileEventPtr file_event = dispatcher->createFileEvent(
+      fd,
+      [&](uint32_t events) -> void {
+        fd_event.ready();
+        if (events & FileReadyType::Read) {
+          read_event.ready();
+          file_event->activate(FileReadyType::Write);
+          file_event->activate(FileReadyType::Closed);
+        }
+
+        if (events & FileReadyType::Write) {
+          write_event.ready();
+          file_event->activate(FileReadyType::Closed);
+        }
+
+        if (events & FileReadyType::Closed) {
+          closed_event.ready();
+        }
+      },
+      trigger, FileReadyType::Read | FileReadyType::Write | FileReadyType::Closed);
+
+  testing::InSequence s;
+  // First loop iteration: handle scheduled read event and the real write event produced by poll.
+  // Note that the real and injected events are combined and delivered in a single call to the fd
+  // callback.
+  EXPECT_CALL(prepare_watcher, ready());
+  EXPECT_CALL(fd_event, ready());
+  EXPECT_CALL(read_event, ready());
+  EXPECT_CALL(write_event, ready());
+  if (activateFdsNextEventLoop()) {
+    // Second loop iteration: handle write and close events scheduled while handling read.
+    EXPECT_CALL(prepare_watcher, ready());
+    EXPECT_CALL(fd_event, ready());
+    EXPECT_CALL(write_event, ready());
+    EXPECT_CALL(closed_event, ready());
+    // Third loop iteration: handle close event scheduled while handling write.
+    EXPECT_CALL(prepare_watcher, ready());
+    EXPECT_CALL(fd_event, ready());
+    EXPECT_CALL(closed_event, ready());
+    // Fourth loop iteration: poll returned no new real events.
+    EXPECT_CALL(prepare_watcher, ready());
+  } else {
+    // Same loop iteration activation: handle write and close events scheduled while handling read.
+    EXPECT_CALL(fd_event, ready());
+    EXPECT_CALL(write_event, ready());
+    EXPECT_CALL(closed_event, ready());
+    // Second same loop iteration activation: handle close event scheduled while handling write.
+    EXPECT_CALL(fd_event, ready());
+    EXPECT_CALL(closed_event, ready());
+    // Second loop iteration: poll returned no new real events.
+    EXPECT_CALL(prepare_watcher, ready());
+  }
+
+  file_event->activate(FileReadyType::Read);
+  dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+
+  os_sys_calls_.close(fd);
+}
+
+TEST_P(FileEventImplActivateTest, SetEnableCancelsActivate) {
+  os_fd_t fd = os_sys_calls_.socket(domain(), SOCK_STREAM, 0).rc_;
+  ASSERT_TRUE(SOCKET_VALID(fd));
+
+  Api::ApiPtr api = Api::createApiForTest();
+  DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
+  ReadyWatcher fd_event;
+  ReadyWatcher read_event;
+  ReadyWatcher write_event;
+  ReadyWatcher closed_event;
+
+  ReadyWatcher prepare_watcher;
+  evwatch_prepare_new(&static_cast<DispatcherImpl*>(dispatcher.get())->base(), onWatcherReady,
+                      &prepare_watcher);
+
+#ifdef WIN32
+  const FileTriggerType trigger = FileTriggerType::Level;
+#else
+  const FileTriggerType trigger = FileTriggerType::Edge;
+#endif
+
+  Event::FileEventPtr file_event = dispatcher->createFileEvent(
+      fd,
+      [&](uint32_t events) -> void {
+        fd_event.ready();
+        if (events & FileReadyType::Read) {
+          read_event.ready();
+          file_event->activate(FileReadyType::Closed);
+          file_event->setEnabled(FileReadyType::Write | FileReadyType::Closed);
+        }
+
+        if (events & FileReadyType::Write) {
+          write_event.ready();
+        }
+
+        if (events & FileReadyType::Closed) {
+          closed_event.ready();
+        }
+      },
+      trigger, FileReadyType::Read | FileReadyType::Write | FileReadyType::Closed);
+
+  testing::InSequence s;
+  // First loop iteration: handle scheduled read event and the real write event produced by poll.
+  // Note that the real and injected events are combined and delivered in a single call to the fd
+  // callback.
+  EXPECT_CALL(prepare_watcher, ready());
+  EXPECT_CALL(fd_event, ready());
+  EXPECT_CALL(read_event, ready());
+  EXPECT_CALL(write_event, ready());
+  // Second loop iteration: handle real write event after resetting event mask via setEnabled. Close
+  // injected event is discarded by the setEnable call.
+  EXPECT_CALL(prepare_watcher, ready());
+  EXPECT_CALL(fd_event, ready());
+  EXPECT_CALL(write_event, ready());
+  // Third loop iteration: poll returned no new real events.
+  EXPECT_CALL(prepare_watcher, ready());
+
+  file_event->activate(FileReadyType::Read);
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
 
   os_sys_calls_.close(fd);
