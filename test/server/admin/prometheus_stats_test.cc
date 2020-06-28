@@ -36,9 +36,7 @@ private:
 
 class PrometheusStatsFormatterTest : public testing::Test {
 protected:
-  PrometheusStatsFormatterTest()
-      : symbol_table_(Stats::SymbolTableCreator::makeSymbolTable()), alloc_(*symbol_table_),
-        pool_(*symbol_table_) {}
+  PrometheusStatsFormatterTest() : alloc_(*symbol_table_), pool_(*symbol_table_) {}
 
   ~PrometheusStatsFormatterTest() override { clearStorage(); }
 
@@ -92,7 +90,7 @@ protected:
     EXPECT_EQ(0, symbol_table_->numSymbols());
   }
 
-  Stats::SymbolTablePtr symbol_table_;
+  Stats::TestSymbolTable symbol_table_;
   Stats::AllocatorImpl alloc_;
   Stats::StatNamePool pool_;
   std::vector<Stats::CounterSharedPtr> counters_;

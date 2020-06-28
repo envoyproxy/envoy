@@ -156,7 +156,7 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
       "", "cpuset-threads", "Get the default # of worker threads from cpuset size", cmd, false);
 
   TCLAP::ValueArg<bool> use_fake_symbol_table("", "use-fake-symbol-table",
-                                              "Use fake symbol table implementation", false, true,
+                                              "Use fake symbol table implementation", false, false,
                                               "bool", cmd);
 
   TCLAP::ValueArg<std::string> disable_extensions("", "disable-extensions",

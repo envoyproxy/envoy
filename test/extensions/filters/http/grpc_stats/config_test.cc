@@ -358,11 +358,18 @@ TEST_F(GrpcStatsFilterConfigTest, MessageCounts) {
                     .counterFromString(
                         "grpc.lyft.users.BadCompanions.GetBadCompanions.request_message_count")
                     .value());
-  EXPECT_EQ(0U, decoder_callbacks_.clusterInfo()
-                    ->statsScope()
-                    .counterFromString(
-                        "grpc.lyft.users.BadCompanions.GetBadCompanions.response_message_count")
-                    .value());
+
+  // Check that there is response_message_count stat yet. We use
+  // stats_store_.findCounterByString rather than looking on
+  // clusterInfo()->statsScope() because findCounterByString is not an API on
+  // Stats::Store, and there is no prefix so the names will match. We verify
+  // that by double-checking we can find the request_message_count using the
+  // same API.
+  EXPECT_FALSE(stats_store_.findCounterByString(
+      "grpc.lyft.users.BadCompanions.GetBadCompanions.response_message_count"));
+  EXPECT_TRUE(stats_store_.findCounterByString(
+      "grpc.lyft.users.BadCompanions.GetBadCompanions.request_message_count"));
+
   const auto& data = stream_info_.filterState()->getDataReadOnly<GrpcStatsObject>(
       HttpFilterNames::get().GrpcStats);
   EXPECT_EQ(2U, data.request_message_count);

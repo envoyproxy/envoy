@@ -4,7 +4,7 @@ namespace Envoy {
 namespace Stats {
 
 bool SymbolTableCreator::initialized_ = false;
-bool SymbolTableCreator::use_fake_symbol_tables_ = true;
+bool SymbolTableCreator::use_fake_symbol_tables_ = false;
 
 SymbolTablePtr SymbolTableCreator::initAndMakeSymbolTable(bool use_fake) {
   ASSERT(!initialized_ || (use_fake_symbol_tables_ == use_fake));
