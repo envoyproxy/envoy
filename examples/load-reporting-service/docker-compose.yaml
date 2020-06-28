@@ -7,6 +7,8 @@ services:
       dockerfile: Dockerfile-http-server
     volumes:
       - ./service-envoy-w-lrs.yaml:/etc/service-envoy-w-lrs.yaml
+    environment:
+      ENVOY_UID: 0
     networks:
       envoymesh:
         aliases:
@@ -17,7 +19,7 @@ services:
     ports:
       - "80-81:80"
       - "8081-8082:8081"
-      
+
   lrs_server:
     build:
       context: .
@@ -32,6 +34,6 @@ services:
       - "18000"
     ports:
       - "18000:18000"
-    
+
 networks:
   envoymesh: {}
