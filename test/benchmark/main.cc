@@ -10,7 +10,7 @@ bool g_skip_expensive_benchmarks = false;
 // Boilerplate main(), which discovers benchmarks and runs them. This uses two
 // different flag parsers, so the order of flags matters: flags defined here
 // must be passed first, and flags defined in benchmark::Initialize second,
-// seperated by --.
+// separated by --.
 int main(int argc, char** argv) {
   Envoy::TestEnvironment::initializeTestMain(argv[0]);
 
