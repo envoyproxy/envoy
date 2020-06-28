@@ -320,7 +320,7 @@ Statistics for monitoring effective host weights when using the
 Request Response Size statistics
 --------------------------------
 
-If :ref:`request response size statistics are tracked <envoy_v3_api_field_config.cluster.v3.Cluster.track_request_response_sizes>` is, 
+If :ref:`request response size statistics <envoy_v3_api_field_config.cluster.v3.Cluster.track_request_response_sizes>` are tracked,
 statistics will be added to *cluster.<name>* and contain the following:
 
 .. csv-table::
