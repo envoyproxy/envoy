@@ -31,8 +31,8 @@
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/config/utility.h"
-#include "common/http/http1/codec_impl.h"
-#include "common/http/http2/codec_impl.h"
+#include "common/http/http1/codec_stats.h"
+#include "common/http/http2/codec_stats.h"
 #include "common/http/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/resolver_impl.h"
@@ -861,7 +861,8 @@ void ClusterInfoImpl::createNetworkFilterChain(Network::Connection& connection) 
 
 Http::Protocol
 ClusterInfoImpl::upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const {
-  if (features_ & Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL) {
+  if (downstream_protocol.has_value() &&
+      features_ & Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL) {
     return downstream_protocol.value();
   } else {
     return (features_ & Upstream::ClusterInfo::Features::HTTP2) ? Http::Protocol::Http2

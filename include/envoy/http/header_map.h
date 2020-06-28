@@ -549,18 +549,6 @@ public:
    */
   virtual void iterateReverse(ConstIterateCb cb, void* context) const PURE;
 
-  enum class Lookup { Found, NotFound, NotSupported };
-
-  /**
-   * Lookup one of the predefined inline headers (see ALL_INLINE_HEADERS below) by key.
-   * @param key supplies the header key.
-   * @param entry is set to the header entry if it exists and if key is one of the predefined inline
-   * headers; otherwise, nullptr.
-   * @return Lookup::Found if lookup was successful, Lookup::NotFound if the header entry doesn't
-   * exist, or Lookup::NotSupported if key is not one of the predefined inline headers.
-   */
-  virtual Lookup lookup(const LowerCaseString& key, const HeaderEntry** entry) const PURE;
-
   /**
    * Clears the headers in the map.
    */

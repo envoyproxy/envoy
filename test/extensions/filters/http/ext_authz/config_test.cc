@@ -87,6 +87,10 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
         patterns:
         - exact: baz
         - prefix: x-fail
+      allowed_upstream_headers_to_append:
+        patterns:
+        - exact: baz-append
+        - prefix: x-append
 
     path_prefix: /extauth
 
@@ -104,7 +108,6 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
   EXPECT_CALL(context, clusterManager()).Times(1);
   EXPECT_CALL(context, runtime()).Times(1);
   EXPECT_CALL(context, scope()).Times(1);
-  EXPECT_CALL(context, timeSource()).Times(1);
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
   testing::StrictMock<Http::MockFilterChainFactoryCallbacks> filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
