@@ -12,6 +12,26 @@
 
 namespace Envoy {
 namespace Router {
+
+/**
+ * Base interface for generic rate limit override action.
+ */
+class RateLimitOverrideAction {
+public:
+  virtual ~RateLimitOverrideAction() = default;
+
+  /**
+   * Potentially populate the descriptors 'limit' property with a RateLimitOverride instance
+   * @param descriptor supplies the descriptor to optionally fill.
+   * @param metadata supplies the dynamic metadata for the request.
+   * @return true if RateLimitOverride was set in the descriptor.
+   */
+  virtual bool populateOverride(RateLimit::Descriptor& descriptor,
+                                const envoy::config::core::v3::Metadata* metadata) const PURE;
+};
+
+using RateLimitOverrideActionPtr = std::unique_ptr<RateLimitOverrideAction>;
+
 /**
  * Base interface for generic rate limit action.
  */
