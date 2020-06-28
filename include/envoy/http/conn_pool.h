@@ -48,7 +48,7 @@ public:
 /**
  * An instance of a generic connection pool.
  */
-class Instance : public Envoy::ConnectionPool::Instance {
+class Instance : public Envoy::ConnectionPool::Instance, public Event::DeferredDeletable {
 public:
   ~Instance() override = default;
 

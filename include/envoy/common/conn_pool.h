@@ -36,12 +36,12 @@ public:
   virtual void cancel(CancelPolicy cancel_policy) PURE;
 };
 
-/*
+/**
  * An instance of a generic connection pool.
  */
-class Instance : public Event::DeferredDeletable {
+class Instance {
 public:
-  ~Instance() override = default;
+  virtual ~Instance() = default;
 
   /**
    * Called when a connection pool has been drained of pending requests, busy connections, and

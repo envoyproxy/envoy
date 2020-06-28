@@ -19,6 +19,7 @@
 #include "common/common/thread.h"
 #include "common/http/codec_helper.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/http2/codec_stats.h"
 #include "common/http/http2/metadata_decoder.h"
 #include "common/http/http2/metadata_encoder.h"
 #include "common/http/status.h"
@@ -34,40 +35,6 @@ namespace Http2 {
 // This is not the full client magic, but it's the smallest size that should be able to
 // differentiate between HTTP/1 and HTTP/2.
 const std::string CLIENT_MAGIC_PREFIX = "PRI * HTTP/2";
-
-/**
- * All stats for the HTTP/2 codec. @see stats_macros.h
- */
-#define ALL_HTTP2_CODEC_STATS(COUNTER)                                                             \
-  COUNTER(dropped_headers_with_underscores)                                                        \
-  COUNTER(header_overflow)                                                                         \
-  COUNTER(headers_cb_no_stream)                                                                    \
-  COUNTER(inbound_empty_frames_flood)                                                              \
-  COUNTER(inbound_priority_frames_flood)                                                           \
-  COUNTER(inbound_window_update_frames_flood)                                                      \
-  COUNTER(outbound_control_flood)                                                                  \
-  COUNTER(outbound_flood)                                                                          \
-  COUNTER(requests_rejected_with_underscores_in_headers)                                           \
-  COUNTER(rx_messaging_error)                                                                      \
-  COUNTER(rx_reset)                                                                                \
-  COUNTER(too_many_header_frames)                                                                  \
-  COUNTER(trailers)                                                                                \
-  COUNTER(tx_reset)
-
-/**
- * Wrapper struct for the HTTP/2 codec stats. @see stats_macros.h
- */
-struct CodecStats {
-  using AtomicPtr = Thread::AtomicPtr<CodecStats, Thread::AtomicPtrAllocMode::DeleteOnDestruct>;
-
-  static CodecStats& atomicGet(AtomicPtr& ptr, Stats::Scope& scope) {
-    return *ptr.get([&scope]() -> CodecStats* {
-      return new CodecStats{ALL_HTTP2_CODEC_STATS(POOL_COUNTER_PREFIX(scope, "http2."))};
-    });
-  }
-
-  ALL_HTTP2_CODEC_STATS(GENERATE_COUNTER_STRUCT)
-};
 
 class Utility {
 public:

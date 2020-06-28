@@ -819,7 +819,6 @@ message Cluster {
   // of 100 would indicate that the request took the entirety of the timeout given to it.
   bool track_timeout_budgets = 47;
 
-  // [#not-implemented-hide:]
   // Optional customization and configuration of upstream connection pool, and upstream type.
   //
   // Currently this field only applies for HTTP traffic but is designed for eventual use for custom

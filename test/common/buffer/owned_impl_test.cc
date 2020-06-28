@@ -272,7 +272,8 @@ TEST_F(OwnedImplTest, Write) {
   EXPECT_EQ(0, result.rc_);
   EXPECT_EQ(1, buffer.length());
 
-  EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, EAGAIN}));
+  EXPECT_CALL(os_sys_calls, writev(_, _, _))
+      .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_AGAIN}));
   result = buffer.write(io_handle);
   EXPECT_EQ(Api::IoError::IoErrorCode::Again, result.err_->getErrorCode());
   EXPECT_EQ(0, result.rc_);
@@ -310,7 +311,8 @@ TEST_F(OwnedImplTest, Read) {
   EXPECT_EQ(0, buffer.length());
   EXPECT_THAT(buffer.describeSlicesForTest(), testing::IsEmpty());
 
-  EXPECT_CALL(os_sys_calls, readv(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, EAGAIN}));
+  EXPECT_CALL(os_sys_calls, readv(_, _, _))
+      .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_AGAIN}));
   result = buffer.read(io_handle, 100);
   EXPECT_EQ(Api::IoError::IoErrorCode::Again, result.err_->getErrorCode());
   EXPECT_EQ(0, result.rc_);
