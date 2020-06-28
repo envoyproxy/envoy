@@ -17,13 +17,13 @@ use(
     },
     {
       "owner": "envoyproxy/api-shepherds!",
-      "path": "api/",
+      "path": "api/envoy/",
       "label": "api",
       "github_status_label": "any API change",
     },
     {
       "owner": "envoyproxy/api-watchers",
-      "path": "api/",
+      "path": "api/envoy/",
     },
   ],
 )

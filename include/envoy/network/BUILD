@@ -53,6 +53,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "exception_interface",
+    hdrs = ["exception.h"],
+)
+
+envoy_cc_library(
     name = "filter_interface",
     hdrs = ["filter.h"],
     deps = [
@@ -60,6 +65,7 @@ envoy_cc_library(
         ":transport_socket_interface",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/upstream:host_description_interface",
+        "//source/common/protobuf",
     ],
 )
 
