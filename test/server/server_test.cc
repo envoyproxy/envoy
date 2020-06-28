@@ -474,7 +474,22 @@ TEST_P(ServerInstanceImplTest, Stats) {
   EXPECT_EQ(2L, TestUtility::findGauge(stats_store_, "server.concurrency")->value());
   EXPECT_EQ(3L, TestUtility::findGauge(stats_store_, "server.hot_restart_epoch")->value());
 
-// This stat only works in this configuration.
+// The ENVOY_BUG stat works in release mode.
+#if defined(NDEBUG)
+  // Test exponential back-off on a fixed line ENVOY_BUG.
+  for (int i = 0; i < 16; i++) {
+    ENVOY_BUG(false, "");
+  }
+  EXPECT_EQ(5L, TestUtility::findCounter(stats_store_, "server.envoy_bug_failures")->value());
+  // Another ENVOY_BUG increments the counter.
+  ENVOY_BUG(false, "Testing envoy bug assertion failure detection in release build.");
+  EXPECT_EQ(6L, TestUtility::findCounter(stats_store_, "server.envoy_bug_failures")->value());
+#else
+  // The ENVOY_BUG macro aborts in debug mode.
+  EXPECT_DEATH(ENVOY_BUG(false, ""), "");
+#endif
+
+// The ASSERT stat only works in this configuration.
 #if defined(NDEBUG) && defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
   ASSERT(false, "Testing debug assertion failure detection in release build.");
   EXPECT_EQ(1L, TestUtility::findCounter(stats_store_, "server.debug_assertion_failures")->value());
