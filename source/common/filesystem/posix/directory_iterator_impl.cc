@@ -1,6 +1,7 @@
 #include "envoy/common/exception.h"
 
 #include "common/common/fmt.h"
+#include "common/common/utility.h"
 #include "common/filesystem/directory_iterator_impl.h"
 
 namespace Envoy {
@@ -29,7 +30,7 @@ void DirectoryIteratorImpl::openDirectory() {
   dir_ = temp_dir;
   if (!dir_) {
     throw EnvoyException(
-        fmt::format("unable to open directory {}: {}", directory_path_, strerror(errno)));
+        fmt::format("unable to open directory {}: {}", directory_path_, errorDetails(errno)));
   }
 }
 
@@ -38,7 +39,7 @@ void DirectoryIteratorImpl::nextEntry() {
   dirent* entry = ::readdir(dir_);
   if (entry == nullptr && errno != 0) {
     throw EnvoyException(
-        fmt::format("unable to iterate directory {}: {}", directory_path_, strerror(errno)));
+        fmt::format("unable to iterate directory {}: {}", directory_path_, errorDetails(errno)));
   }
 
   if (entry == nullptr) {

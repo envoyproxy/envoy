@@ -230,6 +230,8 @@ def runChecks():
       "test/register_factory.cc",
       "Don't use Registry::RegisterFactory or REGISTER_FACTORY in tests, use "
       "Registry::InjectFactory instead.")
+  errors += checkUnfixableError("strerror.cc",
+                                "Don't use strerror; use Envoy::errorDetails instead")
 
   # The following files have errors that can be automatically fixed.
   errors += checkAndFixError("over_enthusiastic_spaces.cc",

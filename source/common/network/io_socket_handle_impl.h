@@ -65,10 +65,10 @@ private:
       return Api::IoCallUint64Result(result.rc_,
                                      Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError));
     }
-    RELEASE_ASSERT(result.errno_ != EINVAL, "Invalid argument passed in.");
+    RELEASE_ASSERT(result.errno_ != SOCKET_ERROR_INVAL, "Invalid argument passed in.");
     return Api::IoCallUint64Result(
         /*rc=*/0,
-        (result.errno_ == EAGAIN
+        (result.errno_ == SOCKET_ERROR_AGAIN
              // EAGAIN is frequent enough that its memory allocation should be avoided.
              ? Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
                                IoSocketError::deleteIoError)

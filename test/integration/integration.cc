@@ -466,16 +466,17 @@ void BaseIntegrationTest::createGeneratedApiTestServer(
     auto end_time = time_system_.monotonicTime() + TestUtility::DefaultTimeout;
     const char* success = "listener_manager.listener_create_success";
     const char* rejected = "listener_manager.lds.update_rejected";
-    while ((test_server_->counter(success) == nullptr ||
-            test_server_->counter(success)->value() < concurrency_) &&
-           (!allow_lds_rejection || test_server_->counter(rejected) == nullptr ||
-            test_server_->counter(rejected)->value() == 0)) {
+    for (Stats::CounterSharedPtr success_counter = test_server_->counter(success),
+                                 rejected_counter = test_server_->counter(rejected);
+         (success_counter == nullptr || success_counter->value() < concurrency_) &&
+         (!allow_lds_rejection || rejected_counter == nullptr || rejected_counter->value() == 0);
+         success_counter = test_server_->counter(success),
+                                 rejected_counter = test_server_->counter(rejected)) {
       if (time_system_.monotonicTime() >= end_time) {
         RELEASE_ASSERT(0, "Timed out waiting for listeners.");
       }
       if (!allow_lds_rejection) {
-        RELEASE_ASSERT(test_server_->counter(rejected) == nullptr ||
-                           test_server_->counter(rejected)->value() == 0,
+        RELEASE_ASSERT(rejected_counter == nullptr || rejected_counter->value() == 0,
                        absl::StrCat("Lds update failed. Details\n",
                                     getListenerDetails(test_server_->server())));
       }

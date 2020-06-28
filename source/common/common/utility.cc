@@ -38,6 +38,31 @@ using UnsignedMilliseconds = std::chrono::duration<uint64_t, std::milli>;
 
 } // namespace
 
+const std::string errorDetails(int error_code) {
+#ifndef WIN32
+  // clang-format off
+  return strerror(error_code);
+  // clang-format on
+#else
+  // Windows error codes do not correspond to POSIX errno values
+  // Use FormatMessage, strip trailing newline, and return "Unknown error" on failure (as on POSIX).
+  // Failures will usually be due to the error message not being found.
+  char* buffer = NULL;
+  DWORD msg_size = FormatMessage(
+      FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_ALLOCATE_BUFFER,
+      NULL, error_code, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR)&buffer, 0, NULL);
+  if (msg_size == 0) {
+    return "Unknown error";
+  }
+  if (msg_size > 1 && buffer[msg_size - 2] == '\r' && buffer[msg_size - 1] == '\n') {
+    msg_size -= 2;
+  }
+  std::string error_details(buffer, msg_size);
+  ASSERT(LocalFree(buffer) == NULL);
+  return error_details;
+#endif
+}
+
 std::string DateFormatter::fromTime(const SystemTime& time) const {
   struct CachedTime {
     // The string length of a number of seconds since the Epoch. E.g. for "1528270093", the length

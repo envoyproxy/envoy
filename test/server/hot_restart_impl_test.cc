@@ -83,7 +83,8 @@ TEST_F(HotRestartImplTest, VersionString) {
 // Test that HotRestartDomainSocketInUseException is thrown when the domain socket is already
 // in use,
 TEST_F(HotRestartImplTest, DomainSocketAlreadyInUse) {
-  EXPECT_CALL(os_sys_calls_, bind(_, _, _)).WillOnce(Return(Api::SysCallIntResult{-1, EADDRINUSE}));
+  EXPECT_CALL(os_sys_calls_, bind(_, _, _))
+      .WillOnce(Return(Api::SysCallIntResult{-1, SOCKET_ERROR_ADDR_IN_USE}));
   EXPECT_CALL(os_sys_calls_, close(_)).Times(1);
 
   EXPECT_THROW(std::make_unique<HotRestartImpl>(0, 0),
@@ -93,7 +94,8 @@ TEST_F(HotRestartImplTest, DomainSocketAlreadyInUse) {
 // Test that EnvoyException is thrown when the domain socket bind fails for reasons other than
 // being in use.
 TEST_F(HotRestartImplTest, DomainSocketError) {
-  EXPECT_CALL(os_sys_calls_, bind(_, _, _)).WillOnce(Return(Api::SysCallIntResult{-1, EACCES}));
+  EXPECT_CALL(os_sys_calls_, bind(_, _, _))
+      .WillOnce(Return(Api::SysCallIntResult{-1, SOCKET_ERROR_ACCESS}));
   EXPECT_CALL(os_sys_calls_, close(_)).Times(1);
 
   EXPECT_THROW(std::make_unique<HotRestartImpl>(0, 0), EnvoyException);

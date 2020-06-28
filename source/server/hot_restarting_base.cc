@@ -52,7 +52,7 @@ void HotRestartingBase::bindDomainSocket(uint64_t id, const std::string& role) {
     const auto msg = fmt::format(
         "unable to bind domain socket with base_id={}, id={}, errno={} (see --base-id option)",
         base_id_, id, result.errno_);
-    if (result.errno_ == EADDRINUSE) {
+    if (result.errno_ == SOCKET_ERROR_ADDR_IN_USE) {
       throw HotRestartDomainSocketInUseException(msg);
     }
     throw EnvoyException(msg);
@@ -187,7 +187,7 @@ std::unique_ptr<HotRestartMessage> HotRestartingBase::receiveHotRestartMessage(B
     message.msg_controllen = CMSG_SPACE(sizeof(int));
 
     const int recvmsg_rc = recvmsg(my_domain_socket_, &message, 0);
-    if (block == Blocking::No && recvmsg_rc == -1 && errno == EAGAIN) {
+    if (block == Blocking::No && recvmsg_rc == -1 && errno == SOCKET_ERROR_AGAIN) {
       return nullptr;
     }
     RELEASE_ASSERT(recvmsg_rc != -1, fmt::format("recvmsg() returned -1, errno = {}", errno));

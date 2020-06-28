@@ -18,6 +18,14 @@
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
+
+/**
+ * Retrieve string description of error code
+ * @param int error code
+ * @return const std::string error detail description
+ */
+const std::string errorDetails(int error_code);
+
 /**
  * Utility class for formatting dates given an absl::FormatTime style format string.
  */

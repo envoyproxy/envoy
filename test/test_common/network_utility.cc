@@ -43,16 +43,17 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
     }
   }
   if (failing_fn != nullptr) {
-    if (result.errno_ == EADDRINUSE) {
+    if (result.errno_ == SOCKET_ERROR_ADDR_IN_USE) {
       // The port is already in use. Perfectly normal.
       return nullptr;
-    } else if (result.errno_ == EACCES) {
+    } else if (result.errno_ == SOCKET_ERROR_ACCESS) {
       // A privileged port, and we don't have privileges. Might want to log this.
       return nullptr;
     }
     // Unexpected failure.
     ADD_FAILURE() << failing_fn << " failed for '" << addr_port->asString()
-                  << "' with error: " << strerror(result.errno_) << " (" << result.errno_ << ")";
+                  << "' with error: " << errorDetails(result.errno_) << " (" << result.errno_
+                  << ")";
     return nullptr;
   }
   return sock.localAddress();
@@ -172,7 +173,7 @@ bindFreeLoopbackPort(Address::IpVersion version, Socket::Type type, bool reuse_p
   if (0 != result.rc_) {
     sock->close();
     std::string msg = fmt::format("bind failed for address {} with error: {} ({})",
-                                  addr->asString(), strerror(result.errno_), result.errno_);
+                                  addr->asString(), errorDetails(result.errno_), result.errno_);
     ADD_FAILURE() << msg;
     throw EnvoyException(msg);
   }
