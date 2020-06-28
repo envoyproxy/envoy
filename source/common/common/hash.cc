@@ -19,7 +19,7 @@ uint64_t MurmurHash::murmurHash2_64(absl::string_view key, uint64_t seed) {
   const char* const end = buf + len_aligned;
   uint64_t hash = seed ^ (len * mul);
   for (const char* p = buf; p != end; p += 8) {
-    const uint64_t data = shift_mix(unaligned_load(p) * mul) * mul;
+    const uint64_t data = shiftMix(unaligned_load(p) * mul) * mul;
     hash ^= data;
     hash *= mul;
   }
@@ -29,8 +29,8 @@ uint64_t MurmurHash::murmurHash2_64(absl::string_view key, uint64_t seed) {
     hash ^= data;
     hash *= mul;
   }
-  hash = shift_mix(hash) * mul;
-  hash = shift_mix(hash);
+  hash = shiftMix(hash) * mul;
+  hash = shiftMix(hash);
   return hash;
 }
 

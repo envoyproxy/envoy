@@ -14,8 +14,19 @@ namespace Extensions {
 namespace Clusters {
 namespace Aggregate {
 
-using PriorityContext = std::pair<Upstream::PrioritySetImpl,
-                                  std::vector<std::pair<uint32_t, Upstream::ThreadLocalCluster*>>>;
+using PriorityToClusterVector = std::vector<std::pair<uint32_t, Upstream::ThreadLocalCluster*>>;
+
+// Maps pair(host_cluster_name, host_priority) to the linearized priority of the Aggregate cluster.
+using ClusterAndPriorityToLinearizedPriorityMap =
+    absl::flat_hash_map<std::pair<std::string, uint32_t>, uint32_t>;
+
+struct PriorityContext {
+  Upstream::PrioritySetImpl priority_set_;
+  PriorityToClusterVector priority_to_cluster_;
+  ClusterAndPriorityToLinearizedPriorityMap cluster_and_priority_to_linearized_priority_;
+};
+
+using PriorityContextPtr = std::unique_ptr<PriorityContext>;
 
 class Cluster : public Upstream::ClusterImplBase, Upstream::ClusterUpdateCallbacks {
 public:
@@ -51,7 +62,7 @@ private:
   void startPreInit() override;
 
   void refresh(const std::function<bool(const std::string&)>& skip_predicate);
-  PriorityContext
+  PriorityContextPtr
   linearizePrioritySet(const std::function<bool(const std::string&)>& skip_predicate);
 };
 
@@ -75,8 +86,9 @@ private:
     LoadBalancerImpl(const PriorityContext& priority_context, Upstream::ClusterStats& stats,
                      Runtime::Loader& runtime, Runtime::RandomGenerator& random,
                      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
-        : Upstream::LoadBalancerBase(priority_context.first, stats, runtime, random, common_config),
-          priority_to_cluster_(priority_context.second) {}
+        : Upstream::LoadBalancerBase(priority_context.priority_set_, stats, runtime, random,
+                                     common_config),
+          priority_context_(priority_context) {}
 
     // Upstream::LoadBalancer
     Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext* context) override;
@@ -86,8 +98,10 @@ private:
       NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     }
 
+    absl::optional<uint32_t> hostToLinearizedPriority(const Upstream::HostDescription& host) const;
+
   private:
-    std::vector<std::pair<uint32_t, Upstream::ThreadLocalCluster*>> priority_to_cluster_;
+    const PriorityContext& priority_context_;
   };
 
   using LoadBalancerImplPtr = std::unique_ptr<LoadBalancerImpl>;
@@ -97,15 +111,17 @@ private:
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
   const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config_;
+  PriorityContextPtr priority_context_;
 
 public:
-  void refresh(const PriorityContext& priority_context) {
-    if (!priority_context.first.hostSetsPerPriority().empty()) {
-      load_balancer_ = std::make_unique<LoadBalancerImpl>(priority_context, stats_, runtime_,
+  void refresh(PriorityContextPtr priority_context) {
+    if (!priority_context->priority_set_.hostSetsPerPriority().empty()) {
+      load_balancer_ = std::make_unique<LoadBalancerImpl>(*priority_context, stats_, runtime_,
                                                           random_, common_config_);
     } else {
       load_balancer_ = nullptr;
     }
+    priority_context_ = std::move(priority_context);
   }
 };
 

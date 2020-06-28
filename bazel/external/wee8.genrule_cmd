@@ -19,10 +19,12 @@ pushd $$ROOT/wee8
 rm -rf out/wee8
 
 # Export compiler configuration.
+export CXXFLAGS="$${CXXFLAGS-} -Wno-deprecated-copy -Wno-unknown-warning-option"
 if [[ ( `uname` == "Darwin" && $${CXX-} == "" ) || $${CXX-} == *"clang"* ]]; then
   export IS_CLANG=true
   export CC=$${CC:-clang}
   export CXX=$${CXX:-clang++}
+  export CXXFLAGS="$${CXXFLAGS} -Wno-implicit-int-float-conversion -Wno-builtin-assume-aligned-alignment -Wno-final-dtor-non-final-class"
 else
   export IS_CLANG=false
   export CC=$${CC:-gcc}

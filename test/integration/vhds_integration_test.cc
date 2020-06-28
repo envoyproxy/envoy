@@ -140,11 +140,7 @@ public:
     use_lds_ = false;
   }
 
-  void TearDown() override {
-    cleanUpXdsConnection();
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
+  void TearDown() override { cleanUpXdsConnection(); }
 
   // Overridden to insert this stuff into the initialize() at the very beginning of
   // HttpIntegrationTest::testRouterRequestAndResponseWithBody().
@@ -206,7 +202,7 @@ TEST_P(VhdsInitializationTest, InitializeVhdsAfterRdsHasBeenInitialized) {
   // Calls our initialize(), which includes establishing a listener, route, and cluster.
   testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/rdsone", "vhost.rds.first");
   cleanupUpstreamAndDownstream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // Update RouteConfig, this time include VHDS config
   sendSotwDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
@@ -231,7 +227,7 @@ TEST_P(VhdsInitializationTest, InitializeVhdsAfterRdsHasBeenInitialized) {
   // Confirm vhost.first that was configured via VHDS is reachable
   testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/", "vhost.first");
   cleanupUpstreamAndDownstream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
 
 class VhdsIntegrationTest : public HttpIntegrationTest,
@@ -242,11 +238,7 @@ public:
     use_lds_ = false;
   }
 
-  void TearDown() override {
-    cleanUpXdsConnection();
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
+  void TearDown() override { cleanUpXdsConnection(); }
 
   std::string virtualHostYaml(const std::string& name, const std::string& domain) {
     return fmt::format(VhostTemplate, name, domain);
@@ -392,7 +384,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, VhdsIntegrationTest, GRPC_CLIENT_
 TEST_P(VhdsIntegrationTest, RdsUpdateWithoutVHDSChangesDoesNotRestartVHDS) {
   testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/", "host");
   cleanupUpstreamAndDownstream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // Update RouteConfig, but don't change VHDS config
   sendSotwDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
@@ -403,7 +395,7 @@ TEST_P(VhdsIntegrationTest, RdsUpdateWithoutVHDSChangesDoesNotRestartVHDS) {
   // Confirm vhost_0 that was originally configured via VHDS is reachable
   testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/", "host");
   cleanupUpstreamAndDownstream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
 
 // tests a scenario when:
@@ -416,7 +408,7 @@ TEST_P(VhdsIntegrationTest, VhdsVirtualHostAddUpdateRemove) {
   // Calls our initialize(), which includes establishing a listener, route, and cluster.
   testRouterHeaderOnlyRequestAndResponse(nullptr, 1);
   cleanupUpstreamAndDownstream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // A spontaneous VHDS DiscoveryResponse adds two virtual hosts
   sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
@@ -426,10 +418,10 @@ TEST_P(VhdsIntegrationTest, VhdsVirtualHostAddUpdateRemove) {
 
   testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/one", "vhost.first");
   cleanupUpstreamAndDownstream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
   testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/two", "vhost.second");
   cleanupUpstreamAndDownstream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // A spontaneous VHDS DiscoveryResponse removes newly added virtual hosts
   sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
@@ -457,7 +449,7 @@ TEST_P(VhdsIntegrationTest, VhdsVirtualHostAddUpdateRemove) {
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
   response->waitForHeaders();
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 
   cleanupUpstreamAndDownstream();
 }
@@ -475,7 +467,7 @@ TEST_P(VhdsIntegrationTest, RdsWithVirtualHostsVhdsVirtualHostAddUpdateRemove) {
 
   testRouterHeaderOnlyRequestAndResponse(nullptr, 1);
   cleanupUpstreamAndDownstream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // A spontaneous VHDS DiscoveryResponse adds two virtual hosts
   sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
@@ -486,13 +478,13 @@ TEST_P(VhdsIntegrationTest, RdsWithVirtualHostsVhdsVirtualHostAddUpdateRemove) {
   // verify that rds-based virtual host can be resolved
   testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/rdsone", "vhost.rds.first");
   cleanupUpstreamAndDownstream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
   testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/one", "vhost.first");
   cleanupUpstreamAndDownstream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
   testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/two", "vhost.second");
   cleanupUpstreamAndDownstream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // A spontaneous VHDS DiscoveryResponse removes virtual hosts added via vhds
   sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
@@ -503,7 +495,7 @@ TEST_P(VhdsIntegrationTest, RdsWithVirtualHostsVhdsVirtualHostAddUpdateRemove) {
   // verify rds-based virtual host is still present
   testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/rdsone", "vhost.rds.first");
   cleanupUpstreamAndDownstream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
@@ -524,7 +516,7 @@ TEST_P(VhdsIntegrationTest, RdsWithVirtualHostsVhdsVirtualHostAddUpdateRemove) {
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
   response->waitForHeaders();
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 
   cleanupUpstreamAndDownstream();
 }
@@ -538,12 +530,12 @@ TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateWithResourceNameAsAlias) {
 
   testRouterHeaderOnlyRequestAndResponse(nullptr, 1);
   cleanupUpstreamAndDownstream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // verify that rds-based virtual host can be resolved
   testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/rdsone", "vhost.rds.first");
   cleanupUpstreamAndDownstream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // Attempt to make a request to an unknown host
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -565,7 +557,7 @@ TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateWithResourceNameAsAlias) {
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
   response->waitForHeaders();
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 
   cleanupUpstreamAndDownstream();
 }
@@ -584,12 +576,12 @@ TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateFailToResolveTheAlias) {
 
   testRouterHeaderOnlyRequestAndResponse(nullptr, 1);
   cleanupUpstreamAndDownstream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // verify that rds-based virtual host can be resolved
   testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/rdsone", "vhost.rds.first");
   cleanupUpstreamAndDownstream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // Attempt to make a request to an unknown host
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -606,7 +598,7 @@ TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateFailToResolveTheAlias) {
   notifyAboutAliasResolutionFailure("4", vhds_stream_, {"my_route/vhost.third"});
 
   response->waitForHeaders();
-  EXPECT_EQ("404", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("404", response->headers().getStatusValue());
 
   cleanupUpstreamAndDownstream();
 }
@@ -625,12 +617,12 @@ TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateFailToResolveOneAliasOutOfSeveral)
 
   testRouterHeaderOnlyRequestAndResponse(nullptr, 1);
   cleanupUpstreamAndDownstream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // verify that rds-based virtual host can be resolved
   testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/rdsone", "vhost.rds.first");
   cleanupUpstreamAndDownstream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // Attempt to make a request to an unknown host
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -648,7 +640,40 @@ TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateFailToResolveOneAliasOutOfSeveral)
                                                   {"vhost.first"}, {"my_route/vhost.third"});
 
   response->waitForHeaders();
-  EXPECT_EQ("404", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("404", response->headers().getStatusValue());
+
+  cleanupUpstreamAndDownstream();
+}
+
+// Verify that an vhds update succeeds even when the client closes its connection
+TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateHttpConnectionCloses) {
+  // RDS exchange with a non-empty virtual_hosts field
+  useRdsWithVhosts();
+
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1);
+  cleanupUpstreamAndDownstream();
+  EXPECT_TRUE(codec_client_->waitForDisconnect());
+
+  // Attempt to make a request to an unknown host
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "vhost_1"},
+                                                 {"x-lyft-user-id", "123"}};
+  auto encoder_decoder = codec_client_->startRequest(request_headers);
+  Http::RequestEncoder& encoder = encoder_decoder.first;
+  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost,
+                                           {vhdsRequestResourceName("vhost_1")}, {}, vhds_stream_));
+
+  envoy::api::v2::DeltaDiscoveryResponse vhds_update =
+      createDeltaDiscoveryResponseWithResourceNameUsedAsAlias();
+  vhds_stream_->sendGrpcMessage(vhds_update);
+
+  codec_client_->sendReset(encoder);
+  response->waitForReset();
+  EXPECT_TRUE(codec_client_->connected());
 
   cleanupUpstreamAndDownstream();
 }

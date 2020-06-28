@@ -31,6 +31,8 @@
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/config/utility.h"
+#include "common/http/http1/codec_impl.h"
+#include "common/http/http2/codec_impl.h"
 #include "common/http/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/resolver_impl.h"
@@ -692,7 +694,12 @@ ClusterInfoImpl::ClusterInfoImpl(
       source_address_(getSourceAddress(config, bind_config)),
       lb_least_request_config_(config.least_request_lb_config()),
       lb_ring_hash_config_(config.ring_hash_lb_config()),
-      lb_original_dst_config_(config.original_dst_lb_config()), added_via_api_(added_via_api),
+      lb_original_dst_config_(config.original_dst_lb_config()),
+      upstream_config_(config.has_upstream_config()
+                           ? absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>(
+                                 config.upstream_config())
+                           : absl::nullopt),
+      added_via_api_(added_via_api),
       lb_subset_(LoadBalancerSubsetInfoImpl(config.lb_subset_config())),
       metadata_(config.metadata()), typed_metadata_(config.metadata()),
       common_lb_config_(config.common_lb_config()),
@@ -854,7 +861,8 @@ void ClusterInfoImpl::createNetworkFilterChain(Network::Connection& connection) 
 
 Http::Protocol
 ClusterInfoImpl::upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const {
-  if (features_ & Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL) {
+  if (downstream_protocol.has_value() &&
+      features_ & Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL) {
     return downstream_protocol.value();
   } else {
     return (features_ & Upstream::ClusterInfo::Features::HTTP2) ? Http::Protocol::Http2
@@ -1101,6 +1109,14 @@ ClusterInfoImpl::generateCircuitBreakersStats(Stats::Scope& scope, const std::st
     return {ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(POOL_GAUGE_PREFIX(scope, prefix),
                                                NULL_POOL_GAUGE(scope))};
   }
+}
+
+Http::Http1::CodecStats& ClusterInfoImpl::http1CodecStats() const {
+  return Http::Http1::CodecStats::atomicGet(http1_codec_stats_, *stats_scope_);
+}
+
+Http::Http2::CodecStats& ClusterInfoImpl::http2CodecStats() const {
+  return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, *stats_scope_);
 }
 
 ResourceManagerImplPtr

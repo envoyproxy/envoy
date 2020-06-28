@@ -1,5 +1,6 @@
 #!/bin/bash
 
+export ENVOY_BIN="${TEST_SRCDIR}"/envoy/test/integration/hotrestart_main
 source "${TEST_SRCDIR}/envoy/test/integration/test_utility.sh"
 
 function expect_fail_with_error() {
@@ -7,8 +8,8 @@ function expect_fail_with_error() {
   rm -f "$log"
   expected_error="$1"
   shift
-  echo ${ENVOY_BIN} "$@" ">&" "$log"
-  ${ENVOY_BIN} "$@" >& "$log"
+  echo ${ENVOY_BIN} --use-dynamic-base-id "$@" ">&" "$log"
+  ${ENVOY_BIN} --use-dynamic-base-id "$@" >& "$log"
   EXIT_CODE=$?
   cat "$log"
   check [ $EXIT_CODE -eq 1 ]

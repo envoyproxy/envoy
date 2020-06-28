@@ -15,6 +15,7 @@
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/config/utility.h"
+#include "common/network/socket_interface_impl.h"
 #include "common/network/utility.h"
 #include "common/stats/symbol_table_impl.h"
 
@@ -27,8 +28,8 @@ namespace Common {
 namespace Statsd {
 
 UdpStatsdSink::WriterImpl::WriterImpl(UdpStatsdSink& parent)
-    : parent_(parent),
-      io_handle_(parent_.server_address_->socket(Network::Address::SocketType::Datagram)) {}
+    : parent_(parent), io_handle_(Network::SocketInterfaceSingleton::get().socket(
+                           Network::Socket::Type::Datagram, parent_.server_address_)) {}
 
 void UdpStatsdSink::WriterImpl::write(const std::string& message) {
   // TODO(mattklein123): We can avoid this const_cast pattern by having a constant variant of

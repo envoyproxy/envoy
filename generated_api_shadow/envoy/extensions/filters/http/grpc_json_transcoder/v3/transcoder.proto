@@ -45,32 +45,36 @@ message GrpcJsonTranscoder {
     bool preserve_proto_field_names = 4;
   }
 
-  // Supplies the filename of
-  // :ref:`the proto descriptor set <config_grpc_json_generate_proto_descriptor_set>` for the gRPC
-  // services.
-  repeated string services = 2 [(validate.rules).repeated = {min_items: 1}];
+  oneof descriptor_set {
+    option (validate.required) = true;
 
-  // Supplies the binary content of
-  // :ref:`the proto descriptor set <config_grpc_json_generate_proto_descriptor_set>` for the gRPC
-  // services.
-  PrintOptions print_options = 3;
+    // Supplies the filename of
+    // :ref:`the proto descriptor set <config_grpc_json_generate_proto_descriptor_set>` for the gRPC
+    // services.
+    string proto_descriptor = 1;
+
+    // Supplies the binary content of
+    // :ref:`the proto descriptor set <config_grpc_json_generate_proto_descriptor_set>` for the gRPC
+    // services.
+    bytes proto_descriptor_bin = 4;
+  }
 
   // A list of strings that
   // supplies the fully qualified service names (i.e. "package_name.service_name") that
   // the transcoder will translate. If the service name doesn't exist in ``proto_descriptor``,
   // Envoy will fail at startup. The ``proto_descriptor`` may contain more services than
   // the service names specified here, but they won't be translated.
-  bool match_incoming_request_route = 5;
+  repeated string services = 2 [(validate.rules).repeated = {min_items: 1}];
 
   // Control options for response JSON. These options are passed directly to
   // `JsonPrintOptions <https://developers.google.com/protocol-buffers/docs/reference/cpp/
   // google.protobuf.util.json_util#JsonPrintOptions>`_.
-  repeated string ignored_query_parameters = 6;
+  PrintOptions print_options = 3;
 
   // Whether to keep the incoming request route after the outgoing headers have been transformed to
   // the match the upstream gRPC service. Note: This means that routes for gRPC services that are
   // not transcoded cannot be used in combination with *match_incoming_request_route*.
-  bool auto_mapping = 7;
+  bool match_incoming_request_route = 5;
 
   // A list of query parameters to be ignored for transcoding method mapping.
   // By default, the transcoder filter will not transcode a request if there are any
@@ -97,7 +101,7 @@ message GrpcJsonTranscoder {
   // The request ``/shelves/100?foo=bar`` will not be mapped to ``GetShelf``` because variable
   // binding for ``foo`` is not defined. Adding ``foo`` to ``ignored_query_parameters`` will allow
   // the same request to be mapped to ``GetShelf``.
-  bool ignore_unknown_query_parameters = 8;
+  repeated string ignored_query_parameters = 6;
 
   // Whether to route methods without the ``google.api.http`` option.
   //
@@ -119,45 +123,41 @@ message GrpcJsonTranscoder {
   //
   // The client could ``post`` a json body ``{"shelf": 1234}`` with the path of
   // ``/bookstore.Bookstore/GetShelfRequest`` to call ``GetShelfRequest``.
+  bool auto_mapping = 7;
+
+  // Whether to ignore query parameters that cannot be mapped to a corresponding
+  // protobuf field. Use this if you cannot control the query parameters and do
+  // not know them beforehand. Otherwise use ``ignored_query_parameters``.
+  // Defaults to false.
+  bool ignore_unknown_query_parameters = 8;
+
+  // Whether to convert gRPC status headers to JSON.
+  // When trailer indicates a gRPC error and there was no HTTP body, take ``google.rpc.Status``
+  // from the ``grpc-status-details-bin`` header and use it as JSON body.
+  // If there was no such header, make ``google.rpc.Status`` out of the ``grpc-status`` and
+  // ``grpc-message`` headers.
+  // The error details types must be present in the ``proto_descriptor``.
+  //
+  // For example, if an upstream server replies with headers:
+  //
+  // .. code-block:: none
+  //
+  //     grpc-status: 5
+  //     grpc-status-details-bin:
+  //         CAUaMwoqdHlwZS5nb29nbGVhcGlzLmNvbS9nb29nbGUucnBjLlJlcXVlc3RJbmZvEgUKA3ItMQ
+  //
+  // The ``grpc-status-details-bin`` header contains a base64-encoded protobuf message
+  // ``google.rpc.Status``. It will be transcoded into:
+  //
+  // .. code-block:: none
+  //
+  //     HTTP/1.1 404 Not Found
+  //     content-type: application/json
+  //
+  //     {"code":5,"details":[{"@type":"type.googleapis.com/google.rpc.RequestInfo","requestId":"r-1"}]}
+  //
+  //  In order to transcode the message, the ``google.rpc.RequestInfo`` type from
+  //  the ``google/rpc/error_details.proto`` should be included in the configured
+  //  :ref:`proto descriptor set <config_grpc_json_generate_proto_descriptor_set>`.
   bool convert_grpc_status = 9;
-
-  oneof descriptor_set {
-    option (validate.required) = true;
-
-    // Whether to ignore query parameters that cannot be mapped to a corresponding
-    // protobuf field. Use this if you cannot control the query parameters and do
-    // not know them beforehand. Otherwise use ``ignored_query_parameters``.
-    // Defaults to false.
-    string proto_descriptor = 1;
-
-    // Whether to convert gRPC status headers to JSON.
-    // When trailer indicates a gRPC error and there was no HTTP body, take ``google.rpc.Status``
-    // from the ``grpc-status-details-bin`` header and use it as JSON body.
-    // If there was no such header, make ``google.rpc.Status`` out of the ``grpc-status`` and
-    // ``grpc-message`` headers.
-    // The error details types must be present in the ``proto_descriptor``.
-    //
-    // For example, if an upstream server replies with headers:
-    //
-    // .. code-block:: none
-    //
-    //     grpc-status: 5
-    //     grpc-status-details-bin:
-    //         CAUaMwoqdHlwZS5nb29nbGVhcGlzLmNvbS9nb29nbGUucnBjLlJlcXVlc3RJbmZvEgUKA3ItMQ
-    //
-    // The ``grpc-status-details-bin`` header contains a base64-encoded protobuf message
-    // ``google.rpc.Status``. It will be transcoded into:
-    //
-    // .. code-block:: none
-    //
-    //     HTTP/1.1 404 Not Found
-    //     content-type: application/json
-    //
-    //     {"code":5,"details":[{"@type":"type.googleapis.com/google.rpc.RequestInfo","requestId":"r-1"}]}
-    //
-    //  In order to transcode the message, the ``google.rpc.RequestInfo`` type from
-    //  the ``google/rpc/error_details.proto`` should be included in the configured
-    //  :ref:`proto descriptor set <config_grpc_json_generate_proto_descriptor_set>`.
-    bytes proto_descriptor_bin = 4;
-  }
 }

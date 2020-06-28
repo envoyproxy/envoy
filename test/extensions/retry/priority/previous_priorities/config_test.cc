@@ -49,9 +49,12 @@ public:
   }
 
   void verifyPriorityLoads(const Upstream::HealthyLoad& expected_healthy_priority_load,
-                           const Upstream::DegradedLoad& expected_degraded_priority_load) {
-    const auto& priority_loads =
-        retry_priority_->determinePriorityLoad(priority_set_, original_priority_load_);
+                           const Upstream::DegradedLoad& expected_degraded_priority_load,
+                           absl::optional<Upstream::RetryPriority::PriorityMappingFunc>
+                               priority_mapping_func = absl::nullopt) {
+    const auto& priority_loads = retry_priority_->determinePriorityLoad(
+        priority_set_, original_priority_load_,
+        priority_mapping_func.value_or(Upstream::RetryPriority::defaultPriorityMapping));
     // Unwrapping gives a nicer gtest error.
     ASSERT_EQ(priority_loads.healthy_priority_load_.get(), expected_healthy_priority_load.get());
     ASSERT_EQ(priority_loads.degraded_priority_load_.get(), expected_degraded_priority_load.get());
@@ -92,6 +95,57 @@ TEST_F(RetryPriorityTest, DefaultFrequency) {
   // priority load.
   retry_priority_->onHostAttempted(host2);
   verifyPriorityLoads(original_priority_load, original_degraded_priority_load);
+}
+
+TEST_F(RetryPriorityTest, PriorityMappingCallback) {
+  const Upstream::HealthyLoad original_priority_load({100, 0});
+  const Upstream::DegradedLoad original_degraded_priority_load({0, 0});
+
+  initialize(original_priority_load, original_degraded_priority_load);
+  addHosts(0, 2, 2);
+  addHosts(1, 2, 2);
+
+  auto host1 = std::make_shared<NiceMock<Upstream::MockHost>>();
+  EXPECT_CALL(*host1, priority()).Times(0);
+
+  auto host2 = std::make_shared<NiceMock<Upstream::MockHost>>();
+  EXPECT_CALL(*host2, priority()).Times(0);
+
+  Upstream::RetryPriority::PriorityMappingFunc priority_mapping_func =
+      [&](const Upstream::HostDescription& host) -> absl::optional<uint32_t> {
+    if (&host == host1.get()) {
+      return 0;
+    }
+    ASSERT(&host == host2.get());
+    return 1;
+  };
+
+  const Upstream::HealthyLoad expected_priority_load({0, 100});
+  const Upstream::DegradedLoad expected_degraded_priority_load({0, 0});
+
+  // After attempting a host in P0, P1 should receive all the load.
+  retry_priority_->onHostAttempted(host1);
+  verifyPriorityLoads(expected_priority_load, expected_degraded_priority_load,
+                      priority_mapping_func);
+
+  // With a mapping function that doesn't recognize host2, results will remain the same as after
+  // only trying host1.
+  retry_priority_->onHostAttempted(host2);
+  Upstream::RetryPriority::PriorityMappingFunc priority_mapping_func_no_host2 =
+      [&](const Upstream::HostDescription& host) -> absl::optional<uint32_t> {
+    if (&host == host1.get()) {
+      return 0;
+    }
+    ASSERT(&host == host2.get());
+    return absl::nullopt;
+  };
+  verifyPriorityLoads(expected_priority_load, expected_degraded_priority_load,
+                      priority_mapping_func_no_host2);
+
+  // After we've tried host2, we've attempted all priorities and should reset back to the original
+  // priority load.
+  verifyPriorityLoads(original_priority_load, original_degraded_priority_load,
+                      priority_mapping_func);
 }
 
 // Tests that we handle all hosts being unhealthy in the original priority set.

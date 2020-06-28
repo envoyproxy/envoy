@@ -147,8 +147,8 @@ public:
   const Http::RequestHeaderMap* downstreamHeaders() const override { return nullptr; }
 
   const HealthyAndDegradedLoad&
-  determinePriorityLoad(const PrioritySet&,
-                        const HealthyAndDegradedLoad& original_priority_load) override {
+  determinePriorityLoad(const PrioritySet&, const HealthyAndDegradedLoad& original_priority_load,
+                        const Upstream::RetryPriority::PriorityMappingFunc&) override {
     return original_priority_load;
   }
 

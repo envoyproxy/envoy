@@ -10,8 +10,10 @@ HTTP filters
   aws_lambda_filter
   aws_request_signing_filter
   buffer_filter
+  compressor_filter
   cors_filter
   csrf_filter
+  decompressor_filter
   dynamic_forward_proxy_filter
   dynamodb_filter
   ext_authz_filter
@@ -39,4 +41,5 @@ HTTP filters
 .. toctree::
   :hidden:
 
+  ../../../api-v3/extensions/filters/http/admission_control/v3alpha/admission_control.proto
   ../../../api-v3/extensions/filters/http/cache/v3alpha/cache.proto

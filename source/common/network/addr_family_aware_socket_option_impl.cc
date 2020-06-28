@@ -7,41 +7,17 @@
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/network/address_impl.h"
+#include "common/network/socket_interface_impl.h"
 #include "common/network/socket_option_impl.h"
 
 namespace Envoy {
 namespace Network {
 
 namespace {
-Address::IpVersion getVersionFromAddress(Address::InstanceConstSharedPtr addr) {
-  if (addr->ip() != nullptr) {
-    return addr->ip()->version();
-  }
-  throw EnvoyException("Unable to set socket option on non-IP sockets");
-}
-
-absl::optional<Address::IpVersion> getVersionFromSocket(const Socket& socket) {
-  try {
-    // We have local address when the socket is used in a listener but have to
-    // infer the IP from the socket FD when initiating connections.
-    // TODO(htuch): Figure out a way to obtain a consistent interface for IP
-    // version from socket.
-    if (socket.localAddress()) {
-      return {getVersionFromAddress(socket.localAddress())};
-    } else {
-      return {getVersionFromAddress(Address::addressFromFd(socket.ioHandle().fd()))};
-    }
-  } catch (const EnvoyException&) {
-    // Ignore, we get here because we failed in getsockname().
-    // TODO(htuch): We should probably clean up this logic to avoid relying on exceptions.
-  }
-
-  return absl::nullopt;
-}
 
 SocketOptionImplOptRef getOptionForSocket(const Socket& socket, SocketOptionImpl& ipv4_option,
                                           SocketOptionImpl& ipv6_option) {
-  auto version = getVersionFromSocket(socket);
+  auto version = socket.ipVersion();
   if (!version.has_value()) {
     return absl::nullopt;
   }

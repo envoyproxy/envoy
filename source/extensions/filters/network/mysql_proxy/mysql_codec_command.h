@@ -60,8 +60,6 @@ public:
   int parseMessage(Buffer::Instance&, uint32_t) override { return MYSQL_SUCCESS; }
   std::string encode() override { return ""; }
 
-  uint16_t getServerStatus() const { return server_status_; }
-  uint16_t getWarnings() const { return warnings_; }
   void setServerStatus(uint16_t status);
   void setWarnings(uint16_t warnings);
 

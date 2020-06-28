@@ -45,15 +45,6 @@ private:
                                     const char* desc);
   static void writeVarString(Buffer::Instance& buffer, const absl::string_view str);
 
-  void setException(AppExceptionType type, std::string reason) {
-    if (exception_.has_value()) {
-      return;
-    }
-
-    exception_ = type;
-    exception_reason_ = reason;
-  }
-
   absl::optional<AppExceptionType> exception_;
   std::string exception_reason_;
 };

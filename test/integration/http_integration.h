@@ -38,7 +38,8 @@ public:
   void sendMetadata(Http::RequestEncoder& encoder, Http::MetadataMap metadata_map);
   std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr>
   startRequest(const Http::RequestHeaderMap& headers);
-  bool waitForDisconnect(std::chrono::milliseconds time_to_wait = std::chrono::milliseconds(0));
+  ABSL_MUST_USE_RESULT AssertionResult
+  waitForDisconnect(std::chrono::milliseconds time_to_wait = TestUtility::DefaultTimeout);
   Network::ClientConnection* connection() const { return connection_.get(); }
   Network::ConnectionEvent lastConnectionEvent() const { return last_connection_event_; }
   Network::Connection& rawConnection() { return *connection_; }
@@ -60,7 +61,7 @@ private:
     CodecCallbacks(IntegrationCodecClient& parent) : parent_(parent) {}
 
     // Http::ConnectionCallbacks
-    void onGoAway() override { parent_.saw_goaway_ = true; }
+    void onGoAway(Http::GoAwayErrorCode) override { parent_.saw_goaway_ = true; }
 
     IntegrationCodecClient& parent_;
   };

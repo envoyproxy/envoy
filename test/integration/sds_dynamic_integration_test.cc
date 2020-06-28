@@ -9,6 +9,7 @@
 
 #include "common/config/api_version.h"
 #include "common/event/dispatcher_impl.h"
+#include "common/http/utility.h"
 #include "common/network/connection_impl.h"
 #include "common/network/utility.h"
 
@@ -151,7 +152,7 @@ public:
                                    ->mutable_listeners(0)
                                    ->mutable_filter_chains(0)
                                    ->mutable_transport_socket();
-      common_tls_context->add_alpn_protocols("http/1.1");
+      common_tls_context->add_alpn_protocols(Http::Utility::AlpnNames::get().Http11);
 
       auto* validation_context = common_tls_context->mutable_validation_context();
       validation_context->mutable_trusted_ca()->set_filename(
@@ -183,10 +184,7 @@ public:
 
   void TearDown() override {
     cleanUpXdsConnection();
-
     client_ssl_ctx_.reset();
-    cleanupUpstreamAndDownstream();
-    codec_client_.reset();
   }
 
   Network::ClientConnectionPtr makeSslClientConnection() {
@@ -257,7 +255,7 @@ public:
                                    ->mutable_transport_socket();
       envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
       auto* common_tls_context = tls_context.mutable_common_tls_context();
-      common_tls_context->add_alpn_protocols("http/1.1");
+      common_tls_context->add_alpn_protocols(Http::Utility::AlpnNames::get().Http11);
 
       auto* tls_certificate = common_tls_context->add_tls_certificates();
       tls_certificate->mutable_certificate_chain()->set_filename(
@@ -346,9 +344,6 @@ public:
     client_ssl_ctx_.reset();
     cleanupUpstreamAndDownstream();
     codec_client_.reset();
-
-    test_server_.reset();
-    fake_upstreams_.clear();
   }
 
   void enableCombinedValidationContext(bool enable) { use_combined_validation_context_ = enable; }
@@ -529,7 +524,7 @@ TEST_P(SdsDynamicUpstreamIntegrationTest, WrongSecretFirst) {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "GET", "/test/long/url", "", downstream_protocol_, version_);
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("503", response->headers().getStatusValue());
 
   // To flush out the reset connection from the first request in upstream.
   FakeRawConnectionPtr fake_upstream_connection;

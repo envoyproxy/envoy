@@ -23,6 +23,13 @@ public:
   using ParamMap = std::unordered_map<std::string, std::string>;
 
   /**
+   * Perform common initialization steps needed to run a test binary. This
+   * method should be called first in all test main functions.
+   * @param program_name argv[0] test program is invoked with
+   */
+  static void initializeTestMain(char* program_name);
+
+  /**
    * Initialize command-line options for later access by tests in getOptions().
    * @param argc number of command-line args.
    * @param argv array of command-line args.
@@ -79,6 +86,12 @@ public:
   static std::string temporaryPath(absl::string_view path) {
     return absl::StrCat(temporaryDirectory(), "/", path);
   }
+
+  /**
+   * Obtain platform specific null device path
+   * @return const std::string& null device path
+   */
+  static const std::string& nullDevicePath();
 
   /**
    * Obtain read-only test input data directory.

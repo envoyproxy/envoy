@@ -4,8 +4,8 @@ executors:
   ubuntu-build:
     description: "A regular build executor based on ubuntu image"
     docker:
-      # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/master/toolchains/rbe_toolchains_config.bzl#L7
-      - image: envoyproxy/envoy-build-ubuntu@sha256:3788a87461f2b3dc8048ad0ce5df40438a56e0a8f1a4ab0f61b4ef0d8c11ff1f
+      # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/master/toolchains/rbe_toolchains_config.bzl#L8
+      - image: envoyproxy/envoy-build-ubuntu:f21773ab398a879f976936f72c78c9dd3718ca1e
     resource_class: xlarge
     working_directory: /source
 
@@ -45,33 +45,6 @@ jobs:
              - "f6:f9:df:90:9c:4b:5f:9c:f4:69:fd:42:94:ff:88:24"
        - run: ci/filter_example_mirror.sh
 
-   coverage:
-     executor: ubuntu-build
-     steps:
-       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
-       - checkout
-       - run:
-           command:
-             ci/do_circle_ci.sh bazel.coverage
-           no_output_timeout: 60m
-       - persist_to_workspace:
-           root: /build/envoy/generated
-           paths:
-             - coverage
-       - store_artifacts:
-           path: /build/envoy/generated
-           destination: /
-
-   coverage_publish:
-     docker:
-       - image: google/cloud-sdk
-     steps:
-       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
-       - checkout
-       - attach_workspace:
-           at: /build/envoy/generated
-       - run: ci/coverage_publish.sh
-
    docs:
      executor: ubuntu-build
      steps:
@@ -92,9 +65,6 @@ workflows:
       - api
       - go_control_plane_mirror
       - filter_example_mirror
-      - coverage
-      - coverage_publish:
-          requires: [coverage]
       - docs:
           filters:
             tags:

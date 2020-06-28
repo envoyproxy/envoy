@@ -20,6 +20,13 @@ enum SomeEnum {
 message Sample {
   option (udpa.annotations.versioning).previous_message_type = "envoy.v2.Sample";
 
+  enum DeprecateEnum {
+    option deprecated = true;
+
+    FIRST = 0;
+    SECOND = 1;
+  }
+
   message Entry {
     option (udpa.annotations.versioning).previous_message_type = "envoy.v2.Sample.Entry";
 

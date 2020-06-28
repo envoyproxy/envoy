@@ -143,7 +143,8 @@ private:
     /**
      * Create a new connection from a socket accepted by the listener.
      */
-    void newConnection(Network::ConnectionSocketPtr&& socket);
+    void newConnection(Network::ConnectionSocketPtr&& socket,
+                       const envoy::config::core::v3::Metadata& dynamic_metadata);
 
     /**
      * Return the active connections container attached with the given filter chain.
@@ -294,6 +295,9 @@ private:
     Network::ConnectionSocket& socket() override { return *socket_.get(); }
     Event::Dispatcher& dispatcher() override { return listener_.parent_.dispatcher_; }
     void continueFilterChain(bool success) override;
+    void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) override;
+    envoy::config::core::v3::Metadata& dynamicMetadata() override { return metadata_; };
+    const envoy::config::core::v3::Metadata& dynamicMetadata() const override { return metadata_; };
 
     ActiveTcpListener& listener_;
     Network::ConnectionSocketPtr socket_;
@@ -301,6 +305,7 @@ private:
     std::list<ListenerFilterWrapperPtr> accept_filters_;
     std::list<ListenerFilterWrapperPtr>::iterator iter_;
     Event::TimerPtr timer_;
+    envoy::config::core::v3::Metadata metadata_{};
   };
 
   using ActiveTcpListenerOptRef = absl::optional<std::reference_wrapper<ActiveTcpListener>>;
@@ -323,17 +328,16 @@ private:
 
 /**
  * Wrapper for an active udp listener owned by this handler.
- * TODO(danzh): rename to ActiveRawUdpListener.
  */
-class ActiveUdpListener : public Network::UdpListenerCallbacks,
-                          public ConnectionHandlerImpl::ActiveListenerImplBase,
-                          public Network::UdpListenerFilterManager,
-                          public Network::UdpReadFilterCallbacks {
+class ActiveRawUdpListener : public Network::UdpListenerCallbacks,
+                             public ConnectionHandlerImpl::ActiveListenerImplBase,
+                             public Network::UdpListenerFilterManager,
+                             public Network::UdpReadFilterCallbacks {
 public:
-  ActiveUdpListener(Network::ConnectionHandler& parent, Event::Dispatcher& dispatcher,
-                    Network::ListenerConfig& config);
-  ActiveUdpListener(Network::ConnectionHandler& parent, Network::UdpListenerPtr&& listener,
-                    Network::ListenerConfig& config);
+  ActiveRawUdpListener(Network::ConnectionHandler& parent, Event::Dispatcher& dispatcher,
+                       Network::ListenerConfig& config);
+  ActiveRawUdpListener(Network::ConnectionHandler& parent, Network::UdpListenerPtr&& listener,
+                       Network::ListenerConfig& config);
 
   // Network::UdpListenerCallbacks
   void onData(Network::UdpRecvData& data) override;

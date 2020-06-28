@@ -1,8 +1,8 @@
-licenses(["notice"])  # Apache 2
-
 load("//bazel:envoy_build_system.bzl", "envoy_cc_fuzz_test", "envoy_cc_test", "envoy_package")
 load("//source/extensions:all_extensions.bzl", "envoy_all_extensions")
 load("//bazel:repositories.bzl", "PPC_SKIP_TARGETS", "WINDOWS_SKIP_TARGETS")
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -27,6 +27,7 @@ envoy_cc_test(
         "//include/envoy/upstream:resource_manager_interface",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/api:api_lib",
+        "//source/common/singleton:manager_impl_lib",
         "//source/common/stats:stats_lib",
         "//source/extensions/transport_sockets/tls:context_lib",
         "//source/server/config_validation:cluster_manager_lib",
@@ -39,7 +40,7 @@ envoy_cc_test(
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:admin_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:simulated_time_system_lib",
@@ -61,7 +62,6 @@ envoy_cc_test(
         "//configs:example_configs",
         "//test/config_test:example_configs_test_setup.sh",
     ],
-    tags = ["fails_on_windows"],
     deps = [
         "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/network/http_connection_manager:config",

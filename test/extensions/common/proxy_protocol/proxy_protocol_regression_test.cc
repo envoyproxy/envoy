@@ -47,8 +47,7 @@ public:
             Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true)),
         connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_)), name_("proxy"),
         filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()) {
-    EXPECT_CALL(socket_factory_, socketType())
-        .WillOnce(Return(Network::Address::SocketType::Stream));
+    EXPECT_CALL(socket_factory_, socketType()).WillOnce(Return(Network::Socket::Type::Stream));
     EXPECT_CALL(socket_factory_, localAddress()).WillOnce(ReturnRef(socket_->localAddress()));
     EXPECT_CALL(socket_factory_, getListenSocket()).WillOnce(Return(socket_));
     connection_handler_->addListener(absl::nullopt, *this);
@@ -98,7 +97,9 @@ public:
           filter_manager.addAcceptFilter(
               nullptr,
               std::make_unique<ListenerFilters::ProxyProtocol::Filter>(
-                  std::make_shared<ListenerFilters::ProxyProtocol::Config>(listenerScope())));
+                  std::make_shared<ListenerFilters::ProxyProtocol::Config>(
+                      listenerScope(),
+                      envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol())));
           maybeExitDispatcher();
           return true;
         }));

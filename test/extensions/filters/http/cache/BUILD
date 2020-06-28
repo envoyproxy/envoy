@@ -1,10 +1,10 @@
-licenses(["notice"])  # Apache 2
-
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load(
     "//test/extensions:extensions_build_system.bzl",
     "envoy_extension_cc_test",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -42,6 +42,16 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/cache/simple_http_cache:simple_http_cache_lib",
         "//test/mocks/server:server_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "cache_filter_utils_test",
+    srcs = ["cache_filter_utils_test.cc"],
+    extension_name = "envoy.filters.http.cache",
+    deps = [
+        "//source/extensions/filters/http/cache:cache_filter_utils_lib",
         "//test/test_common:utility_lib",
     ],
 )

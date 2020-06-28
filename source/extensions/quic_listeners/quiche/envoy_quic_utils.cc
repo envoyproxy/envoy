@@ -90,13 +90,21 @@ Http::StreamResetReason quicErrorCodeToEnvoyResetReason(quic::QuicErrorCode erro
   }
 }
 
+Http::GoAwayErrorCode quicErrorCodeToEnvoyErrorCode(quic::QuicErrorCode error) noexcept {
+  switch (error) {
+  case quic::QUIC_NO_ERROR:
+    return Http::GoAwayErrorCode::NoError;
+  default:
+    return Http::GoAwayErrorCode::Other;
+  }
+}
+
 Network::ConnectionSocketPtr
 createConnectionSocket(Network::Address::InstanceConstSharedPtr& peer_addr,
                        Network::Address::InstanceConstSharedPtr& local_addr,
                        const Network::ConnectionSocket::OptionsSharedPtr& options) {
-  Network::IoHandlePtr io_handle = peer_addr->socket(Network::Address::SocketType::Datagram);
-  auto connection_socket =
-      std::make_unique<Network::ConnectionSocketImpl>(std::move(io_handle), local_addr, peer_addr);
+  auto connection_socket = std::make_unique<Network::ConnectionSocketImpl>(
+      Network::Socket::Type::Datagram, local_addr, peer_addr);
   connection_socket->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
   connection_socket->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
   if (options != nullptr) {
@@ -108,12 +116,9 @@ createConnectionSocket(Network::Address::InstanceConstSharedPtr& peer_addr,
     ENVOY_LOG_MISC(error, "Fail to apply pre-bind options");
     return connection_socket;
   }
-  local_addr->bind(connection_socket->ioHandle().fd());
+  connection_socket->bind(local_addr);
   ASSERT(local_addr->ip());
-  if (local_addr->ip()->port() == 0) {
-    // Get ephemeral port number.
-    local_addr = Network::Address::addressFromFd(connection_socket->ioHandle().fd());
-  }
+  local_addr = connection_socket->localAddress();
   if (!Network::Socket::applyOptions(connection_socket->options(), *connection_socket,
                                      envoy::config::core::v3::SocketOption::STATE_BOUND)) {
     ENVOY_LOG_MISC(error, "Fail to apply post-bind options");

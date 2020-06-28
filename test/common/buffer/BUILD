@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_benchmark_test",
@@ -10,6 +8,8 @@ load(
     "envoy_package",
     "envoy_proto_library",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -74,11 +74,14 @@ envoy_cc_test(
 envoy_cc_test(
     name = "watermark_buffer_test",
     srcs = ["watermark_buffer_test.cc"],
+    # Fails on windows with cr/lf yaml file checkouts
+    tags = ["fails_on_windows"],
     deps = [
         ":utility_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/buffer:watermark_buffer_lib",
         "//source/common/network:address_lib",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 

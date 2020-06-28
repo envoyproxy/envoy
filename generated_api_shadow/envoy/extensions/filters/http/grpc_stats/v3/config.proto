@@ -28,12 +28,12 @@ message FilterConfig {
   // counts.
   bool emit_filter_state = 1;
 
-  // If set, specifies an allowlist of service/methods that will have individual stats
-  // emitted for them. Any call that does not match the allowlist will be counted
-  // in a stat with no method specifier: `cluster.<name>.grpc.*`.
-  bool enable_upstream_stats = 4;
-
   oneof per_method_stat_specifier {
+    // If set, specifies an allowlist of service/methods that will have individual stats
+    // emitted for them. Any call that does not match the allowlist will be counted
+    // in a stat with no method specifier: `cluster.<name>.grpc.*`.
+    config.core.v3.GrpcMethodList individual_method_stats_allowlist = 2;
+
     // If set to true, emit stats for all service/method names.
     //
     // If set to false, emit stats for all service/message types to the same stats without including
@@ -52,16 +52,16 @@ message FilterConfig {
     //   `stats_for_all_methods=false` in order to be safe by default. This behavior can be
     //   controlled with runtime override
     //   `envoy.deprecated_features.grpc_stats_filter_enable_stats_for_all_methods_by_default`.
-    config.core.v3.GrpcMethodList individual_method_stats_allowlist = 2;
-
-    // If true, the filter will gather a histogram for the request time of the upstream.
-    // It works with :ref:`stats_for_all_methods
-    // <envoy_api_field_extensions.filters.http.grpc_stats.v3.FilterConfig.stats_for_all_methods>`
-    // and :ref:`individual_method_stats_allowlist
-    // <envoy_api_field_extensions.filters.http.grpc_stats.v3.FilterConfig.individual_method_stats_allowlist>` the same way
-    // request_message_count and response_message_count works.
     google.protobuf.BoolValue stats_for_all_methods = 3;
   }
+
+  // If true, the filter will gather a histogram for the request time of the upstream.
+  // It works with :ref:`stats_for_all_methods
+  // <envoy_api_field_extensions.filters.http.grpc_stats.v3.FilterConfig.stats_for_all_methods>`
+  // and :ref:`individual_method_stats_allowlist
+  // <envoy_api_field_extensions.filters.http.grpc_stats.v3.FilterConfig.individual_method_stats_allowlist>` the same way
+  // request_message_count and response_message_count works.
+  bool enable_upstream_stats = 4;
 }
 
 // gRPC statistics filter state object in protobuf form.

@@ -20,6 +20,7 @@ const std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>>
 const AsyncStreamImpl::NullHedgePolicy AsyncStreamImpl::RouteEntryImpl::hedge_policy_;
 const AsyncStreamImpl::NullRateLimitPolicy AsyncStreamImpl::RouteEntryImpl::rate_limit_policy_;
 const AsyncStreamImpl::NullRetryPolicy AsyncStreamImpl::RouteEntryImpl::retry_policy_;
+const Router::InternalRedirectPolicyImpl AsyncStreamImpl::RouteEntryImpl::internal_redirect_policy_;
 const std::vector<Router::ShadowPolicyPtr> AsyncStreamImpl::RouteEntryImpl::shadow_policies_;
 const AsyncStreamImpl::NullVirtualHost AsyncStreamImpl::RouteEntryImpl::virtual_host_;
 const AsyncStreamImpl::NullRateLimitPolicy AsyncStreamImpl::NullVirtualHost::rate_limit_policy_;
@@ -131,7 +132,7 @@ void AsyncStreamImpl::encodeTrailers(ResponseTrailerMapPtr&& trailers) {
 }
 
 void AsyncStreamImpl::sendHeaders(RequestHeaderMap& headers, bool end_stream) {
-  if (Http::Headers::get().MethodValues.Head == headers.Method()->value().getStringView()) {
+  if (Http::Headers::get().MethodValues.Head == headers.getMethodValue()) {
     is_head_request_ = true;
   }
 
@@ -239,7 +240,6 @@ AsyncRequestImpl::AsyncRequestImpl(RequestMessagePtr&& request, AsyncClientImpl&
                                    AsyncClient::Callbacks& callbacks,
                                    const AsyncClient::RequestOptions& options)
     : AsyncStreamImpl(parent, *this, options), request_(std::move(request)), callbacks_(callbacks) {
-
   if (nullptr != options.parent_span_) {
     const std::string child_span_name =
         options.child_span_name_.empty()
@@ -265,6 +265,8 @@ void AsyncRequestImpl::initialize() {
 }
 
 void AsyncRequestImpl::onComplete() {
+  callbacks_.onBeforeFinalizeUpstreamSpan(*child_span_, &response_->headers());
+
   Tracing::HttpTracerUtility::finalizeUpstreamSpan(*child_span_, &response_->headers(),
                                                    response_->trailers(), streamInfo(),
                                                    Tracing::EgressConfig::get());
@@ -292,12 +294,15 @@ void AsyncRequestImpl::onTrailers(ResponseTrailerMapPtr&& trailers) {
 
 void AsyncRequestImpl::onReset() {
   if (!cancelled_) {
-    // Add tags about reset.
-    child_span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+    // Set "error reason" tag related to reset. The tagging for "error true" is done inside the
+    // Tracing::HttpTracerUtility::finalizeUpstreamSpan.
     child_span_->setTag(Tracing::Tags::get().ErrorReason, "Reset");
   }
 
-  // Finalize the span based on whether we received a response or not
+  callbacks_.onBeforeFinalizeUpstreamSpan(*child_span_,
+                                          remoteClosed() ? &response_->headers() : nullptr);
+
+  // Finalize the span based on whether we received a response or not.
   Tracing::HttpTracerUtility::finalizeUpstreamSpan(
       *child_span_, remoteClosed() ? &response_->headers() : nullptr,
       remoteClosed() ? response_->trailers() : nullptr, streamInfo(), Tracing::EgressConfig::get());
@@ -311,7 +316,7 @@ void AsyncRequestImpl::onReset() {
 void AsyncRequestImpl::cancel() {
   cancelled_ = true;
 
-  // Add tags about the cancellation
+  // Add tags about the cancellation.
   child_span_->setTag(Tracing::Tags::get().Canceled, Tracing::Tags::get().True);
 
   reset();

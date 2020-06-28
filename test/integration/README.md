@@ -160,7 +160,7 @@ The full command might look something like
 ```
 bazel test //test/integration:http2_upstream_integration_test \
 --test_arg=--gtest_filter="IpVersions/Http2UpstreamIntegrationTest.RouterRequestAndResponseWithBodyNoBuffer/IPv6" \
---jobs 60 --local_resources 100000000000,100000000000,10000000 --runs_per_test=1000 --test_arg="-l trace"
+--jobs 60 --local_ram_resources=1000000000 --local_cpu_resources=1000000000 --runs_per_test=1000 --test_arg="-l trace"
 ```
 
 ## Debugging test flakes

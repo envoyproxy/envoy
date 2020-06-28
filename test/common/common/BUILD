@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_benchmark_test",
@@ -8,6 +6,8 @@ load(
     "envoy_cc_test",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -173,6 +173,8 @@ envoy_cc_test(
     srcs = ["regex_test.cc"],
     deps = [
         "//source/common/common:regex_lib",
+        "//test/test_common:logging_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
@@ -191,6 +193,15 @@ envoy_cc_test(
     srcs = ["perf_annotation_disabled_test.cc"],
     deps = [
         "//source/common/common:perf_annotation_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "basic_resource_impl_test",
+    srcs = ["basic_resource_impl_test.cc"],
+    deps = [
+        "//source/common/common:basic_resource_lib",
+        "//test/mocks/runtime:runtime_mocks",
     ],
 )
 
@@ -243,6 +254,16 @@ envoy_cc_test(
     external_deps = ["abseil_hash_testing"],
     deps = [
         "//source/common/common:thread_lib",
+        "//test/test_common:thread_factory_for_test_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "thread_test",
+    srcs = ["thread_test.cc"],
+    deps = [
+        "//source/common/common:thread_lib",
+        "//source/common/common:thread_synchronizer_lib",
         "//test/test_common:thread_factory_for_test_lib",
     ],
 )

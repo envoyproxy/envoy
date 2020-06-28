@@ -16,10 +16,15 @@ class DrainManager : public Network::DrainDecision {
 public:
   /**
    * Invoked to begin the drain procedure. (Making drain close operations more likely).
-   * @param completion supplies the completion that will be called when the drain sequence is
-   *                   finished. The parameter is optional and can be an unassigned function.
+   * @param drain_complete_cb will be invoked once the drain sequence is finished. The parameter is
+   * optional and can be an unassigned function.
    */
-  virtual void startDrainSequence(std::function<void()> completion) PURE;
+  virtual void startDrainSequence(std::function<void()> drain_complete_cb) PURE;
+
+  /**
+   * @return whether the drain sequence has started.
+   */
+  virtual bool draining() const PURE;
 
   /**
    * Invoked in the newly launched primary process to begin the parent shutdown sequence. At the end

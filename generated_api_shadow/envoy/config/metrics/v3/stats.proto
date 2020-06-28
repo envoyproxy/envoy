@@ -263,47 +263,47 @@ message TagSpecifier {
 message StatsdSink {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.metrics.v2.StatsdSink";
 
-  // The UDP address of a running `statsd <https://github.com/etsy/statsd>`_
-  // compliant listener. If specified, statistics will be flushed to this
-  // address.
-  string prefix = 3;
-
   oneof statsd_specifier {
     option (validate.required) = true;
+
+    // The UDP address of a running `statsd <https://github.com/etsy/statsd>`_
+    // compliant listener. If specified, statistics will be flushed to this
+    // address.
+    core.v3.Address address = 1;
 
     // The name of a cluster that is running a TCP `statsd
     // <https://github.com/etsy/statsd>`_ compliant listener. If specified,
     // Envoy will connect to this cluster to flush statistics.
-    core.v3.Address address = 1;
-
-    // Optional custom prefix for StatsdSink. If
-    // specified, this will override the default prefix.
-    // For example:
-    //
-    // .. code-block:: json
-    //
-    //   {
-    //     "prefix" : "envoy-prod"
-    //   }
-    //
-    // will change emitted stats to
-    //
-    // .. code-block:: cpp
-    //
-    //   envoy-prod.test_counter:1|c
-    //   envoy-prod.test_timer:5|ms
-    //
-    // Note that the default prefix, "envoy", will be used if a prefix is not
-    // specified.
-    //
-    // Stats with default prefix:
-    //
-    // .. code-block:: cpp
-    //
-    //   envoy.test_counter:1|c
-    //   envoy.test_timer:5|ms
     string tcp_cluster_name = 2;
   }
+
+  // Optional custom prefix for StatsdSink. If
+  // specified, this will override the default prefix.
+  // For example:
+  //
+  // .. code-block:: json
+  //
+  //   {
+  //     "prefix" : "envoy-prod"
+  //   }
+  //
+  // will change emitted stats to
+  //
+  // .. code-block:: cpp
+  //
+  //   envoy-prod.test_counter:1|c
+  //   envoy-prod.test_timer:5|ms
+  //
+  // Note that the default prefix, "envoy", will be used if a prefix is not
+  // specified.
+  //
+  // Stats with default prefix:
+  //
+  // .. code-block:: cpp
+  //
+  //   envoy.test_counter:1|c
+  //   envoy.test_timer:5|ms
+  string prefix = 3;
 }
 
 // Stats configuration proto schema for built-in *envoy.stat_sinks.dog_statsd* sink.
@@ -317,17 +317,17 @@ message DogStatsdSink {
 
   reserved 2;
 
-  // The UDP address of a running DogStatsD compliant listener. If specified,
-  // statistics will be flushed to this address.
-  string prefix = 3;
-
   oneof dog_statsd_specifier {
     option (validate.required) = true;
 
-    // Optional custom metric name prefix. See :ref:`StatsdSink's prefix field
-    // <envoy_api_field_config.metrics.v3.StatsdSink.prefix>` for more details.
+    // The UDP address of a running DogStatsD compliant listener. If specified,
+    // statistics will be flushed to this address.
     core.v3.Address address = 1;
   }
+
+  // Optional custom metric name prefix. See :ref:`StatsdSink's prefix field
+  // <envoy_api_field_config.metrics.v3.StatsdSink.prefix>` for more details.
+  string prefix = 3;
 }
 
 // Stats configuration proto schema for built-in *envoy.stat_sinks.hystrix* sink.

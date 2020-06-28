@@ -44,21 +44,36 @@ InstanceImpl::InstanceImpl(
     const Common::Redis::RedisCommandStatsSharedPtr& redis_command_stats,
     Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager)
     : cluster_name_(cluster_name), cm_(cm), client_factory_(client_factory),
-      tls_(tls.allocateSlot()), config_(config), api_(api), stats_scope_(std::move(stats_scope)),
+      tls_(tls.allocateSlot()), config_(new Common::Redis::Client::ConfigImpl(config)), api_(api),
+      stats_scope_(std::move(stats_scope)),
       redis_command_stats_(redis_command_stats), redis_cluster_stats_{REDIS_CLUSTER_STATS(
                                                      POOL_COUNTER(*stats_scope_))},
-      refresh_manager_(std::move(refresh_manager)) {
-  tls_->set([this, cluster_name](
-                Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    return std::make_shared<ThreadLocalPool>(*this, dispatcher, cluster_name);
-  });
+      refresh_manager_(std::move(refresh_manager)) {}
+
+void InstanceImpl::init() {
+  // Note: `this` and `cluster_name` have a a lifetime of the filter.
+  // That may be shorter than the tls callback if the listener is torn down shortly after it is
+  // created. We use a weak pointer to make sure this object outlives the tls callbacks.
+  std::weak_ptr<InstanceImpl> this_weak_ptr = this->shared_from_this();
+  tls_->set(
+      [this_weak_ptr](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+        if (auto this_shared_ptr = this_weak_ptr.lock()) {
+          return std::make_shared<ThreadLocalPool>(this_shared_ptr, dispatcher,
+                                                   this_shared_ptr->cluster_name_);
+        }
+        return nullptr;
+      });
 }
 
+// This method is always called from a InstanceSharedPtr we don't have to worry about tls_->getTyped
+// failing due to InstanceImpl going away.
 Common::Redis::Client::PoolRequest*
 InstanceImpl::makeRequest(const std::string& key, RespVariant&& request, PoolCallbacks& callbacks) {
   return tls_->getTyped<ThreadLocalPool>().makeRequest(key, std::move(request), callbacks);
 }
 
+// This method is always called from a InstanceSharedPtr we don't have to worry about tls_->getTyped
+// failing due to InstanceImpl going away.
 Common::Redis::Client::PoolRequest*
 InstanceImpl::makeRequestToHost(const std::string& host_address,
                                 const Common::Redis::RespValue& request,
@@ -66,15 +81,20 @@ InstanceImpl::makeRequestToHost(const std::string& host_address,
   return tls_->getTyped<ThreadLocalPool>().makeRequestToHost(host_address, request, callbacks);
 }
 
-InstanceImpl::ThreadLocalPool::ThreadLocalPool(InstanceImpl& parent, Event::Dispatcher& dispatcher,
+InstanceImpl::ThreadLocalPool::ThreadLocalPool(std::shared_ptr<InstanceImpl> parent,
+                                               Event::Dispatcher& dispatcher,
                                                std::string cluster_name)
     : parent_(parent), dispatcher_(dispatcher), cluster_name_(std::move(cluster_name)),
       drain_timer_(dispatcher.createTimer([this]() -> void { drainClients(); })),
-      is_redis_cluster_(false) {
-  cluster_update_handle_ = parent_.cm_.addThreadLocalClusterUpdateCallbacks(*this);
-  Upstream::ThreadLocalCluster* cluster = parent_.cm_.get(cluster_name_);
+      is_redis_cluster_(false), client_factory_(parent->client_factory_), config_(parent->config_),
+      stats_scope_(parent->stats_scope_), redis_command_stats_(parent->redis_command_stats_),
+      redis_cluster_stats_(parent->redis_cluster_stats_),
+      refresh_manager_(parent->refresh_manager_) {
+  cluster_update_handle_ = parent->cm_.addThreadLocalClusterUpdateCallbacks(*this);
+  Upstream::ThreadLocalCluster* cluster = parent->cm_.get(cluster_name_);
   if (cluster != nullptr) {
-    auth_password_ = ProtocolOptionsConfigImpl::auth_password(cluster->info(), parent_.api_);
+    auth_username_ = ProtocolOptionsConfigImpl::authUsername(cluster->info(), parent->api_);
+    auth_password_ = ProtocolOptionsConfigImpl::authPassword(cluster->info(), parent->api_);
     onClusterAddOrUpdateNonVirtual(*cluster);
   }
 }
@@ -99,10 +119,15 @@ void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
   if (cluster.info()->name() != cluster_name_) {
     return;
   }
+  // Ensure the filter is not deleted in the main thread during this method.
+  auto shared_parent = parent_.lock();
+  if (!shared_parent) {
+    return;
+  }
 
   if (cluster_ != nullptr) {
     // Treat an update as a removal followed by an add.
-    onClusterRemoval(cluster_name_);
+    ThreadLocalPool::onClusterRemoval(cluster_name_);
   }
 
   ASSERT(cluster_ == nullptr);
@@ -214,9 +239,9 @@ InstanceImpl::ThreadLocalPool::threadLocalActiveClient(Upstream::HostConstShared
   if (!client) {
     client = std::make_unique<ThreadLocalActiveClient>(*this);
     client->host_ = host;
-    client->redis_client_ = parent_.client_factory_.create(host, dispatcher_, parent_.config_,
-                                                           parent_.redis_command_stats_,
-                                                           *parent_.stats_scope_, auth_password_);
+    client->redis_client_ =
+        client_factory_.create(host, dispatcher_, *config_, redis_command_stats_, *(stats_scope_),
+                               auth_username_, auth_password_);
     client->redis_client_->addConnectionCallbacks(*client);
   }
   return client;
@@ -231,9 +256,9 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key, RespVariant&&
     return nullptr;
   }
 
-  Clusters::Redis::RedisLoadBalancerContextImpl lb_context(key, parent_.config_.enableHashtagging(),
+  Clusters::Redis::RedisLoadBalancerContextImpl lb_context(key, config_->enableHashtagging(),
                                                            is_redis_cluster_, getRequest(request),
-                                                           parent_.config_.readPolicy());
+                                                           config_->readPolicy());
   Upstream::HostConstSharedPtr host = cluster_->loadBalancer().chooseHost(&lb_context);
   if (!host) {
     return nullptr;
@@ -289,9 +314,9 @@ Common::Redis::Client::PoolRequest* InstanceImpl::ThreadLocalPool::makeRequestTo
   auto it = host_address_map_.find(host_address_map_key);
   if (it == host_address_map_.end()) {
     // This host is not known to the cluster manager. Create a new host and insert it into the map.
-    if (created_via_redirect_hosts_.size() == parent_.config_.maxUpstreamUnknownConnections()) {
+    if (created_via_redirect_hosts_.size() == config_->maxUpstreamUnknownConnections()) {
       // Too many upstream connections to unknown hosts have been created.
-      parent_.redis_cluster_stats_.max_upstream_unknown_connections_reached_.inc();
+      redis_cluster_stats_.max_upstream_unknown_connections_reached_.inc();
       return nullptr;
     }
     if (!ipv6) {
@@ -343,7 +368,7 @@ void InstanceImpl::ThreadLocalActiveClient::onEvent(Network::ConnectionEvent eve
            it++) {
         if ((*it).get() == this) {
           if (!redis_client_->active()) {
-            parent_.parent_.redis_cluster_stats_.upstream_cx_drained_.inc();
+            parent_.redis_cluster_stats_.upstream_cx_drained_.inc();
           }
           parent_.dispatcher_.deferredDelete(std::move(redis_client_));
           parent_.clients_to_drain_.erase(it);
@@ -379,7 +404,7 @@ void InstanceImpl::PendingRequest::onResponse(Common::Redis::RespValuePtr&& resp
 void InstanceImpl::PendingRequest::onFailure() {
   request_handler_ = nullptr;
   pool_callbacks_.onFailure();
-  parent_.parent_.onFailure();
+  parent_.refresh_manager_->onFailure(parent_.cluster_name_);
   parent_.onRequestCompleted();
 }
 
@@ -402,7 +427,7 @@ bool InstanceImpl::PendingRequest::onRedirection(Common::Redis::RespValuePtr&& v
     onResponse(std::move(value));
     return false;
   } else {
-    parent_.parent_.onRedirection();
+    parent_.refresh_manager_->onRedirection(parent_.cluster_name_);
     return true;
   }
 }

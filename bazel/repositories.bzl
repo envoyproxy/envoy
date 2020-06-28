@@ -2,12 +2,13 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load(":dev_binding.bzl", "envoy_dev_binding")
 load(":genrule_repository.bzl", "genrule_repository")
 load("@envoy_api//bazel:envoy_http_archive.bzl", "envoy_http_archive")
-load(":repository_locations.bzl", "DEPENDENCY_REPOSITORIES", "USE_CATEGORIES")
+load(":repository_locations.bzl", "DEPENDENCY_ANNOTATIONS", "DEPENDENCY_REPOSITORIES", "USE_CATEGORIES", "USE_CATEGORIES_WITH_CPE_OPTIONAL")
 load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_language")
 
 PPC_SKIP_TARGETS = ["envoy.filters.http.lua"]
 
 WINDOWS_SKIP_TARGETS = [
+    "envoy.filters.http.lua",
     "envoy.tracers.dynamic_ot",
     "envoy.tracers.lightstep",
     "envoy.tracers.datadog",
@@ -24,8 +25,14 @@ BUILD_ALL_CONTENT = """filegroup(name = "all", srcs = glob(["**"]), visibility =
 def _repository_locations():
     locations = dict(DEPENDENCY_REPOSITORIES)
     for key, location in locations.items():
+        if "sha256" not in location or len(location["sha256"]) == 0:
+            fail("SHA256 missing for external dependency " + str(location["urls"]))
+
         if "use_category" not in location:
             fail("The 'use_category' attribute must be defined for external dependecy " + str(location["urls"]))
+
+        if "cpe" not in location and not [category for category in USE_CATEGORIES_WITH_CPE_OPTIONAL if category in location["use_category"]]:
+            fail("The 'cpe' attribute must be defined for external dependecy " + str(location["urls"]))
 
         for category in location["use_category"]:
             if category not in USE_CATEGORIES:
@@ -39,7 +46,8 @@ REPOSITORY_LOCATIONS = _repository_locations()
 # See repository_locations.bzl for the list of annotation attributes.
 def _get_location(dependency):
     stripped = dict(REPOSITORY_LOCATIONS[dependency])
-    stripped.pop("use_category", None)
+    for attribute in DEPENDENCY_ANNOTATIONS:
+        stripped.pop(attribute, None)
     return stripped
 
 def _repository_impl(name, **kwargs):
@@ -61,9 +69,9 @@ _default_envoy_build_config = repository_rule(
     },
 )
 
-# Python dependencies. If these become non-trivial, we might be better off using a virtualenv to
-# wrap them, but for now we can treat them as first-class Bazel.
+# Python dependencies.
 def _python_deps():
+    # TODO(htuch): convert these to pip3_import.
     _repository_impl(
         name = "com_github_pallets_markupsafe",
         build_file = "@envoy//bazel/external:markupsafe.BUILD",
@@ -117,7 +125,12 @@ def _go_deps(skip_targets):
     # Keep the skip_targets check around until Istio Proxy has stopped using
     # it to exclude the Go rules.
     if "io_bazel_rules_go" not in skip_targets:
-        _repository_impl("io_bazel_rules_go")
+        _repository_impl(
+            name = "io_bazel_rules_go",
+            # TODO(wrowe, sunjayBhatia): remove when Windows RBE supports batch file invocation
+            patch_args = ["-p1"],
+            patches = ["@envoy//bazel:rules_go.patch"],
+        )
         _repository_impl("bazel_gazelle")
 
 def envoy_dependencies(skip_targets = []):
@@ -183,10 +196,10 @@ def envoy_dependencies(skip_targets = []):
     _repository_impl("bazel_toolchains")
     _repository_impl("bazel_compdb")
     _repository_impl("envoy_build_tools")
+    _repository_impl("rules_cc")
 
     # Unconditional, since we use this only for compiler-agnostic fuzzing utils.
     _org_llvm_releases_compiler_rt()
-    _fuzzit_linux()
 
     _python_deps()
     _cc_deps()
@@ -238,7 +251,6 @@ def _com_github_c_ares_c_ares():
     location = _get_location("com_github_c_ares_c_ares")
     http_archive(
         name = "com_github_c_ares_c_ares",
-        patches = ["@envoy//bazel/foreign_cc:cares-win32-nameser.patch"],
         build_file_content = BUILD_ALL_CONTENT,
         **location
     )
@@ -337,8 +349,6 @@ def _com_github_libevent_libevent():
     http_archive(
         name = "com_github_libevent_libevent",
         build_file_content = BUILD_ALL_CONTENT,
-        patch_args = ["-p0"],
-        patches = ["@envoy//bazel/foreign_cc:libevent_msvc.patch"],
         **location
     )
     native.bind(
@@ -701,12 +711,6 @@ def _org_llvm_releases_compiler_rt():
         build_file = "@envoy//bazel/external:compiler_rt.BUILD",
     )
 
-def _fuzzit_linux():
-    _repository_impl(
-        name = "fuzzit_linux",
-        build_file_content = "exports_files([\"fuzzit\"])",
-    )
-
 def _com_github_grpc_grpc():
     _repository_impl("com_github_grpc_grpc")
     _repository_impl("build_bazel_rules_apple")
@@ -738,6 +742,16 @@ def _com_github_grpc_grpc():
     native.bind(
         name = "grpc_alts_fake_handshaker_server",
         actual = "@com_github_grpc_grpc//test/core/tsi/alts/fake_handshaker:fake_handshaker_lib",
+    )
+
+    native.bind(
+        name = "grpc_alts_handshaker_proto",
+        actual = "@com_github_grpc_grpc//test/core/tsi/alts/fake_handshaker:handshaker_proto",
+    )
+
+    native.bind(
+        name = "grpc_alts_transport_security_common_proto",
+        actual = "@com_github_grpc_grpc//test/core/tsi/alts/fake_handshaker:transport_security_common_proto",
     )
 
 def _upb():

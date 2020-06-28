@@ -25,13 +25,13 @@ DOCS_SUFFIX = (".md", ".rst")
 PROTO_SUFFIX = (".proto")
 
 # Files in these paths can make reference to protobuf stuff directly
-GOOGLE_PROTOBUF_WHITELIST = ("ci/prebuilt", "source/common/protobuf", "api/test")
+GOOGLE_PROTOBUF_ALLOWLIST = ("ci/prebuilt", "source/common/protobuf", "api/test")
 REPOSITORIES_BZL = "bazel/repositories.bzl"
 
 # Files matching these exact names can reference real-world time. These include the class
 # definitions for real-world time, the construction of them in main(), and perf annotation.
 # For now it includes the validation server but that really should be injected too.
-REAL_TIME_WHITELIST = ("./source/common/common/utility.h",
+REAL_TIME_ALLOWLIST = ("./source/common/common/utility.h",
                        "./source/extensions/common/aws/utility.cc",
                        "./source/common/event/real_time_system.cc",
                        "./source/common/event/real_time_system.h", "./source/exe/main_common.cc",
@@ -46,11 +46,11 @@ REAL_TIME_WHITELIST = ("./source/common/common/utility.h",
 # Tests in these paths may make use of the Registry::RegisterFactory constructor or the
 # REGISTER_FACTORY macro. Other locations should use the InjectFactory helper class to
 # perform temporary registrations.
-REGISTER_FACTORY_TEST_WHITELIST = ("./test/common/config/registry_test.cc",
+REGISTER_FACTORY_TEST_ALLOWLIST = ("./test/common/config/registry_test.cc",
                                    "./test/integration/clusters/", "./test/integration/filters/")
 
 # Files in these paths can use MessageLite::SerializeAsString
-SERIALIZE_AS_STRING_WHITELIST = (
+SERIALIZE_AS_STRING_ALLOWLIST = (
     "./source/common/config/version_converter.cc",
     "./source/common/protobuf/utility.cc",
     "./source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.cc",
@@ -58,35 +58,36 @@ SERIALIZE_AS_STRING_WHITELIST = (
     "./test/common/config/version_converter_test.cc",
     "./test/common/grpc/codec_test.cc",
     "./test/common/grpc/codec_fuzz_test.cc",
+    "./test/extensions/filters/http/common/fuzz/uber_filter.h",
 )
 
 # Files in these paths can use Protobuf::util::JsonStringToMessage
-JSON_STRING_TO_MESSAGE_WHITELIST = ("./source/common/protobuf/utility.cc")
+JSON_STRING_TO_MESSAGE_ALLOWLIST = ("./source/common/protobuf/utility.cc")
 
 # Histogram names which are allowed to be suffixed with the unit symbol, all of the pre-existing
 # ones were grandfathered as part of PR #8484 for backwards compatibility.
-HISTOGRAM_WITH_SI_SUFFIX_WHITELIST = ("downstream_cx_length_ms", "downstream_cx_length_ms",
+HISTOGRAM_WITH_SI_SUFFIX_ALLOWLIST = ("downstream_cx_length_ms", "downstream_cx_length_ms",
                                       "initialization_time_ms", "loop_duration_us", "poll_delay_us",
                                       "request_time_ms", "upstream_cx_connect_ms",
                                       "upstream_cx_length_ms")
 
 # Files in these paths can use std::regex
-STD_REGEX_WHITELIST = (
+STD_REGEX_ALLOWLIST = (
     "./source/common/common/utility.cc", "./source/common/common/regex.h",
     "./source/common/common/regex.cc", "./source/common/stats/tag_extractor_impl.h",
     "./source/common/stats/tag_extractor_impl.cc",
-    "./source/common/access_log/access_log_formatter.cc",
+    "./source/common/formatter/substitution_formatter.cc",
     "./source/extensions/filters/http/squash/squash_filter.h",
-    "./source/extensions/filters/http/squash/squash_filter.cc", "./source/server/http/utils.h",
-    "./source/server/http/utils.cc", "./source/server/http/stats_handler.h",
-    "./source/server/http/stats_handler.cc", "./source/server/http/prometheus_stats.h",
-    "./source/server/http/prometheus_stats.cc", "./tools/clang_tools/api_booster/main.cc",
+    "./source/extensions/filters/http/squash/squash_filter.cc", "./source/server/admin/utils.h",
+    "./source/server/admin/utils.cc", "./source/server/admin/stats_handler.h",
+    "./source/server/admin/stats_handler.cc", "./source/server/admin/prometheus_stats.h",
+    "./source/server/admin/prometheus_stats.cc", "./tools/clang_tools/api_booster/main.cc",
     "./tools/clang_tools/api_booster/proto_cxx_utils.cc", "./source/common/common/version.cc")
 
 # Only one C++ file should instantiate grpc_init
-GRPC_INIT_WHITELIST = ("./source/common/grpc/google_grpc_context.cc")
+GRPC_INIT_ALLOWLIST = ("./source/common/grpc/google_grpc_context.cc")
 
-CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-9")
+CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-10")
 BUILDIFIER_PATH = paths.getBuildifier()
 BUILDOZER_PATH = paths.getBuildozer()
 ENVOY_BUILD_FIXER_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])),
@@ -97,6 +98,11 @@ INCLUDE_ANGLE = "#include <"
 INCLUDE_ANGLE_LEN = len(INCLUDE_ANGLE)
 PROTO_PACKAGE_REGEX = re.compile(r"^package (\S+);\n*", re.MULTILINE)
 X_ENVOY_USED_DIRECTLY_REGEX = re.compile(r'.*\"x-envoy-.*\".*')
+DESIGNATED_INITIALIZER_REGEX = re.compile(r"\{\s*\.\w+\s*\=")
+MANGLED_PROTOBUF_NAME_REGEX = re.compile(r"envoy::[a-z0-9_:]+::[A-Z][a-z]\w*_\w*_[A-Z]{2}")
+HISTOGRAM_SI_SUFFIX_REGEX = re.compile(r"(?<=HISTOGRAM\()[a-zA-Z0-9_]+_(b|kb|mb|ns|us|ms|s)(?=,)")
+TEST_NAME_STARTING_LOWER_CASE_REGEX = re.compile(r"TEST(_.\(.*,\s|\()[a-z].*\)\s\{")
+EXTENSIONS_CODEOWNERS_REGEX = re.compile(r'.*(extensions[^@]*\s+)(@.*)')
 
 # yapf: disable
 PROTOBUF_TYPE_ERRORS = {
@@ -213,7 +219,7 @@ def readFile(path):
 # environment variable. If it cannot be found, empty string is returned.
 def lookPath(executable):
   for path_dir in os.environ["PATH"].split(os.pathsep):
-    executable_path = os.path.join(path_dir, executable)
+    executable_path = os.path.expanduser(os.path.join(path_dir, executable))
     if os.path.exists(executable_path):
       return executable_path
   return ""
@@ -244,13 +250,13 @@ def checkTools():
                             "users".format(CLANG_FORMAT_PATH))
   else:
     error_messages.append(
-        "Command {} not found. If you have clang-format in version 9.x.x "
+        "Command {} not found. If you have clang-format in version 10.x.x "
         "installed, but the binary name is different or it's not available in "
         "PATH, please use CLANG_FORMAT environment variable to specify the path. "
         "Examples:\n"
-        "    export CLANG_FORMAT=clang-format-9.0.0\n"
-        "    export CLANG_FORMAT=/opt/bin/clang-format-9\n"
-        "    export CLANG_FORMAT=/usr/local/opt/llvm@9/bin/clang-format".format(CLANG_FORMAT_PATH))
+        "    export CLANG_FORMAT=clang-format-10.0.0\n"
+        "    export CLANG_FORMAT=/opt/bin/clang-format-10\n"
+        "    export CLANG_FORMAT=/usr/local/opt/llvm@10/bin/clang-format".format(CLANG_FORMAT_PATH))
 
   def checkBazelTool(name, path, var):
     bazel_tool_abs_path = lookPath(path)
@@ -304,49 +310,49 @@ def packageNameForProto(file_path):
 
 
 # To avoid breaking the Lyft import, we just check for path inclusion here.
-def whitelistedForProtobufDeps(file_path):
+def allowlistedForProtobufDeps(file_path):
   return (file_path.endswith(PROTO_SUFFIX) or file_path.endswith(REPOSITORIES_BZL) or \
-          any(path_segment in file_path for path_segment in GOOGLE_PROTOBUF_WHITELIST))
+          any(path_segment in file_path for path_segment in GOOGLE_PROTOBUF_ALLOWLIST))
 
 
 # Real-world time sources should not be instantiated in the source, except for a few
 # specific cases. They should be passed down from where they are instantied to where
 # they need to be used, e.g. through the ServerInstance, Dispatcher, or ClusterManager.
-def whitelistedForRealTime(file_path):
+def allowlistedForRealTime(file_path):
   if file_path.endswith(".md"):
     return True
-  return file_path in REAL_TIME_WHITELIST
+  return file_path in REAL_TIME_ALLOWLIST
 
 
-def whitelistedForRegisterFactory(file_path):
+def allowlistedForRegisterFactory(file_path):
   if not file_path.startswith("./test/"):
     return True
 
-  return any(file_path.startswith(prefix) for prefix in REGISTER_FACTORY_TEST_WHITELIST)
+  return any(file_path.startswith(prefix) for prefix in REGISTER_FACTORY_TEST_ALLOWLIST)
 
 
-def whitelistedForSerializeAsString(file_path):
-  return file_path in SERIALIZE_AS_STRING_WHITELIST
+def allowlistedForSerializeAsString(file_path):
+  return file_path in SERIALIZE_AS_STRING_ALLOWLIST
 
 
-def whitelistedForJsonStringToMessage(file_path):
-  return file_path in JSON_STRING_TO_MESSAGE_WHITELIST
+def allowlistedForJsonStringToMessage(file_path):
+  return file_path in JSON_STRING_TO_MESSAGE_ALLOWLIST
 
 
-def whitelistedForHistogramSiSuffix(name):
-  return name in HISTOGRAM_WITH_SI_SUFFIX_WHITELIST
+def allowlistedForHistogramSiSuffix(name):
+  return name in HISTOGRAM_WITH_SI_SUFFIX_ALLOWLIST
 
 
-def whitelistedForStdRegex(file_path):
-  return file_path.startswith("./test") or file_path in STD_REGEX_WHITELIST or file_path.endswith(
+def allowlistedForStdRegex(file_path):
+  return file_path.startswith("./test") or file_path in STD_REGEX_ALLOWLIST or file_path.endswith(
       DOCS_SUFFIX)
 
 
-def whitelistedForGrpcInit(file_path):
-  return file_path in GRPC_INIT_WHITELIST
+def allowlistedForGrpcInit(file_path):
+  return file_path in GRPC_INIT_ALLOWLIST
 
 
-def whitelistedForUnpackTo(file_path):
+def allowlistedForUnpackTo(file_path):
   return file_path.startswith("./test") or file_path in [
       "./source/common/protobuf/utility.cc", "./source/common/protobuf/utility.h"
   ]
@@ -410,7 +416,7 @@ def hasInvalidAngleBracketDirectory(line):
 
 
 VERSION_HISTORY_NEW_LINE_REGEX = re.compile("\* ([a-z \-_]+): ([a-z:`]+)")
-VERSION_HISTORY_NEW_SECTION_REGEX = re.compile("^-----[-]+$")
+VERSION_HISTORY_SECTION_NAME = re.compile("^[A-Z][A-Za-z ]*$")
 RELOADABLE_FLAG_REGEX = re.compile(".*(.)(envoy.reloadable_features.[^ ]*)\s.*")
 # Check for punctuation in a terminal ref clause, e.g.
 # :ref:`panic mode. <arch_overview_load_balancing_panic_threshold>`
@@ -418,8 +424,6 @@ REF_WITH_PUNCTUATION_REGEX = re.compile(".*\. <[^<]*>`\s*")
 
 
 def checkCurrentReleaseNotes(file_path, error_messages):
-  in_changes_section = False
-
   first_word_of_prior_line = ''
   next_word_to_check = ''  # first word after :
   prior_line = ''
@@ -438,12 +442,15 @@ def checkCurrentReleaseNotes(file_path, error_messages):
     def reportError(message):
       error_messages.append("%s:%d: %s" % (file_path, line_number + 1, message))
 
-    if VERSION_HISTORY_NEW_SECTION_REGEX.match(line):
-      # The second section is deprecations, which are not sorted.
-      if in_changes_section:
+    if VERSION_HISTORY_SECTION_NAME.match(line):
+      if line == "Deprecated":
+        # The deprecations section is last, and does not have enforced formatting.
         break
-      # If we see a section marker we are now in the changes section.
-      in_changes_section = True
+
+      # Reset all parsing at the start of a section.
+      first_word_of_prior_line = ''
+      next_word_to_check = ''  # first word after :
+      prior_line = ''
 
     # make sure flags are surrounded by ``s
     flag_match = RELOADABLE_FLAG_REGEX.match(line)
@@ -451,7 +458,7 @@ def checkCurrentReleaseNotes(file_path, error_messages):
       if not flag_match.groups()[0].startswith('`'):
         reportError("Flag `%s` should be enclosed in back ticks" % flag_match.groups()[1])
 
-    if line.startswith("*"):
+    if line.startswith("* "):
       if not endsWithPeriod(prior_line):
         reportError("The following release note does not end with a '.'\n %s" % prior_line)
 
@@ -582,7 +589,7 @@ def checkSourceLine(line, file_path, reportError):
   # Some errors cannot be fixed automatically, and actionable, consistent,
   # navigable messages should be emitted to make it easy to find and fix
   # the errors by hand.
-  if not whitelistedForProtobufDeps(file_path):
+  if not allowlistedForProtobufDeps(file_path):
     if '"google/protobuf' in line or "google::protobuf" in line:
       reportError("unexpected direct dependency on google.protobuf, use "
                   "the definitions in common/protobuf/protobuf.h instead.")
@@ -595,17 +602,17 @@ def checkSourceLine(line, file_path, reportError):
     # We don't check here for std::shared_timed_mutex because that may
     # legitimately show up in comments, for example this one.
     reportError("Don't use <shared_mutex>, use absl::Mutex for reader/writer locks.")
-  if not whitelistedForRealTime(file_path) and not "NO_CHECK_FORMAT(real_time)" in line:
+  if not allowlistedForRealTime(file_path) and not "NO_CHECK_FORMAT(real_time)" in line:
     if "RealTimeSource" in line or \
        ("RealTimeSystem" in line and not "TestRealTimeSystem" in line) or \
        "std::chrono::system_clock::now" in line or "std::chrono::steady_clock::now" in line or \
        "std::this_thread::sleep_for" in line or hasCondVarWaitFor(line):
       reportError("Don't reference real-world time sources from production code; use injection")
-  if not whitelistedForRegisterFactory(file_path):
+  if not allowlistedForRegisterFactory(file_path):
     if "Registry::RegisterFactory<" in line or "REGISTER_FACTORY" in line:
       reportError("Don't use Registry::RegisterFactory or REGISTER_FACTORY in tests, "
                   "use Registry::InjectFactory instead.")
-  if not whitelistedForUnpackTo(file_path):
+  if not allowlistedForUnpackTo(file_path):
     if "UnpackTo" in line:
       reportError("Don't use UnpackTo() directly, use MessageUtil::unpackTo() instead")
   # Check that we use the absl::Time library
@@ -635,7 +642,7 @@ def checkSourceLine(line, file_path, reportError):
     # can be used instead
     reportError("Don't use __attribute__((packed)), use the PACKED_STRUCT macro defined "
                 "in include/envoy/common/platform.h instead")
-  if re.search("\{\s*\.\w+\s*\=", line):
+  if DESIGNATED_INITIALIZER_REGEX.search(line):
     # Designated initializers are not part of the C++14 standard and are not supported
     # by MSVC
     reportError("Don't use designated initializers in struct initialization, "
@@ -647,17 +654,17 @@ def checkSourceLine(line, file_path, reportError):
     reportError("Don't use 'using testing::Test;, elaborate the type instead")
   if line.startswith("using testing::TestWithParams;"):
     reportError("Don't use 'using testing::Test;, elaborate the type instead")
-  if re.search("TEST(_.\(.*,\s|\()[a-z].*\)\s\{", line):
+  if TEST_NAME_STARTING_LOWER_CASE_REGEX.search(line):
     # Matches variants of TEST(), TEST_P(), TEST_F() etc. where the test name begins
     # with a lowercase letter.
     reportError("Test names should be CamelCase, starting with a capital letter")
-  if not whitelistedForSerializeAsString(file_path) and "SerializeAsString" in line:
+  if not allowlistedForSerializeAsString(file_path) and "SerializeAsString" in line:
     # The MessageLite::SerializeAsString doesn't generate deterministic serialization,
     # use MessageUtil::hash instead.
     reportError(
         "Don't use MessageLite::SerializeAsString for generating deterministic serialization, use MessageUtil::hash instead."
     )
-  if not whitelistedForJsonStringToMessage(file_path) and "JsonStringToMessage" in line:
+  if not allowlistedForJsonStringToMessage(file_path) and "JsonStringToMessage" in line:
     # Centralize all usage of JSON parsing so it is easier to make changes in JSON parsing
     # behavior.
     reportError("Don't use Protobuf::util::JsonStringToMessage, use TestUtility::loadFromJson.")
@@ -669,20 +676,20 @@ def checkSourceLine(line, file_path, reportError):
       '->histogramFromString(' in line or '->textReadoutFromString(' in line):
     reportError("Don't lookup stats by name at runtime; use StatName saved during construction")
 
-  if re.search("envoy::[a-z0-9_:]+::[A-Z][a-z]\w*_\w*_[A-Z]{2}", line):
+  if MANGLED_PROTOBUF_NAME_REGEX.search(line):
     reportError("Don't use mangled Protobuf names for enum constants")
 
-  hist_m = re.search("(?<=HISTOGRAM\()[a-zA-Z0-9_]+_(b|kb|mb|ns|us|ms|s)(?=,)", line)
-  if hist_m and not whitelistedForHistogramSiSuffix(hist_m.group(0)):
+  hist_m = HISTOGRAM_SI_SUFFIX_REGEX.search(line)
+  if hist_m and not allowlistedForHistogramSiSuffix(hist_m.group(0)):
     reportError(
         "Don't suffix histogram names with the unit symbol, "
         "it's already part of the histogram object and unit-supporting sinks can use this information natively, "
         "other sinks can add the suffix automatically on flush should they prefer to do so.")
 
-  if not whitelistedForStdRegex(file_path) and "std::regex" in line:
+  if not allowlistedForStdRegex(file_path) and "std::regex" in line:
     reportError("Don't use std::regex in code that handles untrusted input. Use RegexMatcher")
 
-  if not whitelistedForGrpcInit(file_path):
+  if not allowlistedForGrpcInit(file_path):
     grpc_init_or_shutdown = line.find("grpc_init()")
     grpc_shutdown = line.find("grpc_shutdown()")
     if grpc_init_or_shutdown == -1 or (grpc_shutdown != -1 and
@@ -696,9 +703,10 @@ def checkSourceLine(line, file_path, reportError):
 
 
 def checkBuildLine(line, file_path, reportError):
-  if "@bazel_tools" in line and not (isSkylarkFile(file_path) or file_path.startswith("./bazel/")):
+  if "@bazel_tools" in line and not (isSkylarkFile(file_path) or file_path.startswith("./bazel/") or
+                                     "python/runfiles" in line):
     reportError("unexpected @bazel_tools reference, please indirect via a definition in //bazel")
-  if not whitelistedForProtobufDeps(file_path) and '"protobuf"' in line:
+  if not allowlistedForProtobufDeps(file_path) and '"protobuf"' in line:
     reportError("unexpected direct external dependency on protobuf, use "
                 "//source/common/protobuf instead.")
   if (envoy_build_rule_check and not isSkylarkFile(file_path) and not isWorkspaceFile(file_path) and
@@ -724,7 +732,7 @@ def fixBuildPath(file_path):
     if os.system("%s %s %s" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)) != 0:
       error_messages += ["envoy_build_fixer rewrite failed for file: %s" % file_path]
 
-  if os.system("%s -mode=fix %s" % (BUILDIFIER_PATH, file_path)) != 0:
+  if os.system("%s -lint=fix -mode=fix %s" % (BUILDIFIER_PATH, file_path)) != 0:
     error_messages += ["buildifier rewrite failed for file: %s" % file_path]
   return error_messages
 
@@ -1006,7 +1014,7 @@ if __name__ == "__main__":
         for line in f:
           # If this line is of the form "extensions/... @owner1 @owner2" capture the directory
           # name and store it in the list of directories with documented owners.
-          m = re.search(r'.*(extensions[^@]*\s+)(@.*)', line)
+          m = EXTENSIONS_CODEOWNERS_REGEX.search(line)
           if m is not None and not line.startswith('#'):
             owned.append(m.group(1).strip())
             owners = re.findall('@\S+', m.group(2).strip())

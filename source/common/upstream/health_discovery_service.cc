@@ -10,6 +10,7 @@
 
 #include "common/config/version_converter.h"
 #include "common/protobuf/protobuf.h"
+#include "common/upstream/upstream_impl.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -34,8 +35,10 @@ HdsDelegate::HdsDelegate(Stats::Scope& scope, Grpc::RawAsyncClientPtr async_clie
                          Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
                          ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
     : stats_{ALL_HDS_STATS(POOL_COUNTER_PREFIX(scope, "hds_delegate."))},
-      service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-          "envoy.service.discovery.v2.HealthDiscoveryService.StreamHealthCheck")),
+      service_method_(Grpc::VersionedMethods(
+                          "envoy.service.health.v3.HealthDiscoveryService.StreamHealthCheck",
+                          "envoy.service.discovery.v2.HealthDiscoveryService.StreamHealthCheck")
+                          .getMethodDescriptorForVersion(transport_api_version)),
       async_client_(std::move(async_client)), transport_api_version_(transport_api_version),
       dispatcher_(dispatcher), runtime_(runtime), store_stats_(stats),
       ssl_context_manager_(ssl_context_manager), random_(random), info_factory_(info_factory),

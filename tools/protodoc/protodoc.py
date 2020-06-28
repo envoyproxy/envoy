@@ -10,11 +10,26 @@ import os
 import pathlib
 import re
 import string
+import sys
+
+from google.protobuf import json_format
+from bazel_tools.tools.python.runfiles import runfiles
+import yaml
+
+# We have to do some evil things to sys.path due to the way that Python module
+# resolution works; we have both tools/ trees in bazel_tools and envoy. By
+# default, Bazel leaves us with a sys.path in which the @bazel_tools repository
+# takes precedence. Now that we're done with importing runfiles above, we can
+# just remove it from the sys.path.
+sys.path = [p for p in sys.path if not p.endswith('bazel_tools')]
 
 from tools.api_proto_plugin import annotations
 from tools.api_proto_plugin import plugin
 from tools.api_proto_plugin import visitor
+from tools.config_validation import validate_fragment
 
+from tools.protodoc import manifest_pb2
+from udpa.annotations import security_pb2
 from udpa.annotations import status_pb2
 from validate import validate_pb2
 
@@ -173,15 +188,20 @@ def FormatExtension(extension):
   Returns:
     RST formatted extension description.
   """
-  extension_metadata = json.loads(pathlib.Path(
-      os.getenv('EXTENSION_DB_PATH')).read_text())[extension]
-  anchor = FormatAnchor('extension_' + extension)
-  status = EXTENSION_STATUS_VALUES.get(extension_metadata['status'], '')
-  security_posture = EXTENSION_SECURITY_POSTURES[extension_metadata['security_posture']]
-  return EXTENSION_TEMPLATE.substitute(anchor=anchor,
-                                       extension=extension,
-                                       status=status,
-                                       security_posture=security_posture)
+  try:
+    extension_metadata = json.loads(pathlib.Path(
+        os.getenv('EXTENSION_DB_PATH')).read_text())[extension]
+    anchor = FormatAnchor('extension_' + extension)
+    status = EXTENSION_STATUS_VALUES.get(extension_metadata['status'], '')
+    security_posture = EXTENSION_SECURITY_POSTURES[extension_metadata['security_posture']]
+    return EXTENSION_TEMPLATE.substitute(anchor=anchor,
+                                         extension=extension,
+                                         status=status,
+                                         security_posture=security_posture)
+  except KeyError as e:
+    sys.stderr.write(
+        '\n\nDid you forget to add an entry to source/extensions/extensions_build_config.bzl?\n\n')
+    exit(1)  # Raising the error buries the above message in tracebacks.
 
 
 def FormatHeaderFromFile(style, source_code_info, proto_name):
@@ -388,13 +408,39 @@ def FormatAnchor(label):
   return '.. _%s:\n\n' % label
 
 
-def FormatFieldAsDefinitionListItem(outer_type_context, type_context, field):
+def FormatSecurityOptions(security_option, field, type_context, edge_config):
+  sections = []
+
+  if security_option.configure_for_untrusted_downstream:
+    sections.append(
+        Indent(4, 'This field should be configured in the presence of untrusted *downstreams*.'))
+  if security_option.configure_for_untrusted_upstream:
+    sections.append(
+        Indent(4, 'This field should be configured in the presence of untrusted *upstreams*.'))
+  if edge_config.note:
+    sections.append(Indent(4, edge_config.note))
+
+  example_dict = json_format.MessageToDict(edge_config.example)
+  validate_fragment.ValidateFragment(field.type_name[1:], example_dict)
+  field_name = type_context.name.split('.')[-1]
+  example = {field_name: example_dict}
+  sections.append(
+      Indent(4, 'Example configuration for untrusted environments:\n\n') +
+      Indent(4, '.. code-block:: yaml\n\n') +
+      '\n'.join(IndentLines(6,
+                            yaml.dump(example).split('\n'))))
+
+  return '.. attention::\n' + '\n\n'.join(sections)
+
+
+def FormatFieldAsDefinitionListItem(outer_type_context, type_context, field, protodoc_manifest):
   """Format a FieldDescriptorProto as RST definition list item.
 
   Args:
     outer_type_context: contextual information for enclosing message.
     type_context: contextual information for message/enum/field.
     field: FieldDescriptorProto.
+    protodoc_manifest: tools.protodoc.Manifest for proto.
 
   Returns:
     RST formatted definition list item.
@@ -441,18 +487,30 @@ def FormatFieldAsDefinitionListItem(outer_type_context, type_context, field):
   else:
     formatted_oneof_comment = ''
 
+  # If there is a udpa.annotations.security option, include it after the comment.
+  if field.options.HasExtension(security_pb2.security):
+    manifest_description = protodoc_manifest.fields.get(type_context.name)
+    if not manifest_description:
+      raise ProtodocError('Missing protodoc manifest YAML for %s' % type_context.name)
+    formatted_security_options = FormatSecurityOptions(
+        field.options.Extensions[security_pb2.security], field, type_context,
+        manifest_description.edge_config)
+  else:
+    formatted_security_options = ''
+
   comment = '(%s) ' % ', '.join([FormatFieldType(type_context, field)] +
                                 field_annotations) + formatted_leading_comment
-  return anchor + field.name + '\n' + MapLines(functools.partial(Indent, 2),
-                                               comment + formatted_oneof_comment)
+  return anchor + field.name + '\n' + MapLines(functools.partial(
+      Indent, 2), comment + formatted_oneof_comment) + formatted_security_options
 
 
-def FormatMessageAsDefinitionList(type_context, msg):
+def FormatMessageAsDefinitionList(type_context, msg, protodoc_manifest):
   """Format a DescriptorProto as RST definition list.
 
   Args:
     type_context: contextual information for message/enum/field.
     msg: DescriptorProto.
+    protodoc_manifest: tools.protodoc.Manifest for proto.
 
   Returns:
     RST formatted definition list item.
@@ -472,7 +530,8 @@ def FormatMessageAsDefinitionList(type_context, msg):
     type_context.oneof_names[index] = oneof_decl.name
   return '\n'.join(
       FormatFieldAsDefinitionListItem(type_context, type_context.ExtendField(index, field.name),
-                                      field) for index, field in enumerate(msg.field)) + '\n'
+                                      field, protodoc_manifest)
+      for index, field in enumerate(msg.field)) + '\n'
 
 
 def FormatEnumValueAsDefinitionListItem(type_context, enum_value):
@@ -525,6 +584,15 @@ class RstFormatVisitor(visitor.Visitor):
   See visitor.Visitor for visitor method docs comments.
   """
 
+  def __init__(self):
+    r = runfiles.Create()
+    with open(r.Rlocation('envoy/docs/protodoc_manifest.yaml'), 'r') as f:
+      # Load as YAML, emit as JSON and then parse as proto to provide type
+      # checking.
+      protodoc_manifest_untyped = yaml.load(f.read())
+      self.protodoc_manifest = manifest_pb2.Manifest()
+      json_format.Parse(json.dumps(protodoc_manifest_untyped), self.protodoc_manifest)
+
   def VisitEnum(self, enum_proto, type_context):
     normal_enum_type = NormalizeTypeContextName(type_context.name)
     anchor = FormatAnchor(EnumCrossRefLabel(normal_enum_type))
@@ -553,7 +621,8 @@ class RstFormatVisitor(visitor.Visitor):
       return ''
     return anchor + header + proto_link + formatted_leading_comment + FormatMessageAsJson(
         type_context, msg_proto) + FormatMessageAsDefinitionList(
-            type_context, msg_proto) + '\n'.join(nested_msgs) + '\n' + '\n'.join(nested_enums)
+            type_context, msg_proto,
+            self.protodoc_manifest) + '\n'.join(nested_msgs) + '\n' + '\n'.join(nested_enums)
 
   def VisitFile(self, file_proto, type_context, services, msgs, enums):
     has_messages = True

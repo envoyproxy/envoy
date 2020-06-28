@@ -31,19 +31,23 @@ namespace Server {
 
 OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::string& config_yaml,
                                   Network::Address::IpVersion ip_version,
-                                  bool allow_unknown_static_fields,
-                                  bool reject_unknown_dynamic_fields, uint32_t concurrency) {
+                                  FieldValidationConfig validation_config, uint32_t concurrency,
+                                  std::chrono::seconds drain_time,
+                                  Server::DrainStrategy drain_strategy) {
   OptionsImpl test_options("cluster_name", "node_name", "zone_name", spdlog::level::info);
 
   test_options.setConfigPath(config_path);
   test_options.setConfigYaml(config_yaml);
   test_options.setLocalAddressIpVersion(ip_version);
   test_options.setFileFlushIntervalMsec(std::chrono::milliseconds(50));
-  test_options.setDrainTime(std::chrono::seconds(1));
+  test_options.setDrainTime(drain_time);
   test_options.setParentShutdownTime(std::chrono::seconds(2));
-  test_options.setAllowUnkownFields(allow_unknown_static_fields);
-  test_options.setRejectUnknownFieldsDynamic(reject_unknown_dynamic_fields);
+  test_options.setDrainStrategy(drain_strategy);
+  test_options.setAllowUnkownFields(validation_config.allow_unknown_static_fields);
+  test_options.setRejectUnknownFieldsDynamic(validation_config.reject_unknown_dynamic_fields);
+  test_options.setIgnoreUnknownFieldsDynamic(validation_config.ignore_unknown_dynamic_fields);
   test_options.setConcurrency(concurrency);
+  test_options.setHotRestartDisabled(true);
 
   return test_options;
 }
@@ -55,16 +59,16 @@ IntegrationTestServerPtr IntegrationTestServer::create(
     std::function<void(IntegrationTestServer&)> server_ready_function,
     std::function<void()> on_server_init_function, bool deterministic,
     Event::TestTimeSystem& time_system, Api::Api& api, bool defer_listener_finalization,
-    ProcessObjectOptRef process_object, bool allow_unknown_static_fields,
-    bool reject_unknown_dynamic_fields, uint32_t concurrency) {
+    ProcessObjectOptRef process_object, Server::FieldValidationConfig validation_config,
+    uint32_t concurrency, std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
+    bool use_real_stats) {
   IntegrationTestServerPtr server{
-      std::make_unique<IntegrationTestServerImpl>(time_system, api, config_path)};
+      std::make_unique<IntegrationTestServerImpl>(time_system, api, config_path, use_real_stats)};
   if (server_ready_function != nullptr) {
     server->setOnServerReadyCb(server_ready_function);
   }
   server->start(version, on_server_init_function, deterministic, defer_listener_finalization,
-                process_object, allow_unknown_static_fields, reject_unknown_dynamic_fields,
-                concurrency);
+                process_object, validation_config, concurrency, drain_time, drain_strategy);
   return server;
 }
 
@@ -82,15 +86,16 @@ void IntegrationTestServer::start(const Network::Address::IpVersion version,
                                   std::function<void()> on_server_init_function, bool deterministic,
                                   bool defer_listener_finalization,
                                   ProcessObjectOptRef process_object,
-                                  bool allow_unknown_static_fields,
-                                  bool reject_unknown_dynamic_fields, uint32_t concurrency) {
+                                  Server::FieldValidationConfig validator_config,
+                                  uint32_t concurrency, std::chrono::seconds drain_time,
+                                  Server::DrainStrategy drain_strategy) {
   ENVOY_LOG(info, "starting integration test server");
   ASSERT(!thread_);
-  thread_ = api_.threadFactory().createThread(
-      [version, deterministic, process_object, allow_unknown_static_fields,
-       reject_unknown_dynamic_fields, concurrency, this]() -> void {
-        threadRoutine(version, deterministic, process_object, allow_unknown_static_fields,
-                      reject_unknown_dynamic_fields, concurrency);
+  thread_ =
+      api_.threadFactory().createThread([version, deterministic, process_object, validator_config,
+                                         concurrency, drain_time, drain_strategy, this]() -> void {
+        threadRoutine(version, deterministic, process_object, validator_config, concurrency,
+                      drain_time, drain_strategy);
       });
 
   // If any steps need to be done prior to workers starting, do them now. E.g., xDS pre-init.
@@ -165,12 +170,11 @@ void IntegrationTestServer::serverReady() {
 
 void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion version,
                                           bool deterministic, ProcessObjectOptRef process_object,
-                                          bool allow_unknown_static_fields,
-                                          bool reject_unknown_dynamic_fields,
-                                          uint32_t concurrency) {
-  OptionsImpl options(Server::createTestOptionsImpl(config_path_, "", version,
-                                                    allow_unknown_static_fields,
-                                                    reject_unknown_dynamic_fields, concurrency));
+                                          Server::FieldValidationConfig validation_config,
+                                          uint32_t concurrency, std::chrono::seconds drain_time,
+                                          Server::DrainStrategy drain_strategy) {
+  OptionsImpl options(Server::createTestOptionsImpl(config_path_, "", version, validation_config,
+                                                    concurrency, drain_time, drain_strategy));
   Thread::MutexBasicLockable lock;
 
   Runtime::RandomGeneratorPtr random_generator;
@@ -183,6 +187,16 @@ void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion vers
                           lock, *this, std::move(random_generator), process_object);
 }
 
+IntegrationTestServerImpl::IntegrationTestServerImpl(Event::TestTimeSystem& time_system,
+                                                     Api::Api& api, const std::string& config_path,
+                                                     bool use_real_stats)
+    : IntegrationTestServer(time_system, api, config_path),
+      symbol_table_(Stats::SymbolTableCreator::makeSymbolTable()) {
+  stats_allocator_ =
+      (use_real_stats ? std::make_unique<Stats::AllocatorImpl>(*symbol_table_)
+                      : std::make_unique<Stats::NotifyingAllocatorImpl>(*symbol_table_));
+}
+
 void IntegrationTestServerImpl::createAndRunEnvoyServer(
     OptionsImpl& options, Event::TimeSystem& time_system,
     Network::Address::InstanceConstSharedPtr local_address, ListenerHooks& hooks,
@@ -190,11 +204,9 @@ void IntegrationTestServerImpl::createAndRunEnvoyServer(
     Runtime::RandomGeneratorPtr&& random_generator, ProcessObjectOptRef process_object) {
   {
     Init::ManagerImpl init_manager{"Server"};
-    Stats::SymbolTablePtr symbol_table = Stats::SymbolTableCreator::makeSymbolTable();
     Server::HotRestartNopImpl restarter;
     ThreadLocal::InstanceImpl tls;
-    Stats::AllocatorImpl stats_allocator(*symbol_table);
-    Stats::ThreadLocalStoreImpl stat_store(stats_allocator);
+    Stats::ThreadLocalStoreImpl stat_store(*stats_allocator_);
     std::unique_ptr<ProcessContext> process_context;
     if (process_object.has_value()) {
       process_context = std::make_unique<ProcessContextImpl>(process_object->get());
@@ -218,18 +230,25 @@ void IntegrationTestServerImpl::createAndRunEnvoyServer(
 IntegrationTestServerImpl::~IntegrationTestServerImpl() {
   ENVOY_LOG(info, "stopping integration test server");
 
-  Network::Address::InstanceConstSharedPtr admin_address(admin_address_);
-  admin_address_ = nullptr;
-  server_ = nullptr;
-  stat_store_ = nullptr;
-
-  if (admin_address != nullptr) {
-    BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-        admin_address, "POST", "/quitquitquit", "", Http::CodecClient::Type::HTTP1);
-    EXPECT_TRUE(response->complete());
-    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
-    server_gone_.WaitForNotification();
+  if (useAdminInterfaceToQuit()) {
+    Network::Address::InstanceConstSharedPtr admin_address(admin_address_);
+    if (admin_address != nullptr) {
+      BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+          admin_address, "POST", "/quitquitquit", "", Http::CodecClient::Type::HTTP1);
+      EXPECT_TRUE(response->complete());
+      EXPECT_EQ("200", response->headers().getStatusValue());
+      server_gone_.WaitForNotification();
+    }
+  } else {
+    if (server_) {
+      server_->dispatcher().post([this]() { server_->shutdown(); });
+      server_gone_.WaitForNotification();
+    }
   }
+
+  server_ = nullptr;
+  admin_address_ = nullptr;
+  stat_store_ = nullptr;
 }
 
 } // namespace Envoy

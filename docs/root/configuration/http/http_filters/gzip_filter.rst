@@ -1,5 +1,10 @@
 .. _config_http_filters_gzip:
 
+.. warning::
+
+  This filter has been deprecated in favor the
+  :ref:`HTTP Compressor filter <config_http_filters_compressor>`.
+
 Gzip
 ====
 Gzip is an HTTP filter which enables Envoy to compress dispatched data

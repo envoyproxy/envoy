@@ -1,3 +1,5 @@
+load("@rules_cc//cc:defs.bzl", "cc_binary")
+
 # DO NOT LOAD THIS FILE. Load envoy_build_system.bzl instead.
 # Envoy binary targets
 load(
@@ -27,7 +29,7 @@ def envoy_cc_binary(
         linkopts = linkopts + _envoy_stamped_linkopts()
         deps = deps + _envoy_stamped_deps()
     deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + envoy_stdlib_deps()
-    native.cc_binary(
+    cc_binary(
         name = name,
         srcs = srcs,
         data = data,
@@ -61,6 +63,7 @@ def _envoy_linkopts():
         "@envoy//bazel:windows_x86_64": [
             "-DEFAULTLIB:advapi32.lib",
             "-DEFAULTLIB:ws2_32.lib",
+            "-DEFAULTLIB:iphlpapi.lib",
             "-WX",
         ],
         "//conditions:default": [

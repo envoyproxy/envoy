@@ -40,6 +40,7 @@ INSTANTIATE_TEST_SUITE_P(Protocols, CacheIntegrationTest,
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(CacheIntegrationTest, MissInsertHit) {
+  useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   // Set system time to cause Envoy's cached formatted time to match time on this thread.
   simTime().setSystemTime(std::chrono::hours(1));
   initializeFilter(default_config);
@@ -68,7 +69,11 @@ TEST_P(CacheIntegrationTest, MissInsertHit) {
     EXPECT_THAT(request->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_EQ(request->headers().get(Http::Headers::get().Age), nullptr);
     EXPECT_EQ(request->body(), std::string(42, 'a'));
+    EXPECT_EQ(waitForAccessLog(access_log_name_), "- via_upstream\n");
   }
+
+  // Advance time, to verify the original date header is preserved.
+  simTime().advanceTimeWait(std::chrono::seconds(10));
 
   // Send second request, and get response from cache.
   IntegrationStreamDecoderPtr request = codec_client_->makeHeaderOnlyRequest(request_headers);
@@ -77,6 +82,9 @@ TEST_P(CacheIntegrationTest, MissInsertHit) {
   EXPECT_THAT(request->headers(), IsSupersetOfHeaders(response_headers));
   EXPECT_EQ(request->body(), std::string(42, 'a'));
   EXPECT_NE(request->headers().get(Http::Headers::get().Age), nullptr);
+  // Advance time to force a log flush.
+  simTime().advanceTimeWait(std::chrono::seconds(1));
+  EXPECT_EQ(waitForAccessLog(access_log_name_, 1), "RFCF cache.response_from_cache_filter\n");
 }
 
 // Send the same GET request twice with body and trailers twice, then check that the response

@@ -14,7 +14,6 @@ class SpanContext;
 
 struct ExtractorException : public EnvoyException {
   ExtractorException(const std::string& what) : EnvoyException(what) {}
-  ExtractorException(const ExtractorException& ex) : EnvoyException(ex.what()) {}
 };
 
 /**

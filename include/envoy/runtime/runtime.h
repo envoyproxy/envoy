@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/stats/store.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/common/assert.h"
@@ -103,6 +104,11 @@ public:
   };
 
   using OverrideLayerConstPtr = std::unique_ptr<const OverrideLayer>;
+
+  /**
+   * Updates deprecated feature use stats.
+   */
+  virtual void countDeprecatedFeatureUse() const PURE;
 
   /**
    * Returns true if a deprecated feature is allowed.
@@ -252,12 +258,16 @@ public:
   virtual const std::vector<OverrideLayerConstPtr>& getLayers() const PURE;
 };
 
+using SnapshotConstSharedPtr = std::shared_ptr<const Snapshot>;
+
 /**
  * Loads runtime snapshots from storage (local disk, etc.).
  */
 class Loader {
 public:
   virtual ~Loader() = default;
+
+  using ReadyCallback = std::function<void()>;
 
   /**
    * Post-construction initialization. Runtime will be generally available after
@@ -278,7 +288,7 @@ public:
    * @return shared_ptr<const Snapshot> the current snapshot. This function may safely be called
    *         from non-worker threads.
    */
-  virtual std::shared_ptr<const Snapshot> threadsafeSnapshot() PURE;
+  virtual SnapshotConstSharedPtr threadsafeSnapshot() PURE;
 
   /**
    * Merge the given map of key-value pairs into the runtime's state. To remove a previous merge for
@@ -286,6 +296,17 @@ public:
    * @param values the values to merge
    */
   virtual void mergeValues(const std::unordered_map<std::string, std::string>& values) PURE;
+
+  /**
+   * Initiate all RTDS subscriptions. The `on_done` callback is invoked when all RTDS requests
+   * have either received and applied their responses or timed out.
+   */
+  virtual void startRtdsSubscriptions(ReadyCallback on_done) PURE;
+
+  /**
+   * @return Stats::Scope& the root scope.
+   */
+  virtual Stats::Scope& getRootScope() PURE;
 };
 
 using LoaderPtr = std::unique_ptr<Loader>;

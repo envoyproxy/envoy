@@ -74,13 +74,15 @@ public:
         [&host](auto predicate) { return predicate->shouldSelectAnotherHost(host); });
   }
 
-  const Upstream::HealthyAndDegradedLoad&
-  priorityLoadForRetry(const Upstream::PrioritySet& priority_set,
-                       const Upstream::HealthyAndDegradedLoad& original_priority_load) override {
+  const Upstream::HealthyAndDegradedLoad& priorityLoadForRetry(
+      const Upstream::PrioritySet& priority_set,
+      const Upstream::HealthyAndDegradedLoad& original_priority_load,
+      const Upstream::RetryPriority::PriorityMappingFunc& priority_mapping_func) override {
     if (!retry_priority_) {
       return original_priority_load;
     }
-    return retry_priority_->determinePriorityLoad(priority_set, original_priority_load);
+    return retry_priority_->determinePriorityLoad(priority_set, original_priority_load,
+                                                  priority_mapping_func);
   }
 
   uint32_t hostSelectionMaxAttempts() const override { return host_selection_max_attempts_; }

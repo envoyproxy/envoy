@@ -31,8 +31,10 @@ else
   export ENVOY_BLOB_SHA="$BUILD_SHA"
 fi
 
-SCRIPT_DIR=$(dirname "$0")
-API_DIR=$(dirname "$dir")/api
+SCRIPT_DIR="$(dirname "$0")"
+SRC_DIR="$(dirname "$dir")"
+API_DIR="${SRC_DIR}"/api
+CONFIGS_DIR="${SRC_DIR}"/configs
 BUILD_DIR=build_docs
 [[ -z "${DOCS_OUTPUT_DIR}" ]] && DOCS_OUTPUT_DIR=generated/docs
 [[ -z "${GENERATED_RST_DIR}" ]] && GENERATED_RST_DIR=generated/rst
@@ -115,9 +117,12 @@ generate_api_rst v3
 find "${GENERATED_RST_DIR}"/api-v3 -name "*.rst" -print0 | xargs -0 sed -i -e "s#envoy_api_#envoy_v3_api_#g"
 find "${GENERATED_RST_DIR}"/api-v3 -name "*.rst" -print0 | xargs -0 sed -i -e "s#config_resource_monitors#v3_config_resource_monitors#g"
 
+# xDS protocol spec.
 mkdir -p ${GENERATED_RST_DIR}/api-docs
-
-cp -f $API_DIR/xds_protocol.rst "${GENERATED_RST_DIR}/api-docs/xds_protocol.rst"
+cp -f "${API_DIR}"/xds_protocol.rst "${GENERATED_RST_DIR}/api-docs/xds_protocol.rst"
+# Edge hardening example YAML.
+mkdir -p "${GENERATED_RST_DIR}"/configuration/best_practices
+cp -f "${CONFIGS_DIR}"/google-vrp/envoy-edge.yaml "${GENERATED_RST_DIR}"/configuration/best_practices
 
 rsync -rav  $API_DIR/diagrams "${GENERATED_RST_DIR}/api-docs"
 

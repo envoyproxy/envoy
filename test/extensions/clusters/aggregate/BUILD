@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
@@ -8,6 +6,8 @@ load(
     "//test/extensions:extensions_build_system.bzl",
     "envoy_extension_cc_test",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -59,6 +59,7 @@ envoy_extension_cc_test(
         "//source/common/protobuf:utility_lib",
         "//source/extensions/clusters/aggregate:cluster",
         "//source/extensions/filters/network/tcp_proxy:config",
+        "//source/extensions/retry/priority/previous_priorities:config",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/integration:http_integration_lib",
         "//test/integration:integration_lib",

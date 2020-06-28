@@ -1,10 +1,10 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -289,6 +289,7 @@ envoy_cc_library(
         "//source/common/access_log:access_log_lib",
         "//source/common/buffer:watermark_buffer_lib",
         "//source/common/common:assert_lib",
+        "//source/common/common:cleanup_lib",
         "//source/common/common:empty_string",
         "//source/common/common:enum_to_int",
         "//source/common/common:hash_lib",
@@ -324,8 +325,10 @@ envoy_cc_library(
         "//include/envoy/router:router_ratelimit_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
+        "//source/common/config:metadata_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )
@@ -364,10 +367,10 @@ envoy_cc_library(
         "//include/envoy/router:string_accessor_interface",
         "//include/envoy/stream_info:filter_state_interface",
         "//include/envoy/stream_info:stream_info_interface",
-        "//source/common/access_log:access_log_formatter_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:metadata_lib",
+        "//source/common/formatter:substitution_formatter_lib",
         "//source/common/http:header_map_lib",
         "//source/common/json:json_loader_lib",
     ],

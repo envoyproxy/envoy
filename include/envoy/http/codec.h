@@ -6,13 +6,24 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
+#include "envoy/grpc/status.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/metadata_interface.h"
 #include "envoy/http/protocol.h"
 #include "envoy/network/address.h"
 
+#include "common/http/status.h"
+
 namespace Envoy {
 namespace Http {
+
+namespace Http1 {
+struct CodecStats;
+}
+
+namespace Http2 {
+struct CodecStats;
+}
 
 // Legacy default value of 60K is safely under both codec default limits.
 static const uint32_t DEFAULT_MAX_REQUEST_HEADERS_KB = 60;
@@ -25,6 +36,14 @@ const char MaxResponseHeadersCountOverrideKey[] =
     "envoy.reloadable_features.max_response_headers_count";
 
 class Stream;
+
+/**
+ * Error codes used to convey the reason for a GOAWAY.
+ */
+enum class GoAwayErrorCode {
+  NoError,
+  Other,
+};
 
 /**
  * Stream encoder options specific to HTTP/1.
@@ -167,6 +186,22 @@ public:
    * @param trailers supplies the decoded trailers.
    */
   virtual void decodeTrailers(RequestTrailerMapPtr&& trailers) PURE;
+
+  /**
+   * Called if the codec needs to send a protocol error.
+   * @param is_grpc_request indicates if the request is a gRPC request
+   * @param code supplies the HTTP error code to send.
+   * @param body supplies an optional body to send with the local reply.
+   * @param modify_headers supplies a way to edit headers before they are sent downstream.
+   * @param is_head_request indicates if the request is a HEAD request
+   * @param grpc_status an optional gRPC status for gRPC requests
+   * @param details details about the source of the error, for debug purposes
+   */
+  virtual void sendLocalReply(bool is_grpc_request, Code code, absl::string_view body,
+                              const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
+                              bool is_head_request,
+                              const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                              absl::string_view details) PURE;
 };
 
 /**
@@ -314,7 +349,7 @@ public:
   /**
    * Fires when the remote indicates "go away." No new streams should be created.
    */
-  virtual void onGoAway() PURE;
+  virtual void onGoAway(GoAwayErrorCode error_code) PURE;
 };
 
 /**
@@ -358,8 +393,10 @@ public:
   /**
    * Dispatch incoming connection data.
    * @param data supplies the data to dispatch. The codec will drain as many bytes as it processes.
+   * @return Status indicating the status of the codec. Holds any errors encountered while
+   * processing the incoming data.
    */
-  virtual void dispatch(Buffer::Instance& data) PURE;
+  virtual Status dispatch(Buffer::Instance& data) PURE;
 
   /**
    * Indicate "go away" to the remote. No new streams can be created beyond this point.
