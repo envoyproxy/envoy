@@ -192,6 +192,11 @@ bool shouldLogAndInvokeEnvoyBugForEnvoyBugMacroUseOnly(absl::string_view bug_nam
 
 #define _ENVOY_BUG_VERBOSE(X, Y) _ENVOY_BUG_IMPL(X, #X, ENVOY_BUG_ACTION, Y)
 
+// This macro is needed to help to remove: "warning C4003: not enough arguments for function-like
+// macro invocation '<identifier>'" when expanding __VA_ARGS__. In our setup, MSVC treats this
+// warning as an error. A sample code to reproduce the case: https://godbolt.org/z/M4zZNG.
+#define PASS_ON(...) __VA_ARGS__
+
 /**
  * Indicate a failure condition that should never be met in normal circumstances. In contrast
  * with ASSERT, an ENVOY_BUG is compiled in release mode. If a failure condition is met in release
@@ -199,7 +204,7 @@ bool shouldLogAndInvokeEnvoyBugForEnvoyBugMacroUseOnly(absl::string_view bug_nam
  * mode, it will crash if the condition is not met. ENVOY_BUG must be called with two arguments for
  * verbose logging.
  */
-#define ENVOY_BUG(...) _ENVOY_BUG_VERBOSE(__VA_ARGS__)
+#define ENVOY_BUG(...) PASS_ON(PASS_ON(_ENVOY_BUG_VERBOSE)(__VA_ARGS__))
 
 // NOT_IMPLEMENTED_GCOVR_EXCL_LINE is for overridden functions that are expressly not implemented.
 // The macro name includes "GCOVR_EXCL_LINE" to exclude the macro's usage from code coverage
