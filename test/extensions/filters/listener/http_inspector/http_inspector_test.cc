@@ -1,4 +1,5 @@
 #include "common/common/hex.h"
+#include "common/http/utility.h"
 #include "common/network/io_socket_handle_impl.h"
 
 #include "extensions/filters/listener/http_inspector/http_inspector.h"

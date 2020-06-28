@@ -1,3 +1,4 @@
+#include "common/http/utility.h"
 #include "common/network/io_socket_handle_impl.h"
 
 #include "extensions/filters/listener/tls_inspector/tls_inspector.h"
