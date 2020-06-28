@@ -242,7 +242,7 @@ TEST_F(ProxyProtocolTest, V1IPV4DownstreamAddresses) {
       new Network::Address::Ipv4Instance("174.2.2.222", 80));
   Network::TransportSocketOptionsSharedPtr socket_options =
       std::make_shared<Network::TransportSocketOptionsImpl>(
-          "", std::vector<std::string>{}, std::vector<std::string>{},
+          "", std::vector<std::string>{}, std::vector<std::string>{}, absl::nullopt,
           absl::optional<Network::ProxyProtocolOptions>(
               Network::ProxyProtocolOptions{src_addr, dst_addr}));
   transport_callbacks_.connection_.local_address_ =
@@ -272,7 +272,7 @@ TEST_F(ProxyProtocolTest, V1IPV6DownstreamAddresses) {
       Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv6Instance("a:b:c:d::", 80));
   Network::TransportSocketOptionsSharedPtr socket_options =
       std::make_shared<Network::TransportSocketOptionsImpl>(
-          "", std::vector<std::string>{}, std::vector<std::string>{},
+          "", std::vector<std::string>{}, std::vector<std::string>{}, absl::nullopt,
           absl::optional<Network::ProxyProtocolOptions>(
               Network::ProxyProtocolOptions{src_addr, dst_addr}));
   transport_callbacks_.connection_.local_address_ =
@@ -343,7 +343,7 @@ TEST_F(ProxyProtocolTest, V2IPV4DownstreamAddresses) {
       Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("0.1.1.2", 513));
   Network::TransportSocketOptionsSharedPtr socket_options =
       std::make_shared<Network::TransportSocketOptionsImpl>(
-          "", std::vector<std::string>{}, std::vector<std::string>{},
+          "", std::vector<std::string>{}, std::vector<std::string>{}, absl::nullopt,
           absl::optional<Network::ProxyProtocolOptions>(
               Network::ProxyProtocolOptions{src_addr, dst_addr}));
   transport_callbacks_.connection_.local_address_ =
@@ -373,7 +373,7 @@ TEST_F(ProxyProtocolTest, V2IPV6DownstreamAddresses) {
       new Network::Address::Ipv6Instance("1:100:200:3::", 2));
   Network::TransportSocketOptionsSharedPtr socket_options =
       std::make_shared<Network::TransportSocketOptionsImpl>(
-          "", std::vector<std::string>{}, std::vector<std::string>{},
+          "", std::vector<std::string>{}, std::vector<std::string>{}, absl::nullopt,
           absl::optional<Network::ProxyProtocolOptions>(
               Network::ProxyProtocolOptions{src_addr, dst_addr}));
   transport_callbacks_.connection_.local_address_ =
