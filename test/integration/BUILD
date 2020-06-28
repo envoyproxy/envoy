@@ -238,6 +238,7 @@ envoy_cc_test(
     srcs = [
         "drain_close_integration_test.cc",
     ],
+    tags = ["fails_on_windows"],
     deps = [
         ":http_protocol_integration_lib",
         "//source/extensions/filters/http/health_check:config",
@@ -294,6 +295,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
+    tags = ["fails_on_windows"],
     deps = [
         ":http_integration_lib",
         "//test/test_common:utility_lib",
