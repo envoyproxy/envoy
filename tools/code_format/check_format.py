@@ -168,7 +168,6 @@ UNOWNED_EXTENSIONS = {
   "extensions/filters/network/common",
   "extensions/filters/network/common/redis",
 }
-
 # yapf: enable
 
 NON_TYPE_ALIAS_ALLOWED_TYPES = {
@@ -529,6 +528,71 @@ def checkFileContents(file_path, checker):
   return error_messages
 
 
+def replaceWithTypeAlias(line):
+
+  def replaceSmartPtr(match):
+    kind = match.group(1)
+    name = match.group(2)
+    const = "const " in name
+    if const:
+      name = name.replace("const ", "")
+    if whitelistedForNonTypeAlias(name):
+      return match.group()
+
+    with_type_param = "<" in name
+
+    if kind == "unique_ptr" and not const and not with_type_param:
+      return f"{name}Ptr"
+    elif kind == "unique_ptr" and const and not with_type_param:
+      return f"{name}ConstPtr"
+    elif kind == "unique_ptr" and not const and with_type_param:
+      splitted = name.split("<")
+      return f"{splitted[0]}Ptr<{splitted[1]}"
+    elif kind == "unique_ptr" and const and with_type_param:
+      splitted = name.split("<")
+      return f"{splitted[0]}ConstPtr<{splitted[1]}"
+    elif kind == "shared_ptr" and not const and not with_type_param:
+      return f"{name}SharedPtr"
+    elif kind == "shared_ptr" and const and not with_type_param:
+      return f"{name}ConstSharedPtr"
+    elif kind == "shared_ptr" and not const and with_type_param:
+      splitted = name.split("<")
+      return f"{splitted[0]}SharedPtr<{splitted[1]}"
+    elif kind == "shared_ptr" and const and with_type_param:
+      splitted = name.split("<")
+      return f"{splitted[0]}ConstSharedPtr<{splitted[1]}"
+    else:
+      return match.group()
+
+  def replaceOptionalRef(match):
+    name = match.group(1)
+    const = "const " in name
+    if const:
+      name = name.replace("const ", "")
+    if whitelistedForNonTypeAlias(name):
+      return match.group()
+
+    with_type_param = "<" in name
+
+    if not const and not with_type_param:
+      return f"{name}OptRef"
+    elif const and not with_type_param:
+      return f"{name}OptConstRef"
+    elif not const and with_type_param:
+      splitted = name.split("<")
+      return f"{splitted[0]}OptRef<{splitted[1]}"
+    elif const and with_type_param:
+      splitted = name.split("<")
+      return f"{splitted[0]}OptConstRef<{splitted[1]}"
+    else:
+      return match.group()
+
+  line = SMART_PTR_REGEX.sub(replaceSmartPtr, line)
+  line = OPTIONAL_REF_REGEX.sub(replaceOptionalRef, line)
+
+  return line
+
+
 DOT_MULTI_SPACE_REGEX = re.compile("\\. +")
 
 
@@ -547,6 +611,9 @@ def fixSourceLine(line, line_number):
   # Use recommended cpp stdlib
   for invalid_construct, valid_construct in LIBCXX_REPLACEMENTS.items():
     line = line.replace(invalid_construct, valid_construct)
+
+  if aggressive and not USING_TYPE_ALIAS_REGEX.match(line):
+    line = replaceWithTypeAlias(line)
 
   return line
 
@@ -761,6 +828,7 @@ def fixBuildPath(file_path):
   if os.system("%s -lint=fix -mode=fix %s" % (BUILDIFIER_PATH, file_path)) != 0:
     error_messages += ["buildifier rewrite failed for file: %s" % file_path]
   return error_messages
+
 
 def checkBuildPath(file_path):
   error_messages = []

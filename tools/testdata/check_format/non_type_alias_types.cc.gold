@@ -1,0 +1,7 @@
+#include <memory>
+
+namespace Envoy {
+void a(AAAPtr, AAAConstPtr, BBBSharedPtr, BBBConstSharedPtr, CCCOptRef,
+       CCCOptConstRef, DDDPtr<EEE>, DDDConstPtr<EEE>, FFFSharedPtr<GGG>,
+       FFFConstSharedPtr<GGG>, HHHOptRef<III>, HHHOptConstRef<III>) {}
+} // namespace Envoy
