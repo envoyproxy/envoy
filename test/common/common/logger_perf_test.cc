@@ -22,9 +22,7 @@ static void fancySlowPath(benchmark::State& state) {
 }
 
 #define FL FANCY_LOG(trace, "Default")
-#define FL_10                                                                                      \
-  FL;                                                                                              \
-  FL;                                                                                              \
+#define FL_8                                                                                      \
   FL;                                                                                              \
   FL;                                                                                              \
   FL;                                                                                              \
@@ -33,12 +31,12 @@ static void fancySlowPath(benchmark::State& state) {
   FL;                                                                                              \
   FL;                                                                                              \
   FL;
-#define FL_50                                                                                      \
-  { FL_10 FL_10 FL_10 FL_10 FL_10 }
-#define FL_250                                                                                     \
-  { FL_50 FL_50 FL_50 FL_50 FL_50 }
-#define FL_1000                                                                                    \
-  { FL_250 FL_250 FL_250 FL_250 }
+#define FL_64                                                                                      \
+  { FL_8 FL_8 FL_8 FL_8 FL_8 FL_8 FL_8 FL_8}
+#define FL_512                                                                                     \
+  { FL_64 FL_64 FL_64 FL_64 FL_64 FL_64 FL_64 FL_64}
+#define FL_1024                                                                                    \
+  { FL_512 FL_512 }
 
 /**
  * Benchmark for medium path, i.e. new site initialization within the same file.
@@ -48,7 +46,7 @@ static void fancyMediumPath(benchmark::State& state) {
   for (auto _ : state) {
     // create different call sites for medium path
     for (int i = 0; i < state.range(0); i++) {
-      FL_1000
+      FL_1024
     }
   }
 }
@@ -113,22 +111,22 @@ BENCHMARK(fancySlowPath)->Arg(1 << 10);
 BENCHMARK(fancySlowPath)->Arg(1 << 10)->Threads(20)->MeasureProcessCPUTime();
 BENCHMARK(fancySlowPath)->Arg(1 << 10)->Threads(200)->MeasureProcessCPUTime();
 
-BENCHMARK(fancyMediumPath)->Arg(1);
+BENCHMARK(fancyMediumPath)->Arg(1)->Iterations(1);
 // Seems medium path's concurrency test doesn't make sense (hard to do as well)
 
-BENCHMARK(fancyFastPath)->Args({30, 0})->Args({30, 1}); // First no actual log, then log
-BENCHMARK(fancyFastPath)->Args({1 << 8, 0})->Threads(20)->MeasureProcessCPUTime();
-BENCHMARK(fancyFastPath)->Args({1 << 8, 1})->Threads(20)->MeasureProcessCPUTime();
-BENCHMARK(fancyFastPath)->Args({1 << 8, 0})->Threads(200)->MeasureProcessCPUTime();
-BENCHMARK(fancyFastPath)->Args({1 << 8, 1})->Threads(200)->MeasureProcessCPUTime();
+BENCHMARK(fancyFastPath)->Args({1024, 0})->Args({1024, 1}); // First no actual log, then log
+BENCHMARK(fancyFastPath)->Args({1 << 10, 0})->Threads(20)->MeasureProcessCPUTime();
+BENCHMARK(fancyFastPath)->Args({1 << 10, 1})->Threads(20)->MeasureProcessCPUTime();
+BENCHMARK(fancyFastPath)->Args({1 << 10, 0})->Threads(200)->MeasureProcessCPUTime();
+BENCHMARK(fancyFastPath)->Args({1 << 10, 1})->Threads(200)->MeasureProcessCPUTime();
 
-BENCHMARK(envoyNormal)->Args({30, 0})->Args({30, 1});
-BENCHMARK(envoyNormal)->Args({1 << 8, 0})->Threads(20)->MeasureProcessCPUTime();
-BENCHMARK(envoyNormal)->Args({1 << 8, 1})->Threads(20)->MeasureProcessCPUTime();
-BENCHMARK(envoyNormal)->Args({1 << 8, 0})->Threads(200)->MeasureProcessCPUTime();
-BENCHMARK(envoyNormal)->Args({1 << 8, 1})->Threads(200)->MeasureProcessCPUTime();
+BENCHMARK(envoyNormal)->Args({1024, 0})->Args({1024, 1});
+BENCHMARK(envoyNormal)->Args({1 << 10, 0})->Threads(20)->MeasureProcessCPUTime();
+BENCHMARK(envoyNormal)->Args({1 << 10, 1})->Threads(20)->MeasureProcessCPUTime();
+BENCHMARK(envoyNormal)->Args({1 << 10, 0})->Threads(200)->MeasureProcessCPUTime();
+BENCHMARK(envoyNormal)->Args({1 << 10, 1})->Threads(200)->MeasureProcessCPUTime();
 
-BENCHMARK(fancyLevelSetting)->Arg(30);
-BENCHMARK(envoyLevelSetting)->Arg(30);
+BENCHMARK(fancyLevelSetting)->Arg(1 << 10);
+BENCHMARK(envoyLevelSetting)->Arg(1 << 10);
 
 } // namespace Envoy
