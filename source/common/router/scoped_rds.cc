@@ -235,11 +235,11 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   // If new route config sources come after the local init manager's initialize() been
   // called, the init manager can't accept new targets. Instead we use a local override which will
   // start new subscriptions but not wait on them to be ready.
-  std::unique_ptr<Init::ManagerImpl> disposable_init_mgr;
-  // NOTE: This should be defined after disposable_init_mgr and resume_rds, as it depends on the
-  // disposable_init_mgr, and we want a single RDS discovery request to be sent to management
+  std::unique_ptr<Init::ManagerImpl> srds_init_mgr;
+  // NOTE: This should be defined after srds_init_mgr and resume_rds, as it depends on the
+  // srds_init_mgr, and we want a single RDS discovery request to be sent to management
   // server.
-  std::unique_ptr<Cleanup> init_disposable_init_mgr;
+  std::unique_ptr<Cleanup> srds_initialization_continuation;
   ASSERT(localInitManager().state() > Init::Manager::State::Uninitialized);
   const auto type_urls =
       Envoy::Config::getAllVersionTypeUrls<envoy::config::route::v3::RouteConfiguration>();
@@ -251,17 +251,17 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   }
   // if local init manager is initialized, the parent init manager may have gone away.
   if (localInitManager().state() == Init::Manager::State::Initialized) {
-    disposable_init_mgr =
+    srds_init_mgr =
         std::make_unique<Init::ManagerImpl>(fmt::format("SRDS {}:{}", name_, version_info));
-    init_disposable_init_mgr =
-        std::make_unique<Cleanup>([this, &disposable_init_mgr, version_info, &type_urls] {
+    srds_initialization_continuation =
+        std::make_unique<Cleanup>([this, &srds_init_mgr, version_info, &type_urls] {
           // For new RDS subscriptions created after listener warming up, we don't wait for them to
           // warm up.
           Init::WatcherImpl noop_watcher(
               // Note: we just throw it away.
               fmt::format("SRDS ConfigUpdate watcher {}:{}", name_, version_info),
               []() { /*Do nothing.*/ });
-          disposable_init_mgr->initialize(noop_watcher);
+          srds_init_mgr->initialize(noop_watcher);
         });
   }
 
@@ -270,11 +270,11 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   // be reused by some to be added scopes.
   std::list<std::unique_ptr<ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper>>
       to_be_removed_rds_providers = removeScopes(removed_resources, version_info);
-  bool any_applied = addOrUpdateScopes(added_resources,
-                                       (disposable_init_mgr == nullptr ? localInitManager()
-                                                                       : *disposable_init_mgr),
-                                       version_info, exception_msgs) ||
-                     !to_be_removed_rds_providers.empty();
+  bool any_applied =
+      addOrUpdateScopes(added_resources,
+                        (srds_init_mgr == nullptr ? localInitManager() : *srds_init_mgr),
+                        version_info, exception_msgs) ||
+      !to_be_removed_rds_providers.empty();
   ConfigSubscriptionCommonBase::onConfigUpdate();
   if (any_applied) {
     setLastConfigInfo(absl::optional<LastConfigInfo>({absl::nullopt, version_info}));

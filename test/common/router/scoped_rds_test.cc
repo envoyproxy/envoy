@@ -237,7 +237,7 @@ key:
 )EOF";
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
   parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml);
-  init_watcher_.expectReady().Times(1);
+  init_watcher_.expectReady();
   context_init_manager_.initialize(init_watcher_);
   EXPECT_THROW(srds_subscription_->onConfigUpdate(resources, "1"), ProtoValidationException);
   EXPECT_THROW_WITH_REGEX(
@@ -295,7 +295,7 @@ key:
     - string_key: x-bar-key
 )EOF";
   parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml2);
-  init_watcher_.expectReady().Times(1); // Only the SRDS parent_init_target_.
+  init_watcher_.expectReady(); // Only the SRDS parent_init_target_.
   context_init_manager_.initialize(init_watcher_);
   EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(resources, "1"));
   EXPECT_EQ(1UL,
@@ -351,7 +351,7 @@ key:
 // Tests that multiple uniquely named non-conflict resources are allowed in config updates.
 TEST_F(ScopedRdsTest, MultipleResourcesDelta) {
   setup();
-  init_watcher_.expectReady().Times(1);
+  init_watcher_.expectReady();
   const std::string config_yaml = R"EOF(
 name: foo_scope
 route_configuration_name: foo_routes
@@ -487,7 +487,7 @@ key:
     - string_key: x-foo-key
 )EOF";
   parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml2);
-  init_watcher_.expectReady().Times(1); // Partial success gets the subscription ready.
+  init_watcher_.expectReady(); // Partial success gets the subscription ready.
   context_init_manager_.initialize(init_watcher_);
 
   EXPECT_THROW_WITH_REGEX(
@@ -532,7 +532,7 @@ key:
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
   parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml1);
   parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml2);
-  init_watcher_.expectReady().Times(1);
+  init_watcher_.expectReady();
   context_init_manager_.initialize(init_watcher_);
   EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(resources, "1"));
   EXPECT_EQ(1UL,
@@ -704,7 +704,7 @@ TEST_F(ScopedRdsTest, ConfigUpdateFailure) {
 // config.
 TEST_F(ScopedRdsTest, ConfigDump) {
   setup();
-  init_watcher_.expectReady().Times(1);
+  init_watcher_.expectReady();
   context_init_manager_.initialize(init_watcher_);
   auto message_ptr =
       server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"]();
