@@ -46,7 +46,8 @@ TEST(HttpUtility, parseQueryString) {
                       "rq_complete|rq_active|cx_active))|(server.version)"}}),
       Utility::parseQueryString(
           "/stats?filter=%28cluster.upstream_%28rq_total%7Crq_time_sum%7Crq_time_count%7Crq_time_"
-          "bucket%7Crq_xx%7Crq_complete%7Crq_active%7Ccx_active%29%29%7C%28server.version%29"));
+          "bucket%7Crq_xx%7Crq_complete%7Crq_active%7Ccx_active%29%29%7C%28server.version%29",
+          /*do_percent_decoding=*/true));
 }
 
 TEST(HttpUtility, getResponseStatus) {
