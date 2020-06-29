@@ -79,12 +79,11 @@ DnsCacheImpl::loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
 
 Upstream::ResourceAutoIncDecPtr DnsCacheImpl::canCreateDnsRequest(
     absl::optional<std::reference_wrapper<ResourceLimit>> pending_requests) {
-  auto use_cluster_cache_circuit_breaker = pending_requests.has_value();
-  auto& current_pending_requests = use_cluster_cache_circuit_breaker
-                                       ? pending_requests->get()
-                                       : resource_manager_.pendingRequests();
+  const auto has_pending_requests = pending_requests.has_value();
+  auto& current_pending_requests =
+      has_pending_requests ? pending_requests->get() : resource_manager_.pendingRequests();
   if (!current_pending_requests.canCreate()) {
-    if (!use_cluster_cache_circuit_breaker) {
+    if (!has_pending_requests) {
       stats_.dns_rq_pending_overflow_.inc();
     }
     return nullptr;

@@ -58,15 +58,13 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   const bool should_use_dns_cache_circuit_breakers =
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_dns_cache_circuit_breakers");
 
-  auto circuit_breaker_raii_ptr = config_->cache().canCreateDnsRequest(
+  circuit_breaker_ = config_->cache().canCreateDnsRequest(
       !should_use_dns_cache_circuit_breakers
           ? absl::make_optional(std::reference_wrapper<ResourceLimit>(
                 cluster_info_->resourceManager(route_entry->priority()).pendingRequests()))
           : absl::nullopt);
 
-  if (circuit_breaker_raii_ptr != nullptr) {
-    circuit_breaker_ = std::move(circuit_breaker_raii_ptr);
-  } else {
+  if (circuit_breaker_ == nullptr) {
     if (!should_use_dns_cache_circuit_breakers) {
       cluster_info_->stats().upstream_rq_pending_overflow_.inc();
     }

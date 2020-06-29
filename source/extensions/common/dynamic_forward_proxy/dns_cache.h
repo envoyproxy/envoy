@@ -177,10 +177,9 @@ public:
   virtual absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> hosts() PURE;
 
   /**
-   * Handle dns request
-   * @param route_entry resolved route entry.
-   * @param cluster_info destination cluster info.
-   * @return Resource limit which describes about pending requests.
+   * Check if we can do DNS Request.
+   * @param pending_request pending request resource limit
+   * @return RAII Pointer for circuit breakers
    */
   virtual Upstream::ResourceAutoIncDecPtr
   canCreateDnsRequest(absl::optional<std::reference_wrapper<ResourceLimit>> pending_request) PURE;
