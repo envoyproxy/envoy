@@ -69,6 +69,7 @@ const RequestCacheControlTestCase RequestCacheControlTest::test_cases[] = {
      {false, true, false, false, UNSET_DURATION, DURATION(30), UNSET_DURATION}},
     {"max-age=five, min-fresh=30s, max-stale=-2",
      {false, false, false, false, UNSET_DURATION, UNSET_DURATION, UNSET_DURATION}},
+    {"max-age=\"", {false, false, false, false, UNSET_DURATION, UNSET_DURATION, UNSET_DURATION}},
     // Invalid parts of the header are ignored
     {"no-cache, ,,,fjfwioen3298, max-age=20, min-fresh=30=40",
      {true, false, false, false, DURATION(20), UNSET_DURATION, UNSET_DURATION}},
@@ -118,6 +119,7 @@ const ResponseCacheControlTestCase ResponseCacheControlTest::test_cases[] = {
     {"s-maxage=\"50s\", max-age=\"zero\", no-cache",
      {true, false, false, false, false, UNSET_DURATION}},
     {"s-maxage=five, max-age=10, no-transform", {false, false, true, false, false, DURATION(10)}},
+    {"max-age=\"", {false, false, false, false, false, UNSET_DURATION}},
     // Invalid parts of the header are ignored
     {"no-cache, ,,,fjfwioen3298, max-age=20", {true, false, false, false, false, DURATION(20)}},
     // If a directive argument contains a comma by mistake

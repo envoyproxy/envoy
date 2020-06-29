@@ -20,7 +20,7 @@ namespace {
 OptionalDuration parseDuration(absl::string_view s) {
   OptionalDuration duration;
   // Strip quotation marks if any
-  if (!s.empty() && s.front() == '"' && s.back() == '"') {
+  if (s.size() > 1 && s.front() == '"' && s.back() == '"') {
     s = s.substr(1, s.size() - 2);
   }
   long num;
