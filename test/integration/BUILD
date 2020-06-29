@@ -50,6 +50,7 @@ envoy_cc_test_library(
 
 envoy_cc_test(
     name = "ads_integration_test",
+    size = "enormous",
     srcs = ["ads_integration_test.cc"],
     tags = ["fails_on_windows"],
     deps = [
