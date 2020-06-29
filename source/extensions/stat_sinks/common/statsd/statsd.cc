@@ -55,39 +55,54 @@ UdpStatsdSink::UdpStatsdSink(ThreadLocal::SlotAllocator& tls,
 }
 
 void UdpStatsdSink::flush(Stats::MetricSnapshot& snapshot) {
+  Writer& writer = tls_->getTyped<Writer>();
   auto buffer = Buffer::OwnedImpl();
+
   for (const auto& counter : snapshot.counters()) {
     if (counter.counter_.get().used()) {
-      auto counterStr =
+      std::string counter_str =
           absl::StrCat(prefix_, ".", getName(counter.counter_.get()), ":", counter.delta_, "|c",
                        buildTagStr(counter.counter_.get().tags()));
-      if (buffer.length() + counterStr.length() > buffer_size_) {
-        flushBuffer(buffer);
-      }
-      buffer.add(counterStr);
+      writeBuffer(buffer, writer, counter_str);
     }
   }
 
   for (const auto& gauge : snapshot.gauges()) {
     if (gauge.get().used()) {
-      auto gaugeStr = absl::StrCat(prefix_, ".", getName(gauge.get()), ":", gauge.get().value(),
-                                   "|g", buildTagStr(gauge.get().tags()));
-      if (buffer.length() + gaugeStr.length() > buffer_size_) {
-        flushBuffer(buffer);
-      }
-      buffer.add(gaugeStr);
+      std::string gauge_str =
+          absl::StrCat(prefix_, ".", getName(gauge.get()), ":", gauge.get().value(), "|g",
+                       buildTagStr(gauge.get().tags()));
+      writeBuffer(buffer, writer, gauge_str);
     }
   }
 
-  flushBuffer(buffer);
+  flushBuffer(buffer, writer);
   // TODO(efimki): Add support of text readouts stats.
 }
 
-void UdpStatsdSink::flushBuffer(Buffer::OwnedImpl& buffer) const {
+void UdpStatsdSink::writeBuffer(Buffer::OwnedImpl& buffer, Writer& writer,
+                                const std::string& statsd_metric) const {
+  if (statsd_metric.length() > buffer_size_) {
+    // Our statsd_metric is too large to fit into the buffer, skip buffering and write directly
+    writer.write(statsd_metric);
+  } else {
+    if ((buffer.length() + statsd_metric.length() + 1) > buffer_size_) {
+      // If we add the new statsd_metric, we'll overflow our buffer. Flush the buffer to make
+      // room for the new statsd_metric.
+      flushBuffer(buffer, writer);
+    } else if (buffer.length() > 0) {
+      // We have room and statsd_metric already in the buffer, add a newline to separate
+      // metric entries.
+      buffer.add("\n");
+    }
+    buffer.add(statsd_metric);
+  }
+}
+
+void UdpStatsdSink::flushBuffer(Buffer::OwnedImpl& buffer, Writer& writer) const {
   if (buffer.length() == 0) {
     return;
   }
-  Writer& writer = tls_->getTyped<Writer>();
   writer.writeBuffer(&buffer);
   buffer.drain(buffer.length());
 }

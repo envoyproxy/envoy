@@ -76,7 +76,8 @@ private:
     const Network::IoHandlePtr io_handle_;
   };
 
-  void flushBuffer(Buffer::OwnedImpl& buffer) const;
+  void flushBuffer(Buffer::OwnedImpl& buffer, Writer& writer) const;
+  void writeBuffer(Buffer::OwnedImpl& buffer, Writer& writer, const std::string& data) const;
 
   const std::string getName(const Stats::Metric& metric) const;
   const std::string buildTagStr(const std::vector<Stats::Tag>& tags) const;
