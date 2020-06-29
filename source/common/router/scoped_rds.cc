@@ -254,7 +254,7 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
     srds_init_mgr =
         std::make_unique<Init::ManagerImpl>(fmt::format("SRDS {}:{}", name_, version_info));
     srds_initialization_continuation =
-        std::make_unique<Cleanup>([this, &srds_init_mgr, version_info, &type_urls] {
+        std::make_unique<Cleanup>([this, &srds_init_mgr, version_info] {
           // For new RDS subscriptions created after listener warming up, we don't wait for them to
           // warm up.
           Init::WatcherImpl noop_watcher(
