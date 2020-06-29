@@ -59,7 +59,7 @@ public:
   void onPoolFailure(const Upstream::HostDescriptionConstSharedPtr& host_description,
                      absl::string_view failure_reason, ConnectionPool::PoolFailureReason reason,
                      Envoy::ConnectionPool::AttachContext& context) override {
-    auto* callbacks = reinterpret_cast<HttpAttachContext*>(&context)->callbacks_;
+    auto* callbacks = static_cast<HttpAttachContext*>(&context)->callbacks_;
     callbacks->onPoolFailure(reason, failure_reason, host_description);
   }
   void onPoolReady(Envoy::ConnectionPool::ActiveClient& client,
