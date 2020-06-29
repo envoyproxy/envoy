@@ -20,10 +20,11 @@ protected:
 
 class IsCacheableResponseTest : public testing::Test {
 protected:
+  std::string cache_control = "max-age=3600";
   const Http::TestResponseHeaderMapImpl cacheable_response_headers = {
       {":status", "200"},
       {"date", "Sun, 06 Nov 1994 08:49:37 GMT"},
-      {"cache-control", "max-age=3600"}};
+      {"cache-control", cache_control}};
 };
 
 TEST_F(IsCacheableRequestTest, CacheableRequest) {
@@ -68,7 +69,8 @@ TEST_F(IsCacheableRequestTest, ForwardedProtoHeader) {
 TEST_F(IsCacheableRequestTest, AuthorizationHeader) {
   Http::TestRequestHeaderMapImpl request_headers = cacheable_request_headers;
   EXPECT_TRUE(CacheabilityUtils::isCacheableRequest(request_headers));
-  request_headers.setAuthorization("basic YWxhZGRpbjpvcGVuc2VzYW1l");
+  request_headers.setCopy(Http::CustomHeaders::get().Authorization,
+                          "basic YWxhZGRpbjpvcGVuc2VzYW1l");
   EXPECT_FALSE(CacheabilityUtils::isCacheableRequest(request_headers));
 }
 
@@ -88,11 +90,11 @@ TEST_F(IsCacheableResponseTest, UncacheableStatusCode) {
 TEST_F(IsCacheableResponseTest, ValidationData) {
   Http::TestResponseHeaderMapImpl response_headers = cacheable_response_headers;
   EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers));
-  response_headers.setCacheControl("s-maxage=1000");
+  response_headers.setCopy(Http::CustomHeaders::get().CacheControl, "s-maxage=1000");
   EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers));
-  response_headers.setCacheControl("public, no-transform");
+  response_headers.setCopy(Http::CustomHeaders::get().CacheControl, "public, no-transform");
   EXPECT_FALSE(CacheabilityUtils::isCacheableResponse(response_headers));
-  response_headers.removeCacheControl();
+  response_headers.remove(Http::CustomHeaders::get().CacheControl);
   EXPECT_FALSE(CacheabilityUtils::isCacheableResponse(response_headers));
   response_headers.setCopy(Http::Headers::get().Expires, "Sun, 06 Nov 1994 09:49:37 GMT");
   EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers));
@@ -101,18 +103,16 @@ TEST_F(IsCacheableResponseTest, ValidationData) {
 TEST_F(IsCacheableResponseTest, ResponseNoStore) {
   Http::TestResponseHeaderMapImpl response_headers = cacheable_response_headers;
   EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers));
-  absl::string_view cache_control = response_headers.getCacheControlValue();
   std::string cache_control_no_store = absl::StrCat(cache_control, ", no-store");
-  response_headers.setCacheControl(cache_control_no_store);
+  response_headers.setCopy(Http::CustomHeaders::get().CacheControl, cache_control_no_store);
   EXPECT_FALSE(CacheabilityUtils::isCacheableResponse(response_headers));
 }
 
 TEST_F(IsCacheableResponseTest, ResponsePrivate) {
   Http::TestResponseHeaderMapImpl response_headers = cacheable_response_headers;
   EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers));
-  absl::string_view cache_control = response_headers.getCacheControlValue();
   std::string cache_control_private = absl::StrCat(cache_control, ", private");
-  response_headers.setCacheControl(cache_control_private);
+  response_headers.setCopy(Http::CustomHeaders::get().CacheControl, cache_control_private);
   EXPECT_FALSE(CacheabilityUtils::isCacheableResponse(response_headers));
 }
 

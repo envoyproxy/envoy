@@ -16,6 +16,11 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    request_cache_control_handle(Http::CustomHeaders::get().CacheControl);
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
+    response_cache_control_handle(Http::CustomHeaders::get().CacheControl);
+
 std::ostream& operator<<(std::ostream& os, CacheEntryStatus status) {
   switch (status) {
   case CacheEntryStatus::Ok:
@@ -37,7 +42,8 @@ std::ostream& operator<<(std::ostream& os, const AdjustedByteRange& range) {
 }
 
 LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, SystemTime timestamp)
-    : timestamp_(timestamp), request_cache_control_(request_headers.getCacheControlValue()) {
+    : timestamp_(timestamp), request_cache_control_(request_headers.getInlineValue(
+                                 request_cache_control_handle.handle())) {
   // These ASSERTs check prerequisites. A request without these headers can't be looked up in cache;
   // CacheFilter doesn't create LookupRequests for such requests.
   ASSERT(request_headers.Path(), "Can't form cache lookup key for malformed Http::RequestHeaderMap "
@@ -69,7 +75,9 @@ size_t localHashKey(const Key& key) { return stableHashKey(key); }
 
 bool LookupRequest::requiresValidation(const Http::ResponseHeaderMap& response_headers) const {
   // TODO: Store parsed response cache-control in cache instead of parsing it on every lookup
-  const ResponseCacheControl response_cache_control(response_headers.getCacheControlValue());
+  absl::string_view cache_control =
+      response_headers.getInlineValue(response_cache_control_handle.handle());
+  const ResponseCacheControl response_cache_control(cache_control);
 
   SystemTime response_time = CacheHeadersUtils::httpTime(response_headers.Date());
   SystemTime::duration response_age = timestamp_ - response_time;

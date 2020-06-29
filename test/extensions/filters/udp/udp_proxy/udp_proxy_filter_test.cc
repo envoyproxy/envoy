@@ -260,13 +260,13 @@ cluster: fake_cluster
   EXPECT_EQ(5, cluster_manager_.thread_local_cluster_.cluster_.info_->stats_
                    .upstream_cx_tx_bytes_total_.value());
 
-  test_sessions_[0].recvDataFromUpstream("world2", 0, EMSGSIZE);
+  test_sessions_[0].recvDataFromUpstream("world2", 0, SOCKET_ERROR_MSG_SIZE);
   checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 0 /*tx_bytes*/, 0 /*tx_datagrams*/);
   EXPECT_EQ(6, cluster_manager_.thread_local_cluster_.cluster_.info_->stats_
                    .upstream_cx_rx_bytes_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_tx_errors_.value());
 
-  test_sessions_[0].recvDataFromUpstream("world2", EMSGSIZE, 0);
+  test_sessions_[0].recvDataFromUpstream("world2", SOCKET_ERROR_MSG_SIZE, 0);
   checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 0 /*tx_bytes*/, 0 /*tx_datagrams*/);
   EXPECT_EQ(6, cluster_manager_.thread_local_cluster_.cluster_.info_->stats_
                    .upstream_cx_rx_bytes_total_.value());
@@ -275,7 +275,7 @@ cluster: fake_cluster
                    "udp.sess_rx_errors")
                    ->value());
 
-  test_sessions_[0].expectUpstreamWrite("hello", EMSGSIZE);
+  test_sessions_[0].expectUpstreamWrite("hello", SOCKET_ERROR_MSG_SIZE);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   checkTransferStats(10 /*rx_bytes*/, 2 /*rx_datagrams*/, 0 /*tx_bytes*/, 0 /*tx_datagrams*/);
   EXPECT_EQ(5, cluster_manager_.thread_local_cluster_.cluster_.info_->stats_

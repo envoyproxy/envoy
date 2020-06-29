@@ -154,8 +154,7 @@ class RawHttpClientImpl : public Client,
                           public Http::AsyncClient::Callbacks,
                           Logger::Loggable<Logger::Id::config> {
 public:
-  explicit RawHttpClientImpl(Upstream::ClusterManager& cm, ClientConfigSharedPtr config,
-                             TimeSource& time_source);
+  explicit RawHttpClientImpl(Upstream::ClusterManager& cm, ClientConfigSharedPtr config);
   ~RawHttpClientImpl() override;
 
   // ExtAuthz::Client
@@ -167,15 +166,16 @@ public:
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&& message) override;
   void onFailure(const Http::AsyncClient::Request&,
                  Http::AsyncClient::FailureReason reason) override;
+  void onBeforeFinalizeUpstreamSpan(Tracing::Span& span,
+                                    const Http::ResponseHeaderMap* response_headers) override;
 
 private:
   ResponsePtr toResponse(Http::ResponseMessagePtr message);
+
   Upstream::ClusterManager& cm_;
   ClientConfigSharedPtr config_;
   Http::AsyncClient::Request* request_{};
   RequestCallbacks* callbacks_{};
-  TimeSource& time_source_;
-  Tracing::SpanPtr span_;
 };
 
 } // namespace ExtAuthz

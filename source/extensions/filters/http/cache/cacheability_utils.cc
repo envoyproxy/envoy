@@ -7,6 +7,11 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    authorization_handle(Http::CustomHeaders::get().Authorization);
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
+    cache_control_handle(Http::CustomHeaders::get().CacheControl);
+
 // As defined by:
 // https://tools.ietf.org/html/rfc7231#section-6.1,
 // https://tools.ietf.org/html/rfc7538#section-3,
@@ -21,14 +26,15 @@ bool CacheabilityUtils::isCacheableRequest(const Http::RequestHeaderMap& headers
   const Http::HeaderValues& header_values = Http::Headers::get();
   // TODO(toddmgreer): Also serve HEAD requests from cache.
   // TODO(toddmgreer): Check all the other cache-related headers.
-  return headers.Path() && headers.Host() && !headers.Authorization() &&
+  return headers.Path() && headers.Host() && !headers.getInline(authorization_handle.handle()) &&
          (method == header_values.MethodValues.Get) &&
          (forwarded_proto == header_values.SchemeValues.Http ||
           forwarded_proto == header_values.SchemeValues.Https);
 }
 
 bool CacheabilityUtils::isCacheableResponse(const Http::ResponseHeaderMap& headers) {
-  ResponseCacheControl response_cache_control(headers.getCacheControlValue());
+  absl::string_view cache_control = headers.getInlineValue(cache_control_handle.handle());
+  ResponseCacheControl response_cache_control(cache_control);
   bool cacheable_status = cacheable_status_codes_.contains(headers.getStatusValue());
 
   // Only cache responses with explicit validation data, either:
