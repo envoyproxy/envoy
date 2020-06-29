@@ -102,8 +102,8 @@ TEST_F(IsCacheableResponseTest, ResponseNoStore) {
   Http::TestResponseHeaderMapImpl response_headers = cacheable_response_headers;
   EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers));
   absl::string_view cache_control = response_headers.getCacheControlValue();
-  cache_control = absl::StrCat(cache_control, ", no-store");
-  response_headers.setCacheControl(cache_control);
+  std::string cache_control_no_store = absl::StrCat(cache_control, ", no-store");
+  response_headers.setCacheControl(cache_control_no_store);
   EXPECT_FALSE(CacheabilityUtils::isCacheableResponse(response_headers));
 }
 
@@ -111,8 +111,8 @@ TEST_F(IsCacheableResponseTest, ResponsePrivate) {
   Http::TestResponseHeaderMapImpl response_headers = cacheable_response_headers;
   EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers));
   absl::string_view cache_control = response_headers.getCacheControlValue();
-  cache_control = absl::StrCat(cache_control, ", private");
-  response_headers.setCacheControl(cache_control);
+  std::string cache_control_private = absl::StrCat(cache_control, ", private");
+  response_headers.setCacheControl(cache_control_private);
   EXPECT_FALSE(CacheabilityUtils::isCacheableResponse(response_headers));
 }
 
