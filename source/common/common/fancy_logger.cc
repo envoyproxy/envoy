@@ -11,7 +11,7 @@ namespace Envoy {
  */
 
 /**
- * If the sink is initialized, should be protected by WriterLock.
+ * If the sink is initialized.
  */
 int kSinkInit = 0;
 
@@ -23,7 +23,10 @@ absl::Mutex fancy_log_lock__;
 /**
  * Global hash map <unit, log info>, where unit can be file, function or line.
  */
-absl::flat_hash_map<std::string, spdlog::logger*> fancy_log_map__;
+std::shared_ptr<FancyMap> getFancyLogMap() {
+  static std::shared_ptr<FancyMap> fancy_log_map = std::make_shared<FancyMap>();
+  return fancy_log_map;
+}
 
 const char* LOG_PATTERN = "[%Y-%m-%d %T.%e][%t][%l][%n] %v";
 
@@ -65,12 +68,12 @@ void initSink() {
  * Create a logger and add it to map.
  */
 spdlog::logger* createLogger(std::string key, level_enum level = level_enum::info) {
-  spdlog::logger* new_logger = new spdlog::logger(key, getSink()); // TODO: change to unique_ptr
+  std::shared_ptr<spdlog::logger> new_logger = std::make_shared<spdlog::logger>(key, getSink());
   new_logger->set_level(level);
   new_logger->set_pattern(LOG_PATTERN);
   new_logger->flush_on(level_enum::critical);
-  fancy_log_map__.insert(std::make_pair(key, new_logger));
-  return new_logger;
+  getFancyLogMap()->insert(std::make_pair(key, new_logger));
+  return new_logger.get();
 }
 
 /**
@@ -78,24 +81,17 @@ spdlog::logger* createLogger(std::string key, level_enum level = level_enum::inf
  */
 void initFancyLogger(std::string key, std::atomic<spdlog::logger*>& logger) {
   absl::WriterMutexLock l(&fancy_log_lock__);
-//   if (logger.load(std::memory_order_relaxed)) {
-//       // Since if (logger) in fast path is not protected by lock, it's possible that
-//       // the logger is modified by another thread that visited the same call site before
-//       return;
-//   }
   if (!kSinkInit) {
     initSink();
   }
-  auto it = fancy_log_map__.find(key);
+  auto it = getFancyLogMap()->find(key);
   spdlog::logger* target;
-  if (it == fancy_log_map__.end()) {
+  if (it == getFancyLogMap()->end()) {
     target = createLogger(key);
   } else {
-    target = it->second;
+    target = it->second.get();
   }
   logger.store(target);
-  //   printf("  Init: key: %s, level: %d\n", key.c_str(),
-  //   logger.load(std::memory_order_relaxed)->level());
 }
 
 /**
@@ -103,8 +99,8 @@ void initFancyLogger(std::string key, std::atomic<spdlog::logger*>& logger) {
  */
 void setFancyLogger(std::string key, level_enum log_level) {
   absl::WriterMutexLock l(&fancy_log_lock__);
-  auto it = fancy_log_map__.find(key);
-  if (it != fancy_log_map__.end()) {
+  auto it = getFancyLogMap()->find(key);
+  if (it != getFancyLogMap()->end()) {
     it->second->set_level(log_level);
   } else {
     createLogger(key, log_level);

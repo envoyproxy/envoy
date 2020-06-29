@@ -365,9 +365,11 @@ protected:
  * Fancy logging macros by Jinhui Song
  */
 
+using FancyMap = absl::flat_hash_map<std::string, std::shared_ptr<spdlog::logger>>;
+
 extern absl::Mutex fancy_log_lock__;
 
-extern absl::flat_hash_map<std::string, spdlog::logger*> fancy_log_map__;
+extern std::shared_ptr<FancyMap> getFancyLogMap();
 
 extern void setFancyLogger(std::string key, spdlog::level::level_enum log_level);
 
@@ -384,6 +386,8 @@ extern spdlog::sink_ptr getSink();
 /**
  * Macro for fancy logger.
  * Use a global map to store logger and take use of thread-safe spdlog::logger.
+ * The local pointer is used to avoid another load() when logging. Here we use 
+ * spdlog::logger* as atomic<shared_ptr> is a C++20 feature.
  */
 #define FANCY_LOG(LEVEL, ...)                                                                      \
   do {                                                                                             \
@@ -419,7 +423,7 @@ extern spdlog::sink_ptr getSink();
 #define FANCY_FLUSH_LOG()                                                                          \
   {                                                                                                \
     fancy_log_lock__.ReaderLock();                                                                 \
-    fancy_log_map__.find(FANCY_KEY)->second->flush();                                              \
+    getFancyLogMap()->find(FANCY_KEY)->second->flush();                                              \
     fancy_log_lock__.ReaderUnlock();                                                               \
   }
 
