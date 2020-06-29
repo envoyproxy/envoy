@@ -1516,7 +1516,7 @@ Http2Frame Http2FloodMitigationTest::readFrame() {
   return frame;
 }
 
-void Http2FloodMitigationTest::sendFame(const Http2Frame& frame) {
+void Http2FloodMitigationTest::sendFrame(const Http2Frame& frame) {
   ASSERT_TRUE(tcp_client_->connected());
   tcp_client_->write(std::string(frame), false, false);
 }
@@ -1571,7 +1571,7 @@ void Http2FloodMitigationTest::floodServer(absl::string_view host, absl::string_
                                            const std::string& flood_stat) {
   uint32_t request_idx = 0;
   auto request = Http2Frame::makeRequest(request_idx, host, path);
-  sendFame(request);
+  sendFrame(request);
   auto frame = readFrame();
   EXPECT_EQ(Http2Frame::Type::Headers, frame.type());
   EXPECT_EQ(expected_http_status, frame.responseStatus());
@@ -1579,7 +1579,7 @@ void Http2FloodMitigationTest::floodServer(absl::string_view host, absl::string_
   uint64_t total_bytes_sent = 0;
   while (total_bytes_sent < TransmitThreshold && tcp_client_->connected()) {
     request = Http2Frame::makeRequest(++request_idx, host, path);
-    sendFame(request);
+    sendFrame(request);
     total_bytes_sent += request.size();
   }
   EXPECT_LE(total_bytes_sent, TransmitThreshold) << "Flood mitigation is broken.";
@@ -1639,7 +1639,7 @@ TEST_P(Http2FloodMitigationTest, RST_STREAM) {
 
   int i = 0;
   auto request = Http::Http2::Http2Frame::makeMalformedRequest(i);
-  sendFame(request);
+  sendFrame(request);
   auto response = readFrame();
   // Make sure we've got RST_STREAM from the server
   EXPECT_EQ(Http2Frame::Type::RstStream, response.type());
@@ -1650,7 +1650,7 @@ TEST_P(Http2FloodMitigationTest, RST_STREAM) {
   uint64_t total_bytes_sent = 0;
   while (total_bytes_sent < TransmitThreshold && tcp_client_->connected()) {
     request = Http::Http2::Http2Frame::makeMalformedRequest(++i);
-    sendFame(request);
+    sendFrame(request);
     total_bytes_sent += request.size();
   }
   EXPECT_LE(total_bytes_sent, TransmitThreshold) << "Flood mitigation is broken.";
@@ -1687,7 +1687,7 @@ TEST_P(Http2FloodMitigationTest, EmptyHeaders) {
 
   uint32_t request_idx = 0;
   auto request = Http2Frame::makeEmptyHeadersFrame(request_idx);
-  sendFame(request);
+  sendFrame(request);
 
   tcp_client_->waitForDisconnect();
 
@@ -1701,11 +1701,11 @@ TEST_P(Http2FloodMitigationTest, EmptyHeadersContinuation) {
 
   uint32_t request_idx = 0;
   auto request = Http2Frame::makeEmptyHeadersFrame(request_idx);
-  sendFame(request);
+  sendFrame(request);
 
   for (int i = 0; i < 2; i++) {
     request = Http2Frame::makeEmptyContinuationFrame(request_idx);
-    sendFame(request);
+    sendFrame(request);
   }
 
   tcp_client_->waitForDisconnect();
@@ -1721,11 +1721,11 @@ TEST_P(Http2FloodMitigationTest, EmptyData) {
 
   uint32_t request_idx = 0;
   auto request = Http2Frame::makePostRequest(request_idx, "host", "/");
-  sendFame(request);
+  sendFrame(request);
 
   for (int i = 0; i < 2; i++) {
     request = Http2Frame::makeEmptyDataFrame(request_idx);
-    sendFame(request);
+    sendFrame(request);
   }
 
   tcp_client_->waitForDisconnect();
@@ -1748,7 +1748,7 @@ TEST_P(Http2FloodMitigationTest, PriorityOpenStream) {
   // Open stream.
   uint32_t request_idx = 0;
   auto request = Http2Frame::makeRequest(request_idx, "host", "/");
-  sendFame(request);
+  sendFrame(request);
 
   floodServer(Http2Frame::makePriorityFrame(request_idx, request_idx + 1),
               "http2.inbound_priority_frames_flood");
@@ -1762,7 +1762,7 @@ TEST_P(Http2FloodMitigationTest, PriorityClosedStream) {
   // Open stream.
   uint32_t request_idx = 0;
   auto request = Http2Frame::makeRequest(request_idx, "host", "/");
-  sendFame(request);
+  sendFrame(request);
   // Reading response marks this stream as closed in nghttp2.
   auto frame = readFrame();
   EXPECT_EQ(Http2Frame::Type::Headers, frame.type());
@@ -1778,7 +1778,7 @@ TEST_P(Http2FloodMitigationTest, WindowUpdate) {
   // Open stream.
   uint32_t request_idx = 0;
   auto request = Http2Frame::makeRequest(request_idx, "host", "/");
-  sendFame(request);
+  sendFrame(request);
 
   floodServer(Http2Frame::makeWindowUpdateFrame(request_idx, 1),
               "http2.inbound_window_update_frames_flood");
@@ -1792,7 +1792,7 @@ TEST_P(Http2FloodMitigationTest, ZerolenHeader) {
   // Send invalid request.
   uint32_t request_idx = 0;
   auto request = Http2Frame::makeMalformedRequestWithZerolenHeader(request_idx, "host", "/");
-  sendFame(request);
+  sendFrame(request);
 
   tcp_client_->waitForDisconnect();
 
@@ -1819,7 +1819,7 @@ TEST_P(Http2FloodMitigationTest, ZerolenHeaderAllowed) {
   // Send invalid request.
   uint32_t request_idx = 0;
   auto request = Http2Frame::makeMalformedRequestWithZerolenHeader(request_idx, "host", "/");
-  sendFame(request);
+  sendFrame(request);
   // Make sure we've got RST_STREAM from the server.
   auto response = readFrame();
   EXPECT_EQ(Http2Frame::Type::RstStream, response.type());
@@ -1827,7 +1827,7 @@ TEST_P(Http2FloodMitigationTest, ZerolenHeaderAllowed) {
   // Send valid request using the same connection.
   request_idx++;
   request = Http2Frame::makeRequest(request_idx, "host", "/");
-  sendFame(request);
+  sendFrame(request);
   response = readFrame();
   EXPECT_EQ(Http2Frame::Type::Headers, response.type());
   EXPECT_EQ(Http2Frame::ResponseStatus::Ok, response.responseStatus());
