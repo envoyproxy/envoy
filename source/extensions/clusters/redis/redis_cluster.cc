@@ -151,6 +151,10 @@ RedisCluster::DnsDiscoveryResolveTarget::~DnsDiscoveryResolveTarget() {
   if (active_query_) {
     active_query_->cancel();
   }
+  // Disable timer for mock tests.
+  if (resolve_timer_) {
+    resolve_timer_->disableTimer();
+  }
 }
 
 void RedisCluster::DnsDiscoveryResolveTarget::startResolveDns() {
@@ -228,6 +232,10 @@ RedisCluster::RedisDiscoverySession::~RedisDiscoverySession() {
     current_request_->cancel();
     current_request_ = nullptr;
   }
+  // Disable timer for mock tests.
+  if (resolve_timer_) {
+    resolve_timer_->disableTimer();
+  }
 
   while (!client_map_.empty()) {
     client_map_.begin()->second->client_->close();
@@ -295,7 +303,7 @@ void RedisCluster::RedisDiscoverySession::onResponse(
   const uint32_t SlotRangeStart = 0;
   const uint32_t SlotRangeEnd = 1;
   const uint32_t SlotMaster = 2;
-  const uint32_t SlotSlaveStart = 3;
+  const uint32_t SlotReplicaStart = 3;
 
   // Do nothing if the cluster is empty.
   if (value->type() != NetworkFilters::Common::Redis::RespType::Array || value->asArray().empty()) {
@@ -333,8 +341,8 @@ void RedisCluster::RedisDiscoverySession::onResponse(
     slots->emplace_back(slot_range[SlotRangeStart].asInteger(),
                         slot_range[SlotRangeEnd].asInteger(), master_address);
 
-    for (auto replica = std::next(slot_range.begin(), SlotSlaveStart); replica != slot_range.end();
-         ++replica) {
+    for (auto replica = std::next(slot_range.begin(), SlotReplicaStart);
+         replica != slot_range.end(); ++replica) {
       auto replica_address = ProcessCluster(*replica);
       if (!replica_address) {
         onUnexpectedResponse(value);

@@ -50,9 +50,8 @@ private:
 // mechanism used in RealTimeSystem timers is employed for simulated alarms.
 class SimulatedTimeSystemHelper::Alarm : public Timer {
 public:
-  Alarm(SimulatedTimeSystemHelper& time_system, Scheduler& base_scheduler, TimerCb cb,
-        Dispatcher& dispatcher)
-      : base_timer_(base_scheduler.createTimer([this, cb] { runAlarm(cb); }, dispatcher)),
+  Alarm(SimulatedTimeSystemHelper& time_system, CallbackScheduler& cb_scheduler, TimerCb cb)
+      : cb_(cb_scheduler.createSchedulableCallback([this, cb] { runAlarm(cb); })),
         time_system_(time_system), index_(time_system.nextIndex()), armed_(false), pending_(false) {
   }
 
@@ -68,7 +67,7 @@ public:
                      const ScopeTrackedObject* scope) override;
   bool enabled() override {
     absl::MutexLock lock(&time_system_.mutex_);
-    return armed_ || base_timer_->enabled();
+    return armed_ || cb_->enabled();
   }
 
   void disableTimerLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(time_system_.mutex_);
@@ -81,8 +80,7 @@ public:
    * Activates the timer so it will be run the next time the libevent loop is run,
    * typically via Dispatcher::run().
    */
-  void activateLockHeld(const ScopeTrackedObject* scope = nullptr)
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(time_system_.mutex_) {
+  void activateLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(time_system_.mutex_) {
     ASSERT(armed_);
     armed_ = false;
     if (pending_) {
@@ -97,8 +95,7 @@ public:
     // See class comment for UnlockGuard for details on saving
     // time_system_.mutex_ prior to running libevent, which may delete this.
     UnlockGuard unlocker(time_system_.mutex_);
-    std::chrono::milliseconds duration = std::chrono::milliseconds::zero();
-    base_timer_->enableTimer(duration, scope);
+    cb_->scheduleCallbackCurrentIteration();
   }
 
   MonotonicTime time() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(time_system_.mutex_) {
@@ -123,7 +120,7 @@ private:
     time_system.decPending();
   }
 
-  TimerPtr base_timer_;
+  SchedulableCallbackPtr cb_;
   SimulatedTimeSystemHelper& time_system_;
   MonotonicTime time_ ABSL_GUARDED_BY(time_system_.mutex_);
   const uint64_t index_;
@@ -151,16 +148,15 @@ bool SimulatedTimeSystemHelper::CompareAlarms::operator()(const Alarm* a, const 
 // the expected thread.
 class SimulatedTimeSystemHelper::SimulatedScheduler : public Scheduler {
 public:
-  SimulatedScheduler(SimulatedTimeSystemHelper& time_system, Scheduler& base_scheduler)
-      : time_system_(time_system), base_scheduler_(base_scheduler) {}
-  TimerPtr createTimer(const TimerCb& cb, Dispatcher& dispatcher) override {
-    return std::make_unique<SimulatedTimeSystemHelper::Alarm>(time_system_, base_scheduler_, cb,
-                                                              dispatcher);
+  SimulatedScheduler(SimulatedTimeSystemHelper& time_system, CallbackScheduler& cb_scheduler)
+      : time_system_(time_system), cb_scheduler_(cb_scheduler) {}
+  TimerPtr createTimer(const TimerCb& cb, Dispatcher& /*dispatcher*/) override {
+    return std::make_unique<SimulatedTimeSystemHelper::Alarm>(time_system_, cb_scheduler_, cb);
   };
 
 private:
   SimulatedTimeSystemHelper& time_system_;
-  Scheduler& base_scheduler_;
+  CallbackScheduler& cb_scheduler_;
 };
 
 SimulatedTimeSystemHelper::Alarm::Alarm::~Alarm() {
@@ -170,7 +166,7 @@ SimulatedTimeSystemHelper::Alarm::Alarm::~Alarm() {
 }
 
 void SimulatedTimeSystemHelper::Alarm::Alarm::disableTimer() {
-  base_timer_->disableTimer();
+  cb_->cancel();
   absl::MutexLock lock(&time_system_.mutex_);
   disableTimerLockHeld();
 }
@@ -187,7 +183,7 @@ void SimulatedTimeSystemHelper::Alarm::Alarm::disableTimerLockHeld() {
 }
 
 void SimulatedTimeSystemHelper::Alarm::Alarm::enableHRTimer(
-    const std::chrono::microseconds& duration, const ScopeTrackedObject* scope) {
+    const std::chrono::microseconds& duration, const ScopeTrackedObject* /*scope*/) {
   if (duration.count() != 0) {
     disableTimer();
   }
@@ -202,7 +198,7 @@ void SimulatedTimeSystemHelper::Alarm::Alarm::enableHRTimer(
 
   armed_ = true;
   if (duration.count() == 0) {
-    activateLockHeld(scope);
+    activateLockHeld();
   } else {
     time_system_.addAlarmLockHeld(this, duration);
   }
@@ -341,8 +337,9 @@ void SimulatedTimeSystemHelper::addAlarmLockHeld(
 
 void SimulatedTimeSystemHelper::removeAlarmLockHeld(Alarm* alarm) { alarms_.erase(alarm); }
 
-SchedulerPtr SimulatedTimeSystemHelper::createScheduler(Scheduler& base_scheduler) {
-  return std::make_unique<SimulatedScheduler>(*this, base_scheduler);
+SchedulerPtr SimulatedTimeSystemHelper::createScheduler(Scheduler& /*base_scheduler*/,
+                                                        CallbackScheduler& cb_scheduler) {
+  return std::make_unique<SimulatedScheduler>(*this, cb_scheduler);
 }
 
 void SimulatedTimeSystemHelper::setMonotonicTimeLockHeld(const MonotonicTime& monotonic_time) {

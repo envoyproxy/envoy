@@ -31,6 +31,7 @@ namespace Client {
 struct RedirectionValues {
   const std::string ASK = "ASK";
   const std::string MOVED = "MOVED";
+  const std::string CLUSTER_DOWN = "CLUSTERDOWN";
 };
 
 using RedirectionResponse = ConstSingleton<RedirectionValues>;

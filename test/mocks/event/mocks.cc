@@ -51,6 +51,19 @@ MockTimer::MockTimer(MockDispatcher* dispatcher) : MockTimer() {
 
 MockTimer::~MockTimer() = default;
 
+MockSchedulableCallback::~MockSchedulableCallback() = default;
+
+MockSchedulableCallback::MockSchedulableCallback(MockDispatcher* dispatcher)
+    : dispatcher_(dispatcher) {
+  EXPECT_CALL(*dispatcher, createSchedulableCallback_(_))
+      .WillOnce(DoAll(SaveArg<0>(&callback_), Return(this)))
+      .RetiresOnSaturation();
+  ON_CALL(*this, scheduleCallbackCurrentIteration()).WillByDefault(Assign(&enabled_, true));
+  ON_CALL(*this, scheduleCallbackNextIteration()).WillByDefault(Assign(&enabled_, true));
+  ON_CALL(*this, cancel()).WillByDefault(Assign(&enabled_, false));
+  ON_CALL(*this, enabled()).WillByDefault(ReturnPointee(&enabled_));
+}
+
 MockSignalEvent::MockSignalEvent(MockDispatcher* dispatcher) {
   EXPECT_CALL(*dispatcher, listenForSignal_(_, _))
       .WillOnce(DoAll(SaveArg<1>(&callback_), Return(this)))

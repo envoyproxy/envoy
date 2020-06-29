@@ -153,8 +153,8 @@ MatcherSharedPtr
 ClientConfig::toRequestMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
                                 const bool disable_lowercase_string_matcher) {
   const std::vector<Http::LowerCaseString> keys{
-      {Http::Headers::get().Authorization, Http::Headers::get().Method, Http::Headers::get().Path,
-       Http::Headers::get().Host}};
+      {Http::CustomHeaders::get().Authorization, Http::Headers::get().Method,
+       Http::Headers::get().Path, Http::Headers::get().Host}};
 
   std::vector<Matchers::StringMatcherPtr> matchers(
       createStringMatchers(list, disable_lowercase_string_matcher));
@@ -205,23 +205,15 @@ ClientConfig::toUpstreamMatchers(const envoy::type::matcher::v3::ListStringMatch
       createStringMatchers(list, disable_lowercase_string_matcher));
 }
 
-RawHttpClientImpl::RawHttpClientImpl(Upstream::ClusterManager& cm, ClientConfigSharedPtr config,
-                                     TimeSource& time_source)
-    : cm_(cm), config_(config), time_source_(time_source) {}
+RawHttpClientImpl::RawHttpClientImpl(Upstream::ClusterManager& cm, ClientConfigSharedPtr config)
+    : cm_(cm), config_(config) {}
 
-RawHttpClientImpl::~RawHttpClientImpl() {
-  ASSERT(callbacks_ == nullptr);
-  ASSERT(span_ == nullptr);
-}
+RawHttpClientImpl::~RawHttpClientImpl() { ASSERT(callbacks_ == nullptr); }
 
 void RawHttpClientImpl::cancel() {
   ASSERT(callbacks_ != nullptr);
-  ASSERT(span_ != nullptr);
-  span_->setTag(Tracing::Tags::get().Status, Tracing::Tags::get().Canceled);
-  span_->finishSpan();
   request_->cancel();
   callbacks_ = nullptr;
-  span_ = nullptr;
 }
 
 // Client
@@ -230,11 +222,7 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
                               Tracing::Span& parent_span,
                               const StreamInfo::StreamInfo& stream_info) {
   ASSERT(callbacks_ == nullptr);
-  ASSERT(span_ == nullptr);
   callbacks_ = &callbacks;
-  span_ = parent_span.spawnChild(Tracing::EgressConfig::get(), config_->tracingName(),
-                                 time_source_.systemTime());
-  span_->setTag(Tracing::Tags::get().UpstreamCluster, config_->cluster());
 
   Http::RequestHeaderMapPtr headers;
   const uint64_t request_length = request.attributes().request().http().body().size();
@@ -275,51 +263,47 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
   // It's possible that the cluster specified in the filter configuration no longer exists due to a
   // CDS removal.
   if (cm_.get(cluster) == nullptr) {
-    // TODO(dio): Add stats and tracing related to this.
+    // TODO(dio): Add stats related to this.
     ENVOY_LOG(debug, "ext_authz cluster '{}' does not exist", cluster);
     callbacks_->onComplete(std::make_unique<Response>(errorResponse()));
-    span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
-    span_->finishSpan();
     callbacks_ = nullptr;
-    span_ = nullptr;
   } else {
-    span_->injectContext(message->headers());
-    request_ = cm_.httpAsyncClientForCluster(cluster).send(
-        std::move(message), *this,
-        Http::AsyncClient::RequestOptions().setTimeout(config_->timeout()));
+    auto options = Http::AsyncClient::RequestOptions()
+                       .setTimeout(config_->timeout())
+                       .setParentSpan(parent_span)
+                       .setChildSpanName(config_->tracingName());
+
+    request_ = cm_.httpAsyncClientForCluster(cluster).send(std::move(message), *this, options);
   }
 }
 
 void RawHttpClientImpl::onSuccess(const Http::AsyncClient::Request&,
                                   Http::ResponseMessagePtr&& message) {
   callbacks_->onComplete(toResponse(std::move(message)));
-  span_->finishSpan();
   callbacks_ = nullptr;
-  span_ = nullptr;
 }
 
 void RawHttpClientImpl::onFailure(const Http::AsyncClient::Request&,
                                   Http::AsyncClient::FailureReason reason) {
   ASSERT(reason == Http::AsyncClient::FailureReason::Reset);
   callbacks_->onComplete(std::make_unique<Response>(errorResponse()));
-  span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
-  span_->finishSpan();
   callbacks_ = nullptr;
-  span_ = nullptr;
+}
+
+void RawHttpClientImpl::onBeforeFinalizeUpstreamSpan(
+    Tracing::Span& span, const Http::ResponseHeaderMap* response_headers) {
+  if (response_headers != nullptr) {
+    const uint64_t status_code = Http::Utility::getResponseStatus(*response_headers);
+    span.setTag(TracingConstants::get().HttpStatus,
+                Http::CodeUtility::toString(static_cast<Http::Code>(status_code)));
+    span.setTag(TracingConstants::get().TraceStatus, status_code == enumToInt(Http::Code::OK)
+                                                         ? TracingConstants::get().TraceOk
+                                                         : TracingConstants::get().TraceUnauthz);
+  }
 }
 
 ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
-  // Set an error status if parsing status code fails. A Forbidden response is sent to the client
-  // if the filter has not been configured with failure_mode_allow.
-  uint64_t status_code{};
-  if (!absl::SimpleAtoi(message->headers().getStatusValue(), &status_code)) {
-    ENVOY_LOG(warn, "ext_authz HTTP client failed to parse the HTTP status code.");
-    span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
-    return std::make_unique<Response>(errorResponse());
-  }
-
-  span_->setTag(TracingConstants::get().HttpStatus,
-                Http::CodeUtility::toString(static_cast<Http::Code>(status_code)));
+  const uint64_t status_code = Http::Utility::getResponseStatus(message->headers());
 
   // Set an error status if the call to the authorization server returns any of the 5xx HTTP error
   // codes. A Forbidden response is sent to the client if the filter has not been configured with
@@ -334,7 +318,6 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
                        config_->upstreamHeaderToAppendMatchers(),
                        Response{CheckStatus::OK, Http::HeaderVector{}, Http::HeaderVector{},
                                 Http::HeaderVector{}, EMPTY_STRING, Http::Code::OK}};
-    span_->setTag(TracingConstants::get().TraceStatus, TracingConstants::get().TraceOk);
     return std::move(ok.response_);
   }
 
@@ -344,7 +327,6 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
                          Response{CheckStatus::Denied, Http::HeaderVector{}, Http::HeaderVector{},
                                   Http::HeaderVector{}, message->bodyAsString(),
                                   static_cast<Http::Code>(status_code)}};
-  span_->setTag(TracingConstants::get().TraceStatus, TracingConstants::get().TraceUnauthz);
   return std::move(denied.response_);
 }
 
