@@ -1199,6 +1199,7 @@ TEST(PercentEncoding, EncodeDecode) {
 
 TEST(PercentEncoding, Decoding) {
   EXPECT_EQ(Utility::PercentEncoding::decode("hello%20world"), "hello world");
+  EXPECT_EQ(Utility::PercentEncoding::decode("upstream%7Cdownstream"), "upstream|downstream");
   EXPECT_EQ(
       Utility::PercentEncoding::decode(
           "filter=%28cluster.upstream_%28rq_total%7Crq_time_sum%7Crq_time_count%7Crq_time_bucket%"
