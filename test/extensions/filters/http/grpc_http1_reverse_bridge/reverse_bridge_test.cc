@@ -60,7 +60,8 @@ TEST_F(ReverseBridgeTest, InvalidGrpcRequest) {
 
     EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
     EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentLength, "20"));
-    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().Accept, "application/x-protobuf"));
+    EXPECT_THAT(headers,
+                HeaderValueOf(Http::CustomHeaders::get().Accept, "application/x-protobuf"));
   }
 
   {
@@ -174,7 +175,8 @@ TEST_F(ReverseBridgeTest, GrpcRequestNoManageFrameHeader) {
 
     EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
     EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentLength, "25"));
-    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().Accept, "application/x-protobuf"));
+    EXPECT_THAT(headers,
+                HeaderValueOf(Http::CustomHeaders::get().Accept, "application/x-protobuf"));
   }
 
   {
@@ -234,7 +236,8 @@ TEST_F(ReverseBridgeTest, GrpcRequest) {
 
     EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
     EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentLength, "20"));
-    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().Accept, "application/x-protobuf"));
+    EXPECT_THAT(headers,
+                HeaderValueOf(Http::CustomHeaders::get().Accept, "application/x-protobuf"));
   }
 
   {
@@ -313,7 +316,8 @@ TEST_F(ReverseBridgeTest, GrpcRequestNoContentLength) {
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
 
     EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
-    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().Accept, "application/x-protobuf"));
+    EXPECT_THAT(headers,
+                HeaderValueOf(Http::CustomHeaders::get().Accept, "application/x-protobuf"));
     // Ensure that we don't insert a content-length header.
     EXPECT_EQ(nullptr, headers.ContentLength());
   }
@@ -396,7 +400,8 @@ TEST_F(ReverseBridgeTest, GrpcRequestHeaderOnlyResponse) {
 
     EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
     EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentLength, "20"));
-    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().Accept, "application/x-protobuf"));
+    EXPECT_THAT(headers,
+                HeaderValueOf(Http::CustomHeaders::get().Accept, "application/x-protobuf"));
   }
 
   {
@@ -441,7 +446,8 @@ TEST_F(ReverseBridgeTest, GrpcRequestInternalError) {
         {{"content-type", "application/grpc"}, {":path", "/testing.ExampleService/SendData"}});
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
     EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
-    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().Accept, "application/x-protobuf"));
+    EXPECT_THAT(headers,
+                HeaderValueOf(Http::CustomHeaders::get().Accept, "application/x-protobuf"));
   }
 
   {
@@ -516,7 +522,8 @@ TEST_F(ReverseBridgeTest, GrpcRequestBadResponseNoContentType) {
         {{"content-type", "application/grpc"}, {":path", "/testing.ExampleService/SendData"}});
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
     EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
-    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().Accept, "application/x-protobuf"));
+    EXPECT_THAT(headers,
+                HeaderValueOf(Http::CustomHeaders::get().Accept, "application/x-protobuf"));
   }
 
   {
@@ -566,7 +573,8 @@ TEST_F(ReverseBridgeTest, GrpcRequestBadResponse) {
         {{"content-type", "application/grpc"}, {":path", "/testing.ExampleService/SendData"}});
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
     EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
-    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().Accept, "application/x-protobuf"));
+    EXPECT_THAT(headers,
+                HeaderValueOf(Http::CustomHeaders::get().Accept, "application/x-protobuf"));
   }
 
   {
@@ -656,7 +664,8 @@ TEST_F(ReverseBridgeTest, FilterConfigPerRouteEnabled) {
 
     EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
     EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentLength, "20"));
-    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().Accept, "application/x-protobuf"));
+    EXPECT_THAT(headers,
+                HeaderValueOf(Http::CustomHeaders::get().Accept, "application/x-protobuf"));
   }
 
   {
@@ -742,7 +751,8 @@ TEST_F(ReverseBridgeTest, RouteWithTrailers) {
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
     EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
     EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentLength, "20"));
-    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().Accept, "application/x-protobuf"));
+    EXPECT_THAT(headers,
+                HeaderValueOf(Http::CustomHeaders::get().Accept, "application/x-protobuf"));
   }
 
   {

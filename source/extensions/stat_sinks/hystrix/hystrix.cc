@@ -23,9 +23,11 @@ namespace StatSinks {
 namespace Hystrix {
 
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
-    access_control_allow_origin(Http::Headers::get().AccessControlAllowOrigin);
+    access_control_allow_origin_handle(Http::CustomHeaders::get().AccessControlAllowOrigin);
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
-    access_control_allow_headers(Http::Headers::get().AccessControlAllowHeaders);
+    access_control_allow_headers_handle(Http::CustomHeaders::get().AccessControlAllowHeaders);
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
+    cache_control_handle(Http::CustomHeaders::get().CacheControl);
 
 const uint64_t HystrixSink::DEFAULT_NUM_BUCKETS;
 ClusterStatsCache::ClusterStatsCache(const std::string& cluster_name)
@@ -293,12 +295,13 @@ Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
                                                   Server::AdminStream& admin_stream) {
 
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.TextEventStream);
-  response_headers.setReferenceCacheControl(Http::Headers::get().CacheControlValues.NoCache);
+  response_headers.setReferenceInline(cache_control_handle.handle(),
+                                      Http::CustomHeaders::get().CacheControlValues.NoCache);
   response_headers.setReferenceConnection(Http::Headers::get().ConnectionValues.Close);
-  response_headers.setReferenceInline(access_control_allow_headers.handle(),
+  response_headers.setReferenceInline(access_control_allow_headers_handle.handle(),
                                       AccessControlAllowHeadersValue.AllowHeadersHystrix);
-  response_headers.setReferenceInline(access_control_allow_origin.handle(),
-                                      Http::Headers::get().AccessControlAllowOriginValue.All);
+  response_headers.setReferenceInline(access_control_allow_origin_handle.handle(),
+                                      Http::CustomHeaders::get().AccessControlAllowOriginValue.All);
 
   Http::StreamDecoderFilterCallbacks& stream_decoder_filter_callbacks =
       admin_stream.getDecoderFilterCallbacks();

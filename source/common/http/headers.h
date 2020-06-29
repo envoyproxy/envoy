@@ -43,12 +43,13 @@ private:
 };
 
 /**
- * Constant HTTP headers and values. All lower case.
+ * These are headers that are used in extension custom O(1) header registration. These headers
+ * *must* not contain any prefix override headers, as static init order requires that HeaderValues
+ * be instantiated for the first time after bootstrap is loaded and before the header maps are
+ * finalized.
  */
-class HeaderValues {
+class CustomHeaderValues {
 public:
-  const char* prefix() { return ThreadSafeSingleton<PrefixValue>::get().prefix(); }
-
   const LowerCaseString Accept{"accept"};
   const LowerCaseString AcceptEncoding{"accept-encoding"};
   const LowerCaseString AccessControlRequestMethod{"access-control-request-method"};
@@ -58,14 +59,66 @@ public:
   const LowerCaseString AccessControlExposeHeaders{"access-control-expose-headers"};
   const LowerCaseString AccessControlMaxAge{"access-control-max-age"};
   const LowerCaseString AccessControlAllowCredentials{"access-control-allow-credentials"};
-  const LowerCaseString Age{"age"};
   const LowerCaseString Authorization{"authorization"};
+  const LowerCaseString CacheControl{"cache-control"};
+  const LowerCaseString ContentEncoding{"content-encoding"};
+  const LowerCaseString Etag{"etag"};
+  const LowerCaseString GrpcAcceptEncoding{"grpc-accept-encoding"};
+  const LowerCaseString Origin{"origin"};
+  const LowerCaseString OtSpanContext{"x-ot-span-context"};
+  const LowerCaseString Referer{"referer"};
+  const LowerCaseString Vary{"vary"};
+
+  struct {
+    const std::string Gzip{"gzip"};
+    const std::string Identity{"identity"};
+    const std::string Wildcard{"*"};
+  } AcceptEncodingValues;
+
+  struct {
+    const std::string All{"*"};
+  } AccessControlAllowOriginValue;
+
+  struct {
+    const std::string NoCache{"no-cache"};
+    const std::string NoCacheMaxAge0{"no-cache, max-age=0"};
+    const std::string NoTransform{"no-transform"};
+    const std::string Private{"private"};
+  } CacheControlValues;
+
+  struct {
+    const std::string Gzip{"gzip"};
+  } ContentEncodingValues;
+
+  struct {
+    const std::string True{"true"};
+  } CORSValues;
+
+  struct {
+    const std::string Default{"identity,deflate,gzip"};
+  } GrpcAcceptEncodingValues;
+
+  struct {
+    const std::string AcceptEncoding{"Accept-Encoding"};
+    const std::string Wildcard{"*"};
+  } VaryValues;
+};
+
+using CustomHeaders = ConstSingleton<CustomHeaderValues>;
+
+/**
+ * Constant HTTP headers and values. All lower case. This group of headers can contain prefix
+ * override headers.
+ */
+class HeaderValues {
+public:
+  const char* prefix() { return ThreadSafeSingleton<PrefixValue>::get().prefix(); }
+
+  const LowerCaseString Age{"age"};
   const LowerCaseString ProxyAuthenticate{"proxy-authenticate"};
   const LowerCaseString ProxyAuthorization{"proxy-authorization"};
-  const LowerCaseString CacheControl{"cache-control"};
   const LowerCaseString ClientTraceId{"x-client-trace-id"};
   const LowerCaseString Connection{"connection"};
-  const LowerCaseString ContentEncoding{"content-encoding"};
   const LowerCaseString ContentLength{"content-length"};
   const LowerCaseString ContentType{"content-type"};
   const LowerCaseString Cookie{"cookie"};
@@ -86,6 +139,9 @@ public:
       absl::StrCat(prefix(), "-immediate-health-check-fail")};
   const LowerCaseString EnvoyOriginalUrl{absl::StrCat(prefix(), "-original-url")};
   const LowerCaseString EnvoyInternalRequest{absl::StrCat(prefix(), "-internal")};
+  // TODO(mattklein123): EnvoyIpTags should be a custom header registered with the IP tagging
+  // filter. We need to figure out if we can remove this header from the set of headers that
+  // participate in prefix overrides.
   const LowerCaseString EnvoyIpTags{absl::StrCat(prefix(), "-ip-tags")};
   const LowerCaseString EnvoyMaxRetries{absl::StrCat(prefix(), "-max-retries")};
   const LowerCaseString EnvoyNotForwarded{absl::StrCat(prefix(), "-not-forwarded")};
@@ -116,7 +172,6 @@ public:
   const LowerCaseString EnvoyUpstreamHealthCheckedCluster{
       absl::StrCat(prefix(), "-upstream-healthchecked-cluster")};
   const LowerCaseString EnvoyDecoratorOperation{absl::StrCat(prefix(), "-decorator-operation")};
-  const LowerCaseString Etag{"etag"};
   const LowerCaseString Expect{"expect"};
   const LowerCaseString Expires{"expires"};
   const LowerCaseString ForwardedClientCert{"x-forwarded-client-cert"};
@@ -126,7 +181,6 @@ public:
   const LowerCaseString GrpcMessage{"grpc-message"};
   const LowerCaseString GrpcStatus{"grpc-status"};
   const LowerCaseString GrpcTimeout{"grpc-timeout"};
-  const LowerCaseString GrpcAcceptEncoding{"grpc-accept-encoding"};
   const LowerCaseString GrpcStatusDetailsBin{"grpc-status-details-bin"};
   const LowerCaseString Host{":authority"};
   const LowerCaseString HostLegacy{"host"};
@@ -134,12 +188,9 @@ public:
   const LowerCaseString KeepAlive{"keep-alive"};
   const LowerCaseString Location{"location"};
   const LowerCaseString Method{":method"};
-  const LowerCaseString Origin{"origin"};
-  const LowerCaseString OtSpanContext{"x-ot-span-context"};
   const LowerCaseString Path{":path"};
   const LowerCaseString Protocol{":protocol"};
   const LowerCaseString ProxyConnection{"proxy-connection"};
-  const LowerCaseString Referer{"referer"};
   const LowerCaseString RequestId{"x-request-id"};
   const LowerCaseString Scheme{":scheme"};
   const LowerCaseString Server{"server"};
@@ -149,7 +200,6 @@ public:
   const LowerCaseString TE{"te"};
   const LowerCaseString Upgrade{"upgrade"};
   const LowerCaseString UserAgent{"user-agent"};
-  const LowerCaseString Vary{"vary"};
   const LowerCaseString Via{"via"};
   const LowerCaseString WWWAuthenticate{"www-authenticate"};
   const LowerCaseString XContentTypeOptions{"x-content-type-options"};
@@ -166,13 +216,6 @@ public:
     const std::string H2c{"h2c"};
     const std::string WebSocket{"websocket"};
   } UpgradeValues;
-
-  struct {
-    const std::string NoCache{"no-cache"};
-    const std::string NoCacheMaxAge0{"no-cache, max-age=0"};
-    const std::string NoTransform{"no-transform"};
-    const std::string Private{"private"};
-  } CacheControlValues;
 
   struct {
     const std::string Text{"text/plain"};
@@ -262,10 +305,6 @@ public:
   } UserAgentValues;
 
   struct {
-    const std::string Default{"identity,deflate,gzip"};
-  } GrpcAcceptEncodingValues;
-
-  struct {
     const std::string Trailers{"trailers"};
   } TEValues;
 
@@ -274,34 +313,11 @@ public:
   } XContentTypeOptionValues;
 
   struct {
-    const std::string True{"true"};
-  } CORSValues;
-
-  struct {
     const std::string Http10String{"HTTP/1.0"};
     const std::string Http11String{"HTTP/1.1"};
     const std::string Http2String{"HTTP/2"};
     const std::string Http3String{"HTTP/3"};
   } ProtocolStrings;
-
-  struct {
-    const std::string Gzip{"gzip"};
-    const std::string Identity{"identity"};
-    const std::string Wildcard{"*"};
-  } AcceptEncodingValues;
-
-  struct {
-    const std::string Gzip{"gzip"};
-  } ContentEncodingValues;
-
-  struct {
-    const std::string AcceptEncoding{"Accept-Encoding"};
-    const std::string Wildcard{"*"};
-  } VaryValues;
-
-  struct {
-    const std::string All{"*"};
-  } AccessControlAllowOriginValue;
 };
 
 using Headers = ConstSingleton<HeaderValues>;

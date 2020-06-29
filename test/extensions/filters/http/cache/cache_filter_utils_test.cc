@@ -56,7 +56,8 @@ TEST_F(IsCacheableRequestTest, ForwardedProtoHeader) {
 TEST_F(IsCacheableRequestTest, AuthorizationHeader) {
   Http::TestRequestHeaderMapImpl request_headers = cacheable_request_headers;
   EXPECT_TRUE(CacheFilterUtils::isCacheableRequest(request_headers));
-  request_headers.setAuthorization("basic YWxhZGRpbjpvcGVuc2VzYW1l");
+  request_headers.setCopy(Http::CustomHeaders::get().Authorization,
+                          "basic YWxhZGRpbjpvcGVuc2VzYW1l");
   EXPECT_FALSE(CacheFilterUtils::isCacheableRequest(request_headers));
 }
 

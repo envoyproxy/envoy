@@ -445,20 +445,20 @@ TEST(HeaderMapImplTest, InlineAppend) {
 TEST(HeaderMapImplTest, MoveIntoInline) {
   TestRequestHeaderMapImpl headers;
   HeaderString key;
-  key.setCopy(Headers::get().CacheControl.get());
+  key.setCopy(Headers::get().EnvoyRetryOn.get());
   HeaderString value;
   value.setCopy("hello");
   headers.addViaMove(std::move(key), std::move(value));
-  EXPECT_EQ("cache-control", headers.CacheControl()->key().getStringView());
-  EXPECT_EQ("hello", headers.getCacheControlValue());
+  EXPECT_EQ("x-envoy-retry-on", headers.EnvoyRetryOn()->key().getStringView());
+  EXPECT_EQ("hello", headers.getEnvoyRetryOnValue());
 
   HeaderString key2;
-  key2.setCopy(Headers::get().CacheControl.get());
+  key2.setCopy(Headers::get().EnvoyRetryOn.get());
   HeaderString value2;
   value2.setCopy("there");
   headers.addViaMove(std::move(key2), std::move(value2));
-  EXPECT_EQ("cache-control", headers.CacheControl()->key().getStringView());
-  EXPECT_EQ("hello,there", headers.getCacheControlValue());
+  EXPECT_EQ("x-envoy-retry-on", headers.EnvoyRetryOn()->key().getStringView());
+  EXPECT_EQ("hello,there", headers.getEnvoyRetryOnValue());
 }
 
 TEST(HeaderMapImplTest, Remove) {
@@ -787,19 +787,19 @@ TEST(HeaderMapImplTest, AddCopy) {
   EXPECT_EQ("42", headers.get(lcKey3)->value().getStringView());
   EXPECT_EQ(2UL, headers.get(lcKey3)->value().size());
 
-  LowerCaseString cache_control("cache-control");
-  headers.addCopy(cache_control, "max-age=1345");
-  EXPECT_EQ("max-age=1345", headers.get(cache_control)->value().getStringView());
-  EXPECT_EQ("max-age=1345", headers.getCacheControlValue());
-  headers.addCopy(cache_control, "public");
-  EXPECT_EQ("max-age=1345,public", headers.get(cache_control)->value().getStringView());
-  headers.addCopy(cache_control, "");
-  EXPECT_EQ("max-age=1345,public", headers.get(cache_control)->value().getStringView());
-  headers.addCopy(cache_control, 123);
-  EXPECT_EQ("max-age=1345,public,123", headers.get(cache_control)->value().getStringView());
-  headers.addCopy(cache_control, std::numeric_limits<uint64_t>::max());
+  LowerCaseString envoy_retry_on("x-envoy-retry-on");
+  headers.addCopy(envoy_retry_on, "max-age=1345");
+  EXPECT_EQ("max-age=1345", headers.get(envoy_retry_on)->value().getStringView());
+  EXPECT_EQ("max-age=1345", headers.getEnvoyRetryOnValue());
+  headers.addCopy(envoy_retry_on, "public");
+  EXPECT_EQ("max-age=1345,public", headers.get(envoy_retry_on)->value().getStringView());
+  headers.addCopy(envoy_retry_on, "");
+  EXPECT_EQ("max-age=1345,public", headers.get(envoy_retry_on)->value().getStringView());
+  headers.addCopy(envoy_retry_on, 123);
+  EXPECT_EQ("max-age=1345,public,123", headers.get(envoy_retry_on)->value().getStringView());
+  headers.addCopy(envoy_retry_on, std::numeric_limits<uint64_t>::max());
   EXPECT_EQ("max-age=1345,public,123,18446744073709551615",
-            headers.get(cache_control)->value().getStringView());
+            headers.get(envoy_retry_on)->value().getStringView());
 }
 
 TEST(HeaderMapImplTest, Equality) {

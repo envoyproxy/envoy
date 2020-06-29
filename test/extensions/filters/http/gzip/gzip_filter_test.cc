@@ -81,7 +81,8 @@ protected:
     feedBuffer(content_length);
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
     EXPECT_EQ("", headers.get_("content-length"));
-    EXPECT_EQ(Http::Headers::get().ContentEncodingValues.Gzip, headers.get_("content-encoding"));
+    EXPECT_EQ(Http::CustomHeaders::get().ContentEncodingValues.Gzip,
+              headers.get_("content-encoding"));
     EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data_, !with_trailers));
     if (with_trailers) {
       Buffer::OwnedImpl trailers_buffer;

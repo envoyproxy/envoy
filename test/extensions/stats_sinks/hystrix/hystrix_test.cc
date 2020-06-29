@@ -527,7 +527,7 @@ TEST_F(HystrixSinkTest, HystrixEventStreamHandler) {
 
   // Check that response_headers has been set correctly
   EXPECT_EQ(response_headers.ContentType()->value(), "text/event-stream");
-  EXPECT_EQ(response_headers.CacheControl()->value(), "no-cache");
+  EXPECT_EQ(response_headers.get_("cache-control"), "no-cache");
   EXPECT_EQ(response_headers.Connection()->value(), "close");
   EXPECT_EQ(response_headers.get_("access-control-allow-origin"), "*");
   EXPECT_THAT(response_headers.get_("access-control-allow-headers"), HasSubstr("Accept"));

@@ -153,8 +153,8 @@ MatcherSharedPtr
 ClientConfig::toRequestMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
                                 const bool disable_lowercase_string_matcher) {
   const std::vector<Http::LowerCaseString> keys{
-      {Http::Headers::get().Authorization, Http::Headers::get().Method, Http::Headers::get().Path,
-       Http::Headers::get().Host}};
+      {Http::CustomHeaders::get().Authorization, Http::Headers::get().Method,
+       Http::Headers::get().Path, Http::Headers::get().Host}};
 
   std::vector<Matchers::StringMatcherPtr> matchers(
       createStringMatchers(list, disable_lowercase_string_matcher));

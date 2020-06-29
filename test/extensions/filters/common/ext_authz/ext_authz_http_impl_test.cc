@@ -149,7 +149,8 @@ TEST_F(ExtAuthzHttpClientTest, ClientConfig) {
   // Check allowed request headers.
   EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Method.get()));
   EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Host.get()));
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Authorization.get()));
+  EXPECT_TRUE(
+      config_->requestHeaderMatchers()->matches(Http::CustomHeaders::get().Authorization.get()));
   EXPECT_FALSE(config_->requestHeaderMatchers()->matches(Http::Headers::get().ContentLength.get()));
   EXPECT_TRUE(config_->requestHeaderMatchers()->matches(baz.get()));
 
@@ -159,7 +160,7 @@ TEST_F(ExtAuthzHttpClientTest, ClientConfig) {
   EXPECT_FALSE(config_->clientHeaderMatchers()->matches(Http::Headers::get().Path.get()));
   EXPECT_FALSE(config_->clientHeaderMatchers()->matches(Http::Headers::get().Host.get()));
   EXPECT_TRUE(config_->clientHeaderMatchers()->matches(Http::Headers::get().WWWAuthenticate.get()));
-  EXPECT_FALSE(config_->clientHeaderMatchers()->matches(Http::Headers::get().Origin.get()));
+  EXPECT_FALSE(config_->clientHeaderMatchers()->matches(Http::CustomHeaders::get().Origin.get()));
   EXPECT_TRUE(config_->clientHeaderMatchers()->matches(foo.get()));
 
   // Check allowed upstream headers.
@@ -191,7 +192,8 @@ TEST_F(ExtAuthzHttpClientTest, TestDefaultAllowedHeaders) {
   // Check allowed request headers.
   EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Method.get()));
   EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Host.get()));
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Authorization.get()));
+  EXPECT_TRUE(
+      config_->requestHeaderMatchers()->matches(Http::CustomHeaders::get().Authorization.get()));
   EXPECT_FALSE(config_->requestHeaderMatchers()->matches(Http::Headers::get().ContentLength.get()));
 
   // Check allowed client headers.

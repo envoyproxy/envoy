@@ -33,7 +33,7 @@ public:
   Envoy::Compression::Compressor::CompressorPtr createCompressor() override;
   const std::string& statsPrefix() const override { return gzipStatsPrefix(); }
   const std::string& contentEncoding() const override {
-    return Http::Headers::get().ContentEncodingValues.Gzip;
+    return Http::CustomHeaders::get().ContentEncodingValues.Gzip;
   }
 
 private:

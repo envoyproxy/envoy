@@ -24,7 +24,7 @@ protected:
     request_headers_.setMethod("GET");
     request_headers_.setHost("example.com");
     request_headers_.setForwardedProto("https");
-    request_headers_.setCacheControl("max-age=3600");
+    request_headers_.setCopy(Http::CustomHeaders::get().CacheControl, "max-age=3600");
   }
 
   // Performs a cache lookup.
@@ -160,7 +160,7 @@ TEST_F(SimpleHttpCacheTest, Stale) {
 }
 
 TEST_F(SimpleHttpCacheTest, RequestSmallMinFresh) {
-  request_headers_.setReferenceKey(Http::Headers::get().CacheControl, "min-fresh=1000");
+  request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "min-fresh=1000");
   const std::string request_path("Name");
   LookupContextPtr name_lookup_context = lookup(request_path);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
@@ -174,7 +174,7 @@ TEST_F(SimpleHttpCacheTest, RequestSmallMinFresh) {
 }
 
 TEST_F(SimpleHttpCacheTest, ResponseStaleWithRequestLargeMaxStale) {
-  request_headers_.setReferenceKey(Http::Headers::get().CacheControl, "max-stale=9000");
+  request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "max-stale=9000");
 
   const std::string request_path("Name");
   LookupContextPtr name_lookup_context = lookup(request_path);

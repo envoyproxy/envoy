@@ -75,7 +75,7 @@ void SignerImpl::sign(Http::RequestHeaderMap& headers, const std::string& conten
   const auto authorization_header = createAuthorizationHeader(
       credentials.accessKeyId().value(), credential_scope, canonical_headers, signature);
   ENVOY_LOG(debug, "Signing request with: {}", authorization_header);
-  headers.addCopy(Http::Headers::get().Authorization, authorization_header);
+  headers.addCopy(Http::CustomHeaders::get().Authorization, authorization_header);
 }
 
 std::string SignerImpl::createContentHash(Http::RequestMessage& message, bool sign_body) const {

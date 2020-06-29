@@ -175,7 +175,7 @@ TEST_F(OpenTracingDriverTest, InjectFailure) {
 
     const auto span_context_injection_error_count =
         stats_.counter("tracing.opentracing.span_context_injection_error").value();
-    EXPECT_EQ(nullptr, request_headers_.OtSpanContext());
+    EXPECT_FALSE(request_headers_.has(Http::CustomHeaders::get().OtSpanContext));
     span->injectContext(request_headers_);
 
     EXPECT_EQ(span_context_injection_error_count + 1,
