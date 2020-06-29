@@ -333,14 +333,17 @@ void ConnectionHandlerImpl::ActiveTcpSocket::newConnection() {
 void ConnectionHandlerImpl::ActiveTcpListener::onAccept(Network::ConnectionSocketPtr&& socket) {
   onAcceptWorker(std::move(socket), config_->handOffRestoredDestinationConnections(), false);
 }
-// Copied from newConnection()
+// Copied from newConnection(). Invoked by SetupPipeListener.
 void ConnectionHandlerImpl::ActiveTcpListener::setupNewConnection(
     Network::ConnectionPtr server_conn, Network::ConnectionSocketPtr socket) {
+  // Compenstate the connection here since pipe listener bypass the regular listener selection.
+  incNumConnections();
+  
   auto stream_info = std::make_unique<StreamInfo::StreamInfoImpl>(parent_.dispatcher_.timeSource());
   stream_info->setDownstreamLocalAddress(socket->localAddress());
   stream_info->setDownstreamRemoteAddress(socket->remoteAddress());
   stream_info->setDownstreamDirectRemoteAddress(socket->directRemoteAddress());
-  
+
   // TODO(lambdai): refactor
   auto p = dynamic_cast<Network::ServerPipeImpl*>(server_conn.get());
   ASSERT(p);
