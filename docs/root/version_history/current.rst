@@ -7,6 +7,8 @@ Incompatible Behavior Changes
 *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 
 * build: official released binary is now built on Ubuntu 18.04, requires glibc >= 2.27.
+* client_ssl_auth: the `auth_ip_white_list` stat has been renamed to
+  :ref:`auth_ip_allowlist <config_network_filters_client_ssl_auth_stats>`.
 
 Minor Behavior Changes
 ----------------------
@@ -14,9 +16,11 @@ Minor Behavior Changes
 
 * access loggers: applied existing buffer limits to access logs, as well as :ref:`stats <config_access_log_stats>` for logged / dropped logs. This can be reverted temporarily by setting runtime feature `envoy.reloadable_features.disallow_unbounded_access_logs` to false.
 * build: run as non-root inside Docker containers. Existing behaviour can be restored by setting the environment variable `ENVOY_UID` to `0`. `ENVOY_UID` and `ENVOY_GID` can be used to set the envoy user's `uid` and `gid` respectively.
+* header to metadata: on_header_missing rules with empty values are now rejected (they were skipped before).
 * health check: in the health check filter the :ref:`percentage of healthy servers in upstream clusters <envoy_api_field_config.filter.http.health_check.v2.HealthCheck.cluster_min_healthy_percentages>` is now interpreted as an integer.
 * hot restart: added the option :option:`--use-dynamic-base-id` to select an unused base ID at startup and the option :option:`--base-id-path` to write the base id to a file (for reuse with later hot restarts).
 * http: added HCM level configuration of :ref:`error handling on invalid messaging <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_error_on_invalid_http_message>` which substantially changes Envoy's behavior when encountering invalid HTTP/1.1 defaulting to closing the connection instead of allowing reuse. This can temporarily be reverted by setting `envoy.reloadable_features.hcm_stream_error_on_invalid_message` to false, or permanently reverted by setting the :ref:`HCM option <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_error_on_invalid_http_message>` to true to restore prior HTTP/1.1 beavior and setting the *new* HTTP/2 configuration :ref:`stream_error_on_invalid_http_message <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.stream_error_on_invalid_http_message>` to false to retain prior HTTP/2 behavior.
+* http: changed early error path for HTTP/1.1 so that responses consistently flow through the http connection manager, and the http filter chains. This behavior may be temporarily reverted by setting runtime feature `envoy.reloadable_features.early_errors_via_hcm` to false.
 * http: fixed several bugs with applying correct connection close behavior across the http connection manager, health checker, and connection pool. This behavior may be temporarily reverted by setting runtime feature `envoy.reloadable_features.fix_connection_close` to false.
 * http: fixed a bug where the upgrade header was not cleared on responses to non-upgrade requests.
   Can be reverted temporarily by setting runtime feature `envoy.reloadable_features.fix_upgrade_response` to false.
@@ -40,8 +44,8 @@ Bug Fixes
 * http: fixed a bug where in some cases slash was moved from path to query string when :ref:`merging of adjacent slashes<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.merge_slashes>` is enabled.
 * http: fixed several bugs with applying correct connection close behavior across the http connection manager, health checker, and connection pool. This behavior may be temporarily reverted by setting runtime feature `envoy.reloadable_features.fix_connection_close` to false.
 * prometheus stats: fix the sort order of output lines to comply with the standard.
-* udp: the :ref:`reuse_port <envoy_api_field_Listener.reuse_port>` listener option must now be 
-  specified for UDP listeners if concurrency is > 1. This previously crashed so is considered a 
+* udp: the :ref:`reuse_port <envoy_api_field_Listener.reuse_port>` listener option must now be
+  specified for UDP listeners if concurrency is > 1. This previously crashed so is considered a
   bug fix.
 * upstream: fixed a bug where Envoy would panic when receiving a GRPC SERVICE_UNKNOWN status on the health check.
 
@@ -59,6 +63,7 @@ New Features
 * access loggers: extened specifier for FilterStateFormatter to output :ref:`unstructured log string <config_access_log_format_filter_state>`.
 * access loggers: file access logger config added :ref:`log_format <envoy_v3_api_field_extensions.access_loggers.file.v3.FileAccessLog.log_format>`.
 * access loggers: gRPC access logger config added added :ref:`API version <envoy_v3_api_field_extensions.access_loggers.grpc.v3.CommonGrpcAccessLogConfig.transport_api_version>` to explicitly set the version of gRPC service endpoint and message to be used.
+* admin: added support for dumping EDS config at :ref:`/config_dump?include_eds <operations_admin_interface_config_dump_include_eds>`.
 * aggregate cluster: make route :ref:`retry_priority <envoy_v3_api_field_config.route.v3.RetryPolicy.retry_priority>` predicates work with :ref:`this cluster type <envoy_v3_api_msg_extensions.clusters.aggregate.v3.ClusterConfig>`.
 * build: official released binary is now built on Ubuntu 18.04, requires glibc >= 2.27.
 * build: official released binary is now built with Clang 10.0.0.
@@ -85,6 +90,7 @@ New Features
 * grpc-json: send a `x-envoy-original-method` header to grpc services.
 * gzip filter: added option to set zlib's next output buffer size.
 * hds: updated to allow to explicitly set the API version of gRPC service endpoint and message to be used.
+* header to metadata: added support for regex substitutions on header values.
 * health checks: allow configuring health check transport sockets by specifying :ref:`transport socket match criteria <envoy_v3_api_field_config.core.v3.HealthCheck.transport_socket_match_criteria>`.
 * http: added :ref:`local_reply config <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.local_reply_config>` to http_connection_manager to customize :ref:`local reply <config_http_conn_man_local_reply>`.
 * http: added :ref:`stripping port from host header <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.strip_matching_host_port>` support.
@@ -98,11 +104,17 @@ New Features
   interested in; behavior is allowed based on new "envoy.lrs.supports_send_all_clusters" capability
   in :ref:`client_features<envoy_v3_api_field_config.core.v3.Node.client_features>` field.
 * lrs: updated to allow to explicitly set the API version of gRPC service endpoint and message to be used.
+* lua: added tracing to the ``httpCall()`` API.
 * metrics service: added added :ref:`API version <envoy_v3_api_field_config.metrics.v3.MetricsServiceConfig.transport_api_version>` to explicitly set the version of gRPC service endpoint and message to be used.
 * network filters: added a :ref:`postgres proxy filter <config_network_filters_postgres_proxy>`.
 * network filters: added a :ref:`rocketmq proxy filter <config_network_filters_rocketmq_proxy>`.
+* performance: stats symbol table implementation (enabled by default; to disable it, add
+  `--use-fake-symbol-table 1` to the command-line arguments when starting Envoy).
+* ratelimit: add support for use of dynamic metadata :ref:`dynamic_metadata <envoy_v3_api_field_config.route.v3.RateLimit.Action.dynamic_metadata>` as a ratelimit action.
 * ratelimit: added :ref:`API version <envoy_v3_api_field_config.ratelimit.v3.RateLimitServiceConfig.transport_api_version>` to explicitly set the version of gRPC service endpoint and message to be used.
+* ratelimit: support specifying dynamic overrides in rate limit descriptors using :ref:`limit override <envoy_v3_api_field_config.route.v3.RateLimit.limit>` config.
 * redis: added acl support :ref:`downstream_auth_username <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.downstream_auth_username>` for downstream client ACL authentication, and :ref:`auth_username <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProtocolOptions.auth_username>` to configure authentication usernames for upstream Redis 6+ server clusters with ACL enabled.
+* regex: added support for enforcing max program size via runtime and stats to monitor program size for :ref:`Google RE2 <envoy_v3_api_field_type.matcher.v3.RegexMatcher.GoogleRE2.max_program_size>`.
 * request_id: added to :ref:`always_set_request_id_in_response setting <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.always_set_request_id_in_response>`
   to set :ref:`x-request-id <config_http_conn_man_headers_x-request-id>` header in response even if
   tracing is not forced.
@@ -113,6 +125,7 @@ New Features
   <envoy_v3_api_field_config.route.v3.RouteAction.internal_redirect_policy>` field.
 * runtime: add new gauge :ref:`deprecated_feature_seen_since_process_start <runtime_stats>` that gets reset across hot restarts.
 * server: add the option :option:`--drain-strategy` to enable different drain strategies for DrainManager::drainClose().
+* server: added :ref:`server.envoy_bug_failures <server_statistics>` statistic to count ENVOY_BUG failures.
 * stats: added the option to :ref:`report counters as deltas <envoy_v3_api_field_config.metrics.v3.MetricsServiceConfig.report_counters_as_deltas>` to the metrics service stats sink.
 * tracing: tracing configuration has been made fully dynamic and every HTTP connection manager
   can now have a separate :ref:`tracing provider <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.provider>`.
@@ -128,7 +141,7 @@ Deprecated
   :ref:`Compressor <config_http_filters_compressor>`.
 * The * :ref:`GoogleRE2.max_program_size<envoy_v3_api_field_type.matcher.v3.RegexMatcher.GoogleRE2.max_program_size>`
   field is now deprecated. Management servers are expected to validate regexp program sizes
-  instead of expecting the client to do it.
+  instead of expecting the client to do it. Alternatively, the max program size can be enforced by Envoy via runtime.
 * The :ref:`internal_redirect_action <envoy_v3_api_field_config.route.v3.RouteAction.internal_redirect_action>`
   field and :ref:`max_internal_redirects <envoy_v3_api_field_config.route.v3.RouteAction.max_internal_redirects>` field
   are now deprecated. This changes the implemented default cross scheme redirect behavior.

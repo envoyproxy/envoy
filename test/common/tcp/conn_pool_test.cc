@@ -71,7 +71,8 @@ struct ConnPoolCallbacks : public Tcp::ConnectionPool::Callbacks {
 class ConnPoolBase : public Tcp::ConnectionPool::Instance {
 public:
   ConnPoolBase(Event::MockDispatcher& dispatcher, Upstream::HostSharedPtr host,
-               NiceMock<Event::MockTimer>* upstream_ready_timer, bool test_new_connection_pool);
+               NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb,
+               bool test_new_connection_pool);
 
   void addDrainedCallback(DrainedCb cb) override { conn_pool_->addDrainedCallback(cb); }
   void drainConnections() override { conn_pool_->drainConnections(); }
@@ -114,7 +115,7 @@ public:
 
   std::unique_ptr<Tcp::ConnectionPool::Instance> conn_pool_;
   Event::MockDispatcher& mock_dispatcher_;
-  NiceMock<Event::MockTimer>* mock_upstream_ready_timer_;
+  NiceMock<Event::MockSchedulableCallback>* mock_upstream_ready_cb_;
   std::vector<TestConnection> test_conns_;
   Network::ConnectionCallbacks* callbacks_ = nullptr;
   bool test_new_connection_pool_;
@@ -146,12 +147,12 @@ protected:
     void expectEnableUpstreamReady(bool run) {
       if (!run) {
         EXPECT_FALSE(upstream_ready_enabled_);
-        EXPECT_CALL(*parent_.mock_upstream_ready_timer_, enableTimer(_, _))
+        EXPECT_CALL(*parent_.mock_upstream_ready_cb_, scheduleCallbackCurrentIteration())
             .Times(1)
             .RetiresOnSaturation();
       } else {
         EXPECT_TRUE(upstream_ready_enabled_);
-        parent_.mock_upstream_ready_timer_->invokeCallback();
+        parent_.mock_upstream_ready_cb_->invokeCallback();
         EXPECT_FALSE(upstream_ready_enabled_);
       }
     }
@@ -160,9 +161,9 @@ protected:
 };
 
 ConnPoolBase::ConnPoolBase(Event::MockDispatcher& dispatcher, Upstream::HostSharedPtr host,
-                           NiceMock<Event::MockTimer>* upstream_ready_timer,
+                           NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb,
                            bool test_new_connection_pool)
-    : mock_dispatcher_(dispatcher), mock_upstream_ready_timer_(upstream_ready_timer),
+    : mock_dispatcher_(dispatcher), mock_upstream_ready_cb_(upstream_ready_cb),
       test_new_connection_pool_(test_new_connection_pool) {
   // TODO(alyssarwilk) remove this assert and test the old and the new when it lands.
   ASSERT(!test_new_connection_pool_);
@@ -176,9 +177,11 @@ void ConnPoolBase::expectEnableUpstreamReady(bool run) {
     dynamic_cast<ConnPoolImplForTest*>(conn_pool_.get())->expectEnableUpstreamReady(run);
   } else {
     if (!run) {
-      EXPECT_CALL(*mock_upstream_ready_timer_, enableTimer(_, _)).Times(1).RetiresOnSaturation();
+      EXPECT_CALL(*mock_upstream_ready_cb_, scheduleCallbackCurrentIteration())
+          .Times(1)
+          .RetiresOnSaturation();
     } else {
-      mock_upstream_ready_timer_->invokeCallback();
+      mock_upstream_ready_cb_->invokeCallback();
     }
   }
 }
@@ -190,9 +193,9 @@ class TcpConnPoolImplTest : public testing::TestWithParam<bool> {
 public:
   TcpConnPoolImplTest()
       : test_new_connection_pool_(GetParam()),
-        upstream_ready_timer_(new NiceMock<Event::MockTimer>(&dispatcher_)),
+        upstream_ready_cb_(new NiceMock<Event::MockSchedulableCallback>(&dispatcher_)),
         host_(Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000")),
-        conn_pool_(dispatcher_, host_, upstream_ready_timer_, test_new_connection_pool_) {
+        conn_pool_(dispatcher_, host_, upstream_ready_cb_, test_new_connection_pool_) {
     // TODO(alyssarwilk) remove this assert and test the old and the new when it lands.
     ASSERT(!test_new_connection_pool_);
   }
@@ -205,7 +208,7 @@ public:
   bool test_new_connection_pool_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
-  NiceMock<Event::MockTimer>* upstream_ready_timer_;
+  NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb_;
   Upstream::HostSharedPtr host_;
   ConnPoolBase conn_pool_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -218,7 +221,7 @@ class TcpConnPoolImplDestructorTest : public testing::TestWithParam<bool> {
 public:
   TcpConnPoolImplDestructorTest()
       : test_new_connection_pool_(GetParam()),
-        upstream_ready_timer_(new NiceMock<Event::MockTimer>(&dispatcher_)) {
+        upstream_ready_cb_(new NiceMock<Event::MockSchedulableCallback>(&dispatcher_)) {
     host_ = Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000");
     ASSERT(!test_new_connection_pool_);
     if (!test_new_connection_pool_) {
@@ -247,7 +250,7 @@ public:
   Upstream::HostConstSharedPtr host_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
-  NiceMock<Event::MockTimer>* upstream_ready_timer_;
+  NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb_;
   NiceMock<Event::MockTimer>* connect_timer_;
   NiceMock<Network::MockClientConnection>* connection_;
   std::unique_ptr<Tcp::ConnectionPool::Instance> conn_pool_;

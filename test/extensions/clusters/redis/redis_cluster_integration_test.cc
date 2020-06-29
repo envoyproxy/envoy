@@ -194,7 +194,8 @@ protected:
   void roundtripToUpstreamStep(FakeUpstreamPtr& upstream, const std::string& request,
                                const std::string& response, IntegrationTcpClientPtr& redis_client,
                                FakeRawConnectionPtr& fake_upstream_connection,
-                               const std::string& auth_username, const std::string& auth_password) {
+                               const std::string& auth_username, const std::string& auth_password,
+                               const bool expect_readonly = false) {
     std::string proxy_to_server;
     bool expect_auth_command = false;
     std::string ok = "+OK\r\n";
@@ -219,6 +220,13 @@ protected:
       // Send back an OK for the auth command.
       EXPECT_TRUE(fake_upstream_connection->write(ok));
 
+    } else if (expect_readonly) {
+      std::string readonly_command = makeBulkStringArray({"readonly"});
+      EXPECT_TRUE(fake_upstream_connection->waitForData(readonly_command.size() + request.size(),
+                                                        &proxy_to_server));
+      EXPECT_EQ(readonly_command + request, proxy_to_server);
+      // Send back an OK for the readonly command.
+      EXPECT_TRUE(fake_upstream_connection->write(ok));
     } else {
       EXPECT_TRUE(fake_upstream_connection->waitForData(request.size(), &proxy_to_server));
       // The original request should be the same as the data received by the server.
@@ -237,12 +245,12 @@ protected:
    * @param response supplies Redis server data to transmit to the client.
    */
   void simpleRequestAndResponse(const int stream_index, const std::string& request,
-                                const std::string& response) {
+                                const std::string& response, const bool expect_readonly = false) {
     IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
     FakeRawConnectionPtr fake_upstream_connection;
 
     roundtripToUpstreamStep(fake_upstreams_[stream_index], request, response, redis_client,
-                            fake_upstream_connection, "", "");
+                            fake_upstream_connection, "", "", expect_readonly);
 
     redis_client->close();
     EXPECT_TRUE(fake_upstream_connection->close());
@@ -383,6 +391,14 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, RedisClusterWithAuthIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+INSTANTIATE_TEST_SUITE_P(IpVersions, RedisClusterWithReadPolicyIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, RedisClusterWithRefreshIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
 // This test sends a simple "get foo" command from a fake
 // downstream client through the proxy to a fake upstream
 // Redis cluster with a single slot with master and replica.
@@ -515,8 +531,8 @@ TEST_P(RedisClusterWithReadPolicyIntegrationTest, SingleSlotMasterReplicaReadRep
   initialize();
 
   // foo hashes to slot 12182 which has master node in upstream 0 and replica in upstream 1
-  simpleRequestAndResponse(0, makeBulkStringArray({"set", "foo", "bar"}), ":1\r\n");
-  simpleRequestAndResponse(1, makeBulkStringArray({"get", "foo"}), "$3\r\nbar\r\n");
+  simpleRequestAndResponse(0, makeBulkStringArray({"set", "foo", "bar"}), ":1\r\n", true);
+  simpleRequestAndResponse(1, makeBulkStringArray({"get", "foo"}), "$3\r\nbar\r\n", true);
 }
 
 // This test sends a simple "get foo" command from a fake
@@ -572,6 +588,7 @@ TEST_P(RedisClusterWithRefreshIntegrationTest, ClusterSlotRequestAfterFailure) {
   std::string request = makeBulkStringArray({"get", "foo"});
   // The actual error response.
   std::string error_response = "-CLUSTERDOWN The cluster is down\r\n";
+  std::string upstream_error_response = "-upstream failure\r\n";
   std::string cluster_slots_request = makeBulkStringArray({"CLUSTER", "SLOTS"});
   std::string proxy_to_server;
 
@@ -589,9 +606,9 @@ TEST_P(RedisClusterWithRefreshIntegrationTest, ClusterSlotRequestAfterFailure) {
 
   // Send the server down error response from the first fake Redis server back to the proxy.
   EXPECT_TRUE(fake_upstream_connection_1->write(error_response));
-  redis_client->waitForData(error_response);
+  redis_client->waitForData(upstream_error_response);
   // The client should receive response unchanged.
-  EXPECT_EQ(error_response, redis_client->data());
+  EXPECT_EQ(upstream_error_response, redis_client->data());
 
   // A new connection should be created to fake_upstreams_[0] for topology discovery.
   proxy_to_server.clear();

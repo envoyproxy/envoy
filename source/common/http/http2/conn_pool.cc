@@ -16,15 +16,15 @@ ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSha
                            Upstream::ResourcePriority priority,
                            const Network::ConnectionSocket::OptionsSharedPtr& options,
                            const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
-    : ConnPoolImplBase(std::move(host), std::move(priority), dispatcher, options,
-                       transport_socket_options, Protocol::Http2) {}
+    : HttpConnPoolImplBase(std::move(host), std::move(priority), dispatcher, options,
+                           transport_socket_options, Protocol::Http2) {}
 
 ConnPoolImpl::~ConnPoolImpl() { destructAllConnections(); }
 
-ActiveClientPtr ConnPoolImpl::instantiateActiveClient() {
+Envoy::ConnectionPool::ActiveClientPtr ConnPoolImpl::instantiateActiveClient() {
   return std::make_unique<ActiveClient>(*this);
 }
-void ConnPoolImpl::onGoAway(ActiveClient& client) {
+void ConnPoolImpl::onGoAway(ActiveClient& client, Http::GoAwayErrorCode) {
   ENVOY_CONN_LOG(debug, "remote goaway", *client.codec_client_);
   host_->cluster().stats().upstream_cx_close_notify_.inc();
   if (client.state_ != ActiveClient::State::DRAINING) {
@@ -72,10 +72,6 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
   codec_client_->setCodecConnectionCallbacks(*this);
 
   parent.host_->cluster().stats().upstream_cx_http2_total_.inc();
-}
-
-bool ConnPoolImpl::ActiveClient::hasActiveRequests() const {
-  return codec_client_->numActiveRequests() > 0;
 }
 
 bool ConnPoolImpl::ActiveClient::closingWithIncompleteRequest() const {

@@ -259,7 +259,7 @@ std::chrono::seconds DnsFilter::getDomainTTL(const absl::string_view domain) {
 bool DnsFilter::isKnownDomain(const absl::string_view domain_name) {
   const auto& known_suffixes = config_->knownSuffixes();
 
-  // If we don't have a list of whitelisted domain suffixes, we will resolve the name with an
+  // If we don't have a list of allowlisted domain suffixes, we will resolve the name with an
   // external DNS server
   if (known_suffixes.empty()) {
     ENVOY_LOG(debug, "Known domains list is empty");

@@ -29,6 +29,7 @@ MockLoader::MockLoader() {
     return std::make_shared<const NiceMock<MockSnapshot>>();
   }));
   ON_CALL(*this, snapshot()).WillByDefault(ReturnRef(snapshot_));
+  ON_CALL(*this, getRootScope()).WillByDefault(ReturnRef(store_));
 }
 
 MockLoader::~MockLoader() = default;
