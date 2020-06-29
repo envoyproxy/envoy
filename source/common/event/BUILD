@@ -140,6 +140,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "scaled_timer_lib",
+    srcs = ["scaled_timer_impl.cc"],
+    hdrs = ["scaled_timer_impl.h"],
+    deps = [
+        "//include/envoy/event:timer_interface",
+        "//source/common/common:scope_tracker",
+    ],
+)
+
+envoy_cc_library(
     name = "deferred_task",
     hdrs = ["deferred_task.h"],
     deps = [

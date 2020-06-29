@@ -63,12 +63,6 @@ public:
 
   bool enabled() override;
 
-  /**
-   * Provide access to the dispatcher and scope for ScaledTimerImpl below.
-   */
-  Dispatcher& dispatcher() const { return dispatcher_; };
-  const ScopeTrackedObject* scope() const { return object_; }
-
 private:
   TimerCb cb_;
   Dispatcher& dispatcher_;
@@ -77,51 +71,6 @@ private:
   // both set this to null.
   std::atomic<const ScopeTrackedObject*> object_{};
   void internalEnableTimer(const timeval& tv, const ScopeTrackedObject* scope);
-};
-
-class ScaledTimerImpl : public ScaledTimer {
-public:
-  ScaledTimerImpl(Libevent::BasePtr& libevent, TimerCb cb, Event::Dispatcher& dispatcher,
-                  double scale_factor);
-
-  // ScaledTimer
-  void disableTimer() override;
-
-  void enableTimer(const std::chrono::milliseconds& min, const std::chrono::milliseconds& max,
-                   const ScopeTrackedObject* scope) override;
-  void enableHRTimer(const std::chrono::microseconds& min, const std::chrono::microseconds& max,
-                     const ScopeTrackedObject* object) override;
-
-  bool enabled() override;
-
-  /**
-   * Adjusts the scale factor for the timeout, which is used to interpolate between the min and max
-   * values set when the timer is enabled. A value of 0 causes the timer to use the minimum; a value
-   * of 1 uses the maximum.
-   *
-   * This method is only provided on the impl because it should not be used by consumers of the
-   * timer, only producers.
-   * @param scale_factor The scale factor, which will be clipped to the range [0, 1].
-   */
-  void setScaleFactor(double scale_factor);
-
-private:
-  struct Enabled {
-    template <typename T> struct Interval {
-      using value_type = T;
-      Interval(T min, T max) : min(min), max(max) {}
-      T min, max;
-    };
-
-    MonotonicTime last_enabled;
-    absl::variant<Interval<std::chrono::milliseconds>, Interval<std::chrono::microseconds>>
-        interval;
-  };
-
-  double scale_factor_;
-
-  TimerImpl timer_;
-  Enabled enabled_;
 };
 
 } // namespace Event
