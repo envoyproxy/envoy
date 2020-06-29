@@ -1,5 +1,7 @@
 #include "extensions/compression/gzip/decompressor/zlib_decompressor_impl.h"
 
+#include <zlib.h>
+
 #include <memory>
 
 #include "envoy/common/exception.h"
@@ -75,7 +77,26 @@ bool ZlibDecompressorImpl::inflateNext() {
               "zlib decompression error: {}, msg: {}. Error codes are defined in "
               "https://www.zlib.net/manual.html",
               result, zstream_ptr_->msg);
-    stats_.decompression_error_.inc();
+    switch (result) {
+    case Z_ERRNO:
+      stats_.zlib_errno_.inc();
+      break;
+    case Z_STREAM_ERROR:
+      stats_.zlib_stream_error_.inc();
+      break;
+    case Z_DATA_ERROR:
+      stats_.zlib_data_error_.inc();
+      break;
+    case Z_MEM_ERROR:
+      stats_.zlib_mem_error_.inc();
+      break;
+    case Z_BUF_ERROR:
+      stats_.zlib_buf_error_.inc();
+      break;
+    case Z_VERSION_ERROR:
+      stats_.zlib_version_error_.inc();
+      break;
+    }
     return false;
   }
 

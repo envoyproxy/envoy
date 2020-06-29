@@ -81,7 +81,7 @@ protected:
     TestUtility::feedBufferWithRandomCharacters(input_buffer, 100);
     decompressor.decompress(input_buffer, output_buffer);
     ASSERT_TRUE(decompressor.decompression_error_ < 0);
-    ASSERT_EQ(stats_store.counterFromString("test.decompression_error").value(), 1);
+    ASSERT_EQ(stats_store.counterFromString("test.zlib_stream_error").value(), 1);
   }
 };
 
@@ -194,7 +194,7 @@ TEST_F(ZlibDecompressorImplTest, FailedDecompression) {
   decompressor.decompress(accumulation_buffer, buffer);
 
   ASSERT_TRUE(decompressor.decompression_error_ < 0);
-  ASSERT_EQ(stats_store.counterFromString("test.decompression_error").value(), 17);
+  ASSERT_EQ(stats_store.counterFromString("test.zlib_data_error").value(), 17);
 }
 
 // Exercises decompression with a very small output buffer.

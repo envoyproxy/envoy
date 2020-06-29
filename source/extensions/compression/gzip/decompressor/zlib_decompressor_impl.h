@@ -19,7 +19,13 @@ namespace Decompressor {
 /**
  * All zlib decompressor stats. @see stats_macros.h
  */
-#define ALL_ZLIB_DECOMPRESSOR_STATS(COUNTER) COUNTER(decompression_error)
+#define ALL_ZLIB_DECOMPRESSOR_STATS(COUNTER)                                                       \
+  COUNTER(zlib_errno)                                                                              \
+  COUNTER(zlib_stream_error)                                                                       \
+  COUNTER(zlib_data_error)                                                                         \
+  COUNTER(zlib_mem_error)                                                                          \
+  COUNTER(zlib_buf_error)                                                                          \
+  COUNTER(zlib_version_error)
 
 /**
  * Struct definition for zlib decompressor stats. @see stats_macros.h
