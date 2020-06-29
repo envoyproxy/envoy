@@ -86,6 +86,10 @@ def _impl(ctx):
                             # signed characters. Using signed char by default
                             # fixes that.
                             "-fsigned-char",
+                            # Disable assembly code in BoringSSL.
+                            # TODO(mrostecki): Fix BoringSSL assembly code for
+                            # aarch64.
+                            "-DOPENSSL_NO_ASM",
                         ],
                     ),
                 ],
