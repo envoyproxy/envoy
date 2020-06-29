@@ -306,11 +306,10 @@ initializeSocketInterfaces(const envoy::config::core::v3::SocketInterfacesConfig
   for (const auto& sock_interface : sock_interfaces.custom_types()) {
     loadSocketInterface(sock_interface, validation_ctx);
   }
-  if (sock_interfaces.has_custom_default_type()) {
+  if (sock_interfaces.custom_default_type() != "") {
     Network::SocketInterfaceSingleton::clear();
-    const auto& custom_sock = sock_interfaces.custom_default_type();
-    loadSocketInterface(custom_sock, validation_ctx);
-    auto sock = const_cast<Network::SocketInterface*>(Network::socketInterface(custom_sock.name()));
+    auto& sock_name = sock_interfaces.custom_default_type();
+    auto sock = const_cast<Network::SocketInterface*>(Network::socketInterface(sock_name));
     Network::SocketInterfaceSingleton::initialize(sock);
   }
 }
@@ -438,9 +437,8 @@ void InstanceImpl::initialize(const Options& options,
       std::make_unique<Memory::HeapShrinker>(*dispatcher_, *overload_manager_, stats_store_);
 
   // Initialize all SocketInterface implementations, if any are configured.
-  if (bootstrap_.static_resources().has_socket_interfaces()) {
-    initializeSocketInterfaces(bootstrap_.static_resources().socket_interfaces(),
-                               messageValidationContext());
+  if (bootstrap_.has_socket_interfaces()) {
+    initializeSocketInterfaces(bootstrap_.socket_interfaces(), messageValidationContext());
   }
 
   // Workers get created first so they register for thread local updates.

@@ -36,7 +36,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // <config_overview_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
-// [#next-free-field: 22]
+// [#next-free-field: 23]
 message Bootstrap {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v3.Bootstrap";
@@ -60,9 +60,6 @@ message Bootstrap {
     // These static secrets can be used by :ref:`SdsSecretConfig
     // <envoy_api_msg_extensions.transport_sockets.tls.v4alpha.SdsSecretConfig>`
     repeated envoy.extensions.transport_sockets.tls.v4alpha.Secret secrets = 3;
-
-    // Allows loading of multiple socket interfaces and configuration of the default one
-    core.v4alpha.SocketInterfacesConfig socket_interfaces = 4;
   }
 
   message DynamicResources {
@@ -182,6 +179,9 @@ message Bootstrap {
   // Specifies optional bootstrap extensions to be instantiated at startup time.
   // Each item contains extension specific configuration.
   repeated core.v4alpha.TypedExtensionConfig bootstrap_extensions = 21;
+
+  // Optional loading of custom socket interfaces and configuration of the default one
+  core.v4alpha.SocketInterfacesConfig socket_interfaces = 22;
 }
 
 // Administration interface :ref:`operations documentation
