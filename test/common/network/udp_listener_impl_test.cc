@@ -503,12 +503,12 @@ TEST_P(UdpListenerImplTest, UdpGroBasic) {
               send_to_addr_->ip()->ipv6()->address();
         }
 
-        // Specify the gso_size
+        // Specify gso_size
         cmsg = CMSG_NXTHDR(msg, cmsg);
         cmsg->cmsg_level = SOL_UDP;
         cmsg->cmsg_type = UDP_GRO;
         cmsg->cmsg_len = CMSG_LEN(sizeof(uint16_t));
-        const uint64_t gso_size = 8;
+        const uint16_t gso_size = 8;
         *reinterpret_cast<uint16_t*>(CMSG_DATA(cmsg)) = gso_size;
 
 #ifdef SO_RXQ_OVFL
@@ -517,6 +517,8 @@ TEST_P(UdpListenerImplTest, UdpGroBasic) {
         cmsg->cmsg_level = SOL_SOCKET;
         cmsg->cmsg_type = SO_RXQ_OVFL;
         cmsg->cmsg_len = CMSG_LEN(sizeof(uint32_t));
+        const uint32_t overflow = 0;
+        *reinterpret_cast<uint32_t*>(CMSG_DATA(cmsg)) = overflow;
 #endif
         return Api::SysCallSizeResult{static_cast<long>(stacked_message.length()), 0};
       }))
