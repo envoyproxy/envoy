@@ -9,8 +9,7 @@
 namespace Envoy {
 namespace Network {
 BufferSourceSocket::BufferSourceSocket()
-    : read_buffer_([]() -> void {}, []() -> void {},
-                   []() -> void {}) {}
+    : read_buffer_([]() -> void {}, []() -> void {}, []() -> void {}) {}
 void BufferSourceSocket::setTransportSocketCallbacks(TransportSocketCallbacks& callbacks) {
   ASSERT(!callbacks_);
   callbacks_ = &callbacks;
@@ -34,9 +33,9 @@ IoResult BufferSourceSocket::doRead(Buffer::Instance& buffer) {
 IoResult BufferSourceSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
   ASSERT(!shutdown_ || buffer.length() == 0);
   if (write_dest_buf_ == nullptr) {
-    ENVOY_CONN_LOG(trace, "write error: {}", callbacks_->connection(),
-                   "no buffer to write to, closing.");
-    return {PostIoAction::Close, 0, true};
+    ENVOY_CONN_LOG(trace, "write error: {} {}", callbacks_->connection(), buffer.length(),
+                   " bytes to write but no buffer to write to, closing. ");
+    return {PostIoAction::Close, 0, false};
   }
   uint64_t bytes_written = 0;
   if (buffer.length() > 0) {
@@ -44,7 +43,8 @@ IoResult BufferSourceSocket::doWrite(Buffer::Instance& buffer, bool end_stream) 
     write_dest_buf_->move(buffer);
   }
   ENVOY_CONN_LOG(trace, "write returns: {}", callbacks_->connection(), bytes_written);
-  return {PostIoAction::KeepOpen, bytes_written, end_stream};
+  return {buffer.length() == 0 && end_stream ? PostIoAction::Close : PostIoAction::KeepOpen,
+          bytes_written, false};
 }
 
 std::string BufferSourceSocket::protocol() const { return EMPTY_STRING; }

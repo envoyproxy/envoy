@@ -1784,6 +1784,8 @@ void ServerPipeImpl::onWriteReady() {
     }
     if (result.bytes_processed_ > 0) {
       ENVOY_LOG_MISC(debug, "lambdai: {} trigger peer read ready", connection().id());
+      peer_->onReadReady();
+
       for (BytesSentCb& cb : bytes_sent_callbacks_) {
         cb(result.bytes_processed_);
 
