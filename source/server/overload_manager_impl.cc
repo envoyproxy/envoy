@@ -38,8 +38,7 @@ private:
 /**
  * Thread-local copy of the state of each configured overload action.
  */
-class ThreadLocalOverloadStateImpl : public ThreadLocalOverloadState,
-                                     public ThreadLocal::ThreadLocalObject {
+class ThreadLocalOverloadStateImpl : public ThreadLocalOverloadState {
 public:
   const OverloadActionState& getState(const std::string& action) override {
     auto it = actions_.find(action);

@@ -31,7 +31,7 @@ using OverloadActionCb = std::function<void(OverloadActionState)>;
 /**
  * Thread-local copy of the state of each configured overload action.
  */
-class ThreadLocalOverloadState {
+class ThreadLocalOverloadState : public ThreadLocal::ThreadLocalObject {
 public:
   virtual ~ThreadLocalOverloadState() = default;
 
