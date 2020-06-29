@@ -1,12 +1,12 @@
 syntax = "proto3";
 
-package envoy.extensions.filters.http.waf.v3;
+package envoy.extensions.filters.http.waf.v3alpha;
 
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/route/v3/route_components.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.filters.http.waf.v3";
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.waf.v3alpha";
 option java_outer_classname = "WAFProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
@@ -15,209 +15,314 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // WAF :ref:`configuration overview <config_http_filters_waf_tagging>`.
 // [#extension: envoy.filters.http.waf]
 
-message WAF {
+message Waf {
+  // WAF filter provides ability to allow, block, redirect and modify HTTP
+  // requests based on rules. The rules are evaluated in order in which they
+  // are present.
+  //
+  // Here is an example of WAF filter configuration:
+  //
+  //  .. code-block:: yaml
+  // ################################################################
+  // # List of policies being evaluated in the order of appearance #
+  // ################################################################
+  // policies:
+  // #####################################################################
+  // # This policy resets any requests for `/admin` path not originating #
+  // # from internal IP addresses                                        #
+  // #####################################################################
+  // - name: block-admin-pages
+  //   match:
+  //     and_rule:
+  //       rules:
+  //       - header:
+  //           name: ":path"
+  //           prefix_match: "/admin"
+  //       - not_rule:
+  //           source_ip:
+  //             cidrs:
+  //             - addressPrefix: 10.0.0.0
+  //               prefixLength: 8
+  //           providers:
+  //           - predefined: REMOTE_IP
+  //    action:
+  //     - name: envoy.waf_action
+  //       config:
+  //         reset: true
+  // #############################################################################################
+  // # This policy redirects any requests to https://www.acme.com?name1=value&ref=<x-request-id> #
+  // # if the request is in the list of black listed IP addressees but not in the list of white  #
+  // # listed IP addressees (request IP addressees are identified using network remote IP or     #
+  // # first IP address in the x-forwarded-for header or x-cdn-source-ip header) and request is  #
+  // # not for path `/ofac-page`                                                                 #
+  // #############################################################################################
+  // - name: ofac
+  //   match:
+  //     and_rule:
+  //       rules:
+  //       - header:
+  //           name: ":path"
+  //           prefix_match: "/ofac-page"
+  //           invert_match: true
+  //       - source_ip:
+  //           cidrs: # black listed IP addressees
+  //           - addressPrefix: 2.144.136.0
+  //             prefixLength: 21
+  //           - addressPrefix: 2.144.144.0
+  //             prefixLength: 20
+  //           - addressPrefix: 2.144.160.0
+  //             prefixLength: 19
+  //           providers:
+  //           - predefined: REMOTE_IP
+  //           - predefined: X_FORWARDED_FOR
+  //           - header: x-cdn-source-ip
+  //       - not_rule
+  //           source_ip:
+  //             cidrs: # white listed IP addresses
+  //             - addressPrefix: 2.11.16.0
+  //               prefixLength: 21
+  //             - addressPrefix: 2.12.14.0
+  //               prefixLength: 20
+  //             - addressPrefix: 2.13.10.0
+  //               prefixLength: 19
+  //           providers:
+  //           - predefined: REMOTE_IP
+  //           - predefined: X_FORWARDED_FOR
+  //           - header: x-cdn-source-ip
+  //   action:
+  //     name: envoy.waf_action
+  //     config;
+  //       http_redirect:
+  //         response_code: 302
+  //         host_redirect: www.acme.com
+  //         query_params: "name1=value1&ref=%REQ(X-REQUEST-ID)%
+  // #############################################################################################
+  // # This policy drop requests headed `/signup` when the circuit breaker trips if the circuit #
+  // # we want the rule evaluation to continue, since action, has the finally say it will let the #
+  // # rule evaluation continue if circuit breaker did not trip otherwise rule evaluation will   #
+  // # not continue                                                                              #
+  // #############################################################################################
+  // - name: circuit-breaker
+  //   match:
+  //     header:
+  //       name: "path"
+  //       prefix_match: "/signup"
+  //   action
+  //     name: envoy.waf_action
+  //     config:
+  //       circuit_breaker:
+  //         type : gradient2
+  //         action: drop
+  //   continue: true
+  // #############################################################################
+  // # This policy triggers RBAC for any request which allows the requests as    #
+  // # long as extracted principal is one of `cluster.local/ns/default/sa/admin` #
+  // # `cluster.local/ns/default/sa/admin`                                       #
+  // #############################################################################
+  // - name: service-admin
+  //   match:
+  //     any: true
+  //   action:
+  //     name: envoy.rbac
+  //     config
+  //       principals:
+  //         - authenticated:
+  //             principal_name:
+  //               exact: cluster.local/ns/default/sa/admin
+  //         - authenticated:
+  //             principal_name:
+  //               exact: cluster.local/ns/default/sa/superuser
+  //       action: ALLOW
+  // ##################################################################################
+  // # This policy triggers RBAC for all GET requests to `/products` when destination #
+  // # port is also 80 or 442, RBAC in turn allow these requests to continue           #
+  // ##################################################################################
+  // - name: product-viewer
+  //   match:
+  //   - and_rules:
+  //       rules:
+  //         - header:
+  //             name: :method
+  //             exact_match: "GET" }
+  //         - url_path:
+  //             path: { prefix: "/products" }
+  //         - or_rules:
+  //             rules:
+  //             - destination_port: 80
+  //             - destination_port: 443
+  //   action:
+  //     name: envoy.rbac
+  //     config
+  //       principals:
+  //         - any: true
+  //       action: ALLOW
+  // ###########################################################################
+  // # This policy tags requests with header `ip_tagging_header` with value    #
+  // # ip_tagged_value if the does not have x-envoy-internal header and source #
+  // # IP address is in the list source IP is derived from first IP address in #
+  // # x-forwarded-for header and remote IP each one of them is checked against #
+  // # list                                                                    #
+  // ###########################################################################
+  // - name: tag-external-ip
+  //   match:
+  //     and_rule:
+  //       - header:
+  //           name: x-envoy-internal
+  //           present_match: true
+  //           invert_match: true
+  //       - source_ip:
+  //           cidrs:
+  //           - addressPrefix: 2.144.136.0
+  //             prefixLength: 21
+  //           - addressPrefix: 2.144.144.0
+  //             prefixLength: 20
+  //           - addressPrefix: 2.144.160.0
+  //             prefixLength: 19
+  //           providers:
+  //           - predefined: REMOTE_IP
+  //           - predefined: X_FORWARDED_FOR
+  //   action:
+  //     name: envoy.waf_action
+  //     config
+  //       add_header:
+  //         name: ip_tagging_header
+  //         value: ip_tagged_value
+  // ###########################################################################
+  // # This policy tags requests with header `ip_tagging_header` with value    #
+  // # ip_tagged_value if the does not have x-envoy-internal header and source #
+  // # IP address is in the list source IP is derived from first IP address in #
+  // # x-forwarded-for header and remote IP each one of them is checked against #
+  // # list                                                                    #
+  // ###########################################################################
+  // - name: bot-detector
+  //   match:
+  //     - header:
+  //         name: :path
+  //         prefix_match: true
+  //   action:
+  //     name: envoy.ext_auth_action
+  //     config
+  //       grpc_service:
+  //         cluster_name: bot-detector
 
-// WAF filter provides ability to allow, block, redirect and modify HTTP
-// requests based on rules. The rules are evaluated in order in which they
-// are present.
-//
-// Here is an example of WAF filter configuration:
-//
-//  .. code-block:: yaml
-//
-//  executor:
-//	name: envoy.priority
-//
-//  policy_groups:
-//  - name: grp_1
-//    policies:
-//    - name: block-admin-pages
-//      match:
-//        header:
-//          name: ":path"
-//          prefix: "/admin"
-//      watcher:
-//        - name: envoy.watcher
-//          action:
-//            reset: truek
-//    - name: ofac-white-list
-//      match:
-//        sourceIp:
-//          cidrs:
-//          - addressPrefix: 2.144.136.0
-//            prefixLength: 21
-//          - addressPrefix: 2.144.144.0
-//            prefixLength: 20
-//          - addressPrefix: 2.144.160.0
-//            prefixLength: 19
-//      watcher:
-//        - name: envoy.watcher
-//          action:
-//            nop:true
-//    - name: ofac-black-list
-//      match:
-//        andRules:
-//          rules:
-//          - header:
-//              name: ":path"
-//              prefix: "/ofac-page"
-//              invertMatch: true
-//          - sourceIp:
-//              cidrs:
-//              - addressPrefix: 2.144.136.0
-//                prefixLength: 21
-//              - addressPrefix: 2.144.144.0
-//                prefixLength: 20
-//              - addressPrefix: 2.144.160.0
-//                prefixLength: 19
-//      watcher:
-//        - name: envoy.watcher
-//          action:
-//            http_redirect:
-//              query_params: >
-//                "name1=value1&ref=%REQ(X-REQUEST-ID)%&name3=val3"
-//              response_code: "302"'
-//              host: "www.acme.com"'
-//      rule_match_cb: envoy.until_first_match
-//  - name: grp_2
-//    policies:
-//	  - name: ciruit-breaker
-//    	match:
-//      	header: {name: "path", prefix_match: "/signup"}
-//    	watcher:
-//      	name: custom.circuit_breaker
-//      	config:
-//        	type : gradient2
-//        	action: drop
-//	 - name: bot-analyzer
-//     match:
-//       header: {name: "path", prefix_match: "/"}
-//     watcher:
-//       name: custom.bot_analyzer
-//   rule_match_cb: envoy.all
+  message Waf {
+    message PolicySet {
+      repeated Policy policies = 1 [(validate.rules).repeated .min_items = 1];
+    }
 
-message WAF {
-  message PolicySet {
-    repeated Policy policies = 1[(validate.rules).repeated .min_items = 1];
-  }
+    // Rule defines a match condition and an associated action.
+    message Policy {
+      // Name for the policy.
+      string name = 1
+          [(validate.rules).string.pattern = "^[a-zA-Z0-9]([-a-zA-Z0-9]*[a-zA-Z0-9])?$"];
 
-  message PolicyGroup {
-    // Name of the Policy Group.
-    string name = 1 [(validate.rules).string.pattern = "^[a-zA-Z0-9]([-a-zA-Z0-9]*[a-zA-Z0-9])?$"];
-    PolicySet policies = 2;
-    RuleMatchCB callback = 3;
-  }
+      // Match criteria
+      Match match = 2 [(validate.rules).message.required = true];
 
-  repeated PolicyGroup policy_groups = 1[(validate.rules).repeated .min_items = 1];
-  Executor executor = 2;
- }
+      // Action to be performed when HTTP request match above mentioned Match criteria
+      Action action = 3 [(validate.rules).message.required = true];
 
- // Rule defines a match condition and an associated action.
- message Policy {
-  string name = 1 (validate.rules).string.pattern = "^[a-zA-Z0-9]([-a-zA-Z0-9]*[a-zA-Z0-9])?$"];
-  Match match = 2;
-  Watcher watcher = 3;
- }
+      // Specifies whether the policy evaluation should continue after matching this policy and after the execution of the Action. Action may override the this suggestion when it is not safe to continued evaluation of the policy. Default value is false.
+      bool continue = 4;
+    }
 
- // Executor that will execute the actions based on priority or another
- // custom logic
+    // SourceIpMatcher matches remote address, first IP address in the x-forwarded-for header or any header value that is an IP addressees, against list of CidrRanges.
+    message SourceIpMatcher {
+      // Entity providing source IP. It can be one of
+      // 1. Predefined constants REMOTE_IP (Network::Connection.remoteAddress()) or X_FORWARDED_FOR (mapped to 1st address in the header value)
+      // 2. Any header whose value can be converted to an IP address.
+      message Provider {
+        enum Predifined {
+          REMOTE_IP = 0;
+          X_FORWARDED_FOR = 1;
+        }
 
+        oneof provider {
+          option (validate.required) = true;
+          Predefined predefined = 1;
+          // Specifies the name of the header in the request.
+          string header = 2 (validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+        }
+      }
+      // A source IP provider
+      repeated Provider providers = 1 [(validate.rules).repeated .min_items = 1];
+      // A list of IP address subnets to be matched against IP address
+      repeated core.v3.CidrRange cidrs = 2 [(validate.rules).repeated .min_items = 1];
+    }
 
- message Executor {
-   string name = 1;
-   google.protobuf.Any config = 2;
- }
+    // Match Criteria can be one of the matchers or combination of them grouped using And, Or or Nor logical operators
+    message Match {
 
- // RuleMatchCB that will decide if the rule engine should
- // 1. Continue evaluating remaining rules that are bound to this callback
- // 2. Possibly apply request header mutations that Watchers may depend on
- // 3. Pass along the actions recommended by watchers to others
+      // Groups one or more fields in the `rule` oneof. Depending on the context, each are applied with the associated behavior.
+      message Set {
+        repeated Match rules = 1 [(validate.rules).repeated .min_items = 1];
+      }
 
- message RuleMatchCB {
-   string name = 1;
-   google.protobuf.Any config = 2;
- }
+      oneof rule {
+        option (validate.required) = true;
 
- // Watcher that inspect the HTTP request and recommend one or more Action
- message Watcher {
-   string name = 1;
-   google.protobuf.Any config = 2;
- }
+        // A set of rules that all must match in order to define the action.
+        Set and_rules = 1;
 
- message Match {
+        // A set of rules where at least one must match in order to define the action.
+        Set or_rules = 2;
 
-  // Used in the `and_rules` and `or_rules` fields in the `rule` oneof. Depending on the context,
-  // each are applied with the associated behavior.
-  message Set {
-    repeated Match rules = 1 [(validate.rules).repeated .min_items = 1];
-  }
+        // Match any incoming request
+        bool any = 3;
 
-  // Use CidrRangeSet rule instead of large number of CidrRanges combined by or_rule
-  // This rule will evaluate to true, if a given IP is matched aginast any one of the CIDR in this
-  // set
-  message CidrRangeSet {
-    // A list of IP address subnets to be matched against IP address
-    repeated core.v3.CidrRange cidrs = 2 [(validate.rules).repeated .min_items = 1];
-    bool invert_match = 3;
-  }
+        // A header (or pseudo-header such as :path or :method) on the incoming HTTP request. Only
+        // available for HTTP request.
+        // Note: the pseudo-header :path includes the query and fragment string. Use the `url_path`
+        // field if you want to match the URL path without the query and fragment string.
+        route.v3.HeaderMatcher header = 4;
 
-  oneof rule {
-    option (validate.required) = true;
+        // A URL path on the incoming HTTP request. Only available for HTTP.
+        type.matcher.v3.PathMatcher url_path = 5;
 
-    // A set of rules that all must match in order to define the action.
-    Set and_rules = 1;
+        // A CIDR block that describes the destination IP.
+        SourceIpMatcher source_ip = 6;
 
-    // A set of rules where at least one must match in order to define the action.
-    Set or_rules = 2;
+        // A CIDR block that describes the destination IP.
+        core.v3.CidrRange destination_ip = 7;
 
-    // A header (or pseudo-header such as :path or :method) on the incoming HTTP request. Only
-    // available for HTTP request.
-    route.v3.HeaderMatcher header = 3;
+        // A port number that describes the destination port connecting to.
+        uint32 destination_port = 8 [(validate.rules).uint32 = {lte: 65535}];
 
-    // List of CIDR block that is to be matched against the source IP.
-    CidrRangeSet source_ip = 4;
-  }
-}
+        // Metadata that describes additional information about the action.
+        type.matcher.v3.MetadataMatcher metadata = 9;
 
-message WatcherImpl {
-  message Action {
-    oneof rule {
-      option (validate.required) = true;
+        // Negates matching the provided matcher. For instance, if the value of `not_rule` would
+        // match, this permission would not match. Conversely, if the value of `not_rule` would not
+        // match, this permission would match.
+        Matcher not_rule = 10;
 
-      bool nop = 1;
-
-      bool drop_request = 2;
-
-      bool reset_connection = 3;
-
-      bool tarpit_connection = 4;
-
-      string cluster_redirect = 5;
-
-      HttpRedirect http_redirect = 6;
-
-      ExternalService external_service = 6;
+        // The request server from the client's connection request. This is
+        // typically TLS SNI.
+        //
+        // .. attention::
+        //
+        //   The behavior of this field may be affected by how Envoy is configured
+        //   as explained below.
+        //
+        //   * If the :ref:`TLS Inspector <config_listener_filters_tls_inspector>`
+        //     filter is not added, and if a `FilterChainMatch` is not defined for
+        //     the :ref:`server name <envoy_api_field_config.listener.v3.FilterChainMatch.server_names>`,
+        //     a TLS connection's requested SNI server name will be treated as if it
+        //     wasn't present.
+        //
+        //   * A :ref:`listener filter <arch_overview_listener_filters>` may
+        //     overwrite a connection's requested server name within Envoy.
+        //
+        // Please refer to :ref:`this FAQ entry <faq_how_to_setup_sni>` to learn to
+        // setup SNI.
+        type.matcher.v3.StringMatcher requested_server_name = 11;
+      }
     }
   }
 
-  message HttpRedirect {
-
-    string query_params = 1;
-
-    string response_code = 2 [(validate.rules).string = {in: ["301", "302", "307", "308"]}];
-
-    string path = 3;
-
-    string host = 4 [(validate.rules).string.min_len = 0, (validate.rules).string.hostname = true];
-
-    // default is https
-    string scheme = 5 [(validate.rules).string = {in: ["http", "https"]}];
+  // Action to be performed when the request matches the matching condition specified using match criteria
+  message Action {
+    // Name for the Action this is used to instantiate the action instance similar to a filter instantiation.
+    string name = 1 [(validate.rules).string.pattern = "^[a-zA-Z0-9]([-a-zA-Z0-9]*[a-zA-Z0-9])?$"];
+    config.core.v3.TypedExtensionConfig config = 2;
   }
-
-  message ExternalService {
-    google.protobuf.Duration timeout = 2 [(gogoproto.stdduration) = true, (validate.rules).message.required = true];
-    core.v3.GrpcService grpc_service = 2 [(validate.rules).message = {required: true}];
-  }
-
-  Action action = 1;
-}
