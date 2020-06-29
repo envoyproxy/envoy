@@ -251,24 +251,30 @@ private:
    * OverloadManager keeps the admin interface accessible even when the proxy is overloaded.
    */
   struct NullOverloadManager : public OverloadManager {
-    struct NullThreadOverloadState : public ThreadLocalOverloadState {
-      NullThreadOverloadState(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
+    struct NullThreadLocalOverloadState : public ThreadLocalOverloadState {
       const OverloadActionState& getState(const std::string&) override { return inactive_; }
 
       const OverloadActionState inactive_ = OverloadActionState::Inactive;
-      Event::Dispatcher& dispatcher_;
     };
 
-    NullOverloadManager(Event::Dispatcher& dispatcher) : thread_local_overload_state_(dispatcher) {}
-    void start() override {}
-    ThreadLocalOverloadState& getThreadLocalOverloadState() override {
-      return thread_local_overload_state_;
+    NullOverloadManager(ThreadLocal::SlotAllocator& slot_allocator)
+        : tls_(slot_allocator.allocateSlot()) {}
+
+    void start() override {
+      tls_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+        return std::make_shared<NullThreadLocalOverloadState>();
+      });
     }
+
+    ThreadLocalOverloadState& getThreadLocalOverloadState() override {
+      return tls_->getTyped<NullThreadLocalOverloadState>();
+    }
+
     bool registerForAction(const std::string&, Event::Dispatcher&, OverloadActionCb) override {
       return false;
     }
 
-    NullThreadOverloadState thread_local_overload_state_;
+    ThreadLocal::SlotPtr tls_;
   };
 
   /**
@@ -413,7 +419,7 @@ private:
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
   const std::string profile_path_;
   Http::ConnectionManagerStats stats_;
-  NullOverloadManager overload_manager_;
+  NullOverloadManager null_overload_manager_;
   // Note: this is here to essentially blackhole the tracing stats since they aren't used in the
   // Admin case.
   Stats::IsolatedStoreImpl no_op_store_;

@@ -679,7 +679,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
       request_id_extension_(Http::RequestIDExtensionFactory::defaultInstance(server_.random())),
       profile_path_(profile_path),
       stats_(Http::ConnectionManagerImpl::generateStats("http.admin.", server_.stats())),
-      overload_manager_(server_.dispatcher()),
+      null_overload_manager_(server_.threadLocal()),
       tracing_stats_(
           Http::ConnectionManagerImpl::generateTracingStats("http.admin.", no_op_store_)),
       route_config_provider_(server.timeSource()),
@@ -763,7 +763,7 @@ bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
                                          const std::vector<Network::FilterFactoryCb>&) {
   connection.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
       *this, server_.drainManager(), server_.random(), server_.httpContext(), server_.runtime(),
-      server_.localInfo(), server_.clusterManager(), overload_manager_, server_.timeSource())});
+      server_.localInfo(), server_.clusterManager(), null_overload_manager_, server_.timeSource())});
   return true;
 }
 
