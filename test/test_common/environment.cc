@@ -44,13 +44,13 @@ std::string makeTempDir(std::string basename_template) {
   std::string name_template = "c:\\Windows\\TEMP\\" + basename_template;
   char* dirname = ::_mktemp(&name_template[0]);
   RELEASE_ASSERT(dirname != nullptr, fmt::format("failed to create tempdir from template: {} {}",
-                                                 name_template, strerror(errno)));
+                                                 name_template, errorDetails(errno)));
   TestEnvironment::createPath(dirname);
 #else
   std::string name_template = "/tmp/" + basename_template;
   char* dirname = ::mkdtemp(&name_template[0]);
   RELEASE_ASSERT(dirname != nullptr, fmt::format("failed to create tempdir from template: {} {}",
-                                                 name_template, strerror(errno)));
+                                                 name_template, errorDetails(errno)));
 #endif
   return std::string(dirname);
 }

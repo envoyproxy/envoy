@@ -16,6 +16,7 @@ Minor Behavior Changes
 
 * access loggers: applied existing buffer limits to access logs, as well as :ref:`stats <config_access_log_stats>` for logged / dropped logs. This can be reverted temporarily by setting runtime feature `envoy.reloadable_features.disallow_unbounded_access_logs` to false.
 * build: run as non-root inside Docker containers. Existing behaviour can be restored by setting the environment variable `ENVOY_UID` to `0`. `ENVOY_UID` and `ENVOY_GID` can be used to set the envoy user's `uid` and `gid` respectively.
+* header to metadata: on_header_missing rules with empty values are now rejected (they were skipped before).
 * health check: in the health check filter the :ref:`percentage of healthy servers in upstream clusters <envoy_api_field_config.filter.http.health_check.v2.HealthCheck.cluster_min_healthy_percentages>` is now interpreted as an integer.
 * hot restart: added the option :option:`--use-dynamic-base-id` to select an unused base ID at startup and the option :option:`--base-id-path` to write the base id to a file (for reuse with later hot restarts).
 * http: changed early error path for HTTP/1.1 so that responses consistently flow through the http connection manager, and the http filter chains. This behavior may be temporarily reverted by setting runtime feature `envoy.reloadable_features.early_errors_via_hcm` to false.
@@ -88,6 +89,7 @@ New Features
 * grpc-json: send a `x-envoy-original-method` header to grpc services.
 * gzip filter: added option to set zlib's next output buffer size.
 * hds: updated to allow to explicitly set the API version of gRPC service endpoint and message to be used.
+* header to metadata: added support for regex substitutions on header values.
 * health checks: allow configuring health check transport sockets by specifying :ref:`transport socket match criteria <envoy_v3_api_field_config.core.v3.HealthCheck.transport_socket_match_criteria>`.
 * http: added :ref:`local_reply config <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.local_reply_config>` to http_connection_manager to customize :ref:`local reply <config_http_conn_man_local_reply>`.
 * http: added :ref:`stripping port from host header <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.strip_matching_host_port>` support.
@@ -105,8 +107,11 @@ New Features
 * metrics service: added added :ref:`API version <envoy_v3_api_field_config.metrics.v3.MetricsServiceConfig.transport_api_version>` to explicitly set the version of gRPC service endpoint and message to be used.
 * network filters: added a :ref:`postgres proxy filter <config_network_filters_postgres_proxy>`.
 * network filters: added a :ref:`rocketmq proxy filter <config_network_filters_rocketmq_proxy>`.
+* performance: stats symbol table implementation (enabled by default; to disable it, add
+  `--use-fake-symbol-table 1` to the command-line arguments when starting Envoy).
 * ratelimit: add support for use of dynamic metadata :ref:`dynamic_metadata <envoy_v3_api_field_config.route.v3.RateLimit.Action.dynamic_metadata>` as a ratelimit action.
 * ratelimit: added :ref:`API version <envoy_v3_api_field_config.ratelimit.v3.RateLimitServiceConfig.transport_api_version>` to explicitly set the version of gRPC service endpoint and message to be used.
+* ratelimit: support specifying dynamic overrides in rate limit descriptors using :ref:`limit override <envoy_v3_api_field_config.route.v3.RateLimit.limit>` config.
 * redis: added acl support :ref:`downstream_auth_username <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.downstream_auth_username>` for downstream client ACL authentication, and :ref:`auth_username <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProtocolOptions.auth_username>` to configure authentication usernames for upstream Redis 6+ server clusters with ACL enabled.
 * regex: added support for enforcing max program size via runtime and stats to monitor program size for :ref:`Google RE2 <envoy_v3_api_field_type.matcher.v3.RegexMatcher.GoogleRE2.max_program_size>`.
 * request_id: added to :ref:`always_set_request_id_in_response setting <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.always_set_request_id_in_response>`
@@ -119,6 +124,7 @@ New Features
   <envoy_v3_api_field_config.route.v3.RouteAction.internal_redirect_policy>` field.
 * runtime: add new gauge :ref:`deprecated_feature_seen_since_process_start <runtime_stats>` that gets reset across hot restarts.
 * server: add the option :option:`--drain-strategy` to enable different drain strategies for DrainManager::drainClose().
+* server: added :ref:`server.envoy_bug_failures <server_statistics>` statistic to count ENVOY_BUG failures.
 * stats: added the option to :ref:`report counters as deltas <envoy_v3_api_field_config.metrics.v3.MetricsServiceConfig.report_counters_as_deltas>` to the metrics service stats sink.
 * tracing: tracing configuration has been made fully dynamic and every HTTP connection manager
   can now have a separate :ref:`tracing provider <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.provider>`.
