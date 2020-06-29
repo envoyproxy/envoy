@@ -1,19 +1,23 @@
 // NOLINT(namespace-envoy)
 // This is an Envoy driver for benchmarks.
+#include "test/benchmark/main.h"
+
 #include "test/test_common/environment.h"
 
 #include "benchmark/benchmark.h"
 #include "tclap/CmdLine.h"
 
-bool g_skip_expensive_benchmarks = false;
+bool skip_expensive_benchmarks = false;
 
 // Boilerplate main(), which discovers benchmarks and runs them. This uses two
 // different flag parsers, so the order of flags matters: flags defined here
 // must be passed first, and flags defined in benchmark::Initialize second,
 // separated by --.
+// TODO(pgenera): convert this to abseil/flags/ when benchmark also adopts abseil.
 int main(int argc, char** argv) {
   Envoy::TestEnvironment::initializeTestMain(argv[0]);
 
+  // NOLINTNEXTLINE(clang-analyzer-optin.cplusplus.VirtualCall)
   TCLAP::CmdLine cmd("envoy-benchmark-test", ' ', "0.1");
   TCLAP::SwitchArg skip_switch("s", "skip_expensive_benchmarks",
                                "skip or minimize expensive benchmarks", cmd, false);
@@ -27,8 +31,10 @@ int main(int argc, char** argv) {
     return 0;
   }
 
-  g_skip_expensive_benchmarks = skip_switch.getValue();
+  skip_expensive_benchmarks = skip_switch.getValue();
 
   benchmark::Initialize(&argc, argv);
   benchmark::RunSpecifiedBenchmarks();
 }
+
+bool SkipExpensiveBenchmarks() { return skip_expensive_benchmarks; }

@@ -16,6 +16,7 @@
 
 #include "server/transport_socket_config_impl.h"
 
+#include "test/benchmark/main.h"
 #include "test/common/upstream/utility.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
@@ -162,8 +163,6 @@ public:
 } // namespace Upstream
 } // namespace Envoy
 
-extern bool g_skip_expensive_benchmarks;
-
 static void priorityAndLocalityWeighted(benchmark::State& state) {
   Envoy::Thread::MutexBasicLockable lock;
   Envoy::Logger::Context logging_state(spdlog::level::warn,
@@ -171,7 +170,7 @@ static void priorityAndLocalityWeighted(benchmark::State& state) {
   for (auto _ : state) {
     Envoy::Upstream::EdsSpeedTest speed_test(state, state.range(0));
     // if we've been instructed to skip tests, only run once no matter the argument:
-    uint32_t endpoints = g_skip_expensive_benchmarks ? 1 : state.range(2);
+    uint32_t endpoints = SkipExpensiveBenchmarks() ? 1 : state.range(2);
 
     speed_test.priorityAndLocalityWeightedHelper(state.range(1), endpoints, true);
   }
@@ -188,7 +187,7 @@ static void duplicateUpdate(benchmark::State& state) {
 
   for (auto _ : state) {
     Envoy::Upstream::EdsSpeedTest speed_test(state, false);
-    uint32_t endpoints = g_skip_expensive_benchmarks ? 1 : state.range(0);
+    uint32_t endpoints = SkipExpensiveBenchmarks() ? 1 : state.range(0);
 
     speed_test.priorityAndLocalityWeightedHelper(true, endpoints, true);
     speed_test.priorityAndLocalityWeightedHelper(true, endpoints, true);
@@ -203,7 +202,7 @@ static void healthOnlyUpdate(benchmark::State& state) {
                                        Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
   for (auto _ : state) {
     Envoy::Upstream::EdsSpeedTest speed_test(state, false);
-    uint32_t endpoints = g_skip_expensive_benchmarks ? 1 : state.range(0);
+    uint32_t endpoints = SkipExpensiveBenchmarks() ? 1 : state.range(0);
 
     speed_test.priorityAndLocalityWeightedHelper(true, endpoints, true);
     speed_test.priorityAndLocalityWeightedHelper(true, endpoints, false);
