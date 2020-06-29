@@ -14,7 +14,9 @@
 #include "gtest/gtest.h"
 
 using Envoy::Http::HeaderValueOf;
-using std::string_literals::operator""s;
+
+// for ::operator""s (which Windows compiler does not support):
+using namespace std::string_literals;
 
 namespace Envoy {
 namespace {
