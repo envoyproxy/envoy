@@ -37,7 +37,8 @@ TEST_P(DogStatsdConfigLoopbackTest, ValidUdpIp) {
   envoy::config::core::v3::Address& address = *sink_config.mutable_address();
   envoy::config::core::v3::SocketAddress& socket_address = *address.mutable_socket_address();
   socket_address.set_protocol(envoy::config::core::v3::SocketAddress::UDP);
-  auto loopback_flavor = Network::Test::getCanonicalLoopbackAddress(GetParam());
+  Network::Address::InstanceConstSharedPtr loopback_flavor =
+      Network::Test::getCanonicalLoopbackAddress(GetParam());
   socket_address.set_address(loopback_flavor->ip()->addressAsString());
   socket_address.set_port_value(8125);
 
@@ -73,7 +74,8 @@ TEST_P(DogStatsdConfigLoopbackTest, CustomBufferSize) {
   envoy::config::core::v3::Address& address = *sink_config.mutable_address();
   envoy::config::core::v3::SocketAddress& socket_address = *address.mutable_socket_address();
   socket_address.set_protocol(envoy::config::core::v3::SocketAddress::UDP);
-  auto loopback_flavor = Network::Test::getCanonicalLoopbackAddress(GetParam());
+  Network::Address::InstanceConstSharedPtr loopback_flavor =
+      Network::Test::getCanonicalLoopbackAddress(GetParam());
   socket_address.set_address(loopback_flavor->ip()->addressAsString());
   socket_address.set_port_value(8125);
 
