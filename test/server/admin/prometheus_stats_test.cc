@@ -119,6 +119,13 @@ TEST_F(PrometheusStatsFormatterTest, SanitizeMetricNameDigitFirst) {
   EXPECT_EQ(expected, actual);
 }
 
+TEST_F(PrometheusStatsFormatterTest, MetricNameOptOut) {
+  std::string raw = "_vulture.eats-liver";
+  std::string expected = "vulture_eats_liver";
+  auto actual = PrometheusStatsFormatter::metricName(raw);
+  EXPECT_EQ(expected, actual);
+}
+
 TEST_F(PrometheusStatsFormatterTest, FormattedTags) {
   std::vector<Stats::Tag> tags;
   Stats::Tag tag1 = {"a.tag-name", "a.tag-value"};

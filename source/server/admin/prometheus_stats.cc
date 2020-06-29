@@ -176,6 +176,11 @@ std::string generateHistogramOutput(const Stats::ParentHistogram& histogram,
   return output;
 };
 
+// Returns a conventional prefix that excluded from automatic namespacing.
+// This is currently a fixed value ("_"), if desired this can become a configurable
+// value like Envoy::Http::Prefix in the future.
+constexpr absl::string_view namespaceExcludedPrefix() { return "_"; }
+
 } // namespace
 
 std::string PrometheusStatsFormatter::formattedTags(const std::vector<Stats::Tag>& tags) {
@@ -188,6 +193,11 @@ std::string PrometheusStatsFormatter::formattedTags(const std::vector<Stats::Tag
 }
 
 std::string PrometheusStatsFormatter::metricName(const std::string& extracted_name) {
+  // Offer a way to opt out of automatic namespacing.
+  // It is the responsibility of the metric creator to ensure proper namespacing.
+  if (absl::StartsWith(extracted_name, namespaceExcludedPrefix())) {
+    return sanitizeName(extracted_name.substr(namespaceExcludedPrefix().length()));
+  }
   // Add namespacing prefix to avoid conflicts, as per best practice:
   // https://prometheus.io/docs/practices/naming/#metric-names
   // Also, naming conventions on https://prometheus.io/docs/concepts/data_model/
