@@ -732,7 +732,6 @@ def fixBuildPath(file_path):
     error_messages += ["buildifier rewrite failed for file: %s" % file_path]
   return error_messages
 
-
 def checkBuildPath(file_path):
   error_messages = []
 
@@ -971,6 +970,9 @@ if __name__ == "__main__":
                       type=str,
                       default=",".join(common.includeDirOrder()),
                       help="specify the header block include directory order.")
+  parser.add_argument("--aggressive",
+                      action='store_true',
+                      help="specify if it fixes formats making risky changes.")
   args = parser.parse_args()
 
   operation_type = args.operation_type
@@ -988,6 +990,7 @@ if __name__ == "__main__":
       "./tools/clang_tools",
   ]
   include_dir_order = args.include_dir_order
+  aggressive = args.aggressive
   if args.add_excluded_prefixes:
     EXCLUDED_PREFIXES += tuple(args.add_excluded_prefixes)
 
