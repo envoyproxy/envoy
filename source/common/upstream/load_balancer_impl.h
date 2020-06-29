@@ -516,7 +516,7 @@ private:
   // The exponent used to calculate host weights can be configured via runtime. We cache it for
   // performance reasons and refresh it in `LeastRequestLoadBalancer::refresh(uint32_t priority)`
   // whenever a `HostSet` is updated.
-  double active_request_bias_;
+  double active_request_bias_{};
 
   const absl::optional<Runtime::Double> active_request_bias_runtime_;
 };
