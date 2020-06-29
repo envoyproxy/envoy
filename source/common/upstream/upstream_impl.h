@@ -787,7 +787,6 @@ private:
   std::function<void()> initialization_complete_callback_;
   uint64_t pending_initialize_health_checks_{};
   const bool local_cluster_;
-  Stats::SymbolTable& symbol_table_;
   Config::ConstMetadataSharedPoolSharedPtr const_metadata_shared_pool_;
 };
 
