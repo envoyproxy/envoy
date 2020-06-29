@@ -148,19 +148,14 @@ TEST_F(FormatTest, OutputEscaped) {
  * Test for Fancy Logger macros.
  */
 TEST(Fancy, Global) {
-  // First log
   FANCY_LOG(info, "Hello world! Here's a line of fancy log!");
-  
-  // Second log
   FANCY_LOG(error, "Fancy Error! Here's the second message!");
 
-  // Connection and stream log
   NiceMock<Network::MockConnection> connection_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> stream_;
   FANCY_CONN_LOG(warn, "Fake info {} of connection", connection_, 1);
   FANCY_STREAM_LOG(warn, "Fake warning {} of stream", stream_, 1);
 
-  // critical log and flush
   FANCY_LOG(critical, "Critical message for later flush.");
   FANCY_FLUSH_LOG();
 }
@@ -176,12 +171,12 @@ TEST(Fancy, SetLevel) {
 
 TEST(Fancy, FastPath) {
   setFancyLogger(__FILE__, spdlog::level::info);
-  for(int i = 0; i < 10; i ++) {
+  for (int i = 0; i < 10; i++) {
     FANCY_LOG(warn, "Fake warning No. {}", i);
   }
 }
 
-void *logThread(void* id) {
+void* logThread(void* id) {
   int tid = *static_cast<int*>(id);
 
   if (tid == 0) {
@@ -192,24 +187,24 @@ void *logThread(void* id) {
     printf(" - level = debug\n");
     setFancyLogger(__FILE__, spdlog::level::info);
     printf(" - level = info\n");
-    for (int j = 0; j < 10; j ++) {};
-    
+    for (int j = 0; j < 10; j++) {
+    };
+
     setFancyLogger(__FILE__, spdlog::level::warn);
     printf(" - level = warn\n");
     setFancyLogger(__FILE__, spdlog::level::err);
     printf(" - level = error\n");
     setFancyLogger(__FILE__, spdlog::level::critical);
     printf(" - level = critical\n");
-  }
-  else {
-    for (int i = 0; i < 30; i ++) {
+  } else {
+    for (int i = 0; i < 10; i++) {
       FANCY_LOG(critical, "Thread {} round {}: fake critical log;", tid, i);
       FANCY_LOG(trace, "    fake trace log;");
       FANCY_LOG(debug, "    fake debug log;");
       FANCY_LOG(info, "   fake info;");
       FANCY_LOG(warn, "   fake warn;");
       FANCY_LOG(error, "    fake error;");
-      FANCY_LOG(critical, "   fake critical."); 
+      FANCY_LOG(critical, "   fake critical.");
     }
   }
 
@@ -219,7 +214,7 @@ void *logThread(void* id) {
 
 TEST(FANCY, Threads) {
   // test with multiple threads
-  pthread_t threads[2];
+  pthread_t threads[3];
   std::vector<int> range = {0, 1, 2};
   for (int id : range) {
     int rc = pthread_create(&threads[id], nullptr, logThread, static_cast<void*>(&range[id]));
@@ -228,8 +223,6 @@ TEST(FANCY, Threads) {
   for (int id : range) {
     pthread_join(threads[id], nullptr);
   }
-  // pthread_exit(nullptr);
 }
-
 
 } // namespace Envoy
