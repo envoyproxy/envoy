@@ -365,17 +365,25 @@ protected:
  */
 class HttpGenericBodyMatcherCtx : public MatcherCtx {
 public:
-  HttpGenericBodyMatcherCtx(std::list<std::string> patterns, size_t overlap_size)
+  HttpGenericBodyMatcherCtx(const std::shared_ptr<std::vector<std::string>>& patterns,
+                            size_t overlap_size)
       : patterns_(patterns) {
     // Initialize overlap_ buffer's capacity to fit the longest pattern - 1.
+    patterns_index_.resize(patterns_->size());
+    std::iota(patterns_index_.begin(), patterns_index_.end(), 0);
     overlap_.reserve(overlap_size);
   }
   ~HttpGenericBodyMatcherCtx() override = default;
 
-  // List is initialized based on the Matcher's configuration.
-  // When data is passing through the matcher, found patterns are removed
-  // from the list. When all patterns have been found, the list is empty.
-  std::list<std::string> patterns_;
+  // The context is initialized per each http request. The patterns_
+  // shared pointer attaches to matcher's list of patterns, so patterns
+  // can be referenced without copying data.
+  const std::shared_ptr<const std::vector<std::string>> patterns_;
+  // List stores indexes of patterns in patterns_ shared memory which
+  // still need to be located in the body. When a pattern is found
+  // its index is removed from the list.
+  // When all patterns have been found, the list is empty.
+  std::list<uint32_t> patterns_index_;
   // Buffer to store the last bytes from previous body chunk(s).
   // It will store only as many bytes as is the length of the longest
   // pattern to be found minus 1.
@@ -406,7 +414,7 @@ private:
   // The following fields are initialized based on matcher config and are used
   // by all HTTP tappers.
   // List of strings which body must contain to get match.
-  std::list<std::string> patterns_;
+  std::shared_ptr<std::vector<std::string>> patterns_;
   // Stores the length of the longest pattern.
   size_t overlap_size_;
 };

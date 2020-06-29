@@ -137,15 +137,16 @@ HttpGenericBodyMatcher::HttpGenericBodyMatcher(
     const envoy::config::tap::v3::HttpGenericBodyMatch& config,
     const std::vector<MatcherPtr>& matchers)
     : HttpBodyMatcherBase(matchers) {
+  patterns_ = std::make_shared<std::vector<std::string>>();
   for (const auto& i : config.patterns()) {
     switch (i.rule_case()) {
     // For binary match 'i' contains sequence of bytes to locate in the body.
     case envoy::config::tap::v3::HttpGenericBodyMatch::GenericTextMatch::kBinaryMatch: {
-      patterns_.push_back(i.binary_match());
+      patterns_->push_back(i.binary_match());
     } break;
     // For string match 'i' contains exact string to locate in the body.
     case envoy::config::tap::v3::HttpGenericBodyMatch::GenericTextMatch::kStringMatch:
-      patterns_.push_back(i.string_match());
+      patterns_->push_back(i.string_match());
       break;
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
@@ -153,7 +154,7 @@ HttpGenericBodyMatcher::HttpGenericBodyMatcher(
   }
   limit_ = config.bytes_limit();
   auto index = std::max_element(
-      patterns_.begin(), patterns_.end(),
+      patterns_->begin(), patterns_->end(),
       [](const std::string& i, const std::string& j) -> bool { return i.length() < j.length(); });
   // overlap_size_ indicates how many bytes from previous data chunk(s) are buffered.
   overlap_size_ = (*index).length() - 1;
@@ -167,7 +168,7 @@ void HttpGenericBodyMatcher::onBody(const Buffer::Instance& data, MatchStatusVec
   if (statuses[my_index_].might_change_status_ == false) {
     // End of search limit has been already reached or all patterns have been found.
     // Status is not going to change.
-    ASSERT(((0 != limit_) && (limit_ == ctx->processed_bytes_)) || (ctx->patterns_.empty()));
+    ASSERT(((0 != limit_) && (limit_ == ctx->processed_bytes_)) || (ctx->patterns_index_.empty()));
     return;
   }
 
@@ -175,20 +176,20 @@ void HttpGenericBodyMatcher::onBody(const Buffer::Instance& data, MatchStatusVec
   // chunks: part of the pattern was in previous body chunk and remaining of the pattern
   // is in the current body chunk on in the current body chunk.
   auto body_search_limit = limit_ - ctx->processed_bytes_;
-  auto it = ctx->patterns_.begin();
-  while (it != ctx->patterns_.end()) {
-    const auto& pattern = *it;
+  auto it = ctx->patterns_index_.begin();
+  while (it != ctx->patterns_index_.end()) {
+    const auto& pattern = patterns_->at(*it);
     if ((!ctx->overlap_.empty() && (locatePatternAcrossChunks(pattern, data, ctx))) ||
-        (-1 !=
-         data.search(static_cast<const void*>(it->data()), it->length(), 0, body_search_limit))) {
+        (-1 != data.search(static_cast<const void*>(pattern.data()), pattern.length(), 0,
+                           body_search_limit))) {
       // Pattern found. Remove it from the list of patterns to be found.
-      it = ctx->patterns_.erase(it);
+      it = ctx->patterns_index_.erase(it);
     } else {
       it++;
     }
   }
 
-  if (ctx->patterns_.empty()) {
+  if (ctx->patterns_index_.empty()) {
     // All patterns were found.
     statuses[my_index_].matches_ = true;
     statuses[my_index_].might_change_status_ = false;
