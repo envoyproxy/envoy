@@ -104,6 +104,9 @@ public:
                    const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
   virtual ~ConnPoolImplBase();
 
+  // A helper function to get the specific context type from the base class context.
+  template <class T> T& typedContext(AttachContext& context) { return *static_cast<T*>(&context); }
+
   void addDrainedCallbackImpl(Instance::DrainedCb cb);
   void drainConnectionsImpl();
 
@@ -140,7 +143,7 @@ public:
   void onUpstreamReady();
   ConnectionPool::Cancellable* newStream(AttachContext& context);
 
-  virtual ConnectionPool::Cancellable* newPendingRequest(const AttachContext& context) PURE;
+  virtual ConnectionPool::Cancellable* newPendingRequest(AttachContext& context) PURE;
 
   // Creates a new connection if allowed by resourceManager, or if created to avoid
   // starving this pool.

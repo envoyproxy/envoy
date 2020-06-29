@@ -65,10 +65,9 @@ bool HttpConnPoolImplBase::hasActiveConnections() const {
 }
 
 ConnectionPool::Cancellable*
-HttpConnPoolImplBase::newPendingRequest(const Envoy::ConnectionPool::AttachContext& context) {
-  Http::ResponseDecoder& decoder = *static_cast<const HttpAttachContext*>(&context)->decoder_;
-  Http::ConnectionPool::Callbacks& callbacks =
-      *static_cast<const HttpAttachContext*>(&context)->callbacks_;
+HttpConnPoolImplBase::newPendingRequest(Envoy::ConnectionPool::AttachContext& context) {
+  Http::ResponseDecoder& decoder = *typedContext<HttpAttachContext>(context).decoder_;
+  Http::ConnectionPool::Callbacks& callbacks = *typedContext<HttpAttachContext>(context).callbacks_;
   ENVOY_LOG(debug, "queueing request due to no available connections");
   Envoy::ConnectionPool::PendingRequestPtr pending_request(
       new HttpPendingRequest(*this, decoder, callbacks));
@@ -79,9 +78,9 @@ HttpConnPoolImplBase::newPendingRequest(const Envoy::ConnectionPool::AttachConte
 void HttpConnPoolImplBase::onPoolReady(Envoy::ConnectionPool::ActiveClient& client,
                                        Envoy::ConnectionPool::AttachContext& context) {
   ActiveClient* http_client = static_cast<ActiveClient*>(&client);
-  auto* pair = static_cast<HttpAttachContext*>(&context);
-  Http::ResponseDecoder& response_decoder = *pair->decoder_;
-  Http::ConnectionPool::Callbacks& callbacks = *pair->callbacks_;
+  auto& http_context = typedContext<HttpAttachContext>(context);
+  Http::ResponseDecoder& response_decoder = *http_context.decoder_;
+  Http::ConnectionPool::Callbacks& callbacks = *http_context.callbacks_;
   Http::RequestEncoder& new_encoder = http_client->newStreamEncoder(response_decoder);
   callbacks.onPoolReady(new_encoder, client.real_host_description_,
                         http_client->codec_client_->streamInfo());

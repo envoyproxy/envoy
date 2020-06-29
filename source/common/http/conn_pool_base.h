@@ -55,11 +55,11 @@ public:
 
   // Creates a new PendingRequest and enqueues it into the request queue.
   ConnectionPool::Cancellable*
-  newPendingRequest(const Envoy::ConnectionPool::AttachContext& context) override;
+  newPendingRequest(Envoy::ConnectionPool::AttachContext& context) override;
   void onPoolFailure(const Upstream::HostDescriptionConstSharedPtr& host_description,
                      absl::string_view failure_reason, ConnectionPool::PoolFailureReason reason,
                      Envoy::ConnectionPool::AttachContext& context) override {
-    auto* callbacks = static_cast<HttpAttachContext*>(&context)->callbacks_;
+    auto* callbacks = typedContext<HttpAttachContext>(context).callbacks_;
     callbacks->onPoolFailure(reason, failure_reason, host_description);
   }
   void onPoolReady(Envoy::ConnectionPool::ActiveClient& client,
