@@ -50,6 +50,7 @@ envoy_cc_test_library(
 
 envoy_cc_test(
     name = "ads_integration_test",
+    size = "enormous",
     srcs = ["ads_integration_test.cc"],
     tags = ["fails_on_windows"],
     deps = [
@@ -237,6 +238,7 @@ envoy_cc_test(
     srcs = [
         "drain_close_integration_test.cc",
     ],
+    tags = ["fails_on_windows"],
     deps = [
         ":http_protocol_integration_lib",
         "//source/extensions/filters/http/health_check:config",
@@ -254,7 +256,7 @@ envoy_cc_test_binary(
     ],
     stamped = True,
     deps = [
-        "//source/exe:envoy_main_common_lib",
+        "//source/exe:envoy_main_common_with_core_extensions_lib",
         "//source/exe:platform_impl_lib",
     ],
 )
@@ -278,7 +280,7 @@ envoy_sh_test(
 envoy_sh_test(
     name = "run_envoy_test",
     srcs = ["run_envoy_test.sh"],
-    cc_binary = ["//source/exe:envoy-static"],
+    cc_binary = [":hotrestart_main"],
     data = [
         "test_utility.sh",
         "//test/config/integration:server_config_files",
@@ -293,6 +295,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
+    tags = ["fails_on_windows"],
     deps = [
         ":http_integration_lib",
         "//test/test_common:utility_lib",
