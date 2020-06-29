@@ -1208,6 +1208,21 @@ message RedirectAction {
 
   oneof path_rewrite_specifier {
     // The path portion of the URL will be swapped with this value.
+    // Please note that query string in path_redirect will override the
+    // request's query string and will not be stripped.
+    //
+    // For example, let's say we have the following routes:
+    //
+    // - match: { path: "/old-path-1" }
+    //   redirect: { path_redirect: "/new-path-1" }
+    // - match: { path: "/old-path-2" }
+    //   redirect: { path_redirect: "/new-path-2", strip-query: "true" }
+    // - match: { path: "/old-path-3" }
+    //   redirect: { path_redirect: "/new-path-3?foo=1", strip_query: "true" }
+    //
+    // 1. if request uri is "/old-path-1?bar=1", users will be redirected to "/new-path-1?bar=1"
+    // 2. if request uri is "/old-path-2?bar=1", users will be redirected to "/new-path-2"
+    // 3. if request uri is "/old-path-3?bar=1", users will be redirected to "/new-path-3?foo=1"
     string path_redirect = 2
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
