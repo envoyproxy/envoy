@@ -284,7 +284,8 @@ message Http2ProtocolOptions {
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.upgrade_configs>`
   // iff present.
   //
-  // This is deprecated in favor of stream_error_on_invalid_http_message.
+  // This is deprecated in favor of :ref:`stream_error_on_invalid_http_message
+  // <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.stream_error_on_invalid_http_message>`
   //
   // See `RFC7540, sec. 8.1 <https://tools.ietf.org/html/rfc7540#section-8.1>`_ for details.
   bool stream_error_on_invalid_http_messaging = 12 [deprecated = true];
