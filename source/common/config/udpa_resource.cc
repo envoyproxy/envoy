@@ -88,7 +88,7 @@ UdpaResourceIdentifier::encodeUrl(const udpa::core::v1::ResourceLocator& resourc
   const std::string id_path = encodeIdPath(resource_locator.id());
   const std::string fragment = encodeDirectives(resource_locator.directives());
   std::string scheme = "udpa:";
-  switch (resource_locator.schema()) {
+  switch (resource_locator.scheme()) {
   case udpa::core::v1::ResourceLocator::HTTP:
     scheme = "http:";
     FALLTHRU;
@@ -187,11 +187,11 @@ udpa::core::v1::ResourceLocator UdpaResourceIdentifier::decodeUrl(absl::string_v
     path = path.substr(0, fragment_start);
   }
   if (absl::StartsWith(resource_url, "udpa:")) {
-    decoded_resource_locator.set_schema(udpa::core::v1::ResourceLocator::UDPA);
+    decoded_resource_locator.set_scheme(udpa::core::v1::ResourceLocator::UDPA);
   } else if (absl::StartsWith(resource_url, "http:")) {
-    decoded_resource_locator.set_schema(udpa::core::v1::ResourceLocator::HTTP);
+    decoded_resource_locator.set_scheme(udpa::core::v1::ResourceLocator::HTTP);
   } else if (absl::StartsWith(resource_url, "file:")) {
-    decoded_resource_locator.set_schema(udpa::core::v1::ResourceLocator::FILE);
+    decoded_resource_locator.set_scheme(udpa::core::v1::ResourceLocator::FILE);
     // File URLs only have a path and fragment.
     decodePath(path, nullptr, *decoded_resource_locator.mutable_id());
     return decoded_resource_locator;

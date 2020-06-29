@@ -147,7 +147,7 @@ TEST(UdpaResourceLocatorTest, Schemes) {
   {
     const auto resource_locator =
         UdpaResourceIdentifier::decodeUrl("udpa://foo/bar/baz/blah?a=b#entry=m");
-    EXPECT_EQ(udpa::core::v1::ResourceLocator::UDPA, resource_locator.schema());
+    EXPECT_EQ(udpa::core::v1::ResourceLocator::UDPA, resource_locator.scheme());
     EXPECT_EQ("foo", resource_locator.authority());
     EXPECT_EQ("bar", resource_locator.resource_type());
     EXPECT_EQ(2, resource_locator.id().size());
@@ -163,7 +163,7 @@ TEST(UdpaResourceLocatorTest, Schemes) {
   {
     const auto resource_locator =
         UdpaResourceIdentifier::decodeUrl("http://foo/bar/baz/blah?a=b#entry=m");
-    EXPECT_EQ(udpa::core::v1::ResourceLocator::HTTP, resource_locator.schema());
+    EXPECT_EQ(udpa::core::v1::ResourceLocator::HTTP, resource_locator.scheme());
     EXPECT_EQ("foo", resource_locator.authority());
     EXPECT_EQ("bar", resource_locator.resource_type());
     EXPECT_EQ(2, resource_locator.id().size());
@@ -178,7 +178,7 @@ TEST(UdpaResourceLocatorTest, Schemes) {
   }
   {
     const auto resource_locator = UdpaResourceIdentifier::decodeUrl("file:///bar/baz/blah#entry=m");
-    EXPECT_EQ(udpa::core::v1::ResourceLocator::FILE, resource_locator.schema());
+    EXPECT_EQ(udpa::core::v1::ResourceLocator::FILE, resource_locator.scheme());
     EXPECT_EQ(3, resource_locator.id().size());
     EXPECT_EQ("bar", resource_locator.id()[0]);
     EXPECT_EQ("baz", resource_locator.id()[1]);
