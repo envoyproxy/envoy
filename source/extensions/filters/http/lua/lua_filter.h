@@ -346,18 +346,17 @@ public:
                Api::Api& api);
 
   PerLuaCodeSetup* perLuaCodeSetup(const std::string& name) const {
-    auto iter = per_lua_code_setups_map_.find(name);
+    const auto iter = per_lua_code_setups_map_.find(name);
     if (iter != per_lua_code_setups_map_.end()) {
       return iter->second.get();
-    } else {
-      return nullptr;
     }
+    return nullptr;
   }
 
   Upstream::ClusterManager& cluster_manager_;
 
 private:
-  const std::map<std::string, std::string>
+  const absl::flat_hash_map<std::string, const std::string>
   readSourceCodes(const envoy::extensions::filters::http::lua::v3::Lua& config,
                   Api::Api& api) const;
 
@@ -392,9 +391,8 @@ PerLuaCodeSetup* getPerLuaCodeSetup(const FilterConfig* filter_config,
     } else if (!config_per_route->name().empty()) {
       ASSERT(filter_config);
       return filter_config->perLuaCodeSetup(config_per_route->name());
-    } else {
-      return nullptr;
     }
+    return nullptr;
   }
   ASSERT(filter_config);
   return filter_config->perLuaCodeSetup(GLOBAL_SCRIPT_NAME);
@@ -422,12 +420,15 @@ public:
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override {
     const auto config_per_route = getConfigPerRoute(decoder_callbacks_.callbacks_);
-    per_lua_code_setup_ = getPerLuaCodeSetup(config_.get(), config_per_route);
-    if (!per_lua_code_setup_) {
+    PerLuaCodeSetup* setup = getPerLuaCodeSetup(config_.get(), config_per_route);
+    const int function_ref = setup ? setup->requestFunctionRef() : LUA_REFNIL;
+    if (function_ref == LUA_REFNIL) {
       return Http::FilterHeadersStatus::Continue;
     }
-    return doHeaders(request_stream_wrapper_, request_coroutine_, decoder_callbacks_,
-                     per_lua_code_setup_->requestFunctionRef(), headers, end_stream);
+    request_coroutine_ = setup->createCoroutine();
+
+    return doHeaders(request_stream_wrapper_, request_coroutine_, decoder_callbacks_, function_ref,
+                     headers, end_stream);
   }
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override {
     return doData(request_stream_wrapper_, data, end_stream);
@@ -446,12 +447,15 @@ public:
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override {
     const auto config_per_route = getConfigPerRoute(decoder_callbacks_.callbacks_);
-    per_lua_code_setup_ = getPerLuaCodeSetup(config_.get(), config_per_route);
-    if (!per_lua_code_setup_) {
+    PerLuaCodeSetup* setup = getPerLuaCodeSetup(config_.get(), config_per_route);
+    const int function_ref = setup ? setup->responseFunctionRef() : LUA_REFNIL;
+    if (function_ref == LUA_REFNIL) {
       return Http::FilterHeadersStatus::Continue;
     }
+    response_coroutine_ = setup->createCoroutine();
+
     return doHeaders(response_stream_wrapper_, response_coroutine_, encoder_callbacks_,
-                     per_lua_code_setup_->responseFunctionRef(), headers, end_stream);
+                     function_ref, headers, end_stream);
   }
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override {
     return doData(response_stream_wrapper_, data, end_stream);
@@ -521,7 +525,6 @@ private:
   Http::FilterTrailersStatus doTrailers(StreamHandleRef& handle, Http::HeaderMap& trailers);
 
   FilterConfigConstSharedPtr config_{};
-  PerLuaCodeSetup* per_lua_code_setup_{};
   DecoderCallbacks decoder_callbacks_{*this};
   EncoderCallbacks encoder_callbacks_{*this};
   StreamHandleRef request_stream_wrapper_;

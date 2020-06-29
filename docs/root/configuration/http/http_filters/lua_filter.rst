@@ -77,7 +77,7 @@ A simple example of configuring Lua HTTP filter that contains only :ref:`inline_
         -- Do something.
       end
 
-By default, Lua script defined in `inline_code` will be treated as a `GLOBAL` script. Envoy will 
+By default, Lua script defined in ``inline_code`` will be treated as a ``GLOBAL`` script. Envoy will 
 execute it for every HTTP request.
 
 Per-Route Configuration
@@ -120,7 +120,7 @@ LuaPerRoute configuration as follow:
       disabled: true
 
 We can also refer to a Lua script in the filter configuration by specifying a name in LuaPerRoute. 
-The `GLOBAL` Lua script will be overridden by the referenced script:
+The ``GLOBAL`` Lua script will be overridden by the referenced script:
 
 .. code-block:: yaml
 
@@ -130,8 +130,9 @@ The `GLOBAL` Lua script will be overridden by the referenced script:
 
 .. attention::
 
-  The name `GLOBAL` is reserved for :ref:`Lua.inline_code 
-  <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.inline_code>`, so don't use it otherwise.
+  The name ``GLOBAL`` is reserved for :ref:`Lua.inline_code 
+  <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.inline_code>`. Therefore, do not use 
+  ``GLOBAL`` as name for other Lua scripts.
     
 
 Script examples

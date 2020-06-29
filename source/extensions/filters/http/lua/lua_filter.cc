@@ -609,16 +609,15 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
   }
 }
 
-const std::map<std::string, std::string>
+const absl::flat_hash_map<std::string, const std::string>
 FilterConfig::readSourceCodes(const envoy::extensions::filters::http::lua::v3::Lua& config,
                               Api::Api& api) const {
-  std::map<std::string, std::string> source_codes;
+  absl::flat_hash_map<std::string, const std::string> source_codes;
   if (!config.inline_code().empty()) {
     source_codes.insert({GLOBAL_SCRIPT_NAME, config.inline_code()});
   }
   for (const auto& source : config.source_codes()) {
-    std::string code;
-    code = Config::DataSource::read(source.second, true, api);
+    const std::string code = Config::DataSource::read(source.second, true, api);
     source_codes.insert({source.first, code});
   }
   return source_codes;
@@ -643,11 +642,6 @@ Http::FilterHeadersStatus Filter::doHeaders(StreamHandleRef& handle,
                                             Filters::Common::Lua::CoroutinePtr& coroutine,
                                             FilterCallbacks& callbacks, int function_ref,
                                             Http::HeaderMap& headers, bool end_stream) {
-  if (function_ref == LUA_REFNIL) {
-    return Http::FilterHeadersStatus::Continue;
-  }
-
-  coroutine = per_lua_code_setup_->createCoroutine();
   handle.reset(StreamHandleWrapper::create(coroutine->luaState(), *coroutine, headers, end_stream,
                                            *this, callbacks),
                true);

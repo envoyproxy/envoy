@@ -720,7 +720,7 @@ virtual_hosts:
   domains: ["lua.per.route"]
   routes:
   - match:
-      prefix: "/lua/per/route/update"
+      prefix: "/lua/per/route/hello"
     route:
       cluster: lua_cluster
     typed_per_filter_config:
@@ -801,7 +801,7 @@ virtual_hosts:
   test_server_->waitForCounterGe("http.config_test.rds.dynamic_lua_routes.update_success", 2);
 
   Http::TestRequestHeaderMapImpl update_headers{{":method", "GET"},
-                                                {":path", "/lua/per/route/update"},
+                                                {":path", "/lua/per/route/hello"},
                                                 {":scheme", "http"},
                                                 {":authority", "lua.per.route"},
                                                 {"x-forwarded-for", "10.0.0.1"}};
