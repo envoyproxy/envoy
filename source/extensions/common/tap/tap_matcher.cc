@@ -220,8 +220,12 @@ bool HttpGenericBodyMatcher::locatePatternAcrossChunks(const std::string& patter
                                                        const HttpGenericBodyMatcherCtx* ctx) {
   // Take the first character from the pattern and locate it in overlap_.
   auto pattern_index = 0;
-  auto match_iter =
-      std::find(std::begin(ctx->overlap_), std::end(ctx->overlap_), pattern.at(pattern_index));
+  // Start position in overlap_. overlap_ size was calculated based on the longest pattern to be
+  // found, but search for shorter patterns may start from some offset, not the beginning of the
+  // buffer.
+  size_t start_index = ctx->overlap_.size() - (pattern.size() - 1);
+  auto match_iter = std::find(std::begin(ctx->overlap_) + start_index, std::end(ctx->overlap_),
+                              pattern.at(pattern_index));
 
   if (match_iter == std::end(ctx->overlap_)) {
     return false;

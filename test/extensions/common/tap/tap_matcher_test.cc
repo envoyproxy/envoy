@@ -342,7 +342,13 @@ INSTANTIATE_TEST_SUITE_P(
                                                      "    - string_match: \"envoyproxy\""},
                             std::list<std::list<uint32_t>>{{6}, {0}, {1}, {8}, {6}},
                             std::make_pair(true, false)),
-
+            // Test starting search from some offset for shorter patterns.
+            // Overlap buffer size will be initialized for longest pattern but
+            // search for shorter patterns should start from some index in overlap
+            // buffer. Make sure that the index is enough for the shorter pattern to be found.
+            std::make_tuple(std::vector<std::string>{"    - string_match: \"assemble\"",
+                                                     "    - string_match: \"envoyp\""},
+                            std::list<std::list<uint32_t>>{{0, 1}}, std::make_pair(true, false)),
             // SEARCHING FOR MULTIPLE PATTERNS - with limit
             // Should NOT match. None of the patterns is in the body.
             std::make_tuple(std::vector<std::string>{"    - string_match: \"balancer\"",
