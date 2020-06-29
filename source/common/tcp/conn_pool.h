@@ -84,6 +84,8 @@ public:
                   uint64_t concurrent_request_limit);
   ~ActiveTcpClient() override;
 
+  // Override the default's of Envoy::ConnectionPool::ActiveClient for class-specific functions.
+  // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override;
   void onAboveWriteBufferHighWatermark() override { callbacks_->onAboveWriteBufferHighWatermark(); }
   void onBelowWriteBufferLowWatermark() override { callbacks_->onBelowWriteBufferLowWatermark(); }
@@ -131,8 +133,14 @@ public:
     // Legacy behavior for the TCP connection pool marks all connecting clients
     // as draining.
     for (auto& connecting_client : connecting_clients_) {
-      connecting_request_capacity_ -= (connecting_client->remaining_requests_ + 1);
-      connecting_client->remaining_requests_ = 1;
+      if (connecting_client->remaining_requests_ > 1) {
+        uint64_t old_limit = connecting_client->effectiveConcurrentRequestLimit();
+        connecting_client->remaining_requests_ = 1;
+        if (connecting_client->effectiveConcurrentRequestLimit() < old_limit) {
+          connecting_request_capacity_ -=
+              (old_limit - connecting_client->effectiveConcurrentRequestLimit());
+        }
+      }
     }
   }
 
@@ -149,8 +157,8 @@ public:
 
   ConnectionPool::Cancellable* newPendingRequest(void* context) override {
     auto* callbacks = reinterpret_cast<Tcp::ConnectionPool::Callbacks*>(context);
-    Envoy::ConnectionPool::PendingRequestPtr pending_request(
-        new TcpPendingRequest(*this, *callbacks));
+    Envoy::ConnectionPool::PendingRequestPtr pending_request =
+        std::make_unique<TcpPendingRequest>(*this, *callbacks);
     pending_request->moveIntoList(std::move(pending_request), pending_requests_);
     return pending_requests_.front().get();
   }
@@ -158,22 +166,20 @@ public:
   Upstream::HostDescriptionConstSharedPtr host() const override { return host_; }
 
   Envoy::ConnectionPool::ActiveClientPtr instantiateActiveClient() override {
-    return Envoy::ConnectionPool::ActiveClientPtr{
-        new ActiveTcpClient(*this, host_->cluster().maxRequestsPerConnection(), 1)};
+    return std::make_unique<ActiveTcpClient>(*this, host_->cluster().maxRequestsPerConnection(), 1);
   }
 
   void attachRequestToClient(Envoy::ConnectionPool::ActiveClient& client,
                              Envoy::ConnectionPool::PendingRequest& request) override {
-    TcpPendingRequest* tcp_request = reinterpret_cast<TcpPendingRequest*>(&request);
+    TcpPendingRequest* tcp_request = static_cast<TcpPendingRequest*>(&request);
     attachRequestToClientImpl(client, reinterpret_cast<void*>(&tcp_request->callbacks_));
   }
 
   void onPoolReady(Envoy::ConnectionPool::ActiveClient& client, void* context) override {
-    ActiveTcpClient* tcp_client = reinterpret_cast<ActiveTcpClient*>(&client);
+    ActiveTcpClient* tcp_client = static_cast<ActiveTcpClient*>(&client);
     auto* callbacks = reinterpret_cast<Tcp::ConnectionPool::Callbacks*>(context);
     std::unique_ptr<Envoy::Tcp::ConnectionPool::ConnectionData> connection_data =
-        Envoy::Tcp::ConnectionPool::ConnectionDataPtr{
-            new ActiveTcpClient::TcpConnectionData(*tcp_client, *tcp_client->connection_)};
+        std::make_unique<ActiveTcpClient::TcpConnectionData>(*tcp_client, *tcp_client->connection_);
     callbacks->onPoolReady(std::move(connection_data), tcp_client->real_host_description_);
   }
 
@@ -196,7 +202,7 @@ public:
 
 protected:
   Event::SchedulableCallbackPtr upstream_ready_cb_;
-  bool upstream_ready_enabled_ = false;
+  bool upstream_ready_enabled_{};
 };
 
 } // namespace Tcp

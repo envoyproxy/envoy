@@ -1421,8 +1421,8 @@ Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsSharedPtr transport_socket_options) {
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_tcp_connection_pool")) {
-    return Tcp::ConnectionPool::InstancePtr{
-        new Tcp::ConnPoolImpl(dispatcher, host, priority, options, transport_socket_options)};
+    return std::make_unique<Tcp::ConnPoolImpl>(dispatcher, host, priority, options,
+                                               transport_socket_options);
   } else {
     return Tcp::ConnectionPool::InstancePtr{new Tcp::OriginalConnPoolImpl(
         dispatcher, host, priority, options, transport_socket_options)};

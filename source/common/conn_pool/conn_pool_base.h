@@ -162,6 +162,7 @@ public:
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
   const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
 
+protected:
   std::list<Instance::DrainedCb> drained_callbacks_;
   std::list<PendingRequestPtr> pending_requests_;
 

@@ -22,19 +22,8 @@ ActiveTcpClient::ActiveTcpClient(ConnPoolImpl& parent, uint64_t lifetime_request
   connection_ = std::move(data.connection_);
   connection_->addConnectionCallbacks(*this);
   connection_->detectEarlyCloseWhenReadDisabled(false);
-  connection_->addReadFilter(Network::ReadFilterSharedPtr{new ConnReadFilter(*this)});
+  connection_->addReadFilter(std::make_shared<ConnReadFilter>(*this));
   connection_->connect();
-}
-
-void ActiveTcpClient::clearCallbacks() {
-  if (state_ == Envoy::ConnectionPool::ActiveClient::State::BUSY ||
-      state_ == Envoy::ConnectionPool::ActiveClient::State::DRAINING) {
-    parent_.onConnReleased(*this);
-  }
-  callbacks_ = nullptr;
-  tcp_connection_data_ = nullptr;
-  parent_.onRequestClosed(*this, true);
-  parent_.checkForDrained();
 }
 
 ActiveTcpClient::~ActiveTcpClient() {
@@ -50,10 +39,27 @@ ActiveTcpClient::~ActiveTcpClient() {
   parent_.onConnDestroyed();
 }
 
+void ActiveTcpClient::clearCallbacks() {
+  if (state_ == Envoy::ConnectionPool::ActiveClient::State::BUSY ||
+      state_ == Envoy::ConnectionPool::ActiveClient::State::DRAINING) {
+    parent_.onConnReleased(*this);
+  }
+  callbacks_ = nullptr;
+  tcp_connection_data_ = nullptr;
+  parent_.onRequestClosed(*this, true);
+  parent_.checkForDrained();
+}
+
 void ActiveTcpClient::onEvent(Network::ConnectionEvent event) {
   Envoy::ConnectionPool::ActiveClient::onEvent(event);
+  // Do not pass the Connected event to TCP proxy sessions.
+  // The tcp proxy filter synthesizes its own Connected event in onPoolReadyBase
+  // and receiving it twice causes problems.
+  // TODO(alyssawilk) clean this up in a follow-up. It's confusing.
   if (callbacks_ && event != Network::ConnectionEvent::Connected) {
     callbacks_->onEvent(event);
+    // After receiving a disconnect event, the owner of callbacks_ will likely self-destruct.
+    // Clear the pointer to avoid using it again.
     callbacks_ = nullptr;
   }
 }

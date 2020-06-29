@@ -972,6 +972,74 @@ TEST_P(TcpConnPoolImplTest, DrainOnClose) {
 }
 
 /**
+ * Test connecting_request_capacity logic.
+ */
+TEST_P(TcpConnPoolImplTest, RequestCapacity) {
+  if (!test_new_connection_pool_) {
+    return;
+  }
+  cluster_->resetResourceManager(5, 1024, 1024, 1, 1);
+  cluster_->max_requests_per_connection_ = 100;
+
+  ConnPoolCallbacks callbacks1;
+  ConnPoolCallbacks callbacks2;
+  Tcp::ConnectionPool::Cancellable* handle1;
+  Tcp::ConnectionPool::Cancellable* handle2;
+  {
+    // Request 1 should kick off a new connection.
+    conn_pool_.expectConnCreate();
+    handle1 = conn_pool_.newConnection(callbacks1);
+    EXPECT_NE(nullptr, handle1);
+  }
+  {
+    // Request 2 should kick off a new connection.
+    conn_pool_.expectConnCreate();
+    handle2 = conn_pool_.newConnection(callbacks2);
+    EXPECT_NE(nullptr, handle2);
+  }
+
+  // This should set the number of requests remaining to 1 on the active
+  // connections, and the connecting_request_capacity to 2 as well.
+  conn_pool_.drainConnections();
+
+  // Cancel the connections. Because neither used CloseExcess, the two connections should persist.
+  handle1->cancel(ConnectionPool::CancelPolicy::Default);
+  handle2->cancel(ConnectionPool::CancelPolicy::Default);
+
+  Tcp::ConnectionPool::Cancellable* handle3;
+  Tcp::ConnectionPool::Cancellable* handle4;
+  Tcp::ConnectionPool::Cancellable* handle5;
+  ConnPoolCallbacks callbacks3;
+  ConnPoolCallbacks callbacks4;
+  ConnPoolCallbacks callbacks5;
+
+  {
+    // The next two request will use the prefetched connections, bringing
+    // connecting_request_capacity to zero.
+    handle3 = conn_pool_.newConnection(callbacks3);
+    EXPECT_NE(nullptr, handle3);
+
+    handle4 = conn_pool_.newConnection(callbacks4);
+    EXPECT_NE(nullptr, handle4);
+  }
+  {
+    // With connecting_request_capacity zero, a request for a new connection
+    // will kick off connection #3.
+    conn_pool_.expectConnCreate();
+    handle5 = conn_pool_.newConnection(callbacks5);
+    EXPECT_NE(nullptr, handle5);
+  }
+
+  // Clean up remaining connections.
+  handle3->cancel(ConnectionPool::CancelPolicy::Default);
+  handle4->cancel(ConnectionPool::CancelPolicy::Default);
+  handle5->cancel(ConnectionPool::CancelPolicy::Default);
+  conn_pool_.test_conns_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  conn_pool_.test_conns_[1].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  conn_pool_.test_conns_[2].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+/**
  * Test that pending connections are closed when the connection pool is destroyed.
  */
 TEST_P(TcpConnPoolImplDestructorTest, TestPendingConnectionsAreClosed) {
@@ -1014,7 +1082,6 @@ TEST_P(TcpConnPoolImplDestructorTest, TestReadyConnectionsAreClosed) {
   EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
   conn_pool_.reset();
 }
-
 INSTANTIATE_TEST_SUITE_P(ConnectionPools, TcpConnPoolImplTest, testing::Bool());
 INSTANTIATE_TEST_SUITE_P(ConnectionPools, TcpConnPoolImplDestructorTest, testing::Bool());
 
