@@ -171,6 +171,21 @@ UNOWNED_EXTENSIONS = {
 
 # yapf: enable
 
+NON_TYPE_ALIAS_ALLOWED_TYPES = {
+    "^(?![A-Z].*).*$",
+    "^(.*::){,1}(StrictMock<|NiceMock<).*$",
+    "^(.*::){,1}(Test|Mock|Fake).*$",
+    "^Protobuf.*::.*$",
+    "^[A-Z]$",
+    "^.*, .*",
+    r"^.*\[\]$",
+}
+
+USING_TYPE_ALIAS_REGEX = re.compile("using .* = .*;")
+SMART_PTR_REGEX = re.compile("std::(unique_ptr|shared_ptr)<(.*?)>(?!;)")
+OPTIONAL_REF_REGEX = re.compile("absl::optional<std::reference_wrapper<(.*?)>>(?!;)")
+NON_TYPE_ALIAS_ALLOWED_TYPE_REGEX = re.compile(f"({'|'.join(NON_TYPE_ALIAS_ALLOWED_TYPES)})")
+
 
 # Map a line transformation function across each line of a file,
 # writing the result lines as requested.
@@ -346,6 +361,10 @@ def whitelistedForStdRegex(file_path):
 
 def whitelistedForGrpcInit(file_path):
   return file_path in GRPC_INIT_WHITELIST
+
+
+def whitelistedForNonTypeAlias(name):
+  return NON_TYPE_ALIAS_ALLOWED_TYPE_REGEX.match(name)
 
 
 def whitelistedForUnpackTo(file_path):
@@ -696,6 +715,17 @@ def checkSourceLine(line, file_path, reportError):
       if comment == -1 or comment > grpc_init_or_shutdown:
         reportError("Don't call grpc_init() or grpc_shutdown() directly, instantiate " +
                     "Grpc::GoogleGrpcContext. See #8282")
+
+  if not USING_TYPE_ALIAS_REGEX.search(line):
+    smart_ptrs = SMART_PTR_REGEX.finditer(line)
+    for smart_ptr in smart_ptrs:
+      if not whitelistedForNonTypeAlias(smart_ptr.group(2)):
+        reportError(f"Use type alias for '{smart_ptr.group(2)}' instead. See STYLE.md")
+
+    optional_refs = OPTIONAL_REF_REGEX.finditer(line)
+    for optional_ref in optional_refs:
+      if not whitelistedForNonTypeAlias(optional_ref.group(1)):
+        reportError(f"Use type alias for '{optional_ref.group(1)}' instead. See STYLE.md")
 
 
 def checkBuildLine(line, file_path, reportError):

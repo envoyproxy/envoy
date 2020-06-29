@@ -255,6 +255,11 @@ def runChecks():
       "grpc_shutdown.cc",
       "Don't call grpc_init() or grpc_shutdown() directly, instantiate Grpc::GoogleGrpcContext. " +
       "See #8282")
+  errors += checkUnfixableError("non_type_alias_smart_ptr.cc",
+                                "Use type alias for 'Network::Connection' instead. See STYLE.md")
+  errors += checkUnfixableError(
+      "non_type_alias_optional_ref.cc",
+      "Use type alias for 'ConnectionHandlerImpl::ActiveTcpListener' instead. See STYLE.md")
   errors += checkUnfixableError("clang_format_double_off.cc", "clang-format nested off")
   errors += checkUnfixableError("clang_format_trailing_off.cc", "clang-format remains off")
   errors += checkUnfixableError("clang_format_double_on.cc", "clang-format nested on")
@@ -310,6 +315,8 @@ def runChecks():
   errors += checkFileExpectingOK("real_time_source_override.cc")
   errors += checkFileExpectingOK("time_system_wait_for.cc")
   errors += checkFileExpectingOK("clang_format_off.cc")
+  errors += checkFileExpectingOK("using_type_alias.cc")
+  errors += checkFileExpectingOK("non_type_alias_allowed_type.cc")
 
   errors += checkUnfixableLineError(
       "std::unique_ptr<Network::Connection> a() { return nullptr; }",
