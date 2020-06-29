@@ -541,8 +541,8 @@ message HttpConnectionManager {
   //
   // If different behaviors for invalid_http_message for HTTP/1 and HTTP/2 are
   // desired, one *must* use the new HTTP/2 option
-  // :ref:`stream_error_on_invalid_http_message
-  // <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.stream_error_on_invalid_http_message>`
+  // :ref:`override_stream_error_on_invalid_http_message
+  // <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.override_stream_error_on_invalid_http_message>`
   // *not* the deprecated but similarly named :ref:`stream_error_on_invalid_http_messaging
   // <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.stream_error_on_invalid_http_messaging>`
   google.protobuf.BoolValue stream_error_on_invalid_http_message = 40;

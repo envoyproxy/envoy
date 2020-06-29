@@ -179,8 +179,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       route_config_provider_manager_(route_config_provider_manager),
       scoped_routes_config_provider_manager_(scoped_routes_config_provider_manager),
       http2_options_(Http2::Utility::initializeAndValidateOptions(
-          config.http2_protocol_options(), config.has_stream_error_on_invalid_http_message(),
-          config.stream_error_on_invalid_http_message())),
+          config.http2_protocol_options(),
+          config.has_override_stream_error_on_invalid_http_message(),
+          config.override_stream_error_on_invalid_http_message())),
       http1_settings_(Http::Utility::parseHttp1Settings(config.http_protocol_options())),
       max_request_headers_kb_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, max_request_headers_kb, Http::DEFAULT_MAX_REQUEST_HEADERS_KB)),

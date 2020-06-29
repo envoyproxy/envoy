@@ -151,8 +151,9 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions
   auto ret = initializeAndValidateOptions(options);
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.hcm_stream_error_on_invalid_message") &&
-      !options.has_stream_error_on_invalid_http_message() && hcm_stream_error_set) {
-    ret.mutable_stream_error_on_invalid_http_message()->set_value(hcm_stream_error.value());
+      !options.has_override_stream_error_on_invalid_http_message() && hcm_stream_error_set) {
+    ret.mutable_override_stream_error_on_invalid_http_message()->set_value(
+        hcm_stream_error.value());
   }
   return ret;
 }
@@ -163,8 +164,8 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions
   // This will throw an exception when a custom parameter and a named parameter collide.
   validateCustomSettingsParameters(options);
 
-  if (!options.has_stream_error_on_invalid_http_message()) {
-    options_clone.mutable_stream_error_on_invalid_http_message()->set_value(
+  if (!options.has_override_stream_error_on_invalid_http_message()) {
+    options_clone.mutable_override_stream_error_on_invalid_http_message()->set_value(
         options.stream_error_on_invalid_http_messaging());
   }
 
