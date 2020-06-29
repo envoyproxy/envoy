@@ -185,7 +185,6 @@ TEST_P(DecompressorIntegrationTest, BidirectionalDecompressionError) {
   // Send first data chunk upstream.
   Buffer::OwnedImpl request_data1;
   TestUtility::feedBufferWithRandomCharacters(request_data1, 8192);
-  auto uncompressed_request_length = request_data1.length();
   request_compressor_->compress(request_data1, Envoy::Compression::Compressor::State::Flush);
   auto compressed_request_length = request_data1.length();
   codec_client_->sendData(*request_encoder, request_data1, false);
@@ -193,7 +192,6 @@ TEST_P(DecompressorIntegrationTest, BidirectionalDecompressionError) {
   // Send second data chunk upstream and finish the request stream.
   Buffer::OwnedImpl request_data2;
   TestUtility::feedBufferWithRandomCharacters(request_data2, 16384);
-  uncompressed_request_length += request_data2.length();
   request_compressor_->compress(request_data2, Envoy::Compression::Compressor::State::Finish);
   compressed_request_length += request_data2.length();
   codec_client_->sendData(*request_encoder, request_data2, true);
@@ -230,7 +228,6 @@ TEST_P(DecompressorIntegrationTest, BidirectionalDecompressionError) {
   // Send first data chunk downstream.
   Buffer::OwnedImpl response_data1;
   TestUtility::feedBufferWithRandomCharacters(response_data1, 4096);
-  auto uncompressed_response_length = response_data1.length();
   response_compressor_->compress(response_data1, Envoy::Compression::Compressor::State::Flush);
   auto compressed_response_length = response_data1.length();
   upstream_request_->encodeData(response_data1, false);
@@ -238,7 +235,6 @@ TEST_P(DecompressorIntegrationTest, BidirectionalDecompressionError) {
   // Send second data chunk downstream and finish the response stream.
   Buffer::OwnedImpl response_data2;
   TestUtility::feedBufferWithRandomCharacters(response_data2, 8192);
-  uncompressed_response_length += response_data2.length();
   response_compressor_->compress(response_data2, Envoy::Compression::Compressor::State::Flush);
   compressed_response_length += response_data2.length();
   upstream_request_->encodeData(response_data2, true);
