@@ -302,6 +302,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                          : ""),
       path_redirect_(route.redirect().path_redirect()),
       path_redirect_has_query_(path_redirect_.find('?') != absl::string_view::npos),
+      enable_preserve_query_in_path_redirects_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.preserve_query_string_in_path_redirects")),
       https_redirect_(route.redirect().https_redirect()),
       prefix_rewrite_redirect_(route.redirect().prefix_rewrite()),
       strip_query_(route.redirect().strip_query()),
@@ -431,9 +433,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     regex_rewrite_substitution_ = rewrite_spec.substitution();
   }
 
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.preserve_query_string_in_redirects") &&
-      path_redirect_has_query_ && strip_query_) {
+  if (enable_preserve_query_in_path_redirects_ && path_redirect_has_query_ && strip_query_) {
     ENVOY_LOG(warn,
               "`strip_query` is set to true, but `path_redirect` contains query string and it will "
               "not be stripped: {}",
@@ -673,8 +673,7 @@ std::string RouteEntryImplBase::newPath(const Http::RequestHeaderMap& headers) c
   }
 
   std::string final_path_value;
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.preserve_query_string_in_redirects")) {
+  if (enable_preserve_query_in_path_redirects_) {
     if (!path_redirect_.empty()) {
       // The path_redirect query string, if any, takes precedence over the request's query string,
       // and it will not be stripped regardless of `strip_query`.
