@@ -36,7 +36,7 @@ public:
       }
     )EOF",
                                                   spans_file_);
-  std::unique_ptr<DynamicOpenTracingDriver> driver_;
+  DynamicOpenTracingDriverPtr driver_;
   Stats::IsolatedStoreImpl stats_;
 
   const std::string operation_name_{"test"};

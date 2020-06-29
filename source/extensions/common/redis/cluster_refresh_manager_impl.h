@@ -57,8 +57,8 @@ public:
     ~HandleImpl() override { manager_->unregisterCluster(cluster_info_); }
 
   private:
-    const std::shared_ptr<ClusterRefreshManagerImpl> manager_;
-    const std::shared_ptr<ClusterInfo> cluster_info_;
+    const ClusterRefreshManagerImplSharedPtr manager_;
+    const ClusterInfoSharedPtr cluster_info_;
   };
 
   ClusterRefreshManagerImpl(Event::Dispatcher& main_thread_dispatcher, Upstream::ClusterManager& cm,

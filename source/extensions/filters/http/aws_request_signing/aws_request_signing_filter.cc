@@ -13,7 +13,7 @@ FilterConfigImpl::FilterConfigImpl(Extensions::Common::Aws::SignerPtr&& signer,
     : signer_(std::move(signer)), stats_(Filter::generateStats(stats_prefix, scope)),
       host_rewrite_(host_rewrite) {}
 
-Filter::Filter(const std::shared_ptr<FilterConfig>& config) : config_(config) {}
+Filter::Filter(const FilterConfigSharedPtr& config) : config_(config) {}
 
 Extensions::Common::Aws::Signer& FilterConfigImpl::signer() { return *signer_; }
 

@@ -146,7 +146,7 @@ public:
   static constexpr uint32_t MAX_STAGE_NUMBER = 10;
 
 private:
-  std::vector<std::unique_ptr<RateLimitPolicyEntry>> rate_limit_entries_;
+  std::vector<RateLimitPolicyEntryPtr> rate_limit_entries_;
   std::vector<std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>>
       rate_limit_entries_reference_;
 };

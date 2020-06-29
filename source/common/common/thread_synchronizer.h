@@ -80,8 +80,7 @@ private:
 
   struct SynchronizerData {
     absl::Mutex mutex_;
-    absl::flat_hash_map<std::string, std::unique_ptr<SynchronizerEntry>>
-        entries_ ABSL_GUARDED_BY(mutex_);
+    absl::flat_hash_map<std::string, SynchronizerEntryPtr> entries_ ABSL_GUARDED_BY(mutex_);
   };
 
   SynchronizerEntry& getOrCreateEntry(absl::string_view event_name);
@@ -90,7 +89,7 @@ private:
   void barrierOnWorker(absl::string_view event_name);
   void signalWorker(absl::string_view event_name);
 
-  std::unique_ptr<SynchronizerData> data_;
+  SynchronizerDataPtr data_;
 };
 
 } // namespace Thread

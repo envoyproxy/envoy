@@ -23,7 +23,7 @@ public:
                            std::unique_ptr<quic::ProofSource::SignatureCallback> callback) override;
 
 private:
-  absl::optional<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>>
+  Envoy::Ssl::TlsCertificateConfigOptConstRef
   getTlsCertConfig(const quic::QuicSocketAddress& server_address,
                    const quic::QuicSocketAddress& client_address, const std::string& hostname);
 

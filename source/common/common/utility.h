@@ -537,7 +537,7 @@ private:
 
 template <class Value> struct TrieEntry {
   Value value_{};
-  std::array<std::unique_ptr<TrieEntry>, 256> entries_;
+  std::array<TrieEntryPtr, 256> entries_;
 };
 
 /**

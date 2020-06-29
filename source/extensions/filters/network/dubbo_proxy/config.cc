@@ -21,7 +21,7 @@ namespace DubboProxy {
 Network::FilterFactoryCb DubboProxyFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::dubbo_proxy::v3::DubboProxy& proto_config,
     Server::Configuration::FactoryContext& context) {
-  std::shared_ptr<Config> filter_config(std::make_shared<ConfigImpl>(proto_config, context));
+  ConfigSharedPtr filter_config(std::make_shared<ConfigImpl>(proto_config, context));
 
   return [filter_config, &context](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(std::make_shared<ConnectionManager>(

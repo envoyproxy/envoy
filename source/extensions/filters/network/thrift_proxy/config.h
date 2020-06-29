@@ -90,7 +90,7 @@ private:
   ThriftFilterStats stats_;
   const TransportType transport_;
   const ProtocolType proto_;
-  std::unique_ptr<Router::RouteMatcher> route_matcher_;
+  Router::RouteMatcherPtr route_matcher_;
 
   std::list<ThriftFilters::FilterFactoryCb> filter_factories_;
 };

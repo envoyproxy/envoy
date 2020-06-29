@@ -183,7 +183,7 @@ class DocumentImpl : public Document,
 public:
   static DocumentSharedPtr create() { return DocumentSharedPtr{new DocumentImpl()}; }
   static DocumentSharedPtr create(Buffer::Instance& data) {
-    std::shared_ptr<DocumentImpl> new_doc{new DocumentImpl()};
+    DocumentImplSharedPtr new_doc{new DocumentImpl()};
     new_doc->fromBuffer(data);
     return new_doc;
   }

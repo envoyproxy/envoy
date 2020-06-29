@@ -207,7 +207,7 @@ void IntegrationTestServerImpl::createAndRunEnvoyServer(
     Server::HotRestartNopImpl restarter;
     ThreadLocal::InstanceImpl tls;
     Stats::ThreadLocalStoreImpl stat_store(*stats_allocator_);
-    std::unique_ptr<ProcessContext> process_context;
+    ProcessContextPtr process_context;
     if (process_object.has_value()) {
       process_context = std::make_unique<ProcessContextImpl>(process_object->get());
     }

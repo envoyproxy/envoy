@@ -492,7 +492,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
       *callbacks_->streamInfo().filterState());
-  std::unique_ptr<GenericConnPool> generic_conn_pool = createConnPool();
+  GenericConnPoolPtr generic_conn_pool = createConnPool();
 
   if (!generic_conn_pool) {
     sendNoHealthyUpstreamResponse();
@@ -596,7 +596,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   return Http::FilterHeadersStatus::StopIteration;
 }
 
-std::unique_ptr<GenericConnPool> Filter::createConnPool() {
+GenericConnPoolPtr Filter::createConnPool() {
   GenericConnPoolFactory* factory = nullptr;
   if (cluster_->upstreamConfig().has_value()) {
     factory = &Envoy::Config::Utility::getAndCheckFactory<GenericConnPoolFactory>(
@@ -1513,7 +1513,7 @@ void Filter::doRetry() {
   ASSERT(pending_retries_ > 0);
   pending_retries_--;
 
-  std::unique_ptr<GenericConnPool> generic_conn_pool = createConnPool();
+  GenericConnPoolPtr generic_conn_pool = createConnPool();
   if (!generic_conn_pool) {
     sendNoHealthyUpstreamResponse();
     cleanup();

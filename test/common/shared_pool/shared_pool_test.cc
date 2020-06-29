@@ -32,7 +32,7 @@ protected:
     dispatcher_thread_->join();
   }
 
-  void deferredDeleteSharedPoolOnMainThread(std::shared_ptr<ObjectSharedPool<int>>& pool) {
+  void deferredDeleteSharedPoolOnMainThread(ObjectSharedPoolSharedPtr<int>& pool) {
     absl::Notification go;
     dispatcher_->post([&pool, &go]() {
       pool.reset();
@@ -41,7 +41,7 @@ protected:
     go.WaitForNotification();
   }
 
-  void createObjectSharedPool(std::shared_ptr<ObjectSharedPool<int>>& pool) {
+  void createObjectSharedPool(ObjectSharedPoolSharedPtr<int>& pool) {
     absl::Notification go;
     dispatcher_->post([&pool, &go, this]() {
       pool = std::make_shared<ObjectSharedPool<int>>(*dispatcher_);
@@ -50,8 +50,8 @@ protected:
     go.WaitForNotification();
   }
 
-  void getObjectFromObjectSharedPool(std::shared_ptr<ObjectSharedPool<int>>& pool,
-                                     std::shared_ptr<int>& o, int value) {
+  void getObjectFromObjectSharedPool(ObjectSharedPoolSharedPtr<int>& pool, std::shared_ptr<int>& o,
+                                     int value) {
     absl::Notification go;
     dispatcher_->post([&pool, &o, &go, value]() {
       o = pool->getObject(value);
@@ -85,13 +85,13 @@ TEST_F(SharedPoolTest, Basic) {
 }
 
 TEST_F(SharedPoolTest, NonThreadSafeForGetObjectDeathTest) {
-  std::shared_ptr<ObjectSharedPool<int>> pool;
+  ObjectSharedPoolSharedPtr<int> pool;
   createObjectSharedPool(pool);
   EXPECT_DEBUG_DEATH(pool->getObject(4), ".*");
 }
 
 TEST_F(SharedPoolTest, ThreadSafeForDeleteObject) {
-  std::shared_ptr<ObjectSharedPool<int>> pool;
+  ObjectSharedPoolSharedPtr<int> pool;
   {
     // same thread
     createObjectSharedPool(pool);
@@ -113,13 +113,13 @@ TEST_F(SharedPoolTest, ThreadSafeForDeleteObject) {
 }
 
 TEST_F(SharedPoolTest, NonThreadSafeForPoolSizeDeathTest) {
-  std::shared_ptr<ObjectSharedPool<int>> pool;
+  ObjectSharedPoolSharedPtr<int> pool;
   createObjectSharedPool(pool);
   EXPECT_DEBUG_DEATH(pool->poolSize(), ".*");
 }
 
 TEST_F(SharedPoolTest, GetObjectAndDeleteObjectRaceForSameHashValue) {
-  std::shared_ptr<ObjectSharedPool<int>> pool;
+  ObjectSharedPoolSharedPtr<int> pool;
   std::shared_ptr<int> o1;
   createObjectSharedPool(pool);
   getObjectFromObjectSharedPool(pool, o1, 4);
@@ -150,7 +150,7 @@ TEST_F(SharedPoolTest, GetObjectAndDeleteObjectRaceForSameHashValue) {
 }
 
 TEST_F(SharedPoolTest, RaceCondtionForGetObjectWithObjectDeleter) {
-  std::shared_ptr<ObjectSharedPool<int>> pool;
+  ObjectSharedPoolSharedPtr<int> pool;
   std::shared_ptr<int> o1;
   createObjectSharedPool(pool);
   getObjectFromObjectSharedPool(pool, o1, 4);

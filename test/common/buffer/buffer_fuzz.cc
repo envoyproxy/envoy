@@ -29,7 +29,7 @@ constexpr uint32_t BufferCount = 3;
 // These data are exogenous to the buffer, we don't need to worry about their
 // deallocation, just keep them around until the fuzz run is over.
 struct Context {
-  std::vector<std::unique_ptr<Buffer::BufferFragmentImpl>> fragments_;
+  std::vector<Buffer::BufferFragmentImplPtr> fragments_;
 };
 
 // Bound the maximum allocation size per action. We want this to be able to at

@@ -88,15 +88,13 @@ void QuicHttpClientConnectionImpl::onUnderlyingConnectionBelowWriteBufferLowWate
   runWatermarkCallbacksForEachStream(quic_client_session_.stream_map(), false);
 }
 
-std::unique_ptr<Http::ClientConnection>
-QuicHttpClientConnectionFactoryImpl::createQuicClientConnection(
+Http::ClientConnectionPtr QuicHttpClientConnectionFactoryImpl::createQuicClientConnection(
     Network::Connection& connection, Http::ConnectionCallbacks& callbacks) {
   return std::make_unique<Quic::QuicHttpClientConnectionImpl>(
       dynamic_cast<Quic::EnvoyQuicClientSession&>(connection), callbacks);
 }
 
-std::unique_ptr<Http::ServerConnection>
-QuicHttpServerConnectionFactoryImpl::createQuicServerConnection(
+Http::ServerConnectionPtr QuicHttpServerConnectionFactoryImpl::createQuicServerConnection(
     Network::Connection& connection, Http::ConnectionCallbacks& callbacks) {
   return std::make_unique<Quic::QuicHttpServerConnectionImpl>(
       dynamic_cast<Quic::EnvoyQuicServerSession&>(connection),

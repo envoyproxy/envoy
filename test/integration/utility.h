@@ -119,7 +119,7 @@ private:
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
   Event::Dispatcher& dispatcher_;
-  std::unique_ptr<ConnectionCallbacks> callbacks_;
+  ConnectionCallbacksPtr callbacks_;
   Network::ClientConnectionPtr client_;
 };
 

@@ -234,7 +234,7 @@ public:
    */
   static SlicePtr create(const void* data, uint64_t size) {
     uint64_t slice_capacity = sliceSize(size);
-    std::unique_ptr<OwnedSlice> slice(new (slice_capacity) OwnedSlice(slice_capacity));
+    OwnedSlicePtr slice(new (slice_capacity) OwnedSlice(slice_capacity));
     memcpy(slice->base_, data, size);
     slice->reservable_ = size;
     return slice;

@@ -76,7 +76,7 @@ public:
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   FilterConfigSharedPtr config_;
   Filters::Common::ExtAuthz::MockClient* client_;
-  std::unique_ptr<Filter> filter_;
+  FilterPtr filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks_;
   Filters::Common::ExtAuthz::RequestCallbacks* request_callbacks_;
   Http::TestRequestHeaderMapImpl request_headers_;

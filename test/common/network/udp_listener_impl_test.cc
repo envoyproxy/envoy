@@ -100,7 +100,7 @@ protected:
   Network::Test::UdpSyncPeer client_{GetParam()};
   Address::InstanceConstSharedPtr send_to_addr_;
   MockUdpListenerCallbacks listener_callbacks_;
-  std::unique_ptr<UdpListenerImpl> listener_;
+  UdpListenerImplPtr listener_;
   size_t num_packets_received_by_listener_{0};
 };
 

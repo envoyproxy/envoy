@@ -63,7 +63,7 @@ private:
         : success_(success), signature_(signature) {}
 
     // quic::ProofSource::SignatureCallback
-    void Run(bool ok, std::string signature, std::unique_ptr<Details> /*details*/) override {
+    void Run(bool ok, std::string signature, DetailsPtr /*details*/) override {
       success_ = ok;
       signature_ = signature;
     }

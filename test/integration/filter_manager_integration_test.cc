@@ -127,8 +127,8 @@ private:
   Network::ReadFilterCallbacks* read_callbacks_{};
   Network::WriteFilterCallbacks* write_callbacks_{};
 
-  std::unique_ptr<Throttler> read_throttler_;
-  std::unique_ptr<Throttler> write_throttler_;
+  ThrottlerPtr read_throttler_;
+  ThrottlerPtr write_throttler_;
 
   const std::chrono::milliseconds tick_interval_;
   const uint64_t max_chunk_length_;

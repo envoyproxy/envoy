@@ -25,7 +25,7 @@ protected:
   NiceMock<MockInstance> server_;
   NiceMock<MockListenerComponentFactory> listener_factory_;
   NiceMock<MockWorkerFactory> worker_factory_;
-  std::unique_ptr<ListenerManagerImpl> listener_manager_;
+  ListenerManagerImplPtr listener_manager_;
 };
 
 TEST_F(ApiListenerTest, HttpApiListener) {

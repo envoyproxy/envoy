@@ -391,8 +391,7 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
 }
 
 template <class StatType>
-absl::optional<std::reference_wrapper<const StatType>>
-ThreadLocalStoreImpl::ScopeImpl::findStatLockHeld(
+StatTypeOptConstRef ThreadLocalStoreImpl::ScopeImpl::findStatLockHeld(
     StatName name, StatNameHashMap<RefcountPtr<StatType>>& central_cache_map) const {
   auto iter = central_cache_map.find(name);
   if (iter == central_cache_map.end()) {

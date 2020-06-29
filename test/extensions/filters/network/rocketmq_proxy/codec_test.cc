@@ -500,7 +500,7 @@ TEST_F(RocketmqCodecTest, EncodeResponseSendMessageSuccess) {
   const int queue_id = 0;
   const int queue_offset = 0;
 
-  std::unique_ptr<SendMessageResponseHeader> sendMessageResponseHeader =
+  SendMessageResponseHeaderPtr sendMessageResponseHeader =
       std::make_unique<SendMessageResponseHeader>(msg_id, queue_id, queue_offset, EMPTY_STRING);
   CommandCustomHeaderPtr extHeader(sendMessageResponseHeader.release());
   response->customHeader(extHeader);

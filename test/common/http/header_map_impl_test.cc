@@ -735,7 +735,7 @@ TEST(HeaderMapImplTest, AddCopy) {
   TestRequestHeaderMapImpl headers;
 
   // Start with a string value.
-  std::unique_ptr<LowerCaseString> lcKeyPtr(new LowerCaseString("hello"));
+  LowerCaseStringPtr lcKeyPtr(new LowerCaseString("hello"));
   headers.addCopy(*lcKeyPtr, "world");
 
   const HeaderString& value = headers.get(*lcKeyPtr)->value();

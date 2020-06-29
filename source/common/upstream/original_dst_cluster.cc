@@ -65,7 +65,7 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
         std::weak_ptr<OriginalDstCluster> post_parent = parent_;
         parent_->dispatcher_.post([post_parent, host]() mutable {
           // The main cluster may have disappeared while this post was queued.
-          if (std::shared_ptr<OriginalDstCluster> parent = post_parent.lock()) {
+          if (OriginalDstClusterSharedPtr parent = post_parent.lock()) {
             parent->addHost(host);
           }
         });

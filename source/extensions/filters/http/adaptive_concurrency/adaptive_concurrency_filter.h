@@ -66,7 +66,7 @@ public:
 private:
   AdaptiveConcurrencyFilterConfigSharedPtr config_;
   const ConcurrencyControllerSharedPtr controller_;
-  std::unique_ptr<Cleanup> deferred_sample_task_;
+  CleanupPtr deferred_sample_task_;
 };
 
 } // namespace AdaptiveConcurrency

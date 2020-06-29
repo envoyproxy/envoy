@@ -238,7 +238,7 @@ protected:
   Event::SimulatedTimeSystem time_system_;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   NiceMock<Init::MockManager> init_manager_;
-  std::unique_ptr<DummyConfigProviderManager> provider_manager_;
+  DummyConfigProviderManagerPtr provider_manager_;
 };
 
 test::common::config::DummyConfig parseDummyConfigFromYaml(const std::string& yaml) {
@@ -674,7 +674,7 @@ protected:
   Event::SimulatedTimeSystem time_system_;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   NiceMock<Init::MockManager> init_manager_;
-  std::unique_ptr<DeltaDummyConfigProviderManager> provider_manager_;
+  DeltaDummyConfigProviderManagerPtr provider_manager_;
 };
 
 // Validate that delta config subscriptions are shared across delta dynamic config providers and

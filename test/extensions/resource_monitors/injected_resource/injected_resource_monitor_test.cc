@@ -60,7 +60,7 @@ protected:
 
   void updateResource(double pressure) { updateResource(absl::StrCat(pressure)); }
 
-  std::unique_ptr<InjectedResourceMonitor> createMonitor() {
+  InjectedResourceMonitorPtr createMonitor() {
     envoy::config::resource_monitor::injected_resource::v2alpha::InjectedResourceConfig config;
     config.set_filename(resource_filename_);
     Server::Configuration::ResourceMonitorFactoryContextImpl context(
@@ -73,7 +73,7 @@ protected:
   const std::string resource_filename_;
   AtomicFileUpdater file_updater_;
   MockedCallbacks cb_;
-  std::unique_ptr<InjectedResourceMonitor> monitor_;
+  InjectedResourceMonitorPtr monitor_;
 };
 
 TEST_F(InjectedResourceMonitorTest, ReportsCorrectPressure) {

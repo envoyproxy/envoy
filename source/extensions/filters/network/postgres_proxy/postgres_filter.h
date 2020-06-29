@@ -104,7 +104,7 @@ public:
 
   void doDecode(Buffer::Instance& data, bool);
   DecoderPtr createDecoder(DecoderCallbacks* callbacks);
-  void setDecoder(std::unique_ptr<Decoder> decoder) { decoder_ = std::move(decoder); }
+  void setDecoder(DecoderPtr decoder) { decoder_ = std::move(decoder); }
   Decoder* getDecoder() const { return decoder_.get(); }
 
   // Routines used during integration and unit tests
@@ -117,7 +117,7 @@ private:
   PostgresFilterConfigSharedPtr config_;
   Buffer::OwnedImpl frontend_buffer_;
   Buffer::OwnedImpl backend_buffer_;
-  std::unique_ptr<Decoder> decoder_;
+  DecoderPtr decoder_;
 };
 
 } // namespace PostgresProxy

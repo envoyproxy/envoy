@@ -66,7 +66,7 @@ public:
                                                    runtime_, random_, common_config_);
   }
 
-  std::unique_ptr<RoundRobinLoadBalancer> lb_;
+  RoundRobinLoadBalancerPtr lb_;
 };
 
 class LeastRequestTester : public BaseTester {
@@ -79,7 +79,7 @@ public:
                                                    runtime_, random_, common_config_, lr_lb_config);
   }
 
-  std::unique_ptr<LeastRequestLoadBalancer> lb_;
+  LeastRequestLoadBalancerPtr lb_;
 };
 
 void BM_RoundRobinLoadBalancerBuild(benchmark::State& state) {
@@ -134,7 +134,7 @@ public:
   }
 
   absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig> config_;
-  std::unique_ptr<RingHashLoadBalancer> ring_hash_lb_;
+  RingHashLoadBalancerPtr ring_hash_lb_;
 };
 
 class MaglevTester : public BaseTester {
@@ -145,7 +145,7 @@ public:
                                                       random_, common_config_);
   }
 
-  std::unique_ptr<MaglevLoadBalancer> maglev_lb_;
+  MaglevLoadBalancerPtr maglev_lb_;
 };
 
 uint64_t hashInt(uint64_t i) {

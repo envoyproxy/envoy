@@ -63,7 +63,7 @@ FilterFactoryMap::const_iterator findUpgradeCaseInsensitive(const FilterFactoryM
   return upgrade_map.end();
 }
 
-std::unique_ptr<Http::InternalAddressConfig> createInternalAddressConfig(
+Http::InternalAddressConfigPtr createInternalAddressConfig(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
         config) {
   if (config.has_internal_address_config()) {
@@ -82,20 +82,20 @@ SINGLETON_MANAGER_REGISTRATION(scoped_routes_config_provider_manager);
 SINGLETON_MANAGER_REGISTRATION(http_tracer_manager);
 
 Utility::Singletons Utility::createSingletons(Server::Configuration::FactoryContext& context) {
-  std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider =
+  Http::TlsCachingDateProviderImplSharedPtr date_provider =
       context.singletonManager().getTyped<Http::TlsCachingDateProviderImpl>(
           SINGLETON_MANAGER_REGISTERED_NAME(date_provider), [&context] {
             return std::make_shared<Http::TlsCachingDateProviderImpl>(context.dispatcher(),
                                                                       context.threadLocal());
           });
 
-  std::shared_ptr<Router::RouteConfigProviderManager> route_config_provider_manager =
+  Router::RouteConfigProviderManagerSharedPtr route_config_provider_manager =
       context.singletonManager().getTyped<Router::RouteConfigProviderManager>(
           SINGLETON_MANAGER_REGISTERED_NAME(route_config_provider_manager), [&context] {
             return std::make_shared<Router::RouteConfigProviderManagerImpl>(context.admin());
           });
 
-  std::shared_ptr<Router::ScopedRoutesConfigProviderManager> scoped_routes_config_provider_manager =
+  Router::ScopedRoutesConfigProviderManagerSharedPtr scoped_routes_config_provider_manager =
       context.singletonManager().getTyped<Router::ScopedRoutesConfigProviderManager>(
           SINGLETON_MANAGER_REGISTERED_NAME(scoped_routes_config_provider_manager),
           [&context, route_config_provider_manager] {
@@ -114,7 +114,7 @@ Utility::Singletons Utility::createSingletons(Server::Configuration::FactoryCont
           http_tracer_manager};
 }
 
-std::shared_ptr<HttpConnectionManagerConfig> Utility::createConfig(
+HttpConnectionManagerConfigSharedPtr Utility::createConfig(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
         proto_config,
     Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
@@ -427,7 +427,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           fmt::format("Error: multiple upgrade configs with the same name: '{}'", name));
     }
     if (!upgrade_config.filters().empty()) {
-      std::unique_ptr<FilterFactoriesList> factories = std::make_unique<FilterFactoriesList>();
+      FilterFactoriesListPtr factories = std::make_unique<FilterFactoriesList>();
       for (int32_t j = 0; j < upgrade_config.filters().size(); j++) {
         processFilter(upgrade_config.filters(j), j, name, *factories, "http upgrade",
                       j == upgrade_config.filters().size() - 1);
@@ -435,7 +435,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       upgrade_filter_factories_.emplace(
           std::make_pair(name, FilterConfig{std::move(factories), enabled}));
     } else {
-      std::unique_ptr<FilterFactoriesList> factories(nullptr);
+      FilterFactoriesListPtr factories(nullptr);
       upgrade_filter_factories_.emplace(
           std::make_pair(name, FilterConfig{std::move(factories), enabled}));
     }
@@ -495,7 +495,7 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
     // TODO(danzh) Add support to get the factory name from config, possibly
     // from HttpConnectionManager protobuf. This is not essential till there are multiple
     // implementations of QUIC.
-    return std::unique_ptr<Http::ServerConnection>(
+    return Http::ServerConnectionPtr(
         Config::Utility::getAndCheckFactoryByName<Http::QuicHttpServerConnectionFactory>(
             Http::QuicCodecNames::get().Quiche)
             .createQuicServerConnection(connection, callbacks));

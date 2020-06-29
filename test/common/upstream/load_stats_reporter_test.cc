@@ -73,7 +73,7 @@ public:
   NiceMock<Upstream::MockClusterManager> cm_;
   Event::MockDispatcher dispatcher_;
   Stats::IsolatedStoreImpl stats_store_;
-  std::unique_ptr<LoadStatsReporter> load_stats_reporter_;
+  LoadStatsReporterPtr load_stats_reporter_;
   Event::MockTimer* retry_timer_;
   Event::TimerCb retry_timer_cb_;
   Event::MockTimer* response_timer_;

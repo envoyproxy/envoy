@@ -180,8 +180,8 @@ public:
   envoy::config::core::v3::Node node_;
   NiceMock<Config::MockSubscriptionCallbacks> callbacks_;
   NiceMock<Grpc::MockAsyncStream> async_stream_;
-  std::shared_ptr<GrpcMuxImpl> mux_;
-  std::unique_ptr<GrpcSubscriptionImpl> subscription_;
+  GrpcMuxImplSharedPtr mux_;
+  GrpcSubscriptionImplPtr subscription_;
   std::string last_response_nonce_;
   std::set<std::string> last_cluster_names_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;

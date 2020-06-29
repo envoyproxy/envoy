@@ -16,7 +16,7 @@ namespace Stats {
 
 IsolatedStoreImpl::IsolatedStoreImpl() : IsolatedStoreImpl(SymbolTableCreator::makeSymbolTable()) {}
 
-IsolatedStoreImpl::IsolatedStoreImpl(std::unique_ptr<SymbolTable>&& symbol_table)
+IsolatedStoreImpl::IsolatedStoreImpl(SymbolTablePtr&& symbol_table)
     : IsolatedStoreImpl(*symbol_table) {
   symbol_table_storage_ = std::move(symbol_table);
 }

@@ -19,7 +19,7 @@ struct CallbackHandle {
 } // namespace
 class ListenerFilterMatcherTest : public testing::Test {
 public:
-  std::unique_ptr<CallbackHandle> createCallbackOnPort(int port) {
+  CallbackHandlePtr createCallbackOnPort(int port) {
     auto handle = std::make_unique<CallbackHandle>();
     handle->address_ = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", port);
     handle->socket_ = std::make_unique<MockConnectionSocket>();

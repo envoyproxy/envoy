@@ -101,7 +101,7 @@ ProtocolType ProtocolOptionsConfigImpl::protocol(ProtocolType downstream_protoco
 Network::FilterFactoryCb ThriftProxyFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy& proto_config,
     Server::Configuration::FactoryContext& context) {
-  std::shared_ptr<Config> filter_config(new ConfigImpl(proto_config, context));
+  ConfigSharedPtr filter_config(new ConfigImpl(proto_config, context));
 
   return [filter_config, &context](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(std::make_shared<ConnectionManager>(

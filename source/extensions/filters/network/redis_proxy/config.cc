@@ -86,10 +86,9 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
   auto router =
       std::make_unique<PrefixRoutes>(prefix_routes, std::move(upstreams), context.runtime());
 
-  std::shared_ptr<CommandSplitter::Instance> splitter =
-      std::make_shared<CommandSplitter::InstanceImpl>(
-          std::move(router), context.scope(), filter_config->stat_prefix_, context.timeSource(),
-          proto_config.latency_in_micros());
+  CommandSplitter::InstanceSharedPtr splitter = std::make_shared<CommandSplitter::InstanceImpl>(
+      std::move(router), context.scope(), filter_config->stat_prefix_, context.timeSource(),
+      proto_config.latency_in_micros());
   return [splitter, filter_config](Network::FilterManager& filter_manager) -> void {
     Common::Redis::DecoderFactoryImpl factory;
     filter_manager.addReadFilter(std::make_shared<ProxyFilter>(

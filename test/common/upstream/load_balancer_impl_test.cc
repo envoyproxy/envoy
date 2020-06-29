@@ -547,8 +547,8 @@ public:
         {}, empty_host_vector_, empty_host_vector_, absl::nullopt);
   }
 
-  std::shared_ptr<PrioritySetImpl> local_priority_set_;
-  std::shared_ptr<LoadBalancer> lb_;
+  PrioritySetImplSharedPtr local_priority_set_;
+  LoadBalancerSharedPtr lb_;
   HostsPerLocalityConstSharedPtr empty_locality_;
   HostVector empty_host_vector_;
 }; // namespace
@@ -1564,7 +1564,7 @@ public:
     lb_ = std::make_shared<RandomLoadBalancer>(priority_set_, nullptr, stats_, runtime_, random_,
                                                common_config_);
   }
-  std::shared_ptr<LoadBalancer> lb_;
+  LoadBalancerSharedPtr lb_;
 };
 
 TEST_P(RandomLoadBalancerTest, NoHosts) {

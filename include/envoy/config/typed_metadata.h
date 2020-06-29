@@ -62,8 +62,7 @@ public:
    * @return a derived class object pointer of TypedMetadata.
    * @throw EnvoyException if the parsing can't be done.
    */
-  virtual std::unique_ptr<const TypedMetadata::Object>
-  parse(const ProtobufWkt::Struct& data) const PURE;
+  virtual TypedMetadata::ObjectConstPtr parse(const ProtobufWkt::Struct& data) const PURE;
 
   std::string category() const override { return "envoy.typed_metadata"; }
 };

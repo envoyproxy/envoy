@@ -36,7 +36,7 @@ public:
    * Set the trailers.
    * @param trailers supplies the new trailers.
    */
-  virtual void trailers(std::unique_ptr<TrailerType>&& trailers) PURE;
+  virtual void trailers(TrailerTypePtr&& trailers) PURE;
 
   /**
    * @return std::string the message body as a std::string.

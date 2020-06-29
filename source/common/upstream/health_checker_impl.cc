@@ -115,7 +115,7 @@ HealthCheckerSharedPtr HealthCheckerFactory::create(
     auto& factory =
         Config::Utility::getAndCheckFactory<Server::Configuration::CustomHealthCheckerFactory>(
             health_check_config.custom_health_check());
-    std::unique_ptr<Server::Configuration::HealthCheckerFactoryContext> context(
+    Server::Configuration::HealthCheckerFactoryContextPtr context(
         new HealthCheckerFactoryContextImpl(cluster, runtime, random, dispatcher,
                                             std::move(event_logger), validation_visitor, api));
     return factory.createCustomHealthChecker(health_check_config, *context);

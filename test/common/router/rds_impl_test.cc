@@ -120,7 +120,7 @@ http_filters:
   }
 
   NiceMock<Server::MockInstance> server_;
-  std::unique_ptr<RouteConfigProviderManagerImpl> route_config_provider_manager_;
+  RouteConfigProviderManagerImplPtr route_config_provider_manager_;
   RouteConfigProviderSharedPtr rds_;
 };
 
@@ -284,7 +284,7 @@ public:
     server_factory_context_.thread_local_.shutdownThread();
   }
 
-  std::unique_ptr<RouteConfigProviderManagerImpl> route_config_provider_manager_;
+  RouteConfigProviderManagerImplPtr route_config_provider_manager_;
 };
 
 // Verifies that maybeCreateInitManager() creates a noop init manager if the main init manager is in
@@ -308,8 +308,8 @@ TEST_F(RdsRouteConfigSubscriptionTest, CreatesNoopInitManager) {
       (dynamic_cast<RdsRouteConfigProviderImpl*>(route_config_provider.get()))->subscription();
   init_watcher_.expectReady().Times(1); // The parent_init_target_ will call once.
   outer_init_manager_.initialize(init_watcher_);
-  std::unique_ptr<Init::ManagerImpl> noop_init_manager;
-  std::unique_ptr<Cleanup> init_vhds;
+  Init::ManagerImplPtr noop_init_manager;
+  CleanupPtr init_vhds;
   subscription.maybeCreateInitManager("version_info", noop_init_manager, init_vhds);
   // local_init_manager_ is not ready yet as the local_init_target_ is not ready.
   EXPECT_EQ(init_vhds, nullptr);
@@ -347,7 +347,7 @@ public:
   }
 
   envoy::extensions::filters::network::http_connection_manager::v3::Rds rds_;
-  std::unique_ptr<RouteConfigProviderManagerImpl> route_config_provider_manager_;
+  RouteConfigProviderManagerImplPtr route_config_provider_manager_;
   RouteConfigProviderSharedPtr provider_;
 };
 

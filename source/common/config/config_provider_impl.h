@@ -391,8 +391,8 @@ public:
 protected:
   // Ordered set for deterministic config dump output.
   using ConfigProviderSet = std::set<ConfigProvider*>;
-  using ConfigProviderMap = std::unordered_map<ConfigProviderInstanceType,
-                                               std::unique_ptr<ConfigProviderSet>, EnumClassHash>;
+  using ConfigProviderMap =
+      std::unordered_map<ConfigProviderInstanceType, ConfigProviderSetPtr, EnumClassHash>;
   using ConfigSubscriptionMap =
       std::unordered_map<uint64_t, std::weak_ptr<ConfigSubscriptionCommonBase>>;
 

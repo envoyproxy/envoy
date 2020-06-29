@@ -126,8 +126,8 @@ void RouterCheckTool::finalizeHeaders(ToolConfig& tool_config,
 
 RouterCheckTool::RouterCheckTool(
     std::unique_ptr<NiceMock<Server::Configuration::MockServerFactoryContext>> factory_context,
-    std::unique_ptr<Router::ConfigImpl> config, std::unique_ptr<Stats::IsolatedStoreImpl> stats,
-    Api::ApiPtr api, Coverage coverage)
+    Router::ConfigImplPtr config, Stats::IsolatedStoreImplPtr stats, Api::ApiPtr api,
+    Coverage coverage)
     : factory_context_(std::move(factory_context)), config_(std::move(config)),
       stats_(std::move(stats)), api_(std::move(api)), coverage_(std::move(coverage)) {
   ON_CALL(factory_context_->runtime_loader_.snapshot_,

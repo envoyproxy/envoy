@@ -32,7 +32,7 @@ namespace Upstream {
 
 class SubsetLoadBalancerDescribeMetadataTester {
 public:
-  SubsetLoadBalancerDescribeMetadataTester(std::shared_ptr<SubsetLoadBalancer> lb) : lb_(lb) {}
+  SubsetLoadBalancerDescribeMetadataTester(SubsetLoadBalancerSharedPtr lb) : lb_(lb) {}
 
   using MetadataVector = std::vector<std::pair<std::string, ProtobufWkt::Value>>;
 
@@ -42,7 +42,7 @@ public:
   }
 
 private:
-  std::shared_ptr<SubsetLoadBalancer> lb_;
+  SubsetLoadBalancerSharedPtr lb_;
 };
 
 namespace SubsetLoadBalancerTest {
@@ -113,7 +113,7 @@ public:
   const Http::RequestHeaderMap* downstreamHeaders() const override { return nullptr; }
 
 private:
-  const std::shared_ptr<Router::MetadataMatchCriteria> matches_;
+  const Router::MetadataMatchCriteriaSharedPtr matches_;
 };
 
 enum class UpdateOrder { RemovesFirst, Simultaneous };
@@ -469,7 +469,7 @@ public:
   PrioritySetImpl local_priority_set_;
   HostVectorSharedPtr local_hosts_;
   HostsPerLocalitySharedPtr local_hosts_per_locality_;
-  std::shared_ptr<SubsetLoadBalancer> lb_;
+  SubsetLoadBalancerSharedPtr lb_;
 };
 
 TEST_F(SubsetLoadBalancerTest, NoFallback) {

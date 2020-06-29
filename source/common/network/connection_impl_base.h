@@ -49,7 +49,7 @@ protected:
   Event::Dispatcher& dispatcher_;
   const uint64_t id_;
   std::list<ConnectionCallbacks*> callbacks_;
-  std::unique_ptr<ConnectionStats> connection_stats_;
+  ConnectionStatsPtr connection_stats_;
 
 private:
   // Callback issued when a delayed close timeout triggers.

@@ -79,7 +79,7 @@ public:
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   ConfigSharedPtr config_;
   Filters::Common::RateLimit::MockClient* client_;
-  std::unique_ptr<Filter> filter_;
+  FilterPtr filter_;
   NiceMock<ThriftProxy::ThriftFilters::MockDecoderFilterCallbacks> filter_callbacks_;
   Filters::Common::RateLimit::RequestCallbacks* request_callbacks_{};
   ThriftProxy::MessageMetadataSharedPtr request_metadata_;

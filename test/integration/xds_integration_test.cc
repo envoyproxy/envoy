@@ -127,9 +127,9 @@ public:
     context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_, *api_);
   }
 
-  std::unique_ptr<RawConnectionDriver> createConnectionAndWrite(const std::string& alpn,
-                                                                const std::string& request,
-                                                                std::string& response) {
+  RawConnectionDriverPtr createConnectionAndWrite(const std::string& alpn,
+                                                  const std::string& request,
+                                                  std::string& response) {
     Buffer::OwnedImpl buffer(request);
     return std::make_unique<RawConnectionDriver>(
         lookupPort("tcp"), buffer,
@@ -141,7 +141,7 @@ public:
             absl::string_view(""), std::vector<std::string>(), std::vector<std::string>{alpn})));
   }
 
-  std::unique_ptr<Ssl::ContextManager> context_manager_;
+  Ssl::ContextManagerPtr context_manager_;
   Network::TransportSocketFactoryPtr context_;
   testing::NiceMock<Secret::MockSecretManager> secret_manager_;
 };
@@ -331,7 +331,7 @@ public:
     }
   }
 
-  std::unique_ptr<Ssl::ContextManager> context_manager_;
+  Ssl::ContextManagerPtr context_manager_;
   Network::TransportSocketFactoryPtr context_;
   testing::NiceMock<Secret::MockSecretManager> secret_manager_;
   Network::Address::InstanceConstSharedPtr address_;

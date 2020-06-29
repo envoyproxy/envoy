@@ -50,7 +50,7 @@ public:
     ON_CALL(*decoder_callbacks_.cluster_info_, metadata()).WillByDefault(ReturnRef(metadata_));
   }
 
-  std::unique_ptr<Filter> filter_;
+  FilterPtr filter_;
   std::shared_ptr<NiceMock<MockSigner>> signer_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;

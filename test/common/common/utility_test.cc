@@ -457,10 +457,10 @@ using WeightedClusterEntrySharedPtr = std::shared_ptr<WeightedClusterEntry>;
 TEST(WeightedClusterUtil, pickCluster) {
   std::vector<WeightedClusterEntrySharedPtr> clusters;
 
-  std::unique_ptr<WeightedClusterEntry> cluster1(new WeightedClusterEntry("cluster1", 10));
+  WeightedClusterEntryPtr cluster1(new WeightedClusterEntry("cluster1", 10));
   clusters.emplace_back(std::move(cluster1));
 
-  std::unique_ptr<WeightedClusterEntry> cluster2(new WeightedClusterEntry("cluster2", 90));
+  WeightedClusterEntryPtr cluster2(new WeightedClusterEntry("cluster2", 90));
   clusters.emplace_back(std::move(cluster2));
 
   EXPECT_EQ("cluster1", WeightedClusterUtil::pickCluster(clusters, 100, 5, false)->clusterName());

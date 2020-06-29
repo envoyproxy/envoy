@@ -39,8 +39,8 @@ public:
   UdpStatsdSink(ThreadLocal::SlotAllocator& tls, Network::Address::InstanceConstSharedPtr address,
                 const bool use_tag, const std::string& prefix = getDefaultPrefix());
   // For testing.
-  UdpStatsdSink(ThreadLocal::SlotAllocator& tls, const std::shared_ptr<Writer>& writer,
-                const bool use_tag, const std::string& prefix = getDefaultPrefix())
+  UdpStatsdSink(ThreadLocal::SlotAllocator& tls, const WriterSharedPtr& writer, const bool use_tag,
+                const std::string& prefix = getDefaultPrefix())
       : tls_(tls.allocateSlot()), use_tag_(use_tag),
         prefix_(prefix.empty() ? getDefaultPrefix() : prefix) {
     tls_->set(

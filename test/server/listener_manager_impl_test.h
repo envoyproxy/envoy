@@ -127,7 +127,7 @@ protected:
                 const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>&,
                 Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context)
                 -> std::vector<Network::FilterFactoryCb> {
-              std::shared_ptr<ListenerHandle> notifier(raw_listener);
+              ListenerHandleSharedPtr notifier(raw_listener);
               raw_listener->context_ = &filter_chain_factory_context;
               if (need_init) {
                 filter_chain_factory_context.initManager().add(notifier->target_);
@@ -154,7 +154,7 @@ protected:
                 const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>&,
                 Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context)
                 -> std::vector<Network::FilterFactoryCb> {
-              std::shared_ptr<ListenerHandle> notifier(raw_listener);
+              ListenerHandleSharedPtr notifier(raw_listener);
               raw_listener->context_ = &filter_chain_factory_context;
               if (need_init) {
                 filter_chain_factory_context.initManager().add(notifier->target_);
@@ -282,7 +282,7 @@ protected:
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
   MockWorker* worker_ = new MockWorker();
   NiceMock<MockWorkerFactory> worker_factory_;
-  std::unique_ptr<ListenerManagerImpl> manager_;
+  ListenerManagerImplPtr manager_;
   NiceMock<MockGuardDog> guard_dog_;
   Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;

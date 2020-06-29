@@ -122,7 +122,7 @@ private:
 
     ScopedRdsConfigSubscription& parent_;
     std::string scope_name_;
-    std::shared_ptr<RdsRouteConfigProviderImpl> route_provider_;
+    RdsRouteConfigProviderImplSharedPtr route_provider_;
     // This handle_ is owned by the route config provider's RDS subscription, when the helper
     // destructs, the handle is deleted as well.
     Common::CallbackHandle* rds_update_callback_handle_;
@@ -138,7 +138,7 @@ private:
   // Removes given scopes from the managed set of scopes.
   // Returns a list of to be removed helpers which is temporally held in the onConfigUpdate method,
   // to make sure new scopes sharing the same RDS source configs could reuse the subscriptions.
-  std::list<std::unique_ptr<RdsRouteConfigProviderHelper>>
+  std::list<RdsRouteConfigProviderHelperPtr>
   removeScopes(const Protobuf::RepeatedPtrField<std::string>& scope_names,
                const std::string& version_info);
 
@@ -174,14 +174,13 @@ private:
   ScopedRouteMap scoped_route_map_;
 
   // RdsRouteConfigProvider by scope name.
-  absl::flat_hash_map<std::string, std::unique_ptr<RdsRouteConfigProviderHelper>>
-      route_provider_by_scope_;
+  absl::flat_hash_map<std::string, RdsRouteConfigProviderHelperPtr> route_provider_by_scope_;
   // A map of (hash, scope-name), used to detect the key conflict between scopes.
   absl::flat_hash_map<uint64_t, std::string> scope_name_by_hash_;
   // For creating RDS subscriptions.
   Server::Configuration::ServerFactoryContext& factory_context_;
   const std::string name_;
-  std::unique_ptr<Envoy::Config::Subscription> subscription_;
+  Envoy::Config::SubscriptionPtr subscription_;
   const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
       ScopeKeyBuilder scope_key_builder_;
   Stats::ScopePtr scope_;

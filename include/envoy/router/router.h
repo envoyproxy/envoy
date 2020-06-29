@@ -1169,7 +1169,7 @@ public:
    * @param upstream_local_address supplies the local address of the upstream connection.
    * @param info supplies the stream info object associated with the upstream connection.
    */
-  virtual void onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
+  virtual void onPoolReady(GenericUpstreamPtr&& upstream,
                            Upstream::HostDescriptionConstSharedPtr host,
                            const Network::Address::InstanceConstSharedPtr& upstream_local_address,
                            const StreamInfo::StreamInfo& info) PURE;

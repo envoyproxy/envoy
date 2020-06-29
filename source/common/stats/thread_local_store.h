@@ -385,7 +385,7 @@ private:
      * @return a reference to the stat, if it exists.
      */
     template <class StatType>
-    absl::optional<std::reference_wrapper<const StatType>>
+    StatTypeOptConstRef
     findStatLockHeld(StatName name,
                      StatNameHashMap<RefcountPtr<StatType>>& central_cache_map) const;
 

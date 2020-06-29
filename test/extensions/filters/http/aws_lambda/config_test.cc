@@ -36,7 +36,7 @@ invocation_mode: asynchronous
 
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
-  auto has_expected_settings = [](std::shared_ptr<Envoy::Http::StreamFilter> stream_filter) {
+  auto has_expected_settings = [](Envoy::Http::StreamFilterSharedPtr stream_filter) {
     auto filter = std::static_pointer_cast<Filter>(stream_filter);
     const auto settings = filter->settingsForTest();
     return settings.payloadPassthrough() &&
@@ -64,7 +64,7 @@ arn: "arn:aws:lambda:region:424242:function:fun"
 
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
-  auto has_expected_settings = [](std::shared_ptr<Envoy::Http::StreamFilter> stream_filter) {
+  auto has_expected_settings = [](Envoy::Http::StreamFilterSharedPtr stream_filter) {
     auto filter = std::static_pointer_cast<Filter>(stream_filter);
     const auto settings = filter->settingsForTest();
     return settings.payloadPassthrough() == false &&

@@ -124,8 +124,8 @@ private:
     IntegrationTcpClient& parent_;
   };
 
-  std::shared_ptr<WaitForPayloadReader> payload_reader_;
-  std::shared_ptr<ConnectionCallbacks> callbacks_;
+  WaitForPayloadReaderSharedPtr payload_reader_;
+  ConnectionCallbacksSharedPtr callbacks_;
   Network::ClientConnectionPtr connection_;
   bool disconnected_{};
   MockWatermarkBuffer* client_write_buffer_;
@@ -379,7 +379,7 @@ public:
    * @param initial_data the data to send.
    * @param data_callback the callback on the received data.
    **/
-  std::unique_ptr<RawConnectionDriver> createConnectionDriver(
+  RawConnectionDriverPtr createConnectionDriver(
       uint32_t port, const std::string& initial_data,
       std::function<void(Network::ClientConnection&, const Buffer::Instance&)>&& data_callback) {
     Buffer::OwnedImpl buffer(initial_data);
@@ -398,7 +398,7 @@ protected:
 
   bool initialized() const { return initialized_; }
 
-  std::unique_ptr<Stats::Scope> upstream_stats_store_;
+  Stats::ScopePtr upstream_stats_store_;
 
   // The IpVersion (IPv4, IPv6) to use.
   Network::Address::IpVersion version_;

@@ -154,7 +154,7 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
-  std::shared_ptr<Network::TcpListenSocket> socket_;
+  Network::TcpListenSocketSharedPtr socket_;
   Network::MockListenSocketFactory socket_factory_;
   Network::NopConnectionBalancerImpl connection_balancer_;
   Network::ConnectionHandlerPtr connection_handler_;

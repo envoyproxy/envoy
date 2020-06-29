@@ -60,7 +60,7 @@ public:
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&os_sys_calls_};
   Stats::IsolatedStoreImpl store_;
   ConfigSharedPtr cfg_;
-  std::unique_ptr<Filter> filter_;
+  FilterPtr filter_;
   Network::MockListenerFilterCallbacks cb_;
   Network::MockConnectionSocket socket_;
   NiceMock<Event::MockDispatcher> dispatcher_;

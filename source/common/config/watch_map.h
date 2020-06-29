@@ -110,7 +110,7 @@ private:
   // Returns the union of watch_interest_[resource_name] and wildcard_watches_.
   absl::flat_hash_set<Watch*> watchesInterestedIn(const std::string& resource_name);
 
-  absl::flat_hash_set<std::unique_ptr<Watch>> watches_;
+  absl::flat_hash_set<WatchPtr> watches_;
 
   // Watches whose interest set is currently empty, which is interpreted as "everything".
   absl::flat_hash_set<Watch*> wildcard_watches_;

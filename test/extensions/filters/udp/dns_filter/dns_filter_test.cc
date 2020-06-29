@@ -104,8 +104,8 @@ public:
   NiceMock<Server::Configuration::MockListenerFactoryContext> listener_factory_;
   Stats::IsolatedStoreImpl stats_store_;
   std::shared_ptr<Network::MockDnsResolver> resolver_;
-  std::unique_ptr<DnsFilter> filter_;
-  std::unique_ptr<DnsMessageParser> response_parser_;
+  DnsFilterPtr filter_;
+  DnsMessageParserPtr response_parser_;
 
   const std::string forward_query_off_config = R"EOF(
 stat_prefix: "my_prefix"

@@ -374,7 +374,7 @@ public:
   ConnectionManagerStats stats_;
   ConnectionManagerTracingStats tracing_stats_;
   NiceMock<Network::MockDrainDecision> drain_close_;
-  std::unique_ptr<ConnectionManagerImpl> conn_manager_;
+  ConnectionManagerImplPtr conn_manager_;
   std::string server_name_;
   HttpConnectionManagerProto::ServerHeaderTransformation server_transformation_{
       HttpConnectionManagerProto::OVERWRITE};

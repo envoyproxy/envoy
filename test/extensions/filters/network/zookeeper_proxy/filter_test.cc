@@ -502,7 +502,7 @@ public:
 
   Stats::TestUtil::TestStore scope_;
   ZooKeeperFilterConfigSharedPtr config_;
-  std::unique_ptr<ZooKeeperFilter> filter_;
+  ZooKeeperFilterPtr filter_;
   std::string stat_prefix_{"test.zookeeper"};
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;

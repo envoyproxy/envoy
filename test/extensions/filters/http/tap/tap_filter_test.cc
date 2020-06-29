@@ -62,7 +62,7 @@ public:
   std::shared_ptr<MockFilterConfig> filter_config_{new MockFilterConfig()};
   std::shared_ptr<MockHttpTapConfig> http_tap_config_;
   MockHttpPerRequestTapper* http_per_request_tapper_;
-  std::unique_ptr<Filter> filter_;
+  FilterPtr filter_;
   StreamInfo::MockStreamInfo stream_info_;
   Http::MockStreamDecoderFilterCallbacks callbacks_;
 };

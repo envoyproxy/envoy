@@ -72,8 +72,8 @@ public:
     return map;
   }
 
-  std::shared_ptr<RedisClusterLoadBalancerFactory> factory_;
-  std::unique_ptr<RedisClusterThreadAwareLoadBalancer> lb_;
+  RedisClusterLoadBalancerFactorySharedPtr factory_;
+  RedisClusterThreadAwareLoadBalancerPtr lb_;
   std::shared_ptr<Upstream::MockClusterInfo> info_{new NiceMock<Upstream::MockClusterInfo>()};
   NiceMock<Runtime::MockRandomGenerator> random_;
 };

@@ -389,7 +389,7 @@ private:
 
   private:
     struct Node {
-      std::unique_ptr<Node> children[2];
+      NodePtr children[2];
       DataSetSharedPtr data;
     };
     using NodePtr = std::unique_ptr<Node>;
@@ -692,8 +692,8 @@ private:
     const uint32_t root_branching_factor_;
   };
 
-  std::unique_ptr<LcTrieInternal<Ipv4>> ipv4_trie_;
-  std::unique_ptr<LcTrieInternal<Ipv6>> ipv6_trie_;
+  LcTrieInternalPtr<Ipv4> ipv4_trie_;
+  LcTrieInternalPtr<Ipv6> ipv6_trie_;
 };
 
 template <class T>

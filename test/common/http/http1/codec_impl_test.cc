@@ -1827,7 +1827,7 @@ public:
   NiceMock<Network::MockConnection> connection_;
   NiceMock<Http::MockConnectionCallbacks> callbacks_;
   NiceMock<Http1Settings> codec_settings_;
-  std::unique_ptr<ClientConnectionImpl> codec_;
+  ClientConnectionImplPtr codec_;
 
 protected:
   Stats::TestUtil::TestStore store_;

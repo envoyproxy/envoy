@@ -50,7 +50,7 @@ public:
       : BaseDnsRecord(rec_name, rec_type, rec_class) {}
   bool serialize(Buffer::OwnedImpl& output) override;
 
-  std::unique_ptr<Stats::HistogramCompletableTimespanImpl> query_time_ms_;
+  Stats::HistogramCompletableTimespanImplPtr query_time_ms_;
 };
 
 using DnsQueryRecordPtr = std::unique_ptr<DnsQueryRecord>;

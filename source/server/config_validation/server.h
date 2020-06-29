@@ -183,7 +183,7 @@ private:
   // - There may be active filter chains referencing it in listener_manager_.
   // - There may be active clusters referencing it in config_.cluster_manager_.
   // - There may be active connections referencing it.
-  std::unique_ptr<Secret::SecretManager> secret_manager_;
+  Secret::SecretManagerPtr secret_manager_;
   const Options& options_;
   ProtobufMessage::ProdValidationContextImpl validation_context_;
   Stats::IsolatedStoreImpl& stats_store_;
@@ -192,15 +192,15 @@ private:
   Event::DispatcherPtr dispatcher_;
   Server::ValidationAdmin admin_;
   Singleton::ManagerPtr singleton_manager_;
-  std::unique_ptr<Runtime::ScopedLoaderSingleton> runtime_singleton_;
+  Runtime::ScopedLoaderSingletonPtr runtime_singleton_;
   Runtime::RandomGeneratorImpl random_generator_;
-  std::unique_ptr<Ssl::ContextManager> ssl_context_manager_;
+  Ssl::ContextManagerPtr ssl_context_manager_;
   Configuration::MainImpl config_;
   LocalInfo::LocalInfoPtr local_info_;
   AccessLog::AccessLogManagerImpl access_log_manager_;
-  std::unique_ptr<Upstream::ValidationClusterManagerFactory> cluster_manager_factory_;
-  std::unique_ptr<ListenerManagerImpl> listener_manager_;
-  std::unique_ptr<OverloadManager> overload_manager_;
+  Upstream::ValidationClusterManagerFactoryPtr cluster_manager_factory_;
+  ListenerManagerImplPtr listener_manager_;
+  OverloadManagerPtr overload_manager_;
   MutexTracer* mutex_tracer_;
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;

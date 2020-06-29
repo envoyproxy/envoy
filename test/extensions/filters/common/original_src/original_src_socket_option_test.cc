@@ -23,7 +23,7 @@ namespace {
 
 class OriginalSrcSocketOptionTest : public testing::Test {
 public:
-  std::unique_ptr<OriginalSrcSocketOption>
+  OriginalSrcSocketOptionPtr
   makeOptionByAddress(const Network::Address::InstanceConstSharedPtr& address) {
     return std::make_unique<OriginalSrcSocketOption>(address);
   }

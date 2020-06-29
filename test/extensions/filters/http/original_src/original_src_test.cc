@@ -28,19 +28,16 @@ namespace {
 
 class OriginalSrcHttpTest : public testing::Test {
 public:
-  std::unique_ptr<OriginalSrcFilter> makeDefaultFilter() {
-    return makeFilterWithCallbacks(callbacks_);
-  }
+  OriginalSrcFilterPtr makeDefaultFilter() { return makeFilterWithCallbacks(callbacks_); }
 
-  std::unique_ptr<OriginalSrcFilter>
-  makeFilterWithCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
+  OriginalSrcFilterPtr makeFilterWithCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
     const Config default_config;
     auto filter = std::make_unique<OriginalSrcFilter>(default_config);
     filter->setDecoderFilterCallbacks(callbacks);
     return filter;
   }
 
-  std::unique_ptr<OriginalSrcFilter> makeMarkingFilter(uint32_t mark) {
+  OriginalSrcFilterPtr makeMarkingFilter(uint32_t mark) {
     envoy::extensions::filters::http::original_src::v3::OriginalSrc proto_config;
     proto_config.set_mark(mark);
 

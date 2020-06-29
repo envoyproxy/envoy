@@ -150,7 +150,7 @@ protected:
     )EOF";
   }
 
-  std::unique_ptr<OverloadManagerImpl> createOverloadManager(const std::string& config) {
+  OverloadManagerImplPtr createOverloadManager(const std::string& config) {
     return std::make_unique<OverloadManagerImpl>(dispatcher_, stats_, thread_local_,
                                                  parseConfig(config), validation_visitor_, *api_);
   }

@@ -85,7 +85,7 @@ public:
 
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   ProtobufMessage::NullValidationVisitorImpl any_validation_visitor_;
-  std::unique_ptr<ConfigImpl> config_;
+  ConfigImplPtr config_;
   Http::TestRequestHeaderMapImpl header_;
   const RouteEntry* route_;
   Network::Address::Ipv4Instance default_remote_address_{"10.0.0.1"};
@@ -270,7 +270,7 @@ public:
     descriptors_.clear();
   }
 
-  std::unique_ptr<RateLimitPolicyEntryImpl> rate_limit_entry_;
+  RateLimitPolicyEntryImplPtr rate_limit_entry_;
   Http::TestRequestHeaderMapImpl header_;
   NiceMock<MockRouteEntry> route_;
   std::vector<Envoy::RateLimit::Descriptor> descriptors_;

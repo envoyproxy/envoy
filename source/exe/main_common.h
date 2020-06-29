@@ -38,9 +38,9 @@ public:
   // destructed.
   MainCommonBase(const OptionsImpl& options, Event::TimeSystem& time_system,
                  ListenerHooks& listener_hooks, Server::ComponentFactory& component_factory,
-                 std::unique_ptr<Runtime::RandomGenerator>&& random_generator,
+                 Runtime::RandomGeneratorPtr&& random_generator,
                  Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system,
-                 std::unique_ptr<ProcessContext> process_context);
+                 ProcessContextPtr process_context);
 
   bool run();
 
@@ -78,12 +78,12 @@ protected:
   Stats::SymbolTablePtr symbol_table_;
   Stats::AllocatorImpl stats_allocator_;
 
-  std::unique_ptr<ThreadLocal::InstanceImpl> tls_;
-  std::unique_ptr<Server::HotRestart> restarter_;
-  std::unique_ptr<Stats::ThreadLocalStoreImpl> stats_store_;
-  std::unique_ptr<Logger::Context> logging_context_;
-  std::unique_ptr<Init::Manager> init_manager_{std::make_unique<Init::ManagerImpl>("Server")};
-  std::unique_ptr<Server::InstanceImpl> server_;
+  ThreadLocal::InstanceImplPtr tls_;
+  Server::HotRestartPtr restarter_;
+  Stats::ThreadLocalStoreImplPtr stats_store_;
+  Logger::ContextPtr logging_context_;
+  Init::ManagerPtr init_manager_{std::make_unique<Init::ManagerImpl>("Server")};
+  Server::InstanceImplPtr server_;
 
 private:
   void configureComponentLogLevels();

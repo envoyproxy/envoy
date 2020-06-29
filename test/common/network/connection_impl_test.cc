@@ -229,7 +229,7 @@ protected:
   Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
-  std::shared_ptr<Network::TcpListenSocket> socket_{nullptr};
+  Network::TcpListenSocketSharedPtr socket_{nullptr};
   Network::MockListenerCallbacks listener_callbacks_;
   Network::MockConnectionHandler connection_handler_;
   Network::ListenerPtr listener_;
@@ -758,7 +758,7 @@ TEST_P(ConnectionImplTest, WriteWatermarks) {
   EXPECT_FALSE(client_connection_->aboveHighWatermark());
 
   // Stick 5 bytes in the connection buffer.
-  std::unique_ptr<Buffer::OwnedImpl> buffer(new Buffer::OwnedImpl("hello"));
+  Buffer::OwnedImplPtr buffer(new Buffer::OwnedImpl("hello"));
   int buffer_len = buffer->length();
   EXPECT_CALL(*client_write_buffer_, write(_))
       .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::failWrite));
@@ -1419,7 +1419,7 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayConfigDisabledTest) {
         return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
       }));
   IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
-  std::unique_ptr<Network::ConnectionImpl> server_connection(new Network::ConnectionImpl(
+  Network::ConnectionImplPtr server_connection(new Network::ConnectionImpl(
       dispatcher, std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
       std::make_unique<NiceMock<MockTransportSocket>>(), stream_info_, true));
 
@@ -1632,7 +1632,7 @@ public:
     return {PostIoAction::KeepOpen, size, false};
   }
 
-  std::unique_ptr<ConnectionImpl> connection_;
+  ConnectionImplPtr connection_;
   Event::MockDispatcher dispatcher_;
   NiceMock<MockConnectionCallbacks> callbacks_;
   MockTransportSocket* transport_socket_;

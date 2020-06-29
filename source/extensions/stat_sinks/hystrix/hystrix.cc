@@ -369,8 +369,7 @@ void HystrixSink::flush(Stats::MetricSnapshot& snapshot) {
   for (auto& cluster : clusters) {
     Upstream::ClusterInfoConstSharedPtr cluster_info = cluster.second.get().info();
 
-    std::unique_ptr<ClusterStatsCache>& cluster_stats_cache_ptr =
-        cluster_stats_cache_map_[cluster_info->name()];
+    ClusterStatsCachePtr& cluster_stats_cache_ptr = cluster_stats_cache_map_[cluster_info->name()];
     if (cluster_stats_cache_ptr == nullptr) {
       cluster_stats_cache_ptr = std::make_unique<ClusterStatsCache>(cluster_info->name());
     }

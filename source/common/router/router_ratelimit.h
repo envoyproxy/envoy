@@ -138,7 +138,7 @@ public:
   bool empty() const override { return rate_limit_entries_.empty(); }
 
 private:
-  std::vector<std::unique_ptr<RateLimitPolicyEntry>> rate_limit_entries_;
+  std::vector<RateLimitPolicyEntryPtr> rate_limit_entries_;
   std::vector<std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>>
       rate_limit_entries_reference_;
   // The maximum stage number supported. This value should match the maximum stage number in

@@ -43,13 +43,13 @@ RoleBasedAccessControlFilterStats generateStats(const std::string& prefix, Stats
 enum class EnforcementMode { Enforced, Shadow };
 
 template <class ConfigType>
-std::unique_ptr<RoleBasedAccessControlEngineImpl> createEngine(const ConfigType& config) {
+RoleBasedAccessControlEngineImplPtr createEngine(const ConfigType& config) {
   return config.has_rules() ? std::make_unique<RoleBasedAccessControlEngineImpl>(config.rules())
                             : nullptr;
 }
 
 template <class ConfigType>
-std::unique_ptr<RoleBasedAccessControlEngineImpl> createShadowEngine(const ConfigType& config) {
+RoleBasedAccessControlEngineImplPtr createShadowEngine(const ConfigType& config) {
   return config.has_shadow_rules()
              ? std::make_unique<RoleBasedAccessControlEngineImpl>(config.shadow_rules())
              : nullptr;

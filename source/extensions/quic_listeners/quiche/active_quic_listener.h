@@ -69,7 +69,7 @@ private:
   std::unique_ptr<quic::QuicCryptoServerConfig> crypto_config_;
   Event::Dispatcher& dispatcher_;
   quic::QuicVersionManager version_manager_;
-  std::unique_ptr<EnvoyQuicDispatcher> quic_dispatcher_;
+  EnvoyQuicDispatcherPtr quic_dispatcher_;
   Network::Socket& listen_socket_;
   Runtime::FeatureFlag enabled_;
 };

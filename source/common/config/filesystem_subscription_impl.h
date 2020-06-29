@@ -35,7 +35,7 @@ private:
 
   bool started_{};
   const std::string path_;
-  std::unique_ptr<Filesystem::Watcher> watcher_;
+  Filesystem::WatcherPtr watcher_;
   SubscriptionCallbacks& callbacks_;
   SubscriptionStats stats_;
   Api::Api& api_;

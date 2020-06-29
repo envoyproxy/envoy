@@ -145,7 +145,7 @@ private:
     const HeaderStat stat_;
   };
 
-  std::unique_ptr<EncodingDecision> chooseEncoding(const Http::ResponseHeaderMap& headers) const;
+  EncodingDecisionPtr chooseEncoding(const Http::ResponseHeaderMap& headers) const;
   bool shouldCompress(const EncodingDecision& decision) const;
 
   bool skip_compression_;

@@ -560,7 +560,7 @@ protected:
   Extensions::NetworkFilters::Common::Redis::Client::MockClient* client_{};
   Extensions::NetworkFilters::Common::Redis::Client::MockPoolRequest pool_request_;
   Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks* pool_callbacks_{};
-  std::shared_ptr<RedisCluster> cluster_;
+  RedisClusterSharedPtr cluster_;
   std::shared_ptr<NiceMock<MockClusterSlotUpdateCallBack>> cluster_callback_;
   Network::MockActiveDnsQuery active_dns_query_;
 };

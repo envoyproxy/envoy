@@ -52,7 +52,7 @@ public:
    */
   class LoadBalancer : public Upstream::LoadBalancer {
   public:
-    LoadBalancer(const std::shared_ptr<OriginalDstCluster>& parent)
+    LoadBalancer(const OriginalDstClusterSharedPtr& parent)
         : parent_(parent), host_map_(parent->getCurrentHostMap()) {}
 
     // Upstream::LoadBalancer
@@ -61,23 +61,22 @@ public:
   private:
     Network::Address::InstanceConstSharedPtr requestOverrideHost(LoadBalancerContext* context);
 
-    const std::shared_ptr<OriginalDstCluster> parent_;
+    const OriginalDstClusterSharedPtr parent_;
     HostMapConstSharedPtr host_map_;
   };
 
 private:
   struct LoadBalancerFactory : public Upstream::LoadBalancerFactory {
-    LoadBalancerFactory(const std::shared_ptr<OriginalDstCluster>& cluster) : cluster_(cluster) {}
+    LoadBalancerFactory(const OriginalDstClusterSharedPtr& cluster) : cluster_(cluster) {}
 
     // Upstream::LoadBalancerFactory
     Upstream::LoadBalancerPtr create() override { return std::make_unique<LoadBalancer>(cluster_); }
 
-    const std::shared_ptr<OriginalDstCluster> cluster_;
+    const OriginalDstClusterSharedPtr cluster_;
   };
 
   struct ThreadAwareLoadBalancer : public Upstream::ThreadAwareLoadBalancer {
-    ThreadAwareLoadBalancer(const std::shared_ptr<OriginalDstCluster>& cluster)
-        : cluster_(cluster) {}
+    ThreadAwareLoadBalancer(const OriginalDstClusterSharedPtr& cluster) : cluster_(cluster) {}
 
     // Upstream::ThreadAwareLoadBalancer
     Upstream::LoadBalancerFactorySharedPtr factory() override {
@@ -85,7 +84,7 @@ private:
     }
     void initialize() override {}
 
-    const std::shared_ptr<OriginalDstCluster> cluster_;
+    const OriginalDstClusterSharedPtr cluster_;
   };
 
   HostMapConstSharedPtr getCurrentHostMap() {

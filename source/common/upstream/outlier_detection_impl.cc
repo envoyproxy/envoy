@@ -35,8 +35,7 @@ DetectorSharedPtr DetectorImplFactory::createForCluster(
   }
 }
 
-DetectorHostMonitorImpl::DetectorHostMonitorImpl(std::shared_ptr<DetectorImpl> detector,
-                                                 HostSharedPtr host)
+DetectorHostMonitorImpl::DetectorHostMonitorImpl(DetectorImplSharedPtr detector, HostSharedPtr host)
     : detector_(detector), host_(host),
       // add Success Rate monitors
       external_origin_sr_monitor_(envoy::data::cluster::v2alpha::SUCCESS_RATE),
@@ -67,7 +66,7 @@ void DetectorHostMonitorImpl::updateCurrentSuccessRateBucket() {
 void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
   external_origin_sr_monitor_.incTotalReqCounter();
   if (Http::CodeUtility::is5xx(response_code)) {
-    std::shared_ptr<DetectorImpl> detector = detector_.lock();
+    DetectorImplSharedPtr detector = detector_.lock();
     if (!detector) {
       // It's possible for the cluster/detector to go away while we still have a host in use.
       return;
@@ -180,7 +179,7 @@ void DetectorHostMonitorImpl::putResult(Result result, absl::optional<uint64_t> 
 }
 
 void DetectorHostMonitorImpl::localOriginFailure() {
-  std::shared_ptr<DetectorImpl> detector = detector_.lock();
+  DetectorImplSharedPtr detector = detector_.lock();
   if (!detector) {
     // It's possible for the cluster/detector to go away while we still have a host in use.
     return;
@@ -195,7 +194,7 @@ void DetectorHostMonitorImpl::localOriginFailure() {
 }
 
 void DetectorHostMonitorImpl::localOriginNoFailure() {
-  std::shared_ptr<DetectorImpl> detector = detector_.lock();
+  DetectorImplSharedPtr detector = detector_.lock();
   if (!detector) {
     // It's possible for the cluster/detector to go away while we still have a host in use.
     return;
@@ -274,12 +273,12 @@ DetectorImpl::~DetectorImpl() {
   }
 }
 
-std::shared_ptr<DetectorImpl>
+DetectorImplSharedPtr
 DetectorImpl::create(const Cluster& cluster,
                      const envoy::config::cluster::v3::OutlierDetection& config,
                      Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                      TimeSource& time_source, EventLoggerSharedPtr event_logger) {
-  std::shared_ptr<DetectorImpl> detector(
+  DetectorImplSharedPtr detector(
       new DetectorImpl(cluster, config, dispatcher, runtime, time_source, event_logger));
   detector->initialize(cluster);
 
@@ -498,7 +497,7 @@ void DetectorImpl::notifyMainThreadConsecutiveError(
   //          Otherwise we do nothing since the detector/cluster is already gone.
   std::weak_ptr<DetectorImpl> weak_this = shared_from_this();
   dispatcher_.post([weak_this, host, type]() -> void {
-    std::shared_ptr<DetectorImpl> shared_this = weak_this.lock();
+    DetectorImplSharedPtr shared_this = weak_this.lock();
     if (shared_this) {
       shared_this->onConsecutiveErrorWorker(host, type);
     }

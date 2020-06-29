@@ -60,7 +60,7 @@ public:
   }
 
 private:
-  std::unique_ptr<FactoryRegistryProxyImpl<Base>> proxy_;
+  FactoryRegistryProxyImplPtr<Base> proxy_;
   Base& instance_;
 };
 

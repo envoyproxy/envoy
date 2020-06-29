@@ -46,8 +46,8 @@ void Cluster::startPreInit() {
   // If we are attaching to a pre-populated cache we need to initialize our hosts.
   auto existing_hosts = dns_cache_->hosts();
   if (!existing_hosts.empty()) {
-    std::shared_ptr<HostInfoMap> new_host_map;
-    std::unique_ptr<Upstream::HostVector> hosts_added;
+    HostInfoMapSharedPtr new_host_map;
+    Upstream::HostVectorPtr hosts_added;
     for (const auto& existing_host : existing_hosts) {
       addOrUpdateWorker(existing_host.first, existing_host.second, new_host_map, hosts_added);
     }
@@ -60,8 +60,7 @@ void Cluster::startPreInit() {
 void Cluster::addOrUpdateWorker(
     const std::string& host,
     const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info,
-    std::shared_ptr<HostInfoMap>& new_host_map,
-    std::unique_ptr<Upstream::HostVector>& hosts_added) {
+    HostInfoMapSharedPtr& new_host_map, Upstream::HostVectorPtr& hosts_added) {
   // We should never get a host with no address from the cache.
   ASSERT(host_info->address() != nullptr);
 
@@ -117,8 +116,8 @@ void Cluster::addOrUpdateWorker(
 void Cluster::onDnsHostAddOrUpdate(
     const std::string& host,
     const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) {
-  std::shared_ptr<HostInfoMap> new_host_map;
-  std::unique_ptr<Upstream::HostVector> hosts_added;
+  HostInfoMapSharedPtr new_host_map;
+  Upstream::HostVectorPtr hosts_added;
   addOrUpdateWorker(host, host_info, new_host_map, hosts_added);
   if (hosts_added != nullptr) {
     ASSERT(!new_host_map->empty());

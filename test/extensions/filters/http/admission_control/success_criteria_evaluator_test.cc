@@ -70,7 +70,7 @@ public:
   }
 
 protected:
-  std::unique_ptr<SuccessCriteriaEvaluator> evaluator_;
+  SuccessCriteriaEvaluatorPtr evaluator_;
 };
 
 // Ensure the HTTP code successful range configurations are honored.

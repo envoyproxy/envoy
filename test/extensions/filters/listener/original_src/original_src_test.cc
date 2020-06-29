@@ -25,12 +25,12 @@ namespace {
 
 class OriginalSrcTest : public testing::Test {
 public:
-  std::unique_ptr<OriginalSrcFilter> makeDefaultFilter() {
+  OriginalSrcFilterPtr makeDefaultFilter() {
     Config default_config;
     return std::make_unique<OriginalSrcFilter>(default_config);
   }
 
-  std::unique_ptr<OriginalSrcFilter> makeMarkingFilter(uint32_t mark) {
+  OriginalSrcFilterPtr makeMarkingFilter(uint32_t mark) {
     envoy::extensions::filters::listener::original_src::v3::OriginalSrc proto_config;
     proto_config.set_mark(mark);
 

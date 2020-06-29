@@ -66,7 +66,7 @@ private:
   const std::string name_;
 
   // The callback function, called via WatcherHandleImpl by either the target or the manager
-  const std::shared_ptr<ReadyFn> fn_;
+  const ReadyFnSharedPtr fn_;
 };
 
 } // namespace Init

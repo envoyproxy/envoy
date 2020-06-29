@@ -29,13 +29,13 @@ class FixedHeapMonitor : public Server::ResourceMonitor {
 public:
   FixedHeapMonitor(
       const envoy::config::resource_monitor::fixed_heap::v2alpha::FixedHeapConfig& config,
-      std::unique_ptr<MemoryStatsReader> stats = std::make_unique<MemoryStatsReader>());
+      MemoryStatsReaderPtr stats = std::make_unique<MemoryStatsReader>());
 
   void updateResourceUsage(Server::ResourceMonitor::Callbacks& callbacks) override;
 
 private:
   const uint64_t max_heap_;
-  std::unique_ptr<MemoryStatsReader> stats_;
+  MemoryStatsReaderPtr stats_;
 };
 
 } // namespace FixedHeapMonitor

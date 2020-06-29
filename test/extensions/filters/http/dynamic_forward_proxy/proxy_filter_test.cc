@@ -62,7 +62,7 @@ public:
   NiceMock<Upstream::MockTransportSocketMatcher>* transport_socket_match_;
   Upstream::MockClusterManager cm_;
   ProxyFilterConfigSharedPtr filter_config_;
-  std::unique_ptr<ProxyFilter> filter_;
+  ProxyFilterPtr filter_;
   Http::MockStreamDecoderFilterCallbacks callbacks_;
   Http::TestRequestHeaderMapImpl request_headers_{{":authority", "foo"}};
 };

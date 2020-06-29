@@ -163,7 +163,7 @@ CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& conne
     break;
   }
   case Type::HTTP3: {
-    codec_ = std::unique_ptr<ClientConnection>(
+    codec_ = ClientConnectionPtr(
         Config::Utility::getAndCheckFactoryByName<Http::QuicHttpClientConnectionFactory>(
             Http::QuicCodecNames::get().Quiche)
             .createQuicClientConnection(*connection_, *this));

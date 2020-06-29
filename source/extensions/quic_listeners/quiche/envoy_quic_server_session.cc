@@ -17,7 +17,7 @@ namespace Quic {
 
 EnvoyQuicServerSession::EnvoyQuicServerSession(
     const quic::QuicConfig& config, const quic::ParsedQuicVersionVector& supported_versions,
-    std::unique_ptr<EnvoyQuicConnection> connection, quic::QuicSession::Visitor* visitor,
+    EnvoyQuicConnectionPtr connection, quic::QuicSession::Visitor* visitor,
     quic::QuicCryptoServerStream::Helper* helper, const quic::QuicCryptoServerConfig* crypto_config,
     quic::QuicCompressedCertsCache* compressed_certs_cache, Event::Dispatcher& dispatcher,
     uint32_t send_buffer_limit)

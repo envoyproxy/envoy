@@ -189,7 +189,7 @@ public:
   }
 
 private:
-  IsolatedStoreImpl(std::unique_ptr<SymbolTable>&& symbol_table);
+  IsolatedStoreImpl(SymbolTablePtr&& symbol_table);
 
   SymbolTablePtr symbol_table_storage_;
   AllocatorImpl alloc_;

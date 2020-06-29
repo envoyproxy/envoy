@@ -54,7 +54,7 @@ public:
   FilterState& filter_state() { return *filter_state_; }
 
 private:
-  std::unique_ptr<FilterStateImpl> filter_state_;
+  FilterStateImplPtr filter_state_;
 };
 
 } // namespace

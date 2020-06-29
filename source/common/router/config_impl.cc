@@ -1286,8 +1286,7 @@ RouteConstSharedPtr RouteMatcher::route(const RouteCallback& cb,
 }
 
 const SslRedirector SslRedirectRoute::SSL_REDIRECTOR;
-const std::shared_ptr<const SslRedirectRoute> VirtualHostImpl::SSL_REDIRECT_ROUTE{
-    new SslRedirectRoute()};
+const SslRedirectRouteConstSharedPtr VirtualHostImpl::SSL_REDIRECT_ROUTE{new SslRedirectRoute()};
 
 const VirtualCluster*
 VirtualHostImpl::virtualClusterFromEntries(const Http::HeaderMap& headers) const {

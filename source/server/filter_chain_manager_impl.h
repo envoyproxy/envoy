@@ -301,7 +301,7 @@ private:
   const Network::Address::InstanceConstSharedPtr address_;
   // This is the reference to a factory context which all the generations of listener share.
   Configuration::FactoryContext& parent_context_;
-  std::list<std::shared_ptr<Configuration::FilterChainFactoryContext>> factory_contexts_;
+  std::list<Configuration::FilterChainFactoryContextSharedPtr> factory_contexts_;
 
   // Reference to the previous generation of filter chain manager to share the filter chains.
   // Caution: only during warm up could the optional have value.

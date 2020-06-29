@@ -76,7 +76,7 @@ std::list<std::string> hostListToAddresses(const HostVector& hosts) {
 }
 
 template <class HostsT = HostVector>
-std::shared_ptr<const HostsT>
+HostsTConstSharedPtr
 makeHostsFromHostsPerLocality(HostsPerLocalityConstSharedPtr hosts_per_locality) {
   HostVector hosts;
 
@@ -2049,7 +2049,7 @@ class ClusterInfoImplTest : public testing::Test {
 public:
   ClusterInfoImplTest() : api_(Api::createApiForTest(stats_)) {}
 
-  std::unique_ptr<StrictDnsClusterImpl> makeCluster(const std::string& yaml) {
+  StrictDnsClusterImplPtr makeCluster(const std::string& yaml) {
     cluster_config_ = parseClusterFromV2Yaml(yaml);
     scope_ = stats_.createScope(fmt::format("cluster.{}.", cluster_config_.alt_stat_name().empty()
                                                                ? cluster_config_.name()
@@ -2076,7 +2076,7 @@ public:
   ReadyWatcher initialized_;
   envoy::config::cluster::v3::Cluster cluster_config_;
   Envoy::Stats::ScopePtr scope_;
-  std::unique_ptr<Server::Configuration::TransportSocketFactoryContextImpl> factory_context_;
+  Server::Configuration::TransportSocketFactoryContextImplPtr factory_context_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
 };
@@ -2092,8 +2092,7 @@ class BazFactory : public ClusterTypedMetadataFactory {
 public:
   std::string name() const override { return "baz"; }
   // Returns nullptr (conversion failure) if d is empty.
-  std::unique_ptr<const Envoy::Config::TypedMetadata::Object>
-  parse(const ProtobufWkt::Struct& d) const override {
+  Envoy::Config::TypedMetadata::ObjectConstPtr parse(const ProtobufWkt::Struct& d) const override {
     if (d.fields().find("name") != d.fields().end()) {
       return std::make_unique<Baz>(d.fields().at("name").string_value());
     }
@@ -2557,7 +2556,7 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithOptions) {
 
   // This vector is used to gather clusters with extension_protocol_options from the different
   // types of extension factories (network, http).
-  std::vector<std::unique_ptr<StrictDnsClusterImpl>> clusters;
+  std::vector<StrictDnsClusterImplPtr> clusters;
 
   {
     // Get the cluster with extension_protocol_options for a network filter factory.

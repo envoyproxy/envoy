@@ -138,7 +138,7 @@ public:
   Server::ServerFactoryContextImpl server_factory_context_{server_};
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   OptionsImpl options_;
-  std::unique_ptr<Upstream::ProdClusterManagerFactory> cluster_manager_factory_;
+  Upstream::ProdClusterManagerFactoryPtr cluster_manager_factory_;
   NiceMock<Server::MockListenerComponentFactory> component_factory_;
   NiceMock<Server::MockWorkerFactory> worker_factory_;
   Server::ListenerManagerImpl listener_manager_{server_, component_factory_, worker_factory_,

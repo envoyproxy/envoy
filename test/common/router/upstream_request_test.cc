@@ -95,7 +95,7 @@ public:
     EXPECT_TRUE(conn_pool_->valid());
   }
 
-  std::unique_ptr<TcpConnPool> conn_pool_;
+  TcpConnPoolPtr conn_pool_;
   Tcp::ConnectionPool::MockInstance mock_pool_;
   MockGenericConnectionPoolCallbacks mock_generic_callbacks_;
   std::shared_ptr<NiceMock<Upstream::MockHost>> host_;
@@ -156,7 +156,7 @@ protected:
   NiceMock<Network::MockClientConnection> connection_;
   NiceMock<MockRouterFilterInterface> mock_router_filter_;
   Tcp::ConnectionPool::MockConnectionData* mock_connection_data_;
-  std::unique_ptr<TcpUpstream> tcp_upstream_;
+  TcpUpstreamPtr tcp_upstream_;
   Http::TestRequestHeaderMapImpl request_{{":method", "CONNECT"},
                                           {":path", "/"},
                                           {":protocol", "bytestream"},

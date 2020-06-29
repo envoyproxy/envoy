@@ -144,7 +144,7 @@ public:
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   NiceMock<Event::MockTimer>* upstream_ready_timer_;
-  std::unique_ptr<ConnPoolImplForTest> conn_pool_;
+  ConnPoolImplForTestPtr conn_pool_;
   NiceMock<Runtime::MockLoader> runtime_;
 };
 

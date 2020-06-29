@@ -33,7 +33,7 @@ static constexpr double defaultAggression = 2.0;
 AdmissionControlFilterConfig::AdmissionControlFilterConfig(
     const AdmissionControlProto& proto_config, Runtime::Loader& runtime, TimeSource&,
     Runtime::RandomGenerator& random, Stats::Scope& scope, ThreadLocal::SlotPtr&& tls,
-    std::shared_ptr<ResponseEvaluator> response_evaluator)
+    ResponseEvaluatorSharedPtr response_evaluator)
     : random_(random), scope_(scope), tls_(std::move(tls)),
       admission_control_feature_(proto_config.enabled(), runtime),
       aggression_(

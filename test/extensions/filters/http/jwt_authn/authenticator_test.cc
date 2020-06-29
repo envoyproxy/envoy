@@ -77,7 +77,7 @@ public:
 
   JwtAuthentication proto_config_;
   ExtractorConstPtr extractor_;
-  std::shared_ptr<FilterConfigImpl> filter_config_;
+  FilterConfigImplSharedPtr filter_config_;
   MockJwksFetcher* raw_fetcher_;
   JwksFetcherPtr fetcher_;
   AuthenticatorPtr auth_;

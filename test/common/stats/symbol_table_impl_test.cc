@@ -73,8 +73,8 @@ protected:
 
   FakeSymbolTableImpl* fake_symbol_table_{nullptr};
   SymbolTableImpl* real_symbol_table_{nullptr};
-  std::unique_ptr<SymbolTable> table_;
-  std::unique_ptr<StatNamePool> pool_;
+  SymbolTablePtr table_;
+  StatNamePoolPtr pool_;
 };
 
 INSTANTIATE_TEST_SUITE_P(StatNameTest, StatNameTest,

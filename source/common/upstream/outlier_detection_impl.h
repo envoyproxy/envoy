@@ -97,8 +97,8 @@ public:
   absl::optional<std::pair<double, uint64_t>> getSuccessRateAndVolume();
 
 private:
-  std::unique_ptr<SuccessRateAccumulatorBucket> current_success_rate_bucket_;
-  std::unique_ptr<SuccessRateAccumulatorBucket> backup_success_rate_bucket_;
+  SuccessRateAccumulatorBucketPtr current_success_rate_bucket_;
+  SuccessRateAccumulatorBucketPtr backup_success_rate_bucket_;
 };
 
 class SuccessRateMonitor {
@@ -137,7 +137,7 @@ class DetectorImpl;
  */
 class DetectorHostMonitorImpl : public DetectorHostMonitor {
 public:
-  DetectorHostMonitorImpl(std::shared_ptr<DetectorImpl> detector, HostSharedPtr host);
+  DetectorHostMonitorImpl(DetectorImplSharedPtr detector, HostSharedPtr host);
 
   void eject(MonotonicTime ejection_time);
   void uneject(MonotonicTime ejection_time);
@@ -324,10 +324,10 @@ private:
  */
 class DetectorImpl : public Detector, public std::enable_shared_from_this<DetectorImpl> {
 public:
-  static std::shared_ptr<DetectorImpl>
-  create(const Cluster& cluster, const envoy::config::cluster::v3::OutlierDetection& config,
-         Event::Dispatcher& dispatcher, Runtime::Loader& runtime, TimeSource& time_source,
-         EventLoggerSharedPtr event_logger);
+  static DetectorImplSharedPtr create(const Cluster& cluster,
+                                      const envoy::config::cluster::v3::OutlierDetection& config,
+                                      Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
+                                      TimeSource& time_source, EventLoggerSharedPtr event_logger);
   ~DetectorImpl() override;
 
   void onConsecutive5xx(HostSharedPtr host);

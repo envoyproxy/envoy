@@ -43,8 +43,7 @@ HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
       });
 }
 
-std::shared_ptr<const Network::TransportSocketOptionsImpl>
-HealthCheckerImplBase::initTransportSocketOptions(
+Network::TransportSocketOptionsImplConstSharedPtr HealthCheckerImplBase::initTransportSocketOptions(
     const envoy::config::core::v3::HealthCheck& config) {
   if (config.has_tls_options()) {
     std::vector<std::string> protocols{config.tls_options().alpn_protocols().begin(),
@@ -181,7 +180,7 @@ void HealthCheckerImplBase::runCallbacks(HostSharedPtr host, HealthTransition ch
 
 void HealthCheckerImplBase::HealthCheckHostMonitorImpl::setUnhealthy() {
   // This is called cross thread. The cluster/health checker might already be gone.
-  std::shared_ptr<HealthCheckerImplBase> health_checker = health_checker_.lock();
+  HealthCheckerImplBaseSharedPtr health_checker = health_checker_.lock();
   if (health_checker) {
     health_checker->setUnhealthyCrossThread(host_.lock());
   }
@@ -197,7 +196,7 @@ void HealthCheckerImplBase::setUnhealthyCrossThread(const HostSharedPtr& host) {
   // 3) Additionally, the host/session may also be gone by then so we check that also.
   std::weak_ptr<HealthCheckerImplBase> weak_this = shared_from_this();
   dispatcher_.post([weak_this, host]() -> void {
-    std::shared_ptr<HealthCheckerImplBase> shared_this = weak_this.lock();
+    HealthCheckerImplBaseSharedPtr shared_this = weak_this.lock();
     if (shared_this == nullptr) {
       return;
     }

@@ -148,7 +148,7 @@ public:
 
   NiceMock<Stats::MockIsolatedStatsStore> stats_;
   FaultFilterConfigSharedPtr config_;
-  std::unique_ptr<FaultFilter> filter_;
+  FaultFilterPtr filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_filter_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_filter_callbacks_;
   Http::TestRequestHeaderMapImpl request_headers_;

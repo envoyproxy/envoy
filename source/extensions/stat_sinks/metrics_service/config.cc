@@ -28,11 +28,10 @@ Stats::SinkPtr MetricsServiceSinkFactory::createStatsSink(const Protobuf::Messag
   const auto& transport_api_version = sink_config.transport_api_version();
   ENVOY_LOG(debug, "Metrics Service gRPC service configuration: {}", grpc_service.DebugString());
 
-  std::shared_ptr<GrpcMetricsStreamer> grpc_metrics_streamer =
-      std::make_shared<GrpcMetricsStreamerImpl>(
-          server.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
-              grpc_service, server.stats(), false),
-          server.localInfo(), transport_api_version);
+  GrpcMetricsStreamerSharedPtr grpc_metrics_streamer = std::make_shared<GrpcMetricsStreamerImpl>(
+      server.clusterManager().grpcAsyncClientManager().factoryForGrpcService(grpc_service,
+                                                                             server.stats(), false),
+      server.localInfo(), transport_api_version);
 
   return std::make_unique<MetricsServiceSink>(
       grpc_metrics_streamer, server.timeSource(),

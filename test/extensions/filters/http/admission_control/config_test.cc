@@ -30,7 +30,7 @@ class AdmissionControlConfigTest : public testing::Test {
 public:
   AdmissionControlConfigTest() = default;
 
-  std::shared_ptr<AdmissionControlFilterConfig> makeConfig(const std::string& yaml) {
+  AdmissionControlFilterConfigSharedPtr makeConfig(const std::string& yaml) {
     AdmissionControlProto proto;
     TestUtility::loadFromYamlAndValidate(yaml, proto);
     auto tls = context_.threadLocal().allocateSlot();

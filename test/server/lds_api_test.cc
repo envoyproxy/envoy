@@ -96,7 +96,7 @@ public:
   Stats::IsolatedStoreImpl store_;
   MockListenerManager listener_manager_;
   Config::SubscriptionCallbacks* lds_callbacks_{};
-  std::unique_ptr<LdsApiImpl> lds_;
+  LdsApiImplPtr lds_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
 
 private:

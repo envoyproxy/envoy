@@ -28,7 +28,7 @@ protected:
   StatName makeStatName(absl::string_view name) { return pool_.add(name); }
 
   SymbolTablePtr symbol_table_;
-  std::unique_ptr<IsolatedStoreImpl> store_;
+  IsolatedStoreImplPtr store_;
   StatNamePool pool_;
 };
 

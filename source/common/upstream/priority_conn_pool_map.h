@@ -52,7 +52,7 @@ public:
   void drainConnections();
 
 private:
-  std::array<std::unique_ptr<ConnPoolMapType>, NumResourcePriorities> conn_pool_maps_;
+  std::array<ConnPoolMapTypePtr, NumResourcePriorities> conn_pool_maps_;
 };
 
 } // namespace Upstream

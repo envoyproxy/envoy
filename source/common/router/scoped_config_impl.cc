@@ -38,7 +38,7 @@ HeaderValueExtractorImpl::HeaderValueExtractorImpl(
   }
 }
 
-std::unique_ptr<ScopeKeyFragmentBase>
+ScopeKeyFragmentBasePtr
 HeaderValueExtractorImpl::computeFragment(const Http::HeaderMap& headers) const {
   const Envoy::Http::HeaderEntry* header_entry =
       headers.get(Envoy::Http::LowerCaseString(header_value_extractor_config_.name()));
@@ -107,7 +107,7 @@ ScopeKeyPtr ScopeKeyBuilderImpl::computeScopeKey(const Http::HeaderMap& headers)
   ScopeKey key;
   for (const auto& builder : fragment_builders_) {
     // returns nullopt if a null fragment is found.
-    std::unique_ptr<ScopeKeyFragmentBase> fragment = builder->computeFragment(headers);
+    ScopeKeyFragmentBasePtr fragment = builder->computeFragment(headers);
     if (fragment == nullptr) {
       return nullptr;
     }

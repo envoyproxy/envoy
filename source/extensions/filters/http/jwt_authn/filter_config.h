@@ -82,12 +82,11 @@ public:
   ~FilterConfigImpl() override = default;
 
   // Finds the matcher that matched the header
-  static std::shared_ptr<FilterConfigImpl>
+  static FilterConfigImplSharedPtr
   create(envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication proto_config,
          const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
     // We can't use make_shared here because the constructor of this class is private.
-    std::shared_ptr<FilterConfigImpl> ptr(
-        new FilterConfigImpl(proto_config, stats_prefix, context));
+    FilterConfigImplSharedPtr ptr(new FilterConfigImpl(proto_config, stats_prefix, context));
     ptr->init();
     return ptr;
   }

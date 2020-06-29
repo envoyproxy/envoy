@@ -29,8 +29,8 @@ public:
   }
 
 private:
-  std::unique_ptr<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> engine_;
-  std::unique_ptr<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> shadow_engine_;
+  Filters::Common::RBAC::RoleBasedAccessControlEngineImplPtr engine_;
+  Filters::Common::RBAC::RoleBasedAccessControlEngineImplPtr shadow_engine_;
 };
 
 /**
@@ -57,8 +57,8 @@ private:
 
   Filters::Common::RBAC::RoleBasedAccessControlFilterStats stats_;
 
-  std::unique_ptr<const Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> engine_;
-  std::unique_ptr<const Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> shadow_engine_;
+  Filters::Common::RBAC::RoleBasedAccessControlEngineImplConstPtr engine_;
+  Filters::Common::RBAC::RoleBasedAccessControlEngineImplConstPtr shadow_engine_;
 };
 
 using RoleBasedAccessControlFilterConfigSharedPtr =

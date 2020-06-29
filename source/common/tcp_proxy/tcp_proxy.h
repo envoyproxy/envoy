@@ -205,9 +205,9 @@ private:
   const uint32_t max_connect_attempts_;
   ThreadLocal::SlotPtr upstream_drain_manager_slot_;
   SharedConfigSharedPtr shared_config_;
-  std::unique_ptr<const Router::MetadataMatchCriteria> cluster_metadata_match_criteria_;
+  Router::MetadataMatchCriteriaConstPtr cluster_metadata_match_criteria_;
   Runtime::RandomGenerator& random_generator_;
-  std::unique_ptr<const Network::HashPolicyImpl> hash_policy_;
+  Network::HashPolicyImplConstPtr hash_policy_;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
@@ -368,10 +368,10 @@ protected:
   DownstreamCallbacks downstream_callbacks_;
   Event::TimerPtr idle_timer_;
 
-  std::shared_ptr<ConnectionHandle> upstream_handle_;
-  std::shared_ptr<UpstreamCallbacks> upstream_callbacks_; // shared_ptr required for passing as a
-                                                          // read filter.
-  std::unique_ptr<GenericUpstream> upstream_;
+  ConnectionHandleSharedPtr upstream_handle_;
+  UpstreamCallbacksSharedPtr upstream_callbacks_; // shared_ptr required for passing as a
+                                                  // read filter.
+  GenericUpstreamPtr upstream_;
   RouteConstSharedPtr route_;
   Network::TransportSocketOptionsSharedPtr transport_socket_options_;
   uint32_t connect_attempts_{};
@@ -384,7 +384,7 @@ protected:
 class Drainer : public Event::DeferredDeletable {
 public:
   Drainer(UpstreamDrainManager& parent, const Config::SharedConfigSharedPtr& config,
-          const std::shared_ptr<Filter::UpstreamCallbacks>& callbacks,
+          const Filter::UpstreamCallbacksSharedPtr& callbacks,
           Tcp::ConnectionPool::ConnectionDataPtr&& conn_data, Event::TimerPtr&& idle_timer,
           const Upstream::HostDescriptionConstSharedPtr& upstream_host);
 
@@ -396,7 +396,7 @@ public:
 
 private:
   UpstreamDrainManager& parent_;
-  std::shared_ptr<Filter::UpstreamCallbacks> callbacks_;
+  Filter::UpstreamCallbacksSharedPtr callbacks_;
   Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
   Event::TimerPtr timer_;
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
@@ -410,8 +410,7 @@ public:
   ~UpstreamDrainManager() override;
   void add(const Config::SharedConfigSharedPtr& config,
            Tcp::ConnectionPool::ConnectionDataPtr&& upstream_conn_data,
-           const std::shared_ptr<Filter::UpstreamCallbacks>& callbacks,
-           Event::TimerPtr&& idle_timer,
+           const Filter::UpstreamCallbacksSharedPtr& callbacks, Event::TimerPtr&& idle_timer,
            const Upstream::HostDescriptionConstSharedPtr& upstream_host);
   void remove(Drainer& drainer, Event::Dispatcher& dispatcher);
 

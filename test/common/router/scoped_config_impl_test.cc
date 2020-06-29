@@ -116,7 +116,7 @@ TEST(HeaderValueExtractorImplTest, HeaderExtractionByIndex) {
 
   TestUtility::loadFromYaml(yaml_plain, config);
   HeaderValueExtractorImpl extractor(std::move(config));
-  std::unique_ptr<ScopeKeyFragmentBase> fragment = extractor.computeFragment(
+  ScopeKeyFragmentBasePtr fragment = extractor.computeFragment(
       TestRequestHeaderMapImpl{{"foo_header", "part-0,part-1:value_bluh"}});
 
   EXPECT_NE(fragment, nullptr);
@@ -159,10 +159,9 @@ TEST(HeaderValueExtractorImplTest, HeaderExtractionByKey) {
 
   TestUtility::loadFromYaml(yaml_plain, config);
   HeaderValueExtractorImpl extractor(std::move(config));
-  std::unique_ptr<ScopeKeyFragmentBase> fragment =
-      extractor.computeFragment(TestRequestHeaderMapImpl{
-          {"foo_header", "part-0;bar=>bluh;foo=>foo_value"},
-      });
+  ScopeKeyFragmentBasePtr fragment = extractor.computeFragment(TestRequestHeaderMapImpl{
+      {"foo_header", "part-0;bar=>bluh;foo=>foo_value"},
+  });
 
   EXPECT_NE(fragment, nullptr);
   EXPECT_EQ(*fragment, StringKeyFragment{"bluh"});
@@ -220,10 +219,9 @@ TEST(HeaderValueExtractorImplTest, ElementSeparatorEmpty) {
 
   TestUtility::loadFromYaml(yaml_plain, config);
   HeaderValueExtractorImpl extractor(std::move(config));
-  std::unique_ptr<ScopeKeyFragmentBase> fragment =
-      extractor.computeFragment(TestRequestHeaderMapImpl{
-          {"foo_header", "bar=b;c=d;e=f"},
-      });
+  ScopeKeyFragmentBasePtr fragment = extractor.computeFragment(TestRequestHeaderMapImpl{
+      {"foo_header", "bar=b;c=d;e=f"},
+  });
   EXPECT_NE(fragment, nullptr);
   EXPECT_EQ(*fragment, StringKeyFragment{"b;c=d;e=f"});
 
@@ -370,7 +368,7 @@ public:
   envoy::config::route::v3::RouteConfiguration route_configuration_;
   envoy::config::route::v3::ScopedRouteConfiguration scoped_route_config_;
   std::shared_ptr<MockConfig> route_config_;
-  std::unique_ptr<ScopedRouteInfo> info_;
+  ScopedRouteInfoPtr info_;
 };
 
 TEST_F(ScopedRouteInfoTest, Creation) {
@@ -425,7 +423,7 @@ public:
         - string_key: baz
 )EOF");
   }
-  std::shared_ptr<ScopedRouteInfo> makeScopedRouteInfo(const std::string& route_config_yaml) {
+  ScopedRouteInfoSharedPtr makeScopedRouteInfo(const std::string& route_config_yaml) {
     envoy::config::route::v3::ScopedRouteConfiguration scoped_route_config;
     TestUtility::loadFromYaml(route_config_yaml, scoped_route_config);
 
@@ -435,11 +433,11 @@ public:
                                              std::move(route_config));
   }
 
-  std::shared_ptr<ScopedRouteInfo> scope_info_a_;
-  std::shared_ptr<ScopedRouteInfo> scope_info_a_v2_;
-  std::shared_ptr<ScopedRouteInfo> scope_info_b_;
+  ScopedRouteInfoSharedPtr scope_info_a_;
+  ScopedRouteInfoSharedPtr scope_info_a_v2_;
+  ScopedRouteInfoSharedPtr scope_info_b_;
   ScopedRoutes::ScopeKeyBuilder key_builder_config_;
-  std::unique_ptr<ScopedConfigImpl> scoped_config_impl_;
+  ScopedConfigImplPtr scoped_config_impl_;
 };
 
 // Test a ScopedConfigImpl returns the correct route Config.

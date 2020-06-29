@@ -182,7 +182,7 @@ private:
   void delayInjectionTimerCallback();
   void tryInjectDelay();
 
-  std::unique_ptr<Decoder> decoder_;
+  DecoderPtr decoder_;
   std::string stat_prefix_;
   MongoProxyStats stats_;
   Runtime::Loader& runtime_;

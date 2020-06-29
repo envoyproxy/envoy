@@ -15,18 +15,18 @@ std::vector<std::pair<std::string, std::vector<Envoy::Network::Address::CidrRang
 std::vector<std::pair<std::string, std::vector<Envoy::Network::Address::CidrRange>>>
     tag_data_minimal;
 
-std::unique_ptr<Envoy::Network::LcTrie::LcTrie<std::string>> lc_trie;
+Envoy::Network::LcTrie::LcTriePtr<std::string> lc_trie;
 
-std::unique_ptr<Envoy::Network::LcTrie::LcTrie<std::string>> lc_trie_nested_prefixes;
+Envoy::Network::LcTrie::LcTriePtr<std::string> lc_trie_nested_prefixes;
 
-std::unique_ptr<Envoy::Network::LcTrie::LcTrie<std::string>> lc_trie_minimal;
+Envoy::Network::LcTrie::LcTriePtr<std::string> lc_trie_minimal;
 
 } // namespace
 
 namespace Envoy {
 
 static void BM_LcTrieConstruct(benchmark::State& state) {
-  std::unique_ptr<Envoy::Network::LcTrie::LcTrie<std::string>> trie;
+  Envoy::Network::LcTrie::LcTriePtr<std::string> trie;
   for (auto _ : state) {
     trie = std::make_unique<Envoy::Network::LcTrie::LcTrie<std::string>>(tag_data);
   }
@@ -36,7 +36,7 @@ static void BM_LcTrieConstruct(benchmark::State& state) {
 BENCHMARK(BM_LcTrieConstruct);
 
 static void BM_LcTrieConstructNested(benchmark::State& state) {
-  std::unique_ptr<Envoy::Network::LcTrie::LcTrie<std::string>> trie;
+  Envoy::Network::LcTrie::LcTriePtr<std::string> trie;
   for (auto _ : state) {
     trie = std::make_unique<Envoy::Network::LcTrie::LcTrie<std::string>>(tag_data_nested_prefixes);
   }
@@ -47,7 +47,7 @@ BENCHMARK(BM_LcTrieConstructNested);
 
 static void BM_LcTrieConstructMinimal(benchmark::State& state) {
 
-  std::unique_ptr<Envoy::Network::LcTrie::LcTrie<std::string>> trie;
+  Envoy::Network::LcTrie::LcTriePtr<std::string> trie;
   for (auto _ : state) {
     trie = std::make_unique<Envoy::Network::LcTrie::LcTrie<std::string>>(tag_data_minimal);
   }

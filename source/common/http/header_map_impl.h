@@ -378,8 +378,8 @@ protected:
 class RequestHeaderMapImpl final : public TypedHeaderMapImpl<RequestHeaderMap>,
                                    public InlineStorage {
 public:
-  static std::unique_ptr<RequestHeaderMapImpl> create() {
-    return std::unique_ptr<RequestHeaderMapImpl>(new (inlineHeadersSize()) RequestHeaderMapImpl());
+  static RequestHeaderMapImplPtr create() {
+    return RequestHeaderMapImplPtr(new (inlineHeadersSize()) RequestHeaderMapImpl());
   }
 
   INLINE_REQ_HEADERS(DEFINE_INLINE_HEADER_FUNCS)
@@ -414,9 +414,8 @@ private:
 class RequestTrailerMapImpl final : public TypedHeaderMapImpl<RequestTrailerMap>,
                                     public InlineStorage {
 public:
-  static std::unique_ptr<RequestTrailerMapImpl> create() {
-    return std::unique_ptr<RequestTrailerMapImpl>(new (inlineHeadersSize())
-                                                      RequestTrailerMapImpl());
+  static RequestTrailerMapImplPtr create() {
+    return RequestTrailerMapImplPtr(new (inlineHeadersSize()) RequestTrailerMapImpl());
   }
 
 protected:
@@ -438,9 +437,8 @@ private:
 class ResponseHeaderMapImpl final : public TypedHeaderMapImpl<ResponseHeaderMap>,
                                     public InlineStorage {
 public:
-  static std::unique_ptr<ResponseHeaderMapImpl> create() {
-    return std::unique_ptr<ResponseHeaderMapImpl>(new (inlineHeadersSize())
-                                                      ResponseHeaderMapImpl());
+  static ResponseHeaderMapImplPtr create() {
+    return ResponseHeaderMapImplPtr(new (inlineHeadersSize()) ResponseHeaderMapImpl());
   }
 
   INLINE_RESP_HEADERS(DEFINE_INLINE_HEADER_FUNCS)
@@ -474,9 +472,8 @@ private:
 class ResponseTrailerMapImpl final : public TypedHeaderMapImpl<ResponseTrailerMap>,
                                      public InlineStorage {
 public:
-  static std::unique_ptr<ResponseTrailerMapImpl> create() {
-    return std::unique_ptr<ResponseTrailerMapImpl>(new (inlineHeadersSize())
-                                                       ResponseTrailerMapImpl());
+  static ResponseTrailerMapImplPtr create() {
+    return ResponseTrailerMapImplPtr(new (inlineHeadersSize()) ResponseTrailerMapImpl());
   }
 
   INLINE_RESP_HEADERS_TRAILERS(DEFINE_INLINE_HEADER_FUNCS)

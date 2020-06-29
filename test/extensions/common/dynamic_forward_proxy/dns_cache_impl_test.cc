@@ -60,7 +60,7 @@ public:
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   Stats::IsolatedStoreImpl store_;
-  std::unique_ptr<DnsCache> dns_cache_;
+  DnsCachePtr dns_cache_;
   MockUpdateCallbacks update_callbacks_;
   DnsCache::AddUpdateCallbacksHandlePtr update_callbacks_handle_;
 };

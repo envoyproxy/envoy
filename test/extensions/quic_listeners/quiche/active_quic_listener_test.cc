@@ -248,11 +248,11 @@ protected:
   NiceMock<Network::MockListenerConfig> listener_config_;
   quic::QuicConfig quic_config_;
   Server::ConnectionHandlerImpl connection_handler_;
-  std::unique_ptr<ActiveQuicListener> quic_listener_;
+  ActiveQuicListenerPtr quic_listener_;
   Network::ActiveUdpListenerFactoryPtr listener_factory_;
   NiceMock<Network::MockListenSocketFactory> socket_factory_;
   EnvoyQuicDispatcher* quic_dispatcher_;
-  std::unique_ptr<Runtime::ScopedLoaderSingleton> loader_;
+  Runtime::ScopedLoaderSingletonPtr loader_;
 
   NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::TestUtil::TestStore store_;
@@ -262,7 +262,7 @@ protected:
   Init::MockManager init_manager_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
 
-  std::list<std::unique_ptr<Socket>> client_sockets_;
+  std::list<SocketPtr> client_sockets_;
   std::list<std::shared_ptr<Network::MockReadFilter>> read_filters_;
   Network::MockFilterChainManager filter_chain_manager_;
   // The following two containers must guarantee pointer stability as addresses

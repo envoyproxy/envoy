@@ -213,7 +213,7 @@ public:
   Extensions::NetworkFilters::Common::Redis::Client::MockClient* client_{};
   Extensions::NetworkFilters::Common::Redis::Client::MockPoolRequest pool_request_;
   Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks* pool_callbacks_{};
-  std::shared_ptr<RedisHealthChecker> health_checker_;
+  RedisHealthCheckerSharedPtr health_checker_;
   Api::ApiPtr api_;
 };
 

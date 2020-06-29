@@ -153,7 +153,7 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
       // If the first CDS response doesn't have any primary cluster, ClusterLoadAssignment
       // should be already paused by CdsApiImpl::onConfigUpdate(). Need to check that to
       // avoid double pause ClusterLoadAssignment.
-      std::unique_ptr<Cleanup> maybe_eds_resume;
+      CleanupPtr maybe_eds_resume;
       if (cm_.adsMux()) {
         const auto type_urls =
             Config::getAllVersionTypeUrls<envoy::config::endpoint::v3::ClusterLoadAssignment>();
@@ -1023,7 +1023,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(
   container.drains_remaining_ += container.pools_->size();
 
   // Make a copy to protect against erasure in the callback.
-  std::shared_ptr<ConnPoolsContainer::ConnPools> pools = container.pools_;
+  ConnPoolsContainer::ConnPoolsSharedPtr pools = container.pools_;
   pools->addDrainedCallback([this, old_host]() -> void {
     if (destroying_) {
       // It is possible for a connection pool to fire drain callbacks during destruction. Instead

@@ -274,7 +274,7 @@ public:
 
   mutable Stats::TestSymbolTable symbol_table_;
   std::string name_{"fake_vhost"};
-  mutable std::unique_ptr<Stats::StatNameManagedStorage> stat_name_;
+  mutable Stats::StatNameManagedStoragePtr stat_name_;
   testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;
   TestCorsPolicy cors_policy_;
 };
@@ -536,8 +536,7 @@ public:
                absl::string_view transport_failure_reason,
                Upstream::HostDescriptionConstSharedPtr host));
   MOCK_METHOD(void, onPoolReady,
-              (std::unique_ptr<GenericUpstream> && upstream,
-               Upstream::HostDescriptionConstSharedPtr host,
+              (GenericUpstreamPtr && upstream, Upstream::HostDescriptionConstSharedPtr host,
                const Network::Address::InstanceConstSharedPtr& upstream_local_address,
                const StreamInfo::StreamInfo& info));
   MOCK_METHOD(UpstreamRequest*, upstreamRequest, ());

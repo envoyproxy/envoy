@@ -76,7 +76,7 @@ private:
     const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment_;
   };
 
-  std::unique_ptr<Config::Subscription> subscription_;
+  Config::SubscriptionPtr subscription_;
   const LocalInfo::LocalInfo& local_info_;
   const std::string cluster_name_;
   std::vector<LocalityWeightsMap> locality_weights_map_;

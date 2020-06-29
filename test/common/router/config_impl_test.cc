@@ -4579,8 +4579,7 @@ class BazFactory : public HttpRouteTypedMetadataFactory {
 public:
   std::string name() const override { return "baz"; }
   // Returns nullptr (conversion failure) if d is empty.
-  std::unique_ptr<const Envoy::Config::TypedMetadata::Object>
-  parse(const ProtobufWkt::Struct& d) const override {
+  Envoy::Config::TypedMetadata::ObjectConstPtr parse(const ProtobufWkt::Struct& d) const override {
     if (d.fields().find("name") != d.fields().end()) {
       return std::make_unique<Baz>(d.fields().at("name").string_value());
     }

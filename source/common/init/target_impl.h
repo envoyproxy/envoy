@@ -84,7 +84,7 @@ private:
   WatcherHandlePtr watcher_handle_;
 
   // The callback function, called via TargetHandleImpl by the manager
-  const std::shared_ptr<InternalInitalizeFn> fn_;
+  const InternalInitalizeFnSharedPtr fn_;
 };
 
 /**
@@ -122,7 +122,7 @@ private:
   std::vector<WatcherHandlePtr> watcher_handles_;
 
   // The callback function, called via TargetHandleImpl by the manager
-  const std::shared_ptr<InternalInitalizeFn> fn_;
+  const InternalInitalizeFnSharedPtr fn_;
 
   // The state so as to signal the manager when a ready target is added.
   bool initialized_{false};

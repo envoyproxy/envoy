@@ -37,7 +37,7 @@ public:
 
   Stats::IsolatedStoreImpl scope_;
   std::string stat_prefix_{"test."};
-  std::unique_ptr<PostgresFilter> filter_;
+  PostgresFilterPtr filter_;
   PostgresFilterConfigSharedPtr config_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
 

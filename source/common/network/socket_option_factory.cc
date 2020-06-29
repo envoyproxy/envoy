@@ -9,9 +9,9 @@
 namespace Envoy {
 namespace Network {
 
-std::unique_ptr<Socket::Options>
+Socket::OptionsPtr
 SocketOptionFactory::buildTcpKeepaliveOptions(Network::TcpKeepaliveConfig keepalive_config) {
-  std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
+  Socket::OptionsPtr options = std::make_unique<Socket::Options>();
   options->push_back(std::make_shared<Network::SocketOptionImpl>(
       envoy::config::core::v3::SocketOption::STATE_PREBIND, ENVOY_SOCKET_SO_KEEPALIVE, 1));
 
@@ -33,16 +33,16 @@ SocketOptionFactory::buildTcpKeepaliveOptions(Network::TcpKeepaliveConfig keepal
   return options;
 }
 
-std::unique_ptr<Socket::Options> SocketOptionFactory::buildIpFreebindOptions() {
-  std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
+Socket::OptionsPtr SocketOptionFactory::buildIpFreebindOptions() {
+  Socket::OptionsPtr options = std::make_unique<Socket::Options>();
   options->push_back(std::make_shared<Network::AddrFamilyAwareSocketOptionImpl>(
       envoy::config::core::v3::SocketOption::STATE_PREBIND, ENVOY_SOCKET_IP_FREEBIND,
       ENVOY_SOCKET_IPV6_FREEBIND, 1));
   return options;
 }
 
-std::unique_ptr<Socket::Options> SocketOptionFactory::buildIpTransparentOptions() {
-  std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
+Socket::OptionsPtr SocketOptionFactory::buildIpTransparentOptions() {
+  Socket::OptionsPtr options = std::make_unique<Socket::Options>();
   options->push_back(std::make_shared<Network::AddrFamilyAwareSocketOptionImpl>(
       envoy::config::core::v3::SocketOption::STATE_PREBIND, ENVOY_SOCKET_IP_TRANSPARENT,
       ENVOY_SOCKET_IPV6_TRANSPARENT, 1));
@@ -52,8 +52,8 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildIpTransparentOptions(
   return options;
 }
 
-std::unique_ptr<Socket::Options> SocketOptionFactory::buildSocketMarkOptions(uint32_t mark) {
-  std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
+Socket::OptionsPtr SocketOptionFactory::buildSocketMarkOptions(uint32_t mark) {
+  Socket::OptionsPtr options = std::make_unique<Socket::Options>();
   // we need this to happen prior to binding or prior to connecting. In both cases, PREBIND will
   // fire.
   options->push_back(std::make_shared<Network::SocketOptionImpl>(
@@ -61,7 +61,7 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildSocketMarkOptions(uin
   return options;
 }
 
-std::unique_ptr<Socket::Options> SocketOptionFactory::buildLiteralOptions(
+Socket::OptionsPtr SocketOptionFactory::buildLiteralOptions(
     const Protobuf::RepeatedPtrField<envoy::config::core::v3::SocketOption>& socket_options) {
   auto options = std::make_unique<Socket::Options>();
   for (const auto& socket_option : socket_options) {
@@ -90,25 +90,24 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildLiteralOptions(
   return options;
 }
 
-std::unique_ptr<Socket::Options>
-SocketOptionFactory::buildTcpFastOpenOptions(uint32_t queue_length) {
-  std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
+Socket::OptionsPtr SocketOptionFactory::buildTcpFastOpenOptions(uint32_t queue_length) {
+  Socket::OptionsPtr options = std::make_unique<Socket::Options>();
   options->push_back(std::make_shared<Network::SocketOptionImpl>(
       envoy::config::core::v3::SocketOption::STATE_LISTENING, ENVOY_SOCKET_TCP_FASTOPEN,
       queue_length));
   return options;
 }
 
-std::unique_ptr<Socket::Options> SocketOptionFactory::buildIpPacketInfoOptions() {
-  std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
+Socket::OptionsPtr SocketOptionFactory::buildIpPacketInfoOptions() {
+  Socket::OptionsPtr options = std::make_unique<Socket::Options>();
   options->push_back(std::make_shared<AddrFamilyAwareSocketOptionImpl>(
       envoy::config::core::v3::SocketOption::STATE_BOUND, ENVOY_SELF_IP_ADDR, ENVOY_SELF_IPV6_ADDR,
       1));
   return options;
 }
 
-std::unique_ptr<Socket::Options> SocketOptionFactory::buildRxQueueOverFlowOptions() {
-  std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
+Socket::OptionsPtr SocketOptionFactory::buildRxQueueOverFlowOptions() {
+  Socket::OptionsPtr options = std::make_unique<Socket::Options>();
 #ifdef SO_RXQ_OVFL
   options->push_back(std::make_shared<Network::SocketOptionImpl>(
       envoy::config::core::v3::SocketOption::STATE_BOUND,
@@ -117,8 +116,8 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildRxQueueOverFlowOption
   return options;
 }
 
-std::unique_ptr<Socket::Options> SocketOptionFactory::buildReusePortOptions() {
-  std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
+Socket::OptionsPtr SocketOptionFactory::buildReusePortOptions() {
+  Socket::OptionsPtr options = std::make_unique<Socket::Options>();
   options->push_back(std::make_shared<Network::SocketOptionImpl>(
       envoy::config::core::v3::SocketOption::STATE_PREBIND, ENVOY_SOCKET_SO_REUSEPORT, 1));
   return options;

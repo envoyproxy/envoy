@@ -140,8 +140,7 @@ RateLimitPolicyImpl::RateLimitPolicyImpl(
     const Protobuf::RepeatedPtrField<envoy::config::route::v3::RateLimit>& rate_limits)
     : rate_limit_entries_reference_(RateLimitPolicyImpl::MAX_STAGE_NUMBER + 1) {
   for (const auto& rate_limit : rate_limits) {
-    std::unique_ptr<RateLimitPolicyEntry> rate_limit_policy_entry(
-        new RateLimitPolicyEntryImpl(rate_limit));
+    RateLimitPolicyEntryPtr rate_limit_policy_entry(new RateLimitPolicyEntryImpl(rate_limit));
     uint32_t stage = rate_limit_policy_entry->stage();
     ASSERT(stage < rate_limit_entries_reference_.size());
     rate_limit_entries_reference_[stage].emplace_back(*rate_limit_policy_entry);

@@ -16,7 +16,7 @@ int main(int argc, char** argv) {
   // Create a Runfiles object for runfiles lookup.
   // https://github.com/bazelbuild/bazel/blob/master/tools/cpp/runfiles/runfiles_src.h#L32
   std::string error;
-  std::unique_ptr<Runfiles> runfiles(Runfiles::Create(argv[0], &error));
+  RunfilesPtr runfiles(Runfiles::Create(argv[0], &error));
   RELEASE_ASSERT(Envoy::TestEnvironment::getOptionalEnvVar("NORUNFILES").has_value() ||
                      runfiles != nullptr,
                  error);

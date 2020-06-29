@@ -96,7 +96,7 @@ class Filter : public Http::PassThroughFilter, Logger::Loggable<Logger::Id::filt
 
 public:
   Filter(const FilterSettings& config, const FilterStats& stats,
-         const std::shared_ptr<Extensions::Common::Aws::Signer>& sigv4_signer);
+         const Extensions::Common::Aws::SignerSharedPtr& sigv4_signer);
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
@@ -129,7 +129,7 @@ private:
   FilterStats stats_;
   Http::RequestHeaderMap* request_headers_ = nullptr;
   Http::ResponseHeaderMap* response_headers_ = nullptr;
-  std::shared_ptr<Extensions::Common::Aws::Signer> sigv4_signer_;
+  Extensions::Common::Aws::SignerSharedPtr sigv4_signer_;
   absl::optional<Arn> arn_;
   InvocationMode invocation_mode_ = InvocationMode::Synchronous;
   bool payload_passthrough_ = false;

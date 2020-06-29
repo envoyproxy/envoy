@@ -304,7 +304,7 @@ private:
   LdsApiPtr lds_api_;
   const bool enable_dispatcher_stats_{};
   using UpdateFailureState = envoy::admin::v3::UpdateFailureState;
-  absl::flat_hash_map<std::string, std::unique_ptr<UpdateFailureState>> error_state_tracker_;
+  absl::flat_hash_map<std::string, UpdateFailureStatePtr> error_state_tracker_;
   FailureStates overall_error_state_;
 };
 

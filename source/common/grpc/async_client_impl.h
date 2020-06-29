@@ -34,7 +34,7 @@ private:
   Upstream::ClusterManager& cm_;
   const std::string remote_cluster_name_;
   const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue> initial_metadata_;
-  std::list<std::unique_ptr<AsyncStreamImpl>> active_streams_;
+  std::list<AsyncStreamImplPtr> active_streams_;
   TimeSource& time_source_;
 
   friend class AsyncRequestImpl;

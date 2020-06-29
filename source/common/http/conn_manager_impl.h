@@ -103,7 +103,7 @@ public:
   TimeSource& timeSource() { return time_source_; }
 
   // Return a reference to the shared_ptr so that it can be lazy created on demand.
-  std::shared_ptr<StreamInfo::FilterState>& filterState() { return filter_state_; }
+  StreamInfo::FilterStateSharedPtr& filterState() { return filter_state_; }
 
 private:
   struct ActiveStream;
@@ -190,8 +190,8 @@ private:
     // either because [de|en]codeHeaders() of the current filter returns StopAllIteration or because
     // [de|en]codeHeaders() adds new metadata to [de|en]code, but we don't know
     // [de|en]codeHeaders()'s return value yet. The storage is created on demand.
-    std::unique_ptr<MetadataMapVector> saved_request_metadata_{nullptr};
-    std::unique_ptr<MetadataMapVector> saved_response_metadata_{nullptr};
+    MetadataMapVectorPtr saved_request_metadata_{nullptr};
+    MetadataMapVectorPtr saved_response_metadata_{nullptr};
     // The state of iteration.
     enum class IterationState {
       Continue,            // Iteration has not stopped for any frame type.
@@ -735,13 +735,13 @@ private:
     // Stores metadata added in the decoding filter that is being processed. Will be cleared before
     // processing the next filter. The storage is created on demand. We need to store metadata
     // temporarily in the filter in case the filter has stopped all while processing headers.
-    std::unique_ptr<MetadataMapVector> request_metadata_map_vector_{nullptr};
+    MetadataMapVectorPtr request_metadata_map_vector_{nullptr};
     uint32_t buffer_limit_{0};
     uint32_t high_watermark_count_{0};
     const std::string* decorated_operation_{nullptr};
     Network::Socket::OptionsSharedPtr upstream_options_;
-    std::unique_ptr<RouteConfigUpdateRequester> route_config_update_requester_;
-    std::unique_ptr<Tracing::CustomTagMap> tracing_custom_tags_{nullptr};
+    RouteConfigUpdateRequesterPtr route_config_update_requester_;
+    Tracing::CustomTagMapPtr tracing_custom_tags_{nullptr};
   };
 
   using ActiveStreamPtr = std::unique_ptr<ActiveStream>;
@@ -803,7 +803,7 @@ private:
   const Server::OverloadActionState& overload_stop_accepting_requests_ref_;
   const Server::OverloadActionState& overload_disable_keepalive_ref_;
   TimeSource& time_source_;
-  std::shared_ptr<StreamInfo::FilterState> filter_state_;
+  StreamInfo::FilterStateSharedPtr filter_state_;
 };
 
 } // namespace Http

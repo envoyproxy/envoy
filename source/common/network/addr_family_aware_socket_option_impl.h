@@ -48,12 +48,12 @@ public:
    */
   static bool setIpSocketOption(Socket& socket,
                                 envoy::config::core::v3::SocketOption::SocketState state,
-                                const std::unique_ptr<SocketOptionImpl>& ipv4_option,
-                                const std::unique_ptr<SocketOptionImpl>& ipv6_option);
+                                const SocketOptionImplPtr& ipv4_option,
+                                const SocketOptionImplPtr& ipv6_option);
 
 private:
-  const std::unique_ptr<SocketOptionImpl> ipv4_option_;
-  const std::unique_ptr<SocketOptionImpl> ipv6_option_;
+  const SocketOptionImplPtr ipv4_option_;
+  const SocketOptionImplPtr ipv6_option_;
 };
 
 } // namespace Network

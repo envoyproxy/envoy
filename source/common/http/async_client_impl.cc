@@ -59,7 +59,7 @@ AsyncClient::Request* AsyncClientImpl::send(RequestMessagePtr&& request,
   AsyncRequestImpl* async_request =
       new AsyncRequestImpl(std::move(request), *this, callbacks, options);
   async_request->initialize();
-  std::unique_ptr<AsyncStreamImpl> new_request{async_request};
+  AsyncStreamImplPtr new_request{async_request};
 
   // The request may get immediately failed. If so, we will return nullptr.
   if (!new_request->remote_closed_) {
@@ -73,7 +73,7 @@ AsyncClient::Request* AsyncClientImpl::send(RequestMessagePtr&& request,
 
 AsyncClient::Stream* AsyncClientImpl::start(AsyncClient::StreamCallbacks& callbacks,
                                             const AsyncClient::StreamOptions& options) {
-  std::unique_ptr<AsyncStreamImpl> new_stream{new AsyncStreamImpl(*this, callbacks, options)};
+  AsyncStreamImplPtr new_stream{new AsyncStreamImpl(*this, callbacks, options)};
   new_stream->moveIntoList(std::move(new_stream), active_streams_);
   return active_streams_.front().get();
 }

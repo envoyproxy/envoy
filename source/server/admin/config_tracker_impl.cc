@@ -12,7 +12,7 @@ ConfigTracker::EntryOwnerPtr ConfigTrackerImpl::add(const std::string& key, Cb c
 
 const ConfigTracker::CbsMap& ConfigTrackerImpl::getCallbacksMap() const { return *map_; }
 
-ConfigTrackerImpl::EntryOwnerImpl::EntryOwnerImpl(const std::shared_ptr<ConfigTracker::CbsMap>& map,
+ConfigTrackerImpl::EntryOwnerImpl::EntryOwnerImpl(const ConfigTracker::CbsMapSharedPtr& map,
                                                   const std::string& key)
     : map_(map), key_(key) {}
 

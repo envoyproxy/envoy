@@ -46,10 +46,9 @@ Runtime::LoaderPtr ProdComponentFactory::createRuntime(Server::Instance& server,
 MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& time_system,
                                ListenerHooks& listener_hooks,
                                Server::ComponentFactory& component_factory,
-                               std::unique_ptr<Runtime::RandomGenerator>&& random_generator,
+                               Runtime::RandomGeneratorPtr&& random_generator,
                                Thread::ThreadFactory& thread_factory,
-                               Filesystem::Instance& file_system,
-                               std::unique_ptr<ProcessContext> process_context)
+                               Filesystem::Instance& file_system, ProcessContextPtr process_context)
     : options_(options), component_factory_(component_factory), thread_factory_(thread_factory),
       file_system_(file_system), symbol_table_(Stats::SymbolTableCreator::initAndMakeSymbolTable(
                                      options_.fakeSymbolTableEnabled())),
@@ -110,7 +109,7 @@ void MainCommonBase::configureHotRestarter(Runtime::RandomGenerator& random_gene
     if (options_.useDynamicBaseId()) {
       ASSERT(options_.restartEpoch() == 0, "cannot use dynamic base id during hot restart");
 
-      std::unique_ptr<Server::HotRestart> restarter;
+      Server::HotRestartPtr restarter;
 
       // Try 100 times to get an unused base ID and then give up under the assumption
       // that some other problem has occurred to prevent binding the domain socket.
@@ -208,7 +207,7 @@ int MainCommon::main(int argc, char** argv, PostServerHook hook) {
   // handling, such as running in a chroot jail.
   absl::InitializeSymbolizer(argv[0]);
 #endif
-  std::unique_ptr<Envoy::MainCommon> main_common;
+  Envoy::MainCommonPtr main_common;
 
   // Initialize the server's main context under a try/catch loop and simply return EXIT_FAILURE
   // as needed. Whatever code in the initialization path that fails is expected to log an error

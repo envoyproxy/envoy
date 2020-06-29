@@ -63,7 +63,7 @@ TEST_F(JwksFetcherTest, TestGetSuccess) {
   // Setup
   MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, "200", publicKey);
   MockJwksReceiver receiver;
-  std::unique_ptr<JwksFetcher> fetcher(JwksFetcher::create(mock_factory_ctx_.cluster_manager_));
+  JwksFetcherPtr fetcher(JwksFetcher::create(mock_factory_ctx_.cluster_manager_));
   EXPECT_TRUE(fetcher != nullptr);
   EXPECT_CALL(receiver, onJwksSuccessImpl(testing::_)).Times(1);
   EXPECT_CALL(receiver, onJwksError(testing::_)).Times(0);
@@ -76,7 +76,7 @@ TEST_F(JwksFetcherTest, TestGet400) {
   // Setup
   MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, "400", "invalid");
   MockJwksReceiver receiver;
-  std::unique_ptr<JwksFetcher> fetcher(JwksFetcher::create(mock_factory_ctx_.cluster_manager_));
+  JwksFetcherPtr fetcher(JwksFetcher::create(mock_factory_ctx_.cluster_manager_));
   EXPECT_TRUE(fetcher != nullptr);
   EXPECT_CALL(receiver, onJwksSuccessImpl(testing::_)).Times(0);
   EXPECT_CALL(receiver, onJwksError(JwksFetcher::JwksReceiver::Failure::Network)).Times(1);
@@ -89,7 +89,7 @@ TEST_F(JwksFetcherTest, TestGetNoBody) {
   // Setup
   MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, "200", "");
   MockJwksReceiver receiver;
-  std::unique_ptr<JwksFetcher> fetcher(JwksFetcher::create(mock_factory_ctx_.cluster_manager_));
+  JwksFetcherPtr fetcher(JwksFetcher::create(mock_factory_ctx_.cluster_manager_));
   EXPECT_TRUE(fetcher != nullptr);
   EXPECT_CALL(receiver, onJwksSuccessImpl(testing::_)).Times(0);
   EXPECT_CALL(receiver, onJwksError(JwksFetcher::JwksReceiver::Failure::Network)).Times(1);
@@ -102,7 +102,7 @@ TEST_F(JwksFetcherTest, TestGetInvalidJwks) {
   // Setup
   MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, "200", "invalid");
   MockJwksReceiver receiver;
-  std::unique_ptr<JwksFetcher> fetcher(JwksFetcher::create(mock_factory_ctx_.cluster_manager_));
+  JwksFetcherPtr fetcher(JwksFetcher::create(mock_factory_ctx_.cluster_manager_));
   EXPECT_TRUE(fetcher != nullptr);
   EXPECT_CALL(receiver, onJwksSuccessImpl(testing::_)).Times(0);
   EXPECT_CALL(receiver, onJwksError(JwksFetcher::JwksReceiver::Failure::InvalidJwks)).Times(1);
@@ -116,7 +116,7 @@ TEST_F(JwksFetcherTest, TestHttpFailure) {
   MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_,
                            Http::AsyncClient::FailureReason::Reset);
   MockJwksReceiver receiver;
-  std::unique_ptr<JwksFetcher> fetcher(JwksFetcher::create(mock_factory_ctx_.cluster_manager_));
+  JwksFetcherPtr fetcher(JwksFetcher::create(mock_factory_ctx_.cluster_manager_));
   EXPECT_TRUE(fetcher != nullptr);
   EXPECT_CALL(receiver, onJwksSuccessImpl(testing::_)).Times(0);
   EXPECT_CALL(receiver, onJwksError(JwksFetcher::JwksReceiver::Failure::Network)).Times(1);
@@ -130,7 +130,7 @@ TEST_F(JwksFetcherTest, TestCancel) {
   Http::MockAsyncClientRequest request(&(mock_factory_ctx_.cluster_manager_.async_client_));
   MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, &request);
   MockJwksReceiver receiver;
-  std::unique_ptr<JwksFetcher> fetcher(JwksFetcher::create(mock_factory_ctx_.cluster_manager_));
+  JwksFetcherPtr fetcher(JwksFetcher::create(mock_factory_ctx_.cluster_manager_));
   EXPECT_TRUE(fetcher != nullptr);
   EXPECT_CALL(request, cancel()).Times(1);
   EXPECT_CALL(receiver, onJwksSuccessImpl(testing::_)).Times(0);
@@ -148,7 +148,7 @@ TEST_F(JwksFetcherTest, TestSpanPassedDown) {
   // Setup
   MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, "200", publicKey);
   NiceMock<MockJwksReceiver> receiver;
-  std::unique_ptr<JwksFetcher> fetcher(JwksFetcher::create(mock_factory_ctx_.cluster_manager_));
+  JwksFetcherPtr fetcher(JwksFetcher::create(mock_factory_ctx_.cluster_manager_));
 
   // Expectations for span
   EXPECT_CALL(mock_factory_ctx_.cluster_manager_.async_client_, send_(_, _, _))

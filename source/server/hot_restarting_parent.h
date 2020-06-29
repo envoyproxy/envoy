@@ -44,7 +44,7 @@ private:
   const int restart_epoch_;
   sockaddr_un child_address_;
   Event::FileEventPtr socket_event_;
-  std::unique_ptr<Internal> internal_;
+  InternalPtr internal_;
 };
 
 } // namespace Server

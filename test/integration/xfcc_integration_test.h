@@ -59,7 +59,7 @@ public:
   bool tls_ = true;
 
 private:
-  std::unique_ptr<Ssl::ContextManager> context_manager_;
+  Ssl::ContextManagerPtr context_manager_;
   Network::TransportSocketFactoryPtr client_tls_ssl_ctx_;
   Network::TransportSocketFactoryPtr client_mtls_ssl_ctx_;
   Network::TransportSocketFactoryPtr upstream_ssl_ctx_;

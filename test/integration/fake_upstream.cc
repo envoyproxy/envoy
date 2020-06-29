@@ -74,14 +74,14 @@ void FakeStream::decodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr) {
 }
 
 void FakeStream::encode100ContinueHeaders(const Http::ResponseHeaderMap& headers) {
-  std::shared_ptr<Http::ResponseHeaderMap> headers_copy(
+  Http::ResponseHeaderMapSharedPtr headers_copy(
       Http::createHeaderMap<Http::ResponseHeaderMapImpl>(headers));
   parent_.connection().dispatcher().post(
       [this, headers_copy]() -> void { encoder_.encode100ContinueHeaders(*headers_copy); });
 }
 
 void FakeStream::encodeHeaders(const Http::HeaderMap& headers, bool end_stream) {
-  std::shared_ptr<Http::ResponseHeaderMap> headers_copy(
+  Http::ResponseHeaderMapSharedPtr headers_copy(
       Http::createHeaderMap<Http::ResponseHeaderMapImpl>(headers));
   if (add_served_by_header_) {
     headers_copy->addCopy(Http::LowerCaseString("x-served-by"),
@@ -108,13 +108,13 @@ void FakeStream::encodeData(uint64_t size, bool end_stream) {
 }
 
 void FakeStream::encodeData(Buffer::Instance& data, bool end_stream) {
-  std::shared_ptr<Buffer::Instance> data_copy = std::make_shared<Buffer::OwnedImpl>(data);
+  Buffer::InstanceSharedPtr data_copy = std::make_shared<Buffer::OwnedImpl>(data);
   parent_.connection().dispatcher().post(
       [this, data_copy, end_stream]() -> void { encoder_.encodeData(*data_copy, end_stream); });
 }
 
 void FakeStream::encodeTrailers(const Http::HeaderMap& trailers) {
-  std::shared_ptr<Http::ResponseTrailerMap> trailers_copy(
+  Http::ResponseTrailerMapSharedPtr trailers_copy(
       Http::createHeaderMap<Http::ResponseTrailerMapImpl>(trailers));
   parent_.connection().dispatcher().post(
       [this, trailers_copy]() -> void { encoder_.encodeTrailers(*trailers_copy); });

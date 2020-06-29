@@ -61,7 +61,7 @@ private:
   Upstream::ClusterInfoConstSharedPtr cluster_;
   Router::FilterConfig config_;
   Event::Dispatcher& dispatcher_;
-  std::list<std::unique_ptr<AsyncStreamImpl>> active_streams_;
+  std::list<AsyncStreamImplPtr> active_streams_;
 
   friend class AsyncStreamImpl;
   friend class AsyncRequestImpl;
@@ -283,7 +283,7 @@ private:
     bool includeAttemptCountInResponse() const override { return false; }
     const Router::RouteEntry::UpgradeMap& upgradeMap() const override { return upgrade_map_; }
     const std::string& routeName() const override { return route_name_; }
-    std::unique_ptr<const HashPolicyImpl> hash_policy_;
+    HashPolicyImplConstPtr hash_policy_;
     static const NullHedgePolicy hedge_policy_;
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullRetryPolicy retry_policy_;
@@ -409,7 +409,7 @@ private:
   StreamInfo::StreamInfoImpl stream_info_;
   Tracing::NullSpan active_span_;
   const Tracing::Config& tracing_config_;
-  std::shared_ptr<RouteImpl> route_;
+  RouteImplSharedPtr route_;
   uint32_t high_watermark_calls_{};
   bool local_closed_{};
   bool remote_closed_{};
@@ -454,7 +454,7 @@ private:
 
   RequestMessagePtr request_;
   AsyncClient::Callbacks& callbacks_;
-  std::unique_ptr<ResponseMessageImpl> response_;
+  ResponseMessageImplPtr response_;
   bool cancelled_{};
   Tracing::SpanPtr child_span_;
 

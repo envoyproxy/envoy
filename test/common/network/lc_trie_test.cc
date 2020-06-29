@@ -46,7 +46,7 @@ public:
     }
   }
 
-  std::unique_ptr<LcTrie<std::string>> trie_;
+  LcTriePtr<std::string> trie_;
 };
 
 // Use the default constructor values.

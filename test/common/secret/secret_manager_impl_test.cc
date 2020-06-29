@@ -65,7 +65,7 @@ tls_certificate:
     filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem"
 )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
-  std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl(config_tracker_));
+  SecretManagerPtr secret_manager(new SecretManagerImpl(config_tracker_));
   secret_manager->addStaticSecret(secret_config);
 
   ASSERT_EQ(secret_manager->findStaticTlsCertificateProvider("undefined"), nullptr);
@@ -98,7 +98,7 @@ TEST_F(SecretManagerImplTest, DuplicateStaticTlsCertificateSecret) {
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem"
     )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
-  std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl(config_tracker_));
+  SecretManagerPtr secret_manager(new SecretManagerImpl(config_tracker_));
   secret_manager->addStaticSecret(secret_config);
 
   ASSERT_NE(secret_manager->findStaticTlsCertificateProvider("abc.com"), nullptr);
@@ -117,7 +117,7 @@ TEST_F(SecretManagerImplTest, CertificateValidationContextSecretLoadSuccess) {
         allow_expired_certificate: true
       )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
-  std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl(config_tracker_));
+  SecretManagerPtr secret_manager(new SecretManagerImpl(config_tracker_));
   secret_manager->addStaticSecret(secret_config);
 
   ASSERT_EQ(secret_manager->findStaticCertificateValidationContextProvider("undefined"), nullptr);
@@ -142,7 +142,7 @@ TEST_F(SecretManagerImplTest, DuplicateStaticCertificateValidationContextSecret)
       allow_expired_certificate: true
     )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
-  std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl(config_tracker_));
+  SecretManagerPtr secret_manager(new SecretManagerImpl(config_tracker_));
   secret_manager->addStaticSecret(secret_config);
 
   ASSERT_NE(secret_manager->findStaticCertificateValidationContextProvider("abc.com"), nullptr);
@@ -164,7 +164,7 @@ session_ticket_keys:
 
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
 
-  std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl(config_tracker_));
+  SecretManagerPtr secret_manager(new SecretManagerImpl(config_tracker_));
 
   secret_manager->addStaticSecret(secret_config);
 
@@ -193,7 +193,7 @@ session_ticket_keys:
 
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
 
-  std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl(config_tracker_));
+  SecretManagerPtr secret_manager(new SecretManagerImpl(config_tracker_));
 
   secret_manager->addStaticSecret(secret_config);
 
@@ -204,7 +204,7 @@ session_ticket_keys:
 
 // Validate that secret manager adds static generic secret successfully.
 TEST_F(SecretManagerImplTest, GenericSecretLoadSuccess) {
-  std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl(config_tracker_));
+  SecretManagerPtr secret_manager(new SecretManagerImpl(config_tracker_));
 
   envoy::extensions::transport_sockets::tls::v3::Secret secret;
   const std::string yaml =
@@ -229,7 +229,7 @@ generic_secret:
 
 // Validate that secret manager throws an exception when adding duplicated static generic secret.
 TEST_F(SecretManagerImplTest, DuplicateGenericSecret) {
-  std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl(config_tracker_));
+  SecretManagerPtr secret_manager(new SecretManagerImpl(config_tracker_));
 
   envoy::extensions::transport_sockets::tls::v3::Secret secret;
   const std::string yaml =
@@ -251,7 +251,7 @@ generic_secret:
 // Regression test of https://github.com/envoyproxy/envoy/issues/5744
 TEST_F(SecretManagerImplTest, DeduplicateDynamicTlsCertificateSecretProvider) {
   Server::MockInstance server;
-  std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl(config_tracker_));
+  SecretManagerPtr secret_manager(new SecretManagerImpl(config_tracker_));
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
 
@@ -334,7 +334,7 @@ secret_data:
 
 TEST_F(SecretManagerImplTest, SdsDynamicSecretUpdateSuccess) {
   Server::MockInstance server;
-  std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl(config_tracker_));
+  SecretManagerPtr secret_manager(new SecretManagerImpl(config_tracker_));
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
 
@@ -386,7 +386,7 @@ tls_certificate:
 
 TEST_F(SecretManagerImplTest, SdsDynamicGenericSecret) {
   Server::MockInstance server;
-  std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl(config_tracker_));
+  SecretManagerPtr secret_manager(new SecretManagerImpl(config_tracker_));
   envoy::config::core::v3::ConfigSource config_source;
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;

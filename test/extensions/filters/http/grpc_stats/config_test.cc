@@ -64,7 +64,7 @@ protected:
 
   envoy::extensions::filters::http::grpc_stats::v3::FilterConfig config_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
-  std::shared_ptr<Http::StreamFilter> filter_;
+  Http::StreamFilterSharedPtr filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;

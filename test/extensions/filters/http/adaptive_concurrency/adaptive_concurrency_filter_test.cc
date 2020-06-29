@@ -63,7 +63,7 @@ public:
   std::shared_ptr<MockConcurrencyController> controller_{new MockConcurrencyController()};
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
-  std::unique_ptr<AdaptiveConcurrencyFilter> filter_;
+  AdaptiveConcurrencyFilterPtr filter_;
 };
 
 TEST_F(AdaptiveConcurrencyFilterTest, TestEnableOverriddenFromRuntime) {

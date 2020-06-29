@@ -56,7 +56,7 @@ public:
     finishSetup();
   }
 
-  void setup(std::unique_ptr<Config>&& config) {
+  void setup(ConfigPtr&& config) {
     config_ = std::move(config);
     finishSetup();
   }
@@ -138,7 +138,7 @@ public:
   Common::Redis::DecoderCallbacks* callbacks_{};
   NiceMock<Network::MockClientConnection>* upstream_connection_{};
   Network::ReadFilterSharedPtr upstream_read_filter_;
-  std::unique_ptr<Config> config_;
+  ConfigPtr config_;
   ClientPtr client_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_;
   Stats::ScopePtr stats_scope_;

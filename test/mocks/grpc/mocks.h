@@ -42,9 +42,7 @@ public:
 template <class ResponseType>
 class MockAsyncRequestCallbacks : public AsyncRequestCallbacks<ResponseType> {
 public:
-  void onSuccess(std::unique_ptr<ResponseType>&& response, Tracing::Span& span) {
-    onSuccess_(*response, span);
-  }
+  void onSuccess(ResponseTypePtr&& response, Tracing::Span& span) { onSuccess_(*response, span); }
 
   MOCK_METHOD(void, onCreateInitialMetadata, (Http::RequestHeaderMap & metadata));
   MOCK_METHOD(void, onSuccess_, (const ResponseType& response, Tracing::Span& span));
@@ -59,7 +57,7 @@ public:
     onReceiveInitialMetadata_(*metadata);
   }
 
-  void onReceiveMessage(std::unique_ptr<ResponseType>&& message) { onReceiveMessage_(*message); }
+  void onReceiveMessage(ResponseTypePtr&& message) { onReceiveMessage_(*message); }
 
   void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&& metadata) {
     onReceiveTrailingMetadata_(*metadata);

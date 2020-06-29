@@ -252,7 +252,7 @@ protected:
   NiceMock<Envoy::Upstream::MockClusterManager> cm_;
   Envoy::Http::MockAsyncClientRequest request_;
   SquashFilterConfigSharedPtr config_;
-  std::shared_ptr<SquashFilter> filter_;
+  SquashFilterSharedPtr filter_;
   std::deque<Envoy::Http::AsyncClient::Callbacks*> callbacks_;
 };
 

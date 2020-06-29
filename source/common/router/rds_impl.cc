@@ -122,8 +122,8 @@ void RdsRouteConfigSubscription::onConfigUpdate(
     // especially when it comes with per_filter_config,
     provider->validateConfig(route_config);
   }
-  std::unique_ptr<Init::ManagerImpl> noop_init_manager;
-  std::unique_ptr<Cleanup> resume_rds;
+  Init::ManagerImplPtr noop_init_manager;
+  CleanupPtr resume_rds;
   if (config_update_info_->onRdsUpdate(route_config, version_info)) {
     stats_.config_reload_.inc();
     if (config_update_info_->routeConfiguration().has_vhds() &&
@@ -159,9 +159,9 @@ void RdsRouteConfigSubscription::onConfigUpdate(
 // Initialize a no-op InitManager in case the one in the factory_context has completed
 // initialization. This can happen if an RDS config update for an already established RDS
 // subscription contains VHDS configuration.
-void RdsRouteConfigSubscription::maybeCreateInitManager(
-    const std::string& version_info, std::unique_ptr<Init::ManagerImpl>& init_manager,
-    std::unique_ptr<Cleanup>& init_vhds) {
+void RdsRouteConfigSubscription::maybeCreateInitManager(const std::string& version_info,
+                                                        Init::ManagerImplPtr& init_manager,
+                                                        CleanupPtr& init_vhds) {
   if (local_init_manager_.state() == Init::Manager::State::Initialized) {
     init_manager = std::make_unique<Init::ManagerImpl>(
         fmt::format("VHDS {}:{}", route_config_name_, version_info));
@@ -339,7 +339,7 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::createRdsRo
     RdsRouteConfigSubscriptionSharedPtr subscription(new RdsRouteConfigSubscription(
         rds, manager_identifier, factory_context, stat_prefix, *this));
     init_manager.add(subscription->parent_init_target_);
-    std::shared_ptr<RdsRouteConfigProviderImpl> new_provider{
+    RdsRouteConfigProviderImplSharedPtr new_provider{
         new RdsRouteConfigProviderImpl(std::move(subscription), factory_context)};
     dynamic_route_config_providers_.insert(
         {manager_identifier, std::weak_ptr<RdsRouteConfigProviderImpl>(new_provider)});

@@ -1462,7 +1462,7 @@ protected:
   Runtime::MockRandomGenerator generator_;
   Api::ApiPtr api_;
   Runtime::MockRandomGenerator rand_;
-  std::unique_ptr<Runtime::ScopedLoaderSingleton> loader_;
+  Runtime::ScopedLoaderSingletonPtr loader_;
   Stats::Counter& runtime_deprecated_feature_use_;
   Stats::Gauge& deprecated_feature_seen_since_process_start_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;

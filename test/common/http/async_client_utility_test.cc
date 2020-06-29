@@ -14,8 +14,7 @@ namespace {
 
 class AsyncClientRequestTrackerTest : public testing::Test {
 public:
-  std::unique_ptr<AsyncClientRequestTracker> active_requests_{
-      std::make_unique<AsyncClientRequestTracker>()};
+  AsyncClientRequestTrackerPtr active_requests_{std::make_unique<AsyncClientRequestTracker>()};
 
   NiceMock<MockAsyncClient> async_client_;
   StrictMock<MockAsyncClientRequest> request1_{&async_client_};

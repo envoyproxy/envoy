@@ -74,14 +74,14 @@ private:
   class DynamicSecretProviders : public Logger::Loggable<Logger::Id::secret> {
   public:
     // Finds or creates SdsApi object.
-    std::shared_ptr<SecretType>
+    SecretTypeSharedPtr
     findOrCreate(const envoy::config::core::v3::ConfigSource& sds_config_source,
                  const std::string& config_name,
                  Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
       const std::string map_key =
           absl::StrCat(MessageUtil::hash(sds_config_source), ".", config_name);
 
-      std::shared_ptr<SecretType> secret_provider = dynamic_secret_providers_[map_key].lock();
+      SecretTypeSharedPtr secret_provider = dynamic_secret_providers_[map_key].lock();
       if (!secret_provider) {
         // SdsApi is owned by ListenerImpl and ClusterInfo which are destroyed before
         // SecretManagerImpl. It is safe to invoke this callback at the destructor of SdsApi.
@@ -95,10 +95,10 @@ private:
       return secret_provider;
     }
 
-    std::vector<std::shared_ptr<SecretType>> allSecretProviders() {
-      std::vector<std::shared_ptr<SecretType>> providers;
+    std::vector<SecretTypeSharedPtr> allSecretProviders() {
+      std::vector<SecretTypeSharedPtr> providers;
       for (const auto& secret_entry : dynamic_secret_providers_) {
-        std::shared_ptr<SecretType> secret_provider = secret_entry.second.lock();
+        SecretTypeSharedPtr secret_provider = secret_entry.second.lock();
         if (secret_provider) {
           providers.push_back(std::move(secret_provider));
         }

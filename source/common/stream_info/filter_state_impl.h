@@ -40,8 +40,7 @@ public:
   }
 
   // FilterState
-  void setData(absl::string_view data_name, std::shared_ptr<Object> data,
-               FilterState::StateType state_type,
+  void setData(absl::string_view data_name, ObjectSharedPtr data, FilterState::StateType state_type,
                FilterState::LifeSpan life_span = FilterState::LifeSpan::FilterChain) override;
   bool hasDataWithName(absl::string_view) const override;
   const Object* getDataReadOnlyGeneric(absl::string_view data_name) const override;
@@ -58,14 +57,14 @@ private:
   void maybeCreateParent(ParentAccessMode parent_access_mode);
 
   struct FilterObject {
-    std::shared_ptr<Object> data_;
+    ObjectSharedPtr data_;
     FilterState::StateType state_type_;
   };
 
   absl::variant<FilterStateSharedPtr, LazyCreateAncestor> ancestor_;
   FilterStateSharedPtr parent_;
   const FilterState::LifeSpan life_span_;
-  absl::flat_hash_map<std::string, std::unique_ptr<FilterObject>> data_storage_;
+  absl::flat_hash_map<std::string, FilterObjectPtr> data_storage_;
 };
 
 } // namespace StreamInfo

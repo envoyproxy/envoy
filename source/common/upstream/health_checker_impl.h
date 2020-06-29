@@ -260,7 +260,7 @@ private:
 
     TcpHealthCheckerImpl& parent_;
     Network::ClientConnectionPtr client_;
-    std::shared_ptr<TcpSessionCallbacks> session_callbacks_;
+    TcpSessionCallbacksSharedPtr session_callbacks_;
     // If true, stream close was initiated by us, not e.g. remote close or TCP reset.
     // In this case healthcheck status already reported, only state cleanup required.
     bool expect_close_{};

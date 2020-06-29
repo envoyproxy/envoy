@@ -124,7 +124,7 @@ public:
 
 private:
   const Matchers::StringMatcherImpl method_name_;
-  std::shared_ptr<ParameterRouteEntryImpl> parameter_route_;
+  ParameterRouteEntryImplSharedPtr parameter_route_;
 };
 
 class SingleRouteMatcherImpl : public RouteMatcher, public Logger::Loggable<Logger::Id::dubbo> {

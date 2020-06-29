@@ -80,7 +80,7 @@ private:
 // A factory to create QuicHttpClientConnection.
 class QuicHttpClientConnectionFactoryImpl : public Http::QuicHttpClientConnectionFactory {
 public:
-  std::unique_ptr<Http::ClientConnection>
+  Http::ClientConnectionPtr
   createQuicClientConnection(Network::Connection& connection,
                              Http::ConnectionCallbacks& callbacks) override;
 
@@ -90,7 +90,7 @@ public:
 // A factory to create QuicHttpServerConnection.
 class QuicHttpServerConnectionFactoryImpl : public Http::QuicHttpServerConnectionFactory {
 public:
-  std::unique_ptr<Http::ServerConnection>
+  Http::ServerConnectionPtr
   createQuicServerConnection(Network::Connection& connection,
                              Http::ConnectionCallbacks& callbacks) override;
 

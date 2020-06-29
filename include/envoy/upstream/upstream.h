@@ -251,14 +251,14 @@ public:
    * @return vector of HostsPerLocalityConstSharedPtr clones of the HostsPerLocality that match
    *         hosts according to predicates.
    */
-  virtual std::vector<std::shared_ptr<const HostsPerLocality>>
+  virtual std::vector<HostsPerLocalityConstSharedPtr>
   filter(const std::vector<std::function<bool(const Host&)>>& predicates) const PURE;
 
   /**
    * Clone object.
    * @return HostsPerLocalityConstSharedPtr clone of the HostsPerLocality.
    */
-  std::shared_ptr<const HostsPerLocality> clone() const {
+  HostsPerLocalityConstSharedPtr clone() const {
     return filter({[](const Host&) { return true; }})[0];
   }
 };
@@ -738,12 +738,11 @@ public:
   /**
    * @param name std::string containing the well-known name of the extension for which protocol
    *        options are desired
-   * @return std::shared_ptr<const Derived> where Derived is a subclass of ProtocolOptionsConfig
+   * @return DerivedConstSharedPtr where Derived is a subclass of ProtocolOptionsConfig
    *         and contains extension-specific protocol options for upstream connections.
    */
   template <class Derived>
-  const std::shared_ptr<const Derived>
-  extensionProtocolOptionsTyped(const std::string& name) const {
+  const DerivedConstSharedPtr extensionProtocolOptionsTyped(const std::string& name) const {
     return std::dynamic_pointer_cast<const Derived>(extensionProtocolOptions(name));
   }
 

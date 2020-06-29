@@ -271,10 +271,10 @@ private:
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   Event::TimerPtr delay_timer_;
   std::string downstream_cluster_{};
-  std::unique_ptr<Stats::StatNameDynamicStorage> downstream_cluster_storage_;
+  Stats::StatNameDynamicStoragePtr downstream_cluster_storage_;
   const FaultSettings* fault_settings_;
   bool fault_active_{};
-  std::unique_ptr<StreamRateLimiter> response_limiter_;
+  StreamRateLimiterPtr response_limiter_;
   std::string downstream_cluster_delay_percent_key_{};
   std::string downstream_cluster_abort_percent_key_{};
   std::string downstream_cluster_delay_duration_key_{};

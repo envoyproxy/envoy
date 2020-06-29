@@ -54,7 +54,7 @@ public:
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
-  std::unique_ptr<MaglevLoadBalancer> lb_;
+  MaglevLoadBalancerPtr lb_;
 };
 
 // Works correctly without any hosts.

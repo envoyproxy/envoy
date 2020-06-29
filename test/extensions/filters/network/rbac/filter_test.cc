@@ -87,7 +87,7 @@ public:
   Buffer::OwnedImpl data_;
   RoleBasedAccessControlFilterConfigSharedPtr config_;
 
-  std::unique_ptr<RoleBasedAccessControlFilter> filter_;
+  RoleBasedAccessControlFilterPtr filter_;
   Network::Address::InstanceConstSharedPtr address_;
   std::string requested_server_name_;
 };

@@ -55,7 +55,7 @@ private:
   RouteCoverage& coveredRoute(const Envoy::Router::Route& route);
   void printMissingTests(const std::set<std::string>& all_route_names,
                          const std::set<std::string>& covered_route_names);
-  std::vector<std::unique_ptr<RouteCoverage>> covered_routes_;
+  std::vector<RouteCoveragePtr> covered_routes_;
   const envoy::config::route::v3::RouteConfiguration route_config_;
 };
 } // namespace Envoy

@@ -115,7 +115,7 @@ protected:
   NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::TestUtil::TestStore store_;
   MockRandomGenerator generator_;
-  std::unique_ptr<LoaderImpl> loader_;
+  LoaderImplPtr loader_;
   Api::ApiPtr api_;
   Upstream::MockClusterManager cm_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;

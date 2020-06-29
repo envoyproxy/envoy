@@ -29,7 +29,7 @@ class EnvoyQuicClientSession : public QuicFilterManagerConnectionImpl,
 public:
   EnvoyQuicClientSession(const quic::QuicConfig& config,
                          const quic::ParsedQuicVersionVector& supported_versions,
-                         std::unique_ptr<EnvoyQuicClientConnection> connection,
+                         EnvoyQuicClientConnectionPtr connection,
                          const quic::QuicServerId& server_id,
                          quic::QuicCryptoClientConfig* crypto_config,
                          quic::QuicClientPushPromiseIndex* push_promise_index,

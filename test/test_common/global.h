@@ -63,7 +63,7 @@ private:
     void* ptrHelper() override { return ptr_.get(); }
 
   private:
-    std::unique_ptr<Type> ptr_{std::make_unique<Type>()};
+    TypePtr ptr_{std::make_unique<Type>()};
   };
 
   Globals() = default; // Construct via Globals::instance().

@@ -244,7 +244,7 @@ public:
   NiceMock<Server::MockInstance> server_;
   Upstream::ClusterManager::ClusterInfoMap cluster_map_;
 
-  std::unique_ptr<HystrixSink> sink_;
+  HystrixSinkPtr sink_;
   NiceMock<Stats::MockMetricSnapshot> snapshot_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
 };

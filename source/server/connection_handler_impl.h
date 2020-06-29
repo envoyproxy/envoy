@@ -199,7 +199,7 @@ private:
                                public Network::ConnectionCallbacks {
     ActiveTcpConnection(ActiveConnections& active_connections,
                         Network::ConnectionPtr&& new_connection, TimeSource& time_system,
-                        std::unique_ptr<StreamInfo::StreamInfo>&& stream_info);
+                        StreamInfo::StreamInfoPtr&& stream_info);
     ~ActiveTcpConnection() override;
 
     // Network::ConnectionCallbacks
@@ -213,7 +213,7 @@ private:
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 
-    std::unique_ptr<StreamInfo::StreamInfo> stream_info_;
+    StreamInfo::StreamInfoPtr stream_info_;
     ActiveConnections& active_connections_;
     Network::ConnectionPtr connection_;
     Stats::TimespanPtr conn_length_;

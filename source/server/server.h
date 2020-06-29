@@ -210,7 +210,7 @@ public:
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
                Runtime::RandomGeneratorPtr&& random_generator, ThreadLocal::Instance& tls,
                Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system,
-               std::unique_ptr<ProcessContext> process_context);
+               ProcessContextPtr process_context);
 
   ~InstanceImpl() override;
 
@@ -302,7 +302,7 @@ private:
   // - There may be active filter chains referencing it in listener_manager_.
   // - There may be active clusters referencing it in config_.cluster_manager_.
   // - There may be active connections referencing it.
-  std::unique_ptr<Secret::SecretManager> secret_manager_;
+  Secret::SecretManagerPtr secret_manager_;
   bool workers_started_;
   std::atomic<bool> live_;
   bool shutdown_;
@@ -316,20 +316,20 @@ private:
   const time_t start_time_;
   time_t original_start_time_;
   Stats::StoreRoot& stats_store_;
-  std::unique_ptr<ServerStats> server_stats_;
+  ServerStatsPtr server_stats_;
   Assert::ActionRegistrationPtr assert_action_registration_;
   ThreadLocal::Instance& thread_local_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
-  std::unique_ptr<AdminImpl> admin_;
+  AdminImplPtr admin_;
   Singleton::ManagerPtr singleton_manager_;
   Network::ConnectionHandlerPtr handler_;
   Runtime::RandomGeneratorPtr random_generator_;
-  std::unique_ptr<Runtime::ScopedLoaderSingleton> runtime_singleton_;
-  std::unique_ptr<Ssl::ContextManager> ssl_context_manager_;
+  Runtime::ScopedLoaderSingletonPtr runtime_singleton_;
+  Ssl::ContextManagerPtr ssl_context_manager_;
   ProdListenerComponentFactory listener_component_factory_;
   ProdWorkerFactory worker_factory_;
-  std::unique_ptr<ListenerManager> listener_manager_;
+  ListenerManagerPtr listener_manager_;
   absl::node_hash_map<Stage, LifecycleNotifierCallbacks> stage_callbacks_;
   absl::node_hash_map<Stage, LifecycleNotifierCompletionCallbacks> stage_completable_callbacks_;
   Configuration::MainImpl config_;
@@ -337,23 +337,23 @@ private:
   Event::TimerPtr stat_flush_timer_;
   DrainManagerPtr drain_manager_;
   AccessLog::AccessLogManagerImpl access_log_manager_;
-  std::unique_ptr<Upstream::ClusterManagerFactory> cluster_manager_factory_;
-  std::unique_ptr<Server::GuardDog> guard_dog_;
+  Upstream::ClusterManagerFactoryPtr cluster_manager_factory_;
+  Server::GuardDogPtr guard_dog_;
   bool terminated_;
-  std::unique_ptr<Logger::FileSinkDelegate> file_logger_;
+  Logger::FileSinkDelegatePtr file_logger_;
   envoy::config::bootstrap::v3::Bootstrap bootstrap_;
   ConfigTracker::EntryOwnerPtr config_tracker_entry_;
   SystemTime bootstrap_config_update_time_;
   Grpc::AsyncClientManagerPtr async_client_manager_;
   Upstream::ProdClusterInfoFactory info_factory_;
   Upstream::HdsDelegatePtr hds_delegate_;
-  std::unique_ptr<OverloadManagerImpl> overload_manager_;
+  OverloadManagerImplPtr overload_manager_;
   std::vector<BootstrapExtensionPtr> bootstrap_extensions_;
   Envoy::MutexTracer* mutex_tracer_;
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
-  std::unique_ptr<ProcessContext> process_context_;
-  std::unique_ptr<Memory::HeapShrinker> heap_shrinker_;
+  ProcessContextPtr process_context_;
+  Memory::HeapShrinkerPtr heap_shrinker_;
   const std::thread::id main_thread_id_;
   // initialization_time is a histogram for tracking the initialization time across hot restarts
   // whenever we have support for histogram merge across hot restarts.

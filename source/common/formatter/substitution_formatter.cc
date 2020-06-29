@@ -460,17 +460,17 @@ public:
   using FieldExtractor =
       std::function<Network::Address::InstanceConstSharedPtr(const StreamInfo::StreamInfo&)>;
 
-  static std::unique_ptr<StreamInfoAddressFieldExtractor> withPort(FieldExtractor f) {
+  static StreamInfoAddressFieldExtractorPtr withPort(FieldExtractor f) {
     return std::make_unique<StreamInfoAddressFieldExtractor>(
         f, StreamInfoFormatter::StreamInfoAddressFieldExtractionType::WithPort);
   }
 
-  static std::unique_ptr<StreamInfoAddressFieldExtractor> withoutPort(FieldExtractor f) {
+  static StreamInfoAddressFieldExtractorPtr withoutPort(FieldExtractor f) {
     return std::make_unique<StreamInfoAddressFieldExtractor>(
         f, StreamInfoFormatter::StreamInfoAddressFieldExtractionType::WithoutPort);
   }
 
-  static std::unique_ptr<StreamInfoAddressFieldExtractor> justPort(FieldExtractor f) {
+  static StreamInfoAddressFieldExtractorPtr justPort(FieldExtractor f) {
     return std::make_unique<StreamInfoAddressFieldExtractor>(
         f, StreamInfoFormatter::StreamInfoAddressFieldExtractionType::JustPort);
   }

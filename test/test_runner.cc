@@ -124,7 +124,7 @@ int TestRunner::RunTests(int argc, char** argv) {
 
   // Allocate fake log access manager.
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager;
-  std::unique_ptr<Logger::FileSinkDelegate> file_logger;
+  Logger::FileSinkDelegatePtr file_logger;
 
   // Redirect all logs to fake file when --log-path arg is specified in command line.
   if (!TestEnvironment::getOptions().logPath().empty()) {

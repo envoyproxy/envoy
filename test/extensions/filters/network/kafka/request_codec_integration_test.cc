@@ -51,7 +51,7 @@ TEST_F(RequestCodecIntegrationTest, ShouldProduceAbortedMessageOnUnknownData) {
   ASSERT_EQ(parse_failures.size(), sent_headers.size());
 
   for (size_t i = 0; i < parse_failures.size(); ++i) {
-    const std::shared_ptr<RequestParseFailure> failure_data =
+    const RequestParseFailureSharedPtr failure_data =
         std::dynamic_pointer_cast<RequestParseFailure>(parse_failures[i]);
     ASSERT_NE(failure_data, nullptr);
     ASSERT_EQ(failure_data->request_header_, sent_headers[i]);

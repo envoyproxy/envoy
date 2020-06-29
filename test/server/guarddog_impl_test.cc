@@ -73,7 +73,7 @@ protected:
   std::unique_ptr<Event::TestTimeSystem> time_system_;
   Stats::TestUtil::TestStore stats_store_;
   Api::ApiPtr api_;
-  std::unique_ptr<GuardDogImpl> guard_dog_;
+  GuardDogImplPtr guard_dog_;
 };
 
 INSTANTIATE_TEST_SUITE_P(TimeSystemType, GuardDogTestBase,

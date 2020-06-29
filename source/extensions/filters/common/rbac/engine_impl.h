@@ -24,7 +24,7 @@ public:
 private:
   const bool allowed_if_matched_;
 
-  std::map<std::string, std::unique_ptr<PolicyMatcher>> policies_;
+  std::map<std::string, PolicyMatcherPtr> policies_;
 
   Protobuf::Arena constant_arena_;
   Expr::BuilderPtr builder_;

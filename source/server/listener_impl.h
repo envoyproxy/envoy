@@ -156,7 +156,7 @@ public:
             server, validation_visitor, config_message, std::move(drain_manager))),
         listener_config_(listener_config), listener_impl_(listener_impl) {}
   PerListenerFactoryContextImpl(
-      std::shared_ptr<ListenerFactoryContextBaseImpl> listener_factory_context_base,
+      ListenerFactoryContextBaseImplSharedPtr listener_factory_context_base,
       const Network::ListenerConfig* listener_config, ListenerImpl& listener_impl)
       : listener_factory_context_base_(listener_factory_context_base),
         listener_config_(listener_config), listener_impl_(listener_impl) {}
@@ -198,7 +198,7 @@ public:
   friend class ListenerImpl;
 
 private:
-  std::shared_ptr<ListenerFactoryContextBaseImpl> listener_factory_context_base_;
+  ListenerFactoryContextBaseImplSharedPtr listener_factory_context_base_;
   const Network::ListenerConfig* listener_config_;
   ListenerImpl& listener_impl_;
 };
@@ -233,9 +233,8 @@ public:
    * Execute in place filter chain update. The filter chain update is less expensive than full
    * listener update because connections may not need to be drained.
    */
-  std::unique_ptr<ListenerImpl>
-  newListenerWithFilterChain(const envoy::config::listener::v3::Listener& config,
-                             bool workers_started, uint64_t hash);
+  ListenerImplPtr newListenerWithFilterChain(const envoy::config::listener::v3::Listener& config,
+                                             bool workers_started, uint64_t hash);
   /**
    * Determine if in place filter chain update could be executed at this moment.
    */
@@ -370,7 +369,7 @@ private:
   Init::TargetImpl listener_init_target_;
   // This init manager is populated with targets from the filter chain factories, namely
   // RdsRouteConfigSubscription::init_target_, so the listener can wait for route configs.
-  std::unique_ptr<Init::Manager> dynamic_init_manager_;
+  Init::ManagerPtr dynamic_init_manager_;
 
   std::vector<Network::ListenerFilterFactoryCb> listener_filter_factories_;
   std::vector<Network::UdpListenerFilterFactoryCb> udp_listener_filter_factories_;
@@ -384,7 +383,7 @@ private:
   const bool continue_on_listener_filters_timeout_;
   Network::ActiveUdpListenerFactoryPtr udp_listener_factory_;
   Network::ConnectionBalancerPtr connection_balancer_;
-  std::shared_ptr<PerListenerFactoryContextImpl> listener_factory_context_;
+  PerListenerFactoryContextImplSharedPtr listener_factory_context_;
   FilterChainManagerImpl filter_chain_manager_;
 
   // This init watcher, if workers_started_ is false, notifies the "parent" listener manager when

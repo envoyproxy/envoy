@@ -165,8 +165,8 @@ TEST_F(HttpTracerManagerImplCacheTest, ShouldCacheHttpTracersUsingWeakReferences
 
   // Expect HttpTracerManager to create a new HttpTracer.
   EXPECT_CALL(tracer_factory_, createHttpTracer(_, _))
-      .WillOnce(InvokeWithoutArgs(
-          [expected_tracer] { return std::shared_ptr<HttpTracer>(expected_tracer); }));
+      .WillOnce(
+          InvokeWithoutArgs([expected_tracer] { return HttpTracerSharedPtr(expected_tracer); }));
 
   auto actual_tracer_one = http_tracer_manager_.getOrCreateHttpTracer(&tracing_config_one_);
 
@@ -197,9 +197,8 @@ TEST_F(HttpTracerManagerImplCacheTest, ShouldCacheHttpTracersUsingWeakReferences
 
   // Expect HttpTracerManager to create a new HttpTracer once again.
   EXPECT_CALL(tracer_factory_, createHttpTracer(_, _))
-      .WillOnce(InvokeWithoutArgs([expected_another_tracer] {
-        return std::shared_ptr<HttpTracer>(expected_another_tracer);
-      }));
+      .WillOnce(InvokeWithoutArgs(
+          [expected_another_tracer] { return HttpTracerSharedPtr(expected_another_tracer); }));
 
   // Use a different config to guarantee that a new cache entry will be added anyway.
   auto actual_tracer_three = http_tracer_manager_.getOrCreateHttpTracer(&tracing_config_two_);

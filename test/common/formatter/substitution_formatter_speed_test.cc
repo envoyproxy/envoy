@@ -10,7 +10,7 @@ namespace Envoy {
 
 namespace {
 
-std::unique_ptr<Envoy::Formatter::JsonFormatterImpl> makeJsonFormatter(bool typed) {
+Envoy::Formatter::JsonFormatterImplPtr makeJsonFormatter(bool typed) {
   absl::flat_hash_map<std::string, std::string> JsonLogFormat = {
       {"remote_address", "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"},
       {"start_time", "%START_TIME(%Y/%m/%dT%H:%M:%S%z %s)%"},
@@ -44,7 +44,7 @@ static void BM_AccessLogFormatter(benchmark::State& state) {
       "%REQ(X-FORWARDED-PROTO)%://%REQ(:AUTHORITY)%%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL% "
       "s%RESPONSE_CODE% %BYTES_SENT% %DURATION% %REQ(REFERER)% \"%REQ(USER-AGENT)%\" - - -\n";
 
-  std::unique_ptr<Envoy::Formatter::FormatterImpl> formatter =
+  Envoy::Formatter::FormatterImplPtr formatter =
       std::make_unique<Envoy::Formatter::FormatterImpl>(LogFormat);
 
   size_t output_bytes = 0;
@@ -64,7 +64,7 @@ BENCHMARK(BM_AccessLogFormatter);
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_JsonAccessLogFormatter(benchmark::State& state) {
   std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo();
-  std::unique_ptr<Envoy::Formatter::JsonFormatterImpl> json_formatter = makeJsonFormatter(false);
+  Envoy::Formatter::JsonFormatterImplPtr json_formatter = makeJsonFormatter(false);
 
   size_t output_bytes = 0;
   Http::TestRequestHeaderMapImpl request_headers;
@@ -84,8 +84,7 @@ BENCHMARK(BM_JsonAccessLogFormatter);
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_TypedJsonAccessLogFormatter(benchmark::State& state) {
   std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo();
-  std::unique_ptr<Envoy::Formatter::JsonFormatterImpl> typed_json_formatter =
-      makeJsonFormatter(true);
+  Envoy::Formatter::JsonFormatterImplPtr typed_json_formatter = makeJsonFormatter(true);
 
   size_t output_bytes = 0;
   Http::TestRequestHeaderMapImpl request_headers;

@@ -95,7 +95,7 @@ public:
 
   NiceMock<ThreadLocal::MockInstance> tls_;
   Upstream::MockClusterManager cluster_manager_;
-  std::shared_ptr<FilterConfig> config_;
+  FilterConfigSharedPtr config_;
   std::unique_ptr<TestFilter> filter_;
   Http::MockStreamDecoderFilterCallbacks decoder_callbacks_;
   Http::MockStreamEncoderFilterCallbacks encoder_callbacks_;

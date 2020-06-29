@@ -90,8 +90,8 @@ public:
 private:
   RouterCheckTool(
       std::unique_ptr<NiceMock<Server::Configuration::MockServerFactoryContext>> factory_context,
-      std::unique_ptr<Router::ConfigImpl> config, std::unique_ptr<Stats::IsolatedStoreImpl> stats,
-      Api::ApiPtr api, Coverage coverage);
+      Router::ConfigImplPtr config, Stats::IsolatedStoreImplPtr stats, Api::ApiPtr api,
+      Coverage coverage);
 
   /**
    * Set UUID as the name for each route for detecting missing tests during the coverage check.
@@ -163,8 +163,8 @@ private:
 
   // TODO(hennna): Switch away from mocks following work done by @rlazarus in github issue #499.
   std::unique_ptr<NiceMock<Server::Configuration::MockServerFactoryContext>> factory_context_;
-  std::unique_ptr<Router::ConfigImpl> config_;
-  std::unique_ptr<Stats::IsolatedStoreImpl> stats_;
+  Router::ConfigImplPtr config_;
+  Stats::IsolatedStoreImplPtr stats_;
   Api::ApiPtr api_;
   std::string active_runtime_;
   Coverage coverage_;

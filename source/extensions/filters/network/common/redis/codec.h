@@ -32,7 +32,7 @@ class RespValue {
 public:
   RespValue() : type_(RespType::Null) {}
 
-  RespValue(std::shared_ptr<RespValue> base_array, const RespValue& command, const uint64_t start,
+  RespValue(RespValueSharedPtr base_array, const RespValue& command, const uint64_t start,
             const uint64_t end)
       : type_(RespType::CompositeArray) {
     new (&composite_array_) CompositeArray(std::move(base_array), command, start, end);
@@ -57,8 +57,8 @@ public:
   class CompositeArray {
   public:
     CompositeArray() = default;
-    CompositeArray(std::shared_ptr<RespValue> base_array, const RespValue& command,
-                   const uint64_t start, const uint64_t end)
+    CompositeArray(RespValueSharedPtr base_array, const RespValue& command, const uint64_t start,
+                   const uint64_t end)
         : base_array_(std::move(base_array)), command_(&command), start_(start), end_(end) {
       ASSERT(command.type() == RespType::BulkString || command.type() == RespType::SimpleString);
       ASSERT(base_array_ != nullptr);
@@ -68,7 +68,7 @@ public:
     }
 
     const RespValue* command() const { return command_; }
-    const std::shared_ptr<RespValue>& baseArray() const { return base_array_; }
+    const RespValueSharedPtr& baseArray() const { return base_array_; }
 
     bool operator==(const CompositeArray& other) const;
 
@@ -107,7 +107,7 @@ public:
     }
 
   private:
-    std::shared_ptr<RespValue> base_array_;
+    RespValueSharedPtr base_array_;
     const RespValue* command_;
     uint64_t start_;
     uint64_t end_;

@@ -287,8 +287,8 @@ protected:
         [this]() -> void { this->pendingSendBufferHighWatermark(); },
         []() -> void { /* TODO(adisuissa): Handle overflow watermark */ }};
     HeaderMapPtr pending_trailers_to_encode_;
-    std::unique_ptr<MetadataDecoder> metadata_decoder_;
-    std::unique_ptr<MetadataEncoder> metadata_encoder_;
+    MetadataDecoderPtr metadata_decoder_;
+    MetadataEncoderPtr metadata_encoder_;
     absl::optional<StreamResetReason> deferred_reset_;
     HeaderString cookies_;
     bool local_end_stream_sent_ : 1;

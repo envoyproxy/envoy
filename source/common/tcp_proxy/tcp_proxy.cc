@@ -667,7 +667,7 @@ UpstreamDrainManager::~UpstreamDrainManager() {
 
 void UpstreamDrainManager::add(const Config::SharedConfigSharedPtr& config,
                                Tcp::ConnectionPool::ConnectionDataPtr&& upstream_conn_data,
-                               const std::shared_ptr<Filter::UpstreamCallbacks>& callbacks,
+                               const Filter::UpstreamCallbacksSharedPtr& callbacks,
                                Event::TimerPtr&& idle_timer,
                                const Upstream::HostDescriptionConstSharedPtr& upstream_host) {
   DrainerPtr drainer(new Drainer(*this, config, callbacks, std::move(upstream_conn_data),
@@ -687,7 +687,7 @@ void UpstreamDrainManager::remove(Drainer& drainer, Event::Dispatcher& dispatche
 }
 
 Drainer::Drainer(UpstreamDrainManager& parent, const Config::SharedConfigSharedPtr& config,
-                 const std::shared_ptr<Filter::UpstreamCallbacks>& callbacks,
+                 const Filter::UpstreamCallbacksSharedPtr& callbacks,
                  Tcp::ConnectionPool::ConnectionDataPtr&& conn_data, Event::TimerPtr&& idle_timer,
                  const Upstream::HostDescriptionConstSharedPtr& upstream_host)
     : parent_(parent), callbacks_(callbacks), upstream_conn_data_(std::move(conn_data)),

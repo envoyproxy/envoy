@@ -96,7 +96,7 @@ public:
   Buffer::OwnedImpl response_data_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   FilterConfigSharedPtr config_;
-  std::unique_ptr<Filter> filter_;
+  FilterPtr filter_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Router::MockRateLimitPolicyEntry> route_rate_limit_;
   NiceMock<Router::MockRateLimitPolicyEntry> vh_rate_limit_;

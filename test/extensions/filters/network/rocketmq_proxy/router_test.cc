@@ -84,7 +84,7 @@ public:
     RemotingCommandPtr request = std::make_unique<RemotingCommand>();
     request->code(static_cast<int>(RequestCode::AckMessage));
     request->flag(2);
-    std::unique_ptr<AckMessageRequestHeader> header = std::make_unique<AckMessageRequestHeader>();
+    AckMessageRequestHeaderPtr header = std::make_unique<AckMessageRequestHeader>();
     header->consumerGroup("test_cg");
     header->topic("test_topic");
     header->queueId(0);
@@ -142,9 +142,9 @@ public:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   ConfigImpl::RocketmqProxyConfig rocketmq_proxy_config_;
   ConfigImpl config_;
-  std::unique_ptr<ConnectionManager> conn_manager_;
+  ConnectionManagerPtr conn_manager_;
 
-  std::unique_ptr<Router> router_;
+  RouterPtr router_;
 
   std::unique_ptr<NiceMock<MockActiveMessage>> active_message_;
   NiceMock<Network::MockClientConnection> upstream_connection_;

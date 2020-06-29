@@ -83,7 +83,7 @@ public:
 
   Buffer::OwnedImpl buffer_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
-  std::unique_ptr<ConnectionManager> conn_manager_;
+  ConnectionManagerPtr conn_manager_;
 
   Encoder encoder_;
   Decoder decoder_;

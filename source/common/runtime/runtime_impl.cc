@@ -588,7 +588,7 @@ void RtdsSubscription::validateUpdateSize(uint32_t num_resources) {
 }
 
 void LoaderImpl::loadNewSnapshot() {
-  std::shared_ptr<SnapshotImpl> ptr = createNewSnapshot();
+  SnapshotImplSharedPtr ptr = createNewSnapshot();
   tls_->set([ptr](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::static_pointer_cast<ThreadLocal::ThreadLocalObject>(ptr);
   });

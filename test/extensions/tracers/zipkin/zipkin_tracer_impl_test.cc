@@ -140,7 +140,7 @@ public:
   StreamInfo::MockStreamInfo stream_info_;
 
   NiceMock<ThreadLocal::MockInstance> tls_;
-  std::unique_ptr<Driver> driver_;
+  DriverPtr driver_;
   NiceMock<Event::MockTimer>* timer_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_;
   NiceMock<Upstream::MockClusterManager> cm_;

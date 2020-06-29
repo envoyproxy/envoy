@@ -76,7 +76,7 @@ public:
 
   void callInitFetchTimeoutCb() { test_harness_->callInitFetchTimeoutCb(); }
 
-  std::unique_ptr<SubscriptionTestHarness> test_harness_;
+  SubscriptionTestHarnessPtr test_harness_;
 };
 
 class SubscriptionImplInitFetchTimeoutTest : public SubscriptionImplTest {

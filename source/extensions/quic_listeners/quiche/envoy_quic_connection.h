@@ -60,7 +60,7 @@ protected:
 
 private:
   // TODO(danzh): populate stats.
-  std::unique_ptr<Network::Connection::ConnectionStats> connection_stats_;
+  Network::Connection::ConnectionStatsPtr connection_stats_;
   // Assigned upon construction. Constructed with empty local address if unknown
   // by then.
   Network::ConnectionSocketPtr connection_socket_;

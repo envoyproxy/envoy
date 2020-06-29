@@ -186,7 +186,7 @@ public:
   const SymbolTable& constSymbolTable() const override { return counter_->constSymbolTable(); }
 
 private:
-  std::unique_ptr<Stats::Counter> counter_;
+  Stats::CounterPtr counter_;
   absl::Mutex& mutex_;
   absl::CondVar& condvar_;
 };
@@ -538,7 +538,7 @@ private:
   Network::Address::InstanceConstSharedPtr admin_address_;
   absl::Notification server_gone_;
   Stats::SymbolTablePtr symbol_table_;
-  std::unique_ptr<Stats::AllocatorImpl> stats_allocator_;
+  Stats::AllocatorImplPtr stats_allocator_;
 };
 
 } // namespace Envoy

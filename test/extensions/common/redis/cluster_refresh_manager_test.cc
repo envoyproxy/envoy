@@ -106,7 +106,7 @@ public:
   Upstream::ClusterManager::ClusterInfoMap map_;
   Upstream::MockClusterMockPrioritySet mock_cluster_;
   Event::SimulatedTimeSystem time_system_;
-  std::shared_ptr<ClusterRefreshManagerImpl> refresh_manager_;
+  ClusterRefreshManagerImplSharedPtr refresh_manager_;
   ClusterRefreshManager::HandlePtr handle_;
   std::atomic<uint32_t> callback_count_{};
   std::atomic<uint32_t> nthreads_waiting_{};

@@ -18,7 +18,7 @@ Http::FilterFactoryCb AdaptiveConcurrencyFilterFactory::createFilterFactoryFromP
 
   auto acc_stats_prefix = stats_prefix + "adaptive_concurrency.";
 
-  std::shared_ptr<Controller::ConcurrencyController> controller;
+  Controller::ConcurrencyControllerSharedPtr controller;
   using Proto = envoy::extensions::filters::http::adaptive_concurrency::v3::AdaptiveConcurrency;
   ASSERT(config.concurrency_controller_config_case() ==
          Proto::ConcurrencyControllerConfigCase::kGradientControllerConfig);

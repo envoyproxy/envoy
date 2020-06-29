@@ -60,7 +60,7 @@ private:
   // Prerequisite: buffer has at least one slice.
   size_t firstSliceLength(Envoy::Buffer::Instance& buffer);
 
-  std::unique_ptr<Envoy::Buffer::BufferFragmentImpl> fragment_;
+  Envoy::Buffer::BufferFragmentImplPtr fragment_;
   Envoy::Buffer::OwnedImpl single_slice_buffer_;
 };
 

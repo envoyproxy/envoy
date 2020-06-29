@@ -123,7 +123,7 @@ protected:
     }
   }
 
-  std::unordered_map<std::string, std::unique_ptr<const TypedMetadata::Object>> data_;
+  std::unordered_map<std::string, TypedMetadata::ObjectConstPtr> data_;
 };
 
 } // namespace Config

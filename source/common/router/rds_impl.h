@@ -122,9 +122,8 @@ public:
   }
   RouteConfigUpdatePtr& routeConfigUpdate() { return config_update_info_; }
   void updateOnDemand(const std::string& aliases);
-  void maybeCreateInitManager(const std::string& version_info,
-                              std::unique_ptr<Init::ManagerImpl>& init_manager,
-                              std::unique_ptr<Cleanup>& resume_rds);
+  void maybeCreateInitManager(const std::string& version_info, Init::ManagerImplPtr& init_manager,
+                              CleanupPtr& resume_rds);
 
 private:
   // Config::SubscriptionCallbacks
@@ -152,7 +151,7 @@ private:
 
   bool validateUpdateSize(int num_resources);
 
-  std::unique_ptr<Envoy::Config::Subscription> subscription_;
+  Envoy::Config::SubscriptionPtr subscription_;
   const std::string route_config_name_;
   Server::Configuration::ServerFactoryContext& factory_context_;
   ProtobufMessage::ValidationVisitor& validator_;

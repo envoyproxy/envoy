@@ -898,7 +898,7 @@ public:
     return rc;
   }
 
-  std::unique_ptr<Impl> header_map_{Impl::create()};
+  ImplPtr header_map_{Impl::create()};
 };
 
 /**

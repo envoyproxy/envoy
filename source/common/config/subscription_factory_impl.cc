@@ -25,7 +25,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
     Stats::Scope& scope, SubscriptionCallbacks& callbacks) {
   Config::Utility::checkLocalInfo(type_url, local_info_);
-  std::unique_ptr<Subscription> result;
+  SubscriptionPtr result;
   SubscriptionStats stats = Utility::generateStats(scope);
 
   const auto transport_api_version = config.api_config_source().transport_api_version();

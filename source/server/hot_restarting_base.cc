@@ -150,7 +150,7 @@ void HotRestartingBase::initRecvBufIfNewMessage() {
 
 // Must only be called when recv_buf_ contains a full proto. Returns that proto, and resets all of
 // our receive-buffering state back to empty, to await a new message.
-std::unique_ptr<HotRestartMessage> HotRestartingBase::parseProtoAndResetState() {
+HotRestartMessagePtr HotRestartingBase::parseProtoAndResetState() {
   auto ret = std::make_unique<HotRestartMessage>();
   RELEASE_ASSERT(
       ret->ParseFromArray(recv_buf_.data() + sizeof(uint64_t), expected_proto_length_.value()),
@@ -161,7 +161,7 @@ std::unique_ptr<HotRestartMessage> HotRestartingBase::parseProtoAndResetState() 
   return ret;
 }
 
-std::unique_ptr<HotRestartMessage> HotRestartingBase::receiveHotRestartMessage(Blocking block) {
+HotRestartMessagePtr HotRestartingBase::receiveHotRestartMessage(Blocking block) {
   // By default the domain socket is non blocking. If we need to block, make it blocking first.
   if (block == Blocking::Yes) {
     RELEASE_ASSERT(fcntl(my_domain_socket_, F_SETFL, 0) != -1,
@@ -173,7 +173,7 @@ std::unique_ptr<HotRestartMessage> HotRestartingBase::receiveHotRestartMessage(B
   iovec iov[1];
   msghdr message;
   uint8_t control_buffer[CMSG_SPACE(sizeof(int))];
-  std::unique_ptr<HotRestartMessage> ret = nullptr;
+  HotRestartMessagePtr ret = nullptr;
   while (!ret) {
     iov[0].iov_base = recv_buf_.data() + cur_msg_recvd_bytes_;
     iov[0].iov_len = MaxSendmsgSize;

@@ -20,7 +20,7 @@ namespace rocketmq_config = envoy::extensions::filters::network::rocketmq_proxy:
 Network::FilterFactoryCb RocketmqProxyFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const rocketmq_config::RocketmqProxy& proto_config,
     Server::Configuration::FactoryContext& context) {
-  std::shared_ptr<ConfigImpl> filter_config = std::make_shared<ConfigImpl>(proto_config, context);
+  ConfigImplSharedPtr filter_config = std::make_shared<ConfigImpl>(proto_config, context);
   return [filter_config, &context](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(
         std::make_shared<ConnectionManager>(*filter_config, context.dispatcher().timeSource()));

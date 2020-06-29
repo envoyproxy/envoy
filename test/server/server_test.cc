@@ -118,7 +118,7 @@ public:
   NiceMock<MockOverloadManager> overload_manager_;
   Init::ManagerImpl init_manager_{""};
   ReadyWatcher start_workers_;
-  std::unique_ptr<RunHelper> helper_;
+  RunHelperPtr helper_;
   std::function<void()> cm_init_callback_;
 #ifndef WIN32
   Event::MockSignalEvent* sigterm_;
@@ -253,16 +253,16 @@ protected:
   testing::NiceMock<MockOptions> options_;
   DefaultListenerHooks hooks_;
   testing::NiceMock<MockHotRestart> restart_;
-  std::unique_ptr<ThreadLocal::InstanceImpl> thread_local_;
+  ThreadLocal::InstanceImplPtr thread_local_;
   Stats::TestIsolatedStoreImpl stats_store_;
   Thread::MutexBasicLockable fakelock_;
   TestComponentFactory component_factory_;
   Event::GlobalTimeSystem time_system_;
   ProcessObject* process_object_ = nullptr;
-  std::unique_ptr<ProcessContextImpl> process_context_;
-  std::unique_ptr<Init::Manager> init_manager_;
+  ProcessContextImplPtr process_context_;
+  Init::ManagerPtr init_manager_;
 
-  std::unique_ptr<InstanceImpl> server_;
+  InstanceImplPtr server_;
 };
 
 class ServerInstanceImplTest : public ServerInstanceImplTestBase,

@@ -129,7 +129,7 @@ TEST_P(MainCommonTest, RetryDynamicBaseIdFails) {
 
   EXPECT_THROW_WITH_MESSAGE(
       MainCommonBase(second_options, real_time_system, default_listener_hooks,
-                     prod_component_factory, std::unique_ptr<Runtime::RandomGenerator>{mock_rng},
+                     prod_component_factory, Runtime::RandomGeneratorPtr{mock_rng},
                      platform.threadFactory(), platform.fileSystem(), nullptr),
       EnvoyException, "unable to select a dynamic base id");
 #endif
@@ -257,8 +257,8 @@ protected:
   }
 
   Stats::IsolatedStoreImpl stats_store_;
-  std::unique_ptr<Thread::Thread> envoy_thread_;
-  std::unique_ptr<MainCommon> main_common_;
+  Thread::ThreadPtr envoy_thread_;
+  MainCommonPtr main_common_;
   absl::Notification started_;
   absl::Notification finished_;
   absl::Notification resume_;

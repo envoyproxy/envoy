@@ -14,8 +14,8 @@ class QuicHttpServerConnectionFactory : public Config::UntypedFactory {
 public:
   ~QuicHttpServerConnectionFactory() override = default;
 
-  virtual std::unique_ptr<ServerConnection>
-  createQuicServerConnection(Network::Connection& connection, ConnectionCallbacks& callbacks) PURE;
+  virtual ServerConnectionPtr createQuicServerConnection(Network::Connection& connection,
+                                                         ConnectionCallbacks& callbacks) PURE;
 
   std::string category() const override { return "envoy.quic_client_codec"; }
 };
@@ -25,8 +25,8 @@ class QuicHttpClientConnectionFactory : public Config::UntypedFactory {
 public:
   ~QuicHttpClientConnectionFactory() override = default;
 
-  virtual std::unique_ptr<ClientConnection>
-  createQuicClientConnection(Network::Connection& connection, ConnectionCallbacks& callbacks) PURE;
+  virtual ClientConnectionPtr createQuicClientConnection(Network::Connection& connection,
+                                                         ConnectionCallbacks& callbacks) PURE;
 
   std::string category() const override { return "envoy.quic_server_codec"; }
 };

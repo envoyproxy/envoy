@@ -111,7 +111,7 @@ public:
     const std::string name_;
     const std::chrono::milliseconds listener_filters_timeout_;
     const bool continue_on_listener_filters_timeout_;
-    std::unique_ptr<Network::ActiveUdpListenerFactory> udp_listener_factory_;
+    Network::ActiveUdpListenerFactoryPtr udp_listener_factory_;
     Network::ConnectionBalancerPtr connection_balancer_;
     const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
     std::shared_ptr<NiceMock<Network::MockFilterChainManager>> inline_filter_chain_manager_;

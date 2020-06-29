@@ -31,7 +31,7 @@ TEST(HessianProtocolTest, deserializeRpcInvocation) {
         0x05, '0', '.', '0', '.', '0', // Service version
         0x04, 't', 'e', 's', 't',      // method name
     }));
-    std::shared_ptr<ContextImpl> context = std::make_shared<ContextImpl>();
+    ContextImplSharedPtr context = std::make_shared<ContextImpl>();
     context->set_body_size(buffer.length());
     auto result = serializer.deserializeRpcInvocation(buffer, context);
     EXPECT_TRUE(result.second);
@@ -53,7 +53,7 @@ TEST(HessianProtocolTest, deserializeRpcInvocation) {
     }));
     std::string exception_string = fmt::format("RpcInvocation size({}) large than body size({})",
                                                buffer.length(), buffer.length() - 1);
-    std::shared_ptr<ContextImpl> context = std::make_shared<ContextImpl>();
+    ContextImplSharedPtr context = std::make_shared<ContextImpl>();
     context->set_body_size(buffer.length() - 1);
     EXPECT_THROW_WITH_MESSAGE(serializer.deserializeRpcInvocation(buffer, context), EnvoyException,
                               exception_string);
@@ -62,7 +62,7 @@ TEST(HessianProtocolTest, deserializeRpcInvocation) {
 
 TEST(HessianProtocolTest, deserializeRpcResult) {
   DubboHessian2SerializerImpl serializer;
-  std::shared_ptr<ContextImpl> context = std::make_shared<ContextImpl>();
+  ContextImplSharedPtr context = std::make_shared<ContextImpl>();
 
   {
     Buffer::OwnedImpl buffer;
@@ -179,7 +179,7 @@ TEST(HessianProtocolTest, serializeRpcResult) {
   EXPECT_EQ(buffer.length(), hessian_int_size + hessian_string_size);
 
   size_t body_size = mock_response.size() + sizeof(mock_response_type);
-  std::shared_ptr<ContextImpl> context = std::make_shared<ContextImpl>();
+  ContextImplSharedPtr context = std::make_shared<ContextImpl>();
   context->set_body_size(body_size);
   auto result = serializer.deserializeRpcResult(buffer, context);
   EXPECT_TRUE(result.first->hasException());

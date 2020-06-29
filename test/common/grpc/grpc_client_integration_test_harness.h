@@ -346,7 +346,7 @@ public:
 
   virtual void expectExtraHeaders(FakeStream&) {}
 
-  std::unique_ptr<HelloworldRequest> createRequest(const TestMetadata& initial_metadata) {
+  HelloworldRequestPtr createRequest(const TestMetadata& initial_metadata) {
     auto request = std::make_unique<HelloworldRequest>(dispatcher_helper_);
     EXPECT_CALL(*request, onCreateInitialMetadata(_))
         .WillOnce(Invoke([&initial_metadata](Http::HeaderMap& headers) {
@@ -392,7 +392,7 @@ public:
     return request;
   }
 
-  std::unique_ptr<HelloworldStream> createStream(const TestMetadata& initial_metadata) {
+  HelloworldStreamPtr createStream(const TestMetadata& initial_metadata) {
     auto stream = std::make_unique<HelloworldStream>(dispatcher_helper_);
     EXPECT_CALL(*stream, onCreateInitialMetadata(_))
         .WillOnce(Invoke([&initial_metadata](Http::HeaderMap& headers) {
@@ -438,7 +438,7 @@ public:
   std::unique_ptr<Http::TestRequestHeaderMapImpl> stream_headers_;
   std::vector<std::pair<std::string, std::string>> channel_args_;
 #ifdef ENVOY_GOOGLE_GRPC
-  std::unique_ptr<GoogleAsyncClientThreadLocal> google_tls_;
+  GoogleAsyncClientThreadLocalPtr google_tls_;
 #endif
   AsyncClient<helloworld::HelloRequest, helloworld::HelloReply> grpc_client_;
   Event::TimerPtr timeout_timer_;

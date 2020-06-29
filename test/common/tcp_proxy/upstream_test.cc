@@ -27,7 +27,7 @@ public:
 
   Http::MockRequestEncoder encoder_;
   NiceMock<Tcp::ConnectionPool::MockUpstreamCallbacks> callbacks_;
-  std::unique_ptr<HttpUpstream> upstream_;
+  HttpUpstreamPtr upstream_;
   std::string hostname_{"default.host.com"};
 };
 

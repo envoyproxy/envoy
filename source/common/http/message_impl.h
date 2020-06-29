@@ -20,15 +20,13 @@ template <class HeadersInterfaceType, class HeadersImplType, class TrailersInter
 class MessageImpl : public Message<HeadersInterfaceType, TrailersInterfaceType> {
 public:
   MessageImpl() : headers_(HeadersImplType::create()) {}
-  MessageImpl(std::unique_ptr<HeadersInterfaceType>&& headers) : headers_(std::move(headers)) {}
+  MessageImpl(HeadersInterfaceTypePtr&& headers) : headers_(std::move(headers)) {}
 
   // Http::Message
   HeadersInterfaceType& headers() override { return *headers_; }
   Buffer::InstancePtr& body() override { return body_; }
   TrailersInterfaceType* trailers() override { return trailers_.get(); }
-  void trailers(std::unique_ptr<TrailersInterfaceType>&& trailers) override {
-    trailers_ = std::move(trailers);
-  }
+  void trailers(TrailersInterfaceTypePtr&& trailers) override { trailers_ = std::move(trailers); }
   std::string bodyAsString() const override {
     if (body_) {
       return body_->toString();
@@ -38,9 +36,9 @@ public:
   }
 
 private:
-  std::unique_ptr<HeadersInterfaceType> headers_;
+  HeadersInterfaceTypePtr headers_;
   Buffer::InstancePtr body_;
-  std::unique_ptr<TrailersInterfaceType> trailers_;
+  TrailersInterfaceTypePtr trailers_;
 };
 
 using RequestMessageImpl =

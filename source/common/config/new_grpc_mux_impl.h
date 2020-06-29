@@ -71,7 +71,7 @@ public:
   };
 
   // for use in tests only
-  const absl::flat_hash_map<std::string, std::unique_ptr<SubscriptionStuff>>& subscriptions() {
+  const absl::flat_hash_map<std::string, SubscriptionStuffPtr>& subscriptions() {
     return subscriptions_;
   }
 
@@ -130,7 +130,7 @@ private:
   PausableAckQueue pausable_ack_queue_;
 
   // Map key is type_url.
-  absl::flat_hash_map<std::string, std::unique_ptr<SubscriptionStuff>> subscriptions_;
+  absl::flat_hash_map<std::string, SubscriptionStuffPtr> subscriptions_;
 
   // Determines the order of initial discovery requests. (Assumes that subscriptions are added in
   // the order of Envoy's dependency ordering).

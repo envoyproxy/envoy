@@ -354,7 +354,7 @@ std::vector<HostsPerLocalityConstSharedPtr> HostsPerLocalityImpl::filter(
   // We keep two lists: one for being able to mutate the clone and one for returning to the caller.
   // Creating them both at the start avoids iterating over the mutable values at the end to convert
   // them to a const pointer.
-  std::vector<std::shared_ptr<HostsPerLocalityImpl>> mutable_clones;
+  std::vector<HostsPerLocalityImplSharedPtr> mutable_clones;
   std::vector<HostsPerLocalityConstSharedPtr> filtered_clones;
 
   for (size_t i = 0; i < predicates.size(); ++i) {
@@ -415,8 +415,8 @@ void HostSetImpl::updateHosts(PrioritySet::UpdateHostsParams&& update_hosts_para
 }
 
 void HostSetImpl::rebuildLocalityScheduler(
-    std::unique_ptr<EdfScheduler<LocalityEntry>>& locality_scheduler,
-    std::vector<std::shared_ptr<LocalityEntry>>& locality_entries,
+    EdfSchedulerPtr<LocalityEntry>& locality_scheduler,
+    std::vector<LocalityEntrySharedPtr>& locality_entries,
     const HostsPerLocality& eligible_hosts_per_locality, const HostVector& eligible_hosts,
     HostsPerLocalityConstSharedPtr all_hosts_per_locality,
     HostsPerLocalityConstSharedPtr excluded_hosts_per_locality,
@@ -470,7 +470,7 @@ HostSetImpl::chooseLocality(EdfScheduler<LocalityEntry>* locality_scheduler) {
   if (locality_scheduler == nullptr) {
     return {};
   }
-  const std::shared_ptr<LocalityEntry> locality = locality_scheduler->pick();
+  const LocalityEntrySharedPtr locality = locality_scheduler->pick();
   // We don't build a schedule if there are no weighted localities, so we should always succeed.
   ASSERT(locality != nullptr);
   // If we picked it before, its weight must have been positive.

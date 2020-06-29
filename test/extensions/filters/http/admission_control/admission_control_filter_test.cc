@@ -49,7 +49,7 @@ public:
   TestConfig(const AdmissionControlProto& proto_config, Runtime::Loader& runtime,
              TimeSource& time_source, Runtime::RandomGenerator& random, Stats::Scope& scope,
              ThreadLocal::SlotPtr&& tls, MockThreadLocalController& controller,
-             std::shared_ptr<ResponseEvaluator> evaluator)
+             ResponseEvaluatorSharedPtr evaluator)
       : AdmissionControlFilterConfig(proto_config, runtime, time_source, random, scope,
                                      std::move(tls), std::move(evaluator)),
         controller_(controller) {}
@@ -63,7 +63,7 @@ class AdmissionControlTest : public testing::Test {
 public:
   AdmissionControlTest() = default;
 
-  std::shared_ptr<AdmissionControlFilterConfig> makeConfig(const std::string& yaml) {
+  AdmissionControlFilterConfigSharedPtr makeConfig(const std::string& yaml) {
     AdmissionControlProto proto;
     TestUtility::loadFromYamlAndValidate(yaml, proto);
     auto tls = context_.threadLocal().allocateSlot();
@@ -73,7 +73,7 @@ public:
                                         std::move(tls), controller_, evaluator_);
   }
 
-  void setupFilter(std::shared_ptr<AdmissionControlFilterConfig> config) {
+  void setupFilter(AdmissionControlFilterConfigSharedPtr config) {
     filter_ = std::make_shared<AdmissionControlFilter>(config, "test_prefix.");
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
@@ -105,7 +105,7 @@ protected:
   Stats::IsolatedStoreImpl scope_;
   Event::SimulatedTimeSystem time_system_;
   NiceMock<Runtime::MockRandomGenerator> random_;
-  std::shared_ptr<AdmissionControlFilter> filter_;
+  AdmissionControlFilterSharedPtr filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<MockThreadLocalController> controller_;
   std::shared_ptr<MockResponseEvaluator> evaluator_;

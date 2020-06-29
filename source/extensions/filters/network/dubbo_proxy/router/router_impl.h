@@ -90,7 +90,7 @@ private:
   const RouteEntry* route_entry_{};
   Upstream::ClusterInfoConstSharedPtr cluster_;
 
-  std::unique_ptr<UpstreamRequest> upstream_request_;
+  UpstreamRequestPtr upstream_request_;
   Envoy::Buffer::OwnedImpl upstream_request_buffer_;
 
   bool filter_complete_{false};

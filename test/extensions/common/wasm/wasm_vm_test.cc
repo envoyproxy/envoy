@@ -34,12 +34,12 @@ public:
   PluginFactory() = default;
 
   std::string name() const override { return "test_null_vm_plugin"; }
-  std::unique_ptr<Null::NullVmPlugin> create() const override;
+  Null::NullVmPluginPtr create() const override;
 };
 
 TestNullVmPlugin* test_null_vm_plugin_ = nullptr;
 
-std::unique_ptr<Null::NullVmPlugin> PluginFactory::create() const {
+Null::NullVmPluginPtr PluginFactory::create() const {
   auto result = std::make_unique<TestNullVmPlugin>();
   test_null_vm_plugin_ = result.get();
   return result;

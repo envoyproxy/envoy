@@ -144,7 +144,7 @@ public:
   NiceMock<Network::MockDrainDecision> drain_decision_;
   NiceMock<Runtime::MockLoader> runtime_;
   ProxyFilterConfigSharedPtr config_;
-  std::unique_ptr<ProxyFilter> filter_;
+  ProxyFilterPtr filter_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   NiceMock<Api::MockApi> api_;
 };

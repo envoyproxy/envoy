@@ -142,7 +142,7 @@ public:
               headersWithUnderscoresAction, (), (const));
   MOCK_METHOD(const LocalReply::LocalReply&, localReply, (), (const));
 
-  std::unique_ptr<Http::InternalAddressConfig> internal_address_config_ =
+  Http::InternalAddressConfigPtr internal_address_config_ =
       std::make_unique<DefaultInternalAddressConfig>();
 };
 

@@ -44,7 +44,7 @@ public:
   ~DynamoFilterTest() override { filter_->onDestroy(); }
 
   NiceMock<Stats::MockStore> stats_;
-  std::unique_ptr<DynamoFilter> filter_;
+  DynamoFilterPtr filter_;
   NiceMock<Runtime::MockLoader> loader_;
   std::string stat_prefix_{"prefix."};
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;

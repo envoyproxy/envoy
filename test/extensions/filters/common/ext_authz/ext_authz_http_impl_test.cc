@@ -130,7 +130,7 @@ public:
   NiceMock<Http::MockAsyncClientRequest> async_request_;
   ClientConfigSharedPtr config_;
   TimeSource& time_source_;
-  std::unique_ptr<RawHttpClientImpl> client_;
+  RawHttpClientImplPtr client_;
   MockRequestCallbacks request_callbacks_;
   Tracing::MockSpan active_span_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;

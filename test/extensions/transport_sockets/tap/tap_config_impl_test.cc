@@ -72,7 +72,7 @@ public:
   // Raw pointer, returned via mock to unique_ptr.
   TapCommon::MockPerTapSinkHandleManager* sink_manager_ =
       new TapCommon::MockPerTapSinkHandleManager;
-  std::unique_ptr<PerSocketTapperImpl> tapper_;
+  PerSocketTapperImplPtr tapper_;
   std::vector<TapCommon::MatcherPtr> matchers_{1};
   TapCommon::MockMatcher matcher_{matchers_};
   TapCommon::Matcher::MatchStatusVector* statuses_;

@@ -36,7 +36,7 @@ class UpstreamRequest : public Logger::Loggable<Logger::Id::router>,
                         public LinkedObject<UpstreamRequest>,
                         public GenericConnectionPoolCallbacks {
 public:
-  UpstreamRequest(RouterFilterInterface& parent, std::unique_ptr<GenericConnPool>&& conn_pool);
+  UpstreamRequest(RouterFilterInterface& parent, GenericConnPoolPtr&& conn_pool);
   ~UpstreamRequest() override;
 
   void encodeHeaders(bool end_stream);
@@ -68,8 +68,7 @@ public:
   void onPoolFailure(ConnectionPool::PoolFailureReason reason,
                      absl::string_view transport_failure_reason,
                      Upstream::HostDescriptionConstSharedPtr host) override;
-  void onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
-                   Upstream::HostDescriptionConstSharedPtr host,
+  void onPoolReady(GenericUpstreamPtr&& upstream, Upstream::HostDescriptionConstSharedPtr host,
                    const Network::Address::InstanceConstSharedPtr& upstream_local_address,
                    const StreamInfo::StreamInfo& info) override;
   UpstreamRequest* upstreamRequest() override { return this; }
@@ -120,10 +119,10 @@ private:
   }
 
   RouterFilterInterface& parent_;
-  std::unique_ptr<GenericConnPool> conn_pool_;
+  GenericConnPoolPtr conn_pool_;
   bool grpc_rq_success_deferred_;
   Event::TimerPtr per_try_timeout_;
-  std::unique_ptr<GenericUpstream> upstream_;
+  GenericUpstreamPtr upstream_;
   absl::optional<Http::StreamResetReason> deferred_reset_reason_;
   Buffer::WatermarkBufferPtr buffered_request_body_;
   Upstream::HostDescriptionConstSharedPtr upstream_host_;

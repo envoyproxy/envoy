@@ -219,7 +219,7 @@ private:
         : VirtualClusterBase(pool.add("other"), scope.createScope("other")) {}
   };
 
-  static const std::shared_ptr<const SslRedirectRoute> SSL_REDIRECT_ROUTE;
+  static const SslRedirectRouteConstSharedPtr SSL_REDIRECT_ROUTE;
 
   Stats::StatNamePool stat_name_pool_;
   const Stats::StatName stat_name_;
@@ -228,7 +228,7 @@ private:
   std::vector<VirtualClusterEntry> virtual_clusters_;
   SslRequirements ssl_requirements_;
   const RateLimitPolicyImpl rate_limit_policy_;
-  std::unique_ptr<const CorsPolicyImpl> cors_policy_;
+  CorsPolicyImplConstPtr cors_policy_;
   const ConfigImpl& global_route_config_; // See note in RouteEntryImplBase::clusterEntry() on why
                                           // raw ref to the top level config is currently safe.
   HeaderParserPtr request_headers_parser_;
@@ -740,7 +740,7 @@ private:
   // Default timeout is 15s if nothing is specified in the route config.
   static const uint64_t DEFAULT_ROUTE_TIMEOUT_MS = 15000;
 
-  std::unique_ptr<const CorsPolicyImpl> cors_policy_;
+  CorsPolicyImplConstPtr cors_policy_;
   const VirtualHostImpl& vhost_; // See note in RouteEntryImplBase::clusterEntry() on why raw ref
                                  // to virtual host is currently safe.
   const bool auto_host_rewrite_;
@@ -773,7 +773,7 @@ private:
 
   UpgradeMap upgrade_map_;
   const uint64_t total_cluster_weight_;
-  std::unique_ptr<const Http::HashPolicyImpl> hash_policy_;
+  Http::HashPolicyImplConstPtr hash_policy_;
   MetadataMatchCriteriaConstPtr metadata_match_criteria_;
   TlsContextMatchCriteriaConstPtr tls_context_match_criteria_;
   HeaderParserPtr request_headers_parser_;
@@ -980,7 +980,7 @@ public:
   }
 
 private:
-  std::unique_ptr<RouteMatcher> route_matcher_;
+  RouteMatcherPtr route_matcher_;
   std::list<Http::LowerCaseString> internal_only_headers_;
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;

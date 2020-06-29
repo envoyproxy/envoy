@@ -45,7 +45,7 @@ RequestIDExtensionFactory::defaultInstance(Envoy::Runtime::RandomGenerator& rand
 }
 
 RequestIDExtensionSharedPtr RequestIDExtensionFactory::noopInstance() {
-  MUTABLE_CONSTRUCT_ON_FIRST_USE(std::shared_ptr<RequestIDExtension>,
+  MUTABLE_CONSTRUCT_ON_FIRST_USE(RequestIDExtensionSharedPtr,
                                  std::make_shared<NoopRequestIDExtension>());
 }
 

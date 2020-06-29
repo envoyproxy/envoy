@@ -25,7 +25,7 @@ public:
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
 
-  std::unique_ptr<OnDemandRouteUpdate> filter_;
+  OnDemandRouteUpdatePtr filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
 };
 

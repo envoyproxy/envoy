@@ -83,7 +83,7 @@ request_rules:
   const Config* getConfig() { return filter_->getConfig(); }
 
   ConfigSharedPtr config_;
-  std::shared_ptr<HeaderToMetadataFilter> filter_;
+  HeaderToMetadataFilterSharedPtr filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> req_info_;

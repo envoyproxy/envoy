@@ -94,7 +94,7 @@ public:
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
   using FilterFactoriesList = std::list<Http::FilterFactoryCb>;
   struct FilterConfig {
-    std::unique_ptr<FilterFactoriesList> filter_factories;
+    FilterFactoriesListPtr filter_factories;
     bool allow_upgrade;
   };
   bool createUpgradeFilterChain(absl::string_view upgrade_type,
@@ -195,7 +195,7 @@ private:
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   Http::ConnectionManagerTracingStats tracing_stats_;
   const bool use_remote_address_{};
-  const std::unique_ptr<Http::InternalAddressConfig> internal_address_config_;
+  const Http::InternalAddressConfigPtr internal_address_config_;
   const uint32_t xff_num_trusted_hops_;
   const bool skip_xff_append_;
   const std::string via_;
@@ -259,10 +259,9 @@ public:
 class Utility {
 public:
   struct Singletons {
-    std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider_;
-    std::shared_ptr<Router::RouteConfigProviderManager> route_config_provider_manager_;
-    std::shared_ptr<Router::ScopedRoutesConfigProviderManager>
-        scoped_routes_config_provider_manager_;
+    Http::TlsCachingDateProviderImplSharedPtr date_provider_;
+    Router::RouteConfigProviderManagerSharedPtr route_config_provider_manager_;
+    Router::ScopedRoutesConfigProviderManagerSharedPtr scoped_routes_config_provider_manager_;
     Tracing::HttpTracerManagerSharedPtr http_tracer_manager_;
   };
 
@@ -284,7 +283,7 @@ public:
    * @param scoped_routes_config_provider_manager the singleton used in config creation.
    * @return a shared_ptr to the created config object.
    */
-  static std::shared_ptr<HttpConnectionManagerConfig> createConfig(
+  static HttpConnectionManagerConfigSharedPtr createConfig(
       const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
           proto_config,
       Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,

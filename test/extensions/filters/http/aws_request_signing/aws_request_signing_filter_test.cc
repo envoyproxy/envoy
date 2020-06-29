@@ -35,7 +35,7 @@ public:
   }
 
   std::shared_ptr<MockFilterConfig> filter_config_;
-  std::unique_ptr<Filter> filter_;
+  FilterPtr filter_;
 };
 
 // Verify filter functionality when signing works.

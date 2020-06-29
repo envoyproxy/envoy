@@ -38,7 +38,7 @@ public:
 
   Server::MockAdmin admin_;
   Event::MockDispatcher main_thread_dispatcher_{"test_main_thread"};
-  std::unique_ptr<AdminHandler> handler_;
+  AdminHandlerPtr handler_;
   Server::Admin::HandlerCb cb_;
   Http::TestResponseHeaderMapImpl response_headers_;
   Buffer::OwnedImpl response_;

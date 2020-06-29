@@ -24,7 +24,7 @@ void BufferUtility::fillRequestBuffer(Buffer::OwnedImpl& buffer, RequestCode cod
 
   switch (code) {
   case RequestCode::SendMessage: {
-    std::unique_ptr<SendMessageRequestHeader> header = std::make_unique<SendMessageRequestHeader>();
+    SendMessageRequestHeaderPtr header = std::make_unique<SendMessageRequestHeader>();
     header->topic(topic_name_);
     header->version(SendMessageRequestVersion::V1);
     std::string msg_body = msg_body_;
@@ -77,8 +77,7 @@ void BufferUtility::fillRequestBuffer(Buffer::OwnedImpl& buffer, RequestCode cod
   } break;
 
   case RequestCode::UnregisterClient: {
-    std::unique_ptr<UnregisterClientRequestHeader> header =
-        std::make_unique<UnregisterClientRequestHeader>();
+    UnregisterClientRequestHeaderPtr header = std::make_unique<UnregisterClientRequestHeader>();
     header->clientId(client_id_);
     header->consumerGroup(consumer_group_);
     CommandCustomHeaderPtr ptr(header.release());
@@ -87,8 +86,7 @@ void BufferUtility::fillRequestBuffer(Buffer::OwnedImpl& buffer, RequestCode cod
   }
 
   case RequestCode::GetRouteInfoByTopic: {
-    std::unique_ptr<GetRouteInfoRequestHeader> header =
-        std::make_unique<GetRouteInfoRequestHeader>();
+    GetRouteInfoRequestHeaderPtr header = std::make_unique<GetRouteInfoRequestHeader>();
     header->topic(topic_name_);
     CommandCustomHeaderPtr ptr(header.release());
     cmd->customHeader(ptr);
@@ -96,7 +94,7 @@ void BufferUtility::fillRequestBuffer(Buffer::OwnedImpl& buffer, RequestCode cod
   }
 
   case RequestCode::GetConsumerListByGroup: {
-    std::unique_ptr<GetConsumerListByGroupRequestHeader> header =
+    GetConsumerListByGroupRequestHeaderPtr header =
         std::make_unique<GetConsumerListByGroupRequestHeader>();
     header->consumerGroup(consumer_group_);
     CommandCustomHeaderPtr ptr(header.release());
@@ -105,7 +103,7 @@ void BufferUtility::fillRequestBuffer(Buffer::OwnedImpl& buffer, RequestCode cod
   }
 
   case RequestCode::SendMessageV2: {
-    std::unique_ptr<SendMessageRequestHeader> header = std::make_unique<SendMessageRequestHeader>();
+    SendMessageRequestHeaderPtr header = std::make_unique<SendMessageRequestHeader>();
     header->topic(topic_name_);
     header->version(SendMessageRequestVersion::V2);
     header->producerGroup(producer_group_);
@@ -117,7 +115,7 @@ void BufferUtility::fillRequestBuffer(Buffer::OwnedImpl& buffer, RequestCode cod
   }
 
   case RequestCode::PopMessage: {
-    std::unique_ptr<PopMessageRequestHeader> header = std::make_unique<PopMessageRequestHeader>();
+    PopMessageRequestHeaderPtr header = std::make_unique<PopMessageRequestHeader>();
     header->consumerGroup(consumer_group_);
     header->topic(topic_name_);
     header->queueId(queue_id_);
@@ -133,7 +131,7 @@ void BufferUtility::fillRequestBuffer(Buffer::OwnedImpl& buffer, RequestCode cod
   }
 
   case RequestCode::AckMessage: {
-    std::unique_ptr<AckMessageRequestHeader> header = std::make_unique<AckMessageRequestHeader>();
+    AckMessageRequestHeaderPtr header = std::make_unique<AckMessageRequestHeader>();
     header->consumerGroup(consumer_group_);
     header->topic(topic_name_);
     header->queueId(queue_id_);
@@ -160,8 +158,7 @@ void BufferUtility::fillResponseBuffer(Buffer::OwnedImpl& buffer, RequestCode re
 
   switch (req_code) {
   case RequestCode::SendMessageV2: {
-    std::unique_ptr<SendMessageResponseHeader> header =
-        std::make_unique<SendMessageResponseHeader>();
+    SendMessageResponseHeaderPtr header = std::make_unique<SendMessageResponseHeader>();
     header->msgIdForTest("MSG_ID_01");
     header->queueId(1);
     header->queueOffset(100);
@@ -169,7 +166,7 @@ void BufferUtility::fillResponseBuffer(Buffer::OwnedImpl& buffer, RequestCode re
     break;
   }
   case RequestCode::PopMessage: {
-    std::unique_ptr<PopMessageResponseHeader> header = std::make_unique<PopMessageResponseHeader>();
+    PopMessageResponseHeaderPtr header = std::make_unique<PopMessageResponseHeader>();
     header->popTime(1587386521445);
     header->invisibleTime(50000);
     header->reviveQid(5);

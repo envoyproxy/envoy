@@ -235,7 +235,7 @@ public:
   Event::MockTimer* per_try_timeout_{};
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
-  std::shared_ptr<FilterConfig> config_;
+  FilterConfigSharedPtr config_;
   std::shared_ptr<TestFilter> router_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };

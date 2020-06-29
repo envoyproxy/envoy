@@ -200,8 +200,8 @@ public:
   NiceMock<Event::MockTimer>* upstream_ready_timer_;
   NiceMock<Event::MockTimer>* connect_timer_;
   NiceMock<Network::MockClientConnection>* connection_;
-  std::unique_ptr<OriginalConnPoolImpl> conn_pool_;
-  std::unique_ptr<ConnPoolCallbacks> callbacks_;
+  OriginalConnPoolImplPtr conn_pool_;
+  ConnPoolCallbacksPtr callbacks_;
 };
 
 /**

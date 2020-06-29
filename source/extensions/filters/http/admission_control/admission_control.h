@@ -51,7 +51,7 @@ public:
   AdmissionControlFilterConfig(const AdmissionControlProto& proto_config, Runtime::Loader& runtime,
                                TimeSource&, Runtime::RandomGenerator& random, Stats::Scope& scope,
                                ThreadLocal::SlotPtr&& tls,
-                               std::shared_ptr<ResponseEvaluator> response_evaluator);
+                               ResponseEvaluatorSharedPtr response_evaluator);
   virtual ~AdmissionControlFilterConfig() = default;
 
   virtual ThreadLocalController& getController() const { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
@@ -67,8 +67,8 @@ private:
   Stats::Scope& scope_;
   const ThreadLocal::SlotPtr tls_;
   Runtime::FeatureFlag admission_control_feature_;
-  std::unique_ptr<Runtime::Double> aggression_;
-  std::shared_ptr<ResponseEvaluator> response_evaluator_;
+  Runtime::DoublePtr aggression_;
+  ResponseEvaluatorSharedPtr response_evaluator_;
 };
 
 using AdmissionControlFilterConfigSharedPtr = std::shared_ptr<const AdmissionControlFilterConfig>;

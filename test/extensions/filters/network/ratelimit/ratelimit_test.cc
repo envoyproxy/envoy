@@ -90,7 +90,7 @@ failure_mode_deny: true
   NiceMock<Runtime::MockLoader> runtime_;
   ConfigSharedPtr config_;
   Filters::Common::RateLimit::MockClient* client_;
-  std::unique_ptr<Filter> filter_;
+  FilterPtr filter_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   Filters::Common::RateLimit::RequestCallbacks* request_callbacks_{};
 };

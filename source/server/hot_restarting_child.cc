@@ -25,14 +25,14 @@ int HotRestartingChild::duplicateParentListenSocket(const std::string& address) 
   wrapped_request.mutable_request()->mutable_pass_listen_socket()->set_address(address);
   sendHotRestartMessage(parent_address_, wrapped_request);
 
-  std::unique_ptr<HotRestartMessage> wrapped_reply = receiveHotRestartMessage(Blocking::Yes);
+  HotRestartMessagePtr wrapped_reply = receiveHotRestartMessage(Blocking::Yes);
   if (!replyIsExpectedType(wrapped_reply.get(), HotRestartMessage::Reply::kPassListenSocket)) {
     return -1;
   }
   return wrapped_reply->reply().pass_listen_socket().fd();
 }
 
-std::unique_ptr<HotRestartMessage> HotRestartingChild::getParentStats() {
+HotRestartMessagePtr HotRestartingChild::getParentStats() {
   if (restart_epoch_ == 0 || parent_terminated_) {
     return nullptr;
   }
@@ -41,7 +41,7 @@ std::unique_ptr<HotRestartMessage> HotRestartingChild::getParentStats() {
   wrapped_request.mutable_request()->mutable_stats();
   sendHotRestartMessage(parent_address_, wrapped_request);
 
-  std::unique_ptr<HotRestartMessage> wrapped_reply = receiveHotRestartMessage(Blocking::Yes);
+  HotRestartMessagePtr wrapped_reply = receiveHotRestartMessage(Blocking::Yes);
   RELEASE_ASSERT(replyIsExpectedType(wrapped_reply.get(), HotRestartMessage::Reply::kStats),
                  "Hot restart parent did not respond as expected to get stats request.");
   return wrapped_reply;
@@ -66,7 +66,7 @@ void HotRestartingChild::sendParentAdminShutdownRequest(time_t& original_start_t
   wrapped_request.mutable_request()->mutable_shutdown_admin();
   sendHotRestartMessage(parent_address_, wrapped_request);
 
-  std::unique_ptr<HotRestartMessage> wrapped_reply = receiveHotRestartMessage(Blocking::Yes);
+  HotRestartMessagePtr wrapped_reply = receiveHotRestartMessage(Blocking::Yes);
   RELEASE_ASSERT(replyIsExpectedType(wrapped_reply.get(), HotRestartMessage::Reply::kShutdownAdmin),
                  "Hot restart parent did not respond as expected to ShutdownParentAdmin.");
   original_start_time = wrapped_reply->reply().shutdown_admin().original_start_time_unix_seconds();

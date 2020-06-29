@@ -58,7 +58,7 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
   Grpc::MockAsyncClient* async_client_;
   NiceMock<Grpc::MockAsyncStream> async_stream_;
-  std::unique_ptr<NewGrpcMuxImpl> grpc_mux_;
+  NewGrpcMuxImplPtr grpc_mux_;
   NiceMock<Config::MockSubscriptionCallbacks> callbacks_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Stats::TestUtil::TestStore stats_;

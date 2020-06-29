@@ -263,7 +263,7 @@ private:
   const RouteEntry* route_entry_{};
   Upstream::ClusterInfoConstSharedPtr cluster_;
 
-  std::unique_ptr<UpstreamRequest> upstream_request_;
+  UpstreamRequestPtr upstream_request_;
   Buffer::OwnedImpl upstream_request_buffer_;
 };
 

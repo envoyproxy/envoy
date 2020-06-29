@@ -109,7 +109,7 @@ protected:
   Stats::IsolatedStoreImpl stats_store_;
   MockClusterInfoFactory test_factory_;
 
-  std::unique_ptr<Upstream::HdsDelegate> hds_delegate_;
+  Upstream::HdsDelegatePtr hds_delegate_;
   HdsDelegateFriend hds_delegate_friend_;
 
   Event::MockTimer* retry_timer_;

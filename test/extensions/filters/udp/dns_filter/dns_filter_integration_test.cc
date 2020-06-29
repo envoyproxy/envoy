@@ -188,7 +188,7 @@ listener_filters:
   NiceMock<Stats::MockCounter> mock_record_name_overflow_;
   NiceMock<Stats::MockCounter> query_parsing_failure_;
   DnsParserCounters counters_;
-  std::unique_ptr<DnsMessageParser> response_parser_;
+  DnsMessageParserPtr response_parser_;
   DnsQueryContextPtr query_ctx_;
 };
 

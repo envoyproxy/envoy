@@ -55,8 +55,7 @@ absl::optional<Socket::Option::Details> AddrFamilyAwareSocketOptionImpl::getOpti
 
 bool AddrFamilyAwareSocketOptionImpl::setIpSocketOption(
     Socket& socket, envoy::config::core::v3::SocketOption::SocketState state,
-    const std::unique_ptr<SocketOptionImpl>& ipv4_option,
-    const std::unique_ptr<SocketOptionImpl>& ipv6_option) {
+    const SocketOptionImplPtr& ipv4_option, const SocketOptionImplPtr& ipv6_option) {
   auto option = getOptionForSocket(socket, *ipv4_option, *ipv6_option);
 
   if (!option.has_value()) {

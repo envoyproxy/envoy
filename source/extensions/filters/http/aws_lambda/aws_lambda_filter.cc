@@ -116,7 +116,7 @@ bool isContentTypeTextual(const Http::RequestOrResponseHeaderMap& headers) {
 } // namespace
 
 Filter::Filter(const FilterSettings& settings, const FilterStats& stats,
-               const std::shared_ptr<Extensions::Common::Aws::Signer>& sigv4_signer)
+               const Extensions::Common::Aws::SignerSharedPtr& sigv4_signer)
     : settings_(settings), stats_(stats), sigv4_signer_(sigv4_signer) {}
 
 absl::optional<FilterSettings> Filter::getRouteSpecificSettings() const {

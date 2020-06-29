@@ -56,7 +56,7 @@ public:
   TestThreadsafeSingletonInjector<Api::HotRestartOsSysCallsImpl> hot_restart_os_calls{
       &hot_restart_os_sys_calls_};
   std::vector<uint8_t> buffer_;
-  std::unique_ptr<HotRestartImpl> hot_restart_;
+  HotRestartImplPtr hot_restart_;
 };
 
 TEST_F(HotRestartImplTest, VersionString) {

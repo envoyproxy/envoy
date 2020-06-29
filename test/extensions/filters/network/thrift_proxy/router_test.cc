@@ -321,7 +321,7 @@ public:
   Tcp::ConnectionPool::ConnectionStatePtr conn_state_;
 
   RouteConstSharedPtr route_ptr_;
-  std::unique_ptr<Router> router_;
+  RouterPtr router_;
 
   std::string cluster_name_{"cluster"};
 

@@ -121,7 +121,7 @@ public:
   Grpc::ContextImpl grpc_context_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_;
-  std::unique_ptr<LightStepDriver> driver_;
+  LightStepDriverPtr driver_;
   NiceMock<Event::MockTimer>* timer_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Runtime::MockRandomGenerator> random_;

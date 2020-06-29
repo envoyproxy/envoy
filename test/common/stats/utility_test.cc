@@ -30,7 +30,7 @@ protected:
   }
 
   SymbolTablePtr symbol_table_;
-  std::unique_ptr<IsolatedStoreImpl> store_;
+  IsolatedStoreImplPtr store_;
   StatNamePool pool_;
   StatNameTagVector tags_;
 };

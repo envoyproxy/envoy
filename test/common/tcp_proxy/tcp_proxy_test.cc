@@ -963,7 +963,7 @@ public:
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   ConfigSharedPtr config_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
-  std::unique_ptr<Filter> filter_;
+  FilterPtr filter_;
   std::vector<std::shared_ptr<NiceMock<Upstream::MockHost>>> upstream_hosts_{};
   std::vector<std::unique_ptr<NiceMock<Network::MockClientConnection>>> upstream_connections_{};
   std::vector<std::unique_ptr<NiceMock<Tcp::ConnectionPool::MockConnectionData>>>
@@ -1768,7 +1768,7 @@ public:
   ConfigSharedPtr config_;
   NiceMock<Network::MockConnection> connection_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
-  std::unique_ptr<Filter> filter_;
+  FilterPtr filter_;
 };
 
 TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(NonRoutableConnection)) {
@@ -1960,7 +1960,7 @@ public:
   ConfigSharedPtr config_;
   NiceMock<Network::MockConnection> connection_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
-  std::unique_ptr<Filter> filter_;
+  FilterPtr filter_;
 };
 
 // Test TCP proxy use source IP to hash.

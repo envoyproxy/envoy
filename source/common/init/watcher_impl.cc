@@ -30,8 +30,7 @@ absl::string_view WatcherImpl::name() const { return name_; }
 
 WatcherHandlePtr WatcherImpl::createHandle(absl::string_view handle_name) const {
   // Note: can't use std::make_unique because WatcherHandleImpl ctor is private
-  return std::unique_ptr<WatcherHandle>(
-      new WatcherHandleImpl(handle_name, name_, std::weak_ptr<ReadyFn>(fn_)));
+  return WatcherHandlePtr(new WatcherHandleImpl(handle_name, name_, std::weak_ptr<ReadyFn>(fn_)));
 }
 
 } // namespace Init

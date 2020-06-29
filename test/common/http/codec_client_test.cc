@@ -65,7 +65,7 @@ public:
   Event::MockDispatcher dispatcher_;
   Network::MockClientConnection* connection_;
   Http::MockClientConnection* codec_;
-  std::unique_ptr<CodecClientForTest> client_;
+  CodecClientForTestPtr client_;
   Network::ConnectionCallbacks* connection_cb_;
   Network::ReadFilterSharedPtr filter_;
   std::shared_ptr<Upstream::MockIdleTimeEnabledClusterInfo> cluster_{
@@ -350,7 +350,7 @@ protected:
   Network::MockConnectionHandler connection_handler_;
   Network::Address::InstanceConstSharedPtr source_address_;
   Http::MockClientConnection* codec_;
-  std::unique_ptr<CodecClientForTest> client_;
+  CodecClientForTestPtr client_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostDescriptionConstSharedPtr host_{
       Upstream::makeTestHostDescription(cluster_, "tcp://127.0.0.1:80")};

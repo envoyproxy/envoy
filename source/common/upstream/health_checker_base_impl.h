@@ -46,7 +46,7 @@ public:
   // Upstream::HealthChecker
   void addHostCheckCompleteCb(HostStatusCb callback) override { callbacks_.push_back(callback); }
   void start() override;
-  std::shared_ptr<const Network::TransportSocketOptionsImpl> transportSocketOptions() const {
+  Network::TransportSocketOptionsImplConstSharedPtr transportSocketOptions() const {
     return transport_socket_options_;
   }
   MetadataConstSharedPtr transportSocketMatchMetadata() const {
@@ -114,7 +114,7 @@ protected:
 
 private:
   struct HealthCheckHostMonitorImpl : public HealthCheckHostMonitor {
-    HealthCheckHostMonitorImpl(const std::shared_ptr<HealthCheckerImplBase>& health_checker,
+    HealthCheckHostMonitorImpl(const HealthCheckerImplBaseSharedPtr& health_checker,
                                const HostSharedPtr& host)
         : health_checker_(health_checker), host_(host) {}
 
@@ -137,7 +137,7 @@ private:
   void onClusterMemberUpdate(const HostVector& hosts_added, const HostVector& hosts_removed);
   void runCallbacks(HostSharedPtr host, HealthTransition changed_state);
   void setUnhealthyCrossThread(const HostSharedPtr& host);
-  static std::shared_ptr<const Network::TransportSocketOptionsImpl>
+  static Network::TransportSocketOptionsImplConstSharedPtr
   initTransportSocketOptions(const envoy::config::core::v3::HealthCheck& config);
   static MetadataConstSharedPtr
   initTransportSocketMatchMetadata(const envoy::config::core::v3::HealthCheck& config);
@@ -154,7 +154,7 @@ private:
   const std::chrono::milliseconds unhealthy_edge_interval_;
   const std::chrono::milliseconds healthy_edge_interval_;
   std::unordered_map<HostSharedPtr, ActiveHealthCheckSessionPtr> active_sessions_;
-  const std::shared_ptr<const Network::TransportSocketOptionsImpl> transport_socket_options_;
+  const Network::TransportSocketOptionsImplConstSharedPtr transport_socket_options_;
   const MetadataConstSharedPtr transport_socket_match_metadata_;
 };
 

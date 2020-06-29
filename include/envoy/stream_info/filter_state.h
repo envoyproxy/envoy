@@ -81,8 +81,8 @@ public:
    * This is to enforce a single authoritative source for each piece of
    * data stored in FilterState.
    */
-  virtual void setData(absl::string_view data_name, std::shared_ptr<Object> data,
-                       StateType state_type, LifeSpan life_span = LifeSpan::FilterChain) PURE;
+  virtual void setData(absl::string_view data_name, ObjectSharedPtr data, StateType state_type,
+                       LifeSpan life_span = LifeSpan::FilterChain) PURE;
 
   /**
    * @param data_name the name of the data being looked up (mutable/readonly).

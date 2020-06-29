@@ -38,7 +38,7 @@ protected:
   bool debug_with_s_client_{false};
 
 private:
-  std::unique_ptr<ContextManager> context_manager_;
+  ContextManagerPtr context_manager_;
 };
 
 class SslIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,

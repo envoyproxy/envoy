@@ -27,11 +27,11 @@ public:
   void sendAndReceiveTlsData(const std::string& data_to_send_upstream,
                              const std::string& data_to_send_downstream);
 
-  std::unique_ptr<Ssl::ContextManager> context_manager_;
+  Ssl::ContextManagerPtr context_manager_;
   Network::TransportSocketFactoryPtr context_;
   ConnectionStatusCallbacks connect_callbacks_;
   MockWatermarkBuffer* client_write_buffer_;
-  std::shared_ptr<WaitForPayloadReader> payload_reader_;
+  WaitForPayloadReaderSharedPtr payload_reader_;
   testing::NiceMock<Secret::MockSecretManager> secret_manager_;
   Network::ClientConnectionPtr ssl_client_;
   FakeRawConnectionPtr fake_upstream_connection_;

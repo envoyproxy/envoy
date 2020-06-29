@@ -154,7 +154,7 @@ bool CompressorFilter::hasCacheControlNoTransform(Http::ResponseHeaderMap& heade
 // request's Accept-Encoding, the response's Content-Type and the list of compressor
 // filters in the current chain.
 // TODO(rojkov): add an explicit fuzzer for chooseEncoding().
-std::unique_ptr<CompressorFilter::EncodingDecision>
+CompressorFilter::EncodingDecisionPtr
 CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
   using EncPair = std::pair<absl::string_view, float>; // pair of {encoding, q_value}
   std::vector<EncPair> pairs;
@@ -332,7 +332,7 @@ bool CompressorFilter::isAcceptEncodingAllowed(const Http::ResponseHeaderMap& he
   }
 
   // No cached decision found, so decide now.
-  std::unique_ptr<CompressorFilter::EncodingDecision> decision = chooseEncoding(headers);
+  CompressorFilter::EncodingDecisionPtr decision = chooseEncoding(headers);
   bool result = shouldCompress(*decision);
   filter_state->setData(encoding_decision_key, std::move(decision),
                         StreamInfo::FilterState::StateType::ReadOnly);

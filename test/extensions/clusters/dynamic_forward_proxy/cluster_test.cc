@@ -118,7 +118,7 @@ public:
   Api::ApiPtr api_{Api::createApiForTest(stats_store_)};
   std::shared_ptr<Extensions::Common::DynamicForwardProxy::MockDnsCacheManager> dns_cache_manager_{
       new Extensions::Common::DynamicForwardProxy::MockDnsCacheManager()};
-  std::shared_ptr<Cluster> cluster_;
+  ClusterSharedPtr cluster_;
   Upstream::ThreadAwareLoadBalancerPtr thread_aware_lb_;
   Upstream::LoadBalancerFactorySharedPtr lb_factory_;
   Upstream::LoadBalancerPtr lb_;
@@ -206,7 +206,7 @@ protected:
         cm_, stats_store_, tls_, nullptr, ssl_context_manager_, runtime_, random_, dispatcher_,
         log_manager_, local_info_, admin_, singleton_manager_, nullptr, true, validation_visitor_,
         *api_);
-    std::unique_ptr<Upstream::ClusterFactory> cluster_factory = std::make_unique<ClusterFactory>();
+    Upstream::ClusterFactoryPtr cluster_factory = std::make_unique<ClusterFactory>();
 
     std::tie(cluster_, thread_aware_lb_) =
         cluster_factory->create(cluster_config, cluster_factory_context);

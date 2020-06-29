@@ -94,8 +94,7 @@ private:
   void
   addOrUpdateWorker(const std::string& host,
                     const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info,
-                    std::shared_ptr<HostInfoMap>& new_host_map,
-                    std::unique_ptr<Upstream::HostVector>& hosts_added);
+                    HostInfoMapSharedPtr& new_host_map, Upstream::HostVectorPtr& hosts_added);
   void swapAndUpdateMap(const HostInfoMapSharedPtr& new_hosts_map,
                         const Upstream::HostVector& hosts_added,
                         const Upstream::HostVector& hosts_removed);

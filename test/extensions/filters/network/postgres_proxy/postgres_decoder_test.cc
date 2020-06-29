@@ -36,7 +36,7 @@ public:
 
 protected:
   ::testing::NiceMock<DecoderCallbacksMock> callbacks_;
-  std::unique_ptr<DecoderImpl> decoder_;
+  DecoderImplPtr decoder_;
 
   // fields often used
   Buffer::OwnedImpl data_;

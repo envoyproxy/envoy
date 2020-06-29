@@ -182,7 +182,7 @@ Network::ListenerFilterMatcherSharedPtr ProdListenerComponentFactory::createList
   if (!listener_filter.has_filter_disabled()) {
     return nullptr;
   }
-  return std::shared_ptr<Network::ListenerFilterMatcher>(
+  return Network::ListenerFilterMatcherSharedPtr(
       Network::ListenerFilterMatcherBuilder::buildListenerFilterMatcher(
           listener_filter.filter_disabled()));
 }

@@ -173,7 +173,7 @@ protected:
 
   struct SocketForTest {
     HandshakerFactory handshaker_factory_;
-    std::unique_ptr<TsiSocket> tsi_socket_;
+    TsiSocketPtr tsi_socket_;
     NiceMock<Network::MockTransportSocket>* raw_socket_{};
     NiceMock<Network::MockTransportSocketCallbacks> callbacks_;
     Buffer::OwnedImpl read_buffer_;

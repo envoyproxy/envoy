@@ -51,7 +51,7 @@ public:
                                                    {"trailer-key", "trailer-value"}} {
     quic_stream_->setRequestDecoder(stream_decoder_);
     quic_stream_->addCallbacks(stream_callbacks_);
-    quic_session_.ActivateStream(std::unique_ptr<EnvoyQuicServerStream>(quic_stream_));
+    quic_session_.ActivateStream(EnvoyQuicServerStreamPtr(quic_stream_));
     EXPECT_CALL(quic_session_, ShouldYield(_)).WillRepeatedly(testing::Return(false));
     EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _))
         .WillRepeatedly(Invoke([](quic::QuicStreamId, size_t write_length, quic::QuicStreamOffset,

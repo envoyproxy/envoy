@@ -54,7 +54,7 @@ public:
   ScopeKey operator=(const ScopeKey&) = delete;
 
   // Caller should guarantee the fragment is not nullptr.
-  void addFragment(std::unique_ptr<ScopeKeyFragmentBase>&& fragment) {
+  void addFragment(ScopeKeyFragmentBasePtr&& fragment) {
     ASSERT(fragment != nullptr, "null fragment not allowed in ScopeKey.");
     updateHash(*fragment);
     fragments_.emplace_back(std::move(fragment));
@@ -75,7 +75,7 @@ private:
   }
 
   uint64_t hash_{0};
-  std::vector<std::unique_ptr<ScopeKeyFragmentBase>> fragments_;
+  std::vector<ScopeKeyFragmentBasePtr> fragments_;
 };
 
 using ScopeKeyPtr = std::unique_ptr<ScopeKey>;
@@ -104,8 +104,7 @@ public:
 
   // Returns a fragment if the fragment rule applies, a nullptr indicates no fragment could be
   // generated from the headers.
-  virtual std::unique_ptr<ScopeKeyFragmentBase>
-  computeFragment(const Http::HeaderMap& headers) const PURE;
+  virtual ScopeKeyFragmentBasePtr computeFragment(const Http::HeaderMap& headers) const PURE;
 
 protected:
   const ScopedRoutes::ScopeKeyBuilder::FragmentBuilder config_;
@@ -115,8 +114,7 @@ class HeaderValueExtractorImpl : public FragmentBuilderBase {
 public:
   explicit HeaderValueExtractorImpl(ScopedRoutes::ScopeKeyBuilder::FragmentBuilder&& config);
 
-  std::unique_ptr<ScopeKeyFragmentBase>
-  computeFragment(const Http::HeaderMap& headers) const override;
+  ScopeKeyFragmentBasePtr computeFragment(const Http::HeaderMap& headers) const override;
 
 private:
   const ScopedRoutes::ScopeKeyBuilder::FragmentBuilder::HeaderValueExtractor&
@@ -146,7 +144,7 @@ public:
   ScopeKeyPtr computeScopeKey(const Http::HeaderMap& headers) const override;
 
 private:
-  std::vector<std::unique_ptr<FragmentBuilderBase>> fragment_builders_;
+  std::vector<FragmentBuilderBasePtr> fragment_builders_;
 };
 
 // ScopedRouteConfiguration and corresponding RouteConfigProvider.

@@ -76,7 +76,7 @@ public:
   private:
     MockMetric& mock_metric_;
     std::string name_;
-    std::unique_ptr<StatNameStorage> stat_name_storage_;
+    StatNameStoragePtr stat_name_storage_;
   };
 
   SymbolTable& symbolTable() override { return *symbol_table_; }
@@ -140,7 +140,7 @@ private:
   StatNameVec tag_names_and_values_;
   std::string tag_extracted_name_;
   StatNamePool tag_pool_;
-  std::unique_ptr<StatNameManagedStorage> tag_extracted_stat_name_;
+  StatNameManagedStoragePtr tag_extracted_stat_name_;
 };
 
 template <class BaseClass> class MockStatWithRefcount : public MockMetric<BaseClass> {
@@ -252,8 +252,7 @@ public:
   bool used_;
   Unit unit_{Histogram::Unit::Unspecified};
   Store* store_{};
-  std::shared_ptr<HistogramStatistics> histogram_stats_ =
-      std::make_shared<HistogramStatisticsImpl>();
+  HistogramStatisticsSharedPtr histogram_stats_ = std::make_shared<HistogramStatisticsImpl>();
 
 private:
   RefcountHelper refcount_helper_;

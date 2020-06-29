@@ -34,7 +34,7 @@ public:
   const Ssl::ServerContextConfig& serverContextConfig() const { return *config_; }
 
 private:
-  std::unique_ptr<const Ssl::ServerContextConfig> config_;
+  Ssl::ServerContextConfigConstPtr config_;
 };
 
 class QuicClientTransportSocketFactory : public QuicTransportSocketFactoryBase {
@@ -45,7 +45,7 @@ public:
   const Ssl::ClientContextConfig& clientContextConfig() const { return *config_; }
 
 private:
-  std::unique_ptr<const Ssl::ClientContextConfig> config_;
+  Ssl::ClientContextConfigConstPtr config_;
 };
 
 // Base class to create above QuicTransportSocketFactory for server and client

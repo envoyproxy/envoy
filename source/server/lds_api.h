@@ -46,7 +46,7 @@ private:
     return MessageUtil::anyConvert<envoy::config::listener::v3::Listener>(resource).name();
   }
 
-  std::unique_ptr<Config::Subscription> subscription_;
+  Config::SubscriptionPtr subscription_;
   std::string system_version_info_;
   ListenerManager& listener_manager_;
   Stats::ScopePtr scope_;

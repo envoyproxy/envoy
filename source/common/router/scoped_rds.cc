@@ -191,10 +191,10 @@ bool ScopedRdsConfigSubscription::addOrUpdateScopes(
   return any_applied;
 }
 
-std::list<std::unique_ptr<ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper>>
+std::list<ScopedRdsConfigSubscription::RdsRouteConfigProviderHelperPtr>
 ScopedRdsConfigSubscription::removeScopes(
     const Protobuf::RepeatedPtrField<std::string>& scope_names, const std::string& version_info) {
-  std::list<std::unique_ptr<ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper>>
+  std::list<ScopedRdsConfigSubscription::RdsRouteConfigProviderHelperPtr>
       to_be_removed_rds_providers;
   for (const auto& scope_name : scope_names) {
     auto iter = scoped_route_map_.find(scope_name);
@@ -230,10 +230,10 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   // If new route config sources come after the local init manager's initialize() been
   // called, the init manager can't accept new targets. Instead we use a local override which will
   // start new subscriptions but not wait on them to be ready.
-  std::unique_ptr<Init::ManagerImpl> noop_init_manager;
+  Init::ManagerImplPtr noop_init_manager;
   // NOTE: This should be defined after noop_init_manager as it depends on the
   // noop_init_manager.
-  std::unique_ptr<Cleanup> resume_rds;
+  CleanupPtr resume_rds;
   // if local init manager is initialized, the parent init manager may have gone away.
   if (localInitManager().state() == Init::Manager::State::Initialized) {
     const auto type_urls =
@@ -266,7 +266,7 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   std::vector<std::string> exception_msgs;
   // Do not delete RDS config providers just yet, in case the to be deleted RDS subscriptions could
   // be reused by some to be added scopes.
-  std::list<std::unique_ptr<ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper>>
+  std::list<ScopedRdsConfigSubscription::RdsRouteConfigProviderHelperPtr>
       to_be_removed_rds_providers = removeScopes(removed_resources, version_info);
   bool any_applied =
       addOrUpdateScopes(added_resources,

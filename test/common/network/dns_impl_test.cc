@@ -535,10 +535,10 @@ protected:
   virtual bool tcp_only() const { return true; }
   virtual bool use_tcp_for_dns_lookups() const { return false; }
   std::unique_ptr<TestDnsServer> server_;
-  std::unique_ptr<DnsResolverImplPeer> peer_;
+  DnsResolverImplPeerPtr peer_;
   Network::MockConnectionHandler connection_handler_;
-  std::shared_ptr<Network::TcpListenSocket> socket_;
-  std::unique_ptr<Network::Listener> listener_;
+  Network::TcpListenSocketSharedPtr socket_;
+  Network::ListenerPtr listener_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   DnsResolverSharedPtr resolver_;

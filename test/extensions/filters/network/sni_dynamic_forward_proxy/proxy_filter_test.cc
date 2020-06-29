@@ -59,7 +59,7 @@ public:
       new Extensions::Common::DynamicForwardProxy::MockDnsCacheManager()};
   Upstream::MockClusterManager cm_;
   ProxyFilterConfigSharedPtr filter_config_;
-  std::unique_ptr<ProxyFilter> filter_;
+  ProxyFilterPtr filter_;
   Network::MockReadFilterCallbacks callbacks_;
   NiceMock<Network::MockConnection> connection_;
 };

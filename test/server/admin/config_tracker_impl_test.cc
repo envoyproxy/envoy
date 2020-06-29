@@ -45,7 +45,7 @@ TEST_F(ConfigTrackerImplTest, DestroyHandleBeforeTracker) {
 }
 
 TEST_F(ConfigTrackerImplTest, DestroyTrackerBeforeHandle) {
-  std::shared_ptr<ConfigTracker> tracker_ptr = std::make_shared<ConfigTrackerImpl>();
+  ConfigTrackerSharedPtr tracker_ptr = std::make_shared<ConfigTrackerImpl>();
   auto entry_owner = tracker.add("test_key", test_cb);
   tracker_ptr.reset();
   entry_owner.reset(); // Shouldn't explode

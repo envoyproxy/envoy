@@ -43,13 +43,13 @@ class OptionsImplTest : public testing::Test {
 public:
   // Do the ugly work of turning a std::string into a vector and create an OptionsImpl. Args are
   // separated by a single space: no fancy quoting or escaping.
-  std::unique_ptr<OptionsImpl> createOptionsImpl(const std::string& args) {
+  OptionsImplPtr createOptionsImpl(const std::string& args) {
     std::vector<std::string> words = TestUtility::split(args, ' ');
     return std::make_unique<OptionsImpl>(
         std::move(words), [](bool) { return "1"; }, spdlog::level::warn);
   }
 
-  std::unique_ptr<OptionsImpl> createOptionsImpl(std::vector<std::string> args) {
+  OptionsImplPtr createOptionsImpl(std::vector<std::string> args) {
     return std::make_unique<OptionsImpl>(
         std::move(args), [](bool) { return "1"; }, spdlog::level::warn);
   }
@@ -70,7 +70,7 @@ TEST_F(OptionsImplTest, InvalidCommandLine) {
 }
 
 TEST_F(OptionsImplTest, V1Disallowed) {
-  std::unique_ptr<OptionsImpl> options = createOptionsImpl(
+  OptionsImplPtr options = createOptionsImpl(
       "envoy --mode validate --concurrency 2 -c hello --admin-address-path path --restart-epoch 1 "
       "--local-address-ip-version v6 -l info --service-cluster cluster --service-node node "
       "--service-zone zone --file-flush-interval-msec 9000 --drain-time-s 60 --log-format [%v] "
@@ -79,7 +79,7 @@ TEST_F(OptionsImplTest, V1Disallowed) {
 }
 
 TEST_F(OptionsImplTest, All) {
-  std::unique_ptr<OptionsImpl> options = createOptionsImpl(
+  OptionsImplPtr options = createOptionsImpl(
       "envoy --mode validate --concurrency 2 -c hello --admin-address-path path --restart-epoch 0 "
       "--local-address-ip-version v6 -l info --component-log-level upstream:debug,connection:trace "
       "--service-cluster cluster --service-node node --service-zone zone "
@@ -120,11 +120,11 @@ TEST_F(OptionsImplTest, All) {
 // Either variants of allow-unknown-[static-]-fields works.
 TEST_F(OptionsImplTest, AllowUnknownFields) {
   {
-    std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy");
+    OptionsImplPtr options = createOptionsImpl("envoy");
     EXPECT_FALSE(options->allowUnknownStaticFields());
   }
   {
-    std::unique_ptr<OptionsImpl> options;
+    OptionsImplPtr options;
     EXPECT_LOG_CONTAINS(
         "warning",
         "--allow-unknown-fields is deprecated, use --allow-unknown-static-fields instead.",
@@ -132,13 +132,13 @@ TEST_F(OptionsImplTest, AllowUnknownFields) {
     EXPECT_TRUE(options->allowUnknownStaticFields());
   }
   {
-    std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --allow-unknown-static-fields");
+    OptionsImplPtr options = createOptionsImpl("envoy --allow-unknown-static-fields");
     EXPECT_TRUE(options->allowUnknownStaticFields());
   }
 }
 
 TEST_F(OptionsImplTest, SetAll) {
-  std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy -c hello");
+  OptionsImplPtr options = createOptionsImpl("envoy -c hello");
   bool hot_restart_disabled = options->hotRestartDisabled();
   bool signal_handling_enabled = options->signalHandlingEnabled();
   bool cpuset_threads_enabled = options->cpusetThreadsEnabled();
@@ -231,7 +231,7 @@ TEST_F(OptionsImplTest, SetAll) {
 }
 
 TEST_F(OptionsImplTest, DefaultParams) {
-  std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy -c hello");
+  OptionsImplPtr options = createOptionsImpl("envoy -c hello");
   EXPECT_EQ(std::chrono::seconds(600), options->drainTime());
   EXPECT_EQ(Server::DrainStrategy::Gradual, options->drainStrategy());
   EXPECT_EQ(std::chrono::seconds(900), options->parentShutdownTime());
@@ -259,7 +259,7 @@ TEST_F(OptionsImplTest, DefaultParams) {
 
 // Validates that the server_info proto is in sync with the options.
 TEST_F(OptionsImplTest, OptionsAreInSyncWithProto) {
-  std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy -c hello");
+  OptionsImplPtr options = createOptionsImpl("envoy -c hello");
   Server::CommandLineOptionsPtr command_line_options = options->toCommandLineOptions();
   // Failure of this condition indicates that the server_info proto is not in sync with the options.
   // If an option is added/removed, please update server_info proto as well to keep it in sync.
@@ -276,7 +276,7 @@ TEST_F(OptionsImplTest, OptionsAreInSyncWithProto) {
 
 TEST_F(OptionsImplTest, OptionsFromArgv) {
   const std::array<const char*, 3> args{"envoy", "-c", "hello"};
-  std::unique_ptr<OptionsImpl> options = std::make_unique<OptionsImpl>(
+  OptionsImplPtr options = std::make_unique<OptionsImpl>(
       static_cast<int>(args.size()), args.data(), [](bool) { return "1"; }, spdlog::level::warn);
   // Spot check that the arguments were parsed.
   EXPECT_EQ("hello", options->configPath());
@@ -284,7 +284,7 @@ TEST_F(OptionsImplTest, OptionsFromArgv) {
 
 TEST_F(OptionsImplTest, OptionsFromArgvPrefix) {
   const std::array<const char*, 5> args{"envoy", "-c", "hello", "--admin-address-path", "goodbye"};
-  std::unique_ptr<OptionsImpl> options = std::make_unique<OptionsImpl>(
+  OptionsImplPtr options = std::make_unique<OptionsImpl>(
       static_cast<int>(args.size()) - 2, // Pass in only a prefix of the args
       args.data(), [](bool) { return "1"; }, spdlog::level::warn);
   EXPECT_EQ("hello", options->configPath());
@@ -299,7 +299,7 @@ TEST_F(OptionsImplTest, BadCliOption) {
 }
 
 TEST_F(OptionsImplTest, ParseComponentLogLevels) {
-  std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
+  OptionsImplPtr options = createOptionsImpl("envoy --mode init_only");
   options->parseComponentLogLevels("upstream:debug,connection:trace");
   const std::vector<std::pair<std::string, spdlog::level::level_enum>>& component_log_levels =
       options->componentLogLevels();
@@ -311,38 +311,38 @@ TEST_F(OptionsImplTest, ParseComponentLogLevels) {
 }
 
 TEST_F(OptionsImplTest, ParseComponentLogLevelsWithBlank) {
-  std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
+  OptionsImplPtr options = createOptionsImpl("envoy --mode init_only");
   options->parseComponentLogLevels("");
   EXPECT_EQ(0, options->componentLogLevels().size());
 }
 
 TEST_F(OptionsImplTest, InvalidComponent) {
-  std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
+  OptionsImplPtr options = createOptionsImpl("envoy --mode init_only");
   EXPECT_THROW_WITH_REGEX(options->parseComponentLogLevels("blah:debug"), MalformedArgvException,
                           "error: invalid component specified 'blah'");
 }
 
 TEST_F(OptionsImplTest, InvalidComponentLogLevel) {
-  std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
+  OptionsImplPtr options = createOptionsImpl("envoy --mode init_only");
   EXPECT_THROW_WITH_REGEX(options->parseComponentLogLevels("upstream:blah,connection:trace"),
                           MalformedArgvException, "error: invalid log level specified 'blah'");
 }
 
 TEST_F(OptionsImplTest, ComponentLogLevelContainsBlank) {
-  std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
+  OptionsImplPtr options = createOptionsImpl("envoy --mode init_only");
   EXPECT_THROW_WITH_REGEX(options->parseComponentLogLevels("upstream:,connection:trace"),
                           MalformedArgvException, "error: invalid log level specified ''");
 }
 
 TEST_F(OptionsImplTest, InvalidComponentLogLevelStructure) {
-  std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
+  OptionsImplPtr options = createOptionsImpl("envoy --mode init_only");
   EXPECT_THROW_WITH_REGEX(options->parseComponentLogLevels("upstream:foo:bar"),
                           MalformedArgvException,
                           "error: component log level not correctly specified 'upstream:foo:bar'");
 }
 
 TEST_F(OptionsImplTest, IncompleteComponentLogLevel) {
-  std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
+  OptionsImplPtr options = createOptionsImpl("envoy --mode init_only");
   EXPECT_THROW_WITH_REGEX(options->parseComponentLogLevels("upstream"), MalformedArgvException,
                           "component log level not correctly specified 'upstream'");
 }
@@ -353,12 +353,12 @@ TEST_F(OptionsImplTest, InvalidLogLevel) {
 }
 
 TEST_F(OptionsImplTest, ValidLogLevel) {
-  std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy -l critical");
+  OptionsImplPtr options = createOptionsImpl("envoy -l critical");
   EXPECT_EQ(spdlog::level::level_enum::critical, options->logLevel());
 }
 
 TEST_F(OptionsImplTest, WarnIsValidLogLevel) {
-  std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy -l warn");
+  OptionsImplPtr options = createOptionsImpl("envoy -l warn");
   EXPECT_EQ(spdlog::level::level_enum::warn, options->logLevel());
 }
 
@@ -369,7 +369,7 @@ TEST_F(OptionsImplTest, AllowedLogLevels) {
 
 // Test that the test constructor comes up with the same default values as the main constructor.
 TEST_F(OptionsImplTest, SaneTestConstructor) {
-  std::unique_ptr<OptionsImpl> regular_options_impl(createOptionsImpl("envoy"));
+  OptionsImplPtr regular_options_impl(createOptionsImpl("envoy"));
   OptionsImpl test_options_impl("service_cluster", "service_node", "service_zone",
                                 spdlog::level::level_enum::info);
 
@@ -407,34 +407,34 @@ TEST_F(OptionsImplTest, SetBothConcurrencyAndCpuset) {
   EXPECT_LOG_CONTAINS(
       "warning",
       "Both --concurrency and --cpuset-threads options are set; not applying --cpuset-threads.",
-      std::unique_ptr<OptionsImpl> options =
+      OptionsImplPtr options =
           createOptionsImpl("envoy -c hello --concurrency 42 --cpuset-threads"));
 }
 
 TEST_F(OptionsImplTest, SetCpusetOnly) {
-  std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy -c hello --cpuset-threads");
+  OptionsImplPtr options = createOptionsImpl("envoy -c hello --cpuset-threads");
   EXPECT_NE(options->concurrency(), 0);
 }
 
 TEST_F(OptionsImplTest, LogFormatDefault) {
-  std::unique_ptr<OptionsImpl> options = createOptionsImpl({"envoy", "-c", "hello"});
+  OptionsImplPtr options = createOptionsImpl({"envoy", "-c", "hello"});
   EXPECT_EQ(options->logFormat(), "[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v");
 }
 
 TEST_F(OptionsImplTest, LogFormatDefaultNoPrefix) {
-  std::unique_ptr<OptionsImpl> options =
+  OptionsImplPtr options =
       createOptionsImpl({"envoy", "-c", "hello", "--log-format-prefix-with-location", "0"});
   EXPECT_EQ(options->logFormat(), "[%Y-%m-%d %T.%e][%t][%l][%n] %v");
 }
 
 TEST_F(OptionsImplTest, LogFormatOverride) {
-  std::unique_ptr<OptionsImpl> options =
+  OptionsImplPtr options =
       createOptionsImpl({"envoy", "-c", "hello", "--log-format", "%%v %v %t %v"});
   EXPECT_EQ(options->logFormat(), "%%v [%g:%#] %v %t [%g:%#] %v");
 }
 
 TEST_F(OptionsImplTest, LogFormatOverrideNoPrefix) {
-  std::unique_ptr<OptionsImpl> options =
+  OptionsImplPtr options =
       createOptionsImpl({"envoy", "-c", "hello", "--log-format", "%%v %v %t %v",
                          "--log-format-prefix-with-location 0"});
   EXPECT_EQ(options->logFormat(), "%%v %v %t %v");
@@ -442,7 +442,7 @@ TEST_F(OptionsImplTest, LogFormatOverrideNoPrefix) {
 
 // Test that --base-id and --restart-epoch with non-default values are accepted.
 TEST_F(OptionsImplTest, SetBaseIdAndRestartEpoch) {
-  std::unique_ptr<OptionsImpl> options =
+  OptionsImplPtr options =
       createOptionsImpl({"envoy", "-c", "hello", "--base-id", "99", "--restart-epoch", "999"});
   EXPECT_EQ(99U, options->baseId());
   EXPECT_EQ(999U, options->restartEpoch());

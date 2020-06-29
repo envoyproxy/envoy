@@ -78,7 +78,7 @@ public:
   Stats::TestUtil::TestStore stats_store_;
   ConfigSharedPtr config_;
   Filters::Common::ExtAuthz::MockClient* client_;
-  std::unique_ptr<Filter> filter_;
+  FilterPtr filter_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   Network::Address::InstanceConstSharedPtr addr_;
   Filters::Common::ExtAuthz::RequestCallbacks* request_callbacks_{};

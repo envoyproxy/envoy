@@ -146,7 +146,7 @@ public:
   /**
    * For the GrpcStream to pass received protos to the context.
    */
-  virtual void onDiscoveryResponse(std::unique_ptr<ResponseProto>&& message,
+  virtual void onDiscoveryResponse(ResponseProtoPtr&& message,
                                    ControlPlaneStats& control_plane_stats) PURE;
 
   /**

@@ -62,9 +62,9 @@ private:
   Stats::ThreadLocalStoreImpl store_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
-  std::unique_ptr<ThreadLocal::InstanceImpl> tls_;
+  ThreadLocal::InstanceImplPtr tls_;
   envoy::config::metrics::v3::StatsConfig stats_config_;
-  std::vector<std::unique_ptr<Stats::StatNameStorage>> stat_names_;
+  std::vector<Stats::StatNameStoragePtr> stat_names_;
 };
 
 } // namespace Envoy

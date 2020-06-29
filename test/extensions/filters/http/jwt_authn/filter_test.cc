@@ -66,7 +66,7 @@ public:
 
   std::shared_ptr<NiceMock<MockFilterConfig>> mock_config_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks_;
-  std::unique_ptr<Filter> filter_;
+  FilterPtr filter_;
   std::unique_ptr<MockVerifier> mock_verifier_;
   NiceMock<MockVerifierCallbacks> verifier_callback_;
   Http::TestRequestTrailerMapImpl trailers_;

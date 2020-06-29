@@ -109,7 +109,7 @@ ip_white_list:
   Http::MockAsyncClientRequest request_;
   ClientSslAuthConfigSharedPtr config_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
-  std::unique_ptr<ClientSslAuthFilter> instance_;
+  ClientSslAuthFilterPtr instance_;
   Event::MockTimer* interval_timer_;
   Http::AsyncClient::Callbacks* callbacks_;
   Stats::TestUtil::TestStore stats_store_;

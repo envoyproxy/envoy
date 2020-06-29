@@ -5,7 +5,7 @@
 namespace Envoy {
 namespace StreamInfo {
 
-void FilterStateImpl::setData(absl::string_view data_name, std::shared_ptr<Object> data,
+void FilterStateImpl::setData(absl::string_view data_name, ObjectSharedPtr data,
                               FilterState::StateType state_type, FilterState::LifeSpan life_span) {
   if (life_span > life_span_) {
     if (hasDataWithNameInternally(data_name)) {
@@ -35,7 +35,7 @@ void FilterStateImpl::setData(absl::string_view data_name, std::shared_ptr<Objec
     }
   }
 
-  std::unique_ptr<FilterStateImpl::FilterObject> filter_object(new FilterStateImpl::FilterObject());
+  FilterStateImpl::FilterObjectPtr filter_object(new FilterStateImpl::FilterObject());
   filter_object->data_ = data;
   filter_object->state_type_ = state_type;
   data_storage_[data_name] = std::move(filter_object);

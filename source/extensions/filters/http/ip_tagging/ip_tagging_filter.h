@@ -70,7 +70,7 @@ private:
   const Stats::StatName no_hit_;
   const Stats::StatName total_;
   const Stats::StatName unknown_tag_;
-  std::unique_ptr<Network::LcTrie::LcTrie<std::string>> trie_;
+  Network::LcTrie::LcTriePtr<std::string> trie_;
 };
 
 using IpTaggingFilterConfigSharedPtr = std::shared_ptr<IpTaggingFilterConfig>;

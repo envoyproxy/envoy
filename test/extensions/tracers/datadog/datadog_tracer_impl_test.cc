@@ -80,7 +80,7 @@ public:
   SystemTime start_time_;
 
   NiceMock<ThreadLocal::MockInstance> tls_;
-  std::unique_ptr<Driver> driver_;
+  DriverPtr driver_;
   NiceMock<Event::MockTimer>* timer_;
   Stats::TestUtil::TestStore stats_;
   NiceMock<Upstream::MockClusterManager> cm_;

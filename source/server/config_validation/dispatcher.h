@@ -30,7 +30,7 @@ public:
                                       bool bind_to_port) override;
 
 protected:
-  std::shared_ptr<Network::ValidationDnsResolver> dns_resolver_{
+  Network::ValidationDnsResolverSharedPtr dns_resolver_{
       std::make_shared<Network::ValidationDnsResolver>()};
 };
 

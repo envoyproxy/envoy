@@ -54,7 +54,7 @@ public:
 
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
-  std::unique_ptr<TcpStatsdSink> sink_;
+  TcpStatsdSinkPtr sink_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Network::MockClientConnection* connection_{};
   NiceMock<Stats::MockMetricSnapshot> snapshot_;

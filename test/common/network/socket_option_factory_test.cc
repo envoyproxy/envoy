@@ -52,7 +52,7 @@ protected:
 TEST_F(SocketOptionFactoryTest, TestBuildSocketMarkOptions) {
 
   // use a shared_ptr due to applyOptions requiring one
-  std::shared_ptr<Socket::Options> options = SocketOptionFactory::buildSocketMarkOptions(100);
+  Socket::OptionsSharedPtr options = SocketOptionFactory::buildSocketMarkOptions(100);
 
   const auto expected_option = ENVOY_SOCKET_SO_MARK;
   CHECK_OPTION_SUPPORTED(expected_option);
@@ -76,7 +76,7 @@ TEST_F(SocketOptionFactoryTest, TestBuildIpv4TransparentOptions) {
   makeSocketV4();
 
   // use a shared_ptr due to applyOptions requiring one
-  std::shared_ptr<Socket::Options> options = SocketOptionFactory::buildIpTransparentOptions();
+  Socket::OptionsSharedPtr options = SocketOptionFactory::buildIpTransparentOptions();
 
   const auto expected_option = ENVOY_SOCKET_IP_TRANSPARENT;
   CHECK_OPTION_SUPPORTED(expected_option);
@@ -103,7 +103,7 @@ TEST_F(SocketOptionFactoryTest, TestBuildIpv6TransparentOptions) {
   makeSocketV6();
 
   // use a shared_ptr due to applyOptions requiring one
-  std::shared_ptr<Socket::Options> options = SocketOptionFactory::buildIpTransparentOptions();
+  Socket::OptionsSharedPtr options = SocketOptionFactory::buildIpTransparentOptions();
 
   const auto expected_option = ENVOY_SOCKET_IPV6_TRANSPARENT;
   CHECK_OPTION_SUPPORTED(expected_option);

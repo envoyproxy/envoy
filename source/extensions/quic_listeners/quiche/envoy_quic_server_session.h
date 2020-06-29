@@ -28,8 +28,7 @@ class EnvoyQuicServerSession : public quic::QuicServerSessionBase,
 public:
   EnvoyQuicServerSession(const quic::QuicConfig& config,
                          const quic::ParsedQuicVersionVector& supported_versions,
-                         std::unique_ptr<EnvoyQuicConnection> connection,
-                         quic::QuicSession::Visitor* visitor,
+                         EnvoyQuicConnectionPtr connection, quic::QuicSession::Visitor* visitor,
                          quic::QuicCryptoServerStreamBase::Helper* helper,
                          const quic::QuicCryptoServerConfig* crypto_config,
                          quic::QuicCompressedCertsCache* compressed_certs_cache,
@@ -75,7 +74,7 @@ protected:
 private:
   void setUpRequestDecoder(EnvoyQuicServerStream& stream);
 
-  std::unique_ptr<EnvoyQuicConnection> quic_connection_;
+  EnvoyQuicConnectionPtr quic_connection_;
   // These callbacks are owned by network filters and quic session should out live
   // them.
   Http::ServerConnectionCallbacks* http_connection_callbacks_{nullptr};

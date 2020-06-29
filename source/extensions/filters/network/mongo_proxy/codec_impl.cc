@@ -367,51 +367,49 @@ bool DecoderImpl::decode(Buffer::Instance& data) {
 
   switch (op_code) {
   case Message::OpCode::Reply: {
-    std::unique_ptr<ReplyMessageImpl> message(new ReplyMessageImpl(request_id, response_to));
+    ReplyMessageImplPtr message(new ReplyMessageImpl(request_id, response_to));
     message->fromBuffer(message_length, data);
     callbacks_.decodeReply(std::move(message));
     break;
   }
 
   case Message::OpCode::Query: {
-    std::unique_ptr<QueryMessageImpl> message(new QueryMessageImpl(request_id, response_to));
+    QueryMessageImplPtr message(new QueryMessageImpl(request_id, response_to));
     message->fromBuffer(message_length, data);
     callbacks_.decodeQuery(std::move(message));
     break;
   }
 
   case Message::OpCode::GetMore: {
-    std::unique_ptr<GetMoreMessageImpl> message(new GetMoreMessageImpl(request_id, response_to));
+    GetMoreMessageImplPtr message(new GetMoreMessageImpl(request_id, response_to));
     message->fromBuffer(message_length, data);
     callbacks_.decodeGetMore(std::move(message));
     break;
   }
 
   case Message::OpCode::Insert: {
-    std::unique_ptr<InsertMessageImpl> message(new InsertMessageImpl(request_id, response_to));
+    InsertMessageImplPtr message(new InsertMessageImpl(request_id, response_to));
     message->fromBuffer(message_length, data);
     callbacks_.decodeInsert(std::move(message));
     break;
   }
 
   case Message::OpCode::KillCursors: {
-    std::unique_ptr<KillCursorsMessageImpl> message(
-        new KillCursorsMessageImpl(request_id, response_to));
+    KillCursorsMessageImplPtr message(new KillCursorsMessageImpl(request_id, response_to));
     message->fromBuffer(message_length, data);
     callbacks_.decodeKillCursors(std::move(message));
     break;
   }
 
   case Message::OpCode::Command: {
-    std::unique_ptr<CommandMessageImpl> message(new CommandMessageImpl(request_id, response_to));
+    CommandMessageImplPtr message(new CommandMessageImpl(request_id, response_to));
     message->fromBuffer(message_length, data);
     callbacks_.decodeCommand(std::move(message));
     break;
   }
 
   case Message::OpCode::CommandReply: {
-    std::unique_ptr<CommandReplyMessageImpl> message(
-        new CommandReplyMessageImpl(request_id, response_to));
+    CommandReplyMessageImplPtr message(new CommandReplyMessageImpl(request_id, response_to));
     message->fromBuffer(message_length, data);
     callbacks_.decodeCommandReply(std::move(message));
     break;

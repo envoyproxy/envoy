@@ -4449,7 +4449,7 @@ protected:
 
   Stats::TestUtil::TestStore server_stats_store_;
   Stats::TestUtil::TestStore client_stats_store_;
-  std::shared_ptr<Network::TcpListenSocket> socket_;
+  Network::TcpListenSocketSharedPtr socket_;
   Network::MockListenerCallbacks listener_callbacks_;
   Network::MockConnectionHandler connection_handler_;
   const std::string server_ctx_yaml_ = R"EOF(
@@ -4474,7 +4474,7 @@ protected:
 )EOF";
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext downstream_tls_context_;
-  std::unique_ptr<ContextManagerImpl> manager_;
+  ContextManagerImplPtr manager_;
   Network::TransportSocketFactoryPtr server_ssl_socket_factory_;
   Network::ListenerPtr listener_;
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext upstream_tls_context_;

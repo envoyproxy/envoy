@@ -34,7 +34,7 @@ public:
 
 private:
   // Using config validation API.
-  std::unique_ptr<Api::ValidationImpl> validation_;
+  Api::ValidationImplPtr validation_;
 };
 
 // Simple test which creates a connection to fake upstream client. This is to test if

@@ -477,7 +477,7 @@ private:
                    Runtime::Loader& runtime, Runtime::RandomGenerator& random,
                    Event::Dispatcher& dispatcher, Upstream::ResourcePriority priority) PURE;
 
-  std::unique_ptr<GenericConnPool> createConnPool();
+  GenericConnPoolPtr createConnPool();
   UpstreamRequestPtr createUpstreamRequest();
 
   void maybeDoShadowing();
@@ -521,7 +521,7 @@ private:
   RouteConstSharedPtr route_;
   const RouteEntry* route_entry_{};
   Upstream::ClusterInfoConstSharedPtr cluster_;
-  std::unique_ptr<Stats::StatNameDynamicStorage> alt_stat_prefix_;
+  Stats::StatNameDynamicStoragePtr alt_stat_prefix_;
   const VirtualCluster* request_vcluster_;
   Event::TimerPtr response_timeout_;
   FilterUtility::TimeoutData timeout_;

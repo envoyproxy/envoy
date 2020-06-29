@@ -42,7 +42,7 @@ RouteEntryImplBase::RouteEntryImplBase(
 
     total_cluster_weight_ = 0UL;
     for (const auto& cluster : route.route().weighted_clusters().clusters()) {
-      std::unique_ptr<WeightedClusterEntry> cluster_entry(new WeightedClusterEntry(*this, cluster));
+      WeightedClusterEntryPtr cluster_entry(new WeightedClusterEntry(*this, cluster));
       weighted_clusters_.emplace_back(std::move(cluster_entry));
       total_cluster_weight_ += weighted_clusters_.back()->clusterWeight();
     }
@@ -247,7 +247,7 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
     return FilterStatus::StopIteration;
   }
 
-  const std::shared_ptr<const ProtocolOptionsConfig> options =
+  const ProtocolOptionsConfigConstSharedPtr options =
       cluster_->extensionProtocolOptionsTyped<ProtocolOptionsConfig>(
           NetworkFilterNames::get().ThriftProxy);
 

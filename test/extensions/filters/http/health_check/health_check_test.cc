@@ -61,7 +61,7 @@ public:
   Event::MockTimer* cache_timer_{};
   Event::MockDispatcher dispatcher_;
   HealthCheckCacheManagerSharedPtr cache_manager_;
-  std::unique_ptr<HealthCheckFilter> filter_;
+  HealthCheckFilterPtr filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   Http::TestRequestHeaderMapImpl request_headers_;
   Http::TestRequestHeaderMapImpl request_headers_no_hc_;

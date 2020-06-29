@@ -29,7 +29,7 @@ public:
 
 protected:
   testing::NiceMock<Network::MockListenSocket> socket_;
-  std::unique_ptr<QuicIoHandleWrapper> wrapper_;
+  QuicIoHandleWrapperPtr wrapper_;
   testing::StrictMock<Envoy::Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Envoy::Api::OsSysCallsImpl> os_calls_{&os_sys_calls_};
 };

@@ -870,7 +870,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessWithSpuriousMetadata) {
               enableTimer(std::chrono::milliseconds(45000), _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
 
-  std::unique_ptr<Http::MetadataMap> metadata_map(new Http::MetadataMap());
+  Http::MetadataMapPtr metadata_map(new Http::MetadataMap());
   metadata_map->insert(std::make_pair<std::string, std::string>("key", "value"));
   test_sessions_[0]->stream_response_callbacks_->decodeMetadata(std::move(metadata_map));
 
@@ -2558,12 +2558,11 @@ class TestProdHttpHealthChecker : public ProdHttpHealthCheckerImpl {
 public:
   using ProdHttpHealthCheckerImpl::ProdHttpHealthCheckerImpl;
 
-  std::unique_ptr<Http::CodecClient>
-  createCodecClientForTest(std::unique_ptr<Network::ClientConnection>&& connection) {
+  Http::CodecClientPtr createCodecClientForTest(Network::ClientConnectionPtr&& connection) {
     Upstream::Host::CreateConnectionData data;
     data.connection_ = std::move(connection);
     data.host_description_ = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
-    return std::unique_ptr<Http::CodecClient>(createCodecClient(data));
+    return Http::CodecClientPtr(createCodecClient(data));
   }
 };
 
@@ -3052,7 +3051,7 @@ public:
     EXPECT_CALL(*connection_, addReadFilter(_)).WillOnce(SaveArg<0>(&read_filter_));
   }
 
-  std::shared_ptr<TcpHealthCheckerImpl> health_checker_;
+  TcpHealthCheckerImplSharedPtr health_checker_;
   Network::MockClientConnection* connection_{};
   Event::MockTimer* timeout_timer_{};
   Event::MockTimer* interval_timer_{};

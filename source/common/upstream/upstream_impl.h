@@ -409,20 +409,21 @@ private:
   // @param locality_weights the weighting of each locality.
   // @param overprovisioning_factor the overprovisioning factor to use when computing the effective
   // weight of a locality.
-  static void rebuildLocalityScheduler(
-      std::unique_ptr<EdfScheduler<LocalityEntry>>& locality_scheduler,
-      std::vector<std::shared_ptr<LocalityEntry>>& locality_entries,
-      const HostsPerLocality& eligible_hosts_per_locality, const HostVector& eligible_hosts,
-      HostsPerLocalityConstSharedPtr all_hosts_per_locality,
-      HostsPerLocalityConstSharedPtr excluded_hosts_per_locality,
-      LocalityWeightsConstSharedPtr locality_weights, uint32_t overprovisioning_factor);
+  static void rebuildLocalityScheduler(EdfSchedulerPtr<LocalityEntry>& locality_scheduler,
+                                       std::vector<LocalityEntrySharedPtr>& locality_entries,
+                                       const HostsPerLocality& eligible_hosts_per_locality,
+                                       const HostVector& eligible_hosts,
+                                       HostsPerLocalityConstSharedPtr all_hosts_per_locality,
+                                       HostsPerLocalityConstSharedPtr excluded_hosts_per_locality,
+                                       LocalityWeightsConstSharedPtr locality_weights,
+                                       uint32_t overprovisioning_factor);
 
   static absl::optional<uint32_t> chooseLocality(EdfScheduler<LocalityEntry>* locality_scheduler);
 
-  std::vector<std::shared_ptr<LocalityEntry>> healthy_locality_entries_;
-  std::unique_ptr<EdfScheduler<LocalityEntry>> healthy_locality_scheduler_;
-  std::vector<std::shared_ptr<LocalityEntry>> degraded_locality_entries_;
-  std::unique_ptr<EdfScheduler<LocalityEntry>> degraded_locality_scheduler_;
+  std::vector<LocalityEntrySharedPtr> healthy_locality_entries_;
+  EdfSchedulerPtr<LocalityEntry> healthy_locality_scheduler_;
+  std::vector<LocalityEntrySharedPtr> degraded_locality_entries_;
+  EdfSchedulerPtr<LocalityEntry> degraded_locality_scheduler_;
 };
 
 using HostSetImplPtr = std::unique_ptr<HostSetImpl>;
@@ -440,9 +441,7 @@ public:
   Common::CallbackHandle* addPriorityUpdateCb(PriorityUpdateCb callback) const override {
     return priority_update_cb_helper_.add(callback);
   }
-  const std::vector<std::unique_ptr<HostSet>>& hostSetsPerPriority() const override {
-    return host_sets_;
-  }
+  const std::vector<HostSetPtr>& hostSetsPerPriority() const override { return host_sets_; }
   // Get the host set for this priority level, creating it if necessary.
   const HostSet&
   getOrCreateHostSet(uint32_t priority,
@@ -473,7 +472,7 @@ protected:
   // This vector will generally have at least one member, for priority level 0.
   // It will expand as host sets are added but currently does not shrink to
   // avoid any potential lifetime issues.
-  std::vector<std::unique_ptr<HostSet>> host_sets_;
+  std::vector<HostSetPtr> host_sets_;
 
 private:
   // TODO(mattklein123): Remove mutable.
@@ -662,7 +661,7 @@ private:
       upstream_http_protocol_options_;
   absl::optional<std::string> eds_service_name_;
   const absl::optional<envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type_;
-  const std::unique_ptr<Server::Configuration::CommonFactoryContext> factory_context_;
+  const Server::Configuration::CommonFactoryContextPtr factory_context_;
   std::vector<Network::FilterFactoryCb> filter_factories_;
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;

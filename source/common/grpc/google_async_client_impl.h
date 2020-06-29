@@ -189,7 +189,7 @@ private:
   // the client if it gets destructed. The streams need to wait for their tags
   // to drain from the CQ.
   GoogleStubSharedPtr stub_;
-  std::list<std::unique_ptr<GoogleAsyncStreamImpl>> active_streams_;
+  std::list<GoogleAsyncStreamImplPtr> active_streams_;
   const std::string stat_prefix_;
   const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue> initial_metadata_;
   Stats::ScopeSharedPtr scope_;

@@ -83,7 +83,7 @@ public:
 private:
   const UserAgentContext& context_;
   bool initialized_{false};
-  std::unique_ptr<UserAgentStats> stats_;
+  UserAgentStatsPtr stats_;
 };
 
 } // namespace Http

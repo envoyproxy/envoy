@@ -95,7 +95,7 @@ DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v3::Bootstrap& input) {
     options.log_level_ = Fuzz::Runner::logLevel();
   }
 
-  std::unique_ptr<InstanceImpl> server;
+  InstanceImplPtr server;
   try {
     server = std::make_unique<InstanceImpl>(
         init_manager, options, test_time.timeSystem(),

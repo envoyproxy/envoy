@@ -47,7 +47,7 @@ private:
   Api::ApiPtr api_;
   testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
   testing::NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
-  std::unique_ptr<Runtime::ScopedLoaderSingleton> loader_;
+  Runtime::ScopedLoaderSingletonPtr loader_;
 };
 
 } // namespace Envoy

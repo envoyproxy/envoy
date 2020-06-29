@@ -98,7 +98,7 @@ filter_disabled:
       ASSERT(connect_callbacks_.closed());
     }
   }
-  std::unique_ptr<Ssl::ContextManager> context_manager_;
+  Ssl::ContextManagerPtr context_manager_;
   Network::TransportSocketFactoryPtr context_;
   ConnectionStatusCallbacks connect_callbacks_;
   testing::NiceMock<Secret::MockSecretManager> secret_manager_;

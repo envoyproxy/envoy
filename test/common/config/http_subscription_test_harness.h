@@ -191,7 +191,7 @@ public:
   Http::MockAsyncClientRequest http_request_;
   Http::AsyncClient::Callbacks* http_callbacks_;
   Config::MockSubscriptionCallbacks callbacks_;
-  std::unique_ptr<HttpSubscriptionImpl> subscription_;
+  HttpSubscriptionImplPtr subscription_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Event::MockTimer* init_timeout_timer_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;

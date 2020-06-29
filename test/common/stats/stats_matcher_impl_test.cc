@@ -33,7 +33,7 @@ protected:
     }
   }
 
-  std::unique_ptr<StatsMatcherImpl> stats_matcher_impl_;
+  StatsMatcherImplPtr stats_matcher_impl_;
 
 private:
   envoy::config::metrics::v3::StatsConfig stats_config_;

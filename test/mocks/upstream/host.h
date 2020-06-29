@@ -113,7 +113,7 @@ public:
   testing::NiceMock<MockClusterInfo> cluster_;
   HostStats stats_;
   mutable Stats::TestSymbolTable symbol_table_;
-  mutable std::unique_ptr<Stats::StatNameManagedStorage> locality_zone_stat_name_;
+  mutable Stats::StatNameManagedStoragePtr locality_zone_stat_name_;
 };
 
 class MockHost : public Host {
@@ -198,7 +198,7 @@ public:
   testing::NiceMock<Outlier::MockDetectorHostMonitor> outlier_detector_;
   HostStats stats_;
   mutable Stats::TestSymbolTable symbol_table_;
-  mutable std::unique_ptr<Stats::StatNameManagedStorage> locality_zone_stat_name_;
+  mutable Stats::StatNameManagedStoragePtr locality_zone_stat_name_;
 };
 
 } // namespace Upstream

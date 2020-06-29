@@ -16,7 +16,7 @@ uint64_t MemoryStatsReader::unmappedHeapBytes() { return Memory::Stats::totalPag
 
 FixedHeapMonitor::FixedHeapMonitor(
     const envoy::config::resource_monitor::fixed_heap::v2alpha::FixedHeapConfig& config,
-    std::unique_ptr<MemoryStatsReader> stats)
+    MemoryStatsReaderPtr stats)
     : max_heap_(config.max_heap_size_bytes()), stats_(std::move(stats)) {
   ASSERT(max_heap_ > 0);
 }

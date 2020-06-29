@@ -72,7 +72,7 @@ public:
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
-  std::unique_ptr<RingHashLoadBalancer> lb_;
+  RingHashLoadBalancerPtr lb_;
 };
 
 // For tests which don't need to be run in both primary and failover modes.

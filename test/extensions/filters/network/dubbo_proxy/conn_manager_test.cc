@@ -319,7 +319,7 @@ public:
   Buffer::OwnedImpl write_buffer_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   NiceMock<Runtime::MockRandomGenerator> random_;
-  std::unique_ptr<ConnectionManager> conn_manager_;
+  ConnectionManagerPtr conn_manager_;
   MockSerializer* custom_serializer_{};
   MockProtocol* custom_protocol_{};
 };

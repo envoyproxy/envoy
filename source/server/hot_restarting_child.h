@@ -26,7 +26,7 @@ private:
   const int restart_epoch_;
   bool parent_terminated_{};
   sockaddr_un parent_address_;
-  std::unique_ptr<Stats::StatMerger> stat_merger_{};
+  Stats::StatMergerPtr stat_merger_{};
   Stats::StatName hot_restart_generation_stat_name_;
 };
 

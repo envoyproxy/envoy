@@ -56,13 +56,11 @@ class MockClusterTypedMetadata : public Config::TypedMetadataImpl<ClusterTypedMe
 public:
   using Config::TypedMetadataImpl<ClusterTypedMetadataFactory>::TypedMetadataImpl;
 
-  void inject(const std::string& key, std::unique_ptr<const TypedMetadata::Object> value) {
+  void inject(const std::string& key, TypedMetadata::ObjectConstPtr value) {
     data_[key] = std::move(value);
   }
 
-  std::unordered_map<std::string, std::unique_ptr<const TypedMetadata::Object>>& data() {
-    return data_;
-  }
+  std::unordered_map<std::string, TypedMetadata::ObjectConstPtr>& data() { return data_; }
 };
 
 class MockClusterInfo : public ClusterInfo {
@@ -154,7 +152,7 @@ public:
   absl::optional<ClusterTimeoutBudgetStats> timeout_budget_stats_;
   ClusterCircuitBreakersStats circuit_breakers_stats_;
   NiceMock<Runtime::MockLoader> runtime_;
-  std::unique_ptr<Upstream::ResourceManager> resource_manager_;
+  Upstream::ResourceManagerPtr resource_manager_;
   Network::Address::InstanceConstSharedPtr source_address_;
   LoadBalancerType lb_type_{LoadBalancerType::RoundRobin};
   envoy::config::cluster::v3::Cluster::DiscoveryType type_{
@@ -169,7 +167,7 @@ public:
   Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
   envoy::config::cluster::v3::Cluster::CommonLbConfig lb_config_;
   envoy::config::core::v3::Metadata metadata_;
-  std::unique_ptr<Envoy::Config::TypedMetadata> typed_metadata_;
+  Envoy::Config::TypedMetadataPtr typed_metadata_;
   absl::optional<std::chrono::milliseconds> max_stream_duration_;
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;

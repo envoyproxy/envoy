@@ -188,7 +188,7 @@ public:
 private:
   Network::ReadFilterCallbacks* read_callbacks_{};
   ZooKeeperFilterConfigSharedPtr config_;
-  std::unique_ptr<Decoder> decoder_;
+  DecoderPtr decoder_;
 };
 
 } // namespace ZooKeeperProxy

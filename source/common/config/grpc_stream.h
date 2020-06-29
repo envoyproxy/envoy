@@ -74,7 +74,7 @@ public:
     UNREFERENCED_PARAMETER(metadata);
   }
 
-  void onReceiveMessage(std::unique_ptr<ResponseProto>&& message) override {
+  void onReceiveMessage(ResponseProtoPtr&& message) override {
     // Reset here so that it starts with fresh backoff interval on next disconnect.
     backoff_strategy_->reset();
     // Sometimes during hot restarts this stat's value becomes inconsistent and will continue to

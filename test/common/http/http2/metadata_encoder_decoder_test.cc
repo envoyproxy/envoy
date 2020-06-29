@@ -142,7 +142,7 @@ public:
   nghttp2_session* session_ = nullptr;
   nghttp2_session_callbacks* callbacks_;
   MetadataEncoder encoder_;
-  std::unique_ptr<MetadataDecoder> decoder_;
+  MetadataDecoderPtr decoder_;
   nghttp2_option* option_;
   int count_ = 0;
 
@@ -204,7 +204,7 @@ TEST_F(MetadataEncoderDecoderTest, TestDecodeBadData) {
 // Checks if accumulated metadata size reaches size limit, returns failure.
 TEST_F(MetadataEncoderDecoderTest, VerifyEncoderDecoderMultipleMetadataReachSizeLimit) {
   MetadataMap metadata_map_empty = {};
-  MetadataCallback cb = [](std::unique_ptr<MetadataMap>) -> void {};
+  MetadataCallback cb = [](MetadataMapPtr) -> void {};
   initialize(cb);
 
   ssize_t result = 0;

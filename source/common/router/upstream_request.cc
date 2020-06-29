@@ -41,8 +41,7 @@
 namespace Envoy {
 namespace Router {
 
-UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
-                                 std::unique_ptr<GenericConnPool>&& conn_pool)
+UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent, GenericConnPoolPtr&& conn_pool)
     : parent_(parent), conn_pool_(std::move(conn_pool)), grpc_rq_success_deferred_(false),
       stream_info_(parent_.callbacks()->dispatcher().timeSource()),
       start_time_(parent_.callbacks()->dispatcher().timeSource().monotonicTime()),
@@ -329,7 +328,7 @@ void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
 }
 
 void UpstreamRequest::onPoolReady(
-    std::unique_ptr<GenericUpstream>&& upstream, Upstream::HostDescriptionConstSharedPtr host,
+    GenericUpstreamPtr&& upstream, Upstream::HostDescriptionConstSharedPtr host,
     const Network::Address::InstanceConstSharedPtr& upstream_local_address,
     const StreamInfo::StreamInfo& info) {
   // This may be called under an existing ScopeTrackerScopeState but it will unwind correctly.

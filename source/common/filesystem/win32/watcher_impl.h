@@ -53,7 +53,7 @@ private:
     WatcherImpl* watcher_;
   };
 
-  typedef std::unique_ptr<DirectoryWatch> DirectoryWatchPtr;
+  typedef DirectoryWatchPtr DirectoryWatchPtr;
 
   Api::Api& api_;
   std::unordered_map<std::string, DirectoryWatchPtr> callback_map_;

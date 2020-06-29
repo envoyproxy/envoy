@@ -68,7 +68,7 @@ public:
 
 private:
   Upstream::HealthyAndDegradedLoad priority_load_;
-  std::unique_ptr<Upstream::LoadBalancerContext> owned_context_;
+  Upstream::LoadBalancerContextPtr owned_context_;
   Upstream::LoadBalancerContext* context_{nullptr};
   const Upstream::LoadBalancerBase::HostAvailability host_availability_;
   const uint32_t host_priority_;
