@@ -5,12 +5,33 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/ratelimit/ratelimit.h"
 
 namespace Envoy {
 namespace Router {
+
+/**
+ * Base interface for generic rate limit override action.
+ */
+class RateLimitOverrideAction {
+public:
+  virtual ~RateLimitOverrideAction() = default;
+
+  /**
+   * Potentially populate the descriptors 'limit' property with a RateLimitOverride instance
+   * @param descriptor supplies the descriptor to optionally fill.
+   * @param metadata supplies the dynamic metadata for the request.
+   * @return true if RateLimitOverride was set in the descriptor.
+   */
+  virtual bool populateOverride(RateLimit::Descriptor& descriptor,
+                                const envoy::config::core::v3::Metadata* metadata) const PURE;
+};
+
+using RateLimitOverrideActionPtr = std::unique_ptr<RateLimitOverrideAction>;
+
 /**
  * Base interface for generic rate limit action.
  */
@@ -25,12 +46,14 @@ public:
    * @param local_service_cluster supplies the name of the local service cluster.
    * @param headers supplies the header for the request.
    * @param remote_address supplies the trusted downstream address for the connection.
+   * @param dynamic_metadata supplies the dynamic metadata for the request
    * @return true if the RateLimitAction populated the descriptor.
    */
-  virtual bool populateDescriptor(const RouteEntry& route, RateLimit::Descriptor& descriptor,
-                                  const std::string& local_service_cluster,
-                                  const Http::HeaderMap& headers,
-                                  const Network::Address::Instance& remote_address) const PURE;
+  virtual bool
+  populateDescriptor(const RouteEntry& route, RateLimit::Descriptor& descriptor,
+                     const std::string& local_service_cluster, const Http::HeaderMap& headers,
+                     const Network::Address::Instance& remote_address,
+                     const envoy::config::core::v3::Metadata* dynamic_metadata) const PURE;
 };
 
 using RateLimitActionPtr = std::unique_ptr<RateLimitAction>;
@@ -59,12 +82,13 @@ public:
    * @param local_service_cluster supplies the name of the local service cluster.
    * @param headers supplies the header for the request.
    * @param remote_address supplies the trusted downstream address for the connection.
+   * @param dynamic_metadata supplies the dynamic metadata for the request.
    */
-  virtual void populateDescriptors(const RouteEntry& route,
-                                   std::vector<RateLimit::Descriptor>& descriptors,
-                                   const std::string& local_service_cluster,
-                                   const Http::HeaderMap& headers,
-                                   const Network::Address::Instance& remote_address) const PURE;
+  virtual void
+  populateDescriptors(const RouteEntry& route, std::vector<RateLimit::Descriptor>& descriptors,
+                      const std::string& local_service_cluster, const Http::HeaderMap& headers,
+                      const Network::Address::Instance& remote_address,
+                      const envoy::config::core::v3::Metadata* dynamic_metadata) const PURE;
 };
 
 /**

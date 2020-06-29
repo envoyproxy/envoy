@@ -104,6 +104,7 @@ envoy_cc_library(
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:stl_helpers",
+        "//source/common/common:utility_lib",
     ],
 )
 

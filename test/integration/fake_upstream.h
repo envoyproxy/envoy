@@ -81,6 +81,23 @@ public:
   Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() {
     return encoder_.http1StreamEncoderOptions();
   }
+  void
+  sendLocalReply(bool is_grpc_request, Http::Code code, absl::string_view body,
+                 const std::function<void(Http::ResponseHeaderMap& headers)>& /*modify_headers*/,
+                 bool is_head_request, const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                 absl::string_view /*details*/) override {
+    Http::Utility::sendLocalReply(
+        false,
+        Http::Utility::EncodeFunctions(
+            {nullptr,
+             [&](Http::ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
+               encoder_.encodeHeaders(*headers, end_stream);
+             },
+             [&](Buffer::Instance& data, bool end_stream) -> void {
+               encoder_.encodeData(data, end_stream);
+             }}),
+        Http::Utility::LocalReplyData({is_grpc_request, code, body, grpc_status, is_head_request}));
+  }
 
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
@@ -447,7 +464,7 @@ public:
 
   // Http::ServerConnectionCallbacks
   Http::RequestDecoder& newStream(Http::ResponseEncoder& response_encoder, bool) override;
-  void onGoAway() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void onGoAway(Http::GoAwayErrorCode) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
 private:
   struct ReadFilter : public Network::ReadFilterBaseImpl {

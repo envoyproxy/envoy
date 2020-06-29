@@ -33,6 +33,7 @@ envoy_cc_library(
         "//source/common/network:connection_lib",
         "//source/common/network:dns_lib",
         "//source/common/network:listener_lib",
+        "//source/common/runtime:runtime_features_lib",
     ],
 )
 
@@ -64,6 +65,7 @@ envoy_cc_library(
         "dispatcher_impl.h",
         "event_impl_base.h",
         "file_event_impl.h",
+        "schedulable_cb_impl.h",
     ],
     deps = [
         ":libevent_lib",
@@ -104,10 +106,23 @@ envoy_cc_library(
     external_deps = ["event"],
     deps = [
         ":libevent_lib",
+        ":schedulable_cb_lib",
         ":timer_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",
         "//source/common/common:assert_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "schedulable_cb_lib",
+    srcs = ["schedulable_cb_impl.cc"],
+    hdrs = ["schedulable_cb_impl.h"],
+    external_deps = ["event"],
+    deps = [
+        ":event_impl_base_lib",
+        ":libevent_lib",
+        "//include/envoy/event:schedulable_cb_interface",
     ],
 )
 
