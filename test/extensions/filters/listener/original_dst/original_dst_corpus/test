@@ -1,0 +1,4 @@
+config {
+}
+
+address: "unix://domain.socket"
