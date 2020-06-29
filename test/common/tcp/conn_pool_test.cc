@@ -1014,7 +1014,7 @@ TEST_P(TcpConnPoolImplTest, RequestCapacity) {
   ConnPoolCallbacks callbacks5;
 
   {
-    // The next two request will use the prefetched connections, bringing
+    // The next two requests will use the connections in progress, bringing
     // connecting_request_capacity to zero.
     handle3 = conn_pool_.newConnection(callbacks3);
     EXPECT_NE(nullptr, handle3);
