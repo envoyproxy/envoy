@@ -14,6 +14,7 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "common/common/cleanup.h"
+#include "common/common/logger.h"
 #include "common/grpc/common.h"
 #include "common/grpc/status.h"
 #include "common/http/codes.h"
@@ -31,7 +32,10 @@ namespace AdmissionControl {
 /**
  * All stats for the admission control filter.
  */
-#define ALL_ADMISSION_CONTROL_STATS(COUNTER) COUNTER(rq_rejected)
+#define ALL_ADMISSION_CONTROL_STATS(COUNTER)                                                       \
+  COUNTER(rq_rejected)                                                                             \
+  COUNTER(rq_success)                                                                              \
+  COUNTER(rq_failure)
 
 /**
  * Wrapper struct for admission control filter stats. @see stats_macros.h
@@ -62,6 +66,7 @@ public:
   bool filterEnabled() const { return admission_control_feature_.enabled(); }
   Stats::Scope& scope() const { return scope_; }
   double aggression() const;
+  double successRateThreshold() const;
   ResponseEvaluator& responseEvaluator() const { return *response_evaluator_; }
 
 private:
@@ -70,6 +75,7 @@ private:
   const ThreadLocal::SlotPtr tls_;
   Runtime::FeatureFlag admission_control_feature_;
   std::unique_ptr<Runtime::Double> aggression_;
+  std::unique_ptr<Runtime::Double> sr_threshold_;
   std::shared_ptr<ResponseEvaluator> response_evaluator_;
 };
 
@@ -79,7 +85,7 @@ using AdmissionControlFilterConfigSharedPtr = std::shared_ptr<const AdmissionCon
  * A filter that probabilistically rejects requests based on upstream success-rate.
  */
 class AdmissionControlFilter : public Http::PassThroughFilter,
-                               Logger::Loggable<Logger::Id::filter> {
+                               protected Logger::Loggable<Logger::Id::filter> {
 public:
   AdmissionControlFilter(AdmissionControlFilterConfigSharedPtr config,
                          const std::string& stats_prefix);
@@ -99,9 +105,17 @@ private:
 
   bool shouldRejectRequest() const;
 
-  void recordSuccess() { config_->getController().recordSuccess(); }
+  void recordSuccess() {
+    ENVOY_LOG(trace, "recording success");
+    stats_.rq_success_.inc();
+    config_->getController().recordSuccess();
+  }
 
-  void recordFailure() { config_->getController().recordFailure(); }
+  void recordFailure() {
+    ENVOY_LOG(trace, "recording failure");
+    stats_.rq_failure_.inc();
+    config_->getController().recordFailure();
+  }
 
   const AdmissionControlFilterConfigSharedPtr config_;
   AdmissionControlStats stats_;
