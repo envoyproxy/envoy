@@ -50,8 +50,6 @@ MockOptions::MockOptions(const std::string& config_path) : config_path_(config_p
 
 MockOptions::~MockOptions() = default;
 
+} // namespace Server
 
-
-}
-
-}
+} // namespace Envoy

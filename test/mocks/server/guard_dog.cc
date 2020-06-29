@@ -7,11 +7,11 @@
 
 using testing::_;
 using testing::Invoke;
+using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
 using testing::SaveArg;
-using testing::NiceMock;
 
 namespace Envoy {
 namespace Server {
@@ -21,8 +21,6 @@ MockGuardDog::MockGuardDog() : watch_dog_(new NiceMock<MockWatchDog>()) {
 
 MockGuardDog::~MockGuardDog() = default;
 
+} // namespace Server
 
-
-}
-
-}
+} // namespace Envoy

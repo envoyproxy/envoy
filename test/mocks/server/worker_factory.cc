@@ -18,8 +18,6 @@ MockWorkerFactory::MockWorkerFactory() = default;
 
 MockWorkerFactory::~MockWorkerFactory() = default;
 
+} // namespace Server
 
-
-}
-
-}
+} // namespace Envoy

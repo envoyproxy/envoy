@@ -22,8 +22,8 @@ public:
   MOCK_METHOD(ProtobufTypes::MessagePtr, createEmptyConfigProto, (), (override));
   MOCK_METHOD(std::string, name, (), (const, override));
 };
-}
+} // namespace Configuration
 
-}
+} // namespace Server
 
-}
+} // namespace Envoy

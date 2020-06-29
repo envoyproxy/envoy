@@ -2,7 +2,6 @@
 
 #include <string>
 
-
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -28,13 +27,10 @@ MockHealthCheckerFactoryContext::MockHealthCheckerFactoryContext() {
   ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
 }
 
-
 MockHealthCheckerFactoryContext::~MockHealthCheckerFactoryContext() = default;
 
+} // namespace Configuration
 
+} // namespace Server
 
-}
-
-}
-
-}
+} // namespace Envoy

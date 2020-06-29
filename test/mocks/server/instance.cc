@@ -54,12 +54,9 @@ MockInstance::MockInstance()
       .WillByDefault(ReturnRef(*transport_socket_factory_context_));
 }
 
-
 MockInstance::~MockInstance() = default;
 
-
 namespace Configuration {
-
 
 MockServerFactoryContext::MockServerFactoryContext()
     : singleton_manager_(new Singleton::ManagerImpl(Thread::threadFactoryForTest())),
@@ -84,11 +81,8 @@ MockServerFactoryContext::MockServerFactoryContext()
 }
 MockServerFactoryContext::~MockServerFactoryContext() = default;
 
+} // namespace Configuration
 
+} // namespace Server
 
-}
-
-
-}
-
-}
+} // namespace Envoy

@@ -5,8 +5,8 @@
 #include <list>
 #include <string>
 
-#include "envoy/server/tracer_config.h"
 #include "envoy/protobuf/message_validator.h"
+#include "envoy/server/tracer_config.h"
 
 #include "gmock/gmock.h"
 
@@ -27,8 +27,8 @@ public:
 private:
   std::string name_;
 };
-}
+} // namespace Configuration
 
-}
+} // namespace Server
 
-}
+} // namespace Envoy

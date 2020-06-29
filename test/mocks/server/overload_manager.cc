@@ -2,7 +2,6 @@
 
 #include <string>
 
-
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -21,8 +20,6 @@ MockOverloadManager::MockOverloadManager() {
 
 MockOverloadManager::~MockOverloadManager() = default;
 
+} // namespace Server
 
-
-}
-
-}
+} // namespace Envoy

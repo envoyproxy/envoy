@@ -9,7 +9,6 @@
 
 #include "test/mocks/stats/mocks.h"
 
-
 #include "gmock/gmock.h"
 
 namespace Envoy {
@@ -40,6 +39,6 @@ private:
   Thread::MutexBasicLockable access_log_lock_;
   Stats::AllocatorImpl stats_allocator_;
 };
-}
+} // namespace Server
 
-}
+} // namespace Envoy

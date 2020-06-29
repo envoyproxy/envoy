@@ -18,8 +18,6 @@ MockServerLifecycleNotifier::MockServerLifecycleNotifier() = default;
 
 MockServerLifecycleNotifier::~MockServerLifecycleNotifier() = default;
 
+} // namespace Server
 
-
-}
-
-}
+} // namespace Envoy

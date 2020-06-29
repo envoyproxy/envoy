@@ -18,8 +18,6 @@ MockListenerManager::MockListenerManager() = default;
 
 MockListenerManager::~MockListenerManager() = default;
 
+} // namespace Server
 
-
-}
-
-}
+} // namespace Envoy

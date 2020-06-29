@@ -22,8 +22,6 @@ MockHotRestart::MockHotRestart() : stats_allocator_(*symbol_table_) {
 
 MockHotRestart::~MockHotRestart() = default;
 
+} // namespace Server
 
-
-}
-
-}
+} // namespace Envoy

@@ -2,9 +2,8 @@
 
 #include "envoy/server/guarddog.h"
 
-#include "watch_dog.h"
-
 #include "gmock/gmock.h"
+#include "watch_dog.h"
 
 namespace Envoy {
 namespace Server {
@@ -20,6 +19,6 @@ public:
 
   std::shared_ptr<MockWatchDog> watch_dog_;
 };
-}
+} // namespace Server
 
-}
+} // namespace Envoy

@@ -7,7 +7,6 @@
 
 #include "envoy/server/health_checker_config.h"
 
-
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
@@ -43,8 +42,8 @@ public:
   testing::NiceMock<Envoy::Upstream::MockHealthCheckEventLogger>* event_logger_{};
   testing::NiceMock<Envoy::Api::MockApi> api_{};
 };
-}
+} // namespace Configuration
 
-}
+} // namespace Server
 
-}
+} // namespace Envoy

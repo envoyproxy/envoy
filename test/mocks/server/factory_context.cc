@@ -44,13 +44,10 @@ MockFactoryContext::MockFactoryContext()
   ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
 }
 
-
 MockFactoryContext::~MockFactoryContext() = default;
 
+} // namespace Configuration
 
+} // namespace Server
 
-}
-
-}
-
-}
+} // namespace Envoy

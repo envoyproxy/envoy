@@ -49,8 +49,6 @@ MockWorker::MockWorker() {
 
 MockWorker::~MockWorker() = default;
 
+} // namespace Server
 
-
-}
-
-}
+} // namespace Envoy

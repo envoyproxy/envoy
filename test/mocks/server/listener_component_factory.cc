@@ -33,8 +33,6 @@ MockListenerComponentFactory::MockListenerComponentFactory()
 
 MockListenerComponentFactory::~MockListenerComponentFactory() = default;
 
+} // namespace Server
 
-
-}
-
-}
+} // namespace Envoy

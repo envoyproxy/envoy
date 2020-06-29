@@ -6,6 +6,7 @@
 #include <string>
 
 #include "envoy/server/drain_manager.h"
+
 #include "gmock/gmock.h"
 
 namespace Envoy {
@@ -23,6 +24,6 @@ public:
 
   std::function<void()> drain_sequence_completion_;
 };
-}
+} // namespace Server
 
-}
+} // namespace Envoy

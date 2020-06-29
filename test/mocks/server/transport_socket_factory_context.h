@@ -7,10 +7,10 @@
 
 #include "envoy/server/transport_socket_config.h"
 
-#include "test/mocks/upstream/mocks.h"
-#include "test/mocks/api/mocks.h"
-
 #include "common/secret/secret_manager_impl.h"
+
+#include "test/mocks/api/mocks.h"
+#include "test/mocks/upstream/mocks.h"
 
 #include "config_tracker.h"
 #include "gmock/gmock.h"
@@ -44,8 +44,8 @@ public:
   testing::NiceMock<MockConfigTracker> config_tracker_;
   std::unique_ptr<Secret::SecretManager> secret_manager_;
 };
-}
+} // namespace Configuration
 
-}
+} // namespace Server
 
-}
+} // namespace Envoy

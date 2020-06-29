@@ -7,7 +7,6 @@
 
 #include "envoy/server/listener_manager.h"
 
-
 #include "gmock/gmock.h"
 
 namespace Envoy {
@@ -31,6 +30,6 @@ public:
   MOCK_METHOD(void, endListenerUpdate, (ListenerManager::FailureStates &&));
   MOCK_METHOD(ApiListenerOptRef, apiListener, ());
 };
-}
+} // namespace Server
 
-}
+} // namespace Envoy

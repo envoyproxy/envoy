@@ -55,6 +55,6 @@ public:
   std::function<void()> remove_listener_completion_;
   std::function<void()> remove_filter_chains_completion_;
 };
-}
+} // namespace Server
 
-}
+} // namespace Envoy

@@ -20,8 +20,6 @@ MockDrainManager::MockDrainManager() {
 
 MockDrainManager::~MockDrainManager() = default;
 
+} // namespace Server
 
-
-}
-
-}
+} // namespace Envoy

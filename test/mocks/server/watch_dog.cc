@@ -18,8 +18,6 @@ MockWatchDog::MockWatchDog() = default;
 
 MockWatchDog::~MockWatchDog() = default;
 
+} // namespace Server
 
-
-}
-
-}
+} // namespace Envoy

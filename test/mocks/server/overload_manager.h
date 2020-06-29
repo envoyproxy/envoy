@@ -25,6 +25,6 @@ public:
 
   ThreadLocalOverloadState overload_state_;
 };
-}
+} // namespace Server
 
-}
+} // namespace Envoy

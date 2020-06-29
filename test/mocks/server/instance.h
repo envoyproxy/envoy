@@ -10,6 +10,7 @@
 #include "common/grpc/context_impl.h"
 #include "common/http/context_impl.h"
 #include "common/stats/fake_symbol_table_impl.h"
+
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
@@ -27,16 +28,16 @@
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 
-#include "gmock/gmock.h"
-
-#include "listener_manager.h"
-#include "server_lifecycle_notifier.h"
-#include "drain_manager.h"
-#include "overload_manager.h"
 #include "admin.h"
-#include "transport_socket_factory_context.h"
-#include "options.h"
+#include "drain_manager.h"
+#include "gmock/gmock.h"
 #include "hot_restart.h"
+#include "listener_manager.h"
+#include "options.h"
+#include "overload_manager.h"
+#include "server_lifecycle_notifier.h"
+#include "transport_socket_factory_context.h"
+
 namespace Envoy {
 namespace Server {
 namespace Configuration {
@@ -128,7 +129,6 @@ public:
       transport_socket_factory_context_;
 };
 
-
 namespace Configuration {
 class MockServerFactoryContext : public virtual ServerFactoryContext {
 public:
@@ -170,8 +170,8 @@ public:
   testing::NiceMock<Api::MockApi> api_;
   Grpc::ContextImpl grpc_context_;
 };
-}
+} // namespace Configuration
 
-}
+} // namespace Server
 
-}
+} // namespace Envoy

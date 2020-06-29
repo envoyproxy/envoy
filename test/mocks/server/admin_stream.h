@@ -6,6 +6,7 @@
 #include <string>
 
 #include "envoy/server/admin.h"
+
 #include "test/mocks/http/mocks.h"
 
 #include "absl/strings/string_view.h"
@@ -27,6 +28,6 @@ public:
               (const));
   MOCK_METHOD(Http::Http1StreamEncoderOptionsOptRef, http1StreamEncoderOptions, ());
 };
-}
+} // namespace Server
 
-}
+} // namespace Envoy

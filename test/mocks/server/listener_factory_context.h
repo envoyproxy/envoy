@@ -7,9 +7,9 @@
 
 #include "envoy/server/listener_manager.h"
 
+#include "factory_context.h"
 #include "gmock/gmock.h"
 
-#include "factory_context.h"
 namespace Envoy {
 namespace Server {
 namespace Configuration {
@@ -23,8 +23,8 @@ public:
 
   Network::MockListenerConfig listener_config_;
 };
-}
+} // namespace Configuration
 
-}
+} // namespace Server
 
-}
+} // namespace Envoy

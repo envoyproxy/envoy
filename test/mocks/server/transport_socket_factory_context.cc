@@ -2,7 +2,6 @@
 
 #include <string>
 
-
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -24,13 +23,10 @@ MockTransportSocketFactoryContext::MockTransportSocketFactoryContext()
       .WillByDefault(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
 }
 
-
 MockTransportSocketFactoryContext::~MockTransportSocketFactoryContext() = default;
 
+} // namespace Configuration
 
+} // namespace Server
 
-}
-
-}
-
-}
+} // namespace Envoy

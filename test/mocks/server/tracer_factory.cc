@@ -23,10 +23,8 @@ MockTracerFactory::MockTracerFactory(const std::string& name) : name_(name) {
 
 MockTracerFactory::~MockTracerFactory() = default;
 
+} // namespace Configuration
 
+} // namespace Server
 
-}
-
-}
-
-}
+} // namespace Envoy

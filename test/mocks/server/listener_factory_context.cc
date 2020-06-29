@@ -17,10 +17,8 @@ MockListenerFactoryContext::MockListenerFactoryContext() = default;
 
 MockListenerFactoryContext::~MockListenerFactoryContext() = default;
 
+} // namespace Configuration
 
+} // namespace Server
 
-}
-
-}
-
-}
+} // namespace Envoy

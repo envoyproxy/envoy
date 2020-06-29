@@ -8,8 +8,8 @@
 #include "envoy/server/worker.h"
 
 #include "gmock/gmock.h"
-
 #include "worker.h"
+
 namespace Envoy {
 namespace Server {
 class MockWorkerFactory : public WorkerFactory {
@@ -24,6 +24,6 @@ public:
 
   MOCK_METHOD(Worker*, createWorker_, ());
 };
-}
+} // namespace Server
 
-}
+} // namespace Envoy

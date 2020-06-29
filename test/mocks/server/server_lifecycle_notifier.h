@@ -21,6 +21,6 @@ public:
   MOCK_METHOD(ServerLifecycleNotifier::HandlePtr, registerCallback,
               (Stage, StageCallbackWithCompletion));
 };
-}
+} // namespace Server
 
-}
+} // namespace Envoy

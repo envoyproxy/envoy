@@ -21,13 +21,10 @@ MockTracerFactoryContext::MockTracerFactoryContext() {
       .WillByDefault(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
 }
 
-
 MockTracerFactoryContext::~MockTracerFactoryContext() = default;
 
+} // namespace Configuration
 
+} // namespace Server
 
-}
-
-}
-
-}
+} // namespace Envoy

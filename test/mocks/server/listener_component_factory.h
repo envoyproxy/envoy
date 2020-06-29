@@ -5,9 +5,9 @@
 #include <list>
 #include <string>
 
-#include "envoy/server/listener_manager.h"
-#include "envoy/server/drain_manager.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
+#include "envoy/server/drain_manager.h"
+#include "envoy/server/listener_manager.h"
 
 #include "test/mocks/network/mocks.h"
 
@@ -48,6 +48,6 @@ public:
 
   std::shared_ptr<Network::MockListenSocket> socket_;
 };
-}
+} // namespace Server
 
-}
+} // namespace Envoy

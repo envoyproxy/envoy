@@ -7,11 +7,10 @@
 
 #include "envoy/server/configuration.h"
 
-
 #include "gmock/gmock.h"
-
 #include "instance.h"
 #include "tracer_factory.h"
+
 namespace Envoy {
 namespace Server {
 namespace Configuration {
@@ -25,8 +24,8 @@ public:
 
   testing::NiceMock<Configuration::MockServerFactoryContext> server_factory_context_;
 };
-}
+} // namespace Configuration
 
-}
+} // namespace Server
 
-}
+} // namespace Envoy

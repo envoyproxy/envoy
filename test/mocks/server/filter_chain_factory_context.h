@@ -8,6 +8,7 @@
 #include "envoy/server/filter_config.h"
 
 #include "factory_context.h"
+
 namespace Envoy {
 namespace Server {
 namespace Configuration {
@@ -16,8 +17,8 @@ public:
   MockFilterChainFactoryContext();
   ~MockFilterChainFactoryContext() override;
 };
-}
+} // namespace Configuration
 
-}
+} // namespace Server
 
-}
+} // namespace Envoy

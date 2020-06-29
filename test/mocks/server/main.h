@@ -5,8 +5,8 @@
 #include <list>
 #include <string>
 
-#include "envoy/server/overload_manager.h"
 #include "envoy/server/configuration.h"
+#include "envoy/server/overload_manager.h"
 
 #include "gmock/gmock.h"
 
@@ -32,8 +32,8 @@ public:
   std::chrono::milliseconds wd_kill_;
   std::chrono::milliseconds wd_multikill_;
 };
-}
+} // namespace Configuration
 
-}
+} // namespace Server
 
-}
+} // namespace Envoy

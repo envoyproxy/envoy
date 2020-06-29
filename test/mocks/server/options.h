@@ -77,6 +77,6 @@ public:
   bool cpuset_threads_enabled_{};
   std::vector<std::string> disabled_extensions_;
 };
-}
+} // namespace Server
 
-}
+} // namespace Envoy
