@@ -481,40 +481,49 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 void HttpConnectionManagerConfig::processFilter(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter&
         proto_config,
-    int i, absl::string_view prefix, std::list<Router::FilterConfigProviderPtr>& filter_factories,
+    int i, absl::string_view prefix, FilterFactoriesList& filter_factories,
     const char* filter_chain_type, bool last_filter_in_current_config) {
-  switch (proto_config.config_type_case()) {
-  case envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter::
-      ConfigTypeCase::kTypedConfig:
-  case envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter::
-      ConfigTypeCase::kFilterConfigDs:
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
   ENVOY_LOG(debug, "    {} filter #{}", prefix, i);
   ENVOY_LOG(debug, "      name: {}", proto_config.name());
-  ENVOY_LOG(debug, "    config: {}",
-            MessageUtil::getJsonStringFromMessage(
-                proto_config.has_typed_config()
-                    ? static_cast<const Protobuf::Message&>(proto_config.typed_config())
-                    : static_cast<const Protobuf::Message&>(
-                          proto_config.hidden_envoy_deprecated_config()),
-                true));
+  switch (proto_config.config_type_case()) {
+  case envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter::
+      ConfigTypeCase::kFilterConfigDs: {
+    ENVOY_LOG(debug, "      discovery: {}",
+              MessageUtil::getJsonStringFromMessage(proto_config.filter_config_ds()));
+    auto filter_config_provider = filter_config_provider_manager_.createDynamicFilterConfigProvider(
+        proto_config.filter_config_ds().config_source(), proto_config.name(), context_,
+        stats_prefix_);
+    filter_factories.push_back(std::move(filter_config_provider));
+    break;
+  }
+  case envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter::
+      ConfigTypeCase::kTypedConfig:
+  default: {
+    ENVOY_LOG(debug, "    config: {}",
+              MessageUtil::getJsonStringFromMessage(
+                  proto_config.has_typed_config()
+                      ? static_cast<const Protobuf::Message&>(proto_config.typed_config())
+                      : static_cast<const Protobuf::Message&>(
+                            proto_config.hidden_envoy_deprecated_config()),
+                  true));
 
-  // Now see if there is a factory that will accept the config.
-  auto& factory =
-      Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
-          proto_config);
-  ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-      proto_config, context_.messageValidationVisitor(), factory);
-  Http::FilterFactoryCb callback =
-      factory.createFilterFactoryFromProto(*message, stats_prefix_, context_);
-  bool is_terminal = factory.isTerminalFilter();
-  Config::Utility::validateTerminalFilters(proto_config.name(), factory.name(), filter_chain_type,
-                                           is_terminal, last_filter_in_current_config);
-  auto filter_config_provider =
-      filter_config_provider_manager_.createStaticFilterConfigProvider(callback);
-  filter_factories.push_back(std::move(filter_config_provider));
+    // Now see if there is a factory that will accept the config.
+    auto& factory =
+        Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
+            proto_config);
+    ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
+        proto_config, context_.messageValidationVisitor(), factory);
+    Http::FilterFactoryCb callback =
+        factory.createFilterFactoryFromProto(*message, stats_prefix_, context_);
+    bool is_terminal = factory.isTerminalFilter();
+    Config::Utility::validateTerminalFilters(proto_config.name(), factory.name(), filter_chain_type,
+                                             is_terminal, last_filter_in_current_config);
+    auto filter_config_provider = filter_config_provider_manager_.createStaticFilterConfigProvider(
+        callback, proto_config.name());
+    filter_factories.push_back(std::move(filter_config_provider));
+    break;
+  }
+  }
 }
 
 Http::ServerConnectionPtr
@@ -556,7 +565,7 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
 
 void HttpConnectionManagerConfig::createFilterChainForFactories(
     Http::FilterChainFactoryCallbacks& callbacks, const FilterFactoriesList& filter_factories) {
-  for (const Router::FilterConfigProviderPtr& filter_config_provider : filter_factories) {
+  for (const auto& filter_config_provider : filter_factories) {
     auto config = filter_config_provider->config();
     if (config.has_value()) {
       config.value()(callbacks);
@@ -564,6 +573,7 @@ void HttpConnectionManagerConfig::createFilterChainForFactories(
     }
 
     // If a filter config is missing after warming, inject a local reply with status 500.
+    ENVOY_LOG(trace, "Missing filter config for a provider {}", filter_config_provider->name());
     callbacks.addStreamDecoderFilter(
         Http::StreamDecoderFilterSharedPtr{std::make_shared<EmptyConfigFilter>()});
   }

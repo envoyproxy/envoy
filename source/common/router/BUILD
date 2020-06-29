@@ -193,6 +193,7 @@ envoy_cc_library(
         ":config_lib",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/router:filter_config_provider_interface",
+        "//include/envoy/server:filter_config_interface",
         "//include/envoy/singleton:instance_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//source/common/config:subscription_base_interface",

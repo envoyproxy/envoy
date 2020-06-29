@@ -17,6 +17,11 @@ public:
   virtual ~FilterConfigProvider() = default;
 
   /**
+   * Get the filter config resource name.
+   **/
+  virtual const std::string& name() PURE;
+
+  /**
    * @return Http::FilterFctoryCb a filter config to be instantiated on the subsequent streams. Note
    * that if the provider has not yet performed an initial configuration load and no default is
    * provided, no information will be returned.
@@ -32,8 +37,10 @@ public:
 
   /**
    * Callback used to notify provider about configuration changes.
+   * @param config is a filter factory to be used on the subsequent streams.
+   * @param version_info is the version of the new filter configuration.
    */
-  // virtual void onConfigUpdate() PURE;
+  virtual void onConfigUpdate(Http::FilterFactoryCb config, const std::string& version_info) PURE;
 };
 
 using FilterConfigProviderPtr = std::unique_ptr<FilterConfigProvider>;
@@ -51,23 +58,24 @@ public:
    * Get a FilterConfigProviderPtr for a filter config. The config providers may share
    * the underlying subscriptions to the filter config discovery service.
    * @param config_source supplies the configuration source for the filter configs.
-   * @param name the filter config resource name
+   * @param filter_config_name the filter config resource name.
    * @param factory_context is the context to use for the filter config provider.
    * @param stat_prefix supplies the stat_prefix to use for the provider stats.
-   * @param init_manager the Init::Manager used to coordinate initialization of a the underlying
-   * subscription.
    */
-  virtual FilterConfigProviderPtr createDynamicFilterConfigProvider(
-      const envoy::config::core::v3::ConfigSource& config_source, const std::string& name,
-      Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
-      Init::Manager& init_manager) PURE;
+  virtual FilterConfigProviderPtr
+  createDynamicFilterConfigProvider(const envoy::config::core::v3::ConfigSource& config_source,
+                                    const std::string& filter_config_name,
+                                    Server::Configuration::FactoryContext& factory_context,
+                                    const std::string& stat_prefix) PURE;
 
   /**
    * Get a FilterConfigProviderPtr for a statically inlined filter config.
-   * @param callback is a fully resolved filter instantiation callback
+   * @param config is a fully resolved filter instantiation factory.
+   * @param filter_config_name the filter config resource name.
    */
   virtual FilterConfigProviderPtr
-  createStaticFilterConfigProvider(const Http::FilterFactoryCb& callback) PURE;
+  createStaticFilterConfigProvider(const Http::FilterFactoryCb& config,
+                                   const std::string& filter_config_name) PURE;
 };
 
 } // namespace Router
