@@ -60,6 +60,43 @@ public:
 
 using TimerPtr = std::unique_ptr<Timer>;
 
+class ScaledTimer {
+public:
+  virtual ~ScaledTimer() = default;
+
+  /**
+   * Disable a pending timeout without destroying the underlying timer.
+   */
+  virtual void disableTimer() PURE;
+
+  /**
+   * Enable a pending timeout. If a timeout is already pending, it will be reset to the new timeout.
+   *
+   * @param min_ms supplies the minimum duration of the alarm in milliseconds.
+   * @param max_ms supplies the maximum duration of the alarm in milliseconds.
+   * @param object supplies an optional scope for the duration of the alarm.
+   */
+  virtual void enableTimer(const std::chrono::milliseconds& min_ms,
+                           const std::chrono::milliseconds& max_ms,
+                           const ScopeTrackedObject* object = nullptr) PURE;
+
+  /**
+   * Enable a pending high resolution timeout. If a timeout is already pending, it will be reset to
+   * the new timeout.
+   *
+   * @param min_us supplies the minimum duration of the alarm in microseconds.
+   * @param max_us supplies the maximum duration of the alarm in microseconds.
+   * @param object supplies an optional scope for the duration of the alarm.
+   */
+  virtual void enableHRTimer(const std::chrono::microseconds& min_us,
+                             const std::chrono::microseconds& max_us,
+                             const ScopeTrackedObject* object = nullptr) PURE;
+  /**
+   * Return whether the timer is currently armed.
+   */
+  virtual bool enabled() PURE;
+};
+
 class Scheduler {
 public:
   virtual ~Scheduler() = default;
