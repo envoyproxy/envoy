@@ -38,6 +38,15 @@ TEST(HttpUtility, parseQueryString) {
             Utility::parseQueryString("/hello?hello=&hello2=world2"));
   EXPECT_EQ(Utility::QueryParams({{"name", "admin"}, {"level", "trace"}}),
             Utility::parseQueryString("/logging?name=admin&level=trace"));
+  // A sample of an encoded query string of a request by prometheus:
+  // https://github.com/envoyproxy/envoy/issues/10926#issuecomment-651085261.
+  EXPECT_EQ(
+      Utility::QueryParams(
+          {{"filter", "(cluster.upstream_(rq_total|rq_time_sum|rq_time_count|rq_time_bucket|rq_xx|"
+                      "rq_complete|rq_active|cx_active))|(server.version)"}}),
+      Utility::parseQueryString(
+          "/stats?filter=%28cluster.upstream_%28rq_total%7Crq_time_sum%7Crq_time_count%7Crq_time_"
+          "bucket%7Crq_xx%7Crq_complete%7Crq_active%7Ccx_active%29%29%7C%28server.version%29"));
 }
 
 TEST(HttpUtility, getResponseStatus) {
@@ -1188,7 +1197,17 @@ TEST(PercentEncoding, EncodeDecode) {
   validatePercentEncodingEncodeDecode("_-ok-_", "_-ok-_");
 }
 
-TEST(PercentEncoding, Trailing) {
+TEST(PercentEncoding, Decoding) {
+  EXPECT_EQ(Utility::PercentEncoding::decode("hello%20world"), "hello world");
+  EXPECT_EQ(
+      Utility::PercentEncoding::decode(
+          "filter=%28cluster.upstream_%28rq_total%7Crq_time_sum%7Crq_time_count%7Crq_time_bucket%"
+          "7Crq_xx%7Crq_complete%7Crq_active%7Ccx_active%29%29%7C%28server.version%29"),
+      "filter=(cluster.upstream_(rq_total|rq_time_sum|rq_time_count|rq_time_bucket|rq_xx|rq_"
+      "complete|rq_active|cx_active))|(server.version)");
+}
+
+TEST(PercentEncoding, DecodingWithTrailingInput) {
   EXPECT_EQ(Utility::PercentEncoding::decode("too%20lar%20"), "too lar ");
   EXPECT_EQ(Utility::PercentEncoding::decode("too%20larg%e"), "too larg%e");
   EXPECT_EQ(Utility::PercentEncoding::decode("too%20large%"), "too large%");

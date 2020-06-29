@@ -272,7 +272,7 @@ Utility::QueryParams Utility::parseQueryString(absl::string_view url) {
   }
 
   start++;
-  return parseParameters(url, start);
+  return parseParameters(PercentEncoding::decode(StringUtil::subspan(url, start, url.size())), 0);
 }
 
 Utility::QueryParams Utility::parseFromBody(absl::string_view body) {
