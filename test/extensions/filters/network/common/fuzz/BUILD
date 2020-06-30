@@ -1,12 +1,10 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
-    "envoy_cc_test_library",
     "envoy_cc_fuzz_test",
+    "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
 )
-
 load(
     "//source/extensions:all_extensions.bzl",
     "envoy_all_extensions",
@@ -15,6 +13,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 envoy_package()
+
 envoy_proto_library(
     name = "network_filter_fuzz_proto",
     srcs = ["network_filter_fuzz.proto"],
@@ -41,6 +40,8 @@ envoy_cc_test_library(
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
+        "//source/extensions/filters/network/ext_authz",
+        "//test/extensions/filters/common/ext_authz:ext_authz_mocks",
     ],
 )
 

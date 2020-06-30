@@ -7,10 +7,14 @@
 #include "test/extensions/filters/network/common/fuzz/network_filter_fuzz.pb.validate.h"
 #include "test/extensions/filters/network/common/fuzz/uber_filter.h"
 #include "test/fuzz/fuzz_runner.h"
+#include <iostream>
+#include <string_view>
+#include <vector>
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
+
 
 DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase& input) {
   ABSL_ATTRIBUTE_UNUSED static PostProcessorRegistration reg = {
@@ -21,15 +25,17 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase
         // applied only when libprotobuf-mutator calls mutate on an input, and *not* during fuzz
         // target execution. Replaying a corpus through the fuzzer will not be affected by the
         // post-processor mutation.
-        static const std::vector<absl::string_view> filter_names = Registry::FactoryRegistry<
-            Server::Configuration::NamedNetworkFilterConfigFactory>::registeredNames();
+        
+        // static const std::vector<absl::string_view> filter_names = Registry::FactoryRegistry<
+        //     Server::Configuration::NamedNetworkFilterConfigFactory>::registeredNames();
+        static const std::vector<absl::string_view> filter_names = UberFilterFuzzer::filter_names();
         static const auto factories = Registry::FactoryRegistry<
             Server::Configuration::NamedNetworkFilterConfigFactory>::factories();
         // Choose a valid filter name.
         if (std::find(filter_names.begin(), filter_names.end(), input->config().name()) ==
             std::end(filter_names)) {
           absl::string_view filter_name = filter_names[seed % filter_names.size()];
-          filter_name = "envoy.filters.network.local_ratelimit";
+          // filter_name = "envoy.filters.network.local_ratelimit";
           input->mutable_config()->set_name(std::string(filter_name));
         }
         // Set the corresponding type_url for Any.
@@ -42,12 +48,19 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase
   try {
     // Catch invalid header characters.
     TestUtility::validate(input);
+    // names of available filters:
+    // static const std::vector<absl::string_view> filter_names = Registry::FactoryRegistry<
+    // Server::Configuration::NamedNetworkFilterConfigFactory>::registeredNames();
+    // std::cout<<"Found "<<filter_names.size()<<" filters"<<std::endl;
+    // for(absl::string_view filter_name : filter_names){
+    //   std::cout<<filter_name<<std::endl;
+    // }
     // Fuzz filter.
     static UberFilterFuzzer fuzzer;
     fuzzer.fuzz(input.config(), input.actions());
   } catch (const ProtoValidationException& e) {
     ENVOY_LOG_MISC(debug, "ProtoValidationException: {}", e.what());
-  }
+  } 
 }
 
 } // namespace NetworkFilters

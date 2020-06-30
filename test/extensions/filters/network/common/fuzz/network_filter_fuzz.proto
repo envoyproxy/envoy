@@ -12,16 +12,19 @@ message OnData {
   bool end_stream = 2;
 }
 
+message AdvanceTime {
+  uint32 milliseconds = 1 [(validate.rules).uint32 = {gt: 0}];
+}
+
 message Action {
   oneof action_selector {
     option (validate.required) = true;
-    // Call onNewConnection().
+    // Call onNewConnection()
     google.protobuf.Empty on_new_connection = 1;
-    // Call onData().
+    // Call onData()
     OnData on_data = 2;
-    // Connection close
-    // google.protobuf.Empty remote_close = 3;
-    // google.protobuf.Empty local_close = 4;
+    // Advance time_source_
+    AdvanceTime advance_time = 3;
   }
 }
 

@@ -24,6 +24,7 @@ void Filter::callCheck() {
                                                                config_->includePeerCertificate());
 
   status_ = Status::Calling;
+  std::cout<<"calling for check"<<std::endl;
   config_->stats().active_.inc();
   config_->stats().total_.inc();
 
@@ -51,9 +52,11 @@ Network::FilterStatus Filter::onNewConnection() {
 void Filter::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
+    std::cout<<"enter onEvent() in ext_auth"<<std::endl;
     if (status_ == Status::Calling) {
       // Make sure that any pending request in the client is cancelled. This will be NOP if the
       // request already completed.
+      std::cout<<"enter onEvent() in ext_auth and is calling"<<std::endl;
       client_->cancel();
       config_->stats().active_.dec();
     }
