@@ -223,10 +223,13 @@ public:
   }
   const ClusterSet& primaryClusters() override { return primary_clusters_; }
   ThreadLocalCluster* get(absl::string_view cluster) override;
-  Http::ConnectionPool::Instance* httpConnPoolForCluster(const std::string& cluster,
-                                                         ResourcePriority priority,
-                                                         Http::Protocol protocol,
-                                                         LoadBalancerContext* context) override;
+
+  using ClusterManager::httpConnPoolForCluster;
+
+  Http::ConnectionPool::Instance*
+  httpConnPoolForCluster(const std::string& cluster, ResourcePriority priority,
+                         absl::optional<Http::Protocol> downstream_protocol,
+                         LoadBalancerContext* context) override;
   Tcp::ConnectionPool::Instance* tcpConnPoolForCluster(const std::string& cluster,
                                                        ResourcePriority priority,
                                                        LoadBalancerContext* context) override;
@@ -327,7 +330,8 @@ private:
                    const LoadBalancerFactorySharedPtr& lb_factory);
       ~ClusterEntry() override;
 
-      Http::ConnectionPool::Instance* connPool(ResourcePriority priority, Http::Protocol protocol,
+      Http::ConnectionPool::Instance* connPool(ResourcePriority priority,
+                                               absl::optional<Http::Protocol> downstream_protocol,
                                                LoadBalancerContext* context);
 
       Tcp::ConnectionPool::Instance* tcpConnPool(ResourcePriority priority,
