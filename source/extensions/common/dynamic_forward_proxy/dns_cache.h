@@ -177,12 +177,13 @@ public:
   virtual absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> hosts() PURE;
 
   /**
-   * Check if we can do DNS Request.
-   * @param pending_request pending request resource limit
-   * @return RAII Pointer for circuit breakers
+   * Check if a DNS request is allowed given resource limits.
+   * @param pending_request optional pending request resource limit. If no resource limit is
+   * provided the internal DNS cache limit is used.
+   * @return RAII handle for pending request circuit breaker if the request was allowed.
    */
   virtual Upstream::ResourceAutoIncDecPtr
-  canCreateDnsRequest(absl::optional<std::reference_wrapper<ResourceLimit>> pending_request) PURE;
+  canCreateDnsRequest(ResourceLimitOptRef pending_request) PURE;
 };
 
 using DnsCacheSharedPtr = std::shared_ptr<DnsCache>;

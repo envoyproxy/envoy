@@ -52,8 +52,8 @@ public:
                                             LoadDnsCacheEntryCallbacks& callbacks) override;
   AddUpdateCallbacksHandlePtr addUpdateCallbacks(UpdateCallbacks& callbacks) override;
   absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> hosts() override;
-  Upstream::ResourceAutoIncDecPtr canCreateDnsRequest(
-      absl::optional<std::reference_wrapper<ResourceLimit>> pending_requests) override;
+  Upstream::ResourceAutoIncDecPtr
+  canCreateDnsRequest(ResourceLimitOptRef pending_requests) override;
 
 private:
   using TlsHostMap = absl::flat_hash_map<std::string, DnsHostInfoSharedPtr>;

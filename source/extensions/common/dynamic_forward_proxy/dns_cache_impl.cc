@@ -77,8 +77,8 @@ DnsCacheImpl::loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
   }
 }
 
-Upstream::ResourceAutoIncDecPtr DnsCacheImpl::canCreateDnsRequest(
-    absl::optional<std::reference_wrapper<ResourceLimit>> pending_requests) {
+Upstream::ResourceAutoIncDecPtr
+DnsCacheImpl::canCreateDnsRequest(ResourceLimitOptRef pending_requests) {
   const auto has_pending_requests = pending_requests.has_value();
   auto& current_pending_requests =
       has_pending_requests ? pending_requests->get() : resource_manager_.pendingRequests();

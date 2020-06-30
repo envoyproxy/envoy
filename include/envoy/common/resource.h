@@ -44,4 +44,6 @@ public:
   virtual uint64_t count() const PURE;
 };
 
+using ResourceLimitOptRef = absl::optional<std::reference_wrapper<ResourceLimit>>;
+
 } // namespace Envoy
