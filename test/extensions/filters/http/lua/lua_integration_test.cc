@@ -24,9 +24,6 @@ public:
         new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
     fake_upstreams_.emplace_back(
         new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
-    // Create the xDS upstream.
-    fake_upstreams_.emplace_back(
-        new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
   }
 
   void initializeFilter(const std::string& filter_config, const std::string& domain = "*") {
@@ -75,6 +72,19 @@ public:
     initialize();
   }
 
+  void initializeWithYaml(const std::string& filter_config, const std::string& route_config) {
+    config_helper_.addFilter(filter_config);
+
+    createClusters();
+    config_helper_.addConfigModifier(
+        [route_config](
+            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) {
+          TestUtility::loadFromYaml(route_config, *hcm.mutable_route_config(), true);
+        });
+    initialize();
+  }
+
   void createClusters() {
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* lua_cluster = bootstrap.mutable_static_resources()->add_clusters();
@@ -84,54 +94,7 @@ public:
       auto* alt_cluster = bootstrap.mutable_static_resources()->add_clusters();
       alt_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       alt_cluster->set_name("alt_cluster");
-
-      auto* xds_cluster = bootstrap.mutable_static_resources()->add_clusters();
-      xds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
-      xds_cluster->set_name("xds_cluster");
-      xds_cluster->mutable_http2_protocol_options();
     });
-  }
-
-  void initializeWithRds(const std::string& filter_config, const std::string& route_config_name,
-                         const std::string& initial_route_config) {
-    config_helper_.addFilter(filter_config);
-
-    // Create static clusters.
-    createClusters();
-
-    // Set RDS config source.
-    config_helper_.addConfigModifier(
-        [route_config_name](
-            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-                hcm) {
-          hcm.mutable_rds()->set_route_config_name(route_config_name);
-          envoy::config::core::v3::ApiConfigSource* rds_api_config_source =
-              hcm.mutable_rds()->mutable_config_source()->mutable_api_config_source();
-          rds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
-          envoy::config::core::v3::GrpcService* grpc_service =
-              rds_api_config_source->add_grpc_services();
-          grpc_service->mutable_envoy_grpc()->set_cluster_name("xds_cluster");
-        });
-
-    on_server_init_function_ = [&]() {
-      AssertionResult result =
-          fake_upstreams_[3]->waitForHttpConnection(*dispatcher_, xds_connection_);
-      RELEASE_ASSERT(result, result.message());
-      result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
-      RELEASE_ASSERT(result, result.message());
-      xds_stream_->startGrpcStream();
-      fake_upstreams_[3]->set_allow_unexpected_disconnects(true);
-
-      EXPECT_TRUE(compareSotwDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "",
-                                              {route_config_name}, true));
-      sendSotwDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
-          Config::TypeUrl::get().RouteConfiguration,
-          {TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(
-              initial_route_config)},
-          "1");
-    };
-    initialize();
-    registerTestServerPorts({"http"});
   }
 
   void cleanup() {
@@ -147,13 +110,6 @@ public:
       RELEASE_ASSERT(result, result.message());
       result = fake_upstream_connection_->waitForDisconnect();
       RELEASE_ASSERT(result, result.message());
-    }
-    if (xds_connection_ != nullptr) {
-      AssertionResult result = xds_connection_->close();
-      RELEASE_ASSERT(result, result.message());
-      result = xds_connection_->waitForDisconnect();
-      RELEASE_ASSERT(result, result.message());
-      xds_connection_ = nullptr;
     }
   }
 
@@ -660,16 +616,11 @@ typed_config:
       inline_string: |
         function envoy_on_request(request_handle)
           request_handle:headers():add("code", "code_from_byebye")
-        end  
-    update.lua:
-      inline_string: |
-        function envoy_on_request(request_handle)
-          request_handle:headers():add("code", "code_from_update")
-        end   
+        end
 )EOF";
   const std::string INITIAL_ROUTE_CONFIG =
       R"EOF(
-name: dynamic_lua_routes
+name: basic_lua_routes
 virtual_hosts:
 - name: rds_vhost_1
   domains: ["lua.per.route"]
@@ -712,24 +663,7 @@ virtual_hosts:
         name: nocode.lua
 )EOF";
 
-  const std::string UPDATE_ROUTE_CONFIG =
-      R"EOF(
-name: dynamic_lua_routes
-virtual_hosts:
-- name: rds_vhost_1
-  domains: ["lua.per.route"]
-  routes:
-  - match:
-      prefix: "/lua/per/route/hello"
-    route:
-      cluster: lua_cluster
-    typed_per_filter_config:
-      envoy.filters.http.lua:
-        "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
-        name: update.lua
-)EOF";
-
-  initializeWithRds(FILTER_AND_CODE, "dynamic_lua_routes", INITIAL_ROUTE_CONFIG);
+  initializeWithYaml(FILTER_AND_CODE, INITIAL_ROUTE_CONFIG);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -792,22 +726,6 @@ virtual_hosts:
                                                 {"x-forwarded-for", "10.0.0.1"}};
 
   check_request(nocode_headers, "");
-
-  // Update route config by RDS. Test whether RDS can work normally.
-  sendSotwDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
-      Config::TypeUrl::get().RouteConfiguration,
-      {TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(UPDATE_ROUTE_CONFIG)},
-      "2");
-  test_server_->waitForCounterGe("http.config_test.rds.dynamic_lua_routes.update_success", 2);
-
-  Http::TestRequestHeaderMapImpl update_headers{{":method", "GET"},
-                                                {":path", "/lua/per/route/hello"},
-                                                {":scheme", "http"},
-                                                {":authority", "lua.per.route"},
-                                                {"x-forwarded-for", "10.0.0.1"}};
-
-  check_request(update_headers, "code_from_update");
-
   cleanup();
 }
 
