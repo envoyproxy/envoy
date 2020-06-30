@@ -521,16 +521,10 @@ Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, Buffer::RawSlic
   return send_result;
 }
 
-void passPayloadToProcessor(uint64_t bytes_read, Buffer::RawSlice& slice,
-                            Buffer::InstancePtr buffer, Address::InstanceConstSharedPtr peer_addess,
+void passPayloadToProcessor(uint64_t bytes_read, Buffer::InstancePtr buffer,
+                            Address::InstanceConstSharedPtr peer_addess,
                             Address::InstanceConstSharedPtr local_address,
                             UdpPacketProcessor& udp_packet_processor, MonotonicTime receive_time) {
-  if (slice.mem_ != nullptr) {
-    // Adjust used memory length.
-    slice.len_ = std::min(slice.len_, static_cast<size_t>(bytes_read));
-    buffer->commit(&slice, 1);
-  }
-
   RELEASE_ASSERT(
       peer_addess != nullptr,
       fmt::format("Unable to get remote address on the socket bount to local address: {} ",
@@ -561,7 +555,6 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
     ASSERT(num_slices == 1u);
 
     IoHandle::RecvMsgOutput output(1, packets_dropped);
-
     Api::IoCallUint64Result result =
         handle.recvmsg(&slice, num_slices, local_address.ip()->port(), output);
 
@@ -569,40 +562,35 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
       return result;
     }
 
-    ENVOY_LOG_MISC(trace, "recvmsg bytes {}", result.rc_);
+    // Commit the buffer and extract gso_size
+    slice.len_ = std::min(slice.len_, result.rc_);
+    buffer->commit(&slice, 1);
 
-    // Get gso_size
-    if (output.msg_[0].gso_size_ == 0u) {
-      // Skip gso segmentation and proceed as a single payload.
-      ENVOY_LOG_MISC(trace, "Unspecified or zero gso_size received.");
-      passPayloadToProcessor(
-          result.rc_, slice, std::move(buffer), std::move(output.msg_[0].peer_address_),
-          std::move(output.msg_[0].local_address_), udp_packet_processor, receive_time);
+    const uint64_t gso_size = output.msg_[0].gso_size_;
+
+    ENVOY_LOG_MISC(trace, "recvmsg bytes {} with gso_size as {}", result.rc_, gso_size);
+
+    // Skip gso segmentation and proceed as a single payload.
+    if (gso_size == 0u) {
+      passPayloadToProcessor(result.rc_, std::move(buffer), std::move(output.msg_[0].peer_address_),
+                             std::move(output.msg_[0].local_address_), udp_packet_processor,
+                             receive_time);
       return result;
     }
-
-    // Commit the buffer and extract the gso_size
-    slice.len_ = result.rc_;
-    buffer->commit(&slice, 1);
-    const uint64_t gso_size = output.msg_[0].gso_size_;
 
     // Segment the buffer read by the recvmsg syscall into gso_sized sub buffers.
     for (uint64_t bytes_to_skip = 0; bytes_to_skip < slice.len_; bytes_to_skip += gso_size) {
       const uint64_t bytes_to_copy = std::min(slice.len_ - bytes_to_skip, gso_size);
       Buffer::InstancePtr sub_buffer = std::make_unique<Buffer::OwnedImpl>();
       sub_buffer->move(*buffer, bytes_to_copy);
-      // slice with mem_ as nullptr
-      Buffer::RawSlice dummy_slice;
-      passPayloadToProcessor(bytes_to_copy, dummy_slice, std::move(sub_buffer),
-                             output.msg_[0].peer_address_, output.msg_[0].local_address_,
-                             udp_packet_processor, receive_time);
+      passPayloadToProcessor(bytes_to_copy, std::move(sub_buffer), output.msg_[0].peer_address_,
+                             output.msg_[0].local_address_, udp_packet_processor, receive_time);
     }
 
     return result;
   }
 
   if (handle.supportsMmsg()) {
-
     const uint32_t num_packets_per_mmsg_call = 16u;
     const uint32_t num_slices_per_packet = 1u;
     absl::FixedArray<Buffer::InstancePtr> buffers(num_packets_per_mmsg_call);
@@ -629,7 +617,12 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
       ASSERT(msg_len <= slice->len_);
       ENVOY_LOG_MISC(debug, "Receive a packet with {} bytes from {}", msg_len,
                      output.msg_[i].peer_address_->asString());
-      passPayloadToProcessor(msg_len, *slice, std::move(buffers[i]), output.msg_[i].peer_address_,
+
+      // Adjust used memory length and commit slice to buffer
+      slice->len_ = std::min(slice->len_, msg_len);
+      buffers[i]->commit(slice, 1);
+
+      passPayloadToProcessor(msg_len, std::move(buffers[i]), output.msg_[i].peer_address_,
                              output.msg_[i].local_address_, udp_packet_processor, receive_time);
     }
     return result;
@@ -648,11 +641,15 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
     return result;
   }
 
+  // Adjust used memory length and commit slice to buffer
+  slice.len_ = std::min(slice.len_, static_cast<size_t>(result.rc_));
+  buffer->commit(&slice, 1);
+
   ENVOY_LOG_MISC(trace, "recvmsg bytes {}", result.rc_);
 
-  passPayloadToProcessor(
-      result.rc_, slice, std::move(buffer), std::move(output.msg_[0].peer_address_),
-      std::move(output.msg_[0].local_address_), udp_packet_processor, receive_time);
+  passPayloadToProcessor(result.rc_, std::move(buffer), std::move(output.msg_[0].peer_address_),
+                         std::move(output.msg_[0].local_address_), udp_packet_processor,
+                         receive_time);
   return result;
 }
 

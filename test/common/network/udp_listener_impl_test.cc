@@ -34,6 +34,13 @@ namespace Envoy {
 namespace Network {
 namespace {
 
+// UdpGro is only supported on Linux versions >= 5.0. Also, the
+// underlying platform only performs the payload concatenation when
+// packets are sent from a network namespace different to that of
+// the client. Currently, the testing framework does not support
+// this behavior.
+// This helper allows to intercept the supportsUdpGro syscall and
+// toggle the gro behavior as per individual test requirements.
 class MockSupportsUdpGro : public Api::OsSysCallsImpl {
 public:
   MOCK_METHOD(bool, supportsUdpGro, (), (const));
@@ -51,7 +58,9 @@ public:
     // Set listening socket options.
     server_socket_->addOptions(SocketOptionFactory::buildIpPacketInfoOptions());
     server_socket_->addOptions(SocketOptionFactory::buildRxQueueOverFlowOptions());
-    server_socket_->addOptions(SocketOptionFactory::buildUdpGroOptions());
+    if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
+      server_socket_->addOptions(SocketOptionFactory::buildUdpGroOptions());
+    }
 
     listener_ = std::make_unique<UdpListenerImpl>(
         dispatcherImpl(), server_socket_, listener_callbacks_, dispatcherImpl().timeSource());
@@ -88,8 +97,9 @@ protected:
   }
 
   // Validates receive data, source/destination address and received time.
-  void validateRecvCallbackParams(const UdpRecvData& data) {
+  void validateRecvCallbackParams(const UdpRecvData& data, size_t num_packet_per_recv) {
     ASSERT_NE(data.addresses_.local_, nullptr);
+
     ASSERT_NE(data.addresses_.peer_, nullptr);
     ASSERT_NE(data.addresses_.peer_->ip(), nullptr);
 
@@ -100,14 +110,6 @@ protected:
 
     EXPECT_EQ(*data.addresses_.local_, *send_to_addr_);
 
-    size_t num_packet_per_recv = 1u;
-    if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
-      // As in UdpGro Test, the 4 packets stacked together
-      // get delivered in a single recvmsg syscall
-      num_packet_per_recv = 4u;
-    } else if (Api::OsSysCallsSingleton::get().supportsMmsg()) {
-      num_packet_per_recv = 16u;
-    }
     EXPECT_EQ(time_system_.monotonicTime(),
               data.receive_time_ +
                   std::chrono::milliseconds(
@@ -167,12 +169,12 @@ TEST_P(UdpListenerImplTest, UseActualDstUdp) {
   EXPECT_CALL(listener_callbacks_, onReadReady());
   EXPECT_CALL(listener_callbacks_, onData(_))
       .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
-        validateRecvCallbackParams(data);
+        validateRecvCallbackParams(data, Api::OsSysCallsSingleton::get().supportsMmsg() ? 16u : 1u);
 
         EXPECT_EQ(data.buffer_->toString(), first);
       }))
       .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
-        validateRecvCallbackParams(data);
+        validateRecvCallbackParams(data, Api::OsSysCallsSingleton::get().supportsMmsg() ? 16u : 1u);
 
         EXPECT_EQ(data.buffer_->toString(), second);
 
@@ -208,7 +210,7 @@ TEST_P(UdpListenerImplTest, UdpEcho) {
   EXPECT_CALL(listener_callbacks_, onReadReady());
   EXPECT_CALL(listener_callbacks_, onData(_))
       .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
-        validateRecvCallbackParams(data);
+        validateRecvCallbackParams(data, Api::OsSysCallsSingleton::get().supportsMmsg() ? 16u : 1u);
 
         test_peer_address = data.addresses_.peer_;
 
@@ -218,7 +220,7 @@ TEST_P(UdpListenerImplTest, UdpEcho) {
         server_received_data.push_back(data_str);
       }))
       .WillRepeatedly(Invoke([&](const UdpRecvData& data) -> void {
-        validateRecvCallbackParams(data);
+        validateRecvCallbackParams(data, Api::OsSysCallsSingleton::get().supportsMmsg() ? 16u : 1u);
 
         const std::string data_str = data.buffer_->toString();
         EXPECT_EQ(data_str, client_data[num_packets_received_by_listener_ - 1]);
@@ -294,7 +296,7 @@ TEST_P(UdpListenerImplTest, UdpListenerEnableDisable) {
       .Times(2)
       .WillOnce(Return())
       .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
-        validateRecvCallbackParams(data);
+        validateRecvCallbackParams(data, Api::OsSysCallsSingleton::get().supportsMmsg() ? 16u : 1u);
 
         EXPECT_EQ(data.buffer_->toString(), second);
 
@@ -434,22 +436,21 @@ TEST_P(UdpListenerImplTest, UdpGroBasic) {
   // packets
   absl::FixedArray<std::string> client_data({"Equal!!!", "Length!!", "Messages", "trail"});
 
+  for (const auto& i : client_data) {
+    client_.write(i, *send_to_addr_);
+  }
+
+  // The concatenated payload received from kernel supporting udp_gro
   std::string stacked_message = absl::StrJoin(client_data, "");
-  client_.write(stacked_message, *send_to_addr_);
 
-  // For unit test purposes, we assume that the data was received in order.
-  Address::InstanceConstSharedPtr test_peer_address;
-
-  std::vector<std::string> server_received_data;
-
+  // Mock OsSysCalls to mimic kernel behavior for packet concatenation
+  // based on udp_gro. supportsUdpGro should return true and recvmsg should
+  // return the concatenated payload with the gso_size set appropriately.
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-  // Set supportsUdpGro to be set as True for all returns.
   EXPECT_CALL(os_sys_calls, supportsUdpGro).WillRepeatedly(Return(true));
   EXPECT_CALL(os_sys_calls, supportsMmsg).Times(0);
 
-  // Mock the recvmsg syscall to mimic kernel behavior for packet concatenation
-  // based on udp_gro
   EXPECT_CALL(os_sys_calls, recvmsg(_, _, _))
       .WillOnce(Invoke([&](os_fd_t, msghdr* msg, int) {
         // Set msg_name and msg_namelen
@@ -514,6 +515,7 @@ TEST_P(UdpListenerImplTest, UdpGroBasic) {
 #ifdef SO_RXQ_OVFL
         // Set SO_RXQ_OVFL
         cmsg = CMSG_NXTHDR(msg, cmsg);
+        EXPECT_NE(cmsg, nullptr);
         cmsg->cmsg_level = SOL_SOCKET;
         cmsg->cmsg_type = SO_RXQ_OVFL;
         cmsg->cmsg_len = CMSG_LEN(sizeof(uint32_t));
@@ -527,22 +529,16 @@ TEST_P(UdpListenerImplTest, UdpGroBasic) {
   EXPECT_CALL(listener_callbacks_, onReadReady());
   EXPECT_CALL(listener_callbacks_, onData(_))
       .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
-        validateRecvCallbackParams(data);
-
-        test_peer_address = data.addresses_.peer_;
+        validateRecvCallbackParams(data, client_data.size());
 
         const std::string data_str = data.buffer_->toString();
         EXPECT_EQ(data_str, client_data[num_packets_received_by_listener_ - 1]);
-
-        server_received_data.push_back(data_str);
       }))
       .WillRepeatedly(Invoke([&](const UdpRecvData& data) -> void {
-        validateRecvCallbackParams(data);
+        validateRecvCallbackParams(data, client_data.size());
 
         const std::string data_str = data.buffer_->toString();
         EXPECT_EQ(data_str, client_data[num_packets_received_by_listener_ - 1]);
-
-        server_received_data.push_back(data_str);
       }));
 
   EXPECT_CALL(listener_callbacks_, onWriteReady(_)).WillOnce(Invoke([&](const Socket& socket) {

@@ -49,22 +49,13 @@ udp_listener_config:
 
   envoy::config::listener::v3::Listener listener_proto = parseListenerFromV2Yaml(yaml);
   EXPECT_CALL(server_.random_, uuid());
-  expectCreateListenSocket(
-      envoy::config::core::v3::SocketOption::STATE_PREBIND,
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
 #ifdef SO_RXQ_OVFL
-#ifdef UDP_GRO
-      /* expected_num_options */ 4, // SO_REUSEPORT and UDP_GRO is on as configured
+                           /* expected_num_options */ 4, // SO_REUSEPORT is on as configured
 #else
-      /* expected_num_options */ 3, // SO_REUSEPORT is on as configured
+                           /* expected_num_options */ 3,
 #endif
-#else
-#ifdef UDP_GRO
-      /* expected_num_options */ 3, // UDP_GRO is on as configured
-#else
-      /* expected_num_options */ 2,
-#endif
-#endif
-      /* expected_creation_params */ {true, false});
+                           /* expected_creation_params */ {true, false});
 
   expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
                    /* expected_sockopt_name */ ENVOY_IP_PKTINFO,
