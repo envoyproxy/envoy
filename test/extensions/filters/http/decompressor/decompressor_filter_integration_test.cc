@@ -218,8 +218,8 @@ TEST_P(DecompressorIntegrationTest, BidirectionalDecompressionError) {
   test_server_->waitForCounterEq(
       "http.config_test.decompressor.testlib.gzip.request.total_compressed_bytes",
       compressed_request_length);
-  //   test_server_->waitForCounterEq(
-  //       "http.config_test.decompressor.testlib.gzip.decompressor_library.zlib_data_error", 2);
+  test_server_->waitForCounterEq(
+      "http.config_test.decompressor.testlib.gzip.decompressor_library.zlib_data_error", 2);
 
   // Enable response decompression by setting the Content-Encoding header to gzip.
   upstream_request_->encodeHeaders(
@@ -254,9 +254,8 @@ TEST_P(DecompressorIntegrationTest, BidirectionalDecompressionError) {
   test_server_->waitForCounterEq(
       "http.config_test.decompressor.testlib.gzip.response.total_compressed_bytes",
       compressed_response_length);
-  //   test_server_->waitForCounterEq(
-  //       "http.config_test.decompressor.testlib.gzip.decompressor_library.zlib_data_error", 3);
-    ASSERT_TRUE(false);
+  test_server_->waitForCounterEq(
+      "http.config_test.decompressor.testlib.gzip.decompressor_library.zlib_data_error", 3);
 }
 
 } // namespace Envoy
