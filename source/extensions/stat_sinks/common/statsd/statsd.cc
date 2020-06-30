@@ -40,8 +40,8 @@ void UdpStatsdSink::WriterImpl::write(const std::string& message) {
   Network::Utility::writeToSocket(*io_handle_, &slice, 1, nullptr, *parent_.server_address_);
 }
 
-void UdpStatsdSink::WriterImpl::writeBuffer(Buffer::Instance* data) {
-  Network::Utility::writeToSocket(*io_handle_, *data, nullptr, *parent_.server_address_);
+void UdpStatsdSink::WriterImpl::writeBuffer(Buffer::Instance& data) {
+  Network::Utility::writeToSocket(*io_handle_, data, nullptr, *parent_.server_address_);
 }
 
 UdpStatsdSink::UdpStatsdSink(ThreadLocal::SlotAllocator& tls,
@@ -82,7 +82,7 @@ void UdpStatsdSink::flush(Stats::MetricSnapshot& snapshot) {
 
 void UdpStatsdSink::writeBuffer(Buffer::OwnedImpl& buffer, Writer& writer,
                                 const std::string& statsd_metric) const {
-  if (statsd_metric.length() > buffer_size_) {
+  if (statsd_metric.length() >= buffer_size_) {
     // Our statsd_metric is too large to fit into the buffer, skip buffering and write directly
     writer.write(statsd_metric);
   } else {
@@ -91,7 +91,7 @@ void UdpStatsdSink::writeBuffer(Buffer::OwnedImpl& buffer, Writer& writer,
       // room for the new statsd_metric.
       flushBuffer(buffer, writer);
     } else if (buffer.length() > 0) {
-      // We have room and statsd_metric already in the buffer, add a newline to separate
+      // We have room and have metrics already in the buffer, add a newline to separate
       // metric entries.
       buffer.add("\n");
     }
@@ -103,7 +103,7 @@ void UdpStatsdSink::flushBuffer(Buffer::OwnedImpl& buffer, Writer& writer) const
   if (buffer.length() == 0) {
     return;
   }
-  writer.writeBuffer(&buffer);
+  writer.writeBuffer(buffer);
   buffer.drain(buffer.length());
 }
 
