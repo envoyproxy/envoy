@@ -89,9 +89,9 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   membership_total, Gauge, Current cluster membership total
   retry_or_shadow_abandoned, Counter, Total number of times shadowing or retry buffering was canceled due to buffer limits
   config_reload, Counter, Total API fetches that resulted in a config reload due to a different config
-  update_attempt, Counter, Total cluster membership update attempts
-  update_success, Counter, Total cluster membership update successes
-  update_failure, Counter, Total cluster membership update failures
+  update_attempt, Counter, Total attempted cluster membership updates by service discovery
+  update_success, Counter, Total successful cluster membership updates by service discovery
+  update_failure, Counter, Total failed cluster membership updates by service discovery
   update_empty, Counter, Total cluster membership updates ending with empty cluster load assignment and continuing with previous config
   update_no_rebuild, Counter, Total successful cluster membership updates that didn't result in any cluster load balancing structure rebuilds
   version, Gauge, Hash of the contents from the last successful API fetch
