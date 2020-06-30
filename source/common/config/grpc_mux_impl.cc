@@ -10,6 +10,8 @@
 #include "common/memory/utils.h"
 #include "common/protobuf/protobuf.h"
 
+#include "absl/container/btree_map.h"
+
 namespace Envoy {
 namespace Config {
 
@@ -187,7 +189,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
     // ensure we deliver empty config updates when a resource is dropped. We make the map ordered
     // for test determinism.
     std::vector<DecodedResourceImplPtr> resources;
-    std::map<std::string, DecodedResourceRef> resource_ref_map;
+    absl::btree_map<std::string, DecodedResourceRef> resource_ref_map;
     std::vector<DecodedResourceRef> all_resource_refs;
     OpaqueResourceDecoder& resource_decoder =
         api_state_[type_url].watches_.front()->resource_decoder_;
