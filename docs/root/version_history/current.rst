@@ -123,6 +123,7 @@ New Features
 * router: allow Rate Limiting Service to be called in case of missing request header for a descriptor if the :ref:`skip_if_absent <envoy_v3_api_field_config.route.v3.RateLimit.Action.RequestHeaders.skip_if_absent>` field is set to true.
 * router: more fine grained internal redirect configs are added to the :ref:`internal_redirect_policy
   <envoy_v3_api_field_config.route.v3.RouteAction.internal_redirect_policy>` field.
+* router: add regex substitution support for header based hashing.
 * runtime: add new gauge :ref:`deprecated_feature_seen_since_process_start <runtime_stats>` that gets reset across hot restarts.
 * server: add the option :option:`--drain-strategy` to enable different drain strategies for DrainManager::drainClose().
 * server: added :ref:`server.envoy_bug_failures <server_statistics>` statistic to count ENVOY_BUG failures.
