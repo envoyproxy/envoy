@@ -7,15 +7,17 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
-using testing::Invoke;
-using testing::Return;
-using testing::ReturnPointee;
-using testing::ReturnRef;
-using testing::SaveArg;
 
 namespace Envoy {
 namespace Server {
+
+using ::testing::_;
+using ::testing::Invoke;
+using ::testing::Return;
+using ::testing::ReturnPointee;
+using ::testing::ReturnRef;
+using ::testing::SaveArg;
+
 MockInstance::MockInstance()
     : secret_manager_(std::make_unique<Secret::SecretManagerImpl>(admin_.getConfigTracker())),
       cluster_manager_(timeSource()), ssl_context_manager_(timeSource()),
@@ -82,7 +84,5 @@ MockServerFactoryContext::MockServerFactoryContext()
 MockServerFactoryContext::~MockServerFactoryContext() = default;
 
 } // namespace Configuration
-
 } // namespace Server
-
 } // namespace Envoy

@@ -7,16 +7,16 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
-using testing::Invoke;
-using testing::Return;
-using testing::ReturnPointee;
-using testing::ReturnRef;
-using testing::SaveArg;
 
 namespace Envoy {
 namespace Server {
 namespace Configuration {
+
+using ::testing::_;
+using ::testing::Invoke;
+using ::testing::Return;
+using ::testing::ReturnRef;
+
 MockFactoryContext::MockFactoryContext()
     : singleton_manager_(new Singleton::ManagerImpl(Thread::threadFactoryForTest())),
       grpc_context_(scope_.symbolTable()), http_context_(scope_.symbolTable()) {
@@ -47,7 +47,5 @@ MockFactoryContext::MockFactoryContext()
 MockFactoryContext::~MockFactoryContext() = default;
 
 } // namespace Configuration
-
 } // namespace Server
-
 } // namespace Envoy

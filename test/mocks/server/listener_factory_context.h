@@ -24,7 +24,5 @@ public:
   Network::MockListenerConfig listener_config_;
 };
 } // namespace Configuration
-
 } // namespace Server
-
 } // namespace Envoy

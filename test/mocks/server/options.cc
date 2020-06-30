@@ -7,15 +7,17 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
-using testing::Invoke;
-using testing::Return;
-using testing::ReturnPointee;
-using testing::ReturnRef;
-using testing::SaveArg;
 
 namespace Envoy {
 namespace Server {
+
+using ::testing::_;
+using ::testing::Invoke;
+using ::testing::Return;
+using ::testing::ReturnPointee;
+using ::testing::ReturnRef;
+using ::testing::SaveArg;
+
 MockOptions::MockOptions(const std::string& config_path) : config_path_(config_path) {
   ON_CALL(*this, concurrency()).WillByDefault(ReturnPointee(&concurrency_));
   ON_CALL(*this, configPath()).WillByDefault(ReturnRef(config_path_));
@@ -51,5 +53,4 @@ MockOptions::MockOptions(const std::string& config_path) : config_path_(config_p
 MockOptions::~MockOptions() = default;
 
 } // namespace Server
-
 } // namespace Envoy

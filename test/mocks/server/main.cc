@@ -5,16 +5,13 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
-using testing::Invoke;
-using testing::Return;
-using testing::ReturnPointee;
-using testing::ReturnRef;
-using testing::SaveArg;
 
 namespace Envoy {
 namespace Server {
 namespace Configuration {
+
+using ::testing::Return;
+
 MockMain::MockMain(int wd_miss, int wd_megamiss, int wd_kill, int wd_multikill)
     : wd_miss_(wd_miss), wd_megamiss_(wd_megamiss), wd_kill_(wd_kill), wd_multikill_(wd_multikill) {
   ON_CALL(*this, wdMissTimeout()).WillByDefault(Return(wd_miss_));

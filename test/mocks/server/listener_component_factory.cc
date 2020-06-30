@@ -8,15 +8,17 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
-using testing::Invoke;
-using testing::Return;
-using testing::ReturnPointee;
-using testing::ReturnRef;
-using testing::SaveArg;
 
 namespace Envoy {
 namespace Server {
+
+using ::testing::_;
+using ::testing::Invoke;
+using ::testing::Return;
+using ::testing::ReturnPointee;
+using ::testing::ReturnRef;
+using ::testing::SaveArg;
+
 MockListenerComponentFactory::MockListenerComponentFactory()
     : socket_(std::make_shared<testing::NiceMock<Network::MockListenSocket>>()) {
   ON_CALL(*this, createListenSocket(_, _, _, _))
@@ -34,5 +36,4 @@ MockListenerComponentFactory::MockListenerComponentFactory()
 MockListenerComponentFactory::~MockListenerComponentFactory() = default;
 
 } // namespace Server
-
 } // namespace Envoy

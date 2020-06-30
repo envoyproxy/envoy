@@ -5,16 +5,18 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
-using testing::Invoke;
-using testing::Return;
-using testing::ReturnPointee;
-using testing::ReturnRef;
-using testing::SaveArg;
 
 namespace Envoy {
 namespace Server {
 namespace Configuration {
+
+using ::testing::_;
+using ::testing::Invoke;
+using ::testing::Return;
+using ::testing::ReturnPointee;
+using ::testing::ReturnRef;
+using ::testing::SaveArg;
+
 MockTransportSocketFactoryContext::MockTransportSocketFactoryContext()
     : secret_manager_(std::make_unique<Secret::SecretManagerImpl>(config_tracker_)) {
   ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));

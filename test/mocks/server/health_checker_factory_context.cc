@@ -5,16 +5,14 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
-using testing::Invoke;
-using testing::Return;
-using testing::ReturnPointee;
-using testing::ReturnRef;
-using testing::SaveArg;
 
 namespace Envoy {
 namespace Server {
 namespace Configuration {
+
+using ::testing::_;
+using ::testing::ReturnRef;
+
 MockHealthCheckerFactoryContext::MockHealthCheckerFactoryContext() {
   event_logger_ = new testing::NiceMock<Upstream::MockHealthCheckEventLogger>();
   ON_CALL(*this, cluster()).WillByDefault(ReturnRef(cluster_));

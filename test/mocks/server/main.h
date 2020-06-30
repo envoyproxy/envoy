@@ -33,7 +33,5 @@ public:
   std::chrono::milliseconds wd_multikill_;
 };
 } // namespace Configuration
-
 } // namespace Server
-
 } // namespace Envoy
