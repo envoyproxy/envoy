@@ -8,6 +8,8 @@
 
 #include "absl/strings/str_join.h"
 
+#include <iostream>
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -83,8 +85,26 @@ void RoleBasedAccessControlFilter::setDynamicMetadata(std::string shadow_engine_
 EngineResult
 RoleBasedAccessControlFilter::checkEngine(Filters::Common::RBAC::EnforcementMode mode) {
   const auto engine = config_->engine(mode);
+
   if (engine != nullptr) {
     std::string effective_policy_id;
+
+    if (mode == Filters::Common::RBAC::EnforcementMode::Enforced) {
+      //=====================================LogDecision==========================
+      ProtobufWkt::Struct metrics;
+      auto& fields = *metrics.mutable_fields();
+      auto log_dec = engine->shouldLog(callbacks_->connection(),
+                                       callbacks_->connection().streamInfo(), &effective_policy_id);
+      if (log_dec != Filters::Common::RBAC::RoleBasedAccessControlEngine::LogDecision::Undecided) {
+        bool log_yes =
+            log_dec == Filters::Common::RBAC::RoleBasedAccessControlEngine::LogDecision::Yes;
+
+        *fields["envoy.log"].mutable_string_value() = log_yes ? "yes" : "no";
+      }
+
+      callbacks_->connection().streamInfo().setDynamicMetadata("common", metrics);
+    }
+
     if (engine->allowed(callbacks_->connection(), callbacks_->connection().streamInfo(),
                         &effective_policy_id)) {
       if (mode == Filters::Common::RBAC::EnforcementMode::Shadow) {

@@ -109,6 +109,7 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
   const auto engine =
       config_->engine(callbacks_->route(), Filters::Common::RBAC::EnforcementMode::Enforced);
   if (engine != nullptr) {
+<<<<<<< HEAD
     ProtobufWkt::Struct log_metadata;
     auto& log_fields = *log_metadata.mutable_fields();
     // Set kRbacShouldLog to true if shouldLog; false otherwise
@@ -116,6 +117,24 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
         engine->shouldLog(*callbacks_->connection(), headers, callbacks_->streamInfo(), nullptr);
     log_fields["access_log_hint"].set_bool_value(log_decision);
     callbacks_->streamInfo().setDynamicMetadata("envoy.common", log_metadata);
+=======
+    // Set "envoy.log" to true if shouldLog; false otherwise
+    auto log_dec =
+        engine->shouldLog(*callbacks_->connection(), headers, callbacks_->streamInfo(), nullptr);
+    if (log_dec != Filters::Common::RBAC::RoleBasedAccessControlEngine::LogDecision::Undecided) {
+      bool log_yes =
+          log_dec == Filters::Common::RBAC::RoleBasedAccessControlEngine::LogDecision::Yes;
+      *fields["envoy.log"].mutable_string_value() = log_yes ? "yes" : "no";
+
+      if (log_yes) {
+        ENVOY_LOG(debug, "request logged");
+        config_->stats().logged_.inc();
+      } else {
+        ENVOY_LOG(debug, "request not logged");
+        config_->stats().not_logged_.inc();
+      }
+    }
+>>>>>>> c7e38e439... rbac log action for network filter + log key access log filter
 
     if (engine->allowed(*callbacks_->connection(), headers, callbacks_->streamInfo(), nullptr)) {
       ENVOY_LOG(debug, "enforced allowed");
@@ -130,8 +149,15 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
     }
   }
 
+<<<<<<< HEAD
   ENVOY_LOG(debug, "no engine, allowed by default");
   return Http::FilterHeadersStatus::Continue;
+=======
+  if (!metrics.fields().empty())
+    callbacks_->streamInfo().setDynamicMetadata(HttpFilterNames::get().Rbac, metrics);
+  // ENVOY_LOG(debug, "no engine, allowed by default");
+  return result;
+>>>>>>> c7e38e439... rbac log action for network filter + log key access log filter
 }
 
 } // namespace RBACFilter

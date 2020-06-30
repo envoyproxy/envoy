@@ -92,11 +92,17 @@ message AccessLogFilter {
     // gRPC status filter.
     GrpcStatusFilter grpc_status_filter = 10;
 
+    LogKeyFilter log_key_filter = 11;
+
     // Extension filter.
+<<<<<<< HEAD
     ExtensionFilter extension_filter = 11;
 
     // Metadata Filter
     MetadataFilter metadata_filter = 12;
+=======
+    ExtensionFilter extension_filter = 12;
+>>>>>>> c7e38e439... rbac log action for network filter + log key access log filter
   }
 }
 
@@ -284,6 +290,7 @@ message GrpcStatusFilter {
   bool exclude = 2;
 }
 
+<<<<<<< HEAD
 // Filters based on matching dynamic metadata.
 message MetadataFilter {
   option (udpa.annotations.versioning).previous_message_type =
@@ -292,6 +299,11 @@ message MetadataFilter {
   // Matcher to check metadata for specified value. For example, to match on the access_log_hint metadata
   // set the filter to "envoy.common" and the path to "access_log_hint".
   type.matcher.v4alpha.MetadataMatcher matcher = 1;
+=======
+message LogKeyFilter {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.accesslog.v3.LogKeyFilter";
+>>>>>>> c7e38e439... rbac log action for network filter + log key access log filter
 }
 
 // Extension filter is statically registered at runtime.

@@ -130,6 +130,12 @@ TEST_F(RoleBasedAccessControlFilterTest, RequestedServerName) {
   Buffer::OwnedImpl data("");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(trailers_));
+
+  //Check Log
+  setMetadata();
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, log_filter_.decodeHeaders(headers_, false));
+  auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at(HttpFilterNames::get().Rbac);
+  EXPECT_EQ("yes", filter_meta.fields().at("envoy.log").string_value());
 }
 
 TEST_F(RoleBasedAccessControlFilterTest, Path) {
@@ -150,6 +156,12 @@ TEST_F(RoleBasedAccessControlFilterTest, Path) {
       {":authority", "host"},
   };
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));
+
+  //Check Log
+  setMetadata();
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, log_filter_.decodeHeaders(headers, false));
+  auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at(HttpFilterNames::get().Rbac);
+  EXPECT_EQ("no", filter_meta.fields().at("envoy.log").string_value());
 }
 
 TEST_F(RoleBasedAccessControlFilterTest, Denied) {
@@ -200,6 +212,9 @@ TEST_F(RoleBasedAccessControlFilterTest, ShouldLog) {
   EXPECT_EQ(1U, log_config_->stats().allowed_.value());
   EXPECT_EQ(0U, log_config_->stats().shadow_denied_.value());
 
+  EXPECT_EQ(1U, log_config_->stats().logged_.value());
+  EXPECT_EQ(0U, log_config_->stats().not_logged_.value());
+
   Buffer::OwnedImpl data("");
   EXPECT_EQ(Http::FilterDataStatus::Continue, log_filter_.decodeData(data, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, log_filter_.decodeTrailers(trailers_));
@@ -216,12 +231,42 @@ TEST_F(RoleBasedAccessControlFilterTest, ShouldNotLog) {
   EXPECT_EQ(1U, log_config_->stats().allowed_.value());
   EXPECT_EQ(0U, log_config_->stats().shadow_denied_.value());
 
+  EXPECT_EQ(0U, log_config_->stats().logged_.value());
+  EXPECT_EQ(1U, log_config_->stats().not_logged_.value());
+
   Buffer::OwnedImpl data("");
   EXPECT_EQ(Http::FilterDataStatus::Continue, log_filter_.decodeData(data, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, log_filter_.decodeTrailers(trailers_));
 
   auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at("envoy.common");
   EXPECT_EQ(false, filter_meta.fields().at("access_log_hint").bool_value());
+}
+
+TEST_F(RoleBasedAccessControlFilterTest, AllowNoChangeLog) {
+  setDestinationPort(123);
+  setMetadata();
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers_, false));
+  EXPECT_EQ(0U, config_->stats().logged_.value());
+  EXPECT_EQ(0U, config_->stats().not_logged_.value());
+
+  auto& filter_meta = req_info_.dynamicMetadata().filter_metadata().at(HttpFilterNames::get().Rbac);
+  // Check that Allow action does not set 'envoy.log' metadata
+  EXPECT_EQ(filter_meta.fields().end(), filter_meta.fields().find("envoy.log"));
+
+  // setDestinationPort(123);
+  // setMetadata();
+
+  // EXPECT_EQ(Http::FilterHeadersStatus::Continue, log_filter_.decodeHeaders(headers_, false));
+  // filter_meta = req_info_.dynamicMetadata().filter_metadata().at(HttpFilterNames::get().Rbac);
+  // EXPECT_EQ("yes", req_info_.dynamicMetadata().filter_metadata().at(HttpFilterNames::get().Rbac).fields().at("envoy.log").string_value());
+
+  // setDestinationPort(123);
+  // setMetadata();
+
+  // filter_meta = req_info_.dynamicMetadata().filter_metadata().at(HttpFilterNames::get().Rbac);
+  // EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers_, false));
+  // EXPECT_EQ("yes", filter_meta.fields().at("envoy.log").string_value());
 }
 
 } // namespace

@@ -22,19 +22,19 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RBACFilter {
 
-class RBACShouldLogState : public StreamInfo::FilterState::Object {
-public:
-  RBACShouldLogState(std::string value) {
-    value_ = value;
-  }
+// class RBACShouldLogState : public StreamInfo::FilterState::Object {
+// public:
+//   RBACShouldLogState(std::string value) {
+//     value_ = value;
+//   }
 
-  const std::string& value() const { return value_; }
-  void setValue(std::string value) {
-    value_.assign(value);
-  }
-private:
-  std::string value_{};
-};
+//   const std::string& value() const { return value_; }
+//   void setValue(std::string value) {
+//     value_.assign(value);
+//   }
+// private:
+//   std::string value_{};
+// };
 
 class RoleBasedAccessControlRouteSpecificFilterConfig : public Router::RouteSpecificFilterConfig {
 public:

@@ -474,6 +474,34 @@ typed_config:
   }
 }
 
+TEST_F(AccessLogImplTest, LogKey) {
+
+  const std::string yaml = R"EOF(
+name: accesslog
+filter:
+  log_key_filter: {}
+typed_config:
+  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  path: /dev/null
+  )EOF";
+
+  InstanceSharedPtr logger = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+  ProtobufWkt::Struct metrics;
+  auto& fields = *metrics.mutable_fields();
+  *fields["access_log_policy"].mutable_string_value() = "no";
+  stream_info_.setDynamicMetadata("envoy.common", metrics);
+
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  logger->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+
+  *fields["access_log_policy"].mutable_string_value() = "yes";
+  stream_info_.setDynamicMetadata("envoy.common", metrics);
+
+  EXPECT_CALL(*file_, write(_));
+  logger->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+}
+
+
 TEST(AccessLogImplTestCtor, FiltersMissingInOrAndFilter) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
 

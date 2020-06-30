@@ -21,10 +21,10 @@ public:
   bool allowed(const Network::Connection& connection, const StreamInfo::StreamInfo& info,
                std::string* effective_policy_id) const override;
 
-  bool shouldLog(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
+  LogDecision shouldLog(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo& info, std::string* effective_policy_id) const override;
 
-  bool shouldLog(const Network::Connection& connection, const StreamInfo::StreamInfo& info,
+  LogDecision shouldLog(const Network::Connection& connection, const StreamInfo::StreamInfo& info,
                std::string* effective_policy_id) const override;
 
 private:

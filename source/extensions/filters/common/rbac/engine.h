@@ -18,6 +18,8 @@ class RoleBasedAccessControlEngine {
 public:
   virtual ~RoleBasedAccessControlEngine() = default;
 
+  enum class LogDecision { Yes, No, Undecided };
+
   /**
    * Returns whether or not the current action is permitted.
    *
@@ -46,7 +48,7 @@ public:
   virtual bool allowed(const Network::Connection& connection, const StreamInfo::StreamInfo& info,
                        std::string* effective_policy_id) const PURE;
 
-    /**
+  /**
    * Returns whether or not the current action should be logged.
    *
    * @param connection the downstream connection used to identify the action/principal.
@@ -57,10 +59,10 @@ public:
    * @param effective_policy_id  it will be filled by the matching policy's ID,
    *                   which is used to identity the source of the allow/deny.
    */
-  virtual bool shouldLog(const Network::Connection& connection,
-                       const Envoy::Http::RequestHeaderMap& headers,
-                       const StreamInfo::StreamInfo& info,
-                       std::string* effective_policy_id) const PURE;
+  virtual LogDecision shouldLog(const Network::Connection& connection,
+                                const Envoy::Http::RequestHeaderMap& headers,
+                                const StreamInfo::StreamInfo& info,
+                                std::string* effective_policy_id) const PURE;
 
   /**
    * Returns whether or not the current action should be logged.
@@ -71,8 +73,9 @@ public:
    * @param effective_policy_id  it will be filled by the matching policy's ID,
    *                   which is used to identity the source of the allow/deny.
    */
-  virtual bool shouldLog(const Network::Connection& connection, const StreamInfo::StreamInfo& info,
-                       std::string* effective_policy_id) const PURE;
+  virtual LogDecision shouldLog(const Network::Connection& connection,
+                                const StreamInfo::StreamInfo& info,
+                                std::string* effective_policy_id) const PURE;
 };
 
 } // namespace RBAC

@@ -76,8 +76,13 @@ FilterPtr FilterFactory::fromProto(const envoy::config::accesslog::v3::AccessLog
   case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kGrpcStatusFilter:
     MessageUtil::validate(config, validation_visitor);
     return FilterPtr{new GrpcStatusFilter(config.grpc_status_filter())};
+<<<<<<< HEAD
   case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kMetadataFilter:
     return FilterPtr{new MetadataFilter(config.metadata_filter())};
+=======
+  case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kLogKeyFilter:
+    return FilterPtr{new LogKeyFilter()};
+>>>>>>> c7e38e439... rbac log action for network filter + log key access log filter
   case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kExtensionFilter:
     MessageUtil::validate(config, validation_visitor);
     {
@@ -257,6 +262,7 @@ Grpc::Status::GrpcStatus GrpcStatusFilter::protoToGrpcStatus(
   return static_cast<Grpc::Status::GrpcStatus>(status);
 }
 
+<<<<<<< HEAD
 MetadataFilter::MetadataFilter(const envoy::config::accesslog::v3::MetadataFilter& config) : matcher_(Envoy::Matchers::MetadataMatcher(config.matcher())) {}
 
 bool MetadataFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap&,
@@ -264,6 +270,24 @@ bool MetadataFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::Re
                                   const Http::ResponseTrailerMap&) const {
 
   return matcher_.match(info.dynamicMetadata());                                 
+=======
+bool LogKeyFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap&,
+                                  const Http::ResponseHeaderMap&,
+                                  const Http::ResponseTrailerMap&) const {
+
+  const auto& metadata = info.dynamicMetadata().filter_metadata();
+  const auto& com_metadata = metadata.find("envoy.common");
+  if (com_metadata != metadata.end()) {
+    const auto& key_it = com_metadata->second.fields().find("access_log_policy");
+    if (key_it != com_metadata->second.fields().end()) {
+      std::string access_log_policy = key_it->second.string_value();
+      return access_log_policy == "yes";
+    }
+  }
+
+  //If not set, do not filter log.
+  return true;                                  
+>>>>>>> c7e38e439... rbac log action for network filter + log key access log filter
 }
 
 InstanceSharedPtr AccessLogFactory::fromProto(const envoy::config::accesslog::v3::AccessLog& config,
