@@ -9,6 +9,7 @@ Incompatible Behavior Changes
 * build: official released binary is now built on Ubuntu 18.04, requires glibc >= 2.27.
 * client_ssl_auth: the `auth_ip_white_list` stat has been renamed to
   :ref:`auth_ip_allowlist <config_network_filters_client_ssl_auth_stats>`.
+* router: path_redirect now keeps query string by default. This behavior may be reverted by setting runtime feature `envoy.reloadable_features.preserve_query_string_in_path_redirects` to false.
 
 Minor Behavior Changes
 ----------------------
