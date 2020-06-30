@@ -41,10 +41,10 @@ bool CacheabilityUtils::isCacheableResponse(const Http::ResponseHeaderMap& heade
   //    max-age or s-maxage cache-control directives with date header
   //    expires header
   // TODO(yosrym93): If the response has no date header inject date metadata
-  bool has_validation_data = (headers.Date() && response_cache_control.max_age.has_value()) ||
+  bool has_validation_data = (headers.Date() && response_cache_control.max_age_.has_value()) ||
                              headers.get(Http::Headers::get().Expires);
 
-  return !response_cache_control.no_store && cacheable_status && has_validation_data;
+  return !response_cache_control.no_store_ && cacheable_status && has_validation_data;
 }
 
 } // namespace Cache

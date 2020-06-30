@@ -85,9 +85,9 @@ bool LookupRequest::requiresValidation(const Http::ResponseHeaderMap& response_h
 
   ASSERT(response_age >= std::chrono::seconds(0), "Response time is in the future.");
 
-  bool request_max_age_exceeded = request_cache_control_.max_age.has_value() &&
-                                  request_cache_control_.max_age.value() < response_age;
-  if (response_cache_control.must_validate || request_cache_control_.must_validate ||
+  bool request_max_age_exceeded = request_cache_control_.max_age_.has_value() &&
+                                  request_cache_control_.max_age_.value() < response_age;
+  if (response_cache_control.must_validate_ || request_cache_control_.must_validate_ ||
       request_max_age_exceeded) {
     // Either the request or response explicitly require validation or a request max-age requirement
     // is not satisfied
@@ -96,13 +96,13 @@ bool LookupRequest::requiresValidation(const Http::ResponseHeaderMap& response_h
 
   // When date metadata injection for responses with no date
   // is implemented, this ASSERT will need to be updated
-  ASSERT((response_headers.Date() && response_cache_control.max_age.has_value()) ||
+  ASSERT((response_headers.Date() && response_cache_control.max_age_.has_value()) ||
              response_headers.get(Http::Headers::get().Expires),
          "Cache entry does not have valid expiration data.");
 
   SystemTime expiration_time =
-      response_cache_control.max_age.has_value()
-          ? response_time + response_cache_control.max_age.value()
+      response_cache_control.max_age_.has_value()
+          ? response_time + response_cache_control.max_age_.value()
           : CacheHeadersUtils::httpTime(response_headers.get(Http::Headers::get().Expires));
 
   if (timestamp_ > expiration_time) {
@@ -110,14 +110,14 @@ bool LookupRequest::requiresValidation(const Http::ResponseHeaderMap& response_h
     // if the response does not allow being served stale
     // or the request max-stale directive does not allow it
     bool allowed_by_max_stale =
-        request_cache_control_.max_stale.has_value() &&
-        request_cache_control_.max_stale.value() > timestamp_ - expiration_time;
-    return response_cache_control.no_stale || !allowed_by_max_stale;
+        request_cache_control_.max_stale_.has_value() &&
+        request_cache_control_.max_stale_.value() > timestamp_ - expiration_time;
+    return response_cache_control.no_stale_ || !allowed_by_max_stale;
   } else {
     // Response is fresh, requires validation only if there is an unsatisfied min-fresh requirement
     bool min_fresh_unsatisfied =
-        request_cache_control_.min_fresh.has_value() &&
-        request_cache_control_.min_fresh.value() > expiration_time - timestamp_;
+        request_cache_control_.min_fresh_.has_value() &&
+        request_cache_control_.min_fresh_.value() > expiration_time - timestamp_;
     return min_fresh_unsatisfied;
   }
 }

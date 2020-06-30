@@ -39,7 +39,7 @@ public:
 };
 
 // clang-format off
-// RequestCacheControl = {must_validate, no_store, no_transform, only_if_cached, max_age, min_fresh, max_stale}
+// RequestCacheControl = {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
 const RequestCacheControlTestCase RequestCacheControlTest::test_cases[] = {
     // Empty header
     {
@@ -120,7 +120,7 @@ public:
 };
 
 // clang-format off
-// ResponseCacheControl = {must_validate, no_store, no_transform, no_stale, _public, max_age}
+// ResponseCacheControl = {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
 const ResponseCacheControlTestCase ResponseCacheControlTest::test_cases[] = {
     // Empty header
     {

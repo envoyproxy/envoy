@@ -52,12 +52,12 @@ separateDirectiveAndArgument(absl::string_view full_directive) {
 RequestCacheControl::RequestCacheControl(bool must_validate, bool no_store, bool no_transform,
                                          bool only_if_cached, OptionalDuration max_age,
                                          OptionalDuration min_fresh, OptionalDuration max_stale)
-    : must_validate(must_validate), no_store(no_store), no_transform(no_transform),
-      only_if_cached(only_if_cached), max_age(max_age), min_fresh(min_fresh), max_stale(max_stale) {
-}
+    : must_validate_(must_validate), no_store_(no_store), no_transform_(no_transform),
+      only_if_cached_(only_if_cached), max_age_(max_age), min_fresh_(min_fresh),
+      max_stale_(max_stale) {}
 
 RequestCacheControl::RequestCacheControl(absl::string_view cache_control_header) {
-  must_validate = no_store = no_transform = only_if_cached = false;
+  must_validate_ = no_store_ = no_transform_ = only_if_cached_ = false;
   std::vector<absl::string_view> directives = absl::StrSplit(cache_control_header, ',');
 
   for (auto full_directive : directives) {
@@ -65,30 +65,30 @@ RequestCacheControl::RequestCacheControl(absl::string_view cache_control_header)
     std::tie(directive, argument) = separateDirectiveAndArgument(full_directive);
 
     if (directive == "no-cache") {
-      must_validate = true;
+      must_validate_ = true;
     } else if (directive == "no-store") {
-      no_store = true;
+      no_store_ = true;
     } else if (directive == "no-transform") {
-      no_transform = true;
+      no_transform_ = true;
     } else if (directive == "only-if-cached") {
-      only_if_cached = true;
+      only_if_cached_ = true;
     } else if (directive == "max-age") {
-      max_age = parseDuration(argument);
+      max_age_ = parseDuration(argument);
     } else if (directive == "min-fresh") {
-      min_fresh = parseDuration(argument);
+      min_fresh_ = parseDuration(argument);
     } else if (directive == "max-stale") {
-      max_stale = argument.empty() ? SystemTime::duration::max() : parseDuration(argument);
+      max_stale_ = argument.empty() ? SystemTime::duration::max() : parseDuration(argument);
     }
   }
 }
 
 ResponseCacheControl::ResponseCacheControl(bool must_validate, bool no_store, bool no_transform,
                                            bool no_stale, bool is_public, OptionalDuration max_age)
-    : must_validate(must_validate), no_store(no_store), no_transform(no_transform),
-      no_stale(no_stale), is_public(is_public), max_age(max_age) {}
+    : must_validate_(must_validate), no_store_(no_store), no_transform_(no_transform),
+      no_stale_(no_stale), is_public_(is_public), max_age_(max_age) {}
 
 ResponseCacheControl::ResponseCacheControl(absl::string_view cache_control_header) {
-  must_validate = no_store = no_transform = no_stale = is_public = false;
+  must_validate_ = no_store_ = no_transform_ = no_stale_ = is_public_ = false;
   std::vector<absl::string_view> directives = absl::StrSplit(cache_control_header, ',');
 
   for (auto full_directive : directives) {
@@ -97,20 +97,20 @@ ResponseCacheControl::ResponseCacheControl(absl::string_view cache_control_heade
 
     if (directive == "no-cache") {
       // If no-cache directive has arguments they are ignored - not handled
-      must_validate = true;
+      must_validate_ = true;
     } else if (directive == "must-revalidate" || directive == "proxy-revalidate") {
-      no_stale = true;
+      no_stale_ = true;
     } else if (directive == "no-store" || directive == "private") {
       // If private directive has arguments they are ignored - not handled
-      no_store = true;
+      no_store_ = true;
     } else if (directive == "no-transform") {
-      no_transform = true;
+      no_transform_ = true;
     } else if (directive == "public") {
-      is_public = true;
+      is_public_ = true;
     } else if (directive == "s-maxage") {
-      max_age = parseDuration(argument);
-    } else if (!max_age.has_value() && directive == "max-age") {
-      max_age = parseDuration(argument);
+      max_age_ = parseDuration(argument);
+    } else if (!max_age_.has_value() && directive == "max-age") {
+      max_age_ = parseDuration(argument);
     }
   }
 }
@@ -121,36 +121,36 @@ std::ostream& operator<<(std::ostream& os, const OptionalDuration& duration) {
 
 std::ostream& operator<<(std::ostream& os, const RequestCacheControl& request_cache_control) {
   return os << "{"
-            << "must_validate: " << request_cache_control.must_validate << ", "
-            << "no_store: " << request_cache_control.no_store << ", "
-            << "no_transform: " << request_cache_control.no_transform << ", "
-            << "only_if_cached: " << request_cache_control.only_if_cached << ", "
-            << "max_age: " << request_cache_control.max_age << ", "
-            << "min_fresh: " << request_cache_control.min_fresh << ", "
-            << "max_stale: " << request_cache_control.max_stale << "}";
+            << "must_validate: " << request_cache_control.must_validate_ << ", "
+            << "no_store: " << request_cache_control.no_store_ << ", "
+            << "no_transform: " << request_cache_control.no_transform_ << ", "
+            << "only_if_cached: " << request_cache_control.only_if_cached_ << ", "
+            << "max_age: " << request_cache_control.max_age_ << ", "
+            << "min_fresh: " << request_cache_control.min_fresh_ << ", "
+            << "max_stale: " << request_cache_control.max_stale_ << "}";
 }
 
 std::ostream& operator<<(std::ostream& os, const ResponseCacheControl& response_cache_control) {
   return os << "{"
-            << "must_validate: " << response_cache_control.must_validate << ", "
-            << "no_store: " << response_cache_control.no_store << ", "
-            << "no_transform: " << response_cache_control.no_transform << ", "
-            << "no_stale: " << response_cache_control.no_stale << ", "
-            << "public: " << response_cache_control.is_public << ", "
-            << "max_age: " << response_cache_control.max_age << "}";
+            << "must_validate: " << response_cache_control.must_validate_ << ", "
+            << "no_store: " << response_cache_control.no_store_ << ", "
+            << "no_transform: " << response_cache_control.no_transform_ << ", "
+            << "no_stale: " << response_cache_control.no_stale_ << ", "
+            << "public: " << response_cache_control.is_public_ << ", "
+            << "max_age: " << response_cache_control.max_age_ << "}";
 }
 
 bool operator==(const RequestCacheControl& lhs, const RequestCacheControl& rhs) {
-  return (lhs.must_validate == rhs.must_validate) && (lhs.no_store == rhs.no_store) &&
-         (lhs.no_transform == rhs.no_transform) && (lhs.only_if_cached == rhs.only_if_cached) &&
-         (lhs.max_age == rhs.max_age) && (lhs.min_fresh == rhs.min_fresh) &&
-         (lhs.max_stale == rhs.max_stale);
+  return (lhs.must_validate_ == rhs.must_validate_) && (lhs.no_store_ == rhs.no_store_) &&
+         (lhs.no_transform_ == rhs.no_transform_) && (lhs.only_if_cached_ == rhs.only_if_cached_) &&
+         (lhs.max_age_ == rhs.max_age_) && (lhs.min_fresh_ == rhs.min_fresh_) &&
+         (lhs.max_stale_ == rhs.max_stale_);
 }
 
 bool operator==(const ResponseCacheControl& lhs, const ResponseCacheControl& rhs) {
-  return (lhs.must_validate == rhs.must_validate) && (lhs.no_store == rhs.no_store) &&
-         (lhs.no_transform == rhs.no_transform) && (lhs.no_stale == rhs.no_stale) &&
-         (lhs.is_public == rhs.is_public) && (lhs.max_age == rhs.max_age);
+  return (lhs.must_validate_ == rhs.must_validate_) && (lhs.no_store_ == rhs.no_store_) &&
+         (lhs.no_transform_ == rhs.no_transform_) && (lhs.no_stale_ == rhs.no_stale_) &&
+         (lhs.is_public_ == rhs.is_public_) && (lhs.max_age_ == rhs.max_age_);
 }
 
 SystemTime CacheHeadersUtils::httpTime(const Http::HeaderEntry* header_entry) {
