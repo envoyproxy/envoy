@@ -24,6 +24,8 @@ public:
    */
   CallbackHandle* add(Callback callback) {
     callbacks_.emplace_back(*this, callback);
+    // get the list iterator of added vallback handle, which will be used to remove itself from
+    // callbacks_ list.
     callbacks_.back().it_ = (--callbacks_.end());
     return &callbacks_.back();
   }
