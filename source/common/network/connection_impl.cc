@@ -8,6 +8,7 @@
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/event/timer.h"
+#include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 
 #include "common/common/assert.h"
@@ -17,6 +18,7 @@
 #include "common/network/listen_socket_impl.h"
 #include "common/network/raw_buffer_socket.h"
 #include "common/network/utility.h"
+#include "envoy/network/transport_socket.h"
 
 namespace Envoy {
 namespace Network {
@@ -938,6 +940,10 @@ void ClientPipeImpl::closeSocket(ConnectionEvent close_type) {
 
   // Call the base class directly as close() is called in the destructor.
   ClientPipeImpl::raiseEvent(close_type);
+
+  // Close peer using the opposite event type.
+  peer_->closeSocket(close_type == ConnectionEvent::LocalClose ? ConnectionEvent::RemoteClose
+                                                               : ConnectionEvent::LocalClose);
 }
 
 void ClientPipeImpl::noDelay(bool enable) {
@@ -1403,6 +1409,7 @@ bool ServerPipeImpl::initializeReadFilters() { return filter_manager_.initialize
 
 void ServerPipeImpl::close(ConnectionCloseType) {
   if (!isOpen()) {
+    ENVOY_LOG_MISC(debug, "lambdai: attempt to close a closed server pipe CS{}", id());
     return;
   }
   closeConnectionImmediately();
@@ -1449,6 +1456,10 @@ void ServerPipeImpl::closeSocket(ConnectionEvent close_type) {
 
   // Call the base class directly as close() is called in the destructor.
   ServerPipeImpl::raiseEvent(close_type);
+
+  // Close peer using the opposite event type.
+  peer_->closeSocket(close_type == ConnectionEvent::LocalClose ? ConnectionEvent::RemoteClose
+                                                               : ConnectionEvent::LocalClose);
 }
 
 void ServerPipeImpl::noDelay(bool enable) {

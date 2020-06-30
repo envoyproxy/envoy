@@ -219,6 +219,7 @@ public:
   virtual ~PeeringPipe() = default;
   void setPeer(PeeringPipe* peer) { peer_ = peer; }
   virtual void onReadReady() PURE;   
+  virtual void closeSocket(ConnectionEvent close_type) PURE;
 protected:
   PeeringPipe* peer_;
 };
@@ -317,7 +318,8 @@ protected:
   // Network::ConnectionImplBase
   void closeConnectionImmediately() override;
 
-  void closeSocket(ConnectionEvent close_type);
+  // PeeringPipe
+  void closeSocket(ConnectionEvent close_type) override;
 
   void onReadBufferLowWatermark();
   void onReadBufferHighWatermark();
@@ -484,7 +486,8 @@ protected:
   // Network::ConnectionImplBase
   void closeConnectionImmediately() override;
 
-  void closeSocket(ConnectionEvent close_type);
+  // PeeringPipe
+  void closeSocket(ConnectionEvent close_type) override;
 
   void onReadBufferLowWatermark();
   void onReadBufferHighWatermark();
