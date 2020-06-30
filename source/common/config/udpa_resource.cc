@@ -18,7 +18,7 @@ using PercentEncoding = Http::Utility::PercentEncoding;
 
 namespace {
 
-// We need to percent-encode authority, id, path and query params. Qualified types should not have
+// We need to percent-encode authority, id, path and query params. Resource types should not have
 // reserved characters.
 
 std::string encodeAuthority(const std::string& authority) {
@@ -119,7 +119,7 @@ void decodePath(absl::string_view path, std::string* resource_type,
     *resource_type = std::string(path_components[0]);
     if (resource_type->empty()) {
       throw UdpaResourceIdentifier::DecodeException(
-          fmt::format("Qualified type missing from {}", path));
+          fmt::format("Resource type missing from {}", path));
     }
     id_it = std::next(id_it);
   }

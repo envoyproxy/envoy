@@ -4,6 +4,17 @@
 
 #include "gtest/gtest.h"
 
+using ::testing::ElementsAre;
+using ::testing::Pair;
+using ::testing::UnorderedElementsAre;
+
+#define EXPECT_CONTEXT_PARAMS(context_params, ...)                                                 \
+  {                                                                                                \
+    std::map<std::string, std::string> param_map((context_params).begin(),                         \
+                                                 (context_params).end());                          \
+    EXPECT_THAT(param_map, UnorderedElementsAre(__VA_ARGS__));                                     \
+  }
+
 namespace Envoy {
 namespace Config {
 namespace {
@@ -52,14 +63,9 @@ TEST(UdpaResourceNameTest, DecodeSuccess) {
   const auto resource_name = UdpaResourceIdentifier::decodeUrn(EscapedUrnWithManyQueryParams);
   EXPECT_EQ("f123%/?#o", resource_name.authority());
   EXPECT_EQ("envoy.config.listener.v3.Listener", resource_name.resource_type());
-  EXPECT_EQ(3, resource_name.id().size());
-  EXPECT_EQ("b%:/?#[]ar", resource_name.id()[0]);
-  EXPECT_EQ("", resource_name.id()[1]);
-  EXPECT_EQ("baz", resource_name.id()[2]);
-  EXPECT_EQ(3, resource_name.context().params().size());
-  EXPECT_EQ("bar", resource_name.context().params().at("%#[]&="));
-  EXPECT_EQ("cde%#[]&=f", resource_name.context().params().at("%#[]&=ab"));
-  EXPECT_EQ("%#[]&=", resource_name.context().params().at("foo"));
+  EXPECT_THAT(resource_name.id(), ElementsAre("b%:/?#[]ar", "", "baz"));
+  EXPECT_CONTEXT_PARAMS(resource_name.context().params(), Pair("%#[]&=", "bar"),
+                        Pair("%#[]&=ab", "cde%#[]&=f"), Pair("foo", "%#[]&="));
 }
 
 // Validate that URL decoding behaves as expected component-wise.
@@ -68,14 +74,9 @@ TEST(UdpaResourceLocatorTest, DecodeSuccess) {
       UdpaResourceIdentifier::decodeUrl(EscapedUrlWithManyQueryParamsAndDirectives);
   EXPECT_EQ("f123%/?#o", resource_locator.authority());
   EXPECT_EQ("envoy.config.listener.v3.Listener", resource_locator.resource_type());
-  EXPECT_EQ(3, resource_locator.id().size());
-  EXPECT_EQ("b%:/?#[]ar", resource_locator.id()[0]);
-  EXPECT_EQ("", resource_locator.id()[1]);
-  EXPECT_EQ("baz", resource_locator.id()[2]);
-  EXPECT_EQ(3, resource_locator.exact_context().params().size());
-  EXPECT_EQ("bar", resource_locator.exact_context().params().at("%#[]&="));
-  EXPECT_EQ("cde%#[]&=f", resource_locator.exact_context().params().at("%#[]&=ab"));
-  EXPECT_EQ("%#[]&=", resource_locator.exact_context().params().at("foo"));
+  EXPECT_THAT(resource_locator.id(), ElementsAre("b%:/?#[]ar", "", "baz"));
+  EXPECT_CONTEXT_PARAMS(resource_locator.exact_context().params(), Pair("%#[]&=", "bar"),
+                        Pair("%#[]&=ab", "cde%#[]&=f"), Pair("foo", "%#[]&="));
   EXPECT_EQ(2, resource_locator.directives().size());
   EXPECT_EQ("some_en%#[],try", resource_locator.directives()[0].entry());
   const auto& alt = resource_locator.directives()[1].alt();
@@ -119,7 +120,7 @@ TEST(UdpaResourceNameTest, DecodeFail) {
   {
     EXPECT_THROW_WITH_MESSAGE(UdpaResourceIdentifier::decodeUrn("udpa://foo"),
                               UdpaResourceIdentifier::DecodeException,
-                              "Qualified type missing from /");
+                              "Resource type missing from /");
   }
 }
 
@@ -133,7 +134,7 @@ TEST(UdpaResourceLocatorTest, DecodeFail) {
   {
     EXPECT_THROW_WITH_MESSAGE(UdpaResourceIdentifier::decodeUrl("udpa://foo"),
                               UdpaResourceIdentifier::DecodeException,
-                              "Qualified type missing from /");
+                              "Resource type missing from /");
   }
   {
     EXPECT_THROW_WITH_MESSAGE(UdpaResourceIdentifier::decodeUrl("udpa://foo/some-type#bar=baz"),
@@ -150,11 +151,8 @@ TEST(UdpaResourceLocatorTest, Schemes) {
     EXPECT_EQ(udpa::core::v1::ResourceLocator::UDPA, resource_locator.scheme());
     EXPECT_EQ("foo", resource_locator.authority());
     EXPECT_EQ("bar", resource_locator.resource_type());
-    EXPECT_EQ(2, resource_locator.id().size());
-    EXPECT_EQ("baz", resource_locator.id()[0]);
-    EXPECT_EQ("blah", resource_locator.id()[1]);
-    EXPECT_EQ(1, resource_locator.exact_context().params().size());
-    EXPECT_EQ("b", resource_locator.exact_context().params().at("a"));
+    EXPECT_THAT(resource_locator.id(), ElementsAre("baz", "blah"));
+    EXPECT_CONTEXT_PARAMS(resource_locator.exact_context().params(), Pair("a", "b"));
     EXPECT_EQ(1, resource_locator.directives().size());
     EXPECT_EQ("m", resource_locator.directives()[0].entry());
     EXPECT_EQ("udpa://foo/bar/baz/blah?a=b#entry=m",
@@ -167,10 +165,8 @@ TEST(UdpaResourceLocatorTest, Schemes) {
     EXPECT_EQ("foo", resource_locator.authority());
     EXPECT_EQ("bar", resource_locator.resource_type());
     EXPECT_EQ(2, resource_locator.id().size());
-    EXPECT_EQ("baz", resource_locator.id()[0]);
-    EXPECT_EQ("blah", resource_locator.id()[1]);
-    EXPECT_EQ(1, resource_locator.exact_context().params().size());
-    EXPECT_EQ("b", resource_locator.exact_context().params().at("a"));
+    EXPECT_THAT(resource_locator.id(), ElementsAre("baz", "blah"));
+    EXPECT_CONTEXT_PARAMS(resource_locator.exact_context().params(), Pair("a", "b"));
     EXPECT_EQ(1, resource_locator.directives().size());
     EXPECT_EQ("m", resource_locator.directives()[0].entry());
     EXPECT_EQ("http://foo/bar/baz/blah?a=b#entry=m",
@@ -180,9 +176,7 @@ TEST(UdpaResourceLocatorTest, Schemes) {
     const auto resource_locator = UdpaResourceIdentifier::decodeUrl("file:///bar/baz/blah#entry=m");
     EXPECT_EQ(udpa::core::v1::ResourceLocator::FILE, resource_locator.scheme());
     EXPECT_EQ(3, resource_locator.id().size());
-    EXPECT_EQ("bar", resource_locator.id()[0]);
-    EXPECT_EQ("baz", resource_locator.id()[1]);
-    EXPECT_EQ("blah", resource_locator.id()[2]);
+    EXPECT_THAT(resource_locator.id(), ElementsAre("bar", "baz", "blah"));
     EXPECT_EQ(1, resource_locator.directives().size());
     EXPECT_EQ("m", resource_locator.directives()[0].entry());
     EXPECT_EQ("file:///bar/baz/blah#entry=m", UdpaResourceIdentifier::encodeUrl(resource_locator));
