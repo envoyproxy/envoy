@@ -190,7 +190,7 @@ class ConfigBufferSizeGTSingleRequest : public Config {
   }
   uint32_t maxUpstreamUnknownConnections() const override { return 0; }
   bool enableCommandStats() const override { return false; }
-  ReadPolicy readPolicy() const override { return ReadPolicy::Master; }
+  ReadPolicy readPolicy() const override { return ReadPolicy::Primary; }
 };
 
 TEST_F(RedisClientImplTest, BatchWithTimerFiring) {
@@ -347,7 +347,7 @@ class ConfigEnableCommandStats : public Config {
   std::chrono::milliseconds bufferFlushTimeoutInMs() const override {
     return std::chrono::milliseconds(0);
   }
-  ReadPolicy readPolicy() const override { return ReadPolicy::Master; }
+  ReadPolicy readPolicy() const override { return ReadPolicy::Primary; }
   uint32_t maxUpstreamUnknownConnections() const override { return 0; }
   bool enableCommandStats() const override { return true; }
 };
@@ -546,7 +546,7 @@ TEST_F(RedisClientImplTest, InitializedWithAuthAcl) {
   client_->close();
 }
 
-TEST_F(RedisClientImplTest, InitializedWithPreferMasterReadPolicy) {
+TEST_F(RedisClientImplTest, InitializedWithPreferPrimaryReadPolicy) {
   testInitializeReadPolicy(envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::
                                ConnPoolSettings::PREFER_MASTER);
 }
@@ -732,7 +732,7 @@ class ConfigOutlierDisabled : public Config {
   std::chrono::milliseconds bufferFlushTimeoutInMs() const override {
     return std::chrono::milliseconds(0);
   }
-  ReadPolicy readPolicy() const override { return ReadPolicy::Master; }
+  ReadPolicy readPolicy() const override { return ReadPolicy::Primary; }
   uint32_t maxUpstreamUnknownConnections() const override { return 0; }
   bool enableCommandStats() const override { return false; }
 };

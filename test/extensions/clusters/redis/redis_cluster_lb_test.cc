@@ -51,7 +51,7 @@ public:
                           const std::vector<std::pair<uint32_t, uint32_t>>& expected_assignments,
                           bool read_command = false,
                           NetworkFilters::Common::Redis::Client::ReadPolicy read_policy =
-                              NetworkFilters::Common::Redis::Client::ReadPolicy::Master) {
+                              NetworkFilters::Common::Redis::Client::ReadPolicy::Primary) {
 
     Upstream::LoadBalancerPtr lb = lb_->factory()->create();
     for (auto& assignment : expected_assignments) {
@@ -173,22 +173,22 @@ TEST_F(RedisClusterLoadBalancerTest, ReadStrategiesHealthy) {
   validateAssignment(hosts, replica_assignments, true,
                      NetworkFilters::Common::Redis::Client::ReadPolicy::PreferReplica);
 
-  const std::vector<std::pair<uint32_t, uint32_t>> master_assignments = {
+  const std::vector<std::pair<uint32_t, uint32_t>> primary_assignments = {
       {0, 0}, {1100, 0}, {2000, 0}, {18382, 0}, {2001, 1}, {2100, 1}, {16383, 1}, {19382, 1}};
-  validateAssignment(hosts, master_assignments, true,
-                     NetworkFilters::Common::Redis::Client::ReadPolicy::Master);
-  validateAssignment(hosts, master_assignments, true,
-                     NetworkFilters::Common::Redis::Client::ReadPolicy::PreferMaster);
+  validateAssignment(hosts, primary_assignments, true,
+                     NetworkFilters::Common::Redis::Client::ReadPolicy::Primary);
+  validateAssignment(hosts, primary_assignments, true,
+                     NetworkFilters::Common::Redis::Client::ReadPolicy::PreferPrimary);
 
   ON_CALL(random_, random()).WillByDefault(Return(0));
-  validateAssignment(hosts, master_assignments, true,
+  validateAssignment(hosts, primary_assignments, true,
                      NetworkFilters::Common::Redis::Client::ReadPolicy::Any);
   ON_CALL(random_, random()).WillByDefault(Return(1));
   validateAssignment(hosts, replica_assignments, true,
                      NetworkFilters::Common::Redis::Client::ReadPolicy::Any);
 }
 
-TEST_F(RedisClusterLoadBalancerTest, ReadStrategiesUnhealthyMaster) {
+TEST_F(RedisClusterLoadBalancerTest, ReadStrategiesUnhealthyPrimary) {
   Upstream::HostVector hosts{
       Upstream::makeTestHost(info_, "tcp://127.0.0.1:90"),
       Upstream::makeTestHost(info_, "tcp://127.0.0.1:91"),
@@ -215,17 +215,17 @@ TEST_F(RedisClusterLoadBalancerTest, ReadStrategiesUnhealthyMaster) {
   // A list of (hash: host_index) pair
   const std::vector<std::pair<uint32_t, uint32_t>> replica_assignments = {
       {0, 2}, {1100, 2}, {2000, 2}, {18382, 2}, {2001, 3}, {2100, 3}, {16383, 3}, {19382, 3}};
-  const std::vector<std::pair<uint32_t, uint32_t>> master_assignments = {
+  const std::vector<std::pair<uint32_t, uint32_t>> primary_assignments = {
       {0, 0}, {1100, 0}, {2000, 0}, {18382, 0}, {2001, 1}, {2100, 1}, {16383, 1}, {19382, 1}};
 
   validateAssignment(hosts, replica_assignments, true,
                      NetworkFilters::Common::Redis::Client::ReadPolicy::Replica);
   validateAssignment(hosts, replica_assignments, true,
                      NetworkFilters::Common::Redis::Client::ReadPolicy::PreferReplica);
-  validateAssignment(hosts, master_assignments, true,
-                     NetworkFilters::Common::Redis::Client::ReadPolicy::Master);
+  validateAssignment(hosts, primary_assignments, true,
+                     NetworkFilters::Common::Redis::Client::ReadPolicy::Primary);
   validateAssignment(hosts, replica_assignments, true,
-                     NetworkFilters::Common::Redis::Client::ReadPolicy::PreferMaster);
+                     NetworkFilters::Common::Redis::Client::ReadPolicy::PreferPrimary);
 
   ON_CALL(random_, random()).WillByDefault(Return(0));
   validateAssignment(hosts, replica_assignments, true,
@@ -262,23 +262,23 @@ TEST_F(RedisClusterLoadBalancerTest, ReadStrategiesUnhealthyReplica) {
   // A list of (hash: host_index) pair
   const std::vector<std::pair<uint32_t, uint32_t>> replica_assignments = {
       {0, 2}, {1100, 2}, {2000, 2}, {18382, 2}, {2001, 3}, {2100, 3}, {16383, 3}, {19382, 3}};
-  const std::vector<std::pair<uint32_t, uint32_t>> master_assignments = {
+  const std::vector<std::pair<uint32_t, uint32_t>> primary_assignments = {
       {0, 0}, {1100, 0}, {2000, 0}, {18382, 0}, {2001, 1}, {2100, 1}, {16383, 1}, {19382, 1}};
 
   validateAssignment(hosts, replica_assignments, true,
                      NetworkFilters::Common::Redis::Client::ReadPolicy::Replica);
-  validateAssignment(hosts, master_assignments, true,
+  validateAssignment(hosts, primary_assignments, true,
                      NetworkFilters::Common::Redis::Client::ReadPolicy::PreferReplica);
-  validateAssignment(hosts, master_assignments, true,
-                     NetworkFilters::Common::Redis::Client::ReadPolicy::Master);
-  validateAssignment(hosts, master_assignments, true,
-                     NetworkFilters::Common::Redis::Client::ReadPolicy::PreferMaster);
+  validateAssignment(hosts, primary_assignments, true,
+                     NetworkFilters::Common::Redis::Client::ReadPolicy::Primary);
+  validateAssignment(hosts, primary_assignments, true,
+                     NetworkFilters::Common::Redis::Client::ReadPolicy::PreferPrimary);
 
   ON_CALL(random_, random()).WillByDefault(Return(0));
-  validateAssignment(hosts, master_assignments, true,
+  validateAssignment(hosts, primary_assignments, true,
                      NetworkFilters::Common::Redis::Client::ReadPolicy::Any);
   ON_CALL(random_, random()).WillByDefault(Return(1));
-  validateAssignment(hosts, master_assignments, true,
+  validateAssignment(hosts, primary_assignments, true,
                      NetworkFilters::Common::Redis::Client::ReadPolicy::Any);
 }
 
@@ -296,15 +296,15 @@ TEST_F(RedisClusterLoadBalancerTest, ReadStrategiesNoReplica) {
   factory_->onClusterSlotUpdate(std::move(slots), all_hosts);
 
   // A list of (hash: host_index) pair
-  const std::vector<std::pair<uint32_t, uint32_t>> master_assignments = {
+  const std::vector<std::pair<uint32_t, uint32_t>> primary_assignments = {
       {0, 0}, {1100, 0}, {2000, 0}, {18382, 0}, {2001, 1}, {2100, 1}, {16383, 1}, {19382, 1}};
-  validateAssignment(hosts, master_assignments, true,
-                     NetworkFilters::Common::Redis::Client::ReadPolicy::Master);
-  validateAssignment(hosts, master_assignments, true,
-                     NetworkFilters::Common::Redis::Client::ReadPolicy::PreferMaster);
-  validateAssignment(hosts, master_assignments, true,
+  validateAssignment(hosts, primary_assignments, true,
+                     NetworkFilters::Common::Redis::Client::ReadPolicy::Primary);
+  validateAssignment(hosts, primary_assignments, true,
+                     NetworkFilters::Common::Redis::Client::ReadPolicy::PreferPrimary);
+  validateAssignment(hosts, primary_assignments, true,
                      NetworkFilters::Common::Redis::Client::ReadPolicy::Any);
-  validateAssignment(hosts, master_assignments, true,
+  validateAssignment(hosts, primary_assignments, true,
                      NetworkFilters::Common::Redis::Client::ReadPolicy::PreferReplica);
 
   Upstream::LoadBalancerPtr lb = lb_->factory()->create();
@@ -393,11 +393,11 @@ TEST_F(RedisLoadBalancerContextImplTest, Basic) {
   get_request.asArray().swap(get_foo);
 
   RedisLoadBalancerContextImpl context1("foo", true, true, get_request,
-                                        NetworkFilters::Common::Redis::Client::ReadPolicy::Master);
+                                        NetworkFilters::Common::Redis::Client::ReadPolicy::Primary);
 
   EXPECT_EQ(absl::optional<uint64_t>(44950), context1.computeHashKey());
   EXPECT_EQ(true, context1.isReadCommand());
-  EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::Master, context1.readPolicy());
+  EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::Primary, context1.readPolicy());
 
   // Simple write command
   std::vector<NetworkFilters::Common::Redis::RespValue> set_foo(3);
@@ -413,11 +413,11 @@ TEST_F(RedisLoadBalancerContextImplTest, Basic) {
   set_request.asArray().swap(set_foo);
 
   RedisLoadBalancerContextImpl context2("foo", true, true, set_request,
-                                        NetworkFilters::Common::Redis::Client::ReadPolicy::Master);
+                                        NetworkFilters::Common::Redis::Client::ReadPolicy::Primary);
 
   EXPECT_EQ(absl::optional<uint64_t>(44950), context2.computeHashKey());
   EXPECT_EQ(false, context2.isReadCommand());
-  EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::Master, context2.readPolicy());
+  EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::Primary, context2.readPolicy());
 }
 
 TEST_F(RedisLoadBalancerContextImplTest, CompositeArray) {
@@ -435,18 +435,18 @@ TEST_F(RedisLoadBalancerContextImplTest, CompositeArray) {
   NetworkFilters::Common::Redis::RespValue get_request2{base, get_command, 2, 2};
 
   RedisLoadBalancerContextImpl context1("foo", true, true, get_request1,
-                                        NetworkFilters::Common::Redis::Client::ReadPolicy::Master);
+                                        NetworkFilters::Common::Redis::Client::ReadPolicy::Primary);
 
   EXPECT_EQ(absl::optional<uint64_t>(44950), context1.computeHashKey());
   EXPECT_EQ(true, context1.isReadCommand());
-  EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::Master, context1.readPolicy());
+  EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::Primary, context1.readPolicy());
 
   RedisLoadBalancerContextImpl context2("bar", true, true, get_request2,
-                                        NetworkFilters::Common::Redis::Client::ReadPolicy::Master);
+                                        NetworkFilters::Common::Redis::Client::ReadPolicy::Primary);
 
   EXPECT_EQ(absl::optional<uint64_t>(37829), context2.computeHashKey());
   EXPECT_EQ(true, context2.isReadCommand());
-  EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::Master, context2.readPolicy());
+  EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::Primary, context2.readPolicy());
 
   // Composite write command
   NetworkFilters::Common::Redis::RespValue set_command;
@@ -455,11 +455,11 @@ TEST_F(RedisLoadBalancerContextImplTest, CompositeArray) {
 
   NetworkFilters::Common::Redis::RespValue set_request{base, set_command, 1, 2};
   RedisLoadBalancerContextImpl context3("foo", true, true, set_request,
-                                        NetworkFilters::Common::Redis::Client::ReadPolicy::Master);
+                                        NetworkFilters::Common::Redis::Client::ReadPolicy::Primary);
 
   EXPECT_EQ(absl::optional<uint64_t>(44950), context3.computeHashKey());
   EXPECT_EQ(false, context3.isReadCommand());
-  EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::Master, context3.readPolicy());
+  EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::Primary, context3.readPolicy());
 }
 
 TEST_F(RedisLoadBalancerContextImplTest, UpperCaseCommand) {
@@ -475,11 +475,11 @@ TEST_F(RedisLoadBalancerContextImplTest, UpperCaseCommand) {
   get_request.asArray().swap(get_foo);
 
   RedisLoadBalancerContextImpl context1("foo", true, true, get_request,
-                                        NetworkFilters::Common::Redis::Client::ReadPolicy::Master);
+                                        NetworkFilters::Common::Redis::Client::ReadPolicy::Primary);
 
   EXPECT_EQ(absl::optional<uint64_t>(44950), context1.computeHashKey());
   EXPECT_EQ(true, context1.isReadCommand());
-  EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::Master, context1.readPolicy());
+  EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::Primary, context1.readPolicy());
 
   // Simple write command
   std::vector<NetworkFilters::Common::Redis::RespValue> set_foo(3);
@@ -495,11 +495,11 @@ TEST_F(RedisLoadBalancerContextImplTest, UpperCaseCommand) {
   set_request.asArray().swap(set_foo);
 
   RedisLoadBalancerContextImpl context2("foo", true, true, set_request,
-                                        NetworkFilters::Common::Redis::Client::ReadPolicy::Master);
+                                        NetworkFilters::Common::Redis::Client::ReadPolicy::Primary);
 
   EXPECT_EQ(absl::optional<uint64_t>(44950), context2.computeHashKey());
   EXPECT_EQ(false, context2.isReadCommand());
-  EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::Master, context2.readPolicy());
+  EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::Primary, context2.readPolicy());
 }
 
 TEST_F(RedisLoadBalancerContextImplTest, UnsupportedCommand) {
@@ -511,11 +511,11 @@ TEST_F(RedisLoadBalancerContextImplTest, UnsupportedCommand) {
   unknown_request.asArray().swap(unknown);
 
   RedisLoadBalancerContextImpl context3("foo", true, true, unknown_request,
-                                        NetworkFilters::Common::Redis::Client::ReadPolicy::Master);
+                                        NetworkFilters::Common::Redis::Client::ReadPolicy::Primary);
 
   EXPECT_EQ(absl::optional<uint64_t>(44950), context3.computeHashKey());
   EXPECT_EQ(false, context3.isReadCommand());
-  EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::Master, context3.readPolicy());
+  EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::Primary, context3.readPolicy());
 }
 
 TEST_F(RedisLoadBalancerContextImplTest, EnforceHashTag) {
@@ -534,11 +534,11 @@ TEST_F(RedisLoadBalancerContextImplTest, EnforceHashTag) {
   // Enable_hash tagging should be override when is_redis_cluster is true. This is treated like
   // "foo"
   RedisLoadBalancerContextImpl context2("{foo}bar", false, true, set_request,
-                                        NetworkFilters::Common::Redis::Client::ReadPolicy::Master);
+                                        NetworkFilters::Common::Redis::Client::ReadPolicy::Primary);
 
   EXPECT_EQ(absl::optional<uint64_t>(44950), context2.computeHashKey());
   EXPECT_EQ(false, context2.isReadCommand());
-  EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::Master, context2.readPolicy());
+  EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::Primary, context2.readPolicy());
 }
 
 } // namespace Redis

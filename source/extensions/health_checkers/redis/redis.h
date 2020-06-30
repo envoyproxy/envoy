@@ -75,7 +75,7 @@ private:
       return true;
     } // Redirection errors are treated as check successes.
     NetworkFilters::Common::Redis::Client::ReadPolicy readPolicy() const override {
-      return NetworkFilters::Common::Redis::Client::ReadPolicy::Master;
+      return NetworkFilters::Common::Redis::Client::ReadPolicy::Primary;
     }
 
     // Batching

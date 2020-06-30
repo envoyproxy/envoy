@@ -388,7 +388,7 @@ TEST_F(RedisConnPoolImplTest, ClientRequestFailed) {
 TEST_F(RedisConnPoolImplTest, BasicWithReadPolicy) {
   testReadPolicy(envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::
                      ConnPoolSettings::PREFER_MASTER,
-                 NetworkFilters::Common::Redis::Client::ReadPolicy::PreferMaster);
+                 NetworkFilters::Common::Redis::Client::ReadPolicy::PreferPrimary);
   testReadPolicy(
       envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::REPLICA,
       NetworkFilters::Common::Redis::Client::ReadPolicy::Replica);

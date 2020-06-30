@@ -96,7 +96,7 @@ void RedisCluster::onClusterSlotUpdate(ClusterSlotsPtr&& slots) {
   Upstream::HostVector new_hosts;
 
   for (const ClusterSlot& slot : *slots) {
-    new_hosts.emplace_back(new RedisHost(info(), "", slot.master(), *this, true));
+    new_hosts.emplace_back(new RedisHost(info(), "", slot.primary(), *this, true));
     for (auto const& replica : slot.replicas()) {
       new_hosts.emplace_back(new RedisHost(info(), "", replica, *this, false));
     }
@@ -302,7 +302,7 @@ void RedisCluster::RedisDiscoverySession::onResponse(
 
   const uint32_t SlotRangeStart = 0;
   const uint32_t SlotRangeEnd = 1;
-  const uint32_t SlotMaster = 2;
+  const uint32_t SlotPrimary = 2;
   const uint32_t SlotReplicaStart = 3;
 
   // Do nothing if the cluster is empty.
@@ -331,15 +331,15 @@ void RedisCluster::RedisDiscoverySession::onResponse(
       return;
     }
 
-    // Field 2: Master address for slot range
-    auto master_address = ProcessCluster(slot_range[SlotMaster]);
-    if (!master_address) {
+    // Field 2: Primary address for slot range
+    auto primary_address = ProcessCluster(slot_range[SlotPrimary]);
+    if (!primary_address) {
       onUnexpectedResponse(value);
       return;
     }
 
     slots->emplace_back(slot_range[SlotRangeStart].asInteger(),
-                        slot_range[SlotRangeEnd].asInteger(), master_address);
+                        slot_range[SlotRangeEnd].asInteger(), primary_address);
 
     for (auto replica = std::next(slot_range.begin(), SlotReplicaStart);
          replica != slot_range.end(); ++replica) {
