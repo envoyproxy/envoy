@@ -6,6 +6,7 @@
 
 #include "common/singleton/const_singleton.h"
 #include "common/singleton/threadsafe_singleton.h"
+#include "include/envoy/http/_virtual_includes/header_map_interface/envoy/http/header_map.h"
 
 namespace Envoy {
 namespace Http {
@@ -64,6 +65,7 @@ public:
   const LowerCaseString ContentEncoding{"content-encoding"};
   const LowerCaseString Etag{"etag"};
   const LowerCaseString GrpcAcceptEncoding{"grpc-accept-encoding"};
+  const LowerCaseString LastModified{"last-modified"};
   const LowerCaseString Origin{"origin"};
   const LowerCaseString OtSpanContext{"x-ot-span-context"};
   const LowerCaseString Referer{"referer"};

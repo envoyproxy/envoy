@@ -1,5 +1,7 @@
 #include "extensions/filters/http/cache/cache_filter.h"
 
+#include "envoy/http/header_map.h"
+
 #include "common/http/headers.h"
 
 #include "extensions/filters/http/cache/cacheability_utils.h"
@@ -51,6 +53,8 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
   ASSERT(lookup_);
 
   ENVOY_STREAM_LOG(debug, "CacheFilter::decodeHeaders starting lookup", *decoder_callbacks_);
+  // Used exclusively to access the RequestHeaderMap in onHeaders
+  request_headers_ = &headers;
   lookup_->getHeaders([this](LookupResult&& result) { onHeaders(std::move(result)); });
   if (state_ == GetHeadersState::GetHeadersResultUnusable) {
     // onHeaders has already been called, and no usable cache entry was found--continue iteration.
@@ -64,6 +68,7 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
 Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                      bool end_stream) {
+  // TODO(yosrym93): Check and handle cache entry validation results
   // If lookup_ is null, the request wasn't cacheable, so the response isn't either.
   if (lookup_ && request_allows_inserts_ && CacheabilityUtils::isCacheableResponse(headers)) {
     // TODO(yosrym93): Add date internal header or metadata to cached responses and use it instead
@@ -85,6 +90,23 @@ Http::FilterDataStatus CacheFilter::encodeData(Buffer::Instance& data, bool end_
   return Http::FilterDataStatus::Continue;
 }
 
+void CacheFilter::injectValidationHeaders(const Http::ResponseHeaderMapPtr& response_headers) {
+  ASSERT(request_headers_,
+         "CacheFilter must set request_headers_ in decodeHeaders before onHeaders is called.");
+  const Http::HeaderEntry* etag_header = response_headers->get(Http::CustomHeaders::get().Etag);
+  const Http::HeaderEntry* last_modified_header =
+      response_headers->get(Http::CustomHeaders::get().LastModified);
+
+  if (etag_header) {
+    absl::string_view etag = etag_header->value().getStringView();
+    request_headers_->setCopy(Http::LowerCaseString{"if-none-match"}, etag);
+  }
+  if (last_modified_header) {
+    absl::string_view last_modified = last_modified_header->value().getStringView();
+    request_headers_->setCopy(Http::LowerCaseString{"if-unmodified-since"}, last_modified);
+  }
+}
+
 void CacheFilter::onHeaders(LookupResult&& result) {
   // TODO(yosrym93): Handle request only-if-cached directive
   switch (result.cache_entry_status_) {
@@ -92,9 +114,10 @@ void CacheFilter::onHeaders(LookupResult&& result) {
   case CacheEntryStatus::UnsatisfiableRange:
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE; // We don't yet return or support these codes.
   case CacheEntryStatus::RequiresValidation:
-    // Cache entries that require validation are treated as unusable entries
-    // until validation is implemented
-    // TODO(yosrym93): Implement response validation
+    // If a cache entry requires validation inject validadation headers in the request and let it
+    // pass through as if no cache entry was found. If the cache entry was valid the response
+    // status should be 304 (unmodified), and the cache entry will be injected in the response body
+    injectValidationHeaders(result.headers_);
   case CacheEntryStatus::Unusable:
     if (state_ == GetHeadersState::FinishedGetHeadersCall) {
       // decodeHeader returned Http::FilterHeadersStatus::StopAllIterationAndWatermark--restart it
@@ -103,7 +126,7 @@ void CacheFilter::onHeaders(LookupResult&& result) {
       // decodeHeader hasn't yet returned--tell it to return Http::FilterHeadersStatus::Continue.
       state_ = GetHeadersState::GetHeadersResultUnusable;
     }
-    return;
+    break;
   case CacheEntryStatus::Ok:
     response_has_trailers_ = result.has_trailers_;
     const bool end_stream = (result.content_length_ == 0 && !response_has_trailers_);
@@ -115,7 +138,7 @@ void CacheFilter::onHeaders(LookupResult&& result) {
         CacheResponseCodeDetails::get().ResponseFromCacheFilter);
     decoder_callbacks_->encodeHeaders(std::move(result.headers_), end_stream);
     if (end_stream) {
-      return;
+      break;
     }
     if (result.content_length_ > 0) {
       remaining_body_.emplace_back(0, result.content_length_);
@@ -125,6 +148,9 @@ void CacheFilter::onHeaders(LookupResult&& result) {
           [this](Http::ResponseTrailerMapPtr&& trailers) { onTrailers(std::move(trailers)); });
     }
   }
+  // All switch case paths should lead to this line
+  // Stored pointer to RequestHeaderMap is no longer needed
+  request_headers_ = nullptr;
 }
 
 void CacheFilter::getBody() {

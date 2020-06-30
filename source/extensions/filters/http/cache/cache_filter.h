@@ -43,10 +43,18 @@ private:
   void onBody(Buffer::InstancePtr&& body);
   void onTrailers(Http::ResponseTrailerMapPtr&& trailers);
 
+  // Adds required conditional headers for cache validation to the request headers
+  // according to the present response headers
+  void injectValidationHeaders(const Http::ResponseHeaderMapPtr& response_headers);
+
   TimeSource& time_source_;
   HttpCache& cache_;
   LookupContextPtr lookup_;
   InsertContextPtr insert_;
+
+  // Used exclusively to store a reference to the request header map passed to decodeHeaders to be
+  // used in onHeaders afterwards the pointer must not be used and is set back to null
+  Http::RequestHeaderMap* request_headers_ = nullptr;
 
   // Tracks what body bytes still need to be read from the cache. This is
   // currently only one Range, but will expand when full range support is added. Initialized by
