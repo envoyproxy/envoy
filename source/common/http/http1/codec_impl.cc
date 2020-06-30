@@ -378,6 +378,7 @@ void ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers, bool e
 static const char REQUEST_POSTFIX[] = " HTTP/1.1\r\n";
 
 void RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool end_stream) {
+  ASSERT(!dispatching_);
   const HeaderEntry* method = headers.Method();
   const HeaderEntry* path = headers.Path();
   const HeaderEntry* host = headers.Host();
@@ -414,11 +415,13 @@ void RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool end
 }
 
 int ConnectionImpl::setAndCheckCallbackStatus(Status&& status) {
+  ASSERT(codec_status_.ok());
   codec_status_ = std::move(status);
   return codec_status_.ok() ? enumToInt(HttpParserCode::Success) : enumToInt(HttpParserCode::Error);
 }
 
 int ConnectionImpl::setAndCheckCallbackStatusOr(Envoy::StatusOr<int>&& statusor) {
+  ASSERT(codec_status_.ok());
   if (statusor.ok()) {
     return statusor.value();
   } else {
@@ -429,9 +432,9 @@ int ConnectionImpl::setAndCheckCallbackStatusOr(Envoy::StatusOr<int>&& statusor)
 
 http_parser_settings ConnectionImpl::settings_{
     [](http_parser* parser) -> int {
-      auto status = static_cast<ConnectionImpl*>(parser->data)->onMessageBeginBase();
-      return static_cast<ConnectionImpl*>(parser->data)
-          ->setAndCheckCallbackStatus(std::move(status));
+      auto* conn_impl = static_cast<ConnectionImpl*>(parser->data);
+      auto status = conn_impl->onMessageBeginBase();
+      return conn_impl->setAndCheckCallbackStatus(std::move(status));
     },
     [](http_parser* parser, const char* at, size_t length) -> int {
       static_cast<ConnectionImpl*>(parser->data)->onUrl(at, length);
@@ -439,28 +442,28 @@ http_parser_settings ConnectionImpl::settings_{
     },
     nullptr, // on_status
     [](http_parser* parser, const char* at, size_t length) -> int {
-      auto status = static_cast<ConnectionImpl*>(parser->data)->onHeaderField(at, length);
-      return static_cast<ConnectionImpl*>(parser->data)
-          ->setAndCheckCallbackStatus(std::move(status));
+      auto* conn_impl = static_cast<ConnectionImpl*>(parser->data);
+      auto status = conn_impl->onHeaderField(at, length);
+      return conn_impl->setAndCheckCallbackStatus(std::move(status));
     },
     [](http_parser* parser, const char* at, size_t length) -> int {
-      auto status = static_cast<ConnectionImpl*>(parser->data)->onHeaderValue(at, length);
-      return static_cast<ConnectionImpl*>(parser->data)
-          ->setAndCheckCallbackStatus(std::move(status));
+      auto* conn_impl = static_cast<ConnectionImpl*>(parser->data);
+      auto status = conn_impl->onHeaderValue(at, length);
+      return conn_impl->setAndCheckCallbackStatus(std::move(status));
     },
     [](http_parser* parser) -> int {
-      auto statusor = static_cast<ConnectionImpl*>(parser->data)->onHeadersCompleteBase();
-      return static_cast<ConnectionImpl*>(parser->data)
-          ->setAndCheckCallbackStatusOr(std::move(statusor));
+      auto* conn_impl = static_cast<ConnectionImpl*>(parser->data);
+      auto statusor = conn_impl->onHeadersCompleteBase();
+      return conn_impl->setAndCheckCallbackStatusOr(std::move(statusor));
     },
     [](http_parser* parser, const char* at, size_t length) -> int {
       static_cast<ConnectionImpl*>(parser->data)->bufferBody(at, length);
       return 0;
     },
     [](http_parser* parser) -> int {
-      auto status = static_cast<ConnectionImpl*>(parser->data)->onMessageCompleteBase();
-      return static_cast<ConnectionImpl*>(parser->data)
-          ->setAndCheckCallbackStatus(std::move(status));
+      auto* conn_impl = static_cast<ConnectionImpl*>(parser->data);
+      auto status = conn_impl->onMessageCompleteBase();
+      return conn_impl->setAndCheckCallbackStatus(std::move(status));
     },
     [](http_parser* parser) -> int {
       // A 0-byte chunk header is used to signal the end of the chunked body.
@@ -558,6 +561,7 @@ Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
   // ConnectionImpl::dispatch throws an exception.
   Cleanup cleanup([this]() { dispatching_ = false; });
   ASSERT(!dispatching_);
+  ASSERT(codec_status_.ok());
   ASSERT(buffered_body_.length() == 0);
 
   dispatching_ = true;

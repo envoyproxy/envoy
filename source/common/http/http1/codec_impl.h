@@ -531,7 +531,7 @@ private:
 
   void releaseOutboundResponse(const Buffer::OwnedBufferFragmentImpl* fragment);
   void maybeAddSentinelBufferFragment(Buffer::WatermarkBuffer& output_buffer) override;
-  Status doFloodProtectionChecks();
+  Status doFloodProtectionChecks() const;
   Status checkHeaderNameForUnderscores() override;
 
   ServerConnectionCallbacks& callbacks_;
