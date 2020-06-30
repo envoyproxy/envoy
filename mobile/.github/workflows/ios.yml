@@ -48,9 +48,8 @@ jobs:
       # Run the app in the background and redirect logs.
       - name: 'Run swift app'
         run: bazel run --config=ios //examples/swift/hello_world:app &> /tmp/envoy.log &
-      # Wait for the app to start and get some requests/responses.
-      - name: 'Sleep'
-        run: sleep 120
+      - name: 'Wait for simulator to start & perform requests'
+        run: sleep 180
       # Print out the log in case the liveliness check fails.
       # This allows the author to decide if the failure is a flake or a real problem.
       - name: 'Cat log'
@@ -80,9 +79,8 @@ jobs:
       # Run the app in the background and redirect logs.
       - name: 'Run objective-c app'
         run: bazel run --config=ios //examples/objective-c/hello_world:app &> /tmp/envoy.log &
-      # Wait for the app to start and get some requests/responses.
-      - name: 'Sleep'
-        run: sleep 120
+      - name: 'Wait for simulator to start & perform requests'
+        run: sleep 180
       # Print out the log in case the liveliness check fails.
       # This allows the author to decide if the failure is a flake or a real problem.
       - name: 'Cat log'
