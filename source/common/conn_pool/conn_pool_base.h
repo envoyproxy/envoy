@@ -16,7 +16,10 @@ class ConnPoolImplBase;
 
 // A placeholder struct for whatever data a given connection pool needs to
 // successfully attach and upstream connection to a downstream connection.
-struct AttachContext {};
+struct AttachContext {
+  // Add a virtual destructor to allow for the dynamic_cast ASSERT in typedContext.
+  virtual ~AttachContext() = default;
+};
 
 // ActiveClient provides a base class for connection pool clients that handles connection timings
 // as well as managing the connection timeout.
@@ -105,7 +108,10 @@ public:
   virtual ~ConnPoolImplBase();
 
   // A helper function to get the specific context type from the base class context.
-  template <class T> T& typedContext(AttachContext& context) { return *static_cast<T*>(&context); }
+  template <class T> T& typedContext(AttachContext& context) {
+    ASSERT(dynamic_cast<T*>(&context) != nullptr);
+    return *static_cast<T*>(&context);
+  }
 
   void addDrainedCallbackImpl(Instance::DrainedCb cb);
   void drainConnectionsImpl();
