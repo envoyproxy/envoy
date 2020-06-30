@@ -28,9 +28,7 @@ class GrpcJsonTranscoderIntegrationTest
 public:
   GrpcJsonTranscoderIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
-  /**
-   * Global initializer for all integration tests.
-   */
+
   void SetUp() override {
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
     const std::string filter =
@@ -43,15 +41,6 @@ public:
             )EOF";
     config_helper_.addFilter(
         fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
-  }
-
-  /**
-   * Global destructor for all integration tests.
-   */
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstream_connection_.reset();
-    fake_upstreams_.clear();
   }
 
 protected:
@@ -330,6 +319,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetHttpBody) {
 TEST_P(GrpcJsonTranscoderIntegrationTest, StreamGetHttpBody) {
   HttpIntegrationTest::initialize();
 
+  // 1. Normal streaming get
   testTranscoding<Empty, google::api::HttpBody>(
       Http::TestRequestHeaderMapImpl{
           {":method", "GET"}, {":path", "/indexStream"}, {":authority", "host"}},
@@ -339,6 +329,14 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, StreamGetHttpBody) {
       Status(), Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "text/html"}},
       R"(<h1>Hello!</h1>)"
       R"(Hello!)");
+
+  // 2. Empty response (trailers only) from streaming backend, with a gRPC error.
+  testTranscoding<Empty, google::api::HttpBody>(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"}, {":path", "/indexStream"}, {":authority", "host"}},
+      "", {""}, {}, Status(Code::NOT_FOUND, "Not Found"),
+      Http::TestResponseHeaderMapImpl{{":status", "404"}, {"content-type", "application/json"}},
+      "");
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, StreamGetHttpBodyMultipleFramesInData) {
@@ -642,7 +640,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, ServerStreamingGet) {
       Http::TestRequestHeaderMapImpl{
           {":method", "GET"}, {":path", "/shelves/37/books"}, {":authority", "host"}},
       "", {"shelf: 37"}, {}, Status(Code::NOT_FOUND, "Shelf 37 not found"),
-      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+      Http::TestResponseHeaderMapImpl{{":status", "404"}, {"content-type", "application/json"}},
       "[]");
 }
 

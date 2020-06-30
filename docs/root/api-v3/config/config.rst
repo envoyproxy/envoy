@@ -19,3 +19,4 @@ Extensions
   trace/trace
   internal_redirect/internal_redirect
   endpoint/endpoint
+  upstream/upstream

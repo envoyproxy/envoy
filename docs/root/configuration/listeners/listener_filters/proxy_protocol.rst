@@ -11,8 +11,8 @@ which places the original coordinates (IP, PORT) into a connection-string.
 Envoy then extracts these and uses them as the remote address.
 
 In Proxy Protocol v2 there exists the concept of extensions (TLV)
-tags that are optional. This implementation skips over these without
-using them.
+tags that are optional. If the type of the TLV is added to the filter's configuration,
+the TLV will be emitted as dynamic metadata with user-specified key.
 
 This implementation supports both version 1 and version 2, it
 automatically determines on a per-connection basis which of the two

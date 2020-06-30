@@ -67,11 +67,11 @@ void CdsApiImpl::onConfigUpdate(
     const std::string& system_version_info) {
   std::unique_ptr<Cleanup> maybe_eds_resume;
   if (cm_.adsMux()) {
-    const auto type_url = Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-        envoy::config::core::v3::ApiVersion::V2);
-    cm_.adsMux()->pause(type_url);
+    const auto type_urls =
+        Config::getAllVersionTypeUrls<envoy::config::endpoint::v3::ClusterLoadAssignment>();
+    cm_.adsMux()->pause(type_urls);
     maybe_eds_resume =
-        std::make_unique<Cleanup>([this, type_url] { cm_.adsMux()->resume(type_url); });
+        std::make_unique<Cleanup>([this, type_urls] { cm_.adsMux()->resume(type_urls); });
   }
 
   ENVOY_LOG(info, "cds: add {} cluster(s), remove {} cluster(s)", added_resources.size(),

@@ -6,6 +6,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::DoAll;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
@@ -153,5 +154,8 @@ MockScopedRouteConfigProvider::MockScopedRouteConfigProvider()
 }
 MockScopedRouteConfigProvider::~MockScopedRouteConfigProvider() = default;
 
+MockGenericConnectionPoolCallbacks::MockGenericConnectionPoolCallbacks() {
+  ON_CALL(*this, upstreamToDownstream()).WillByDefault(ReturnRef(upstream_to_downstream_));
+}
 } // namespace Router
 } // namespace Envoy

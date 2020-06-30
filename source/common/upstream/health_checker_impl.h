@@ -32,8 +32,9 @@ public:
    * @param runtime supplies the runtime loader.
    * @param random supplies the random generator.
    * @param dispatcher supplies the dispatcher.
-   * @param event_logger supplies the event_logger.
+   * @param log_manager supplies the log_manager.
    * @param validation_visitor message validation visitor instance.
+   * @param api reference to the Api object
    * @return a health checker.
    */
   static HealthCheckerSharedPtr
@@ -323,7 +324,7 @@ private:
     void onBelowWriteBufferLowWatermark() override {}
 
     void onEvent(Network::ConnectionEvent event);
-    void onGoAway();
+    void onGoAway(Http::GoAwayErrorCode error_code);
 
     class ConnectionCallbackImpl : public Network::ConnectionCallbacks {
     public:
@@ -341,7 +342,7 @@ private:
     public:
       HttpConnectionCallbackImpl(GrpcActiveHealthCheckSession& parent) : parent_(parent) {}
       // Http::ConnectionCallbacks
-      void onGoAway() override { parent_.onGoAway(); }
+      void onGoAway(Http::GoAwayErrorCode error_code) override { parent_.onGoAway(error_code); }
 
     private:
       GrpcActiveHealthCheckSession& parent_;
@@ -358,6 +359,9 @@ private:
     // e.g. remote reset. In this case healthcheck status has already been reported, only state
     // cleanup is required.
     bool expect_reset_ = false;
+    // If true, we received a GOAWAY (NO_ERROR code) and are deferring closing the connection
+    // until the active probe completes.
+    bool received_no_error_goaway_ = false;
   };
 
   virtual Http::CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;

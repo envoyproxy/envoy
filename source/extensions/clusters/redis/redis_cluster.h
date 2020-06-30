@@ -144,7 +144,7 @@ private:
   class RedisHost : public Upstream::HostImpl {
   public:
     RedisHost(Upstream::ClusterInfoConstSharedPtr cluster, const std::string& hostname,
-              Network::Address::InstanceConstSharedPtr address, RedisCluster& parent, bool master)
+              Network::Address::InstanceConstSharedPtr address, RedisCluster& parent, bool primary)
         : Upstream::HostImpl(
               cluster, hostname, address,
               // TODO(zyfjeff): Created through metadata shared pool
@@ -153,12 +153,12 @@ private:
               parent.localityLbEndpoint().locality(),
               parent.lbEndpoint().endpoint().health_check_config(),
               parent.localityLbEndpoint().priority(), parent.lbEndpoint().health_status()),
-          master_(master) {}
+          primary_(primary) {}
 
-    bool isMaster() const { return master_; }
+    bool isPrimary() const { return primary_; }
 
   private:
-    const bool master_;
+    const bool primary_;
   };
 
   // Resolves the discovery endpoint.
@@ -221,12 +221,12 @@ private:
     std::chrono::milliseconds bufferFlushTimeoutInMs() const override { return buffer_timeout_; }
     uint32_t maxUpstreamUnknownConnections() const override { return 0; }
     bool enableCommandStats() const override { return false; }
-    // For any readPolicy other than Master, the RedisClientFactory will send a READONLY command
+    // For any readPolicy other than Primary, the RedisClientFactory will send a READONLY command
     // when establishing a new connection. Since we're only using this for making the "cluster
     // slots" commands, the READONLY command is not relevant in this context. We're setting it to
-    // Master to avoid the additional READONLY command.
+    // Primary to avoid the additional READONLY command.
     Extensions::NetworkFilters::Common::Redis::Client::ReadPolicy readPolicy() const override {
-      return Extensions::NetworkFilters::Common::Redis::Client::ReadPolicy::Master;
+      return Extensions::NetworkFilters::Common::Redis::Client::ReadPolicy::Primary;
     }
 
     // Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks
@@ -276,6 +276,7 @@ private:
   Upstream::HostVector hosts_;
   Upstream::HostMap all_hosts_;
 
+  const std::string auth_username_;
   const std::string auth_password_;
   const std::string cluster_name_;
   const Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager_;

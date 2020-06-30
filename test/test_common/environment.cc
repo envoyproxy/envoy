@@ -44,13 +44,13 @@ std::string makeTempDir(std::string basename_template) {
   std::string name_template = "c:\\Windows\\TEMP\\" + basename_template;
   char* dirname = ::_mktemp(&name_template[0]);
   RELEASE_ASSERT(dirname != nullptr, fmt::format("failed to create tempdir from template: {} {}",
-                                                 name_template, strerror(errno)));
+                                                 name_template, errorDetails(errno)));
   TestEnvironment::createPath(dirname);
 #else
   std::string name_template = "/tmp/" + basename_template;
   char* dirname = ::mkdtemp(&name_template[0]);
   RELEASE_ASSERT(dirname != nullptr, fmt::format("failed to create tempdir from template: {} {}",
-                                                 name_template, strerror(errno)));
+                                                 name_template, errorDetails(errno)));
 #endif
   return std::string(dirname);
 }
@@ -243,10 +243,12 @@ std::vector<Network::Address::IpVersion> TestEnvironment::getIpVersionsForTest()
     if (TestEnvironment::shouldRunTestForIpVersion(version)) {
       parameters.push_back(version);
       if (!Network::Test::supportsIpVersion(version)) {
-        ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::testing), warn,
-                            "Testing with IP{} addresses may not be supported on this machine. If "
-                            "testing fails, set the environment variable ENVOY_IP_TEST_VERSIONS.",
-                            Network::Test::addressVersionAsString(version));
+        const auto version_string = Network::Test::addressVersionAsString(version);
+        ENVOY_LOG_TO_LOGGER(
+            Logger::Registry::getLog(Logger::Id::testing), warn,
+            "Testing with IP{} addresses may not be supported on this machine. If "
+            "testing fails, set the environment variable ENVOY_IP_TEST_VERSIONS to 'v{}only'.",
+            version_string, version_string);
       }
     }
   }

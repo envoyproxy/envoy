@@ -135,6 +135,7 @@ MockListenSocket::MockListenSocket()
   ON_CALL(testing::Const(*this), isOpen()).WillByDefault(Invoke([this]() {
     return socket_is_open_;
   }));
+  ON_CALL(*this, ipVersion()).WillByDefault(Return(local_address_->ip()->version()));
 }
 
 MockSocketOption::MockSocketOption() {
@@ -152,6 +153,7 @@ MockConnectionSocket::MockConnectionSocket()
   ON_CALL(*this, directRemoteAddress()).WillByDefault(ReturnRef(remote_address_));
   ON_CALL(*this, ioHandle()).WillByDefault(ReturnRef(*io_handle_));
   ON_CALL(testing::Const(*this), ioHandle()).WillByDefault(ReturnRef(*io_handle_));
+  ON_CALL(*this, ipVersion()).WillByDefault(Return(local_address_->ip()->version()));
 }
 
 MockConnectionSocket::~MockConnectionSocket() = default;

@@ -130,6 +130,8 @@ private:
   RuntimeStats& stats_;
 };
 
+using SnapshotImplPtr = std::unique_ptr<SnapshotImpl>;
+
 /**
  * Base implementation of OverrideLayer that by itself provides an empty values map.
  */
@@ -252,15 +254,16 @@ public:
   // Runtime::Loader
   void initialize(Upstream::ClusterManager& cm) override;
   const Snapshot& snapshot() override;
-  std::shared_ptr<const Snapshot> threadsafeSnapshot() override;
+  SnapshotConstSharedPtr threadsafeSnapshot() override;
   void mergeValues(const std::unordered_map<std::string, std::string>& values) override;
   void startRtdsSubscriptions(ReadyCallback on_done) override;
+  Stats::Scope& getRootScope() override;
 
 private:
   friend RtdsSubscription;
 
   // Create a new Snapshot
-  virtual std::unique_ptr<SnapshotImpl> createNewSnapshot();
+  virtual SnapshotImplPtr createNewSnapshot();
   // Load a new Snapshot into TLS
   void loadNewSnapshot();
   RuntimeStats generateStats(Stats::Store& store);
@@ -279,9 +282,10 @@ private:
   Init::ManagerImpl init_manager_{"RTDS"};
   std::vector<RtdsSubscriptionPtr> subscriptions_;
   Upstream::ClusterManager* cm_{};
+  Stats::Store& store_;
 
   absl::Mutex snapshot_mutex_;
-  std::shared_ptr<const Snapshot> thread_safe_snapshot_ ABSL_GUARDED_BY(snapshot_mutex_);
+  SnapshotConstSharedPtr thread_safe_snapshot_ ABSL_GUARDED_BY(snapshot_mutex_);
 };
 
 } // namespace Runtime
