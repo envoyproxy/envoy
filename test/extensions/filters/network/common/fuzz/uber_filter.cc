@@ -2,13 +2,14 @@
 
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
-
 #include "common/network/utility.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
-#include "extensions/filters/network/well_known_names.h"
-#include "test/test_common/utility.h"
+
 #include "extensions/filters/network/ext_authz/ext_authz.h"
+#include "extensions/filters/network/well_known_names.h"
+
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Extensions {
