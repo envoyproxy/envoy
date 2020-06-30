@@ -605,6 +605,7 @@ public:
   // between concrete header map types.
   template <Type type> struct Handle {
     Handle(RegistrationMap::const_iterator it) : it_(it) {}
+    bool operator==(const Handle& rhs) const { return it_ == rhs.it_; }
 
     RegistrationMap::const_iterator it_;
   };
