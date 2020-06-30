@@ -16,6 +16,8 @@
 #include "common/init/watcher_impl.h"
 #include "common/protobuf/protobuf.h"
 
+#include "absl/container/flat_hash_set.h"
+
 namespace Envoy {
 namespace Config {
 
@@ -390,11 +392,11 @@ public:
 
 protected:
   // Ordered set for deterministic config dump output.
-  using ConfigProviderSet = std::set<ConfigProvider*>;
-  using ConfigProviderMap = std::unordered_map<ConfigProviderInstanceType,
-                                               std::unique_ptr<ConfigProviderSet>, EnumClassHash>;
+  using ConfigProviderSet = absl::flat_hash_set<ConfigProvider*>;
+  using ConfigProviderMap = absl::flat_hash_map<ConfigProviderInstanceType,
+                                                std::unique_ptr<ConfigProviderSet>, EnumClassHash>;
   using ConfigSubscriptionMap =
-      std::unordered_map<uint64_t, std::weak_ptr<ConfigSubscriptionCommonBase>>;
+      absl::flat_hash_map<uint64_t, std::weak_ptr<ConfigSubscriptionCommonBase>>;
 
   ConfigProviderManagerImplBase(Server::Admin& admin, const std::string& config_name);
 

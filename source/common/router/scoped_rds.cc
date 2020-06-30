@@ -84,9 +84,7 @@ InlineScopedRoutesConfigProvider::InlineScopedRoutesConfigProvider(
                                                  ConfigProvider::ApiType::Delta),
       name_(std::move(name)),
       config_(std::make_shared<ScopedConfigImpl>(std::move(scope_key_builder))),
-      config_protos_(std::make_move_iterator(config_protos.begin()),
-                     std::make_move_iterator(config_protos.end())),
-      rds_config_source_(std::move(rds_config_source)) {}
+      config_protos_(std::move(config_protos)), rds_config_source_(std::move(rds_config_source)) {}
 
 ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
     const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRds& scoped_rds,
