@@ -163,7 +163,8 @@ using TypeUrlToVersionedServiceMap = std::unordered_map<TypeUrl, VersionedServic
 //         "V2": "envoy.api.v2.RouteDiscoveryService.StreamRoutes",
 //         "V3": "envoy.service.route.v3.RouteDiscoveryService.StreamRoutes"
 //       }
-//     }
+//     },
+//     ...
 //   },
 //   "type.googleapis.com/envoy.config.route.v3.RouteConfiguration": {
 //     "sotw_grpc_": {
@@ -175,7 +176,8 @@ using TypeUrlToVersionedServiceMap = std::unordered_map<TypeUrl, VersionedServic
 //         "V2": "envoy.api.v2.RouteDiscoveryService.StreamRoutes",
 //         "V3": "envoy.service.route.v3.RouteDiscoveryService.StreamRoutes"
 //       }
-//     }
+//     },
+//     ...
 //   }
 // }
 //
