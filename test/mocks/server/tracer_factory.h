@@ -28,7 +28,5 @@ private:
   std::string name_;
 };
 } // namespace Configuration
-
 } // namespace Server
-
 } // namespace Envoy

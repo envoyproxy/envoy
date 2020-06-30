@@ -31,5 +31,4 @@ public:
   MOCK_METHOD(ApiListenerOptRef, apiListener, ());
 };
 } // namespace Server
-
 } // namespace Envoy

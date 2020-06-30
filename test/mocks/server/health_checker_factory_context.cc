@@ -10,7 +10,6 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-using ::testing::_;
 using ::testing::ReturnRef;
 
 MockHealthCheckerFactoryContext::MockHealthCheckerFactoryContext() {
@@ -28,7 +27,5 @@ MockHealthCheckerFactoryContext::MockHealthCheckerFactoryContext() {
 MockHealthCheckerFactoryContext::~MockHealthCheckerFactoryContext() = default;
 
 } // namespace Configuration
-
 } // namespace Server
-
 } // namespace Envoy

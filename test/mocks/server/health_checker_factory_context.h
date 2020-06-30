@@ -45,5 +45,4 @@ public:
 } // namespace Configuration
 
 } // namespace Server
-
 } // namespace Envoy

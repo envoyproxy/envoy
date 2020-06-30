@@ -14,5 +14,4 @@ MockAdmin::MockAdmin() {
 MockAdmin::~MockAdmin() = default;
 
 } // namespace Server
-
 } // namespace Envoy

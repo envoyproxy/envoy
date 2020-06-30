@@ -25,5 +25,4 @@ public:
   std::function<void()> drain_sequence_completion_;
 };
 } // namespace Server
-
 } // namespace Envoy

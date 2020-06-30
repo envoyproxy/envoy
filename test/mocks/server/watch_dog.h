@@ -23,5 +23,4 @@ public:
   MOCK_METHOD(MonotonicTime, lastTouchTime, (), (const));
 };
 } // namespace Server
-
 } // namespace Envoy

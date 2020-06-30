@@ -20,5 +20,4 @@ public:
   std::shared_ptr<MockWatchDog> watch_dog_;
 };
 } // namespace Server
-
 } // namespace Envoy

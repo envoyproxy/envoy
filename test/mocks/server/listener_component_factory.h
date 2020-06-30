@@ -49,5 +49,4 @@ public:
   std::shared_ptr<Network::MockListenSocket> socket_;
 };
 } // namespace Server
-
 } // namespace Envoy

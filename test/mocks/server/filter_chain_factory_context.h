@@ -18,7 +18,5 @@ public:
   ~MockFilterChainFactoryContext() override;
 };
 } // namespace Configuration
-
 } // namespace Server
-
 } // namespace Envoy

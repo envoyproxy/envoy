@@ -23,7 +23,5 @@ public:
   MOCK_METHOD(std::string, name, (), (const, override));
 };
 } // namespace Configuration
-
 } // namespace Server
-
 } // namespace Envoy

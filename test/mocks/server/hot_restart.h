@@ -40,5 +40,4 @@ private:
   Stats::AllocatorImpl stats_allocator_;
 };
 } // namespace Server
-
 } // namespace Envoy

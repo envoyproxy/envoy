@@ -12,5 +12,4 @@ MockAdminStream::MockAdminStream() = default;
 MockAdminStream::~MockAdminStream() = default;
 
 } // namespace Server
-
 } // namespace Envoy

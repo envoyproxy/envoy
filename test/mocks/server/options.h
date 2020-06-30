@@ -78,5 +78,4 @@ public:
   std::vector<std::string> disabled_extensions_;
 };
 } // namespace Server
-
 } // namespace Envoy

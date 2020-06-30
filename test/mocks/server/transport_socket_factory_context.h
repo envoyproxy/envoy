@@ -45,7 +45,5 @@ public:
   std::unique_ptr<Secret::SecretManager> secret_manager_;
 };
 } // namespace Configuration
-
 } // namespace Server
-
 } // namespace Envoy

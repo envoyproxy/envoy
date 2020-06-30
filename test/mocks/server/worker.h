@@ -56,5 +56,4 @@ public:
   std::function<void()> remove_filter_chains_completion_;
 };
 } // namespace Server
-
 } // namespace Envoy

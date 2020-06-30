@@ -29,5 +29,4 @@ public:
   MOCK_METHOD(Http::Http1StreamEncoderOptionsOptRef, http1StreamEncoderOptions, ());
 };
 } // namespace Server
-
 } // namespace Envoy

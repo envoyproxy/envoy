@@ -28,7 +28,5 @@ MockTransportSocketFactoryContext::MockTransportSocketFactoryContext()
 MockTransportSocketFactoryContext::~MockTransportSocketFactoryContext() = default;
 
 } // namespace Configuration
-
 } // namespace Server
-
 } // namespace Envoy

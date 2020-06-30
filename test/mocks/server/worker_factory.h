@@ -25,5 +25,4 @@ public:
   MOCK_METHOD(Worker*, createWorker_, ());
 };
 } // namespace Server
-
 } // namespace Envoy

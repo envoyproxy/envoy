@@ -171,7 +171,5 @@ public:
   Grpc::ContextImpl grpc_context_;
 };
 } // namespace Configuration
-
 } // namespace Server
-
 } // namespace Envoy

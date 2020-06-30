@@ -22,5 +22,4 @@ public:
               (Stage, StageCallbackWithCompletion));
 };
 } // namespace Server
-
 } // namespace Envoy

@@ -26,7 +26,5 @@ MockTracerFactoryContext::MockTracerFactoryContext() {
 MockTracerFactoryContext::~MockTracerFactoryContext() = default;
 
 } // namespace Configuration
-
 } // namespace Server
-
 } // namespace Envoy
