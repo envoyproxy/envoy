@@ -280,7 +280,7 @@ Driver::Driver(const envoy::config::trace::v3::OpenCensusConfig& oc_config,
         // address will be used.
         stackdriver_service.mutable_google_grpc()->set_target_uri(GoogleStackdriverTraceAddress);
       }
-      auto channel = Envoy::Grpc::GoogleGrpcUtils::createChannel(stackdriver_service, api);
+      auto channel = Envoy::Grpc::GoogleGrpcUtils::createChannel(stackdriver_service, api, true);
       opts.trace_service_stub = ::google::devtools::cloudtrace::v2::TraceService::NewStub(channel);
 #else
       throw EnvoyException("Opencensus tracer: cannot handle stackdriver google grpc service, "
@@ -303,7 +303,7 @@ Driver::Driver(const envoy::config::trace::v3::OpenCensusConfig& oc_config,
 #ifdef ENVOY_GOOGLE_GRPC
       const envoy::config::core::v3::GrpcService& ocagent_service =
           oc_config.ocagent_grpc_service();
-      auto channel = Envoy::Grpc::GoogleGrpcUtils::createChannel(ocagent_service, api);
+      auto channel = Envoy::Grpc::GoogleGrpcUtils::createChannel(ocagent_service, api, true);
       opts.trace_service_stub =
           ::opencensus::proto::agent::trace::v1::TraceService::NewStub(channel);
 #else
