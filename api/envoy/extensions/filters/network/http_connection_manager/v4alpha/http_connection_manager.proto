@@ -327,6 +327,16 @@ message HttpConnectionManager {
   // is terminated with a 408 Request Timeout error code if no upstream response
   // header has been received, otherwise a stream reset occurs.
   //
+  // This timeout also specifies the amount of time that Envoy will wait for the peer to open enough
+  // window to write any remaining stream data once the entirety of stream data (local end stream is
+  // true) has been buffered pending available window. In other words, this timeout defends against
+  // a peer that does not release enough window to completely write the stream, even though all
+  // data has been proxied within available flow control windows. If the timeout is hit in this
+  // case, the :ref:`tx_flush_timeout <config_http_conn_man_stats_per_codec>` counter will be
+  // incremented. Note that :ref:`max_stream_duration
+  // <envoy_api_field_config.core.v4alpha.HttpProtocolOptions.max_stream_duration>` does not apply to
+  // this corner case.
+  //
   // Note that it is possible to idle timeout even if the wire traffic for a stream is non-idle, due
   // to the granularity of events presented to the connection manager. For example, while receiving
   // very large request headers, it may be the case that there is traffic regularly arriving on the
