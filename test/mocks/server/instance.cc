@@ -1,7 +1,5 @@
 #include "instance.h"
 
-#include <string>
-
 #include "common/singleton/manager_impl.h"
 
 #include "gmock/gmock.h"

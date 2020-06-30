@@ -23,5 +23,3 @@
 #include "watch_dog.h"
 #include "worker.h"
 #include "worker_factory.h"
-
-namespace Envoy {}

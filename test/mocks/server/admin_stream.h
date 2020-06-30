@@ -1,17 +1,10 @@
 #pragma once
 
-#include <chrono>
-#include <cstdint>
-#include <list>
-#include <string>
-
 #include "envoy/server/admin.h"
 
 #include "test/mocks/http/mocks.h"
 
-#include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
-#include "spdlog/spdlog.h"
 
 namespace Envoy {
 namespace Server {

@@ -1,10 +1,5 @@
 #pragma once
 
-#include <chrono>
-#include <cstdint>
-#include <list>
-#include <string>
-
 #include "envoy/server/worker.h"
 
 #include "gmock/gmock.h"

@@ -1,10 +1,5 @@
 #pragma once
 
-#include <chrono>
-#include <cstdint>
-#include <list>
-#include <string>
-
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/server/options.h"
 

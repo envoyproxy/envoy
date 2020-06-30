@@ -1,23 +1,15 @@
 #pragma once
 
-#include <chrono>
-#include <cstdint>
-#include <list>
-#include <string>
-
 #include "envoy/server/configuration.h"
 
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 
-#include "absl/strings/string_view.h"
 #include "admin.h"
-#include "config_tracker.h"
 #include "drain_manager.h"
 #include "gmock/gmock.h"
 #include "instance.h"
 #include "overload_manager.h"
 #include "server_lifecycle_notifier.h"
-#include "spdlog/spdlog.h"
 
 namespace Envoy {
 namespace Server {

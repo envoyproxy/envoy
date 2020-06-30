@@ -284,7 +284,7 @@ envoy_cc_mock(
 
 envoy_cc_mock(
     name = "server_mocks",
-    srcs = ["mocks.cc"],
+    srcs = [],
     hdrs = ["mocks.h"],
     deps = [
         "//test/mocks/server:admin_mocks",

@@ -1,8 +1,5 @@
 #include "listener_component_factory.h"
 
-#include <string>
-
-#include "envoy/admin/v3/server_info.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 
 #include "gmock/gmock.h"

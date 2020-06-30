@@ -1,7 +1,5 @@
 #include "options.h"
 
-#include <string>
-
 #include "envoy/admin/v3/server_info.pb.h"
 
 #include "gmock/gmock.h"
