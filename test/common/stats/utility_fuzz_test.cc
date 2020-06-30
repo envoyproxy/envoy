@@ -23,7 +23,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
 
   // Create a greater scope vector to store the string to prevent the string memory from being free
   std::vector<std::string> string_vector;
-  auto make_string = [&string_vector](std::string str) -> std::string {
+  auto make_string = [&string_vector](std::string str) -> absl::string_view {
     string_vector.push_back(std::string(str));
     return string_vector.back();
   };
