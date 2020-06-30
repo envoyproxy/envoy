@@ -19,6 +19,7 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/core/v1/collection_entry.proto";
 import "udpa/core/v1/resource_locator.proto";
 
 import "envoy/annotations/deprecation.proto";
@@ -34,6 +35,12 @@ option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Cluster configuration]
+
+// Cluster list collections. Entries are *Cluster* resources or references.
+// [#not-implemented-hide:]
+message ClusterCollection {
+  udpa.core.v1.CollectionEntry entries = 1;
+}
 
 // Configuration for a single upstream cluster.
 // [#next-free-field: 49]
