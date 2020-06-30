@@ -29,6 +29,7 @@ void expectCorrectProto(envoy::config::core::v3::ApiVersion api_version) {
   failure_mode_allow: false
   stat_prefix: name
   transport_api_version: {}
+  emit_dynamic_metadata: false
 )EOF";
 
   ExtAuthzConfigFactory factory;

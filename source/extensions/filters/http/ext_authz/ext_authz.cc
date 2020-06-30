@@ -185,6 +185,12 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
         request_headers_->appendCopy(header.first, header.second);
       }
     }
+
+    if (config_->emitDynamicMetadata()) {
+      callbacks_->streamInfo().setDynamicMetadata(HttpFilterNames::get().ExtAuthorization,
+                                                  response->dynamic_metadata);
+    }
+
     if (cluster_) {
       config_->incCounter(cluster_->statsScope(), config_->ext_authz_ok_);
     }
@@ -265,7 +271,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     NOT_REACHED_GCOVR_EXCL_LINE;
     break;
   }
-}
+} // namespace ExtAuthz
 
 bool Filter::isBufferFull() const {
   const auto* buffer = callbacks_->decodingBuffer();

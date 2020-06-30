@@ -23,7 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v2.ExtAuthz";
@@ -113,6 +113,9 @@ message ExtAuthz {
   // When this field is true, Envoy will include the peer X.509 certificate, if available, in the
   // :ref:`certificate<envoy_api_field_service.auth.v3.AttributeContext.Peer.certificate>`.
   bool include_peer_certificate = 10;
+
+  // Flag to specify whether dynamic metadata should be emitted. Defaults to false.
+  bool emit_dynamic_metadata = 13;
 
   bool hidden_envoy_deprecated_use_alpha = 4
       [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
