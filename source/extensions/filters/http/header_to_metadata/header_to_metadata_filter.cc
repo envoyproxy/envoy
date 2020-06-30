@@ -210,7 +210,8 @@ void HeaderToMetadataFilter::writeHeaderToMetadata(Http::HeaderMap& headers,
       if (proto_rule.remove()) {
         headers.remove(header);
       }
-    } else if (proto_rule.has_on_header_missing()) {
+    }
+    if (header_entry == nullptr && proto_rule.has_on_header_missing()) {
       // Add metadata for the header missing case.
       const auto& keyval = proto_rule.on_header_missing();
 
