@@ -842,9 +842,6 @@ public:
   void iterateReverse(HeaderMap::ConstIterateCb cb, void* context) const override {
     header_map_->iterateReverse(cb, context);
   }
-  HeaderMap::Lookup lookup(const LowerCaseString& key, const HeaderEntry** entry) const override {
-    return header_map_->lookup(key, entry);
-  }
   void clear() override {
     header_map_->clear();
     header_map_->verifyByteSizeInternalForTest();

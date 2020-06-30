@@ -112,7 +112,7 @@ TEST_F(ExtractorTest, TestDefaultHeaderLocation) {
 
   // Test token remove
   tokens[0]->removeJwt(headers);
-  EXPECT_FALSE(headers.Authorization());
+  EXPECT_FALSE(headers.has(Http::CustomHeaders::get().Authorization));
 }
 
 // Test extracting JWT as Bearer token from the default header location: "Authorization" -

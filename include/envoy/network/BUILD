@@ -65,6 +65,7 @@ envoy_cc_library(
         ":transport_socket_interface",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/upstream:host_description_interface",
+        "//source/common/protobuf",
     ],
 )
 
