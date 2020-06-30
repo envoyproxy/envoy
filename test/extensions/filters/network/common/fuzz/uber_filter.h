@@ -2,12 +2,13 @@
 
 #include "common/protobuf/protobuf.h"
 
+#include "test/extensions/filters/common/ext_authz/mocks.h"
 #include "test/extensions/filters/network/common/fuzz/network_filter_fuzz.pb.validate.h"
 #include "test/fuzz/utility.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
-#include "test/extensions/filters/common/ext_authz/mocks.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -44,12 +45,11 @@ private:
   Stats::IsolatedStoreImpl scope_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Network::MockReadFilterCallbacks> read_filter_callbacks_;
-  
+
   // Filters::Common::ExtAuthz::MockClient* client_;
   // NiceMock<Http::MockAsyncClientRequest> async_request_;
-  
-  // Filters::Common::ExtAuthz::ResponsePtr response_;
 
+  // Filters::Common::ExtAuthz::ResponsePtr response_;
 };
 
 } // namespace NetworkFilters

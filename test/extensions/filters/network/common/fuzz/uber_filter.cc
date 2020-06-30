@@ -3,13 +3,11 @@
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
 
-// #include "common/network/message_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 #include "extensions/filters/network/well_known_names.h"
 #include "test/test_common/utility.h"
-// #include <cstdlib>
 #include "extensions/filters/network/ext_authz/ext_authz.h"
 
 namespace Envoy {
@@ -24,12 +22,11 @@ std::vector<absl::string_view> UberFilterFuzzer::filter_names() {
 }
 
 void UberFilterFuzzer::reset(const std::string filter_name) {
-  if(filter_name==NetworkFilterNames::get().ExtAuthorization){
+  if (filter_name == NetworkFilterNames::get().ExtAuthorization) {
     // read_filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
-    ExtAuthz::Filter* ext_authz_filter=dynamic_cast<ExtAuthz::Filter*>(read_filter_.get());
+    ExtAuthz::Filter* ext_authz_filter = dynamic_cast<ExtAuthz::Filter*>(read_filter_.get());
     ext_authz_filter->onEvent(Network::ConnectionEvent::LocalClose);
   }
-  
 
   // ENVOY_LOG_MISC(info, "Reset finished");
 }
@@ -50,13 +47,12 @@ void UberFilterFuzzer::mockMethodsSetup() {
   // Prepare expectations for the local_ratelimit filter.
   ON_CALL(factory_context_, runtime()).WillByDefault(testing::ReturnRef(runtime_));
   ON_CALL(factory_context_, scope()).WillByDefault(testing::ReturnRef(scope_));
-  // Prapre general expectations for filters.
+  // Prepare general expectations for filters.
   ON_CALL(factory_context_, timeSource()).WillByDefault(testing::ReturnRef(time_source_));
 
   ON_CALL(connection_, addReadFilter(_))
       .WillByDefault(Invoke(
           [&](Network::ReadFilterSharedPtr read_filter) -> void { read_filter_ = read_filter; }));
-
 }
 
 void UberFilterFuzzer::filterSetup(const envoy::config::listener::v3::Filter& proto_config) {
@@ -80,20 +76,19 @@ void UberFilterFuzzer::filterSetup(const envoy::config::listener::v3::Filter& pr
   //   ON_CALL(*client_, check(_, _, _, _))
   //         .WillByDefault(testing::WithArgs<0>(
   //             Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
-  //               Filters::Common::ExtAuthz::ResponsePtr response = std::make_unique<Filters::Common::ExtAuthz::Response>();
-  //               response->status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  //               Filters::Common::ExtAuthz::ResponsePtr response =
+  //               std::make_unique<Filters::Common::ExtAuthz::Response>(); response->status =
+  //               Filters::Common::ExtAuthz::CheckStatus::OK;
   //               callbacks.onComplete(std::move(response));
   //             })));
   //   read_filter_ = std::make_unique<ExtAuthz::Filter>(ext_authz_config,
   //                                                     Filters::Common::ExtAuthz::ClientPtr{client_});
   // } else {
-    cb_ = factory.createFilterFactoryFromProto(*message, factory_context_);
-    cb_(connection_);
+  cb_ = factory.createFilterFactoryFromProto(*message, factory_context_);
+  cb_(connection_);
   // }
 }
-UberFilterFuzzer::UberFilterFuzzer() { 
-  mockMethodsSetup(); 
-}
+UberFilterFuzzer::UberFilterFuzzer() { mockMethodsSetup(); }
 
 void UberFilterFuzzer::fuzz(
     const envoy::config::listener::v3::Filter& proto_config,
@@ -116,9 +111,9 @@ void UberFilterFuzzer::fuzz(
         break;
       }
       case test::extensions::filters::network::Action::kOnNewConnection: {
-        // ENVOY_LOG_MISC(trace, "inside onnewconnection before");
+        // ENVOY_LOG_MISC(trace, "inside onNewConnection before");
         read_filter_->onNewConnection();
-        // ENVOY_LOG_MISC(trace, "inside onnewconnection after");
+        // ENVOY_LOG_MISC(trace, "inside onNewConnection after");
         break;
       }
       case test::extensions::filters::network::Action::kAdvanceTime: {

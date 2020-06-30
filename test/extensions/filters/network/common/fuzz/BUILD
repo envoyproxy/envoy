@@ -36,12 +36,12 @@ envoy_cc_test_library(
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:utility_lib",
+        "//source/extensions/filters/network/ext_authz",
+        "//test/extensions/filters/common/ext_authz:ext_authz_mocks",
         "//test/fuzz:utility_lib",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
-        "//source/extensions/filters/network/ext_authz",
-        "//test/extensions/filters/common/ext_authz:ext_authz_mocks",
     ],
 )
 
