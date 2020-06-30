@@ -158,7 +158,7 @@ TEST_F(ClusterManagerImplTest, MultipleProtocolClusterFail) {
       http_protocol_options: {}
   )EOF";
   EXPECT_THROW_WITH_MESSAGE(
-      create(parseBootstrapFromV3Yaml(yaml, false)), EnvoyException,
+      create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
       "cluster: Both HTTP1 and HTTP2 options may only be configured with non-default "
       "'protocol_selection' values");
 }
@@ -180,7 +180,7 @@ TEST_F(ClusterManagerImplTest, MultipleHealthCheckFail) {
           path: "/"
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(yaml, false)), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
                             "Multiple health checks not supported");
 }
 

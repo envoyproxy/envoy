@@ -36,11 +36,11 @@ TEST(HealthCheckerFactoryTest, DEPRECATED_FEATURE_TEST(CreateRedisDeprecated)) {
   NiceMock<Server::Configuration::MockHealthCheckerFactoryContext> context;
 
   RedisHealthCheckerFactory factory;
-  EXPECT_NE(
-      nullptr,
-      dynamic_cast<CustomRedisHealthChecker*>(
-          factory.createCustomHealthChecker(Upstream::parseHealthCheckFromV2Yaml(yaml), context)
-              .get()));
+  EXPECT_NE(nullptr, dynamic_cast<CustomRedisHealthChecker*>(
+                         factory
+                             .createCustomHealthChecker(
+                                 Upstream::parseHealthCheckFromV3Yaml(yaml, false), context)
+                             .get()));
 }
 
 TEST(HealthCheckerFactoryTest, CreateRedis) {
@@ -84,11 +84,11 @@ TEST(HealthCheckerFactoryTest, DEPRECATED_FEATURE_TEST(CreateRedisWithoutKeyDepr
   NiceMock<Server::Configuration::MockHealthCheckerFactoryContext> context;
 
   RedisHealthCheckerFactory factory;
-  EXPECT_NE(
-      nullptr,
-      dynamic_cast<CustomRedisHealthChecker*>(
-          factory.createCustomHealthChecker(Upstream::parseHealthCheckFromV2Yaml(yaml), context)
-              .get()));
+  EXPECT_NE(nullptr, dynamic_cast<CustomRedisHealthChecker*>(
+                         factory
+                             .createCustomHealthChecker(
+                                 Upstream::parseHealthCheckFromV3Yaml(yaml, false), context)
+                             .get()));
 }
 
 TEST(HealthCheckerFactoryTest, CreateRedisWithoutKey) {

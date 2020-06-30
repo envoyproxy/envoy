@@ -106,7 +106,7 @@ public:
         Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this);
   }
 
-  void setupExistsHealthcheckDeprecated() {
+  void setupExistsHealthcheckDeprecated(bool avoid_boosting = true) {
     const std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
@@ -120,7 +120,7 @@ public:
         key: foo
     )EOF";
 
-    const auto& health_check_config = Upstream::parseHealthCheckFromV3Yaml(yaml);
+    const auto& health_check_config = Upstream::parseHealthCheckFromV3Yaml(yaml, avoid_boosting);
     const auto& redis_config = getRedisHealthCheckConfig(
         health_check_config, ProtobufMessage::getStrictValidationVisitor());
 
@@ -398,7 +398,7 @@ TEST_F(RedisHealthCheckerTest, LogInitialFailure) {
 
 TEST_F(RedisHealthCheckerTest, DEPRECATED_FEATURE_TEST(ExistsDeprecated)) {
   InSequence s;
-  setupExistsHealthcheckDeprecated();
+  setupExistsHealthcheckDeprecated(false);
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
