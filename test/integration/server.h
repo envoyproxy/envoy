@@ -198,11 +198,13 @@ public:
 
   virtual void waitForCounterFromStringEq(const std::string& name, uint64_t value) {
     absl::MutexLock l(&mutex_);
-    ENVOY_LOG_MISC(trace, "waiting for {} to be {}", name, value);
+    ENVOY_LOG_MISC(error, "waiting for {} to be {}", name, value);
     while (getCounterLockHeld(name) == nullptr || getCounterLockHeld(name)->value() != value) {
+      ENVOY_LOG_MISC(error, "but {} is currently {}", name,
+                     getCounterLockHeld(name) == nullptr ? -1 : getCounterLockHeld(name)->value());
       condvar_.Wait(&mutex_);
     }
-    ENVOY_LOG_MISC(trace, "done waiting for {} to be {}", name, value);
+    ENVOY_LOG_MISC(error, "done waiting for {} to be {}", name, value);
   }
 
   virtual void waitForCounterFromStringGe(const std::string& name, uint64_t value) {
