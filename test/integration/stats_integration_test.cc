@@ -273,7 +273,6 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // 2020/05/13  10531    44425       44600   Refactor resource manager
   // 2020/05/20  11223    44491       44600   Add primary clusters tracking to cluster manager.
   // 2020/06/10  11561    44491       44811   Make upstreams pluggable
-  // 2020/06/23  11252    44747       46000   Introduce Least Request LB active request bias config
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -287,7 +286,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_cluster, 44747);
+  EXPECT_MEMORY_EQ(m_per_cluster, 44491);
   EXPECT_MEMORY_LE(m_per_cluster, 46000); // Round up to allow platform variations.
 }
 
@@ -337,7 +336,6 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // 2020/05/13  10531    36537       36800   Refactor resource manager
   // 2020/05/20  11223    36603       36800   Add primary clusters tracking to cluster manager.
   // 2020/06/10  11561    36603       36923   Make upstreams pluggable
-  // 2020/06/23  11252    36859       38000   Introduce Least Request LB active request bias config
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -351,7 +349,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_cluster, 36859);
+  EXPECT_MEMORY_EQ(m_per_cluster, 36603);
   EXPECT_MEMORY_LE(m_per_cluster, 38000); // Round up to allow platform variations.
 }
 

@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <memory>
 #include <queue>
 #include <set>
 #include <vector>
@@ -457,16 +458,16 @@ public:
                 : 2),
         active_request_bias_runtime_(
             least_request_config.has_value() && least_request_config->has_active_request_bias()
-                ? absl::optional<Runtime::Double>(
-                      Runtime::Double(least_request_config->active_request_bias(), runtime))
-                : absl::nullopt) {
+                ? std::make_unique<Runtime::Double>(least_request_config->active_request_bias(),
+                                                    runtime)
+                : nullptr) {
     initialize();
   }
 
 protected:
   void refresh(uint32_t priority) override {
     active_request_bias_ =
-        active_request_bias_runtime_.has_value() ? active_request_bias_runtime_->value() : 1.0;
+        active_request_bias_runtime_ != nullptr ? active_request_bias_runtime_->value() : 1.0;
 
     if (active_request_bias_ < 0.0) {
       ENVOY_LOG(warn, "upstream: invalid active request bias supplied (runtime key {}), using 1.0",
@@ -518,7 +519,7 @@ private:
   // whenever a `HostSet` is updated.
   double active_request_bias_{};
 
-  const absl::optional<Runtime::Double> active_request_bias_runtime_;
+  const std::unique_ptr<Runtime::Double> active_request_bias_runtime_;
 };
 
 /**
