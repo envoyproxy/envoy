@@ -151,13 +151,10 @@ HttpGenericBodyMatcher::HttpGenericBodyMatcher(
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
+    // overlap_size_ indicates how many bytes from previous data chunk(s) are buffered.
+    overlap_size_ = std::max(overlap_size_, patterns_->back().length() - 1);
   }
   limit_ = config.bytes_limit();
-  auto index = std::max_element(
-      patterns_->begin(), patterns_->end(),
-      [](const std::string& i, const std::string& j) -> bool { return i.length() < j.length(); });
-  // overlap_size_ indicates how many bytes from previous data chunk(s) are buffered.
-  overlap_size_ = (*index).length() - 1;
 }
 
 void HttpGenericBodyMatcher::onBody(const Buffer::Instance& data, MatchStatusVector& statuses) {
@@ -175,6 +172,7 @@ void HttpGenericBodyMatcher::onBody(const Buffer::Instance& data, MatchStatusVec
   // Iterate through all patterns to be found and check if they are located across body
   // chunks: part of the pattern was in previous body chunk and remaining of the pattern
   // is in the current body chunk on in the current body chunk.
+  bool resize_required = false;
   auto body_search_limit = limit_ - ctx->processed_bytes_;
   auto it = ctx->patterns_index_.begin();
   while (it != ctx->patterns_index_.end()) {
@@ -183,6 +181,9 @@ void HttpGenericBodyMatcher::onBody(const Buffer::Instance& data, MatchStatusVec
         (-1 != data.search(static_cast<const void*>(pattern.data()), pattern.length(), 0,
                            body_search_limit))) {
       // Pattern found. Remove it from the list of patterns to be found.
+      // If the longest pattern has been found, resize of overlap buffer may be
+      // required.
+      resize_required = resize_required || (ctx->capacity_ == (pattern.length() - 1));
       it = ctx->patterns_index_.erase(it);
     } else {
       it++;
@@ -206,6 +207,12 @@ void HttpGenericBodyMatcher::onBody(const Buffer::Instance& data, MatchStatusVec
       statuses[my_index_].might_change_status_ = false;
       return;
     }
+  }
+
+  // If longest pattern has been located, there is possibility that overlap_
+  // buffer size may be reduced.
+  if (resize_required) {
+    resizeOverlapBuffer(ctx);
   }
 
   bufferLastBytes(data, ctx);
@@ -262,13 +269,13 @@ void HttpGenericBodyMatcher::bufferLastBytes(const Buffer::Instance& data,
   // 2. The new data length is smaller than X and there is enough room in overlap buffer to just
   // copy the bytes from data.
   // 3. The new data length is smaller than X and there is not enough room in overlap buffer.
-  if (data.length() >= ctx->overlap_.capacity()) {
+  if (data.length() >= ctx->capacity_) {
     // Case 1:
     // Just overwrite the entire overlap_ buffer with new data.
-    ctx->overlap_.resize(overlap_size_);
-    data.copyOut(data.length() - overlap_size_, overlap_size_, ctx->overlap_.data());
+    ctx->overlap_.resize(ctx->capacity_);
+    data.copyOut(data.length() - ctx->capacity_, ctx->capacity_, ctx->overlap_.data());
   } else {
-    if (data.length() <= (overlap_size_ - ctx->overlap_.size())) {
+    if (data.length() <= (ctx->capacity_ - ctx->overlap_.size())) {
       // Case 2. Just add the new data on top of already buffered.
       const auto size = ctx->overlap_.size();
       ctx->overlap_.resize(ctx->overlap_.size() + data.length());
@@ -276,14 +283,43 @@ void HttpGenericBodyMatcher::bufferLastBytes(const Buffer::Instance& data,
     } else {
       // Case 3. First shift data to make room for new data and then copy
       // entire new buffer.
-      const size_t shift = ctx->overlap_.size() - (overlap_size_ - data.length());
+      const size_t shift = ctx->overlap_.size() - (ctx->capacity_ - data.length());
       for (size_t i = 0; i < (ctx->overlap_.size() - shift); i++) {
         ctx->overlap_[i] = ctx->overlap_[i + shift];
       }
       const auto size = ctx->overlap_.size();
-      ctx->overlap_.resize(overlap_size_);
+      ctx->overlap_.resize(ctx->capacity_);
       data.copyOut(0, data.length(), ctx->overlap_.data() + (size - shift));
     }
+  }
+}
+
+// Method takes list of indexes of patterns not yet located in the http body and returns the
+// length of the longest pattern.
+// This is used by matcher to buffer as minimum bytes as possible.
+size_t HttpGenericBodyMatcher::calcLongestPatternSize(const std::list<uint32_t>& indexes) const {
+  ASSERT(indexes.size() >= 1);
+  size_t max_len = 0;
+  for (const auto& i : indexes) {
+    max_len = std::max(max_len, patterns_->at(i).length());
+    std::cout << patterns_->at(i) << std::endl;
+  }
+  return max_len;
+}
+
+// Method checks if it is possible to reduce the size of overlap_ buffer.
+void HttpGenericBodyMatcher::resizeOverlapBuffer(HttpGenericBodyMatcherCtx* ctx) {
+  // Check if we need to resize overlap_ buffer. Since it was initialized to size of the longest
+  // pattern, it will be shrunk only and memory allocations should not happen.
+  const size_t max_len = calcLongestPatternSize(ctx->patterns_index_);
+  if (ctx->capacity_ != (max_len - 1)) {
+    const size_t new_size = max_len - 1;
+    const size_t shift = ctx->overlap_.size() - new_size;
+    // Copy the last new_size bytes to the beginning of the buffer.
+    for (size_t i = 0; i < new_size; i++) {
+      ctx->overlap_[i] = ctx->overlap_[i + shift];
+    }
+    ctx->capacity_ = new_size;
   }
 }
 

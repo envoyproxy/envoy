@@ -369,9 +369,11 @@ public:
                             size_t overlap_size)
       : patterns_(patterns) {
     // Initialize overlap_ buffer's capacity to fit the longest pattern - 1.
+    // The length of the longest pattern is known and passed here as overlap_size.
     patterns_index_.resize(patterns_->size());
     std::iota(patterns_index_.begin(), patterns_index_.end(), 0);
     overlap_.reserve(overlap_size);
+    capacity_ = overlap_size;
   }
   ~HttpGenericBodyMatcherCtx() override = default;
 
@@ -390,6 +392,12 @@ public:
   // It is necessary to locate patterns which are spread across 2 or more
   // body chunks.
   std::vector<char> overlap_;
+  // capacity_ tells how many bytes should be buffered. overlap_'s initial
+  // capacity is set to the length of the longest pattern - 1. As patterns
+  // are found, there is a possibility that not as many bytes are required to be buffered.
+  // It must be tracked outside of vector, because vector::reserve does not
+  // change capacity when new value is lower than current capacity.
+  uint32_t capacity_{};
   // processed_bytes_ tracks how many bytes of HTTP body have been processed.
   uint32_t processed_bytes_{};
 };
@@ -409,6 +417,9 @@ protected:
   bool locatePatternAcrossChunks(const std::string& pattern, const Buffer::Instance& data,
                                  const HttpGenericBodyMatcherCtx* ctx);
   void bufferLastBytes(const Buffer::Instance& data, HttpGenericBodyMatcherCtx* ctx);
+
+  size_t calcLongestPatternSize(const std::list<uint32_t>& indexes) const;
+  void resizeOverlapBuffer(HttpGenericBodyMatcherCtx* ctx);
 
 private:
   // The following fields are initialized based on matcher config and are used

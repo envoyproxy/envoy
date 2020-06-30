@@ -141,6 +141,41 @@ TapMatcherGenericBodyTest::TapMatcherGenericBodyTest() {
   body_parts_.push_back(hex); // Index 8
 }
 
+// This test initializes matcher with several patterns. The length of the longest
+// pattern is used to initialize overlap_ buffer.
+// The longest pattern is found first. This should result in less buffering
+// required for locating remaining patterns.
+TEST_F(TapMatcherGenericBodyTest, ResizeOverlap) {
+  std::string matcher_yaml = R"EOF(
+http_request_generic_body_match:
+  patterns:
+    - string_match: generic
+    - string_match: htt
+)EOF";
+  TestUtility::loadFromYaml(matcher_yaml, config_);
+  buildMatcher(config_, matchers_);
+  EXPECT_EQ(1, matchers_.size());
+  statuses_.resize(matchers_.size());
+  matchers_[0]->onNewStream(statuses_);
+
+  const auto& ctx = reinterpret_cast<HttpGenericBodyMatcherCtx*>(statuses_[0].ctx_.get());
+  // 6 is length of "generic"
+  ASSERT_THAT(ctx->overlap_.capacity(), 6);
+  // 2 patterns must be located
+  ASSERT_THAT(ctx->patterns_index_.size(), 2);
+
+  // Now pass the chunk which matches "generic" pattern.
+  data_.add(body_parts_[0].data(), body_parts_[0].length());
+  matchers_[0]->onRequestBody(data_, statuses_);
+
+  // Size of patterns_index_ should drop down to one.
+  // Capacity of the overlap_ should drop to to 2, as the longest pattern not found yet is 3 chars
+  // long. Also 2 bytes should have been copied to overlap, so its size is 2.
+  ASSERT_THAT(ctx->patterns_index_.size(), 1);
+  ASSERT_THAT(ctx->overlap_.size(), 2);
+  ASSERT_THAT(ctx->capacity_, 2);
+}
+
 // Test the case when hex string is not even number of characters
 TEST_F(TapMatcherGenericBodyTest, WrongConfigTest) {
   std::string matcher_yaml = R"EOF(

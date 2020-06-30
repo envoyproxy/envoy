@@ -187,7 +187,7 @@ public:
   virtual ssize_t search(const void* data, uint64_t size, size_t start, size_t length) const PURE;
 
   /**
-   * Wrapper around search method which does not take length parameter.
+   *  Search for an occurrence of data within entire buffer.
    */
   ssize_t search(const void* data, uint64_t size, size_t start) const {
     return search(data, size, start, 0);

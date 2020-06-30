@@ -153,6 +153,12 @@ header ``foo: bar`` is present AND request body contains string ``test`` and hex
 in the first 128 bytes AND response body contains hex bytes ``beef`` (``vu8=`` in base64 format) in the first 64 bytes. If all of these
 conditions are met, the request will be tapped and streamed out to the admin endpoint.
 
+.. attention::
+
+  Searching for patterns in HTTP body is potentially cpu intensive. For each specified pattern, http body is scanned byte by byte to find a match.
+  If multiple patterns are specified, the process is repeated for each pattern. If location of a pattern is known, ``bytes_limit`` should be specified
+  to scan only part of the http body.
+
 Output format
 -------------
 

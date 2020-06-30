@@ -389,7 +389,7 @@ ssize_t OwnedImpl::search(const void* data, uint64_t size, size_t start, size_t 
   }
   ssize_t offset = 0;
   const uint8_t* needle = static_cast<const uint8_t*>(data);
-  for (size_t slice_index = 0; slice_index < slices_.size() && (0 < left_to_search);
+  for (size_t slice_index = 0; slice_index < slices_.size() && (left_to_search > 0);
        slice_index++) {
     const auto& slice = slices_[slice_index];
     uint64_t slice_size = slice->dataSize();
@@ -403,12 +403,13 @@ ssize_t OwnedImpl::search(const void* data, uint64_t size, size_t start, size_t 
     const uint8_t* haystack_end = haystack + slice_size;
     haystack += start;
     while (haystack < haystack_end) {
-      size_t num = std::min(static_cast<size_t>(haystack_end - haystack), left_to_search);
+      const size_t slice_search_limit =
+          std::min(static_cast<size_t>(haystack_end - haystack), left_to_search);
       // Search within this slice for the first byte of the needle.
       const uint8_t* first_byte_match =
-          static_cast<const uint8_t*>(memchr(haystack, needle[0], num));
+          static_cast<const uint8_t*>(memchr(haystack, needle[0], slice_search_limit));
       if (first_byte_match == nullptr) {
-        left_to_search -= num;
+        left_to_search -= slice_search_limit;
         break;
       }
       // After finding a match for the first byte of the needle, check whether the following
@@ -418,7 +419,7 @@ ssize_t OwnedImpl::search(const void* data, uint64_t size, size_t start, size_t 
       // Save the current number of bytes left to search.
       // If the pattern is not found, the search will resume from the next byte
       // and left_to_search value must be restored.
-      size_t saved_left_to_search = left_to_search;
+      const size_t saved_left_to_search = left_to_search;
       size_t i = 1;
       size_t match_index = slice_index;
       const uint8_t* match_next = first_byte_match + 1;
