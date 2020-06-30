@@ -1036,6 +1036,8 @@ envoy_cc_test(
     name = "dynamic_validation_integration_test",
     srcs = ["dynamic_validation_integration_test.cc"],
     data = ["//test/config/integration:server_xds_files"],
+    # Fails on windows with cr/lf yaml file checkouts
+    tags = ["fails_on_windows"],
     deps = [
         ":http_integration_lib",
         "//source/common/stats:stats_lib",
@@ -1269,6 +1271,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
+    tags = ["fails_on_windows"],
     deps = [
         ":integration_lib",
         "//source/common/config:api_version_lib",
