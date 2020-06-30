@@ -3,7 +3,10 @@
 #include "envoy/network/address.h"
 #include "envoy/network/socket.h"
 
+#include "common/network/socket_interface_factory.h"
 #include "common/singleton/threadsafe_singleton.h"
+
+#define DEFAULT_SOCKET_INTERFACE_NAME "envoy.config.core.default_socket_interface"
 
 namespace Envoy {
 namespace Network {
@@ -17,8 +20,16 @@ public:
   bool ipFamilySupported(int domain) override;
 };
 
-using SocketInterfaceSingleton = InjectableSingleton<SocketInterface>;
-using SocketInterfaceLoader = ScopedInjectableLoader<SocketInterface>;
+class DefaultSocketInterfaceFactory : public SocketInterfaceFactory {
+public:
+  Server::BootstrapExtensionPtr
+  createBootstrapExtension(const Protobuf::Message& config,
+                           Server::Configuration::ServerFactoryContext& context) override;
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override;
+  std::string name() const override { return DEFAULT_SOCKET_INTERFACE_NAME; }
+};
+
+DECLARE_FACTORY(DefaultSocketInterfaceFactory);
 
 } // namespace Network
 } // namespace Envoy

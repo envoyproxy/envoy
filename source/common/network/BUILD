@@ -17,10 +17,10 @@ envoy_cc_library(
     hdrs = [
         "address_impl.h",
         "io_socket_handle_impl.h",
-        "socket_interface_impl.h",
     ],
     deps = [
         ":io_socket_error_lib",
+        ":socket_interface_factory_lib",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/network:address_interface",
         "//include/envoy/network:io_handle_interface",
@@ -179,6 +179,7 @@ envoy_cc_library(
         "//include/envoy/config:typed_config_interface",
         "//include/envoy/network:socket_interface",
         "//include/envoy/registry",
+        "//include/envoy/server:bootstrap_extension_config_interface",
     ],
 )
 

@@ -289,31 +289,6 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
   MessageUtil::validate(bootstrap, validation_visitor);
 }
 
-static void loadSocketInterface(envoy::config::core::v3::TypedExtensionConfig sock_interface,
-                                ProtobufMessage::ValidationContext& validation_ctx) {
-  auto& factory =
-      Config::Utility::getAndCheckFactory<Network::SocketInterfaceFactory>(sock_interface);
-  auto config = Config::Utility::translateAnyToFactoryConfig(
-      sock_interface.typed_config(), validation_ctx.staticValidationVisitor(), factory);
-  Network::SocketInterfacesSingleton::get().emplace(
-      std::make_pair(sock_interface.name(), factory.createSocketInterface(*config)));
-}
-
-static void
-initializeSocketInterfaces(const envoy::config::core::v3::SocketInterfacesConfig& sock_interfaces,
-                           ProtobufMessage::ValidationContext& validation_ctx) {
-  Network::SocketInterfacesSingleton::initialize(new Network::SocketInterfacesMap());
-  for (const auto& sock_interface : sock_interfaces.custom_types()) {
-    loadSocketInterface(sock_interface, validation_ctx);
-  }
-  if (sock_interfaces.custom_default_type() != "") {
-    Network::SocketInterfaceSingleton::clear();
-    auto& sock_name = sock_interfaces.custom_default_type();
-    auto sock = const_cast<Network::SocketInterface*>(Network::socketInterface(sock_name));
-    Network::SocketInterfaceSingleton::initialize(sock);
-  }
-}
-
 void InstanceImpl::initialize(const Options& options,
                               Network::Address::InstanceConstSharedPtr local_address,
                               ComponentFactory& component_factory, ListenerHooks& hooks) {
@@ -436,9 +411,23 @@ void InstanceImpl::initialize(const Options& options,
   heap_shrinker_ =
       std::make_unique<Memory::HeapShrinker>(*dispatcher_, *overload_manager_, stats_store_);
 
-  // Initialize all SocketInterface implementations, if any are configured.
-  if (bootstrap_.has_socket_interfaces()) {
-    initializeSocketInterfaces(bootstrap_.socket_interfaces(), messageValidationContext());
+  for (const auto& bootstrap_extension : bootstrap_.bootstrap_extensions()) {
+    auto& factory = Config::Utility::getAndCheckFactory<Configuration::BootstrapExtensionFactory>(
+        bootstrap_extension);
+    auto config = Config::Utility::translateAnyToFactoryConfig(
+        bootstrap_extension.typed_config(), messageValidationContext().staticValidationVisitor(),
+        factory);
+    bootstrap_extensions_.push_back(
+        factory.createBootstrapExtension(*config, serverFactoryContext()));
+  }
+
+  if (!bootstrap_.default_socket_interface().empty()) {
+    auto& sock_name = bootstrap_.default_socket_interface();
+    auto sock = const_cast<Network::SocketInterface*>(Network::socketInterface(sock_name));
+    if (sock != nullptr) {
+      Network::SocketInterfaceSingleton::clear();
+      Network::SocketInterfaceSingleton::initialize(sock);
+    }
   }
 
   // Workers get created first so they register for thread local updates.
@@ -521,16 +510,6 @@ void InstanceImpl::initialize(const Options& options,
   // GuardDog (deadlock detection) object and thread setup before workers are
   // started and before our own run() loop runs.
   guard_dog_ = std::make_unique<Server::GuardDogImpl>(stats_store_, config_, *api_);
-
-  for (const auto& bootstrap_extension : bootstrap_.bootstrap_extensions()) {
-    auto& factory = Config::Utility::getAndCheckFactory<Configuration::BootstrapExtensionFactory>(
-        bootstrap_extension);
-    auto config = Config::Utility::translateAnyToFactoryConfig(
-        bootstrap_extension.typed_config(), messageValidationContext().staticValidationVisitor(),
-        factory);
-    bootstrap_extensions_.push_back(
-        factory.createBootstrapExtension(*config, serverFactoryContext()));
-  }
 }
 
 void InstanceImpl::onClusterManagerPrimaryInitializationComplete() {

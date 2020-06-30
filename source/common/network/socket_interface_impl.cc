@@ -7,7 +7,6 @@
 #include "common/api/os_sys_calls_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/io_socket_handle_impl.h"
-#include "common/network/socket_interface_factory.h"
 
 namespace Envoy {
 namespace Network {
@@ -82,18 +81,24 @@ bool SocketInterfaceImpl::ipFamilySupported(int domain) {
   return SOCKET_VALID(result.rc_);
 }
 
-SocketInterfacePtr DefaultSocketInterfaceFactory::createSocketInterface(const Protobuf::Message&) {
-  return std::make_unique<SocketInterfaceImpl>();
+Server::BootstrapExtensionPtr DefaultSocketInterfaceFactory::createBootstrapExtension(
+    const Protobuf::Message&, Server::Configuration::ServerFactoryContext&) {
+  auto sock_interface = std::make_unique<SocketInterfaceImpl>();
+  Network::registerSocketInterface(DEFAULT_SOCKET_INTERFACE_NAME, sock_interface.get());
+  return std::make_unique<SocketInterfaceExtension>(std::move(sock_interface));
 }
 
 ProtobufTypes::MessagePtr DefaultSocketInterfaceFactory::createEmptyConfigProto() {
   return std::make_unique<envoy::config::core::v3::DefaultSocketInterface>();
 }
 
-REGISTER_FACTORY(DefaultSocketInterfaceFactory, SocketInterfaceFactory);
+REGISTER_FACTORY(DefaultSocketInterfaceFactory, Server::Configuration::BootstrapExtensionFactory);
 
 static SocketInterfaceLoader* socket_interface_ =
     new SocketInterfaceLoader(std::make_unique<SocketInterfaceImpl>());
+
+static SocketInterfacesLoader* socket_interfaces_ =
+    new SocketInterfacesLoader(std::make_unique<SocketInterfacesMap>());
 
 } // namespace Network
 } // namespace Envoy
