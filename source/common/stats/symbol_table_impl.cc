@@ -128,8 +128,7 @@ SymbolVec SymbolTableImpl::Encoding::decodeSymbols(const SymbolTable::Storage ar
 }
 
 void SymbolTableImpl::Encoding::decodeTokens(
-    const SymbolTable::Storage array, size_t size,
-    const std::function<void(Symbol)>& symbolTokenFn,
+    const SymbolTable::Storage array, size_t size, const std::function<void(Symbol)>& symbolTokenFn,
     const std::function<void(absl::string_view)>& stringViewTokenFn) {
   while (size > 0) {
     if (*array == LiteralStringIndicator) {
