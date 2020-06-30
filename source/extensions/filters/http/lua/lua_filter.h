@@ -42,21 +42,6 @@ private:
 
 using PerLuaCodeSetupPtr = std::unique_ptr<PerLuaCodeSetup>;
 
-class FilterConfigPerRoute;
-class FilterConfig;
-
-namespace {
-const FilterConfigPerRoute* getConfigPerRoute(Http::StreamFilterCallbacks* callbacks) {
-  if (callbacks == nullptr || callbacks->route() == nullptr ||
-      callbacks->route()->routeEntry() == nullptr) {
-    return nullptr;
-  }
-
-  return Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(
-      Extensions::HttpFilters::HttpFilterNames::get().Lua, callbacks->route());
-}
-} // namespace
-
 /**
  * Callbacks used by a stream handler to access the filter.
  */
@@ -356,10 +341,6 @@ public:
   Upstream::ClusterManager& cluster_manager_;
 
 private:
-  const absl::flat_hash_map<std::string, const std::string>
-  readSourceCodes(const envoy::extensions::filters::http::lua::v3::Lua& config,
-                  Api::Api& api) const;
-
   absl::flat_hash_map<std::string, PerLuaCodeSetupPtr> per_lua_code_setups_map_;
 };
 
@@ -384,7 +365,13 @@ private:
 namespace {
 
 PerLuaCodeSetup* getPerLuaCodeSetup(const FilterConfig* filter_config,
-                                    const FilterConfigPerRoute* config_per_route) {
+                                    Http::StreamFilterCallbacks* callbacks) {
+  const FilterConfigPerRoute* config_per_route = nullptr;
+  if (callbacks && callbacks->route()) {
+    config_per_route = Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(
+        HttpFilterNames::get().Lua, callbacks->route());
+  }
+
   if (config_per_route != nullptr) {
     if (config_per_route->disabled()) {
       return nullptr;
@@ -419,16 +406,10 @@ public:
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override {
-    const auto config_per_route = getConfigPerRoute(decoder_callbacks_.callbacks_);
-    PerLuaCodeSetup* setup = getPerLuaCodeSetup(config_.get(), config_per_route);
+    PerLuaCodeSetup* setup = getPerLuaCodeSetup(config_.get(), decoder_callbacks_.callbacks_);
     const int function_ref = setup ? setup->requestFunctionRef() : LUA_REFNIL;
-    if (function_ref == LUA_REFNIL) {
-      return Http::FilterHeadersStatus::Continue;
-    }
-    request_coroutine_ = setup->createCoroutine();
-
     return doHeaders(request_stream_wrapper_, request_coroutine_, decoder_callbacks_, function_ref,
-                     headers, end_stream);
+                     setup, headers, end_stream);
   }
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override {
     return doData(request_stream_wrapper_, data, end_stream);
@@ -446,16 +427,10 @@ public:
   }
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override {
-    const auto config_per_route = getConfigPerRoute(decoder_callbacks_.callbacks_);
-    PerLuaCodeSetup* setup = getPerLuaCodeSetup(config_.get(), config_per_route);
+    PerLuaCodeSetup* setup = getPerLuaCodeSetup(config_.get(), decoder_callbacks_.callbacks_);
     const int function_ref = setup ? setup->responseFunctionRef() : LUA_REFNIL;
-    if (function_ref == LUA_REFNIL) {
-      return Http::FilterHeadersStatus::Continue;
-    }
-    response_coroutine_ = setup->createCoroutine();
-
     return doHeaders(response_stream_wrapper_, response_coroutine_, encoder_callbacks_,
-                     function_ref, headers, end_stream);
+                     function_ref, setup, headers, end_stream);
   }
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override {
     return doData(response_stream_wrapper_, data, end_stream);
@@ -520,11 +495,12 @@ private:
   Http::FilterHeadersStatus doHeaders(StreamHandleRef& handle,
                                       Filters::Common::Lua::CoroutinePtr& coroutine,
                                       FilterCallbacks& callbacks, int function_ref,
-                                      Http::HeaderMap& headers, bool end_stream);
+                                      PerLuaCodeSetup* setup, Http::HeaderMap& headers,
+                                      bool end_stream);
   Http::FilterDataStatus doData(StreamHandleRef& handle, Buffer::Instance& data, bool end_stream);
   Http::FilterTrailersStatus doTrailers(StreamHandleRef& handle, Http::HeaderMap& trailers);
 
-  FilterConfigConstSharedPtr config_{};
+  FilterConfigConstSharedPtr config_;
   DecoderCallbacks decoder_callbacks_{*this};
   EncoderCallbacks encoder_callbacks_{*this};
   StreamHandleRef request_stream_wrapper_;

@@ -600,27 +600,19 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
                            ThreadLocal::SlotAllocator& tls,
                            Upstream::ClusterManager& cluster_manager, Api::Api& api)
     : cluster_manager_(cluster_manager) {
-  for (const auto& source_code : readSourceCodes(proto_config, api)) {
-    auto per_lua_code_setup_ptr = std::make_unique<PerLuaCodeSetup>(source_code.second, tls);
+  auto global_setup_ptr = std::make_unique<PerLuaCodeSetup>(proto_config.inline_code(), tls);
+  if (global_setup_ptr) {
+    per_lua_code_setups_map_[GLOBAL_SCRIPT_NAME] = std::move(global_setup_ptr);
+  }
+
+  for (const auto& source : proto_config.source_codes()) {
+    const std::string code = Config::DataSource::read(source.second, true, api);
+    auto per_lua_code_setup_ptr = std::make_unique<PerLuaCodeSetup>(code, tls);
     if (!per_lua_code_setup_ptr) {
       continue;
     }
-    per_lua_code_setups_map_[source_code.first] = std::move(per_lua_code_setup_ptr);
+    per_lua_code_setups_map_[source.first] = std::move(per_lua_code_setup_ptr);
   }
-}
-
-const absl::flat_hash_map<std::string, const std::string>
-FilterConfig::readSourceCodes(const envoy::extensions::filters::http::lua::v3::Lua& config,
-                              Api::Api& api) const {
-  absl::flat_hash_map<std::string, const std::string> source_codes;
-  if (!config.inline_code().empty()) {
-    source_codes.insert({GLOBAL_SCRIPT_NAME, config.inline_code()});
-  }
-  for (const auto& source : config.source_codes()) {
-    const std::string code = Config::DataSource::read(source.second, true, api);
-    source_codes.insert({source.first, code});
-  }
-  return source_codes;
 }
 
 FilterConfigPerRoute::FilterConfigPerRoute(
@@ -641,7 +633,14 @@ void Filter::onDestroy() {
 Http::FilterHeadersStatus Filter::doHeaders(StreamHandleRef& handle,
                                             Filters::Common::Lua::CoroutinePtr& coroutine,
                                             FilterCallbacks& callbacks, int function_ref,
-                                            Http::HeaderMap& headers, bool end_stream) {
+                                            PerLuaCodeSetup* setup, Http::HeaderMap& headers,
+                                            bool end_stream) {
+  if (function_ref == LUA_REFNIL) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+  ASSERT(setup);
+  coroutine = setup->createCoroutine();
+
   handle.reset(StreamHandleWrapper::create(coroutine->luaState(), *coroutine, headers, end_stream,
                                            *this, callbacks),
                true);

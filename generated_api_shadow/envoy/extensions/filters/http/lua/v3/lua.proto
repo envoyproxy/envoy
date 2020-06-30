@@ -57,6 +57,6 @@ message LuaPerRoute {
 
     // A name of a Lua source code stored in
     // :ref:`Lua.source_codes <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.source_codes>`.
-    string name = 2 [(validate.rules).string = {min_bytes: 1}];
+    string name = 2 [(validate.rules).string.min_len = 1];
   }
 }
