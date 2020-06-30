@@ -1,5 +1,7 @@
 #include "extensions/filters/http/cache/cacheability_utils.h"
 
+#include "envoy/http/header_map.h"
+
 #include "common/common/macros.h"
 #include "common/common/utility.h"
 
@@ -18,6 +20,14 @@ const absl::flat_hash_set<absl::string_view>& cacheableStatusCodes() {
   CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<absl::string_view>, "200", "203", "204", "206", "300",
                          "301", "308", "404", "405", "410", "414", "451", "501");
 }
+
+const std::vector<Http::LowerCaseString>& conditionalHeaders() {
+  // As defined by: https://httpwg.org/specs/rfc7232.html#preconditions
+  CONSTRUCT_ON_FIRST_USE(
+      std::vector<Http::LowerCaseString>, Http::LowerCaseString{"if-match"},
+      Http::LowerCaseString{"if-none-match"}, Http::LowerCaseString{"if-modified-since"},
+      Http::LowerCaseString{"if-unmodified-since"}, Http::LowerCaseString{"if-range"});
+}
 } // namespace
 
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
@@ -29,10 +39,24 @@ bool CacheabilityUtils::isCacheableRequest(const Http::RequestHeaderMap& headers
   const absl::string_view method = headers.getMethodValue();
   const absl::string_view forwarded_proto = headers.getForwardedProtoValue();
   const Http::HeaderValues& header_values = Http::Headers::get();
+
+  // Check if the request contains any conditional headers
+  // For now, requests with conditional headers bypass the CacheFilter
+  // This behavior does not cause any incorrect results but may reduce the cache effectiveness
+  // If needed to be handled properly refer to:
+  // https://httpwg.org/specs/rfc7234.html#validation.received
+  bool contains_conditional_headers = false;
+  for (const auto& conditional_header : conditionalHeaders()) {
+    if (headers.get(Http::LowerCaseString{conditional_header})) {
+      contains_conditional_headers = true;
+      break;
+    }
+  }
+
   // TODO(toddmgreer): Also serve HEAD requests from cache.
-  // TODO(toddmgreer): Check all the other cache-related headers.
+  // Cache-related headers are checked in HttpCache::LookupRequest
   return headers.Path() && headers.Host() && !headers.getInline(authorization_handle.handle()) &&
-         (method == header_values.MethodValues.Get) &&
+         !contains_conditional_headers && (method == header_values.MethodValues.Get) &&
          (forwarded_proto == header_values.SchemeValues.Http ||
           forwarded_proto == header_values.SchemeValues.Https);
 }

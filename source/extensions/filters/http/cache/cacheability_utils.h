@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/http/header_map.h"
+
 #include "common/common/utility.h"
 #include "common/http/headers.h"
 
