@@ -7,6 +7,7 @@ import "envoy/config/core/v3/base.proto";
 import "google/protobuf/any.proto";
 import "google/rpc/status.proto";
 
+import "udpa/core/v1/resource_locator.proto";
 import "udpa/core/v1/resource_name.proto";
 
 import "udpa/annotations/migrate.proto";
@@ -180,17 +181,20 @@ message DeltaDiscoveryRequest {
   repeated string resource_names_subscribe = 3;
 
   // As with *resource_names_subscribe* but used when subscribing to resources indicated
-  // by a *udpa.core.v1.ResourceLocator*.
+  // by a *udpa.core.v1.ResourceLocator*. The directives in the resource locator
+  // are ignored and the context parameters are matched with
+  // *context_param_specifier* specific semantics.
   // [#not-implemented-hide:]
-  repeated udpa.core.v1.ResourceName udpa_resources_subscribe = 8;
+  repeated udpa.core.v1.ResourceLocator udpa_resources_subscribe = 8;
 
   // A list of Resource names to remove from the list of tracked resources.
   repeated string resource_names_unsubscribe = 4;
 
   // As with *resource_names_unsubscribe* but used when unsubscribing to resources indicated by a
-  // *udpa.core.v1.ResourceLocator*.
+  // *udpa.core.v1.ResourceLocator*. This must match a previously subscribed
+  // resource locator provided in *udpa_resources_subscribe*.
   // [#not-implemented-hide:]
-  repeated udpa.core.v1.ResourceName udpa_resources_unsubscribe = 9;
+  repeated udpa.core.v1.ResourceLocator udpa_resources_unsubscribe = 9;
 
   // Informs the server of the versions of the resources the xDS client knows of, to enable the
   // client to continue the same logical xDS session even in the face of gRPC stream reconnection.

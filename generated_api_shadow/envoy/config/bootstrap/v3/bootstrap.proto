@@ -211,7 +211,8 @@ message Bootstrap {
   //    each configuration source in *config_sources*. The first *ConfigSource*
   //    to match wins.
   // 4. As a fallback, if no configuration source matches, then
-  //    *default_configuration_source* is used.
+  //    *default_config_source* is used.
+  // 5. If *default_config_source* is not specified, resolution fails.
   // [#not-implemented-hide:]
   repeated core.v3.ConfigSource config_sources = 22;
 
