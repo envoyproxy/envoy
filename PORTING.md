@@ -35,6 +35,11 @@ from ISO stdc++;
 
 * [MSVC non-standard behaviors](https://docs.microsoft.com/en-us/cpp/cpp/nonstandard-behavior?view=vs-2019)
 
+Microsoft documents their conformance fixes by Virtual Studio toolchain revision (the CI attempts
+to keep up with the most recent release);
+
+* [MSVC conformance improvements](https://docs.microsoft.com/en-us/cpp/overview/cpp-conformance-improvements?view=vs-2019)
+
 Note that Envoy project has elected to distribute a monolithic envoy-static.exe including
 all components compiled into the single executable. This includes the libcmt (C Runtime)
 and cpp libraries; all code is compiled with /MT (or /MTd for debug runtime). Do not inject
