@@ -164,7 +164,6 @@ TEST(UdpaResourceLocatorTest, Schemes) {
     EXPECT_EQ(udpa::core::v1::ResourceLocator::HTTP, resource_locator.scheme());
     EXPECT_EQ("foo", resource_locator.authority());
     EXPECT_EQ("bar", resource_locator.resource_type());
-    EXPECT_EQ(2, resource_locator.id().size());
     EXPECT_THAT(resource_locator.id(), ElementsAre("baz", "blah"));
     EXPECT_CONTEXT_PARAMS(resource_locator.exact_context().params(), Pair("a", "b"));
     EXPECT_EQ(1, resource_locator.directives().size());
@@ -175,7 +174,6 @@ TEST(UdpaResourceLocatorTest, Schemes) {
   {
     const auto resource_locator = UdpaResourceIdentifier::decodeUrl("file:///bar/baz/blah#entry=m");
     EXPECT_EQ(udpa::core::v1::ResourceLocator::FILE, resource_locator.scheme());
-    EXPECT_EQ(3, resource_locator.id().size());
     EXPECT_THAT(resource_locator.id(), ElementsAre("bar", "baz", "blah"));
     EXPECT_EQ(1, resource_locator.directives().size());
     EXPECT_EQ("m", resource_locator.directives()[0].entry());
