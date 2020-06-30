@@ -2223,10 +2223,12 @@ TEST_F(Http1ClientConnectionImplTest, BadEncodeParams) {
 
   // Need to set :method and :path
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
-  EXPECT_DEATH(request_encoder.encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}}, true),
-               ":method and :path must be specified");
-  EXPECT_DEATH(request_encoder.encodeHeaders(TestRequestHeaderMapImpl{{":method", "GET"}}, true),
-               ":method and :path must be specified");
+  EXPECT_DEATH_LOG_TO_STDERR(
+      request_encoder.encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}}, true),
+      ":method and :path must be specified");
+  EXPECT_DEATH_LOG_TO_STDERR(
+      request_encoder.encodeHeaders(TestRequestHeaderMapImpl{{":method", "GET"}}, true),
+      ":method and :path must be specified");
 }
 
 TEST_F(Http1ClientConnectionImplTest, NoContentLengthResponse) {
