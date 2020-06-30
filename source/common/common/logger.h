@@ -366,10 +366,12 @@ protected:
  */
 
 using FancyMap = absl::flat_hash_map<std::string, std::shared_ptr<spdlog::logger>>;
+using FancyMapPtr = std::shared_ptr<FancyMap>;
+using SpdLoggerPtr = std::shared_ptr<spdlog::logger>;
 
 extern absl::Mutex fancy_log_lock__;
 
-extern std::shared_ptr<FancyMap> getFancyLogMap();
+extern FancyMapPtr getFancyLogMap();
 
 extern void setFancyLogger(std::string key, spdlog::level::level_enum log_level);
 

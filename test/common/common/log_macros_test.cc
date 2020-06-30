@@ -176,7 +176,7 @@ TEST(Fancy, FastPath) {
   }
 }
 
-void* logThread(void* id) {
+void* logThreadForTest(void* id) {
   int tid = *static_cast<int*>(id);
 
   if (tid == 0) {
@@ -217,7 +217,7 @@ TEST(FANCY, Threads) {
   pthread_t threads[3];
   std::vector<int> range = {0, 1, 2};
   for (int id : range) {
-    int rc = pthread_create(&threads[id], nullptr, logThread, static_cast<void*>(&range[id]));
+    int rc = pthread_create(&threads[id], nullptr, logThreadForTest, static_cast<void*>(&range[id]));
     EXPECT_EQ(rc, 0);
   }
   for (int id : range) {

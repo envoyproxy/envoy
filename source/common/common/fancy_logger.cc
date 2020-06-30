@@ -23,17 +23,12 @@ absl::Mutex fancy_log_lock__;
 /**
  * Global hash map <unit, log info>, where unit can be file, function or line.
  */
-std::shared_ptr<FancyMap> getFancyLogMap() {
-  static std::shared_ptr<FancyMap> fancy_log_map = std::make_shared<FancyMap>();
+FancyMapPtr getFancyLogMap() ABSL_EXCLUSIVE_LOCKS_REQUIRED(fancy_log_lock__) {
+  static FancyMapPtr fancy_log_map = std::make_shared<FancyMap>();
   return fancy_log_map;
 }
 
 const char* LOG_PATTERN = "[%Y-%m-%d %T.%e][%t][%l][%n] %v";
-
-spdlog::sink_ptr getSink() {
-  static spdlog::sink_ptr sink = Logger::DelegatingLogSink::init();
-  return sink;
-}
 
 /**
  * Implementation of BasicLockable by Jinhui Song, to avoid dependency
@@ -49,6 +44,14 @@ public:
 private:
   absl::Mutex mutex_;
 };
+
+namespace {
+
+spdlog::sink_ptr getSink() {
+  static spdlog::sink_ptr sink = Logger::DelegatingLogSink::init();
+  return sink;
+}
+
 
 /**
  * Initialize sink for the initialization of loggers, once and for all.
@@ -67,14 +70,17 @@ void initSink() {
 /**
  * Create a logger and add it to map.
  */
-spdlog::logger* createLogger(std::string key, level_enum level = level_enum::info) {
-  std::shared_ptr<spdlog::logger> new_logger = std::make_shared<spdlog::logger>(key, getSink());
+spdlog::logger* createLogger(std::string key, level_enum level = level_enum::info)
+    ABSL_EXCLUSIVE_LOCKS_REQUIRED(fancy_log_lock__) {
+  SpdLoggerPtr new_logger = std::make_shared<spdlog::logger>(key, getSink());
   new_logger->set_level(level);
   new_logger->set_pattern(LOG_PATTERN);
   new_logger->flush_on(level_enum::critical);
   getFancyLogMap()->insert(std::make_pair(key, new_logger));
   return new_logger.get();
 }
+
+}   // namespace
 
 /**
  * Initialize Fancy Logger and register it in global map if not done.
