@@ -149,6 +149,10 @@ Stats::TextReadoutSharedPtr TestUtility::findTextReadout(Stats::Store& store,
 
 void TestUtility::waitForCounterEq(Stats::Store& store, const std::string& name, uint64_t value,
                                    Event::TestTimeSystem& time_system) {
+  ENVOY_LOG_MISC(error, "here");
+  for (auto counter : store.counters()) {
+    std::cout << counter->name() << " " << counter->value() << std::endl;
+  }
   while (findCounter(store, name) == nullptr || findCounter(store, name)->value() != value) {
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
   }
