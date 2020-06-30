@@ -354,6 +354,23 @@ TEST(HeaderStringTest, All) {
   }
 }
 
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    custom_header_1(Http::LowerCaseString{"foo_custom_header"});
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    custom_header_1_copy(Http::LowerCaseString{"foo_custom_header"});
+
+// Make sure that the same header registered twice points to the same location.
+TEST(HeaderMapImplTest, CustomRegisteredHeaders) {
+  TestRequestHeaderMapImpl headers;
+  EXPECT_EQ(custom_header_1.handle(), custom_header_1_copy.handle());
+  EXPECT_EQ(nullptr, headers.getInline(custom_header_1.handle()));
+  EXPECT_EQ(nullptr, headers.getInline(custom_header_1_copy.handle()));
+  headers.setInline(custom_header_1.handle(), 42);
+  EXPECT_EQ("42", headers.getInlineValue(custom_header_1_copy.handle()));
+  EXPECT_EQ("foo_custom_header",
+            headers.getInline(custom_header_1.handle())->key().getStringView());
+}
+
 #define TEST_INLINE_HEADER_FUNCS(name)                                                             \
   header_map->addCopy(Headers::get().name, #name);                                                 \
   EXPECT_EQ(header_map->name()->value().getStringView(), #name);                                   \
