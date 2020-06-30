@@ -5,7 +5,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-
 namespace Envoy {
 namespace Server {
 

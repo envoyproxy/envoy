@@ -1,4 +1,7 @@
 #pragma once
+
+// NOLINT(namespace-envoy)
+
 #include "admin.h"
 #include "admin_stream.h"
 #include "bootstrap_extension_factory.h"
