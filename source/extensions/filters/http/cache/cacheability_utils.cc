@@ -16,7 +16,7 @@ Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::Respons
 // https://tools.ietf.org/html/rfc7231#section-6.1,
 // https://tools.ietf.org/html/rfc7538#section-3,
 // https://tools.ietf.org/html/rfc7725#section-3
-// TODO: the list of cacheable status codes should be configurable
+// TODO(yosrym93): the list of cacheable status codes should be configurable
 const absl::flat_hash_set<absl::string_view> CacheabilityUtils::cacheable_status_codes_ = {
     "200", "203", "204", "206", "300", "301", "308", "404", "405", "410", "414", "451", "501"};
 
@@ -40,7 +40,7 @@ bool CacheabilityUtils::isCacheableResponse(const Http::ResponseHeaderMap& heade
   // Only cache responses with explicit validation data, either:
   //    max-age or s-maxage cache-control directives with date header
   //    expires header
-  // TODO: If the response has no date header inject date metadata
+  // TODO(yosrym93): If the response has no date header inject date metadata
   bool has_validation_data = (headers.Date() && response_cache_control.max_age.has_value()) ||
                              headers.get(Http::Headers::get().Expires);
 

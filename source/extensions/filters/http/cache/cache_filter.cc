@@ -84,7 +84,7 @@ Http::FilterDataStatus CacheFilter::encodeData(Buffer::Instance& data, bool end_
 }
 
 void CacheFilter::onHeaders(LookupResult&& result) {
-  // TODO: Handle request only-if-cached directive
+  // TODO(yosrym93): Handle request only-if-cached directive
   switch (result.cache_entry_status_) {
   case CacheEntryStatus::FoundNotModified:
   case CacheEntryStatus::UnsatisfiableRange:
@@ -92,7 +92,7 @@ void CacheFilter::onHeaders(LookupResult&& result) {
   case CacheEntryStatus::RequiresValidation:
     // Cache entries that require validation are treated as unusable entries
     // until validation is implemented
-    // TODO: Implement response validation
+    // TODO(yosrym93): Implement response validation
   case CacheEntryStatus::Unusable:
     if (state_ == GetHeadersState::FinishedGetHeadersCall) {
       // decodeHeader returned Http::FilterHeadersStatus::StopAllIterationAndWatermark--restart it
