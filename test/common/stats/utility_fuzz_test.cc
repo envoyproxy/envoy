@@ -53,7 +53,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
       Stats::Utility::counterFromStatNames(*scope, {});
       Stats::Utility::counterFromElements(*scope, {});
     } else {
-      // add ranndom length string in each loop
+      // add random length string in each loop
       while (provider.remaining_bytes() > 3) {
         if (provider.ConsumeBool()) {
           if (provider.ConsumeBool()) {
