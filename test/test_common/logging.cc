@@ -2,8 +2,6 @@
 
 #include "common/common/assert.h"
 
-#include "absl/synchronization/mutex.h"
-
 namespace Envoy {
 
 LogLevelSetter::LogLevelSetter(spdlog::level::level_enum log_level) {
@@ -29,8 +27,6 @@ LogRecordingSink::~LogRecordingSink() = default;
 
 void LogRecordingSink::log(absl::string_view msg) {
   previous_delegate()->log(msg);
-
-  absl::MutexLock ml(&mtx_);
   messages_.push_back(std::string(msg));
 }
 

@@ -155,11 +155,9 @@ protected:
   }
 
   const Type type_;
-  // The order of host_, connection_, and codec_ matter as during destruction each can refer to
-  // the previous, at least in tests.
-  Upstream::HostDescriptionConstSharedPtr host_;
-  Network::ClientConnectionPtr connection_;
   ClientConnectionPtr codec_;
+  Network::ClientConnectionPtr connection_;
+  Upstream::HostDescriptionConstSharedPtr host_;
   Event::TimerPtr idle_timer_;
   const absl::optional<std::chrono::milliseconds> idle_timeout_;
 

@@ -72,7 +72,5 @@ UdsListenSocket::UdsListenSocket(IoHandlePtr&& io_handle,
                                  const Address::InstanceConstSharedPtr& address)
     : ListenSocketImpl(std::move(io_handle), address) {}
 
-std::atomic<uint64_t> AcceptedSocketImpl::global_accepted_socket_count_;
-
 } // namespace Network
 } // namespace Envoy

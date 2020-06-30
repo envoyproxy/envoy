@@ -61,14 +61,13 @@ private:
       remaining_.set(max);
     }
 
-    ~ManagedResourceImpl() override { ASSERT(count() == 0); }
-
+    // Upstream::Resource
+    bool canCreate() override { return current_ < max(); }
     void inc() override {
       BasicResourceLimitImpl::inc();
       updateRemaining();
       open_gauge_.set(BasicResourceLimitImpl::canCreate() ? 0 : 1);
     }
-
     void decBy(uint64_t amount) override {
       BasicResourceLimitImpl::decBy(amount);
       updateRemaining();

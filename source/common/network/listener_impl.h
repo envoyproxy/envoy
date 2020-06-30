@@ -1,8 +1,5 @@
 #pragma once
 
-#include "envoy/runtime/runtime.h"
-
-#include "absl/strings/string_view.h"
 #include "base_listener_impl.h"
 
 namespace Envoy {
@@ -20,8 +17,6 @@ public:
   void disable() override;
   void enable() override;
 
-  static const absl::string_view GlobalMaxCxRuntimeKey;
-
 protected:
   void setupServerSocket(Event::DispatcherImpl& dispatcher, Socket& socket);
 
@@ -31,10 +26,6 @@ private:
   static void listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr* remote_addr,
                              int remote_addr_len, void* arg);
   static void errorCallback(evconnlistener* listener, void* context);
-
-  // Returns true if global connection limit has been reached and the accepted socket should be
-  // rejected/closed. If the accepted socket is to be admitted, false is returned.
-  static bool rejectCxOverGlobalLimit();
 
   Event::Libevent::ListenerPtr listener_;
 };
