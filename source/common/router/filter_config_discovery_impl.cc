@@ -11,9 +11,14 @@ namespace Envoy {
 namespace Router {
 
 DynamicFilterConfigProviderImpl::DynamicFilterConfigProviderImpl(
-    FilterConfigSubscriptionSharedPtr&& subscription,
+    FilterConfigSubscriptionSharedPtr&& subscription, bool require_terminal,
     Server::Configuration::FactoryContext& factory_context)
-    : subscription_(std::move(subscription)), tls_(factory_context.threadLocal().allocateSlot()) {
+    : subscription_(std::move(subscription)), require_terminal_(require_terminal),
+      tls_(factory_context.threadLocal().allocateSlot()),
+      init_target_("DynamicFilterConfigProviderImpl", [this]() {
+        subscription_->start();
+        init_target_.ready();
+      }) {
   subscription_->filter_config_providers_.insert(this);
   tls_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<ThreadLocalConfig>();
@@ -28,6 +33,17 @@ const std::string& DynamicFilterConfigProviderImpl::name() { return subscription
 
 absl::optional<Http::FilterFactoryCb> DynamicFilterConfigProviderImpl::config() {
   return tls_->getTyped<ThreadLocalConfig>().config_;
+}
+
+void DynamicFilterConfigProviderImpl::validateConfig(
+    Server::Configuration::NamedHttpFilterConfigFactory& factory) {
+  if (factory.isTerminalFilter() && !require_terminal_) {
+    throw EnvoyException(
+        fmt::format("Error: filter config {} must not be the last in the filter chain", name()));
+  } else if (!factory.isTerminalFilter() && require_terminal_) {
+    throw EnvoyException(
+        fmt::format("Error: filter config {} must be the last in the filter chain", name()));
+  }
 }
 
 void DynamicFilterConfigProviderImpl::onConfigUpdate(Http::FilterFactoryCb config,
@@ -56,19 +72,25 @@ FilterConfigSubscription::FilterConfigSubscription(
           [this]() { parent_init_target_.ready(); }),
       local_init_target_(
           fmt::format("FilterConfigSubscription local-init-target {}", filter_config_name_),
-          [this]() { subscription_->start({filter_config_name_}); }),
+          [this]() { start(); }),
       local_init_manager_(
           fmt::format("FilterConfigSubscription local-init-manager {}", filter_config_name_)),
       scope_(factory_context.scope().createScope(stat_prefix + "filter_config_discovery." +
                                                  filter_config_name_ + ".")),
       stat_prefix_(stat_prefix), filter_config_provider_manager_(filter_config_provider_manager),
       subscription_id_(subscription_id) {
-  // stats_({ALL_RDS_STATS(POOL_COUNTER(*scope_))})
   const auto resource_name = getResourceName();
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           config_source, Grpc::Common::typeUrl(resource_name), *scope_, *this);
   local_init_manager_.add(local_init_target_);
+}
+
+void FilterConfigSubscription::start() {
+  if (!started_) {
+    started_ = true;
+    subscription_->start({filter_config_name_});
+  }
 }
 
 void FilterConfigSubscription::onConfigUpdate(
@@ -90,6 +112,10 @@ void FilterConfigSubscription::onConfigUpdate(
   }
   auto& factory = Envoy::Config::Utility::getAndCheckFactory<
       Server::Configuration::NamedHttpFilterConfigFactory>(filter_config);
+  // Ensure that the factory is valid in the filter chain context.
+  for (auto* provider : filter_config_providers_) {
+    provider->validateConfig(factory);
+  }
   ProtobufTypes::MessagePtr message = Envoy::Config::Utility::translateAnyToFactoryConfig(
       filter_config.typed_config(), validator_, factory);
   Http::FilterFactoryCb factory_callback =
@@ -140,7 +166,6 @@ std::shared_ptr<FilterConfigSubscription> FilterConfigProviderManagerImpl::getSu
   if (it == subscriptions_.end()) {
     auto subscription = std::make_shared<FilterConfigSubscription>(
         config_source, name, factory_context, stat_prefix, *this, subscription_id);
-    std::cout << "made subscription" << std::endl;
     subscriptions_.insert({subscription_id, std::weak_ptr<FilterConfigSubscription>(subscription)});
     return subscription;
   } else {
@@ -153,13 +178,21 @@ std::shared_ptr<FilterConfigSubscription> FilterConfigProviderManagerImpl::getSu
 
 FilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFilterConfigProvider(
     const envoy::config::core::v3::ConfigSource& config_source,
-    const std::string& filter_config_name, Server::Configuration::FactoryContext& factory_context,
-    const std::string& stat_prefix) {
+    const std::string& filter_config_name, bool require_terminal,
+    Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
+    bool apply_without_warming) {
   auto subscription =
       getSubscription(config_source, filter_config_name, factory_context, stat_prefix);
-  factory_context.initManager().add(subscription->initTarget());
-  return std::make_unique<DynamicFilterConfigProviderImpl>(std::move(subscription),
-                                                           factory_context);
+  if (!apply_without_warming) {
+    factory_context.initManager().add(subscription->initTarget());
+  }
+  auto provider = std::make_unique<DynamicFilterConfigProviderImpl>(
+      std::move(subscription), require_terminal, factory_context);
+  // Ensure the subscription starts if it has not already.
+  if (apply_without_warming) {
+    factory_context.initManager().add(provider->init_target_);
+  }
+  return provider;
 }
 
 } // namespace Router

@@ -234,27 +234,36 @@ public:
    */
   template <class Factory, class ProtoMessage>
   static Factory& getAndCheckFactory(const ProtoMessage& message) {
-    const ProtobufWkt::Any& typed_config = message.typed_config();
-    static const std::string& typed_struct_type =
-        udpa::type::v1::TypedStruct::default_instance().GetDescriptor()->full_name();
-
-    if (!typed_config.type_url().empty()) {
-      // Unpack methods will only use the fully qualified type name after the last '/'.
-      // https://github.com/protocolbuffers/protobuf/blob/3.6.x/src/google/protobuf/any.proto#L87
-      auto type = std::string(TypeUtil::typeUrlToDescriptorFullName(typed_config.type_url()));
-      if (type == typed_struct_type) {
-        udpa::type::v1::TypedStruct typed_struct;
-        MessageUtil::unpackTo(typed_config, typed_struct);
-        // Not handling nested structs or typed structs in typed structs
-        type = std::string(TypeUtil::typeUrlToDescriptorFullName(typed_struct.type_url()));
-      }
-      Factory* factory = Registry::FactoryRegistry<Factory>::getFactoryByType(type);
-      if (factory != nullptr) {
-        return *factory;
-      }
+    Factory* factory = Utility::getFactoryByType<Factory>(message.typed_config());
+    if (factory != nullptr) {
+      return *factory;
     }
 
     return Utility::getAndCheckFactoryByName<Factory>(message.name());
+  }
+
+  /**
+   * Get a Factory from the registry by type URL.
+   * @param typed_config for the extension config.
+   */
+  template <class Factory> static Factory* getFactoryByType(const ProtobufWkt::Any& typed_config) {
+    static const std::string& typed_struct_type =
+        udpa::type::v1::TypedStruct::default_instance().GetDescriptor()->full_name();
+
+    if (typed_config.type_url().empty()) {
+      return nullptr;
+    }
+
+    // Unpack methods will only use the fully qualified type name after the last '/'.
+    // https://github.com/protocolbuffers/protobuf/blob/3.6.x/src/google/protobuf/any.proto#L87
+    auto type = std::string(TypeUtil::typeUrlToDescriptorFullName(typed_config.type_url()));
+    if (type == typed_struct_type) {
+      udpa::type::v1::TypedStruct typed_struct;
+      MessageUtil::unpackTo(typed_config, typed_struct);
+      // Not handling nested structs or typed structs in typed structs
+      type = std::string(TypeUtil::typeUrlToDescriptorFullName(typed_struct.type_url()));
+    }
+    return Registry::FactoryRegistry<Factory>::getFactoryByType(type);
   }
 
   /**

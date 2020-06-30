@@ -488,11 +488,38 @@ void HttpConnectionManagerConfig::processFilter(
   switch (proto_config.config_type_case()) {
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter::
       ConfigTypeCase::kFilterConfigDs: {
+    const auto& filter_config_ds = proto_config.filter_config_ds();
     ENVOY_LOG(debug, "      discovery: {}",
-              MessageUtil::getJsonStringFromMessage(proto_config.filter_config_ds()));
+              MessageUtil::getJsonStringFromMessage(filter_config_ds));
+    if (filter_config_ds.apply_default_config_without_warming() &&
+        !filter_config_ds.has_default_config()) {
+      throw EnvoyException(
+          fmt::format("Error: filter config {} applied without warming but has no default config",
+                      proto_config.name()));
+    }
     auto filter_config_provider = filter_config_provider_manager_.createDynamicFilterConfigProvider(
-        proto_config.filter_config_ds().config_source(), proto_config.name(), context_,
-        stats_prefix_);
+        proto_config.filter_config_ds().config_source(), proto_config.name(),
+        last_filter_in_current_config, context_, stats_prefix_,
+        filter_config_ds.apply_default_config_without_warming());
+    if (filter_config_ds.has_default_config()) {
+      auto* default_factory =
+          Config::Utility::getFactoryByType<Server::Configuration::NamedHttpFilterConfigFactory>(
+              filter_config_ds.default_config());
+      if (default_factory == nullptr) {
+        throw EnvoyException(fmt::format("Error: cannot find filter factory {} for default filter "
+                                         "configuration with type URL {}.",
+                                         proto_config.name(),
+                                         filter_config_ds.default_config().type_url()));
+      }
+      ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+          filter_config_ds.default_config(), context_.messageValidationVisitor(), *default_factory);
+      Http::FilterFactoryCb default_config =
+          default_factory->createFilterFactoryFromProto(*message, stats_prefix_, context_);
+      Config::Utility::validateTerminalFilters(
+          proto_config.name(), default_factory->name(), filter_chain_type,
+          default_factory->isTerminalFilter(), last_filter_in_current_config);
+      filter_config_provider->onConfigUpdate(default_config, "");
+    }
     filter_factories.push_back(std::move(filter_config_provider));
     break;
   }

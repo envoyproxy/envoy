@@ -30,15 +30,14 @@ using FilterConfigSubscriptionSharedPtr = std::shared_ptr<FilterConfigSubscripti
 class DynamicFilterConfigProviderImpl : public FilterConfigProvider {
 public:
   DynamicFilterConfigProviderImpl(FilterConfigSubscriptionSharedPtr&& subscription,
+                                  bool require_terminal,
                                   Server::Configuration::FactoryContext& factory_context);
   ~DynamicFilterConfigProviderImpl() override;
 
   // Router::FilterConfigProvider
   const std::string& name() override;
   absl::optional<Http::FilterFactoryCb> config() override;
-  void validateConfig(
-      ABSL_ATTRIBUTE_UNUSED Server::Configuration::NamedHttpFilterConfigFactory& factory) override {
-  }
+  void validateConfig(Server::Configuration::NamedHttpFilterConfigFactory& factory) override;
   void onConfigUpdate(Http::FilterFactoryCb config, const std::string&) override;
 
 private:
@@ -48,7 +47,12 @@ private:
   };
 
   FilterConfigSubscriptionSharedPtr subscription_;
+  const bool require_terminal_;
   ThreadLocal::SlotPtr tls_;
+
+  // Local initialization target to ensure that the subscription starts in
+  // case no warming is requested by any other filter config provider.
+  Init::TargetImpl init_target_;
 
   friend class FilterConfigProviderManagerImpl;
 };
@@ -75,6 +79,8 @@ public:
   const std::string& name() { return filter_config_name_; }
 
 private:
+  void start();
+
   // Config::SubscriptionCallbacks
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                       const std::string& version_info) override;
@@ -100,6 +106,7 @@ private:
   Init::WatcherImpl local_init_watcher_;
   Init::TargetImpl local_init_target_;
   Init::ManagerImpl local_init_manager_;
+  bool started_{false};
 
   Stats::ScopePtr scope_;
   const std::string stat_prefix_;
@@ -143,9 +150,10 @@ public:
 
   FilterConfigProviderPtr
   createDynamicFilterConfigProvider(const envoy::config::core::v3::ConfigSource& config_source,
-                                    const std::string& filter_config_name,
+                                    const std::string& filter_config_name, bool require_terminal,
                                     Server::Configuration::FactoryContext& factory_context,
-                                    const std::string& stat_prefix) override;
+                                    const std::string& stat_prefix,
+                                    bool apply_without_warming) override;
 
   FilterConfigProviderPtr
   createStaticFilterConfigProvider(const Http::FilterFactoryCb& config,
