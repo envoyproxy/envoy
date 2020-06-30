@@ -81,7 +81,7 @@ TEST_F(CdsApiImplTest, UpdateVersionOnClusterRemove) {
   const std::string response1_yaml = R"EOF(
 version_info: '0'
 resources:
-- "@type": type.googleapis.com/envoy.api.v2.Cluster
+- "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
   name: cluster1
   type: EDS
   eds_cluster_config:
@@ -252,13 +252,13 @@ TEST_F(CdsApiImplTest, Basic) {
   const std::string response1_yaml = R"EOF(
 version_info: '0'
 resources:
-- "@type": type.googleapis.com/envoy.api.v2.Cluster
+- "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
   name: cluster1
   type: EDS
   eds_cluster_config:
     eds_config:
       path: eds path
-- "@type": type.googleapis.com/envoy.api.v2.Cluster
+- "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
   name: cluster2
   type: EDS
   eds_cluster_config:
@@ -281,13 +281,13 @@ resources:
   const std::string response2_yaml = R"EOF(
 version_info: '1'
 resources:
-- "@type": type.googleapis.com/envoy.api.v2.Cluster
+- "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
   name: cluster1
   type: EDS
   eds_cluster_config:
     eds_config:
       path: eds path
-- "@type": type.googleapis.com/envoy.api.v2.Cluster
+- "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
   name: cluster3
   type: EDS
   eds_cluster_config:
@@ -306,6 +306,40 @@ resources:
   cds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info());
 
   EXPECT_EQ("1", cds_->versionInfo());
+}
+
+// Validate behavior when the config is delivered but it fails PGV validation.
+TEST_F(CdsApiImplTest, FailureInvalidConfig) {
+  InSequence s;
+
+  setup();
+
+  const std::string response1_yaml = R"EOF(
+version_info: '0'
+resources:
+- "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
+  name: cluster1
+  type: EDS
+  eds_cluster_config:
+    eds_config:
+      path: eds path
+- "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
+  name: cluster1
+  type: EDS
+  eds_cluster_config:
+    eds_config:
+      path: eds path
+)EOF";
+  auto response1 =
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response1_yaml);
+
+  EXPECT_CALL(cm_, clusters()).WillRepeatedly(Return(cluster_map_));
+  EXPECT_CALL(initialized_, ready());
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::cluster::v3::Cluster>(response1);
+  EXPECT_THROW(cds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()),
+               EnvoyException);
+  EXPECT_EQ("", cds_->versionInfo());
 }
 
 // Validate behavior when the config fails delivery at the subscription level.

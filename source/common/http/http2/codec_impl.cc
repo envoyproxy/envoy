@@ -29,23 +29,23 @@ namespace Http2 {
 class Http2ResponseCodeDetailValues {
   // Invalid HTTP header field was received and stream is going to be
   // closed.
-  const absl::string_view NgHttp2ErrHttpHeader = "http2.invalid.header.field";
+  const absl::string_view ng_http2_err_http_header_ = "http2.invalid.header.field";
 
   // Violation in HTTP messaging rule.
-  const absl::string_view NgHttp2ErrHttpMessaging = "http2.violation.of.messaging.rule";
+  const absl::string_view ng_http2_err_http_messaging_ = "http2.violation.of.messaging.rule";
 
   // none of the above
-  const absl::string_view NgHttp2ErrUnknown = "http2.unknown.nghttp2.error";
+  const absl::string_view ng_http2_err_unknown_ = "http2.unknown.nghttp2.error";
 
 public:
-  const absl::string_view strerror(int error_code) const {
+  const absl::string_view errorDetails(int error_code) const {
     switch (error_code) {
     case NGHTTP2_ERR_HTTP_HEADER:
-      return NgHttp2ErrHttpHeader;
+      return ng_http2_err_http_header_;
     case NGHTTP2_ERR_HTTP_MESSAGING:
-      return NgHttp2ErrHttpMessaging;
+      return ng_http2_err_http_messaging_;
     default:
-      return NgHttp2ErrUnknown;
+      return ng_http2_err_unknown_;
     }
   }
 };
@@ -720,7 +720,7 @@ int ConnectionImpl::onInvalidFrame(int32_t stream_id, int error_code) {
   // Set details of error_code in the stream whenever we have one.
   StreamImpl* stream = getStream(stream_id);
   if (stream != nullptr) {
-    stream->setDetails(Http2ResponseCodeDetails::get().strerror(error_code));
+    stream->setDetails(Http2ResponseCodeDetails::get().errorDetails(error_code));
   }
 
   if (error_code == NGHTTP2_ERR_HTTP_HEADER || error_code == NGHTTP2_ERR_HTTP_MESSAGING) {
