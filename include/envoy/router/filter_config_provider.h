@@ -22,21 +22,21 @@ public:
   virtual const std::string& name() PURE;
 
   /**
-   * @return Http::FilterFctoryCb a filter config to be instantiated on the subsequent streams. Note
+   * @return Http::FilterFactoryCb a filter config to be instantiated on the subsequent streams. Note
    * that if the provider has not yet performed an initial configuration load and no default is
    * provided, no information will be returned.
    */
   virtual absl::optional<Http::FilterFactoryCb> config() PURE;
 
   /**
-   * Validate if the route configuration can be applied to the context of the filter manager.
+   * Validate if the route configuration can be applied in the context of the filter manager.
    * @param Server::Configuration::NamedHttpFilterConfigFactory a filter factory to validate in the
    * context of the filter manager filter chains.
    */
   virtual void validateConfig(Server::Configuration::NamedHttpFilterConfigFactory& factory) PURE;
 
   /**
-   * Callback used to notify provider about configuration changes.
+   * Update the provider about the configuration changes.
    * @param config is a filter factory to be used on the subsequent streams.
    * @param version_info is the version of the new filter configuration.
    */
