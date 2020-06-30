@@ -284,7 +284,7 @@ void ServerConnectionImpl::maybeAddSentinelBufferFragment(Buffer::WatermarkBuffe
   outbound_responses_++;
 }
 
-Status ServerConnectionImpl::doFloodProtectionChecks() {
+Status ServerConnectionImpl::doFloodProtectionChecks() const {
   ASSERT(dispatching_);
   if (!flood_protection_) {
     return okStatus();
@@ -378,7 +378,6 @@ void ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers, bool e
 static const char REQUEST_POSTFIX[] = " HTTP/1.1\r\n";
 
 void RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool end_stream) {
-  ASSERT(!dispatching_);
   const HeaderEntry* method = headers.Method();
   const HeaderEntry* path = headers.Path();
   const HeaderEntry* host = headers.Host();
