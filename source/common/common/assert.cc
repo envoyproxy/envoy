@@ -35,9 +35,6 @@ ActionRegistrationPtr setDebugAssertionFailureRecordAction(const std::function<v
 }
 
 void invokeDebugAssertionFailureRecordAction_ForAssertMacroUseOnly() {
-  std::pair<int, int> test_pair = {5, 3};
-  auto& [key, val] = test_pair;
-  key = key + val;
   ActionRegistrationImpl::invokeAction();
 }
 

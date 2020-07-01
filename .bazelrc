@@ -105,10 +105,8 @@ build:libc++ --action_env=BAZEL_CXXOPTS=-stdlib=libc++
 build:libc++ --action_env=BAZEL_LINKLIBS=-l%:libc++.a:-l%:libc++abi.a:-lm
 build:libc++ --define force_libcpp=enabled
 
-
 # Optimize build for binary size reduction.
 build:sizeopt -c opt --copt -Os
-
 
 # Test options
 build --test_env=HEAPCHECK=normal --test_env=PPROF_PATH
@@ -194,7 +192,6 @@ build:docker-sandbox --strategy=Genrule=docker
 build:docker-sandbox --define=EXECUTOR=remote
 build:docker-sandbox --experimental_docker_verbose
 build:docker-sandbox --experimental_enable_docker_sandbox
-
 
 build:docker-clang --config=docker-sandbox
 build:docker-clang --config=rbe-toolchain-clang
