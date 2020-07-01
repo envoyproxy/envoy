@@ -4,6 +4,7 @@
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/thread_local/thread_local.h"
+#include "envoy/upstream/resource_manager.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -42,6 +43,32 @@ public:
 };
 
 using DnsHostInfoSharedPtr = std::shared_ptr<DnsHostInfo>;
+
+#define ALL_DNS_CACHE_CIRCUIT_BREAKERS_STATS(OPEN_GAUGE, REMAINING_GAUGE)                          \
+  OPEN_GAUGE(rq_pending_open, Accumulate)                                                          \
+  REMAINING_GAUGE(rq_pending_remaining, Accumulate)
+
+struct DnsCacheCircuitBreakersStats {
+  ALL_DNS_CACHE_CIRCUIT_BREAKERS_STATS(GENERATE_GAUGE_STRUCT, GENERATE_GAUGE_STRUCT)
+};
+
+/**
+ * A resource manager of DNS Cache.
+ */
+class DnsCacheResourceManager {
+public:
+  virtual ~DnsCacheResourceManager() = default;
+
+  /**
+   * Returns the resource limit of pending requests to DNS.
+   */
+  virtual ResourceLimit& pendingRequests() PURE;
+
+  /**
+   * Returns the reference of stats for dns cache circuit breakers.
+   */
+  virtual DnsCacheCircuitBreakersStats& stats() PURE;
+};
 
 /**
  * A cache of DNS hosts. Hosts will re-resolve their addresses or be automatically purged
@@ -148,6 +175,15 @@ public:
    * @return all hosts currently stored in the cache.
    */
   virtual absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> hosts() PURE;
+
+  /**
+   * Check if a DNS request is allowed given resource limits.
+   * @param pending_request optional pending request resource limit. If no resource limit is
+   * provided the internal DNS cache limit is used.
+   * @return RAII handle for pending request circuit breaker if the request was allowed.
+   */
+  virtual Upstream::ResourceAutoIncDecPtr
+  canCreateDnsRequest(ResourceLimitOptRef pending_request) PURE;
 };
 
 using DnsCacheSharedPtr = std::shared_ptr<DnsCache>;
@@ -176,7 +212,7 @@ using DnsCacheManagerSharedPtr = std::shared_ptr<DnsCacheManager>;
 DnsCacheManagerSharedPtr getCacheManager(Singleton::Manager& manager,
                                          Event::Dispatcher& main_thread_dispatcher,
                                          ThreadLocal::SlotAllocator& tls,
-                                         Runtime::RandomGenerator& random,
+                                         Runtime::RandomGenerator& random, Runtime::Loader& loader,
                                          Stats::Scope& root_scope);
 
 /**

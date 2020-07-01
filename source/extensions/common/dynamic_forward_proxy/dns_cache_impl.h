@@ -2,12 +2,14 @@
 
 #include "envoy/common/backoff_strategy.h"
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
+#include "envoy/http/filter.h"
 #include "envoy/network/dns.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/cleanup.h"
 
 #include "extensions/common/dynamic_forward_proxy/dns_cache.h"
+#include "extensions/common/dynamic_forward_proxy/dns_cache_resource_manager.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -27,6 +29,7 @@ namespace DynamicForwardProxy {
   COUNTER(host_address_changed)                                                                    \
   COUNTER(host_overflow)                                                                           \
   COUNTER(host_removed)                                                                            \
+  COUNTER(dns_rq_pending_overflow)                                                                 \
   GAUGE(num_hosts, NeverImport)
 
 /**
@@ -39,15 +42,18 @@ struct DnsCacheStats {
 class DnsCacheImpl : public DnsCache, Logger::Loggable<Logger::Id::forward_proxy> {
 public:
   DnsCacheImpl(Event::Dispatcher& main_thread_dispatcher, ThreadLocal::SlotAllocator& tls,
-               Runtime::RandomGenerator& random, Stats::Scope& root_scope,
+               Runtime::RandomGenerator& random, Runtime::Loader& loader, Stats::Scope& root_scope,
                const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config);
   ~DnsCacheImpl() override;
+  static DnsCacheStats generateDnsCacheStats(Stats::Scope& scope);
 
   // DnsCache
   LoadDnsCacheEntryResult loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
                                             LoadDnsCacheEntryCallbacks& callbacks) override;
   AddUpdateCallbacksHandlePtr addUpdateCallbacks(UpdateCallbacks& callbacks) override;
   absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> hosts() override;
+  Upstream::ResourceAutoIncDecPtr
+  canCreateDnsRequest(ResourceLimitOptRef pending_requests) override;
 
 private:
   using TlsHostMap = absl::flat_hash_map<std::string, DnsHostInfoSharedPtr>;
@@ -138,6 +144,7 @@ private:
   DnsCacheStats stats_;
   std::list<AddUpdateCallbacksHandleImpl*> update_callbacks_;
   absl::flat_hash_map<std::string, PrimaryHostInfoPtr> primary_hosts_;
+  DnsCacheResourceManagerImpl resource_manager_;
   const std::chrono::milliseconds refresh_interval_;
   const BackOffStrategyPtr failure_backoff_strategy_;
   const std::chrono::milliseconds host_ttl_;

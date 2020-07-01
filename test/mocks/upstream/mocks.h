@@ -433,5 +433,19 @@ public:
     return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
   }
 };
+
+class MockBasicResourceLimit : public ResourceLimit {
+public:
+  MockBasicResourceLimit();
+  ~MockBasicResourceLimit() override;
+
+  MOCK_METHOD(bool, canCreate, ());
+  MOCK_METHOD(void, inc, ());
+  MOCK_METHOD(void, dec, ());
+  MOCK_METHOD(void, decBy, (uint64_t));
+  MOCK_METHOD(uint64_t, max, ());
+  MOCK_METHOD(uint64_t, count, (), (const));
+};
+
 } // namespace Upstream
 } // namespace Envoy

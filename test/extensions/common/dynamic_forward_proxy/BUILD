@@ -21,7 +21,23 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/common/dynamic_forward_proxy/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "dns_cache_resource_manager_test",
+    srcs = ["dns_cache_resource_manager_test.cc"],
+    deps = [
+        ":mocks",
+        "//source/common/config:utility_lib",
+        "//source/extensions/common/dynamic_forward_proxy:dns_cache_impl",
+        "//source/extensions/common/dynamic_forward_proxy:dns_cache_resource_manager",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/common/dynamic_forward_proxy/v3:pkg_cc_proto",
     ],
 )
@@ -31,7 +47,8 @@ envoy_cc_mock(
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
-        "//source/extensions/common/dynamic_forward_proxy:dns_cache_interface",
+        "//source/extensions/common/dynamic_forward_proxy:dns_cache_impl",
+        "//test/mocks/upstream:upstream_mocks",
         "@envoy_api//envoy/extensions/common/dynamic_forward_proxy/v3:pkg_cc_proto",
     ],
 )
