@@ -1,0 +1,74 @@
+#pragma once
+
+#include <string>
+
+#include "common/common/assert.h"
+
+#include "absl/strings/str_cat.h"
+
+#pragma GCC diagnostic push
+
+// QUICHE allows unused parameters.
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#include "quiche/quic/core/crypto/proof_source.h"
+#include "quiche/quic/core/quic_versions.h"
+#include "quiche/quic/core/crypto/crypto_protocol.h"
+#include "quiche/quic/platform/api/quic_reference_counted.h"
+#include "quiche/quic/platform/api/quic_socket_address.h"
+#include "quiche/common/platform/api/quiche_string_piece.h"
+#pragma GCC diagnostic pop
+
+#include "openssl/ssl.h"
+#include "envoy/network/filter.h"
+#include "server/backtrace.h"
+
+namespace Envoy {
+namespace Quic {
+
+// A partial implementation of quic::ProofSource which uses RSA cipher suite to sign in GetProof().
+// TODO(danzh) Rename it to EnvoyQuicProofSource once it's fully implemented.
+class EnvoyQuicProofSourceBase : public quic::ProofSource {
+public:
+  ~EnvoyQuicProofSourceBase() override = default;
+
+  // quic::ProofSource
+  // Returns a certs chain and its fake SCT "Fake timestamp" and TLS signature wrapped
+  // in QuicCryptoProof.
+  void GetProof(const quic::QuicSocketAddress& server_address,
+                const quic::QuicSocketAddress& client_address, const std::string& hostname,
+                const std::string& server_config, quic::QuicTransportVersion /*transport_version*/,
+                quiche::QuicheStringPiece chlo_hash,
+                std::unique_ptr<quic::ProofSource::Callback> callback) override;
+
+  TicketCrypter* GetTicketCrypter() override { return nullptr; }
+
+private:
+  // Used by GetProof() to get signature.
+  class SignatureCallback : public quic::ProofSource::SignatureCallback {
+  public:
+    // TODO(danzh) Pass in Details to retain the certs chain, and quic::ProofSource::Callback to be
+    // triggered in Run().
+    SignatureCallback(std::unique_ptr<quic::ProofSource::Callback> callback,
+                      quic::QuicReferenceCountedPointer<quic::ProofSource::Chain> chain)
+        : callback_(std::move(callback)), chain_(chain) {}
+
+    // quic::ProofSource::SignatureCallback
+    void Run(bool ok, std::string signature, std::unique_ptr<Details> details) override {
+      quic::QuicCryptoProof proof;
+      if (!ok) {
+        callback_->Run(false, chain_, proof, nullptr);
+        return;
+      }
+      proof.signature = signature;
+      proof.leaf_cert_scts = "Fake timestamp";
+      callback_->Run(true, chain_, proof, std::move(details));
+    }
+
+  private:
+    std::unique_ptr<quic::ProofSource::Callback> callback_;
+    quic::QuicReferenceCountedPointer<quic::ProofSource::Chain> chain_;
+  };
+};
+
+} // namespace Quic
+} // namespace Envoy

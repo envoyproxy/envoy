@@ -62,12 +62,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "envoy_quic_fake_proof_source_lib",
-    hdrs = ["envoy_quic_fake_proof_source.h"],
+    name = "envoy_quic_proof_source_base_lib",
+    srcs = ["envoy_quic_proof_source_base.cc"],
+    hdrs = ["envoy_quic_proof_source_base.h"],
     external_deps = ["quiche_quic_platform"],
     tags = ["nofips"],
     deps = [
+        "@com_googlesource_quiche//:quic_core_crypto_certificate_view_lib",
+        "@com_googlesource_quiche//:quic_core_crypto_crypto_handshake_lib",
         "@com_googlesource_quiche//:quic_core_crypto_proof_source_interface_lib",
+        "@com_googlesource_quiche//:quic_core_data_lib",
         "@com_googlesource_quiche//:quic_core_versions_lib",
     ],
 )
@@ -79,24 +83,39 @@ envoy_cc_library(
     external_deps = ["ssl"],
     tags = ["nofips"],
     deps = [
-        ":envoy_quic_fake_proof_source_lib",
+        ":envoy_quic_proof_source_base_lib",
         ":envoy_quic_utils_lib",
         ":quic_io_handle_wrapper_lib",
         ":quic_transport_socket_factory_lib",
         "//include/envoy/ssl:tls_certificate_config_interface",
         "//source/extensions/transport_sockets:well_known_names",
+        "//source/server:connection_handler_lib",
         "@com_googlesource_quiche//:quic_core_crypto_certificate_view_lib",
     ],
 )
 
 envoy_cc_library(
-    name = "envoy_quic_proof_verifier_lib",
-    hdrs = ["envoy_quic_fake_proof_verifier.h"],
+    name = "envoy_quic_proof_verifier_base_lib",
+    srcs = ["envoy_quic_proof_verifier_base.cc"],
+    hdrs = ["envoy_quic_proof_verifier_base.h"],
     external_deps = ["quiche_quic_platform"],
     tags = ["nofips"],
     deps = [
+        "@com_googlesource_quiche//:quic_core_crypto_certificate_view_lib",
         "@com_googlesource_quiche//:quic_core_crypto_crypto_handshake_lib",
         "@com_googlesource_quiche//:quic_core_versions_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "envoy_quic_proof_verifier_lib",
+    srcs = ["envoy_quic_proof_verifier.cc"],
+    hdrs = ["envoy_quic_proof_verifier.h"],
+    external_deps = ["quiche_quic_platform"],
+    tags = ["nofips"],
+    deps = [
+        ":envoy_quic_proof_verifier_base_lib",
+        "//source/extensions/transport_sockets/tls:context_lib",
     ],
 )
 
@@ -171,6 +190,7 @@ envoy_cc_library(
     ],
     tags = ["nofips"],
     deps = [
+        ":envoy_quic_crypto_server_stream_lib",
         ":envoy_quic_stream_lib",
         ":envoy_quic_utils_lib",
         ":quic_filter_manager_connection_lib",
@@ -341,5 +361,15 @@ envoy_cc_extension(
         "//source/extensions/transport_sockets:well_known_names",
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "envoy_quic_crypto_server_stream_lib",
+    hdrs = ["envoy_quic_crypto_server_stream.h"],
+    tags = ["nofips"],
+    deps = [
+        ":envoy_quic_proof_source_lib",
+        "@com_googlesource_quiche//:quic_core_http_spdy_session_lib",
     ],
 )

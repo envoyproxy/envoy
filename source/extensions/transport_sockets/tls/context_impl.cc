@@ -525,49 +525,51 @@ int ContextImpl::verifyCallback(X509_STORE_CTX* store_ctx, void* arg) {
   ContextImpl* impl = reinterpret_cast<ContextImpl*>(arg);
   SSL* ssl = reinterpret_cast<SSL*>(
       X509_STORE_CTX_get_ex_data(store_ctx, SSL_get_ex_data_X509_STORE_CTX_idx()));
-  Envoy::Ssl::SslExtendedSocketInfo* sslExtendedInfo =
+  return impl->doVerifyCertChain(
+      store_ctx,
       reinterpret_cast<Envoy::Ssl::SslExtendedSocketInfo*>(
-          SSL_get_ex_data(ssl, ContextImpl::sslExtendedSocketInfoIndex()));
+          SSL_get_ex_data(ssl, ContextImpl::sslExtendedSocketInfoIndex())),
+      bssl::UniquePtr<X509>(SSL_get_peer_certificate(ssl)),
+      static_cast<const Network::TransportSocketOptions*>(SSL_get_app_data(ssl)));
+}
 
-  if (impl->verify_trusted_ca_) {
+int ContextImpl::doVerifyCertChain(
+    X509_STORE_CTX* store_ctx, Ssl::SslExtendedSocketInfo* ssl_extended_info,
+    bssl::UniquePtr<X509> leaf_cert,
+    const Network::TransportSocketOptions* transport_socket_options) {
+  if (verify_trusted_ca_) {
     int ret = X509_verify_cert(store_ctx);
-    if (sslExtendedInfo) {
-      sslExtendedInfo->setCertificateValidationStatus(
+    if (ssl_extended_info) {
+      ssl_extended_info->setCertificateValidationStatus(
           ret == 1 ? Envoy::Ssl::ClientValidationStatus::Validated
                    : Envoy::Ssl::ClientValidationStatus::Failed);
     }
 
     if (ret <= 0) {
-      impl->stats_.fail_verify_error_.inc();
-      return impl->allow_untrusted_certificate_ ? 1 : ret;
+      stats_.fail_verify_error_.inc();
+      return allow_untrusted_certificate_ ? 1 : ret;
     }
   }
 
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
-
-  const Network::TransportSocketOptions* transport_socket_options =
-      static_cast<const Network::TransportSocketOptions*>(SSL_get_app_data(ssl));
-
-  Envoy::Ssl::ClientValidationStatus validated = impl->verifyCertificate(
-      cert.get(),
+  Envoy::Ssl::ClientValidationStatus validated = verifyCertificate(
+      leaf_cert.get(),
       transport_socket_options &&
               !transport_socket_options->verifySubjectAltNameListOverride().empty()
           ? transport_socket_options->verifySubjectAltNameListOverride()
-          : impl->verify_subject_alt_name_list_,
-      impl->subject_alt_name_matchers_);
+          : verify_subject_alt_name_list_,
+      subject_alt_name_matchers_);
 
-  if (sslExtendedInfo) {
-    if (sslExtendedInfo->certificateValidationStatus() ==
+  if (ssl_extended_info) {
+    if (ssl_extended_info->certificateValidationStatus() ==
         Envoy::Ssl::ClientValidationStatus::NotValidated) {
-      sslExtendedInfo->setCertificateValidationStatus(validated);
+      ssl_extended_info->setCertificateValidationStatus(validated);
     } else if (validated != Envoy::Ssl::ClientValidationStatus::NotValidated) {
-      sslExtendedInfo->setCertificateValidationStatus(validated);
+      ssl_extended_info->setCertificateValidationStatus(validated);
     }
   }
 
-  return impl->allow_untrusted_certificate_
-             ? 1
-             : (validated != Envoy::Ssl::ClientValidationStatus::Failed);
+  return allow_untrusted_certificate_ ? 1
+                                      : (validated != Envoy::Ssl::ClientValidationStatus::Failed);
 }
 
 Envoy::Ssl::ClientValidationStatus ContextImpl::verifyCertificate(
