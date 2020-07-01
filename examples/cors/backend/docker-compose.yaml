@@ -10,10 +10,10 @@ services:
     networks:
       - envoymesh
     expose:
-      - "80"
+      - "8000"
       - "8001"
     ports:
-      - "8002:80"
+      - "8002:8000"
       - "8003:8001"
 
   backend-service:
@@ -27,7 +27,7 @@ services:
         aliases:
           - backendservice
     expose:
-      - "80"
+      - "8000"
 
 networks:
   envoymesh: {}

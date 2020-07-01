@@ -17,7 +17,7 @@ namespace Http1 {
  *       address. Higher layer code should handle resolving DNS on error and creating a new pool
  *       bound to a different IP address.
  */
-class ConnPoolImpl : public Envoy::Http::ConnPoolImplBase {
+class ConnPoolImpl : public Http::HttpConnPoolImplBase {
 public:
   ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                Upstream::ResourcePriority priority,
@@ -30,7 +30,7 @@ public:
   Http::Protocol protocol() const override { return Http::Protocol::Http11; }
 
   // ConnPoolImplBase
-  ActiveClientPtr instantiateActiveClient() override;
+  Envoy::ConnectionPool::ActiveClientPtr instantiateActiveClient() override;
 
 protected:
   class ActiveClient;
@@ -71,7 +71,6 @@ protected:
     ConnPoolImpl& parent() { return static_cast<ConnPoolImpl&>(parent_); }
 
     // ConnPoolImplBase::ActiveClient
-    bool hasActiveRequests() const override;
     bool closingWithIncompleteRequest() const override;
     RequestEncoder& newStreamEncoder(ResponseDecoder& response_decoder) override;
 
@@ -81,7 +80,7 @@ protected:
   void onDownstreamReset(ActiveClient& client);
   void onResponseComplete(ActiveClient& client);
 
-  Event::TimerPtr upstream_ready_timer_;
+  Event::SchedulableCallbackPtr upstream_ready_cb_;
   bool upstream_ready_enabled_{false};
 };
 

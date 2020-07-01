@@ -15,6 +15,11 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Csrf {
 
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    origin_handle(Http::CustomHeaders::get().Origin);
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    referer_handle(Http::CustomHeaders::get().Referer);
+
 struct RcDetailsValues {
   const std::string OriginMismatch = "csrf_origin_mismatch";
 };
@@ -43,11 +48,11 @@ absl::string_view hostAndPort(const absl::string_view header) {
 }
 
 absl::string_view sourceOriginValue(const Http::RequestHeaderMap& headers) {
-  const absl::string_view origin = hostAndPort(headers.getOriginValue());
+  const absl::string_view origin = hostAndPort(headers.getInlineValue(origin_handle.handle()));
   if (origin != EMPTY_STRING) {
     return origin;
   }
-  return hostAndPort(headers.getRefererValue());
+  return hostAndPort(headers.getInlineValue(referer_handle.handle()));
 }
 
 absl::string_view targetOriginValue(const Http::RequestHeaderMap& headers) {

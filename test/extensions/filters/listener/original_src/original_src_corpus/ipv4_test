@@ -1,0 +1,7 @@
+config {
+  bind_port: true
+  mark: 0
+}
+
+address: "tcp://1.2.3.4:0"
+
