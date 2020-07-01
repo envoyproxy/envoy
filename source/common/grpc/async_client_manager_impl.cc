@@ -3,6 +3,7 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/stats/scope.h"
 
+#include "common/config/utility.h"
 #include "common/grpc/async_client_impl.h"
 
 #ifdef ENVOY_GOOGLE_GRPC
@@ -20,15 +21,8 @@ AsyncClientFactoryImpl::AsyncClientFactoryImpl(Upstream::ClusterManager& cm,
     return;
   }
 
-  const std::string& cluster_name = config.envoy_grpc().cluster_name();
-  auto clusters = cm_.clusters();
-  const auto& it = clusters.find(cluster_name);
-  if (it == clusters.end()) {
-    throw EnvoyException(fmt::format("Unknown gRPC client cluster '{}'", cluster_name));
-  }
-  if (it->second.get().info()->addedViaApi()) {
-    throw EnvoyException(fmt::format("gRPC client cluster '{}' is not static", cluster_name));
-  }
+  Config::Utility::checkCluster("gRPC async client", config.envoy_grpc().cluster_name(), cm_,
+                                false);
 }
 
 AsyncClientManagerImpl::AsyncClientManagerImpl(Upstream::ClusterManager& cm,

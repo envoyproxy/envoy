@@ -25,6 +25,8 @@ public:
         async_client_manager_(cm_, tls_, test_time_.timeSystem(), *api_, stat_names_) {}
 
   Upstream::MockClusterManager cm_;
+  Upstream::MockClusterInfo* mock_cluster_info_ = new NiceMock<Upstream::MockClusterInfo>();
+  Upstream::ClusterInfoConstSharedPtr cluster_info_ptr_{mock_cluster_info_};
   NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::MockStore scope_;
   DangerousDeprecatedTestTime test_time_;
@@ -37,13 +39,9 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcOk) {
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
 
-  Upstream::ClusterManager::ClusterInfoMap cluster_map;
-  Upstream::MockClusterMockPrioritySet cluster;
-  cluster_map.emplace("foo", cluster);
-  EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
-  EXPECT_CALL(cluster, info());
-  EXPECT_CALL(*cluster.info_, addedViaApi());
-
+  EXPECT_CALL(cm_, get("foo"));
+  EXPECT_CALL(cm_.thread_local_cluster_, info()).WillOnce(Return(cluster_info_ptr_));
+  EXPECT_CALL(*mock_cluster_info_, addedViaApi());
   async_client_manager_.factoryForGrpcService(grpc_service, scope_, false);
 }
 
@@ -51,25 +49,23 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcUnknown) {
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
 
-  EXPECT_CALL(cm_, clusters());
+  EXPECT_CALL(cm_, get("foo")).WillOnce(Return(nullptr));
   EXPECT_THROW_WITH_MESSAGE(
       async_client_manager_.factoryForGrpcService(grpc_service, scope_, false), EnvoyException,
-      "Unknown gRPC client cluster 'foo'");
+      "gRPC async client: unknown cluster 'foo'");
 }
 
 TEST_F(AsyncClientManagerImplTest, EnvoyGrpcDynamicCluster) {
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
 
-  Upstream::ClusterManager::ClusterInfoMap cluster_map;
-  Upstream::MockClusterMockPrioritySet cluster;
-  cluster_map.emplace("foo", cluster);
-  EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
-  EXPECT_CALL(cluster, info());
-  EXPECT_CALL(*cluster.info_, addedViaApi()).WillOnce(Return(true));
+  EXPECT_CALL(cm_, get("foo"));
+  EXPECT_CALL(cm_.thread_local_cluster_, info()).WillOnce(Return(cluster_info_ptr_));
+  EXPECT_CALL(*mock_cluster_info_, addedViaApi()).WillOnce(Return(true));
   EXPECT_THROW_WITH_MESSAGE(
       async_client_manager_.factoryForGrpcService(grpc_service, scope_, false), EnvoyException,
-      "gRPC client cluster 'foo' is not static");
+      "gRPC async client: invalid cluster 'foo': currently only static (non-CDS) clusters are "
+      "supported");
 }
 
 TEST_F(AsyncClientManagerImplTest, GoogleGrpc) {
