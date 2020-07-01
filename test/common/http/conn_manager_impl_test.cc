@@ -6078,7 +6078,7 @@ TEST_F(HttpConnectionManagerImplTest, UpstreamHeadersSize) {
   conn_manager_->onData(fake_input, false);
 
   EXPECT_EQ(Stats::Histogram::Unit::Bytes,
-            host_->cluster_.requestResponseSizeStats()->upstream_rq_headers_size_.unit());
+            host_->cluster_.requestResponseSizeStats()->get().upstream_rq_headers_size_.unit());
 }
 
 TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponseUsingHttp3) {

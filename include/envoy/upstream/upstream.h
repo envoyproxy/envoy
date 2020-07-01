@@ -663,12 +663,20 @@ struct ClusterRequestResponseSizeStats {
   ALL_CLUSTER_REQUEST_RESPONSE_SIZE_STATS(GENERATE_HISTOGRAM_STRUCT)
 };
 
+using ClusterRequestResponseSizePtr = std::unique_ptr<ClusterRequestResponseSizeStats>;
+using ClusterRequestResponseSizeOptRef =
+    absl::optional<std::reference_wrapper<ClusterRequestResponseSizeStats>>;
+
 /**
  * Struct definition for cluster timeout budget stats. @see stats_macros.h
  */
 struct ClusterTimeoutBudgetStats {
   ALL_CLUSTER_TIMEOUT_BUDGET_STATS(GENERATE_HISTOGRAM_STRUCT)
 };
+
+using ClusterTimeoutBudgetPtr = std::unique_ptr<ClusterTimeoutBudgetStats>;
+using ClusterTimeoutBudgetOptRef =
+    absl::optional<std::reference_wrapper<ClusterTimeoutBudgetStats>>;
 
 /**
  * All extension protocol specific options returned by the method at
@@ -864,17 +872,18 @@ public:
   virtual ClusterLoadReportStats& loadReportStats() const PURE;
 
   /**
-   * @return absl::optional<std::reference_wrapper<ClusterRequestResponseSizeStats>> stats to track headers/body sizes of
-   * request/response for this cluster.
+   * @return absl::optional<std::reference_wrapper<ClusterRequestResponseSizeStats>> stats to track
+   * headers/body sizes of request/response for this cluster.
    */
 
   virtual absl::optional<std::reference_wrapper<ClusterRequestResponseSizeStats>>
   requestResponseSizeStats() const PURE;
 
   /**
-   * @return absl::optional<std::reference_wrapper<ClusterTimeoutBudgetStats>> stats on timeout budgets for this cluster.
+   * @return absl::optional<std::reference_wrapper<ClusterTimeoutBudgetStats>> stats on timeout
+   * budgets for this cluster.
    */
-  
+
   virtual absl::optional<std::reference_wrapper<ClusterTimeoutBudgetStats>>
   timeoutBudgetStats() const PURE;
 

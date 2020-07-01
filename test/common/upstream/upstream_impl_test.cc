@@ -2260,7 +2260,7 @@ TEST_F(ClusterInfoImplTest, TestTrackRequestResponseSizes) {
   // The stats should be created.
   EXPECT_TRUE(cluster->info()->requestResponseSizeStats().has_value());
   EXPECT_EQ(Stats::Histogram::Unit::Bytes,
-            cluster->info()->requestResponseSizeStats()->upstream_rq_headers_size_.unit());
+            cluster->info()->requestResponseSizeStats()->get().upstream_rq_headers_size_.unit());
 }
 
 TEST_F(ClusterInfoImplTest, TestTrackRemainingResourcesGauges) {
@@ -2372,8 +2372,9 @@ TEST_F(ClusterInfoImplTest, TestTrackTimeoutBudgets) {
   cluster = makeCluster(yaml);
   // The stats should be created.
   EXPECT_TRUE(cluster->info()->timeoutBudgetStats().has_value());
-  EXPECT_EQ(Stats::Histogram::Unit::Unspecified,
-            cluster->info()->timeoutBudgetStats()->upstream_rq_timeout_budget_percent_used_.unit());
+  EXPECT_EQ(
+      Stats::Histogram::Unit::Unspecified,
+      cluster->info()->timeoutBudgetStats()->get().upstream_rq_timeout_budget_percent_used_.unit());
 }
 
 // Validates HTTP2 SETTINGS config.

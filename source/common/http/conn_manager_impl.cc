@@ -775,7 +775,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
 
   if (host_ != nullptr) {
     if (host_->cluster().requestResponseSizeStats().has_value()) {
-      host_->cluster().requestResponseSizeStats()->upstream_rq_headers_size_.recordValue(
+      host_->cluster().requestResponseSizeStats()->get().upstream_rq_headers_size_.recordValue(
           request_headers_->byteSize());
     }
   }

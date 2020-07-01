@@ -813,7 +813,7 @@ message Cluster {
 
   // Configuration to track optional cluster stats.
   TrackOptionalClusterStats track_optional_cluster_stats = 47;
-  
+
   // Optional customization and configuration of upstream connection pool, and upstream type.
   //
   // Currently this field only applies for HTTP traffic but is designed for eventual use for custom

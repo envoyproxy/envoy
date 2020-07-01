@@ -811,10 +811,10 @@ message Cluster {
   // maybe by allowing LRS to go on the ADS stream, or maybe by moving some of the negotiation
   // from the LRS stream here.]
   core.v4alpha.ConfigSource lrs_server = 42;
-  
+
   // Configuration to track optional cluster stats.
   TrackOptionalClusterStats track_optional_cluster_stats = 47;
-  
+
   // Optional customization and configuration of upstream connection pool, and upstream type.
   //
   // Currently this field only applies for HTTP traffic but is designed for eventual use for custom
@@ -897,6 +897,9 @@ message UpstreamConnectionOptions {
 }
 
 message TrackOptionalClusterStats {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.cluster.v3.TrackOptionalClusterStats";
+
   // If timeout_budgets is true, the :ref:`timeout budget histograms
   // <config_cluster_manager_cluster_stats_timeout_budgets>` will be published for each
   // request. These show what percentage of a request's per try and global timeout was used. A value
