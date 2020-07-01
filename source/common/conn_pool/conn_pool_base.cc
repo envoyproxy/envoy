@@ -60,8 +60,8 @@ void ConnPoolImplBase::tryCreateNewConnection() {
   }
 }
 
-void ConnPoolImplBase::attachRequestToClientImpl(Envoy::ConnectionPool::ActiveClient& client,
-                                                 void* context) {
+void ConnPoolImplBase::attachRequestToClient(Envoy::ConnectionPool::ActiveClient& client,
+                                             AttachContext& context) {
   ASSERT(client.state_ == Envoy::ConnectionPool::ActiveClient::State::READY);
 
   if (!host_->cluster().resourceManager(priority_).requests().canCreate()) {
@@ -115,11 +115,11 @@ void ConnPoolImplBase::onRequestClosed(Envoy::ConnectionPool::ActiveClient& clie
   }
 }
 
-ConnectionPool::Cancellable* ConnPoolImplBase::newStream(void* context) {
+ConnectionPool::Cancellable* ConnPoolImplBase::newStream(AttachContext& context) {
   if (!ready_clients_.empty()) {
     ActiveClient& client = *ready_clients_.front();
     ENVOY_CONN_LOG(debug, "using existing connection", client);
-    attachRequestToClientImpl(client, context);
+    attachRequestToClient(client, context);
     return nullptr;
   }
 
@@ -145,7 +145,7 @@ void ConnPoolImplBase::onUpstreamReady() {
     ActiveClientPtr& client = ready_clients_.front();
     ENVOY_CONN_LOG(debug, "attaching to next request", *client);
     // Pending requests are pushed onto the front, so pull from the back.
-    attachRequestToClient(*client, *pending_requests_.back());
+    attachRequestToClient(*client, pending_requests_.back()->context());
     pending_requests_.pop_back();
   }
 }
@@ -317,14 +317,14 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
 }
 
 PendingRequest::PendingRequest(ConnPoolImplBase& parent) : parent_(parent) {
-  parent_.host_->cluster().stats().upstream_rq_pending_total_.inc();
-  parent_.host_->cluster().stats().upstream_rq_pending_active_.inc();
-  parent_.host_->cluster().resourceManager(parent_.priority_).pendingRequests().inc();
+  parent_.host()->cluster().stats().upstream_rq_pending_total_.inc();
+  parent_.host()->cluster().stats().upstream_rq_pending_active_.inc();
+  parent_.host()->cluster().resourceManager(parent_.priority()).pendingRequests().inc();
 }
 
 PendingRequest::~PendingRequest() {
-  parent_.host_->cluster().stats().upstream_rq_pending_active_.dec();
-  parent_.host_->cluster().resourceManager(parent_.priority_).pendingRequests().dec();
+  parent_.host()->cluster().stats().upstream_rq_pending_active_.dec();
+  parent_.host()->cluster().resourceManager(parent_.priority()).pendingRequests().dec();
 }
 
 void PendingRequest::cancel(Envoy::ConnectionPool::CancelPolicy policy) {
@@ -385,18 +385,18 @@ ActiveClient::ActiveClient(ConnPoolImplBase& parent, uint64_t lifetime_request_l
                            uint64_t concurrent_request_limit)
     : parent_(parent), remaining_requests_(translateZeroToUnlimited(lifetime_request_limit)),
       concurrent_request_limit_(translateZeroToUnlimited(concurrent_request_limit)),
-      connect_timer_(parent_.dispatcher_.createTimer([this]() -> void { onConnectTimeout(); })) {
+      connect_timer_(parent_.dispatcher().createTimer([this]() -> void { onConnectTimeout(); })) {
   conn_connect_ms_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
-      parent_.host_->cluster().stats().upstream_cx_connect_ms_, parent_.dispatcher_.timeSource());
+      parent_.host()->cluster().stats().upstream_cx_connect_ms_, parent_.dispatcher().timeSource());
   conn_length_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
-      parent_.host_->cluster().stats().upstream_cx_length_ms_, parent_.dispatcher_.timeSource());
-  connect_timer_->enableTimer(parent_.host_->cluster().connectTimeout());
+      parent_.host()->cluster().stats().upstream_cx_length_ms_, parent_.dispatcher().timeSource());
+  connect_timer_->enableTimer(parent_.host()->cluster().connectTimeout());
 
-  parent_.host_->stats().cx_total_.inc();
-  parent_.host_->stats().cx_active_.inc();
-  parent_.host_->cluster().stats().upstream_cx_total_.inc();
-  parent_.host_->cluster().stats().upstream_cx_active_.inc();
-  parent_.host_->cluster().resourceManager(parent_.priority_).connections().inc();
+  parent_.host()->stats().cx_total_.inc();
+  parent_.host()->stats().cx_active_.inc();
+  parent_.host()->cluster().stats().upstream_cx_total_.inc();
+  parent_.host()->cluster().stats().upstream_cx_active_.inc();
+  parent_.host()->cluster().resourceManager(parent_.priority()).connections().inc();
 }
 
 ActiveClient::~ActiveClient() { releaseResources(); }
@@ -411,15 +411,15 @@ void ActiveClient::releaseResources() {
 
     conn_length_->complete();
 
-    parent_.host_->cluster().stats().upstream_cx_active_.dec();
-    parent_.host_->stats().cx_active_.dec();
-    parent_.host_->cluster().resourceManager(parent_.priority_).connections().dec();
+    parent_.host()->cluster().stats().upstream_cx_active_.dec();
+    parent_.host()->stats().cx_active_.dec();
+    parent_.host()->cluster().resourceManager(parent_.priority()).connections().dec();
   }
 }
 
 void ActiveClient::onConnectTimeout() {
   ENVOY_CONN_LOG(debug, "connect timeout", *this);
-  parent_.host_->cluster().stats().upstream_cx_connect_timeout_.inc();
+  parent_.host()->cluster().stats().upstream_cx_connect_timeout_.inc();
   timed_out_ = true;
   close();
 }
