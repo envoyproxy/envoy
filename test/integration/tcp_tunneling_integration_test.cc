@@ -315,6 +315,23 @@ TEST_P(TcpTunnelingIntegrationTest, Basic) {
   upstream_request_->encodeData(0, true);
 }
 
+// Validates that if the cluster is not configured with HTTP/2 we don't attempt
+// to tunnel the data.
+TEST_P(TcpTunnelingIntegrationTest, InvalidCluster) {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    bootstrap.mutable_static_resources()
+        ->mutable_clusters()
+        ->Mutable(0)
+        ->clear_http2_protocol_options();
+  });
+  initialize();
+
+  // Start a connection and see it close immediately due to the invalid cluster.
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  tcp_client->waitForHalfClose();
+  tcp_client->close();
+}
+
 TEST_P(TcpTunnelingIntegrationTest, InvalidResponseHeaders) {
   initialize();
 
