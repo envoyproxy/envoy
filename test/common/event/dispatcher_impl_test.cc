@@ -956,6 +956,13 @@ public:
     EXPECT_TRUE(timer.enabled());
     while (true) {
       dispatcher.run(Dispatcher::RunType::NonBlock);
+#ifdef WIN32
+      // The event loop runs for a single iteration in NonBlock mode on Windows. A few iterations
+      // are required to ensure that next iteration callbacks have a chance to run before time
+      // advances once again.
+      dispatcher.run(Dispatcher::RunType::NonBlock);
+      dispatcher.run(Dispatcher::RunType::NonBlock);
+#endif
       if (timer.enabled()) {
         time_system.advanceTimeAsync(std::chrono::microseconds(1));
       } else {

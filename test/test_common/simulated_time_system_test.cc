@@ -139,6 +139,11 @@ TEST_P(SimulatedTimeSystemTest, TimerOrderAndRescheduleTimer) {
   // is delayed since it is rescheduled with a non-zero delta.
   advanceMsAndLoop(5);
   if (activateTimersNextEventLoop()) {
+#ifdef WIN32
+    // The event loop runs for a single iteration in NonBlock mode on Windows. Force it to run again
+    // to pick up next iteration callbacks.
+    advanceMsAndLoop(0);
+#endif
     EXPECT_EQ("p013p4", output_);
   } else {
     EXPECT_EQ("p0134", output_);
@@ -178,6 +183,11 @@ TEST_P(SimulatedTimeSystemTest, TimerOrderDisableAndRescheduleTimer) {
   // re-enabled with a non-zero timeout.
   advanceMsAndLoop(5);
   if (activateTimersNextEventLoop()) {
+#ifdef WIN32
+    // The event loop runs for a single iteration in NonBlock mode on Windows. Force it to run again
+    // to pick up next iteration callbacks.
+    advanceMsAndLoop(0);
+#endif
     EXPECT_EQ("p03p14", output_);
   } else {
     EXPECT_EQ("p0314", output_);
