@@ -271,7 +271,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     NOT_REACHED_GCOVR_EXCL_LINE;
     break;
   }
-} // namespace ExtAuthz
+}
 
 bool Filter::isBufferFull() const {
   const auto* buffer = callbacks_->decodingBuffer();
