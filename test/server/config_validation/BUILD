@@ -1,4 +1,4 @@
-load("//bazel:envoy_build_system.bzl", "envoy_cc_fuzz_test", "envoy_cc_test", "envoy_package")
+load("//bazel:envoy_build_system.bzl", "envoy_cc_fuzz_test", "envoy_cc_test", "envoy_cc_test_library", "envoy_package", "envoy_proto_library")
 load("//source/extensions:all_extensions.bzl", "envoy_all_extensions")
 load("//bazel:repositories.bzl", "PPC_SKIP_TARGETS", "WINDOWS_SKIP_TARGETS")
 
@@ -106,4 +106,35 @@ envoy_cc_fuzz_test(
         "//bazel:linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
         "//conditions:default": envoy_all_extensions(),
     }),
+)
+
+envoy_proto_library(
+    name = "xds_fuzz_proto",
+    srcs = ["xds_fuzz.proto"],
+)
+
+envoy_cc_test_library(
+    name = "xds_fuzz_lib",
+    srcs = ["xds_fuzz.cc"],
+    hdrs = ["xds_fuzz.h"],
+    deps = [
+        ":xds_fuzz_proto_cc_proto",
+        "//test/integration:http_integration_lib",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "xds_fuzz_test",
+    srcs = ["xds_fuzz_test.cc"],
+    corpus = "xds_corpus",
+    deps = [
+        ":xds_fuzz_lib",
+        "//source/common/protobuf:utility_lib",
+    ],
 )

@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package test.server.config_validation;
+
+import "validate/validate.proto";
+
+message AddListener {
+  // generates a new listener listener_x with number listener_num, which can later be removed by
+  // RemoveListener
+  // if listener_x had already been added, it will update listener_x's route_config
+  uint32 listener_num = 1;
+  // listener_x references route_y, which has number route_num
+  uint32 route_num = 2;
+}
+
+message AddRoute {
+  // generates a new route route_y with number route_num which can later be removed by a RemoveRoute
+  uint32 route_num = 1;
+}
+
+message RemoveListener {
+  // removes listener_x
+  uint32 listener_num = 1;
+}
+
+message RemoveRoute {
+  // removes route_y
+  uint32 route_num = 1;
+}
+
+message Action {
+  oneof action_selector {
+    option (validate.required) = true;
+
+    AddListener add_listener = 1;
+    AddRoute add_route = 2;
+    RemoveListener remove_listener = 3;
+    RemoveRoute remove_route = 4;
+  }
+}
+
+message Config {
+  enum SotwOrDelta {
+    SOTW = 0;
+    DELTA = 1;
+  }
+  SotwOrDelta sotw_or_delta = 1;
+}
+
+message XdsTestCase {
+  repeated Action actions = 1;
+  Config config = 2;
+}
