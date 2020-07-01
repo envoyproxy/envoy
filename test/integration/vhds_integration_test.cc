@@ -368,7 +368,7 @@ public:
     resource->set_version("4");
     resource->mutable_resource()->PackFrom(
         API_DOWNGRADE(TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
-            virtualHostYaml("vhost_1", "vhost_1, vhost.first"))));
+            virtualHostYaml("my_route/vhost_1", "vhost_1, vhost.first"))));
     resource->add_aliases("my_route/vhost.first");
     ret.set_nonce("test-nonce-0");
 
