@@ -539,6 +539,27 @@ void passPayloadToProcessor(uint64_t bytes_read, Buffer::InstancePtr buffer,
                                      std::move(buffer), receive_time);
 }
 
+Api::IoCallUint64Result receiveMessage(uint64_t maxPacketSize, Buffer::InstancePtr& buffer,
+                                       Buffer::RawSlice& slice, IoHandle::RecvMsgOutput& output,
+                                       IoHandle& handle, const Address::Instance& local_address) {
+
+  const uint64_t num_slices = buffer->reserve(maxPacketSize, &slice, 1);
+  ASSERT(num_slices == 1u);
+
+  Api::IoCallUint64Result result =
+      handle.recvmsg(&slice, num_slices, local_address.ip()->port(), output);
+
+  if (!result.ok()) {
+    return result;
+  }
+
+  // Adjust memory length and commit slice to buffer
+  slice.len_ = std::min(slice.len_, result.rc_);
+  buffer->commit(&slice, 1);
+
+  return result;
+}
+
 Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
                                                 const Address::Instance& local_address,
                                                 UdpPacketProcessor& udp_packet_processor,
@@ -548,26 +569,19 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
   if (handle.supportsUdpGro()) {
     Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
     Buffer::RawSlice slice;
+    IoHandle::RecvMsgOutput output(1, packets_dropped);
 
     // TODO(yugant): Avoid using 64k by getting memory from UdpPacketProcessor
     const uint64_t maxPacketSizeWithGro = 65535;
-    const uint64_t num_slices = buffer->reserve(maxPacketSizeWithGro, &slice, 1);
-    ASSERT(num_slices == 1u);
 
-    IoHandle::RecvMsgOutput output(1, packets_dropped);
     Api::IoCallUint64Result result =
-        handle.recvmsg(&slice, num_slices, local_address.ip()->port(), output);
+        receiveMessage(maxPacketSizeWithGro, buffer, slice, output, handle, local_address);
 
     if (!result.ok()) {
       return result;
     }
 
-    // Commit the buffer and extract gso_size
-    slice.len_ = std::min(slice.len_, result.rc_);
-    buffer->commit(&slice, 1);
-
     const uint64_t gso_size = output.msg_[0].gso_size_;
-
     ENVOY_LOG_MISC(trace, "recvmsg bytes {} with gso_size as {}", result.rc_, gso_size);
 
     // Skip gso segmentation and proceed as a single payload.
@@ -630,20 +644,14 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
 
   Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
   Buffer::RawSlice slice;
-  const uint64_t num_slices = buffer->reserve(udp_packet_processor.maxPacketSize(), &slice, 1);
-  ASSERT(num_slices == 1u);
-
   IoHandle::RecvMsgOutput output(1, packets_dropped);
-  Api::IoCallUint64Result result =
-      handle.recvmsg(&slice, num_slices, local_address.ip()->port(), output);
+
+  Api::IoCallUint64Result result = receiveMessage(udp_packet_processor.maxPacketSize(), buffer,
+                                                  slice, output, handle, local_address);
 
   if (!result.ok()) {
     return result;
   }
-
-  // Adjust used memory length and commit slice to buffer
-  slice.len_ = std::min(slice.len_, static_cast<size_t>(result.rc_));
-  buffer->commit(&slice, 1);
 
   ENVOY_LOG_MISC(trace, "recvmsg bytes {}", result.rc_);
 

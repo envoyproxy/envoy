@@ -51,9 +51,13 @@ udp_listener_config:
   EXPECT_CALL(server_.random_, uuid());
   expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
 #ifdef SO_RXQ_OVFL
-                           /* expected_num_options */ 4, // SO_REUSEPORT is on as configured
+                           /* expected_num_options */
+                           (Api::OsSysCallsSingleton::get().supportsUdpGro()
+                                ? 4
+                                : 3), // SO_REUSEPORT is on as configured
 #else
-                           /* expected_num_options */ 3,
+                           /* expected_num_options */
+                           (Api::OsSysCallsSingleton::get().supportsUdpGro() ? 3 : 2),
 #endif
                            /* expected_creation_params */ {true, false});
 

@@ -10,6 +10,7 @@
 #include "envoy/stats/scope.h"
 
 #include "common/access_log/access_log_impl.h"
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/config/utility.h"
 #include "common/network/connection_balancer_impl.h"
@@ -373,8 +374,10 @@ void ListenerImpl::buildListenSocketOptions(Network::Socket::Type socket_type) {
     // Needed to return receive buffer overflown indicator.
     addListenSocketOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
     // TODO(yugant) : Add a config option for UDP_GRO
-    // Needed to receive gso_size option
-    addListenSocketOptions(Network::SocketOptionFactory::buildUdpGroOptions());
+    if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
+      // Needed to receive gso_size option
+      addListenSocketOptions(Network::SocketOptionFactory::buildUdpGroOptions());
+    }
   }
 }
 
