@@ -23,10 +23,6 @@ supported Lua version is mostly 5.1 with some 5.2 features. See the `LuaJIT docu
   supports more 5.2 features and additional architectures. Envoy can be built with moonjit support
   by using the following bazel option: ``--//source/extensions/filters/common/lua:moonjit=1``.
 
-The filter only supports loading Lua code in-line in the configuration. If local filesystem code
-is desired, a trivial in-line script can be used to load the rest of the code from the local
-environment.
-
 The design of the filter and Lua support at a high level is as follows:
 
 * All Lua environments are :ref:`per worker thread <arch_overview_threading>`. This means that
@@ -62,6 +58,82 @@ Configuration
 
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.lua.v3.Lua>`
 * This filter should be configured with the name *envoy.filters.http.lua*.
+
+A simple example of configuring Lua HTTP filter that contains only :ref:`inline_code 
+<envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.inline_code>` is as follow:
+
+.. code-block:: yaml
+
+  name: envoy.filters.http.lua
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.lua
+    inline_code: |
+      -- Called on the request path.
+      function envoy_on_request(request_handle)
+        -- Do something.
+      end
+      -- Called on the response path.
+      function envoy_on_response(response_handle)
+        -- Do something.
+      end
+
+By default, Lua script defined in ``inline_code`` will be treated as a ``GLOBAL`` script. Envoy will 
+execute it for every HTTP request.
+
+Per-Route Configuration
+-----------------------
+
+The Lua HTTP filter also can be disabled or overridden on a per-route basis by providing a 
+:ref:`LuaPerRoute <envoy_v3_api_msg_extensions.filters.http.lua.v3.LuaPerRoute>` configuration 
+on the virtual host, route, or weighted cluster.
+
+As a concrete example, given the following Lua filter configuration:
+
+.. code-block:: yaml
+
+  name: envoy.filters.http.lua
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.lua
+    inline_code: |
+      function envoy_on_request(request_handle)
+        -- do something
+      end
+    source_codes:
+      hello.lua:
+        inline_string: |
+          function envoy_on_request(request_handle)
+            request_handle:logInfo("Hello World.")
+          end
+      bye.lua:
+        inline_string: |
+          function envoy_on_response(response_handle)
+            response_handle:logInfo("Bye Bye.")
+          end
+
+The HTTP Lua filter can be disabled on some virtual host, route, or weighted cluster by the 
+LuaPerRoute configuration as follow:
+
+.. code-block:: yaml
+
+  per_filter_config:
+    envoy.filters.http.lua:
+      disabled: true
+
+We can also refer to a Lua script in the filter configuration by specifying a name in LuaPerRoute. 
+The ``GLOBAL`` Lua script will be overridden by the referenced script:
+
+.. code-block:: yaml
+
+  per_filter_config:
+    envoy.filters.http.lua:
+      name: hello.lua
+
+.. attention::
+
+  The name ``GLOBAL`` is reserved for :ref:`Lua.inline_code 
+  <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.inline_code>`. Therefore, do not use 
+  ``GLOBAL`` as name for other Lua scripts.
+    
 
 Script examples
 ---------------
