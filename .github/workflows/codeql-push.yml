@@ -1,0 +1,57 @@
+on:
+  push:
+    paths:
+    - 'source/common/**'
+  pull_request:
+
+jobs:
+  CodeQL-Build:
+
+    strategy:
+      fail-fast: false
+
+    # CodeQL runs on ubuntu-latest and windows-latest
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+      with:
+        # We must fetch at least the immediate parents so that if this is
+        # a pull request then we can checkout the head.
+        fetch-depth: 2
+
+    # If this run was triggered by a pull request event, then checkout
+    # the head of the pull request instead of the merge commit.
+    - run: git checkout HEAD^2
+      if: ${{ github.event_name == 'pull_request' }}
+
+    # Initializes the CodeQL tools for scanning.
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v1
+      # Override language selection by uncommenting this and choosing your languages
+      with:
+         languages: cpp
+
+    - name: Install deps
+      shell: bash
+      run: |
+       sudo apt-get update && sudo apt-get install libtool cmake automake autoconf make ninja-build curl unzip virtualenv openjdk-11-jdk build-essential libc++1
+       mkdir -p bin/clang10
+       cd bin/clang10
+       wget https://github.com/llvm/llvm-project/releases/download/llvmorg-10.0.0/clang+llvm-10.0.0-x86_64-linux-gnu-ubuntu-18.04.tar.xz
+       tar -xf clang+llvm-10.0.0-x86_64-linux-gnu-ubuntu-18.04.tar.xz --strip-components 1
+       export PATH=bin/clang10/bin:$PATH
+
+    - name: Build
+      run: |
+       bazel/setup_clang.sh bin/clang10
+       bazelisk shutdown
+       bazelisk build -c fastbuild --spawn_strategy=local --discard_analysis_cache --nouse_action_cache --config clang --config libc++ //source/common/http/http1:codec_lib //source/common/http/http2:codec_lib
+
+    - name: Clean Artifacts
+      run: |
+        git clean -xdf
+       
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v1

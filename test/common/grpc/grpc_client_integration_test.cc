@@ -413,14 +413,13 @@ public:
   void expectExtraHeaders(FakeStream& fake_stream) override {
     AssertionResult result = fake_stream.waitForHeadersComplete();
     RELEASE_ASSERT(result, result.message());
-    Http::TestRequestHeaderMapImpl stream_headers(fake_stream.headers());
+    std::vector<absl::string_view> auth_headers;
+    Http::HeaderUtility::getAllOfHeader(fake_stream.headers(), "authorization", auth_headers);
     if (!access_token_value_.empty()) {
-      if (access_token_value_2_.empty()) {
-        EXPECT_EQ("Bearer " + access_token_value_, stream_headers.get_("authorization"));
-      } else {
-        EXPECT_EQ("Bearer " + access_token_value_ + ",Bearer " + access_token_value_2_,
-                  stream_headers.get_("authorization"));
-      }
+      EXPECT_EQ("Bearer " + access_token_value_, auth_headers[0]);
+    }
+    if (!access_token_value_2_.empty()) {
+      EXPECT_EQ("Bearer " + access_token_value_2_, auth_headers[1]);
     }
   }
 
