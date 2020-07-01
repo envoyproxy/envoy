@@ -18,6 +18,31 @@ namespace Router {
 
 const uint64_t RateLimitPolicyImpl::MAX_STAGE_NUMBER = 10UL;
 
+bool DynamicMetadataRateLimitOverride::populateOverride(
+    RateLimit::Descriptor& descriptor, const envoy::config::core::v3::Metadata* metadata) const {
+  const ProtobufWkt::Value& metadata_value =
+      Envoy::Config::Metadata::metadataValue(metadata, metadata_key_);
+  if (metadata_value.kind_case() != ProtobufWkt::Value::kStructValue) {
+    return false;
+  }
+
+  const auto& override_value = metadata_value.struct_value().fields();
+  const auto& limit_it = override_value.find("requests_per_unit");
+  const auto& unit_it = override_value.find("unit");
+  if (limit_it != override_value.end() &&
+      limit_it->second.kind_case() == ProtobufWkt::Value::kNumberValue &&
+      unit_it != override_value.end() &&
+      unit_it->second.kind_case() == ProtobufWkt::Value::kStringValue) {
+    envoy::type::v3::RateLimitUnit unit;
+    if (envoy::type::v3::RateLimitUnit_Parse(unit_it->second.string_value(), &unit)) {
+      descriptor.limit_.emplace(RateLimit::RateLimitOverride{
+          static_cast<uint32_t>(limit_it->second.number_value()), unit});
+      return true;
+    }
+  }
+  return false;
+}
+
 bool SourceClusterAction::populateDescriptor(const Router::RouteEntry&,
                                              RateLimit::Descriptor& descriptor,
                                              const std::string& local_service_cluster,
@@ -144,6 +169,16 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }
+  if (config.has_limit()) {
+    switch (config.limit().override_specifier_case()) {
+    case envoy::config::route::v3::RateLimit_Override::OverrideSpecifierCase::kDynamicMetadata:
+      limit_override_.emplace(
+          new DynamicMetadataRateLimitOverride(config.limit().dynamic_metadata()));
+      break;
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
+  }
 }
 
 void RateLimitPolicyEntryImpl::populateDescriptors(
@@ -159,6 +194,10 @@ void RateLimitPolicyEntryImpl::populateDescriptors(
     if (!result) {
       break;
     }
+  }
+
+  if (limit_override_) {
+    limit_override_.value()->populateOverride(descriptor, dynamic_metadata);
   }
 
   if (result) {

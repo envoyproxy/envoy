@@ -263,9 +263,6 @@ private:
  * processing. This allows O(1) access to these headers without even a hash lookup.
  */
 #define INLINE_REQ_HEADERS(HEADER_FUNC)                                                            \
-  HEADER_FUNC(Accept)                                                                              \
-  HEADER_FUNC(AcceptEncoding)                                                                      \
-  HEADER_FUNC(Authorization)                                                                       \
   HEADER_FUNC(ClientTraceId)                                                                       \
   HEADER_FUNC(EnvoyDownstreamServiceCluster)                                                       \
   HEADER_FUNC(EnvoyDownstreamServiceNode)                                                          \
@@ -290,15 +287,11 @@ private:
   HEADER_FUNC(ForwardedClientCert)                                                                 \
   HEADER_FUNC(ForwardedFor)                                                                        \
   HEADER_FUNC(ForwardedProto)                                                                      \
-  HEADER_FUNC(GrpcAcceptEncoding)                                                                  \
   HEADER_FUNC(GrpcTimeout)                                                                         \
   HEADER_FUNC(Host)                                                                                \
   HEADER_FUNC(Method)                                                                              \
-  HEADER_FUNC(OtSpanContext)                                                                       \
-  HEADER_FUNC(Origin)                                                                              \
   HEADER_FUNC(Path)                                                                                \
   HEADER_FUNC(Protocol)                                                                            \
-  HEADER_FUNC(Referer)                                                                             \
   HEADER_FUNC(Scheme)                                                                              \
   HEADER_FUNC(TE)                                                                                  \
   HEADER_FUNC(UserAgent)
@@ -308,7 +301,6 @@ private:
  */
 #define INLINE_RESP_HEADERS(HEADER_FUNC)                                                           \
   HEADER_FUNC(Date)                                                                                \
-  HEADER_FUNC(Etag)                                                                                \
   HEADER_FUNC(EnvoyDegraded)                                                                       \
   HEADER_FUNC(EnvoyImmediateHealthCheckFail)                                                       \
   HEADER_FUNC(EnvoyRateLimited)                                                                    \
@@ -317,16 +309,13 @@ private:
   HEADER_FUNC(EnvoyUpstreamServiceTime)                                                            \
   HEADER_FUNC(Location)                                                                            \
   HEADER_FUNC(Server)                                                                              \
-  HEADER_FUNC(Status)                                                                              \
-  HEADER_FUNC(Vary)
+  HEADER_FUNC(Status)
 
 /**
  * Default O(1) request and response headers.
  */
 #define INLINE_REQ_RESP_HEADERS(HEADER_FUNC)                                                       \
-  HEADER_FUNC(CacheControl)                                                                        \
   HEADER_FUNC(Connection)                                                                          \
-  HEADER_FUNC(ContentEncoding)                                                                     \
   HEADER_FUNC(ContentLength)                                                                       \
   HEADER_FUNC(ContentType)                                                                         \
   HEADER_FUNC(EnvoyAttemptCount)                                                                   \
@@ -616,6 +605,7 @@ public:
   // between concrete header map types.
   template <Type type> struct Handle {
     Handle(RegistrationMap::const_iterator it) : it_(it) {}
+    bool operator==(const Handle& rhs) const { return it_ == rhs.it_; }
 
     RegistrationMap::const_iterator it_;
   };

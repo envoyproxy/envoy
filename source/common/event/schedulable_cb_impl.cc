@@ -21,7 +21,17 @@ SchedulableCallbackImpl::SchedulableCallbackImpl(Libevent::BasePtr& libevent,
 }
 
 void SchedulableCallbackImpl::scheduleCallbackCurrentIteration() {
+  // event_active directly adds the event to the end of the work queue so it executes in the current
+  // iteration of the event loop.
   event_active(&raw_event_, EV_TIMEOUT, 0);
+}
+
+void SchedulableCallbackImpl::scheduleCallbackNextIteration() {
+  // libevent computes the list of timers to move to the work list after polling for fd events, but
+  // iteration through the work list starts. Zero delay timers added while iterating through the
+  // work list execute on the next iteration of the event loop.
+  const timeval zero_tv{};
+  event_add(&raw_event_, &zero_tv);
 }
 
 void SchedulableCallbackImpl::cancel() { event_del(&raw_event_); }
