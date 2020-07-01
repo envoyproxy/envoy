@@ -66,7 +66,7 @@ build:clang-asan --config=asan
 build:clang-asan --linkopt -fuse-ld=lld
 
 # macOS ASAN/UBSAN
-build:macos -std=c++17
+build:macos --define --cxxopt=-std=c++17
 build:macos-asan --config=asan
 # Workaround, see https://github.com/bazelbuild/bazel/issues/6932
 build:macos-asan --copt -Wno-macro-redefined
