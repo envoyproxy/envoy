@@ -19,6 +19,8 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/core/v1/resource_locator.proto";
+
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
@@ -36,7 +38,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // <config_overview_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
-// [#next-free-field: 22]
+// [#next-free-field: 24]
 message Bootstrap {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v3.Bootstrap";
@@ -62,6 +64,7 @@ message Bootstrap {
     repeated envoy.extensions.transport_sockets.tls.v4alpha.Secret secrets = 3;
   }
 
+  // [#next-free-field: 7]
   message DynamicResources {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.bootstrap.v3.Bootstrap.DynamicResources";
@@ -72,10 +75,18 @@ message Bootstrap {
     // :ref:`LDS <arch_overview_dynamic_config_lds>` configuration source.
     core.v4alpha.ConfigSource lds_config = 1;
 
+    // Resource locator for listener collection.
+    // [#not-implemented-hide:]
+    udpa.core.v1.ResourceLocator lds_resources_locator = 5;
+
     // All post-bootstrap :ref:`Cluster <envoy_api_msg_config.cluster.v4alpha.Cluster>` definitions are
     // provided by a single :ref:`CDS <arch_overview_dynamic_config_cds>`
     // configuration source.
     core.v4alpha.ConfigSource cds_config = 2;
+
+    // Resource locator for cluster collection.
+    // [#not-implemented-hide:]
+    udpa.core.v1.ResourceLocator cds_resources_locator = 6;
 
     // A single :ref:`ADS <config_overview_ads>` source may be optionally
     // specified. This must have :ref:`api_type
@@ -186,6 +197,30 @@ message Bootstrap {
   // Specifies optional bootstrap extensions to be instantiated at startup time.
   // Each item contains extension specific configuration.
   repeated core.v4alpha.TypedExtensionConfig bootstrap_extensions = 21;
+
+  // Configuration sources that will participate in
+  // *udpa.core.v1.ResourceLocator* authority resolution. The algorithm is as
+  // follows:
+  // 1. The authority field is taken from the *udpa.core.v1.ResourceLocator*, call
+  //    this *resource_authority*.
+  // 2. *resource_authority* is compared against the authorities in any peer
+  //    *ConfigSource*. The peer *ConfigSource* is the configuration source
+  //    message which would have been used unconditionally for resolution
+  //    with opaque resource names. If there is a match with an authority, the
+  //    peer *ConfigSource* message is used.
+  // 3. *resource_authority* is compared sequentially with the authorities in
+  //    each configuration source in *config_sources*. The first *ConfigSource*
+  //    to match wins.
+  // 4. As a fallback, if no configuration source matches, then
+  //    *default_config_source* is used.
+  // 5. If *default_config_source* is not specified, resolution fails.
+  // [#not-implemented-hide:]
+  repeated core.v4alpha.ConfigSource config_sources = 22;
+
+  // Default configuration source for *udpa.core.v1.ResourceLocator* if all
+  // other resolution fails.
+  // [#not-implemented-hide:]
+  core.v4alpha.ConfigSource default_config_source = 23;
 }
 
 // Administration interface :ref:`operations documentation
@@ -352,8 +387,14 @@ message RuntimeLayer {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.bootstrap.v3.RuntimeLayer.RtdsLayer";
 
-    // Resource to subscribe to at *rtds_config* for the RTDS layer.
-    string name = 1;
+    oneof name_specifier {
+      // Resource to subscribe to at *rtds_config* for the RTDS layer.
+      string name = 1;
+
+      // Resource locator for RTDS layer. This is mutually exclusive to *name*.
+      // [#not-implemented-hide:]
+      udpa.core.v1.ResourceLocator rtds_resource_locator = 3;
+    }
 
     // RTDS configuration source.
     core.v4alpha.ConfigSource rtds_config = 2;

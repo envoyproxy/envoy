@@ -19,7 +19,11 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/core/v1/collection_entry.proto";
+import "udpa/core/v1/resource_locator.proto";
+
 import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/migrate.proto";
 import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -31,6 +35,12 @@ option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Cluster configuration]
+
+// Cluster list collections. Entries are *Cluster* resources or references.
+// [#not-implemented-hide:]
+message ClusterCollection {
+  udpa.core.v1.CollectionEntry entries = 1;
+}
 
 // Configuration for a single upstream cluster.
 // [#next-free-field: 49]
@@ -178,7 +188,12 @@ message Cluster {
     // Optional alternative to cluster name to present to EDS. This does not
     // have the same restrictions as cluster name, i.e. it may be arbitrary
     // length.
-    string service_name = 2;
+    string service_name = 2 [(udpa.annotations.field_migrate).oneof_promotion = "name_specifier"];
+
+    // Resource locator for EDS. This is mutually exclusive to *service_name*.
+    // [#not-implemented-hide:]
+    udpa.core.v1.ResourceLocator eds_resource_locator = 3
+        [(udpa.annotations.field_migrate).oneof_promotion = "name_specifier"];
   }
 
   // Optionally divide the endpoints in this cluster into subsets defined by

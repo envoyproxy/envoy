@@ -7,6 +7,8 @@ import "envoy/config/core/v3/grpc_service.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/core/v1/authority.proto";
+
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -52,13 +54,23 @@ message ApiConfigSource {
     // the v2 protos is used.
     REST = 1;
 
-    // gRPC v2 API.
+    // SotW gRPC service.
     GRPC = 2;
 
     // Using the delta xDS gRPC service, i.e. DeltaDiscovery{Request,Response}
     // rather than Discovery{Request,Response}. Rather than sending Envoy the entire state
     // with every update, the xDS server only sends what has changed since the last update.
     DELTA_GRPC = 3;
+
+    // SotW xDS gRPC with ADS. All resources which resolve to this configuration source will be
+    // multiplexed on a single connection to an ADS endpoint.
+    // [#not-implemented-hide:]
+    AGGREGATED_GRPC = 5;
+
+    // Delta xDS gRPC with ADS. All resources which resolve to this configuration source will be
+    // multiplexed on a single connection to an ADS endpoint.
+    // [#not-implemented-hide:]
+    AGGREGATED_DELTA_GRPC = 6;
   }
 
   // API type (gRPC, REST, delta gRPC)
@@ -136,9 +148,16 @@ message RateLimitSettings {
 // <arch_overview_service_discovery>` etc. may either be sourced from the
 // filesystem or from an xDS API source. Filesystem configs are watched with
 // inotify for updates.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message ConfigSource {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.ConfigSource";
+
+  // Authorities that this config source may be used for. An authority specified
+  // in a *udpa.core.v1.ResourceLocator* is resolved to a *ConfigSource* prior
+  // to configuration fetch. This field provides the association between
+  // authority name and configuration source.
+  // [#not-implemented-hide:]
+  repeated udpa.core.v1.Authority authorities = 7;
 
   oneof config_source_specifier {
     option (validate.required) = true;
