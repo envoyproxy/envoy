@@ -66,7 +66,6 @@ public:
     // Close the first connection that was successful so that we can open a new successful
     // connection.
     tcp_clients.front()->close();
-    ASSERT_TRUE(raw_conns.front()->close());
     ASSERT_TRUE(raw_conns.front()->waitForDisconnect());
 
     tcp_clients.emplace_back(makeTcpConnection(lookupPort("listener_0")));
