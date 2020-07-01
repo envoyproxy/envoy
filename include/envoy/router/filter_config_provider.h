@@ -22,8 +22,8 @@ public:
   virtual const std::string& name() PURE;
 
   /**
-   * @return Http::FilterFactoryCb a filter config to be instantiated on the subsequent streams. Note
-   * that if the provider has not yet performed an initial configuration load and no default is
+   * @return Http::FilterFactoryCb a filter config to be instantiated on the subsequent streams.
+   * Note that if the provider has not yet performed an initial configuration load and no default is
    * provided, no information will be returned.
    */
   virtual absl::optional<Http::FilterFactoryCb> config() PURE;
