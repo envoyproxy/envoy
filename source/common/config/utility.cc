@@ -60,12 +60,12 @@ void Utility::translateApiConfigSource(
 
 void Utility::checkCluster(absl::string_view error_prefix, absl::string_view cluster_name,
                            Upstream::ClusterManager& cm, bool allow_added_via_api) {
-  Upstream::ThreadLocalCluster* cluster = cm.get(cluster_name);
-  if (cluster == nullptr) {
+  auto clusters = cm.clusters();
+  const auto& it = clusters.find(std::string(cluster_name));
+  if (it == clusters.end()) {
     throw EnvoyException(fmt::format("{}: unknown cluster '{}'", error_prefix, cluster_name));
   }
-
-  if (!allow_added_via_api && cluster->info()->addedViaApi()) {
+  if (!allow_added_via_api && it->second.get().info()->addedViaApi()) {
     throw EnvoyException(fmt::format(
         "{}: invalid cluster '{}': currently only static (non-CDS) clusters are supported",
         error_prefix, cluster_name));
