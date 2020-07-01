@@ -56,17 +56,18 @@ HttpConnPoolImplBase::HttpConnPoolImplBase(
 ConnectionPool::Cancellable*
 HttpConnPoolImplBase::newStream(Http::ResponseDecoder& response_decoder,
                                 Http::ConnectionPool::Callbacks& callbacks) {
-  AttachContext context = std::make_pair(&response_decoder, &callbacks);
-  return Envoy::ConnectionPool::ConnPoolImplBase::newStream(reinterpret_cast<void*>(&context));
+  HttpAttachContext context({&response_decoder, &callbacks});
+  return Envoy::ConnectionPool::ConnPoolImplBase::newStream(context);
 }
 
 bool HttpConnPoolImplBase::hasActiveConnections() const {
   return (!pending_requests_.empty() || (num_active_requests_ > 0));
 }
 
-ConnectionPool::Cancellable* HttpConnPoolImplBase::newPendingRequest(void* context) {
-  Http::ResponseDecoder& decoder = *reinterpret_cast<AttachContext*>(context)->first;
-  Http::ConnectionPool::Callbacks& callbacks = *reinterpret_cast<AttachContext*>(context)->second;
+ConnectionPool::Cancellable*
+HttpConnPoolImplBase::newPendingRequest(Envoy::ConnectionPool::AttachContext& context) {
+  Http::ResponseDecoder& decoder = *typedContext<HttpAttachContext>(context).decoder_;
+  Http::ConnectionPool::Callbacks& callbacks = *typedContext<HttpAttachContext>(context).callbacks_;
   ENVOY_LOG(debug, "queueing request due to no available connections");
   Envoy::ConnectionPool::PendingRequestPtr pending_request(
       new HttpPendingRequest(*this, decoder, callbacks));
@@ -74,11 +75,12 @@ ConnectionPool::Cancellable* HttpConnPoolImplBase::newPendingRequest(void* conte
   return pending_requests_.front().get();
 }
 
-void HttpConnPoolImplBase::onPoolReady(Envoy::ConnectionPool::ActiveClient& client, void* context) {
-  ActiveClient* http_client = reinterpret_cast<ActiveClient*>(&client);
-  auto* pair = reinterpret_cast<AttachContext*>(context);
-  Http::ResponseDecoder& response_decoder = *pair->first;
-  Http::ConnectionPool::Callbacks& callbacks = *pair->second;
+void HttpConnPoolImplBase::onPoolReady(Envoy::ConnectionPool::ActiveClient& client,
+                                       Envoy::ConnectionPool::AttachContext& context) {
+  ActiveClient* http_client = static_cast<ActiveClient*>(&client);
+  auto& http_context = typedContext<HttpAttachContext>(context);
+  Http::ResponseDecoder& response_decoder = *http_context.decoder_;
+  Http::ConnectionPool::Callbacks& callbacks = *http_context.callbacks_;
   Http::RequestEncoder& new_encoder = http_client->newStreamEncoder(response_decoder);
   callbacks.onPoolReady(new_encoder, client.real_host_description_,
                         http_client->codec_client_->streamInfo());

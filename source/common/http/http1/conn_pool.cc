@@ -87,7 +87,7 @@ void ConnPoolImpl::StreamWrapper::decodeHeaders(ResponseHeaderMapPtr&& headers, 
     close_connection_ =
         HeaderUtility::shouldCloseConnection(parent_.codec_client_->protocol(), *headers);
     if (close_connection_) {
-      parent_.parent_.host_->cluster().stats().upstream_cx_close_notify_.inc();
+      parent_.parent_.host()->cluster().stats().upstream_cx_close_notify_.inc();
     }
   } else {
     // If Connection: close OR
@@ -100,7 +100,7 @@ void ConnPoolImpl::StreamWrapper::decodeHeaders(ResponseHeaderMapPtr&& headers, 
                                  Headers::get().ConnectionValues.KeepAlive)) ||
         (absl::EqualsIgnoreCase(headers->getProxyConnectionValue(),
                                 Headers::get().ConnectionValues.Close))) {
-      parent_.parent_.host_->cluster().stats().upstream_cx_close_notify_.inc();
+      parent_.parent_.host()->cluster().stats().upstream_cx_close_notify_.inc();
       close_connection_ = true;
     }
   }
