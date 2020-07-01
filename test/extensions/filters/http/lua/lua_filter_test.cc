@@ -276,7 +276,7 @@ TEST_F(LuaHttpFilterTest, ScriptBodyChunksRequestBodyTrailers) {
 
   Buffer::OwnedImpl data("hello");
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("5")));
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data, false));
 
   Http::TestRequestTrailerMapImpl request_trailers{{"foo", "bar"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("done")));
@@ -320,7 +320,7 @@ TEST_F(LuaHttpFilterTest, ScriptTrailersRequestBodyTrailers) {
 
   Buffer::OwnedImpl data("hello");
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("5")));
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data, false));
 
   Http::TestRequestTrailerMapImpl request_trailers{{"foo", "bar"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("bar")));
@@ -507,7 +507,7 @@ TEST_F(LuaHttpFilterTest, BodyChunkOutsideOfLoop) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 
   Buffer::OwnedImpl data1("hello");
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data1, false));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data1, false));
 
   Buffer::OwnedImpl data2("world");
   EXPECT_CALL(*filter_,
@@ -684,7 +684,7 @@ TEST_F(LuaHttpFilterTest, RequestAndResponse) {
 
   Buffer::OwnedImpl data("hello");
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("5")));
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data, false));
 
   Http::TestRequestTrailerMapImpl request_trailers{{"foo", "bar"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("bar")));
@@ -705,7 +705,7 @@ TEST_F(LuaHttpFilterTest, RequestAndResponse) {
 
   Buffer::OwnedImpl data2("helloworld");
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("10")));
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data2, false));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->encodeData(data2, false));
 
   Http::TestResponseTrailerMapImpl response_trailers{{"hello", "world"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("world")));
@@ -915,6 +915,65 @@ TEST_F(LuaHttpFilterTest, HttpCallAsynchronous) {
 
   Http::TestRequestTrailerMapImpl request_trailers{{"foo", "bar"}};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
+}
+
+TEST_F(LuaHttpFilterTest, StreamBodyChunksThenDoHttpCallAsynchronous) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_response(response_handle)
+      response_handle:logTrace(response_handle:headers():get(":status"))
+      response_handle:headers():add("foo", "bar")
+
+      for chunk in response_handle:bodyChunks() do
+        response_handle:logTrace(chunk:length())
+      end
+
+      local headers, body = response_handle:httpCall(
+        "cluster",
+        {
+          [":method"] = "POST",
+          [":path"] = "/",
+          [":authority"] = "foo",
+          ["set-cookie"] = { "flavor=chocolate; Path=/", "variant=chewy; Path=/" }
+        },
+        "hello world",
+        5000,
+        true)
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("200")));
+
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("5")));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("5")));
+
+  Http::MockAsyncClientRequest request(&cluster_manager_.async_client_);
+  Http::AsyncClient::Callbacks* callbacks;
+  EXPECT_CALL(cluster_manager_, get(Eq("cluster")));
+  EXPECT_CALL(cluster_manager_, httpAsyncClientForCluster("cluster"));
+  EXPECT_CALL(cluster_manager_.async_client_, send_(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            EXPECT_EQ((Http::TestRequestHeaderMapImpl{{":path", "/"},
+                                                      {":method", "POST"},
+                                                      {":authority", "foo"},
+                                                      {"set-cookie", "flavor=chocolate; Path=/"},
+                                                      {"set-cookie", "variant=chewy; Path=/"},
+                                                      {"content-length", "11"}}),
+                      message->headers());
+            callbacks = &cb;
+            return &request;
+          }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+  Buffer::OwnedImpl data2("hello");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->encodeData(data2, false));
+  Buffer::OwnedImpl data3("world");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data3, true));
 }
 
 // Double HTTP call. Responses before request body.

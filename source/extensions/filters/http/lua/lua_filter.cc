@@ -189,7 +189,8 @@ Http::FilterDataStatus StreamHandleWrapper::onData(Buffer::Instance& data, bool 
     coroutine_.resume(0, yield_callback_);
   }
 
-  if (state_ == State::HttpCall || state_ == State::WaitForBody) {
+  if (state_ == State::HttpCall || state_ == State::WaitForBody ||
+      state_ == State::WaitForBodyChunk) {
     ENVOY_LOG(trace, "buffering body");
     return Http::FilterDataStatus::StopIterationAndBuffer;
   } else if (state_ == State::Responded) {
