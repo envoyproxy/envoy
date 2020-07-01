@@ -12,12 +12,13 @@
 namespace Envoy {
 namespace Tcp {
 
-ActiveTcpClient::ActiveTcpClient(ConnPoolImpl& parent, uint64_t lifetime_request_limit,
+ActiveTcpClient::ActiveTcpClient(ConnPoolImpl& parent, const Upstream::HostConstSharedPtr& host,
                                  uint64_t concurrent_request_limit)
-    : Envoy::ConnectionPool::ActiveClient(parent, lifetime_request_limit, concurrent_request_limit),
+    : Envoy::ConnectionPool::ActiveClient(parent, host->cluster().maxRequestsPerConnection(),
+                                          concurrent_request_limit),
       parent_(parent) {
-  Upstream::Host::CreateConnectionData data = parent_.host_->createConnection(
-      parent_.dispatcher_, parent_.socket_options_, parent_.transport_socket_options_);
+  Upstream::Host::CreateConnectionData data = host->createConnection(
+      parent_.dispatcher(), parent_.socketOptions(), parent_.transportSocketOptions());
   real_host_description_ = data.host_description_;
   connection_ = std::move(data.connection_);
   connection_->addConnectionCallbacks(*this);

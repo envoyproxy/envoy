@@ -21,14 +21,18 @@ namespace Tcp {
 
 class ConnPoolImpl;
 
+struct TcpAttachContext : public Envoy::ConnectionPool::AttachContext {
+  TcpAttachContext(Tcp::ConnectionPool::Callbacks* callbacks) : callbacks_(callbacks) {}
+  Tcp::ConnectionPool::Callbacks* callbacks_;
+};
+
 class TcpPendingRequest : public Envoy::ConnectionPool::PendingRequest {
 public:
-  TcpPendingRequest(Envoy::ConnectionPool::ConnPoolImplBase& parent,
-                    Tcp::ConnectionPool::Callbacks& callbacks)
-      : Envoy::ConnectionPool::PendingRequest(parent), callbacks_(callbacks) {}
-  void* context() override { return static_cast<void*>(&callbacks_); }
+  TcpPendingRequest(Envoy::ConnectionPool::ConnPoolImplBase& parent, TcpAttachContext& context)
+      : Envoy::ConnectionPool::PendingRequest(parent), context_(context) {}
+  Envoy::ConnectionPool::AttachContext& context() override { return context_; }
 
-  Tcp::ConnectionPool::Callbacks& callbacks_;
+  TcpAttachContext context_;
 };
 
 class ActiveTcpClient : public Envoy::ConnectionPool::ActiveClient {
@@ -80,7 +84,7 @@ public:
     Network::ClientConnection& connection_;
   };
 
-  ActiveTcpClient(ConnPoolImpl& parent, uint64_t lifetime_request_limit,
+  ActiveTcpClient(ConnPoolImpl& parent, const Upstream::HostConstSharedPtr& host,
                   uint64_t concurrent_request_limit);
   ~ActiveTcpClient() override;
 
@@ -121,7 +125,7 @@ public:
                Network::TransportSocketOptionsSharedPtr transport_socket_options)
       : Envoy::ConnectionPool::ConnPoolImplBase(host, priority, dispatcher, options,
                                                 transport_socket_options),
-        upstream_ready_cb_(dispatcher_.createSchedulableCallback([this]() {
+        upstream_ready_cb_(dispatcher.createSchedulableCallback([this]() {
           upstream_ready_enabled_ = false;
           onUpstreamReady();
         })) {}
@@ -152,32 +156,31 @@ public:
     }
   }
   ConnectionPool::Cancellable* newConnection(Tcp::ConnectionPool::Callbacks& callbacks) override {
-    return Envoy::ConnectionPool::ConnPoolImplBase::newStream(reinterpret_cast<void*>(&callbacks));
+    TcpAttachContext context(&callbacks);
+    return Envoy::ConnectionPool::ConnPoolImplBase::newStream(context);
   }
 
-  ConnectionPool::Cancellable* newPendingRequest(void* context) override {
-    auto* callbacks = reinterpret_cast<Tcp::ConnectionPool::Callbacks*>(context);
+  ConnectionPool::Cancellable*
+  newPendingRequest(Envoy::ConnectionPool::AttachContext& context) override {
     Envoy::ConnectionPool::PendingRequestPtr pending_request =
-        std::make_unique<TcpPendingRequest>(*this, *callbacks);
+        std::make_unique<TcpPendingRequest>(*this, typedContext<TcpAttachContext>(context));
     pending_request->moveIntoList(std::move(pending_request), pending_requests_);
     return pending_requests_.front().get();
   }
 
-  Upstream::HostDescriptionConstSharedPtr host() const override { return host_; }
+  Upstream::HostDescriptionConstSharedPtr host() const override {
+    return Envoy::ConnectionPool::ConnPoolImplBase::host();
+  }
 
   Envoy::ConnectionPool::ActiveClientPtr instantiateActiveClient() override {
-    return std::make_unique<ActiveTcpClient>(*this, host_->cluster().maxRequestsPerConnection(), 1);
+    return std::make_unique<ActiveTcpClient>(*this, Envoy::ConnectionPool::ConnPoolImplBase::host(),
+                                             1);
   }
 
-  void attachRequestToClient(Envoy::ConnectionPool::ActiveClient& client,
-                             Envoy::ConnectionPool::PendingRequest& request) override {
-    TcpPendingRequest* tcp_request = static_cast<TcpPendingRequest*>(&request);
-    attachRequestToClientImpl(client, reinterpret_cast<void*>(&tcp_request->callbacks_));
-  }
-
-  void onPoolReady(Envoy::ConnectionPool::ActiveClient& client, void* context) override {
+  void onPoolReady(Envoy::ConnectionPool::ActiveClient& client,
+                   Envoy::ConnectionPool::AttachContext& context) override {
     ActiveTcpClient* tcp_client = static_cast<ActiveTcpClient*>(&client);
-    auto* callbacks = reinterpret_cast<Tcp::ConnectionPool::Callbacks*>(context);
+    auto* callbacks = typedContext<TcpAttachContext>(context).callbacks_;
     std::unique_ptr<Envoy::Tcp::ConnectionPool::ConnectionData> connection_data =
         std::make_unique<ActiveTcpClient::TcpConnectionData>(*tcp_client, *tcp_client->connection_);
     callbacks->onPoolReady(std::move(connection_data), tcp_client->real_host_description_);
@@ -185,8 +188,8 @@ public:
 
   void onPoolFailure(const Upstream::HostDescriptionConstSharedPtr& host_description,
                      absl::string_view, ConnectionPool::PoolFailureReason reason,
-                     void* context) override {
-    auto* callbacks = reinterpret_cast<Tcp::ConnectionPool::Callbacks*>(context);
+                     Envoy::ConnectionPool::AttachContext& context) override {
+    auto* callbacks = typedContext<TcpAttachContext>(context).callbacks_;
     callbacks->onPoolFailure(reason, host_description);
   }
 
