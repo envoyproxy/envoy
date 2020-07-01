@@ -7,6 +7,8 @@ services:
       dockerfile: Dockerfile-frontenvoy
     volumes:
       - ./front-envoy.yaml:/etc/front-envoy.yaml
+    environment:
+      ENVOY_UID: 0    
     networks:
       - envoymesh
     expose:
