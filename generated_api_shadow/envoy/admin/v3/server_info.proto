@@ -174,10 +174,4 @@ message CommandLineOptions {
 
   // See :option:`--bootstrap-version` for details.
   uint32 bootstrap_version = 29;
-
-  uint64 hidden_envoy_deprecated_max_stats = 20
-      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
-
-  uint64 hidden_envoy_deprecated_max_obj_name_len = 21
-      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 }
