@@ -1308,6 +1308,8 @@ envoy_cc_test(
 envoy_cc_test(
     name = "cx_limit_integration_test",
     srcs = ["cx_limit_integration_test.cc"],
+    # TODO(11841) See if this can be reenabled once the test is deflaked.
+    tags = ["fails_on_windows"],
     deps = [
         ":http_integration_lib",
         "//include/envoy/network:filter_interface",
