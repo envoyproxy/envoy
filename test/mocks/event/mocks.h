@@ -187,6 +187,7 @@ public:
 
   // SchedulableCallback
   MOCK_METHOD(void, scheduleCallbackCurrentIteration, ());
+  MOCK_METHOD(void, scheduleCallbackNextIteration, ());
   MOCK_METHOD(void, cancel, ());
   MOCK_METHOD(bool, enabled, ());
 
