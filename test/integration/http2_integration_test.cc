@@ -9,6 +9,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/http/header_map_impl.h"
+#include "common/network/socket_option_impl.h"
 
 #include "test/integration/utility.h"
 #include "test/mocks/http/mocks.h"
@@ -1520,7 +1521,13 @@ void Http2FloodMitigationTest::beginSession() {
   // set lower outbound frame limits to make tests run faster
   config_helper_.setOutboundFramesLimits(1000, 100);
   initialize();
-  tcp_client_ = makeTcpConnection(lookupPort("http"));
+  // Set up a raw connection to easily send requests without reading responses. Also, set a small
+  // TCP receive buffer to speed up connection backup.
+  auto options = std::make_shared<Network::Socket::Options>();
+  options->emplace_back(std::make_shared<Network::SocketOptionImpl>(
+      envoy::config::core::v3::SocketOption::STATE_PREBIND,
+      ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_RCVBUF), 1024));
+  tcp_client_ = makeTcpConnection(lookupPort("http"), options);
   startHttp2Session();
 }
 
