@@ -6258,7 +6258,7 @@ virtual_hosts:
 TEST_F(RouteConfigurationV2, PathRedirectQueryNotPreserved) {
   TestScopedRuntime scoped_runtime;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.preserve_query_string_in_redirects", "false"}});
+      {{"envoy.reloadable_features.preserve_query_string_in_path_redirects", "false"}});
 
   std::string RouteDynPathRedirect = R"EOF(
 name: AllRedirects
@@ -6283,7 +6283,7 @@ virtual_hosts:
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("redirect.lyft.com", "/path/redirect/?lang=eng&con=US", true, false);
-    EXPECT_EQ("https://redirect.lyft.com/new/path-redirect/?lang=eng&con=US",
+    EXPECT_EQ("https://redirect.lyft.com/new/path-redirect/",
               config.route(headers, 0)->directResponseEntry()->newPath(headers));
   }
   {
