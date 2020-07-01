@@ -436,8 +436,9 @@ http_parser_settings ConnectionImpl::settings_{
       return conn_impl->setAndCheckCallbackStatus(std::move(status));
     },
     [](http_parser* parser, const char* at, size_t length) -> int {
-      static_cast<ConnectionImpl*>(parser->data)->onUrl(at, length);
-      return 0;
+      auto* conn_impl = static_cast<ConnectionImpl*>(parser->data);
+      auto status = conn_impl->onUrl(at, length);
+      return conn_impl->setAndCheckCallbackStatus(std::move(status));
     },
     nullptr, // on_status
     [](http_parser* parser, const char* at, size_t length) -> int {
@@ -531,6 +532,23 @@ Status ConnectionImpl::completeLastHeader() {
   header_parsing_state_ = HeaderParsingState::Field;
   ASSERT(current_header_field_.empty());
   ASSERT(current_header_value_.empty());
+  return okStatus();
+}
+
+uint32_t ConnectionImpl::getHeadersSize() {
+  return current_header_field_.size() + current_header_value_.size() +
+         headersOrTrailers().byteSize();
+}
+
+Status ConnectionImpl::checkMaxHeadersSize() {
+  const uint32_t total = getHeadersSize();
+  if (total > (max_headers_kb_ * 1024)) {
+    const absl::string_view header_type =
+        processing_trailers_ ? Http1HeaderTypes::get().Trailers : Http1HeaderTypes::get().Headers;
+    error_code_ = Http::Code::RequestHeaderFieldsTooLarge;
+    RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().HeadersTooLarge));
+    return codecProtocolError(absl::StrCat(header_type, " size exceeds limit"));
+  }
   return okStatus();
 }
 
@@ -633,13 +651,15 @@ Status ConnectionImpl::onHeaderField(const char* data, size_t length) {
     }
     processing_trailers_ = true;
     header_parsing_state_ = HeaderParsingState::Field;
+    allocTrailers();
   }
   if (header_parsing_state_ == HeaderParsingState::Value) {
     RETURN_IF_ERROR(completeLastHeader());
   }
 
   current_header_field_.append(data, length);
-  return okStatus();
+
+  return checkMaxHeadersSize();
 }
 
 Status ConnectionImpl::onHeaderValue(const char* data, size_t length) {
@@ -649,12 +669,7 @@ Status ConnectionImpl::onHeaderValue(const char* data, size_t length) {
     return okStatus();
   }
 
-  if (processing_trailers_) {
-    maybeAllocTrailers();
-  }
-
   absl::string_view header_value{data, length};
-
   if (strict_header_validation_) {
     if (!Http::HeaderUtility::headerValueIsValid(header_value)) {
       ENVOY_CONN_LOG(debug, "invalid header value: {}", connection_, header_value);
@@ -674,16 +689,7 @@ Status ConnectionImpl::onHeaderValue(const char* data, size_t length) {
   }
   current_header_value_.append(header_value.data(), header_value.length());
 
-  const uint32_t total =
-      current_header_field_.size() + current_header_value_.size() + headersOrTrailers().byteSize();
-  if (total > (max_headers_kb_ * 1024)) {
-    const absl::string_view header_type =
-        processing_trailers_ ? Http1HeaderTypes::get().Trailers : Http1HeaderTypes::get().Headers;
-    error_code_ = Http::Code::RequestHeaderFieldsTooLarge;
-    RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().HeadersTooLarge));
-    return codecProtocolError(absl::StrCat(header_type, " size exceeds limit"));
-  }
-  return okStatus();
+  return checkMaxHeadersSize();
 }
 
 Envoy::StatusOr<int> ConnectionImpl::onHeadersCompleteBase() {
@@ -848,6 +854,14 @@ ServerConnectionImpl::ServerConnectionImpl(
           Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_flood_protection")),
       headers_with_underscores_action_(headers_with_underscores_action) {}
 
+uint32_t ServerConnectionImpl::getHeadersSize() {
+  // Add in the the size of the request URL if processing request headers.
+  const uint32_t url_size = (!processing_trailers_ && active_request_.has_value())
+                                ? active_request_.value().request_url_.size()
+                                : 0;
+  return url_size + ConnectionImpl::getHeadersSize();
+}
+
 void ServerConnectionImpl::onEncodeComplete() {
   if (active_request_.value().remote_complete_) {
     // Only do this if remote is complete. If we are replying before the request is complete the
@@ -983,10 +997,13 @@ Status ServerConnectionImpl::onMessageBegin() {
   return okStatus();
 }
 
-void ServerConnectionImpl::onUrl(const char* data, size_t length) {
+Status ServerConnectionImpl::onUrl(const char* data, size_t length) {
   if (active_request_.has_value()) {
     active_request_.value().request_url_.append(data, length);
+
+    RETURN_IF_ERROR(checkMaxHeadersSize());
   }
+  return okStatus();
 }
 
 void ServerConnectionImpl::onBody(Buffer::Instance& data) {
