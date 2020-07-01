@@ -13,6 +13,7 @@ Common messages
   ../config/core/v3/proxy_protocol.proto
   ../service/discovery/v3/discovery.proto
   ../config/core/v3/config_source.proto
+  ../config/core/v3/default_socket_interface.proto
   ../config/core/v3/grpc_service.proto
   ../config/core/v3/grpc_method_list.proto
   ../config/core/v3/http_uri.proto
