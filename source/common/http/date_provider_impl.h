@@ -35,6 +35,7 @@ public:
   TlsCachingDateProviderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls);
 
   // Http::DateProvider
+  void setDateHeader(RequestHeaderMap& headers) override;
   void setDateHeader(ResponseHeaderMap& headers) override;
 
 private:
@@ -58,6 +59,7 @@ class SlowDateProviderImpl : public DateProviderImplBase {
 
 public:
   // Http::DateProvider
+  void setDateHeader(RequestHeaderMap& headers) override;
   void setDateHeader(ResponseHeaderMap& headers) override;
 };
 

@@ -19,7 +19,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Router :ref:`configuration overview <config_http_filters_router>`.
 // [#extension: envoy.filters.http.router]
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message Router {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.router.v2.Router";
@@ -35,9 +35,9 @@ message Router {
   bool start_child_span = 2;
 
   // Configuration for HTTP upstream logs emitted by the router. Upstream logs
-  // are configured in the same way as access logs, but each log entry represents
-  // an upstream request. Presuming retries are configured, multiple upstream
-  // requests may be made for each downstream (inbound) request.
+  // are configured in the same way as access logs, but each log entry
+  // represents an upstream request. Presuming retries are configured, multiple
+  // upstream requests may be made for each downstream (inbound) request.
   repeated config.accesslog.v3.AccessLog upstream_log = 3;
 
   // Do not add any additional *x-envoy-* headers to requests or responses. This
@@ -75,7 +75,11 @@ message Router {
   }];
 
   // If not set, ingress Envoy will ignore
-  // :ref:`config_http_filters_router_x-envoy-expected-rq-timeout-ms` header, populated by egress
-  // Envoy, when deriving timeout for upstream cluster.
+  // :ref:`config_http_filters_router_x-envoy-expected-rq-timeout-ms` header,
+  // populated by egress Envoy, when deriving timeout for upstream cluster.
   bool respect_expected_rq_timeout = 6;
+
+  // Enable the addition of the `Date` header to outbound requests.
+  // If `true`, the header will be assigned on each request (and retry).
+  bool add_request_date_header = 7;
 }

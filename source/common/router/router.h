@@ -26,6 +26,7 @@
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"
 #include "common/config/well_known_names.h"
+#include "common/http/date_provider_impl.h"
 #include "common/http/utility.h"
 #include "common/router/config_impl.h"
 #include "common/router/upstream_request.h"
@@ -182,14 +183,17 @@ public:
                Stats::Scope& scope, Upstream::ClusterManager& cm, Runtime::Loader& runtime,
                Runtime::RandomGenerator& random, ShadowWriterPtr&& shadow_writer,
                bool emit_dynamic_stats, bool start_child_span, bool suppress_envoy_headers,
-               bool respect_expected_rq_timeout,
+               bool respect_expected_rq_timeout, bool add_request_date_header,
                const Protobuf::RepeatedPtrField<std::string>& strict_check_headers,
-               TimeSource& time_source, Http::Context& http_context)
+               TimeSource& time_source, Http::DateProvider& date_provider,
+               Http::Context& http_context)
       : scope_(scope), local_info_(local_info), cm_(cm), runtime_(runtime),
         random_(random), stats_{ALL_ROUTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix))},
         emit_dynamic_stats_(emit_dynamic_stats), start_child_span_(start_child_span),
         suppress_envoy_headers_(suppress_envoy_headers),
-        respect_expected_rq_timeout_(respect_expected_rq_timeout), http_context_(http_context),
+        respect_expected_rq_timeout_(respect_expected_rq_timeout),
+        add_request_date_header_(add_request_date_header), http_context_(http_context),
+        date_provider_(date_provider),
         stat_name_pool_(scope_.symbolTable()), retry_(stat_name_pool_.add("retry")),
         zone_name_(stat_name_pool_.add(local_info_.zoneName())),
         empty_stat_name_(stat_name_pool_.add("")), shadow_writer_(std::move(shadow_writer)),
@@ -203,14 +207,15 @@ public:
   }
 
   FilterConfig(const std::string& stat_prefix, Server::Configuration::FactoryContext& context,
-               ShadowWriterPtr&& shadow_writer,
+               ShadowWriterPtr&& shadow_writer, Http::DateProvider& date_provider,
                const envoy::extensions::filters::http::router::v3::Router& config)
       : FilterConfig(stat_prefix, context.localInfo(), context.scope(), context.clusterManager(),
                      context.runtime(), context.random(), std::move(shadow_writer),
                      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true),
                      config.start_child_span(), config.suppress_envoy_headers(),
-                     config.respect_expected_rq_timeout(), config.strict_check_headers(),
-                     context.api().timeSource(), context.httpContext()) {
+                     config.respect_expected_rq_timeout(), config.add_request_date_header(),
+                     config.strict_check_headers(), context.api().timeSource(), date_provider,
+                     context.httpContext()) {
     for (const auto& upstream_log : config.upstream_log()) {
       upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, context));
     }
@@ -231,10 +236,12 @@ public:
   const bool start_child_span_;
   const bool suppress_envoy_headers_;
   const bool respect_expected_rq_timeout_;
+  const bool add_request_date_header_;
   // TODO(xyu-stripe): Make this a bitset to keep cluster memory footprint down.
   HeaderVectorPtr strict_check_headers_;
   std::list<AccessLog::InstanceSharedPtr> upstream_logs_;
   Http::Context& http_context_;
+  Http::DateProvider& date_provider_;
   Stats::StatNamePool stat_name_pool_;
   Stats::StatName retry_;
   Stats::StatName zone_name_;
@@ -513,7 +520,7 @@ private:
   void handleNon5xxResponseHeaders(absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                                    UpstreamRequest& upstream_request, bool end_stream,
                                    uint64_t grpc_to_http_status);
-  Http::Context& httpContext() { return config_.http_context_; }
+  Http::Context& () { return config_.http_context_; }
 
   FilterConfig& config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};

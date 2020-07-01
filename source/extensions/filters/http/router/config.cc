@@ -11,12 +11,22 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RouterFilter {
 
+// Singleton registration via macro defined in envoy/singleton/manager.h
+SINGLETON_MANAGER_REGISTRATION(date_provider);
+
 Http::FilterFactoryCb RouterFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::router::v3::Router& proto_config,
     const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
+  std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider =
+      context.singletonManager().getTyped<Http::TlsCachingDateProviderImpl>(
+          SINGLETON_MANAGER_REGISTERED_NAME(date_provider), [&context] {
+            return std::make_shared<Http::TlsCachingDateProviderImpl>(context.dispatcher(),
+                                                                      context.threadLocal());
+          });
+
   Router::FilterConfigSharedPtr filter_config(new Router::FilterConfig(
       stat_prefix, context, std::make_unique<Router::ShadowWriterImpl>(context.clusterManager()),
-      proto_config));
+      *date_provider, proto_config));
 
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<Router::ProdFilter>(*filter_config));

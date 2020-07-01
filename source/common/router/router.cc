@@ -330,6 +330,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   ASSERT(headers.Method());
   ASSERT(headers.Host());
 
+  if (config_.add_request_date_header_) {
+    config_.date_provider_.setDateHeader(headers);
+  }
+
   downstream_headers_ = &headers;
 
   // Extract debug configuration from filter state. This is used further along to determine whether
