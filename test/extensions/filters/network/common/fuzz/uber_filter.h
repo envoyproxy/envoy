@@ -20,36 +20,33 @@ public:
   void
   fuzz(const envoy::config::listener::v3::Filter& proto_config,
        const Protobuf::RepeatedPtrField<::test::extensions::filters::network::Action>& actions);
-
   // Get the name of filters which has been covered by this fuzzer.
   static std::vector<absl::string_view> filter_names();
+  // Avoid issues in destructors.
   void reset(const std::string filter_name);
 
 protected:
   // Set-up filter specific mock expectations in constructor.
   void mockMethodsSetup();
+  // Set-up mock expectations each timer when a filter is fuzzed.
   void filterSetup(const envoy::config::listener::v3::Filter& proto_config);
 
 private:
   static ::std::vector<absl::string_view> filter_names_;
-
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  // NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  Server::Configuration::MockFactoryContext factory_context_;
   Network::ReadFilterSharedPtr read_filter_;
-
   Network::FilterFactoryCb cb_;
-  NiceMock<Envoy::Network::MockConnection> connection_;
+  // NiceMock<Envoy::Network::MockConnection> connection_;
+  Envoy::Network::MockConnection connection_;
   Network::Address::InstanceConstSharedPtr addr_;
-  NiceMock<Upstream::MockClusterManager> cluster_manager_;
+  // NiceMock<Upstream::MockClusterManager> cluster_manager_;
+  Upstream::MockClusterManager cluster_manager_;
   Event::SimulatedTimeSystem time_source_;
-
   Stats::IsolatedStoreImpl scope_;
-  NiceMock<Runtime::MockLoader> runtime_;
+  // NiceMock<Runtime::MockLoader> runtime_;
+  Runtime::MockLoader runtime_;
   NiceMock<Network::MockReadFilterCallbacks> read_filter_callbacks_;
-
-  // Filters::Common::ExtAuthz::MockClient* client_;
-  // NiceMock<Http::MockAsyncClientRequest> async_request_;
-
-  // Filters::Common::ExtAuthz::ResponsePtr response_;
 };
 
 } // namespace NetworkFilters

@@ -1,5 +1,3 @@
-#include <iostream>
-#include <string_view>
 #include <vector>
 
 #include "common/config/utility.h"
@@ -35,7 +33,7 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase
         if (std::find(filter_names.begin(), filter_names.end(), input->config().name()) ==
             std::end(filter_names)) {
           absl::string_view filter_name = filter_names[seed % filter_names.size()];
-          // filter_name = "envoy.filters.network.local_ratelimit";
+          filter_name = "envoy.filters.network.redis_proxy";
           input->mutable_config()->set_name(std::string(filter_name));
         }
         // Set the corresponding type_url for Any.
@@ -46,15 +44,7 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase
       }};
 
   try {
-    // Catch invalid header characters.
     TestUtility::validate(input);
-    // names of available filters:
-    // static const std::vector<absl::string_view> filter_names = Registry::FactoryRegistry<
-    // Server::Configuration::NamedNetworkFilterConfigFactory>::registeredNames();
-    // std::cout<<"Found "<<filter_names.size()<<" filters"<<std::endl;
-    // for(absl::string_view filter_name : filter_names){
-    //   std::cout<<filter_name<<std::endl;
-    // }
     // Fuzz filter.
     static UberFilterFuzzer fuzzer;
     fuzzer.fuzz(input.config(), input.actions());
