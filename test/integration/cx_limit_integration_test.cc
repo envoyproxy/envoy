@@ -55,7 +55,8 @@ public:
 
     tcp_clients.emplace_back(makeTcpConnection(lookupPort("listener_0")));
     raw_conns.emplace_back();
-    ASSERT_FALSE(fake_upstreams_[0]->waitForRawConnection(raw_conns.back(), std::chrono::milliseconds(500)));
+    ASSERT_FALSE(
+        fake_upstreams_[0]->waitForRawConnection(raw_conns.back(), std::chrono::milliseconds(500)));
     tcp_clients.back()->waitForDisconnect();
 
     // Get rid of the client that failed to connect.
