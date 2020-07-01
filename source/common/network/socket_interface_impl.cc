@@ -82,24 +82,20 @@ bool SocketInterfaceImpl::ipFamilySupported(int domain) {
   return SOCKET_VALID(result.rc_);
 }
 
-Server::BootstrapExtensionPtr DefaultSocketInterfaceFactory::createBootstrapExtension(
-    const Protobuf::Message&, Server::Configuration::ServerFactoryContext&) {
-  auto sock_interface = std::make_unique<SocketInterfaceImpl>();
-  Network::registerSocketInterface(DEFAULT_SOCKET_INTERFACE_NAME, sock_interface.get());
-  return std::make_unique<SocketInterfaceExtension>(std::move(sock_interface));
+Server::BootstrapExtensionPtr
+SocketInterfaceImpl::createBootstrapExtension(const Protobuf::Message&,
+                                              Server::Configuration::ServerFactoryContext&) {
+  return std::make_unique<SocketInterfaceExtension>(this);
 }
 
-ProtobufTypes::MessagePtr DefaultSocketInterfaceFactory::createEmptyConfigProto() {
+ProtobufTypes::MessagePtr SocketInterfaceImpl::createEmptyConfigProto() {
   return std::make_unique<envoy::config::core::v3::DefaultSocketInterface>();
 }
 
-REGISTER_FACTORY(DefaultSocketInterfaceFactory, Server::Configuration::BootstrapExtensionFactory);
+REGISTER_FACTORY(SocketInterfaceImpl, Server::Configuration::BootstrapExtensionFactory);
 
 static SocketInterfaceLoader* socket_interface_ =
     new SocketInterfaceLoader(std::make_unique<SocketInterfaceImpl>());
-
-static SocketInterfacesLoader* socket_interfaces_ =
-    new SocketInterfacesLoader(std::make_unique<SocketInterfacesMap>());
 
 } // namespace Network
 } // namespace Envoy

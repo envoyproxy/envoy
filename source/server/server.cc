@@ -35,7 +35,7 @@
 #include "common/memory/stats.h"
 #include "common/network/address_impl.h"
 #include "common/network/listener_impl.h"
-#include "common/network/socket_interface_factory.h"
+#include "common/network/socket_interface.h"
 #include "common/network/socket_interface_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/router/rds_impl.h"

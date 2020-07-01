@@ -20,7 +20,7 @@ envoy_cc_library(
     ],
     deps = [
         ":io_socket_error_lib",
-        ":socket_interface_factory_lib",
+        ":socket_interface_lib",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/network:address_interface",
         "//include/envoy/network:io_handle_interface",
@@ -173,8 +173,8 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "socket_interface_factory_lib",
-    hdrs = ["socket_interface_factory.h"],
+    name = "socket_interface_lib",
+    hdrs = ["socket_interface.h"],
     deps = [
         "//include/envoy/config:typed_config_interface",
         "//include/envoy/network:socket_interface",
@@ -195,11 +195,10 @@ envoy_cc_library(
     ],
     deps = [
         ":address_lib",
-        ":socket_interface_factory_lib",
+        ":socket_interface_lib",
         "//include/envoy/network:socket_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
-        "//source/common/singleton:threadsafe_singleton",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

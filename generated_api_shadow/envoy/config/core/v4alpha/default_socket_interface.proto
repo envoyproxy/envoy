@@ -13,8 +13,6 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // [#protodoc-title: Default Socket Interface configuration]
 // Configuration for default socket interface that relies on OS dependent syscall to create
 // sockets.
-// [#extension: envoy.config.core]
-
 message DefaultSocketInterface {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.core.v3.DefaultSocketInterface";

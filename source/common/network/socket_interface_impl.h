@@ -3,33 +3,29 @@
 #include "envoy/network/address.h"
 #include "envoy/network/socket.h"
 
-#include "common/network/socket_interface_factory.h"
-#include "common/singleton/threadsafe_singleton.h"
-
-#define DEFAULT_SOCKET_INTERFACE_NAME "envoy.config.core.default_socket_interface"
+#include "common/network/socket_interface.h"
 
 namespace Envoy {
 namespace Network {
 
-class SocketInterfaceImpl : public SocketInterface {
+class SocketInterfaceImpl : public SocketInterfaceBase {
 public:
+  // SocketInterface
   IoHandlePtr socket(Socket::Type socket_type, Address::Type addr_type,
                      Address::IpVersion version) override;
   IoHandlePtr socket(Socket::Type socket_type, const Address::InstanceConstSharedPtr addr) override;
   IoHandlePtr socket(os_fd_t fd) override;
   bool ipFamilySupported(int domain) override;
-};
 
-class DefaultSocketInterfaceFactory : public SocketInterfaceFactory {
-public:
+  // Server::Configuration::BootstrapExtensionFactory
   Server::BootstrapExtensionPtr
   createBootstrapExtension(const Protobuf::Message& config,
                            Server::Configuration::ServerFactoryContext& context) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
-  std::string name() const override { return DEFAULT_SOCKET_INTERFACE_NAME; }
+  std::string name() const override { return "envoy.config.core.default_socket_interface"; };
 };
 
-DECLARE_FACTORY(DefaultSocketInterfaceFactory);
+DECLARE_FACTORY(SocketInterfaceImpl);
 
 } // namespace Network
 } // namespace Envoy
