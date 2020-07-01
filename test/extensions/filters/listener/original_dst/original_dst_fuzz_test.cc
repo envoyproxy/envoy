@@ -32,10 +32,13 @@ DEFINE_PROTO_FUZZER(
     auto address_ = Network::Utility::resolveUrl(input.address());
     ON_CALL(socket_, localAddress()).WillByDefault(testing::ReturnRef(address_));
     ON_CALL(callbacks_, socket()).WillByDefault(testing::ReturnRef(socket_));
-    if (address_ != nullptr)
+
+    if (address_ != nullptr) {
       ON_CALL(socket_, addressType()).WillByDefault(testing::Return(address_->type()));
-    if (socket_.addressType() == Network::Address::Type::Ip)
-      ON_CALL(socket_, ipVersion()).WillByDefault(testing::Return(address_->ip()->version()));
+      if (socket_.addressType() == Network::Address::Type::Ip) {
+        ON_CALL(socket_, ipVersion()).WillByDefault(testing::Return(address_->ip()->version()));
+      }
+    }
 
     auto filter = std::make_unique<OriginalDstFilter>();
 
