@@ -9,7 +9,9 @@ tasks:
     name: "RBE"
     platform: ubuntu1804
     test_targets:
-      - "//test/..."
+      - "//test/common/common/..."
+      - "//test/integration/..."
+      - "//test/exe/..."
     test_flags:
       - "--config=remote-clang-libc++"
       - "--config=remote-ci"
@@ -21,6 +23,7 @@ tasks:
       - "bazel/setup_clang.sh /usr/lib/llvm-10"
     test_targets:
       - "//test/common/common/..."
+      - "//test/integration/..."
       - "//test/exe/..."
     test_flags:
       - "--config=coverage"
