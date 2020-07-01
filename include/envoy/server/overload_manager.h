@@ -33,8 +33,6 @@ using OverloadActionCb = std::function<void(OverloadActionState)>;
  */
 class ThreadLocalOverloadState : public ThreadLocal::ThreadLocalObject {
 public:
-  virtual ~ThreadLocalOverloadState() = default;
-
   // Get a thread-local reference to the value for the given action key.
   virtual const OverloadActionState& getState(const std::string& action) PURE;
 };
