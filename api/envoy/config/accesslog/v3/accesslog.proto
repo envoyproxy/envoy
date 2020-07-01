@@ -285,6 +285,7 @@ message GrpcStatusFilter {
   bool exclude = 2;
 }
 
+<<<<<<< HEAD
 // Filters based on matching dynamic metadata.
 message MetadataFilter {
   option (udpa.annotations.versioning).previous_message_type =
@@ -293,6 +294,12 @@ message MetadataFilter {
   // Matcher to check metadata for specified value. For example, to match on the access_log_hint metadata
   // set the filter to "envoy.common" and the path to "access_log_hint".
   type.matcher.v3.MetadataMatcher matcher = 1;
+=======
+//Filters based on dynamic metadata log key
+message LogKeyFilter {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.filter.accesslog.v2.LogKeyFilter";
+>>>>>>> df71aafb0... added clarification to proto and previous versioning option
 }
 
 // Extension filter is statically registered at runtime.
