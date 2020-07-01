@@ -298,7 +298,7 @@ void HttpGenericBodyMatcher::bufferLastBytes(const Buffer::Instance& data,
 // length of the longest pattern.
 // This is used by matcher to buffer as minimum bytes as possible.
 size_t HttpGenericBodyMatcher::calcLongestPatternSize(const std::list<uint32_t>& indexes) const {
-  ASSERT(indexes.size() >= 1);
+  ASSERT(!indexes.empty());
   size_t max_len = 0;
   for (const auto& i : indexes) {
     max_len = std::max(max_len, patterns_->at(i).length());
