@@ -1643,6 +1643,7 @@ TEST_P(Http2FloodMitigationTest, Data) {
   // Set large buffer limits so the test is not affected by the flow control.
   config_helper_.setBufferLimits(1024 * 1024 * 1024, 1024 * 1024 * 1024);
   autonomous_upstream_ = true;
+  autonomous_allow_incomplete_streams_ = true;
   beginSession();
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
