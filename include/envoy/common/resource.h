@@ -2,6 +2,8 @@
 
 #include "envoy/common/pure.h"
 
+#include "absl/types/optional.h"
+
 #pragma once
 
 namespace Envoy {
