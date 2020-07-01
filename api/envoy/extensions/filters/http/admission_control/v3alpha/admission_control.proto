@@ -81,7 +81,7 @@ message AdmissionControl {
 
   // Rejection probability is defined by the formula::
   //
-  //     max(0, (rq_count -  rq_success_count / sr_threshold) / (rq_count + 1)) ^ aggression
+  //     max(0, (rq_count -  rq_success_count / sr_threshold) / (rq_count + 1)) ^ (1 / aggression)
   //
   // The aggression dictates how heavily the admission controller will throttle requests upon SR
   // dropping at or below the threshold. A value of 1 will result in a linear increase in

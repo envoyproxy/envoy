@@ -39,7 +39,7 @@ AdmissionControlFilterConfig::AdmissionControlFilterConfig(
       admission_control_feature_(proto_config.enabled(), runtime),
       aggression_(
           proto_config.has_aggression()
-              ? std::make_unique<Runtime::Double>(proto_config.aggression_coefficient(), runtime)
+              ? std::make_unique<Runtime::Double>(proto_config.aggression(), runtime)
               : nullptr),
       sr_threshold_(proto_config.has_sr_threshold()
                         ? std::make_unique<Runtime::Double>(proto_config.sr_threshold(), runtime)
@@ -51,8 +51,9 @@ double AdmissionControlFilterConfig::aggression() const {
 }
 
 double AdmissionControlFilterConfig::successRateThreshold() const {
-  return std::max<double>(0.0,
+  const double pct = std::max<double>(0.0,
                           sr_threshold_ ? sr_threshold_->value() : defaultSuccessRateThreshold);
+  return std::min<double>(pct, 100.0) / 100.0;
 }
 
 AdmissionControlFilter::AdmissionControlFilter(AdmissionControlFilterConfigSharedPtr config,
@@ -71,11 +72,8 @@ Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::RequestHea
   }
 
   if (shouldRejectRequest()) {
-    ENVOY_LOG(trace, "rejecting request");
     record_request_ = false;
     stats_.rq_rejected_.inc();
-    ENVOY_LOG(trace, "@tallen (decode) record request {} @ {}", record_request_,
-              uint64_t(&record_request_));
     decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "", nullptr, absl::nullopt,
                                        "denied by admission control");
     return Http::FilterHeadersStatus::StopIteration;
@@ -89,10 +87,7 @@ Http::FilterHeadersStatus AdmissionControlFilter::encodeHeaders(Http::ResponseHe
   // TODO(tonya11en): It's not possible for an HTTP filter to understand why a stream is reset, so
   // we are not currently accounting for resets when recording requests.
 
-  ENVOY_LOG(trace, "@tallen (encode) record request {} @ {}", record_request_,
-            uint64_t(&record_request_));
   if (!record_request_) {
-    ENVOY_LOG(trace, "not recording request");
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -107,12 +102,10 @@ Http::FilterHeadersStatus AdmissionControlFilter::encodeHeaders(Http::ResponseHe
     }
 
     const uint32_t status = enumToInt(grpc_status.value());
-    ENVOY_LOG(trace, "grpc status {}", status);
     successful_response = config_->responseEvaluator().isGrpcSuccess(status);
   } else {
     // HTTP response.
     const uint64_t http_status = Http::Utility::getResponseStatus(headers);
-    ENVOY_LOG(trace, "http status {}", http_status);
     successful_response = config_->responseEvaluator().isHttpSuccess(http_status);
   }
 
@@ -127,7 +120,6 @@ Http::FilterHeadersStatus AdmissionControlFilter::encodeHeaders(Http::ResponseHe
 
 Http::FilterTrailersStatus
 AdmissionControlFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
-  ENVOY_LOG(trace, "encode trailers");
   if (expect_grpc_status_in_trailer_) {
     absl::optional<GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(trailers, false);
 
@@ -147,11 +139,11 @@ bool AdmissionControlFilter::shouldRejectRequest() const {
   const double total = request_counts.requests;
   const double success = request_counts.successes;
   double probability = total - success / config_->successRateThreshold();
+  const auto aggression = config_->aggression();
   probability = probability / (total + 1);
-  probability = std::pow(probability, config_->aggression());
-
-  ENVOY_LOG(trace, "request_total={}, success_count={}, rej_probability={}", total, success,
-            probability);
+  if (aggression != 1.0) {
+    probability = std::pow(probability, 1.0 / config_->aggression());
+  }
 
   // Choosing an accuracy of 4 significant figures for the probability.
   static constexpr uint64_t accuracy = 1e4;
