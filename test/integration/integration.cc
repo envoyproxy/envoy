@@ -149,10 +149,11 @@ void IntegrationStreamDecoder::onResetStream(Http::StreamResetReason reason, abs
 }
 
 IntegrationTcpClient::IntegrationTcpClient(Event::Dispatcher& dispatcher,
+                                           Event::TestTimeSystem& time_system,
                                            MockBufferFactory& factory, uint32_t port,
                                            Network::Address::IpVersion version,
                                            bool enable_half_close)
-    : payload_reader_(new WaitForPayloadReader(dispatcher)),
+    : time_system_(time_system), payload_reader_(new WaitForPayloadReader(dispatcher)),
       callbacks_(new ConnectionCallbacks(*this)) {
   EXPECT_CALL(factory, create_(_, _, _))
       .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
@@ -219,7 +220,9 @@ void IntegrationTcpClient::waitForHalfClose() {
 
 void IntegrationTcpClient::readDisable(bool disabled) { connection_->readDisable(disabled); }
 
-void IntegrationTcpClient::write(const std::string& data, bool end_stream, bool verify) {
+AssertionResult IntegrationTcpClient::write(const std::string& data, bool end_stream, bool verify,
+                                            std::chrono::milliseconds timeout) {
+  auto end_time = time_system_.monotonicTime() + timeout;
   Buffer::OwnedImpl buffer(data);
   if (verify) {
     EXPECT_CALL(*client_write_buffer_, move(_));
@@ -233,12 +236,21 @@ void IntegrationTcpClient::write(const std::string& data, bool end_stream, bool 
   connection_->write(buffer, end_stream);
   do {
     connection_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
-  } while (client_write_buffer_->bytes_written() != bytes_expected && !disconnected_);
-  if (verify) {
-    // If we disconnect part way through the write, then we should fail, since write() is always
-    // expected to succeed.
-    EXPECT_TRUE(!disconnected_ || client_write_buffer_->bytes_written() == bytes_expected);
+    if (client_write_buffer_->bytes_written() == bytes_expected || disconnected_) {
+      break;
+    }
+  } while (time_system_.monotonicTime() < end_time);
+
+  if (time_system_.monotonicTime() >= end_time) {
+    return AssertionFailure() << "Timed out completing write";
+  } else if (verify && (disconnected_ || client_write_buffer_->bytes_written() != bytes_expected)) {
+    return AssertionFailure()
+           << "Failed to complete write or unexpected disconnect. disconnected_: " << disconnected_
+           << " bytes_written: " << client_write_buffer_->bytes_written()
+           << " bytes_expected: " << bytes_expected;
   }
+
+  return AssertionSuccess();
 }
 
 void IntegrationTcpClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent event) {
@@ -390,8 +402,8 @@ void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol)
 }
 
 IntegrationTcpClientPtr BaseIntegrationTest::makeTcpConnection(uint32_t port) {
-  return std::make_unique<IntegrationTcpClient>(*dispatcher_, *mock_buffer_factory_, port, version_,
-                                                enable_half_close_);
+  return std::make_unique<IntegrationTcpClient>(*dispatcher_, time_system_, *mock_buffer_factory_,
+                                                port, version_, enable_half_close_);
 }
 
 void BaseIntegrationTest::registerPort(const std::string& key, uint32_t port) {
