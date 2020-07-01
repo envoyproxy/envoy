@@ -1540,22 +1540,22 @@ Http2Frame Http2FloodMitigationTest::readFrame() {
 
 void Http2FloodMitigationTest::sendFame(const Http2Frame& frame) {
   ASSERT_TRUE(tcp_client_->connected());
-  tcp_client_->write(std::string(frame), false, false);
+  ASSERT_TRUE(tcp_client_->write(std::string(frame), false, false));
 }
 
 void Http2FloodMitigationTest::startHttp2Session() {
-  tcp_client_->write(Http2Frame::Preamble, false, false);
+  ASSERT_TRUE(tcp_client_->write(Http2Frame::Preamble, false, false));
 
   // Send empty initial SETTINGS frame.
   auto settings = Http2Frame::makeEmptySettingsFrame();
-  tcp_client_->write(std::string(settings), false, false);
+  ASSERT_TRUE(tcp_client_->write(std::string(settings), false, false));
 
   // Read initial SETTINGS frame from the server.
   readFrame();
 
   // Send an SETTINGS ACK.
   settings = Http2Frame::makeEmptySettingsFrame(Http2Frame::SettingsFlags::Ack);
-  tcp_client_->write(std::string(settings), false, false);
+  ASSERT_TRUE(tcp_client_->write(std::string(settings), false, false));
 
   // read pending SETTINGS and WINDOW_UPDATE frames
   readFrame();
@@ -1578,7 +1578,7 @@ void Http2FloodMitigationTest::floodServer(const Http2Frame& frame, const std::s
   // Add early stop if we have sent more than 100M of frames, as it this
   // point it is obvious something is wrong.
   while (total_bytes_sent < TransmitThreshold && tcp_client_->connected()) {
-    tcp_client_->write({buf.begin(), buf.end()}, false, false);
+    ASSERT_TRUE(tcp_client_->write({buf.begin(), buf.end()}, false, false));
     total_bytes_sent += buf.size();
   }
 

@@ -89,7 +89,7 @@ typed_config:
               any: true
 )EOF");
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  tcp_client->write("hello");
+  ASSERT_TRUE(tcp_client->write("hello"));
   ASSERT_TRUE(tcp_client->connected());
   tcp_client->close();
 
@@ -122,7 +122,7 @@ typed_config:
           - any: true
 )EOF");
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  tcp_client->write("hello");
+  ASSERT_TRUE(tcp_client->write("hello"));
   tcp_client->waitForDisconnect();
 
   EXPECT_EQ(0U, test_server_->counter("tcp.rbac.allowed")->value());

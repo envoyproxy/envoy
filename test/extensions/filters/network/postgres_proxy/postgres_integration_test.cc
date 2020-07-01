@@ -52,7 +52,7 @@ TEST_P(PostgresIntegrationTest, Login) {
   data.writeBEInt<uint32_t>(12);
   // Add 8 bytes of some data.
   data.add(buf, 8);
-  tcp_client->write(data.toString());
+  ASSERT_TRUE(tcp_client->write(data.toString()));
   ASSERT_TRUE(fake_upstream_connection->waitForData(data.toString().length(), &rcvd));
   data.drain(data.length());
 

@@ -201,7 +201,7 @@ protected:
     std::string ok = "+OK\r\n";
 
     redis_client->clearData();
-    redis_client->write(request);
+    ASSERT_TRUE(redis_client->write(request));
 
     if (fake_upstream_connection.get() == nullptr) {
       expect_auth_command = (!auth_password.empty());
@@ -471,7 +471,7 @@ TEST_P(RedisClusterIntegrationTest, ClusterSlotRequestAfterRedirection) {
   std::string proxy_to_server;
 
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
-  redis_client->write(request);
+  ASSERT_TRUE(redis_client->write(request));
 
   FakeRawConnectionPtr fake_upstream_connection_1, fake_upstream_connection_2,
       fake_upstream_connection_3;
@@ -593,7 +593,7 @@ TEST_P(RedisClusterWithRefreshIntegrationTest, ClusterSlotRequestAfterFailure) {
   std::string proxy_to_server;
 
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
-  redis_client->write(request);
+  ASSERT_TRUE(redis_client->write(request));
 
   FakeRawConnectionPtr fake_upstream_connection_1, fake_upstream_connection_2;
 

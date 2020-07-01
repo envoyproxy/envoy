@@ -136,11 +136,11 @@ TEST_P(TcpGrpcAccessLogIntegrationTest, BasicAccessLogFlow) {
 
   ASSERT_TRUE(fake_upstream_connection->write("hello"));
   tcp_client->waitForData("hello");
-  tcp_client->write("bar", false);
+  ASSERT_TRUE(tcp_client->write("bar", false));
 
   ASSERT_TRUE(fake_upstream_connection->write("", true));
   tcp_client->waitForHalfClose();
-  tcp_client->write("", true);
+  ASSERT_TRUE(tcp_client->write("", true));
 
   ASSERT_TRUE(fake_upstream_connection->waitForData(3));
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());

@@ -96,7 +96,8 @@ using IntegrationStreamDecoderPtr = std::unique_ptr<IntegrationStreamDecoder>;
  */
 class IntegrationTcpClient {
 public:
-  IntegrationTcpClient(Event::Dispatcher& dispatcher, MockBufferFactory& factory, uint32_t port,
+  IntegrationTcpClient(Event::Dispatcher& dispatcher, Event::TestTimeSystem& time_system,
+                       MockBufferFactory& factory, uint32_t port,
                        Network::Address::IpVersion version, bool enable_half_close = false);
 
   void close();
@@ -106,7 +107,9 @@ public:
   void waitForDisconnect(bool ignore_spurious_events = false);
   void waitForHalfClose();
   void readDisable(bool disabled);
-  void write(const std::string& data, bool end_stream = false, bool verify = true);
+  ABSL_MUST_USE_RESULT AssertionResult
+  write(const std::string& data, bool end_stream = false, bool verify = true,
+        std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
   const std::string& data() { return payload_reader_->data(); }
   bool connected() const { return !disconnected_; }
   // clear up to the `count` number of bytes of received data
@@ -124,6 +127,7 @@ private:
     IntegrationTcpClient& parent_;
   };
 
+  Event::TestTimeSystem& time_system_;
   std::shared_ptr<WaitForPayloadReader> payload_reader_;
   std::shared_ptr<ConnectionCallbacks> callbacks_;
   Network::ClientConnectionPtr connection_;
