@@ -117,8 +117,7 @@ std::pair<uint64_t, size_t> SymbolTableImpl::Encoding::decodeNumber(const uint8_
   return std::make_pair(number, encoding - start);
 }
 
-SymbolVec SymbolTableImpl::Encoding::decodeSymbols(const SymbolTable::Storage array,
-                                                   size_t size) {
+SymbolVec SymbolTableImpl::Encoding::decodeSymbols(const SymbolTable::Storage array, size_t size) {
   SymbolVec symbol_vec;
   symbol_vec.reserve(size);
   decodeTokens(
