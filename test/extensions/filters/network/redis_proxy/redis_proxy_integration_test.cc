@@ -1,6 +1,8 @@
 #include <sstream>
 #include <vector>
 
+#include "common/common/fmt.h"
+
 #include "extensions/filters/network/common/redis/fault_impl.h"
 #include "extensions/filters/network/redis_proxy/command_splitter_impl.h"
 
@@ -1096,12 +1098,13 @@ TEST_P(RedisProxyWithMirrorsIntegrationTest, EnabledViaRuntimeFraction) {
 
 // This test injects an error fault. The server responds with an error.
 TEST_P(RedisProxyWithFaultInjectionIntegrationTest, ErrorFault) {
-  // TODO: Figure out why there is a memory leak related to ErrorFaultRequest::create
-  std::stringstream fault_response;
-  fault_response << "-" << Extensions::NetworkFilters::Common::Redis::FaultMessages::get().Error
-                 << "\r\n";
+  // std::stringstream fault_response;
+  std::string fault_response = fmt::format("-{}\r\n", Extensions::NetworkFilters::Common::Redis::FaultMessages::get().Error);
   initialize();
-  simpleProxyResponse(makeBulkStringArray({"get", "foo"}), fault_response.str());
+  simpleProxyResponse(makeBulkStringArray({"get", "foo"}), fault_response);
+
+  EXPECT_EQ(1, test_server_->counter("redis.redis_stats.command.get.error")->value());
+  EXPECT_EQ(1, test_server_->counter("redis.redis_stats.command.get.error_fault")->value());
 }
 
 // This test injects a delay fault. The response from the server is unaffected.
@@ -1110,6 +1113,9 @@ TEST_P(RedisProxyWithFaultInjectionIntegrationTest, DelayFault) {
   const std::string& set_response = ":1\r\n";
   initialize();
   simpleRequestAndResponse(set_request, set_response);
+  
+  EXPECT_EQ(1, test_server_->counter("redis.redis_stats.command.set.success")->value());
+  EXPECT_EQ(1, test_server_->counter("redis.redis_stats.command.set.delay_fault")->value());
 }
 
 } // namespace

@@ -659,10 +659,8 @@ TEST_F(HttpHealthCheckerImplTest, Success) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.max_interval", testing::Matcher<uint64_t>(_)));
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.min_interval", testing::Matcher<uint64_t>(_)))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
       .WillOnce(Return(45000));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
               enableTimer(std::chrono::milliseconds(45000), _));
@@ -683,10 +681,8 @@ TEST_F(HttpHealthCheckerImplTest, Degraded) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.max_interval", testing::Matcher<uint64_t>(_)));
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.min_interval", testing::Matcher<uint64_t>(_)))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
       .WillRepeatedly(Return(45000));
 
   // We start off as healthy, and should go degraded after receiving the degraded health response.
@@ -699,8 +695,7 @@ TEST_F(HttpHealthCheckerImplTest, Degraded) {
   // Then, after receiving a regular health check response we should go back to healthy.
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   expectStreamCreate(0);
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.max_interval", testing::Matcher<uint64_t>(_)));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
   test_sessions_[0]->interval_timer_->invokeCallback();
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
@@ -840,10 +835,8 @@ TEST_F(HttpHealthCheckerImplTest, SuccessWithSpurious100Continue) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.max_interval", testing::Matcher<uint64_t>(_)));
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.min_interval", testing::Matcher<uint64_t>(_)))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
       .WillOnce(Return(45000));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
               enableTimer(std::chrono::milliseconds(45000), _));
@@ -870,10 +863,8 @@ TEST_F(HttpHealthCheckerImplTest, SuccessWithSpuriousMetadata) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.max_interval", testing::Matcher<uint64_t>(_)));
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.min_interval", testing::Matcher<uint64_t>(_)))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
       .WillOnce(Return(45000));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
               enableTimer(std::chrono::milliseconds(45000), _));
@@ -905,11 +896,8 @@ TEST_F(HttpHealthCheckerImplTest, SuccessWithMultipleHosts) {
   EXPECT_CALL(*test_sessions_[1]->timeout_timer_, enableTimer(_, _));
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.max_interval", testing::Matcher<uint64_t>(_)))
-      .Times(2);
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.min_interval", testing::Matcher<uint64_t>(_)))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _)).Times(2);
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
       .Times(2)
       .WillRepeatedly(Return(45000));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
@@ -943,11 +931,8 @@ TEST_F(HttpHealthCheckerImplTest, SuccessWithMultipleHostSets) {
   EXPECT_CALL(*test_sessions_[1]->timeout_timer_, enableTimer(_, _));
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.max_interval", testing::Matcher<uint64_t>(_)))
-      .Times(2);
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.min_interval", testing::Matcher<uint64_t>(_)))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _)).Times(2);
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
       .Times(2)
       .WillRepeatedly(Return(45000));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
@@ -1001,12 +986,8 @@ TEST_F(HttpHealthCheckerImplTest, ZeroRetryInterval) {
       }));
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.max_interval", testing::Matcher<uint64_t>(_)))
-      .WillOnce(Return(0));
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.min_interval", testing::Matcher<uint64_t>(_)))
-      .WillOnce(Return(0));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _)).WillOnce(Return(0));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _)).WillOnce(Return(0));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(1), _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
   absl::optional<std::string> health_checked_cluster("locations-production-iad");
@@ -1080,10 +1061,8 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheck) {
       }));
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.max_interval", testing::Matcher<uint64_t>(_)));
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.min_interval", testing::Matcher<uint64_t>(_)))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
       .WillOnce(Return(45000));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
               enableTimer(std::chrono::milliseconds(45000), _));
@@ -1116,10 +1095,8 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServicePrefixPatternCheck) {
       }));
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.max_interval", testing::Matcher<uint64_t>(_)));
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.min_interval", testing::Matcher<uint64_t>(_)))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
       .WillOnce(Return(45000));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
               enableTimer(std::chrono::milliseconds(45000), _));
@@ -1152,10 +1129,8 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceExactPatternCheck) {
       }));
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.max_interval", testing::Matcher<uint64_t>(_)));
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.min_interval", testing::Matcher<uint64_t>(_)))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
       .WillOnce(Return(45000));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
               enableTimer(std::chrono::milliseconds(45000), _));
@@ -1188,10 +1163,8 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceRegexPatternCheck) {
       }));
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.max_interval", testing::Matcher<uint64_t>(_)));
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.min_interval", testing::Matcher<uint64_t>(_)))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
       .WillOnce(Return(45000));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
               enableTimer(std::chrono::milliseconds(45000), _));
@@ -1231,10 +1204,8 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithCustomHostValueOnTheHos
       }));
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.max_interval", testing::Matcher<uint64_t>(_)));
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.min_interval", testing::Matcher<uint64_t>(_)))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
       .WillOnce(Return(45000));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
               enableTimer(std::chrono::milliseconds(45000), _));
@@ -1277,10 +1248,8 @@ TEST_F(HttpHealthCheckerImplTest,
       }));
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.max_interval", testing::Matcher<uint64_t>(_)));
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.min_interval", testing::Matcher<uint64_t>(_)))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
       .WillOnce(Return(45000));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
               enableTimer(std::chrono::milliseconds(45000), _));
@@ -1313,10 +1282,8 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithCustomHostValue) {
       }));
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.max_interval", testing::Matcher<uint64_t>(_)));
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.min_interval", testing::Matcher<uint64_t>(_)))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
       .WillOnce(Return(45000));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
               enableTimer(std::chrono::milliseconds(45000), _));
@@ -1397,10 +1364,8 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithAdditionalHeaders) {
       }));
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.max_interval", testing::Matcher<uint64_t>(_)));
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.min_interval", testing::Matcher<uint64_t>(_)))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
       .WillOnce(Return(45000));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
               enableTimer(std::chrono::milliseconds(45000), _));
@@ -1441,10 +1406,8 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithoutUserAgent) {
       }));
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.max_interval", testing::Matcher<uint64_t>(_)));
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.min_interval", testing::Matcher<uint64_t>(_)))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
       .WillOnce(Return(45000));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
               enableTimer(std::chrono::milliseconds(45000), _));
@@ -1475,10 +1438,8 @@ TEST_F(HttpHealthCheckerImplTest, ServiceDoesNotMatchFail) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.max_interval", testing::Matcher<uint64_t>(_)));
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.min_interval", testing::Matcher<uint64_t>(_)))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
       .WillOnce(Return(45000));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
               enableTimer(std::chrono::milliseconds(45000), _));
@@ -1508,10 +1469,8 @@ TEST_F(HttpHealthCheckerImplTest, ServicePatternDoesNotMatchFail) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.max_interval", testing::Matcher<uint64_t>(_)));
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.min_interval", testing::Matcher<uint64_t>(_)))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
       .WillOnce(Return(45000));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
               enableTimer(std::chrono::milliseconds(45000), _));
@@ -1541,10 +1500,8 @@ TEST_F(HttpHealthCheckerImplTest, ServiceNotPresentInResponseFail) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.max_interval", testing::Matcher<uint64_t>(_)));
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.min_interval", testing::Matcher<uint64_t>(_)))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
       .WillOnce(Return(45000));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
               enableTimer(std::chrono::milliseconds(45000), _));
@@ -1571,10 +1528,8 @@ TEST_F(HttpHealthCheckerImplTest, ServiceCheckRuntimeOff) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.max_interval", testing::Matcher<uint64_t>(_)));
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.min_interval", testing::Matcher<uint64_t>(_)))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
       .WillOnce(Return(45000));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
               enableTimer(std::chrono::milliseconds(45000), _));
@@ -1599,10 +1554,8 @@ TEST_F(HttpHealthCheckerImplTest, ServiceCheckRuntimeOffWithStringPattern) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.max_interval", testing::Matcher<uint64_t>(_)));
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.min_interval", testing::Matcher<uint64_t>(_)))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
       .WillOnce(Return(45000));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
               enableTimer(std::chrono::milliseconds(45000), _));
@@ -1651,11 +1604,8 @@ TEST_F(HttpHealthCheckerImplTest, SuccessStartFailedSuccessFirst) {
   // Test fast success immediately moves us to healthy.
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed)).Times(1);
   EXPECT_CALL(event_logger_, logAddHealthy(_, _, true));
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.max_interval", testing::Matcher<uint64_t>(_)))
-      .WillOnce(Return(500));
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.min_interval", testing::Matcher<uint64_t>(_)));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _)).WillOnce(Return(500));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(500), _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
   respond(0, "200", false);
@@ -2441,10 +2391,8 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithAltPort) {
       }));
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.max_interval", testing::Matcher<uint64_t>(_)));
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.min_interval", testing::Matcher<uint64_t>(_)))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
       .WillOnce(Return(45000));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
               enableTimer(std::chrono::milliseconds(45000), _));
@@ -2473,11 +2421,8 @@ TEST_F(HttpHealthCheckerImplTest, SuccessWithMultipleHostsAndAltPort) {
   EXPECT_CALL(*test_sessions_[1]->timeout_timer_, enableTimer(_, _));
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.max_interval", testing::Matcher<uint64_t>(_)))
-      .Times(2);
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.min_interval", testing::Matcher<uint64_t>(_)))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _)).Times(2);
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
       .Times(2)
       .WillRepeatedly(Return(45000));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
@@ -2749,10 +2694,8 @@ TEST_F(HttpHealthCheckerImplTest, DEPRECATED_FEATURE_TEST(ServiceNameMatch)) {
       }));
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.max_interval", testing::Matcher<uint64_t>(_)));
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.min_interval", testing::Matcher<uint64_t>(_)))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
       .WillOnce(Return(45000));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
               enableTimer(std::chrono::milliseconds(45000), _));
@@ -2779,10 +2722,8 @@ TEST_F(HttpHealthCheckerImplTest, DEPRECATED_FEATURE_TEST(ServiceNameMismatch)) 
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.max_interval", testing::Matcher<uint64_t>(_)));
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.min_interval", testing::Matcher<uint64_t>(_)))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
       .WillOnce(Return(45000));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
               enableTimer(std::chrono::milliseconds(45000), _));
@@ -3776,11 +3717,9 @@ public:
     }
     health_checker_->start();
 
-    EXPECT_CALL(runtime_.snapshot_,
-                getInteger("health_check.max_interval", testing::Matcher<uint64_t>(_)))
+    EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _))
         .Times(num_healthchecks);
-    EXPECT_CALL(runtime_.snapshot_,
-                getInteger("health_check.min_interval", testing::Matcher<uint64_t>(_)))
+    EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
         .Times(num_healthchecks)
         .WillRepeatedly(Return(45000));
     for (size_t i = 0; i < num_healthchecks; i++) {
@@ -3904,10 +3843,8 @@ public:
         }));
     health_checker_->start();
 
-    EXPECT_CALL(runtime_.snapshot_,
-                getInteger("health_check.max_interval", testing::Matcher<uint64_t>(_)));
-    EXPECT_CALL(runtime_.snapshot_,
-                getInteger("health_check.min_interval", testing::Matcher<uint64_t>(_)))
+    EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+    EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
         .WillOnce(Return(45000));
     expectHealthcheckStop(0, 45000);
 
@@ -4087,11 +4024,8 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessStartFailedSuccessFirst) {
   expectHealthcheckStart(0);
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.max_interval", testing::Matcher<uint64_t>(_)))
-      .WillOnce(Return(500));
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("health_check.min_interval", testing::Matcher<uint64_t>(_)));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _)).WillOnce(Return(500));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _));
   expectHealthcheckStop(0, 500);
   // Fast success immediately moves us to healthy.
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));

@@ -15,10 +15,8 @@ using FaultManagerKeyNames = ConstSingleton<FaultManagerKeyNamesValues>;
 FaultManagerImpl::FaultImpl::FaultImpl(
     envoy::extensions::filters::network::redis_proxy::v3::RedisProxy_RedisFault base_fault)
     : commands_(buildCommands(base_fault)) {
-  // Get delay
   delay_ms_ = std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(base_fault, delay, 0));
 
-  // Get fault type
   switch (base_fault.fault_type()) {
   case envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::RedisFault::DELAY:
     fault_type_ = FaultType::Delay;
@@ -31,7 +29,6 @@ FaultManagerImpl::FaultImpl::FaultImpl(
     break;
   }
 
-  // Get the default value/runtime key
   default_value_ = base_fault.fault_enabled().default_value();
   runtime_key_ = base_fault.fault_enabled().runtime_key();
 };
@@ -75,9 +72,7 @@ FaultMap FaultManagerImpl::buildFaultMap(
   // Get all ALL_KEY faults.
   FaultMap::iterator it_outer = fault_map.find(FaultManagerKeyNames::get().AllKey);
   if (it_outer != fault_map.end()) {
-    // For each ALL_KEY fault...
     for (const FaultSharedPtr& fault_ptr : it_outer->second) {
-      // Loop through all unique commands other than ALL_KEY and add the fault.
       FaultMap::iterator it_inner;
       for (it_inner = fault_map.begin(); it_inner != fault_map.end(); it_inner++) {
         std::string command = it_inner->first;
@@ -108,7 +103,7 @@ const Fault* FaultManagerImpl::getFaultForCommandInternal(std::string command) c
     int amortized_fault = 0;
 
     for (const FaultSharedPtr& fault_ptr : it_outer->second) {
-      uint64_t fault_injection_percentage = runtime_.snapshot().getInteger(
+      uint64_t fault_injection_percentage = runtime_.snapshot().getIntegerNumeratorOfFractionalPercent(
           fault_ptr->runtimeKey().value(), fault_ptr->defaultValue());
       if (random_number < (fault_injection_percentage + amortized_fault)) {
         return fault_ptr.get();
@@ -122,7 +117,6 @@ const Fault* FaultManagerImpl::getFaultForCommandInternal(std::string command) c
 }
 
 const Fault* FaultManagerImpl::getFaultForCommand(std::string command) const {
-  // Check if faults exist for given command; else use ALL_KEY and search for general faults.
   if (!fault_map_.empty()) {
     if (fault_map_.count(command) > 0) {
       return getFaultForCommandInternal(command);

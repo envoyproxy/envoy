@@ -203,7 +203,8 @@ message RedisProxy {
     // Delay for all faults. If not set, defaults to zero
     google.protobuf.Duration delay = 3;
 
-    // Commands fault is restricted to, if any.
+    // Commands fault is restricted to, if any. If not set, fault applies to all commands
+    // other than auth and ping (due to special handling of those commands in Envoy).
     repeated string commands = 4;
   }
 

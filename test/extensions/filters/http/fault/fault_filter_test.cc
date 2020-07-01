@@ -496,9 +496,7 @@ TEST_F(FaultFilterTest, FixedDelayZeroDuration) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", 5000))
       .WillOnce(Return(0));
 
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("fault.http.abort.http_status", testing::Matcher<uint64_t>(_)))
-      .Times(0);
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, _)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_, setResponseFlag(_)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
@@ -555,9 +553,7 @@ TEST_F(FaultFilterTest, FixedDelayDeprecatedPercentAndNonZeroDuration) {
             filter_->decodeHeaders(request_headers_, false));
 
   // Delay only case
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("fault.http.abort.http_status", testing::Matcher<uint64_t>(_)))
-      .Times(0);
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, _)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::FaultInjected))
@@ -601,12 +597,8 @@ TEST_F(FaultFilterTest, DelayForDownstreamCluster) {
             filter_->decodeHeaders(request_headers_, false));
 
   // Delay only case, no aborts.
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("fault.http.cluster.abort.http_status", testing::Matcher<uint64_t>(_)))
-      .Times(0);
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("fault.http.abort.http_status", testing::Matcher<uint64_t>(_)))
-      .Times(0);
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.cluster.abort.http_status", _)).Times(0);
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, _)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::FaultInjected))
@@ -873,16 +865,12 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortHeaderMatchFail) {
               featureEnabled("fault.http.delay.fixed_delay_percent",
                              Matcher<const envoy::type::v3::FractionalPercent&>(_)))
       .Times(0);
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("fault.http.delay.fixed_duration_ms", testing::Matcher<uint64_t>(_)))
-      .Times(0);
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", _)).Times(0);
   EXPECT_CALL(runtime_.snapshot_,
               featureEnabled("fault.http.abort.abort_percent",
                              Matcher<const envoy::type::v3::FractionalPercent&>(_)))
       .Times(0);
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("fault.http.abort.http_status", testing::Matcher<uint64_t>(_)))
-      .Times(0);
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, _)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_, setResponseFlag(_)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
@@ -933,9 +921,7 @@ TEST_F(FaultFilterTest, TimerResetAfterStreamReset) {
               featureEnabled("fault.http.abort.abort_percent",
                              Matcher<const envoy::type::v3::FractionalPercent&>(_)))
       .Times(0);
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("fault.http.abort.http_status", testing::Matcher<uint64_t>(_)))
-      .Times(0);
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, _)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::FaultInjected))
@@ -977,9 +963,7 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterMatchSuccess) {
             filter_->decodeHeaders(request_headers_, false));
 
   // Delay only case
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("fault.http.abort.http_status", testing::Matcher<uint64_t>(_)))
-      .Times(0);
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, _)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::FaultInjected))
@@ -1007,16 +991,12 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterMatchFail) {
               featureEnabled("fault.http.delay.fixed_delay_percent",
                              Matcher<const envoy::type::v3::FractionalPercent&>(_)))
       .Times(0);
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("fault.http.delay.fixed_duration_ms", testing::Matcher<uint64_t>(_)))
-      .Times(0);
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", _)).Times(0);
   EXPECT_CALL(runtime_.snapshot_,
               featureEnabled("fault.http.abort.abort_percent",
                              Matcher<const envoy::type::v3::FractionalPercent&>(_)))
       .Times(0);
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("fault.http.abort.http_status", testing::Matcher<uint64_t>(_)))
-      .Times(0);
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, _)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_, setResponseFlag(_)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
@@ -1041,16 +1021,12 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterNullRoute) {
               featureEnabled("fault.http.delay.fixed_delay_percent",
                              Matcher<const envoy::type::v3::FractionalPercent&>(_)))
       .Times(0);
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("fault.http.delay.fixed_duration_ms", testing::Matcher<uint64_t>(_)))
-      .Times(0);
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", _)).Times(0);
   EXPECT_CALL(runtime_.snapshot_,
               featureEnabled("fault.http.abort.abort_percent",
                              Matcher<const envoy::type::v3::FractionalPercent&>(_)))
       .Times(0);
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("fault.http.abort.http_status", testing::Matcher<uint64_t>(_)))
-      .Times(0);
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, _)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_, setResponseFlag(_)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
