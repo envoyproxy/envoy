@@ -40,25 +40,31 @@ DEFINE_PROTO_FUZZER(
       }
     }
 
-    auto filter = std::make_unique<OriginalDstFilter>();
+  } catch (const EnvoyException& e) {
+    ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
+    return;
+  }
 
-    // Set address family of mock socket so that it routes correctly thru addressFromSockAddr
-    ON_CALL(socket_, getSocketOption(_, _, _, _))
-        .WillByDefault(testing::WithArgs<0, 2>(Invoke([](int level, void* optval) {
-          switch (level) {
-          case SOL_IPV6:
-            static_cast<sockaddr_storage*>(optval)->ss_family = AF_INET6;
-            break;
-          case SOL_IP:
-            static_cast<sockaddr_storage*>(optval)->ss_family = AF_INET;
-            break;
-          default:
-            NOT_REACHED_GCOVR_EXCL_LINE;
-          }
+  auto filter = std::make_unique<OriginalDstFilter>();
 
-          return Api::SysCallIntResult{0, 0};
-        })));
+  // Set address family of mock socket so that it routes correctly thru addressFromSockAddr
+  ON_CALL(socket_, getSocketOption(_, _, _, _))
+      .WillByDefault(testing::WithArgs<0, 2>(Invoke([](int level, void* optval) {
+    switch (level) {
+        case SOL_IPV6:
+          static_cast<sockaddr_storage*>(optval)->ss_family = AF_INET6;
+          break;
+        case SOL_IP:
+          static_cast<sockaddr_storage*>(optval)->ss_family = AF_INET;
+          break;
+        default:
+          NOT_REACHED_GCOVR_EXCL_LINE;
+        }
 
+        return Api::SysCallIntResult{0, 0};
+    })));
+
+  try {
     filter->onAccept(callbacks_);
   } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
