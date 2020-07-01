@@ -48,7 +48,7 @@ DEFINE_PROTO_FUZZER(
   // Set address family of mock socket so that it routes correctly thru addressFromSockAddr
   ON_CALL(socket_, getSocketOption(_, _, _, _))
       .WillByDefault(testing::WithArgs<0, 2>(Invoke([](int level, void* optval) {
-    switch (level) {
+        switch (level) {
         case SOL_IPV6:
           static_cast<sockaddr_storage*>(optval)->ss_family = AF_INET6;
           break;
@@ -60,7 +60,7 @@ DEFINE_PROTO_FUZZER(
         }
 
         return Api::SysCallIntResult{0, 0};
-    })));
+        })));
 
   filter->onAccept(callbacks_);
 }
