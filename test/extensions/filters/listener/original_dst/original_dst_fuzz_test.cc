@@ -1,5 +1,3 @@
-#include "envoy/extensions/filters/listener/original_dst/v3/original_dst.pb.h"
-
 #include "common/network/utility.h"
 
 #include "extensions/filters/listener/original_dst/original_dst.h"

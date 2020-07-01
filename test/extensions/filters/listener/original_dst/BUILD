@@ -37,6 +37,5 @@ envoy_cc_fuzz_test(
         ":original_dst_fuzz_test_proto_cc_proto",
         "//source/extensions/filters/listener/original_dst:original_dst_lib",
         "//test/mocks/network:network_mocks",
-        "@envoy_api//envoy/extensions/filters/listener/original_dst/v3:pkg_cc_proto",
     ],
 )
