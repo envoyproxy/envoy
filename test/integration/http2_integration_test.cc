@@ -9,6 +9,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/http/header_map_impl.h"
+#include "common/network/socket_option_impl.h"
 
 #include "test/integration/utility.h"
 #include "test/mocks/http/mocks.h"
@@ -1520,7 +1521,13 @@ void Http2FloodMitigationTest::beginSession() {
   // set lower outbound frame limits to make tests run faster
   config_helper_.setOutboundFramesLimits(1000, 100);
   initialize();
-  tcp_client_ = makeTcpConnection(lookupPort("http"));
+  // Set up a raw connection to easily send requests without reading responses. Also, set a small
+  // TCP receive buffer to speed up connection backup.
+  auto options = std::make_shared<Network::Socket::Options>();
+  options->emplace_back(std::make_shared<Network::SocketOptionImpl>(
+      envoy::config::core::v3::SocketOption::STATE_PREBIND,
+      ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_RCVBUF), 1024));
+  tcp_client_ = makeTcpConnection(lookupPort("http"), options);
   startHttp2Session();
 }
 
@@ -1540,22 +1547,22 @@ Http2Frame Http2FloodMitigationTest::readFrame() {
 
 void Http2FloodMitigationTest::sendFame(const Http2Frame& frame) {
   ASSERT_TRUE(tcp_client_->connected());
-  tcp_client_->write(std::string(frame), false, false);
+  ASSERT_TRUE(tcp_client_->write(std::string(frame), false, false));
 }
 
 void Http2FloodMitigationTest::startHttp2Session() {
-  tcp_client_->write(Http2Frame::Preamble, false, false);
+  ASSERT_TRUE(tcp_client_->write(Http2Frame::Preamble, false, false));
 
   // Send empty initial SETTINGS frame.
   auto settings = Http2Frame::makeEmptySettingsFrame();
-  tcp_client_->write(std::string(settings), false, false);
+  ASSERT_TRUE(tcp_client_->write(std::string(settings), false, false));
 
   // Read initial SETTINGS frame from the server.
   readFrame();
 
   // Send an SETTINGS ACK.
   settings = Http2Frame::makeEmptySettingsFrame(Http2Frame::SettingsFlags::Ack);
-  tcp_client_->write(std::string(settings), false, false);
+  ASSERT_TRUE(tcp_client_->write(std::string(settings), false, false));
 
   // read pending SETTINGS and WINDOW_UPDATE frames
   readFrame();
@@ -1578,7 +1585,7 @@ void Http2FloodMitigationTest::floodServer(const Http2Frame& frame, const std::s
   // Add early stop if we have sent more than 100M of frames, as it this
   // point it is obvious something is wrong.
   while (total_bytes_sent < TransmitThreshold && tcp_client_->connected()) {
-    tcp_client_->write({buf.begin(), buf.end()}, false, false);
+    ASSERT_TRUE(tcp_client_->write({buf.begin(), buf.end()}, false, false));
     total_bytes_sent += buf.size();
   }
 
@@ -1643,6 +1650,7 @@ TEST_P(Http2FloodMitigationTest, Data) {
   // Set large buffer limits so the test is not affected by the flow control.
   config_helper_.setBufferLimits(1024 * 1024 * 1024, 1024 * 1024 * 1024);
   autonomous_upstream_ = true;
+  autonomous_allow_incomplete_streams_ = true;
   beginSession();
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
