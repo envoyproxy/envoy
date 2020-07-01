@@ -2,11 +2,6 @@ syntax = "proto3";
 
 package envoy.extensions.filters.listener.original_dst.v3;
 
-import "envoy/extensions/filters/listener/original_dst/v3/original_dst.proto";
-import "google/protobuf/empty.proto";
-import "validate/validate.proto";
-
 message OriginalDstTestCase {
-  envoy.extensions.filters.listener.original_dst.v3.OriginalDst config = 1;
   string address = 2;
 }

@@ -26,9 +26,7 @@ envoy_extension_cc_test(
 envoy_proto_library(
     name = "original_dst_fuzz_test_proto",
     srcs = ["original_dst_fuzz_test.proto"],
-    deps = [
-        "@envoy_api//envoy/extensions/filters/listener/original_dst/v3:pkg",
-    ],
+    deps = [],
 )
 
 envoy_cc_fuzz_test(

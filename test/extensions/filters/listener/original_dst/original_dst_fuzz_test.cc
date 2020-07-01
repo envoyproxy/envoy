@@ -64,12 +64,7 @@ DEFINE_PROTO_FUZZER(
         return Api::SysCallIntResult{0, 0};
     })));
 
-  try {
-    filter->onAccept(callbacks_);
-  } catch (const EnvoyException& e) {
-    ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
-    return;
-  }
+  filter->onAccept(callbacks_);
 }
 
 } // namespace OriginalDst
