@@ -12,7 +12,6 @@
 #include "envoy/admin/v3/server_info.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
-#include "envoy/event/timer.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/request_id_extension.h"
