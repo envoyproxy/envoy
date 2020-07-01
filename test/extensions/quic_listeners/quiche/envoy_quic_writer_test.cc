@@ -82,7 +82,7 @@ TEST_F(EnvoyQuicWriterTest, SendBlocked) {
   EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _))
       .WillOnce(testing::Invoke([this, str](int, const msghdr* message, int) {
         verifySendData(str, message);
-        return Api::SysCallSizeResult{-1, EAGAIN};
+        return Api::SysCallSizeResult{-1, SOCKET_ERROR_AGAIN};
       }));
   quic::WriteResult result = envoy_quic_writer_.WritePacket(str.data(), str.length(), self_address_,
                                                             peer_address_, nullptr);
@@ -94,7 +94,7 @@ TEST_F(EnvoyQuicWriterTest, SendBlocked) {
   EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _))
       .WillOnce(testing::Invoke([this, str](int, const msghdr* message, int) {
         verifySendData(str, message);
-        return Api::SysCallSizeResult{-1, EAGAIN};
+        return Api::SysCallSizeResult{-1, SOCKET_ERROR_AGAIN};
       }));
 #endif
   EXPECT_DEBUG_DEATH(envoy_quic_writer_.WritePacket(str.data(), str.length(), self_address_,
@@ -109,7 +109,7 @@ TEST_F(EnvoyQuicWriterTest, SendFailure) {
   EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _))
       .WillOnce(testing::Invoke([this, str](int, const msghdr* message, int) {
         verifySendData(str, message);
-        return Api::SysCallSizeResult{-1, ENOTSUP};
+        return Api::SysCallSizeResult{-1, SOCKET_ERROR_NOT_SUP};
       }));
   quic::WriteResult result = envoy_quic_writer_.WritePacket(str.data(), str.length(), self_address_,
                                                             peer_address_, nullptr);
@@ -123,7 +123,7 @@ TEST_F(EnvoyQuicWriterTest, SendFailureMessageTooBig) {
   EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _))
       .WillOnce(testing::Invoke([this, str](int, const msghdr* message, int) {
         verifySendData(str, message);
-        return Api::SysCallSizeResult{-1, EMSGSIZE};
+        return Api::SysCallSizeResult{-1, SOCKET_ERROR_MSG_SIZE};
       }));
   quic::WriteResult result = envoy_quic_writer_.WritePacket(str.data(), str.length(), self_address_,
                                                             peer_address_, nullptr);

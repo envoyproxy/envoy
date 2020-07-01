@@ -15,7 +15,7 @@ Below you can see a graphic showing the docker compose deployment:
   :width: 100%
 
 All incoming requests are routed via the front Envoy, which is acting as a reverse proxy sitting on
-the edge of the ``envoymesh`` network. Port ``80`` is mapped to  port ``8000`` by docker compose
+the edge of the ``envoymesh`` network. Port ``8000`` is exposed by docker compose
 (see :repo:`/examples/front-proxy/docker-compose.yaml`). Moreover, notice
 that all  traffic routed by the front Envoy to the service containers is actually routed to the
 service Envoys (routes setup in :repo:`/examples/front-proxy/front-envoy.yaml`). In turn the service
@@ -49,9 +49,9 @@ or ``git clone https://github.com/envoyproxy/envoy.git``::
 
             Name                         Command             State                            Ports
   --------------------------------------------------------------------------------------------------------------------------
-  front-proxy_front-envoy_1   /docker-entrypoint.sh /bin ... Up      10000/tcp, 0.0.0.0:8000->80/tcp, 0.0.0.0:8001->8001/tcp
-  front-proxy_service1_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 80/tcp
-  front-proxy_service2_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 80/tcp
+  front-proxy_front-envoy_1   /docker-entrypoint.sh /bin ... Up      10000/tcp, 0.0.0.0:8000->8000/tcp, 0.0.0.0:8001->8001/tcp
+  front-proxy_service1_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 8000/tcp
+  front-proxy_service2_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 8000/tcp
 
 **Step 3: Test Envoy's routing capabilities**
 
@@ -174,13 +174,13 @@ can use ``docker-compose exec <container_name> /bin/bash``. For example we can
 enter the ``front-envoy`` container, and ``curl`` for services locally::
 
   $ docker-compose exec front-envoy /bin/bash
-  root@81288499f9d7:/# curl localhost:80/service/1
+  root@81288499f9d7:/# curl localhost:8000/service/1
   Hello from behind Envoy (service 1)! hostname: 85ac151715c6 resolvedhostname: 172.19.0.3
-  root@81288499f9d7:/# curl localhost:80/service/1
+  root@81288499f9d7:/# curl localhost:8000/service/1
   Hello from behind Envoy (service 1)! hostname: 20da22cfc955 resolvedhostname: 172.19.0.5
-  root@81288499f9d7:/# curl localhost:80/service/1
+  root@81288499f9d7:/# curl localhost:8000/service/1
   Hello from behind Envoy (service 1)! hostname: f26027f1ce28 resolvedhostname: 172.19.0.6
-  root@81288499f9d7:/# curl localhost:80/service/2
+  root@81288499f9d7:/# curl localhost:8000/service/2
   Hello from behind Envoy (service 2)! hostname: 92f4a3737bbc resolvedhostname: 172.19.0.2
 
 **Step 6: enter containers and curl admin**
@@ -227,7 +227,7 @@ statistics. For example inside ``frontenvoy`` we can get::
     "uptime_current_epoch": "401s",
     "uptime_all_epochs": "401s"
   }
-  
+
 .. code-block:: text
 
   root@e654c2c83277:/# curl localhost:8001/stats

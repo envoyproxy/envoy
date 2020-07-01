@@ -18,3 +18,7 @@ The following Envoy filters emit dynamic metadata that other filters can leverag
 * :ref:`Role Based Access Control (RBAC) Filter <config_http_filters_rbac_dynamic_metadata>`
 * :ref:`Role Based Access Control (RBAC) Network Filter <config_network_filters_rbac_dynamic_metadata>`
 * :ref:`ZooKeeper Proxy Filter <config_network_filters_zookeeper_proxy_dynamic_metadata>`
+
+The following Envoy filters can be configured to consume dynamic metadata emitted by other filters.
+
+* :ref:`RateLimit Filter limit override <config_http_filters_rate_limit_override_dynamic_metadata>`
