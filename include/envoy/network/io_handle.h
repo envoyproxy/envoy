@@ -148,7 +148,7 @@ public:
    * @return a Api::SysCallIntResult with rc_ = 0 for success and rc_ = -1 for failure. If the call
    *   is successful, errno_ shouldn't be used.
    */
-  virtual Api::SysCallIntResult bind(const sockaddr* address, socklen_t addrlen) PURE;
+  virtual Api::SysCallIntResult bind(Address::InstanceConstSharedPtr address) PURE;
 
   /**
    * Listen on bound handle.
@@ -166,7 +166,7 @@ public:
    * @return a Api::SysCallIntResult with rc_ = 0 for success and rc_ = -1 for failure. If the call
    *   is successful, errno_ shouldn't be used.
    */
-  virtual Api::SysCallIntResult connect(const sockaddr* address, socklen_t addrlen) PURE;
+  virtual Api::SysCallIntResult connect(Address::InstanceConstSharedPtr address) PURE;
 
   /**
    * Set option (see man 2 setsockopt)

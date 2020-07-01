@@ -757,13 +757,6 @@ public:
     }
     header_map_->verifyByteSizeInternalForTest();
   }
-  TestHeaderMapImplBase(
-      const std::initializer_list<std::pair<Http::LowerCaseString, std::string>>& values) {
-    for (auto& value : values) {
-      header_map_->addCopy(value.first, value.second);
-    }
-    header_map_->verifyByteSizeInternalForTest();
-  }
   TestHeaderMapImplBase(const TestHeaderMapImplBase& rhs)
       : TestHeaderMapImplBase(*rhs.header_map_) {}
   TestHeaderMapImplBase(const HeaderMap& rhs) {
@@ -848,9 +841,6 @@ public:
   }
   void iterateReverse(HeaderMap::ConstIterateCb cb, void* context) const override {
     header_map_->iterateReverse(cb, context);
-  }
-  HeaderMap::Lookup lookup(const LowerCaseString& key, const HeaderEntry** entry) const override {
-    return header_map_->lookup(key, entry);
   }
   void clear() override {
     header_map_->clear();

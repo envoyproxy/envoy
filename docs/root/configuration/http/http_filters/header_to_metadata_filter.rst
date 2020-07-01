@@ -60,6 +60,26 @@ This would then allow requests with the `x-version` header set to be matched aga
 endpoints with the corresponding version. Whereas requests with that header missing
 would be matched with the default endpoints.
 
+If the header's value needs to be transformed before it's added to the request as
+dynamic metadata, this filter supports regex matching and substitution:
+
+.. code-block:: yaml
+
+  http_filters:
+    - name: envoy.filters.http.header_to_metadata
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.header_to_metadata.v3.Config
+        request_rules:
+          - header: ":path"
+            on_header_present:
+              metadata_namespace: envoy.lb
+              key: cluster
+              regex_value_rewrite:
+                pattern:
+                  google_re2: {}
+                  regex: "^/(cluster[\\d\\w-]+)/?.*$"
+                substitution: "\\1"
+
 Note that this filter also supports per route configuration:
 
 .. code-block:: yaml
