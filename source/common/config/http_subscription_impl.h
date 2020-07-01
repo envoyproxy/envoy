@@ -28,8 +28,8 @@ public:
                        std::chrono::milliseconds request_timeout,
                        const Protobuf::MethodDescriptor& service_method, absl::string_view type_url,
                        envoy::config::core::v3::ApiVersion transport_api_version,
-                       SubscriptionCallbacks& callbacks, SubscriptionStats stats,
-                       std::chrono::milliseconds init_fetch_timeout,
+                       SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
+                       SubscriptionStats stats, std::chrono::milliseconds init_fetch_timeout,
                        ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // Config::Subscription
@@ -50,6 +50,7 @@ private:
   Protobuf::RepeatedPtrField<std::string> resources_;
   envoy::service::discovery::v3::DiscoveryRequest request_;
   Config::SubscriptionCallbacks& callbacks_;
+  Config::OpaqueResourceDecoder& resource_decoder_;
   SubscriptionStats stats_;
   Event::Dispatcher& dispatcher_;
   std::chrono::milliseconds init_fetch_timeout_;

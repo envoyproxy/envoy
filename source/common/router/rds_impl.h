@@ -10,6 +10,7 @@
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
+#include "envoy/config/route/v3/route.pb.validate.h"
 #include "envoy/config/subscription.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/http/codes.h"
@@ -128,17 +129,13 @@ public:
 
 private:
   // Config::SubscriptionCallbacks
-  void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+  void onConfigUpdate(const std::vector<Envoy::Config::DecodedResourceRef>& resources,
                       const std::string& version_info) override;
-  void onConfigUpdate(
-      const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
-      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-      const std::string&) override;
+  void onConfigUpdate(const std::vector<Envoy::Config::DecodedResourceRef>& added_resources,
+                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                      const std::string& system_version_info) override;
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
-  std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::config::route::v3::RouteConfiguration>(resource).name();
-  }
 
   Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) {
     return update_callback_manager_.add(callback);
@@ -155,7 +152,6 @@ private:
   std::unique_ptr<Envoy::Config::Subscription> subscription_;
   const std::string route_config_name_;
   Server::Configuration::ServerFactoryContext& factory_context_;
-  ProtobufMessage::ValidationVisitor& validator_;
 
   // Init target used to notify the parent init manager that the subscription [and its sub resource]
   // is ready.

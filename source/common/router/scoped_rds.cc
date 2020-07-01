@@ -6,7 +6,6 @@
 #include "envoy/api/v2/scoped_route.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/route/v3/scoped_route.pb.h"
-#include "envoy/config/route/v3/scoped_route.pb.validate.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
@@ -100,18 +99,18 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
     : DeltaConfigSubscriptionInstance("SRDS", manager_identifier, config_provider_manager,
                                       factory_context),
       Envoy::Config::SubscriptionBase<envoy::config::route::v3::ScopedRouteConfiguration>(
-          rds_config_source.resource_api_version()),
+          rds_config_source.resource_api_version(),
+          factory_context.messageValidationContext().dynamicValidationVisitor(), "name"),
       factory_context_(factory_context), name_(name), scope_key_builder_(scope_key_builder),
       scope_(factory_context.scope().createScope(stat_prefix + "scoped_rds." + name + ".")),
       stats_({ALL_SCOPED_RDS_STATS(POOL_COUNTER(*scope_))}),
-      rds_config_source_(std::move(rds_config_source)),
-      validation_visitor_(factory_context.messageValidationContext().dynamicValidationVisitor()),
-      stat_prefix_(stat_prefix), route_config_provider_manager_(route_config_provider_manager) {
+      rds_config_source_(std::move(rds_config_source)), stat_prefix_(stat_prefix),
+      route_config_provider_manager_(route_config_provider_manager) {
   const auto resource_name = getResourceName();
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           scoped_rds.scoped_rds_config_source(), Grpc::Common::typeUrl(resource_name), *scope_,
-          *this);
+          *this, resource_decoder_);
 
   initialize([scope_key_builder]() -> Envoy::Config::ConfigProvider::ConfigConstSharedPtr {
     return std::make_shared<ScopedConfigImpl>(
@@ -135,19 +134,18 @@ ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::RdsRouteConfigProvide
       })) {}
 
 bool ScopedRdsConfigSubscription::addOrUpdateScopes(
-    const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& resources,
-    Init::Manager& init_manager, const std::string& version_info,
-    std::vector<std::string>& exception_msgs) {
+    const std::vector<Envoy::Config::DecodedResourceRef>& resources, Init::Manager& init_manager,
+    const std::string& version_info, std::vector<std::string>& exception_msgs) {
   bool any_applied = false;
   envoy::extensions::filters::network::http_connection_manager::v3::Rds rds;
   rds.mutable_config_source()->MergeFrom(rds_config_source_);
   absl::flat_hash_set<std::string> unique_resource_names;
   for (const auto& resource : resources) {
-    envoy::config::route::v3::ScopedRouteConfiguration scoped_route_config;
     try {
-      scoped_route_config =
-          MessageUtil::anyConvertAndValidate<envoy::config::route::v3::ScopedRouteConfiguration>(
-              resource.resource(), validation_visitor_);
+      // Explicit copy so that we can std::move later.
+      envoy::config::route::v3::ScopedRouteConfiguration scoped_route_config =
+          dynamic_cast<const envoy::config::route::v3::ScopedRouteConfiguration&>(
+              resource.get().resource());
       const std::string scope_name = scoped_route_config.name();
       if (!unique_resource_names.insert(scope_name).second) {
         throw EnvoyException(
@@ -221,7 +219,7 @@ ScopedRdsConfigSubscription::removeScopes(
 }
 
 void ScopedRdsConfigSubscription::onConfigUpdate(
-    const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
+    const std::vector<Envoy::Config::DecodedResourceRef>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& version_info) {
   // NOTE: deletes are done before adds/updates.
@@ -306,17 +304,17 @@ void ScopedRdsConfigSubscription::onRdsConfigUpdate(const std::string& scope_nam
 // TODO(stevenzzzz): see issue #7508, consider generalizing this function as it overlaps with
 // CdsApiImpl::onConfigUpdate.
 void ScopedRdsConfigSubscription::onConfigUpdate(
-    const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+    const std::vector<Envoy::Config::DecodedResourceRef>& resources,
     const std::string& version_info) {
   absl::flat_hash_map<std::string, envoy::config::route::v3::ScopedRouteConfiguration>
       scoped_routes;
   absl::flat_hash_map<uint64_t, std::string> scope_name_by_key_hash;
-  for (const auto& resource_any : resources) {
+  for (const auto& resource : resources) {
     // Throws (thus rejects all) on any error.
-    auto scoped_route =
-        MessageUtil::anyConvertAndValidate<envoy::config::route::v3::ScopedRouteConfiguration>(
-            resource_any, validation_visitor_);
-    const std::string scope_name = scoped_route.name();
+    const auto& scoped_route =
+        dynamic_cast<const envoy::config::route::v3::ScopedRouteConfiguration&>(
+            resource.get().resource());
+    const std::string& scope_name = scoped_route.name();
     auto scope_config_inserted = scoped_routes.try_emplace(scope_name, std::move(scoped_route));
     if (!scope_config_inserted.second) {
       throw EnvoyException(
@@ -332,21 +330,15 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
     }
   }
   ScopedRouteMap scoped_routes_to_remove = scoped_route_map_;
-  Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> to_add_repeated;
   Protobuf::RepeatedPtrField<std::string> to_remove_repeated;
   for (auto& iter : scoped_routes) {
     const std::string& scope_name = iter.first;
     scoped_routes_to_remove.erase(scope_name);
-    auto* to_add = to_add_repeated.Add();
-    to_add->set_name(scope_name);
-    to_add->set_version(version_info);
-    to_add->mutable_resource()->PackFrom(iter.second);
   }
-
   for (const auto& scoped_route : scoped_routes_to_remove) {
     *to_remove_repeated.Add() = scoped_route.first;
   }
-  onConfigUpdate(to_add_repeated, to_remove_repeated, version_info);
+  onConfigUpdate(resources, to_remove_repeated, version_info);
 }
 
 ScopedRdsConfigProvider::ScopedRdsConfigProvider(

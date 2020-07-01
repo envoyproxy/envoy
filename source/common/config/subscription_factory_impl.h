@@ -22,7 +22,8 @@ public:
   // Config::SubscriptionFactory
   SubscriptionPtr subscriptionFromConfigSource(const envoy::config::core::v3::ConfigSource& config,
                                                absl::string_view type_url, Stats::Scope& scope,
-                                               SubscriptionCallbacks& callbacks) override;
+                                               SubscriptionCallbacks& callbacks,
+                                               OpaqueResourceDecoder& resource_decoder) override;
 
 private:
   const LocalInfo::LocalInfo& local_info_;

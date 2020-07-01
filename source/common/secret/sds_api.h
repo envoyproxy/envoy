@@ -8,6 +8,7 @@
 #include "envoy/config/subscription_factory.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/secret.pb.validate.h"
 #include "envoy/init/manager.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
@@ -56,16 +57,13 @@ protected:
   Common::CallbackManager<> update_callback_manager_;
 
   // Config::SubscriptionCallbacks
-  void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+  void onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
                       const std::string& version_info) override;
-  void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>&,
-                      const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override;
+  void onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
+                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                      const std::string& system_version_info) override;
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
-  std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::extensions::transport_sockets::tls::v3::Secret>(resource)
-        .name();
-  }
   virtual std::vector<std::string> getDataSourceFilenames() PURE;
 
 private:
@@ -83,7 +81,6 @@ private:
   uint64_t secret_hash_;
   uint64_t files_hash_;
   Cleanup clean_up_;
-  ProtobufMessage::ValidationVisitor& validation_visitor_;
   Config::SubscriptionFactory& subscription_factory_;
   TimeSource& time_source_;
   SecretData secret_data_;

@@ -3,6 +3,7 @@
 #include <fstream>
 
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/config/filesystem_subscription_impl.h"
@@ -31,7 +32,8 @@ public:
       : path_(TestEnvironment::temporaryPath("eds.json")),
         api_(Api::createApiForTest(stats_store_, simTime())),
         dispatcher_(api_->allocateDispatcher("test_thread")),
-        subscription_(*dispatcher_, path_, callbacks_, stats_, validation_visitor_, *api_) {}
+        subscription_(*dispatcher_, path_, callbacks_, resource_decoder_, stats_,
+                      validation_visitor_, *api_) {}
 
   ~FilesystemSubscriptionTestHarness() override { TestEnvironment::removePath(path_); }
 
@@ -74,7 +76,10 @@ public:
     file_json += "]}";
     envoy::service::discovery::v3::DiscoveryResponse response_pb;
     TestUtility::loadFromJson(file_json, response_pb);
-    EXPECT_CALL(callbacks_, onConfigUpdate(RepeatedProtoEq(response_pb.resources()), version))
+    const auto decoded_resources =
+        TestUtility::decodeResources<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+            response_pb, "cluster_name");
+    EXPECT_CALL(callbacks_, onConfigUpdate(DecodedResourcesEq(decoded_resources.refvec_), version))
         .WillOnce(ThrowOnRejectedConfig(accept));
     if (accept) {
       version_ = version;
@@ -114,6 +119,8 @@ public:
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   NiceMock<Config::MockSubscriptionCallbacks> callbacks_;
+  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
+      resource_decoder_{"cluster_name"};
   FilesystemSubscriptionImpl subscription_;
   bool file_at_start_{false};
 };

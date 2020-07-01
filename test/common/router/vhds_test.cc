@@ -76,8 +76,8 @@ vhds:
   }
   RouteConfigUpdatePtr
   makeRouteConfigUpdate(const envoy::config::route::v3::RouteConfiguration& rc) {
-    RouteConfigUpdatePtr config_update_info = std::make_unique<RouteConfigUpdateReceiverImpl>(
-        factory_context_.timeSource(), factory_context_.messageValidationVisitor());
+    RouteConfigUpdatePtr config_update_info =
+        std::make_unique<RouteConfigUpdateReceiverImpl>(factory_context_.timeSource());
     config_update_info->onRdsUpdate(rc, "1");
     return config_update_info;
   }
@@ -131,9 +131,11 @@ TEST_F(VhdsTest, VhdsAddsVirtualHosts) {
 
   auto vhost = buildVirtualHost("vhost1", "vhost.first");
   const auto& added_resources = buildAddedResources({vhost});
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(added_resources);
   const Protobuf::RepeatedPtrField<std::string> removed_resources;
   factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
-      added_resources, removed_resources, "1");
+      decoded_resources.refvec_, removed_resources, "1");
 
   EXPECT_EQ(1UL, config_update_info->routeConfiguration().virtual_hosts_size());
   EXPECT_TRUE(
@@ -189,9 +191,11 @@ vhds:
 
   auto vhost = buildVirtualHost("vhost_vhds1", "vhost.first");
   const auto& added_resources = buildAddedResources({vhost});
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(added_resources);
   const Protobuf::RepeatedPtrField<std::string> removed_resources;
   factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
-      added_resources, removed_resources, "1");
+      decoded_resources.refvec_, removed_resources, "1");
   EXPECT_EQ(2UL, config_update_info->routeConfiguration().virtual_hosts_size());
 
   config_update_info->onRdsUpdate(updated_route_config, "2");
@@ -206,30 +210,6 @@ vhds:
               "vhost_rds2" == actual_vhost_2.name());
   EXPECT_TRUE("vhost_vhds1" == actual_vhost_0.name() || "vhost_vhds1" == actual_vhost_1.name() ||
               "vhost_vhds1" == actual_vhost_2.name());
-}
-
-// verify vhds validates VirtualHosts in added_resources
-TEST_F(VhdsTest, VhdsValidatesAddedVirtualHosts) {
-  const auto route_config =
-      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(default_vhds_config_);
-  RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
-
-  VhdsSubscription subscription(config_update_info, factory_context_, context_, providers_);
-
-  auto vhost = TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(R"EOF(
-        name: invalid_vhost
-        domains: []
-        routes:
-        - match: { prefix: "/" }
-          route: { cluster: "my_service" }
-)EOF");
-
-  const auto& added_resources = buildAddedResources({vhost});
-  const Protobuf::RepeatedPtrField<std::string> removed_resources;
-
-  EXPECT_THROW(factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
-                   added_resources, removed_resources, "1"),
-               ProtoValidationException);
 }
 
 } // namespace

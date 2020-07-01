@@ -24,8 +24,10 @@ struct AddedRemoved {
 };
 
 struct Watch {
-  Watch(SubscriptionCallbacks& callbacks) : callbacks_(callbacks) {}
+  Watch(SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder)
+      : callbacks_(callbacks), resource_decoder_(resource_decoder) {}
   SubscriptionCallbacks& callbacks_;
+  OpaqueResourceDecoder& resource_decoder_;
   std::set<std::string> resource_names_; // must be sorted set, for set_difference.
   // Needed only for state-of-the-world.
   // Whether the most recent update contained any resources this watch cares about.
@@ -56,14 +58,14 @@ struct Watch {
 // update the subscription accordingly.
 //
 // A WatchMap is assumed to be dedicated to a single type_url type of resource (EDS, CDS, etc).
-class WatchMap : public SubscriptionCallbacks, public Logger::Loggable<Logger::Id::config> {
+class WatchMap : public UntypedConfigUpdateCallbacks, public Logger::Loggable<Logger::Id::config> {
 public:
   WatchMap() = default;
 
   // Adds 'callbacks' to the WatchMap, with every possible resource being watched.
   // (Use updateWatchInterest() to narrow it down to some specific names).
   // Returns the newly added watch, to be used with updateWatchInterest and removeWatch.
-  Watch* addWatch(SubscriptionCallbacks& callbacks);
+  Watch* addWatch(SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder);
 
   // Updates the set of resource names that the given watch should watch.
   // Returns any resource name additions/removals that are unique across all watches. That is:
@@ -81,17 +83,14 @@ public:
   AddedRemoved
   convertAliasWatchesToNameWatches(const envoy::service::discovery::v3::Resource& resource);
 
-  // SubscriptionCallbacks
+  // UntypedConfigUpdateCallbacks.
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                       const std::string& version_info) override;
   void onConfigUpdate(
       const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
       const std::string& system_version_info) override;
-
   void onConfigUpdateFailed(ConfigUpdateFailureReason reason, const EnvoyException* e) override;
-
-  std::string resourceName(const ProtobufWkt::Any&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
   WatchMap(const WatchMap&) = delete;
   WatchMap& operator=(const WatchMap&) = delete;

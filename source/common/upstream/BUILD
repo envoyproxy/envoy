@@ -365,6 +365,7 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_factory_interface",
         "//include/envoy/upstream:locality_lib",
         "//source/common/config:api_version_lib",
+        "//source/common/config:decoded_resource_lib",
         "//source/common/config:metadata_lib",
         "//source/common/config:subscription_base_interface",
         "//source/common/config:subscription_factory_lib",

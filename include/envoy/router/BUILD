@@ -13,6 +13,7 @@ envoy_cc_library(
     hdrs = ["rds.h"],
     deps = [
         ":router_interface",
+        "//include/envoy/http:filter_interface",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )

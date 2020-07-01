@@ -19,12 +19,15 @@ public:
    * @param scope stats scope for any stats tracked by the subscription.
    * @param callbacks the callbacks needed by all Subscription objects, to deliver config updates.
    *                  The callbacks must not result in the deletion of the Subscription object.
+   * @param resource_decoder how incoming opaque resource objects are to be decoded.
+   *
    * @return SubscriptionPtr subscription object corresponding for config and type_url.
    */
   virtual SubscriptionPtr
   subscriptionFromConfigSource(const envoy::config::core::v3::ConfigSource& config,
                                absl::string_view type_url, Stats::Scope& scope,
-                               SubscriptionCallbacks& callbacks) PURE;
+                               SubscriptionCallbacks& callbacks,
+                               OpaqueResourceDecoder& resource_decoder) PURE;
 };
 
 } // namespace Config

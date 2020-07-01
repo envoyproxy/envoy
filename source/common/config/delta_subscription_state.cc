@@ -10,9 +10,9 @@ namespace Envoy {
 namespace Config {
 
 DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
-                                               SubscriptionCallbacks& callbacks,
+                                               UntypedConfigUpdateCallbacks& watch_map,
                                                const LocalInfo::LocalInfo& local_info)
-    : type_url_(std::move(type_url)), callbacks_(callbacks), local_info_(local_info) {}
+    : type_url_(std::move(type_url)), watch_map_(watch_map), local_info_(local_info) {}
 
 void DeltaSubscriptionState::updateSubscriptionInterest(const std::set<std::string>& cur_added,
                                                         const std::set<std::string>& cur_removed) {
@@ -81,7 +81,7 @@ void DeltaSubscriptionState::handleGoodResponse(
           fmt::format("duplicate name {} found in the union of added+removed resources", name));
     }
   }
-  callbacks_.onConfigUpdate(message.resources(), message.removed_resources(),
+  watch_map_.onConfigUpdate(message.resources(), message.removed_resources(),
                             message.system_version_info());
   for (const auto& resource : message.resources()) {
     setResourceVersion(resource.name(), resource.version());
@@ -108,11 +108,11 @@ void DeltaSubscriptionState::handleBadResponse(const EnvoyException& e, UpdateAc
   ack.error_detail_.set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
   ack.error_detail_.set_message(Config::Utility::truncateGrpcStatusMessage(e.what()));
   ENVOY_LOG(warn, "delta config for {} rejected: {}", type_url_, e.what());
-  callbacks_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);
+  watch_map_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);
 }
 
 void DeltaSubscriptionState::handleEstablishmentFailure() {
-  callbacks_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure,
+  watch_map_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure,
                                   nullptr);
 }
 
