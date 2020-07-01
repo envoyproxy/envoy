@@ -45,6 +45,9 @@ public:
   void replay();
   void close();
 
+  const size_t ListenersMax = 3;
+  const size_t RoutesMax = 5;
+
 private:
   absl::optional<std::string> removeListener(uint32_t listener_num);
   absl::optional<std::string> removeRoute(uint32_t route_num);
@@ -59,9 +62,6 @@ private:
   envoy::config::core::v3::ApiVersion api_version_;
 
   Network::Address::IpVersion ip_version_;
-
-  const size_t ListenersMax = 3;
-  const size_t RoutesMax = 5;
 };
 
 } // namespace Envoy
