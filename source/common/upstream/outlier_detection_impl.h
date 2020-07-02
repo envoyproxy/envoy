@@ -69,6 +69,8 @@ struct SuccessRateAccumulatorBucket {
   std::atomic<uint64_t> total_request_counter_;
 };
 
+using SuccessRateAccumulatorBucketPtr = std::unique_ptr<SuccessRateAccumulatorBucket>;
+
 /**
  * The SuccessRateAccumulator uses the SuccessRateAccumulatorBucket to get per host success rate
  * stats. This implementation has a fixed window size of time, and thus only needs a
@@ -131,6 +133,8 @@ private:
 };
 
 class DetectorImpl;
+
+using DetectorImplSharedPtr = std::shared_ptr<DetectorImpl>;
 
 /**
  * Implementation of DetectorHostMonitor for the generic detector.

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <deque>
+#include <memory>
 #include <string>
 
 #include "envoy/buffer/buffer.h"
@@ -211,6 +212,10 @@ protected:
 };
 
 using SlicePtr = std::unique_ptr<Slice>;
+
+class OwnedSlice;
+
+using OwnedSlicePtr = std::unique_ptr<OwnedSlice>;
 
 // OwnedSlice can not be derived from as it has variable sized array as member.
 class OwnedSlice final : public Slice, public InlineStorage {

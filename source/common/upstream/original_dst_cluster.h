@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <string>
 #include <unordered_map>
 
@@ -23,6 +24,10 @@ namespace Upstream {
 
 using HostMapSharedPtr = std::shared_ptr<HostMap>;
 using HostMapConstSharedPtr = std::shared_ptr<const HostMap>;
+
+class OriginalDstCluster;
+
+using OriginalDstClusterSharedPtr = std::shared_ptr<OriginalDstCluster>;
 
 /**
  * The OriginalDstCluster is a dynamic cluster that automatically adds hosts as needed based on the
@@ -113,8 +118,6 @@ private:
 
   friend class OriginalDstClusterFactory;
 };
-
-using OriginalDstClusterSharedPtr = std::shared_ptr<OriginalDstCluster>;
 
 class OriginalDstClusterFactory : public ClusterFactoryImplBase {
 public:

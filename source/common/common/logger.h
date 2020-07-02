@@ -129,6 +129,8 @@ private:
   Thread::BasicLockable* lock_{};
 };
 
+using StderrSinkDelegatePtr = std::unique_ptr<StderrSinkDelegate>;
+
 /**
  * Stacks logging sinks, so you can temporarily override the logging mechanism, restoring
  * the previous state when the DelegatingSink is destructed.

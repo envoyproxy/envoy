@@ -2,6 +2,7 @@
 
 #include "envoy/network/transport_socket.h"
 #include "envoy/stream_info/filter_state.h"
+#include <memory>
 
 namespace Envoy {
 namespace Network {
@@ -65,6 +66,8 @@ private:
   const std::vector<std::string> override_alpn_list_;
   const absl::optional<std::string> alpn_fallback_;
 };
+
+using TransportSocketOptionsImplConstSharedPtr = std::shared_ptr<const TransportSocketOptionsImpl>;
 
 class TransportSocketOptionsUtility {
 public:

@@ -6,6 +6,7 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "common/protobuf/protobuf.h"
+#include <memory>
 
 namespace Envoy {
 namespace Config {
@@ -124,6 +125,7 @@ public:
 using GrpcMuxPtr = std::unique_ptr<GrpcMux>;
 using GrpcMuxSharedPtr = std::shared_ptr<GrpcMux>;
 
+template <class ResponseProto> using ResponseProtoPtr = std::unique_ptr<ResponseProto>;
 /**
  * A grouping of callbacks that a GrpcMux should provide to its GrpcStream.
  */
@@ -146,7 +148,7 @@ public:
   /**
    * For the GrpcStream to pass received protos to the context.
    */
-  virtual void onDiscoveryResponse(ResponseProtoPtr&& message,
+  virtual void onDiscoveryResponse(ResponseProtoPtr<ResponseProto>&& message,
                                    ControlPlaneStats& control_plane_stats) PURE;
 
   /**

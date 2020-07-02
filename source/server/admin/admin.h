@@ -3,6 +3,7 @@
 #include <chrono>
 #include <functional>
 #include <list>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -412,6 +413,8 @@ private:
   const AdminInternalAddressConfig internal_address_config_;
   const LocalReply::LocalReplyPtr local_reply_;
 };
+
+using AdminImplPtr = std::unique_ptr<AdminImpl>;
 
 } // namespace Server
 } // namespace Envoy

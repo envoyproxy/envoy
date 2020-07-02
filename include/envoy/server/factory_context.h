@@ -104,6 +104,8 @@ public:
   virtual Api::Api& api() PURE;
 };
 
+using CommonFactoryContextPtr = std::unique_ptr<CommonFactoryContext>;
+
 /**
  * ServerFactoryContext is an specialization of common interface for downstream and upstream network
  * filters. The implementation guarantees the lifetime is no shorter than server. It could be used
@@ -248,6 +250,7 @@ public:
 };
 
 using FilterChainFactoryContextPtr = std::unique_ptr<FilterChainFactoryContext>;
+using FilterChainFactoryContextSharedPtr = std::shared_ptr<FilterChainFactoryContext>;
 
 /**
  * An implementation of FactoryContext. The life time should cover the lifetime of the filter chains

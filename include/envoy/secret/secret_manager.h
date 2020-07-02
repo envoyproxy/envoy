@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <string>
 
 #include "envoy/config/core/v3/config_source.pb.h"
@@ -155,6 +156,8 @@ public:
       const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name,
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context) PURE;
 };
+
+using SecretManagerPtr = std::unique_ptr<SecretManager>;
 
 } // namespace Secret
 } // namespace Envoy

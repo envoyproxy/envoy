@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/common/pure.h"
 #include "envoy/server/watchdog.h"
 
@@ -41,6 +43,8 @@ public:
    */
   virtual void stopWatching(WatchDogSharedPtr wd) PURE;
 };
+
+using GuardDogPtr = std::unique_ptr<GuardDog>;
 
 } // namespace Server
 } // namespace Envoy

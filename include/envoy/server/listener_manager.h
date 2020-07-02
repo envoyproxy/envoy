@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <vector>
 
 #include "envoy/admin/v3/config_dump.pb.h"
@@ -222,6 +223,8 @@ public:
    */
   virtual ApiListenerOptRef apiListener() PURE;
 };
+
+using ListenerManagerPtr = std::unique_ptr<ListenerManager>;
 
 } // namespace Server
 } // namespace Envoy

@@ -426,6 +426,8 @@ private:
     };
   };
 
+  using RouteConfigUpdateRequesterPtr = std::unique_ptr<RouteConfigUpdateRequester>;
+
   class RdsRouteConfigUpdateRequester : public RouteConfigUpdateRequester {
   public:
     RdsRouteConfigUpdateRequester(Router::RouteConfigProvider* route_config_provider)

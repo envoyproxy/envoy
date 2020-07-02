@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <unordered_map>
 
@@ -81,6 +82,8 @@ private:
     const ares_channel channel_;
     const std::string dns_name_;
   };
+
+  using PendingResolutionPtr = std::unique_ptr<PendingResolution>;
 
   struct AresOptions {
     ares_options options_;

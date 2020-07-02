@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <memory>
 #include <set>
 #include <sstream>
 #include <string>
@@ -535,9 +536,13 @@ private:
   double m2_{0};
 };
 
+template <class Value> struct TrieEntry;
+
+template <class Value> using TrieEntryPtr = std::unique_ptr<TrieEntry<Value>>;
+
 template <class Value> struct TrieEntry {
   Value value_{};
-  std::array<TrieEntryPtr, 256> entries_;
+  std::array<TrieEntryPtr<Value>, 256> entries_;
 };
 
 /**

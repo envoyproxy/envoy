@@ -192,6 +192,7 @@ public:
 
   using OptionConstSharedPtr = std::shared_ptr<const Option>;
   using Options = std::vector<OptionConstSharedPtr>;
+  using OptionsPtr = std::unique_ptr<Options>;
   using OptionsSharedPtr = std::shared_ptr<Options>;
 
   static OptionsSharedPtr& appendOptions(OptionsSharedPtr& to, const OptionsSharedPtr& from) {

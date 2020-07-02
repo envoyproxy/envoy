@@ -10,6 +10,7 @@
 #include "common/router/metadatamatchcriteria_impl.h"
 
 #include "extensions/filters/network/thrift_proxy/app_exception_impl.h"
+#include "extensions/filters/network/thrift_proxy/conn_manager.h"
 #include "extensions/filters/network/well_known_names.h"
 
 #include "absl/strings/match.h"

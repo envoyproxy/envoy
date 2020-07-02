@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/http/conn_pool.h"
 #include "envoy/network/connection.h"
 #include "envoy/tcp/conn_pool.h"
@@ -16,6 +18,8 @@ public:
   // Cancel the conn pool request and close any excess pending requests.
   virtual void cancel() PURE;
 };
+
+using ConnectionHandleSharedPtr = std::shared_ptr<ConnectionHandle>;
 
 // An implementation of ConnectionHandle which works with the Tcp::ConnectionPool.
 class TcpConnectionHandle : public ConnectionHandle {
@@ -58,6 +62,8 @@ public:
   virtual Tcp::ConnectionPool::ConnectionData*
   onDownstreamEvent(Network::ConnectionEvent event) PURE;
 };
+
+using GenericUpstreamPtr = std::unique_ptr<GenericUpstream>;
 
 class TcpUpstream : public GenericUpstream {
 public:

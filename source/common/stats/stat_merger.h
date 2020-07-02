@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/stats/store.h"
 
 #include "common/protobuf/protobuf.h"
@@ -98,6 +100,8 @@ private:
   // another store/scope.
   ScopePtr temp_scope_;
 };
+
+using StatMergerPtr = std::unique_ptr<StatMerger>;
 
 } // namespace Stats
 } // namespace Envoy

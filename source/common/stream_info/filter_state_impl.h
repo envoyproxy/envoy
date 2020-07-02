@@ -56,6 +56,10 @@ private:
   enum class ParentAccessMode { ReadOnly, ReadWrite };
   void maybeCreateParent(ParentAccessMode parent_access_mode);
 
+  struct FilterObject;
+
+  using FilterObjectPtr = std::unique_ptr<FilterObject>;
+
   struct FilterObject {
     ObjectSharedPtr data_;
     FilterState::StateType state_type_;

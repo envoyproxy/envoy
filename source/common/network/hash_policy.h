@@ -4,6 +4,7 @@
 #include "envoy/type/v3/hash_policy.pb.h"
 
 #include "common/common/hash.h"
+#include <memory>
 
 namespace Envoy {
 namespace Network {
@@ -32,5 +33,8 @@ public:
 private:
   HashMethodPtr hash_impl_;
 };
+
+using HashPolicyImplConstPtr = std::unique_ptr<const HashPolicyImpl>;
+
 } // namespace Network
 } // namespace Envoy

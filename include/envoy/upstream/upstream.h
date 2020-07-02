@@ -208,6 +208,7 @@ public:
 using HostConstSharedPtr = std::shared_ptr<const Host>;
 
 using HostVector = std::vector<HostSharedPtr>;
+using HostVectorPtr = std::unique_ptr<HostVector>;
 using HealthyHostVector = Phantom<HostVector, Healthy>;
 using DegradedHostVector = Phantom<HostVector, Degraded>;
 using ExcludedHostVector = Phantom<HostVector, Excluded>;
@@ -223,6 +224,10 @@ using HostListPtr = std::unique_ptr<HostVector>;
 using LocalityWeightsMap =
     std::unordered_map<envoy::config::core::v3::Locality, uint32_t, LocalityHash, LocalityEqualTo>;
 using PriorityState = std::vector<std::pair<HostListPtr, LocalityWeightsMap>>;
+
+class HostsPerLocality;
+
+using HostsPerLocalityConstSharedPtr = std::shared_ptr<const HostsPerLocality>;
 
 /**
  * Bucket hosts by locality.
@@ -264,7 +269,6 @@ public:
 };
 
 using HostsPerLocalitySharedPtr = std::shared_ptr<HostsPerLocality>;
-using HostsPerLocalityConstSharedPtr = std::shared_ptr<const HostsPerLocality>;
 
 // Weight for each locality index in HostsPerLocality.
 using LocalityWeights = std::vector<uint32_t>;
@@ -735,6 +739,8 @@ public:
   virtual const envoy::config::core::v3::HttpProtocolOptions&
   commonHttpProtocolOptions() const PURE;
 
+  template <class Derived> using DerivedConstSharedPtr = std::shared_ptr<const Derived>;
+
   /**
    * @param name std::string containing the well-known name of the extension for which protocol
    *        options are desired
@@ -742,7 +748,8 @@ public:
    *         and contains extension-specific protocol options for upstream connections.
    */
   template <class Derived>
-  const DerivedConstSharedPtr extensionProtocolOptionsTyped(const std::string& name) const {
+  const DerivedConstSharedPtr<Derived>
+  extensionProtocolOptionsTyped(const std::string& name) const {
     return std::dynamic_pointer_cast<const Derived>(extensionProtocolOptions(name));
   }
 

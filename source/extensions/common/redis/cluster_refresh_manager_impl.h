@@ -2,6 +2,7 @@
 
 #include <array>
 #include <atomic>
+#include <memory>
 #include <numeric>
 
 #include "envoy/event/dispatcher.h"
@@ -17,6 +18,10 @@ namespace Envoy {
 namespace Extensions {
 namespace Common {
 namespace Redis {
+
+class ClusterRefreshManagerImpl;
+
+using ClusterRefreshManagerImplSharedPtr = std::shared_ptr<ClusterRefreshManagerImpl>;
 
 class ClusterRefreshManagerImpl : public ClusterRefreshManager,
                                   public Envoy::Singleton::Instance,

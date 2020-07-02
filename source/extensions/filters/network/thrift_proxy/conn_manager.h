@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/common/pure.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/network/connection.h"
@@ -51,6 +53,8 @@ public:
   virtual TransportType transport(TransportType downstream_transport) const PURE;
   virtual ProtocolType protocol(ProtocolType downstream_protocol) const PURE;
 };
+
+using ProtocolOptionsConfigConstSharedPtr = std::shared_ptr<const ProtocolOptionsConfig>;
 
 /**
  * ConnectionManager is a Network::Filter that will perform Thrift request handling on a connection.

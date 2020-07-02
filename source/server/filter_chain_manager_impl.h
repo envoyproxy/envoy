@@ -6,6 +6,7 @@
 
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/network/drain_decision.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/transport_socket_config.h"

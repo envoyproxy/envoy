@@ -9,6 +9,8 @@
 namespace Envoy {
 namespace Http {
 
+template <class TrailerType> using TrailerTypePtr = std::unique_ptr<TrailerType>;
+
 /**
  * Wraps an HTTP message including its headers, body, and any trailers.
  */
@@ -36,7 +38,7 @@ public:
    * Set the trailers.
    * @param trailers supplies the new trailers.
    */
-  virtual void trailers(TrailerTypePtr&& trailers) PURE;
+  virtual void trailers(TrailerTypePtr<TrailerType>&& trailers) PURE;
 
   /**
    * @return std::string the message body as a std::string.

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <memory>
 
 #include "envoy/config/grpc_mux.h"
 #include "envoy/grpc/async_client.h"
@@ -12,6 +13,8 @@
 
 namespace Envoy {
 namespace Config {
+
+template <class ResponseProto> using ResponseProtoPtr = std::unique_ptr<ResponseProto>;
 
 // Oversees communication for gRPC xDS implementations (parent to both regular xDS and delta
 // xDS variants). Reestablishes the gRPC channel when necessary, and provides rate limiting of
@@ -74,7 +77,7 @@ public:
     UNREFERENCED_PARAMETER(metadata);
   }
 
-  void onReceiveMessage(ResponseProtoPtr&& message) override {
+  void onReceiveMessage(ResponseProtoPtr<ResponseProto>&& message) override {
     // Reset here so that it starts with fresh backoff interval on next disconnect.
     backoff_strategy_->reset();
     // Sometimes during hot restarts this stat's value becomes inconsistent and will continue to

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/config/rbac/v3/rbac.pb.h"
 
 #include "extensions/filters/common/rbac/engine.h"
@@ -29,6 +31,8 @@ private:
   Protobuf::Arena constant_arena_;
   Expr::BuilderPtr builder_;
 };
+
+using RoleBasedAccessControlEngineImplPtr = std::unique_ptr<RoleBasedAccessControlEngineImpl>;
 
 } // namespace RBAC
 } // namespace Common

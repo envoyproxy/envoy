@@ -131,6 +131,7 @@ private:
 };
 
 using SnapshotImplPtr = std::unique_ptr<SnapshotImpl>;
+using SnapshotImplSharedPtr = std::shared_ptr<SnapshotImpl>;
 
 /**
  * Base implementation of OverrideLayer that by itself provides an empty values map.

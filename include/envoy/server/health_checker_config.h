@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/runtime/runtime.h"
@@ -51,6 +53,8 @@ public:
    */
   virtual Api::Api& api() PURE;
 };
+
+using HealthCheckerFactoryContextPtr = std::unique_ptr<HealthCheckerFactoryContext>;
 
 /**
  * Implemented by each custom health checker and registered via Registry::registerFactory()

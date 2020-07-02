@@ -86,6 +86,8 @@ private:
     const uint64_t cluster_weight_;
     Envoy::Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;
   };
+
+  using WeightedClusterEntryPtr = std::unique_ptr<WeightedClusterEntry>;
   using WeightedClusterEntrySharedPtr = std::shared_ptr<WeightedClusterEntry>;
 
   class DynamicRouteEntry : public RouteEntry, public Route {
@@ -246,6 +248,8 @@ private:
     bool response_started_ : 1;
     bool response_complete_ : 1;
   };
+
+  using UpstreamRequestPtr = std::unique_ptr<UpstreamRequest>;
 
   void convertMessageBegin(MessageMetadataSharedPtr metadata);
   void cleanup();

@@ -73,6 +73,7 @@ public:
 
 using CustomTagConstSharedPtr = std::shared_ptr<const CustomTag>;
 using CustomTagMap = absl::flat_hash_map<std::string, CustomTagConstSharedPtr>;
+using CustomTagMapPtr = std::unique_ptr<CustomTagMap>;
 
 /**
  * Tracing configuration, it carries additional data needed to populate the span.

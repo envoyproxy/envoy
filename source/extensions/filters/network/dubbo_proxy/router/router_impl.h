@@ -81,6 +81,8 @@ private:
     bool stream_reset_ : 1;
   };
 
+  using UpstreamRequestPtr = std::unique_ptr<UpstreamRequest>;
+
   void cleanup();
 
   Upstream::ClusterManager& cluster_manager_;

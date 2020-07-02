@@ -1,11 +1,14 @@
 #pragma once
 
+#include <memory>
+
 #include "common/common/assert.h"
 #include "common/common/logger.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"
 #include "absl/synchronization/mutex.h"
+#include <memory>
 
 namespace Envoy {
 namespace Thread {
@@ -78,10 +81,14 @@ private:
     bool at_barrier_ ABSL_GUARDED_BY(mutex_){};
   };
 
+  using SynchronizerEntryPtr = std::unique_ptr<SynchronizerEntry>;
+
   struct SynchronizerData {
     absl::Mutex mutex_;
     absl::flat_hash_map<std::string, SynchronizerEntryPtr> entries_ ABSL_GUARDED_BY(mutex_);
   };
+
+  using SynchronizerDataPtr = std::unique_ptr<SynchronizerData>;
 
   SynchronizerEntry& getOrCreateEntry(absl::string_view event_name);
   void syncPointWorker(absl::string_view event_name);

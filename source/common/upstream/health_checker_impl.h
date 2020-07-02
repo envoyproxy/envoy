@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/api.h"
 #include "envoy/config/core/v3/health_check.pb.h"
@@ -244,6 +246,8 @@ private:
 
     TcpActiveHealthCheckSession& parent_;
   };
+
+  using TcpSessionCallbacksSharedPtr = std::shared_ptr<TcpSessionCallbacks>;
 
   struct TcpActiveHealthCheckSession : public ActiveHealthCheckSession {
     TcpActiveHealthCheckSession(TcpHealthCheckerImpl& parent, const HostSharedPtr& host)

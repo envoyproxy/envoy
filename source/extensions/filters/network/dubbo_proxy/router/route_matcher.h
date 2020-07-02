@@ -113,6 +113,8 @@ private:
   std::vector<ParameterData> parameter_data_list_;
 };
 
+using ParameterRouteEntryImplSharedPtr = std::shared_ptr<ParameterRouteEntryImpl>;
+
 class MethodRouteEntryImpl : public RouteEntryImplBase {
 public:
   MethodRouteEntryImpl(const envoy::extensions::filters::network::dubbo_proxy::v3::Route& route);

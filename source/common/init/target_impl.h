@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <memory>
 
 #include "envoy/init/target.h"
 
@@ -21,6 +22,8 @@ using InitializeFn = std::function<void()>;
  * need to provide an `InitializeFn` above when constructing a target.
  */
 using InternalInitalizeFn = std::function<void(WatcherHandlePtr)>;
+
+using InternalInitalizeFnSharedPtr = std::shared_ptr<InternalInitalizeFn>;
 
 /**
  * A TargetHandleImpl functions as a weak reference to a TargetImpl. It is how a ManagerImpl safely

@@ -24,6 +24,10 @@ namespace Redis {
  */
 enum class RespType { Null, SimpleString, BulkString, Integer, Error, Array, CompositeArray };
 
+class RespValue;
+
+using RespValueSharedPtr = std::shared_ptr<RespValue>;
+
 /**
  * A variant implementation of a RESP value optimized for performance. A C++11 union is used for
  * the underlying type so that no unnecessary allocations/constructions are needed.

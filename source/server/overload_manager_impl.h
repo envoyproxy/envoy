@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <memory>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -113,6 +114,8 @@ private:
   using ActionToCallbackMap = std::unordered_multimap<std::string, ActionCallback>;
   ActionToCallbackMap action_to_callbacks_;
 };
+
+using OverloadManagerImplPtr = std::unique_ptr<OverloadManagerImpl>;
 
 } // namespace Server
 } // namespace Envoy

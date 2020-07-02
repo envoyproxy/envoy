@@ -93,6 +93,8 @@ public:
     Stats::Counter* delayed_close_timeouts_;
   };
 
+  using ConnectionStatsPtr = std::unique_ptr<ConnectionStats>;
+
   ~Connection() override = default;
 
   /**

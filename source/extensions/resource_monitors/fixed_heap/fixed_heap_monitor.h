@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/config/resource_monitor/fixed_heap/v2alpha/fixed_heap.pb.h"
 #include "envoy/server/resource_monitor.h"
 
@@ -21,6 +23,8 @@ public:
   // Memory in free, unmapped pages in the page heap.
   virtual uint64_t unmappedHeapBytes();
 };
+
+using MemoryStatsReaderPtr = std::unique_ptr<MemoryStatsReader>;
 
 /**
  * Heap memory monitor with a statically configured maximum.

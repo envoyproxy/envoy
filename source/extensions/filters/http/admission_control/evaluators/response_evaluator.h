@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 
 #include "envoy/common/pure.h"
 
@@ -26,6 +27,8 @@ public:
    */
   virtual bool isGrpcSuccess(uint32_t status) const PURE;
 };
+
+using ResponseEvaluatorSharedPtr = std::shared_ptr<ResponseEvaluator>;
 
 } // namespace AdmissionControl
 } // namespace HttpFilters

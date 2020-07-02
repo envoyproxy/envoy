@@ -208,6 +208,8 @@ private:
   Expr::ExpressionPtr expr_;
 };
 
+using PolicyMatcherPtr = std::unique_ptr<PolicyMatcher>;
+
 class MetadataMatcher : public Matcher {
 public:
   MetadataMatcher(const Envoy::Matchers::MetadataMatcher& matcher) : matcher_(matcher) {}

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/common/time.h"
 #include "envoy/extensions/filters/network/dubbo_proxy/v3/dubbo_proxy.pb.h"
 #include "envoy/network/connection.h"
@@ -36,6 +38,8 @@ public:
   virtual ProtocolPtr createProtocol() PURE;
   virtual Router::Config& routerConfig() PURE;
 };
+
+using ConfigSharedPtr = std::shared_ptr<Config>;
 
 // class ActiveMessagePtr;
 class ConnectionManager : public Network::ReadFilter,

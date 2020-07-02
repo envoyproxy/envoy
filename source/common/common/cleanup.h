@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <list>
+#include <memory>
 
 #include "common/common/assert.h"
 
@@ -24,6 +25,8 @@ private:
   std::function<void()> f_;
   bool cancelled_;
 };
+
+using CleanupPtr = std::unique_ptr<Cleanup>;
 
 // RAII helper class to add an element to an std::list on construction and erase
 // it on destruction, unless the cancel method has been called.

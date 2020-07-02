@@ -85,6 +85,8 @@ public:
   virtual Network::TransportSocketOptionsSharedPtr upstreamTransportSocketOptions() const PURE;
 };
 
+using LoadBalancerContextPtr = std::unique_ptr<LoadBalancerContext>;
+
 /**
  * Abstract load balancing interface.
  */

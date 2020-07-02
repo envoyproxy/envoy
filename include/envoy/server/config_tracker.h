@@ -23,6 +23,7 @@ class ConfigTracker {
 public:
   using Cb = std::function<ProtobufTypes::MessagePtr()>;
   using CbsMap = std::map<std::string, Cb>;
+  using CbsMapSharedPtr = std::shared_ptr<CbsMap>;
 
   /**
    * EntryOwner supplies RAII semantics for entries in the map.

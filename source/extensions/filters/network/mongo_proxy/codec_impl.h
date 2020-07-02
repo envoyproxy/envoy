@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <list>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -59,6 +60,8 @@ private:
   int64_t cursor_id_{};
 };
 
+using GetMoreMessageImplPtr = std::unique_ptr<GetMoreMessageImpl>;
+
 class InsertMessageImpl : public MessageImpl,
                           public InsertMessage,
                           Logger::Loggable<Logger::Id::mongo> {
@@ -85,6 +88,8 @@ private:
   std::string full_collection_name_;
   std::list<Bson::DocumentSharedPtr> documents_;
 };
+
+using InsertMessageImplPtr = std::unique_ptr<InsertMessageImpl>;
 
 class KillCursorsMessageImpl : public MessageImpl,
                                public KillCursorsMessage,
@@ -113,6 +118,8 @@ private:
   int32_t number_of_cursor_ids_{};
   std::vector<int64_t> cursor_ids_;
 };
+
+using KillCursorsMessageImplPtr = std::unique_ptr<KillCursorsMessageImpl>;
 
 class QueryMessageImpl : public MessageImpl,
                          public QueryMessage,
@@ -154,6 +161,8 @@ private:
   Bson::DocumentSharedPtr return_fields_selector_;
 };
 
+using QueryMessageImplPtr = std::unique_ptr<QueryMessageImpl>;
+
 class ReplyMessageImpl : public MessageImpl,
                          public ReplyMessage,
                          Logger::Loggable<Logger::Id::mongo> {
@@ -186,6 +195,8 @@ private:
   int32_t number_returned_{};
   std::list<Bson::DocumentSharedPtr> documents_;
 };
+
+using ReplyMessageImplPtr = std::unique_ptr<ReplyMessageImpl>;
 
 // OP_COMMAND message.
 class CommandMessageImpl : public MessageImpl,
@@ -221,6 +232,8 @@ private:
   std::list<Bson::DocumentSharedPtr> input_docs_;
 };
 
+using CommandMessageImplPtr = std::unique_ptr<CommandMessageImpl>;
+
 // OP_COMMANDREPLY message.
 class CommandReplyMessageImpl : public MessageImpl,
                                 public CommandReplyMessage,
@@ -248,6 +261,8 @@ private:
   Bson::DocumentSharedPtr command_reply_;
   std::list<Bson::DocumentSharedPtr> output_docs_;
 };
+
+using CommandReplyMessageImplPtr = std::unique_ptr<CommandReplyMessageImpl>;
 
 class DecoderImpl : public Decoder, Logger::Loggable<Logger::Id::mongo> {
 public:

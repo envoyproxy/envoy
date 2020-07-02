@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/common/pure.h"
 #include "envoy/init/target.h"
 #include "envoy/init/watcher.h"
@@ -74,6 +76,8 @@ struct Manager {
    */
   virtual void initialize(const Watcher& watcher) PURE;
 };
+
+using ManagerPtr = std::unique_ptr<Manager>;
 
 } // namespace Init
 } // namespace Envoy

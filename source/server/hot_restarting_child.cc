@@ -1,11 +1,14 @@
 #include "server/hot_restarting_child.h"
 
+#include <memory>
+
 #include "common/common/utility.h"
 
 namespace Envoy {
 namespace Server {
 
 using HotRestartMessage = envoy::HotRestartMessage;
+using HotRestartMessagePtr = std::unique_ptr<HotRestartMessage>;
 
 HotRestartingChild::HotRestartingChild(int base_id, int restart_epoch)
     : HotRestartingBase(base_id), restart_epoch_(restart_epoch) {

@@ -31,14 +31,19 @@ using Envoy::ProtobufUtil::Status;
 using Envoy::ProtobufUtil::error::Code;
 using google::api::HttpRule;
 using google::grpc::transcoding::JsonRequestTranslator;
+using JsonRequestTranslatorPtr = std::unique_ptr<JsonRequestTranslator>;
 using google::grpc::transcoding::MessageStream;
 using google::grpc::transcoding::PathMatcherBuilder;
 using google::grpc::transcoding::PathMatcherUtility;
 using google::grpc::transcoding::RequestInfo;
 using google::grpc::transcoding::RequestMessageTranslator;
+using RequestMessageTranslatorPtr = std::unique_ptr<RequestMessageTranslator>;
 using google::grpc::transcoding::ResponseToJsonTranslator;
+using ResponseToJsonTranslatorPtr = std::unique_ptr<ResponseToJsonTranslator>;
 using google::grpc::transcoding::Transcoder;
+using TranscoderPtr = std::unique_ptr<Transcoder>;
 using google::grpc::transcoding::TranscoderInputStream;
+using TranscoderInputStreamPtr = std::unique_ptr<TranscoderInputStream>;
 
 namespace Envoy {
 namespace Extensions {

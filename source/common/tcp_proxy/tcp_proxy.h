@@ -11,6 +11,7 @@
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
+#include "envoy/network/hash_policy.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/stats/scope.h"
@@ -293,6 +294,10 @@ public:
   // They are called by the Downstream/Upstream Watermark callbacks to limit buffering.
   void readDisableUpstream(bool disable);
   void readDisableDownstream(bool disable);
+
+  struct UpstreamCallbacks;
+
+  using UpstreamCallbacksSharedPtr = std::shared_ptr<UpstreamCallbacks>;
 
   struct UpstreamCallbacks : public Tcp::ConnectionPool::UpstreamCallbacks {
     UpstreamCallbacks(Filter* parent) : parent_(parent) {}

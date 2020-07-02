@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/api/os_sys_calls.h"
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
@@ -152,6 +154,8 @@ private:
   // the buffer so its data() is not aligned in to alignof(void*).
   const std::vector<uint8_t> value_;
 };
+
+using SocketOptionImplPtr = std::unique_ptr<SocketOptionImpl>;
 
 using SocketOptionImplOptRef = absl::optional<std::reference_wrapper<SocketOptionImpl>>;
 

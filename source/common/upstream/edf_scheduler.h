@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <queue>
 
 #include "common/common/assert.h"
@@ -99,6 +100,9 @@ private:
   // Min priority queue for EDF.
   std::priority_queue<EdfEntry> queue_;
 };
+
+template <class C> using EdfSchedulerPtr = std::unique_ptr<EdfScheduler<C>>;
+template <class C> using EdfSchedulerConstPtr = std::unique_ptr<EdfScheduler<const C>>;
 
 #undef EDF_DEBUG
 

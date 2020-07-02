@@ -177,6 +177,10 @@ private:
   Value value_;
 };
 
+class DocumentImpl;
+
+using DocumentImplSharedPtr = std::shared_ptr<DocumentImpl>;
+
 class DocumentImpl : public Document,
                      Logger::Loggable<Logger::Id::mongo>,
                      public std::enable_shared_from_this<DocumentImpl> {

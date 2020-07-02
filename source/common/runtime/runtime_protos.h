@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <string>
 
 #include "envoy/config/core/v3/base.pb.h"
@@ -42,6 +43,8 @@ private:
   const double default_value_;
   Runtime::Loader& runtime_;
 };
+
+using DoublePtr = std::unique_ptr<Double>;
 
 // Helper class for runtime-derived fractional percent flags.
 class FractionalPercent {

@@ -29,6 +29,9 @@ namespace Envoy {
 namespace Grpc {
 
 class GoogleAsyncStreamImpl;
+
+using GoogleAsyncStreamImplPtr = std::unique_ptr<GoogleAsyncStreamImpl>;
+
 class GoogleAsyncRequestImpl;
 
 struct GoogleAsyncTag {

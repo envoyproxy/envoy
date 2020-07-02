@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/common/pure.h"
 
 #include "absl/types/optional.h"
@@ -30,6 +32,7 @@ public:
   virtual ProcessObject& get() const PURE;
 };
 
+using ProcessContextPtr = std::unique_ptr<ProcessContext>;
 using ProcessContextOptRef = absl::optional<std::reference_wrapper<ProcessContext>>;
 
 } // namespace Envoy

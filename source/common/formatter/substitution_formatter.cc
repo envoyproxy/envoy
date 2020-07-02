@@ -2,6 +2,7 @@
 
 #include <climits>
 #include <cstdint>
+#include <memory>
 #include <regex>
 #include <string>
 #include <vector>
@@ -453,6 +454,10 @@ public:
 private:
   FieldExtractor field_extractor_;
 };
+
+class StreamInfoAddressFieldExtractor;
+
+using StreamInfoAddressFieldExtractorPtr = std::unique_ptr<StreamInfoAddressFieldExtractor>;
 
 // StreamInfo Envoy::Network::Address::InstanceConstSharedPtr field extractor.
 class StreamInfoAddressFieldExtractor : public StreamInfoFormatter::FieldExtractor {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <memory>
 
 #include "envoy/init/watcher.h"
 
@@ -14,6 +15,8 @@ namespace Init {
  * initialization completes.
  */
 using ReadyFn = std::function<void()>;
+
+using ReadyFnSharedPtr = std::shared_ptr<ReadyFn>;
 
 /**
  * A WatcherHandleImpl functions as a weak reference to a Watcher. It is how a TargetImpl safely

@@ -17,6 +17,7 @@
 #include "envoy/http/async_client.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/context.h"
+#include "envoy/http/hash_policy.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/message.h"
 #include "envoy/router/router.h"
@@ -40,6 +41,9 @@ namespace Envoy {
 namespace Http {
 
 class AsyncStreamImpl;
+
+using AsyncStreamImplPtr = std::unique_ptr<AsyncStreamImpl>;
+
 class AsyncRequestImpl;
 
 class AsyncClientImpl final : public AsyncClient {
@@ -321,6 +325,8 @@ private:
 
     RouteEntryImpl route_entry_;
   };
+
+  using RouteImplSharedPtr = std::shared_ptr<RouteImpl>;
 
   void cleanup();
   void closeRemote(bool end_stream);

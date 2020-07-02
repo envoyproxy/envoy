@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <string>
 
 #include "envoy/http/codec.h"
@@ -73,6 +74,8 @@ private:
   using Inflater = CSmartPtr<nghttp2_hd_inflater, nghttp2_hd_inflate_del>;
   Inflater inflater_;
 };
+
+using MetadataDecoderPtr = std::unique_ptr<MetadataDecoder>;
 
 } // namespace Http2
 } // namespace Http

@@ -314,6 +314,7 @@ using LoaderPtr = std::unique_ptr<Loader>;
 // protos being enabled or disabled by default.
 using LoaderSingleton = InjectableSingleton<Loader>;
 using ScopedLoaderSingleton = ScopedInjectableLoader<Loader>;
+using ScopedLoaderSingletonPtr = std::unique_ptr<ScopedLoaderSingleton>;
 
 } // namespace Runtime
 } // namespace Envoy

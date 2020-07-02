@@ -48,6 +48,8 @@ struct UserAgentStats {
   Stats::Histogram& downstream_cx_length_ms_;
 };
 
+using UserAgentStatsPtr = std::unique_ptr<UserAgentStats>;
+
 /**
  * Stats support for specific user agents.
  */

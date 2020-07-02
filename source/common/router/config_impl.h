@@ -108,6 +108,8 @@ private:
   static const SslRedirector SSL_REDIRECTOR;
 };
 
+using SslRedirectRouteConstSharedPtr = std::shared_ptr<const SslRedirectRoute>;
+
 /**
  * Implementation of CorsPolicy that reads from the proto route and virtual host config.
  */
@@ -152,6 +154,8 @@ private:
   absl::optional<bool> allow_credentials_{};
   const bool legacy_enabled_;
 };
+
+using CorsPolicyImplConstPtr = std::unique_ptr<const CorsPolicyImpl>;
 
 class ConfigImpl;
 /**
@@ -939,6 +943,8 @@ private:
 
   VirtualHostSharedPtr default_virtual_host_;
 };
+
+using RouteMatcherPtr = std::unique_ptr<RouteMatcher>;
 
 /**
  * Implementation of Config that reads from a proto file.

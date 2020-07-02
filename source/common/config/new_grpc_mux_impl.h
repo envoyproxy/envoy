@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/common/token_bucket.h"
 #include "envoy/config/grpc_mux.h"
@@ -69,6 +71,8 @@ public:
     SubscriptionStuff(const SubscriptionStuff&) = delete;
     SubscriptionStuff& operator=(const SubscriptionStuff&) = delete;
   };
+
+  using SubscriptionStuffPtr = std::unique_ptr<SubscriptionStuff>;
 
   // for use in tests only
   const absl::flat_hash_map<std::string, SubscriptionStuffPtr>& subscriptions() {

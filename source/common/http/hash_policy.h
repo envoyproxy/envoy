@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/http/hash_policy.h"
 #include "envoy/stream_info/filter_state.h"
@@ -39,6 +41,8 @@ public:
 private:
   std::vector<HashMethodPtr> hash_impls_;
 };
+
+using HashPolicyImplConstPtr = std::unique_ptr<const HashPolicyImpl>;
 
 } // namespace Http
 } // namespace Envoy

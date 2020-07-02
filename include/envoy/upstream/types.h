@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <vector>
 
 #include "common/common/phantom.h"
@@ -23,10 +24,14 @@ struct DegradedLoad : PriorityLoad {
   using PriorityLoad::PriorityLoad;
 };
 
+using DegradedLoadSharedPtr = std::shared_ptr<DegradedLoad>;
+
 // PriorityLoad specific to healthy hosts.
 struct HealthyLoad : PriorityLoad {
   using PriorityLoad::PriorityLoad;
 };
+
+using HealthyLoadSharedPtr = std::shared_ptr<HealthyLoad>;
 
 struct HealthyAndDegradedLoad {
   HealthyLoad healthy_priority_load_;

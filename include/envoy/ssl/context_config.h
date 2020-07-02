@@ -137,6 +137,7 @@ public:
 };
 
 using ServerContextConfigPtr = std::unique_ptr<ServerContextConfig>;
+using ServerContextConfigConstPtr = std::unique_ptr<const ServerContextConfig>;
 
 } // namespace Ssl
 } // namespace Envoy

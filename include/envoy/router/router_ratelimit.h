@@ -67,6 +67,8 @@ public:
                                    const Network::Address::Instance& remote_address) const PURE;
 };
 
+using RateLimitPolicyEntryPtr = std::unique_ptr<RateLimitPolicyEntry>;
+
 /**
  * Rate limiting policy.
  */

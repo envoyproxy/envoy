@@ -33,6 +33,8 @@ private:
   AccessLog::AccessLogFileSharedPtr log_file_;
 };
 
+using FileSinkDelegatePtr = std::unique_ptr<FileSinkDelegate>;
+
 } // namespace Logger
 
 } // namespace Envoy

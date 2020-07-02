@@ -3,6 +3,7 @@
 #include <atomic>
 #include <cstdint>
 #include <list>
+#include <memory>
 #include <vector>
 
 #include "envoy/thread_local/thread_local.h"
@@ -49,6 +50,8 @@ private:
     InstanceImpl& parent_;
     const uint64_t index_;
   };
+
+  using SlotImplPtr = std::unique_ptr<SlotImpl>;
 
   // A Wrapper of SlotImpl which on destruction returns the SlotImpl to the deferred delete queue
   // (detaches it).

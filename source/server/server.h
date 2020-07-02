@@ -76,6 +76,8 @@ struct ServerStats {
   ALL_SERVER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
 };
 
+using ServerStatsPtr = std::unique_ptr<ServerStats>;
+
 /**
  * Interface for creating service components during boot.
  */

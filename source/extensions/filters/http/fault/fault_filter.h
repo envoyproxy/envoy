@@ -206,6 +206,8 @@ private:
   Buffer::WatermarkBuffer buffer_;
 };
 
+using StreamRateLimiterPtr = std::unique_ptr<StreamRateLimiter>;
+
 using AbortHttpAndGrpcStatus =
     std::pair<absl::optional<Http::Code>, absl::optional<Grpc::Status::GrpcStatus>>;
 /**

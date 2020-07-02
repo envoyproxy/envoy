@@ -1,10 +1,13 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
 #include "common/upstream/load_balancer_impl.h"
 
 #include "absl/synchronization/mutex.h"
+#include "envoy/upstream/types.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -82,11 +85,12 @@ private:
     DegradedLoadSharedPtr degraded_per_priority_load_ ABSL_GUARDED_BY(mutex_);
   };
 
+  using LoadBalancerFactoryImplSharedPtr = std::shared_ptr<LoadBalancerFactoryImpl>;
+
   virtual HashingLoadBalancerSharedPtr
   createLoadBalancer(const NormalizedHostWeightVector& normalized_host_weights,
                      double min_normalized_weight, double max_normalized_weight) PURE;
   void refresh();
-
   LoadBalancerFactoryImplSharedPtr factory_;
 };
 

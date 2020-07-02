@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/compression/compressor/compressor.h"
 #include "envoy/extensions/filters/http/compressor/v3/compressor.pb.h"
 #include "envoy/stats/scope.h"
@@ -144,6 +146,8 @@ private:
     const std::string encoding_;
     const HeaderStat stat_;
   };
+
+  using EncodingDecisionPtr = std::unique_ptr<EncodingDecision>;
 
   EncodingDecisionPtr chooseEncoding(const Http::ResponseHeaderMap& headers) const;
   bool shouldCompress(const EncodingDecision& decision) const;

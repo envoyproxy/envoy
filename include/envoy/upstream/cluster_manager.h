@@ -344,6 +344,8 @@ public:
   virtual Secret::SecretManager& secretManager() PURE;
 };
 
+using ClusterManagerFactoryPtr = std::unique_ptr<ClusterManagerFactory>;
+
 /**
  * Factory for creating ClusterInfo
  */

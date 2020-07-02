@@ -1099,6 +1099,8 @@ class GenericConnectionPoolCallbacks;
 class UpstreamRequest;
 class GenericUpstream;
 
+using GenericUpstreamPtr = std::unique_ptr<GenericUpstream>;
+
 /**
  * An API for wrapping either an HTTP or a TCP connection pool.
  *

@@ -251,6 +251,10 @@ private:
   std::atomic<bool> used_;
 };
 
+class HostsPerLocalityImpl;
+
+using HostsPerLocalityImplSharedPtr = std::shared_ptr<HostsPerLocalityImpl>;
+
 class HostsPerLocalityImpl : public HostsPerLocality {
 public:
   HostsPerLocalityImpl() : HostsPerLocalityImpl(std::vector<HostVector>(), false) {}
@@ -395,6 +399,8 @@ private:
     const uint32_t index_;
     const double effective_weight_;
   };
+
+  using LocalityEntrySharedPtr = std::shared_ptr<LocalityEntry>;
 
   // Rebuilds the provided locality scheduler with locality entries based on the locality weights
   // and eligible hosts.

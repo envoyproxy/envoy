@@ -5,6 +5,7 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/init/manager.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/drain_manager.h"
@@ -140,6 +141,8 @@ private:
   const Server::DrainManagerPtr drain_manager_;
 };
 
+using ListenerFactoryContextBaseImplSharedPtr = std::shared_ptr<ListenerFactoryContextBaseImpl>;
+
 class ListenerImpl;
 
 // TODO(lambdai): Strip the interface since ListenerFactoryContext only need to support
@@ -202,6 +205,12 @@ private:
   const Network::ListenerConfig* listener_config_;
   ListenerImpl& listener_impl_;
 };
+
+using PerListenerFactoryContextImplSharedPtr = std::shared_ptr<PerListenerFactoryContextImpl>;
+
+class ListenerImpl;
+
+using ListenerImplPtr = std::unique_ptr<ListenerImpl>;
 
 /**
  * Maps proto config to runtime config for a listener with a network filter chain.

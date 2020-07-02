@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <climits>
+#include <memory>
 #include <unordered_set>
 #include <vector>
 
@@ -388,11 +389,14 @@ private:
     }
 
   private:
+    struct Node;
+    using NodePtr = std::unique_ptr<Node>;
+
     struct Node {
       NodePtr children[2];
       DataSetSharedPtr data;
     };
-    using NodePtr = std::unique_ptr<Node>;
+
     NodePtr root_;
     bool exclusive_;
   };
@@ -407,7 +411,7 @@ private:
    * 'http://www.csc.kth.se/~snilsson/software/router/C/' were used as reference during
    * implementation.
    *
-   * Note: The trie can only support up 524288(2^19) prefixes with a fill_factor of 1 and
+   * Note: The trie can only support up 524288(2^19) prefixes with a fill_factor of: 1 and
    * root_branching_factor not set. Refer to LcTrieInternal::build() method for more details.
    */
   template <class IpType, uint32_t address_size = CHAR_BIT * sizeof(IpType)> class LcTrieInternal {
@@ -692,9 +696,14 @@ private:
     const uint32_t root_branching_factor_;
   };
 
+  template <class IpType, uint32_t address_size = CHAR_BIT * sizeof(IpType)>
+  using LcTrieInternalPtr = std::unique_ptr<LcTrieInternal<IpType, address_size>>;
+
   LcTrieInternalPtr<Ipv4> ipv4_trie_;
   LcTrieInternalPtr<Ipv6> ipv6_trie_;
 };
+
+template <class T> using LcTriePtr = std::unique_ptr<LcTrie<T>>;
 
 template <class T>
 template <class IpType, uint32_t address_size>

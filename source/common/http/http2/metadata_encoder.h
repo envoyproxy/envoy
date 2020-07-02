@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <queue>
 #include <string>
 
@@ -89,6 +90,8 @@ private:
   // payload size gets updated when the payload is packed into metadata frames.
   std::deque<uint64_t> payload_size_queue_;
 };
+
+using MetadataEncoderPtr = std::unique_ptr<MetadataEncoder>;
 
 } // namespace Http2
 } // namespace Http

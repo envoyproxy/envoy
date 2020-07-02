@@ -14,6 +14,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/macros.h"
 #include "common/network/io_socket_handle_impl.h"
+#include <memory>
 
 namespace Envoy {
 namespace Extensions {
@@ -35,6 +36,8 @@ public:
   public:
     virtual void write(const std::string& message) PURE;
   };
+
+  using WriterSharedPtr = std::shared_ptr<Writer>;
 
   UdpStatsdSink(ThreadLocal::SlotAllocator& tls, Network::Address::InstanceConstSharedPtr address,
                 const bool use_tag, const std::string& prefix = getDefaultPrefix());

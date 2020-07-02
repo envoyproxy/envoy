@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/api/api.h"
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 #include "envoy/router/string_accessor.h"
@@ -70,6 +72,10 @@ public:
                                        const StreamInfo::FilterState& filter_state) const PURE;
 };
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
+
+class FilterConfigImpl;
+
+using FilterConfigImplSharedPtr = std::shared_ptr<FilterConfigImpl>;
 
 /**
  * The filter config object to hold config and relevant objects.

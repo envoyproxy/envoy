@@ -523,6 +523,8 @@ public:
       : StatNameStorageBase(std::move(src)) {}
 };
 
+using StatNameDynamicStoragePtr = std::unique_ptr<StatNameDynamicStorage>;
+
 /**
  * Maintains storage for a collection of StatName objects. Like
  * StatNameManagedStorage, this has an RAII usage model, taking

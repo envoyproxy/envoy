@@ -65,6 +65,8 @@ public:
     virtual absl::optional<std::string> serializeAsString() const { return absl::nullopt; }
   };
 
+  using ObjectSharedPtr = std::shared_ptr<Object>;
+
   virtual ~FilterState() = default;
 
   /**

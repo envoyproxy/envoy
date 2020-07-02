@@ -16,6 +16,10 @@ namespace NetworkFilters {
 namespace Common {
 namespace Redis {
 
+class RedisCommandStats;
+
+using RedisCommandStatsSharedPtr = std::shared_ptr<RedisCommandStats>;
+
 class RedisCommandStats {
 public:
   RedisCommandStats(Stats::SymbolTable& symbol_table, const std::string& prefix);

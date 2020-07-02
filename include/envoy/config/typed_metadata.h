@@ -21,6 +21,8 @@ public:
     virtual ~Object() = default;
   };
 
+  using ObjectConstPtr = std::unique_ptr<const Object>;
+
   virtual ~TypedMetadata() = default;
 
   /**

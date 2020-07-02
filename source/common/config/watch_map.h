@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <set>
 #include <string>
 #include <utility>
@@ -32,6 +33,8 @@ struct Watch {
   // If true, a new update that also contains no resources can skip this watch.
   bool state_of_the_world_empty_{true};
 };
+
+using WatchPtr = std::unique_ptr<Watch>;
 
 // NOTE: Users are responsible for eventually calling removeWatch() on the Watch* returned
 //       by addWatch(). We don't expect there to be new users of this class beyond

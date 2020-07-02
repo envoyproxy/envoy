@@ -12,6 +12,7 @@
 #include "common/common/logger.h"
 #include "common/common/matchers.h"
 #include "common/network/transport_socket_options_impl.h"
+#include <memory>
 
 namespace Envoy {
 namespace Upstream {
@@ -35,6 +36,10 @@ namespace Upstream {
 struct HealthCheckerStats {
   ALL_HEALTH_CHECKER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
+
+class HealthCheckerImplBase;
+
+using HealthCheckerImplBaseSharedPtr = std::shared_ptr<HealthCheckerImplBase>;
 
 /**
  * Base implementation for all health checkers.

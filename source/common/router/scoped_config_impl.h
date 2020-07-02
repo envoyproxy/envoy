@@ -41,6 +41,8 @@ public:
   virtual uint64_t hash() const PURE;
 };
 
+using ScopeKeyFragmentBasePtr = std::unique_ptr<ScopeKeyFragmentBase>;
+
 /**
  *  Scope Key is composed of non-null fragments.
  **/
@@ -109,6 +111,8 @@ public:
 protected:
   const ScopedRoutes::ScopeKeyBuilder::FragmentBuilder config_;
 };
+
+using FragmentBuilderBasePtr = std::unique_ptr<FragmentBuilderBase>;
 
 class HeaderValueExtractorImpl : public FragmentBuilderBase {
 public:

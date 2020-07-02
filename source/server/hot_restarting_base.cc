@@ -1,5 +1,7 @@
 #include "server/hot_restarting_base.h"
 
+#include <memory>
+
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/utility.h"
 #include "common/stats/utility.h"
@@ -8,6 +10,7 @@ namespace Envoy {
 namespace Server {
 
 using HotRestartMessage = envoy::HotRestartMessage;
+using HotRestartMessagePtr = std::unique_ptr<HotRestartMessage>;
 
 static constexpr uint64_t MaxSendmsgSize = 4096;
 

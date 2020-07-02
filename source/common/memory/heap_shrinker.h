@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/server/overload_manager.h"
 #include "envoy/stats/scope.h"
@@ -24,6 +26,8 @@ private:
   Envoy::Stats::Counter* shrink_counter_;
   Envoy::Event::TimerPtr timer_;
 };
+
+using HeapShrinkerPtr = std::unique_ptr<HeapShrinker>;
 
 } // namespace Memory
 } // namespace Envoy

@@ -371,6 +371,10 @@ protected:
   Handle name =                                                                                    \
       CustomInlineHeaderRegistry::getInlineHeader<header_map_type>(Headers::get().name).value();
 
+class RequestHeaderMapImpl;
+
+using RequestHeaderMapImplPtr = std::unique_ptr<RequestHeaderMapImpl>;
+
 /**
  * Concrete implementation of RequestHeaderMap which allows for variable custom registered inline
  * headers.
@@ -407,6 +411,10 @@ private:
   HeaderEntryImpl* inline_headers_[];
 };
 
+class RequestTrailerMapImpl;
+
+using RequestTrailerMapImplPtr = std::unique_ptr<RequestTrailerMapImpl>;
+
 /**
  * Concrete implementation of RequestTrailerMap which allows for variable custom registered inline
  * headers.
@@ -429,6 +437,10 @@ private:
 
   HeaderEntryImpl* inline_headers_[];
 };
+
+class ResponseHeaderMapImpl;
+
+using ResponseHeaderMapImplPtr = std::unique_ptr<ResponseHeaderMapImpl>;
 
 /**
  * Concrete implementation of ResponseHeaderMap which allows for variable custom registered inline
@@ -464,6 +476,10 @@ private:
 
   HeaderEntryImpl* inline_headers_[];
 };
+
+class ResponseTrailerMapImpl;
+
+using ResponseTrailerMapImplPtr = std::unique_ptr<ResponseTrailerMapImpl>;
 
 /**
  * Concrete implementation of ResponseTrailerMap which allows for variable custom registered

@@ -52,6 +52,8 @@ public:
   }
 };
 
+using MetadataMapVectorPtr = std::unique_ptr<MetadataMapVector>;
+
 using MetadataCallback = std::function<void(MetadataMapPtr&&)>;
 
 } // namespace Http

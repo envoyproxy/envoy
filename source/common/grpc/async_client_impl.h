@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/grpc/async_client.h"
@@ -13,7 +15,9 @@ namespace Envoy {
 namespace Grpc {
 
 class AsyncRequestImpl;
+
 class AsyncStreamImpl;
+using AsyncStreamImplPtr = std::unique_ptr<AsyncStreamImpl>;
 
 class AsyncClientImpl final : public RawAsyncClient {
 public:
