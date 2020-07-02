@@ -136,13 +136,13 @@ AdmissionControlFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
 
 bool AdmissionControlFilter::shouldRejectRequest() const {
   const auto request_counts = config_->getController().requestCounts();
-  const double total = request_counts.requests;
-  const double success = request_counts.successes;
-  double probability = total - success / config_->successRateThreshold();
+  const double total_requests = request_counts.requests;
+  const double successful_requests = request_counts.successes;
+  double probability = total_requests - successful_requests / config_->successRateThreshold();
   const auto aggression = config_->aggression();
-  probability = probability / (total + 1);
+  probability = probability / (total_requests + 1);
   if (aggression != 1.0) {
-    probability = std::pow(probability, 1.0 / config_->aggression());
+    probability = std::pow(probability, 1.0 / aggression);
   }
 
   // Choosing an accuracy of 4 significant figures for the probability.

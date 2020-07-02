@@ -119,7 +119,7 @@ private:
 
   const AdmissionControlFilterConfigSharedPtr config_;
   AdmissionControlStats stats_;
-  bool expect_grpc_status_in_trailer_;
+  bool expect_grpc_status_in_trailer_{false};
 
   // If false, the filter will forego recording a request success or failure during encoding.
   bool record_request_;
