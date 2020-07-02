@@ -3,6 +3,7 @@
 #include "envoy/common/exception.h"
 
 #include "common/api/os_sys_calls_impl.h"
+#include "common/common/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/io_socket_handle_impl.h"
 #include "common/network/socket_interface_impl.h"
@@ -62,7 +63,7 @@ Api::SysCallIntResult SocketImpl::bind(Network::Address::InstanceConstSharedPtr 
       if (set_permissions.rc_ != 0) {
         throw EnvoyException(fmt::format("Failed to create socket with mode {}: {}",
                                          std::to_string(pipe->mode()),
-                                         strerror(set_permissions.errno_)));
+                                         errorDetails(set_permissions.errno_)));
       }
     }
     return bind_result;

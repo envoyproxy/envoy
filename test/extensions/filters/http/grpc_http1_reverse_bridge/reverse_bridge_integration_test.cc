@@ -14,7 +14,9 @@
 #include "gtest/gtest.h"
 
 using Envoy::Http::HeaderValueOf;
-using std::string_literals::operator""s;
+
+// for ::operator""s (which Windows compiler does not support):
+using namespace std::string_literals;
 
 namespace Envoy {
 namespace {
@@ -139,7 +141,7 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRoute) {
   EXPECT_THAT(upstream_request_->headers(),
               HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
   EXPECT_THAT(upstream_request_->headers(),
-              HeaderValueOf(Http::Headers::get().Accept, "application/x-protobuf"));
+              HeaderValueOf(Http::CustomHeaders::get().Accept, "application/x-protobuf"));
 
   // Respond to the request.
   Http::TestResponseHeaderMapImpl response_headers;

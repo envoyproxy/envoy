@@ -33,7 +33,7 @@ void HttpConnPool::newStream(GenericConnectionPoolCallbacks* callbacks) {
   // might get deleted inline as well. Only write the returned handle out if it is not nullptr to
   // deal with this case.
   Envoy::Http::ConnectionPool::Cancellable* handle =
-      conn_pool_->newStream(*callbacks->upstreamRequest(), *this);
+      conn_pool_->newStream(callbacks->upstreamToDownstream(), *this);
   if (handle) {
     conn_pool_stream_handle_ = handle;
   }
@@ -62,7 +62,8 @@ void HttpConnPool::onPoolReady(Envoy::Http::RequestEncoder& request_encoder,
                                Upstream::HostDescriptionConstSharedPtr host,
                                const StreamInfo::StreamInfo& info) {
   conn_pool_stream_handle_ = nullptr;
-  auto upstream = std::make_unique<HttpUpstream>(*callbacks_->upstreamRequest(), &request_encoder);
+  auto upstream =
+      std::make_unique<HttpUpstream>(callbacks_->upstreamToDownstream(), &request_encoder);
   callbacks_->onPoolReady(std::move(upstream), host,
                           request_encoder.getStream().connectionLocalAddress(), info);
 }

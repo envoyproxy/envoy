@@ -127,6 +127,8 @@ envoy_cc_test_library(
         "//source/common/common:empty_string",
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
+        "//source/common/config:decoded_resource_lib",
+        "//source/common/config:opaque_resource_decoder_lib",
         "//source/common/config:version_converter_lib",
         "//source/common/filesystem:directory_lib",
         "//source/common/filesystem:filesystem_lib",

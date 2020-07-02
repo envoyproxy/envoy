@@ -13,6 +13,7 @@ envoy_cc_library(
     hdrs = ["runtime.h"],
     external_deps = ["abseil_optional"],
     deps = [
+        "//include/envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
         "//source/common/singleton:threadsafe_singleton",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
