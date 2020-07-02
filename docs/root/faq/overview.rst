@@ -27,6 +27,8 @@ API
   api/why_versioning
   api/incremental
 
+.. _faq_overview_debug:
+
 Debugging
 ---------
 .. toctree::
@@ -60,6 +62,7 @@ Configuration
   configuration/flow_control
   configuration/timeouts
   configuration/deprecation
+  configuration/resource_limits
 
 Load balancing
 --------------

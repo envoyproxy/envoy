@@ -13,6 +13,7 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -332,7 +333,8 @@ message RetryPolicy {
 
   // Specifies the allowed number of retries. This parameter is optional and
   // defaults to 1.
-  google.protobuf.UInt32Value num_retries = 2;
+  google.protobuf.UInt32Value num_retries = 2
+      [(udpa.annotations.field_migrate).rename = "max_retries"];
 }
 
 // The message specifies how to fetch data from remote and how to verify it.

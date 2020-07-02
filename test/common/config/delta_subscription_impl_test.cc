@@ -136,6 +136,7 @@ TEST(DeltaSubscriptionImplFixturelessTest, NoGrpcStream) {
   NiceMock<Runtime::MockRandomGenerator> random;
   Envoy::Config::RateLimitSettings rate_limit_settings;
   NiceMock<Config::MockSubscriptionCallbacks> callbacks;
+  NiceMock<Config::MockOpaqueResourceDecoder> resource_decoder;
   auto* async_client = new Grpc::MockAsyncClient();
 
   const Protobuf::MethodDescriptor* method_descriptor =
@@ -147,8 +148,8 @@ TEST(DeltaSubscriptionImplFixturelessTest, NoGrpcStream) {
       local_info);
 
   std::unique_ptr<GrpcSubscriptionImpl> subscription = std::make_unique<GrpcSubscriptionImpl>(
-      xds_context, callbacks, stats, Config::TypeUrl::get().ClusterLoadAssignment, dispatcher,
-      std::chrono::milliseconds(12345), false);
+      xds_context, callbacks, resource_decoder, stats, Config::TypeUrl::get().ClusterLoadAssignment,
+      dispatcher, std::chrono::milliseconds(12345), false);
 
   EXPECT_CALL(*async_client, startRaw(_, _, _, _)).WillOnce(Return(nullptr));
 

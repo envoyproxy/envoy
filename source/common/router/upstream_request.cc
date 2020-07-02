@@ -157,6 +157,11 @@ void UpstreamRequest::decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) {
   }
   parent_.onUpstreamTrailers(std::move(trailers), *this);
 }
+const RouteEntry& UpstreamRequest::routeEntry() const { return *parent_.routeEntry(); }
+
+const Network::Connection& UpstreamRequest::connection() const {
+  return *parent_.callbacks()->connection();
+}
 
 void UpstreamRequest::decodeMetadata(Http::MetadataMapPtr&& metadata_map) {
   parent_.onUpstreamMetadata(std::move(metadata_map));

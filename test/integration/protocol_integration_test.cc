@@ -992,6 +992,10 @@ TEST_P(ProtocolIntegrationTest, 304WithBody) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
+  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+    // The invalid data will trigger disconnect.
+    fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+  }
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
 
   waitForNextUpstreamRequest();
@@ -1098,6 +1102,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLength) {
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("400", response->headers().getStatusValue());
+    test_server_->waitForCounterGe("http.config_test.downstream_rq_4xx", 1);
   } else {
     ASSERT_TRUE(response->reset());
     EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->reset_reason());
@@ -1345,6 +1350,16 @@ name: decode-headers-only
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
   EXPECT_EQ(0, upstream_request_->body().length());
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, LargeRequestUrlRejected) {
+  // Send one 95 kB URL with limit 60 kB headers.
+  testLargeRequestUrl(95, 60);
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, LargeRequestUrlAccepted) {
+  // Send one 95 kB URL with limit 96 kB headers.
+  testLargeRequestUrl(95, 96);
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersRejected) {
