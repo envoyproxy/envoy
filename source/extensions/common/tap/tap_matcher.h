@@ -427,7 +427,7 @@ private:
   // List of strings which body must contain to get match.
   std::shared_ptr<std::vector<std::string>> patterns_;
   // Stores the length of the longest pattern.
-  size_t overlap_size_;
+  size_t overlap_size_{};
 };
 
 class HttpRequestGenericBodyMatcher : public HttpGenericBodyMatcher {

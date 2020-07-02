@@ -230,7 +230,9 @@ bool HttpGenericBodyMatcher::locatePatternAcrossChunks(const std::string& patter
   // Start position in overlap_. overlap_ size was calculated based on the longest pattern to be
   // found, but search for shorter patterns may start from some offset, not the beginning of the
   // buffer.
-  size_t start_index = ctx->overlap_.size() - (pattern.size() - 1);
+  size_t start_index = (ctx->overlap_.size() > (pattern.size() - 1))
+                           ? ctx->overlap_.size() - (pattern.size() - 1)
+                           : 0;
   auto match_iter = std::find(std::begin(ctx->overlap_) + start_index, std::end(ctx->overlap_),
                               pattern.at(pattern_index));
 
@@ -313,12 +315,13 @@ void HttpGenericBodyMatcher::resizeOverlapBuffer(HttpGenericBodyMatcherCtx* ctx)
   const size_t max_len = calcLongestPatternSize(ctx->patterns_index_);
   if (ctx->capacity_ != (max_len - 1)) {
     const size_t new_size = max_len - 1;
-    const size_t shift = ctx->overlap_.size() - new_size;
+    const size_t shift = ctx->capacity_ - new_size;
     // Copy the last new_size bytes to the beginning of the buffer.
     for (size_t i = 0; i < new_size; i++) {
       ctx->overlap_[i] = ctx->overlap_[i + shift];
     }
     ctx->capacity_ = new_size;
+    ctx->overlap_.resize(new_size);
   }
 }
 
