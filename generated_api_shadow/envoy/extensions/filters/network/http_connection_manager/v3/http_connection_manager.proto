@@ -18,7 +18,10 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/core/v1/resource_locator.proto";
+
 import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/migrate.proto";
 import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -329,6 +332,16 @@ message HttpConnectionManager {
   // is terminated with a 408 Request Timeout error code if no upstream response
   // header has been received, otherwise a stream reset occurs.
   //
+  // This timeout also specifies the amount of time that Envoy will wait for the peer to open enough
+  // window to write any remaining stream data once the entirety of stream data (local end stream is
+  // true) has been buffered pending available window. In other words, this timeout defends against
+  // a peer that does not release enough window to completely write the stream, even though all
+  // data has been proxied within available flow control windows. If the timeout is hit in this
+  // case, the :ref:`tx_flush_timeout <config_http_conn_man_stats_per_codec>` counter will be
+  // incremented. Note that :ref:`max_stream_duration
+  // <envoy_api_field_config.core.v3.HttpProtocolOptions.max_stream_duration>` does not apply to
+  // this corner case.
+  //
   // Note that it is possible to idle timeout even if the wire traffic for a stream is non-idle, due
   // to the granularity of events presented to the connection manager. For example, while receiving
   // very large request headers, it may be the case that there is traffic regularly arriving on the
@@ -607,7 +620,13 @@ message Rds {
   // API. This allows an Envoy configuration with multiple HTTP listeners (and
   // associated HTTP connection manager filters) to use different route
   // configurations.
-  string route_config_name = 2 [(validate.rules).string = {min_bytes: 1}];
+  string route_config_name = 2
+      [(udpa.annotations.field_migrate).oneof_promotion = "name_specifier"];
+
+  // Resource locator for RDS. This is mutually exclusive to *route_config_name*.
+  // [#not-implemented-hide:]
+  udpa.core.v1.ResourceLocator rds_resource_locator = 3
+      [(udpa.annotations.field_migrate).oneof_promotion = "name_specifier"];
 }
 
 // This message is used to work around the limitations with 'oneof' and repeated fields.
@@ -755,20 +774,50 @@ message ScopedRds {
       [(validate.rules).message = {required: true}];
 }
 
+// [#next-free-field: 6]
 message HttpFilter {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpFilter";
 
+  // [#not-implemented-hide:] Configuration source specifier for the late-bound
+  // filter configuration. The HTTP Listener is warmed until all the initial
+  // filter configurations are received, unless the flag to apply the default
+  // configuration is set. Subsequent filter updates are atomic on a per-worker
+  // basis, and apply to new streams while the active streams continue using
+  // the older filter configurations. If the initial delivery of the filter
+  // configuration fails, due to a timeout for example, the optional default
+  // configuration is applied. Without a default configuration, the filter is
+  // disabled, and the HTTP listener responds with 500 immediately. After the
+  // failure, the listener continues subscribing to the subsequent filter
+  // configurations.
+  message HttpFilterConfigSource {
+    config.core.v3.ConfigSource config_source = 1;
+
+    // Optional default configuration to use as the initial configuration if
+    // there is a failure to receive the initial filter configuration or if
+    // `apply_default_config_without_warming` flag is set.
+    google.protobuf.Any default_config = 2;
+
+    // Use the default config as the initial configuration without warming and
+    // waiting for the first xDS response. Requires the default configuration
+    // to be supplied.
+    bool apply_default_config_without_warming = 3;
+  }
+
   reserved 3;
 
-  // The name of the filter to instantiate. The name must match a
-  // :ref:`supported filter <config_http_filters>`.
+  // The name of the filter configuration. The name is used as a fallback to
+  // select an extension if the type of the configuration proto is not
+  // sufficient. It also serves as a resource name in FilterConfigDS.
   string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
   // Filter specific configuration which depends on the filter being instantiated. See the supported
   // filters for further documentation.
   oneof config_type {
     google.protobuf.Any typed_config = 4;
+
+    // [#not-implemented-hide:] Configuration source specifier for FilterConfigDS.
+    HttpFilterConfigSource filter_config_ds = 5;
 
     google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
   }

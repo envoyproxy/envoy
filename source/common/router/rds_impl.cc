@@ -8,8 +8,6 @@
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/api/v2/route.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
-#include "envoy/config/route/v3/route.pb.h"
-#include "envoy/config/route/v3/route.pb.validate.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
@@ -69,9 +67,9 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
     const std::string& stat_prefix,
     Envoy::Router::RouteConfigProviderManagerImpl& route_config_provider_manager)
     : Envoy::Config::SubscriptionBase<envoy::config::route::v3::RouteConfiguration>(
-          rds.config_source().resource_api_version()),
+          rds.config_source().resource_api_version(),
+          factory_context.messageValidationContext().dynamicValidationVisitor(), "name"),
       route_config_name_(rds.route_config_name()), factory_context_(factory_context),
-      validator_(factory_context.messageValidationContext().dynamicValidationVisitor()),
       parent_init_target_(fmt::format("RdsRouteConfigSubscription init {}", route_config_name_),
                           [this]() { local_init_manager_.initialize(local_init_watcher_); }),
       local_init_watcher_(fmt::format("RDS local-init-watcher {}", rds.route_config_name()),
@@ -87,10 +85,11 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
   const auto resource_name = getResourceName();
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
-          rds.config_source(), Grpc::Common::typeUrl(resource_name), *scope_, *this);
+          rds.config_source(), Grpc::Common::typeUrl(resource_name), *scope_, *this,
+          resource_decoder_);
   local_init_manager_.add(local_init_target_);
   config_update_info_ =
-      std::make_unique<RouteConfigUpdateReceiverImpl>(factory_context.timeSource(), validator_);
+      std::make_unique<RouteConfigUpdateReceiverImpl>(factory_context.timeSource());
 }
 
 RdsRouteConfigSubscription::~RdsRouteConfigSubscription() {
@@ -105,14 +104,13 @@ RdsRouteConfigSubscription::~RdsRouteConfigSubscription() {
 }
 
 void RdsRouteConfigSubscription::onConfigUpdate(
-    const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+    const std::vector<Envoy::Config::DecodedResourceRef>& resources,
     const std::string& version_info) {
   if (!validateUpdateSize(resources.size())) {
     return;
   }
-  auto route_config =
-      MessageUtil::anyConvertAndValidate<envoy::config::route::v3::RouteConfiguration>(resources[0],
-                                                                                       validator_);
+  const auto& route_config = dynamic_cast<const envoy::config::route::v3::RouteConfiguration&>(
+      resources[0].get().resource());
   if (route_config.name() != route_config_name_) {
     throw EnvoyException(fmt::format("Unexpected RDS configuration (expecting {}): {}",
                                      route_config_name_, route_config.name()));
@@ -178,7 +176,7 @@ void RdsRouteConfigSubscription::maybeCreateInitManager(
 }
 
 void RdsRouteConfigSubscription::onConfigUpdate(
-    const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
+    const std::vector<Envoy::Config::DecodedResourceRef>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources, const std::string&) {
   if (!removed_resources.empty()) {
     // TODO(#2500) when on-demand resource loading is supported, an RDS removal may make sense
@@ -189,9 +187,7 @@ void RdsRouteConfigSubscription::onConfigUpdate(
         removed_resources[0]);
   }
   if (!added_resources.empty()) {
-    Protobuf::RepeatedPtrField<ProtobufWkt::Any> unwrapped_resource;
-    *unwrapped_resource.Add() = added_resources[0].resource();
-    onConfigUpdate(unwrapped_resource, added_resources[0].version());
+    onConfigUpdate(added_resources, added_resources[0].get().version());
   }
 }
 

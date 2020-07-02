@@ -25,6 +25,153 @@ namespace Envoy {
 namespace Event {
 namespace {
 
+class SchedulableCallbackImplTest : public testing::Test {
+protected:
+  SchedulableCallbackImplTest()
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
+
+  void createCallback(std::function<void()> cb) {
+    callbacks_.emplace_back(dispatcher_->createSchedulableCallback(cb));
+  }
+
+  Api::ApiPtr api_;
+  DispatcherPtr dispatcher_;
+  std::vector<SchedulableCallbackPtr> callbacks_;
+
+  static void onWatcherReady(evwatch*, const evwatch_prepare_cb_info*, void* arg) {
+    // `arg` contains the ReadyWatcher passed in from evwatch_prepare_new.
+    auto watcher = static_cast<ReadyWatcher*>(arg);
+    watcher->ready();
+  }
+};
+
+TEST_F(SchedulableCallbackImplTest, ScheduleCurrentAndCancel) {
+  ReadyWatcher watcher;
+
+  auto cb = dispatcher_->createSchedulableCallback([&]() { watcher.ready(); });
+
+  // Cancel is a no-op if not scheduled.
+  cb->cancel();
+  dispatcher_->run(Dispatcher::RunType::Block);
+
+  // Callback is not invoked if cancelled before it executes.
+  cb->scheduleCallbackCurrentIteration();
+  EXPECT_TRUE(cb->enabled());
+  cb->cancel();
+  EXPECT_FALSE(cb->enabled());
+  dispatcher_->run(Dispatcher::RunType::Block);
+
+  // Scheduled callback executes.
+  cb->scheduleCallbackCurrentIteration();
+  EXPECT_CALL(watcher, ready());
+  dispatcher_->run(Dispatcher::RunType::Block);
+
+  // Callbacks implicitly cancelled if runner is deleted.
+  cb->scheduleCallbackCurrentIteration();
+  cb.reset();
+  dispatcher_->run(Dispatcher::RunType::Block);
+}
+
+TEST_F(SchedulableCallbackImplTest, ScheduleNextAndCancel) {
+  ReadyWatcher watcher;
+
+  auto cb = dispatcher_->createSchedulableCallback([&]() { watcher.ready(); });
+
+  // Cancel is a no-op if not scheduled.
+  cb->cancel();
+  dispatcher_->run(Dispatcher::RunType::Block);
+
+  // Callback is not invoked if cancelled before it executes.
+  cb->scheduleCallbackNextIteration();
+  EXPECT_TRUE(cb->enabled());
+  cb->cancel();
+  EXPECT_FALSE(cb->enabled());
+  dispatcher_->run(Dispatcher::RunType::Block);
+
+  // Scheduled callback executes.
+  cb->scheduleCallbackNextIteration();
+  EXPECT_CALL(watcher, ready());
+  dispatcher_->run(Dispatcher::RunType::Block);
+
+  // Callbacks implicitly cancelled if runner is deleted.
+  cb->scheduleCallbackNextIteration();
+  cb.reset();
+  dispatcher_->run(Dispatcher::RunType::Block);
+}
+
+TEST_F(SchedulableCallbackImplTest, ScheduleOrder) {
+  ReadyWatcher watcher0;
+  createCallback([&]() { watcher0.ready(); });
+  ReadyWatcher watcher1;
+  createCallback([&]() { watcher1.ready(); });
+  ReadyWatcher watcher2;
+  createCallback([&]() { watcher2.ready(); });
+
+  // Current iteration callbacks run in the order they are scheduled. Next iteration callbacks run
+  // after current iteration callbacks.
+  callbacks_[0]->scheduleCallbackNextIteration();
+  callbacks_[1]->scheduleCallbackCurrentIteration();
+  callbacks_[2]->scheduleCallbackCurrentIteration();
+  InSequence s;
+  EXPECT_CALL(watcher1, ready());
+  EXPECT_CALL(watcher2, ready());
+  EXPECT_CALL(watcher0, ready());
+  dispatcher_->run(Dispatcher::RunType::Block);
+}
+
+TEST_F(SchedulableCallbackImplTest, ScheduleChainingAndCancellation) {
+  DispatcherImpl* dispatcher_impl = static_cast<DispatcherImpl*>(dispatcher_.get());
+  ReadyWatcher prepare_watcher;
+  evwatch_prepare_new(&dispatcher_impl->base(), onWatcherReady, &prepare_watcher);
+
+  ReadyWatcher watcher0;
+  createCallback([&]() {
+    watcher0.ready();
+    callbacks_[1]->scheduleCallbackCurrentIteration();
+  });
+
+  ReadyWatcher watcher1;
+  createCallback([&]() {
+    watcher1.ready();
+    callbacks_[2]->scheduleCallbackCurrentIteration();
+    callbacks_[3]->scheduleCallbackCurrentIteration();
+    callbacks_[4]->scheduleCallbackCurrentIteration();
+    callbacks_[5]->scheduleCallbackNextIteration();
+  });
+
+  ReadyWatcher watcher2;
+  createCallback([&]() {
+    watcher2.ready();
+    EXPECT_TRUE(callbacks_[3]->enabled());
+    callbacks_[3]->cancel();
+    EXPECT_TRUE(callbacks_[4]->enabled());
+    callbacks_[4].reset();
+  });
+
+  ReadyWatcher watcher3;
+  createCallback([&]() { watcher3.ready(); });
+
+  ReadyWatcher watcher4;
+  createCallback([&]() { watcher4.ready(); });
+
+  ReadyWatcher watcher5;
+  createCallback([&]() { watcher5.ready(); });
+
+  // Chained callbacks run in the same event loop iteration, as signaled by a single call to
+  // prepare_watcher.ready(). watcher3 and watcher4 are not invoked because cb2 cancels
+  // cb3 and deletes cb4 as part of its execution. cb5 runs after a second call to the
+  // prepare callback since it's scheduled for the next iteration.
+  callbacks_[0]->scheduleCallbackCurrentIteration();
+  InSequence s;
+  EXPECT_CALL(prepare_watcher, ready());
+  EXPECT_CALL(watcher0, ready());
+  EXPECT_CALL(watcher1, ready());
+  EXPECT_CALL(watcher2, ready());
+  EXPECT_CALL(prepare_watcher, ready());
+  EXPECT_CALL(watcher5, ready());
+  dispatcher_->run(Dispatcher::RunType::Block);
+}
+
 class TestDeferredDeletable : public DeferredDeletable {
 public:
   TestDeferredDeletable(std::function<void()> on_destroy) : on_destroy_(on_destroy) {}
@@ -209,6 +356,7 @@ TEST_F(DispatcherImplTest, RunPostCallbacksLocking) {
 }
 
 TEST_F(DispatcherImplTest, Timer) {
+  timerTest([](Timer& timer) { timer.enableTimer(std::chrono::milliseconds(0)); });
   timerTest([](Timer& timer) { timer.enableTimer(std::chrono::milliseconds(50)); });
   timerTest([](Timer& timer) { timer.enableHRTimer(std::chrono::microseconds(50)); });
 }
@@ -337,6 +485,274 @@ TEST(TimerImplTest, TimerEnabledDisabled) {
   EXPECT_TRUE(timer->enabled());
   dispatcher->run(Dispatcher::RunType::NonBlock);
   EXPECT_FALSE(timer->enabled());
+}
+
+// Timers scheduled at different times execute in order.
+TEST(TimerImplTest, TimerOrdering) {
+  Api::ApiPtr api = Api::createApiForTest();
+  DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
+
+  ReadyWatcher watcher1;
+  Event::TimerPtr timer1 = dispatcher->createTimer([&] { watcher1.ready(); });
+
+  ReadyWatcher watcher2;
+  Event::TimerPtr timer2 = dispatcher->createTimer([&] { watcher2.ready(); });
+
+  ReadyWatcher watcher3;
+  Event::TimerPtr timer3 = dispatcher->createTimer([&] { watcher3.ready(); });
+
+  timer1->enableTimer(std::chrono::milliseconds(0));
+  timer2->enableTimer(std::chrono::milliseconds(1));
+  timer3->enableTimer(std::chrono::milliseconds(2));
+
+  // Sleep for 5ms so timers above all trigger in the same loop iteration.
+  absl::SleepFor(absl::Milliseconds(5));
+
+  EXPECT_TRUE(timer1->enabled());
+  EXPECT_TRUE(timer2->enabled());
+  EXPECT_TRUE(timer3->enabled());
+
+  // Expect watcher calls to happen in order since timers have different times.
+  InSequence s;
+  EXPECT_CALL(watcher1, ready());
+  EXPECT_CALL(watcher2, ready());
+  EXPECT_CALL(watcher3, ready());
+  dispatcher->run(Dispatcher::RunType::Block);
+}
+
+// Alarms that are scheduled to execute and are cancelled do not trigger.
+TEST(TimerImplTest, TimerOrderAndDisableAlarm) {
+  Api::ApiPtr api = Api::createApiForTest();
+  DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
+
+  ReadyWatcher watcher3;
+  Event::TimerPtr timer3 = dispatcher->createTimer([&] { watcher3.ready(); });
+
+  ReadyWatcher watcher2;
+  Event::TimerPtr timer2 = dispatcher->createTimer([&] { watcher2.ready(); });
+
+  ReadyWatcher watcher1;
+  Event::TimerPtr timer1 = dispatcher->createTimer([&] {
+    timer2->disableTimer();
+    watcher1.ready();
+  });
+
+  timer1->enableTimer(std::chrono::milliseconds(0));
+  timer2->enableTimer(std::chrono::milliseconds(1));
+  timer3->enableTimer(std::chrono::milliseconds(2));
+
+  // Sleep for 5ms so timers above all trigger in the same loop iteration.
+  absl::SleepFor(absl::Milliseconds(5));
+
+  EXPECT_TRUE(timer1->enabled());
+  EXPECT_TRUE(timer2->enabled());
+  EXPECT_TRUE(timer3->enabled());
+
+  // Expect watcher calls to happen in order since timers have different times.
+  InSequence s;
+  EXPECT_CALL(watcher1, ready());
+  EXPECT_CALL(watcher3, ready());
+  dispatcher->run(Dispatcher::RunType::Block);
+}
+
+// Change the registration time for a timer that is already activated by disabling and re-enabling
+// the timer. Verify that execution is delayed.
+TEST(TimerImplTest, TimerOrderDisableAndReschedule) {
+  Api::ApiPtr api = Api::createApiForTest();
+  DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
+
+  ReadyWatcher watcher4;
+  Event::TimerPtr timer4 = dispatcher->createTimer([&] { watcher4.ready(); });
+
+  ReadyWatcher watcher3;
+  Event::TimerPtr timer3 = dispatcher->createTimer([&] { watcher3.ready(); });
+
+  ReadyWatcher watcher2;
+  Event::TimerPtr timer2 = dispatcher->createTimer([&] { watcher2.ready(); });
+
+  ReadyWatcher watcher1;
+  Event::TimerPtr timer1 = dispatcher->createTimer([&] {
+    timer2->disableTimer();
+    timer2->enableTimer(std::chrono::milliseconds(0));
+    timer3->disableTimer();
+    timer3->enableTimer(std::chrono::milliseconds(1));
+    watcher1.ready();
+  });
+
+  timer1->enableTimer(std::chrono::milliseconds(0));
+  timer2->enableTimer(std::chrono::milliseconds(1));
+  timer3->enableTimer(std::chrono::milliseconds(2));
+  timer4->enableTimer(std::chrono::milliseconds(3));
+
+  // Sleep for 5ms so timers above all trigger in the same loop iteration.
+  absl::SleepFor(absl::Milliseconds(5));
+
+  EXPECT_TRUE(timer1->enabled());
+  EXPECT_TRUE(timer2->enabled());
+  EXPECT_TRUE(timer3->enabled());
+  EXPECT_TRUE(timer4->enabled());
+
+  // timer1 is expected to run first and reschedule timers 2 and 3. timer4 should fire before
+  // timer2 and timer3 since timer4's registration is unaffected.
+  InSequence s;
+  EXPECT_CALL(watcher1, ready());
+  EXPECT_CALL(watcher4, ready());
+  EXPECT_CALL(watcher2, ready());
+  EXPECT_CALL(watcher3, ready());
+  dispatcher->run(Dispatcher::RunType::Block);
+}
+
+// Change the registration time for a timer that is already activated by re-enabling the timer
+// without calling disableTimer first.
+TEST(TimerImplTest, TimerOrderAndReschedule) {
+  Api::ApiPtr api = Api::createApiForTest();
+  DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
+
+  ReadyWatcher watcher4;
+  Event::TimerPtr timer4 = dispatcher->createTimer([&] { watcher4.ready(); });
+
+  ReadyWatcher watcher3;
+  Event::TimerPtr timer3 = dispatcher->createTimer([&] { watcher3.ready(); });
+
+  ReadyWatcher watcher2;
+  Event::TimerPtr timer2 = dispatcher->createTimer([&] { watcher2.ready(); });
+
+  ReadyWatcher watcher1;
+  Event::TimerPtr timer1 = dispatcher->createTimer([&] {
+    timer2->enableTimer(std::chrono::milliseconds(0));
+    timer3->enableTimer(std::chrono::milliseconds(1));
+    watcher1.ready();
+  });
+
+  timer1->enableTimer(std::chrono::milliseconds(0));
+  timer2->enableTimer(std::chrono::milliseconds(1));
+  timer3->enableTimer(std::chrono::milliseconds(2));
+  timer4->enableTimer(std::chrono::milliseconds(3));
+
+  // Sleep for 5ms so timers above all trigger in the same loop iteration.
+  absl::SleepFor(absl::Milliseconds(5));
+
+  EXPECT_TRUE(timer1->enabled());
+  EXPECT_TRUE(timer2->enabled());
+  EXPECT_TRUE(timer3->enabled());
+  EXPECT_TRUE(timer4->enabled());
+
+  // Rescheduling timers that are already scheduled to run in the current event loop iteration has
+  // no effect if the time delta is 0. Expect timers 1, 2 and 4 to execute in the original order.
+  // Timer 3 is delayed since it is rescheduled with a non-zero delta.
+  InSequence s;
+  EXPECT_CALL(watcher1, ready());
+  EXPECT_CALL(watcher2, ready());
+  EXPECT_CALL(watcher4, ready());
+  EXPECT_CALL(watcher3, ready());
+  dispatcher->run(Dispatcher::RunType::Block);
+}
+
+TEST(TimerImplTest, TimerChaining) {
+  Api::ApiPtr api = Api::createApiForTest();
+  DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
+
+  ReadyWatcher watcher1;
+  Event::TimerPtr timer1 = dispatcher->createTimer([&] { watcher1.ready(); });
+
+  ReadyWatcher watcher2;
+  Event::TimerPtr timer2 = dispatcher->createTimer([&] {
+    watcher2.ready();
+    timer1->enableTimer(std::chrono::milliseconds(0));
+  });
+
+  ReadyWatcher watcher3;
+  Event::TimerPtr timer3 = dispatcher->createTimer([&] {
+    watcher3.ready();
+    timer2->enableTimer(std::chrono::milliseconds(0));
+  });
+
+  ReadyWatcher watcher4;
+  Event::TimerPtr timer4 = dispatcher->createTimer([&] {
+    watcher4.ready();
+    timer3->enableTimer(std::chrono::milliseconds(0));
+  });
+
+  timer4->enableTimer(std::chrono::milliseconds(0));
+
+  EXPECT_FALSE(timer1->enabled());
+  EXPECT_FALSE(timer2->enabled());
+  EXPECT_FALSE(timer3->enabled());
+  EXPECT_TRUE(timer4->enabled());
+  EXPECT_CALL(watcher4, ready());
+  EXPECT_CALL(watcher3, ready());
+  EXPECT_CALL(watcher2, ready());
+  EXPECT_CALL(watcher1, ready());
+  dispatcher->run(Dispatcher::RunType::NonBlock);
+
+  EXPECT_FALSE(timer1->enabled());
+  EXPECT_FALSE(timer2->enabled());
+  EXPECT_FALSE(timer3->enabled());
+  EXPECT_FALSE(timer4->enabled());
+}
+
+TEST(TimerImplTest, TimerChainDisable) {
+  Api::ApiPtr api = Api::createApiForTest();
+  DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
+
+  ReadyWatcher watcher;
+  Event::TimerPtr timer1;
+  Event::TimerPtr timer2;
+  Event::TimerPtr timer3;
+
+  auto timer_cb = [&] {
+    watcher.ready();
+    timer1->disableTimer();
+    timer2->disableTimer();
+    timer3->disableTimer();
+  };
+
+  timer1 = dispatcher->createTimer(timer_cb);
+  timer2 = dispatcher->createTimer(timer_cb);
+  timer3 = dispatcher->createTimer(timer_cb);
+
+  timer3->enableTimer(std::chrono::milliseconds(0));
+  timer2->enableTimer(std::chrono::milliseconds(0));
+  timer1->enableTimer(std::chrono::milliseconds(0));
+
+  EXPECT_TRUE(timer1->enabled());
+  EXPECT_TRUE(timer2->enabled());
+  EXPECT_TRUE(timer3->enabled());
+  // Only 1 call to watcher ready since the other 2 timers were disabled by the first timer.
+  EXPECT_CALL(watcher, ready());
+  dispatcher->run(Dispatcher::RunType::NonBlock);
+}
+
+TEST(TimerImplTest, TimerChainDelete) {
+  Api::ApiPtr api = Api::createApiForTest();
+  DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
+
+  ReadyWatcher watcher;
+  Event::TimerPtr timer1;
+  Event::TimerPtr timer2;
+  Event::TimerPtr timer3;
+
+  auto timer_cb = [&] {
+    watcher.ready();
+    timer1.reset();
+    timer2.reset();
+    timer3.reset();
+  };
+
+  timer1 = dispatcher->createTimer(timer_cb);
+  timer2 = dispatcher->createTimer(timer_cb);
+  timer3 = dispatcher->createTimer(timer_cb);
+
+  timer3->enableTimer(std::chrono::milliseconds(0));
+  timer2->enableTimer(std::chrono::milliseconds(0));
+  timer1->enableTimer(std::chrono::milliseconds(0));
+
+  EXPECT_TRUE(timer1->enabled());
+  EXPECT_TRUE(timer2->enabled());
+  EXPECT_TRUE(timer3->enabled());
+  // Only 1 call to watcher ready since the other 2 timers were deleted by the first timer.
+  EXPECT_CALL(watcher, ready());
+  dispatcher->run(Dispatcher::RunType::NonBlock);
 }
 
 class TimerImplTimingTest : public testing::Test {

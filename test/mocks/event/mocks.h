@@ -74,7 +74,17 @@ public:
   }
 
   Event::TimerPtr createTimer(Event::TimerCb cb) override {
-    return Event::TimerPtr{createTimer_(cb)};
+    auto timer = Event::TimerPtr{createTimer_(cb)};
+    // Assert that the timer is not null to avoid confusing test failures down the line.
+    ASSERT(timer != nullptr);
+    return timer;
+  }
+
+  Event::SchedulableCallbackPtr createSchedulableCallback(std::function<void()> cb) override {
+    auto schedulable_cb = Event::SchedulableCallbackPtr{createSchedulableCallback_(cb)};
+    // Assert that schedulable_cb is not null to avoid confusing test failures down the line.
+    ASSERT(schedulable_cb != nullptr);
+    return schedulable_cb;
   }
 
   void deferredDelete(DeferredDeletablePtr&& to_delete) override {
@@ -109,6 +119,7 @@ public:
   MOCK_METHOD(Network::UdpListener*, createUdpListener_,
               (Network::SocketSharedPtr && socket, Network::UdpListenerCallbacks& cb));
   MOCK_METHOD(Timer*, createTimer_, (Event::TimerCb cb));
+  MOCK_METHOD(SchedulableCallback*, createSchedulableCallback_, (std::function<void()> cb));
   MOCK_METHOD(void, deferredDelete_, (DeferredDeletable * to_delete));
   MOCK_METHOD(void, exit, ());
   MOCK_METHOD(SignalEvent*, listenForSignal_, (int signal_num, SignalCb cb));
@@ -161,6 +172,30 @@ public:
 
 private:
   Event::TimerCb callback_;
+};
+
+class MockSchedulableCallback : public SchedulableCallback {
+public:
+  MockSchedulableCallback(MockDispatcher* dispatcher);
+  ~MockSchedulableCallback() override;
+
+  void invokeCallback() {
+    EXPECT_TRUE(enabled_);
+    enabled_ = false;
+    callback_();
+  }
+
+  // SchedulableCallback
+  MOCK_METHOD(void, scheduleCallbackCurrentIteration, ());
+  MOCK_METHOD(void, scheduleCallbackNextIteration, ());
+  MOCK_METHOD(void, cancel, ());
+  MOCK_METHOD(bool, enabled, ());
+
+  MockDispatcher* dispatcher_{};
+  bool enabled_{};
+
+private:
+  std::function<void()> callback_;
 };
 
 class MockSignalEvent : public SignalEvent {
