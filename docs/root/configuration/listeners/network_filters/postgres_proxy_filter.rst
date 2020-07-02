@@ -111,7 +111,7 @@ SQL statement was parsed successfully and metadata was created. The metadata is 
 
 .. attention::
 
-   Currently used parser does not successfully parse all Postgres SQL statements and it cannot be assumed that all SQL queries will successfully produce Dynamic Metadata.
+   Currently used parser does not successfully parse all SQL statements and it cannot be assumed that all SQL queries will successfully produce Dynamic Metadata.
    Creating Dynamic Metadata from SQL queries is on best-effort basis at the moment. If parsing of an SQL query fails, ``statements_parse_error`` counter is increased, log message is created, Dynamic Metadata is not
    produced, but the Postgres message is still forwarded to upstream Postgres server.
 
