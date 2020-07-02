@@ -33,7 +33,6 @@ ThreadLocalStoreImpl::ThreadLocalStoreImpl(Allocator& alloc)
   for (const auto& desc : Config::TagNames::get().descriptorVec()) {
     well_known_tags_->rememberBuiltin(desc.name_);
   }
-  well_known_tags_->rememberBuiltin("admin");
 }
 
 ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
@@ -307,11 +306,7 @@ public:
         if (tag_name.empty()) {
           tag_name = pool_.add(tag.name_);
         }
-        StatName tag_value = tls.wellKnownTags().getBuiltin(tag.value_, empty);
-        if (tag_value.empty()) {
-          tag_value = pool_.add(tag.value_);
-        }
-        stat_name_tags_.emplace_back(tag_name, tag_value);
+        stat_name_tags_.emplace_back(tag_name, pool_.add(tag.value_));
       }
     } else {
       tag_extracted_name_ = name;
