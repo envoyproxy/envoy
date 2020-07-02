@@ -60,7 +60,7 @@ DEFINE_PROTO_FUZZER(
         }
 
         return Api::SysCallIntResult{0, 0};
-        })));
+      })));
 
   filter->onAccept(callbacks_);
 }
