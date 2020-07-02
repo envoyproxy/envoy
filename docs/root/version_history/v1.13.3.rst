@@ -1,0 +1,12 @@
+1.13.3 (June 30, 2020)
+======================
+
+Changes
+-------
+
+* buffer: fixed CVE-2020-12603 by avoiding fragmentation, and tracking of HTTP/2 data and control frames in the output buffer.
+* http: fixed CVE-2020-12604 by changing :ref:`stream_idle_timeout <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.stream_idle_timeout>`
+  to also defend against an HTTP/2 peer that does not open stream window once an entire response has been buffered to be sent to a downstream client.
+* http: fixed CVE-2020-12605 by including request URL in request header size computation, and rejecting partial headers that exceed configured limits.
+* listener: fixed CVE-2020-8663 by adding runtime support for :ref:`per-listener limits <config_listeners_runtime>` on active/accepted connections.
+* overload management: fixed CVE-2020-8663 by adding runtime support for :ref:`global limits <config_overload_manager>` on active/accepted connections.
