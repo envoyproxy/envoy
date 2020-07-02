@@ -150,7 +150,7 @@ TEST_F(TapMatcherGenericBodyTest, ResizeOverlap) {
 http_request_generic_body_match:
   patterns:
     - string_match: generic
-    - string_match: htt
+    - string_match: lay
 )EOF";
   TestUtility::loadFromYaml(matcher_yaml, config_);
   buildMatcher(config_, matchers_);
@@ -164,7 +164,15 @@ http_request_generic_body_match:
   // 2 patterns must be located
   ASSERT_THAT(ctx->patterns_index_.size(), 2);
 
+  // Process body chunk which produces no match.
+  // It should fill the overlap_ buffer to full capacity.
+  data_.add(body_parts_[1].data(), body_parts_[1].length());
+  matchers_[0]->onRequestBody(data_, statuses_);
+  ASSERT_THAT(ctx->overlap_.size(), 6);
+  ASSERT_THAT(ctx->capacity_, 6);
+
   // Now pass the chunk which matches "generic" pattern.
+  data_.drain(data_.length());
   data_.add(body_parts_[0].data(), body_parts_[0].length());
   matchers_[0]->onRequestBody(data_, statuses_);
 
@@ -263,6 +271,10 @@ INSTANTIATE_TEST_SUITE_P(
             // chunk contains 'proxy' at the beginning.
             std::make_tuple(std::vector<std::string>{"    - string_match: \"envoyproxy\""},
                             std::list<std::list<uint32_t>>{{0}, {1}}, std::make_pair(true, false)),
+            // Should not match - 2 body chunks. First chunk does not contain 'enwoy' at the end but
+            // should match 'en' and then bail out.
+            std::make_tuple(std::vector<std::string>{"    - string_match: \"enwoyproxy\""},
+                            std::list<std::list<uint32_t>>{{0}, {1}}, std::make_pair(false, true)),
             // Should match - 3 body chunks containing string `envoyproxy` when reassembled.
             std::make_tuple(std::vector<std::string>{"    - string_match: \"envoyproxy\""},
                             std::list<std::list<uint32_t>>{{2}, {3}, {4}},
