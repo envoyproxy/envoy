@@ -5,7 +5,6 @@
 #include "envoy/api/v2/auth/cert.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
-#include "envoy/extensions/transport_sockets/tls/v3/secret.pb.validate.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/assert.h"
@@ -21,10 +20,10 @@ SdsApi::SdsApi(envoy::config::core::v3::ConfigSource sds_config, absl::string_vi
                Init::Manager& init_manager, std::function<void()> destructor_cb,
                Event::Dispatcher& dispatcher, Api::Api& api)
     : Envoy::Config::SubscriptionBase<envoy::extensions::transport_sockets::tls::v3::Secret>(
-          sds_config.resource_api_version()),
+          sds_config.resource_api_version(), validation_visitor, "name"),
       init_target_(fmt::format("SdsApi {}", sds_config_name), [this] { initialize(); }),
       stats_(stats), sds_config_(std::move(sds_config)), sds_config_name_(sds_config_name),
-      secret_hash_(0), clean_up_(std::move(destructor_cb)), validation_visitor_(validation_visitor),
+      secret_hash_(0), clean_up_(std::move(destructor_cb)),
       subscription_factory_(subscription_factory),
       time_source_(time_source), secret_data_{sds_config_name_, "uninitialized",
                                               time_source_.systemTime()},
@@ -32,7 +31,7 @@ SdsApi::SdsApi(envoy::config::core::v3::ConfigSource sds_config, absl::string_vi
   const auto resource_name = getResourceName();
   // This has to happen here (rather than in initialize()) as it can throw exceptions.
   subscription_ = subscription_factory_.subscriptionFromConfigSource(
-      sds_config_, Grpc::Common::typeUrl(resource_name), stats_, *this);
+      sds_config_, Grpc::Common::typeUrl(resource_name), stats_, *this, resource_decoder_);
   // TODO(JimmyCYJ): Implement chained_init_manager, so that multiple init_manager
   // can be chained together to behave as one init_manager. In that way, we let
   // two listeners which share same SdsApi to register at separate init managers, and
@@ -40,12 +39,11 @@ SdsApi::SdsApi(envoy::config::core::v3::ConfigSource sds_config, absl::string_vi
   init_manager.add(init_target_);
 }
 
-void SdsApi::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+void SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
                             const std::string& version_info) {
   validateUpdateSize(resources.size());
-  auto secret =
-      MessageUtil::anyConvertAndValidate<envoy::extensions::transport_sockets::tls::v3::Secret>(
-          resources[0], validation_visitor_);
+  const auto& secret = dynamic_cast<const envoy::extensions::transport_sockets::tls::v3::Secret&>(
+      resources[0].get().resource());
 
   if (secret.name() != sds_config_name_) {
     throw EnvoyException(
@@ -88,13 +86,10 @@ void SdsApi::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& 
   init_target_.ready();
 }
 
-void SdsApi::onConfigUpdate(
-    const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& resources,
-    const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
-  validateUpdateSize(resources.size());
-  Protobuf::RepeatedPtrField<ProtobufWkt::Any> unwrapped_resource;
-  *unwrapped_resource.Add() = resources[0].resource();
-  onConfigUpdate(unwrapped_resource, resources[0].version());
+void SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
+                            const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
+  validateUpdateSize(added_resources.size());
+  onConfigUpdate(added_resources, added_resources[0].get().version());
 }
 
 void SdsApi::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
