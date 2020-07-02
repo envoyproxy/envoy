@@ -3,8 +3,10 @@
 namespace Envoy {
 namespace Quic {
 
+// A test quic::ProofVerifier which always approves the certs and signature.
 class TestProofVerifier : public EnvoyQuicProofVerifierBase {
 public:
+  //  quic::ProofVerifier
   quic::QuicAsyncStatus
   VerifyCertChain(const std::string& /*hostname*/, const uint16_t /*port*/,
                   const std::vector<std::string>& /*certs*/, const std::string& /*ocsp_response*/,
@@ -15,6 +17,7 @@ public:
     return quic::QUIC_SUCCESS;
   }
 
+  // EnvoyQuicProofVerifierBase
   bool verifySignature(const std::string& /*server_config*/, absl::string_view /*chlo_hash*/,
                        const std::string& /*cert*/, const std::string& /*signature*/) override {
     return true;

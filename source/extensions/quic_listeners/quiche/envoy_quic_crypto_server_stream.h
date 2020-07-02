@@ -48,10 +48,6 @@ public:
         // Retain a copy of the proof source details after getting filter chain.
         parent_->details_ = std::make_unique<DetailsWithFilterChain>(
             static_cast<DetailsWithFilterChain&>(*proof_source_details));
-      } else {
-        ENVOY_LOG_MISC(
-            debug,
-            "ProofSource didn't provide ProofSource::Details. No filter chain will be installed.");
       }
       parent_->done_cb_wrapper_ = nullptr;
       parent_ = nullptr;
@@ -96,6 +92,7 @@ public:
                                                      std::move(done_cb_wrapper));
   }
 
+  // EnvoyCryptoServerStream
   const DetailsWithFilterChain* proofSourceDetails() const override { return details_.get(); }
 
 private:
@@ -103,6 +100,7 @@ private:
   std::unique_ptr<DetailsWithFilterChain> details_;
 };
 
+// A dedicated stream to do TLS1.3 handshake.
 class EnvoyQuicTlsServerHandshaker : public quic::TlsServerHandshaker,
                                      public EnvoyCryptoServerStream {
 public:
@@ -110,6 +108,7 @@ public:
                                const quic::QuicCryptoServerConfig& crypto_config)
       : quic::TlsServerHandshaker(session, crypto_config) {}
 
+  // EnvoyCryptoServerStream
   const DetailsWithFilterChain* proofSourceDetails() const override {
     return dynamic_cast<DetailsWithFilterChain*>(proof_source_details());
   }

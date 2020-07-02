@@ -217,12 +217,7 @@ protected:
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
 
   std::list<std::unique_ptr<Socket>> client_sockets_;
-  std::list<std::shared_ptr<Network::MockReadFilter>> read_filters_;
   Network::MockFilterChainManager filter_chain_manager_;
-  // The following two containers must guarantee pointer stability as addresses
-  // of elements are saved in expectations before new elements are added.
-  std::list<std::vector<Network::FilterFactoryCb>> filter_factories_;
-  std::list<Network::MockFilterChain> filter_chains_;
   quic::ParsedQuicVersion quic_version_;
 };
 

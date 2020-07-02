@@ -112,21 +112,14 @@ void EnvoyQuicServerSession::SetDefaultEncryptionLevel(quic::EncryptionLevel lev
       dynamic_cast<const EnvoyQuicCryptoServerStream*>(GetCryptoStream())->proofSourceDetails();
   if (proof_source_detail == nullptr) {
     // Unit tests using TestProofSource might not set ProofSource::Details.
-    std::cerr << "========= No proof source details\n";
+    ENVOY_CONN_LOG(
+        trace,
+        "ProofSource didn't provide ProofSource::Details. No filter chain will be installed.",
+        *this);
+
     return;
   }
   createNetworkFilters(proof_source_detail->filterChain());
-}
-
-void EnvoyQuicServerSession::createNetworkFilters(const Network::FilterChain& filter_chain) {
-  const bool empty_filter_chain = !listener_config_.filterChainFactory().createNetworkFilterChain(
-      *this, filter_chain.networkFilterFactories());
-  if (empty_filter_chain) {
-    // TODO(danzh) check empty filter chain at config load time instead of here.
-    connection()->CloseConnection(quic::QUIC_CRYPTO_INTERNAL_ERROR,
-                                  "closing connection: filter chain is empty",
-                                  quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
-  }
 }
 
 bool EnvoyQuicServerSession::hasDataToWrite() { return HasDataToWrite(); }
@@ -138,11 +131,20 @@ void EnvoyQuicServerSession::OnOneRttKeysAvailable() {
   const DetailsWithFilterChain* details =
       dynamic_cast<const EnvoyQuicTlsServerHandshaker*>(GetCryptoStream())->proofSourceDetails();
   if (details == nullptr) {
-    std::cerr << "========= No proof source details\n";
-
+    ENVOY_CONN_LOG(
+        trace,
+        "ProofSource didn't provide ProofSource::Details. No filter chain will be installed.",
+        *this);
     return;
   }
   createNetworkFilters(details->filterChain());
+}
+
+void EnvoyQuicServerSession::createNetworkFilters(const Network::FilterChain& filter_chain) {
+  const bool has_filter_initialized =
+      listener_config_.filterChainFactory().createNetworkFilterChain(
+          *this, filter_chain.networkFilterFactories());
+  ASSERT(has_filter_initialized);
 }
 
 } // namespace Quic

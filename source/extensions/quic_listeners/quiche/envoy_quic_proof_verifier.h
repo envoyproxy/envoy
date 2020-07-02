@@ -12,6 +12,7 @@ public:
                          TimeSource& time_source)
       : EnvoyQuicProofVerifierBase(), context_impl_(scope, config, time_source) {}
 
+  // EnvoyQuicProofVerifierBase
   quic::QuicAsyncStatus
   VerifyCertChain(const std::string& hostname, const uint16_t port,
                   const std::vector<std::string>& certs, const std::string& ocsp_response,
