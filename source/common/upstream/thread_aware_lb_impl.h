@@ -3,11 +3,11 @@
 #include <memory>
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/upstream/types.h"
 
 #include "common/upstream/load_balancer_impl.h"
 
 #include "absl/synchronization/mutex.h"
-#include "envoy/upstream/types.h"
 
 namespace Envoy {
 namespace Upstream {

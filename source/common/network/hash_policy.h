@@ -1,10 +1,11 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/network/hash_policy.h"
 #include "envoy/type/v3/hash_policy.pb.h"
 
 #include "common/common/hash.h"
-#include <memory>
 
 namespace Envoy {
 namespace Network {

@@ -1,8 +1,9 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/network/transport_socket.h"
 #include "envoy/stream_info/filter_state.h"
-#include <memory>
 
 namespace Envoy {
 namespace Network {

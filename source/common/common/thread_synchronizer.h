@@ -8,7 +8,6 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"
 #include "absl/synchronization/mutex.h"
-#include <memory>
 
 namespace Envoy {
 namespace Thread {

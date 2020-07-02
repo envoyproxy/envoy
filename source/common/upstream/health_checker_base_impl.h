@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/access_log/access_log.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/data/core/v3/health_check_event.pb.h"
@@ -12,7 +14,6 @@
 #include "common/common/logger.h"
 #include "common/common/matchers.h"
 #include "common/network/transport_socket_options_impl.h"
-#include <memory>
 
 namespace Envoy {
 namespace Upstream {

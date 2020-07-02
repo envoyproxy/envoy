@@ -1,12 +1,13 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
 #include "envoy/config/subscription.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "common/protobuf/protobuf.h"
-#include <memory>
 
 namespace Envoy {
 namespace Config {

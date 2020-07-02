@@ -5,13 +5,13 @@
 #include <string>
 #include <vector>
 
-#include "common/upstream/edf_scheduler.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/assert.h"
 #include "common/protobuf/utility.h"
+#include "common/upstream/edf_scheduler.h"
 
 #include "absl/container/fixed_array.h"
 

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/common/platform.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/connection.h"
@@ -14,7 +16,6 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/macros.h"
 #include "common/network/io_socket_handle_impl.h"
-#include <memory>
 
 namespace Envoy {
 namespace Extensions {
