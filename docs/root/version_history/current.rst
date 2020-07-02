@@ -79,6 +79,9 @@ New Features
 * config: added :ref:`version_text <config_cluster_manager_cds>` stat that reflects xDS version.
 * decompressor: generic :ref:`decompressor <config_http_filters_decompressor>` filter exposed to users.
 * dynamic forward proxy: added :ref:`SNI based dynamic forward proxy <config_network_filters_sni_dynamic_forward_proxy>` support.
+* dynamic forward proxy: added configurable :ref:`circuit breakers <dns_cache_circuit_breakers>` for resolver on DNS cache.
+  This behavior can be temporarily disabled by the runtime feature `envoy.reloadable_features.enable_dns_cache_circuit_breakers`.
+  If this runtime feature is disabled, the upstream circuit breakers for the cluster will be used even if the :ref:`DNS Cache circuit breakers <dns_cache_circuit_breakers>` are configured.
 * dynamic forward proxy: added :ref:`allow_insecure_cluster_options<envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig.allow_insecure_cluster_options>` to allow disabling of auto_san_validation and auto_sni.
 * ext_authz filter: added :ref:`v2 deny_at_disable <envoy_api_field_config.filter.http.ext_authz.v2.ExtAuthz.deny_at_disable>`, :ref:`v3 deny_at_disable <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.deny_at_disable>`. This allows to force deny for protected path while filter gets disabled, by setting this key to true.
 * ext_authz filter: added API version field for both :ref:`HTTP <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.transport_api_version>`
@@ -110,6 +113,7 @@ New Features
   interested in; behavior is allowed based on new "envoy.lrs.supports_send_all_clusters" capability
   in :ref:`client_features<envoy_v3_api_field_config.core.v3.Node.client_features>` field.
 * lrs: updated to allow to explicitly set the API version of gRPC service endpoint and message to be used.
+* lua: added :ref:`per route config <envoy_v3_api_msg_extensions.filters.http.lua.v3.LuaPerRoute>` for Lua filter.
 * lua: added tracing to the ``httpCall()`` API.
 * metrics service: added added :ref:`API version <envoy_v3_api_field_config.metrics.v3.MetricsServiceConfig.transport_api_version>` to explicitly set the version of gRPC service endpoint and message to be used.
 * network filters: added a :ref:`postgres proxy filter <config_network_filters_postgres_proxy>`.
@@ -157,3 +161,4 @@ Deprecated
   in :ref:`predicates <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.predicates>`.
 * File access logger fields :ref:`format <envoy_v3_api_field_extensions.access_loggers.file.v3.FileAccessLog.format>`, :ref:`json_format <envoy_v3_api_field_extensions.access_loggers.file.v3.FileAccessLog.json_format>` and :ref:`typed_json_format <envoy_v3_api_field_extensions.access_loggers.file.v3.FileAccessLog.typed_json_format>` are deprecated in favor of :ref:`log_format <envoy_v3_api_field_extensions.access_loggers.file.v3.FileAccessLog.log_format>`.
 * A warning is now logged when v2 xDS api is used. This behavior can be temporarily disabled by setting `envoy.reloadable_features.enable_deprecated_v2_api_warning` to `false`.
+* Using cluster circuit breakers for DNS Cache is now deprecated in favor of :ref:`DNS cache circuit breakers <dns_cache_circuit_breakers>`. This behavior can be temporarily disabled by setting `envoy.reloadable_features.enable_dns_cache_circuit_breakers` to `false`.
