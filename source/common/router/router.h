@@ -192,7 +192,7 @@ public:
         suppress_envoy_headers_(suppress_envoy_headers),
         respect_expected_rq_timeout_(respect_expected_rq_timeout),
         add_request_date_header_(add_request_date_header), http_context_(http_context),
-        date_provider_(time_source),
+        date_provider_(Http::SlowDateProviderImpl(time_source)),
         stat_name_pool_(scope_.symbolTable()), retry_(stat_name_pool_.add("retry")),
         zone_name_(stat_name_pool_.add(local_info_.zoneName())),
         empty_stat_name_(stat_name_pool_.add("")), shadow_writer_(std::move(shadow_writer)),
@@ -240,7 +240,7 @@ public:
   HeaderVectorPtr strict_check_headers_;
   std::list<AccessLog::InstanceSharedPtr> upstream_logs_;
   Http::Context& http_context_;
-  Http::SlowDateProviderImpl& date_provider_;
+  Http::SlowDateProviderImpl date_provider_;
   Stats::StatNamePool stat_name_pool_;
   Stats::StatName retry_;
   Stats::StatName zone_name_;
