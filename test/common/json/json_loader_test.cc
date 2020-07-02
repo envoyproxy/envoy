@@ -246,7 +246,7 @@ TEST_F(JsonLoaderTest, Hash) {
   ObjectSharedPtr json1 = Factory::loadFromString("{\"value1\": 10.5, \"value2\": -12.3}");
   ObjectSharedPtr json2 = Factory::loadFromString("{\"value2\": -12.3, \"value1\": 10.5}");
   ObjectSharedPtr json3 = Factory::loadFromString("  {  \"value2\":  -12.3, \"value1\":  10.5} ");
-  EXPECT_NE(json1->hash(), json2->hash());
+  EXPECT_EQ(json1->hash(), json2->hash());
   EXPECT_EQ(json2->hash(), json3->hash());
 }
 
