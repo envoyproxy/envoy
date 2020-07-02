@@ -876,16 +876,14 @@ public:
    * headers/body sizes of request/response for this cluster.
    */
 
-  virtual absl::optional<std::reference_wrapper<ClusterRequestResponseSizeStats>>
-  requestResponseSizeStats() const PURE;
+  virtual ClusterRequestResponseSizeOptRef requestResponseSizeStats() const PURE;
 
   /**
    * @return absl::optional<std::reference_wrapper<ClusterTimeoutBudgetStats>> stats on timeout
    * budgets for this cluster.
    */
 
-  virtual absl::optional<std::reference_wrapper<ClusterTimeoutBudgetStats>>
-  timeoutBudgetStats() const PURE;
+  virtual ClusterTimeoutBudgetOptRef timeoutBudgetStats() const PURE;
 
   /**
    * Returns an optional source address for upstream connections to bind to.

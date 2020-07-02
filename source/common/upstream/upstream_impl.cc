@@ -26,6 +26,7 @@
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/health_checker.h"
+#include "envoy/upstream/upstream.h"
 
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
@@ -46,7 +47,6 @@
 #include "common/upstream/logical_dns_cluster.h"
 #include "common/upstream/original_dst_cluster.h"
 
-#include "envoy/upstream/upstream.h"
 #include "server/transport_socket_config_impl.h"
 
 #include "extensions/filters/network/common/utility.h"
