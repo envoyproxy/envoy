@@ -128,6 +128,7 @@ New Features
 * request_id: added to :ref:`always_set_request_id_in_response setting <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.always_set_request_id_in_response>`
   to set :ref:`x-request-id <config_http_conn_man_headers_x-request-id>` header in response even if
   tracing is not forced.
+* router: add regex substitution support for header based hashing.
 * router: add support for RESPONSE_FLAGS and RESPONSE_CODE_DETAILS :ref:`header formatters
   <config_http_conn_man_headers_custom_request_headers>`.
 * router: allow Rate Limiting Service to be called in case of missing request header for a descriptor if the :ref:`skip_if_absent <envoy_v3_api_field_config.route.v3.RateLimit.Action.RequestHeaders.skip_if_absent>` field is set to true.
