@@ -2248,12 +2248,23 @@ TEST_F(ClusterInfoImplTest, TestTrackRequestResponseSizes) {
   // By default, histograms tracking request/response sizes are not published.
   EXPECT_FALSE(cluster->info()->requestResponseSizeStats().has_value());
 
+  const std::string yaml_disabled2 = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    track_optional_cluster_stats: { timeout_budgets : true }
+  )EOF";
+
+  cluster = makeCluster(yaml_disabled2);
+  EXPECT_FALSE(cluster->info()->requestResponseSizeStats().has_value());
+
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    track_request_response_sizes: true
+    track_optional_cluster_stats: { request_response_sizes : true }
   )EOF";
 
   cluster = makeCluster(yaml);
@@ -2366,7 +2377,7 @@ TEST_F(ClusterInfoImplTest, TestTrackTimeoutBudgets) {
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    track_timeout_budgets: true
+    track_optional_cluster_stats: { timeout_budgets : true }
   )EOF";
 
   cluster = makeCluster(yaml);
