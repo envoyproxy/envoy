@@ -23,6 +23,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using Envoy::Protobuf::util::MessageDifferencer;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -41,7 +42,17 @@ protected:
         dynamic_cast<const envoy::admin::v3::SecretsConfigDump&>(*message_ptr);
     envoy::admin::v3::SecretsConfigDump expected_secrets_config_dump;
     TestUtility::loadFromYaml(expected_dump_yaml, expected_secrets_config_dump);
-    EXPECT_EQ(expected_secrets_config_dump.DebugString(), secrets_config_dump.DebugString());
+
+    MessageDifferencer message_differencer;
+    std::string difference_report;
+    message_differencer.ReportDifferencesToString(&difference_report);
+    auto descriptor = secrets_config_dump.descriptor();
+    // Do not assert on the order of elements in these repeated fields
+    message_differencer.TreatAsSet(descriptor->FindFieldByName("static_secrets"));
+    message_differencer.TreatAsSet(descriptor->FindFieldByName("dynamic_active_secrets"));
+    message_differencer.TreatAsSet(descriptor->FindFieldByName("dynamic_warming_secrets"));
+    EXPECT_TRUE(message_differencer.Compare(expected_secrets_config_dump, secrets_config_dump))
+        << difference_report;
   }
 
   void setupSecretProviderContext() {}

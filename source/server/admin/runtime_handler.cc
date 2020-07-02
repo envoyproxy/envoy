@@ -1,7 +1,6 @@
 #include "server/admin/runtime_handler.h"
 
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "common/common/empty_string.h"
@@ -9,6 +8,8 @@
 #include "common/http/utility.h"
 
 #include "server/admin/utils.h"
+
+#include "absl/container/node_hash_map.h"
 
 namespace Envoy {
 namespace Server {
@@ -96,7 +97,7 @@ Http::Code RuntimeHandler::handlerRuntimeModify(absl::string_view url, Http::Res
       return Http::Code::BadRequest;
     }
   }
-  std::unordered_map<std::string, std::string> overrides;
+  absl::node_hash_map<std::string, std::string> overrides;
   overrides.insert(params.begin(), params.end());
   try {
     server_.runtime().mergeValues(overrides);

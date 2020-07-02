@@ -1,7 +1,6 @@
 #pragma once
 
 #include <queue>
-#include <unordered_map>
 
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/common/time.h"
@@ -17,6 +16,8 @@
 #include "common/config/api_version.h"
 #include "common/config/grpc_stream.h"
 #include "common/config/utility.h"
+
+#include "absl/container/node_hash_map.h"
 
 namespace Envoy {
 namespace Config {
@@ -132,7 +133,7 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   const bool skip_subsequent_node_;
   bool first_stream_request_;
-  std::unordered_map<std::string, ApiState> api_state_;
+  absl::node_hash_map<std::string, ApiState> api_state_;
   // Envoy's dependency ordering.
   std::list<std::string> subscriptions_;
 

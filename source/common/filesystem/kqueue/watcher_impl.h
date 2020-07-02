@@ -47,7 +47,7 @@ private:
 
   Api::Api& api_;
   int queue_;
-  std::unordered_map<int, FileWatchPtr> watches_;
+  absl::node_hash_map<int, FileWatchPtr> watches_;
   Event::FileEventPtr kqueue_event_;
 };
 

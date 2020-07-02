@@ -150,7 +150,7 @@ public:
     EXPECT_NE(nullptr, request);
   }
 
-  std::unordered_map<Upstream::HostConstSharedPtr, InstanceImpl::ThreadLocalActiveClientPtr>&
+  absl::node_hash_map<Upstream::HostConstSharedPtr, InstanceImpl::ThreadLocalActiveClientPtr>&
   clientMap() {
     InstanceImpl* conn_pool_impl = dynamic_cast<InstanceImpl*>(conn_pool_.get());
     return conn_pool_impl->tls_->getTyped<InstanceImpl::ThreadLocalPool>().client_map_;
@@ -161,7 +161,7 @@ public:
     return conn_pool_impl->tls_->getTyped<InstanceImpl::ThreadLocalPool>().client_map_[host].get();
   }
 
-  std::unordered_map<std::string, Upstream::HostConstSharedPtr>& hostAddressMap() {
+  absl::node_hash_map<std::string, Upstream::HostConstSharedPtr>& hostAddressMap() {
     InstanceImpl* conn_pool_impl = dynamic_cast<InstanceImpl*>(conn_pool_.get());
     return conn_pool_impl->tls_->getTyped<InstanceImpl::ThreadLocalPool>().host_address_map_;
   }
@@ -741,7 +741,7 @@ TEST_F(RedisConnPoolImplTest, HostsAddedAndRemovedWithDraining) {
   EXPECT_EQ(&active_request2, request2);
   EXPECT_EQ(host2->address()->asString(), "[2001:470:813b::1]:3333");
 
-  std::unordered_map<std::string, Upstream::HostConstSharedPtr>& host_address_map =
+  absl::node_hash_map<std::string, Upstream::HostConstSharedPtr>& host_address_map =
       hostAddressMap();
   EXPECT_EQ(host_address_map.size(), 2); // host1 and host2 have been created.
   EXPECT_EQ(host_address_map[host1->address()->asString()], host1);
@@ -840,7 +840,7 @@ TEST_F(RedisConnPoolImplTest, HostsAddedAndEndWithNoDraining) {
   EXPECT_EQ(&active_request2, request2);
   EXPECT_EQ(host2->address()->asString(), "[2001:470:813b::1]:3333");
 
-  std::unordered_map<std::string, Upstream::HostConstSharedPtr>& host_address_map =
+  absl::node_hash_map<std::string, Upstream::HostConstSharedPtr>& host_address_map =
       hostAddressMap();
   EXPECT_EQ(host_address_map.size(), 2); // host1 and host2 have been created.
   EXPECT_EQ(host_address_map[host1->address()->asString()], host1);
@@ -918,7 +918,7 @@ TEST_F(RedisConnPoolImplTest, HostsAddedAndEndWithClusterRemoval) {
   EXPECT_EQ(&active_request2, request2);
   EXPECT_EQ(host2->address()->asString(), "[2001:470:813b::1]:3333");
 
-  std::unordered_map<std::string, Upstream::HostConstSharedPtr>& host_address_map =
+  absl::node_hash_map<std::string, Upstream::HostConstSharedPtr>& host_address_map =
       hostAddressMap();
   EXPECT_EQ(host_address_map.size(), 2); // host1 and host2 have been created.
   EXPECT_EQ(host_address_map[host1->address()->asString()], host1);

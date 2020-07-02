@@ -4,7 +4,6 @@
 #include <functional>
 #include <memory>
 #include <string>
-#include <unordered_map>
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/api.h"
@@ -30,6 +29,9 @@
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/thread_local_cluster.h"
 #include "envoy/upstream/upstream.h"
+
+#include "absl/container/node_hash_map.h"
+#include "absl/container/node_hash_set.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -122,7 +124,7 @@ public:
   virtual void
   initializeSecondaryClusters(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) PURE;
 
-  using ClusterInfoMap = std::unordered_map<std::string, std::reference_wrapper<const Cluster>>;
+  using ClusterInfoMap = absl::node_hash_map<std::string, std::reference_wrapper<const Cluster>>;
 
   /**
    * @return ClusterInfoMap all current clusters. These are the primary (not thread local)
@@ -130,7 +132,7 @@ public:
    */
   virtual ClusterInfoMap clusters() PURE;
 
-  using ClusterSet = std::unordered_set<std::string>;
+  using ClusterSet = absl::node_hash_set<std::string>;
 
   /**
    * @return const ClusterSet& providing the cluster names that are eligible as

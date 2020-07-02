@@ -136,8 +136,8 @@ public:
 
   using TestSessionPtr = std::unique_ptr<TestSession>;
   using HostWithHealthCheckMap =
-      std::unordered_map<std::string,
-                         const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig>;
+      absl::node_hash_map<std::string,
+                          const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig>;
 
   void allocHealthChecker(const std::string& yaml) {
     health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(

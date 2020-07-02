@@ -2,7 +2,6 @@
 #include <fstream>
 #include <memory>
 #include <regex>
-#include <unordered_map>
 #include <vector>
 
 #include "envoy/admin/v3/clusters.pb.h"

@@ -1,13 +1,14 @@
 #pragma once
 
 #include <string>
-#include <unordered_map>
 
 #include "envoy/common/pure.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/macros.h"
 #include "common/singleton/const_singleton.h"
+
+#include "absl/container/node_hash_map.h"
 
 namespace Envoy {
 namespace Server {
@@ -51,7 +52,7 @@ public:
   }
 
 private:
-  std::unordered_map<std::string, OverloadActionState> actions_;
+  absl::node_hash_map<std::string, OverloadActionState> actions_;
 };
 
 /**

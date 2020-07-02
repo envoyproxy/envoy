@@ -19,7 +19,7 @@ struct Service {
 };
 
 // Map from resource type URL to service RPC methods.
-using TypeUrlToServiceMap = std::unordered_map<std::string, Service>;
+using TypeUrlToServiceMap = absl::node_hash_map<std::string, Service>;
 
 TypeUrlToServiceMap* buildTypeUrlToServiceMap() {
   auto* type_url_to_service_map = new TypeUrlToServiceMap();

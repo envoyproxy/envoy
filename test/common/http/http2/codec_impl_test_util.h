@@ -54,7 +54,7 @@ protected:
   }
 
 private:
-  std::unordered_map<int32_t, uint32_t> settings_;
+  absl::node_hash_map<int32_t, uint32_t> settings_;
 };
 
 class TestServerConnectionImpl : public TestCodecStatsProvider,

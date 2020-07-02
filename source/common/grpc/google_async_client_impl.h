@@ -106,7 +106,7 @@ private:
   Thread::ThreadPtr completion_thread_;
   // Track all streams that are currently using this CQ, so we can notify them
   // on shutdown.
-  std::unordered_set<GoogleAsyncStreamImpl*> streams_;
+  absl::node_hash_set<GoogleAsyncStreamImpl*> streams_;
 };
 
 // Google gRPC client stats. TODO(htuch): consider how a wider set of stats collected by the

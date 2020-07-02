@@ -6,7 +6,6 @@
 #include <list>
 #include <memory>
 #include <string>
-#include <unordered_map>
 #include <utility>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"

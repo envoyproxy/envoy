@@ -1,7 +1,6 @@
 #pragma once
 
 #include <string>
-#include <unordered_map>
 
 #include "envoy/buffer/buffer.h"
 
@@ -11,6 +10,8 @@
 
 #include "extensions/filters/network/dubbo_proxy/message.h"
 #include "extensions/filters/network/dubbo_proxy/metadata.h"
+
+#include "absl/container/node_hash_map.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -27,7 +28,7 @@ public:
   };
 
   using DeserializerTypeNameMap =
-      std::unordered_map<SerializationType, std::string, SerializationTypeHash>;
+      absl::node_hash_map<SerializationType, std::string, SerializationTypeHash>;
 
   const DeserializerTypeNameMap deserializerTypeNameMap = {
       {SerializationType::Hessian, "hessian"},

@@ -77,7 +77,7 @@ private:
   Http::ResponseHeaderMapPtr headers_;
   Http::ResponseTrailerMapPtr trailers_;
   Http::MetadataMapPtr metadata_map_{new Http::MetadataMap()};
-  std::unordered_map<std::string, uint64_t> duplicated_metadata_key_count_;
+  absl::node_hash_map<std::string, uint64_t> duplicated_metadata_key_count_;
   bool waiting_for_end_stream_{};
   bool saw_end_stream_{};
   std::string body_;
