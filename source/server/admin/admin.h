@@ -257,13 +257,13 @@ private:
     };
 
     NullOverloadManager(ThreadLocal::SlotAllocator& slot_allocator)
-        : tls_(slot_allocator.allocateSlot()) {
+        : tls_(slot_allocator.allocateSlot()) {}
+
+    void start() override {
       tls_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
         return std::make_shared<NullThreadLocalOverloadState>();
       });
     }
-
-    void start() override {}
 
     ThreadLocalOverloadState& getThreadLocalOverloadState() override {
       return tls_->getTyped<NullThreadLocalOverloadState>();

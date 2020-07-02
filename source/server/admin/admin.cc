@@ -660,6 +660,7 @@ void AdminImpl::startHttpListener(const std::string& access_log_path,
   access_logs_.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
       access_log_path, {}, Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
       server_.accessLogManager()));
+  null_overload_manager_.start();
   socket_ = std::make_shared<Network::TcpListenSocket>(address, socket_options, true);
   socket_factory_ = std::make_shared<AdminListenSocketFactory>(socket_);
   listener_ = std::make_unique<AdminListener>(*this, std::move(listener_scope));
