@@ -42,7 +42,7 @@ public class MainActivity extends Activity {
 
     streamClient = new AndroidStreamClientBuilder(getApplication()).build();
 
-    recyclerView = findViewById(R.id.recycler_view);
+    recyclerView = (RecyclerView)findViewById(R.id.recycler_view);
     recyclerView.setLayoutManager(new LinearLayoutManager(this));
 
     viewAdapter = new ResponseRecyclerViewAdapter();
