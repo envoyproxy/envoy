@@ -311,17 +311,21 @@ size_t HttpGenericBodyMatcher::calcLongestPatternSize(const std::list<uint32_t>&
 // Method checks if it is possible to reduce the size of overlap_ buffer.
 void HttpGenericBodyMatcher::resizeOverlapBuffer(HttpGenericBodyMatcherCtx* ctx) {
   // Check if we need to resize overlap_ buffer. Since it was initialized to size of the longest
-  // pattern, it will be shrunk only and memory allocations should not happen.
+  // pattern, it will be shrunk only and memory allocations do not happen.
+  // Depending on how many bytes were already in the buffer, shift may be required if
+  // the new size is smaller than number of already buffered bytes.
   const size_t max_len = calcLongestPatternSize(ctx->patterns_index_);
   if (ctx->capacity_ != (max_len - 1)) {
     const size_t new_size = max_len - 1;
-    const size_t shift = ctx->capacity_ - new_size;
+    const size_t shift = (ctx->overlap_.size() > new_size) ? (ctx->overlap_.size() - new_size) : 0;
     // Copy the last new_size bytes to the beginning of the buffer.
-    for (size_t i = 0; i < new_size; i++) {
+    for (size_t i = 0; (i < new_size) && (shift > 0); i++) {
       ctx->overlap_[i] = ctx->overlap_[i + shift];
     }
     ctx->capacity_ = new_size;
-    ctx->overlap_.resize(new_size);
+    if (shift > 0) {
+      ctx->overlap_.resize(new_size);
+    }
   }
 }
 
