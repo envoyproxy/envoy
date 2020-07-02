@@ -302,7 +302,6 @@ size_t HttpGenericBodyMatcher::calcLongestPatternSize(const std::list<uint32_t>&
   size_t max_len = 0;
   for (const auto& i : indexes) {
     max_len = std::max(max_len, patterns_->at(i).length());
-    std::cout << patterns_->at(i) << std::endl;
   }
   return max_len;
 }
