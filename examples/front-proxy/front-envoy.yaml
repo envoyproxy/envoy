@@ -64,3 +64,12 @@ admin:
     socket_address:
       address: 0.0.0.0
       port_value: 8001
+layered_runtime:
+  layers:
+    - name: static_layer_0
+      static_layer:
+        envoy:
+          resource_limits:
+            listener:
+              example_listener_name:
+                connection_limit: 10000

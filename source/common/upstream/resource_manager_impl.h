@@ -16,6 +16,53 @@
 namespace Envoy {
 namespace Upstream {
 
+struct ManagedResourceImpl : public BasicResourceLimitImpl {
+  ManagedResourceImpl(uint64_t max, Runtime::Loader& runtime, const std::string& runtime_key,
+                      Stats::Gauge& open_gauge, Stats::Gauge& remaining)
+      : BasicResourceLimitImpl(max, runtime, runtime_key), open_gauge_(open_gauge),
+        remaining_(remaining) {
+    remaining_.set(max);
+  }
+
+  // Upstream::Resource
+  bool canCreate() override { return current_ < max(); }
+  void inc() override {
+    BasicResourceLimitImpl::inc();
+    updateRemaining();
+    open_gauge_.set(BasicResourceLimitImpl::canCreate() ? 0 : 1);
+  }
+  void decBy(uint64_t amount) override {
+    BasicResourceLimitImpl::decBy(amount);
+    updateRemaining();
+    open_gauge_.set(BasicResourceLimitImpl::canCreate() ? 0 : 1);
+  }
+
+  /**
+   * We set the gauge instead of incrementing and decrementing because,
+   * though atomics are used, it is possible for the current resource count
+   * to be greater than the supplied max.
+   */
+  void updateRemaining() {
+    /**
+     * We cannot use std::max here because max() and current_ are
+     * unsigned and subtracting them may overflow.
+     */
+    const uint64_t current_copy = current_;
+    remaining_.set(max() > current_copy ? max() - current_copy : 0);
+  }
+
+  /**
+   * A gauge to notify the live circuit breaker state. The gauge is set to 0
+   * to notify that the circuit breaker is not yet triggered.
+   */
+  Stats::Gauge& open_gauge_;
+
+  /**
+   * The number of resources remaining before the circuit breaker opens.
+   */
+  Stats::Gauge& remaining_;
+};
+
 /**
  * Implementation of ResourceManager.
  * NOTE: This implementation makes some assumptions which favor simplicity over correctness.
@@ -53,53 +100,6 @@ public:
   ResourceLimit& connectionPools() override { return connection_pools_; }
 
 private:
-  struct ManagedResourceImpl : public BasicResourceLimitImpl {
-    ManagedResourceImpl(uint64_t max, Runtime::Loader& runtime, const std::string& runtime_key,
-                        Stats::Gauge& open_gauge, Stats::Gauge& remaining)
-        : BasicResourceLimitImpl(max, runtime, runtime_key), open_gauge_(open_gauge),
-          remaining_(remaining) {
-      remaining_.set(max);
-    }
-
-    // Upstream::Resource
-    bool canCreate() override { return current_ < max(); }
-    void inc() override {
-      BasicResourceLimitImpl::inc();
-      updateRemaining();
-      open_gauge_.set(BasicResourceLimitImpl::canCreate() ? 0 : 1);
-    }
-    void decBy(uint64_t amount) override {
-      BasicResourceLimitImpl::decBy(amount);
-      updateRemaining();
-      open_gauge_.set(BasicResourceLimitImpl::canCreate() ? 0 : 1);
-    }
-
-    /**
-     * We set the gauge instead of incrementing and decrementing because,
-     * though atomics are used, it is possible for the current resource count
-     * to be greater than the supplied max.
-     */
-    void updateRemaining() {
-      /**
-       * We cannot use std::max here because max() and current_ are
-       * unsigned and subtracting them may overflow.
-       */
-      const uint64_t current_copy = current_;
-      remaining_.set(max() > current_copy ? max() - current_copy : 0);
-    }
-
-    /**
-     * A gauge to notify the live circuit breaker state. The gauge is set to 0
-     * to notify that the circuit breaker is not yet triggered.
-     */
-    Stats::Gauge& open_gauge_;
-
-    /**
-     * The number of resources remaining before the circuit breaker opens.
-     */
-    Stats::Gauge& remaining_;
-  };
-
   class RetryBudgetImpl : public ResourceLimit {
   public:
     RetryBudgetImpl(absl::optional<double> budget_percent,
