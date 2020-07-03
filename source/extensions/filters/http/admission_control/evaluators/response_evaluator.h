@@ -28,6 +28,7 @@ public:
   virtual bool isGrpcSuccess(uint32_t status) const PURE;
 };
 
+using ResponseEvaluatorPtr = std::unique_ptr<ResponseEvaluator>;
 using ResponseEvaluatorSharedPtr = std::shared_ptr<ResponseEvaluator>;
 
 } // namespace AdmissionControl

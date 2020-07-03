@@ -101,6 +101,8 @@ private:
     Common::Redis::Client::ClientPtr redis_client_;
   };
 
+  using InstanceImplSharedPtr = std::shared_ptr<InstanceImpl>;
+
   using ThreadLocalActiveClientPtr = std::unique_ptr<ThreadLocalActiveClient>;
 
   struct PendingRequest : public Common::Redis::Client::ClientCallbacks,
@@ -126,7 +128,7 @@ private:
 
   struct ThreadLocalPool : public ThreadLocal::ThreadLocalObject,
                            public Upstream::ClusterUpdateCallbacks {
-    ThreadLocalPool(std::shared_ptr<InstanceImpl> parent, Event::Dispatcher& dispatcher,
+    ThreadLocalPool(InstanceImplSharedPtr parent, Event::Dispatcher& dispatcher,
                     std::string cluster_name);
     ~ThreadLocalPool() override;
     ThreadLocalActiveClientPtr& threadLocalActiveClient(Upstream::HostConstSharedPtr host);

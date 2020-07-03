@@ -33,7 +33,7 @@ Http::FilterFactoryCb AdmissionControlFilterFactory::createFilterFactoryFromProt
         return std::make_shared<ThreadLocalControllerImpl>(context.timeSource(), sampling_window);
       });
 
-  std::unique_ptr<ResponseEvaluator> response_evaluator;
+  ResponseEvaluatorPtr response_evaluator;
   switch (config.evaluation_criteria_case()) {
   case AdmissionControlProto::EvaluationCriteriaCase::kSuccessCriteria:
     response_evaluator = std::make_unique<SuccessCriteriaEvaluator>(config.success_criteria());

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/config/config_provider.h"
 #include "envoy/config/config_provider_manager.h"
 #include "envoy/init/manager.h"
@@ -15,7 +17,6 @@
 #include "common/init/target_impl.h"
 #include "common/init/watcher_impl.h"
 #include "common/protobuf/protobuf.h"
-#include <memory>
 
 namespace Envoy {
 namespace Config {

@@ -113,7 +113,7 @@ public:
   NiceMock<Api::MockApi> api_;
   Upstream::MockClusterManager cluster_manager_;
   FilterConfigSharedPtr config_;
-  std::shared_ptr<FilterConfigPerRoute> per_route_config_;
+  FilterConfigPerRouteSharedPtr per_route_config_;
   std::unique_ptr<TestFilter> filter_;
   Http::MockStreamDecoderFilterCallbacks decoder_callbacks_;
   Http::MockStreamEncoderFilterCallbacks encoder_callbacks_;

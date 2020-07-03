@@ -113,7 +113,7 @@ public:
 
   void expectEnableUpstreamReady(bool run);
 
-  std::unique_ptr<Tcp::ConnectionPool::Instance> conn_pool_;
+  Tcp::ConnectionPool::InstancePtr conn_pool_;
   Event::MockDispatcher& mock_dispatcher_;
   NiceMock<Event::MockSchedulableCallback>* mock_upstream_ready_cb_;
   std::vector<TestConnection> test_conns_;

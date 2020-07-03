@@ -1,6 +1,7 @@
 #pragma once
 
 #include <limits>
+#include <memory>
 
 #include "envoy/common/resource.h"
 #include "envoy/runtime/runtime.h"
@@ -56,5 +57,7 @@ private:
   Runtime::Loader* runtime_{nullptr};
   const absl::optional<std::string> runtime_key_;
 };
+
+using BasicResourceLimitImplSharedPtr = std::shared_ptr<BasicResourceLimitImpl>;
 
 } // namespace Envoy

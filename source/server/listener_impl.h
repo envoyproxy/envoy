@@ -402,7 +402,7 @@ private:
   //
   // TODO (tonya11en): Move this functionality into the overload manager.
   const std::string cx_limit_runtime_key_;
-  std::shared_ptr<BasicResourceLimitImpl> open_connections_;
+  BasicResourceLimitImplSharedPtr open_connections_;
 
   // This init watcher, if workers_started_ is false, notifies the "parent" listener manager when
   // listener initialization is complete.

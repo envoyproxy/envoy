@@ -44,7 +44,7 @@ public:
   Upstream::ResourceAutoIncDecPtr
   canCreateDnsRequest(ResourceLimitOptRef pending_requests) override {
     Upstream::ResourceAutoIncDec* raii_ptr = canCreateDnsRequest_(pending_requests);
-    return std::unique_ptr<Upstream::ResourceAutoIncDec>(raii_ptr);
+    return Upstream::ResourceAutoIncDecPtr(raii_ptr);
   }
   MOCK_METHOD(MockLoadDnsCacheEntryResult, loadDnsCacheEntry_,
               (absl::string_view host, uint16_t default_port,
