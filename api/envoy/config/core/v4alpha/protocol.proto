@@ -159,7 +159,7 @@ message Http1ProtocolOptions {
   bool enable_trailers = 5;
 
   // [#not-implemented-hide:]
-  // Overrides envoy's behavior on invalid HTTP messahing configured in the hcm
+  // Overrides envoy's behavior on invalid HTTP messaging configured in the hcm
   google.protobuf.BoolValue override_stream_error_on_invalid_http_message = 6;
 }
 
