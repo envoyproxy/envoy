@@ -925,7 +925,7 @@ message TrackOptionalClusterStats {
   // of 100 would indicate that the request took the entirety of the timeout given to it.
   bool timeout_budgets = 1;
 
-  // If track_request_response_sizes is true, then the :ref:`histograms
+  // If request_response_sizes is true, then the :ref:`histograms
   // <config_cluster_manager_cluster_stats_request_response_sizes>`  tracking header and body sizes
   // of requests and responses will be published.
   bool request_response_sizes = 2;
