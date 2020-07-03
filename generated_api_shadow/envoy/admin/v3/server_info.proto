@@ -83,7 +83,7 @@ message CommandLineOptions {
     Immediate = 1;
   }
 
-  reserved 12;
+  reserved 12, 20, 21;
 
   // See :option:`--base-id` for details.
   uint64 base_id = 1;
