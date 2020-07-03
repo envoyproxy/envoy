@@ -617,7 +617,7 @@ def fixSourceLine(line, line_number):
   for invalid_construct, valid_construct in LIBCXX_REPLACEMENTS.items():
     line = line.replace(invalid_construct, valid_construct)
 
-  if aggressive and not USING_TYPE_ALIAS_REGEX.match(line):
+  if aggressive and not USING_TYPE_ALIAS_REGEX.search(line):
     line = replaceWithTypeAlias(line)
 
   return line
