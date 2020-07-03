@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <string>
 
 #include "envoy/common/callback.h"
@@ -128,6 +129,8 @@ private:
     Common::CallbackHandle* rds_update_callback_handle_;
   };
 
+  using RdsRouteConfigProviderHelperPtr = std::unique_ptr<RdsRouteConfigProviderHelper>;
+
   // Adds or updates scopes, create a new RDS provider for each resource, if an exception is thrown
   // during updating, the exception message is collected via the exception messages vector.
   // Returns true if any scope updated, false otherwise.
@@ -244,6 +247,9 @@ public:
 private:
   RouteConfigProviderManager& route_config_provider_manager_;
 };
+
+using ScopedRoutesConfigProviderManagerSharedPtr =
+    std::shared_ptr<ScopedRoutesConfigProviderManager>;
 
 // The optional argument passed to the ConfigProviderManager::create*() functions.
 class ScopedRoutesConfigProviderManagerOptArg

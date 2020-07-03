@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <string>
 
 #include "envoy/common/pure.h"
@@ -100,6 +101,8 @@ public:
    */
   virtual Thread::BasicLockable& accessLogLock() PURE;
 };
+
+using HotRestartPtr = std::unique_ptr<HotRestart>;
 
 /**
  * HotRestartDomainSocketInUseException is thrown during HotRestart construction only when the

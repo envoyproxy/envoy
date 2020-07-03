@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/config/config_provider.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/http/filter.h"
@@ -174,6 +176,8 @@ public:
   virtual ~InternalAddressConfig() = default;
   virtual bool isInternalAddress(const Network::Address::Instance& address) const PURE;
 };
+
+using InternalAddressConfigPtr = std::unique_ptr<InternalAddressConfig>;
 
 /**
  * Determines if an address is internal based on whether it is an RFC1918 ip address.

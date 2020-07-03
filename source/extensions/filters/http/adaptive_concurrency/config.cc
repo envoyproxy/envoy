@@ -5,6 +5,7 @@
 #include "envoy/registry/registry.h"
 
 #include "extensions/filters/http/adaptive_concurrency/adaptive_concurrency_filter.h"
+#include "extensions/filters/http/adaptive_concurrency/controller/controller.h"
 #include "extensions/filters/http/adaptive_concurrency/controller/gradient_controller.h"
 
 namespace Envoy {

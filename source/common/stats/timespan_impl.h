@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/common/time.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/stats.h"
@@ -33,6 +35,8 @@ private:
   Histogram& histogram_;
   const MonotonicTime start_;
 };
+
+using HistogramCompletableTimespanImplPtr = std::unique_ptr<HistogramCompletableTimespanImpl>;
 
 } // namespace Stats
 } // namespace Envoy

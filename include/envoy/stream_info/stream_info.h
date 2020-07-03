@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <memory>
 #include <string>
 
 #include "envoy/common/pure.h"
@@ -563,6 +564,8 @@ public:
    */
   virtual Http::RequestIDExtensionSharedPtr getRequestIDExtension() const PURE;
 };
+
+using StreamInfoPtr = std::unique_ptr<StreamInfo>;
 
 } // namespace StreamInfo
 } // namespace Envoy

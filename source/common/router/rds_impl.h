@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <queue>
 #include <string>
 #include <unordered_map>
@@ -229,6 +230,8 @@ private:
 
   friend class RouteConfigProviderManagerImpl;
 };
+
+using RdsRouteConfigProviderImplSharedPtr = std::shared_ptr<RdsRouteConfigProviderImpl>;
 
 class RouteConfigProviderManagerImpl : public RouteConfigProviderManager,
                                        public Singleton::Instance {

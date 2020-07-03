@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "common/common/hash.h"
 
 #include "server/hot_restarting_base.h"
@@ -17,6 +19,10 @@ public:
   HotRestartingParent(int base_id, int restart_epoch);
   void initialize(Event::Dispatcher& dispatcher, Server::Instance& server);
   void shutdown();
+
+  class Internal;
+
+  using InternalPtr = std::unique_ptr<Internal>;
 
   // The hot restarting parent's hot restart logic. Each function is meant to be called to fulfill a
   // request from the child for that action.

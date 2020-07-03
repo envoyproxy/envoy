@@ -66,6 +66,8 @@ private:
   static constexpr uint64_t TransientObjectLifeSpan = 30 * 1000;
 };
 
+using ConfigImplSharedPtr = std::shared_ptr<ConfigImpl>;
+
 } // namespace RocketmqProxy
 } // namespace NetworkFilters
 } // namespace Extensions

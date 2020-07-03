@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <string>
 
 #include "envoy/event/dispatcher.h"
@@ -49,6 +50,8 @@ private:
   ThreadLocal::SlotPtr tls_;
   Event::TimerPtr refresh_timer_;
 };
+
+using TlsCachingDateProviderImplSharedPtr = std::shared_ptr<TlsCachingDateProviderImpl>;
 
 /**
  * A basic provider that just creates the date string every time.

@@ -15,6 +15,7 @@
 #include "common/init/target_impl.h"
 #include "common/init/watcher_impl.h"
 #include "common/protobuf/protobuf.h"
+#include <memory>
 
 namespace Envoy {
 namespace Config {
@@ -391,6 +392,7 @@ public:
 protected:
   // Ordered set for deterministic config dump output.
   using ConfigProviderSet = std::set<ConfigProvider*>;
+  using ConfigProviderSetPtr = std::unique_ptr<ConfigProviderSet>;
   using ConfigProviderMap =
       std::unordered_map<ConfigProviderInstanceType, ConfigProviderSetPtr, EnumClassHash>;
   using ConfigSubscriptionMap =

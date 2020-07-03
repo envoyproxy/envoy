@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <memory>
 #include <vector>
 
 #include "envoy/event/dispatcher.h"
@@ -14,12 +15,14 @@
 
 namespace Envoy {
 namespace Upstream {
+template <typename POOL_TYPE> using POOL_TYPEPtr = std::unique_ptr<POOL_TYPE>;
+
 /**
  *  A class mapping keys to connection pools, with some recycling logic built in.
  */
 template <typename KEY_TYPE, typename POOL_TYPE> class ConnPoolMap {
 public:
-  using PoolFactory = std::function<POOL_TYPEPtr()>;
+  using PoolFactory = std::function<POOL_TYPEPtr<POOL_TYPE>()>;
   using DrainedCb = std::function<void()>;
   using PoolOptRef = absl::optional<std::reference_wrapper<POOL_TYPE>>;
 
@@ -68,7 +71,7 @@ private:
    **/
   void clearActivePools();
 
-  absl::flat_hash_map<KEY_TYPE, POOL_TYPEPtr> active_pools_;
+  absl::flat_hash_map<KEY_TYPE, POOL_TYPEPtr<POOL_TYPE>> active_pools_;
   Event::Dispatcher& thread_local_dispatcher_;
   std::vector<DrainedCb> cached_callbacks_;
   Common::DebugRecursionChecker recursion_checker_;

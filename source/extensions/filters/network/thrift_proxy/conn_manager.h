@@ -43,6 +43,8 @@ public:
   virtual Router::Config& routerConfig() PURE;
 };
 
+using ConfigSharedPtr = std::shared_ptr<Config>;
+
 /**
  * Extends Upstream::ProtocolOptionsConfig with Thrift-specific cluster options.
  */

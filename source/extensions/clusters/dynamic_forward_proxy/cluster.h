@@ -52,15 +52,16 @@ private:
   };
 
   using HostInfoMap = absl::flat_hash_map<std::string, HostInfo>;
-  using HostInfoMapSharedPtr = std::shared_ptr<const HostInfoMap>;
+  using HostInfoMapSharedPtr = std::shared_ptr<HostInfoMap>;
+  using HostInfoMapConstSharedPtr = std::shared_ptr<const HostInfoMap>;
 
   struct LoadBalancer : public Upstream::LoadBalancer {
-    LoadBalancer(const HostInfoMapSharedPtr& host_map) : host_map_(host_map) {}
+    LoadBalancer(const HostInfoMapConstSharedPtr& host_map) : host_map_(host_map) {}
 
     // Upstream::LoadBalancer
     Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext* context) override;
 
-    const HostInfoMapSharedPtr host_map_;
+    const HostInfoMapConstSharedPtr host_map_;
   };
 
   struct LoadBalancerFactory : public Upstream::LoadBalancerFactory {
@@ -86,7 +87,7 @@ private:
     Cluster& cluster_;
   };
 
-  HostInfoMapSharedPtr getCurrentHostMap() {
+  HostInfoMapConstSharedPtr getCurrentHostMap() {
     absl::ReaderMutexLock lock(&host_map_lock_);
     return host_map_;
   }
@@ -95,7 +96,7 @@ private:
   addOrUpdateWorker(const std::string& host,
                     const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info,
                     HostInfoMapSharedPtr& new_host_map, Upstream::HostVectorPtr& hosts_added);
-  void swapAndUpdateMap(const HostInfoMapSharedPtr& new_hosts_map,
+  void swapAndUpdateMap(const HostInfoMapConstSharedPtr& new_hosts_map,
                         const Upstream::HostVector& hosts_added,
                         const Upstream::HostVector& hosts_removed);
 
@@ -108,7 +109,7 @@ private:
   const LocalInfo::LocalInfo& local_info_;
 
   absl::Mutex host_map_lock_;
-  HostInfoMapSharedPtr host_map_ ABSL_GUARDED_BY(host_map_lock_);
+  HostInfoMapConstSharedPtr host_map_ ABSL_GUARDED_BY(host_map_lock_);
 
   friend class ClusterFactory;
   friend class ClusterTest;

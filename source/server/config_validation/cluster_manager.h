@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/secret/secret_manager.h"
@@ -48,6 +50,8 @@ private:
   Grpc::Context& grpc_context_;
   Event::TimeSystem& time_system_;
 };
+
+using ValidationClusterManagerFactoryPtr = std::unique_ptr<ValidationClusterManagerFactory>;
 
 /**
  * Config-validation-only implementation of ClusterManager, which opens no upstream connections.

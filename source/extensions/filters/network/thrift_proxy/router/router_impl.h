@@ -162,6 +162,8 @@ private:
   std::vector<RouteEntryImplBaseConstSharedPtr> routes_;
 };
 
+using RouteMatcherPtr = std::unique_ptr<RouteMatcher>;
+
 #define ALL_THRIFT_ROUTER_STATS(COUNTER, GAUGE, HISTOGRAM)                                         \
   COUNTER(route_missing)                                                                           \
   COUNTER(unknown_cluster)                                                                         \

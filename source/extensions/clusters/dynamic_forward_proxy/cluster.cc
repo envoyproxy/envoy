@@ -70,7 +70,7 @@ void Cluster::addOrUpdateWorker(
   // marginal memory cost above that already used by connections and requests, so relying on
   // connection/request circuit breakers is sufficient. We may have to revisit this in the future.
 
-  HostInfoMapSharedPtr current_map = getCurrentHostMap();
+  HostInfoMapConstSharedPtr current_map = getCurrentHostMap();
   const auto host_map_it = current_map->find(host);
   if (host_map_it != current_map->end()) {
     // If we only have an address change, we can do that swap inline without any other updates.
@@ -128,7 +128,7 @@ void Cluster::onDnsHostAddOrUpdate(
   }
 }
 
-void Cluster::swapAndUpdateMap(const HostInfoMapSharedPtr& new_hosts_map,
+void Cluster::swapAndUpdateMap(const HostInfoMapConstSharedPtr& new_hosts_map,
                                const Upstream::HostVector& hosts_added,
                                const Upstream::HostVector& hosts_removed) {
   {
@@ -148,7 +148,7 @@ void Cluster::swapAndUpdateMap(const HostInfoMapSharedPtr& new_hosts_map,
 }
 
 void Cluster::onDnsHostRemove(const std::string& host) {
-  HostInfoMapSharedPtr current_map = getCurrentHostMap();
+  HostInfoMapConstSharedPtr current_map = getCurrentHostMap();
   const auto host_map_it = current_map->find(host);
   ASSERT(host_map_it != current_map->end());
   const auto new_host_map = std::make_shared<HostInfoMap>(*current_map);

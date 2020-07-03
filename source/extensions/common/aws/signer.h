@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/common/pure.h"
 #include "envoy/http/message.h"
 
@@ -37,6 +39,7 @@ public:
 };
 
 using SignerPtr = std::unique_ptr<Signer>;
+using SignerSharedPtr = std::shared_ptr<Signer>;
 
 } // namespace Aws
 } // namespace Common

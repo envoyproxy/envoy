@@ -33,6 +33,8 @@ private:
 };
 
 using RoleBasedAccessControlEngineImplPtr = std::unique_ptr<RoleBasedAccessControlEngineImpl>;
+using RoleBasedAccessControlEngineImplConstPtr =
+    std::unique_ptr<const RoleBasedAccessControlEngineImpl>;
 
 } // namespace RBAC
 } // namespace Common

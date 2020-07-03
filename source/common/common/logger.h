@@ -218,6 +218,8 @@ private:
   Context* const save_context_;
 };
 
+using ContextPtr = std::unique_ptr<Context>;
+
 /**
  * A registry of all named loggers in envoy. Usable for adjusting levels of each logger
  * individually.

@@ -3,6 +3,7 @@
 #include <array>
 #include <chrono>
 #include <functional>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -103,6 +104,7 @@ public:
 };
 
 using ClientContextConfigPtr = std::unique_ptr<ClientContextConfig>;
+using ClientContextConfigConstPtr = std::unique_ptr<const ClientContextConfig>;
 
 class ServerContextConfig : public virtual ContextConfig {
 public:

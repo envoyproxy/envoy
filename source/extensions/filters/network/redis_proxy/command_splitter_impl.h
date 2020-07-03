@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -123,6 +124,8 @@ private:
       : SingleServerRequest(callbacks, command_stats, time_source) {}
 };
 
+using SimpleRequestPtr = std::unique_ptr<SimpleRequest>;
+
 /**
  * EvalRequest hashes the fourth argument as the key.
  */
@@ -136,6 +139,8 @@ private:
   EvalRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source)
       : SingleServerRequest(callbacks, command_stats, time_source) {}
 };
+
+using EvalRequestPtr = std::unique_ptr<EvalRequest>;
 
 /**
  * FragmentedRequest is a base class for requests that contains multiple keys. An individual request
@@ -196,6 +201,8 @@ private:
   void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) override;
 };
 
+using MGETRequestPtr = std::unique_ptr<MGETRequest>;
+
 /**
  * SplitKeysSumResultRequest takes each key from the command and sends the same incoming command
  * with each key to the appropriate Redis server. The response from each Redis (which must be an
@@ -219,6 +226,8 @@ private:
   int64_t total_{0};
 };
 
+using SplitKeysSumResultRequestPtr = std::unique_ptr<SplitKeysSumResultRequest>;
+
 /**
  * MSETRequest takes each key and value pair from the command and sends a SET for each to the
  * appropriate Redis server. The response is an OK if all commands succeeded or an ERR if any
@@ -237,6 +246,8 @@ private:
   // RedisProxy::CommandSplitter::FragmentedRequest
   void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) override;
 };
+
+using MSETRequestPtr = std::unique_ptr<MSETRequest>;
 
 /**
  * CommandHandlerFactory is placed in the command lookup map for each supported command and is used

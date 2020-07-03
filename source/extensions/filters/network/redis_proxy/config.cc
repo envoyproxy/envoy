@@ -5,6 +5,7 @@
 
 #include "extensions/common/redis/cluster_refresh_manager_impl.h"
 #include "extensions/filters/network/common/redis/client_impl.h"
+#include "extensions/filters/network/redis_proxy/command_splitter.h"
 #include "extensions/filters/network/redis_proxy/command_splitter_impl.h"
 #include "extensions/filters/network/redis_proxy/proxy_filter.h"
 #include "extensions/filters/network/redis_proxy/router_impl.h"

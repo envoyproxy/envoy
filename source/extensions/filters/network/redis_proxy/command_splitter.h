@@ -73,6 +73,8 @@ public:
                                       SplitCallbacks& callbacks) PURE;
 };
 
+using InstanceSharedPtr = std::shared_ptr<Instance>;
+
 } // namespace CommandSplitter
 } // namespace RedisProxy
 } // namespace NetworkFilters

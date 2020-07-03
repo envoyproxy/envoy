@@ -281,6 +281,7 @@ private:
           : pools_{std::make_shared<ConnPools>(dispatcher, host)} {}
 
       using ConnPools = PriorityConnPoolMap<std::vector<uint8_t>, Http::ConnectionPool::Instance>;
+      using ConnPoolsSharedPtr = std::shared_ptr<ConnPools>;
 
       // This is a shared_ptr so we can keep it alive while cleaning up.
       ConnPoolsSharedPtr pools_;
@@ -319,6 +320,8 @@ private:
       HostConstSharedPtr host_;
       Network::ClientConnection& connection_;
     };
+
+    using TcpConnContainerPtr = std::unique_ptr<TcpConnContainer>;
     using TcpConnectionsMap = std::unordered_map<Network::ClientConnection*, TcpConnContainerPtr>;
 
     struct ClusterEntry : public ThreadLocalCluster {

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/dns.h"
 
@@ -18,6 +20,8 @@ public:
   ActiveDnsQuery* resolve(const std::string& dns_name, DnsLookupFamily dns_lookup_family,
                           ResolveCb callback) override;
 };
+
+using ValidationDnsResolverSharedPtr = std::shared_ptr<ValidationDnsResolver>;
 
 } // namespace Network
 } // namespace Envoy

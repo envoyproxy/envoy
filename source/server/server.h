@@ -371,6 +371,8 @@ private:
   };
 };
 
+using InstanceImplPtr = std::unique_ptr<InstanceImpl>;
+
 // Local implementation of Stats::MetricSnapshot used to flush metrics to sinks. We could
 // potentially have a single class instance held in a static and have a clear() method to avoid some
 // vector constructions and reservations, but I'm not sure it's worth the extra complexity until it

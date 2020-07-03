@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <string>
 #include <unordered_map>
 
@@ -118,6 +119,8 @@ public:
     CONSTRUCT_ON_FIRST_USE(OverloadActionState, OverloadActionState::Inactive);
   }
 };
+
+using OverloadManagerPtr = std::unique_ptr<OverloadManager>;
 
 } // namespace Server
 } // namespace Envoy

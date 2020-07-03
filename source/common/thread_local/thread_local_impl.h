@@ -51,6 +51,8 @@ private:
     const uint64_t index_;
   };
 
+  using InstanceImplPtr = std::unique_ptr<InstanceImpl>;
+
   using SlotImplPtr = std::unique_ptr<SlotImpl>;
 
   // A Wrapper of SlotImpl which on destruction returns the SlotImpl to the deferred delete queue
@@ -106,6 +108,8 @@ private:
   // Test only.
   friend class ThreadLocalInstanceImplTest;
 };
+
+using InstanceImplPtr = std::unique_ptr<InstanceImpl>;
 
 } // namespace ThreadLocal
 } // namespace Envoy

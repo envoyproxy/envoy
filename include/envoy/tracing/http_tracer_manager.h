@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/config/trace/v3/http_tracer.pb.h"
 #include "envoy/tracing/http_tracer.h"
 

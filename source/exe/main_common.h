@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/event/timer.h"
 #include "envoy/runtime/runtime.h"
 
@@ -151,5 +153,7 @@ private:
   ProdComponentFactory prod_component_factory_;
   MainCommonBase base_;
 };
+
+using MainCommonPtr = std::unique_ptr<MainCommon>;
 
 } // namespace Envoy

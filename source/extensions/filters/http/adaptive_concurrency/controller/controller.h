@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <memory>
 
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
@@ -57,6 +58,8 @@ public:
    */
   virtual uint32_t concurrencyLimit() const PURE;
 };
+
+using ConcurrencyControllerSharedPtr = std::shared_ptr<ConcurrencyController>;
 
 } // namespace Controller
 } // namespace AdaptiveConcurrency

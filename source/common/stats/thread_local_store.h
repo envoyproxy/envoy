@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cstdint>
 #include <list>
+#include <memory>
 #include <string>
 
 #include "envoy/stats/tag.h"
@@ -458,6 +459,8 @@ private:
   Thread::ThreadSynchronizer sync_;
   std::atomic<uint64_t> next_scope_id_{};
 };
+
+using ThreadLocalStoreImplPtr = std::unique_ptr<ThreadLocalStoreImpl>;
 
 } // namespace Stats
 } // namespace Envoy

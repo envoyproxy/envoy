@@ -5,6 +5,7 @@
 #include <functional>
 #include <list>
 #include <map>
+#include <memory>
 #include <string>
 
 #include "envoy/config/config_provider_manager.h"
@@ -93,6 +94,7 @@ public:
   // Http::FilterChainFactory
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
   using FilterFactoriesList = std::list<Http::FilterFactoryCb>;
+  using FilterFactoriesListPtr = std::unique_ptr<FilterFactoriesList>;
   struct FilterConfig {
     FilterFactoriesListPtr filter_factories;
     bool allow_upgrade;
@@ -241,6 +243,8 @@ private:
   // request timeout is disabled by default
   static const uint64_t RequestTimeoutMs = 0;
 };
+
+using HttpConnectionManagerConfigSharedPtr = std::shared_ptr<HttpConnectionManagerConfig>;
 
 /**
  * Factory to create an HttpConnectionManager outside of a Network Filter Chain.

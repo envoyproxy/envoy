@@ -1,6 +1,7 @@
 #pragma once
 
 #include <list>
+#include <memory>
 
 #include "envoy/init/manager.h"
 
@@ -57,6 +58,8 @@ private:
   // All registered targets
   std::list<TargetHandlePtr> target_handles_;
 };
+
+using ManagerImplPtr = std::unique_ptr<ManagerImpl>;
 
 } // namespace Init
 } // namespace Envoy

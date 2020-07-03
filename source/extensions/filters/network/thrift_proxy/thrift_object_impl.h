@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "extensions/filters/network/thrift_proxy/decoder.h"
 #include "extensions/filters/network/thrift_proxy/filters/filter.h"
 #include "extensions/filters/network/thrift_proxy/thrift_object.h"
@@ -69,6 +71,8 @@ public:
 protected:
   const FieldType value_type_;
 };
+
+using ThriftValueBasePtr = std::unique_ptr<ThriftValueBase>;
 
 class ThriftStructValueImpl;
 

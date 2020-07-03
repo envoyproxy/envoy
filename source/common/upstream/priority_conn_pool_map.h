@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/upstream.h"
@@ -14,6 +16,7 @@ namespace Upstream {
 template <typename KEY_TYPE, typename POOL_TYPE> class PriorityConnPoolMap {
 public:
   using ConnPoolMapType = ConnPoolMap<KEY_TYPE, POOL_TYPE>;
+  using ConnPoolMapTypePtr = std::unique_ptr<ConnPoolMapType>;
   using PoolFactory = typename ConnPoolMapType::PoolFactory;
   using DrainedCb = typename ConnPoolMapType::DrainedCb;
   using PoolOptRef = typename ConnPoolMapType::PoolOptRef;
