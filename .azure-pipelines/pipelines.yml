@@ -168,6 +168,8 @@ jobs:
       - bash: ci/run_envoy_docker_windows.sh ci/windows_ci_steps.sh
         displayName: "Run Windows CI"
         env:
+          ENVOY_RBE: "true"
+          BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=remote-msvc-cl --jobs=$(RbeJobs)"
           BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
           BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
           GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
