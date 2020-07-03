@@ -387,6 +387,7 @@ ServerContextConfigImpl::ServerContextConfigImpl(
                         DEFAULT_CIPHER_SUITES, DEFAULT_CURVES, factory_context),
       require_client_certificate_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, require_client_certificate, false)),
+      ocsp_staple_policy_(ocspStaplePolicyFromProto(config.ocsp_staple_policy())),
       session_ticket_keys_provider_(getTlsSessionTicketKeysConfigProvider(factory_context, config)),
       disable_stateless_session_resumption_(getStatelessSessionResumptionDisabled(config)) {
 
@@ -477,6 +478,23 @@ ServerContextConfigImpl::getSessionTicketKey(const std::string& key_data) {
   ASSERT(key_data.begin() + pos == key_data.end());
 
   return dst_key;
+}
+
+Ssl::ServerContextConfig::OcspStaplePolicy ServerContextConfigImpl::ocspStaplePolicyFromProto(
+    const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::OcspStaplePolicy&
+        policy) {
+  switch (policy) {
+  case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::
+      SKIP_STAPLING_IF_EXPIRED:
+    return Ssl::ServerContextConfig::OcspStaplePolicy::SKIP_STAPLING_IF_EXPIRED;
+  case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::STAPLING_REQUIRED:
+    return Ssl::ServerContextConfig::OcspStaplePolicy::STAPLING_REQUIRED;
+  case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::
+      REJECT_CONNECTION_ON_EXPIRED:
+    return Ssl::ServerContextConfig::OcspStaplePolicy::REJECT_CONNECTION_ON_EXPIRED;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
 }
 
 } // namespace Tls

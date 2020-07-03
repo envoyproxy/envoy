@@ -6,16 +6,18 @@ set -e
 
 trap cleanup EXIT
 cleanup() {
-  rm *_index*
-  rm *.csr
-  rm *.cnf
-  rm *_serial*
+  rm -f *_index*
+  rm -f *.csr
+  rm -f *.cnf
+  rm -f *_serial*
 }
 
 [[ -z "${TEST_TMPDIR}" ]] && TEST_TMPDIR="$(cd $(dirname $0) && pwd)"
 
 TEST_OCSP_DIR="${TEST_TMPDIR}/ocsp_test_data"
 mkdir -p "${TEST_OCSP_DIR}"
+
+rm -f ${TEST_OCSP_DIR}/*
 
 cd $TEST_OCSP_DIR
 
@@ -25,6 +27,10 @@ cd $TEST_OCSP_DIR
 
 # $1=<certificate name> $2=<CA name>
 generate_config() {
+touch $1_index.txt
+echo "unique_subject = no" > $1_index.txt.attr
+echo 1000 > $1_serial
+
 (cat << EOF
 [ req ]
 default_bits            = 2048
@@ -78,6 +84,9 @@ subjectKeyIdentifier = hash
 authorityKeyIdentifier = keyid:always,issuer
 basicConstraints = critical, CA:true
 keyUsage = critical, digitalSignature, cRLSign, keyCertSign
+
+[ must_staple ]
+tlsfeature = status_request
 EOF
 ) > $1.cnf
 }
@@ -93,11 +102,17 @@ generate_ca() {
     -extensions v3_ca -extfile $1.cnf $EXTRA_ARGS
 }
 
-# $1=<certificate name> $2=<CA name>
-generate_x509_cert() {
+# $1=<certificate name> $2=<CA name> $3=[req args]
+generate_rsa_cert() {
   openssl genrsa -out $1_key.pem 2048
   openssl req -new -key $1_key.pem -out $1_cert.csr -config $1.cnf -batch -sha256
-  openssl ca -config $1.cnf -notext -batch -in $1_cert.csr -out $1_cert.pem
+  openssl ca -config $1.cnf -notext -batch -in $1_cert.csr -out $1_cert.pem $3
+}
+
+generate_ecdsa_cert() {
+  openssl ecparam -name secp256r1 -genkey -out $1_key.pem
+  openssl req -new -key $1_key.pem -out $1_cert.csr -config $1.cnf -batch -sha256
+  openssl ca -config $1.cnf -notext -batch -in $1_cert.csr -out $1_cert.pem $3
 }
 
 # $1=<certificate name> $2=<CA name> $3=<test name> $4=[extra args]
@@ -118,22 +133,16 @@ revoke_certificate() {
 }
 
 # Set up the CA
-touch ca_index.txt
-echo "unique_subject = no" > ca_index.txt.attr
-echo 1000 > ca_serial
 generate_config ca ca
 generate_ca ca
 
 # Set up an intermediate CA with a different database
-touch intermediate_ca_index.txt
-echo "unique_subject = no" > intermediate_ca_index.txt.attr
-echo 1000 > intermediate_ca_serial
 generate_config intermediate_ca intermediate_ca
 generate_ca intermediate_ca ca
 
 # Generate valid cert and OCSP response
 generate_config good ca
-generate_x509_cert good ca
+generate_rsa_cert good ca
 generate_ocsp_response good ca good "-ndays 7"
 
 # Generate OCSP response with the responder key hash instead of name
@@ -141,12 +150,17 @@ generate_ocsp_response good ca responder_key_hash -resp_key_id
 
 # Generate and revoke a cert and create OCSP response
 generate_config revoked ca
-generate_x509_cert revoked ca
+generate_rsa_cert revoked ca "-extensions must_staple"
 revoke_certificate revoked ca
 generate_ocsp_response revoked ca revoked
 
 # Create OCSP response for cert unknown to the CA
 generate_ocsp_response good intermediate_ca unknown
+
+# Generate cert with ECDSA key and OCSP response
+generate_config ecdsa ca
+generate_ecdsa_cert ecdsa ca
+generate_ocsp_response ecdsa ca ecdsa
 
 # Generate an OCSP request/response for multiple certs
 openssl ocsp -CAfile ca_cert.pem -issuer ca_cert.pem \

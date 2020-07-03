@@ -62,6 +62,22 @@ size_t ContextManagerImpl::daysUntilFirstCertExpires() const {
   return ret;
 }
 
+absl::optional<uint64_t> ContextManagerImpl::secondsUntilFirstOcspResponseExpires() const {
+  absl::optional<uint64_t> ret;
+  for (const auto& ctx_weak_ptr : contexts_) {
+    Envoy::Ssl::ContextSharedPtr context = ctx_weak_ptr.lock();
+    if (context) {
+      auto next_expiration = context->secondsUntilFirstOcspResponseExpires();
+      if (ret && next_expiration) {
+        ret = std::min<uint64_t>(ret.value(), next_expiration.value());
+      } else if (next_expiration) {
+        ret = next_expiration;
+      }
+    }
+  }
+  return ret;
+}
+
 void ContextManagerImpl::iterateContexts(std::function<void(const Envoy::Ssl::Context&)> callback) {
   for (const auto& ctx_weak_ptr : contexts_) {
     Envoy::Ssl::ContextSharedPtr context = ctx_weak_ptr.lock();

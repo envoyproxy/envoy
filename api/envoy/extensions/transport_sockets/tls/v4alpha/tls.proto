@@ -53,10 +53,30 @@ message UpstreamTlsContext {
   google.protobuf.UInt32Value max_session_keys = 4;
 }
 
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message DownstreamTlsContext {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext";
+
+  enum OcspStaplePolicy {
+    // OCSP responses are optional. Invalid or expired OCSP
+    // responses are rejected at config time. If an OCSP
+    // response expires before a config update, it is no
+    // longer stapled.
+    SKIP_STAPLING_IF_EXPIRED = 0;
+
+    // OCSP responses are required on all certificates for a
+    // configuration to be deemed valid. If an OCSP response
+    // expires before a config update, subsequent TLS
+    // handshakes for that certificate are aborted.
+    STAPLING_REQUIRED = 1;
+
+    // OCSP responses are optional. Invalid or expired OCSP
+    // responses are rejected at config time. If an OCSP
+    // response expires before a config update, subsequent
+    // TLS handshakes for that certificate are aborted.
+    REJECT_CONNECTION_ON_EXPIRED = 2;
+  }
 
   // Common TLS context settings.
   CommonTlsContext common_tls_context = 1;
@@ -95,6 +115,11 @@ message DownstreamTlsContext {
     lt {seconds: 4294967296}
     gte {}
   }];
+
+  // Config for whether to use certificates if they do not have
+  // an accompanying OCSP response or if the response expires at runtime.
+  // Defaults to SKIP_STAPLING_IF_EXPIRED
+  OcspStaplePolicy ocsp_staple_policy = 8 [(validate.rules).enum = {defined_only: true}];
 }
 
 // TLS context shared by both client and server TLS contexts.

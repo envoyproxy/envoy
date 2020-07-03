@@ -34,7 +34,10 @@ namespace Ssl {
 void SslIntegrationTestBase::initialize() {
   config_helper_.addSslConfig(ConfigHelper::ServerSslOptions()
                                   .setRsaCert(server_rsa_cert_)
+                                  .setRsaCertOcspStaple(server_rsa_cert_ocsp_staple_)
                                   .setEcdsaCert(server_ecdsa_cert_)
+                                  .setEcdsaCertOcspStaple(server_ecdsa_cert_ocsp_staple_)
+                                  .setOcspStapleRequired(ocsp_staple_required_)
                                   .setTlsV13(server_tlsv1_3_)
                                   .setExpectClientEcdsaCert(client_ecdsa_cert_));
   HttpIntegrationTest::initialize();
@@ -339,6 +342,57 @@ TEST_P(SslCertficateIntegrationTest, ServerEcdsaClientEcdsaOnly) {
 TEST_P(SslCertficateIntegrationTest, ServerRsaEcdsaClientEcdsaOnly) {
   server_rsa_cert_ = true;
   server_ecdsa_cert_ = true;
+  client_ecdsa_cert_ = true;
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection(ecdsaOnlyClientOptions());
+  };
+  testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
+  checkStats();
+}
+
+// Server has an RSA certificate with an OCSP response works.
+TEST_P(SslCertficateIntegrationTest, ServerRsaOnlyOcspResponse) {
+  server_rsa_cert_ = true;
+  server_rsa_cert_ocsp_staple_ = true;
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection(rsaOnlyClientOptions());
+  };
+  testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
+  checkStats();
+}
+
+// Server has an ECDSA certificate with an OCSP response works.
+TEST_P(SslCertficateIntegrationTest, ServerEcdsaOnlyOcspResponse) {
+  server_ecdsa_cert_ = true;
+  server_ecdsa_cert_ocsp_staple_ = true;
+  client_ecdsa_cert_ = true;
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection(ecdsaOnlyClientOptions());
+  };
+  testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
+  checkStats();
+}
+
+// Server has two certificates one with and one without OCSP response works under optional policy.
+TEST_P(SslCertficateIntegrationTest, BothEcdsaAndRsaOnlyRsaOcspResponse) {
+  server_rsa_cert_ = true;
+  server_rsa_cert_ocsp_staple_ = true;
+  server_ecdsa_cert_ = true;
+  client_ecdsa_cert_ = true;
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection(ecdsaOnlyClientOptions());
+  };
+  testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
+  checkStats();
+}
+
+// Server has ECDSA and RSA certificates with OCSP responses and stapling required policy works.
+TEST_P(SslCertficateIntegrationTest, BothEcdsaAndRsaWithOcspResponseStaplingRequired) {
+  server_rsa_cert_ = true;
+  server_rsa_cert_ocsp_staple_ = true;
+  server_ecdsa_cert_ = true;
+  server_ecdsa_cert_ocsp_staple_ = true;
+  ocsp_staple_required_ = true;
   client_ecdsa_cert_ = true;
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection(ecdsaOnlyClientOptions());

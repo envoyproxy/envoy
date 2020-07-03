@@ -112,10 +112,18 @@ public:
     std::array<uint8_t, 256 / 8> aes_key_; // AES256 key size, in bytes
   };
 
+  enum class OcspStaplePolicy {
+    SKIP_STAPLING_IF_EXPIRED,
+    STAPLING_REQUIRED,
+    REJECT_CONNECTION_ON_EXPIRED,
+  };
+
   /**
    * @return True if client certificate is required, false otherwise.
    */
   virtual bool requireClientCertificate() const PURE;
+
+  virtual OcspStaplePolicy ocspStaplePolicy() const PURE;
 
   /**
    * @return The keys to use for encrypting and decrypting session tickets.

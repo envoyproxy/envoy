@@ -34,7 +34,7 @@ message Certificate {
   repeated CertificateDetails cert_chain = 2;
 }
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message CertificateDetails {
   option (udpa.annotations.versioning).previous_message_type = "envoy.admin.v3.CertificateDetails";
 
@@ -55,6 +55,9 @@ message CertificateDetails {
 
   // Indicates the time at which the certificate expires.
   google.protobuf.Timestamp expiration_time = 6;
+
+  // Seconds until expiration of the certificate's OCSP response.
+  uint64 seconds_until_ocsp_response_expiration = 7;
 }
 
 message SubjectAlternateName {

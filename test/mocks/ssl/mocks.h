@@ -29,6 +29,7 @@ public:
               (Stats::Scope & stats, const ServerContextConfig& config,
                const std::vector<std::string>& server_names));
   MOCK_METHOD(size_t, daysUntilFirstCertExpires, (), (const));
+  MOCK_METHOD(absl::optional<uint64_t>, secondsUntilFirstOcspResponseExpires, (), (const));
   MOCK_METHOD(void, iterateContexts, (std::function<void(const Context&)> callback));
   MOCK_METHOD(Ssl::PrivateKeyMethodManager&, privateKeyMethodManager, ());
 };

@@ -186,19 +186,19 @@ public:
    * @return std::vector<uint8_t>& a reference to the underlying bytestring representation
    * of the OCSP response
    */
-  const std::vector<uint8_t>& rawBytes() { return raw_bytes_; }
+  const std::vector<uint8_t>& rawBytes() const { return raw_bytes_; }
 
   /**
    * @return OcspResponseStatus whether the OCSP response was successfully created
    * or a status indicating an error in the OCSP process
    */
-  OcspResponseStatus getResponseStatus() { return response_->status_; }
+  OcspResponseStatus getResponseStatus() const { return response_->status_; }
 
   /**
    * @param cert a X509& SSL certificate
    * @returns bool whether this OCSP response contains the revocation status of `cert`
    */
-  bool matchesCertificate(X509& cert);
+  bool matchesCertificate(X509& cert) const;
 
   /**
    * Determines whether the OCSP response can no longer be considered valid.
@@ -210,10 +210,16 @@ public:
    */
   bool isExpired();
 
+  /**
+   * @returns the seconds until this OCSP response expires.
+   */
+  uint64_t secondsUntilExpiration() const;
+
 private:
   const std::vector<uint8_t> raw_bytes_;
   const std::unique_ptr<OcspResponse> response_;
   TimeSource& time_source_;
+  std::atomic<bool> is_expired_{false};
 };
 
 using OcspResponseWrapperPtr = std::unique_ptr<OcspResponseWrapper>;
