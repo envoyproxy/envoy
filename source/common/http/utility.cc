@@ -399,6 +399,11 @@ Utility::parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions&
     ret.header_key_format_ = Http1Settings::HeaderKeyFormat::Default;
   }
 
+  if (config.has_override_stream_error_on_invalid_http_message()) {
+    ret.stream_error_on_invalid_http_message_ =
+        config.override_stream_error_on_invalid_http_message().value();
+  }
+
   return ret;
 }
 

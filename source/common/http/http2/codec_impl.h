@@ -347,7 +347,9 @@ protected:
    */
   struct ServerStreamImpl : public StreamImpl, public ResponseEncoder {
     ServerStreamImpl(ConnectionImpl& parent, uint32_t buffer_limit)
-        : StreamImpl(parent, buffer_limit), headers_or_trailers_(RequestHeaderMapImpl::create()) {}
+        : StreamImpl(parent, buffer_limit), headers_or_trailers_(RequestHeaderMapImpl::create()) {
+      stream_error_on_invalid_http_message_ = parent.stream_error_on_invalid_http_messaging_;
+    }
 
     // StreamImpl
     void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
@@ -379,6 +381,11 @@ protected:
 
     RequestDecoder* request_decoder_{};
     absl::variant<RequestHeaderMapPtr, RequestTrailerMapPtr> headers_or_trailers_;
+    absl::optional<bool> stream_error_on_invalid_http_message_;
+
+    absl::optional<bool> streamErrorOnInvalidHTTPMessage() override {
+      return stream_error_on_invalid_http_message_;
+    }
   };
 
   using ServerStreamImplPtr = std::unique_ptr<ServerStreamImpl>;

@@ -123,8 +123,11 @@ private:
  */
 class ResponseEncoderImpl : public StreamEncoderImpl, public ResponseEncoder {
 public:
-  ResponseEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter)
-      : StreamEncoderImpl(connection, header_key_formatter) {}
+  ResponseEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter,
+                      absl::optional<bool>& stream_error_on_invalid_http_message)
+      : StreamEncoderImpl(connection, header_key_formatter) {
+    stream_error_on_invalid_http_message_ = stream_error_on_invalid_http_message;
+  }
 
   bool startedResponse() { return started_response_; }
 
@@ -133,8 +136,13 @@ public:
   void encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) override;
   void encodeTrailers(const ResponseTrailerMap& trailers) override { encodeTrailersBase(trailers); }
 
+  absl::optional<bool> streamErrorOnInvalidHTTPMessage() override {
+    return stream_error_on_invalid_http_message_;
+  }
+
 private:
   bool started_response_{};
+  absl::optional<bool> stream_error_on_invalid_http_message_;
 };
 
 /**
@@ -432,8 +440,9 @@ protected:
    * An active HTTP/1.1 request.
    */
   struct ActiveRequest {
-    ActiveRequest(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter)
-        : response_encoder_(connection, header_key_formatter) {}
+    ActiveRequest(ServerConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter)
+        : response_encoder_(connection, header_key_formatter,
+                            connection.codec_settings_.stream_error_on_invalid_http_message_) {}
 
     HeaderString request_url_;
     RequestDecoder* request_decoder_{};

@@ -93,7 +93,7 @@ message HttpProtocolOptions {
   HeadersWithUnderscoresAction headers_with_underscores_action = 5;
 }
 
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message Http1ProtocolOptions {
   message HeaderKeyFormat {
     message ProperCaseWords {
@@ -142,6 +142,10 @@ message Http1ProtocolOptions {
   //   - Not a response to a HEAD request.
   //   - The content length header is not present.
   bool enable_trailers = 5;
+
+  // [#not-implemented-hide:]
+  // Overrides envoy's behavior on invalid HTTP messahing configured in the hcm
+  google.protobuf.BoolValue override_stream_error_on_invalid_http_message = 6;
 }
 
 // [#next-free-field: 14]
