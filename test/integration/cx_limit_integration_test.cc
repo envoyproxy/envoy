@@ -43,7 +43,6 @@ public:
 
     std::vector<IntegrationTcpClientPtr> tcp_clients;
     std::vector<FakeRawConnectionPtr> raw_conns;
-
     tcp_clients.emplace_back(makeTcpConnection(lookupPort("listener_0")));
     raw_conns.emplace_back();
     ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(raw_conns.back()));
@@ -56,7 +55,8 @@ public:
 
     tcp_clients.emplace_back(makeTcpConnection(lookupPort("listener_0")));
     raw_conns.emplace_back();
-    ASSERT_FALSE(fake_upstreams_[0]->waitForRawConnection(raw_conns.back()));
+    ASSERT_FALSE(
+        fake_upstreams_[0]->waitForRawConnection(raw_conns.back(), std::chrono::milliseconds(500)));
     tcp_clients.back()->waitForDisconnect();
 
     // Get rid of the client that failed to connect.
@@ -66,7 +66,6 @@ public:
     // Close the first connection that was successful so that we can open a new successful
     // connection.
     tcp_clients.front()->close();
-    ASSERT_TRUE(raw_conns.front()->close());
     ASSERT_TRUE(raw_conns.front()->waitForDisconnect());
 
     tcp_clients.emplace_back(makeTcpConnection(lookupPort("listener_0")));

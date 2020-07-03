@@ -4,6 +4,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
 #include "envoy/config/subscription.h"
 #include "envoy/config/subscription_factory.h"
 #include "envoy/local_info/local_info.h"
@@ -37,16 +38,13 @@ public:
 
 private:
   // Config::SubscriptionCallbacks
-  void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+  void onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
                       const std::string& version_info) override;
-  void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>&,
-                      const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override;
+  void onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
+                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                      const std::string& system_version_info) override;
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
-  std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::config::endpoint::v3::ClusterLoadAssignment>(resource)
-        .cluster_name();
-  }
   using LocalityWeightsMap = std::unordered_map<envoy::config::core::v3::Locality, uint32_t,
                                                 LocalityHash, LocalityEqualTo>;
   bool updateHostsPerLocality(const uint32_t priority, const uint32_t overprovisioning_factor,
@@ -82,7 +80,6 @@ private:
   std::vector<LocalityWeightsMap> locality_weights_map_;
   HostMap all_hosts_;
   Event::TimerPtr assignment_timeout_;
-  ProtobufMessage::ValidationVisitor& validation_visitor_;
   InitializePhase initialize_phase_;
 };
 
