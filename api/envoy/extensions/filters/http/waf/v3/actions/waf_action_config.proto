@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.waf.actions.v3alpha;
+
+import "envoy.config.core.v3.base.proto";
+import "envoy.config.route.v3.route_components.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.waf.actions.v3alpha";
+option java_outer_classname = "WAFActionProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: WAF Action]
+// WAF Action:ref:`configuration overview <config_http_filters_waf_tagging>`.
+// [#extension: envoy.filters.http.waf]
+
+message WafActionConfig {
+  // WAF Action supports following options:
+  //  1. Dropping incoming request (i.e discard incoming headers, trailers,
+  //  body)
+  //  2. Resetting connection
+  //  3. Adding and Removing headers to and from incoming request
+  //  4. Sending HTTP redirect reponse to the incoing requtest
+  // since it offers mutiple actions desired action can be specified using this
+  // configuration
+
+  message AddRemoveHeaders {
+    // Specifies a list of HTTP headers that should be added from request
+    repeated core.HeaderValueOption add_header = 1
+        [ (validate.rules).repeated = {max_items : 1000} ];
+
+    // Specifies a list of HTTP headers that should be removed from request
+    repeated string remove_headers = 5 [ (validate.rules).repeated = {
+      items {string {well_known_regex : HTTP_HEADER_NAME strict : false}}
+    } ];
+  }
+
+  oneof action {
+    option (validate.required) = true;
+
+    // Specifies if the request should be removed
+    bool drop_request = 1;
+
+    // Specifies if the connection should be reset
+    bool reset_connection = 2;
+
+    // Specifies list of headers to be added and removed
+    AddRemoveHeaders add_remove_headers = 3;
+
+    // Specifies the redirect response
+    config.route.v3.RedirectAction redirect = 4;
+  }
+}

@@ -205,118 +205,116 @@ message Waf {
   //       grpc_service:
   //         cluster_name: bot-detector
 
-  message Waf {
-    message PolicySet {
-      repeated Policy policies = 1 [(validate.rules).repeated .min_items = 1];
-    }
+  message PolicySet {
+    repeated Policy policies = 1 [(validate.rules).repeated .min_items = 1];
+  }
 
     // Rule defines a match condition and an associated action.
-    message Policy {
-      // Name for the policy.
-      string name = 1
-          [(validate.rules).string.pattern = "^[a-zA-Z0-9]([-a-zA-Z0-9]*[a-zA-Z0-9])?$"];
+  message Policy {
+    // Name for the policy.
+    string name = 1
+        [(validate.rules).string.pattern = "^[a-zA-Z0-9]([-a-zA-Z0-9]*[a-zA-Z0-9])?$"];
 
-      // Match criteria
-      Match match = 2 [(validate.rules).message.required = true];
+    // Match criteria
+    Match match = 2 [(validate.rules).message.required = true];
 
-      // Action to be performed when HTTP request match above mentioned Match criteria
-      Action action = 3 [(validate.rules).message.required = true];
+    // Action to be performed when HTTP request match above mentioned Match criteria
+    Action action = 3 [(validate.rules).message.required = true];
 
-      // Specifies whether the policy evaluation should continue after matching this policy and after the execution of the Action. Action may override the this suggestion when it is not safe to continued evaluation of the policy. Default value is false.
-      bool continue = 4;
-    }
+    // Specifies whether the policy evaluation should continue after matching this policy and after the execution of the Action. Action may override the this suggestion when it is not safe to continued evaluation of the policy. Default value is false.
+    bool continue = 4;
+  }
 
-    // SourceIpMatcher matches remote address, first IP address in the x-forwarded-for header or any header value that is an IP addressees, against list of CidrRanges.
-    message SourceIpMatcher {
-      // Entity providing source IP. It can be one of
-      // 1. Predefined constants REMOTE_IP (Network::Connection.remoteAddress()) or X_FORWARDED_FOR (mapped to 1st address in the header value)
-      // 2. Any header whose value can be converted to an IP address.
-      message Provider {
-        enum Predifined {
-          REMOTE_IP = 0;
-          X_FORWARDED_FOR = 1;
-        }
-
-        oneof provider {
-          option (validate.required) = true;
-          Predefined predefined = 1;
-          // Specifies the name of the header in the request.
-          string header = 2 (validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
-        }
+  // SourceIpMatcher matches remote address, first IP address in the x-forwarded-for header or any header value that is an IP addressees, against list of CidrRanges.
+  message SourceIpMatcher {
+    // Entity providing source IP. It can be one of
+    // 1. Predefined constants REMOTE_IP (Network::Connection.remoteAddress()) or X_FORWARDED_FOR (mapped to 1st address in the header value)
+    // 2. Any header whose value can be converted to an IP address.
+    message Provider {
+      enum Predefined {
+        REMOTE_IP = 0;
+        X_FORWARDED_FOR = 1;
       }
-      // A source IP provider
-      repeated Provider providers = 1 [(validate.rules).repeated .min_items = 1];
-      // A list of IP address subnets to be matched against IP address
-      repeated core.v3.CidrRange cidrs = 2 [(validate.rules).repeated .min_items = 1];
+
+      oneof provider {
+        option (validate.required) = true;
+        Predefined predefined = 1;
+        // Specifies the name of the header in the request.
+        string header = 2 [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+      }
     }
+    // A source IP provider
+    repeated Provider providers = 1 [(validate.rules).repeated .min_items = 1];
+    // A list of IP address subnets to be matched against IP address
+    repeated core.v3.CidrRange cidrs = 2 [(validate.rules).repeated .min_items = 1];
+  }
 
     // Match Criteria can be one of the matchers or combination of them grouped using And, Or or Nor logical operators
-    message Match {
+  message Match {
 
-      // Groups one or more fields in the `rule` oneof. Depending on the context, each are applied with the associated behavior.
-      message Set {
-        repeated Match rules = 1 [(validate.rules).repeated .min_items = 1];
-      }
+    // Groups one or more fields in the `rule` oneof. Depending on the context, each are applied with the associated behavior.
+    message Set {
+      repeated Match rules = 1 [(validate.rules).repeated .min_items = 1];
+    }
 
-      oneof rule {
-        option (validate.required) = true;
+    oneof rule {
+      option (validate.required) = true;
 
-        // A set of rules that all must match in order to define the action.
-        Set and_rules = 1;
+      // A set of rules that all must match in order to define the action.
+      Set and_rules = 1;
 
-        // A set of rules where at least one must match in order to define the action.
-        Set or_rules = 2;
+      // A set of rules where at least one must match in order to define the action.
+      Set or_rules = 2;
 
-        // Match any incoming request
-        bool any = 3;
+      // Match any incoming request
+      bool any = 3;
 
-        // A header (or pseudo-header such as :path or :method) on the incoming HTTP request. Only
-        // available for HTTP request.
-        // Note: the pseudo-header :path includes the query and fragment string. Use the `url_path`
-        // field if you want to match the URL path without the query and fragment string.
-        route.v3.HeaderMatcher header = 4;
+      // A header (or pseudo-header such as :path or :method) on the incoming HTTP request. Only
+      // available for HTTP request.
+      // Note: the pseudo-header :path includes the query and fragment string. Use the `url_path`
+      // field if you want to match the URL path without the query and fragment string.
+      route.v3.HeaderMatcher header = 4;
 
-        // A URL path on the incoming HTTP request. Only available for HTTP.
-        type.matcher.v3.PathMatcher url_path = 5;
+      // A URL path on the incoming HTTP request. Only available for HTTP.
+      type.matcher.v3.PathMatcher url_path = 5;
 
-        // A CIDR block that describes the destination IP.
-        SourceIpMatcher source_ip = 6;
+      // A CIDR block that describes the destination IP.
+      SourceIpMatcher source_ip = 6;
 
-        // A CIDR block that describes the destination IP.
-        core.v3.CidrRange destination_ip = 7;
+      // A CIDR block that describes the destination IP.
+      core.v3.CidrRange destination_ip = 7;
 
-        // A port number that describes the destination port connecting to.
-        uint32 destination_port = 8 [(validate.rules).uint32 = {lte: 65535}];
+      // A port number that describes the destination port connecting to.
+      uint32 destination_port = 8 [(validate.rules).uint32 = {lte: 65535}];
 
-        // Metadata that describes additional information about the action.
-        type.matcher.v3.MetadataMatcher metadata = 9;
+      // Metadata that describes additional information about the action.
+      type.matcher.v3.MetadataMatcher metadata = 9;
 
-        // Negates matching the provided matcher. For instance, if the value of `not_rule` would
-        // match, this permission would not match. Conversely, if the value of `not_rule` would not
-        // match, this permission would match.
-        Matcher not_rule = 10;
+      // Negates matching the provided matcher. For instance, if the value of `not_rule` would
+      // match, this permission would not match. Conversely, if the value of `not_rule` would not
+      // match, this permission would match.
+      Matcher not_rule = 10;
 
-        // The request server from the client's connection request. This is
-        // typically TLS SNI.
-        //
-        // .. attention::
-        //
-        //   The behavior of this field may be affected by how Envoy is configured
-        //   as explained below.
-        //
-        //   * If the :ref:`TLS Inspector <config_listener_filters_tls_inspector>`
-        //     filter is not added, and if a `FilterChainMatch` is not defined for
-        //     the :ref:`server name <envoy_api_field_config.listener.v3.FilterChainMatch.server_names>`,
-        //     a TLS connection's requested SNI server name will be treated as if it
-        //     wasn't present.
-        //
-        //   * A :ref:`listener filter <arch_overview_listener_filters>` may
-        //     overwrite a connection's requested server name within Envoy.
-        //
-        // Please refer to :ref:`this FAQ entry <faq_how_to_setup_sni>` to learn to
-        // setup SNI.
-        type.matcher.v3.StringMatcher requested_server_name = 11;
-      }
+      // The request server from the client's connection request. This is
+      // typically TLS SNI.
+      //
+      // .. attention::
+      //
+      //   The behavior of this field may be affected by how Envoy is configured
+      //   as explained below.
+      //
+      //   * If the :ref:`TLS Inspector <config_listener_filters_tls_inspector>`
+      //     filter is not added, and if a `FilterChainMatch` is not defined for
+      //     the :ref:`server name <envoy_api_field_config.listener.v3.FilterChainMatch.server_names>`,
+      //     a TLS connection's requested SNI server name will be treated as if it
+      //     wasn't present.
+      //
+      //   * A :ref:`listener filter <arch_overview_listener_filters>` may
+      //     overwrite a connection's requested server name within Envoy.
+      //
+      // Please refer to :ref:`this FAQ entry <faq_how_to_setup_sni>` to learn to
+      // setup SNI.
+      type.matcher.v3.StringMatcher requested_server_name = 11;
     }
   }
 
@@ -326,3 +324,4 @@ message Waf {
     string name = 1 [(validate.rules).string.pattern = "^[a-zA-Z0-9]([-a-zA-Z0-9]*[a-zA-Z0-9])?$"];
     config.core.v3.TypedExtensionConfig config = 2;
   }
+}
