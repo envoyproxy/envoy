@@ -44,7 +44,7 @@ public:
   ~MockConnectionCallbacks() override;
 
   // Http::ConnectionCallbacks
-  MOCK_METHOD(void, onGoAway, ());
+  MOCK_METHOD(void, onGoAway, (GoAwayErrorCode error_code));
 };
 
 class MockServerConnectionCallbacks : public ServerConnectionCallbacks,
@@ -258,6 +258,11 @@ public:
   MOCK_METHOD(FilterMetadataStatus, decodeMetadata, (Http::MetadataMap & metadata_map));
   MOCK_METHOD(void, setDecoderFilterCallbacks, (StreamDecoderFilterCallbacks & callbacks));
   MOCK_METHOD(void, decodeComplete, ());
+  MOCK_METHOD(void, sendLocalReply,
+              (bool is_grpc_request, Code code, absl::string_view body,
+               const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
+               bool is_head_request, const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+               absl::string_view details));
 
   Http::StreamDecoderFilterCallbacks* callbacks_{};
 };
@@ -346,6 +351,8 @@ public:
   MOCK_METHOD(void, onSuccess_, (const Http::AsyncClient::Request&, ResponseMessage*));
   MOCK_METHOD(void, onFailure,
               (const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason));
+  MOCK_METHOD(void, onBeforeFinalizeUpstreamSpan,
+              (Envoy::Tracing::Span&, const Http::ResponseHeaderMap*));
 };
 
 class MockAsyncClientStreamCallbacks : public AsyncClient::StreamCallbacks {

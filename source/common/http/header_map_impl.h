@@ -88,7 +88,6 @@ public:
   const HeaderEntry* get(const LowerCaseString& key) const;
   void iterate(HeaderMap::ConstIterateCb cb, void* context) const;
   void iterateReverse(HeaderMap::ConstIterateCb cb, void* context) const;
-  HeaderMap::Lookup lookup(const LowerCaseString& key, const HeaderEntry** entry) const;
   void clear();
   size_t remove(const LowerCaseString& key);
   size_t removePrefix(const LowerCaseString& key);
@@ -242,7 +241,6 @@ protected:
   HeaderEntryImpl& maybeCreateInline(HeaderEntryImpl** entry, const LowerCaseString& key,
                                      HeaderString&& value);
   HeaderEntry* getExisting(const LowerCaseString& key);
-  HeaderEntryImpl* getExistingInline(absl::string_view key);
   size_t removeInline(HeaderEntryImpl** entry);
   void updateSize(uint64_t from_size, uint64_t to_size);
   void addSize(uint64_t size);
@@ -305,9 +303,6 @@ public:
   }
   void iterateReverse(HeaderMap::ConstIterateCb cb, void* context) const override {
     HeaderMapImpl::iterateReverse(cb, context);
-  }
-  HeaderMap::Lookup lookup(const LowerCaseString& key, const HeaderEntry** entry) const override {
-    return HeaderMapImpl::lookup(key, entry);
   }
   void clear() override { HeaderMapImpl::clear(); }
   size_t remove(const LowerCaseString& key) override { return HeaderMapImpl::remove(key); }

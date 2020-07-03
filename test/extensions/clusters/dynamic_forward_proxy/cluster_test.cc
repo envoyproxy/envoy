@@ -297,6 +297,23 @@ upstream_http_protocol_options: {}
       "configured with upstream_http_protocol_options");
 }
 
+TEST_F(ClusterFactoryTest, InsecureUpstreamHttpProtocolOptions) {
+  const std::string yaml_config = TestEnvironment::substitute(R"EOF(
+name: name
+connect_timeout: 0.25s
+cluster_type:
+  name: dynamic_forward_proxy
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
+    allow_insecure_cluster_options: true
+    dns_cache_config:
+      name: foo
+upstream_http_protocol_options: {}
+)EOF");
+
+  createCluster(yaml_config);
+}
+
 } // namespace DynamicForwardProxy
 } // namespace Clusters
 } // namespace Extensions

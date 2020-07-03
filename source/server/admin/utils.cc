@@ -23,18 +23,19 @@ envoy::admin::v3::ServerInfo::State serverState(Init::Manager::State state,
 
 void populateFallbackResponseHeaders(Http::Code code, Http::ResponseHeaderMap& header_map) {
   header_map.setStatus(std::to_string(enumToInt(code)));
-  const auto& headers = Http::Headers::get();
   if (header_map.ContentType() == nullptr) {
     // Default to text-plain if unset.
-    header_map.setReferenceContentType(headers.ContentTypeValues.TextUtf8);
+    header_map.setReferenceContentType(Http::Headers::get().ContentTypeValues.TextUtf8);
   }
   // Default to 'no-cache' if unset, but not 'no-store' which may break the back button.
-  if (header_map.CacheControl() == nullptr) {
-    header_map.setReferenceCacheControl(headers.CacheControlValues.NoCacheMaxAge0);
+  if (header_map.get(Http::CustomHeaders::get().CacheControl) == nullptr) {
+    header_map.setReference(Http::CustomHeaders::get().CacheControl,
+                            Http::CustomHeaders::get().CacheControlValues.NoCacheMaxAge0);
   }
 
   // Under no circumstance should browsers sniff content-type.
-  header_map.addReference(headers.XContentTypeOptions, headers.XContentTypeOptionValues.Nosniff);
+  header_map.addReference(Http::Headers::get().XContentTypeOptions,
+                          Http::Headers::get().XContentTypeOptionValues.Nosniff);
 }
 
 // Helper method to get filter parameter, or report an error for an invalid regex.

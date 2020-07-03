@@ -68,6 +68,12 @@ void releaseFragmentAllocation(const void* p, size_t, const Buffer::BufferFragme
 // walk off the edge; the caller should be guaranteeing this.
 class StringBuffer : public Buffer::Instance {
 public:
+  void addDrainTracker(std::function<void()> drain_tracker) override {
+    // Not implemented well.
+    ASSERT(false);
+    drain_tracker();
+  }
+
   void add(const void* data, uint64_t size) override {
     FUZZ_ASSERT(start_ + size_ + size <= data_.size());
     ::memcpy(mutableEnd(), data, size);

@@ -54,6 +54,7 @@ namespace Server {
  */
 #define ALL_SERVER_STATS(COUNTER, GAUGE, HISTOGRAM)                                                \
   COUNTER(debug_assertion_failures)                                                                \
+  COUNTER(envoy_bug_failures)                                                                      \
   COUNTER(dynamic_unknown_fields)                                                                  \
   COUNTER(static_unknown_fields)                                                                   \
   GAUGE(concurrency, NeverImport)                                                                  \
@@ -320,6 +321,7 @@ private:
   Stats::StoreRoot& stats_store_;
   ServerStatsPtr server_stats_;
   Assert::ActionRegistrationPtr assert_action_registration_;
+  Assert::ActionRegistrationPtr envoy_bug_action_registration_;
   ThreadLocal::Instance& thread_local_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;

@@ -55,8 +55,8 @@ Terminal 1 (samesite)
 
             Name                        Command              State                            Ports
   ----------------------------------------------------------------------------------------------------------------------
-  samesite_front-envoy_1      /docker-entrypoint.sh /bin ... Up      10000/tcp, 0.0.0.0:8000->80/tcp, 0.0.0.0:8001->8001/tcp
-  samesite_service_1          /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 80/tcp
+  samesite_front-envoy_1      /docker-entrypoint.sh /bin ... Up      10000/tcp, 0.0.0.0:8000->8000/tcp, 0.0.0.0:8001->8001/tcp
+  samesite_service_1          /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 8000/tcp
 
 Terminal 2 (crosssite)
 
@@ -69,8 +69,8 @@ Terminal 2 (crosssite)
 
             Name                       Command                State                            Ports
   ----------------------------------------------------------------------------------------------------------------------
-  crosssite_front-envoy_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 0.0.0.0:8002->80/tcp, 0.0.0.0:8003->8001/tcp
-  crosssite_service_1          /docker-entrypoint.sh /bin ... Up      10000/tcp, 80/tcp
+  crosssite_front-envoy_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 0.0.0.0:8002->8000/tcp, 0.0.0.0:8003->8001/tcp
+  crosssite_service_1          /docker-entrypoint.sh /bin ... Up      10000/tcp, 8000/tcp
 
 **Step 3: Test Envoy's CSRF capabilities**
 

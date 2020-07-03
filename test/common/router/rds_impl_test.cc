@@ -175,13 +175,15 @@ TEST_F(RdsImplTest, Basic) {
 )EOF";
   auto response1 =
       TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response1_json);
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response1);
 
   EXPECT_CALL(init_watcher_, ready());
-  rds_callbacks_->onConfigUpdate(response1.resources(), response1.version_info());
+  rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info());
   EXPECT_EQ(nullptr, route(Http::TestRequestHeaderMapImpl{{":authority", "foo"}}));
 
   // 2nd request with same response. Based on hash should not reload config.
-  rds_callbacks_->onConfigUpdate(response1.resources(), response1.version_info());
+  rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info());
   EXPECT_EQ(nullptr, route(Http::TestRequestHeaderMapImpl{{":authority", "foo"}}));
 
   // Load the config and verified shared count.
@@ -220,10 +222,12 @@ TEST_F(RdsImplTest, Basic) {
   )EOF";
   auto response2 =
       TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response2_json);
+  const auto decoded_resources_2 =
+      TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response2);
 
   // Make sure we don't lookup/verify clusters.
   EXPECT_CALL(server_factory_context_.cluster_manager_, get(Eq("bar"))).Times(0);
-  rds_callbacks_->onConfigUpdate(response2.resources(), response2.version_info());
+  rds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info());
   EXPECT_EQ("foo", route(Http::TestRequestHeaderMapImpl{{":authority", "foo"}, {":path", "/foo"}})
                        ->routeEntry()
                        ->clusterName());
@@ -253,10 +257,12 @@ TEST_F(RdsImplTest, FailureInvalidConfig) {
 )EOF";
   auto response1 =
       TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response1_json);
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response1);
 
   EXPECT_CALL(init_watcher_, ready());
   EXPECT_THROW_WITH_MESSAGE(
-      rds_callbacks_->onConfigUpdate(response1.resources(), response1.version_info()),
+      rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()),
       EnvoyException,
       "Unexpected RDS configuration (expecting foo_route_config): INVALID_NAME_FOR_route_config");
 }
@@ -433,9 +439,11 @@ dynamic_route_configs:
 )EOF";
   auto response1 =
       TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response1_json);
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response1);
 
   EXPECT_CALL(init_watcher_, ready());
-  rds_callbacks_->onConfigUpdate(response1.resources(), response1.version_info());
+  rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info());
   message_ptr =
       server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"]();
   const auto& route_config_dump3 =
@@ -476,8 +484,7 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
 
   EXPECT_FALSE(provider_->configInfo().has_value());
 
-  Protobuf::RepeatedPtrField<ProtobufWkt::Any> route_configs;
-  route_configs.Add()->PackFrom(parseRouteConfigurationFromV2Yaml(R"EOF(
+  const auto route_config = parseRouteConfigurationFromV2Yaml(R"EOF(
 name: foo_route_config
 virtual_hosts:
   - name: bar
@@ -485,10 +492,11 @@ virtual_hosts:
     routes:
       - match: { prefix: "/" }
         route: { cluster: baz }
-)EOF"));
+)EOF");
+  const auto decoded_resources = TestUtility::decodeResources({route_config});
 
   server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
-      route_configs, "1");
+      decoded_resources.refvec_, "1");
 
   RouteConfigProviderSharedPtr provider2 =
       route_config_provider_manager_->createRdsRouteConfigProvider(
@@ -512,7 +520,7 @@ virtual_hosts:
           rds2, server_factory_context_, "foo_prefix", outer_init_manager_);
   EXPECT_NE(provider3, provider_);
   server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
-      route_configs, "provider3");
+      decoded_resources.refvec_, "provider3");
   EXPECT_EQ(2UL,
             route_config_provider_manager_->dumpRouteConfigs()->dynamic_route_configs().size());
 
@@ -557,8 +565,7 @@ TEST_F(RouteConfigProviderManagerImplTest, SameProviderOnTwoInitManager) {
   EXPECT_EQ(Init::Manager::State::Initializing, real_init_manager.state());
 
   {
-    Protobuf::RepeatedPtrField<ProtobufWkt::Any> route_configs;
-    route_configs.Add()->PackFrom(parseRouteConfigurationFromV2Yaml(R"EOF(
+    const auto route_config = parseRouteConfigurationFromV2Yaml(R"EOF(
 name: foo_route_config
 virtual_hosts:
   - name: bar
@@ -566,29 +573,16 @@ virtual_hosts:
     routes:
       - match: { prefix: "/" }
         route: { cluster: baz }
-)EOF"));
+)EOF");
+    const auto decoded_resources = TestUtility::decodeResources({route_config});
 
     server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
-        route_configs, "1");
+        decoded_resources.refvec_, "1");
 
     EXPECT_TRUE(provider_->configInfo().has_value());
     EXPECT_TRUE(provider2->configInfo().has_value());
     EXPECT_EQ(Init::Manager::State::Initialized, real_init_manager.state());
   }
-}
-
-// Negative test for protoc-gen-validate constraints.
-TEST_F(RouteConfigProviderManagerImplTest, ValidateFail) {
-  setup();
-  Protobuf::RepeatedPtrField<ProtobufWkt::Any> route_configs;
-  envoy::config::route::v3::RouteConfiguration route_config;
-  route_config.set_name("foo_route_config");
-  route_config.mutable_virtual_hosts()->Add();
-  route_configs.Add()->PackFrom(route_config);
-  EXPECT_THROW(
-      server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
-          route_configs, ""),
-      ProtoValidationException);
 }
 
 TEST_F(RouteConfigProviderManagerImplTest, OnConfigUpdateEmpty) {
@@ -605,13 +599,12 @@ TEST_F(RouteConfigProviderManagerImplTest, OnConfigUpdateWrongSize) {
   EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_factory_.subscription_,
               start(_));
   outer_init_manager_.initialize(init_watcher_);
-  Protobuf::RepeatedPtrField<ProtobufWkt::Any> route_configs;
-  route_configs.Add();
-  route_configs.Add();
+  envoy::config::route::v3::RouteConfiguration route_config;
+  const auto decoded_resources = TestUtility::decodeResources({route_config, route_config});
   EXPECT_CALL(init_watcher_, ready());
   EXPECT_THROW_WITH_MESSAGE(
       server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
-          route_configs, ""),
+          decoded_resources.refvec_, ""),
       EnvoyException, "Unexpected RDS resource length: 2");
 }
 
@@ -664,11 +657,13 @@ resources:
 )EOF";
   auto response1 =
       TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response1_yaml);
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response1);
 
   EXPECT_CALL(init_watcher_, ready());
 
   EXPECT_THROW_WITH_MESSAGE(
-      rds_callbacks_->onConfigUpdate(response1.resources(), response1.version_info()),
+      rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()),
       EnvoyException, "Only a single wildcard domain is permitted");
 
   message_ptr =
