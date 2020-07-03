@@ -490,17 +490,17 @@ message HttpConnectionManager {
   // true in the future. When not specified, this value may be overridden by the
   // runtime variable
   // :ref:`http_connection_manager.normalize_path<config_http_conn_man_runtime_normalize_path>`.
-  // See `Normalization and Comparison <https://tools.ietf.org/html/rfc3986#section-6>`
+  // See `Normalization and Comparison <https://tools.ietf.org/html/rfc3986#section-6>`_
   // for details of normalization.
   // Note that Envoy does not perform
-  // `case normalization <https://tools.ietf.org/html/rfc3986#section-6.2.2.1>`
+  // `case normalization <https://tools.ietf.org/html/rfc3986#section-6.2.2.1>`_
   google.protobuf.BoolValue normalize_path = 30;
 
   // Determines if adjacent slashes in the path are merged into one before any processing of
   // requests by HTTP filters or routing. This affects the upstream *:path* header as well. Without
   // setting this option, incoming requests with path `//dir///file` will not match against route
   // with `prefix` match set to `/dir`. Defaults to `false`. Note that slash merging is not part of
-  // `HTTP spec <https://tools.ietf.org/html/rfc3986>` and is provided for convenience.
+  // `HTTP spec <https://tools.ietf.org/html/rfc3986>`_ and is provided for convenience.
   bool merge_slashes = 33;
 
   // The configuration of the request ID extension. This includes operations such as
@@ -525,7 +525,7 @@ message HttpConnectionManager {
   // local port and request method is not CONNECT. This affects the upstream host header as well.
   // Without setting this option, incoming requests with host `example:443` will not match against
   // route with :ref:`domains<envoy_api_field_config.route.v4alpha.VirtualHost.domains>` match set to `example`. Defaults to `false`. Note that port removal is not part
-  // of `HTTP spec <https://tools.ietf.org/html/rfc3986>` and is provided for convenience.
+  // of `HTTP spec <https://tools.ietf.org/html/rfc3986>`_ and is provided for convenience.
   bool strip_matching_host_port = 39;
 }
 
@@ -757,22 +757,56 @@ message ScopedRds {
       [(validate.rules).message = {required: true}];
 }
 
+// [#next-free-field: 6]
 message HttpFilter {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.network.http_connection_manager.v3.HttpFilter";
+
+  // [#not-implemented-hide:] Configuration source specifier for the late-bound
+  // filter configuration. The HTTP Listener is warmed until all the initial
+  // filter configurations are received, unless the flag to apply the default
+  // configuration is set. Subsequent filter updates are atomic on a per-worker
+  // basis, and apply to new streams while the active streams continue using
+  // the older filter configurations. If the initial delivery of the filter
+  // configuration fails, due to a timeout for example, the optional default
+  // configuration is applied. Without a default configuration, the filter is
+  // disabled, and the HTTP listener responds with 500 immediately. After the
+  // failure, the listener continues subscribing to the subsequent filter
+  // configurations.
+  message HttpFilterConfigSource {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.extensions.filters.network.http_connection_manager.v3.HttpFilter."
+        "HttpFilterConfigSource";
+
+    config.core.v4alpha.ConfigSource config_source = 1;
+
+    // Optional default configuration to use as the initial configuration if
+    // there is a failure to receive the initial filter configuration or if
+    // `apply_default_config_without_warming` flag is set.
+    google.protobuf.Any default_config = 2;
+
+    // Use the default config as the initial configuration without warming and
+    // waiting for the first xDS response. Requires the default configuration
+    // to be supplied.
+    bool apply_default_config_without_warming = 3;
+  }
 
   reserved 3, 2;
 
   reserved "config";
 
-  // The name of the filter to instantiate. The name must match a
-  // :ref:`supported filter <config_http_filters>`.
+  // The name of the filter configuration. The name is used as a fallback to
+  // select an extension if the type of the configuration proto is not
+  // sufficient. It also serves as a resource name in FilterConfigDS.
   string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
   // Filter specific configuration which depends on the filter being instantiated. See the supported
   // filters for further documentation.
   oneof config_type {
     google.protobuf.Any typed_config = 4;
+
+    // [#not-implemented-hide:] Configuration source specifier for FilterConfigDS.
+    HttpFilterConfigSource filter_config_ds = 5;
   }
 }
 

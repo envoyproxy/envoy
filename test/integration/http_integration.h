@@ -61,7 +61,7 @@ private:
     CodecCallbacks(IntegrationCodecClient& parent) : parent_(parent) {}
 
     // Http::ConnectionCallbacks
-    void onGoAway() override { parent_.saw_goaway_ = true; }
+    void onGoAway(Http::GoAwayErrorCode) override { parent_.saw_goaway_ = true; }
 
     IntegrationCodecClient& parent_;
   };

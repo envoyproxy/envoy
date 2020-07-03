@@ -10,7 +10,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
-class Utils {
+class HttpCacheUtils {
 public:
   // Parses and returns max-age or s-maxage (with s-maxage taking precedence),
   // parsed into a SystemTime::Duration. Returns SystemTime::Duration::zero if

@@ -75,12 +75,12 @@ descriptors:
 - entries:
   - key: my_key
     value: my_value
-ip_white_list: '12'
+ip_allowlist: '12'
   )EOF";
 
   envoy::extensions::filters::network::ratelimit::v3::RateLimit proto_config;
   EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYaml(yaml_string, proto_config), EnvoyException,
-                          "ip_white_list: Cannot find field");
+                          "ip_allowlist: Cannot find field");
 }
 
 // Test that the deprecated extension name still functions.

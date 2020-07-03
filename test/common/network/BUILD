@@ -2,6 +2,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_benchmark_test",
     "envoy_cc_benchmark_binary",
+    "envoy_cc_fuzz_test",
     "envoy_cc_test",
     "envoy_cc_test_binary",
     "envoy_cc_test_library",
@@ -64,7 +65,6 @@ envoy_cc_test(
     name = "cidr_range_test",
     srcs = ["cidr_range_test.cc"],
     deps = [
-        "//source/common/json:json_loader_lib",
         "//source/common/network:address_lib",
         "//source/common/network:cidr_range_lib",
     ],
@@ -299,6 +299,17 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_fuzz_test(
+    name = "utility_fuzz_test",
+    srcs = ["utility_fuzz_test.cc"],
+    corpus = "utility_corpus",
+    deps = [
+        "//source/common/network:address_lib",
+        "//source/common/network:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
 envoy_cc_test_binary(
     name = "lc_trie_speed_test",
     srcs = ["lc_trie_speed_test.cc"],
@@ -315,6 +326,7 @@ envoy_cc_test(
     name = "io_socket_handle_impl_test",
     srcs = ["io_socket_handle_impl_test.cc"],
     deps = [
+        "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
     ],
 )

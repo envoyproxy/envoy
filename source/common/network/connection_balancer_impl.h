@@ -24,7 +24,7 @@ public:
 
 private:
   absl::Mutex lock_;
-  std::vector<BalancedConnectionHandler*> handlers_ GUARDED_BY(lock_);
+  std::vector<BalancedConnectionHandler*> handlers_ ABSL_GUARDED_BY(lock_);
 };
 
 /**

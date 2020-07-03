@@ -60,6 +60,11 @@ public:
     Thread::LockGuard lock(lock_);
     return end_stream_;
   }
+
+  // Execute a callback using the dispatcher associated with the FakeStream's connection. This
+  // allows execution of non-interrupted sequences of operations on the fake stream which may run
+  // into trouble if client-side events are interleaved.
+  void postToConnectionThread(std::function<void()> cb);
   void encode100ContinueHeaders(const Http::ResponseHeaderMap& headers);
   void encodeHeaders(const Http::HeaderMap& headers, bool end_stream);
   void encodeData(uint64_t size, bool end_stream);
@@ -75,6 +80,23 @@ public:
   bool receivedData() { return received_data_; }
   Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() {
     return encoder_.http1StreamEncoderOptions();
+  }
+  void
+  sendLocalReply(bool is_grpc_request, Http::Code code, absl::string_view body,
+                 const std::function<void(Http::ResponseHeaderMap& headers)>& /*modify_headers*/,
+                 bool is_head_request, const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                 absl::string_view /*details*/) override {
+    Http::Utility::sendLocalReply(
+        false,
+        Http::Utility::EncodeFunctions(
+            {nullptr,
+             [&](Http::ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
+               encoder_.encodeHeaders(*headers, end_stream);
+             },
+             [&](Buffer::Instance& data, bool end_stream) -> void {
+               encoder_.encodeData(data, end_stream);
+             }}),
+        Http::Utility::LocalReplyData({is_grpc_request, code, body, grpc_status, is_head_request}));
   }
 
   ABSL_MUST_USE_RESULT
@@ -442,7 +464,7 @@ public:
 
   // Http::ServerConnectionCallbacks
   Http::RequestDecoder& newStream(Http::ResponseEncoder& response_encoder, bool) override;
-  void onGoAway() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void onGoAway(Http::GoAwayErrorCode) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
 private:
   struct ReadFilter : public Network::ReadFilterBaseImpl {
