@@ -52,20 +52,6 @@ do
     # our `relpath` helper.
     SCRIPT_DIR="$(dirname "$(realpath "$0")")/../../tools"
 
-    git diff $RANGE -- '*.cc' '*.h' | grep -v -E '^\+\+\+' | grep -E '^\+' | sed -e 's/^\+//g' | while IFS='' read -r line
-    do
-      if [ -z "$line" ]
-      then
-        continue
-      fi
-
-      echo -ne "  Checking format for $line - "
-      "$SCRIPT_DIR"/code_format/check_line_format.py "$line"
-      if [[ $? -ne 0 ]]; then
-        exit 1
-      fi
-    done
-
     # TODO(hausdorff): We should have a more graceful failure story when the
     # user does not have all the tools set up correctly. This script assumes
     # `$CLANG_FORMAT` and `$BUILDIFY` are defined, or that the default values it

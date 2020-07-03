@@ -19,7 +19,6 @@ curr_dir = os.path.dirname(os.path.realpath(__file__))
 tools = os.path.dirname(curr_dir)
 src = os.path.join(tools, 'testdata', 'check_format')
 check_format = sys.executable + " " + os.path.join(curr_dir, 'check_format.py')
-check_line_format = sys.executable + " " + os.path.join(curr_dir, 'check_line_format.py')
 errors = 0
 
 
@@ -31,12 +30,6 @@ def runCheckFormat(operation, filename, options=None):
   if options is not None:
     command += f"{' '.join(options)} "
 
-  status, stdout, stderr = runCommand(command)
-  return (command, status, stdout + stderr)
-
-
-def runCheckLineFormat(line):
-  command = f"{check_line_format} \"{line}\""
   status, stdout, stderr = runCommand(command)
   return (command, status, stdout + stderr)
 
@@ -135,11 +128,6 @@ def checkFileExpectingError(filename, expected_substring, extra_input_files=None
   return expectError(filename, status, stdout, expected_substring)
 
 
-def checkLineExpectingError(line, expected_error):
-  command, status, stdout = runCheckLineFormat(line)
-  return expectLineError(line, status, stdout, expected_error)
-
-
 def checkAndFixError(filename, expected_substring, extra_input_files=None, options=None):
   errors = checkFileExpectingError(filename,
                                    expected_substring,
@@ -168,25 +156,12 @@ def checkUnfixableError(filename, expected_substring):
   return errors
 
 
-def checkUnfixableLineError(line, expected_error):
-  return checkLineExpectingError(line, expected_error)
-
-
 def checkFileExpectingOK(filename):
   command, status, stdout = runCheckFormat("check", getInputFile(filename))
   if status != 0:
     logging.error("Expected %s to have no errors; status=%d, output:\n" % (filename, status))
     emitStdoutAsError(stdout)
   return status + fixFileExpectingNoChange(filename)
-
-
-def checkLineExpectingOK(line):
-  command, status, stdout = runCheckLineFormat(line)
-  if status != 0:
-    logging.error(f"Expected '{line}' to have no errors; status={status}, output:\n")
-    emitStdoutAsError(stdout)
-
-  return status
 
 
 def runChecks():
@@ -328,24 +303,6 @@ def runChecks():
   errors += checkFileExpectingOK("clang_format_off.cc")
   errors += checkFileExpectingOK("using_type_alias.cc")
   errors += checkFileExpectingOK("non_type_alias_allowed_type.cc")
-
-  errors += checkUnfixableLineError(
-      "std::unique_ptr<Network::Connection> a() { return nullptr; }",
-      "Use type alias for 'Network::Connection' instead. See STYLE.md")
-  errors += checkUnfixableLineError(
-      ("absl::optional<std::reference_wrapper<ConnectionHandlerImpl::ActiveTcpListener>> a() {"
-       "    return nullptr;"
-       "}"), "Use type alias for 'ConnectionHandlerImpl::ActiveTcpListener' instead. See STYLE.md")
-
-  errors += checkLineExpectingOK(
-      ("using ConnectionPtr = std::unique_ptr<Connection>;"
-       "class A {"
-       "using ConnectionSharedPtr = std::shared_ptr<Connection>;"
-       "using ConnectionOptRef = absl::optional<std::reference_wrapper<Connection>>;"
-       "};"))
-  errors += checkLineExpectingOK(("void a(std::unique_ptr<int>, std::shared_ptr<std::string>,"
-                                  "absl::optional<std::reference_wrapper<char[]>>,"
-                                  "absl::optional<std::reference_wrapper<std::vector<int>>>) {}"))
 
   return errors
 
