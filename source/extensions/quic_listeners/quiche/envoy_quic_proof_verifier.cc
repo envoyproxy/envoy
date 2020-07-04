@@ -45,6 +45,8 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
   }
 
   bssl::UniquePtr<X509_STORE_CTX> ctx(X509_STORE_CTX_new());
+  // It doesn't matter which SSL context is used, because they share the same
+  // cert validation config.
   X509_STORE* store = SSL_CTX_get_cert_store(context_impl_.chooseSslContexts());
   if (!X509_STORE_CTX_init(ctx.get(), store, leaf.get(), intermediates.get())) {
     *error_details = "Failed to verify certificate chain: X509_STORE_CTX_init";

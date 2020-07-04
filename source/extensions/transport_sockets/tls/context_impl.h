@@ -106,6 +106,7 @@ public:
                         bssl::UniquePtr<X509> leaf_cert,
                         const Network::TransportSocketOptions* transport_socket_options);
 
+  // Always return the first SSL context in the config.
   SSL_CTX* chooseSslContexts() const { return tls_contexts_[0].ssl_ctx_.get(); }
 
 protected:
