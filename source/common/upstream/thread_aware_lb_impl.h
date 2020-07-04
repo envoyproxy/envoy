@@ -48,6 +48,7 @@ protected:
 private:
   struct PerPriorityState {
     std::shared_ptr<HashingLoadBalancer> current_lb_;
+    std::shared_ptr<NormalizedHostWeightVector> normalized_host_weights_;
     bool global_panic_{};
   };
   using PerPriorityStatePtr = std::unique_ptr<PerPriorityState>;

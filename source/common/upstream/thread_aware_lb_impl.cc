@@ -116,13 +116,14 @@ void ThreadAwareLoadBalancerBase::refresh() {
     per_priority_state->global_panic_ = per_priority_panic_[priority];
 
     // Normalize host and locality weights such that the sum of all normalized weights is 1.
-    NormalizedHostWeightVector normalized_host_weights;
+    std::shared_ptr<NormalizedHostWeightVector> normalized_host_weights = std::make_shared<NormalizedHostWeightVector>();
     double min_normalized_weight = 1.0;
     double max_normalized_weight = 0.0;
-    normalizeWeights(*host_set, per_priority_state->global_panic_, normalized_host_weights,
+    normalizeWeights(*host_set, per_priority_state->global_panic_, *normalized_host_weights,
                      min_normalized_weight, max_normalized_weight);
     per_priority_state->current_lb_ =
-        createLoadBalancer(normalized_host_weights, min_normalized_weight, max_normalized_weight);
+        createLoadBalancer(*normalized_host_weights, min_normalized_weight, max_normalized_weight);
+    per_priority_state->normalized_host_weights_ = normalized_host_weights;
   }
 
   {
@@ -157,10 +158,48 @@ ThreadAwareLoadBalancerBase::LoadBalancerImpl::chooseHost(LoadBalancerContext* c
     stats_.lb_healthy_panic_.inc();
   }
 
+
+  /*
+    This will be a config parameter under consistent_hashing_lb_config.
+
+    hash_balance_factor: a percentage of load to bound per upstream server.
+    For eg., with a value of 150, no upstream host will get a load more than
+    1.5 times the average load of any other upstream host.
+
+    Default 0 for being disabled.
+
+  */
+  const uint32_t hash_balance_factor = 125;
+
   HostConstSharedPtr host;
   const uint32_t max_attempts = context ? context->hostSelectionRetryCount() + 1 : 1;
   for (uint32_t i = 0; i < max_attempts; ++i) {
     host = per_priority_state->current_lb_->chooseHost(h, i);
+
+    if (hash_balance_factor > 0) {
+      auto normalized_host_weights = per_priority_state->normalized_host_weights_;
+      const auto& it = std::find_if(normalized_host_weights->begin(), normalized_host_weights->end(),
+                        [host] (const std::pair<HostConstSharedPtr, double>& p) { return p.first == host; } );
+      ASSERT(it != normalized_host_weights->end());
+      const double chosen_host_normalized_weight = it->second;
+
+      /*
+        Consistent Hashing with Bounded Load
+        Ref: https://arxiv.org/abs/1608.01350
+      */
+      uint32_t total_slots = ((host->cluster().stats().upstream_rq_active_.value() + 1) * hash_balance_factor + 99) / 100;
+      uint32_t slots = static_cast<uint32_t>(std::ceil(total_slots * chosen_host_normalized_weight));
+
+      if (slots == 0)
+        slots = 1;
+
+      if (host->stats().rq_active_.value() > slots) {
+        ENVOY_LOG_MISC(debug, "ThreadAwareLoadBalancerBase::LoadBalancerImpl::chooseHost: chosen host {} overloaded; active {} > slots {}",
+                host->hostname(), host->stats().rq_active_.value(), slots);
+        continue;
+      }
+    }
+
 
     // If host selection failed or the host is accepted by the filter, return.
     // Otherwise, try again.
