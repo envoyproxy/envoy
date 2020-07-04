@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.waf.actions.v3alpha.rbac;
 
-
 import "envoy/config/rbac/v3/rbac.proto";
 import "google/api/expr/v1alpha1/syntax.proto";
 import "validate/validate.proto";
@@ -21,12 +20,12 @@ message RBACActionConfig {
   // Required. The set of principals that are assigned/denied the role based on “action”. Each
   // principal is matched with OR semantics. To match all downstreams for this policy, a single
   // Principal with the `any` field set to true should be used.
-  repeated envoy.config.rbac.v3.Principal principals = 1 [(validate.rules).repeated = {min_items: 1}];
+  repeated envoy.config.rbac.v3.Principal principals = 1
+      [(validate.rules).repeated = {min_items: 1}];
 
   // An optional symbolic expression specifying an access control
   // :ref:`condition <arch_overview_condition>`.
   google.api.expr.v1alpha1.Expr condition = 2;
-
 
   // The action to take if a policy matches. The request is allowed if and only if:
   //

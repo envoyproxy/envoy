@@ -209,11 +209,10 @@ message Waf {
     repeated Policy policies = 1 [(validate.rules).repeated .min_items = 1];
   }
 
-    // Rule defines a match condition and an associated action.
+  // Rule defines a match condition and an associated action.
   message Policy {
     // Name for the policy.
-    string name = 1
-        [(validate.rules).string.pattern = "^[a-zA-Z0-9]([-a-zA-Z0-9]*[a-zA-Z0-9])?$"];
+    string name = 1 [(validate.rules).string.pattern = "^[a-zA-Z0-9]([-a-zA-Z0-9]*[a-zA-Z0-9])?$"];
 
     // Match criteria
     Match match = 2 [(validate.rules).message.required = true];
@@ -240,7 +239,9 @@ message Waf {
         option (validate.required) = true;
         Predefined predefined = 1;
         // Specifies the name of the header in the request.
-        string header = 2 [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+        string header = 2 [
+          (validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}
+        ];
       }
     }
     // A source IP provider
@@ -249,7 +250,7 @@ message Waf {
     repeated core.v3.CidrRange cidrs = 2 [(validate.rules).repeated .min_items = 1];
   }
 
-    // Match Criteria can be one of the matchers or combination of them grouped using And, Or or Nor logical operators
+  // Match Criteria can be one of the matchers or combination of them grouped using And, Or or Nor logical operators
   message Match {
 
     // Groups one or more fields in the `rule` oneof. Depending on the context, each are applied with the associated behavior.
