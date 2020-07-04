@@ -2270,8 +2270,13 @@ TEST_F(ClusterInfoImplTest, TestTrackRequestResponseSizes) {
   cluster = makeCluster(yaml);
   // The stats should be created.
   EXPECT_TRUE(cluster->info()->requestResponseSizeStats().has_value());
+
   EXPECT_EQ(Stats::Histogram::Unit::Bytes,
             cluster->info()->requestResponseSizeStats()->get().upstream_rq_headers_size_.unit());
+  EXPECT_EQ(Stats::Histogram::Unit::Bytes,
+            cluster->info()->requestResponseSizeStats()->get().upstream_rq_body_size_.unit());
+  EXPECT_EQ(Stats::Histogram::Unit::Bytes,
+            cluster->info()->requestResponseSizeStats()->get().upstream_rs_body_size_.unit());
 }
 
 TEST_F(ClusterInfoImplTest, TestTrackRemainingResourcesGauges) {
@@ -2371,6 +2376,17 @@ TEST_F(ClusterInfoImplTest, TestTrackTimeoutBudgets) {
   // The stats will be null if they have not been explicitly turned on.
   EXPECT_FALSE(cluster->info()->timeoutBudgetStats().has_value());
 
+  const std::string yaml_disabled2 = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    track_optional_cluster_stats: { request_response_sizes : true }
+  )EOF";
+
+  cluster = makeCluster(yaml_disabled2);
+  EXPECT_FALSE(cluster->info()->timeoutBudgetStats().has_value());
+
   // Check that with the flag, the histogram is created.
   const std::string yaml = R"EOF(
     name: name
@@ -2386,6 +2402,11 @@ TEST_F(ClusterInfoImplTest, TestTrackTimeoutBudgets) {
   EXPECT_EQ(
       Stats::Histogram::Unit::Unspecified,
       cluster->info()->timeoutBudgetStats()->get().upstream_rq_timeout_budget_percent_used_.unit());
+  EXPECT_EQ(Stats::Histogram::Unit::Unspecified,
+            cluster->info()
+                ->timeoutBudgetStats()
+                ->get()
+                .upstream_rq_timeout_budget_per_try_percent_used_.unit());
 }
 
 // Validates HTTP2 SETTINGS config.

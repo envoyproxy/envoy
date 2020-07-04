@@ -6051,7 +6051,8 @@ TEST_F(HttpConnectionManagerImplTest, NewConnection) {
   EXPECT_EQ(1U, stats_.named_.downstream_cx_http3_active_.value());
 }
 
-TEST_F(HttpConnectionManagerImplTest, UpstreamHeadersSize) {
+TEST_F(HttpConnectionManagerImplTest, TestUpstreamRequestHeadersSize) {
+  // Test with Headers only request, No Data, No response
   setup(false, "");
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
@@ -6074,12 +6075,99 @@ TEST_F(HttpConnectionManagerImplTest, UpstreamHeadersSize) {
   EXPECT_CALL(
       host_->cluster_.request_response_size_stats_store_,
       deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_headers_size"), 30));
+  EXPECT_CALL(host_->cluster_.request_response_size_stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_body_size"), 0));
+  EXPECT_CALL(host_->cluster_.request_response_size_stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rs_body_size"), 0));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
+TEST_F(HttpConnectionManagerImplTest, TestUpstreamRequestBodySize) {
+  // Test Request with Headers and Data, No response
+  setup(false, "");
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
+    RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{
+        new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+    decoder->decodeHeaders(std::move(headers), false);
+
+    Buffer::OwnedImpl fake_data("12345");
+    decoder->decodeData(fake_data, true);
+    return Http::okStatus();
+  }));
+
+  setupFilterChain(1, 0);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*decoder_filters_[0], decodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::StopIterationNoBuffer));
+
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+
+  std::shared_ptr<NiceMock<Upstream::MockHostDescription>> host_{
+      new NiceMock<Upstream::MockHostDescription>()};
+  filter_callbacks_.upstreamHost(host_);
+
+  EXPECT_CALL(
+      host_->cluster_.request_response_size_stats_store_,
+      deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_headers_size"), 30));
+  EXPECT_CALL(host_->cluster_.request_response_size_stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_body_size"), 5));
+  EXPECT_CALL(host_->cluster_.request_response_size_stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rs_body_size"), 0));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
+TEST_F(HttpConnectionManagerImplTest, TestUpstreamResponseBodySize) {
+  setup(false, "");
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
+    RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{
+        new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+    decoder->decodeHeaders(std::move(headers), false);
+
+    Buffer::OwnedImpl fake_data("1234");
+    decoder->decodeData(fake_data, true);
+
+    return Http::okStatus();
+  }));
+
+  setupFilterChain(1, 0);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*decoder_filters_[0], decodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::StopIterationNoBuffer));
+
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+
+  std::shared_ptr<NiceMock<Upstream::MockHostDescription>> host_{
+      new NiceMock<Upstream::MockHostDescription>()};
+  filter_callbacks_.upstreamHost(host_);
+
+  EXPECT_CALL(
+      host_->cluster_.request_response_size_stats_store_,
+      deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_headers_size"), 30));
+  EXPECT_CALL(host_->cluster_.request_response_size_stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_body_size"), 4));
+  EXPECT_CALL(host_->cluster_.request_response_size_stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rs_body_size"), 11));
 
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
 
-  EXPECT_EQ(Stats::Histogram::Unit::Bytes,
-            host_->cluster_.requestResponseSizeStats()->get().upstream_rq_headers_size_.unit());
+  EXPECT_CALL(response_encoder_, encodeData(_, true));
+  expectOnDestroy();
+
+  // invoke encodeData
+  Buffer::OwnedImpl fake_response("hello-world");
+  decoder_filters_[0]->callbacks_->encodeData(fake_response, true);
 }
 
 TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponseUsingHttp3) {

@@ -626,7 +626,9 @@ public:
  * All stats tracking request/response headers and body sizes. Not used by default.
  */
 #define ALL_CLUSTER_REQUEST_RESPONSE_SIZE_STATS(HISTOGRAM)                                         \
-  HISTOGRAM(upstream_rq_headers_size, Bytes)
+  HISTOGRAM(upstream_rq_headers_size, Bytes)                                                       \
+  HISTOGRAM(upstream_rq_body_size, Bytes)                                                          \
+  HISTOGRAM(upstream_rs_body_size, Bytes)
 
 /**
  * All stats around timeout budgets. Not used by default.
@@ -875,14 +877,12 @@ public:
    * @return absl::optional<std::reference_wrapper<ClusterRequestResponseSizeStats>> stats to track
    * headers/body sizes of request/response for this cluster.
    */
-
   virtual ClusterRequestResponseSizeOptRef requestResponseSizeStats() const PURE;
 
   /**
    * @return absl::optional<std::reference_wrapper<ClusterTimeoutBudgetStats>> stats on timeout
    * budgets for this cluster.
    */
-
   virtual ClusterTimeoutBudgetOptRef timeoutBudgetStats() const PURE;
 
   /**
