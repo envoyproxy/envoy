@@ -12,24 +12,23 @@
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #include "quiche/quic/core/crypto/proof_source.h"
 #include "quiche/quic/core/quic_versions.h"
-#include "quiche/quic/core/crypto/crypto_protocol.h"
-#include "quiche/quic/platform/api/quic_reference_counted.h"
-#include "quiche/quic/platform/api/quic_socket_address.h"
-#include "quiche/common/platform/api/quiche_string_piece.h"
+
 #pragma GCC diagnostic pop
 
 #include "openssl/ssl.h"
 #include "envoy/network/filter.h"
-#include "server/backtrace.h"
+#include "quiche/quic/platform/api/quic_reference_counted.h"
+#include "quiche/quic/platform/api/quic_socket_address.h"
+#include "quiche/common/platform/api/quiche_string_piece.h"
 
 namespace Envoy {
 namespace Quic {
 
-// A partial implementation of quic::ProofSource which uses RSA cipher suite to sign in GetProof().
+// A fake implementation of quic::ProofSource which uses RSA cipher suite to sign in GetProof().
 // TODO(danzh) Rename it to EnvoyQuicProofSource once it's fully implemented.
-class EnvoyQuicProofSourceBase : public quic::ProofSource {
+class EnvoyQuicFakeProofSource : public quic::ProofSource {
 public:
-  ~EnvoyQuicProofSourceBase() override = default;
+  ~EnvoyQuicFakeProofSource() override = default;
 
   // quic::ProofSource
   // Returns a certs chain and its fake SCT "Fake timestamp" and TLS signature wrapped
@@ -37,8 +36,16 @@ public:
   void GetProof(const quic::QuicSocketAddress& server_address,
                 const quic::QuicSocketAddress& client_address, const std::string& hostname,
                 const std::string& server_config, quic::QuicTransportVersion /*transport_version*/,
-                quiche::QuicheStringPiece chlo_hash,
-                std::unique_ptr<quic::ProofSource::Callback> callback) override;
+                quiche::QuicheStringPiece /*chlo_hash*/,
+                std::unique_ptr<quic::ProofSource::Callback> callback) override {
+    quic::QuicReferenceCountedPointer<quic::ProofSource::Chain> chain =
+        GetCertChain(server_address, client_address, hostname);
+    quic::QuicCryptoProof proof;
+    // TODO(danzh) Get the signature algorithm from leaf cert.
+    auto signature_callback = std::make_unique<SignatureCallback>(std::move(callback), chain);
+    ComputeTlsSignature(server_address, client_address, hostname, SSL_SIGN_RSA_PSS_RSAE_SHA256,
+                        server_config, std::move(signature_callback));
+  }
 
   TicketCrypter* GetTicketCrypter() override { return nullptr; }
 
