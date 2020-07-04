@@ -13,14 +13,14 @@
 #endif
 
 #include <memory>
-#include "extensions/quic_listeners/quiche/envoy_quic_fake_proof_source.h"
+#include "extensions/quic_listeners/quiche/envoy_quic_proof_source_base.h"
 
 namespace Envoy {
 namespace Quic {
 
 // A test ProofSource which always provide a hard-coded test certificate in
 // QUICHE and a fake signature.
-class TestProofSource : public Quic::EnvoyQuicFakeProofSource {
+class TestProofSource : public EnvoyQuicProofSourceBase {
 public:
   quic::QuicReferenceCountedPointer<quic::ProofSource::Chain>
   GetCertChain(const quic::QuicSocketAddress& /*server_address*/,

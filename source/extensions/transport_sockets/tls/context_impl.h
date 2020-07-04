@@ -101,6 +101,13 @@ public:
 
   std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> getPrivateKeyMethodProviders();
 
+  // Called by verifyCallback to do the actual cert chain verification.
+  int doVerifyCertChain(X509_STORE_CTX* store_ctx, Ssl::SslExtendedSocketInfo* ssl_extended_info,
+                        bssl::UniquePtr<X509> leaf_cert,
+                        const Network::TransportSocketOptions* transport_socket_options);
+
+  SSL_CTX* chooseSslContexts() const { return tls_contexts_[0].ssl_ctx_.get(); }
+
 protected:
   ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
               TimeSource& time_source);

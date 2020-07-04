@@ -7,6 +7,7 @@
 
 #include "test/config/utility.h"
 #include "test/integration/http_integration.h"
+#include "test/integration/ssl_utility.h"
 #include "test/test_common/utility.h"
 
 #pragma GCC diagnostic push
@@ -23,12 +24,14 @@
 
 #include "extensions/quic_listeners/quiche/envoy_quic_client_session.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_client_connection.h"
-#include "extensions/quic_listeners/quiche/envoy_quic_fake_proof_verifier.h"
+#include "extensions/quic_listeners/quiche/envoy_quic_proof_verifier.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_connection_helper.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_alarm_factory.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_packet_writer.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
+#include "extensions/quic_listeners/quiche/quic_transport_socket_factory.h"
 #include "test/extensions/quic_listeners/quiche/test_utils.h"
+#include "extensions/transport_sockets/tls/context_config_impl.h"
 
 namespace Envoy {
 namespace Quic {
@@ -43,6 +46,43 @@ public:
 
   Http::StreamResetReason last_stream_reset_reason_{Http::StreamResetReason::LocalReset};
 };
+
+std::unique_ptr<QuicClientTransportSocketFactory>
+createQuicClientTransportSocketFactory(const Ssl::ClientSslTransportOptions& options,
+                                       Api::Api& api) {
+  std::string yaml_plain = R"EOF(
+  common_tls_context:
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/config/integration/certs/cacert.pem"
+)EOF";
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml_plain), tls_context);
+  auto* common_context = tls_context.mutable_common_tls_context();
+
+  if (options.alpn_) {
+    common_context->add_alpn_protocols("h3");
+  }
+  if (options.san_) {
+    common_context->mutable_validation_context()
+        ->add_hidden_envoy_deprecated_verify_subject_alt_name("spiffe://lyft.com/backend-team");
+  }
+  for (const std::string& cipher_suite : options.cipher_suites_) {
+    common_context->mutable_tls_params()->add_cipher_suites(cipher_suite);
+  }
+  if (!options.sni_.empty()) {
+    tls_context.set_sni(options.sni_);
+  }
+
+  common_context->mutable_tls_params()->set_tls_minimum_protocol_version(options.tls_version_);
+  common_context->mutable_tls_params()->set_tls_maximum_protocol_version(options.tls_version_);
+
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
+  ON_CALL(mock_factory_ctx, api()).WillByDefault(testing::ReturnRef(api));
+  auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
+      tls_context, options.sigalgs_, mock_factory_ctx);
+  return std::make_unique<QuicClientTransportSocketFactory>(std::move(cfg));
+}
 
 class QuicHttpIntegrationTest : public HttpIntegrationTest, public QuicMultiVersionTest {
 public:
@@ -59,8 +99,7 @@ public:
           SetQuicReloadableFlag(quic_enable_version_draft_25_v3, use_http3);
           return quic::CurrentSupportedVersions();
         }()),
-        crypto_config_(std::make_unique<EnvoyQuicFakeProofVerifier>()), conn_helper_(*dispatcher_),
-        alarm_factory_(*dispatcher_, *conn_helper_.GetClock()),
+        conn_helper_(*dispatcher_), alarm_factory_(*dispatcher_, *conn_helper_.GetClock()),
         injected_resource_filename_(TestEnvironment::temporaryPath("injected_resource")),
         file_updater_(injected_resource_filename_) {}
 
@@ -81,7 +120,7 @@ public:
         quic::ParsedQuicVersionVector{supported_versions_[0]}, local_addr, *dispatcher_, nullptr);
     quic_connection_ = connection.get();
     auto session = std::make_unique<EnvoyQuicClientSession>(
-        quic_config_, supported_versions_, std::move(connection), server_id_, &crypto_config_,
+        quic_config_, supported_versions_, std::move(connection), server_id_, crypto_config_.get(),
         &push_promise_index_, *dispatcher_, 0);
     session->Initialize();
     return session;
@@ -105,7 +144,7 @@ public:
   }
 
   quic::QuicConnectionId getNextServerDesignatedConnectionId() {
-    quic::QuicCryptoClientConfig::CachedState* cached = crypto_config_.LookupOrCreate(server_id_);
+    quic::QuicCryptoClientConfig::CachedState* cached = crypto_config_->LookupOrCreate(server_id_);
     // If the cached state indicates that we should use a server-designated
     // connection ID, then return that connection ID.
     quic::QuicConnectionId conn_id = cached->has_server_designated_connection_id()
@@ -168,16 +207,23 @@ public:
     updateResource(0);
     HttpIntegrationTest::initialize();
     registerTestServerPorts({"http"});
+    crypto_config_ =
+        std::make_unique<quic::QuicCryptoClientConfig>(std::make_unique<EnvoyQuicProofVerifier>(
+            stats_store_,
+            createQuicClientTransportSocketFactory(
+                Ssl::ClientSslTransportOptions().setAlpn(true).setSan(true), *api_)
+                ->clientContextConfig(),
+            timeSystem()));
   }
 
   void updateResource(double pressure) { file_updater_.update(absl::StrCat(pressure)); }
 
 protected:
   quic::QuicConfig quic_config_;
-  quic::QuicServerId server_id_{"example.com", 443, false};
+  quic::QuicServerId server_id_{"lyft.com", 443, false};
   quic::QuicClientPushPromiseIndex push_promise_index_;
   quic::ParsedQuicVersionVector supported_versions_;
-  quic::QuicCryptoClientConfig crypto_config_;
+  std::unique_ptr<quic::QuicCryptoClientConfig> crypto_config_;
   EnvoyQuicConnectionHelper conn_helper_;
   EnvoyQuicAlarmFactory alarm_factory_;
   CodecClientCallbacksForTest client_codec_callback_;
@@ -287,7 +333,7 @@ TEST_P(QuicHttpIntegrationTest, MultipleQuicListenersWithBPF) {
   set_reuse_port_ = true;
   initialize();
   std::vector<IntegrationCodecClientPtr> codec_clients;
-  quic::QuicCryptoClientConfig::CachedState* cached = crypto_config_.LookupOrCreate(server_id_);
+  quic::QuicCryptoClientConfig::CachedState* cached = crypto_config_->LookupOrCreate(server_id_);
   for (size_t i = 1; i <= concurrency_; ++i) {
     // The BPF filter looks at the 1st word of connection id in the packet
     // header. And currently all QUIC versions support 8 bytes connection id. So
@@ -330,7 +376,7 @@ TEST_P(QuicHttpIntegrationTest, MultipleQuicListenersNoBPF) {
 #undef SO_ATTACH_REUSEPORT_CBPF
 #endif
   std::vector<IntegrationCodecClientPtr> codec_clients;
-  quic::QuicCryptoClientConfig::CachedState* cached = crypto_config_.LookupOrCreate(server_id_);
+  quic::QuicCryptoClientConfig::CachedState* cached = crypto_config_->LookupOrCreate(server_id_);
   for (size_t i = 1; i <= concurrency_; ++i) {
     // The BPF filter looks at the 1st byte of connection id in the packet
     // header. And currently all QUIC versions support 8 bytes connection id. So
