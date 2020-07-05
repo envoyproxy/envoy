@@ -141,6 +141,30 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithBody) {
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());
 }
 
+TEST_P(ProxyFilterIntegrationTest, HeaderRequestWithClusterCircuitBreaker) {
+  disableDnsCacheCircuitBreakers();
+  setup();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},
+      {":path", "/test/long/url"},
+      {":scheme", "http"},
+      {":authority",
+       fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port())}};
+
+  auto response =
+      sendRequestAndWaitForResponse(request_headers, 1024, default_response_headers_, 1024);
+  checkSimpleRequestSuccess(1024, 1024, response.get());
+  EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
+  EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());
+
+  // Now send another request. This should hit the DNS cache.
+  response = sendRequestAndWaitForResponse(request_headers, 512, default_response_headers_, 512);
+  checkSimpleRequestSuccess(512, 512, response.get());
+  EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
+  EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());
+}
+
 // Verify that after we populate the cache and reload the cluster we reattach to the cache with
 // its existing hosts.
 TEST_P(ProxyFilterIntegrationTest, ReloadClusterAndAttachToCache) {
