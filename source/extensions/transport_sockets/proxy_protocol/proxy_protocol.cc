@@ -32,28 +32,13 @@ namespace ProxyProtocol {
 UpstreamProxyProtocolSocket::UpstreamProxyProtocolSocket(
     Network::TransportSocketPtr transport_socket, Network::TransportSocketOptionsSharedPtr options,
     ProxyProtocolConfig_Version version)
-    : transport_socket_(std::move(transport_socket)), options_(options), version_(version) {}
+    : PassthroughSocket(std::move(transport_socket)), options_(options), version_(version) {}
 
 void UpstreamProxyProtocolSocket::setTransportSocketCallbacks(
     Network::TransportSocketCallbacks& callbacks) {
   transport_socket_->setTransportSocketCallbacks(callbacks);
   callbacks_ = &callbacks;
-}
-
-std::string UpstreamProxyProtocolSocket::protocol() const { return transport_socket_->protocol(); }
-
-absl::string_view UpstreamProxyProtocolSocket::failureReason() const {
-  return transport_socket_->failureReason();
-}
-
-bool UpstreamProxyProtocolSocket::canFlushClose() { return transport_socket_->canFlushClose(); }
-
-void UpstreamProxyProtocolSocket::closeSocket(Network::ConnectionEvent event) {
-  transport_socket_->closeSocket(event);
-}
-
-Network::IoResult UpstreamProxyProtocolSocket::doRead(Buffer::Instance& buffer) {
-  return transport_socket_->doRead(buffer);
+  generateHeader();
 }
 
 Network::IoResult UpstreamProxyProtocolSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
@@ -125,15 +110,6 @@ Network::IoResult UpstreamProxyProtocolSocket::writeHeader() {
   } while (true);
 
   return {action, bytes_written, false};
-}
-
-void UpstreamProxyProtocolSocket::onConnected() {
-  generateHeader();
-  transport_socket_->onConnected();
-}
-
-Ssl::ConnectionInfoConstSharedPtr UpstreamProxyProtocolSocket::ssl() const {
-  return transport_socket_->ssl();
 }
 
 UpstreamProxyProtocolSocketFactory::UpstreamProxyProtocolSocketFactory(

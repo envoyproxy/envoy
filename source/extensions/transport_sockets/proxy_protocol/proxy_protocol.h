@@ -7,6 +7,8 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"
 
+#include "extensions/transport_sockets/common/passthrough.h"
+
 using envoy::config::core::v3::ProxyProtocolConfig_Version;
 
 namespace Envoy {
@@ -14,7 +16,7 @@ namespace Extensions {
 namespace TransportSockets {
 namespace ProxyProtocol {
 
-class UpstreamProxyProtocolSocket : public Network::TransportSocket,
+class UpstreamProxyProtocolSocket : public TransportSockets::PassthroughSocket,
                                     public Logger::Loggable<Logger::Id::connection> {
 public:
   UpstreamProxyProtocolSocket(Network::TransportSocketPtr transport_socket,
@@ -22,14 +24,7 @@ public:
                               ProxyProtocolConfig_Version version);
 
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
-  std::string protocol() const override;
-  absl::string_view failureReason() const override;
-  bool canFlushClose() override;
-  void closeSocket(Network::ConnectionEvent event) override;
-  Network::IoResult doRead(Buffer::Instance& buffer) override;
   Network::IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
-  void onConnected() override;
-  Ssl::ConnectionInfoConstSharedPtr ssl() const override;
 
 private:
   void generateHeader();
@@ -37,7 +32,6 @@ private:
   void generateHeaderV2();
   Network::IoResult writeHeader();
 
-  Network::TransportSocketPtr transport_socket_;
   Network::TransportSocketOptionsSharedPtr options_;
   Network::TransportSocketCallbacks* callbacks_{};
   Buffer::OwnedImpl header_buffer_{};
