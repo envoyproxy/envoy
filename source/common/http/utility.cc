@@ -264,7 +264,7 @@ std::string Utility::createSslRedirectPath(const RequestHeaderMap& headers) {
   return fmt::format("https://{}{}", headers.getHostValue(), headers.getPathValue());
 }
 
-Utility::QueryParams Utility::parseQueryString(absl::string_view url, bool do_percent_decoding) {
+Utility::QueryParams Utility::parseQueryString(absl::string_view url) {
   size_t start = url.find('?');
   if (start == std::string::npos) {
     QueryParams params;
@@ -272,10 +272,18 @@ Utility::QueryParams Utility::parseQueryString(absl::string_view url, bool do_pe
   }
 
   start++;
-  return do_percent_decoding
-             ? parseParameters(PercentEncoding::decode(StringUtil::subspan(url, start, url.size())),
-                               0)
-             : parseParameters(url, start);
+  return parseParameters(url, start);
+}
+
+Utility::QueryParams Utility::parseAndDecodeQueryString(absl::string_view url) {
+  size_t start = url.find('?');
+  if (start == std::string::npos) {
+    QueryParams params;
+    return params;
+  }
+
+  start++;
+  return parseParameters(PercentEncoding::decode(StringUtil::subspan(url, start, url.size())), 0);
 }
 
 Utility::QueryParams Utility::parseFromBody(absl::string_view body) {

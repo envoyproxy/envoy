@@ -189,11 +189,16 @@ std::string createSslRedirectPath(const RequestHeaderMap& headers);
 /**
  * Parse a URL into query parameters.
  * @param url supplies the url to parse.
- * @param do_percent_decoding supplies the flag to do percent decoding to the query parameters.
- *        It defaults to false.
  * @return QueryParams the parsed parameters, if any.
  */
-QueryParams parseQueryString(absl::string_view url, bool do_percent_decoding = false);
+QueryParams parseQueryString(absl::string_view url);
+
+/**
+ * Parse a URL into percent-decoded query parameters.
+ * @param url supplies the url to parse.
+ * @return QueryParams the parsed and percent-decoded parameters, if any.
+ */
+QueryParams parseAndDecodeQueryString(absl::string_view url);
 
 /**
  * Parse a a request body into query parameters.
