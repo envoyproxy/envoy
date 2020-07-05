@@ -553,7 +553,7 @@ Api::IoCallUint64Result receiveMessage(uint64_t maxPacketSize, Buffer::InstanceP
     return result;
   }
 
-  // Adjust memory length and commit slice to buffer
+  // Adjust memory length & commit slice to buffer
   slice.len_ = std::min(slice.len_, result.rc_);
   buffer->commit(&slice, 1);
 
