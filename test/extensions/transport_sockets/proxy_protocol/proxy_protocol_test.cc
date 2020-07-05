@@ -43,14 +43,14 @@ public:
     inner_socket_ = inner_socket.get();
     ON_CALL(transport_callbacks_, ioHandle()).WillByDefault(ReturnRef(io_handle_));
     proxy_protocol_socket_ =
-        std::make_unique<ProxyProtocolSocket>(std::move(inner_socket), socket_options, version);
+        std::make_unique<UpstreamProxyProtocolSocket>(std::move(inner_socket), socket_options, version);
     proxy_protocol_socket_->setTransportSocketCallbacks(transport_callbacks_);
     proxy_protocol_socket_->onConnected();
   }
 
   NiceMock<Network::MockTransportSocket>* inner_socket_;
   NiceMock<Network::MockIoHandle> io_handle_;
-  std::unique_ptr<ProxyProtocolSocket> proxy_protocol_socket_;
+  std::unique_ptr<UpstreamProxyProtocolSocket> proxy_protocol_socket_;
   NiceMock<Network::MockTransportSocketCallbacks> transport_callbacks_;
 };
 
