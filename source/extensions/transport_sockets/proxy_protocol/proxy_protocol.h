@@ -14,12 +14,12 @@ namespace Extensions {
 namespace TransportSockets {
 namespace ProxyProtocol {
 
-class ProxyProtocolSocket : public Network::TransportSocket,
-                            public Logger::Loggable<Logger::Id::connection> {
+class UpstreamProxyProtocolSocket : public Network::TransportSocket,
+                                    public Logger::Loggable<Logger::Id::connection> {
 public:
-  ProxyProtocolSocket(Network::TransportSocketPtr transport_socket,
-                      Network::TransportSocketOptionsSharedPtr options,
-                      ProxyProtocolConfig_Version version);
+  UpstreamProxyProtocolSocket(Network::TransportSocketPtr transport_socket,
+                              Network::TransportSocketOptionsSharedPtr options,
+                              ProxyProtocolConfig_Version version);
 
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
   std::string protocol() const override;
@@ -41,6 +41,21 @@ private:
   Network::TransportSocketOptionsSharedPtr options_;
   Network::TransportSocketCallbacks* callbacks_{};
   Buffer::OwnedImpl header_buffer_{};
+  ProxyProtocolConfig_Version version_{ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1};
+};
+
+class UpstreamProxyProtocolSocketFactory : public Network::TransportSocketFactory {
+public:
+  UpstreamProxyProtocolSocketFactory(Network::TransportSocketFactoryPtr transport_socket_factory,
+                                     ProxyProtocolConfig_Version version);
+
+  // Network::TransportSocketFactory
+  Network::TransportSocketPtr
+  createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
+  bool implementsSecureTransport() const override;
+
+private:
+  Network::TransportSocketFactoryPtr transport_socket_factory_;
   ProxyProtocolConfig_Version version_{ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1};
 };
 

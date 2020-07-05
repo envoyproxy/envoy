@@ -29,34 +29,34 @@ namespace Extensions {
 namespace TransportSockets {
 namespace ProxyProtocol {
 
-ProxyProtocolSocket::ProxyProtocolSocket(Network::TransportSocketPtr transport_socket,
-                                         Network::TransportSocketOptionsSharedPtr options,
-                                         ProxyProtocolConfig_Version version)
+UpstreamProxyProtocolSocket::UpstreamProxyProtocolSocket(
+    Network::TransportSocketPtr transport_socket, Network::TransportSocketOptionsSharedPtr options,
+    ProxyProtocolConfig_Version version)
     : transport_socket_(std::move(transport_socket)), options_(options), version_(version) {}
 
-void ProxyProtocolSocket::setTransportSocketCallbacks(
+void UpstreamProxyProtocolSocket::setTransportSocketCallbacks(
     Network::TransportSocketCallbacks& callbacks) {
   transport_socket_->setTransportSocketCallbacks(callbacks);
   callbacks_ = &callbacks;
 }
 
-std::string ProxyProtocolSocket::protocol() const { return transport_socket_->protocol(); }
+std::string UpstreamProxyProtocolSocket::protocol() const { return transport_socket_->protocol(); }
 
-absl::string_view ProxyProtocolSocket::failureReason() const {
+absl::string_view UpstreamProxyProtocolSocket::failureReason() const {
   return transport_socket_->failureReason();
 }
 
-bool ProxyProtocolSocket::canFlushClose() { return transport_socket_->canFlushClose(); }
+bool UpstreamProxyProtocolSocket::canFlushClose() { return transport_socket_->canFlushClose(); }
 
-void ProxyProtocolSocket::closeSocket(Network::ConnectionEvent event) {
+void UpstreamProxyProtocolSocket::closeSocket(Network::ConnectionEvent event) {
   transport_socket_->closeSocket(event);
 }
 
-Network::IoResult ProxyProtocolSocket::doRead(Buffer::Instance& buffer) {
+Network::IoResult UpstreamProxyProtocolSocket::doRead(Buffer::Instance& buffer) {
   return transport_socket_->doRead(buffer);
 }
 
-Network::IoResult ProxyProtocolSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
+Network::IoResult UpstreamProxyProtocolSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
   if (header_buffer_.length() > 0) {
     auto header_res = writeHeader();
     if (header_buffer_.length() == 0 && header_res.action_ == Network::PostIoAction::KeepOpen) {
@@ -69,7 +69,7 @@ Network::IoResult ProxyProtocolSocket::doWrite(Buffer::Instance& buffer, bool en
   }
 }
 
-void ProxyProtocolSocket::generateHeader() {
+void UpstreamProxyProtocolSocket::generateHeader() {
   if (version_ == ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1) {
     generateHeaderV1();
   } else {
@@ -77,7 +77,7 @@ void ProxyProtocolSocket::generateHeader() {
   }
 }
 
-void ProxyProtocolSocket::generateHeaderV1() {
+void UpstreamProxyProtocolSocket::generateHeaderV1() {
   // Default to local addresses
   auto src_addr = callbacks_->connection().localAddress();
   auto dst_addr = callbacks_->connection().remoteAddress();
@@ -91,7 +91,7 @@ void ProxyProtocolSocket::generateHeaderV1() {
   Common::ProxyProtocol::generateV1Header(*src_addr->ip(), *dst_addr->ip(), header_buffer_);
 }
 
-void ProxyProtocolSocket::generateHeaderV2() {
+void UpstreamProxyProtocolSocket::generateHeaderV2() {
   if (!options_ || !options_->proxyProtocolOptions().has_value()) {
     Common::ProxyProtocol::generateV2LocalHeader(header_buffer_);
   } else {
@@ -101,7 +101,7 @@ void ProxyProtocolSocket::generateHeaderV2() {
   }
 }
 
-Network::IoResult ProxyProtocolSocket::writeHeader() {
+Network::IoResult UpstreamProxyProtocolSocket::writeHeader() {
   Network::PostIoAction action = Network::PostIoAction::KeepOpen;
   uint64_t bytes_written = 0;
   do {
@@ -127,13 +127,28 @@ Network::IoResult ProxyProtocolSocket::writeHeader() {
   return {action, bytes_written, false};
 }
 
-void ProxyProtocolSocket::onConnected() {
+void UpstreamProxyProtocolSocket::onConnected() {
   generateHeader();
   transport_socket_->onConnected();
 }
 
-Ssl::ConnectionInfoConstSharedPtr ProxyProtocolSocket::ssl() const {
+Ssl::ConnectionInfoConstSharedPtr UpstreamProxyProtocolSocket::ssl() const {
   return transport_socket_->ssl();
+}
+
+UpstreamProxyProtocolSocketFactory::UpstreamProxyProtocolSocketFactory(
+    Network::TransportSocketFactoryPtr transport_socket_factory,
+    ProxyProtocolConfig_Version version)
+    : transport_socket_factory_(std::move(transport_socket_factory)), version_(version) {}
+
+Network::TransportSocketPtr UpstreamProxyProtocolSocketFactory::createTransportSocket(
+    Network::TransportSocketOptionsSharedPtr options) const {
+  return std::make_unique<UpstreamProxyProtocolSocket>(
+      transport_socket_factory_->createTransportSocket(options), options, version_);
+}
+
+bool UpstreamProxyProtocolSocketFactory::implementsSecureTransport() const {
+  return transport_socket_factory_->implementsSecureTransport();
 }
 
 } // namespace ProxyProtocol
