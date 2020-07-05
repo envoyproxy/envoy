@@ -633,7 +633,7 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
                      output.msg_[i].peer_address_->asString());
 
       // Adjust used memory length and commit slice to buffer
-      slice->len_ = std::min(slice->len_, msg_len);
+      slice->len_ = std::min(slice->len_, static_cast<size_t>(msg_len));
       buffers[i]->commit(slice, 1);
 
       passPayloadToProcessor(msg_len, std::move(buffers[i]), output.msg_[i].peer_address_,
