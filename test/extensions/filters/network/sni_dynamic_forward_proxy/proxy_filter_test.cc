@@ -40,10 +40,6 @@ public:
     // Allow for an otherwise strict mock.
     ON_CALL(callbacks_, connection()).WillByDefault(ReturnRef(connection_));
     EXPECT_CALL(callbacks_, connection()).Times(AtLeast(0));
-
-    // Configure max pending to 1 so we can test circuit breaking.
-    // TODO(lizan): implement circuit breaker in SNI dynamic forward proxy
-    cm_.thread_local_cluster_.cluster_.info_->resetResourceManager(0, 1, 0, 0, 0);
   }
 
   ~SniDynamicProxyFilterTest() override {

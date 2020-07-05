@@ -140,8 +140,6 @@ TEST_P(SniDynamicProxyFilterIntegrationTest, CircuitBraekerInvokedUpstreamTls) {
   codec_client_ = makeRawHttpConnection(
       makeSslClientConnection(Ssl::ClientSslTransportOptions().setSni("localhost")), absl::nullopt);
   ASSERT_FALSE(codec_client_->connected());
-
-  EXPECT_EQ(1, test_server_->gauge("dns_cache.foo.circuit_breakers.rq_pending_open"));
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_rq_pending_overflow")->value());
 }
 
