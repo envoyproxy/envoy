@@ -1,7 +1,7 @@
 
 .. _config_http_filters_oauth:
 
-OAuth
+OAuth2
 =====
 
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.oauth.v3.OAuth2>`
@@ -9,7 +9,7 @@ OAuth
 
 .. attention::
 
-  The OAuth filter is currently under active development.
+  The OAuth2 filter is currently under active development.
 
 Example configuration
 ---------------------

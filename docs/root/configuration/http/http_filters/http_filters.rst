@@ -29,7 +29,7 @@ HTTP filters
   ip_tagging_filter
   jwt_authn_filter
   lua_filter
-  oauth_filter
+  oauth2_filter
   on_demand_updates_filter
   original_src_filter
   rate_limit_filter
