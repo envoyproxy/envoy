@@ -1,7 +1,5 @@
 #include "admin.h"
 
-#include <string>
-
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -14,5 +12,4 @@ MockAdmin::MockAdmin() {
 MockAdmin::~MockAdmin() = default;
 
 } // namespace Server
-
 } // namespace Envoy

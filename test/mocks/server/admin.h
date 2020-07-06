@@ -35,5 +35,4 @@ public:
   ::testing::NiceMock<MockConfigTracker> config_tracker_;
 };
 } // namespace Server
-
 } // namespace Envoy
