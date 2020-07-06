@@ -2,6 +2,7 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
@@ -20,64 +21,51 @@ namespace Envoy {
 namespace Config {
 namespace {
 
-class NamedMockSubscriptionCallbacks : public MockSubscriptionCallbacks {
-public:
-  std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return TestUtility::anyConvert<envoy::config::endpoint::v3::ClusterLoadAssignment>(resource)
-        .cluster_name();
-  }
-};
-
 // expectDeltaAndSotwUpdate() EXPECTs two birds with one function call: we want to cover both SotW
 // and delta, which, while mechanically different, can behave identically for our testing purposes.
 // Specifically, as a simplification for these tests, every still-present resource is updated in
 // every update. Therefore, a resource can never show up in the SotW update but not the delta
 // update. We can therefore use the same expected_resources for both.
 void expectDeltaAndSotwUpdate(
-    NamedMockSubscriptionCallbacks& callbacks,
+    MockSubscriptionCallbacks& callbacks,
     const std::vector<envoy::config::endpoint::v3::ClusterLoadAssignment>& expected_resources,
     const std::vector<std::string>& expected_removals, const std::string& version) {
   EXPECT_CALL(callbacks, onConfigUpdate(_, version))
-      .WillOnce(Invoke(
-          [expected_resources](const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& gotten_resources,
-                               const std::string&) {
-            EXPECT_EQ(expected_resources.size(), gotten_resources.size());
-            for (size_t i = 0; i < expected_resources.size(); i++) {
-              envoy::config::endpoint::v3::ClusterLoadAssignment cur_gotten_resource;
-              gotten_resources[i].UnpackTo(&cur_gotten_resource);
-              EXPECT_TRUE(TestUtility::protoEqual(cur_gotten_resource, expected_resources[i]));
-            }
-          }));
+      .WillOnce(Invoke([expected_resources](const std::vector<DecodedResourceRef>& gotten_resources,
+                                            const std::string&) {
+        EXPECT_EQ(expected_resources.size(), gotten_resources.size());
+        for (size_t i = 0; i < expected_resources.size(); i++) {
+          EXPECT_TRUE(
+              TestUtility::protoEqual(gotten_resources[i].get().resource(), expected_resources[i]));
+        }
+      }));
   EXPECT_CALL(callbacks, onConfigUpdate(_, _, _))
-      .WillOnce(
-          Invoke([expected_resources, expected_removals, version](
-                     const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>&
-                         gotten_resources,
-                     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                     const std::string&) {
-            EXPECT_EQ(expected_resources.size(), gotten_resources.size());
-            for (size_t i = 0; i < expected_resources.size(); i++) {
-              EXPECT_EQ(gotten_resources[i].version(), version);
-              envoy::config::endpoint::v3::ClusterLoadAssignment cur_gotten_resource;
-              gotten_resources[i].resource().UnpackTo(&cur_gotten_resource);
-              EXPECT_TRUE(TestUtility::protoEqual(cur_gotten_resource, expected_resources[i]));
-            }
-            EXPECT_EQ(expected_removals.size(), removed_resources.size());
-            for (size_t i = 0; i < expected_removals.size(); i++) {
-              EXPECT_EQ(expected_removals[i], removed_resources[i]);
-            }
-          }));
+      .WillOnce(Invoke([expected_resources, expected_removals,
+                        version](const std::vector<DecodedResourceRef>& gotten_resources,
+                                 const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                                 const std::string&) {
+        EXPECT_EQ(expected_resources.size(), gotten_resources.size());
+        for (size_t i = 0; i < expected_resources.size(); i++) {
+          EXPECT_EQ(gotten_resources[i].get().version(), version);
+          EXPECT_TRUE(
+              TestUtility::protoEqual(gotten_resources[i].get().resource(), expected_resources[i]));
+        }
+        EXPECT_EQ(expected_removals.size(), removed_resources.size());
+        for (size_t i = 0; i < expected_removals.size(); i++) {
+          EXPECT_EQ(expected_removals[i], removed_resources[i]);
+        }
+      }));
 }
 
-void expectNoUpdate(NamedMockSubscriptionCallbacks& callbacks, const std::string& version) {
+void expectNoUpdate(MockSubscriptionCallbacks& callbacks, const std::string& version) {
   EXPECT_CALL(callbacks, onConfigUpdate(_, version)).Times(0);
   EXPECT_CALL(callbacks, onConfigUpdate(_, _, version)).Times(0);
 }
 
-void expectEmptySotwNoDeltaUpdate(NamedMockSubscriptionCallbacks& callbacks,
+void expectEmptySotwNoDeltaUpdate(MockSubscriptionCallbacks& callbacks,
                                   const std::string& version) {
   EXPECT_CALL(callbacks, onConfigUpdate(_, version))
-      .WillOnce(Invoke([](const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& gotten_resources,
+      .WillOnce(Invoke([](const std::vector<DecodedResourceRef>& gotten_resources,
                           const std::string&) { EXPECT_EQ(gotten_resources.size(), 0); }));
   EXPECT_CALL(callbacks, onConfigUpdate(_, _, version)).Times(0);
 }
@@ -99,7 +87,7 @@ wrapInResource(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& anys,
 
 // Similar to expectDeltaAndSotwUpdate(), but making the onConfigUpdate() happen, rather than
 // EXPECT-ing it.
-void doDeltaAndSotwUpdate(SubscriptionCallbacks& watch_map,
+void doDeltaAndSotwUpdate(WatchMap& watch_map,
                           const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& sotw_resources,
                           const std::vector<std::string>& removed_names,
                           const std::string& version) {
@@ -118,9 +106,11 @@ void doDeltaAndSotwUpdate(SubscriptionCallbacks& watch_map,
 // resources it doesn't care about. Checks that the watch can later decide it does care about them,
 // and then receive subsequent updates to them.
 TEST(WatchMapTest, Basic) {
-  NamedMockSubscriptionCallbacks callbacks;
+  MockSubscriptionCallbacks callbacks;
+  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
+      resource_decoder("cluster_name");
   WatchMap watch_map;
-  Watch* watch = watch_map.addWatch(callbacks);
+  Watch* watch = watch_map.addWatch(callbacks, resource_decoder);
 
   {
     // The watch is interested in Alice and Bob...
@@ -182,11 +172,13 @@ TEST(WatchMapTest, Basic) {
 // NOTE: we need the resource name "dummy" to keep either watch from ever having no names watched,
 // which is treated as interest in all names.
 TEST(WatchMapTest, Overlap) {
-  NamedMockSubscriptionCallbacks callbacks1;
-  NamedMockSubscriptionCallbacks callbacks2;
+  MockSubscriptionCallbacks callbacks1;
+  MockSubscriptionCallbacks callbacks2;
+  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
+      resource_decoder("cluster_name");
   WatchMap watch_map;
-  Watch* watch1 = watch_map.addWatch(callbacks1);
-  Watch* watch2 = watch_map.addWatch(callbacks2);
+  Watch* watch1 = watch_map.addWatch(callbacks1, resource_decoder);
+  Watch* watch2 = watch_map.addWatch(callbacks2, resource_decoder);
 
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> updated_resources;
   envoy::config::endpoint::v3::ClusterLoadAssignment alice;
@@ -248,11 +240,13 @@ TEST(WatchMapTest, Overlap) {
 // NOTE: we need the resource name "dummy" to keep either watch from ever having no names watched,
 // which is treated as interest in all names.
 TEST(WatchMapTest, AddRemoveAdd) {
-  NamedMockSubscriptionCallbacks callbacks1;
-  NamedMockSubscriptionCallbacks callbacks2;
+  MockSubscriptionCallbacks callbacks1;
+  MockSubscriptionCallbacks callbacks2;
+  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
+      resource_decoder("cluster_name");
   WatchMap watch_map;
-  Watch* watch1 = watch_map.addWatch(callbacks1);
-  Watch* watch2 = watch_map.addWatch(callbacks2);
+  Watch* watch1 = watch_map.addWatch(callbacks1, resource_decoder);
+  Watch* watch2 = watch_map.addWatch(callbacks2, resource_decoder);
 
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> updated_resources;
   envoy::config::endpoint::v3::ClusterLoadAssignment alice;
@@ -301,9 +295,11 @@ TEST(WatchMapTest, AddRemoveAdd) {
 
 // Tests that nothing breaks if an update arrives that we entirely do not care about.
 TEST(WatchMapTest, UninterestingUpdate) {
-  NamedMockSubscriptionCallbacks callbacks;
+  MockSubscriptionCallbacks callbacks;
+  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
+      resource_decoder("cluster_name");
   WatchMap watch_map;
-  Watch* watch = watch_map.addWatch(callbacks);
+  Watch* watch = watch_map.addWatch(callbacks, resource_decoder);
   watch_map.updateWatchInterest(watch, {"alice"});
 
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> alice_update;
@@ -342,11 +338,13 @@ TEST(WatchMapTest, UninterestingUpdate) {
 // Tests that a watch that specifies no particular resource interest is treated as interested in
 // everything.
 TEST(WatchMapTest, WatchingEverything) {
-  NamedMockSubscriptionCallbacks callbacks1;
-  NamedMockSubscriptionCallbacks callbacks2;
+  MockSubscriptionCallbacks callbacks1;
+  MockSubscriptionCallbacks callbacks2;
+  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
+      resource_decoder("cluster_name");
   WatchMap watch_map;
-  /*Watch* watch1 = */ watch_map.addWatch(callbacks1);
-  Watch* watch2 = watch_map.addWatch(callbacks2);
+  /*Watch* watch1 = */ watch_map.addWatch(callbacks1, resource_decoder);
+  Watch* watch2 = watch_map.addWatch(callbacks2, resource_decoder);
   // watch1 never specifies any names, and so is treated as interested in everything.
   watch_map.updateWatchInterest(watch2, {"alice"});
 
@@ -375,13 +373,15 @@ TEST(WatchMapTest, WatchingEverything) {
 // onConfigUpdate even if none of the watch's interested resources are among the updated resources.
 // (Which ensures we deliver empty config updates when a resource is dropped.)
 TEST(WatchMapTest, DeltaOnConfigUpdate) {
-  NamedMockSubscriptionCallbacks callbacks1;
-  NamedMockSubscriptionCallbacks callbacks2;
-  NamedMockSubscriptionCallbacks callbacks3;
+  MockSubscriptionCallbacks callbacks1;
+  MockSubscriptionCallbacks callbacks2;
+  MockSubscriptionCallbacks callbacks3;
+  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
+      resource_decoder("cluster_name");
   WatchMap watch_map;
-  Watch* watch1 = watch_map.addWatch(callbacks1);
-  Watch* watch2 = watch_map.addWatch(callbacks2);
-  Watch* watch3 = watch_map.addWatch(callbacks3);
+  Watch* watch1 = watch_map.addWatch(callbacks1, resource_decoder);
+  Watch* watch2 = watch_map.addWatch(callbacks2, resource_decoder);
+  Watch* watch3 = watch_map.addWatch(callbacks3, resource_decoder);
   watch_map.updateWatchInterest(watch1, {"updated"});
   watch_map.updateWatchInterest(watch2, {"updated", "removed"});
   watch_map.updateWatchInterest(watch3, {"removed"});
@@ -415,10 +415,12 @@ TEST(WatchMapTest, OnConfigUpdateFailed) {
   // calling on empty map doesn't break
   watch_map.onConfigUpdateFailed(ConfigUpdateFailureReason::UpdateRejected, nullptr);
 
-  NamedMockSubscriptionCallbacks callbacks1;
-  NamedMockSubscriptionCallbacks callbacks2;
-  watch_map.addWatch(callbacks1);
-  watch_map.addWatch(callbacks2);
+  MockSubscriptionCallbacks callbacks1;
+  MockSubscriptionCallbacks callbacks2;
+  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
+      resource_decoder("cluster_name");
+  watch_map.addWatch(callbacks1, resource_decoder);
+  watch_map.addWatch(callbacks2, resource_decoder);
 
   EXPECT_CALL(callbacks1, onConfigUpdateFailed(ConfigUpdateFailureReason::UpdateRejected, nullptr));
   EXPECT_CALL(callbacks2, onConfigUpdateFailed(ConfigUpdateFailureReason::UpdateRejected, nullptr));
@@ -427,9 +429,11 @@ TEST(WatchMapTest, OnConfigUpdateFailed) {
 
 // verifies that a watch is updated with the resource name
 TEST(WatchMapTest, ConvertAliasWatchesToNameWatches) {
-  NamedMockSubscriptionCallbacks callbacks;
+  MockSubscriptionCallbacks callbacks;
+  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
+      resource_decoder("cluster_name");
   WatchMap watch_map;
-  Watch* watch = watch_map.addWatch(callbacks);
+  Watch* watch = watch_map.addWatch(callbacks, resource_decoder);
   watch_map.updateWatchInterest(watch, {"alias"});
 
   envoy::service::discovery::v3::Resource resource;
@@ -448,9 +452,11 @@ TEST(WatchMapTest, ConvertAliasWatchesToNameWatches) {
 // verifies that if a resource contains an alias the same as its name, and the watch has been set
 // with that alias, the watch won't be updated
 TEST(WatchMapTest, ConvertAliasWatchesToNameWatchesAliasIsSameAsName) {
-  NamedMockSubscriptionCallbacks callbacks;
+  MockSubscriptionCallbacks callbacks;
+  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
+      resource_decoder("cluster_name");
   WatchMap watch_map;
-  Watch* watch = watch_map.addWatch(callbacks);
+  Watch* watch = watch_map.addWatch(callbacks, resource_decoder);
   watch_map.updateWatchInterest(watch, {"name-and-alias"});
 
   envoy::service::discovery::v3::Resource resource;
