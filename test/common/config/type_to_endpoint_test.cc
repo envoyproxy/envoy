@@ -31,7 +31,7 @@ TEST(TypeToEndpoint, All) {
                             envoy::config::core::v3::ApiVersion::V3)
                 .full_name());
 
-  EXPECT_EQ("envoy.service.route.v3.RouteDiscoveryService.DeltaRoutes",
+  EXPECT_EQ("envoy.api.v2.RouteDiscoveryService.DeltaRoutes",
             deltaGrpcMethod("type.googleapis.com/envoy.config.route.v3.RouteConfiguration",
                             envoy::config::core::v3::ApiVersion::AUTO)
                 .full_name());
@@ -58,7 +58,7 @@ TEST(TypeToEndpoint, All) {
                            envoy::config::core::v3::ApiVersion::V3)
                 .full_name());
 
-  EXPECT_EQ("envoy.service.route.v3.RouteDiscoveryService.StreamRoutes",
+  EXPECT_EQ("envoy.api.v2.RouteDiscoveryService.StreamRoutes",
             sotwGrpcMethod("type.googleapis.com/envoy.config.route.v3.RouteConfiguration",
                            envoy::config::core::v3::ApiVersion::AUTO)
                 .full_name());
@@ -85,7 +85,7 @@ TEST(TypeToEndpoint, All) {
                        envoy::config::core::v3::ApiVersion::V3)
                 .full_name());
 
-  EXPECT_EQ("envoy.service.route.v3.RouteDiscoveryService.FetchRoutes",
+  EXPECT_EQ("envoy.api.v2.RouteDiscoveryService.FetchRoutes",
             restMethod("type.googleapis.com/envoy.config.route.v3.RouteConfiguration",
                        envoy::config::core::v3::ApiVersion::AUTO)
                 .full_name());
