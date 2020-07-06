@@ -2,6 +2,8 @@
 
 #include "envoy/config/route/v3/route_components.pb.h"
 
+#include "common/common/matchers.h"
+#include "common/common/regex.h"
 #include "common/http/utility.h"
 
 #include "absl/strings/str_cat.h"
@@ -21,8 +23,15 @@ private:
 
 class HeaderHashMethod : public HashMethodImplBase {
 public:
-  HeaderHashMethod(const std::string& header_name, bool terminal)
-      : HashMethodImplBase(terminal), header_name_(header_name) {}
+  HeaderHashMethod(const envoy::config::route::v3::RouteAction::HashPolicy::Header& header,
+                   bool terminal)
+      : HashMethodImplBase(terminal), header_name_(header.header_name()) {
+    if (header.has_regex_rewrite()) {
+      const auto& rewrite_spec = header.regex_rewrite();
+      regex_rewrite_ = Regex::Utility::parseRegex(rewrite_spec.pattern());
+      regex_rewrite_substitution_ = rewrite_spec.substitution();
+    }
+  }
 
   absl::optional<uint64_t> evaluate(const Network::Address::Instance*,
                                     const RequestHeaderMap& headers,
@@ -32,13 +41,20 @@ public:
 
     const HeaderEntry* header = headers.get(header_name_);
     if (header) {
-      hash = HashUtil::xxHash64(header->value().getStringView());
+      if (regex_rewrite_ != nullptr) {
+        hash = HashUtil::xxHash64(regex_rewrite_->replaceAll(header->value().getStringView(),
+                                                             regex_rewrite_substitution_));
+      } else {
+        hash = HashUtil::xxHash64(header->value().getStringView());
+      }
     }
     return hash;
   }
 
 private:
   const LowerCaseString header_name_;
+  Regex::CompiledMatcherPtr regex_rewrite_{};
+  std::string regex_rewrite_substitution_{};
 };
 
 class CookieHashMethod : public HashMethodImplBase {
@@ -145,7 +161,7 @@ HashPolicyImpl::HashPolicyImpl(
     switch (hash_policy->policy_specifier_case()) {
     case envoy::config::route::v3::RouteAction::HashPolicy::PolicySpecifierCase::kHeader:
       hash_impls_.emplace_back(
-          new HeaderHashMethod(hash_policy->header().header_name(), hash_policy->terminal()));
+          new HeaderHashMethod(hash_policy->header(), hash_policy->terminal()));
       break;
     case envoy::config::route::v3::RouteAction::HashPolicy::PolicySpecifierCase::kCookie: {
       absl::optional<std::chrono::seconds> ttl;
