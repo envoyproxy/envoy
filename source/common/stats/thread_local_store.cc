@@ -23,24 +23,16 @@ namespace Stats {
 
 const char ThreadLocalStoreImpl::MainDispatcherCleanupSync[] = "main-dispatcher-cleanup";
 
-#define WELL_KNOWN_TAGS 1
-
 ThreadLocalStoreImpl::ThreadLocalStoreImpl(Allocator& alloc)
     : alloc_(alloc), default_scope_(createScope("")),
       tag_producer_(std::make_unique<TagProducerImpl>()),
       stats_matcher_(std::make_unique<StatsMatcherImpl>()), heap_allocator_(alloc.symbolTable()),
       null_counter_(alloc.symbolTable()), null_gauge_(alloc.symbolTable()),
-      null_histogram_(alloc.symbolTable()), null_text_readout_(alloc.symbolTable())
-#if WELL_KNOWN_TAGS
-      ,
-      well_known_tags_(alloc.symbolTable().makeSet("well_known_tags"))
-#endif
-{
-#if WELL_KNOWN_TAGS
+      null_histogram_(alloc.symbolTable()), null_text_readout_(alloc.symbolTable()),
+      well_known_tags_(alloc.symbolTable().makeSet("well_known_tags")) {
   for (const auto& desc : Config::TagNames::get().descriptorVec()) {
     well_known_tags_->rememberBuiltin(desc.name_);
   }
-#endif
 }
 
 ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
@@ -308,18 +300,12 @@ public:
       tls.symbolTable().callWithStringView(name, [&tags, &tls, this](absl::string_view name_str) {
         tag_extracted_name_ = pool_.add(tls.tagProducer().produceTags(name_str, tags));
       });
-#if WELL_KNOWN_TAGS
       StatName empty;
-#endif
       for (const auto& tag : tags) {
-#if WELL_KNOWN_TAGS
         StatName tag_name = tls.wellKnownTags().getBuiltin(tag.name_, empty);
         if (tag_name.empty()) {
           tag_name = pool_.add(tag.name_);
         }
-#else
-        StatName tag_name = pool_.add(tag.name_);
-#endif
         stat_name_tags_.emplace_back(tag_name, pool_.add(tag.value_));
       }
     } else {
