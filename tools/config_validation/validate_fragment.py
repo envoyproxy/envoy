@@ -21,6 +21,7 @@ from bazel_tools.tools.python.runfiles import runfiles
 
 import argparse
 
+
 def ValidateFragment(type_name, fragment):
   """Validate a dictionary representing a JSON/YAML fragment against an Envoy API proto3 type.
 
@@ -50,14 +51,14 @@ def ValidateFragment(type_name, fragment):
   msg = message_factory.MessageFactory(pool=pool).GetPrototype(desc)()
   json_format.Parse(json_fragment, msg, descriptor_pool=pool)
 
+
 def ParseArgs():
-  parser = argparse.ArgumentParser(description='Validate a YAML fragment against an Envoy API proto3 type.')
-  parser.add_argument('Type', 
-                    help='a string providing the type name, e.g. envoy.config.bootstrap.v3.Bootstrap.')
-  parser.add_argument('Fragment', nargs='?',
-                    help='Path to a YAML configuration fragment.')
-  parser.add_argument('-s', required=False,
-                    help='YAML configuration fragment.')
+  parser = argparse.ArgumentParser(
+      description='Validate a YAML fragment against an Envoy API proto3 type.')
+  parser.add_argument(
+      'Type', help='a string providing the type name, e.g. envoy.config.bootstrap.v3.Bootstrap.')
+  parser.add_argument('Fragment', nargs='?', help='Path to a YAML configuration fragment.')
+  parser.add_argument('-s', required=False, help='YAML configuration fragment.')
 
   return parser.parse_args()
 
@@ -65,5 +66,6 @@ def ParseArgs():
 if __name__ == '__main__':
   parsed_args = ParseArgs()
   type_name = parsed_args.Type
-  content = parsed_args.s if (parsed_args.Fragment is None) else pathlib.Path(parsed_args.Fragment).read_text()
+  content = parsed_args.s if (parsed_args.Fragment is None) else pathlib.Path(
+      parsed_args.Fragment).read_text()
   ValidateFragment(type_name, yaml.load(content, Loader=yaml.FullLoader))
