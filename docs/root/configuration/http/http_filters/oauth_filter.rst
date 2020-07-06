@@ -35,7 +35,12 @@ Example configuration
     connect_timeout: 5s
     type: LOGICAL_DNS
     lb_policy: ROUND_ROBIN
-    hosts: [{ socket_address: { address: auth.example.com, port_value: 443 }}]
+    load_assignment:
+      cluster_name: auth
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address: { socket_address: { address: auth.example.com, port_value: 443 }}
     tls_context: { sni: auth.example.com }
 
 There is some duplicate configuration above - the oauth server hostname is defined twice, once in config and once in
