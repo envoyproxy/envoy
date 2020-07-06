@@ -11,6 +11,8 @@
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"
 
+#include "absl/container/node_hash_map.h"
+
 namespace Envoy {
 namespace Filesystem {
 
