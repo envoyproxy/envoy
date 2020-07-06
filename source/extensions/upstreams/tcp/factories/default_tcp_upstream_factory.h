@@ -1,5 +1,5 @@
 #pragma once
-#include "envoy/tcp/factory.h"
+#include "common/tcp_proxy/factory.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -181,20 +181,24 @@ public:
       upstream_http_handle_ = nullptr;
     }
   }
+
   void complete() override { upstream_http_handle_ = nullptr; }
-  bool hasFailure() override { return has_failure_; }
 
   Envoy::Tcp::GenericUpstreamSharedPtr upstream() override { return http_upstream_; }
 
-  bool failingOnPool() override {
+  bool failedOnPool() override {
     return http_upstream_ == nullptr && upstream_http_handle_ == nullptr;
   }
+
+  bool failedOnConnection() override { return has_failure_; }
+
   bool isConnecting() override { return upstream_http_handle_ != nullptr; }
 
   // Http::ConnectionPool::Callbacks
   void onPoolFailure(Envoy::ConnectionPool::PoolFailureReason reason,
                      absl::string_view transport_failure_reason,
                      Envoy::Upstream::HostDescriptionConstSharedPtr host) override;
+
   void onPoolReady(Envoy::Http::RequestEncoder& request_encoder,
                    Envoy::Upstream::HostDescriptionConstSharedPtr host,
                    StreamInfo::StreamInfo& info) override;
@@ -203,6 +207,7 @@ public:
     ASSERT(upstream_http_handle_ == nullptr);
     upstream_http_handle_ = upstream_handle;
   }
+
   void setUpstream(const std::shared_ptr<HttpUpstream>& http_upstream) {
     ASSERT(http_upstream_ == nullptr);
     http_upstream_ = http_upstream;

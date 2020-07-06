@@ -9,6 +9,16 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
+    name = "tcp_upstream_factory",
+    hdrs = [
+        "factory.h",
+    ],
+    deps = [
+        "//include/envoy/tcp:upstream_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "tcp_proxy",
     srcs = [
         "tcp_proxy.cc",

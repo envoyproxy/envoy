@@ -19,6 +19,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/tcp:upstream_interface",
         "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/tcp_proxy:tcp_upstream_factory",
         "//source/extensions/upstreams/tcp/http:http_upstream",
         "//source/extensions/upstreams/tcp/tcp:tcp_upstream",
     ],

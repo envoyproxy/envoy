@@ -10,8 +10,6 @@
 #include "envoy/event/timer.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/stats/scope.h"
-#include "envoy/tcp/config.h"
-#include "envoy/tcp/factory.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
@@ -27,6 +25,7 @@
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/upstream_server_name.h"
 #include "common/router/metadatamatchcriteria_impl.h"
+#include "common/tcp_proxy/factory.h"
 
 #include "extensions/upstreams/tcp/factories/default_tcp_upstream_factory.h"
 
@@ -446,10 +445,10 @@ Filter::UpstreamStatus Filter::maybeTunnel(const std::string& cluster_name) {
   // Put connecting_ and connect_attempts_ here?
   if (upstream_handle_ == nullptr ||
       // Error during creating the conn pool.
-      (upstream_handle_->failingOnPool() && !upstream_handle_->hasFailure())) {
+      (upstream_handle_->failedOnPool() && !upstream_handle_->failedOnConnection())) {
     connecting_ = false;
     return UpstreamStatus::Error;
-  } else if (upstream_handle_->hasFailure()) {
+  } else if (upstream_handle_->failedOnConnection()) {
     return UpstreamStatus::Retry;
   } else if (upstream_handle_->isConnecting()) {
     // Connecting state applies to both H2 CONNECT and raw tcp.

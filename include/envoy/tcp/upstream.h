@@ -46,14 +46,16 @@ public:
   // Cancel the conn pool request and close any excess pending requests.
   virtual void cancel() PURE;
   virtual void complete() PURE;
-  virtual bool hasFailure() PURE;
 
   // Return the GenericUpstream associated with ConnectionHandle.
   virtual GenericUpstreamSharedPtr upstream() PURE;
 
-  // Return true if the conn pool is not valid to connect. This can be called when this handle is
+  // Return true if the conn pool is not valid. This can be called when this handle is
   // created.
-  virtual bool failingOnPool() PURE;
+  virtual bool failedOnPool() PURE;
+  // Return true if the conn pool is valid but fail to connect. This can be called when this handle
+  // is created.
+  virtual bool failedOnConnection() PURE;
   // Return true if the associated upstream is not yet connected. This can be called when this
   // handle is created.
   virtual bool isConnecting() PURE;

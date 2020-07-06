@@ -22,8 +22,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "upstream_interface",
     hdrs = [
-        "config.h",
-        "factory.h",
         "upstream.h",
     ],
     deps = [

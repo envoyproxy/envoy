@@ -52,11 +52,12 @@ public:
   }
 
   void complete() override { tcp_upstream_handle_ = nullptr; }
-  bool hasFailure() override { return has_failure_; }
 
   Envoy::Tcp::GenericUpstreamSharedPtr upstream() override { return tcp_upstream_; }
 
-  bool failingOnPool() override { return tcp_upstream_handle_ == nullptr; }
+  bool failedOnPool() override { return tcp_upstream_handle_ == nullptr; }
+
+  bool failedOnConnection() override { return has_failure_; }
 
   bool isConnecting() override {
     return tcp_upstream_handle_ != nullptr && tcp_upstream_ == nullptr;
@@ -65,6 +66,7 @@ public:
   // Envoy::Tcp::ConnectionPool::Callbacks
   void onPoolReady(Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
                    Envoy::Upstream::HostDescriptionConstSharedPtr host) override;
+
   void onPoolFailure(Envoy::Tcp::ConnectionPool::PoolFailureReason reason,
                      Envoy::Upstream::HostDescriptionConstSharedPtr host) override;
 

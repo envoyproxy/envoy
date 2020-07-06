@@ -339,7 +339,7 @@ protected:
     Ok,
     // Hard failure.
     Error,
-    // Immediate retryable failure.
+    // Immediate retriable failure.
     Retry
   };
 

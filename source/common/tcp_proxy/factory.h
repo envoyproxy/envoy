@@ -11,6 +11,7 @@ class ClusterManager;
 
 namespace Tcp {
 
+// TODO(lambdai): move to include path.
 class TcpUpstreamFactory {
 public:
   virtual ~TcpUpstreamFactory() = default;
