@@ -4,10 +4,13 @@
 
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
+#include "common/config/decoded_resource_impl.h"
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
 #include "common/memory/utils.h"
 #include "common/protobuf/protobuf.h"
+
+#include "absl/container/btree_map.h"
 
 namespace Envoy {
 namespace Config {
@@ -70,8 +73,10 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
 
 GrpcMuxWatchPtr GrpcMuxImpl::addWatch(const std::string& type_url,
                                       const std::set<std::string>& resources,
-                                      SubscriptionCallbacks& callbacks) {
-  auto watch = std::make_unique<GrpcMuxWatchImpl>(resources, callbacks, type_url, *this);
+                                      SubscriptionCallbacks& callbacks,
+                                      OpaqueResourceDecoder& resource_decoder) {
+  auto watch =
+      std::make_unique<GrpcMuxWatchImpl>(resources, callbacks, resource_decoder, type_url, *this);
   ENVOY_LOG(debug, "gRPC mux addWatch for " + type_url);
 
   // Lazily kick off the requests based on first subscription. This has the
@@ -181,31 +186,37 @@ void GrpcMuxImpl::onDiscoveryResponse(
     // To avoid O(n^2) explosion (e.g. when we have 1000s of EDS watches), we
     // build a map here from resource name to resource and then walk watches_.
     // We have to walk all watches (and need an efficient map as a result) to
-    // ensure we deliver empty config updates when a resource is dropped.
-    std::unordered_map<std::string, ProtobufWkt::Any> resources;
-    SubscriptionCallbacks& callbacks = api_state_[type_url].watches_.front()->callbacks_;
+    // ensure we deliver empty config updates when a resource is dropped. We make the map ordered
+    // for test determinism.
+    std::vector<DecodedResourceImplPtr> resources;
+    absl::btree_map<std::string, DecodedResourceRef> resource_ref_map;
+    std::vector<DecodedResourceRef> all_resource_refs;
+    OpaqueResourceDecoder& resource_decoder =
+        api_state_[type_url].watches_.front()->resource_decoder_;
     for (const auto& resource : message->resources()) {
       if (type_url != resource.type_url()) {
         throw EnvoyException(
             fmt::format("{} does not match the message-wide type URL {} in DiscoveryResponse {}",
                         resource.type_url(), type_url, message->DebugString()));
       }
-      const std::string resource_name = callbacks.resourceName(resource);
-      resources.emplace(resource_name, resource);
+      resources.emplace_back(
+          new DecodedResourceImpl(resource_decoder, resource, message->version_info()));
+      all_resource_refs.emplace_back(*resources.back());
+      resource_ref_map.emplace(resources.back()->name(), *resources.back());
     }
     for (auto watch : api_state_[type_url].watches_) {
       // onConfigUpdate should be called in all cases for single watch xDS (Cluster and
       // Listener) even if the message does not have resources so that update_empty stat
       // is properly incremented and state-of-the-world semantics are maintained.
       if (watch->resources_.empty()) {
-        watch->callbacks_.onConfigUpdate(message->resources(), message->version_info());
+        watch->callbacks_.onConfigUpdate(all_resource_refs, message->version_info());
         continue;
       }
-      Protobuf::RepeatedPtrField<ProtobufWkt::Any> found_resources;
+      std::vector<DecodedResourceRef> found_resources;
       for (const auto& watched_resource_name : watch->resources_) {
-        auto it = resources.find(watched_resource_name);
-        if (it != resources.end()) {
-          found_resources.Add()->MergeFrom(it->second);
+        auto it = resource_ref_map.find(watched_resource_name);
+        if (it != resource_ref_map.end()) {
+          found_resources.emplace_back(it->second);
         }
       }
       // onConfigUpdate should be called only on watches(clusters/routes) that have
