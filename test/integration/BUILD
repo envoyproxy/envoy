@@ -942,6 +942,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
+    shard_count = 2,
     deps = [
         ":integration_lib",
         "//source/common/config:api_version_lib",
