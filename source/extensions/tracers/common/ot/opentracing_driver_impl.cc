@@ -15,6 +15,9 @@ namespace Tracers {
 namespace Common {
 namespace Ot {
 
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    ot_span_context_handle(Http::CustomHeaders::get().OtSpanContext);
+
 namespace {
 class OpenTracingHTTPHeadersWriter : public opentracing::HTTPHeadersWriter {
 public:
@@ -110,7 +113,8 @@ void OpenTracingSpan::injectContext(Http::RequestHeaderMap& request_headers) {
       return;
     }
     const std::string current_span_context = oss.str();
-    request_headers.setOtSpanContext(
+    request_headers.setInline(
+        ot_span_context_handle.handle(),
         Base64::encode(current_span_context.c_str(), current_span_context.length()));
   } else {
     // Inject the context using the tracer's standard HTTP header format.
@@ -149,10 +153,11 @@ Tracing::SpanPtr OpenTracingDriver::startSpan(const Tracing::Config& config,
   const opentracing::Tracer& tracer = this->tracer();
   std::unique_ptr<opentracing::Span> active_span;
   std::unique_ptr<opentracing::SpanContext> parent_span_ctx;
-  if (propagation_mode == PropagationMode::SingleHeader && request_headers.OtSpanContext()) {
+  if (propagation_mode == PropagationMode::SingleHeader &&
+      request_headers.getInline(ot_span_context_handle.handle())) {
     opentracing::expected<std::unique_ptr<opentracing::SpanContext>> parent_span_ctx_maybe;
-    std::string parent_context =
-        Base64::decode(std::string(request_headers.getOtSpanContextValue()));
+    std::string parent_context = Base64::decode(
+        std::string(request_headers.getInlineValue(ot_span_context_handle.handle())));
 
     if (!parent_context.empty()) {
       InputConstMemoryStream istream{parent_context.data(), parent_context.size()};
