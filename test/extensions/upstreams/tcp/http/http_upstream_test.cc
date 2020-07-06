@@ -108,14 +108,6 @@ TEST_F(HttpUpstreamTest, UpstreamWatermarks) {
   EXPECT_CALL(callbacks_, onBelowWriteBufferLowWatermark());
   upstream_->onBelowWriteBufferLowWatermark();
 }
-
-class HttpConnectionHandleTest : public testing::Test {
-public:
-  HttpConnectionHandleTest() {}
-};
-
-TEST_F(HttpConnectionHandleTest, UpstreamWatermarks) {}
-
 } // namespace Http
 } // namespace Tcp
 } // namespace Upstreams
