@@ -133,7 +133,6 @@ envoy_benchmark_test(
 envoy_cc_test(
     name = "health_checker_impl_test",
     srcs = ["health_checker_impl_test.cc"],
-    tags = ["fails_on_windows"],
     deps = [
         ":utility_lib",
         "//source/common/buffer:buffer_lib",
@@ -399,7 +398,6 @@ envoy_benchmark_test(
     name = "load_balancer_benchmark_test",
     timeout = "long",
     benchmark_binary = "load_balancer_benchmark",
-    tags = ["fails_on_windows"],
 )
 
 envoy_cc_test(
