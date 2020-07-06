@@ -66,11 +66,28 @@ public:
   virtual void pause(const std::string& type_url) PURE;
 
   /**
+   * Pause discovery requests for given API types. This is useful when we're processing an update
+   * for LDS or CDS and don't want a flood of updates for RDS or EDS respectively. Discovery
+   * requests may later be resumed with resume().
+   * @param type_urls type URLs corresponding to xDS API, e.g.
+   * type.googleapis.com/envoy.api.v2.Cluster.
+   */
+  virtual void pause(const std::vector<std::string> type_urls) PURE;
+
+  /**
    * Resume discovery requests for a given API type. This will send a discovery request if one would
    * have been sent during the pause.
    * @param type_url type URL corresponding to xDS API e.g. type.googleapis.com/envoy.api.v2.Cluster
    */
   virtual void resume(const std::string& type_url) PURE;
+
+  /**
+   * Resume discovery requests for given API types. This will send a discovery request if one would
+   * have been sent during the pause.
+   * @param type_urls type URLs corresponding to xDS API e.g.
+   * type.googleapis.com/envoy.api.v2.Cluster
+   */
+  virtual void resume(const std::vector<std::string> type_urls) PURE;
 
   /**
    * Retrieves the current pause state as set by pause()/resume().
@@ -81,6 +98,14 @@ public:
   virtual bool paused(const std::string& type_url) const PURE;
 
   /**
+   * Retrieves the current pause state as set by pause()/resume().
+   * @param type_urls type URLs corresponding to xDS API, e.g.
+   * type.googleapis.com/envoy.api.v2.Cluster
+   * @return bool whether any of the APIs is paused.
+   */
+  virtual bool paused(const std::vector<std::string> type_urls) const PURE;
+
+  /**
    * Start a configuration subscription asynchronously for some API type and resources.
    * @param type_url type URL corresponding to xDS API, e.g.
    * type.googleapis.com/envoy.api.v2.Cluster.
@@ -88,12 +113,14 @@ public:
    *                  resources for type_url will result in callbacks.
    * @param callbacks the callbacks to be notified of configuration updates. These must be valid
    *                  until GrpcMuxWatch is destroyed.
+   * @param resource_decoder how incoming opaque resource objects are to be decoded.
    * @return GrpcMuxWatchPtr a handle to cancel the subscription with. E.g. when a cluster goes
    * away, its EDS updates should be cancelled by destroying the GrpcMuxWatchPtr.
    */
   virtual GrpcMuxWatchPtr addWatch(const std::string& type_url,
                                    const std::set<std::string>& resources,
-                                   SubscriptionCallbacks& callbacks) PURE;
+                                   SubscriptionCallbacks& callbacks,
+                                   OpaqueResourceDecoder& resource_decoder) PURE;
 };
 
 using GrpcMuxPtr = std::unique_ptr<GrpcMux>;

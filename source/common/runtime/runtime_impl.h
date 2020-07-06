@@ -14,6 +14,7 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/service/runtime/v3/rtds.pb.h"
+#include "envoy/service/runtime/v3/rtds.pb.validate.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stats/store.h"
 #include "envoy/thread_local/thread_local.h"
@@ -130,6 +131,8 @@ private:
   RuntimeStats& stats_;
 };
 
+using SnapshotImplPtr = std::unique_ptr<SnapshotImpl>;
+
 /**
  * Base implementation of OverrideLayer that by itself provides an empty values map.
  */
@@ -207,18 +210,14 @@ struct RtdsSubscription : Envoy::Config::SubscriptionBase<envoy::service::runtim
                    Stats::Store& store, ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // Config::SubscriptionCallbacks
-  void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+  void onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
+                      const std::string& version_info) override;
+  void onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
+                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                       const std::string&) override;
-  void onConfigUpdate(
-      const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
-      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-      const std::string&) override;
 
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
-  std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::service::runtime::v3::Runtime>(resource).name();
-  }
 
   void start();
   void validateUpdateSize(uint32_t num_resources);
@@ -230,7 +229,6 @@ struct RtdsSubscription : Envoy::Config::SubscriptionBase<envoy::service::runtim
   std::string resource_name_;
   Init::TargetImpl init_target_;
   ProtobufWkt::Struct proto_;
-  ProtobufMessage::ValidationVisitor& validation_visitor_;
 };
 
 using RtdsSubscriptionPtr = std::unique_ptr<RtdsSubscription>;
@@ -252,15 +250,16 @@ public:
   // Runtime::Loader
   void initialize(Upstream::ClusterManager& cm) override;
   const Snapshot& snapshot() override;
-  std::shared_ptr<const Snapshot> threadsafeSnapshot() override;
+  SnapshotConstSharedPtr threadsafeSnapshot() override;
   void mergeValues(const std::unordered_map<std::string, std::string>& values) override;
   void startRtdsSubscriptions(ReadyCallback on_done) override;
+  Stats::Scope& getRootScope() override;
 
 private:
   friend RtdsSubscription;
 
   // Create a new Snapshot
-  virtual std::unique_ptr<SnapshotImpl> createNewSnapshot();
+  virtual SnapshotImplPtr createNewSnapshot();
   // Load a new Snapshot into TLS
   void loadNewSnapshot();
   RuntimeStats generateStats(Stats::Store& store);
@@ -279,9 +278,10 @@ private:
   Init::ManagerImpl init_manager_{"RTDS"};
   std::vector<RtdsSubscriptionPtr> subscriptions_;
   Upstream::ClusterManager* cm_{};
+  Stats::Store& store_;
 
   absl::Mutex snapshot_mutex_;
-  std::shared_ptr<const Snapshot> thread_safe_snapshot_ ABSL_GUARDED_BY(snapshot_mutex_);
+  SnapshotConstSharedPtr thread_safe_snapshot_ ABSL_GUARDED_BY(snapshot_mutex_);
 };
 
 } // namespace Runtime

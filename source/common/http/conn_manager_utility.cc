@@ -34,7 +34,7 @@ std::string ConnectionManagerUtility::determineNextProtocol(Network::Connection&
   // us the first few bytes of the HTTP/2 prefix since in all public cases we use SSL/ALPN. For
   // internal cases this should practically never happen.
   if (data.startsWith(Http2::CLIENT_MAGIC_PREFIX)) {
-    return Http2::ALPN_STRING;
+    return Utility::AlpnNames::get().Http2;
   }
 
   return "";
@@ -49,7 +49,7 @@ ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(
     uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
         headers_with_underscores_action) {
-  if (determineNextProtocol(connection, data) == Http2::ALPN_STRING) {
+  if (determineNextProtocol(connection, data) == Utility::AlpnNames::get().Http2) {
     Http2::CodecStats& stats = Http2::CodecStats::atomicGet(http2_codec_stats, scope);
     return std::make_unique<Http2::ServerConnectionImpl>(
         connection, callbacks, stats, http2_options, max_request_headers_kb,

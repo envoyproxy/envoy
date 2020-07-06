@@ -8,6 +8,7 @@
 #include "common/common/assert.h"
 #include "common/common/macros.h"
 #include "common/http/headers.h"
+#include "common/http/utility.h"
 
 #include "extensions/transport_sockets/well_known_names.h"
 
@@ -104,9 +105,9 @@ ParseState Filter::onRead() {
   const Api::SysCallSizeResult result =
       os_syscalls.recv(socket.ioHandle().fd(), buf_, Config::MAX_INSPECT_SIZE, MSG_PEEK);
   ENVOY_LOG(trace, "http inspector: recv: {}", result.rc_);
-  if (result.rc_ == -1 && result.errno_ == EAGAIN) {
+  if (SOCKET_FAILURE(result.rc_) && result.errno_ == SOCKET_ERROR_AGAIN) {
     return ParseState::Continue;
-  } else if (result.rc_ < 0) {
+  } else if (SOCKET_FAILURE(result.rc_)) {
     config_->stats().read_error_.inc();
     return ParseState::Error;
   }
@@ -181,16 +182,16 @@ void Filter::done(bool success) {
     absl::string_view protocol;
     if (protocol_ == Http::Headers::get().ProtocolStrings.Http10String) {
       config_->stats().http10_found_.inc();
-      protocol = "http/1.0";
+      protocol = Http::Utility::AlpnNames::get().Http10;
     } else if (protocol_ == Http::Headers::get().ProtocolStrings.Http11String) {
       config_->stats().http11_found_.inc();
-      protocol = "http/1.1";
+      protocol = Http::Utility::AlpnNames::get().Http11;
     } else {
       ASSERT(protocol_ == "HTTP/2");
       config_->stats().http2_found_.inc();
       // h2 HTTP/2 over TLS, h2c HTTP/2 over TCP
       // TODO(yxue): use detected protocol from http inspector and support h2c token in HCM
-      protocol = "h2c";
+      protocol = Http::Utility::AlpnNames::get().Http2c;
     }
 
     cb_->socket().setRequestedApplicationProtocols({protocol});

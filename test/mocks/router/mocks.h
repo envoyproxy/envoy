@@ -184,7 +184,8 @@ public:
   MOCK_METHOD(void, populateDescriptors,
               (const RouteEntry& route, std::vector<Envoy::RateLimit::Descriptor>& descriptors,
                const std::string& local_service_cluster, const Http::HeaderMap& headers,
-               const Network::Address::Instance& remote_address),
+               const Network::Address::Instance& remote_address,
+               const envoy::config::core::v3::Metadata* dynamic_metadata),
               (const));
 
   uint64_t stage_{};
@@ -529,8 +530,26 @@ class MockGenericConnPool : public GenericConnPool {
   MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, host, (), (const));
 };
 
+class MockUpstreamToDownstream : public UpstreamToDownstream {
+public:
+  MOCK_METHOD(const RouteEntry&, routeEntry, (), (const));
+  MOCK_METHOD(const Network::Connection&, connection, (), (const));
+
+  MOCK_METHOD(void, decodeData, (Buffer::Instance&, bool));
+  MOCK_METHOD(void, decodeMetadata, (Http::MetadataMapPtr &&));
+  MOCK_METHOD(void, decode100ContinueHeaders, (Http::ResponseHeaderMapPtr &&));
+  MOCK_METHOD(void, decodeHeaders, (Http::ResponseHeaderMapPtr&&, bool));
+  MOCK_METHOD(void, decodeTrailers, (Http::ResponseTrailerMapPtr &&));
+
+  MOCK_METHOD(void, onResetStream, (Http::StreamResetReason, absl::string_view));
+  MOCK_METHOD(void, onAboveWriteBufferHighWatermark, ());
+  MOCK_METHOD(void, onBelowWriteBufferLowWatermark, ());
+};
+
 class MockGenericConnectionPoolCallbacks : public GenericConnectionPoolCallbacks {
 public:
+  MockGenericConnectionPoolCallbacks();
+
   MOCK_METHOD(void, onPoolFailure,
               (Http::ConnectionPool::PoolFailureReason reason,
                absl::string_view transport_failure_reason,
@@ -540,7 +559,9 @@ public:
                Upstream::HostDescriptionConstSharedPtr host,
                const Network::Address::InstanceConstSharedPtr& upstream_local_address,
                const StreamInfo::StreamInfo& info));
-  MOCK_METHOD(UpstreamRequest*, upstreamRequest, ());
+  MOCK_METHOD(UpstreamToDownstream&, upstreamToDownstream, ());
+
+  NiceMock<MockUpstreamToDownstream> upstream_to_downstream_;
 };
 
 } // namespace Router

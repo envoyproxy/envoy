@@ -474,7 +474,7 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
     // We have no warming or active listener so we need to make a new one. What we do depends on
     // whether workers have been started or not. Additionally, search through draining listeners
     // to see if there is a listener that has a socket factory for the same address we are
-    // configured for and doesn't not use SO_REUSEPORT. This is an edge case, but may happen if a
+    // configured for and doesn't use SO_REUSEPORT. This is an edge case, but may happen if a
     // listener is removed and then added back with a same or different name and intended to listen
     // on the same address. This should work and not fail.
     Network::ListenSocketFactorySharedPtr draining_listen_socket_factory;
@@ -593,14 +593,14 @@ void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener) {
         server_.dispatcher().post([this, draining_it]() -> void {
           // TODO(lambdai): Resolve race condition below.
           // Consider the below events in global sequence order
-          // master thread: calling drainListener
+          // main thread: calling drainListener
           // work thread: deferred delete the active connection
-          // work thread: post to master that the drain is done
-          // master thread: erase the listener
+          // work thread: post to main that the drain is done
+          // main thread: erase the listener
           // worker thread: execute destroying connection when the shared listener config is
           // destroyed at step 4 (could be worse such as access the connection because connection is
           // not yet started to deleted). The race condition is introduced because 3 occurs too
-          // early. My solution is to defer schedule the callback posting to master thread, by
+          // early. My solution is to defer schedule the callback posting to main thread, by
           // introducing DeferTaskUtil. So that 5 should always happen before 3.
           if (--draining_it->workers_pending_removal_ == 0) {
             draining_it->listener_->debugLog("draining listener removal complete");
@@ -659,19 +659,22 @@ void ListenerManagerImpl::addListenerToWorker(Worker& worker,
         // The add listener completion runs on the worker thread. Post back to the main thread to
         // avoid locking.
         server_.dispatcher().post([this, success, &listener, completion_callback]() -> void {
-          // It is theoretically possible for a listener to get added on 1 worker but not the
-          // others. The below check with onListenerCreateFailure() is there to ensure we execute
-          // the removal/logging/stats at most once on failure. Note also that drain/removal can
-          // race with addition. It's guaranteed that workers process remove after add so this
-          // should be fine.
+          // It is possible for a listener to get added on 1 worker but not the others. The below
+          // check with onListenerCreateFailure() is there to ensure we execute the
+          // removal/logging/stats at most once on failure. Note also that drain/removal can race
+          // with addition. It's guaranteed that workers process remove after add so this should be
+          // fine.
+          //
+          // TODO(mattklein123): We should consider rewriting how listener sockets are added to
+          // workers, especially in the case of reuse port. If we were to create all needed
+          // listener sockets on the main thread (even in the case of reuse port) we could catch
+          // almost all socket errors here. This would both greatly simplify the logic and allow
+          // for xDS NACK in most cases.
           if (!success && !listener.onListenerCreateFailure()) {
-            // TODO(mattklein123): In addition to a critical log and a stat, we should consider
-            // adding a startup option here to cause the server to exit. I think we probably want
-            // this at Lyft but I will do it in a follow up.
-            ENVOY_LOG(critical, "listener '{}' failed to listen on address '{}' on worker",
+            ENVOY_LOG(error, "listener '{}' failed to listen on address '{}' on worker",
                       listener.name(), listener.listenSocketFactory().localAddress()->asString());
             stats_.listener_create_failure_.inc();
-            removeListener(listener.name());
+            removeListenerInternal(listener.name(), false);
           }
           if (success) {
             stats_.listener_create_success_.inc();
@@ -795,14 +798,19 @@ uint64_t ListenerManagerImpl::numConnections() const {
 }
 
 bool ListenerManagerImpl::removeListener(const std::string& name) {
+  return removeListenerInternal(name, true);
+}
+
+bool ListenerManagerImpl::removeListenerInternal(const std::string& name,
+                                                 bool dynamic_listeners_only) {
   ENVOY_LOG(debug, "begin remove listener: name={}", name);
 
   auto existing_active_listener = getListenerByName(active_listeners_, name);
   auto existing_warming_listener = getListenerByName(warming_listeners_, name);
   if ((existing_warming_listener == warming_listeners_.end() ||
-       (*existing_warming_listener)->blockRemove()) &&
+       (dynamic_listeners_only && (*existing_warming_listener)->blockRemove())) &&
       (existing_active_listener == active_listeners_.end() ||
-       (*existing_active_listener)->blockRemove())) {
+       (dynamic_listeners_only && (*existing_active_listener)->blockRemove()))) {
     ENVOY_LOG(debug, "unknown/locked listener '{}'. no remove", name);
     return false;
   }
@@ -936,18 +944,16 @@ ListenerFilterChainFactoryBuilder::ListenerFilterChainFactoryBuilder(
     : validator_(validator), listener_component_factory_(listener_component_factory),
       factory_context_(factory_context) {}
 
-std::shared_ptr<Network::DrainableFilterChain> ListenerFilterChainFactoryBuilder::buildFilterChain(
+Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildFilterChain(
     const envoy::config::listener::v3::FilterChain& filter_chain,
     FilterChainFactoryContextCreator& context_creator) const {
   return buildFilterChainInternal(filter_chain,
                                   context_creator.createFilterChainFactoryContext(&filter_chain));
 }
 
-std::shared_ptr<Network::DrainableFilterChain>
-ListenerFilterChainFactoryBuilder::buildFilterChainInternal(
+Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildFilterChainInternal(
     const envoy::config::listener::v3::FilterChain& filter_chain,
-    std::unique_ptr<Configuration::FilterChainFactoryContext>&& filter_chain_factory_context)
-    const {
+    Configuration::FilterChainFactoryContextPtr&& filter_chain_factory_context) const {
   // If the cluster doesn't have transport socket configured, then use the default "raw_buffer"
   // transport socket or BoringSSL-based "tls" transport socket if TLS settings are configured.
   // We copy by value first then override if necessary.

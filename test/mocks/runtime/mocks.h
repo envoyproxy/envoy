@@ -8,6 +8,8 @@
 #include "envoy/type/v3/percent.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "test/mocks/stats/mocks.h"
+
 #include "gmock/gmock.h"
 
 namespace Envoy {
@@ -73,11 +75,13 @@ public:
 
   MOCK_METHOD(void, initialize, (Upstream::ClusterManager & cm));
   MOCK_METHOD(const Snapshot&, snapshot, ());
-  MOCK_METHOD(std::shared_ptr<const Snapshot>, threadsafeSnapshot, ());
+  MOCK_METHOD(SnapshotConstSharedPtr, threadsafeSnapshot, ());
   MOCK_METHOD(void, mergeValues, ((const std::unordered_map<std::string, std::string>&)));
   MOCK_METHOD(void, startRtdsSubscriptions, (ReadyCallback));
+  MOCK_METHOD(Stats::Scope&, getRootScope, ());
 
   testing::NiceMock<MockSnapshot> snapshot_;
+  testing::NiceMock<Stats::MockStore> store_;
 };
 
 class MockOverrideLayer : public Snapshot::OverrideLayer {
