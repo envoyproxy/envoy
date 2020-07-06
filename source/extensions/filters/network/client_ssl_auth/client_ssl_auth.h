@@ -30,7 +30,7 @@ namespace ClientSslAuth {
 #define ALL_CLIENT_SSL_AUTH_STATS(COUNTER, GAUGE)                                                  \
   COUNTER(auth_digest_match)                                                                       \
   COUNTER(auth_digest_no_match)                                                                    \
-  COUNTER(auth_ip_white_list)                                                                      \
+  COUNTER(auth_ip_allowlist)                                                                       \
   COUNTER(auth_no_ssl)                                                                             \
   COUNTER(update_failure)                                                                          \
   COUNTER(update_success)                                                                          \
@@ -70,7 +70,7 @@ using ClientSslAuthConfigSharedPtr = std::shared_ptr<ClientSslAuthConfig>;
 /**
  * Global configuration for client SSL authentication. The config contacts a JSON API to fetch the
  * list of allowed principals, caches it, then makes auth decisions on it and any associated IP
- * white list.
+ * allowlist.
  */
 class ClientSslAuthConfig : public Http::RestApiFetcher {
 public:
@@ -80,7 +80,7 @@ public:
          Event::Dispatcher& dispatcher, Stats::Scope& scope, Runtime::RandomGenerator& random);
 
   const AllowedPrincipals& allowedPrincipals();
-  const Network::Address::IpList& ipWhiteList() { return ip_white_list_; }
+  const Network::Address::IpList& ipAllowlist() { return ip_allowlist_; }
   GlobalStats& stats() { return stats_; }
 
 private:
@@ -98,7 +98,7 @@ private:
   void onFetchFailure(Config::ConfigUpdateFailureReason reason, const EnvoyException* e) override;
 
   ThreadLocal::SlotPtr tls_;
-  Network::Address::IpList ip_white_list_;
+  Network::Address::IpList ip_allowlist_;
   GlobalStats stats_;
 };
 

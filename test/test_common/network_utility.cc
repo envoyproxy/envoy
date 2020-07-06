@@ -10,6 +10,7 @@
 #include "common/network/address_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/raw_buffer_socket.h"
+#include "common/network/socket_option_factory.h"
 #include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
 
@@ -42,16 +43,17 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
     }
   }
   if (failing_fn != nullptr) {
-    if (result.errno_ == EADDRINUSE) {
+    if (result.errno_ == SOCKET_ERROR_ADDR_IN_USE) {
       // The port is already in use. Perfectly normal.
       return nullptr;
-    } else if (result.errno_ == EACCES) {
+    } else if (result.errno_ == SOCKET_ERROR_ACCESS) {
       // A privileged port, and we don't have privileges. Might want to log this.
       return nullptr;
     }
     // Unexpected failure.
     ADD_FAILURE() << failing_fn << " failed for '" << addr_port->asString()
-                  << "' with error: " << strerror(result.errno_) << " (" << result.errno_ << ")";
+                  << "' with error: " << errorDetails(result.errno_) << " (" << result.errno_
+                  << ")";
     return nullptr;
   }
   return sock.localAddress();
@@ -159,14 +161,19 @@ std::string ipVersionToDnsFamily(Network::Address::IpVersion version) {
 }
 
 std::pair<Address::InstanceConstSharedPtr, Network::SocketPtr>
-bindFreeLoopbackPort(Address::IpVersion version, Socket::Type type) {
+bindFreeLoopbackPort(Address::IpVersion version, Socket::Type type, bool reuse_port) {
   Address::InstanceConstSharedPtr addr = getCanonicalLoopbackAddress(version);
   SocketPtr sock = std::make_unique<SocketImpl>(type, addr);
+  if (reuse_port) {
+    sock->addOptions(SocketOptionFactory::buildReusePortOptions());
+    Socket::applyOptions(sock->options(), *sock,
+                         envoy::config::core::v3::SocketOption::STATE_PREBIND);
+  }
   Api::SysCallIntResult result = sock->bind(addr);
   if (0 != result.rc_) {
     sock->close();
     std::string msg = fmt::format("bind failed for address {} with error: {} ({})",
-                                  addr->asString(), strerror(result.errno_), result.errno_);
+                                  addr->asString(), errorDetails(result.errno_), result.errno_);
     ADD_FAILURE() << msg;
     throw EnvoyException(msg);
   }

@@ -41,7 +41,7 @@ SharedMemory* attachSharedMemory(uint32_t base_id, uint32_t restart_epoch) {
       hot_restart_os_sys_calls.shmOpen(shmem_name.c_str(), flags, S_IRUSR | S_IWUSR);
   if (result.rc_ == -1) {
     PANIC(fmt::format("cannot open shared memory region {} check user permissions. Error: {}",
-                      shmem_name, strerror(result.errno_)));
+                      shmem_name, errorDetails(result.errno_)));
   }
 
   if (restart_epoch == 0) {

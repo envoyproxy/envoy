@@ -50,6 +50,7 @@ envoy_cc_test_library(
 
 envoy_cc_test(
     name = "ads_integration_test",
+    size = "enormous",
     srcs = ["ads_integration_test.cc"],
     tags = ["fails_on_windows"],
     deps = [
@@ -185,7 +186,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "cluster_filter_integration_test",
     srcs = ["cluster_filter_integration_test.cc"],
-    tags = ["fails_on_windows"],
     deps = [
         ":integration_lib",
         "//include/envoy/network:filter_interface",
@@ -199,7 +199,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "custom_cluster_integration_test",
     srcs = ["custom_cluster_integration_test.cc"],
-    tags = ["fails_on_windows"],
     deps = [
         ":http_integration_lib",
         "//source/common/upstream:load_balancer_lib",
@@ -237,6 +236,7 @@ envoy_cc_test(
     srcs = [
         "drain_close_integration_test.cc",
     ],
+    tags = ["fails_on_windows"],
     deps = [
         ":http_protocol_integration_lib",
         "//source/extensions/filters/http/health_check:config",
@@ -254,7 +254,7 @@ envoy_cc_test_binary(
     ],
     stamped = True,
     deps = [
-        "//source/exe:envoy_main_common_lib",
+        "//source/exe:envoy_main_common_with_core_extensions_lib",
         "//source/exe:platform_impl_lib",
     ],
 )
@@ -278,10 +278,28 @@ envoy_sh_test(
 envoy_sh_test(
     name = "run_envoy_test",
     srcs = ["run_envoy_test.sh"],
-    cc_binary = ["//source/exe:envoy-static"],
+    cc_binary = [":hotrestart_main"],
     data = [
         "test_utility.sh",
         "//test/config/integration:server_config_files",
+    ],
+)
+
+envoy_cc_test(
+    name = "alpn_selection_integration_test",
+    srcs = [
+        "alpn_selection_integration_test.cc",
+    ],
+    data = [
+        "//test/config/integration/certs",
+    ],
+    tags = ["fails_on_windows"],
+    deps = [
+        ":http_integration_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
 
@@ -356,7 +374,6 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    tags = ["fails_on_windows"],
     deps = [
         ":http_integration_lib",
         "//source/extensions/transport_sockets/tls:context_lib",
@@ -373,7 +390,6 @@ envoy_cc_test(
     srcs = [
         "header_casing_integration_test.cc",
     ],
-    tags = ["fails_on_windows"],
     deps = [
         ":http_integration_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
@@ -574,6 +590,7 @@ envoy_cc_test_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/common:assert_lib",
+        "//source/common/common:basic_resource_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:api_version_lib",
         "//source/common/config:version_converter_lib",
@@ -727,7 +744,6 @@ envoy_cc_test(
     # The symbol table cluster memory tests take a while to run specially under tsan.
     # Shard it to avoid test timeout.
     shard_count = 2,
-    tags = ["fails_on_windows"],
     deps = [
         ":integration_lib",
         "//source/common/memory:stats_lib",
@@ -926,7 +942,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    tags = ["fails_on_windows"],
+    shard_count = 2,
     deps = [
         ":integration_lib",
         "//source/common/config:api_version_lib",
@@ -973,7 +989,6 @@ envoy_cc_test(
     srcs = [
         "tcp_conn_pool_integration_test.cc",
     ],
-    tags = ["fails_on_windows"],
     deps = [
         ":integration_lib",
         "//include/envoy/server:filter_config_interface",
@@ -1025,6 +1040,7 @@ envoy_cc_test(
     name = "dynamic_validation_integration_test",
     srcs = ["dynamic_validation_integration_test.cc"],
     data = ["//test/config/integration:server_xds_files"],
+    # Fails on windows with cr/lf yaml file checkouts
     tags = ["fails_on_windows"],
     deps = [
         ":http_integration_lib",
@@ -1067,7 +1083,6 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    tags = ["fails_on_windows"],
     deps = [
         ":http_integration_lib",
         "//source/common/http:header_map_lib",
@@ -1281,6 +1296,23 @@ envoy_cc_test(
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "cx_limit_integration_test",
+    srcs = ["cx_limit_integration_test.cc"],
+    # TODO(11841) See if this can be reenabled once the test is deflaked.
+    tags = ["fails_on_windows"],
+    deps = [
+        ":http_integration_lib",
+        "//include/envoy/network:filter_interface",
+        "//include/envoy/registry",
+        "//source/extensions/filters/network/tcp_proxy:config",
+        "//test/config:utility_lib",
+        "//test/test_common:logging_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
 

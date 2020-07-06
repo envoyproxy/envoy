@@ -452,9 +452,12 @@ TEST_P(ProtocolIntegrationTest, RetryStreamingReset) {
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
 
   // Send back an upstream failure and end stream. Make sure an immediate reset
-  // doesn't cause problems.
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
-  upstream_request_->encodeResetStream();
+  // doesn't cause problems. Schedule via the upstream_request_ dispatcher to ensure that the stream
+  // still exists when encoding the reset stream.
+  upstream_request_->postToConnectionThread([this]() {
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
+    upstream_request_->encodeResetStream();
+  });
 
   // Make sure the fake stream is reset.
   if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
@@ -989,6 +992,10 @@ TEST_P(ProtocolIntegrationTest, 304WithBody) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
+  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+    // The invalid data will trigger disconnect.
+    fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+  }
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
 
   waitForNextUpstreamRequest();
@@ -1095,6 +1102,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLength) {
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("400", response->headers().getStatusValue());
+    test_server_->waitForCounterGe("http.config_test.downstream_rq_4xx", 1);
   } else {
     ASSERT_TRUE(response->reset());
     EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->reset_reason());
@@ -1344,6 +1352,16 @@ name: decode-headers-only
   EXPECT_EQ(0, upstream_request_->body().length());
 }
 
+TEST_P(DownstreamProtocolIntegrationTest, LargeRequestUrlRejected) {
+  // Send one 95 kB URL with limit 60 kB headers.
+  testLargeRequestUrl(95, 60);
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, LargeRequestUrlAccepted) {
+  // Send one 95 kB URL with limit 96 kB headers.
+  testLargeRequestUrl(95, 96);
+}
+
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersRejected) {
   // Send one 95 kB header with limit 60 kB and 100 headers.
   testLargeRequestHeaders(95, 1, 60, 100);
@@ -1454,9 +1472,9 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyTrailerHeaders) {
             max_request_headers_count_);
       });
 
-  Http::RequestTrailerMapImpl request_trailers;
+  auto request_trailers = Http::RequestTrailerMapImpl::create();
   for (int i = 0; i < 20000; i++) {
-    request_trailers.addCopy(Http::LowerCaseString(std::to_string(i)), "");
+    request_trailers->addCopy(Http::LowerCaseString(std::to_string(i)), "");
   }
 
   initialize();
@@ -1468,7 +1486,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyTrailerHeaders) {
                                                                  {":authority", "host"}});
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
-  codec_client_->sendTrailers(*request_encoder_, request_trailers);
+  codec_client_->sendTrailers(*request_encoder_, *request_trailers);
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(default_response_headers_, true);
   response->waitForEndStream();

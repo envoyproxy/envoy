@@ -101,6 +101,7 @@ public:
 
   MOCK_METHOD(bool, connectionAllowed, ());
   MOCK_METHOD(void, onAuth, (const std::string& password));
+  MOCK_METHOD(void, onAuth, (const std::string& username, const std::string& password));
   MOCK_METHOD(void, onResponse_, (Common::Redis::RespValuePtr & value));
 };
 

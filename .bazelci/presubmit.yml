@@ -9,18 +9,22 @@ tasks:
     name: "RBE"
     platform: ubuntu1804
     test_targets:
-      - "//test/..."
+      - "//test/common/common/..."
+      - "//test/integration/..."
+      - "//test/exe/..."
     test_flags:
-      - "--config=remote-clang"
+      - "--config=remote-clang-libc++"
       - "--config=remote-ci"
       - "--jobs=75"
   coverage:
     name: "Coverage"
     platform: ubuntu1804
+    shell_commands:
+      - "bazel/setup_clang.sh /usr/lib/llvm-10"
     test_targets:
+      - "//test/common/common/..."
       - "//test/integration/..."
       - "//test/exe/..."
     test_flags:
-      - "--action_env=CC=clang"
-      - "--action_env=CXX=clang++"
       - "--config=coverage"
+      - "--config=clang"

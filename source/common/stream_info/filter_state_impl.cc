@@ -97,8 +97,8 @@ void FilterStateImpl::maybeCreateParent(ParentAccessMode parent_access_mode) {
   if (life_span_ >= FilterState::LifeSpan::TopSpan) {
     return;
   }
-  if (absl::holds_alternative<std::shared_ptr<FilterState>>(ancestor_)) {
-    std::shared_ptr<FilterState> ancestor = absl::get<std::shared_ptr<FilterState>>(ancestor_);
+  if (absl::holds_alternative<FilterStateSharedPtr>(ancestor_)) {
+    FilterStateSharedPtr ancestor = absl::get<FilterStateSharedPtr>(ancestor_);
     if (ancestor == nullptr || ancestor->lifeSpan() != life_span_ + 1) {
       parent_ = std::make_shared<FilterStateImpl>(ancestor, FilterState::LifeSpan(life_span_ + 1));
     } else {
