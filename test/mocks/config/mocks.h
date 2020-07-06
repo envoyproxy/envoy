@@ -94,6 +94,10 @@ public:
   MockGrpcMux();
   ~MockGrpcMux() override;
 
+  using GrpcMux::pause;
+  using GrpcMux::paused;
+  using GrpcMux::resume;
+
   MOCK_METHOD(void, start, ());
   MOCK_METHOD(void, pause, (const std::string& type_url));
   MOCK_METHOD(void, pause, (const std::vector<std::string> type_urls));
