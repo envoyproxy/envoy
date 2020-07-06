@@ -19,7 +19,7 @@ namespace {
 class SimulatedTimeSystemTest : public testing::Test {
 protected:
   SimulatedTimeSystemTest()
-      : scheduler_(time_system_.createScheduler(base_scheduler_)),
+      : scheduler_(time_system_.createScheduler(base_scheduler_, base_scheduler_)),
         start_monotonic_time_(time_system_.monotonicTime()),
         start_system_time_(time_system_.systemTime()) {}
 
@@ -58,7 +58,7 @@ protected:
     base_scheduler_.run(Dispatcher::RunType::NonBlock);
   }
 
-  testing::NiceMock<Event::MockDispatcher> dispatcher_;
+  Event::MockDispatcher dispatcher_;
   LibeventScheduler base_scheduler_;
   SimulatedTimeSystem time_system_;
   SchedulerPtr scheduler_;

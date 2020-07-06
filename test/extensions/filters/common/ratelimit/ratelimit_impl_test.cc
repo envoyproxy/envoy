@@ -124,6 +124,29 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
     EXPECT_CALL(request_callbacks_, complete_(LimitStatus::Error, _, _));
     client_.onFailure(Grpc::Status::Unknown, "", span_);
   }
+
+  {
+    envoy::service::ratelimit::v3::RateLimitRequest request;
+    Http::TestRequestHeaderMapImpl headers;
+    GrpcClientImpl::createRequest(
+        request, "foo",
+        {{{{"foo", "bar"}, {"bar", "baz"}}, {{42, envoy::type::v3::RateLimitUnit::MINUTE}}}});
+    EXPECT_CALL(*async_client_, sendRaw(_, _, Grpc::ProtoBufferEq(request), _, _, _))
+        .WillOnce(Return(&async_request_));
+
+    client_.limit(
+        request_callbacks_, "foo",
+        {{{{"foo", "bar"}, {"bar", "baz"}}, {{42, envoy::type::v3::RateLimitUnit::MINUTE}}}},
+        Tracing::NullSpan::instance());
+
+    client_.onCreateInitialMetadata(headers);
+
+    response = std::make_unique<envoy::service::ratelimit::v3::RateLimitResponse>();
+    response->set_overall_code(envoy::service::ratelimit::v3::RateLimitResponse::OK);
+    EXPECT_CALL(span_, setTag(Eq("ratelimit_status"), Eq("ok")));
+    EXPECT_CALL(request_callbacks_, complete_(LimitStatus::OK, _, _));
+    client_.onSuccess(std::move(response), span_);
+  }
 }
 
 TEST_F(RateLimitGrpcClientTest, Cancel) {

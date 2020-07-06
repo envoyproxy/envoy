@@ -31,11 +31,11 @@ ConfigImpl::ConfigImpl(
       enable_command_stats_(config.enable_command_stats()) {
   switch (config.read_policy()) {
   case envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::MASTER:
-    read_policy_ = ReadPolicy::Master;
+    read_policy_ = ReadPolicy::Primary;
     break;
   case envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::
       PREFER_MASTER:
-    read_policy_ = ReadPolicy::PreferMaster;
+    read_policy_ = ReadPolicy::PreferPrimary;
     break;
   case envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::REPLICA:
     read_policy_ = ReadPolicy::Replica;
@@ -240,7 +240,11 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
       }
     }
     if (!redirected) {
-      callbacks.onResponse(std::move(value));
+      if (err[0] == RedirectionResponse::get().CLUSTER_DOWN) {
+        callbacks.onFailure();
+      } else {
+        callbacks.onResponse(std::move(value));
+      }
     }
   } else {
     callbacks.onResponse(std::move(value));
@@ -296,9 +300,9 @@ void ClientImpl::initialize(const std::string& auth_username, const std::string&
     makeRequest(auth_request, null_pool_callbacks);
   }
   // Any connection to replica requires the READONLY command in order to perform read.
-  // Also the READONLY command is a no-opt for the master.
+  // Also the READONLY command is a no-opt for the primary.
   // We only need to send the READONLY command iff it's possible that the host is a replica.
-  if (config_.readPolicy() != Common::Redis::Client::ReadPolicy::Master) {
+  if (config_.readPolicy() != Common::Redis::Client::ReadPolicy::Primary) {
     makeRequest(Utility::ReadOnlyRequest::instance(), null_pool_callbacks);
   }
 }
