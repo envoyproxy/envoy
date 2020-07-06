@@ -62,7 +62,8 @@ FilterConfigSubscription::FilterConfigSubscription(
     const std::string& stat_prefix, FilterConfigProviderManagerImpl& filter_config_provider_manager,
     const std::string& subscription_id)
     : Envoy::Config::SubscriptionBase<envoy::config::core::v3::TypedExtensionConfig>(
-          envoy::config::core::v3::ApiVersion::V3),
+          envoy::config::core::v3::ApiVersion::V3,
+          factory_context.messageValidationContext().dynamicValidationVisitor(), "name"),
       filter_config_name_(filter_config_name), factory_context_(factory_context),
       validator_(factory_context.messageValidationContext().dynamicValidationVisitor()),
       parent_init_target_(fmt::format("FilterConfigSubscription init {}", filter_config_name_),
@@ -82,7 +83,7 @@ FilterConfigSubscription::FilterConfigSubscription(
   const auto resource_name = getResourceName();
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
-          config_source, Grpc::Common::typeUrl(resource_name), *scope_, *this);
+          config_source, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_);
   local_init_manager_.add(local_init_target_);
 }
 
@@ -94,7 +95,7 @@ void FilterConfigSubscription::start() {
 }
 
 void FilterConfigSubscription::onConfigUpdate(
-    const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+    const std::vector<Envoy::Config::DecodedResourceRef>& resources,
     const std::string& version_info) {
   // Make sure to make progress in case the control plane is temporarily inconsistent.
   local_init_target_.ready();
@@ -103,9 +104,8 @@ void FilterConfigSubscription::onConfigUpdate(
     throw EnvoyException(fmt::format(
         "Unexpected number of resources in FilterConfigDS response: {}", resources.size()));
   }
-  auto filter_config =
-      MessageUtil::anyConvertAndValidate<envoy::config::core::v3::TypedExtensionConfig>(
-          resources[0], validator_);
+  const auto& filter_config = dynamic_cast<const envoy::config::core::v3::TypedExtensionConfig&>(
+      resources[0].get().resource());
   if (filter_config.name() != filter_config_name_) {
     throw EnvoyException(fmt::format("Unexpected resource name in FilterConfigDS response: {}",
                                      filter_config.name()));
@@ -127,7 +127,7 @@ void FilterConfigSubscription::onConfigUpdate(
 }
 
 void FilterConfigSubscription::onConfigUpdate(
-    const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
+    const std::vector<Envoy::Config::DecodedResourceRef>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources, const std::string&) {
   if (!removed_resources.empty()) {
     ENVOY_LOG(error,
@@ -136,9 +136,7 @@ void FilterConfigSubscription::onConfigUpdate(
               removed_resources[0]);
   }
   if (!added_resources.empty()) {
-    Protobuf::RepeatedPtrField<ProtobufWkt::Any> unwrapped_resource;
-    *unwrapped_resource.Add() = added_resources[0].resource();
-    onConfigUpdate(unwrapped_resource, added_resources[0].version());
+    onConfigUpdate(added_resources, added_resources[0].get().version());
   }
 }
 
