@@ -73,8 +73,6 @@ using RandomGeneratorPtr = std::unique_ptr<RandomGenerator>;
  */
 class Snapshot : public ThreadLocal::ThreadLocalObject {
 public:
-  virtual ~Snapshot() = default;
-
   struct Entry {
     std::string raw_string_value_;
     absl::optional<uint64_t> uint_value_;
