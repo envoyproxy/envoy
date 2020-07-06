@@ -47,10 +47,18 @@ private:
   // according to the present response headers
   void injectValidationHeaders(const Http::ResponseHeaderMapPtr& response_headers);
 
+  // Precondition: result_ represents a fresh or validated cache look up result
+  // Adds a cache lookup result to the response encoding stream
+  // Can be called during decoding if a valid cache hit is found
+  // or during encoding if a cache entry was being validated
+  // Returns true if any data is actually being encoded
+  bool encodeCachedResponse();
+
   TimeSource& time_source_;
   HttpCache& cache_;
   LookupContextPtr lookup_;
   InsertContextPtr insert_;
+  LookupResultPtr result_;
 
   // Used exclusively to store a reference to the request header map passed to decodeHeaders to be
   // used in onHeaders afterwards the pointer must not be used and is set back to null
@@ -69,9 +77,21 @@ private:
   // https://httpwg.org/specs/rfc7234.html#response.cacheability
   bool request_allows_inserts_ = false;
 
+  // True if the CacheFilter is injected validation headers and should check for 304 responses
+  bool cache_entry_validation_ = false;
+
+  // True if a fresh cache hit is found during decoding and no validation required
+  // When a cache hit is found during decoding, decoder_callbacks_->encodeHeaders() is called
+  // which causes CacheFilter::encodeHeaders() to be called, this flag indicates that
+  // encodeHeaders() should do nothing as the encoding was initiated by the CacheFilter itself
+  bool decoding_cache_hit_ = false;
+
   // Used for coordinating between decodeHeaders and onHeaders.
   enum class GetHeadersState { Initial, FinishedGetHeadersCall, GetHeadersResultUnusable };
-  GetHeadersState state_ = GetHeadersState::Initial;
+  GetHeadersState get_headers_state_ = GetHeadersState::Initial;
+
+  enum class FilterState { Initial, Decoding, Encoding };
+  FilterState filter_state_ = FilterState::Initial;
 };
 
 } // namespace Cache
