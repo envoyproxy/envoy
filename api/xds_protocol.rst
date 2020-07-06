@@ -77,7 +77,7 @@ API flow
 For typical HTTP routing scenarios, the core resource types for the client's configuration are
 `Listener`, `RouteConfiguration`, `Cluster`, and `ClusterLoadAssignment`. Each `Listener` resource
 may point to a `RouteConfiguration` resource, which may point to one or more `Cluster` resources,
-and each Cluster` resource may point to a `ClusterLoadAssignment` resource.
+and each `Cluster` resource may point to a `ClusterLoadAssignment` resource.
 
 Envoy fetches all `Listener` and `Cluster` resources at startup. It then fetches whatever
 `RouteConfiguration` and `ClusterLoadAssignment` resources that are required by the `Listener` and
