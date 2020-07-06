@@ -55,8 +55,8 @@ message OAuth2Config {
   // The path to sign a user out, clearing their credential cookies.
   string signout_path = 5 [(validate.rules).string = {min_bytes: 1}];
 
-  // The timeout for outgoing auth requests. Default is 3s.
-  google.protobuf.Duration timeout = 6;
+  // The timeout for outgoing auth requests.
+  google.protobuf.Duration timeout = 6 [(validate.rules).duration = {required: true}];
 
   // Forward the OAuth token as a Bearer to upstream web service.
   bool forward_bearer_token = 7;

@@ -51,8 +51,7 @@ Http::FilterFactoryCb OAuth2Config::createFilterFactoryFromProtoTyped(
   auto config = std::make_shared<FilterConfig>(proto_config, context.clusterManager(),
                                                secret_reader, context.scope(), stats_prefix);
 
-  const std::chrono::milliseconds timeout_duration(
-      PROTOBUF_GET_MS_OR_DEFAULT(proto_config, timeout, 3000));
+  const std::chrono::milliseconds timeout_duration(PROTOBUF_GET_MS_REQUIRED(proto_config, timeout));
 
   return
       [&context, config, timeout_duration](Http::FilterChainFactoryCallbacks& callbacks) -> void {

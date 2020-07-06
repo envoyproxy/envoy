@@ -74,8 +74,8 @@ FilterConfig::FilterConfig(
     Stats::Scope& scope, const std::string& stats_prefix)
     : cluster_name_(proto_config.cluster()), client_id_(proto_config.credentials().client_id()),
       oauth_server_hostname_(proto_config.hostname()), callback_path_(proto_config.callback_path()),
-      signout_path_(proto_config.signout_path()),
-      secret_reader_(secret_reader), stats_(FilterConfig::generateStats(stats_prefix, scope)),
+      signout_path_(proto_config.signout_path()), secret_reader_(secret_reader),
+      stats_(FilterConfig::generateStats(stats_prefix, scope)),
       forward_bearer_token_(proto_config.forward_bearer_token()),
       pass_through_options_method_(proto_config.pass_through_options_method()) {
   if (!cluster_manager.get(cluster_name_)) {
@@ -350,7 +350,8 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
   return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
 }
 
-void OAuth2Filter::onGetAccessTokenSuccess(const std::string& access_code, const std::string& expires_in) {
+void OAuth2Filter::onGetAccessTokenSuccess(const std::string& access_code,
+                                           const std::string& expires_in) {
   std::istringstream iss(expires_in);
   time_t expires_in_t;
   iss >> expires_in_t;
@@ -396,22 +397,22 @@ void OAuth2Filter::finishFlow() {
    * At this point we have all of the pieces needed to authenticate a user that did not originally
    * have a bearer access token. Now, we construct a redirect request to return the user to their
    * previous state and additionally set the OAuth cookies in browser.
-   * The redirection should result in successfully passing this filer.
+   * The redirection should result in successfully passing this filter.
    */
   Http::ResponseHeaderMapPtr response_headers{Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
       {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Found))}})};
 
-  static const Http::LowerCaseString set_cookie_key = Http::Headers::get().SetCookie;
-
   response_headers->addReferenceKey(
-      set_cookie_key, absl::StrCat("OauthHMAC=", encoded_token, cookie_tail_http_only));
+      Http::Headers::get().SetCookie,
+      absl::StrCat("OauthHMAC=", encoded_token, cookie_tail_http_only));
   response_headers->addReferenceKey(
-      set_cookie_key, absl::StrCat("OauthExpires=", new_expires_, cookie_tail_http_only));
+      Http::Headers::get().SetCookie,
+      absl::StrCat("OauthExpires=", new_expires_, cookie_tail_http_only));
 
   // If opted-in, we also create a new Bearer cookie for the authorization token provided by the
   // auth server.
   if (config_->forwardBearerToken()) {
-    response_headers->addReferenceKey(set_cookie_key,
+    response_headers->addReferenceKey(Http::Headers::get().SetCookie,
                                       absl::StrCat("BearerToken=", access_token_, cookie_tail));
   }
 
