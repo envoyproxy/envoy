@@ -5,6 +5,8 @@ package envoy.extensions.common.tap.v4alpha;
 import "envoy/config/core/v4alpha/config_source.proto";
 import "envoy/config/tap/v4alpha/common.proto";
 
+import "udpa/core/v1/resource_locator.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -30,8 +32,14 @@ message CommonExtensionConfig {
     config.core.v4alpha.ConfigSource config_source = 1
         [(validate.rules).message = {required: true}];
 
-    // Tap config to request from XDS server.
-    string name = 2 [(validate.rules).string = {min_bytes: 1}];
+    oneof name_specifier {
+      // Tap config to request from XDS server.
+      string name = 2;
+
+      // Resource locator for TAP. This is mutually exclusive to *name*.
+      // [#not-implemented-hide:]
+      udpa.core.v1.ResourceLocator tap_resource_locator = 3;
+    }
   }
 
   oneof config_type {
