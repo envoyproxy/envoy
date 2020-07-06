@@ -5100,9 +5100,22 @@ virtual_hosts:
       cluster: www2
   )EOF";
 
+#ifndef GTEST_USES_SIMPLE_RE
   EXPECT_THROW_WITH_REGEX(
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      "invalid value oneof field 'path_specifier' is already set.");
+      "invalid value oneof field 'path_specifier' is already set. Cannot set '(prefix|path)' for "
+      "type oneof");
+#else
+  EXPECT_THAT_THROWS_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
+      ::testing::AnyOf(
+        ::testing::ContainsRegex(
+          "invalid value oneof field 'path_specifier' is already set. Cannot set 'prefix' for "
+          "type oneof"),
+        ::testing::ContainsRegex(
+          "invalid value oneof field 'path_specifier' is already set. Cannot set 'path' for "
+          "type oneof")));
+#endif
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigMissingPathSpecifier) {
@@ -5135,9 +5148,22 @@ virtual_hosts:
       cluster: www2
   )EOF";
 
+#ifndef GTEST_USES_SIMPLE_RE
   EXPECT_THROW_WITH_REGEX(
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      "invalid value oneof field 'path_specifier' is already set.");
+      "invalid value oneof field 'path_specifier' is already set. Cannot set '(prefix|regex)' for "
+      "type oneof");
+#else
+  EXPECT_THAT_THROWS_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
+      ::testing::AnyOf(
+        ::testing::ContainsRegex(
+          "invalid value oneof field 'path_specifier' is already set. Cannot set 'prefix' for "
+          "type oneof"),
+        ::testing::ContainsRegex(
+          "invalid value oneof field 'path_specifier' is already set. Cannot set 'regex' for "
+          "type oneof")));
+#endif
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigNoAction) {
@@ -5170,9 +5196,22 @@ virtual_hosts:
       cluster: www2
   )EOF";
 
+#ifndef GTEST_USES_SIMPLE_RE
   EXPECT_THROW_WITH_REGEX(
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      "invalid value oneof field 'path_specifier' is already set.");
+      "invalid value oneof field 'path_specifier' is already set. Cannot set '(path|regex)' for "
+      "type oneof");
+#else
+  EXPECT_THAT_THROWS_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
+      ::testing::AnyOf(
+        ::testing::ContainsRegex(
+          "invalid value oneof field 'path_specifier' is already set. Cannot set 'path' for "
+          "type oneof"),
+        ::testing::ContainsRegex(
+          "invalid value oneof field 'path_specifier' is already set. Cannot set 'regex' for "
+          "type oneof")));
+#endif
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPrefixAndPathAndRegex) {
