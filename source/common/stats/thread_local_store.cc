@@ -23,7 +23,7 @@ namespace Stats {
 
 const char ThreadLocalStoreImpl::MainDispatcherCleanupSync[] = "main-dispatcher-cleanup";
 
-#define WELL_KNOWN_TAGS 0
+#define WELL_KNOWN_TAGS 1
 
 ThreadLocalStoreImpl::ThreadLocalStoreImpl(Allocator& alloc)
     : alloc_(alloc), default_scope_(createScope("")),
@@ -32,7 +32,8 @@ ThreadLocalStoreImpl::ThreadLocalStoreImpl(Allocator& alloc)
       null_counter_(alloc.symbolTable()), null_gauge_(alloc.symbolTable()),
       null_histogram_(alloc.symbolTable()), null_text_readout_(alloc.symbolTable())
 #if WELL_KNOWN_TAGS
-    , well_known_tags_(alloc.symbolTable().makeSet("well_known_tags")) */
+      ,
+      well_known_tags_(alloc.symbolTable().makeSet("well_known_tags"))
 #endif
 {
 #if WELL_KNOWN_TAGS

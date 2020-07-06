@@ -138,7 +138,8 @@ TEST_P(StatsIntegrationTest, WithTagSpecifierWithFixedValue) {
 // cluster overhead.
 class ClusterMemoryTestHelper : public BaseIntegrationTest {
 public:
-  ClusterMemoryTestHelper() : BaseIntegrationTest(Network::Address::IpVersion::v4) {
+  ClusterMemoryTestHelper()
+      : BaseIntegrationTest(testing::TestWithParam<Network::Address::IpVersion>::GetParam()) {
     use_real_stats_ = true;
   }
 
@@ -196,22 +197,26 @@ private:
       }
     });
     initialize();
-    sleep(10);
 
     return memory_test.consumedBytes();
   }
 };
 
-class ClusterMemoryTestRunner : public testing::Test {
+class ClusterMemoryTestRunner : public testing::TestWithParam<Network::Address::IpVersion> {
 protected:
+  ClusterMemoryTestRunner()
+      : ip_version_(testing::TestWithParam<Network::Address::IpVersion>::GetParam()) {}
+
   Stats::TestUtil::SymbolTableCreatorTestPeer symbol_table_creator_test_peer_;
+
+  Network::Address::IpVersion ip_version_;
 };
 
-/*INSTANTIATE_TEST_SUITE_P(IpVersions, ClusterMemoryTestRunner,
+INSTANTIATE_TEST_SUITE_P(IpVersions, ClusterMemoryTestRunner,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);*/
+                         TestUtility::ipTestParamsToString);
 
-TEST_F(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
+TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   symbol_table_creator_test_peer_.setUseFakeSymbolTables(true);
 
   // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
@@ -289,18 +294,18 @@ TEST_F(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_cluster, 22582);
+  EXPECT_MEMORY_EQ(m_per_cluster, ip_version_ == Network::Address::IpVersion::v4 ? 44671 : 44667);
   EXPECT_MEMORY_LE(m_per_cluster, 46000); // Round up to allow platform variations.
 }
 
-TEST_F(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
+TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   symbol_table_creator_test_peer_.setUseFakeSymbolTables(false);
 
   // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
   // differing configuration. This is necessary for measuring the memory consumption
   // between the different instances within the same test.
-  const size_t m200 = ClusterMemoryTestHelper::computeMemoryDelta(1, 0, 201, 0, true);
-  const size_t m_per_cluster = (m200) / 200;
+  const size_t m100 = ClusterMemoryTestHelper::computeMemoryDelta(1, 0, 101, 0, true);
+  const size_t m_per_cluster = (m100) / 100;
 
   // Note: if you are increasing this golden value because you are adding a
   // stat, please confirm that this will be generally useful to most Envoy
@@ -354,18 +359,18 @@ TEST_F(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_cluster, 36603);
+  EXPECT_MEMORY_EQ(m_per_cluster, ip_version_ == Network::Address::IpVersion::v4 ? 36603 : 36596);
   EXPECT_MEMORY_LE(m_per_cluster, 37000);
 }
 
-TEST_F(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
+TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
   symbol_table_creator_test_peer_.setUseFakeSymbolTables(false);
 
   // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
   // differing configuration. This is necessary for measuring the memory consumption
   // between the different instances within the same test.
-  const size_t m200 = ClusterMemoryTestHelper::computeMemoryDelta(1, 1, 1, 201, true);
-  const size_t m_per_host = (m200) / 200;
+  const size_t m100 = ClusterMemoryTestHelper::computeMemoryDelta(1, 1, 1, 101, true);
+  const size_t m_per_host = (m100) / 100;
 
   // Note: if you are increasing this golden value because you are adding a
   // stat, please confirm that this will be generally useful to most Envoy
