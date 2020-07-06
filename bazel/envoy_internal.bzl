@@ -48,7 +48,7 @@ def envoy_copts(repository, test = False):
                repository + "//bazel:windows_fastbuild_build": [],
                repository + "//bazel:windows_dbg_build": [],
            }) + select({
-               repository + "//bazel:clang_build": ["-fno-limit-debug-info", "-Wgnu-conditional-omitted-operand"],
+               repository + "//bazel:clang_build": ["-fno-limit-debug-info", "-Wgnu-conditional-omitted-operand", "-Wc++2a-extensions"],
                repository + "//bazel:gcc_build": ["-Wno-maybe-uninitialized"],
                "//conditions:default": [],
            }) + select({
