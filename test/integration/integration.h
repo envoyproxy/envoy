@@ -98,7 +98,8 @@ class IntegrationTcpClient {
 public:
   IntegrationTcpClient(Event::Dispatcher& dispatcher, Event::TestTimeSystem& time_system,
                        MockBufferFactory& factory, uint32_t port,
-                       Network::Address::IpVersion version, bool enable_half_close = false);
+                       Network::Address::IpVersion version, bool enable_half_close,
+                       const Network::ConnectionSocket::OptionsSharedPtr& options);
 
   void close();
   void waitForData(const std::string& data, bool exact_match = true);
@@ -190,7 +191,9 @@ public:
 
   FakeHttpConnection::Type upstreamProtocol() const { return upstream_protocol_; }
 
-  IntegrationTcpClientPtr makeTcpConnection(uint32_t port);
+  IntegrationTcpClientPtr
+  makeTcpConnection(uint32_t port,
+                    const Network::ConnectionSocket::OptionsSharedPtr& options = nullptr);
 
   // Test-wide port map.
   void registerPort(const std::string& key, uint32_t port);

@@ -14,6 +14,8 @@ import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/core/v1/collection_entry.proto";
+
 import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -26,6 +28,15 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 
 // [#protodoc-title: Listener configuration]
 // Listener :ref:`configuration overview <config_listeners>`
+
+// Listener list collections. Entries are *Listener* resources or references.
+// [#not-implemented-hide:]
+message ListenerCollection {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.listener.v3.ListenerCollection";
+
+  udpa.core.v1.CollectionEntry entries = 1;
+}
 
 // [#next-free-field: 23]
 message Listener {
