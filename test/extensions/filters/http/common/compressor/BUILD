@@ -1,7 +1,8 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_benchmark_test",
+    "envoy_cc_benchmark_binary",
     "envoy_cc_test",
-    "envoy_cc_test_binary",
     "envoy_package",
 )
 
@@ -25,7 +26,7 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test_binary(
+envoy_cc_benchmark_binary(
     name = "compressor_filter_speed_test",
     srcs = ["compressor_filter_speed_test.cc"],
     external_deps = [
@@ -43,4 +44,9 @@ envoy_cc_test_binary(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/compressor/v3:pkg_cc_proto",
     ],
+)
+
+envoy_benchmark_test(
+    name = "compressor_filter_speed_test_benchmark_test",
+    benchmark_binary = "compressor_filter_speed_test",
 )
