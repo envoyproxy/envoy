@@ -9,12 +9,7 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-using ::testing::_;
-using ::testing::Invoke;
-using ::testing::Return;
-using ::testing::ReturnPointee;
 using ::testing::ReturnRef;
-using ::testing::SaveArg;
 
 MockTransportSocketFactoryContext::MockTransportSocketFactoryContext()
     : secret_manager_(std::make_unique<Secret::SecretManagerImpl>(config_tracker_)) {

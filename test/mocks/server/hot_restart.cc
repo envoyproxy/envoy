@@ -8,12 +8,7 @@
 namespace Envoy {
 namespace Server {
 
-using ::testing::_;
-using ::testing::Invoke;
-using ::testing::Return;
-using ::testing::ReturnPointee;
 using ::testing::ReturnRef;
-using ::testing::SaveArg;
 
 MockHotRestart::MockHotRestart() : stats_allocator_(*symbol_table_) {
   ON_CALL(*this, logLock()).WillByDefault(ReturnRef(log_lock_));

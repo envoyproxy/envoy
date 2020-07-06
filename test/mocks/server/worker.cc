@@ -10,10 +10,6 @@ namespace Server {
 
 using ::testing::_;
 using ::testing::Invoke;
-using ::testing::Return;
-using ::testing::ReturnPointee;
-using ::testing::ReturnRef;
-using ::testing::SaveArg;
 
 MockWorker::MockWorker() {
   ON_CALL(*this, addListener(_, _, _))

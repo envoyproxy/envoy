@@ -9,12 +9,7 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-using ::testing::_;
-using ::testing::Invoke;
-using ::testing::Return;
-using ::testing::ReturnPointee;
 using ::testing::ReturnRef;
-using ::testing::SaveArg;
 
 MockTracerFactoryContext::MockTracerFactoryContext() {
   ON_CALL(*this, serverFactoryContext()).WillByDefault(ReturnRef(server_factory_context_));

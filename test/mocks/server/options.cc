@@ -8,12 +8,10 @@
 namespace Envoy {
 namespace Server {
 
-using ::testing::_;
 using ::testing::Invoke;
 using ::testing::Return;
 using ::testing::ReturnPointee;
 using ::testing::ReturnRef;
-using ::testing::SaveArg;
 
 MockOptions::MockOptions(const std::string& config_path) : config_path_(config_path) {
   ON_CALL(*this, concurrency()).WillByDefault(ReturnPointee(&concurrency_));
