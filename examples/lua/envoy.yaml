@@ -4,7 +4,7 @@ static_resources:
     address:
       socket_address:
         address: 0.0.0.0
-        port_value: 80
+        port_value: 8000
     filter_chains:
     - filters:
       - name: envoy.filters.network.http_connection_manager
@@ -21,7 +21,7 @@ static_resources:
               routes:
               - match:
                   prefix: "/"
-                route: 
+                route:
                   cluster: web_service
           http_filters:
           - name: envoy.filters.http.lua
@@ -29,7 +29,7 @@ static_resources:
               "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
               inline_code: |
                 local mylibrary = require("lib.mylibrary")
-              
+
                 function envoy_on_request(request_handle)
                   request_handle:headers():add("foo", mylibrary.foobar())
                 end

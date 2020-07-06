@@ -79,8 +79,10 @@ ECMP
 ECONNREFUSED
 EDESTRUCTION
 EDF
+EINPROGRESS
 EINVAL
 ELB
+EMSGSIZE
 ENOTFOUND
 ENOTSUP
 ENV
@@ -665,6 +667,7 @@ inflight
 -ing
 init
 initializer
+initializers
 inlined
 inlining
 inobservability

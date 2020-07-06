@@ -33,7 +33,7 @@ public:
   createDecompressor(const std::string& stats_prefix) override;
   const std::string& statsPrefix() const override { return gzipStatsPrefix(); }
   const std::string& contentEncoding() const override {
-    return Http::Headers::get().ContentEncodingValues.Gzip;
+    return Http::CustomHeaders::get().ContentEncodingValues.Gzip;
   }
 
 private:
