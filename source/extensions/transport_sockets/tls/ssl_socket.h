@@ -121,7 +121,6 @@ public:
 
   SSL* rawSslForTest() const { return rawSsl(); }
 
-protected:
   SSL* rawSsl() const { return info_->ssl_.get(); }
 
 private:
