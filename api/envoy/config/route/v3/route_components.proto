@@ -615,6 +615,10 @@ message RouteAction {
       string header_name = 1 [
         (validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}
       ];
+
+      // If specified, the request header value will be rewritten and used
+      // to produce the hash key.
+      type.matcher.v3.RegexMatchAndSubstitute regex_rewrite = 2;
     }
 
     // Envoy supports two types of cookie affinity:
