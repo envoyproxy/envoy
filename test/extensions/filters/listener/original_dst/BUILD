@@ -26,7 +26,6 @@ envoy_extension_cc_test(
 envoy_proto_library(
     name = "original_dst_fuzz_test_proto",
     srcs = ["original_dst_fuzz_test.proto"],
-    deps = [],
 )
 
 envoy_cc_fuzz_test(
